@@ -29,16 +29,39 @@ jobs:
     env:
       DATABASE_URL: postgresql://planthepath:planthepath_ci@127.0.0.1:5432/planthepath_test
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: pnpm/action-setup@d15e628ca66d93ee5f352c71671a7bc6a97af5c9 # v6.0.8
         with:
           version: 10.15.0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '22'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Validate n8n source artifacts and deployment materialization
+        shell: bash
+        env:
+          PTP_ADAPTER_HEADER_CREDENTIAL_ID: ci_header_credential
+          PTP_SMTP_CREDENTIAL_ID: ci_smtp_credential
+        run: |
+          set -euo pipefail
+          node automation/n8n/scripts/validate-workflows.mjs
+          node automation/n8n/scripts/materialize-workflows.mjs --output "$RUNNER_TEMP/planthepath-n8n-workflows"
+          test "$(find "$RUNNER_TEMP/planthepath-n8n-workflows" -name workflow.json | wc -l)" -eq 6
+          N8N_DB_PASSWORD=ci-only-db-password N8N_ENCRYPTION_KEY=ci-only-encryption-key-000000000000 N8N_USER_MANAGEMENT_JWT_SECRET=ci-only-jwt-secret-000000000000 docker compose --profile mailpit -f automation/n8n/docker-compose.yml -f automation/n8n/compose.local.yaml config --quiet
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
       - run: pnpm db:migrate
+      - name: Validate additive upgrade from Phase B migrations
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PGPASSWORD=planthepath_ci
+          createdb -h 127.0.0.1 -U planthepath planthepath_upgrade
+          for migration in packages/persistence/drizzle/0000*.sql packages/persistence/drizzle/0001*.sql packages/persistence/drizzle/0002*.sql packages/persistence/drizzle/0003*.sql; do
+            psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -U planthepath -d planthepath_upgrade -f "$migration"
+          done
+          DATABASE_URL=postgresql://planthepath:planthepath_ci@127.0.0.1:5432/planthepath_upgrade pnpm db:migrate
+      - name: Scan production dependencies
+        run: pnpm audit --prod --audit-level=high

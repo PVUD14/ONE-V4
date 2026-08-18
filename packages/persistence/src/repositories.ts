@@ -1,4 +1,5 @@
-import { and, eq, gt, isNull, lte, or, sql } from 'drizzle-orm';
+import { and, eq, gt, isNotNull, isNull, lte, or, sql } from 'drizzle-orm';
+import { createIntegrationEventEnvelope, requireCorrelationId, schemaForEvent } from '@planthepath/events/src/index.js';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from './schema.js';
 
@@ -38,7 +39,7 @@ export interface RoleScopeInput {
   readonly employerId?: string;
 }
 
-export async function hasActiveInstitutionRelationship(
+export async function hasInstitutionRelationshipAuthorizationForActivity(
   db: PersistenceDb,
   institutionId: string,
   studentUserId: string,
@@ -53,8 +54,14 @@ export async function hasActiveInstitutionRelationship(
       or(
         eq(schema.institutionRelationships.state, 'VERIFIED'),
         eq(schema.institutionRelationships.state, 'ACTIVE'),
-        eq(schema.institutionRelationships.state, 'TRANSFERRED'),
-        eq(schema.institutionRelationships.state, 'GRADUATED'),
+        and(
+          eq(schema.institutionRelationships.state, 'TRANSFERRED'),
+          isNotNull(schema.institutionRelationships.effectiveTo),
+        ),
+        and(
+          eq(schema.institutionRelationships.state, 'GRADUATED'),
+          isNotNull(schema.institutionRelationships.effectiveTo),
+        ),
       ),
       lte(schema.institutionRelationships.effectiveFrom, activityAt),
       or(isNull(schema.institutionRelationships.effectiveTo), gt(schema.institutionRelationships.effectiveTo, activityAt)),
@@ -62,6 +69,16 @@ export async function hasActiveInstitutionRelationship(
     .limit(1);
 
   return rows.length === 1;
+}
+
+/** @deprecated Use hasInstitutionRelationshipAuthorizationForActivity. */
+export async function hasActiveInstitutionRelationship(
+  db: PersistenceDb,
+  institutionId: string,
+  studentUserId: string,
+  activityAt: Date,
+): Promise<boolean> {
+  return hasInstitutionRelationshipAuthorizationForActivity(db, institutionId, studentUserId, activityAt);
 }
 
 export async function hasEmployerApplicantAccess(
@@ -233,7 +250,7 @@ export async function suspendMembershipWithOutbox(
     readonly organizationId: string;
     readonly eventId: string;
     readonly audit?: AuditWriteInput;
-    readonly correlationId?: string;
+    readonly correlationId: string;
   },
 ): Promise<void> {
   await db.transaction(async (tx) => {
@@ -257,7 +274,7 @@ export async function suspendMembershipWithOutbox(
       eventVersion: 1,
       payload: { membershipId: membership.id },
       organizationId: membership.organizationId,
-      correlationId: input.correlationId ?? 'system',
+      correlationId: input.correlationId,
     });
   });
 }
@@ -382,7 +399,29 @@ export async function acceptInvitationWithIdempotency(
   });
 }
 
+export function validateAuditWriteInput(input: AuditWriteInput): void {
+  requireCorrelationId(input.correlationId);
+}
+
+export function validateOutboxWriteInput(input: OutboxWriteInput): void {
+  const eventVersion = input.eventVersion ?? 1;
+  const definition = schemaForEvent(input.eventType, eventVersion);
+  if (input.aggregateType !== definition.aggregateType) throw new Error('outbox aggregateType does not match registered event schema');
+  createIntegrationEventEnvelope({
+    eventId: input.id,
+    eventType: input.eventType,
+    eventVersion,
+    occurredAt: '2026-01-01T00:00:00.000Z',
+    aggregateId: input.aggregateId,
+    ...(input.actorUserId ? { actorId: input.actorUserId } : {}),
+    ...(input.organizationId ? { organizationId: input.organizationId } : {}),
+    correlationId: input.correlationId,
+    payload: input.payload,
+  });
+}
+
 async function writeAuditEvent(db: PersistenceDb, input: AuditWriteInput): Promise<void> {
+  validateAuditWriteInput(input);
   await db.insert(schema.auditEvents).values({
     id: input.id,
     actorUserId: input.actorUserId,
@@ -397,6 +436,7 @@ async function writeAuditEvent(db: PersistenceDb, input: AuditWriteInput): Promi
 }
 
 async function writeOutboxEvent(db: PersistenceDb, input: OutboxWriteInput): Promise<void> {
+  validateOutboxWriteInput(input);
   await db.insert(schema.outboxEvents).values({
     id: input.id,
     aggregateType: input.aggregateType,

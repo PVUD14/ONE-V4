@@ -5,14 +5,33 @@ export interface TemporalInstitutionScope {
   readonly relationshipState: 'PENDING' | 'VERIFIED' | 'ACTIVE' | 'ENDED' | 'TRANSFERRED' | 'GRADUATED' | 'REVOKED';
 }
 
+export const canonicalInstitutionRelationshipPolicy = {
+  effectiveToBoundary: 'exclusive',
+  continuingAccessStates: ['VERIFIED', 'ACTIVE'],
+  historicalAccessStates: ['TRANSFERRED', 'GRADUATED'],
+} as const;
+
+export function institutionRelationshipAuthorizesActivity(
+  scope: TemporalInstitutionScope,
+  activityOccurredAt: Date,
+): boolean {
+  if (activityOccurredAt < scope.effectiveFrom) return false;
+
+  if (canonicalInstitutionRelationshipPolicy.historicalAccessStates.includes(scope.relationshipState as never)) {
+    if (!scope.effectiveTo) return false;
+    return activityOccurredAt < scope.effectiveTo;
+  }
+
+  if (!canonicalInstitutionRelationshipPolicy.continuingAccessStates.includes(scope.relationshipState as never)) return false;
+  if (scope.effectiveTo && activityOccurredAt >= scope.effectiveTo) return false;
+  return true;
+}
+
 export function canInstitutionReadStudentActivity(
   scope: TemporalInstitutionScope,
   activityOccurredAt: Date,
 ): boolean {
-  if (!['VERIFIED', 'ACTIVE', 'GRADUATED'].includes(scope.relationshipState)) return false;
-  if (activityOccurredAt < scope.effectiveFrom) return false;
-  if (scope.effectiveTo && activityOccurredAt > scope.effectiveTo) return false;
-  return true;
+  return institutionRelationshipAuthorizesActivity(scope, activityOccurredAt);
 }
 
 export interface EmployerApplicantScope {

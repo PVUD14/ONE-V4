@@ -19,10 +19,11 @@ export const organizationKind = pgEnum('organization_kind', ['PLATFORM', 'INSTIT
 export const verificationState = pgEnum('verification_state', ['PENDING', 'UNDER_REVIEW', 'VERIFIED', 'REJECTED', 'SUSPENDED']);
 export const membershipState = pgEnum('membership_state', ['ACTIVE', 'SUSPENDED', 'ENDED']);
 export const invitationState = pgEnum('invitation_state', ['PENDING', 'ACCEPTED', 'REVOKED', 'EXPIRED']);
-export const relationshipState = pgEnum('relationship_state', ['PENDING', 'VERIFIED', 'ACTIVE', 'ENDED', 'TRANSFERRED', 'GRADUATED']);
+export const relationshipState = pgEnum('relationship_state', ['PENDING', 'VERIFIED', 'ACTIVE', 'ENDED', 'TRANSFERRED', 'GRADUATED', 'REVOKED']);
 export const institutionUnitKind = pgEnum('institution_unit_kind', ['INSTITUTION', 'CAMPUS', 'DEPARTMENT', 'PROGRAM', 'BATCH', 'SECTION']);
 export const outboxDeliveryState = pgEnum('outbox_delivery_state', ['PENDING', 'PROCESSING', 'PUBLISHED', 'FAILED']);
 export const idempotencyStatus = pgEnum('idempotency_status', ['STARTED', 'SUCCEEDED', 'FAILED']);
+export const eventConsumerReceiptStatus = pgEnum('event_consumer_receipt_status', ['STARTED', 'SUCCEEDED', 'FAILED']);
 
 const zeroUuid = '00000000-0000-0000-0000-000000000000';
 
@@ -157,6 +158,8 @@ export const institutionRelationships = pgTable('institution_relationships', {
   uniqueIndex('institution_relationship_identity_window_uq').on(t.institutionId, t.studentUserId, t.effectiveFrom),
   index('institution_relationship_scope_idx').on(t.institutionId, t.studentUserId, t.effectiveFrom, t.effectiveTo),
   check('institution_relationship_window_ck', sql`${t.effectiveTo} is null or ${t.effectiveTo} > ${t.effectiveFrom}`),
+  check('institution_relationship_transferred_end_ck', sql`${t.state} <> 'TRANSFERRED' or ${t.effectiveTo} is not null`),
+  check('institution_relationship_graduated_end_ck', sql`${t.state} <> 'GRADUATED' or ${t.effectiveTo} is not null`),
 ]);
 
 export const employerApplicantAccessGrants = pgTable('employer_applicant_access_grants', {
@@ -206,11 +209,22 @@ export const outboxEvents = pgTable('outbox_events', {
   occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull().defaultNow(),
   deliveryState: outboxDeliveryState('delivery_state').notNull().default('PENDING'),
   attempts: integer('attempts').notNull().default(0),
+  availableAt: timestamp('available_at', { withTimezone: true }).notNull().defaultNow(),
+  leaseOwner: text('lease_owner'),
+  leaseToken: text('lease_token'),
+  leaseExpiresAt: timestamp('lease_expires_at', { withTimezone: true }),
+  lastFailureClass: text('last_failure_class'),
+  lastFailureMessage: text('last_failure_message'),
+  expiresAt: timestamp('expires_at', { withTimezone: true }),
   publishedAt: timestamp('published_at', { withTimezone: true }),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
-  index('outbox_unpublished_idx').on(t.deliveryState, t.occurredAt),
+  index('outbox_unpublished_idx').on(t.deliveryState, t.availableAt, t.occurredAt),
+  index('outbox_lease_expiry_idx').on(t.deliveryState, t.leaseExpiresAt),
   check('outbox_event_version_ck', sql`${t.eventVersion} > 0`),
   check('outbox_attempts_ck', sql`${t.attempts} >= 0`),
+  check('outbox_lease_state_ck', sql`(${t.deliveryState} = 'PROCESSING' and ${t.leaseOwner} is not null and ${t.leaseToken} is not null and ${t.leaseExpiresAt} is not null) or (${t.deliveryState} <> 'PROCESSING' and ${t.leaseOwner} is null and ${t.leaseToken} is null and ${t.leaseExpiresAt} is null)`),
+  check('outbox_published_state_ck', sql`(${t.deliveryState} = 'PUBLISHED' and ${t.publishedAt} is not null) or (${t.deliveryState} <> 'PUBLISHED' and ${t.publishedAt} is null)`),
 ]);
 
 export const idempotencyRecords = pgTable('idempotency_records', {
@@ -227,4 +241,21 @@ export const idempotencyRecords = pgTable('idempotency_records', {
   uniqueIndex('idempotency_scope_key_uq').on(t.scope, t.key),
   check('idempotency_request_hash_ck', sql`length(${t.requestHash}) >= 32`),
   check('idempotency_response_pair_ck', sql`(${t.responseResourceType} is null and ${t.responseResourceId} is null) or (${t.responseResourceType} is not null and ${t.responseResourceId} is not null)`),
+]);
+
+export const eventConsumerReceipts = pgTable('event_consumer_receipts', {
+  id: uuid('id').primaryKey(),
+  consumerName: text('consumer_name').notNull(),
+  eventId: uuid('event_id').notNull().references(() => outboxEvents.id),
+  status: eventConsumerReceiptStatus('status').notNull().default('STARTED'),
+  attempts: integer('attempts').notNull().default(0),
+  lastFailureClass: text('last_failure_class'),
+  startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+  succeededAt: timestamp('succeeded_at', { withTimezone: true }),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex('event_consumer_receipts_consumer_event_uq').on(t.consumerName, t.eventId),
+  index('event_consumer_receipts_event_idx').on(t.eventId),
+  check('event_consumer_receipts_attempts_ck', sql`${t.attempts} >= 0`),
+  check('event_consumer_receipts_success_ck', sql`(${t.status} = 'SUCCEEDED' and ${t.succeededAt} is not null) or (${t.status} <> 'SUCCEEDED')`),
 ]);

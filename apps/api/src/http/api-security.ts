@@ -32,7 +32,7 @@ import {
   assertEmployerApplicantAccessForAuthenticatedPrincipal,
 } from '@planthepath/persistence/src/employer-authentication.js';
 import {
-  hasActiveInstitutionRelationship,
+  hasInstitutionRelationshipAuthorizationForActivity,
   type PersistenceDb,
 } from '@planthepath/persistence/src/repositories.js';
 
@@ -183,7 +183,7 @@ export class Phase1ProtectedApiRoutes {
       throw new ForbiddenException(safeError('FORBIDDEN', context.correlationId));
     }
 
-    const hasRelationship = await hasActiveInstitutionRelationship(this.db, institutionId, studentUserId, activityAt);
+    const hasRelationship = await hasInstitutionRelationshipAuthorizationForActivity(this.db, institutionId, studentUserId, activityAt);
     if (!hasRelationship) throw new ForbiddenException(safeError('FORBIDDEN', context.correlationId));
     return { allowed: true, correlationId: context.correlationId };
   }

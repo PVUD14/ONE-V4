@@ -3,12 +3,12 @@
   "private": true,
   "packageManager": "pnpm@10.15.0",
   "scripts": {
-    "api:dev": "pnpm --filter @planthepath/api dev",
-    "api:start": "pnpm --filter @planthepath/api start",
-    "build": "pnpm -r build",
-    "db:migrate": "pnpm --filter @planthepath/persistence db:migrate",
-    "test": "pnpm -r --workspace-concurrency=1 test",
-    "typecheck": "pnpm -r typecheck",
-    "web:dev": "pnpm --filter @planthepath/web dev"
+    "api:dev": "corepack pnpm --filter @planthepath/api dev",
+    "api:start": "corepack pnpm --filter @planthepath/api start",
+    "build": "corepack pnpm -r build",
+    "db:migrate": "corepack pnpm --filter @planthepath/persistence db:migrate",
+    "test": "corepack pnpm -r --workspace-concurrency=1 test",
+    "typecheck": "corepack pnpm -r typecheck",
+    "web:dev": "corepack pnpm --filter @planthepath/web dev"
   }
 }

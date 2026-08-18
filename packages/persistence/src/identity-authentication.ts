@@ -54,7 +54,6 @@ export async function loadActiveMembershipsForUser(
       userId: schema.organizationMemberships.userId,
       role: schema.organizationMemberships.role,
       state: schema.organizationMemberships.state,
-      scopeOrganizationId: schema.organizationMemberships.scopeOrganizationId,
       scopeInstitutionId: schema.organizationMemberships.scopeInstitutionId,
       scopeDepartmentUnitId: schema.organizationMemberships.scopeDepartmentUnitId,
       scopeBatchUnitId: schema.organizationMemberships.scopeBatchUnitId,
@@ -73,7 +72,7 @@ export async function loadActiveMembershipsForUser(
     role: row.role,
     state: 'ACTIVE' as const,
     scope: {
-      organizationId: row.scopeOrganizationId,
+      organizationId: row.organizationId,
       ...(row.scopeInstitutionId ? { institutionId: row.scopeInstitutionId } : {}),
       ...(row.scopeDepartmentUnitId ? { departmentId: row.scopeDepartmentUnitId } : {}),
       ...(row.scopeBatchUnitId ? { batchId: row.scopeBatchUnitId } : {}),

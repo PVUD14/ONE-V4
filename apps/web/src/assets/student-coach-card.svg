@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="220" viewBox="0 0 300 220" role="img" aria-label="Abstract AI guidance card illustration">
+  <defs>
+    <linearGradient id="halo" x1="0" x2="1" y1="0" y2="1">
+      <stop stop-color="#F4F0FF"/>
+      <stop offset="1" stop-color="#EEF4FF"/>
+    </linearGradient>
+  </defs>
+  <rect width="300" height="220" rx="26" fill="url(#halo)"/>
+  <circle cx="92" cy="105" r="44" fill="#fff" stroke="#DDE7F6"/>
+  <circle cx="92" cy="96" r="15" fill="#1F55E5"/>
+  <path d="M61 138c10-21 52-21 62 0" fill="#DFF7EE"/>
+  <rect x="148" y="58" width="96" height="28" rx="14" fill="#fff" stroke="#DDE7F6"/>
+  <rect x="148" y="98" width="116" height="28" rx="14" fill="#fff" stroke="#DDE7F6"/>
+  <rect x="148" y="138" width="80" height="28" rx="14" fill="#fff" stroke="#DDE7F6"/>
+  <circle cx="165" cy="72" r="5" fill="#14A578"/>
+  <circle cx="165" cy="112" r="5" fill="#1F55E5"/>
+  <circle cx="165" cy="152" r="5" fill="#F59E0B"/>
+  <path d="M236 42l5 13 14 1-11 9 4 14-12-8-12 8 4-14-11-9 14-1z" fill="#7C5CE8"/>
+</svg>

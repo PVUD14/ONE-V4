@@ -1,0 +1,40 @@
+{
+    "commit":  "6153d0ac2dbce9290e579c540a3e5effd7b85f9d",
+    "branch":  "agent/all-role-portals-completion",
+    "generatedAt":  "2026-08-18T11:35:03.4347684+05:30",
+    "tools":  {
+                  "node":  "v22.18.0",
+                  "npm":  "10.9.3",
+                  "pnpm":  "10.15.0",
+                  "chrome":  "151.0.7922.138"
+              },
+    "routeTotals":  {
+                        "roleRoutes":  135,
+                        "withDemo":  136,
+                        "institutionAnalystRoutes":  11
+                    },
+    "frontendValidation":  {
+                               "typecheck":  "passed",
+                               "tests":  "81 passed",
+                               "productionBuild":  "passed"
+                           },
+    "evidenceReports":  [
+                            "route-title-overflow-network-audit.json",
+                            "visible-sidebar-navigation-click-audit.json",
+                            "representative-workflow-interaction-audit.json",
+                            "mobile-drawer-focus-audit.json",
+                            "topbar-control-postfix-proof.json",
+                            "postfix-136-route-title-mobile-overflow-sweep.json",
+                            "postfix-route-sweep-transient-rerun.json"
+                        ],
+    "screenshots":  [
+                        "demo-desktop-1440x900.png",
+                        "demo-mobile-390x844.png",
+                        "student-mobile-390x844.png",
+                        "placement-officer-desktop-1440x900.png",
+                        "institution-analyst-mobile-390x844.png",
+                        "recruiter-desktop-1440x900.png",
+                        "operations-admin-mobile-390x844.png"
+                    ],
+    "limitation":  "Managed in-app browser was unavailable; local Chrome CDP was used. Exhaustive control evidence groups repeated row/card controls by shared component/handler and exercises representative instances."
+}

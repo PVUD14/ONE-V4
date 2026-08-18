@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="220" viewBox="0 0 320 220" role="img" aria-label="Abstract opportunity card and employer match illustration">
+  <defs>
+    <linearGradient id="card" x1="0" x2="1" y1="0" y2="1">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#F1F6FF"/>
+    </linearGradient>
+  </defs>
+  <rect width="320" height="220" rx="28" fill="#EEF4FF"/>
+  <rect x="42" y="44" width="236" height="132" rx="22" fill="url(#card)" stroke="#DDE7F6"/>
+  <rect x="66" y="70" width="72" height="12" rx="6" fill="#1F55E5"/>
+  <rect x="66" y="94" width="142" height="9" rx="4.5" fill="#D7E2F5"/>
+  <rect x="66" y="116" width="110" height="9" rx="4.5" fill="#D7E2F5"/>
+  <rect x="66" y="143" width="64" height="22" rx="11" fill="#E7FBF2"/>
+  <circle cx="230" cy="111" r="34" fill="#FFF2D6" stroke="#F59E0B" stroke-width="8"/>
+  <path d="M216 111l10 10 20-24" fill="none" stroke="#14A578" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

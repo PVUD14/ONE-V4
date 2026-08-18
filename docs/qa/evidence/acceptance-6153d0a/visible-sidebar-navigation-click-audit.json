@@ -1,0 +1,1903 @@
+{
+  "results": [
+    {
+      "start": "/student",
+      "index": 0,
+      "label": "Home",
+      "before": "/student",
+      "clicked": true,
+      "after": "/student",
+      "title": "Student Dashboard | PlanThePath",
+      "h1": "Student Dashboard",
+      "current": [
+        "Home"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/student",
+      "index": 1,
+      "label": "My Career",
+      "before": "/student",
+      "clicked": true,
+      "after": "/student/career-path",
+      "title": "My Career Path — Student | PlanThePath",
+      "h1": "My Career Path",
+      "current": [
+        "My Career"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/student",
+      "index": 2,
+      "label": "AI Career Coach",
+      "before": "/student",
+      "clicked": true,
+      "after": "/student/ai-coach",
+      "title": "AI Career Coach — Student | PlanThePath",
+      "h1": "AI Career Coach",
+      "current": [
+        "AI Career Coach"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/student",
+      "index": 3,
+      "label": "Readiness",
+      "before": "/student",
+      "clicked": true,
+      "after": "/student/readiness",
+      "title": "Readiness — Student | PlanThePath",
+      "h1": "Readiness",
+      "current": [
+        "Readiness"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/student",
+      "index": 4,
+      "label": "Skills",
+      "before": "/student",
+      "clicked": true,
+      "after": "/student/skills",
+      "title": "Skills — Student | PlanThePath",
+      "h1": "Skills",
+      "current": [
+        "Skills"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/student",
+      "index": 5,
+      "label": "Assessments",
+      "before": "/student",
+      "clicked": true,
+      "after": "/student/assessments",
+      "title": "Assessments — Student | PlanThePath",
+      "h1": "Assessments",
+      "current": [
+        "Assessments"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/student",
+      "index": 6,
+      "label": "Learning",
+      "before": "/student",
+      "clicked": true,
+      "after": "/student/learning",
+      "title": "Learning — Student | PlanThePath",
+      "h1": "Learning",
+      "current": [
+        "Learning"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/student",
+      "index": 7,
+      "label": "Experience",
+      "before": "/student",
+      "clicked": true,
+      "after": "/student/experience",
+      "title": "Experience — Student | PlanThePath",
+      "h1": "Experience",
+      "current": [
+        "Experience"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/student",
+      "index": 8,
+      "label": "Opportunities",
+      "before": "/student",
+      "clicked": true,
+      "after": "/student/opportunities",
+      "title": "Opportunities — Student | PlanThePath",
+      "h1": "Opportunities",
+      "current": [
+        "Opportunities"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/student",
+      "index": 9,
+      "label": "Applications",
+      "before": "/student",
+      "clicked": true,
+      "after": "/student/applications",
+      "title": "Applications — Student | PlanThePath",
+      "h1": "Applications",
+      "current": [
+        "Applications"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/student",
+      "index": 10,
+      "label": "Interviews",
+      "before": "/student",
+      "clicked": true,
+      "after": "/student/interviews",
+      "title": "Interviews — Student | PlanThePath",
+      "h1": "Interviews",
+      "current": [
+        "Interviews"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/student",
+      "index": 11,
+      "label": "Documents",
+      "before": "/student",
+      "clicked": true,
+      "after": "/student/documents",
+      "title": "Documents — Student | PlanThePath",
+      "h1": "Documents",
+      "current": [
+        "Documents"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/student",
+      "index": 12,
+      "label": "Profile",
+      "before": "/student",
+      "clicked": true,
+      "after": "/student/profile",
+      "title": "Profile — Student | PlanThePath",
+      "h1": "Profile",
+      "current": [
+        "Profile"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/student",
+      "index": 13,
+      "label": "Settings",
+      "before": "/student",
+      "clicked": true,
+      "after": "/student/settings",
+      "title": "Settings — Student | PlanThePath",
+      "h1": "Settings",
+      "current": [
+        "Settings"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/placement-officer",
+      "index": 0,
+      "label": "Dashboard",
+      "before": "/institution/placement-officer",
+      "clicked": true,
+      "after": "/institution/placement-officer",
+      "title": "Placement Dashboard | PlanThePath",
+      "h1": "Placement Dashboard",
+      "current": [
+        "Dashboard"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/placement-officer",
+      "index": 1,
+      "label": "Students",
+      "before": "/institution/placement-officer",
+      "clicked": true,
+      "after": "/institution/placement-officer/students",
+      "title": "Students — Placement Officer | PlanThePath",
+      "h1": "Students",
+      "current": [
+        "Students"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/placement-officer",
+      "index": 2,
+      "label": "Departments",
+      "before": "/institution/placement-officer",
+      "clicked": true,
+      "after": "/institution/placement-officer/departments",
+      "title": "Departments — Placement Officer | PlanThePath",
+      "h1": "Departments",
+      "current": [
+        "Departments"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/placement-officer",
+      "index": 3,
+      "label": "Batches",
+      "before": "/institution/placement-officer",
+      "clicked": true,
+      "after": "/institution/placement-officer/batches",
+      "title": "Batches — Placement Officer | PlanThePath",
+      "h1": "Batches",
+      "current": [
+        "Batches"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/placement-officer",
+      "index": 4,
+      "label": "Student Search",
+      "before": "/institution/placement-officer",
+      "clicked": true,
+      "after": "/institution/placement-officer/student-search",
+      "title": "Student Search — Placement Officer | PlanThePath",
+      "h1": "Student Search",
+      "current": [
+        "Student Search"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/placement-officer",
+      "index": 5,
+      "label": "Readiness",
+      "before": "/institution/placement-officer",
+      "clicked": true,
+      "after": "/institution/placement-officer/readiness",
+      "title": "Readiness — Placement Officer | PlanThePath",
+      "h1": "Readiness",
+      "current": [
+        "Readiness"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/placement-officer",
+      "index": 6,
+      "label": "Assessments",
+      "before": "/institution/placement-officer",
+      "clicked": true,
+      "after": "/institution/placement-officer/assessments",
+      "title": "Assessments — Placement Officer | PlanThePath",
+      "h1": "Assessments",
+      "current": [
+        "Assessments"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/placement-officer",
+      "index": 7,
+      "label": "Interventions",
+      "before": "/institution/placement-officer",
+      "clicked": true,
+      "after": "/institution/placement-officer/interventions",
+      "title": "Interventions — Placement Officer | PlanThePath",
+      "h1": "Interventions",
+      "current": [
+        "Interventions"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/placement-officer",
+      "index": 8,
+      "label": "Opportunities",
+      "before": "/institution/placement-officer",
+      "clicked": true,
+      "after": "/institution/placement-officer/opportunities",
+      "title": "Opportunities — Placement Officer | PlanThePath",
+      "h1": "Opportunities",
+      "current": [
+        "Opportunities"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/placement-officer",
+      "index": 9,
+      "label": "Applications",
+      "before": "/institution/placement-officer",
+      "clicked": true,
+      "after": "/institution/placement-officer/applications",
+      "title": "Applications — Placement Officer | PlanThePath",
+      "h1": "Applications",
+      "current": [
+        "Applications"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/placement-officer",
+      "index": 10,
+      "label": "Interviews",
+      "before": "/institution/placement-officer",
+      "clicked": true,
+      "after": "/institution/placement-officer/interviews",
+      "title": "Interviews — Placement Officer | PlanThePath",
+      "h1": "Interviews",
+      "current": [
+        "Interviews"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/placement-officer",
+      "index": 11,
+      "label": "Offers",
+      "before": "/institution/placement-officer",
+      "clicked": true,
+      "after": "/institution/placement-officer/offers",
+      "title": "Offers — Placement Officer | PlanThePath",
+      "h1": "Offers",
+      "current": [
+        "Offers"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/placement-officer",
+      "index": 12,
+      "label": "Employers",
+      "before": "/institution/placement-officer",
+      "clicked": true,
+      "after": "/institution/placement-officer/employers",
+      "title": "Employers — Placement Officer | PlanThePath",
+      "h1": "Employers",
+      "current": [
+        "Employers"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/placement-officer",
+      "index": 13,
+      "label": "Communications",
+      "before": "/institution/placement-officer",
+      "clicked": true,
+      "after": "/institution/placement-officer/communications",
+      "title": "Communications — Placement Officer | PlanThePath",
+      "h1": "Communications",
+      "current": [
+        "Communications"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/placement-officer",
+      "index": 14,
+      "label": "Events",
+      "before": "/institution/placement-officer",
+      "clicked": true,
+      "after": "/institution/placement-officer/events",
+      "title": "Events — Placement Officer | PlanThePath",
+      "h1": "Events",
+      "current": [
+        "Events"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/placement-officer",
+      "index": 15,
+      "label": "Reports",
+      "before": "/institution/placement-officer",
+      "clicked": true,
+      "after": "/institution/placement-officer/reports",
+      "title": "Reports — Placement Officer | PlanThePath",
+      "h1": "Reports",
+      "current": [
+        "Reports"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/placement-officer",
+      "index": 16,
+      "label": "Dashboards",
+      "before": "/institution/placement-officer",
+      "clicked": true,
+      "after": "/institution/placement-officer/dashboards",
+      "title": "Dashboards — Placement Officer | PlanThePath",
+      "h1": "Dashboards",
+      "current": [
+        "Dashboards"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/faculty",
+      "index": 0,
+      "label": "Dashboard",
+      "before": "/institution/faculty",
+      "clicked": true,
+      "after": "/institution/faculty",
+      "title": "Faculty Dashboard | PlanThePath",
+      "h1": "Faculty Dashboard",
+      "current": [
+        "Dashboard"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/faculty",
+      "index": 1,
+      "label": "My Students",
+      "before": "/institution/faculty",
+      "clicked": true,
+      "after": "/institution/faculty/my-students",
+      "title": "My Students — Lecturer / Faculty | PlanThePath",
+      "h1": "My Students",
+      "current": [
+        "My Students"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/faculty",
+      "index": 2,
+      "label": "Student Detail",
+      "before": "/institution/faculty",
+      "clicked": true,
+      "after": "/institution/faculty/student-detail",
+      "title": "Student Detail — Lecturer / Faculty | PlanThePath",
+      "h1": "Student Detail",
+      "current": [
+        "Student Detail"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/faculty",
+      "index": 3,
+      "label": "Academic Verification",
+      "before": "/institution/faculty",
+      "clicked": true,
+      "after": "/institution/faculty/academic-verification",
+      "title": "Academic Verification — Lecturer / Faculty | PlanThePath",
+      "h1": "Academic Verification",
+      "current": [
+        "Academic Verification"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/faculty",
+      "index": 4,
+      "label": "Assessments",
+      "before": "/institution/faculty",
+      "clicked": true,
+      "after": "/institution/faculty/assessments",
+      "title": "Assessments — Lecturer / Faculty | PlanThePath",
+      "h1": "Assessments",
+      "current": [
+        "Assessments"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/faculty",
+      "index": 5,
+      "label": "Assessment Detail",
+      "before": "/institution/faculty",
+      "clicked": true,
+      "after": "/institution/faculty/assessment-detail",
+      "title": "Assessment Detail — Lecturer / Faculty | PlanThePath",
+      "h1": "Assessment Detail",
+      "current": [
+        "Assessment Detail"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/faculty",
+      "index": 6,
+      "label": "Assigned Tasks",
+      "before": "/institution/faculty",
+      "clicked": true,
+      "after": "/institution/faculty/assigned-tasks",
+      "title": "Assigned Tasks — Lecturer / Faculty | PlanThePath",
+      "h1": "Assigned Tasks",
+      "current": [
+        "Assigned Tasks"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/faculty",
+      "index": 7,
+      "label": "Interventions",
+      "before": "/institution/faculty",
+      "clicked": true,
+      "after": "/institution/faculty/interventions",
+      "title": "Interventions — Lecturer / Faculty | PlanThePath",
+      "h1": "Interventions",
+      "current": [
+        "Interventions"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/faculty",
+      "index": 8,
+      "label": "Learning Resources",
+      "before": "/institution/faculty",
+      "clicked": true,
+      "after": "/institution/faculty/learning-resources",
+      "title": "Learning Resources — Lecturer / Faculty | PlanThePath",
+      "h1": "Learning Resources",
+      "current": [
+        "Learning Resources"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/faculty",
+      "index": 9,
+      "label": "Reports",
+      "before": "/institution/faculty",
+      "clicked": true,
+      "after": "/institution/faculty/reports",
+      "title": "Reports — Lecturer / Faculty | PlanThePath",
+      "h1": "Reports",
+      "current": [
+        "Reports"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/faculty",
+      "index": 10,
+      "label": "Calendar",
+      "before": "/institution/faculty",
+      "clicked": true,
+      "after": "/institution/faculty/calendar",
+      "title": "Calendar — Lecturer / Faculty | PlanThePath",
+      "h1": "Calendar",
+      "current": [
+        "Calendar"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/faculty",
+      "index": 11,
+      "label": "Messages",
+      "before": "/institution/faculty",
+      "clicked": true,
+      "after": "/institution/faculty/messages",
+      "title": "Messages — Lecturer / Faculty | PlanThePath",
+      "h1": "Messages",
+      "current": [
+        "Messages"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/faculty",
+      "index": 12,
+      "label": "Profile",
+      "before": "/institution/faculty",
+      "clicked": true,
+      "after": "/institution/faculty/profile",
+      "title": "Profile — Lecturer / Faculty | PlanThePath",
+      "h1": "Profile",
+      "current": [
+        "Profile"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/faculty",
+      "index": 13,
+      "label": "Settings",
+      "before": "/institution/faculty",
+      "clicked": true,
+      "after": "/institution/faculty/settings",
+      "title": "Settings — Lecturer / Faculty | PlanThePath",
+      "h1": "Settings",
+      "current": [
+        "Settings"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/career-counselor",
+      "index": 0,
+      "label": "Dashboard",
+      "before": "/institution/career-counselor",
+      "clicked": true,
+      "after": "/institution/career-counselor",
+      "title": "Career Counselor Dashboard | PlanThePath",
+      "h1": "Career Counselor Dashboard",
+      "current": [
+        "Dashboard"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/career-counselor",
+      "index": 1,
+      "label": "Counselor Sessions",
+      "before": "/institution/career-counselor",
+      "clicked": true,
+      "after": "/institution/career-counselor/counselor-sessions",
+      "title": "Counselor Sessions — Career Counselor | PlanThePath",
+      "h1": "Counselor Sessions",
+      "current": [
+        "Counselor Sessions"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/career-counselor",
+      "index": 2,
+      "label": "Student Cases",
+      "before": "/institution/career-counselor",
+      "clicked": true,
+      "after": "/institution/career-counselor/student-cases",
+      "title": "Student Cases — Career Counselor | PlanThePath",
+      "h1": "Student Cases",
+      "current": [
+        "Student Cases"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/career-counselor",
+      "index": 3,
+      "label": "Counseling Notes",
+      "before": "/institution/career-counselor",
+      "clicked": true,
+      "after": "/institution/career-counselor/counseling-notes",
+      "title": "Counseling Notes — Career Counselor | PlanThePath",
+      "h1": "Counseling Notes",
+      "current": [
+        "Counseling Notes"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/career-counselor",
+      "index": 4,
+      "label": "Interventions",
+      "before": "/institution/career-counselor",
+      "clicked": true,
+      "after": "/institution/career-counselor/interventions",
+      "title": "Interventions — Career Counselor | PlanThePath",
+      "h1": "Interventions",
+      "current": [
+        "Interventions"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/career-counselor",
+      "index": 5,
+      "label": "Career Guidance",
+      "before": "/institution/career-counselor",
+      "clicked": true,
+      "after": "/institution/career-counselor/career-guidance",
+      "title": "Career Guidance — Career Counselor | PlanThePath",
+      "h1": "Career Guidance",
+      "current": [
+        "Career Guidance"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/career-counselor",
+      "index": 6,
+      "label": "Assessments",
+      "before": "/institution/career-counselor",
+      "clicked": true,
+      "after": "/institution/career-counselor/assessments",
+      "title": "Assessments — Career Counselor | PlanThePath",
+      "h1": "Assessments",
+      "current": [
+        "Assessments"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/career-counselor",
+      "index": 7,
+      "label": "Resources",
+      "before": "/institution/career-counselor",
+      "clicked": true,
+      "after": "/institution/career-counselor/resources",
+      "title": "Resources — Career Counselor | PlanThePath",
+      "h1": "Resources",
+      "current": [
+        "Resources"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/career-counselor",
+      "index": 8,
+      "label": "Reports",
+      "before": "/institution/career-counselor",
+      "clicked": true,
+      "after": "/institution/career-counselor/reports",
+      "title": "Reports — Career Counselor | PlanThePath",
+      "h1": "Reports",
+      "current": [
+        "Reports"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/career-counselor",
+      "index": 9,
+      "label": "Calendar",
+      "before": "/institution/career-counselor",
+      "clicked": true,
+      "after": "/institution/career-counselor/calendar",
+      "title": "Calendar — Career Counselor | PlanThePath",
+      "h1": "Calendar",
+      "current": [
+        "Calendar"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/career-counselor",
+      "index": 10,
+      "label": "Messages",
+      "before": "/institution/career-counselor",
+      "clicked": true,
+      "after": "/institution/career-counselor/messages",
+      "title": "Messages — Career Counselor | PlanThePath",
+      "h1": "Messages",
+      "current": [
+        "Messages"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/career-counselor",
+      "index": 11,
+      "label": "Profile",
+      "before": "/institution/career-counselor",
+      "clicked": true,
+      "after": "/institution/career-counselor/profile",
+      "title": "Profile — Career Counselor | PlanThePath",
+      "h1": "Profile",
+      "current": [
+        "Profile"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/career-counselor",
+      "index": 12,
+      "label": "Settings",
+      "before": "/institution/career-counselor",
+      "clicked": true,
+      "after": "/institution/career-counselor/settings",
+      "title": "Settings — Career Counselor | PlanThePath",
+      "h1": "Settings",
+      "current": [
+        "Settings"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/department-head",
+      "index": 0,
+      "label": "Dashboard",
+      "before": "/institution/department-head",
+      "clicked": true,
+      "after": "/institution/department-head",
+      "title": "Department Dashboard | PlanThePath",
+      "h1": "Department Dashboard",
+      "current": [
+        "Dashboard"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/department-head",
+      "index": 1,
+      "label": "Department Overview",
+      "before": "/institution/department-head",
+      "clicked": true,
+      "after": "/institution/department-head/department-overview",
+      "title": "Department Overview — Department Head | PlanThePath",
+      "h1": "Department Overview",
+      "current": [
+        "Department Overview"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/department-head",
+      "index": 2,
+      "label": "Students",
+      "before": "/institution/department-head",
+      "clicked": true,
+      "after": "/institution/department-head/students",
+      "title": "Students — Department Head | PlanThePath",
+      "h1": "Students",
+      "current": [
+        "Students"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/department-head",
+      "index": 3,
+      "label": "Readiness",
+      "before": "/institution/department-head",
+      "clicked": true,
+      "after": "/institution/department-head/readiness",
+      "title": "Readiness — Department Head | PlanThePath",
+      "h1": "Readiness",
+      "current": [
+        "Readiness"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/department-head",
+      "index": 4,
+      "label": "Assessments",
+      "before": "/institution/department-head",
+      "clicked": true,
+      "after": "/institution/department-head/assessments",
+      "title": "Assessments — Department Head | PlanThePath",
+      "h1": "Assessments",
+      "current": [
+        "Assessments"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/department-head",
+      "index": 5,
+      "label": "Interventions",
+      "before": "/institution/department-head",
+      "clicked": true,
+      "after": "/institution/department-head/interventions",
+      "title": "Interventions — Department Head | PlanThePath",
+      "h1": "Interventions",
+      "current": [
+        "Interventions"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/department-head",
+      "index": 6,
+      "label": "Faculty and Staff",
+      "before": "/institution/department-head",
+      "clicked": true,
+      "after": "/institution/department-head/faculty-and-staff",
+      "title": "Faculty and Staff — Department Head | PlanThePath",
+      "h1": "Faculty and Staff",
+      "current": [
+        "Faculty and Staff"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/department-head",
+      "index": 7,
+      "label": "Placement Pipeline",
+      "before": "/institution/department-head",
+      "clicked": true,
+      "after": "/institution/department-head/placement-pipeline",
+      "title": "Placement Pipeline — Department Head | PlanThePath",
+      "h1": "Placement Pipeline",
+      "current": [
+        "Placement Pipeline"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/department-head",
+      "index": 8,
+      "label": "Opportunities and Offers",
+      "before": "/institution/department-head",
+      "clicked": true,
+      "after": "/institution/department-head/opportunities-and-offers",
+      "title": "Opportunities and Offers — Department Head | PlanThePath",
+      "h1": "Opportunities and Offers",
+      "current": [
+        "Opportunities and Offers"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/department-head",
+      "index": 9,
+      "label": "Batches",
+      "before": "/institution/department-head",
+      "clicked": true,
+      "after": "/institution/department-head/batches",
+      "title": "Batches — Department Head | PlanThePath",
+      "h1": "Batches",
+      "current": [
+        "Batches"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/department-head",
+      "index": 10,
+      "label": "Meetings",
+      "before": "/institution/department-head",
+      "clicked": true,
+      "after": "/institution/department-head/meetings",
+      "title": "Meetings — Department Head | PlanThePath",
+      "h1": "Meetings",
+      "current": [
+        "Meetings"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/department-head",
+      "index": 11,
+      "label": "Reports and Analytics",
+      "before": "/institution/department-head",
+      "clicked": true,
+      "after": "/institution/department-head/reports-and-analytics",
+      "title": "Reports and Analytics — Department Head | PlanThePath",
+      "h1": "Reports and Analytics",
+      "current": [
+        "Reports and Analytics"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/department-head",
+      "index": 12,
+      "label": "Settings",
+      "before": "/institution/department-head",
+      "clicked": true,
+      "after": "/institution/department-head/settings",
+      "title": "Settings — Department Head | PlanThePath",
+      "h1": "Settings",
+      "current": [
+        "Settings"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/analyst",
+      "index": 0,
+      "label": "Dashboard",
+      "before": "/institution/analyst",
+      "clicked": true,
+      "after": "/institution/analyst",
+      "title": "Institution Analytics | PlanThePath",
+      "h1": "Institution Analytics",
+      "current": [
+        "Dashboard"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/analyst",
+      "index": 1,
+      "label": "Analysis Overview",
+      "before": "/institution/analyst",
+      "clicked": true,
+      "after": "/institution/analyst/analysis-overview",
+      "title": "Analysis Overview — Institution Analyst | PlanThePath",
+      "h1": "Analysis Overview",
+      "current": [
+        "Analysis Overview"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/analyst",
+      "index": 2,
+      "label": "Placement Analysis",
+      "before": "/institution/analyst",
+      "clicked": true,
+      "after": "/institution/analyst/placement-analysis",
+      "title": "Placement Analysis — Institution Analyst | PlanThePath",
+      "h1": "Placement Analysis",
+      "current": [
+        "Placement Analysis"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/analyst",
+      "index": 3,
+      "label": "Readiness Analysis",
+      "before": "/institution/analyst",
+      "clicked": true,
+      "after": "/institution/analyst/readiness-analysis",
+      "title": "Readiness Analysis — Institution Analyst | PlanThePath",
+      "h1": "Readiness Analysis",
+      "current": [
+        "Readiness Analysis"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/analyst",
+      "index": 4,
+      "label": "Skill Gap Analysis",
+      "before": "/institution/analyst",
+      "clicked": true,
+      "after": "/institution/analyst/skill-gap-analysis",
+      "title": "Skill Gap Analysis — Institution Analyst | PlanThePath",
+      "h1": "Skill Gap Analysis",
+      "current": [
+        "Skill Gap Analysis"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/analyst",
+      "index": 5,
+      "label": "Cohort Comparison",
+      "before": "/institution/analyst",
+      "clicked": true,
+      "after": "/institution/analyst/cohort-comparison",
+      "title": "Cohort Comparison — Institution Analyst | PlanThePath",
+      "h1": "Cohort Comparison",
+      "current": [
+        "Cohort Comparison"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/analyst",
+      "index": 6,
+      "label": "Reports",
+      "before": "/institution/analyst",
+      "clicked": true,
+      "after": "/institution/analyst/reports",
+      "title": "Reports — Institution Analyst | PlanThePath",
+      "h1": "Reports",
+      "current": [
+        "Reports"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/analyst",
+      "index": 7,
+      "label": "Data Exports",
+      "before": "/institution/analyst",
+      "clicked": true,
+      "after": "/institution/analyst/data-exports",
+      "title": "Data Exports — Institution Analyst | PlanThePath",
+      "h1": "Data Exports",
+      "current": [
+        "Data Exports"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/analyst",
+      "index": 8,
+      "label": "Visualizations",
+      "before": "/institution/analyst",
+      "clicked": true,
+      "after": "/institution/analyst/visualizations",
+      "title": "Visualizations — Institution Analyst | PlanThePath",
+      "h1": "Visualizations",
+      "current": [
+        "Visualizations"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/analyst",
+      "index": 9,
+      "label": "Saved Views",
+      "before": "/institution/analyst",
+      "clicked": true,
+      "after": "/institution/analyst/saved-views",
+      "title": "Saved Views — Institution Analyst | PlanThePath",
+      "h1": "Saved Views",
+      "current": [
+        "Saved Views"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/institution/analyst",
+      "index": 10,
+      "label": "Settings",
+      "before": "/institution/analyst",
+      "clicked": true,
+      "after": "/institution/analyst/settings",
+      "title": "Settings — Institution Analyst | PlanThePath",
+      "h1": "Settings",
+      "current": [
+        "Settings"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/employer/recruiter",
+      "index": 0,
+      "label": "Dashboard",
+      "before": "/employer/recruiter",
+      "clicked": true,
+      "after": "/employer/recruiter",
+      "title": "Recruiter Dashboard | PlanThePath",
+      "h1": "Recruiter Dashboard",
+      "current": [
+        "Dashboard"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/employer/recruiter",
+      "index": 1,
+      "label": "Opportunities",
+      "before": "/employer/recruiter",
+      "clicked": true,
+      "after": "/employer/recruiter/opportunities",
+      "title": "Opportunities — Recruiter | PlanThePath",
+      "h1": "Opportunities",
+      "current": [
+        "Opportunities"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/employer/recruiter",
+      "index": 2,
+      "label": "Opportunity Detail",
+      "before": "/employer/recruiter",
+      "clicked": true,
+      "after": "/employer/recruiter/opportunity-detail",
+      "title": "Opportunity Detail — Recruiter | PlanThePath",
+      "h1": "Opportunity Detail",
+      "current": [
+        "Opportunity Detail"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/employer/recruiter",
+      "index": 3,
+      "label": "Applicants",
+      "before": "/employer/recruiter",
+      "clicked": true,
+      "after": "/employer/recruiter/applicants",
+      "title": "Applicants — Recruiter | PlanThePath",
+      "h1": "Applicants",
+      "current": [
+        "Applicants"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/employer/recruiter",
+      "index": 4,
+      "label": "Candidate Detail",
+      "before": "/employer/recruiter",
+      "clicked": true,
+      "after": "/employer/recruiter/candidate-detail",
+      "title": "Candidate Detail — Recruiter | PlanThePath",
+      "h1": "Candidate Detail",
+      "current": [
+        "Candidate Detail"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/employer/recruiter",
+      "index": 5,
+      "label": "Assessments",
+      "before": "/employer/recruiter",
+      "clicked": true,
+      "after": "/employer/recruiter/assessments",
+      "title": "Assessments — Recruiter | PlanThePath",
+      "h1": "Assessments",
+      "current": [
+        "Assessments"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/employer/recruiter",
+      "index": 6,
+      "label": "Interviews",
+      "before": "/employer/recruiter",
+      "clicked": true,
+      "after": "/employer/recruiter/interviews",
+      "title": "Interviews — Recruiter | PlanThePath",
+      "h1": "Interviews",
+      "current": [
+        "Interviews"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/employer/recruiter",
+      "index": 7,
+      "label": "Talent Pool",
+      "before": "/employer/recruiter",
+      "clicked": true,
+      "after": "/employer/recruiter/talent-pool",
+      "title": "Talent Pool — Recruiter | PlanThePath",
+      "h1": "Talent Pool",
+      "current": [
+        "Talent Pool"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/employer/recruiter",
+      "index": 8,
+      "label": "Offers",
+      "before": "/employer/recruiter",
+      "clicked": true,
+      "after": "/employer/recruiter/offers",
+      "title": "Offers — Recruiter | PlanThePath",
+      "h1": "Offers",
+      "current": [
+        "Offers"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/employer/recruiter",
+      "index": 9,
+      "label": "Reports",
+      "before": "/employer/recruiter",
+      "clicked": true,
+      "after": "/employer/recruiter/reports",
+      "title": "Reports — Recruiter | PlanThePath",
+      "h1": "Reports",
+      "current": [
+        "Reports"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/employer/recruiter",
+      "index": 10,
+      "label": "Team",
+      "before": "/employer/recruiter",
+      "clicked": true,
+      "after": "/employer/recruiter/team",
+      "title": "Team — Recruiter | PlanThePath",
+      "h1": "Team",
+      "current": [
+        "Team"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/employer/recruiter",
+      "index": 11,
+      "label": "Messages",
+      "before": "/employer/recruiter",
+      "clicked": true,
+      "after": "/employer/recruiter/messages",
+      "title": "Messages — Recruiter | PlanThePath",
+      "h1": "Messages",
+      "current": [
+        "Messages"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/employer/recruiter",
+      "index": 12,
+      "label": "Company Profile",
+      "before": "/employer/recruiter",
+      "clicked": true,
+      "after": "/employer/recruiter/company-profile",
+      "title": "Company Profile — Recruiter | PlanThePath",
+      "h1": "Company Profile",
+      "current": [
+        "Company Profile"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/employer/recruiter",
+      "index": 13,
+      "label": "Settings",
+      "before": "/employer/recruiter",
+      "clicked": true,
+      "after": "/employer/recruiter/settings",
+      "title": "Settings — Recruiter | PlanThePath",
+      "h1": "Settings",
+      "current": [
+        "Settings"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/employer/hiring-manager",
+      "index": 0,
+      "label": "Dashboard",
+      "before": "/employer/hiring-manager",
+      "clicked": true,
+      "after": "/employer/hiring-manager",
+      "title": "Hiring Manager Dashboard | PlanThePath",
+      "h1": "Hiring Manager Dashboard",
+      "current": [
+        "Dashboard"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/employer/hiring-manager",
+      "index": 1,
+      "label": "Requisitions",
+      "before": "/employer/hiring-manager",
+      "clicked": true,
+      "after": "/employer/hiring-manager/requisitions",
+      "title": "Requisitions — Hiring Manager | PlanThePath",
+      "h1": "Requisitions",
+      "current": [
+        "Requisitions"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/employer/hiring-manager",
+      "index": 2,
+      "label": "Requisition Detail",
+      "before": "/employer/hiring-manager",
+      "clicked": true,
+      "after": "/employer/hiring-manager/requisition-detail",
+      "title": "Requisition Detail — Hiring Manager | PlanThePath",
+      "h1": "Requisition Detail",
+      "current": [
+        "Requisition Detail"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/employer/hiring-manager",
+      "index": 3,
+      "label": "Candidates",
+      "before": "/employer/hiring-manager",
+      "clicked": true,
+      "after": "/employer/hiring-manager/candidates",
+      "title": "Candidates — Hiring Manager | PlanThePath",
+      "h1": "Candidates",
+      "current": [
+        "Candidates"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/employer/hiring-manager",
+      "index": 4,
+      "label": "Candidate Review",
+      "before": "/employer/hiring-manager",
+      "clicked": true,
+      "after": "/employer/hiring-manager/candidate-review",
+      "title": "Candidate Review — Hiring Manager | PlanThePath",
+      "h1": "Candidate Review",
+      "current": [
+        "Candidate Review"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/employer/hiring-manager",
+      "index": 5,
+      "label": "Interviews",
+      "before": "/employer/hiring-manager",
+      "clicked": true,
+      "after": "/employer/hiring-manager/interviews",
+      "title": "Interviews — Hiring Manager | PlanThePath",
+      "h1": "Interviews",
+      "current": [
+        "Interviews"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/employer/hiring-manager",
+      "index": 6,
+      "label": "Evaluations",
+      "before": "/employer/hiring-manager",
+      "clicked": true,
+      "after": "/employer/hiring-manager/evaluations",
+      "title": "Evaluations — Hiring Manager | PlanThePath",
+      "h1": "Evaluations",
+      "current": [
+        "Evaluations"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/employer/hiring-manager",
+      "index": 7,
+      "label": "Offers",
+      "before": "/employer/hiring-manager",
+      "clicked": true,
+      "after": "/employer/hiring-manager/offers",
+      "title": "Offers — Hiring Manager | PlanThePath",
+      "h1": "Offers",
+      "current": [
+        "Offers"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/employer/hiring-manager",
+      "index": 8,
+      "label": "Hiring Reports",
+      "before": "/employer/hiring-manager",
+      "clicked": true,
+      "after": "/employer/hiring-manager/hiring-reports",
+      "title": "Hiring Reports — Hiring Manager | PlanThePath",
+      "h1": "Hiring Reports",
+      "current": [
+        "Hiring Reports"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/employer/hiring-manager",
+      "index": 9,
+      "label": "Team",
+      "before": "/employer/hiring-manager",
+      "clicked": true,
+      "after": "/employer/hiring-manager/team",
+      "title": "Team — Hiring Manager | PlanThePath",
+      "h1": "Team",
+      "current": [
+        "Team"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/employer/hiring-manager",
+      "index": 10,
+      "label": "Messages",
+      "before": "/employer/hiring-manager",
+      "clicked": true,
+      "after": "/employer/hiring-manager/messages",
+      "title": "Messages — Hiring Manager | PlanThePath",
+      "h1": "Messages",
+      "current": [
+        "Messages"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/employer/hiring-manager",
+      "index": 11,
+      "label": "Settings",
+      "before": "/employer/hiring-manager",
+      "clicked": true,
+      "after": "/employer/hiring-manager/settings",
+      "title": "Settings — Hiring Manager | PlanThePath",
+      "h1": "Settings",
+      "current": [
+        "Settings"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/employer/interviewer",
+      "index": 0,
+      "label": "Dashboard",
+      "before": "/employer/interviewer",
+      "clicked": true,
+      "after": "/employer/interviewer",
+      "title": "Interviewer Dashboard | PlanThePath",
+      "h1": "Interviewer Dashboard",
+      "current": [
+        "Dashboard"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/employer/interviewer",
+      "index": 1,
+      "label": "My Interviews",
+      "before": "/employer/interviewer",
+      "clicked": true,
+      "after": "/employer/interviewer/my-interviews",
+      "title": "My Interviews — Interviewer | PlanThePath",
+      "h1": "My Interviews",
+      "current": [
+        "My Interviews"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/employer/interviewer",
+      "index": 2,
+      "label": "Schedule",
+      "before": "/employer/interviewer",
+      "clicked": true,
+      "after": "/employer/interviewer/schedule",
+      "title": "Schedule — Interviewer | PlanThePath",
+      "h1": "Schedule",
+      "current": [
+        "Schedule"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/employer/interviewer",
+      "index": 3,
+      "label": "Candidate Brief",
+      "before": "/employer/interviewer",
+      "clicked": true,
+      "after": "/employer/interviewer/candidate-brief",
+      "title": "Candidate Brief — Interviewer | PlanThePath",
+      "h1": "Candidate Brief",
+      "current": [
+        "Candidate Brief"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/employer/interviewer",
+      "index": 4,
+      "label": "Scorecards",
+      "before": "/employer/interviewer",
+      "clicked": true,
+      "after": "/employer/interviewer/scorecards",
+      "title": "Scorecards — Interviewer | PlanThePath",
+      "h1": "Scorecards",
+      "current": [
+        "Scorecards"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/employer/interviewer",
+      "index": 5,
+      "label": "Feedback",
+      "before": "/employer/interviewer",
+      "clicked": true,
+      "after": "/employer/interviewer/feedback",
+      "title": "Feedback — Interviewer | PlanThePath",
+      "h1": "Feedback",
+      "current": [
+        "Feedback"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/employer/interviewer",
+      "index": 6,
+      "label": "Interview Guidelines",
+      "before": "/employer/interviewer",
+      "clicked": true,
+      "after": "/employer/interviewer/interview-guidelines",
+      "title": "Interview Guidelines — Interviewer | PlanThePath",
+      "h1": "Interview Guidelines",
+      "current": [
+        "Interview Guidelines"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/employer/interviewer",
+      "index": 7,
+      "label": "Reports",
+      "before": "/employer/interviewer",
+      "clicked": true,
+      "after": "/employer/interviewer/reports",
+      "title": "Reports — Interviewer | PlanThePath",
+      "h1": "Reports",
+      "current": [
+        "Reports"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/employer/interviewer",
+      "index": 8,
+      "label": "Settings",
+      "before": "/employer/interviewer",
+      "clicked": true,
+      "after": "/employer/interviewer/settings",
+      "title": "Settings — Interviewer | PlanThePath",
+      "h1": "Settings",
+      "current": [
+        "Settings"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/operations/admin",
+      "index": 0,
+      "label": "Overview",
+      "before": "/operations/admin",
+      "clicked": true,
+      "after": "/operations/admin",
+      "title": "Operations Dashboard | PlanThePath",
+      "h1": "Operations Dashboard",
+      "current": [
+        "Overview"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/operations/admin",
+      "index": 1,
+      "label": "Organizations",
+      "before": "/operations/admin",
+      "clicked": true,
+      "after": "/operations/admin/organizations",
+      "title": "Organizations — Platform Administrator / Operations Administrator | PlanThePath",
+      "h1": "Organizations",
+      "current": [
+        "Organizations"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/operations/admin",
+      "index": 2,
+      "label": "Organization Detail",
+      "before": "/operations/admin",
+      "clicked": true,
+      "after": "/operations/admin/organization-detail",
+      "title": "Organization Detail — Platform Administrator / Operations Administrator | PlanThePath",
+      "h1": "Organization Detail",
+      "current": [
+        "Organization Detail"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/operations/admin",
+      "index": 3,
+      "label": "Users",
+      "before": "/operations/admin",
+      "clicked": true,
+      "after": "/operations/admin/users",
+      "title": "Users — Platform Administrator / Operations Administrator | PlanThePath",
+      "h1": "Users",
+      "current": [
+        "Users"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/operations/admin",
+      "index": 4,
+      "label": "User Detail",
+      "before": "/operations/admin",
+      "clicked": true,
+      "after": "/operations/admin/user-detail",
+      "title": "User Detail — Platform Administrator / Operations Administrator | PlanThePath",
+      "h1": "User Detail",
+      "current": [
+        "User Detail"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/operations/admin",
+      "index": 5,
+      "label": "Verification",
+      "before": "/operations/admin",
+      "clicked": true,
+      "after": "/operations/admin/verification",
+      "title": "Verification — Platform Administrator / Operations Administrator | PlanThePath",
+      "h1": "Verification",
+      "current": [
+        "Verification"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/operations/admin",
+      "index": 6,
+      "label": "Trust and Safety",
+      "before": "/operations/admin",
+      "clicked": true,
+      "after": "/operations/admin/trust-and-safety",
+      "title": "Trust and Safety — Platform Administrator / Operations Administrator | PlanThePath",
+      "h1": "Trust and Safety",
+      "current": [
+        "Trust and Safety"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/operations/admin",
+      "index": 7,
+      "label": "Content Management",
+      "before": "/operations/admin",
+      "clicked": true,
+      "after": "/operations/admin/content-management",
+      "title": "Content Management — Platform Administrator / Operations Administrator | PlanThePath",
+      "h1": "Content Management",
+      "current": [
+        "Content Management"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/operations/admin",
+      "index": 8,
+      "label": "AI Operations",
+      "before": "/operations/admin",
+      "clicked": true,
+      "after": "/operations/admin/ai-operations",
+      "title": "AI Operations — Platform Administrator / Operations Administrator | PlanThePath",
+      "h1": "AI Operations",
+      "current": [
+        "AI Operations"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/operations/admin",
+      "index": 9,
+      "label": "Subscriptions",
+      "before": "/operations/admin",
+      "clicked": true,
+      "after": "/operations/admin/subscriptions",
+      "title": "Subscriptions — Platform Administrator / Operations Administrator | PlanThePath",
+      "h1": "Subscriptions",
+      "current": [
+        "Subscriptions"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/operations/admin",
+      "index": 10,
+      "label": "Billing",
+      "before": "/operations/admin",
+      "clicked": true,
+      "after": "/operations/admin/billing",
+      "title": "Billing — Platform Administrator / Operations Administrator | PlanThePath",
+      "h1": "Billing",
+      "current": [
+        "Billing"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/operations/admin",
+      "index": 11,
+      "label": "Analytics",
+      "before": "/operations/admin",
+      "clicked": true,
+      "after": "/operations/admin/analytics",
+      "title": "Analytics — Platform Administrator / Operations Administrator | PlanThePath",
+      "h1": "Analytics",
+      "current": [
+        "Analytics"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/operations/admin",
+      "index": 12,
+      "label": "System Health",
+      "before": "/operations/admin",
+      "clicked": true,
+      "after": "/operations/admin/system-health",
+      "title": "System Health — Platform Administrator / Operations Administrator | PlanThePath",
+      "h1": "System Health",
+      "current": [
+        "System Health"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/operations/admin",
+      "index": 13,
+      "label": "Audit Logs",
+      "before": "/operations/admin",
+      "clicked": true,
+      "after": "/operations/admin/audit-logs",
+      "title": "Audit Logs — Platform Administrator / Operations Administrator | PlanThePath",
+      "h1": "Audit Logs",
+      "current": [
+        "Audit Logs"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/operations/admin",
+      "index": 14,
+      "label": "Security",
+      "before": "/operations/admin",
+      "clicked": true,
+      "after": "/operations/admin/security",
+      "title": "Security — Platform Administrator / Operations Administrator | PlanThePath",
+      "h1": "Security",
+      "current": [
+        "Security"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/operations/admin",
+      "index": 15,
+      "label": "Feature Flags",
+      "before": "/operations/admin",
+      "clicked": true,
+      "after": "/operations/admin/feature-flags",
+      "title": "Feature Flags — Platform Administrator / Operations Administrator | PlanThePath",
+      "h1": "Feature Flags",
+      "current": [
+        "Feature Flags"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/operations/admin",
+      "index": 16,
+      "label": "Support",
+      "before": "/operations/admin",
+      "clicked": true,
+      "after": "/operations/admin/support",
+      "title": "Support — Platform Administrator / Operations Administrator | PlanThePath",
+      "h1": "Support",
+      "current": [
+        "Support"
+      ],
+      "issue": false
+    },
+    {
+      "start": "/operations/admin",
+      "index": 17,
+      "label": "Settings",
+      "before": "/operations/admin",
+      "clicked": true,
+      "after": "/operations/admin/settings",
+      "title": "Settings — Platform Administrator / Operations Administrator | PlanThePath",
+      "h1": "Settings",
+      "current": [
+        "Settings"
+      ],
+      "issue": false
+    }
+  ],
+  "network": {
+    "badResponses": [],
+    "failed": [],
+    "production": []
+  },
+  "console": {
+    "bad": [],
+    "exceptions": []
+  }
+}

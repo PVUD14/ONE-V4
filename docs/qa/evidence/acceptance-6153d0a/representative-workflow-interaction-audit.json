@@ -1,0 +1,1600 @@
+{
+  "workflows": [
+    {
+      "name": "Demo launcher is preview, not authentication",
+      "route": "/demo",
+      "steps": [
+        {
+          "name": "notice present",
+          "result": true,
+          "state": {
+            "path": "/demo",
+            "title": "Portal Preview Launcher | PlanThePath",
+            "h1": "Multi-role portal launcher",
+            "text": "PLANTHEPATH PRODUCT PREVIEW\nMulti-role portal launcher\n\nPortal preview — role selection here does not authenticate or authorize a user.\n\nStudent\nStudent Portal\nStudent\n\nABC Engineering College\n\nPreview user\nRahul Kumar\nBackend role\nSTUDENT\nEnforcement\nBackend enforced\nOpen portal\nInstitution\nInstitution Portal\nPlacement Officer\n\nABC Engineering College\n\nPreview user\nAnita Sharma\nBackend role\nPLACEMENT_ADMIN / PLACEMENT_OFFICER\nEnforcement\nPartially backend enforced\nOpen portal\nFaculty Portal\nLecturer / Faculty\n\nABC Engineering College\n\nPreview user\nDr. Meera Iyer\nBackend role\nFACULTY_LECTURER\nEnforcement\nPartially backend enforced\nOpen portal\nCounselor Portal\nCareer Counselor\n\nABC Engineering College\n\nPreview user\nKavya Menon\nBackend role\nCAREER_COUNSELOR\nEnforcement\nDomain-model only\nOpen portal\nDepartment Portal\nDepartment Head\n\nABC Engineering College - CSE\n\nPreview user\nProf. Arvind Rao\nBackend role\nDEPARTMENT_HEAD\nEnforcement\nPartially backend enforced\nOpen portal\nAnalytics Portal\nInstitution Analyst\n\nABC Engineering College\n\nPreview user\nNisha Verma\nBackend role\nINSTITUTION_ANALYST\nEnforcement\nDomain-model only\nOpen portal\nEmployer\nEmployer Portal\nRecruiter\n\nAster Mobility\n\nPreview user\nRohan Shah\nBackend role\nRECRUITER\nEnforcement\nBackend enforced\nOpen portal\nHiring Manager Portal\nHiring Manager\n\nAster Mobility\n\nPreview user\nLeena Kapoor\nBackend role\nHIRING_MANAGER\nEnforcement\nDomain-model only\nOpen portal\nInterviewer Portal\nInterviewer\n\nAster Mobility\n\nPreview user\nDev Nair\nBackend role\nINTERVIEWER\nEnforcement\nDomain-model only\nOpen portal\nOperations\nOperations Portal\nPlatform Administrator / Operations Administrator\n\nPlanThePath Platform\n\nPreview user\nSamir Das\nBackend role\nOPERATIONS_ADMIN\nEnforcement\nBackend enforced\nOpen portal",
+            "dialogs": [],
+            "alerts": [],
+            "status": [],
+            "active": "PlanThePath product previewMulti-role portal launcherPortal preview — role selection here does not authenticate or autho",
+            "overflow": false
+          }
+        },
+        {
+          "name": "open Recruiter portal card",
+          "result": {
+            "clicked": true,
+            "label": "Open portal"
+          },
+          "state": {
+            "path": "/student",
+            "title": "Student Dashboard | PlanThePath",
+            "h1": "Student Dashboard",
+            "text": "Skip to content\nPlanThePath\nStudent Portal\nPLAN\nHome\nMy Career\nAI Career Coach\nPREPARE\nReadiness\nSkills\nAssessments\nLearning\nExperience\nAPPLY\nOpportunities\nApplications\nInterviews\nACCOUNT\nDocuments\nProfile\nSettings\nCollapse\nSearch student workspace\n3\nAPI Online\nRK\nRahul Kumar\nB.Tech CSE | 2027\nDemo preview\nonline\nSession-local preview\nSession-local Student preview ready.\nHOME\nStudent Dashboard\n\nA guided summary of your career progress and next steps.\n\nGOOD MORNING, RAHUL\nYour Cybersecurity Analyst path is moving forward.\n\nFocus today on the SIEM assessment, one security lab update, and one matched SOC opportunity review.\n\nContinue next action\nView roadmap\nCareer readiness\n68/100\n\n+8 points this month\n\nTarget career\nCybersecurity Analyst\n\n62% roadmap progress\n\nNext milestone\nComplete SIEM Assessment\n\nDue in 3 days\n\nAI Career Coach\nCommunication gap\n\nPractice incident triage and attach the lab summary.\n\nOpen coach\nRecommended next actions\nView all tasks\n1\nComplete profile evidence\n\nAdd institution-verified academic record references.\n\nPending\n2\nFinish readiness assessment\n\nCommunication module is ready to continue.\n\nDue soon\n3\nReview matched opportunity\n\nSOC Analyst Intern role matches your networking and SIEM signals.\n\nReview\n4\nUpdate skill evidence\n\nLink security lab outcomes to incident triage and stakeholder notes.\n\nDraft\nReadiness breakdown\nFull breakdown\n68\nReady\nTechnical readiness\n72%\nLinux hardening lab needs verification\nAptitude readiness\n70%\nOne timed reasoning reassessment recommended\nCommunication readiness\n58%\nIncident-triage story needs mock feedback\nResume/profile readiness\n80%\nResume tailored for SOC roles\nInterview readiness\n58%\nMock interview not completed\nUpcoming\nCalendar\nToday\nComplete Linux assessment\n20 Aug\nSOC interview practice\n22 Aug\nNetworking reassessment\nApplication pipeline\nApplications\n1\nDraft\n1\nApplied\n1\nInterview\n1\nOffer\nLatest matched opportunities\nView all\nSL\nSOC Analyst Intern\n\nSecureTech Labs | Bengaluru\n\n86% fit\nIS\nCybersecurity Intern\n\nInfoSec Solutions | Remote\n\n78% fit\nAM\nSecurity Operations Trainee\n\nAster Mobility | Pune\n\n72% fit\nLearning progress\nLearning plan\nSIEM Investigation Sprint\n60%\nSIEM investigation\nLinux Hardening Basics\n35%\nLinux fundamentals\nInterview Narrative Practice\n0%\nCommunication\nMilestone unlocked\n\nNetworking fundamentals assessment completed with portfolio-ready notes.\n\nCertificate ready",
+            "dialogs": [],
+            "alerts": [],
+            "status": [
+              "Session-local previewSession-local Student preview ready."
+            ],
+            "active": "Skip to contentPlanThePathStudent PortalPlanHomeMy CareerAI Career CoachPrepareReadinessSkillsAssessmentsLearningExperie",
+            "overflow": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "Student Skills filter/edit/read-only",
+      "route": "/student/skills",
+      "steps": [
+        {
+          "name": "filter Technical changes visible state",
+          "result": {
+            "clicked": true,
+            "label": "Technical"
+          },
+          "state": {
+            "path": "/student/skills",
+            "title": "Skills — Student | PlanThePath",
+            "h1": "Skills",
+            "text": "Skip to content\nPlanThePath\nStudent Portal\nPLAN\nHome\nMy Career\nAI Career Coach\nPREPARE\nReadiness\nSkills\nAssessments\nLearning\nExperience\nAPPLY\nOpportunities\nApplications\nInterviews\nACCOUNT\nDocuments\nProfile\nSettings\nCollapse\nSearch student workspace\n3\nAPI Online\nRK\nRahul Kumar\nB.Tech CSE | 2027\nDemo preview\nonline\nSession-local preview\nSession-local Student preview ready.\nSKILL PROFILE\nSkills\n\nClaimed, evidenced, institution-verified, and assessment-verified capabilities.\n\nTracked skills\n8\n\nAcross technical, analytical, communication and aptitude\n\nPriority gaps\n7\n\nHighest: SIEM and incident triage\n\nVerified signals\n4\n\nAssessment or institution-backed\n\nSkill inventory\nAdd or update skill\nSearch skills\nTechnical\nAnalytical\nCommunication\nAptitude\nVerified\nClaimed\nClear filters\n\n4 skills shown\n\nNetworking fundamentals\n\nTechnical | target 80% | trend +8\n\nProficiency\n82%\nGap: 0 points\nAssessment-verified\nStrong evidence\nVerified read-only\nAttach evidence\nLinux fundamentals\n\nTechnical | target 78% | trend +5\n\nProficiency\n74%\nGap: 4 points\nSelf-declared\nMedium evidence\nEdit skill\nRemove\nAttach evidence\nSecurity fundamentals\n\nTechnical | target 82% | trend +6\n\nProficiency\n76%\nGap: 6 points\nInstitution-verified\nMedium evidence\nVerified read-only\nAttach evidence\nPython security automation\n\nTechnical | target 72% | trend +7\n\nProficiency\n63%\nGap: 9 points\nCourse artifact\nMedium evidence\nEdit skill\nRemove\nAttach evidence\nPriority next action\n\nComplete the SIEM Investigation Assessment, then attach the investigation note as evidence.\n\nVerification guide\nClaimed: visible only as self-reported.\nEvidenced: linked to a document or project.\nAssessment/institution verified: strongest readiness signals.",
+            "dialogs": [],
+            "alerts": [],
+            "status": [
+              "Session-local previewSession-local Student preview ready.",
+              "4 skills shown"
+            ],
+            "active": "Skip to contentPlanThePathStudent PortalPlanHomeMy CareerAI Career CoachPrepareReadinessSkillsAssessmentsLearningExperie",
+            "overflow": false
+          }
+        },
+        {
+          "name": "open edit skill",
+          "result": {
+            "clicked": true,
+            "label": "Edit skill"
+          },
+          "state": {
+            "path": "/student/skills",
+            "title": "Skills — Student | PlanThePath",
+            "h1": "Skills",
+            "text": "Skip to content\nPlanThePath\nStudent Portal\nPLAN\nHome\nMy Career\nAI Career Coach\nPREPARE\nReadiness\nSkills\nAssessments\nLearning\nExperience\nAPPLY\nOpportunities\nApplications\nInterviews\nACCOUNT\nDocuments\nProfile\nSettings\nCollapse\nSearch student workspace\n3\nAPI Online\nRK\nRahul Kumar\nB.Tech CSE | 2027\nDemo preview\nonline\nSession-local preview\nSession-local Student preview ready.\nSKILL PROFILE\nSkills\n\nClaimed, evidenced, institution-verified, and assessment-verified capabilities.\n\nTracked skills\n8\n\nAcross technical, analytical, communication and aptitude\n\nPriority gaps\n7\n\nHighest: SIEM and incident triage\n\nVerified signals\n4\n\nAssessment or institution-backed\n\nSkill inventory\nAdd or update skill\nSearch skills\nTechnical\nAnalytical\nCommunication\nAptitude\nVerified\nClaimed\nClear filters\n\n4 skills shown\n\nNetworking fundamentals\n\nTechnical | target 80% | trend +8\n\nProficiency\n82%\nGap: 0 points\nAssessment-verified\nStrong evidence\nVerified read-only\nAttach evidence\nLinux fundamentals\n\nTechnical | target 78% | trend +5\n\nProficiency\n74%\nGap: 4 points\nSelf-declared\nMedium evidence\nEdit skill\nRemove\nAttach evidence\nSecurity fundamentals\n\nTechnical | target 82% | trend +6\n\nProficiency\n76%\nGap: 6 points\nInstitution-verified\nMedium evidence\nVerified read-only\nAttach evidence\nPython security automation\n\nTechnical | target 72% | trend +7\n\nProficiency\n63%\nGap: 9 points\nCourse artifact\nMedium evidence\nEdit skill\nRemove\nAttach evidence\nPriority next action\n\nComplete the SIEM Investigation Assessment, then attach the investigation note as evidence.\n\nVerification guide\nClaimed: visible only as self-reported.\nEvidenced: linked to a document or project.\nAssessment/institution verified: strongest readiness signals.\nEdit self-declared skill\nCancel\nSkill name\nSkill group\nTechnical\nAnalytical\nCommunication\nAptitude\nSelf-rated proficiency\n74%\nEvidence metadata\n\nAssessment-verified and institution-verified skills remain read-only.\n\nSave skill\nCancel",
+            "dialogs": [
+              "Edit self-declared skillCancelSkill nameSkill groupTechnicalAnalyticalCommunicationAptitudeSelf-rate"
+            ],
+            "alerts": [],
+            "status": [
+              "Session-local previewSession-local Student preview ready.",
+              "4 skills shown"
+            ],
+            "active": "Cancel",
+            "overflow": false
+          }
+        },
+        {
+          "name": "cancel returns",
+          "result": {
+            "clicked": true,
+            "label": "Cancel"
+          },
+          "state": {
+            "path": "/student/skills",
+            "title": "Skills — Student | PlanThePath",
+            "h1": "Skills",
+            "text": "Skip to content\nPlanThePath\nStudent Portal\nPLAN\nHome\nMy Career\nAI Career Coach\nPREPARE\nReadiness\nSkills\nAssessments\nLearning\nExperience\nAPPLY\nOpportunities\nApplications\nInterviews\nACCOUNT\nDocuments\nProfile\nSettings\nCollapse\nSearch student workspace\n3\nAPI Online\nRK\nRahul Kumar\nB.Tech CSE | 2027\nDemo preview\nonline\nSession-local preview\nSession-local Student preview ready.\nSKILL PROFILE\nSkills\n\nClaimed, evidenced, institution-verified, and assessment-verified capabilities.\n\nTracked skills\n8\n\nAcross technical, analytical, communication and aptitude\n\nPriority gaps\n7\n\nHighest: SIEM and incident triage\n\nVerified signals\n4\n\nAssessment or institution-backed\n\nSkill inventory\nAdd or update skill\nSearch skills\nTechnical\nAnalytical\nCommunication\nAptitude\nVerified\nClaimed\nClear filters\n\n4 skills shown\n\nNetworking fundamentals\n\nTechnical | target 80% | trend +8\n\nProficiency\n82%\nGap: 0 points\nAssessment-verified\nStrong evidence\nVerified read-only\nAttach evidence\nLinux fundamentals\n\nTechnical | target 78% | trend +5\n\nProficiency\n74%\nGap: 4 points\nSelf-declared\nMedium evidence\nEdit skill\nRemove\nAttach evidence\nSecurity fundamentals\n\nTechnical | target 82% | trend +6\n\nProficiency\n76%\nGap: 6 points\nInstitution-verified\nMedium evidence\nVerified read-only\nAttach evidence\nPython security automation\n\nTechnical | target 72% | trend +7\n\nProficiency\n63%\nGap: 9 points\nCourse artifact\nMedium evidence\nEdit skill\nRemove\nAttach evidence\nPriority next action\n\nComplete the SIEM Investigation Assessment, then attach the investigation note as evidence.\n\nVerification guide\nClaimed: visible only as self-reported.\nEvidenced: linked to a document or project.\nAssessment/institution verified: strongest readiness signals.",
+            "dialogs": [],
+            "alerts": [],
+            "status": [
+              "Session-local previewSession-local Student preview ready.",
+              "4 skills shown"
+            ],
+            "active": "Edit skill",
+            "overflow": false
+          }
+        },
+        {
+          "name": "verified read-only boundary visible",
+          "result": true,
+          "state": {
+            "path": "/student/skills",
+            "title": "Skills — Student | PlanThePath",
+            "h1": "Skills",
+            "text": "Skip to content\nPlanThePath\nStudent Portal\nPLAN\nHome\nMy Career\nAI Career Coach\nPREPARE\nReadiness\nSkills\nAssessments\nLearning\nExperience\nAPPLY\nOpportunities\nApplications\nInterviews\nACCOUNT\nDocuments\nProfile\nSettings\nCollapse\nSearch student workspace\n3\nAPI Online\nRK\nRahul Kumar\nB.Tech CSE | 2027\nDemo preview\nonline\nSession-local preview\nSession-local Student preview ready.\nSKILL PROFILE\nSkills\n\nClaimed, evidenced, institution-verified, and assessment-verified capabilities.\n\nTracked skills\n8\n\nAcross technical, analytical, communication and aptitude\n\nPriority gaps\n7\n\nHighest: SIEM and incident triage\n\nVerified signals\n4\n\nAssessment or institution-backed\n\nSkill inventory\nAdd or update skill\nSearch skills\nTechnical\nAnalytical\nCommunication\nAptitude\nVerified\nClaimed\nClear filters\n\n4 skills shown\n\nNetworking fundamentals\n\nTechnical | target 80% | trend +8\n\nProficiency\n82%\nGap: 0 points\nAssessment-verified\nStrong evidence\nVerified read-only\nAttach evidence\nLinux fundamentals\n\nTechnical | target 78% | trend +5\n\nProficiency\n74%\nGap: 4 points\nSelf-declared\nMedium evidence\nEdit skill\nRemove\nAttach evidence\nSecurity fundamentals\n\nTechnical | target 82% | trend +6\n\nProficiency\n76%\nGap: 6 points\nInstitution-verified\nMedium evidence\nVerified read-only\nAttach evidence\nPython security automation\n\nTechnical | target 72% | trend +7\n\nProficiency\n63%\nGap: 9 points\nCourse artifact\nMedium evidence\nEdit skill\nRemove\nAttach evidence\nPriority next action\n\nComplete the SIEM Investigation Assessment, then attach the investigation note as evidence.\n\nVerification guide\nClaimed: visible only as self-reported.\nEvidenced: linked to a document or project.\nAssessment/institution verified: strongest readiness signals.",
+            "dialogs": [],
+            "alerts": [],
+            "status": [
+              "Session-local previewSession-local Student preview ready.",
+              "4 skills shown"
+            ],
+            "active": "Edit skill",
+            "overflow": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "Student Applications detail/edit/confirmation",
+      "route": "/student/applications",
+      "steps": [
+        {
+          "name": "open detail",
+          "result": {
+            "clicked": true,
+            "label": "View detail"
+          },
+          "state": {
+            "path": "/student/applications",
+            "title": "Applications — Student | PlanThePath",
+            "h1": "Applications",
+            "text": "Skip to content\nPlanThePath\nStudent Portal\nPLAN\nHome\nMy Career\nAI Career Coach\nPREPARE\nReadiness\nSkills\nAssessments\nLearning\nExperience\nAPPLY\nOpportunities\nApplications\nInterviews\nACCOUNT\nDocuments\nProfile\nSettings\nCollapse\nSearch student workspace\n3\nAPI Online\nRK\nRahul Kumar\nB.Tech CSE | 2027\nDemo preview\nonline\nSession-local preview\nSession-local Student preview ready.\nPIPELINE\nApplications\n\nDrafts, active applications, interviews, offers, closed roles, and next actions.\n\nApplication pipeline\nNew draft\n\nSecure workflow required: final submit/withdraw persistence requires the configured application service.\n\nSearch applications\n1\nDraft\n1\nApplied\n0\nShortlisted\n0\nAssessment\n1\nInterview\n1\nOffer\n0\nClosed\nSL\nSOC Analyst Intern\n\nSecureTech Labs | submitted Aug 17 | next deadline Aug 18\n\nNext: Confirm resume version. Documents: Resume draft ready. Assessment: Not assigned. Interview: Not scheduled\n\nActivity timeline\nDraft\nView detail\nEdit draft\nWithdraw application\nIS\nCybersecurity Intern\n\nInfoSec Solutions | submitted Aug 14 | next deadline Aug 29\n\nNext: Await recruiter review. Documents: Resume submitted. Assessment: Screening pending. Interview: Pending\n\nActivity timeline\nApplied\nView detail\nSubmitted read-only\nWithdraw application\nAM\nSecurity Operations Trainee\n\nAster Mobility | submitted Aug 12 | next deadline Aug 21\n\nNext: Prepare incident triage exercise. Documents: Portfolio requested. Assessment: Completed. Interview: Technical round scheduled\n\nActivity timeline\nInterview\nView detail\nSubmitted read-only\nWithdraw application\nMS\nIncident Response Associate\n\nMarketWorks Security | submitted Aug 08 | next deadline Aug 25\n\nNext: Review terms snapshot. Documents: Offer letter available. Assessment: Completed. Interview: Completed\n\nActivity timeline\nOffer\nView detail\nSubmitted read-only\nWithdraw application\nAPI health note\n\nAPI Offline in earlier captures was expected when the local API health check had not responded during screenshot timing or the API process was unavailable. The UI reflects health state from the real local check and is not hard-coded.\n\nApplication detail\nCancel\nSOC Analyst Intern\n\nSecureTech Labs | stage: Draft\n\nSubmission/draft date: Aug 17. Next deadline: Aug 18.\n\nStudent-owned documents: Resume draft ready\n\nAssessment: Not assigned. Interview: Not scheduled.\n\nToday\nResume version marked ready for review\n\nCybersecurity analyst resume v3\n\nAug 16\nNetworking fundamentals verified\n\nAssessment score added to readiness model\n\nAug 15\nSecurity lab portfolio updated\n\nEvidence source labels still pending\n\nDraft fields are Student-owned until secure submission.\n\nClose",
+            "dialogs": [
+              "Application detailCancelSOC Analyst InternSecureTech Labs | stage: DraftSubmission/draft date: Aug 1"
+            ],
+            "alerts": [],
+            "status": [
+              "Session-local previewSession-local Student preview ready."
+            ],
+            "active": "Cancel",
+            "overflow": false
+          }
+        },
+        {
+          "name": "close detail",
+          "result": {
+            "clicked": true,
+            "label": "Close navigation"
+          },
+          "state": {
+            "path": "/student/applications",
+            "title": "Applications — Student | PlanThePath",
+            "h1": "Applications",
+            "text": "Skip to content\nPlanThePath\nStudent Portal\nPLAN\nHome\nMy Career\nAI Career Coach\nPREPARE\nReadiness\nSkills\nAssessments\nLearning\nExperience\nAPPLY\nOpportunities\nApplications\nInterviews\nACCOUNT\nDocuments\nProfile\nSettings\nCollapse\nSearch student workspace\n3\nAPI Online\nRK\nRahul Kumar\nB.Tech CSE | 2027\nDemo preview\nonline\nSession-local preview\nSession-local Student preview ready.\nPIPELINE\nApplications\n\nDrafts, active applications, interviews, offers, closed roles, and next actions.\n\nApplication pipeline\nNew draft\n\nSecure workflow required: final submit/withdraw persistence requires the configured application service.\n\nSearch applications\n1\nDraft\n1\nApplied\n0\nShortlisted\n0\nAssessment\n1\nInterview\n1\nOffer\n0\nClosed\nSL\nSOC Analyst Intern\n\nSecureTech Labs | submitted Aug 17 | next deadline Aug 18\n\nNext: Confirm resume version. Documents: Resume draft ready. Assessment: Not assigned. Interview: Not scheduled\n\nActivity timeline\nDraft\nView detail\nEdit draft\nWithdraw application\nIS\nCybersecurity Intern\n\nInfoSec Solutions | submitted Aug 14 | next deadline Aug 29\n\nNext: Await recruiter review. Documents: Resume submitted. Assessment: Screening pending. Interview: Pending\n\nActivity timeline\nApplied\nView detail\nSubmitted read-only\nWithdraw application\nAM\nSecurity Operations Trainee\n\nAster Mobility | submitted Aug 12 | next deadline Aug 21\n\nNext: Prepare incident triage exercise. Documents: Portfolio requested. Assessment: Completed. Interview: Technical round scheduled\n\nActivity timeline\nInterview\nView detail\nSubmitted read-only\nWithdraw application\nMS\nIncident Response Associate\n\nMarketWorks Security | submitted Aug 08 | next deadline Aug 25\n\nNext: Review terms snapshot. Documents: Offer letter available. Assessment: Completed. Interview: Completed\n\nActivity timeline\nOffer\nView detail\nSubmitted read-only\nWithdraw application\nAPI health note\n\nAPI Offline in earlier captures was expected when the local API health check had not responded during screenshot timing or the API process was unavailable. The UI reflects health state from the real local check and is not hard-coded.\n\nApplication detail\nCancel\nSOC Analyst Intern\n\nSecureTech Labs | stage: Draft\n\nSubmission/draft date: Aug 17. Next deadline: Aug 18.\n\nStudent-owned documents: Resume draft ready\n\nAssessment: Not assigned. Interview: Not scheduled.\n\nToday\nResume version marked ready for review\n\nCybersecurity analyst resume v3\n\nAug 16\nNetworking fundamentals verified\n\nAssessment score added to readiness model\n\nAug 15\nSecurity lab portfolio updated\n\nEvidence source labels still pending\n\nDraft fields are Student-owned until secure submission.\n\nClose",
+            "dialogs": [
+              "Application detailCancelSOC Analyst InternSecureTech Labs | stage: DraftSubmission/draft date: Aug 1"
+            ],
+            "alerts": [],
+            "status": [
+              "Session-local previewSession-local Student preview ready."
+            ],
+            "active": "Cancel",
+            "overflow": false
+          }
+        },
+        {
+          "name": "open edit draft",
+          "result": {
+            "clicked": true,
+            "label": "Edit draft"
+          },
+          "state": {
+            "path": "/student/applications",
+            "title": "Applications — Student | PlanThePath",
+            "h1": "Applications",
+            "text": "Skip to content\nPlanThePath\nStudent Portal\nPLAN\nHome\nMy Career\nAI Career Coach\nPREPARE\nReadiness\nSkills\nAssessments\nLearning\nExperience\nAPPLY\nOpportunities\nApplications\nInterviews\nACCOUNT\nDocuments\nProfile\nSettings\nCollapse\nSearch student workspace\n3\nAPI Online\nRK\nRahul Kumar\nB.Tech CSE | 2027\nDemo preview\nonline\nSession-local preview\nSession-local Student preview ready.\nPIPELINE\nApplications\n\nDrafts, active applications, interviews, offers, closed roles, and next actions.\n\nApplication pipeline\nNew draft\n\nSecure workflow required: final submit/withdraw persistence requires the configured application service.\n\nSearch applications\n1\nDraft\n1\nApplied\n0\nShortlisted\n0\nAssessment\n1\nInterview\n1\nOffer\n0\nClosed\nSL\nSOC Analyst Intern\n\nSecureTech Labs | submitted Aug 17 | next deadline Aug 18\n\nNext: Confirm resume version. Documents: Resume draft ready. Assessment: Not assigned. Interview: Not scheduled\n\nActivity timeline\nDraft\nView detail\nEdit draft\nWithdraw application\nIS\nCybersecurity Intern\n\nInfoSec Solutions | submitted Aug 14 | next deadline Aug 29\n\nNext: Await recruiter review. Documents: Resume submitted. Assessment: Screening pending. Interview: Pending\n\nActivity timeline\nApplied\nView detail\nSubmitted read-only\nWithdraw application\nAM\nSecurity Operations Trainee\n\nAster Mobility | submitted Aug 12 | next deadline Aug 21\n\nNext: Prepare incident triage exercise. Documents: Portfolio requested. Assessment: Completed. Interview: Technical round scheduled\n\nActivity timeline\nInterview\nView detail\nSubmitted read-only\nWithdraw application\nMS\nIncident Response Associate\n\nMarketWorks Security | submitted Aug 08 | next deadline Aug 25\n\nNext: Review terms snapshot. Documents: Offer letter available. Assessment: Completed. Interview: Completed\n\nActivity timeline\nOffer\nView detail\nSubmitted read-only\nWithdraw application\nAPI health note\n\nAPI Offline in earlier captures was expected when the local API health check had not responded during screenshot timing or the API process was unavailable. The UI reflects health state from the real local check and is not hard-coded.\n\nApplication detail\nCancel\nSOC Analyst Intern\n\nSecureTech Labs | stage: Draft\n\nSubmission/draft date: Aug 17. Next deadline: Aug 18.\n\nStudent-owned documents: Resume draft ready\n\nAssessment: Not assigned. Interview: Not scheduled.\n\nToday\nResume version marked ready for review\n\nCybersecurity analyst resume v3\n\nAug 16\nNetworking fundamentals verified\n\nAssessment score added to readiness model\n\nAug 15\nSecurity lab portfolio updated\n\nEvidence source labels still pending\n\nDraft fields are Student-owned until secure submission.\n\nClose\nEdit application draft\nCancel\nResume selection\nResume draft ready\nCybersecurity analyst resume v3\nSecurity lab portfolio attached\nCover-note text\nOptional portfolio/evidence\nSecurity lab portfolio\nSuspicious login notebook\nNo additional evidence\n\nDraft-only content can change. Submitted application history is protected.\n\nSave draft\nCancel",
+            "dialogs": [
+              "Application detailCancelSOC Analyst InternSecureTech Labs | stage: DraftSubmission/draft date: Aug 1",
+              "Edit application draftCancelResume selectionResume draft readyCybersecurity analyst resume v3Securit"
+            ],
+            "alerts": [],
+            "status": [
+              "Session-local previewSession-local Student preview ready."
+            ],
+            "active": "Cancel",
+            "overflow": false
+          }
+        },
+        {
+          "name": "cancel edit",
+          "result": {
+            "clicked": true,
+            "label": "Cancel"
+          },
+          "state": {
+            "path": "/student/applications",
+            "title": "Applications — Student | PlanThePath",
+            "h1": "Applications",
+            "text": "Skip to content\nPlanThePath\nStudent Portal\nPLAN\nHome\nMy Career\nAI Career Coach\nPREPARE\nReadiness\nSkills\nAssessments\nLearning\nExperience\nAPPLY\nOpportunities\nApplications\nInterviews\nACCOUNT\nDocuments\nProfile\nSettings\nCollapse\nSearch student workspace\n3\nAPI Online\nRK\nRahul Kumar\nB.Tech CSE | 2027\nDemo preview\nonline\nSession-local preview\nSession-local Student preview ready.\nPIPELINE\nApplications\n\nDrafts, active applications, interviews, offers, closed roles, and next actions.\n\nApplication pipeline\nNew draft\n\nSecure workflow required: final submit/withdraw persistence requires the configured application service.\n\nSearch applications\n1\nDraft\n1\nApplied\n0\nShortlisted\n0\nAssessment\n1\nInterview\n1\nOffer\n0\nClosed\nSL\nSOC Analyst Intern\n\nSecureTech Labs | submitted Aug 17 | next deadline Aug 18\n\nNext: Confirm resume version. Documents: Resume draft ready. Assessment: Not assigned. Interview: Not scheduled\n\nActivity timeline\nDraft\nView detail\nEdit draft\nWithdraw application\nIS\nCybersecurity Intern\n\nInfoSec Solutions | submitted Aug 14 | next deadline Aug 29\n\nNext: Await recruiter review. Documents: Resume submitted. Assessment: Screening pending. Interview: Pending\n\nActivity timeline\nApplied\nView detail\nSubmitted read-only\nWithdraw application\nAM\nSecurity Operations Trainee\n\nAster Mobility | submitted Aug 12 | next deadline Aug 21\n\nNext: Prepare incident triage exercise. Documents: Portfolio requested. Assessment: Completed. Interview: Technical round scheduled\n\nActivity timeline\nInterview\nView detail\nSubmitted read-only\nWithdraw application\nMS\nIncident Response Associate\n\nMarketWorks Security | submitted Aug 08 | next deadline Aug 25\n\nNext: Review terms snapshot. Documents: Offer letter available. Assessment: Completed. Interview: Completed\n\nActivity timeline\nOffer\nView detail\nSubmitted read-only\nWithdraw application\nAPI health note\n\nAPI Offline in earlier captures was expected when the local API health check had not responded during screenshot timing or the API process was unavailable. The UI reflects health state from the real local check and is not hard-coded.\n\nEdit application draft\nCancel\nResume selection\nResume draft ready\nCybersecurity analyst resume v3\nSecurity lab portfolio attached\nCover-note text\nOptional portfolio/evidence\nSecurity lab portfolio\nSuspicious login notebook\nNo additional evidence\n\nDraft-only content can change. Submitted application history is protected.\n\nSave draft\nCancel",
+            "dialogs": [
+              "Edit application draftCancelResume selectionResume draft readyCybersecurity analyst resume v3Securit"
+            ],
+            "alerts": [],
+            "status": [
+              "Session-local previewSession-local Student preview ready."
+            ],
+            "active": "Cancel",
+            "overflow": false
+          }
+        },
+        {
+          "name": "open withdraw confirmation",
+          "result": {
+            "clicked": true,
+            "label": "Withdraw application"
+          },
+          "state": {
+            "path": "/student/applications",
+            "title": "Applications — Student | PlanThePath",
+            "h1": "Applications",
+            "text": "Skip to content\nPlanThePath\nStudent Portal\nPLAN\nHome\nMy Career\nAI Career Coach\nPREPARE\nReadiness\nSkills\nAssessments\nLearning\nExperience\nAPPLY\nOpportunities\nApplications\nInterviews\nACCOUNT\nDocuments\nProfile\nSettings\nCollapse\nSearch student workspace\n3\nAPI Online\nRK\nRahul Kumar\nB.Tech CSE | 2027\nDemo preview\nonline\nSession-local preview\nSession-local Student preview ready.\nPIPELINE\nApplications\n\nDrafts, active applications, interviews, offers, closed roles, and next actions.\n\nApplication pipeline\nNew draft\n\nSecure workflow required: final submit/withdraw persistence requires the configured application service.\n\nSearch applications\n1\nDraft\n1\nApplied\n0\nShortlisted\n0\nAssessment\n1\nInterview\n1\nOffer\n0\nClosed\nSL\nSOC Analyst Intern\n\nSecureTech Labs | submitted Aug 17 | next deadline Aug 18\n\nNext: Confirm resume version. Documents: Resume draft ready. Assessment: Not assigned. Interview: Not scheduled\n\nActivity timeline\nDraft\nView detail\nEdit draft\nWithdraw application\nIS\nCybersecurity Intern\n\nInfoSec Solutions | submitted Aug 14 | next deadline Aug 29\n\nNext: Await recruiter review. Documents: Resume submitted. Assessment: Screening pending. Interview: Pending\n\nActivity timeline\nApplied\nView detail\nSubmitted read-only\nWithdraw application\nAM\nSecurity Operations Trainee\n\nAster Mobility | submitted Aug 12 | next deadline Aug 21\n\nNext: Prepare incident triage exercise. Documents: Portfolio requested. Assessment: Completed. Interview: Technical round scheduled\n\nActivity timeline\nInterview\nView detail\nSubmitted read-only\nWithdraw application\nMS\nIncident Response Associate\n\nMarketWorks Security | submitted Aug 08 | next deadline Aug 25\n\nNext: Review terms snapshot. Documents: Offer letter available. Assessment: Completed. Interview: Completed\n\nActivity timeline\nOffer\nView detail\nSubmitted read-only\nWithdraw application\nAPI health note\n\nAPI Offline in earlier captures was expected when the local API health check had not responded during screenshot timing or the API process was unavailable. The UI reflects health state from the real local check and is not hard-coded.\n\nEdit application draft\nCancel\nResume selection\nResume draft ready\nCybersecurity analyst resume v3\nSecurity lab portfolio attached\nCover-note text\nOptional portfolio/evidence\nSecurity lab portfolio\nSuspicious login notebook\nNo additional evidence\n\nDraft-only content can change. Submitted application history is protected.\n\nSave draft\nCancel\nWithdraw application\nCancel\n\nRemove local draft for SOC Analyst Intern? No employer/backend will be notified.\n\nConfirm withdraw\nCancel",
+            "dialogs": [
+              "Edit application draftCancelResume selectionResume draft readyCybersecurity analyst resume v3Securit",
+              "Withdraw applicationCancelRemove local draft for SOC Analyst Intern? No employer/backend will be not"
+            ],
+            "alerts": [],
+            "status": [
+              "Session-local previewSession-local Student preview ready."
+            ],
+            "active": "Cancel",
+            "overflow": false
+          }
+        },
+        {
+          "name": "cancel confirmation",
+          "result": {
+            "clicked": true,
+            "label": "Cancel"
+          },
+          "state": {
+            "path": "/student/applications",
+            "title": "Applications — Student | PlanThePath",
+            "h1": "Applications",
+            "text": "Skip to content\nPlanThePath\nStudent Portal\nPLAN\nHome\nMy Career\nAI Career Coach\nPREPARE\nReadiness\nSkills\nAssessments\nLearning\nExperience\nAPPLY\nOpportunities\nApplications\nInterviews\nACCOUNT\nDocuments\nProfile\nSettings\nCollapse\nSearch student workspace\n3\nAPI Online\nRK\nRahul Kumar\nB.Tech CSE | 2027\nDemo preview\nonline\nSession-local preview\nSession-local Student preview ready.\nPIPELINE\nApplications\n\nDrafts, active applications, interviews, offers, closed roles, and next actions.\n\nApplication pipeline\nNew draft\n\nSecure workflow required: final submit/withdraw persistence requires the configured application service.\n\nSearch applications\n1\nDraft\n1\nApplied\n0\nShortlisted\n0\nAssessment\n1\nInterview\n1\nOffer\n0\nClosed\nSL\nSOC Analyst Intern\n\nSecureTech Labs | submitted Aug 17 | next deadline Aug 18\n\nNext: Confirm resume version. Documents: Resume draft ready. Assessment: Not assigned. Interview: Not scheduled\n\nActivity timeline\nDraft\nView detail\nEdit draft\nWithdraw application\nIS\nCybersecurity Intern\n\nInfoSec Solutions | submitted Aug 14 | next deadline Aug 29\n\nNext: Await recruiter review. Documents: Resume submitted. Assessment: Screening pending. Interview: Pending\n\nActivity timeline\nApplied\nView detail\nSubmitted read-only\nWithdraw application\nAM\nSecurity Operations Trainee\n\nAster Mobility | submitted Aug 12 | next deadline Aug 21\n\nNext: Prepare incident triage exercise. Documents: Portfolio requested. Assessment: Completed. Interview: Technical round scheduled\n\nActivity timeline\nInterview\nView detail\nSubmitted read-only\nWithdraw application\nMS\nIncident Response Associate\n\nMarketWorks Security | submitted Aug 08 | next deadline Aug 25\n\nNext: Review terms snapshot. Documents: Offer letter available. Assessment: Completed. Interview: Completed\n\nActivity timeline\nOffer\nView detail\nSubmitted read-only\nWithdraw application\nAPI health note\n\nAPI Offline in earlier captures was expected when the local API health check had not responded during screenshot timing or the API process was unavailable. The UI reflects health state from the real local check and is not hard-coded.\n\nWithdraw application\nCancel\n\nRemove local draft for SOC Analyst Intern? No employer/backend will be notified.\n\nConfirm withdraw\nCancel",
+            "dialogs": [
+              "Withdraw applicationCancelRemove local draft for SOC Analyst Intern? No employer/backend will be not"
+            ],
+            "alerts": [],
+            "status": [
+              "Session-local previewSession-local Student preview ready."
+            ],
+            "active": "Cancel",
+            "overflow": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "Student Coach prompt and clear confirmation",
+      "route": "/student/ai-coach",
+      "steps": [
+        {
+          "name": "send suggested prompt",
+          "result": {
+            "clicked": true,
+            "label": "Explain my readiness score"
+          },
+          "state": {
+            "path": "/student/ai-coach",
+            "title": "AI Career Coach — Student | PlanThePath",
+            "h1": "AI Career Coach",
+            "text": "Skip to content\nPlanThePath\nStudent Portal\nPLAN\nHome\nMy Career\nAI Career Coach\nPREPARE\nReadiness\nSkills\nAssessments\nLearning\nExperience\nAPPLY\nOpportunities\nApplications\nInterviews\nACCOUNT\nDocuments\nProfile\nSettings\nCollapse\nSearch student workspace\n3\nAPI Online\nRK\nRahul Kumar\nB.Tech CSE | 2027\nDemo preview\nonline\nUnsaved session changes\nAdded coach preview exchange: Local demo response for \"Explain my readiness score\".\nReset Student preview\nPREVIEW GUIDANCE\nAI Career Coach\n\nExplainable, non-authoritative recommendations using demo-only Student data.\n\nPREVIEW-ONLY GUIDANCE\nExplainable AI Career Coach\n\nThis preview uses local demo data only. No protected Student data is sent to an external model, and advice is non-authoritative.\n\nSuggest next action\nEscalate to counselor\nConversation history\nClear conversation\nCoach preview\n\nYour strongest signal is networking. The highest leverage gap is explaining incident triage clearly.\n\nRahul\n\nWhat should I do before applying to the SOC Analyst Intern role?\n\nCoach preview\n\nComplete the SIEM assessment, attach the lab note, then tailor your resume summary to SOC monitoring and escalation.\n\nRahul\n\nExplain my readiness score\n\nCoach preview\n\nDemo guidance: connect \"Explain my readiness score\" to verified evidence, readiness gaps, and counselor review before acting.\n\nAsk the coach\nPreview prompt\nCited supporting data\nReadiness gap: Communication readiness 58%\nOpportunity match: SOC Analyst Intern, 86% supported by networking/SIEM signals\nLearning recommendation: SIEM Investigation Sprint\nPrompt suggestions\nExplain my readiness score\nWhat evidence should I attach?\nWhy this opportunity?\nWhat should I learn next?",
+            "dialogs": [],
+            "alerts": [],
+            "status": [
+              "Unsaved session changesAdded coach preview exchange: Local demo response for \"Explain my readiness score\".Reset Student preview"
+            ],
+            "active": "Skip to contentPlanThePathStudent PortalPlanHomeMy CareerAI Career CoachPrepareReadinessSkillsAssessmentsLearningExperie",
+            "overflow": false
+          }
+        },
+        {
+          "name": "open clear confirmation",
+          "result": {
+            "clicked": true,
+            "label": "Clear conversation"
+          },
+          "state": {
+            "path": "/student/ai-coach",
+            "title": "AI Career Coach — Student | PlanThePath",
+            "h1": "AI Career Coach",
+            "text": "Skip to content\nPlanThePath\nStudent Portal\nPLAN\nHome\nMy Career\nAI Career Coach\nPREPARE\nReadiness\nSkills\nAssessments\nLearning\nExperience\nAPPLY\nOpportunities\nApplications\nInterviews\nACCOUNT\nDocuments\nProfile\nSettings\nCollapse\nSearch student workspace\n3\nAPI Online\nRK\nRahul Kumar\nB.Tech CSE | 2027\nDemo preview\nonline\nUnsaved session changes\nAdded coach preview exchange: Local demo response for \"Explain my readiness score\".\nReset Student preview\nPREVIEW GUIDANCE\nAI Career Coach\n\nExplainable, non-authoritative recommendations using demo-only Student data.\n\nPREVIEW-ONLY GUIDANCE\nExplainable AI Career Coach\n\nThis preview uses local demo data only. No protected Student data is sent to an external model, and advice is non-authoritative.\n\nSuggest next action\nEscalate to counselor\nConversation history\nClear conversation\nCoach preview\n\nYour strongest signal is networking. The highest leverage gap is explaining incident triage clearly.\n\nRahul\n\nWhat should I do before applying to the SOC Analyst Intern role?\n\nCoach preview\n\nComplete the SIEM assessment, attach the lab note, then tailor your resume summary to SOC monitoring and escalation.\n\nRahul\n\nExplain my readiness score\n\nCoach preview\n\nDemo guidance: connect \"Explain my readiness score\" to verified evidence, readiness gaps, and counselor review before acting.\n\nAsk the coach\nPreview prompt\n\nClear the session-local AI Coach conversation?\n\nClear conversation\nCancel\nCited supporting data\nReadiness gap: Communication readiness 58%\nOpportunity match: SOC Analyst Intern, 86% supported by networking/SIEM signals\nLearning recommendation: SIEM Investigation Sprint\nPrompt suggestions\nExplain my readiness score\nWhat evidence should I attach?\nWhy this opportunity?\nWhat should I learn next?",
+            "dialogs": [
+              "Clear coach conversation"
+            ],
+            "alerts": [],
+            "status": [
+              "Unsaved session changesAdded coach preview exchange: Local demo response for \"Explain my readiness score\".Reset Student preview"
+            ],
+            "active": "Skip to contentPlanThePathStudent PortalPlanHomeMy CareerAI Career CoachPrepareReadinessSkillsAssessmentsLearningExperie",
+            "overflow": false
+          }
+        },
+        {
+          "name": "cancel clear confirmation",
+          "result": {
+            "clicked": true,
+            "label": "Cancel"
+          },
+          "state": {
+            "path": "/student/ai-coach",
+            "title": "AI Career Coach — Student | PlanThePath",
+            "h1": "AI Career Coach",
+            "text": "Skip to content\nPlanThePath\nStudent Portal\nPLAN\nHome\nMy Career\nAI Career Coach\nPREPARE\nReadiness\nSkills\nAssessments\nLearning\nExperience\nAPPLY\nOpportunities\nApplications\nInterviews\nACCOUNT\nDocuments\nProfile\nSettings\nCollapse\nSearch student workspace\n3\nAPI Online\nRK\nRahul Kumar\nB.Tech CSE | 2027\nDemo preview\nonline\nUnsaved session changes\nAdded coach preview exchange: Local demo response for \"Explain my readiness score\".\nReset Student preview\nPREVIEW GUIDANCE\nAI Career Coach\n\nExplainable, non-authoritative recommendations using demo-only Student data.\n\nPREVIEW-ONLY GUIDANCE\nExplainable AI Career Coach\n\nThis preview uses local demo data only. No protected Student data is sent to an external model, and advice is non-authoritative.\n\nSuggest next action\nEscalate to counselor\nConversation history\nClear conversation\nCoach preview\n\nYour strongest signal is networking. The highest leverage gap is explaining incident triage clearly.\n\nRahul\n\nWhat should I do before applying to the SOC Analyst Intern role?\n\nCoach preview\n\nComplete the SIEM assessment, attach the lab note, then tailor your resume summary to SOC monitoring and escalation.\n\nRahul\n\nExplain my readiness score\n\nCoach preview\n\nDemo guidance: connect \"Explain my readiness score\" to verified evidence, readiness gaps, and counselor review before acting.\n\nAsk the coach\nPreview prompt\nCited supporting data\nReadiness gap: Communication readiness 58%\nOpportunity match: SOC Analyst Intern, 86% supported by networking/SIEM signals\nLearning recommendation: SIEM Investigation Sprint\nPrompt suggestions\nExplain my readiness score\nWhat evidence should I attach?\nWhy this opportunity?\nWhat should I learn next?",
+            "dialogs": [],
+            "alerts": [],
+            "status": [
+              "Unsaved session changesAdded coach preview exchange: Local demo response for \"Explain my readiness score\".Reset Student preview"
+            ],
+            "active": "Skip to contentPlanThePathStudent PortalPlanHomeMy CareerAI Career CoachPrepareReadinessSkillsAssessmentsLearningExperie",
+            "overflow": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "Placement Officer filters/review/assign",
+      "route": "/institution/placement-officer/students",
+      "steps": [
+        {
+          "name": "open mobile-independent review dialog",
+          "result": {
+            "clicked": true,
+            "label": "Review preview action"
+          },
+          "state": {
+            "path": "/institution/placement-officer/students",
+            "title": "Students — Placement Officer | PlanThePath",
+            "h1": "Students",
+            "text": "Skip to content\nPlanThePath\nInstitution Portal\nHOME\nDashboard\nSTUDENTS\nStudents\nDepartments\nBatches\nStudent Search\nPLACEMENT\nReadiness\nAssessments\nInterventions\nOpportunities\nApplications\nInterviews\nOffers\nENGAGEMENT\nEmployers\nCommunications\nEvents\nANALYTICS\nReports\nDashboards\nCollapse\nPlacement Officer\nABC Engineering College\nSearch institution placement workspace\n5\nAPI Online\nAS\nAnita Sharma\nPlacement Officer\nUI preview\nonline\nDemo mode — changes are stored only for this session.\nPreview data only. Secure sign-in, authorization and persistent actions require the configured backend workflow.\nABC ENGINEERING COLLEGE\nStudents\n\nRoster of placement-eligible students with readiness, risk, department, batch and intervention state. Preview data only; authorization remains backend-enforced.\n\nEdit placement status\n4,286\ntotal students\n1,084\nplacement eligible\n269\nneed intervention\nStudents actions\n\nView student opens the student readiness presentation; Assign routes to intervention planning.\n\nRead-only: student identity, consent decisions, profile fields, student-owned evidence and documents.\n\nEdit placement status\nView student\nAssign intervention\nReset\nStudents records\nTitle\tStatus\tOwner\tNote\tActions\nRahul Kumar placement status\tNeeds intervention\tAnita Sharma\tStudent identity, consent and documents are read-only.\tReview\n\t\t\t\tReview\n\t\t\t\tReview\n\t\t\t\tReview\n\t\t\t\tReview\n\t\t\t\tReview\nPreview activity log\n\nNo demo changes yet.\n\nEdit placement status\n\nEdit institution placement status, participation, counselor assignment, or institution notes.\n\nTitle required\nStatus required\nOwner required\nInstitution note\nRead-only: student identity, consent decisions, profile fields, student-owned evidence and documents.\nCancel\nSave changes",
+            "dialogs": [
+              "Edit placement statusEdit institution placement status, participation, counselor assignment, or inst"
+            ],
+            "alerts": [],
+            "status": [],
+            "active": "INPUT",
+            "overflow": false
+          }
+        },
+        {
+          "name": "cancel review",
+          "result": {
+            "clicked": true,
+            "label": "Close institution navigation"
+          },
+          "state": {
+            "path": "/institution/placement-officer/students",
+            "title": "Students — Placement Officer | PlanThePath",
+            "h1": "Students",
+            "text": "Skip to content\nPlanThePath\nInstitution Portal\nHOME\nDashboard\nSTUDENTS\nStudents\nDepartments\nBatches\nStudent Search\nPLACEMENT\nReadiness\nAssessments\nInterventions\nOpportunities\nApplications\nInterviews\nOffers\nENGAGEMENT\nEmployers\nCommunications\nEvents\nANALYTICS\nReports\nDashboards\nCollapse\nPlacement Officer\nABC Engineering College\nSearch institution placement workspace\n5\nAPI Online\nAS\nAnita Sharma\nPlacement Officer\nUI preview\nonline\nDemo mode — changes are stored only for this session.\nPreview data only. Secure sign-in, authorization and persistent actions require the configured backend workflow.\nABC ENGINEERING COLLEGE\nStudents\n\nRoster of placement-eligible students with readiness, risk, department, batch and intervention state. Preview data only; authorization remains backend-enforced.\n\nEdit placement status\n4,286\ntotal students\n1,084\nplacement eligible\n269\nneed intervention\nStudents actions\n\nView student opens the student readiness presentation; Assign routes to intervention planning.\n\nRead-only: student identity, consent decisions, profile fields, student-owned evidence and documents.\n\nEdit placement status\nView student\nAssign intervention\nReset\nStudents records\nTitle\tStatus\tOwner\tNote\tActions\nRahul Kumar placement status\tNeeds intervention\tAnita Sharma\tStudent identity, consent and documents are read-only.\tReview\n\t\t\t\tReview\n\t\t\t\tReview\n\t\t\t\tReview\n\t\t\t\tReview\n\t\t\t\tReview\nPreview activity log\n\nNo demo changes yet.\n\nEdit placement status\n\nEdit institution placement status, participation, counselor assignment, or institution notes.\n\nTitle required\nStatus required\nOwner required\nInstitution note\nRead-only: student identity, consent decisions, profile fields, student-owned evidence and documents.\nCancel\nSave changes",
+            "dialogs": [
+              "Edit placement statusEdit institution placement status, participation, counselor assignment, or inst"
+            ],
+            "alerts": [],
+            "status": [],
+            "active": "INPUT",
+            "overflow": false
+          }
+        },
+        {
+          "name": "assign routes to interventions",
+          "result": {
+            "clicked": true,
+            "label": "Assign preview action"
+          },
+          "state": {
+            "path": "/institution/placement-officer/interventions",
+            "title": "Interventions — Placement Officer | PlanThePath",
+            "h1": "Interventions",
+            "text": "Skip to content\nPlanThePath\nInstitution Portal\nHOME\nDashboard\nSTUDENTS\nStudents\nDepartments\nBatches\nStudent Search\nPLACEMENT\nReadiness\nAssessments\nInterventions\nOpportunities\nApplications\nInterviews\nOffers\nENGAGEMENT\nEmployers\nCommunications\nEvents\nANALYTICS\nReports\nDashboards\nCollapse\nPlacement Officer\nABC Engineering College\nSearch institution placement workspace\n5\nAPI Online\nAS\nAnita Sharma\nPlacement Officer\nUI preview\nonline\nDemo mode — changes are stored only for this session.\nPreview data only. Secure sign-in, authorization and persistent actions require the configured backend workflow.\nABC ENGINEERING COLLEGE\nInterventions\n\nActive interventions with severity, owner, due date, progress and affected students. Preview data only; authorization remains backend-enforced.\n\nCreate intervention\n42\nactive plans\n12\noverdue\n5\nowners assigned\nInterventions actions\n\nCreate intervention is preview-only until secure backend workflow enforcement exists.\n\nFrontend permission checks are presentation logic only; backend enforcement is still required.\n\nCreate intervention\nView student\nAssign intervention\nReset\nInterventions records\nTitle\tStatus\tOwner\tNote\tActions\nResume Review\tIn progress\tPlacement Cell\tInstitution intervention metadata can be edited in preview.\tReview\n\t\tPlacement Cell\t\tReview\n\t\tTraining Team\t\tReview\n\t\tFaculty mentors\t\tReview\nPreview activity log\n\nNo demo changes yet.\n\nCreate intervention\n\nCreate, assign, update, complete or reopen institution intervention work.\n\nTitle required\nStatus required\nOwner required\nInstitution note\nFrontend permission checks are presentation logic only; backend enforcement is still required.\nCancel\nSave changes",
+            "dialogs": [
+              "Create interventionCreate, assign, update, complete or reopen institution intervention work.Title re"
+            ],
+            "alerts": [],
+            "status": [],
+            "active": "INPUT",
+            "overflow": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "Lecturer / Faculty representative filter/detail/edit validation",
+      "route": "/institution/faculty/my-students",
+      "steps": [
+        {
+          "name": "apply first filter if present",
+          "result": {
+            "label": "Student support",
+            "changed": false
+          },
+          "state": {
+            "path": "/institution/faculty/my-students",
+            "title": "My Students — Lecturer / Faculty | PlanThePath",
+            "h1": "My Students",
+            "text": "Skip to content\nMI\nPlanThePath\nFaculty Portal\nHOME\nDashboard\nSTUDENTS\nMy Students\nStudent Detail\nAcademic Verification\nTEACHING\nAssessments\nAssessment Detail\nAssigned Tasks\nInterventions\nLearning Resources\nWORK\nReports\nCalendar\nMessages\nProfile\nSettings\nCollapse\nLecturer / Faculty\nABC Engineering College\nSearch Lecturer / Faculty workspace\nSwitch preview portal\n4\nonline\nMI\nDr. Meera IyerLecturer / Faculty\nPortal preview — role selection here does not authenticate or authorize a user. Partially backend enforced.\nLECTURER / FACULTY\nMy Students\n\nMy Students for Dr. Meera Iyer at ABC Engineering College. This page exposes Lecturer / Faculty-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nAssign support task\nSearch My Students\nStudent support\nAssessment\nResource\nClear filters\n\n1 records shown\n\nStudent support\nRahul Kumar\n\nCommunication gap with active resume review.\n\nOwner\nCSE 2027\nStatus\nNeeds intervention\n\nStudent identity, private evidence and consent decisions remain read-only.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nCreate draft assessment\nAssign Student task\nAdd faculty note\nRequest academic evidence\nCreate intervention recommendation\nAdd learning resource\nSchedule faculty session\nRead-only\nStudent-controlled consent\nEmployer decisions\nCalculated readiness formula\nForbidden\nEdit employer offers\nChange platform roles",
+            "dialogs": [],
+            "alerts": [],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "Skip to contentMIPlanThePathFaculty PortalHomeDashboardStudentsMy StudentsStudent DetailAcademic VerificationTeachingAss",
+            "overflow": false
+          }
+        },
+        {
+          "name": "open detail",
+          "result": {
+            "clicked": true,
+            "label": "View detail"
+          },
+          "state": {
+            "path": "/institution/faculty/my-students",
+            "title": "My Students — Lecturer / Faculty | PlanThePath",
+            "h1": "My Students",
+            "text": "Skip to content\nMI\nPlanThePath\nFaculty Portal\nHOME\nDashboard\nSTUDENTS\nMy Students\nStudent Detail\nAcademic Verification\nTEACHING\nAssessments\nAssessment Detail\nAssigned Tasks\nInterventions\nLearning Resources\nWORK\nReports\nCalendar\nMessages\nProfile\nSettings\nCollapse\nLecturer / Faculty\nABC Engineering College\nSearch Lecturer / Faculty workspace\nSwitch preview portal\n4\nonline\nMI\nDr. Meera IyerLecturer / Faculty\nPortal preview — role selection here does not authenticate or authorize a user. Partially backend enforced.\nLECTURER / FACULTY\nMy Students\n\nMy Students for Dr. Meera Iyer at ABC Engineering College. This page exposes Lecturer / Faculty-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nAssign support task\nSearch My Students\nStudent support\nAssessment\nResource\nClear filters\n\n1 records shown\n\nStudent support\nRahul Kumar\n\nCommunication gap with active resume review.\n\nOwner\nCSE 2027\nStatus\nNeeds intervention\n\nStudent identity, private evidence and consent decisions remain read-only.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nCreate draft assessment\nAssign Student task\nAdd faculty note\nRequest academic evidence\nCreate intervention recommendation\nAdd learning resource\nSchedule faculty session\nRead-only\nStudent-controlled consent\nEmployer decisions\nCalculated readiness formula\nForbidden\nEdit employer offers\nChange platform roles\nRahul Kumar\n\nCommunication gap with active resume review.\n\nRole\nLecturer / Faculty\nOwner\nCSE 2027\nStatus\nNeeds intervention\nProtected boundary\nStudent identity, private evidence and consent decisions remain read-only.\nClose",
+            "dialogs": [
+              "Rahul KumarCommunication gap with active resume review.RoleLecturer / FacultyOwnerCSE 2027StatusNeed"
+            ],
+            "alerts": [],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "Close",
+            "overflow": false
+          }
+        },
+        {
+          "name": "close detail",
+          "result": {
+            "clicked": true,
+            "label": "Close Lecturer / Faculty navigation"
+          },
+          "state": {
+            "path": "/institution/faculty/my-students",
+            "title": "My Students — Lecturer / Faculty | PlanThePath",
+            "h1": "My Students",
+            "text": "Skip to content\nMI\nPlanThePath\nFaculty Portal\nHOME\nDashboard\nSTUDENTS\nMy Students\nStudent Detail\nAcademic Verification\nTEACHING\nAssessments\nAssessment Detail\nAssigned Tasks\nInterventions\nLearning Resources\nWORK\nReports\nCalendar\nMessages\nProfile\nSettings\nCollapse\nLecturer / Faculty\nABC Engineering College\nSearch Lecturer / Faculty workspace\nSwitch preview portal\n4\nonline\nMI\nDr. Meera IyerLecturer / Faculty\nPortal preview — role selection here does not authenticate or authorize a user. Partially backend enforced.\nLECTURER / FACULTY\nMy Students\n\nMy Students for Dr. Meera Iyer at ABC Engineering College. This page exposes Lecturer / Faculty-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nAssign support task\nSearch My Students\nStudent support\nAssessment\nResource\nClear filters\n\n1 records shown\n\nStudent support\nRahul Kumar\n\nCommunication gap with active resume review.\n\nOwner\nCSE 2027\nStatus\nNeeds intervention\n\nStudent identity, private evidence and consent decisions remain read-only.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nCreate draft assessment\nAssign Student task\nAdd faculty note\nRequest academic evidence\nCreate intervention recommendation\nAdd learning resource\nSchedule faculty session\nRead-only\nStudent-controlled consent\nEmployer decisions\nCalculated readiness formula\nForbidden\nEdit employer offers\nChange platform roles\nRahul Kumar\n\nCommunication gap with active resume review.\n\nRole\nLecturer / Faculty\nOwner\nCSE 2027\nStatus\nNeeds intervention\nProtected boundary\nStudent identity, private evidence and consent decisions remain read-only.\nClose",
+            "dialogs": [
+              "Rahul KumarCommunication gap with active resume review.RoleLecturer / FacultyOwnerCSE 2027StatusNeed"
+            ],
+            "alerts": [],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "Close",
+            "overflow": false
+          }
+        },
+        {
+          "name": "open edit preview",
+          "result": {
+            "clicked": true,
+            "label": "Edit preview"
+          },
+          "state": {
+            "path": "/institution/faculty/my-students",
+            "title": "My Students — Lecturer / Faculty | PlanThePath",
+            "h1": "My Students",
+            "text": "Skip to content\nMI\nPlanThePath\nFaculty Portal\nHOME\nDashboard\nSTUDENTS\nMy Students\nStudent Detail\nAcademic Verification\nTEACHING\nAssessments\nAssessment Detail\nAssigned Tasks\nInterventions\nLearning Resources\nWORK\nReports\nCalendar\nMessages\nProfile\nSettings\nCollapse\nLecturer / Faculty\nABC Engineering College\nSearch Lecturer / Faculty workspace\nSwitch preview portal\n4\nonline\nMI\nDr. Meera IyerLecturer / Faculty\nPortal preview — role selection here does not authenticate or authorize a user. Partially backend enforced.\nLECTURER / FACULTY\nMy Students\n\nMy Students for Dr. Meera Iyer at ABC Engineering College. This page exposes Lecturer / Faculty-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nAssign support task\nSearch My Students\nStudent support\nAssessment\nResource\nClear filters\n\n1 records shown\n\nStudent support\nRahul Kumar\n\nCommunication gap with active resume review.\n\nOwner\nCSE 2027\nStatus\nNeeds intervention\n\nStudent identity, private evidence and consent decisions remain read-only.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nCreate draft assessment\nAssign Student task\nAdd faculty note\nRequest academic evidence\nCreate intervention recommendation\nAdd learning resource\nSchedule faculty session\nRead-only\nStudent-controlled consent\nEmployer decisions\nCalculated readiness formula\nForbidden\nEdit employer offers\nChange platform roles\nRahul Kumar\n\nCommunication gap with active resume review.\n\nRole\nLecturer / Faculty\nOwner\nCSE 2027\nStatus\nNeeds intervention\nProtected boundary\nStudent identity, private evidence and consent decisions remain read-only.\nClose\nAssign support task\n\nStudent identity, private evidence and consent decisions remain read-only.\n\nStatus\nPreview note\nCancel\nSave preview change",
+            "dialogs": [
+              "Rahul KumarCommunication gap with active resume review.RoleLecturer / FacultyOwnerCSE 2027StatusNeed",
+              "Assign support taskStudent identity, private evidence and consent decisions remain read-only.StatusP"
+            ],
+            "alerts": [],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "INPUT",
+            "overflow": false
+          }
+        },
+        {
+          "name": "save empty triggers validation or save",
+          "result": {
+            "clicked": true,
+            "label": "Save preview change"
+          },
+          "state": {
+            "path": "/institution/faculty/my-students",
+            "title": "My Students — Lecturer / Faculty | PlanThePath",
+            "h1": "My Students",
+            "text": "Skip to content\nMI\nPlanThePath\nFaculty Portal\nHOME\nDashboard\nSTUDENTS\nMy Students\nStudent Detail\nAcademic Verification\nTEACHING\nAssessments\nAssessment Detail\nAssigned Tasks\nInterventions\nLearning Resources\nWORK\nReports\nCalendar\nMessages\nProfile\nSettings\nCollapse\nLecturer / Faculty\nABC Engineering College\nSearch Lecturer / Faculty workspace\nSwitch preview portal\n4\nonline\nMI\nDr. Meera IyerLecturer / Faculty\nPortal preview — role selection here does not authenticate or authorize a user. Partially backend enforced.\nLECTURER / FACULTY\nMy Students\n\nMy Students for Dr. Meera Iyer at ABC Engineering College. This page exposes Lecturer / Faculty-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nAssign support task\nSearch My Students\nStudent support\nAssessment\nResource\nClear filters\n\n1 records shown\n\nStudent support\nRahul Kumar\n\nCommunication gap with active resume review.\n\nOwner\nCSE 2027\nStatus\nNeeds intervention\n\nStudent identity, private evidence and consent decisions remain read-only.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nCreate draft assessment\nAssign Student task\nAdd faculty note\nRequest academic evidence\nCreate intervention recommendation\nAdd learning resource\nSchedule faculty session\nRead-only\nStudent-controlled consent\nEmployer decisions\nCalculated readiness formula\nForbidden\nEdit employer offers\nChange platform roles\nRahul Kumar\n\nCommunication gap with active resume review.\n\nRole\nLecturer / Faculty\nOwner\nCSE 2027\nStatus\nNeeds intervention\nProtected boundary\nStudent identity, private evidence and consent decisions remain read-only.\nClose\nAssign support task\n\nStudent identity, private evidence and consent decisions remain read-only.\n\nStatus\nPreview note\n\nStatus and preview note are required.\n\nCancel\nSave preview change",
+            "dialogs": [
+              "Rahul KumarCommunication gap with active resume review.RoleLecturer / FacultyOwnerCSE 2027StatusNeed",
+              "Assign support taskStudent identity, private evidence and consent decisions remain read-only.StatusP"
+            ],
+            "alerts": [
+              "Status and preview note are required."
+            ],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "INPUT",
+            "overflow": false
+          }
+        },
+        {
+          "name": "cancel edit",
+          "result": {
+            "clicked": true,
+            "label": "Close Lecturer / Faculty navigation"
+          },
+          "state": {
+            "path": "/institution/faculty/my-students",
+            "title": "My Students — Lecturer / Faculty | PlanThePath",
+            "h1": "My Students",
+            "text": "Skip to content\nMI\nPlanThePath\nFaculty Portal\nHOME\nDashboard\nSTUDENTS\nMy Students\nStudent Detail\nAcademic Verification\nTEACHING\nAssessments\nAssessment Detail\nAssigned Tasks\nInterventions\nLearning Resources\nWORK\nReports\nCalendar\nMessages\nProfile\nSettings\nCollapse\nLecturer / Faculty\nABC Engineering College\nSearch Lecturer / Faculty workspace\nSwitch preview portal\n4\nonline\nMI\nDr. Meera IyerLecturer / Faculty\nPortal preview — role selection here does not authenticate or authorize a user. Partially backend enforced.\nLECTURER / FACULTY\nMy Students\n\nMy Students for Dr. Meera Iyer at ABC Engineering College. This page exposes Lecturer / Faculty-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nAssign support task\nSearch My Students\nStudent support\nAssessment\nResource\nClear filters\n\n1 records shown\n\nStudent support\nRahul Kumar\n\nCommunication gap with active resume review.\n\nOwner\nCSE 2027\nStatus\nNeeds intervention\n\nStudent identity, private evidence and consent decisions remain read-only.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nCreate draft assessment\nAssign Student task\nAdd faculty note\nRequest academic evidence\nCreate intervention recommendation\nAdd learning resource\nSchedule faculty session\nRead-only\nStudent-controlled consent\nEmployer decisions\nCalculated readiness formula\nForbidden\nEdit employer offers\nChange platform roles\nRahul Kumar\n\nCommunication gap with active resume review.\n\nRole\nLecturer / Faculty\nOwner\nCSE 2027\nStatus\nNeeds intervention\nProtected boundary\nStudent identity, private evidence and consent decisions remain read-only.\nClose\nAssign support task\n\nStudent identity, private evidence and consent decisions remain read-only.\n\nStatus\nPreview note\n\nStatus and preview note are required.\n\nCancel\nSave preview change",
+            "dialogs": [
+              "Rahul KumarCommunication gap with active resume review.RoleLecturer / FacultyOwnerCSE 2027StatusNeed",
+              "Assign support taskStudent identity, private evidence and consent decisions remain read-only.StatusP"
+            ],
+            "alerts": [
+              "Status and preview note are required."
+            ],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "INPUT",
+            "overflow": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "Career Counselor representative filter/detail/edit validation",
+      "route": "/institution/career-counselor/student-cases",
+      "steps": [
+        {
+          "name": "apply first filter if present",
+          "result": {
+            "label": "Student support",
+            "changed": false
+          },
+          "state": {
+            "path": "/institution/career-counselor/student-cases",
+            "title": "Student Cases — Career Counselor | PlanThePath",
+            "h1": "Student Cases",
+            "text": "Skip to content\nKM\nPlanThePath\nCounselor Portal\nHOME\nDashboard\nCOUNSELING\nCounselor Sessions\nStudent Cases\nCounseling Notes\nInterventions\nCareer Guidance\nRESOURCES\nAssessments\nResources\nReports\nCalendar\nMessages\nProfile\nSettings\nCollapse\nCareer Counselor\nABC Engineering College\nSearch Career Counselor workspace\nSwitch preview portal\n4\nonline\nKM\nKavya MenonCareer Counselor\nPortal preview — role selection here does not authenticate or authorize a user. Domain-model only.\nCAREER COUNSELOR\nStudent Cases\n\nStudent Cases for Kavya Menon at ABC Engineering College. This page exposes Career Counselor-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nAssign support task\nSearch Student Cases\nStudent support\nAssessment\nResource\nClear filters\n\n1 records shown\n\nStudent support\nRahul Kumar\n\nCommunication gap with active resume review.\n\nOwner\nCSE 2027\nStatus\nNeeds intervention\n\nStudent identity, private evidence and consent decisions remain read-only.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nSchedule counseling session\nAdd private counselor note\nCreate follow-up\nRecommend career path\nAssign intervention\nAttach resource\nRecord outcome\nRead-only\nInstitution verification source records\nEmployer decisions\nForbidden\nExpose private notes to employers\nChange student consent",
+            "dialogs": [],
+            "alerts": [],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "Skip to contentKMPlanThePathCounselor PortalHomeDashboardCounselingCounselor SessionsStudent CasesCounseling NotesInterv",
+            "overflow": false
+          }
+        },
+        {
+          "name": "open detail",
+          "result": {
+            "clicked": true,
+            "label": "View detail"
+          },
+          "state": {
+            "path": "/institution/career-counselor/student-cases",
+            "title": "Student Cases — Career Counselor | PlanThePath",
+            "h1": "Student Cases",
+            "text": "Skip to content\nKM\nPlanThePath\nCounselor Portal\nHOME\nDashboard\nCOUNSELING\nCounselor Sessions\nStudent Cases\nCounseling Notes\nInterventions\nCareer Guidance\nRESOURCES\nAssessments\nResources\nReports\nCalendar\nMessages\nProfile\nSettings\nCollapse\nCareer Counselor\nABC Engineering College\nSearch Career Counselor workspace\nSwitch preview portal\n4\nonline\nKM\nKavya MenonCareer Counselor\nPortal preview — role selection here does not authenticate or authorize a user. Domain-model only.\nCAREER COUNSELOR\nStudent Cases\n\nStudent Cases for Kavya Menon at ABC Engineering College. This page exposes Career Counselor-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nAssign support task\nSearch Student Cases\nStudent support\nAssessment\nResource\nClear filters\n\n1 records shown\n\nStudent support\nRahul Kumar\n\nCommunication gap with active resume review.\n\nOwner\nCSE 2027\nStatus\nNeeds intervention\n\nStudent identity, private evidence and consent decisions remain read-only.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nSchedule counseling session\nAdd private counselor note\nCreate follow-up\nRecommend career path\nAssign intervention\nAttach resource\nRecord outcome\nRead-only\nInstitution verification source records\nEmployer decisions\nForbidden\nExpose private notes to employers\nChange student consent\nRahul Kumar\n\nCommunication gap with active resume review.\n\nRole\nCareer Counselor\nOwner\nCSE 2027\nStatus\nNeeds intervention\nProtected boundary\nStudent identity, private evidence and consent decisions remain read-only.\nClose",
+            "dialogs": [
+              "Rahul KumarCommunication gap with active resume review.RoleCareer CounselorOwnerCSE 2027StatusNeeds "
+            ],
+            "alerts": [],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "Close",
+            "overflow": false
+          }
+        },
+        {
+          "name": "close detail",
+          "result": {
+            "clicked": true,
+            "label": "Close Career Counselor navigation"
+          },
+          "state": {
+            "path": "/institution/career-counselor/student-cases",
+            "title": "Student Cases — Career Counselor | PlanThePath",
+            "h1": "Student Cases",
+            "text": "Skip to content\nKM\nPlanThePath\nCounselor Portal\nHOME\nDashboard\nCOUNSELING\nCounselor Sessions\nStudent Cases\nCounseling Notes\nInterventions\nCareer Guidance\nRESOURCES\nAssessments\nResources\nReports\nCalendar\nMessages\nProfile\nSettings\nCollapse\nCareer Counselor\nABC Engineering College\nSearch Career Counselor workspace\nSwitch preview portal\n4\nonline\nKM\nKavya MenonCareer Counselor\nPortal preview — role selection here does not authenticate or authorize a user. Domain-model only.\nCAREER COUNSELOR\nStudent Cases\n\nStudent Cases for Kavya Menon at ABC Engineering College. This page exposes Career Counselor-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nAssign support task\nSearch Student Cases\nStudent support\nAssessment\nResource\nClear filters\n\n1 records shown\n\nStudent support\nRahul Kumar\n\nCommunication gap with active resume review.\n\nOwner\nCSE 2027\nStatus\nNeeds intervention\n\nStudent identity, private evidence and consent decisions remain read-only.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nSchedule counseling session\nAdd private counselor note\nCreate follow-up\nRecommend career path\nAssign intervention\nAttach resource\nRecord outcome\nRead-only\nInstitution verification source records\nEmployer decisions\nForbidden\nExpose private notes to employers\nChange student consent\nRahul Kumar\n\nCommunication gap with active resume review.\n\nRole\nCareer Counselor\nOwner\nCSE 2027\nStatus\nNeeds intervention\nProtected boundary\nStudent identity, private evidence and consent decisions remain read-only.\nClose",
+            "dialogs": [
+              "Rahul KumarCommunication gap with active resume review.RoleCareer CounselorOwnerCSE 2027StatusNeeds "
+            ],
+            "alerts": [],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "Close",
+            "overflow": false
+          }
+        },
+        {
+          "name": "open edit preview",
+          "result": {
+            "clicked": true,
+            "label": "Edit preview"
+          },
+          "state": {
+            "path": "/institution/career-counselor/student-cases",
+            "title": "Student Cases — Career Counselor | PlanThePath",
+            "h1": "Student Cases",
+            "text": "Skip to content\nKM\nPlanThePath\nCounselor Portal\nHOME\nDashboard\nCOUNSELING\nCounselor Sessions\nStudent Cases\nCounseling Notes\nInterventions\nCareer Guidance\nRESOURCES\nAssessments\nResources\nReports\nCalendar\nMessages\nProfile\nSettings\nCollapse\nCareer Counselor\nABC Engineering College\nSearch Career Counselor workspace\nSwitch preview portal\n4\nonline\nKM\nKavya MenonCareer Counselor\nPortal preview — role selection here does not authenticate or authorize a user. Domain-model only.\nCAREER COUNSELOR\nStudent Cases\n\nStudent Cases for Kavya Menon at ABC Engineering College. This page exposes Career Counselor-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nAssign support task\nSearch Student Cases\nStudent support\nAssessment\nResource\nClear filters\n\n1 records shown\n\nStudent support\nRahul Kumar\n\nCommunication gap with active resume review.\n\nOwner\nCSE 2027\nStatus\nNeeds intervention\n\nStudent identity, private evidence and consent decisions remain read-only.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nSchedule counseling session\nAdd private counselor note\nCreate follow-up\nRecommend career path\nAssign intervention\nAttach resource\nRecord outcome\nRead-only\nInstitution verification source records\nEmployer decisions\nForbidden\nExpose private notes to employers\nChange student consent\nRahul Kumar\n\nCommunication gap with active resume review.\n\nRole\nCareer Counselor\nOwner\nCSE 2027\nStatus\nNeeds intervention\nProtected boundary\nStudent identity, private evidence and consent decisions remain read-only.\nClose\nAssign support task\n\nStudent identity, private evidence and consent decisions remain read-only.\n\nStatus\nPreview note\nCancel\nSave preview change",
+            "dialogs": [
+              "Rahul KumarCommunication gap with active resume review.RoleCareer CounselorOwnerCSE 2027StatusNeeds ",
+              "Assign support taskStudent identity, private evidence and consent decisions remain read-only.StatusP"
+            ],
+            "alerts": [],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "INPUT",
+            "overflow": false
+          }
+        },
+        {
+          "name": "save empty triggers validation or save",
+          "result": {
+            "clicked": true,
+            "label": "Save preview change"
+          },
+          "state": {
+            "path": "/institution/career-counselor/student-cases",
+            "title": "Student Cases — Career Counselor | PlanThePath",
+            "h1": "Student Cases",
+            "text": "Skip to content\nKM\nPlanThePath\nCounselor Portal\nHOME\nDashboard\nCOUNSELING\nCounselor Sessions\nStudent Cases\nCounseling Notes\nInterventions\nCareer Guidance\nRESOURCES\nAssessments\nResources\nReports\nCalendar\nMessages\nProfile\nSettings\nCollapse\nCareer Counselor\nABC Engineering College\nSearch Career Counselor workspace\nSwitch preview portal\n4\nonline\nKM\nKavya MenonCareer Counselor\nPortal preview — role selection here does not authenticate or authorize a user. Domain-model only.\nCAREER COUNSELOR\nStudent Cases\n\nStudent Cases for Kavya Menon at ABC Engineering College. This page exposes Career Counselor-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nAssign support task\nSearch Student Cases\nStudent support\nAssessment\nResource\nClear filters\n\n1 records shown\n\nStudent support\nRahul Kumar\n\nCommunication gap with active resume review.\n\nOwner\nCSE 2027\nStatus\nNeeds intervention\n\nStudent identity, private evidence and consent decisions remain read-only.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nSchedule counseling session\nAdd private counselor note\nCreate follow-up\nRecommend career path\nAssign intervention\nAttach resource\nRecord outcome\nRead-only\nInstitution verification source records\nEmployer decisions\nForbidden\nExpose private notes to employers\nChange student consent\nRahul Kumar\n\nCommunication gap with active resume review.\n\nRole\nCareer Counselor\nOwner\nCSE 2027\nStatus\nNeeds intervention\nProtected boundary\nStudent identity, private evidence and consent decisions remain read-only.\nClose\nAssign support task\n\nStudent identity, private evidence and consent decisions remain read-only.\n\nStatus\nPreview note\n\nStatus and preview note are required.\n\nCancel\nSave preview change",
+            "dialogs": [
+              "Rahul KumarCommunication gap with active resume review.RoleCareer CounselorOwnerCSE 2027StatusNeeds ",
+              "Assign support taskStudent identity, private evidence and consent decisions remain read-only.StatusP"
+            ],
+            "alerts": [
+              "Status and preview note are required."
+            ],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "INPUT",
+            "overflow": false
+          }
+        },
+        {
+          "name": "cancel edit",
+          "result": {
+            "clicked": true,
+            "label": "Close Career Counselor navigation"
+          },
+          "state": {
+            "path": "/institution/career-counselor/student-cases",
+            "title": "Student Cases — Career Counselor | PlanThePath",
+            "h1": "Student Cases",
+            "text": "Skip to content\nKM\nPlanThePath\nCounselor Portal\nHOME\nDashboard\nCOUNSELING\nCounselor Sessions\nStudent Cases\nCounseling Notes\nInterventions\nCareer Guidance\nRESOURCES\nAssessments\nResources\nReports\nCalendar\nMessages\nProfile\nSettings\nCollapse\nCareer Counselor\nABC Engineering College\nSearch Career Counselor workspace\nSwitch preview portal\n4\nonline\nKM\nKavya MenonCareer Counselor\nPortal preview — role selection here does not authenticate or authorize a user. Domain-model only.\nCAREER COUNSELOR\nStudent Cases\n\nStudent Cases for Kavya Menon at ABC Engineering College. This page exposes Career Counselor-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nAssign support task\nSearch Student Cases\nStudent support\nAssessment\nResource\nClear filters\n\n1 records shown\n\nStudent support\nRahul Kumar\n\nCommunication gap with active resume review.\n\nOwner\nCSE 2027\nStatus\nNeeds intervention\n\nStudent identity, private evidence and consent decisions remain read-only.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nSchedule counseling session\nAdd private counselor note\nCreate follow-up\nRecommend career path\nAssign intervention\nAttach resource\nRecord outcome\nRead-only\nInstitution verification source records\nEmployer decisions\nForbidden\nExpose private notes to employers\nChange student consent\nRahul Kumar\n\nCommunication gap with active resume review.\n\nRole\nCareer Counselor\nOwner\nCSE 2027\nStatus\nNeeds intervention\nProtected boundary\nStudent identity, private evidence and consent decisions remain read-only.\nClose\nAssign support task\n\nStudent identity, private evidence and consent decisions remain read-only.\n\nStatus\nPreview note\n\nStatus and preview note are required.\n\nCancel\nSave preview change",
+            "dialogs": [
+              "Rahul KumarCommunication gap with active resume review.RoleCareer CounselorOwnerCSE 2027StatusNeeds ",
+              "Assign support taskStudent identity, private evidence and consent decisions remain read-only.StatusP"
+            ],
+            "alerts": [
+              "Status and preview note are required."
+            ],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "INPUT",
+            "overflow": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "Department Head representative filter/detail/edit validation",
+      "route": "/institution/department-head/students",
+      "steps": [
+        {
+          "name": "apply first filter if present",
+          "result": {
+            "label": "Student support",
+            "changed": false
+          },
+          "state": {
+            "path": "/institution/department-head/students",
+            "title": "Students — Department Head | PlanThePath",
+            "h1": "Students",
+            "text": "Skip to content\nAR\nPlanThePath\nDepartment Portal\nHOME\nDashboard\nDEPARTMENT\nDepartment Overview\nStudents\nReadiness\nAssessments\nInterventions\nFaculty and Staff\nPLACEMENT\nPlacement Pipeline\nOpportunities and Offers\nBatches\nMeetings\nReports and Analytics\nSettings\nCollapse\nDepartment Head\nABC Engineering College - CSE\nSearch Department Head workspace\nSwitch preview portal\n4\nonline\nAR\nProf. Arvind RaoDepartment Head\nPortal preview — role selection here does not authenticate or authorize a user. Partially backend enforced.\nDEPARTMENT HEAD\nStudents\n\nStudents for Prof. Arvind Rao at ABC Engineering College - CSE. This page exposes Department Head-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nAssign support task\nSearch Students\nStudent support\nAssessment\nResource\nClear filters\n\n1 records shown\n\nStudent support\nRahul Kumar\n\nCommunication gap with active resume review.\n\nOwner\nCSE 2027\nStatus\nNeeds intervention\n\nStudent identity, private evidence and consent decisions remain read-only.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nAssign faculty workload\nCreate department intervention\nReview assessment plan\nSchedule meeting\nCreate saved dashboard\nAdd department note\nRead-only\nStudent identity\nEmployer-owned offer terms\nForbidden\nEdit student-owned profile\nIssue offers",
+            "dialogs": [],
+            "alerts": [],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "Skip to contentARPlanThePathDepartment PortalHomeDashboardDepartmentDepartment OverviewStudentsReadinessAssessmentsInter",
+            "overflow": false
+          }
+        },
+        {
+          "name": "open detail",
+          "result": {
+            "clicked": true,
+            "label": "View detail"
+          },
+          "state": {
+            "path": "/institution/department-head/students",
+            "title": "Students — Department Head | PlanThePath",
+            "h1": "Students",
+            "text": "Skip to content\nAR\nPlanThePath\nDepartment Portal\nHOME\nDashboard\nDEPARTMENT\nDepartment Overview\nStudents\nReadiness\nAssessments\nInterventions\nFaculty and Staff\nPLACEMENT\nPlacement Pipeline\nOpportunities and Offers\nBatches\nMeetings\nReports and Analytics\nSettings\nCollapse\nDepartment Head\nABC Engineering College - CSE\nSearch Department Head workspace\nSwitch preview portal\n4\nonline\nAR\nProf. Arvind RaoDepartment Head\nPortal preview — role selection here does not authenticate or authorize a user. Partially backend enforced.\nDEPARTMENT HEAD\nStudents\n\nStudents for Prof. Arvind Rao at ABC Engineering College - CSE. This page exposes Department Head-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nAssign support task\nSearch Students\nStudent support\nAssessment\nResource\nClear filters\n\n1 records shown\n\nStudent support\nRahul Kumar\n\nCommunication gap with active resume review.\n\nOwner\nCSE 2027\nStatus\nNeeds intervention\n\nStudent identity, private evidence and consent decisions remain read-only.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nAssign faculty workload\nCreate department intervention\nReview assessment plan\nSchedule meeting\nCreate saved dashboard\nAdd department note\nRead-only\nStudent identity\nEmployer-owned offer terms\nForbidden\nEdit student-owned profile\nIssue offers\nRahul Kumar\n\nCommunication gap with active resume review.\n\nRole\nDepartment Head\nOwner\nCSE 2027\nStatus\nNeeds intervention\nProtected boundary\nStudent identity, private evidence and consent decisions remain read-only.\nClose",
+            "dialogs": [
+              "Rahul KumarCommunication gap with active resume review.RoleDepartment HeadOwnerCSE 2027StatusNeeds i"
+            ],
+            "alerts": [],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "Close",
+            "overflow": false
+          }
+        },
+        {
+          "name": "close detail",
+          "result": {
+            "clicked": true,
+            "label": "Close Department Head navigation"
+          },
+          "state": {
+            "path": "/institution/department-head/students",
+            "title": "Students — Department Head | PlanThePath",
+            "h1": "Students",
+            "text": "Skip to content\nAR\nPlanThePath\nDepartment Portal\nHOME\nDashboard\nDEPARTMENT\nDepartment Overview\nStudents\nReadiness\nAssessments\nInterventions\nFaculty and Staff\nPLACEMENT\nPlacement Pipeline\nOpportunities and Offers\nBatches\nMeetings\nReports and Analytics\nSettings\nCollapse\nDepartment Head\nABC Engineering College - CSE\nSearch Department Head workspace\nSwitch preview portal\n4\nonline\nAR\nProf. Arvind RaoDepartment Head\nPortal preview — role selection here does not authenticate or authorize a user. Partially backend enforced.\nDEPARTMENT HEAD\nStudents\n\nStudents for Prof. Arvind Rao at ABC Engineering College - CSE. This page exposes Department Head-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nAssign support task\nSearch Students\nStudent support\nAssessment\nResource\nClear filters\n\n1 records shown\n\nStudent support\nRahul Kumar\n\nCommunication gap with active resume review.\n\nOwner\nCSE 2027\nStatus\nNeeds intervention\n\nStudent identity, private evidence and consent decisions remain read-only.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nAssign faculty workload\nCreate department intervention\nReview assessment plan\nSchedule meeting\nCreate saved dashboard\nAdd department note\nRead-only\nStudent identity\nEmployer-owned offer terms\nForbidden\nEdit student-owned profile\nIssue offers\nRahul Kumar\n\nCommunication gap with active resume review.\n\nRole\nDepartment Head\nOwner\nCSE 2027\nStatus\nNeeds intervention\nProtected boundary\nStudent identity, private evidence and consent decisions remain read-only.\nClose",
+            "dialogs": [
+              "Rahul KumarCommunication gap with active resume review.RoleDepartment HeadOwnerCSE 2027StatusNeeds i"
+            ],
+            "alerts": [],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "Close",
+            "overflow": false
+          }
+        },
+        {
+          "name": "open edit preview",
+          "result": {
+            "clicked": true,
+            "label": "Edit preview"
+          },
+          "state": {
+            "path": "/institution/department-head/students",
+            "title": "Students — Department Head | PlanThePath",
+            "h1": "Students",
+            "text": "Skip to content\nAR\nPlanThePath\nDepartment Portal\nHOME\nDashboard\nDEPARTMENT\nDepartment Overview\nStudents\nReadiness\nAssessments\nInterventions\nFaculty and Staff\nPLACEMENT\nPlacement Pipeline\nOpportunities and Offers\nBatches\nMeetings\nReports and Analytics\nSettings\nCollapse\nDepartment Head\nABC Engineering College - CSE\nSearch Department Head workspace\nSwitch preview portal\n4\nonline\nAR\nProf. Arvind RaoDepartment Head\nPortal preview — role selection here does not authenticate or authorize a user. Partially backend enforced.\nDEPARTMENT HEAD\nStudents\n\nStudents for Prof. Arvind Rao at ABC Engineering College - CSE. This page exposes Department Head-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nAssign support task\nSearch Students\nStudent support\nAssessment\nResource\nClear filters\n\n1 records shown\n\nStudent support\nRahul Kumar\n\nCommunication gap with active resume review.\n\nOwner\nCSE 2027\nStatus\nNeeds intervention\n\nStudent identity, private evidence and consent decisions remain read-only.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nAssign faculty workload\nCreate department intervention\nReview assessment plan\nSchedule meeting\nCreate saved dashboard\nAdd department note\nRead-only\nStudent identity\nEmployer-owned offer terms\nForbidden\nEdit student-owned profile\nIssue offers\nRahul Kumar\n\nCommunication gap with active resume review.\n\nRole\nDepartment Head\nOwner\nCSE 2027\nStatus\nNeeds intervention\nProtected boundary\nStudent identity, private evidence and consent decisions remain read-only.\nClose\nAssign support task\n\nStudent identity, private evidence and consent decisions remain read-only.\n\nStatus\nPreview note\nCancel\nSave preview change",
+            "dialogs": [
+              "Rahul KumarCommunication gap with active resume review.RoleDepartment HeadOwnerCSE 2027StatusNeeds i",
+              "Assign support taskStudent identity, private evidence and consent decisions remain read-only.StatusP"
+            ],
+            "alerts": [],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "INPUT",
+            "overflow": false
+          }
+        },
+        {
+          "name": "save empty triggers validation or save",
+          "result": {
+            "clicked": true,
+            "label": "Save preview change"
+          },
+          "state": {
+            "path": "/institution/department-head/students",
+            "title": "Students — Department Head | PlanThePath",
+            "h1": "Students",
+            "text": "Skip to content\nAR\nPlanThePath\nDepartment Portal\nHOME\nDashboard\nDEPARTMENT\nDepartment Overview\nStudents\nReadiness\nAssessments\nInterventions\nFaculty and Staff\nPLACEMENT\nPlacement Pipeline\nOpportunities and Offers\nBatches\nMeetings\nReports and Analytics\nSettings\nCollapse\nDepartment Head\nABC Engineering College - CSE\nSearch Department Head workspace\nSwitch preview portal\n4\nonline\nAR\nProf. Arvind RaoDepartment Head\nPortal preview — role selection here does not authenticate or authorize a user. Partially backend enforced.\nDEPARTMENT HEAD\nStudents\n\nStudents for Prof. Arvind Rao at ABC Engineering College - CSE. This page exposes Department Head-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nAssign support task\nSearch Students\nStudent support\nAssessment\nResource\nClear filters\n\n1 records shown\n\nStudent support\nRahul Kumar\n\nCommunication gap with active resume review.\n\nOwner\nCSE 2027\nStatus\nNeeds intervention\n\nStudent identity, private evidence and consent decisions remain read-only.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nAssign faculty workload\nCreate department intervention\nReview assessment plan\nSchedule meeting\nCreate saved dashboard\nAdd department note\nRead-only\nStudent identity\nEmployer-owned offer terms\nForbidden\nEdit student-owned profile\nIssue offers\nRahul Kumar\n\nCommunication gap with active resume review.\n\nRole\nDepartment Head\nOwner\nCSE 2027\nStatus\nNeeds intervention\nProtected boundary\nStudent identity, private evidence and consent decisions remain read-only.\nClose\nAssign support task\n\nStudent identity, private evidence and consent decisions remain read-only.\n\nStatus\nPreview note\n\nStatus and preview note are required.\n\nCancel\nSave preview change",
+            "dialogs": [
+              "Rahul KumarCommunication gap with active resume review.RoleDepartment HeadOwnerCSE 2027StatusNeeds i",
+              "Assign support taskStudent identity, private evidence and consent decisions remain read-only.StatusP"
+            ],
+            "alerts": [
+              "Status and preview note are required."
+            ],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "INPUT",
+            "overflow": false
+          }
+        },
+        {
+          "name": "cancel edit",
+          "result": {
+            "clicked": true,
+            "label": "Close Department Head navigation"
+          },
+          "state": {
+            "path": "/institution/department-head/students",
+            "title": "Students — Department Head | PlanThePath",
+            "h1": "Students",
+            "text": "Skip to content\nAR\nPlanThePath\nDepartment Portal\nHOME\nDashboard\nDEPARTMENT\nDepartment Overview\nStudents\nReadiness\nAssessments\nInterventions\nFaculty and Staff\nPLACEMENT\nPlacement Pipeline\nOpportunities and Offers\nBatches\nMeetings\nReports and Analytics\nSettings\nCollapse\nDepartment Head\nABC Engineering College - CSE\nSearch Department Head workspace\nSwitch preview portal\n4\nonline\nAR\nProf. Arvind RaoDepartment Head\nPortal preview — role selection here does not authenticate or authorize a user. Partially backend enforced.\nDEPARTMENT HEAD\nStudents\n\nStudents for Prof. Arvind Rao at ABC Engineering College - CSE. This page exposes Department Head-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nAssign support task\nSearch Students\nStudent support\nAssessment\nResource\nClear filters\n\n1 records shown\n\nStudent support\nRahul Kumar\n\nCommunication gap with active resume review.\n\nOwner\nCSE 2027\nStatus\nNeeds intervention\n\nStudent identity, private evidence and consent decisions remain read-only.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nAssign faculty workload\nCreate department intervention\nReview assessment plan\nSchedule meeting\nCreate saved dashboard\nAdd department note\nRead-only\nStudent identity\nEmployer-owned offer terms\nForbidden\nEdit student-owned profile\nIssue offers\nRahul Kumar\n\nCommunication gap with active resume review.\n\nRole\nDepartment Head\nOwner\nCSE 2027\nStatus\nNeeds intervention\nProtected boundary\nStudent identity, private evidence and consent decisions remain read-only.\nClose\nAssign support task\n\nStudent identity, private evidence and consent decisions remain read-only.\n\nStatus\nPreview note\n\nStatus and preview note are required.\n\nCancel\nSave preview change",
+            "dialogs": [
+              "Rahul KumarCommunication gap with active resume review.RoleDepartment HeadOwnerCSE 2027StatusNeeds i",
+              "Assign support taskStudent identity, private evidence and consent decisions remain read-only.StatusP"
+            ],
+            "alerts": [
+              "Status and preview note are required."
+            ],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "INPUT",
+            "overflow": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "Institution Analyst representative filter/detail/edit validation",
+      "route": "/institution/analyst/analysis-overview",
+      "steps": [
+        {
+          "name": "apply first filter if present",
+          "result": {
+            "label": "Student support",
+            "changed": false
+          },
+          "state": {
+            "path": "/institution/analyst/analysis-overview",
+            "title": "Analysis Overview — Institution Analyst | PlanThePath",
+            "h1": "Analysis Overview",
+            "text": "Skip to content\nNV\nPlanThePath\nAnalytics Portal\nHOME\nDashboard\nANALYSIS\nAnalysis Overview\nPlacement Analysis\nReadiness Analysis\nSkill Gap Analysis\nCohort Comparison\nOUTPUTS\nReports\nData Exports\nVisualizations\nSaved Views\nSettings\nCollapse\nInstitution Analyst\nABC Engineering College\nSearch Institution Analyst workspace\nSwitch preview portal\n4\nonline\nNV\nNisha VermaInstitution Analyst\nPortal preview — role selection here does not authenticate or authorize a user. Domain-model only.\nINSTITUTION ANALYST\nAnalysis Overview\n\nAnalysis Overview for Nisha Verma at ABC Engineering College. This page exposes Institution Analyst-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nGenerate preview report\nSearch Analysis Overview\nStudent support\nAssessment\nResource\nClear filters\n\n1 records shown\n\nStudent support\nRahul Kumar\n\nCommunication gap with active resume review.\n\nOwner\nCSE 2027\nStatus\nNeeds intervention\n\nStudent identity, private evidence and consent decisions remain read-only.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nConfigure filters\nSave view\nGenerate preview report\nConfigure chart\nCreate export request presentation\nAdd annotation\nRead-only\nSource records\nVerification decisions\nPlacement decisions\nForbidden\nEdit source student records\nChange backend authorization",
+            "dialogs": [],
+            "alerts": [],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "Skip to contentNVPlanThePathAnalytics PortalHomeDashboardAnalysisAnalysis OverviewPlacement AnalysisReadiness AnalysisSk",
+            "overflow": false
+          }
+        },
+        {
+          "name": "open detail",
+          "result": {
+            "clicked": true,
+            "label": "View detail"
+          },
+          "state": {
+            "path": "/institution/analyst/analysis-overview",
+            "title": "Analysis Overview — Institution Analyst | PlanThePath",
+            "h1": "Analysis Overview",
+            "text": "Skip to content\nNV\nPlanThePath\nAnalytics Portal\nHOME\nDashboard\nANALYSIS\nAnalysis Overview\nPlacement Analysis\nReadiness Analysis\nSkill Gap Analysis\nCohort Comparison\nOUTPUTS\nReports\nData Exports\nVisualizations\nSaved Views\nSettings\nCollapse\nInstitution Analyst\nABC Engineering College\nSearch Institution Analyst workspace\nSwitch preview portal\n4\nonline\nNV\nNisha VermaInstitution Analyst\nPortal preview — role selection here does not authenticate or authorize a user. Domain-model only.\nINSTITUTION ANALYST\nAnalysis Overview\n\nAnalysis Overview for Nisha Verma at ABC Engineering College. This page exposes Institution Analyst-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nGenerate preview report\nSearch Analysis Overview\nStudent support\nAssessment\nResource\nClear filters\n\n1 records shown\n\nStudent support\nRahul Kumar\n\nCommunication gap with active resume review.\n\nOwner\nCSE 2027\nStatus\nNeeds intervention\n\nStudent identity, private evidence and consent decisions remain read-only.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nConfigure filters\nSave view\nGenerate preview report\nConfigure chart\nCreate export request presentation\nAdd annotation\nRead-only\nSource records\nVerification decisions\nPlacement decisions\nForbidden\nEdit source student records\nChange backend authorization\nRahul Kumar\n\nCommunication gap with active resume review.\n\nRole\nInstitution Analyst\nOwner\nCSE 2027\nStatus\nNeeds intervention\nProtected boundary\nStudent identity, private evidence and consent decisions remain read-only.\nClose",
+            "dialogs": [
+              "Rahul KumarCommunication gap with active resume review.RoleInstitution AnalystOwnerCSE 2027StatusNee"
+            ],
+            "alerts": [],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "Close",
+            "overflow": false
+          }
+        },
+        {
+          "name": "close detail",
+          "result": {
+            "clicked": true,
+            "label": "Close Institution Analyst navigation"
+          },
+          "state": {
+            "path": "/institution/analyst/analysis-overview",
+            "title": "Analysis Overview — Institution Analyst | PlanThePath",
+            "h1": "Analysis Overview",
+            "text": "Skip to content\nNV\nPlanThePath\nAnalytics Portal\nHOME\nDashboard\nANALYSIS\nAnalysis Overview\nPlacement Analysis\nReadiness Analysis\nSkill Gap Analysis\nCohort Comparison\nOUTPUTS\nReports\nData Exports\nVisualizations\nSaved Views\nSettings\nCollapse\nInstitution Analyst\nABC Engineering College\nSearch Institution Analyst workspace\nSwitch preview portal\n4\nonline\nNV\nNisha VermaInstitution Analyst\nPortal preview — role selection here does not authenticate or authorize a user. Domain-model only.\nINSTITUTION ANALYST\nAnalysis Overview\n\nAnalysis Overview for Nisha Verma at ABC Engineering College. This page exposes Institution Analyst-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nGenerate preview report\nSearch Analysis Overview\nStudent support\nAssessment\nResource\nClear filters\n\n1 records shown\n\nStudent support\nRahul Kumar\n\nCommunication gap with active resume review.\n\nOwner\nCSE 2027\nStatus\nNeeds intervention\n\nStudent identity, private evidence and consent decisions remain read-only.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nConfigure filters\nSave view\nGenerate preview report\nConfigure chart\nCreate export request presentation\nAdd annotation\nRead-only\nSource records\nVerification decisions\nPlacement decisions\nForbidden\nEdit source student records\nChange backend authorization\nRahul Kumar\n\nCommunication gap with active resume review.\n\nRole\nInstitution Analyst\nOwner\nCSE 2027\nStatus\nNeeds intervention\nProtected boundary\nStudent identity, private evidence and consent decisions remain read-only.\nClose",
+            "dialogs": [
+              "Rahul KumarCommunication gap with active resume review.RoleInstitution AnalystOwnerCSE 2027StatusNee"
+            ],
+            "alerts": [],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "Close",
+            "overflow": false
+          }
+        },
+        {
+          "name": "open edit preview",
+          "result": {
+            "clicked": true,
+            "label": "Edit preview"
+          },
+          "state": {
+            "path": "/institution/analyst/analysis-overview",
+            "title": "Analysis Overview — Institution Analyst | PlanThePath",
+            "h1": "Analysis Overview",
+            "text": "Skip to content\nNV\nPlanThePath\nAnalytics Portal\nHOME\nDashboard\nANALYSIS\nAnalysis Overview\nPlacement Analysis\nReadiness Analysis\nSkill Gap Analysis\nCohort Comparison\nOUTPUTS\nReports\nData Exports\nVisualizations\nSaved Views\nSettings\nCollapse\nInstitution Analyst\nABC Engineering College\nSearch Institution Analyst workspace\nSwitch preview portal\n4\nonline\nNV\nNisha VermaInstitution Analyst\nPortal preview — role selection here does not authenticate or authorize a user. Domain-model only.\nINSTITUTION ANALYST\nAnalysis Overview\n\nAnalysis Overview for Nisha Verma at ABC Engineering College. This page exposes Institution Analyst-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nGenerate preview report\nSearch Analysis Overview\nStudent support\nAssessment\nResource\nClear filters\n\n1 records shown\n\nStudent support\nRahul Kumar\n\nCommunication gap with active resume review.\n\nOwner\nCSE 2027\nStatus\nNeeds intervention\n\nStudent identity, private evidence and consent decisions remain read-only.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nConfigure filters\nSave view\nGenerate preview report\nConfigure chart\nCreate export request presentation\nAdd annotation\nRead-only\nSource records\nVerification decisions\nPlacement decisions\nForbidden\nEdit source student records\nChange backend authorization\nRahul Kumar\n\nCommunication gap with active resume review.\n\nRole\nInstitution Analyst\nOwner\nCSE 2027\nStatus\nNeeds intervention\nProtected boundary\nStudent identity, private evidence and consent decisions remain read-only.\nClose\nGenerate preview report\n\nStudent identity, private evidence and consent decisions remain read-only.\n\nStatus\nPreview note\nCancel\nSave preview change",
+            "dialogs": [
+              "Rahul KumarCommunication gap with active resume review.RoleInstitution AnalystOwnerCSE 2027StatusNee",
+              "Generate preview reportStudent identity, private evidence and consent decisions remain read-only.Sta"
+            ],
+            "alerts": [],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "INPUT",
+            "overflow": false
+          }
+        },
+        {
+          "name": "save empty triggers validation or save",
+          "result": {
+            "clicked": true,
+            "label": "Save preview change"
+          },
+          "state": {
+            "path": "/institution/analyst/analysis-overview",
+            "title": "Analysis Overview — Institution Analyst | PlanThePath",
+            "h1": "Analysis Overview",
+            "text": "Skip to content\nNV\nPlanThePath\nAnalytics Portal\nHOME\nDashboard\nANALYSIS\nAnalysis Overview\nPlacement Analysis\nReadiness Analysis\nSkill Gap Analysis\nCohort Comparison\nOUTPUTS\nReports\nData Exports\nVisualizations\nSaved Views\nSettings\nCollapse\nInstitution Analyst\nABC Engineering College\nSearch Institution Analyst workspace\nSwitch preview portal\n4\nonline\nNV\nNisha VermaInstitution Analyst\nPortal preview — role selection here does not authenticate or authorize a user. Domain-model only.\nINSTITUTION ANALYST\nAnalysis Overview\n\nAnalysis Overview for Nisha Verma at ABC Engineering College. This page exposes Institution Analyst-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nGenerate preview report\nSearch Analysis Overview\nStudent support\nAssessment\nResource\nClear filters\n\n1 records shown\n\nStudent support\nRahul Kumar\n\nCommunication gap with active resume review.\n\nOwner\nCSE 2027\nStatus\nNeeds intervention\n\nStudent identity, private evidence and consent decisions remain read-only.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nConfigure filters\nSave view\nGenerate preview report\nConfigure chart\nCreate export request presentation\nAdd annotation\nRead-only\nSource records\nVerification decisions\nPlacement decisions\nForbidden\nEdit source student records\nChange backend authorization\nRahul Kumar\n\nCommunication gap with active resume review.\n\nRole\nInstitution Analyst\nOwner\nCSE 2027\nStatus\nNeeds intervention\nProtected boundary\nStudent identity, private evidence and consent decisions remain read-only.\nClose\nGenerate preview report\n\nStudent identity, private evidence and consent decisions remain read-only.\n\nStatus\nPreview note\n\nStatus and preview note are required.\n\nCancel\nSave preview change",
+            "dialogs": [
+              "Rahul KumarCommunication gap with active resume review.RoleInstitution AnalystOwnerCSE 2027StatusNee",
+              "Generate preview reportStudent identity, private evidence and consent decisions remain read-only.Sta"
+            ],
+            "alerts": [
+              "Status and preview note are required."
+            ],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "INPUT",
+            "overflow": false
+          }
+        },
+        {
+          "name": "cancel edit",
+          "result": {
+            "clicked": true,
+            "label": "Close Institution Analyst navigation"
+          },
+          "state": {
+            "path": "/institution/analyst/analysis-overview",
+            "title": "Analysis Overview — Institution Analyst | PlanThePath",
+            "h1": "Analysis Overview",
+            "text": "Skip to content\nNV\nPlanThePath\nAnalytics Portal\nHOME\nDashboard\nANALYSIS\nAnalysis Overview\nPlacement Analysis\nReadiness Analysis\nSkill Gap Analysis\nCohort Comparison\nOUTPUTS\nReports\nData Exports\nVisualizations\nSaved Views\nSettings\nCollapse\nInstitution Analyst\nABC Engineering College\nSearch Institution Analyst workspace\nSwitch preview portal\n4\nonline\nNV\nNisha VermaInstitution Analyst\nPortal preview — role selection here does not authenticate or authorize a user. Domain-model only.\nINSTITUTION ANALYST\nAnalysis Overview\n\nAnalysis Overview for Nisha Verma at ABC Engineering College. This page exposes Institution Analyst-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nGenerate preview report\nSearch Analysis Overview\nStudent support\nAssessment\nResource\nClear filters\n\n1 records shown\n\nStudent support\nRahul Kumar\n\nCommunication gap with active resume review.\n\nOwner\nCSE 2027\nStatus\nNeeds intervention\n\nStudent identity, private evidence and consent decisions remain read-only.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nConfigure filters\nSave view\nGenerate preview report\nConfigure chart\nCreate export request presentation\nAdd annotation\nRead-only\nSource records\nVerification decisions\nPlacement decisions\nForbidden\nEdit source student records\nChange backend authorization\nRahul Kumar\n\nCommunication gap with active resume review.\n\nRole\nInstitution Analyst\nOwner\nCSE 2027\nStatus\nNeeds intervention\nProtected boundary\nStudent identity, private evidence and consent decisions remain read-only.\nClose\nGenerate preview report\n\nStudent identity, private evidence and consent decisions remain read-only.\n\nStatus\nPreview note\n\nStatus and preview note are required.\n\nCancel\nSave preview change",
+            "dialogs": [
+              "Rahul KumarCommunication gap with active resume review.RoleInstitution AnalystOwnerCSE 2027StatusNee",
+              "Generate preview reportStudent identity, private evidence and consent decisions remain read-only.Sta"
+            ],
+            "alerts": [
+              "Status and preview note are required."
+            ],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "INPUT",
+            "overflow": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "Recruiter representative filter/detail/edit validation",
+      "route": "/employer/recruiter/opportunities",
+      "steps": [
+        {
+          "name": "apply first filter if present",
+          "result": {
+            "label": "Opportunity",
+            "changed": false
+          },
+          "state": {
+            "path": "/employer/recruiter/opportunities",
+            "title": "Opportunities — Recruiter | PlanThePath",
+            "h1": "Opportunities",
+            "text": "Skip to content\nRS\nPlanThePath\nEmployer Portal\nHOME\nDashboard\nHIRING\nOpportunities\nOpportunity Detail\nApplicants\nCandidate Detail\nAssessments\nInterviews\nTalent Pool\nOffers\nORG\nReports\nTeam\nMessages\nCompany Profile\nSettings\nCollapse\nRecruiter\nAster Mobility\nSearch Recruiter workspace\nSwitch preview portal\n4\nonline\nRS\nRohan ShahRecruiter\nPortal preview — role selection here does not authenticate or authorize a user. Backend enforced.\nRECRUITER\nOpportunities\n\nOpportunities for Rohan Shah at Aster Mobility. This page exposes Recruiter-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nCreate draft opportunity\nSearch Opportunities\nOpportunity\nCandidate\nInterview\nClear filters\n\n1 records shown\n\nOpportunity\nSOC Analyst Intern\n\nEntry SOC role with SIEM and communication requirements.\n\nOwner\nAster Mobility\nStatus\nOpen\n\nStudent private documents and institution-only notes remain hidden.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nCreate draft opportunity\nPublish preview state\nShortlist candidate\nMove recruiter-owned stage\nSchedule interview request\nCreate assessment request\nDraft offer\nAdd recruiter note\nRead-only\nStudent private evidence\nInstitution-only notes\nOther employers data\nForbidden\nBypass consent\nView unrelated student directory",
+            "dialogs": [],
+            "alerts": [],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "Skip to contentRSPlanThePathEmployer PortalHomeDashboardHiringOpportunitiesOpportunity DetailApplicantsCandidate DetailA",
+            "overflow": false
+          }
+        },
+        {
+          "name": "open detail",
+          "result": {
+            "clicked": true,
+            "label": "View detail"
+          },
+          "state": {
+            "path": "/employer/recruiter/opportunities",
+            "title": "Opportunities — Recruiter | PlanThePath",
+            "h1": "Opportunities",
+            "text": "Skip to content\nRS\nPlanThePath\nEmployer Portal\nHOME\nDashboard\nHIRING\nOpportunities\nOpportunity Detail\nApplicants\nCandidate Detail\nAssessments\nInterviews\nTalent Pool\nOffers\nORG\nReports\nTeam\nMessages\nCompany Profile\nSettings\nCollapse\nRecruiter\nAster Mobility\nSearch Recruiter workspace\nSwitch preview portal\n4\nonline\nRS\nRohan ShahRecruiter\nPortal preview — role selection here does not authenticate or authorize a user. Backend enforced.\nRECRUITER\nOpportunities\n\nOpportunities for Rohan Shah at Aster Mobility. This page exposes Recruiter-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nCreate draft opportunity\nSearch Opportunities\nOpportunity\nCandidate\nInterview\nClear filters\n\n1 records shown\n\nOpportunity\nSOC Analyst Intern\n\nEntry SOC role with SIEM and communication requirements.\n\nOwner\nAster Mobility\nStatus\nOpen\n\nStudent private documents and institution-only notes remain hidden.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nCreate draft opportunity\nPublish preview state\nShortlist candidate\nMove recruiter-owned stage\nSchedule interview request\nCreate assessment request\nDraft offer\nAdd recruiter note\nRead-only\nStudent private evidence\nInstitution-only notes\nOther employers data\nForbidden\nBypass consent\nView unrelated student directory\nSOC Analyst Intern\n\nEntry SOC role with SIEM and communication requirements.\n\nRole\nRecruiter\nOwner\nAster Mobility\nStatus\nOpen\nProtected boundary\nStudent private documents and institution-only notes remain hidden.\nClose",
+            "dialogs": [
+              "SOC Analyst InternEntry SOC role with SIEM and communication requirements.RoleRecruiterOwnerAster Mo"
+            ],
+            "alerts": [],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "Close",
+            "overflow": false
+          }
+        },
+        {
+          "name": "close detail",
+          "result": {
+            "clicked": true,
+            "label": "Close Recruiter navigation"
+          },
+          "state": {
+            "path": "/employer/recruiter/opportunities",
+            "title": "Opportunities — Recruiter | PlanThePath",
+            "h1": "Opportunities",
+            "text": "Skip to content\nRS\nPlanThePath\nEmployer Portal\nHOME\nDashboard\nHIRING\nOpportunities\nOpportunity Detail\nApplicants\nCandidate Detail\nAssessments\nInterviews\nTalent Pool\nOffers\nORG\nReports\nTeam\nMessages\nCompany Profile\nSettings\nCollapse\nRecruiter\nAster Mobility\nSearch Recruiter workspace\nSwitch preview portal\n4\nonline\nRS\nRohan ShahRecruiter\nPortal preview — role selection here does not authenticate or authorize a user. Backend enforced.\nRECRUITER\nOpportunities\n\nOpportunities for Rohan Shah at Aster Mobility. This page exposes Recruiter-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nCreate draft opportunity\nSearch Opportunities\nOpportunity\nCandidate\nInterview\nClear filters\n\n1 records shown\n\nOpportunity\nSOC Analyst Intern\n\nEntry SOC role with SIEM and communication requirements.\n\nOwner\nAster Mobility\nStatus\nOpen\n\nStudent private documents and institution-only notes remain hidden.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nCreate draft opportunity\nPublish preview state\nShortlist candidate\nMove recruiter-owned stage\nSchedule interview request\nCreate assessment request\nDraft offer\nAdd recruiter note\nRead-only\nStudent private evidence\nInstitution-only notes\nOther employers data\nForbidden\nBypass consent\nView unrelated student directory\nSOC Analyst Intern\n\nEntry SOC role with SIEM and communication requirements.\n\nRole\nRecruiter\nOwner\nAster Mobility\nStatus\nOpen\nProtected boundary\nStudent private documents and institution-only notes remain hidden.\nClose",
+            "dialogs": [
+              "SOC Analyst InternEntry SOC role with SIEM and communication requirements.RoleRecruiterOwnerAster Mo"
+            ],
+            "alerts": [],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "Close",
+            "overflow": false
+          }
+        },
+        {
+          "name": "open edit preview",
+          "result": {
+            "clicked": true,
+            "label": "Edit preview"
+          },
+          "state": {
+            "path": "/employer/recruiter/opportunities",
+            "title": "Opportunities — Recruiter | PlanThePath",
+            "h1": "Opportunities",
+            "text": "Skip to content\nRS\nPlanThePath\nEmployer Portal\nHOME\nDashboard\nHIRING\nOpportunities\nOpportunity Detail\nApplicants\nCandidate Detail\nAssessments\nInterviews\nTalent Pool\nOffers\nORG\nReports\nTeam\nMessages\nCompany Profile\nSettings\nCollapse\nRecruiter\nAster Mobility\nSearch Recruiter workspace\nSwitch preview portal\n4\nonline\nRS\nRohan ShahRecruiter\nPortal preview — role selection here does not authenticate or authorize a user. Backend enforced.\nRECRUITER\nOpportunities\n\nOpportunities for Rohan Shah at Aster Mobility. This page exposes Recruiter-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nCreate draft opportunity\nSearch Opportunities\nOpportunity\nCandidate\nInterview\nClear filters\n\n1 records shown\n\nOpportunity\nSOC Analyst Intern\n\nEntry SOC role with SIEM and communication requirements.\n\nOwner\nAster Mobility\nStatus\nOpen\n\nStudent private documents and institution-only notes remain hidden.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nCreate draft opportunity\nPublish preview state\nShortlist candidate\nMove recruiter-owned stage\nSchedule interview request\nCreate assessment request\nDraft offer\nAdd recruiter note\nRead-only\nStudent private evidence\nInstitution-only notes\nOther employers data\nForbidden\nBypass consent\nView unrelated student directory\nSOC Analyst Intern\n\nEntry SOC role with SIEM and communication requirements.\n\nRole\nRecruiter\nOwner\nAster Mobility\nStatus\nOpen\nProtected boundary\nStudent private documents and institution-only notes remain hidden.\nClose\nCreate draft opportunity\n\nStudent private documents and institution-only notes remain hidden.\n\nStatus\nPreview note\nCancel\nSave preview change",
+            "dialogs": [
+              "SOC Analyst InternEntry SOC role with SIEM and communication requirements.RoleRecruiterOwnerAster Mo",
+              "Create draft opportunityStudent private documents and institution-only notes remain hidden.StatusPre"
+            ],
+            "alerts": [],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "INPUT",
+            "overflow": false
+          }
+        },
+        {
+          "name": "save empty triggers validation or save",
+          "result": {
+            "clicked": true,
+            "label": "Save preview change"
+          },
+          "state": {
+            "path": "/employer/recruiter/opportunities",
+            "title": "Opportunities — Recruiter | PlanThePath",
+            "h1": "Opportunities",
+            "text": "Skip to content\nRS\nPlanThePath\nEmployer Portal\nHOME\nDashboard\nHIRING\nOpportunities\nOpportunity Detail\nApplicants\nCandidate Detail\nAssessments\nInterviews\nTalent Pool\nOffers\nORG\nReports\nTeam\nMessages\nCompany Profile\nSettings\nCollapse\nRecruiter\nAster Mobility\nSearch Recruiter workspace\nSwitch preview portal\n4\nonline\nRS\nRohan ShahRecruiter\nPortal preview — role selection here does not authenticate or authorize a user. Backend enforced.\nRECRUITER\nOpportunities\n\nOpportunities for Rohan Shah at Aster Mobility. This page exposes Recruiter-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nCreate draft opportunity\nSearch Opportunities\nOpportunity\nCandidate\nInterview\nClear filters\n\n1 records shown\n\nOpportunity\nSOC Analyst Intern\n\nEntry SOC role with SIEM and communication requirements.\n\nOwner\nAster Mobility\nStatus\nOpen\n\nStudent private documents and institution-only notes remain hidden.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nCreate draft opportunity\nPublish preview state\nShortlist candidate\nMove recruiter-owned stage\nSchedule interview request\nCreate assessment request\nDraft offer\nAdd recruiter note\nRead-only\nStudent private evidence\nInstitution-only notes\nOther employers data\nForbidden\nBypass consent\nView unrelated student directory\nSOC Analyst Intern\n\nEntry SOC role with SIEM and communication requirements.\n\nRole\nRecruiter\nOwner\nAster Mobility\nStatus\nOpen\nProtected boundary\nStudent private documents and institution-only notes remain hidden.\nClose\nCreate draft opportunity\n\nStudent private documents and institution-only notes remain hidden.\n\nStatus\nPreview note\n\nStatus and preview note are required.\n\nCancel\nSave preview change",
+            "dialogs": [
+              "SOC Analyst InternEntry SOC role with SIEM and communication requirements.RoleRecruiterOwnerAster Mo",
+              "Create draft opportunityStudent private documents and institution-only notes remain hidden.StatusPre"
+            ],
+            "alerts": [
+              "Status and preview note are required."
+            ],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "INPUT",
+            "overflow": false
+          }
+        },
+        {
+          "name": "cancel edit",
+          "result": {
+            "clicked": true,
+            "label": "Close Recruiter navigation"
+          },
+          "state": {
+            "path": "/employer/recruiter/opportunities",
+            "title": "Opportunities — Recruiter | PlanThePath",
+            "h1": "Opportunities",
+            "text": "Skip to content\nRS\nPlanThePath\nEmployer Portal\nHOME\nDashboard\nHIRING\nOpportunities\nOpportunity Detail\nApplicants\nCandidate Detail\nAssessments\nInterviews\nTalent Pool\nOffers\nORG\nReports\nTeam\nMessages\nCompany Profile\nSettings\nCollapse\nRecruiter\nAster Mobility\nSearch Recruiter workspace\nSwitch preview portal\n4\nonline\nRS\nRohan ShahRecruiter\nPortal preview — role selection here does not authenticate or authorize a user. Backend enforced.\nRECRUITER\nOpportunities\n\nOpportunities for Rohan Shah at Aster Mobility. This page exposes Recruiter-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nCreate draft opportunity\nSearch Opportunities\nOpportunity\nCandidate\nInterview\nClear filters\n\n1 records shown\n\nOpportunity\nSOC Analyst Intern\n\nEntry SOC role with SIEM and communication requirements.\n\nOwner\nAster Mobility\nStatus\nOpen\n\nStudent private documents and institution-only notes remain hidden.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nCreate draft opportunity\nPublish preview state\nShortlist candidate\nMove recruiter-owned stage\nSchedule interview request\nCreate assessment request\nDraft offer\nAdd recruiter note\nRead-only\nStudent private evidence\nInstitution-only notes\nOther employers data\nForbidden\nBypass consent\nView unrelated student directory\nSOC Analyst Intern\n\nEntry SOC role with SIEM and communication requirements.\n\nRole\nRecruiter\nOwner\nAster Mobility\nStatus\nOpen\nProtected boundary\nStudent private documents and institution-only notes remain hidden.\nClose\nCreate draft opportunity\n\nStudent private documents and institution-only notes remain hidden.\n\nStatus\nPreview note\n\nStatus and preview note are required.\n\nCancel\nSave preview change",
+            "dialogs": [
+              "SOC Analyst InternEntry SOC role with SIEM and communication requirements.RoleRecruiterOwnerAster Mo",
+              "Create draft opportunityStudent private documents and institution-only notes remain hidden.StatusPre"
+            ],
+            "alerts": [
+              "Status and preview note are required."
+            ],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "INPUT",
+            "overflow": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "Hiring Manager representative filter/detail/edit validation",
+      "route": "/employer/hiring-manager/requisitions",
+      "steps": [
+        {
+          "name": "apply first filter if present",
+          "result": {
+            "label": "Opportunity",
+            "changed": false
+          },
+          "state": {
+            "path": "/employer/hiring-manager/requisitions",
+            "title": "Requisitions — Hiring Manager | PlanThePath",
+            "h1": "Requisitions",
+            "text": "Skip to content\nLK\nPlanThePath\nHiring Manager Portal\nHOME\nDashboard\nHIRING\nRequisitions\nRequisition Detail\nCandidates\nCandidate Review\nInterviews\nEvaluations\nOffers\nTEAM\nHiring Reports\nTeam\nMessages\nSettings\nCollapse\nHiring Manager\nAster Mobility\nSearch Hiring Manager workspace\nSwitch preview portal\n4\nonline\nLK\nLeena KapoorHiring Manager\nPortal preview — role selection here does not authenticate or authorize a user. Domain-model only.\nHIRING MANAGER\nRequisitions\n\nRequisitions for Leena Kapoor at Aster Mobility. This page exposes Hiring Manager-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nCreate requisition draft\nSearch Requisitions\nOpportunity\nCandidate\nInterview\nClear filters\n\n1 records shown\n\nOpportunity\nSOC Analyst Intern\n\nEntry SOC role with SIEM and communication requirements.\n\nOwner\nAster Mobility\nStatus\nOpen\n\nStudent private documents and institution-only notes remain hidden.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nCreate requisition draft\nApprove shortlist\nAssign interview panel\nSubmit evaluation\nRequest offer draft\nAdd hiring note\nChange owned candidate stage\nRead-only\nStudent private evidence\nRecruiter-owned admin settings\nForbidden\nIssue platform permissions\nBypass consent",
+            "dialogs": [],
+            "alerts": [],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "Skip to contentLKPlanThePathHiring Manager PortalHomeDashboardHiringRequisitionsRequisition DetailCandidatesCandidate Re",
+            "overflow": false
+          }
+        },
+        {
+          "name": "open detail",
+          "result": {
+            "clicked": true,
+            "label": "View detail"
+          },
+          "state": {
+            "path": "/employer/hiring-manager/requisitions",
+            "title": "Requisitions — Hiring Manager | PlanThePath",
+            "h1": "Requisitions",
+            "text": "Skip to content\nLK\nPlanThePath\nHiring Manager Portal\nHOME\nDashboard\nHIRING\nRequisitions\nRequisition Detail\nCandidates\nCandidate Review\nInterviews\nEvaluations\nOffers\nTEAM\nHiring Reports\nTeam\nMessages\nSettings\nCollapse\nHiring Manager\nAster Mobility\nSearch Hiring Manager workspace\nSwitch preview portal\n4\nonline\nLK\nLeena KapoorHiring Manager\nPortal preview — role selection here does not authenticate or authorize a user. Domain-model only.\nHIRING MANAGER\nRequisitions\n\nRequisitions for Leena Kapoor at Aster Mobility. This page exposes Hiring Manager-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nCreate requisition draft\nSearch Requisitions\nOpportunity\nCandidate\nInterview\nClear filters\n\n1 records shown\n\nOpportunity\nSOC Analyst Intern\n\nEntry SOC role with SIEM and communication requirements.\n\nOwner\nAster Mobility\nStatus\nOpen\n\nStudent private documents and institution-only notes remain hidden.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nCreate requisition draft\nApprove shortlist\nAssign interview panel\nSubmit evaluation\nRequest offer draft\nAdd hiring note\nChange owned candidate stage\nRead-only\nStudent private evidence\nRecruiter-owned admin settings\nForbidden\nIssue platform permissions\nBypass consent\nSOC Analyst Intern\n\nEntry SOC role with SIEM and communication requirements.\n\nRole\nHiring Manager\nOwner\nAster Mobility\nStatus\nOpen\nProtected boundary\nStudent private documents and institution-only notes remain hidden.\nClose",
+            "dialogs": [
+              "SOC Analyst InternEntry SOC role with SIEM and communication requirements.RoleHiring ManagerOwnerAst"
+            ],
+            "alerts": [],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "Close",
+            "overflow": false
+          }
+        },
+        {
+          "name": "close detail",
+          "result": {
+            "clicked": true,
+            "label": "Close Hiring Manager navigation"
+          },
+          "state": {
+            "path": "/employer/hiring-manager/requisitions",
+            "title": "Requisitions — Hiring Manager | PlanThePath",
+            "h1": "Requisitions",
+            "text": "Skip to content\nLK\nPlanThePath\nHiring Manager Portal\nHOME\nDashboard\nHIRING\nRequisitions\nRequisition Detail\nCandidates\nCandidate Review\nInterviews\nEvaluations\nOffers\nTEAM\nHiring Reports\nTeam\nMessages\nSettings\nCollapse\nHiring Manager\nAster Mobility\nSearch Hiring Manager workspace\nSwitch preview portal\n4\nonline\nLK\nLeena KapoorHiring Manager\nPortal preview — role selection here does not authenticate or authorize a user. Domain-model only.\nHIRING MANAGER\nRequisitions\n\nRequisitions for Leena Kapoor at Aster Mobility. This page exposes Hiring Manager-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nCreate requisition draft\nSearch Requisitions\nOpportunity\nCandidate\nInterview\nClear filters\n\n1 records shown\n\nOpportunity\nSOC Analyst Intern\n\nEntry SOC role with SIEM and communication requirements.\n\nOwner\nAster Mobility\nStatus\nOpen\n\nStudent private documents and institution-only notes remain hidden.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nCreate requisition draft\nApprove shortlist\nAssign interview panel\nSubmit evaluation\nRequest offer draft\nAdd hiring note\nChange owned candidate stage\nRead-only\nStudent private evidence\nRecruiter-owned admin settings\nForbidden\nIssue platform permissions\nBypass consent\nSOC Analyst Intern\n\nEntry SOC role with SIEM and communication requirements.\n\nRole\nHiring Manager\nOwner\nAster Mobility\nStatus\nOpen\nProtected boundary\nStudent private documents and institution-only notes remain hidden.\nClose",
+            "dialogs": [
+              "SOC Analyst InternEntry SOC role with SIEM and communication requirements.RoleHiring ManagerOwnerAst"
+            ],
+            "alerts": [],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "Close",
+            "overflow": false
+          }
+        },
+        {
+          "name": "open edit preview",
+          "result": {
+            "clicked": true,
+            "label": "Edit preview"
+          },
+          "state": {
+            "path": "/employer/hiring-manager/requisitions",
+            "title": "Requisitions — Hiring Manager | PlanThePath",
+            "h1": "Requisitions",
+            "text": "Skip to content\nLK\nPlanThePath\nHiring Manager Portal\nHOME\nDashboard\nHIRING\nRequisitions\nRequisition Detail\nCandidates\nCandidate Review\nInterviews\nEvaluations\nOffers\nTEAM\nHiring Reports\nTeam\nMessages\nSettings\nCollapse\nHiring Manager\nAster Mobility\nSearch Hiring Manager workspace\nSwitch preview portal\n4\nonline\nLK\nLeena KapoorHiring Manager\nPortal preview — role selection here does not authenticate or authorize a user. Domain-model only.\nHIRING MANAGER\nRequisitions\n\nRequisitions for Leena Kapoor at Aster Mobility. This page exposes Hiring Manager-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nCreate requisition draft\nSearch Requisitions\nOpportunity\nCandidate\nInterview\nClear filters\n\n1 records shown\n\nOpportunity\nSOC Analyst Intern\n\nEntry SOC role with SIEM and communication requirements.\n\nOwner\nAster Mobility\nStatus\nOpen\n\nStudent private documents and institution-only notes remain hidden.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nCreate requisition draft\nApprove shortlist\nAssign interview panel\nSubmit evaluation\nRequest offer draft\nAdd hiring note\nChange owned candidate stage\nRead-only\nStudent private evidence\nRecruiter-owned admin settings\nForbidden\nIssue platform permissions\nBypass consent\nSOC Analyst Intern\n\nEntry SOC role with SIEM and communication requirements.\n\nRole\nHiring Manager\nOwner\nAster Mobility\nStatus\nOpen\nProtected boundary\nStudent private documents and institution-only notes remain hidden.\nClose\nCreate requisition draft\n\nStudent private documents and institution-only notes remain hidden.\n\nStatus\nPreview note\nCancel\nSave preview change",
+            "dialogs": [
+              "SOC Analyst InternEntry SOC role with SIEM and communication requirements.RoleHiring ManagerOwnerAst",
+              "Create requisition draftStudent private documents and institution-only notes remain hidden.StatusPre"
+            ],
+            "alerts": [],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "INPUT",
+            "overflow": false
+          }
+        },
+        {
+          "name": "save empty triggers validation or save",
+          "result": {
+            "clicked": true,
+            "label": "Save preview change"
+          },
+          "state": {
+            "path": "/employer/hiring-manager/requisitions",
+            "title": "Requisitions — Hiring Manager | PlanThePath",
+            "h1": "Requisitions",
+            "text": "Skip to content\nLK\nPlanThePath\nHiring Manager Portal\nHOME\nDashboard\nHIRING\nRequisitions\nRequisition Detail\nCandidates\nCandidate Review\nInterviews\nEvaluations\nOffers\nTEAM\nHiring Reports\nTeam\nMessages\nSettings\nCollapse\nHiring Manager\nAster Mobility\nSearch Hiring Manager workspace\nSwitch preview portal\n4\nonline\nLK\nLeena KapoorHiring Manager\nPortal preview — role selection here does not authenticate or authorize a user. Domain-model only.\nHIRING MANAGER\nRequisitions\n\nRequisitions for Leena Kapoor at Aster Mobility. This page exposes Hiring Manager-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nCreate requisition draft\nSearch Requisitions\nOpportunity\nCandidate\nInterview\nClear filters\n\n1 records shown\n\nOpportunity\nSOC Analyst Intern\n\nEntry SOC role with SIEM and communication requirements.\n\nOwner\nAster Mobility\nStatus\nOpen\n\nStudent private documents and institution-only notes remain hidden.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nCreate requisition draft\nApprove shortlist\nAssign interview panel\nSubmit evaluation\nRequest offer draft\nAdd hiring note\nChange owned candidate stage\nRead-only\nStudent private evidence\nRecruiter-owned admin settings\nForbidden\nIssue platform permissions\nBypass consent\nSOC Analyst Intern\n\nEntry SOC role with SIEM and communication requirements.\n\nRole\nHiring Manager\nOwner\nAster Mobility\nStatus\nOpen\nProtected boundary\nStudent private documents and institution-only notes remain hidden.\nClose\nCreate requisition draft\n\nStudent private documents and institution-only notes remain hidden.\n\nStatus\nPreview note\n\nStatus and preview note are required.\n\nCancel\nSave preview change",
+            "dialogs": [
+              "SOC Analyst InternEntry SOC role with SIEM and communication requirements.RoleHiring ManagerOwnerAst",
+              "Create requisition draftStudent private documents and institution-only notes remain hidden.StatusPre"
+            ],
+            "alerts": [
+              "Status and preview note are required."
+            ],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "INPUT",
+            "overflow": false
+          }
+        },
+        {
+          "name": "cancel edit",
+          "result": {
+            "clicked": true,
+            "label": "Close Hiring Manager navigation"
+          },
+          "state": {
+            "path": "/employer/hiring-manager/requisitions",
+            "title": "Requisitions — Hiring Manager | PlanThePath",
+            "h1": "Requisitions",
+            "text": "Skip to content\nLK\nPlanThePath\nHiring Manager Portal\nHOME\nDashboard\nHIRING\nRequisitions\nRequisition Detail\nCandidates\nCandidate Review\nInterviews\nEvaluations\nOffers\nTEAM\nHiring Reports\nTeam\nMessages\nSettings\nCollapse\nHiring Manager\nAster Mobility\nSearch Hiring Manager workspace\nSwitch preview portal\n4\nonline\nLK\nLeena KapoorHiring Manager\nPortal preview — role selection here does not authenticate or authorize a user. Domain-model only.\nHIRING MANAGER\nRequisitions\n\nRequisitions for Leena Kapoor at Aster Mobility. This page exposes Hiring Manager-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nCreate requisition draft\nSearch Requisitions\nOpportunity\nCandidate\nInterview\nClear filters\n\n1 records shown\n\nOpportunity\nSOC Analyst Intern\n\nEntry SOC role with SIEM and communication requirements.\n\nOwner\nAster Mobility\nStatus\nOpen\n\nStudent private documents and institution-only notes remain hidden.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nCreate requisition draft\nApprove shortlist\nAssign interview panel\nSubmit evaluation\nRequest offer draft\nAdd hiring note\nChange owned candidate stage\nRead-only\nStudent private evidence\nRecruiter-owned admin settings\nForbidden\nIssue platform permissions\nBypass consent\nSOC Analyst Intern\n\nEntry SOC role with SIEM and communication requirements.\n\nRole\nHiring Manager\nOwner\nAster Mobility\nStatus\nOpen\nProtected boundary\nStudent private documents and institution-only notes remain hidden.\nClose\nCreate requisition draft\n\nStudent private documents and institution-only notes remain hidden.\n\nStatus\nPreview note\n\nStatus and preview note are required.\n\nCancel\nSave preview change",
+            "dialogs": [
+              "SOC Analyst InternEntry SOC role with SIEM and communication requirements.RoleHiring ManagerOwnerAst",
+              "Create requisition draftStudent private documents and institution-only notes remain hidden.StatusPre"
+            ],
+            "alerts": [
+              "Status and preview note are required."
+            ],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "INPUT",
+            "overflow": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "Interviewer representative filter/detail/edit validation",
+      "route": "/employer/interviewer/my-interviews",
+      "steps": [
+        {
+          "name": "apply first filter if present",
+          "result": {
+            "label": "Opportunity",
+            "changed": false
+          },
+          "state": {
+            "path": "/employer/interviewer/my-interviews",
+            "title": "My Interviews — Interviewer | PlanThePath",
+            "h1": "My Interviews",
+            "text": "Skip to content\nDN\nPlanThePath\nInterviewer Portal\nHOME\nDashboard\nINTERVIEWS\nMy Interviews\nSchedule\nCandidate Brief\nScorecards\nFeedback\nInterview Guidelines\nACCOUNT\nReports\nSettings\nCollapse\nInterviewer\nAster Mobility\nSearch Interviewer workspace\nSwitch preview portal\n4\nonline\nDN\nDev NairInterviewer\nPortal preview — role selection here does not authenticate or authorize a user. Domain-model only.\nINTERVIEWER\nMy Interviews\n\nMy Interviews for Dev Nair at Aster Mobility. This page exposes Interviewer-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nSchedule preview session\nSearch My Interviews\nOpportunity\nCandidate\nInterview\nClear filters\n\n1 records shown\n\nOpportunity\nSOC Analyst Intern\n\nEntry SOC role with SIEM and communication requirements.\n\nOwner\nAster Mobility\nStatus\nOpen\n\nStudent private documents and institution-only notes remain hidden.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nOpen candidate brief\nComplete draft scorecard\nSave interview notes\nSubmit preview feedback\nMark preparation complete\nRead-only\nOffer decisions\nUnauthorized candidate data\nForbidden\nIssue offers\nChange requisitions",
+            "dialogs": [],
+            "alerts": [],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "Skip to contentDNPlanThePathInterviewer PortalHomeDashboardInterviewsMy InterviewsScheduleCandidate BriefScorecardsFeedb",
+            "overflow": false
+          }
+        },
+        {
+          "name": "open detail",
+          "result": {
+            "clicked": true,
+            "label": "View detail"
+          },
+          "state": {
+            "path": "/employer/interviewer/my-interviews",
+            "title": "My Interviews — Interviewer | PlanThePath",
+            "h1": "My Interviews",
+            "text": "Skip to content\nDN\nPlanThePath\nInterviewer Portal\nHOME\nDashboard\nINTERVIEWS\nMy Interviews\nSchedule\nCandidate Brief\nScorecards\nFeedback\nInterview Guidelines\nACCOUNT\nReports\nSettings\nCollapse\nInterviewer\nAster Mobility\nSearch Interviewer workspace\nSwitch preview portal\n4\nonline\nDN\nDev NairInterviewer\nPortal preview — role selection here does not authenticate or authorize a user. Domain-model only.\nINTERVIEWER\nMy Interviews\n\nMy Interviews for Dev Nair at Aster Mobility. This page exposes Interviewer-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nSchedule preview session\nSearch My Interviews\nOpportunity\nCandidate\nInterview\nClear filters\n\n1 records shown\n\nOpportunity\nSOC Analyst Intern\n\nEntry SOC role with SIEM and communication requirements.\n\nOwner\nAster Mobility\nStatus\nOpen\n\nStudent private documents and institution-only notes remain hidden.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nOpen candidate brief\nComplete draft scorecard\nSave interview notes\nSubmit preview feedback\nMark preparation complete\nRead-only\nOffer decisions\nUnauthorized candidate data\nForbidden\nIssue offers\nChange requisitions\nSOC Analyst Intern\n\nEntry SOC role with SIEM and communication requirements.\n\nRole\nInterviewer\nOwner\nAster Mobility\nStatus\nOpen\nProtected boundary\nStudent private documents and institution-only notes remain hidden.\nClose",
+            "dialogs": [
+              "SOC Analyst InternEntry SOC role with SIEM and communication requirements.RoleInterviewerOwnerAster "
+            ],
+            "alerts": [],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "Close",
+            "overflow": false
+          }
+        },
+        {
+          "name": "close detail",
+          "result": {
+            "clicked": true,
+            "label": "Close Interviewer navigation"
+          },
+          "state": {
+            "path": "/employer/interviewer/my-interviews",
+            "title": "My Interviews — Interviewer | PlanThePath",
+            "h1": "My Interviews",
+            "text": "Skip to content\nDN\nPlanThePath\nInterviewer Portal\nHOME\nDashboard\nINTERVIEWS\nMy Interviews\nSchedule\nCandidate Brief\nScorecards\nFeedback\nInterview Guidelines\nACCOUNT\nReports\nSettings\nCollapse\nInterviewer\nAster Mobility\nSearch Interviewer workspace\nSwitch preview portal\n4\nonline\nDN\nDev NairInterviewer\nPortal preview — role selection here does not authenticate or authorize a user. Domain-model only.\nINTERVIEWER\nMy Interviews\n\nMy Interviews for Dev Nair at Aster Mobility. This page exposes Interviewer-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nSchedule preview session\nSearch My Interviews\nOpportunity\nCandidate\nInterview\nClear filters\n\n1 records shown\n\nOpportunity\nSOC Analyst Intern\n\nEntry SOC role with SIEM and communication requirements.\n\nOwner\nAster Mobility\nStatus\nOpen\n\nStudent private documents and institution-only notes remain hidden.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nOpen candidate brief\nComplete draft scorecard\nSave interview notes\nSubmit preview feedback\nMark preparation complete\nRead-only\nOffer decisions\nUnauthorized candidate data\nForbidden\nIssue offers\nChange requisitions\nSOC Analyst Intern\n\nEntry SOC role with SIEM and communication requirements.\n\nRole\nInterviewer\nOwner\nAster Mobility\nStatus\nOpen\nProtected boundary\nStudent private documents and institution-only notes remain hidden.\nClose",
+            "dialogs": [
+              "SOC Analyst InternEntry SOC role with SIEM and communication requirements.RoleInterviewerOwnerAster "
+            ],
+            "alerts": [],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "Close",
+            "overflow": false
+          }
+        },
+        {
+          "name": "open edit preview",
+          "result": {
+            "clicked": true,
+            "label": "Edit preview"
+          },
+          "state": {
+            "path": "/employer/interviewer/my-interviews",
+            "title": "My Interviews — Interviewer | PlanThePath",
+            "h1": "My Interviews",
+            "text": "Skip to content\nDN\nPlanThePath\nInterviewer Portal\nHOME\nDashboard\nINTERVIEWS\nMy Interviews\nSchedule\nCandidate Brief\nScorecards\nFeedback\nInterview Guidelines\nACCOUNT\nReports\nSettings\nCollapse\nInterviewer\nAster Mobility\nSearch Interviewer workspace\nSwitch preview portal\n4\nonline\nDN\nDev NairInterviewer\nPortal preview — role selection here does not authenticate or authorize a user. Domain-model only.\nINTERVIEWER\nMy Interviews\n\nMy Interviews for Dev Nair at Aster Mobility. This page exposes Interviewer-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nSchedule preview session\nSearch My Interviews\nOpportunity\nCandidate\nInterview\nClear filters\n\n1 records shown\n\nOpportunity\nSOC Analyst Intern\n\nEntry SOC role with SIEM and communication requirements.\n\nOwner\nAster Mobility\nStatus\nOpen\n\nStudent private documents and institution-only notes remain hidden.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nOpen candidate brief\nComplete draft scorecard\nSave interview notes\nSubmit preview feedback\nMark preparation complete\nRead-only\nOffer decisions\nUnauthorized candidate data\nForbidden\nIssue offers\nChange requisitions\nSOC Analyst Intern\n\nEntry SOC role with SIEM and communication requirements.\n\nRole\nInterviewer\nOwner\nAster Mobility\nStatus\nOpen\nProtected boundary\nStudent private documents and institution-only notes remain hidden.\nClose\nSchedule preview session\n\nStudent private documents and institution-only notes remain hidden.\n\nStatus\nPreview note\nCancel\nSave preview change",
+            "dialogs": [
+              "SOC Analyst InternEntry SOC role with SIEM and communication requirements.RoleInterviewerOwnerAster ",
+              "Schedule preview sessionStudent private documents and institution-only notes remain hidden.StatusPre"
+            ],
+            "alerts": [],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "INPUT",
+            "overflow": false
+          }
+        },
+        {
+          "name": "save empty triggers validation or save",
+          "result": {
+            "clicked": true,
+            "label": "Save preview change"
+          },
+          "state": {
+            "path": "/employer/interviewer/my-interviews",
+            "title": "My Interviews — Interviewer | PlanThePath",
+            "h1": "My Interviews",
+            "text": "Skip to content\nDN\nPlanThePath\nInterviewer Portal\nHOME\nDashboard\nINTERVIEWS\nMy Interviews\nSchedule\nCandidate Brief\nScorecards\nFeedback\nInterview Guidelines\nACCOUNT\nReports\nSettings\nCollapse\nInterviewer\nAster Mobility\nSearch Interviewer workspace\nSwitch preview portal\n4\nonline\nDN\nDev NairInterviewer\nPortal preview — role selection here does not authenticate or authorize a user. Domain-model only.\nINTERVIEWER\nMy Interviews\n\nMy Interviews for Dev Nair at Aster Mobility. This page exposes Interviewer-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nSchedule preview session\nSearch My Interviews\nOpportunity\nCandidate\nInterview\nClear filters\n\n1 records shown\n\nOpportunity\nSOC Analyst Intern\n\nEntry SOC role with SIEM and communication requirements.\n\nOwner\nAster Mobility\nStatus\nOpen\n\nStudent private documents and institution-only notes remain hidden.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nOpen candidate brief\nComplete draft scorecard\nSave interview notes\nSubmit preview feedback\nMark preparation complete\nRead-only\nOffer decisions\nUnauthorized candidate data\nForbidden\nIssue offers\nChange requisitions\nSOC Analyst Intern\n\nEntry SOC role with SIEM and communication requirements.\n\nRole\nInterviewer\nOwner\nAster Mobility\nStatus\nOpen\nProtected boundary\nStudent private documents and institution-only notes remain hidden.\nClose\nSchedule preview session\n\nStudent private documents and institution-only notes remain hidden.\n\nStatus\nPreview note\n\nStatus and preview note are required.\n\nCancel\nSave preview change",
+            "dialogs": [
+              "SOC Analyst InternEntry SOC role with SIEM and communication requirements.RoleInterviewerOwnerAster ",
+              "Schedule preview sessionStudent private documents and institution-only notes remain hidden.StatusPre"
+            ],
+            "alerts": [
+              "Status and preview note are required."
+            ],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "INPUT",
+            "overflow": false
+          }
+        },
+        {
+          "name": "cancel edit",
+          "result": {
+            "clicked": true,
+            "label": "Close Interviewer navigation"
+          },
+          "state": {
+            "path": "/employer/interviewer/my-interviews",
+            "title": "My Interviews — Interviewer | PlanThePath",
+            "h1": "My Interviews",
+            "text": "Skip to content\nDN\nPlanThePath\nInterviewer Portal\nHOME\nDashboard\nINTERVIEWS\nMy Interviews\nSchedule\nCandidate Brief\nScorecards\nFeedback\nInterview Guidelines\nACCOUNT\nReports\nSettings\nCollapse\nInterviewer\nAster Mobility\nSearch Interviewer workspace\nSwitch preview portal\n4\nonline\nDN\nDev NairInterviewer\nPortal preview — role selection here does not authenticate or authorize a user. Domain-model only.\nINTERVIEWER\nMy Interviews\n\nMy Interviews for Dev Nair at Aster Mobility. This page exposes Interviewer-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nSchedule preview session\nSearch My Interviews\nOpportunity\nCandidate\nInterview\nClear filters\n\n1 records shown\n\nOpportunity\nSOC Analyst Intern\n\nEntry SOC role with SIEM and communication requirements.\n\nOwner\nAster Mobility\nStatus\nOpen\n\nStudent private documents and institution-only notes remain hidden.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nOpen candidate brief\nComplete draft scorecard\nSave interview notes\nSubmit preview feedback\nMark preparation complete\nRead-only\nOffer decisions\nUnauthorized candidate data\nForbidden\nIssue offers\nChange requisitions\nSOC Analyst Intern\n\nEntry SOC role with SIEM and communication requirements.\n\nRole\nInterviewer\nOwner\nAster Mobility\nStatus\nOpen\nProtected boundary\nStudent private documents and institution-only notes remain hidden.\nClose\nSchedule preview session\n\nStudent private documents and institution-only notes remain hidden.\n\nStatus\nPreview note\n\nStatus and preview note are required.\n\nCancel\nSave preview change",
+            "dialogs": [
+              "SOC Analyst InternEntry SOC role with SIEM and communication requirements.RoleInterviewerOwnerAster ",
+              "Schedule preview sessionStudent private documents and institution-only notes remain hidden.StatusPre"
+            ],
+            "alerts": [
+              "Status and preview note are required."
+            ],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "INPUT",
+            "overflow": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "Operations Administrator representative filter/detail/edit validation",
+      "route": "/operations/admin/organizations",
+      "steps": [
+        {
+          "name": "apply first filter if present",
+          "result": {
+            "label": "Organization",
+            "changed": false
+          },
+          "state": {
+            "path": "/operations/admin/organizations",
+            "title": "Organizations — Platform Administrator / Operations Administrator | PlanThePath",
+            "h1": "Organizations",
+            "text": "Skip to content\nSD\nPlanThePath\nOperations Portal\nHOME\nOverview\nORGANIZATIONS\nOrganizations\nOrganization Detail\nUsers\nUser Detail\nVerification\nTrust and Safety\nContent Management\nAI Operations\nPLATFORM\nSubscriptions\nBilling\nAnalytics\nSystem Health\nAudit Logs\nSecurity\nFeature Flags\nSupport\nSettings\nCollapse\nPlatform Administrator / Operations Administrator\nPlanThePath Platform\nSearch Platform Administrator / Operations Administrator workspace\nSwitch preview portal\n4\nonline\nSD\nSamir DasPlatform Administrator / Operations Administrator\nPortal preview — role selection here does not authenticate or authorize a user. Backend enforced.\nPLATFORM ADMINISTRATOR / OPERATIONS ADMINISTRATOR\nOrganizations\n\nOrganizations for Samir Das at PlanThePath Platform. This page exposes Platform Administrator / Operations Administrator-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nUpdate preview queue status\nSearch Organizations\nOrganization\nTrust and safety\nHealth\nClear filters\n\n1 records shown\n\nOrganization\nABC Engineering College\n\nKYC and institutional status queue.\n\nOwner\nInstitution verification\nStatus\nUnder review\n\nPreview actions do not mutate production organizations.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nReview organization\nAdd operational note\nUpdate preview queue status\nCreate support case\nConfigure preview feature flag\nAcknowledge simulated event\nCreate saved operational view\nRead-only\nSecrets\nProduction billing effects\nReal privileged mutations\nForbidden\nExpose tokens\nFake production health\nWeaken backend authorization",
+            "dialogs": [],
+            "alerts": [],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "Skip to contentSDPlanThePathOperations PortalHomeOverviewOrganizationsOrganizationsOrganization DetailUsersUser DetailVe",
+            "overflow": false
+          }
+        },
+        {
+          "name": "open detail",
+          "result": {
+            "clicked": true,
+            "label": "View detail"
+          },
+          "state": {
+            "path": "/operations/admin/organizations",
+            "title": "Organizations — Platform Administrator / Operations Administrator | PlanThePath",
+            "h1": "Organizations",
+            "text": "Skip to content\nSD\nPlanThePath\nOperations Portal\nHOME\nOverview\nORGANIZATIONS\nOrganizations\nOrganization Detail\nUsers\nUser Detail\nVerification\nTrust and Safety\nContent Management\nAI Operations\nPLATFORM\nSubscriptions\nBilling\nAnalytics\nSystem Health\nAudit Logs\nSecurity\nFeature Flags\nSupport\nSettings\nCollapse\nPlatform Administrator / Operations Administrator\nPlanThePath Platform\nSearch Platform Administrator / Operations Administrator workspace\nSwitch preview portal\n4\nonline\nSD\nSamir DasPlatform Administrator / Operations Administrator\nPortal preview — role selection here does not authenticate or authorize a user. Backend enforced.\nPLATFORM ADMINISTRATOR / OPERATIONS ADMINISTRATOR\nOrganizations\n\nOrganizations for Samir Das at PlanThePath Platform. This page exposes Platform Administrator / Operations Administrator-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nUpdate preview queue status\nSearch Organizations\nOrganization\nTrust and safety\nHealth\nClear filters\n\n1 records shown\n\nOrganization\nABC Engineering College\n\nKYC and institutional status queue.\n\nOwner\nInstitution verification\nStatus\nUnder review\n\nPreview actions do not mutate production organizations.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nReview organization\nAdd operational note\nUpdate preview queue status\nCreate support case\nConfigure preview feature flag\nAcknowledge simulated event\nCreate saved operational view\nRead-only\nSecrets\nProduction billing effects\nReal privileged mutations\nForbidden\nExpose tokens\nFake production health\nWeaken backend authorization\nABC Engineering College\n\nKYC and institutional status queue.\n\nRole\nPlatform Administrator / Operations Administrator\nOwner\nInstitution verification\nStatus\nUnder review\nProtected boundary\nPreview actions do not mutate production organizations.\nClose",
+            "dialogs": [
+              "ABC Engineering CollegeKYC and institutional status queue.RolePlatform Administrator / Operations Ad"
+            ],
+            "alerts": [],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "Close",
+            "overflow": false
+          }
+        },
+        {
+          "name": "close detail",
+          "result": {
+            "clicked": true,
+            "label": "Close Platform Administrator / Operations Administrator navigation"
+          },
+          "state": {
+            "path": "/operations/admin/organizations",
+            "title": "Organizations — Platform Administrator / Operations Administrator | PlanThePath",
+            "h1": "Organizations",
+            "text": "Skip to content\nSD\nPlanThePath\nOperations Portal\nHOME\nOverview\nORGANIZATIONS\nOrganizations\nOrganization Detail\nUsers\nUser Detail\nVerification\nTrust and Safety\nContent Management\nAI Operations\nPLATFORM\nSubscriptions\nBilling\nAnalytics\nSystem Health\nAudit Logs\nSecurity\nFeature Flags\nSupport\nSettings\nCollapse\nPlatform Administrator / Operations Administrator\nPlanThePath Platform\nSearch Platform Administrator / Operations Administrator workspace\nSwitch preview portal\n4\nonline\nSD\nSamir DasPlatform Administrator / Operations Administrator\nPortal preview — role selection here does not authenticate or authorize a user. Backend enforced.\nPLATFORM ADMINISTRATOR / OPERATIONS ADMINISTRATOR\nOrganizations\n\nOrganizations for Samir Das at PlanThePath Platform. This page exposes Platform Administrator / Operations Administrator-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nUpdate preview queue status\nSearch Organizations\nOrganization\nTrust and safety\nHealth\nClear filters\n\n1 records shown\n\nOrganization\nABC Engineering College\n\nKYC and institutional status queue.\n\nOwner\nInstitution verification\nStatus\nUnder review\n\nPreview actions do not mutate production organizations.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nReview organization\nAdd operational note\nUpdate preview queue status\nCreate support case\nConfigure preview feature flag\nAcknowledge simulated event\nCreate saved operational view\nRead-only\nSecrets\nProduction billing effects\nReal privileged mutations\nForbidden\nExpose tokens\nFake production health\nWeaken backend authorization\nABC Engineering College\n\nKYC and institutional status queue.\n\nRole\nPlatform Administrator / Operations Administrator\nOwner\nInstitution verification\nStatus\nUnder review\nProtected boundary\nPreview actions do not mutate production organizations.\nClose",
+            "dialogs": [
+              "ABC Engineering CollegeKYC and institutional status queue.RolePlatform Administrator / Operations Ad"
+            ],
+            "alerts": [],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "Close",
+            "overflow": false
+          }
+        },
+        {
+          "name": "open edit preview",
+          "result": {
+            "clicked": true,
+            "label": "Edit preview"
+          },
+          "state": {
+            "path": "/operations/admin/organizations",
+            "title": "Organizations — Platform Administrator / Operations Administrator | PlanThePath",
+            "h1": "Organizations",
+            "text": "Skip to content\nSD\nPlanThePath\nOperations Portal\nHOME\nOverview\nORGANIZATIONS\nOrganizations\nOrganization Detail\nUsers\nUser Detail\nVerification\nTrust and Safety\nContent Management\nAI Operations\nPLATFORM\nSubscriptions\nBilling\nAnalytics\nSystem Health\nAudit Logs\nSecurity\nFeature Flags\nSupport\nSettings\nCollapse\nPlatform Administrator / Operations Administrator\nPlanThePath Platform\nSearch Platform Administrator / Operations Administrator workspace\nSwitch preview portal\n4\nonline\nSD\nSamir DasPlatform Administrator / Operations Administrator\nPortal preview — role selection here does not authenticate or authorize a user. Backend enforced.\nPLATFORM ADMINISTRATOR / OPERATIONS ADMINISTRATOR\nOrganizations\n\nOrganizations for Samir Das at PlanThePath Platform. This page exposes Platform Administrator / Operations Administrator-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nUpdate preview queue status\nSearch Organizations\nOrganization\nTrust and safety\nHealth\nClear filters\n\n1 records shown\n\nOrganization\nABC Engineering College\n\nKYC and institutional status queue.\n\nOwner\nInstitution verification\nStatus\nUnder review\n\nPreview actions do not mutate production organizations.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nReview organization\nAdd operational note\nUpdate preview queue status\nCreate support case\nConfigure preview feature flag\nAcknowledge simulated event\nCreate saved operational view\nRead-only\nSecrets\nProduction billing effects\nReal privileged mutations\nForbidden\nExpose tokens\nFake production health\nWeaken backend authorization\nABC Engineering College\n\nKYC and institutional status queue.\n\nRole\nPlatform Administrator / Operations Administrator\nOwner\nInstitution verification\nStatus\nUnder review\nProtected boundary\nPreview actions do not mutate production organizations.\nClose\nUpdate preview queue status\n\nPreview actions do not mutate production organizations.\n\nStatus\nPreview note\nCancel\nSave preview change",
+            "dialogs": [
+              "ABC Engineering CollegeKYC and institutional status queue.RolePlatform Administrator / Operations Ad",
+              "Update preview queue statusPreview actions do not mutate production organizations.StatusPreview note"
+            ],
+            "alerts": [],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "INPUT",
+            "overflow": false
+          }
+        },
+        {
+          "name": "save empty triggers validation or save",
+          "result": {
+            "clicked": true,
+            "label": "Save preview change"
+          },
+          "state": {
+            "path": "/operations/admin/organizations",
+            "title": "Organizations — Platform Administrator / Operations Administrator | PlanThePath",
+            "h1": "Organizations",
+            "text": "Skip to content\nSD\nPlanThePath\nOperations Portal\nHOME\nOverview\nORGANIZATIONS\nOrganizations\nOrganization Detail\nUsers\nUser Detail\nVerification\nTrust and Safety\nContent Management\nAI Operations\nPLATFORM\nSubscriptions\nBilling\nAnalytics\nSystem Health\nAudit Logs\nSecurity\nFeature Flags\nSupport\nSettings\nCollapse\nPlatform Administrator / Operations Administrator\nPlanThePath Platform\nSearch Platform Administrator / Operations Administrator workspace\nSwitch preview portal\n4\nonline\nSD\nSamir DasPlatform Administrator / Operations Administrator\nPortal preview — role selection here does not authenticate or authorize a user. Backend enforced.\nPLATFORM ADMINISTRATOR / OPERATIONS ADMINISTRATOR\nOrganizations\n\nOrganizations for Samir Das at PlanThePath Platform. This page exposes Platform Administrator / Operations Administrator-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nUpdate preview queue status\nSearch Organizations\nOrganization\nTrust and safety\nHealth\nClear filters\n\n1 records shown\n\nOrganization\nABC Engineering College\n\nKYC and institutional status queue.\n\nOwner\nInstitution verification\nStatus\nUnder review\n\nPreview actions do not mutate production organizations.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nReview organization\nAdd operational note\nUpdate preview queue status\nCreate support case\nConfigure preview feature flag\nAcknowledge simulated event\nCreate saved operational view\nRead-only\nSecrets\nProduction billing effects\nReal privileged mutations\nForbidden\nExpose tokens\nFake production health\nWeaken backend authorization\nABC Engineering College\n\nKYC and institutional status queue.\n\nRole\nPlatform Administrator / Operations Administrator\nOwner\nInstitution verification\nStatus\nUnder review\nProtected boundary\nPreview actions do not mutate production organizations.\nClose\nUpdate preview queue status\n\nPreview actions do not mutate production organizations.\n\nStatus\nPreview note\n\nStatus and preview note are required.\n\nCancel\nSave preview change",
+            "dialogs": [
+              "ABC Engineering CollegeKYC and institutional status queue.RolePlatform Administrator / Operations Ad",
+              "Update preview queue statusPreview actions do not mutate production organizations.StatusPreview note"
+            ],
+            "alerts": [
+              "Status and preview note are required."
+            ],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "INPUT",
+            "overflow": false
+          }
+        },
+        {
+          "name": "cancel edit",
+          "result": {
+            "clicked": true,
+            "label": "Close Platform Administrator / Operations Administrator navigation"
+          },
+          "state": {
+            "path": "/operations/admin/organizations",
+            "title": "Organizations — Platform Administrator / Operations Administrator | PlanThePath",
+            "h1": "Organizations",
+            "text": "Skip to content\nSD\nPlanThePath\nOperations Portal\nHOME\nOverview\nORGANIZATIONS\nOrganizations\nOrganization Detail\nUsers\nUser Detail\nVerification\nTrust and Safety\nContent Management\nAI Operations\nPLATFORM\nSubscriptions\nBilling\nAnalytics\nSystem Health\nAudit Logs\nSecurity\nFeature Flags\nSupport\nSettings\nCollapse\nPlatform Administrator / Operations Administrator\nPlanThePath Platform\nSearch Platform Administrator / Operations Administrator workspace\nSwitch preview portal\n4\nonline\nSD\nSamir DasPlatform Administrator / Operations Administrator\nPortal preview — role selection here does not authenticate or authorize a user. Backend enforced.\nPLATFORM ADMINISTRATOR / OPERATIONS ADMINISTRATOR\nOrganizations\n\nOrganizations for Samir Das at PlanThePath Platform. This page exposes Platform Administrator / Operations Administrator-appropriate records, filters, detail review and owned preview actions. Preview data only; backend authorization remains authoritative.\n\nUpdate preview queue status\nSearch Organizations\nOrganization\nTrust and safety\nHealth\nClear filters\n\n1 records shown\n\nOrganization\nABC Engineering College\n\nKYC and institutional status queue.\n\nOwner\nInstitution verification\nStatus\nUnder review\n\nPreview actions do not mutate production organizations.\n\nView detail\nEdit preview\nOwnership boundaries\nAllowed in preview\nReview organization\nAdd operational note\nUpdate preview queue status\nCreate support case\nConfigure preview feature flag\nAcknowledge simulated event\nCreate saved operational view\nRead-only\nSecrets\nProduction billing effects\nReal privileged mutations\nForbidden\nExpose tokens\nFake production health\nWeaken backend authorization\nABC Engineering College\n\nKYC and institutional status queue.\n\nRole\nPlatform Administrator / Operations Administrator\nOwner\nInstitution verification\nStatus\nUnder review\nProtected boundary\nPreview actions do not mutate production organizations.\nClose\nUpdate preview queue status\n\nPreview actions do not mutate production organizations.\n\nStatus\nPreview note\n\nStatus and preview note are required.\n\nCancel\nSave preview change",
+            "dialogs": [
+              "ABC Engineering CollegeKYC and institutional status queue.RolePlatform Administrator / Operations Ad",
+              "Update preview queue statusPreview actions do not mutate production organizations.StatusPreview note"
+            ],
+            "alerts": [
+              "Status and preview note are required."
+            ],
+            "status": [
+              "1 records shown"
+            ],
+            "active": "INPUT",
+            "overflow": false
+          }
+        }
+      ]
+    }
+  ],
+  "mobileDrawerSample": {
+    "before": {
+      "path": "/employer/recruiter",
+      "title": "Recruiter Dashboard | PlanThePath",
+      "h1": "Recruiter Dashboard",
+      "text": "Skip to content\nRS\nPlanThePath\nEmployer Portal\nHOME\nDashboard\nHIRING\nOpportunities\nOpportunity Detail\nApplicants\nCandidate Detail\nAssessments\nInterviews\nTalent Pool\nOffers\nORG\nReports\nTeam\nMessages\nCompany Profile\nSettings\nCollapse\nSearch Recruiter workspace\nPortal preview — role selection here does not authenticate or authorize a user. Backend enforced.\nASTER MOBILITY\nRecruiter Dashboard\n\nOpportunities, applications, shortlists, interviews, offers, talent pool and recruiter activity.\n\nCreate saved dashboard\nActive opportunities\n9\n\n3 closing this week\n\nApplications\n312\n\n46 new\n\nShortlisted\n38\n\n12 awaiting manager\n\nInterviews\n21\n\n7 this week\n\nNeeds attention now\nOpen work queue\nOpportunity\nSOC Analyst Intern\n\nEntry SOC role with SIEM and communication requirements.\n\nOwner\nAster Mobility\nStatus\nOpen\n\nStudent private documents and institution-only notes remain hidden.\n\nView detail\nEdit preview\nCandidate\nRahul Kumar\n\nConsented applicant profile with verified evidence summary.\n\nOwner\nCandidate pipeline\nStatus\nShortlist review\n\nAcademic source records remain institution-verified and read-only.\n\nView detail\nEdit preview\nInterview\nTechnical interview panel\n\nPanel assignment and scorecard preparation.\n\nOwner\nHiring team\nStatus\nScheduled\n\nInterviewers cannot issue offers or edit requisitions.\n\nView detail\nEdit preview\nRole-owned workflows\nCreate draft opportunity\nPublish preview state\nShortlist candidate\nMove recruiter-owned stage\nSchedule interview request\nCreate assessment request\nProtected boundaries\nStudent private evidence\nInstitution-only notes\nOther employers data\nPreview activity\n\nNo preview changes yet.",
+      "dialogs": [],
+      "alerts": [],
+      "status": [],
+      "active": "Skip to contentRSPlanThePathEmployer PortalHomeDashboardHiringOpportunitiesOpportunity DetailApplicantsCandidate DetailA",
+      "overflow": false
+    },
+    "open": {
+      "clicked": true,
+      "label": "Open Recruiter navigation"
+    },
+    "afterOpen": {
+      "path": "/employer/recruiter",
+      "title": "Recruiter Dashboard | PlanThePath",
+      "h1": "Recruiter Dashboard",
+      "text": "Skip to content\nRS\nPlanThePath\nEmployer Portal\nHOME\nDashboard\nHIRING\nOpportunities\nOpportunity Detail\nApplicants\nCandidate Detail\nAssessments\nInterviews\nTalent Pool\nOffers\nORG\nReports\nTeam\nMessages\nCompany Profile\nSettings\nCollapse\nSearch Recruiter workspace\nPortal preview — role selection here does not authenticate or authorize a user. Backend enforced.\nASTER MOBILITY\nRecruiter Dashboard\n\nOpportunities, applications, shortlists, interviews, offers, talent pool and recruiter activity.\n\nCreate saved dashboard\nActive opportunities\n9\n\n3 closing this week\n\nApplications\n312\n\n46 new\n\nShortlisted\n38\n\n12 awaiting manager\n\nInterviews\n21\n\n7 this week\n\nNeeds attention now\nOpen work queue\nOpportunity\nSOC Analyst Intern\n\nEntry SOC role with SIEM and communication requirements.\n\nOwner\nAster Mobility\nStatus\nOpen\n\nStudent private documents and institution-only notes remain hidden.\n\nView detail\nEdit preview\nCandidate\nRahul Kumar\n\nConsented applicant profile with verified evidence summary.\n\nOwner\nCandidate pipeline\nStatus\nShortlist review\n\nAcademic source records remain institution-verified and read-only.\n\nView detail\nEdit preview\nInterview\nTechnical interview panel\n\nPanel assignment and scorecard preparation.\n\nOwner\nHiring team\nStatus\nScheduled\n\nInterviewers cannot issue offers or edit requisitions.\n\nView detail\nEdit preview\nRole-owned workflows\nCreate draft opportunity\nPublish preview state\nShortlist candidate\nMove recruiter-owned stage\nSchedule interview request\nCreate assessment request\nProtected boundaries\nStudent private evidence\nInstitution-only notes\nOther employers data\nPreview activity\n\nNo preview changes yet.",
+      "dialogs": [],
+      "alerts": [],
+      "status": [],
+      "active": "Skip to contentRSPlanThePathEmployer PortalHomeDashboardHiringOpportunitiesOpportunity DetailApplicantsCandidate DetailA",
+      "overflow": false
+    },
+    "escape": {
+      "path": "/employer/recruiter",
+      "title": "Recruiter Dashboard | PlanThePath",
+      "h1": "Recruiter Dashboard",
+      "text": "Skip to content\nRS\nPlanThePath\nEmployer Portal\nHOME\nDashboard\nHIRING\nOpportunities\nOpportunity Detail\nApplicants\nCandidate Detail\nAssessments\nInterviews\nTalent Pool\nOffers\nORG\nReports\nTeam\nMessages\nCompany Profile\nSettings\nCollapse\nSearch Recruiter workspace\nPortal preview — role selection here does not authenticate or authorize a user. Backend enforced.\nASTER MOBILITY\nRecruiter Dashboard\n\nOpportunities, applications, shortlists, interviews, offers, talent pool and recruiter activity.\n\nCreate saved dashboard\nActive opportunities\n9\n\n3 closing this week\n\nApplications\n312\n\n46 new\n\nShortlisted\n38\n\n12 awaiting manager\n\nInterviews\n21\n\n7 this week\n\nNeeds attention now\nOpen work queue\nOpportunity\nSOC Analyst Intern\n\nEntry SOC role with SIEM and communication requirements.\n\nOwner\nAster Mobility\nStatus\nOpen\n\nStudent private documents and institution-only notes remain hidden.\n\nView detail\nEdit preview\nCandidate\nRahul Kumar\n\nConsented applicant profile with verified evidence summary.\n\nOwner\nCandidate pipeline\nStatus\nShortlist review\n\nAcademic source records remain institution-verified and read-only.\n\nView detail\nEdit preview\nInterview\nTechnical interview panel\n\nPanel assignment and scorecard preparation.\n\nOwner\nHiring team\nStatus\nScheduled\n\nInterviewers cannot issue offers or edit requisitions.\n\nView detail\nEdit preview\nRole-owned workflows\nCreate draft opportunity\nPublish preview state\nShortlist candidate\nMove recruiter-owned stage\nSchedule interview request\nCreate assessment request\nProtected boundaries\nStudent private evidence\nInstitution-only notes\nOther employers data\nPreview activity\n\nNo preview changes yet.",
+      "dialogs": [],
+      "alerts": [],
+      "status": [],
+      "active": "Open Recruiter navigation",
+      "overflow": false
+    }
+  },
+  "network": {
+    "badResponses": [],
+    "failed": [],
+    "production": []
+  },
+  "console": {
+    "bad": [],
+    "exceptions": []
+  }
+}

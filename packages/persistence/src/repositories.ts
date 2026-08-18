@@ -50,6 +50,12 @@ export async function hasActiveInstitutionRelationship(
     .where(and(
       eq(schema.institutionRelationships.institutionId, institutionId),
       eq(schema.institutionRelationships.studentUserId, studentUserId),
+      or(
+        eq(schema.institutionRelationships.state, 'VERIFIED'),
+        eq(schema.institutionRelationships.state, 'ACTIVE'),
+        eq(schema.institutionRelationships.state, 'TRANSFERRED'),
+        eq(schema.institutionRelationships.state, 'GRADUATED'),
+      ),
       lte(schema.institutionRelationships.effectiveFrom, activityAt),
       or(isNull(schema.institutionRelationships.effectiveTo), gt(schema.institutionRelationships.effectiveTo, activityAt)),
     ))

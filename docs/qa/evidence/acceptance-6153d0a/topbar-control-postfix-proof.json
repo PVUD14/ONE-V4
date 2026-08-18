@@ -1,0 +1,208 @@
+{
+  "generatedAt": "2026-08-18T06:02:43.704Z",
+  "checks": [
+    {
+      "name": "student messages",
+      "clicked": true,
+      "before": {
+        "path": "/student",
+        "title": "Student Dashboard | PlanThePath",
+        "h1": "Student Dashboard",
+        "status": [
+          "Session-local previewSession-local Student preview ready."
+        ],
+        "overflow": false,
+        "scrollWidth": 1425,
+        "clientWidth": 1425
+      },
+      "after": {
+        "path": "/student",
+        "title": "Student Dashboard | PlanThePath",
+        "h1": "Student Dashboard",
+        "status": [
+          "Session-local previewStudent messages require the secure backend messaging workflow; no message inbox was opened in preview."
+        ],
+        "overflow": false,
+        "scrollWidth": 1425,
+        "clientWidth": 1425
+      }
+    },
+    {
+      "name": "student notifications",
+      "clicked": true,
+      "after": {
+        "path": "/student",
+        "title": "Student Dashboard | PlanThePath",
+        "h1": "Student Dashboard",
+        "status": [
+          "Session-local previewStudent notifications preview: 3 reminders are represented by local demo data only."
+        ],
+        "overflow": false,
+        "scrollWidth": 1425,
+        "clientWidth": 1425
+      }
+    },
+    {
+      "name": "placement messages",
+      "clicked": true,
+      "after": {
+        "path": "/institution/placement-officer/communications",
+        "title": "Communications — Placement Officer | PlanThePath",
+        "h1": "Communications",
+        "status": [
+          "Demo mode — changes are stored only for this session.Preview data only. Secure sign-in, authorization and persistent actions require the configured backend workflow."
+        ],
+        "overflow": false,
+        "scrollWidth": 1440,
+        "clientWidth": 1440
+      }
+    },
+    {
+      "name": "placement notifications",
+      "clicked": true,
+      "after": {
+        "path": "/institution/placement-officer/communications",
+        "title": "Communications — Placement Officer | PlanThePath",
+        "h1": "Communications",
+        "status": [
+          "Placement notifications preview: 5 local demo alerts are summarized only; no backend notification state was changed.",
+          "Demo mode — changes are stored only for this session.Preview data only. Secure sign-in, authorization and persistent actions require the configured backend workflow."
+        ],
+        "overflow": false,
+        "scrollWidth": 1440,
+        "clientWidth": 1440
+      }
+    },
+    {
+      "name": "recruiter messages",
+      "clicked": true,
+      "after": {
+        "path": "/employer/recruiter/messages",
+        "title": "Messages — Recruiter | PlanThePath",
+        "h1": "Messages",
+        "status": [
+          "Portal preview � role selection here does not authenticate or authorize a user. Backend enforced.",
+          "3 records shown"
+        ],
+        "overflow": false,
+        "scrollWidth": 1425,
+        "clientWidth": 1425
+      }
+    },
+    {
+      "name": "recruiter notifications",
+      "clicked": true,
+      "after": {
+        "path": "/employer/recruiter/messages",
+        "title": "Messages — Recruiter | PlanThePath",
+        "h1": "Messages",
+        "status": [
+          "Portal preview � role selection here does not authenticate or authorize a user. Backend enforced.Recruiter notifications preview: 4 local demo alerts are summarized only; no backend notification state was changed.",
+          "Recruiter notifications preview: 4 local demo alerts are summarized only; no backend notification state was changed.",
+          "3 records shown"
+        ],
+        "overflow": false,
+        "scrollWidth": 1425,
+        "clientWidth": 1425
+      }
+    },
+    {
+      "name": "operations messages backend notice",
+      "clicked": true,
+      "after": {
+        "path": "/operations/admin",
+        "title": "Operations Dashboard | PlanThePath",
+        "h1": "Operations Dashboard",
+        "status": [
+          "Portal preview � role selection here does not authenticate or authorize a user. Backend enforced.Platform Administrator / Operations Administrator messaging is backend-dependent and no message route exists for this preview role.",
+          "Platform Administrator / Operations Administrator messaging is backend-dependent and no message route exists for this preview role."
+        ],
+        "overflow": false,
+        "scrollWidth": 1425,
+        "clientWidth": 1425
+      }
+    },
+    {
+      "name": "operations notifications",
+      "clicked": true,
+      "after": {
+        "path": "/operations/admin",
+        "title": "Operations Dashboard | PlanThePath",
+        "h1": "Operations Dashboard",
+        "status": [
+          "Portal preview � role selection here does not authenticate or authorize a user. Backend enforced.Platform Administrator / Operations Administrator notifications preview: 4 local demo alerts are summarized only; no backend notification state was changed.",
+          "Platform Administrator / Operations Administrator notifications preview: 4 local demo alerts are summarized only; no backend notification state was changed."
+        ],
+        "overflow": false,
+        "scrollWidth": 1425,
+        "clientWidth": 1425
+      }
+    },
+    {
+      "name": "student 390 overflow",
+      "after": {
+        "path": "/student",
+        "title": "Student Dashboard | PlanThePath",
+        "h1": "Student Dashboard",
+        "status": [
+          "Session-local previewSession-local Student preview ready."
+        ],
+        "overflow": false,
+        "scrollWidth": 390,
+        "clientWidth": 390
+      }
+    },
+    {
+      "name": "placement 390 overflow",
+      "after": {
+        "path": "/institution/placement-officer",
+        "title": "Placement Dashboard | PlanThePath",
+        "h1": "Placement Dashboard",
+        "status": [
+          "Selected readiness band: Ready, 712 students, 25.3%. Selection refresh 0.",
+          "Demo mode — changes are stored only for this session.Preview data only. Secure sign-in, authorization and persistent actions require the configured backend workflow."
+        ],
+        "overflow": false,
+        "scrollWidth": 390,
+        "clientWidth": 390
+      }
+    },
+    {
+      "name": "recruiter 390 overflow",
+      "after": {
+        "path": "/employer/recruiter",
+        "title": "Recruiter Dashboard | PlanThePath",
+        "h1": "Recruiter Dashboard",
+        "status": [
+          "Portal preview � role selection here does not authenticate or authorize a user. Backend enforced."
+        ],
+        "overflow": false,
+        "scrollWidth": 390,
+        "clientWidth": 390
+      }
+    },
+    {
+      "name": "operations 390 overflow",
+      "after": {
+        "path": "/operations/admin",
+        "title": "Operations Dashboard | PlanThePath",
+        "h1": "Operations Dashboard",
+        "status": [
+          "Portal preview � role selection here does not authenticate or authorize a user. Backend enforced."
+        ],
+        "overflow": false,
+        "scrollWidth": 390,
+        "clientWidth": 390
+      }
+    }
+  ],
+  "network": {
+    "badResponses": [],
+    "failed": [],
+    "production": []
+  },
+  "console": {
+    "bad": [],
+    "exceptions": []
+  }
+}

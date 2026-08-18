@@ -2,8 +2,12 @@
   "name": "@planthepath/persistence",
   "private": true,
   "type": "module",
+  "exports": {
+    "./src/*": "./src/*"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "db:migrate": "tsx src/migrate.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --fileParallelism=false"
   },
@@ -13,6 +17,7 @@
   },
   "devDependencies": {
     "@types/pg": "^8.15.0",
+    "tsx": "^4.20.5",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"
   }

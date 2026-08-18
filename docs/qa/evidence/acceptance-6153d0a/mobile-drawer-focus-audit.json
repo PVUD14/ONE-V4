@@ -1,0 +1,116 @@
+{
+  "results": [
+    {
+      "role": "Student",
+      "route": "/student",
+      "before": {
+        "path": "/student",
+        "overflow": false,
+        "openButtons": [
+          {
+            "i": 16,
+            "label": "Open student navigation"
+          },
+          {
+            "i": 19,
+            "label": "Student profile menu"
+          }
+        ]
+      },
+      "clicked": "Open student navigation",
+      "afterOpen": {
+        "drawerOpen": true,
+        "navVisible": true,
+        "active": "Skip to contentPlanThePathStudent PortalPlanHomeMy CareerAI Career CoachPrepareReadinessSkillsAssessmentsLearningExperienceApplyOpportunitiesApplicationsInterviewsAccountDocumentsProfileSettingsCollapseSearch student workspace3API OnlineRKRahul KumarB.Tech CSE | 2027Demo previewonlineSession-local previewSession-local Student preview ready.HomeStudent DashboardA guided summary of your career progress and next steps.Good morning, RahulYour Cybersecurity Analyst path is moving forward.Focus today on the SIEM assessment, one security lab update, and one matched SOC opportunity review.Continue next actionView roadmapCareer readiness68/100+8 points this monthTarget careerCybersecurity Analyst62% roadmap progressNext milestoneComplete SIEM AssessmentDue in 3 daysAI Career CoachCommunication gapPractice incident triage and attach the lab summary.Open coachRecommended next actionsView all tasks1Complete profile evidenceAdd institution-verified academic record references.Pending2Finish readiness assessmentCommunication module is ready to continue.Due soon3Review matched opportunitySOC Analyst Intern role matches your networking and SIEM signals.Review4Update skill evidenceLink security lab outcomes to incident triage and stakeholder notes.DraftReadiness breakdownFull breakdown68ReadyTechnical readiness72%Linux hardening lab needs verificationAptitude readiness70%One timed reasoning reassessment recommendedCommunication readiness58%Incident-triage story needs mock feedbackResume/profile readiness80%Resume tailored for SOC rolesInterview readiness58%Mock interview not completedUpcomingCalendarTodayComplete Linux assessment20 AugSOC interview practice22 AugNetworking reassessmentApplication pipelineApplications1Draft1Applied1Interview1OfferLatest matched opportunitiesView allSLSOC Analyst InternSecureTech Labs | Bengaluru86% fitISCybersecurity InternInfoSec Solutions | Remote78% fitAMSecurity Operations TraineeAster Mobility | Pune72% fitLearning progressLearning planSIEM Investigation Sprint60%SIEM investigationLinux Hardening Basics35%Linux fundamentalsInterview Narrative Practice0%CommunicationMilestone unlockedNetworking fundamentals assessment completed with portfolio-ready notes.Certificate ready",
+        "overflow": false
+      },
+      "afterEsc": {
+        "drawerOpen": false,
+        "active": "Open student navigation",
+        "overflow": false
+      },
+      "issue": false
+    },
+    {
+      "role": "Placement Officer",
+      "route": "/institution/placement-officer",
+      "before": {
+        "path": "/institution/placement-officer",
+        "overflow": false,
+        "openButtons": [
+          {
+            "i": 19,
+            "label": "Open institution navigation"
+          }
+        ]
+      },
+      "clicked": "Open institution navigation",
+      "afterOpen": {
+        "drawerOpen": true,
+        "navVisible": true,
+        "active": "Skip to contentPlanThePathInstitution PortalHomeDashboardStudentsStudentsDepartmentsBatchesStudent SearchPlacementReadinessAssessmentsInterventionsOpportunitiesApplicationsInterviewsOffersEngagementEmployersCommunicationsEventsAnalyticsReportsDashboardsCollapsePlacement OfficerABC Engineering CollegeSearch institution placement workspace5API OnlineASAnita SharmaPlacement OfficerUI previewonlineABC Engineering CollegePlacement DashboardOperational overview of placement activity, student readiness, risk, and interventions. Preview data only; authorization is still backend-enforced.Date rangeAug 1 - Aug 16, 2025Last 30 daysThis quarterFiltersDepartmentAll departmentsCSEECEMEITCivilReadinessAll readinessNeeds interventionHigh riskTotal Students4,286+5.2% vs last monthPlacement Eligible1,08425.3% of totalPlacement Ready71266% of eligibleNeed Intervention26924.8% of eligibleHigh Risk1039.5% of eligibleOffers Received198+18.1% vs last monthReadiness overviewConnected readiness trendAverage readiness moves from 52 to 89 over the selected date range.Average Readiness Score - 71% - +6% vs last monthReadiness DistributionReady(70-100)71225.3%Moderate(40-69)80428.6%Low(20-39)37413.3%At Risk(0-19)1039.5%Selected readiness band: Ready, 712 students, 25.3%. Selection refresh 0.Placement pipelineApplications3,842Shortlisted612Interviews198Offers198Placed164Conversion (Applications to Offers)5.15%Top skill gapsView full reportCommunication62%Cloud Computing48%Python41%SQL37%Aptitude34%Students requiring attentionSearch students requiring attention5 recordsStudents requiring attention for placement readiness interventionsStudentDepartmentBatchReadinessPrimary gapLast activityInterventionActionsRKRahul KumarCSE202748%Communication2 days agoResume ReviewViewAssignPSPriya SinghCSE202751%Aptitude1 day agoAptitude BootcampViewAssignADArun DasECE202753%Resume3 days agoResume ReviewViewAssignNPNeha PatelCSE202754%Technical Skills2 days agoSIEM AssessmentViewAssignVJVikram JoshiME202757%Interview Skills2 days agoMock InterviewViewAssignRahul KumarCSE - Batch 2027Readiness48%Primary gapCommunicationLast activity2 days agoInterventionResume ReviewView studentAssignPriya SinghCSE - Batch 2027Readiness51%Primary gapAptitudeLast activity1 day agoInterventionAptitude BootcampView studentAssignArun DasECE - Batch 2027Readiness53%Primary gapResumeLast activity3 days agoInterventionResume ReviewView studentAssignNeha PatelCSE - Batch 2027Readiness54%Primary gapTechnical SkillsLast activity2 days agoInterventionSIEM AssessmentView studentAssignVikram JoshiME - Batch 2027Readiness57%Primary gapInterview SkillsLast activity2 days agoInterventionMock InterviewView studentAssignUpcoming interviewsView calendarTCTCS20 Aug, 11:00 AM12 StudentsDetailsInInfosys21 Aug, 10:00 AM18 StudentsDetailsAcAccenture22 Aug, 02:00 PM15 StudentsDetailsRecent announcementsView allTCS campus drive registration openPosted in placement communicationsAptitude bootcamp starting 19 AugPosted in placement communicationsResume building workshop - 18 AugPosted in placement communicationsAssessmentsCreate, schedule and manage assessmentsManage AssessmentsInterventionsAssign and track student interventionsManage InterventionsOpportunitiesPost and manage opportunitiesManage OpportunitiesReportsView placement and readiness reportsManage ReportsCommunicationsSend messages and notificationsManage CommunicationsEventsManage placement eventsManage EventsDepartment readiness comparisonView full analysisDepartmentStudentsAvg readinessReadyNeed interventionCSE1,24572%412 (33%)168 (13%)ECE98768%276 (28%)146 (15%)ME85663%184 (21%)162 (19%)IT64571%248 (38%)86 (13%)Civil55358%144 (26%)132 (24%)Placement trendPlacement trendMonthly offers rise from 32 in March to 68 in July, then 54 in August.32Mar'2545Apr'2552May'2561Jun'2568Jul'2554Aug'25 Offers PlacedTop recruitersView allTCTCSOffers: 45Placed: 32InInfosysOffers: 38Placed: 28AcAccentureOffers: 28Placed: 20CoCognizantOffers: 24Placed: 18WiWiproOffers: 20Placed: 15Quick actionsAdd New OpportunitySchedule AssessmentCreate InterventionSend AnnouncementGenerate Readiness ReportDemo mode — changes are stored only for this session.Preview data only. Secure sign-in, authorization and persistent actions require the configured backend workflow.",
+        "overflow": false
+      },
+      "afterEsc": {
+        "drawerOpen": false,
+        "active": "Open institution navigation",
+        "overflow": false
+      },
+      "issue": false
+    },
+    {
+      "role": "Recruiter",
+      "route": "/employer/recruiter",
+      "before": {
+        "path": "/employer/recruiter",
+        "overflow": false,
+        "openButtons": [
+          {
+            "i": 16,
+            "label": "Open Recruiter navigation"
+          }
+        ]
+      },
+      "clicked": "Open Recruiter navigation",
+      "afterOpen": {
+        "drawerOpen": true,
+        "navVisible": true,
+        "active": "Skip to contentRSPlanThePathEmployer PortalHomeDashboardHiringOpportunitiesOpportunity DetailApplicantsCandidate DetailAssessmentsInterviewsTalent PoolOffersOrgReportsTeamMessagesCompany ProfileSettingsCollapseRecruiterAster MobilitySearch Recruiter workspaceSwitch preview portal4onlineRSRohan ShahRecruiterPortal preview — role selection here does not authenticate or authorize a user. Backend enforced.Aster MobilityRecruiter DashboardOpportunities, applications, shortlists, interviews, offers, talent pool and recruiter activity.Create saved dashboardActive opportunities93 closing this weekApplications31246 newShortlisted3812 awaiting managerInterviews217 this weekNeeds attention nowOpen work queueOpportunitySOC Analyst InternEntry SOC role with SIEM and communication requirements.OwnerAster MobilityStatusOpenStudent private documents and institution-only notes remain hidden.View detailEdit previewCandidateRahul KumarConsented applicant profile with verified evidence summary.OwnerCandidate pipelineStatusShortlist reviewAcademic source records remain institution-verified and read-only.View detailEdit previewInterviewTechnical interview panelPanel assignment and scorecard preparation.OwnerHiring teamStatusScheduledInterviewers cannot issue offers or edit requisitions.View detailEdit previewRole-owned workflowsCreate draft opportunityPublish preview stateShortlist candidateMove recruiter-owned stageSchedule interview requestCreate assessment requestProtected boundariesStudent private evidenceInstitution-only notesOther employers dataPreview activityNo preview changes yet.",
+        "overflow": false
+      },
+      "afterEsc": {
+        "drawerOpen": false,
+        "active": "Open Recruiter navigation",
+        "overflow": false
+      },
+      "issue": false
+    },
+    {
+      "role": "Operations Administrator",
+      "route": "/operations/admin",
+      "before": {
+        "path": "/operations/admin",
+        "overflow": false,
+        "openButtons": [
+          {
+            "i": 20,
+            "label": "Open Platform Administrator / Operations Administrator navigation"
+          }
+        ]
+      },
+      "clicked": "Open Platform Administrator / Operations Administrator navigation",
+      "afterOpen": {
+        "drawerOpen": true,
+        "navVisible": true,
+        "active": "Skip to contentSDPlanThePathOperations PortalHomeOverviewOrganizationsOrganizationsOrganization DetailUsersUser DetailVerificationTrust and SafetyContent ManagementAI OperationsPlatformSubscriptionsBillingAnalyticsSystem HealthAudit LogsSecurityFeature FlagsSupportSettingsCollapsePlatform Administrator / Operations AdministratorPlanThePath PlatformSearch Platform Administrator / Operations Administrator workspaceSwitch preview portal4onlineSDSamir DasPlatform Administrator / Operations AdministratorPortal preview — role selection here does not authenticate or authorize a user. Backend enforced.PlanThePath PlatformOperations DashboardOrganizations, users, verification, trust queues, usage, system health, audit and feature flags.Create saved dashboardTotal students42.8kPreview platform totalInstitutions387 under reviewEmployers12418 active campaignsRequests today18.2kHealthy simulated loadNeeds attention nowOpen work queueOrganizationABC Engineering CollegeKYC and institutional status queue.OwnerInstitution verificationStatusUnder reviewPreview actions do not mutate production organizations.View detailEdit previewTrust and safetyTrust review caseModeration workflow with reason capture.OwnerPlatform operationsStatusOpenNo secrets, tokens or privileged backend mutations are exposed.View detailEdit previewHealthAPI latency watchSimulated operational event for preview response.OwnerSystem healthStatusAcknowledgedProduction health is not fabricated by the frontend.View detailEdit previewRole-owned workflowsReview organizationAdd operational noteUpdate preview queue statusCreate support caseConfigure preview feature flagAcknowledge simulated eventProtected boundariesSecretsProduction billing effectsReal privileged mutationsPreview activityNo preview changes yet.",
+        "overflow": false
+      },
+      "afterEsc": {
+        "drawerOpen": false,
+        "active": "Open Platform Administrator / Operations Administrator navigation",
+        "overflow": false
+      },
+      "issue": false
+    }
+  ]
+}

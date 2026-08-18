@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="260" viewBox="0 0 360 260" role="img" aria-label="Abstract learning path course cards">
+  <defs>
+    <linearGradient id="panel" x1="0" x2="1" y1="0" y2="1">
+      <stop stop-color="#F6F9FF"/>
+      <stop offset="1" stop-color="#EDF4FF"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" x2="1">
+      <stop stop-color="#1F55E5"/>
+      <stop offset="1" stop-color="#14A578"/>
+    </linearGradient>
+  </defs>
+  <rect width="360" height="260" rx="28" fill="url(#panel)"/>
+  <rect x="44" y="48" width="120" height="150" rx="22" fill="#fff" stroke="#DDE7F6"/>
+  <rect x="194" y="62" width="122" height="128" rx="22" fill="#fff" stroke="#DDE7F6"/>
+  <rect x="68" y="78" width="72" height="12" rx="6" fill="#1F55E5"/>
+  <rect x="68" y="106" width="50" height="9" rx="4.5" fill="#D7E2F5"/>
+  <rect x="68" y="128" width="74" height="9" rx="4.5" fill="#D7E2F5"/>
+  <rect x="68" y="157" width="58" height="12" rx="6" fill="#14A578"/>
+  <circle cx="255" cy="117" r="34" fill="#EEF4FF" stroke="#B8C8EA" stroke-width="10"/>
+  <path d="M255 83a34 34 0 0 1 32 45" fill="none" stroke="url(#accent)" stroke-width="10" stroke-linecap="round"/>
+  <path d="M126 210 C166 178 199 213 234 176" fill="none" stroke="#1F55E5" stroke-width="8" stroke-linecap="round" opacity=".35"/>
+  <circle cx="126" cy="210" r="9" fill="#1F55E5"/>
+  <circle cx="234" cy="176" r="9" fill="#14A578"/>
+</svg>

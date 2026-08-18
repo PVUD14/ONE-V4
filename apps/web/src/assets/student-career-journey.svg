@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="260" viewBox="0 0 360 260" role="img" aria-label="Abstract student career roadmap illustration">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop stop-color="#EAF2FF"/>
+      <stop offset="1" stop-color="#F9FBFF"/>
+    </linearGradient>
+    <linearGradient id="blue" x1="0" x2="1">
+      <stop stop-color="#1F55E5"/>
+      <stop offset="1" stop-color="#6A8DFF"/>
+    </linearGradient>
+  </defs>
+  <rect width="360" height="260" rx="28" fill="url(#bg)"/>
+  <path d="M58 189 C108 130 142 204 196 133 S276 65 311 96" fill="none" stroke="#B8C8EA" stroke-width="10" stroke-linecap="round"/>
+  <circle cx="58" cy="189" r="18" fill="#DFF7EE" stroke="#14A578" stroke-width="6"/>
+  <circle cx="174" cy="155" r="22" fill="#EEF4FF" stroke="#1F55E5" stroke-width="7"/>
+  <circle cx="303" cy="99" r="24" fill="#FFF2D6" stroke="#F59E0B" stroke-width="7"/>
+  <rect x="82" y="61" width="94" height="54" rx="16" fill="#fff" stroke="#DDE7F6"/>
+  <rect x="197" y="154" width="94" height="54" rx="16" fill="#fff" stroke="#DDE7F6"/>
+  <rect x="103" y="79" width="52" height="8" rx="4" fill="#1F55E5"/>
+  <rect x="103" y="94" width="36" height="7" rx="3.5" fill="#B8C8EA"/>
+  <rect x="218" y="172" width="50" height="8" rx="4" fill="#14A578"/>
+  <rect x="218" y="187" width="38" height="7" rx="3.5" fill="#B8C8EA"/>
+  <path d="M267 58 l12 24 26 4 -19 18 5 26 -24-13 -23 13 4-26 -18-18 26-4z" fill="url(#blue)" opacity=".92"/>
+</svg>

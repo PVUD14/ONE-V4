@@ -1,6 +1,6 @@
 import { and, eq, sql } from 'drizzle-orm';
 import * as schema from './schema.js';
-import type { AuditWriteInput, OutboxWriteInput, PersistenceDb } from './repositories.js';
+import { validateAuditWriteInput, validateOutboxWriteInput, type AuditWriteInput, type OutboxWriteInput, type PersistenceDb } from './repositories.js';
 
 type QueryResult<T> = { rows: T[] };
 
@@ -206,6 +206,7 @@ export async function acceptInvitationByTokenHashForVerifiedRecipientWithIdempot
 }
 
 async function writeAuditEvent(db: PersistenceDb, input: AuditWriteInput): Promise<void> {
+  validateAuditWriteInput(input);
   await db.insert(schema.auditEvents).values({
     id: input.id,
     actorUserId: input.actorUserId,
@@ -220,6 +221,7 @@ async function writeAuditEvent(db: PersistenceDb, input: AuditWriteInput): Promi
 }
 
 async function writeOutboxEvent(db: PersistenceDb, input: OutboxWriteInput): Promise<void> {
+  validateOutboxWriteInput(input);
   await db.insert(schema.outboxEvents).values({
     id: input.id,
     aggregateType: input.aggregateType,

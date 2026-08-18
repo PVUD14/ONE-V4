@@ -12,6 +12,16 @@ It is intentionally small and explicit. It is not a generic event framework.
 | --- | ---: | --- | --- | --- |
 | `identity.invitation.accepted` | 1 | `identity-organization` | `user` | Invitation acceptance |
 | `identity.user.provisioned` | 1 | `identity-organization` | `user` | User provisioning |
+| `identity.invitation.created` | 1 | `identity-organization` | `invitation` | Invitation creation |
+| `organization.created` | 1 | `identity-organization` | `organization` | Organization creation |
+| `organization.role.assigned` | 1 | `identity-organization` | `organization_membership` | Role assignment |
+| `institution.unit.created` | 1 | `identity-organization` | `institution_unit` | Institution unit creation |
+| `institution.relationship.created` | 1 | `identity-organization` | `institution_relationship` | Institution relationship creation |
+| `organization_membership.suspended` | 1 | `identity-organization` | `organization_membership` | Membership suspension |
+| `employer.grant.created` | 1 | `identity-organization` | `employer_applicant_grant` | Employer applicant grant creation |
+| `employer.grant.revoked` | 1 | `identity-organization` | `employer_applicant_grant` | Employer applicant grant revocation |
+| `document.reference.recorded` | 1 | `identity-organization` | `document_reference` | Opaque document-reference event shape |
+| `assessment.answer_sheet.recorded` | 1 | `identity-organization` | `answer_sheet` | Opaque answer-sheet event shape |
 
 The serialized integration type may be represented by downstream tooling as `identity.invitation.accepted.v1`, but persistence stores `event_type` and `event_version` separately.
 
@@ -30,7 +40,7 @@ The serialized integration type may be represented by downstream tooling as `ide
 | `organizationId` | Optional tenant/organization scope |
 | `subjectId` | Optional subject scope when applicable |
 | `actorId` | Optional actor scope when applicable |
-| `correlationId` | Opaque UUID for traceability |
+| `correlationId` | Bounded trace identifier matching `[A-Za-z0-9._:-]{8,128}` |
 | `causationId` | Optional parent event/command ID |
 | `purpose` | Registered purpose |
 | `dataClassification` | Registered classification |
@@ -40,9 +50,9 @@ The serialized integration type may be represented by downstream tooling as `ide
 
 ## Security Rules
 
-Events reject unsupported versions and schema mismatches before publication.
+Persistence producers validate event type, version, aggregate type, aggregate ID, correlation ID and payload before transaction commit. The dispatcher validates the envelope again before publication.
 
-Payloads are allowlisted per event and must not contain raw emails, tokens, credentials, resumes, documents, assessment answers, answer keys, AI prompts, conversations, stack traces, or broad snapshots. Sensitive-looking string values are rejected in the current registered events.
+Payloads are allowlisted per event and must not contain raw emails, tokens, credentials, resumes, documents, assessment answers, answer keys, AI prompts, conversations, stack traces, or broad snapshots. Opaque identifiers such as `documentId`, `documentVersionId`, and `answerSheetId` are allowed only when the event schema explicitly declares them with UUID validation. Sensitive-looking string values are rejected in the current registered events.
 
 Serialization is deterministic for test and audit comparisons.
 

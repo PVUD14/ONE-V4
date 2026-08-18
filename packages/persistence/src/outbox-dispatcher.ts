@@ -11,6 +11,12 @@ type QueryResult<T> = { rows: T[] };
 
 export type OutboxFailureClass = 'RETRYABLE_PUBLISH_FAILURE' | 'TERMINAL_PUBLISH_FAILURE' | 'SCHEMA_VALIDATION_FAILED' | 'EVENT_EXPIRED';
 
+const safeFailureMessages: Record<Exclude<OutboxFailureClass, 'RETRYABLE_PUBLISH_FAILURE'>, string> = {
+  TERMINAL_PUBLISH_FAILURE: 'publisher terminal failure',
+  SCHEMA_VALIDATION_FAILED: 'event schema validation failed',
+  EVENT_EXPIRED: 'event expired before publish',
+};
+
 export interface ClaimedOutboxEvent {
   readonly id: string;
   readonly aggregateType: string;
@@ -193,6 +199,7 @@ export async function markExpiredOutboxEvents(
       WHERE delivery_state IN ('PENDING','PROCESSING')
         AND expires_at IS NOT NULL
         AND expires_at <= ${input.now}
+        AND (delivery_state = 'PENDING' OR lease_expires_at <= ${input.now})
       ORDER BY expires_at ASC, id ASC
       LIMIT ${input.limit}
       FOR UPDATE SKIP LOCKED
@@ -223,11 +230,15 @@ export async function dispatchClaimedOutboxEvent(
   if (input.leaseOwner !== event.leaseOwner || input.leaseToken !== event.leaseToken) throw new OutboxLeaseStateError('claimed event lease does not match dispatcher input');
   const retryPolicy = input.retryPolicy ?? defaultRetryPolicy;
   if (event.expiresAt && event.expiresAt <= input.now) {
-    await ensureUpdated(markOutboxTerminalFailure(db, event.id, input.leaseOwner, input.leaseToken, input.now, 'EVENT_EXPIRED', 'event expired before publish'));
+    await ensureUpdated(markOutboxTerminalFailure(db, event.id, input.leaseOwner, input.leaseToken, input.now, 'EVENT_EXPIRED'));
     return 'TERMINAL_FAILURE';
   }
   if (input.now.getTime() - event.occurredAt.getTime() > retryPolicy.maxEventAgeMs) {
-    await ensureUpdated(markOutboxTerminalFailure(db, event.id, input.leaseOwner, input.leaseToken, input.now, 'EVENT_EXPIRED', 'event exceeded maximum age'));
+    await ensureUpdated(markOutboxTerminalFailure(db, event.id, input.leaseOwner, input.leaseToken, input.now, 'EVENT_EXPIRED'));
+    return 'TERMINAL_FAILURE';
+  }
+  if (event.attempts > retryPolicy.maxAttempts) {
+    await ensureUpdated(markOutboxTerminalFailure(db, event.id, input.leaseOwner, input.leaseToken, input.now, 'TERMINAL_PUBLISH_FAILURE'));
     return 'TERMINAL_FAILURE';
   }
 
@@ -247,7 +258,7 @@ export async function dispatchClaimedOutboxEvent(
     });
     validateIntegrationEventEnvelope(envelope);
   } catch {
-    await ensureUpdated(markOutboxTerminalFailure(db, event.id, input.leaseOwner, input.leaseToken, input.now, 'SCHEMA_VALIDATION_FAILED', 'event schema validation failed'));
+    await ensureUpdated(markOutboxTerminalFailure(db, event.id, input.leaseOwner, input.leaseToken, input.now, 'SCHEMA_VALIDATION_FAILED'));
     return 'TERMINAL_FAILURE';
   }
 
@@ -261,7 +272,7 @@ export async function dispatchClaimedOutboxEvent(
     if (error instanceof OutboxReconciliationRequiredError || error instanceof OutboxLeaseStateError) throw error;
     const retryable = !(error instanceof OutboxPublishError) || error.retryable;
     if (!retryable || event.attempts >= retryPolicy.maxAttempts) {
-      await ensureUpdated(markOutboxTerminalFailure(db, event.id, input.leaseOwner, input.leaseToken, input.now, 'TERMINAL_PUBLISH_FAILURE', 'publisher terminal failure'));
+      await ensureUpdated(markOutboxTerminalFailure(db, event.id, input.leaseOwner, input.leaseToken, input.now, 'TERMINAL_PUBLISH_FAILURE'));
       return 'TERMINAL_FAILURE';
     }
     const delayMs = computeRetryDelayMs(event.attempts, retryPolicy);
@@ -327,8 +338,8 @@ export async function markOutboxTerminalFailure(
   leaseToken: string,
   now: Date,
   failureClass: OutboxFailureClass,
-  failureMessage: string,
 ): Promise<boolean> {
+  if (failureClass === 'RETRYABLE_PUBLISH_FAILURE') throw new RangeError('terminal failure must use a terminal failure class');
   const result = await db.execute(sql`
     UPDATE outbox_events
     SET delivery_state = 'FAILED',
@@ -336,7 +347,7 @@ export async function markOutboxTerminalFailure(
         lease_token = NULL,
         lease_expires_at = NULL,
         last_failure_class = ${failureClass},
-        last_failure_message = left(${failureMessage}, 240),
+        last_failure_message = ${safeFailureMessages[failureClass]},
         updated_at = now()
     WHERE id = ${eventId}::uuid
       AND delivery_state = 'PROCESSING'

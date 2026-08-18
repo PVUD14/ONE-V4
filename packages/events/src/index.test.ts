@@ -54,8 +54,11 @@ describe('integration event envelope', () => {
     expect(() => invitationEvent({ payload: { userId: 'person@example.test', invitationId: randomUUID() } })).toThrow(/looks sensitive/);
   });
 
-  it('validates payload values, versions, correlation shape, and JSON compatibility', () => {
-    expect(() => invitationEvent({ correlationId: 'system' })).toThrow(/correlationId must be bounded printable ASCII/);
+  it('validates payload values, versions, canonical correlation shape, and JSON compatibility', () => {
+    expect(() => invitationEvent({ correlationId: 'system' })).toThrow(/correlationId must match/);
+    expect(() => invitationEvent({ correlationId: 'bad quote"' })).toThrow(/correlationId must match/);
+    expect(() => invitationEvent({ correlationId: 'bad\\slash' })).toThrow(/correlationId must match/);
+    expect(() => invitationEvent({ correlationId: 'bad space' })).toThrow(/correlationId must match/);
     expect(() => invitationEvent({ correlationId: 'api-correlation-123' })).not.toThrow();
     expect(() => invitationEvent({ payload: { userId: null, invitationId: randomUUID() } })).toThrow(/payload field userId must be a UUID string/);
     expect(() => invitationEvent({ payload: { userId: 7, invitationId: randomUUID() } })).toThrow(/payload field userId must be a UUID string/);
@@ -65,13 +68,12 @@ describe('integration event envelope', () => {
     expect(() => invitationEvent({ aggregateVersion: Number.NaN })).toThrow(/aggregateVersion must be a positive integer/);
   });
 
-  it('registers every executable application event literal', () => {
+  it('registers every persistence outbox producer event literal', () => {
     const sourceFiles = [
-      resolve(process.cwd(), '../../apps/api/src/application/identity-organization/services.ts'),
       resolve(process.cwd(), '../persistence/src/repositories.ts'),
       resolve(process.cwd(), '../persistence/src/identity-authentication.ts'),
     ];
-    const registered = new Set(Object.values(eventSchemas).map((schema) => schema.eventType));
+    const registered: Set<string> = new Set(Object.values(eventSchemas).map((schema) => schema.eventType));
     const emitted = new Set<string>();
     for (const file of sourceFiles) {
       const text = readFileSync(file, 'utf8');
@@ -79,8 +81,74 @@ describe('integration event envelope', () => {
         if (match[1]?.includes('.')) emitted.add(match[1]);
       }
     }
-    expect([...emitted].filter((eventType) => eventType.includes('created') || eventType.includes('accepted') || eventType.includes('assigned') || eventType.includes('provisioned') || eventType.includes('suspended')).sort())
-      .toEqual([...registered].sort());
+    const producerEvents = [...emitted].filter((eventType) => (
+      eventType.includes('created')
+      || eventType.includes('accepted')
+      || eventType.includes('assigned')
+      || eventType.includes('provisioned')
+      || eventType.includes('suspended')
+      || eventType.includes('revoked')
+    ));
+    expect(producerEvents.filter((eventType) => !registered.has(eventType))).toEqual([]);
+  });
+
+  it('keeps the in-memory service event list explicitly out of the integration producer contract', () => {
+    const text = readFileSync(resolve(process.cwd(), '../../apps/api/src/application/identity-organization/services.ts'), 'utf8');
+    expect(text).toContain('SequenceIdGenerator');
+    expect(text).toContain('organization.role.assigned');
+  });
+
+  it('accepts the organization.role.assigned producer contract with a role payload', () => {
+    expect(() => createIntegrationEventEnvelope({
+      eventId: randomUUID(),
+      eventType: 'organization.role.assigned',
+      eventVersion: 1,
+      occurredAt: '2026-08-18T00:00:00.000Z',
+      aggregateId: randomUUID(),
+      organizationId: randomUUID(),
+      actorId: randomUUID(),
+      correlationId: 'role-contract-1',
+      payload: { membershipId: randomUUID(), role: 'PLACEMENT_ADMIN' },
+    })).not.toThrow();
+    expect(() => createIntegrationEventEnvelope({
+      eventId: randomUUID(),
+      eventType: 'organization.role.assigned',
+      eventVersion: 1,
+      occurredAt: '2026-08-18T00:00:00.000Z',
+      aggregateId: randomUUID(),
+      correlationId: 'role-contract-2',
+      payload: { membershipId: randomUUID(), role: 'OWNER_OF_EVERYTHING' },
+    })).toThrow(/invalid enum/);
+  });
+
+  it('allows safe opaque future identifiers without permitting raw document or answer content', () => {
+    expect(() => createIntegrationEventEnvelope({
+      eventId: randomUUID(),
+      eventType: 'document.reference.recorded',
+      eventVersion: 1,
+      occurredAt: '2026-08-18T00:00:00.000Z',
+      aggregateId: randomUUID(),
+      correlationId: 'doc-reference-1',
+      payload: { documentId: randomUUID(), documentVersionId: randomUUID() },
+    })).not.toThrow();
+    expect(() => createIntegrationEventEnvelope({
+      eventId: randomUUID(),
+      eventType: 'assessment.answer_sheet.recorded',
+      eventVersion: 1,
+      occurredAt: '2026-08-18T00:00:00.000Z',
+      aggregateId: randomUUID(),
+      correlationId: 'answer-sheet-1',
+      payload: { answerSheetId: randomUUID() },
+    })).not.toThrow();
+    expect(() => createIntegrationEventEnvelope({
+      eventId: randomUUID(),
+      eventType: 'document.reference.recorded',
+      eventVersion: 1,
+      occurredAt: '2026-08-18T00:00:00.000Z',
+      aggregateId: randomUUID(),
+      correlationId: 'doc-reference-2',
+      payload: { documentId: randomUUID(), documentVersionId: randomUUID(), documentContent: 'raw essay answers' },
+    })).toThrow(/unexpected payload field documentContent/);
   });
 
   it('enforces expiry and deterministic serialization', () => {

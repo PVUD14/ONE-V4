@@ -28,6 +28,7 @@ import {
   handleEventIdempotently,
   markExpiredOutboxEvents,
   markOutboxPublished,
+  markOutboxTerminalFailure,
   replayOutboxEvent,
 } from '../src/outbox-dispatcher.js';
 
@@ -682,6 +683,46 @@ describe('Phase 1 identity organization persistence invariants', () => {
     await expect(countById('audit_events', auditId)).resolves.toBe(0);
   });
 
+  it('rejects unsupported outbox events before committing the domain transaction', async () => {
+    const actor = await seedUser('unsupported-event-actor@example.test');
+    const target = await seedUser('unsupported-event-target@example.test');
+    const institution = await seedOrg('INSTITUTION', 'Unsupported Event College');
+    const membershipId = randomUUID();
+    const auditId = randomUUID();
+
+    await expect(assignOrganizationMembershipWithAuditOutbox(db, {
+      membershipId,
+      organizationId: institution,
+      targetUserId: target,
+      role: 'FACULTY_LECTURER',
+      scope: { organizationId: institution, institutionId: institution },
+      audit: { id: auditId, actorUserId: actor, action: 'organization.role.assigned', resourceType: 'organization_membership', resourceId: membershipId, organizationId: institution, correlationId: 'corr-unsupported' },
+      outbox: { id: randomUUID(), aggregateType: 'organization_membership', aggregateId: membershipId, eventType: 'organization.role.poisoned', payload: { membershipId }, actorUserId: actor, organizationId: institution, correlationId: 'corr-unsupported' },
+    })).rejects.toThrow(/unsupported event schema/);
+
+    await expect(countById('organization_memberships', membershipId)).resolves.toBe(0);
+    await expect(countById('audit_events', auditId)).resolves.toBe(0);
+  });
+
+  it('rejects invalid audit correlation and outbox schema before commit', async () => {
+    const actor = await seedUser('invalid-outbox-actor@example.test');
+    const target = await seedUser('invalid-outbox-target@example.test');
+    const institution = await seedOrg('INSTITUTION', 'Invalid Outbox College');
+    const membershipId = randomUUID();
+
+    await expect(assignOrganizationMembershipWithAuditOutbox(db, {
+      membershipId,
+      organizationId: institution,
+      targetUserId: target,
+      role: 'FACULTY_LECTURER',
+      scope: { organizationId: institution, institutionId: institution },
+      audit: { id: randomUUID(), actorUserId: actor, action: 'organization.role.assigned', resourceType: 'organization_membership', resourceId: membershipId, organizationId: institution, correlationId: 'bad quote"' },
+      outbox: { id: randomUUID(), aggregateType: 'user', aggregateId: membershipId, eventType: 'organization.role.assigned', payload: { membershipId, role: 'FACULTY_LECTURER' }, actorUserId: actor, organizationId: institution, correlationId: 'bad quote"' },
+    })).rejects.toThrow(/correlationId must match/);
+
+    await expect(countById('organization_memberships', membershipId)).resolves.toBe(0);
+  });
+
   it('claims outbox events in bounded batches with deterministic ordering and leases', async () => {
     const actor = await seedUser('outbox-actor@example.test');
     const organization = await seedOrg('INSTITUTION', 'Outbox College');
@@ -767,6 +808,32 @@ describe('Phase 1 identity organization persistence invariants', () => {
     expect(claimed[0]?.attempts).toBe(2);
     expect(claimed[0]?.leaseOwner).toBe('worker-b');
     expect(claimed[0]?.leaseToken).toMatch(/[0-9a-f-]{36}/);
+  });
+
+  it('does not let expiry sweeping clear an active PROCESSING lease', async () => {
+    const eventId = randomUUID();
+    const now = new Date('2026-08-18T00:00:10Z');
+    await db.insert(schema.outboxEvents).values({
+      id: eventId,
+      aggregateType: 'user',
+      aggregateId: randomUUID(),
+      eventType: 'identity.user.provisioned',
+      payload: { userId: randomUUID() },
+      correlationId: randomUUID(),
+      occurredAt: new Date('2026-08-18T00:00:00Z'),
+      availableAt: new Date('2026-08-18T00:00:00Z'),
+      expiresAt: new Date('2026-08-18T00:00:05Z'),
+      deliveryState: 'PROCESSING',
+      leaseOwner: 'active-worker',
+      leaseToken: randomUUID(),
+      leaseExpiresAt: new Date('2026-08-18T00:01:00Z'),
+      attempts: 1,
+    });
+
+    await expect(markExpiredOutboxEvents(db, { now, limit: 10 })).resolves.toBe(0);
+    const [row] = await db.select().from(schema.outboxEvents).where(eq(schema.outboxEvents.id, eventId));
+    expect(row?.deliveryState).toBe('PROCESSING');
+    expect(row?.leaseOwner).toBe('active-worker');
   });
 
   it('publishes valid events and rejects stale lease completion', async () => {
@@ -897,6 +964,68 @@ describe('Phase 1 identity organization persistence invariants', () => {
     expect(JSON.stringify(terminalRow)).not.toContain('Error:');
   });
 
+  it('treats attempts as claims and does not publish after a final-attempt crash is reclaimed', async () => {
+    const eventId = randomUUID();
+    const eventUserId = randomUUID();
+    await db.insert(schema.outboxEvents).values({
+      id: eventId,
+      aggregateType: 'user',
+      aggregateId: eventUserId,
+      eventType: 'identity.user.provisioned',
+      payload: { userId: eventUserId },
+      correlationId: randomUUID(),
+      occurredAt: new Date('2026-08-18T00:00:00Z'),
+      availableAt: new Date('2026-08-18T00:00:00Z'),
+      deliveryState: 'PROCESSING',
+      leaseOwner: 'crashed-worker',
+      leaseToken: randomUUID(),
+      leaseExpiresAt: new Date('2026-08-18T00:00:01Z'),
+      attempts: 2,
+    });
+
+    const [claimed] = await claimOutboxBatch(db, {
+      leaseOwner: 'reclaimer',
+      batchSize: 1,
+      leaseDurationMs: 30_000,
+      now: new Date('2026-08-18T00:00:02Z'),
+    });
+    expect(claimed?.attempts).toBe(3);
+
+    const publisher = new InMemoryIntegrationEventPublisher();
+    await expect(dispatchClaimedOutboxEvent(db, claimed!, publisher, {
+      leaseOwner: 'reclaimer',
+      leaseToken: claimed!.leaseToken,
+      now: new Date('2026-08-18T00:00:02Z'),
+      retryPolicy: { maxAttempts: 2, maxEventAgeMs: 60_000, baseDelayMs: 1_000, maxDelayMs: 10_000, jitterRatio: 0, random: () => 0 },
+    })).resolves.toBe('TERMINAL_FAILURE');
+    expect(publisher.published).toHaveLength(0);
+  });
+
+  it('persists only fixed safe terminal failure messages', async () => {
+    const eventId = randomUUID();
+    const leaseToken = randomUUID();
+    await db.insert(schema.outboxEvents).values({
+      id: eventId,
+      aggregateType: 'user',
+      aggregateId: randomUUID(),
+      eventType: 'identity.user.provisioned',
+      payload: { userId: randomUUID() },
+      correlationId: randomUUID(),
+      occurredAt: new Date('2026-08-18T00:00:00Z'),
+      deliveryState: 'PROCESSING',
+      leaseOwner: 'worker-safe-failure',
+      leaseToken,
+      leaseExpiresAt: new Date('2026-08-18T00:01:00Z'),
+      attempts: 1,
+    });
+
+    await markOutboxTerminalFailure(db, eventId, 'worker-safe-failure', leaseToken, new Date('2026-08-18T00:00:10Z'), 'TERMINAL_PUBLISH_FAILURE');
+    const [row] = await db.select().from(schema.outboxEvents).where(eq(schema.outboxEvents.id, eventId));
+    expect(row?.lastFailureMessage).toBe('publisher terminal failure');
+    expect(JSON.stringify(row)).not.toContain('secret');
+    expect(JSON.stringify(row)).not.toContain('@');
+  });
+
   it('marks expired events failed without publishing and rejects incompatible schemas', async () => {
     const expiredId = randomUUID();
     const invalidId = randomUUID();
@@ -1009,6 +1138,44 @@ describe('Phase 1 identity organization persistence invariants', () => {
     expect(replayConsumer).toEqual({ executed: false });
   });
 
+  it('rejects replay for pending, active processing, published, and expired failed events', async () => {
+    const actor = await seedUser('replay-states-actor@example.test');
+    const now = new Date('2026-08-18T00:05:00Z');
+    const rows = [
+      { id: randomUUID(), deliveryState: 'PENDING' as const },
+      { id: randomUUID(), deliveryState: 'PROCESSING' as const, leaseOwner: 'worker', leaseToken: randomUUID(), leaseExpiresAt: new Date('2026-08-18T00:10:00Z') },
+      { id: randomUUID(), deliveryState: 'PUBLISHED' as const },
+      { id: randomUUID(), deliveryState: 'FAILED' as const, expiresAt: new Date('2026-08-18T00:00:00Z'), lastFailureClass: 'TERMINAL_PUBLISH_FAILURE' },
+    ];
+    for (const row of rows) {
+      const userId = randomUUID();
+      await db.insert(schema.outboxEvents).values({
+        id: row.id,
+        aggregateType: 'user',
+        aggregateId: userId,
+        eventType: 'identity.user.provisioned',
+        payload: { userId },
+        correlationId: randomUUID(),
+        occurredAt: new Date('2026-08-18T00:00:00Z'),
+        deliveryState: row.deliveryState,
+        ...(row.deliveryState === 'PUBLISHED' ? { publishedAt: now } : {}),
+        ...(row.leaseOwner ? { leaseOwner: row.leaseOwner } : {}),
+        ...(row.leaseToken ? { leaseToken: row.leaseToken } : {}),
+        ...(row.leaseExpiresAt ? { leaseExpiresAt: row.leaseExpiresAt } : {}),
+        ...(row.expiresAt ? { expiresAt: row.expiresAt } : {}),
+        ...(row.lastFailureClass ? { lastFailureClass: row.lastFailureClass } : {}),
+      });
+      await expect(replayOutboxEvent(db, {
+        eventId: row.id,
+        actorUserId: actor,
+        reasonCode: 'RETRY_BLOCKED',
+        ticketReference: 'INC-REPLAY-1',
+        auditId: randomUUID(),
+        now,
+      })).resolves.toBe(false);
+    }
+  });
+
   it('persists consumer failure receipt while rolling back failed effect writes and allows retry', async () => {
     const actor = await seedUser('consumer-failure-actor@example.test');
     const eventId = randomUUID();
@@ -1060,21 +1227,69 @@ describe('Phase 1 identity organization persistence invariants', () => {
     expect(receipt?.attempts).toBe(2);
   });
 
+  it('executes only one concurrent consumer effect for duplicate deliveries', async () => {
+    const actor = await seedUser('consumer-concurrent-actor@example.test');
+    const eventId = randomUUID();
+    await db.insert(schema.outboxEvents).values({
+      id: eventId,
+      aggregateType: 'user',
+      aggregateId: actor,
+      eventType: 'identity.user.provisioned',
+      payload: { userId: actor },
+      correlationId: randomUUID(),
+      occurredAt: new Date('2026-08-18T00:00:00Z'),
+    });
+
+    const effectAuditId = randomUUID();
+    const results = await Promise.all([
+      handleEventIdempotently(db, {
+        consumerName: 'projection-concurrent',
+        eventId,
+        effect: async (tx) => {
+          await tx.execute(sql`SELECT pg_sleep(0.1)`);
+          await tx.insert(schema.auditEvents).values({
+            id: effectAuditId,
+            actorUserId: actor,
+            action: 'consumer.concurrent.effect',
+            resourceType: 'outbox_event',
+            resourceId: eventId,
+            outcome: 'SUCCESS',
+            correlationId: 'consumer-concurrent-1',
+          });
+          return 'first';
+        },
+      }),
+      handleEventIdempotently(db, {
+        consumerName: 'projection-concurrent',
+        eventId,
+        effect: async () => 'second',
+      }),
+    ]);
+
+    expect(results.filter((result) => result.executed)).toHaveLength(1);
+    const [receipt] = await db.select().from(schema.eventConsumerReceipts).where(eq(schema.eventConsumerReceipts.eventId, eventId));
+    const audits = await db.select().from(schema.auditEvents).where(eq(schema.auditEvents.id, effectAuditId));
+    expect(receipt?.status).toBe('SUCCEEDED');
+    expect(audits).toHaveLength(1);
+  });
+
   it('allows only one concurrent duplicate role assignment to commit', async () => {
     const actor = await seedUser('role-race-actor@example.test');
     const target = await seedUser('role-race-target@example.test');
     const institution = await seedOrg('INSTITUTION', 'Race College');
 
+    const firstMembershipId = randomUUID();
+    const secondMembershipId = randomUUID();
     const attempts = await Promise.allSettled([
       assignOrganizationMembershipWithAuditOutbox(db, {
-        membershipId: randomUUID(), organizationId: institution, targetUserId: target, role: 'PLACEMENT_ADMIN', scope: { organizationId: institution, institutionId: institution },
-        audit: { id: randomUUID(), actorUserId: actor, action: 'organization.role.assigned', resourceType: 'organization_membership', resourceId: 'race', organizationId: institution, correlationId: 'race-1' },
-        outbox: { id: randomUUID(), aggregateType: 'organization_membership', aggregateId: 'race', eventType: 'organization.role.assigned', payload: {}, actorUserId: actor, organizationId: institution, correlationId: 'race-1' },
+        membershipId: firstMembershipId, organizationId: institution, targetUserId: target, role: 'PLACEMENT_ADMIN', scope: { organizationId: institution, institutionId: institution },
+        audit: { id: randomUUID(), actorUserId: actor, action: 'organization.role.assigned', resourceType: 'organization_membership', resourceId: firstMembershipId, organizationId: institution, correlationId: 'race-1-ok' },
+        outbox: { id: randomUUID(), aggregateType: 'organization_membership', aggregateId: firstMembershipId, eventType: 'organization.role.assigned', payload: { membershipId: firstMembershipId, role: 'PLACEMENT_ADMIN' }, actorUserId: actor, organizationId: institution, correlationId: 'race-1-ok' },
       }),
       assignOrganizationMembershipWithAuditOutbox(db, {
-        membershipId: randomUUID(), organizationId: institution, targetUserId: target, role: 'PLACEMENT_ADMIN', scope: { organizationId: institution, institutionId: institution },
-        audit: { id: randomUUID(), actorUserId: actor, action: 'organization.role.assigned', resourceType: 'organization_membership', resourceId: 'race', organizationId: institution, correlationId: 'race-2' },
-        outbox: { id: randomUUID(), aggregateType: 'organization_membership', aggregateId: 'race', eventType: 'organization.role.assigned', payload: {}, actorUserId: actor, organizationId: institution, correlationId: 'race-2' },
+        membershipId: secondMembershipId, organizationId: institution, targetUserId: target, role: 'PLACEMENT_ADMIN', scope: { organizationId: institution, institutionId: institution },
+        audit: { id: randomUUID(), actorUserId: actor, action: 'organization.role.assigned', resourceType: 'organization_membership', resourceId: secondMembershipId, organizationId: institution, correlationId: 'race-2-ok' },
+        outbox: { id: randomUUID(), aggregateType: 'organization_membership', aggregateId: secondMembershipId, eventType: 'organization.role.assigned', payload: { membershipId: secondMembershipId, role: 'PLACEMENT_ADMIN' }, actorUserId: actor, organizationId: institution, correlationId: 'race-2-ok' },
       }),
     ]);
 

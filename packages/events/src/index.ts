@@ -33,9 +33,9 @@ export interface EventSchemaDefinition {
 }
 
 export type PayloadFieldDefinition =
-  | { readonly kind: 'uuid' }
-  | { readonly kind: 'string'; readonly minLength?: number; readonly maxLength: number; readonly pattern?: RegExp }
-  | { readonly kind: 'enum'; readonly values: readonly string[] };
+  | { readonly kind: 'uuid'; readonly required?: boolean }
+  | { readonly kind: 'string'; readonly minLength?: number; readonly maxLength: number; readonly pattern?: RegExp; readonly required?: boolean }
+  | { readonly kind: 'enum'; readonly values: readonly string[]; readonly required?: boolean };
 
 export class EventValidationError extends Error {
   constructor(message: string) {
@@ -46,22 +46,36 @@ export class EventValidationError extends Error {
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const rfc3339UtcPattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
-const correlationIdPattern = /^[\x20-\x7E]{8,128}$/;
+export const correlationIdPattern = /^[A-Za-z0-9._:-]{8,128}$/;
 const prohibitedPayloadKeys = [
-  /email/i,
-  /password/i,
-  /token/i,
-  /credential/i,
-  /secret/i,
-  /resume/i,
-  /document/i,
-  /answer/i,
-  /answerKey/i,
-  /prompt/i,
-  /conversation/i,
-  /stack/i,
-  /snapshot/i,
+  /^email$/i,
+  /^raw[A-Z_ -]?email$/i,
+  /^password$/i,
+  /^token$/i,
+  /^credential(s)?$/i,
+  /^secret$/i,
+  /^resume(Text|Content)?$/i,
+  /^document(Content|Text|Body)?$/i,
+  /^answer(Text|Content|Body|Key)?$/i,
+  /^prompt$/i,
+  /^conversation$/i,
+  /^stack$/i,
+  /^snapshot$/i,
 ];
+
+const organizationRoles = [
+  'PLATFORM_SUPER_ADMIN',
+  'OPERATIONS_ADMIN',
+  'SECURITY_ADMIN',
+  'INSTITUTION_OWNER',
+  'INSTITUTION_ADMIN',
+  'PLACEMENT_ADMIN',
+  'DEPARTMENT_HEAD',
+  'FACULTY_LECTURER',
+  'EMPLOYER_OWNER',
+  'EMPLOYER_ADMIN',
+  'RECRUITER',
+] as const;
 
 export const eventSchemas = {
   identityInvitationAcceptedV1: {
@@ -112,7 +126,47 @@ export const eventSchemas = {
     purpose: 'organization-role-assignment',
     dataClassification: 'confidential',
     schemaRef: 'registry://organization.role.assigned/1',
-    payload: { membershipId: { kind: 'uuid' } },
+    payload: { membershipId: { kind: 'uuid' }, role: { kind: 'enum', values: organizationRoles, required: false } },
+  },
+  employerGrantCreatedV1: {
+    eventType: 'employer.grant.created',
+    eventVersion: 1,
+    producer: 'identity-organization',
+    aggregateType: 'employer_applicant_grant',
+    purpose: 'employer-applicant-grant-creation',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://employer.grant.created/1',
+    payload: { opportunityId: { kind: 'uuid' } },
+  },
+  employerGrantRevokedV1: {
+    eventType: 'employer.grant.revoked',
+    eventVersion: 1,
+    producer: 'identity-organization',
+    aggregateType: 'employer_applicant_grant',
+    purpose: 'employer-applicant-grant-revocation',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://employer.grant.revoked/1',
+    payload: { grantId: { kind: 'uuid' } },
+  },
+  documentReferenceRecordedV1: {
+    eventType: 'document.reference.recorded',
+    eventVersion: 1,
+    producer: 'identity-organization',
+    aggregateType: 'document_reference',
+    purpose: 'document-reference-recording',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://document.reference.recorded/1',
+    payload: { documentId: { kind: 'uuid' }, documentVersionId: { kind: 'uuid' } },
+  },
+  assessmentAnswerSheetRecordedV1: {
+    eventType: 'assessment.answer_sheet.recorded',
+    eventVersion: 1,
+    producer: 'identity-organization',
+    aggregateType: 'answer_sheet',
+    purpose: 'assessment-answer-sheet-recording',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://assessment.answer_sheet.recorded/1',
+    payload: { answerSheetId: { kind: 'uuid' } },
   },
   institutionUnitCreatedV1: {
     eventType: 'institution.unit.created',
@@ -194,7 +248,7 @@ export function validateIntegrationEventEnvelope(event: IntegrationEventEnvelope
   requirePlainJsonObject(event.payload, 'payload');
   const payloadKeys = Object.keys(event.payload).sort();
   for (const key of Object.keys(definition.payload)) {
-    if (!(key in event.payload)) throw new EventValidationError(`missing payload field ${key}`);
+    if (definition.payload[key]?.required !== false && !(key in event.payload)) throw new EventValidationError(`missing payload field ${key}`);
   }
   for (const key of payloadKeys) {
     const fieldDefinition = definition.payload[key];
@@ -215,8 +269,8 @@ function requireUuid(value: string, field: string): void {
   if (!uuidPattern.test(value)) throw new EventValidationError(`${field} must be an opaque UUID`);
 }
 
-function requireCorrelationId(value: string, field: string): void {
-  if (!correlationIdPattern.test(value)) throw new EventValidationError(`${field} must be bounded printable ASCII`);
+export function requireCorrelationId(value: string, field = 'correlationId'): void {
+  if (!correlationIdPattern.test(value)) throw new EventValidationError(`${field} must match [A-Za-z0-9._:-]{8,128}`);
 }
 
 function requireTimestamp(value: string, field: string): void {

@@ -35,7 +35,7 @@ The claim order is deterministic enough for operations:
 available_at, occurred_at, id
 ```
 
-Completion helpers require both `delivery_state = PROCESSING` and the same `lease_owner`. A stale dispatcher cannot mark another worker's lease as published or failed.
+Completion helpers require `delivery_state = PROCESSING`, the same `lease_owner`, the same `lease_token`, and an unexpired lease. A stale dispatcher cannot mark another worker's lease as published or failed.
 
 ## Retry Policy
 
@@ -51,9 +51,11 @@ The default retry policy is:
 
 Tests can inject deterministic time and random functions. Runtime retry logic does not depend on uncontrolled randomness for correctness.
 
-Retryable publisher failures return the event to `PENDING`, increment attempts through the claim path, set the next `available_at`, and clear the lease. Terminal failures or exhausted attempts mark `FAILED`.
+Attempts are counted as delivery claims. Retryable publisher failures return the event to `PENDING`, increment attempts through the claim path, set the next `available_at`, and clear the lease. If a worker crashes after claiming the final allowed attempt, a later reclaim increments attempts past the limit and fails the row before any external publish.
 
-Expired events can be marked failed through `markExpiredOutboxEvents`; claimed events also fail closed if they expire before publication.
+Expired pending events can be marked failed through `markExpiredOutboxEvents`. Expired processing events are not swept while their lease is still active; the active worker must still check expiry before publication and fail closed without calling the publisher.
+
+Terminal failure persistence uses bounded failure classes and fixed safe messages. Raw exception text, provider response bodies, stack traces, credentials, or personal data are not accepted by the terminal-failure helper.
 
 ## Publisher Contract
 

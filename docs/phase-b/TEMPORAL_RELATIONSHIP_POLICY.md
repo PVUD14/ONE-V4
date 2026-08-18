@@ -21,14 +21,14 @@ effective_from <= activity_occurred_at < effective_to
 | `ACTIVE` | Allowed inside the effective window; may continue if `effective_to` is null |
 | `ENDED` | Denied in this implementation pending a separately approved historical-retention policy |
 | `TRANSFERRED` | Former relationship; allowed only for eligible historical activity before a non-null `effective_to` |
-| `GRADUATED` | Allowed inside the effective window; may continue if `effective_to` is null under existing behavior |
+| `GRADUATED` | Former relationship; allowed only for eligible historical activity before a non-null `effective_to` |
 | `REVOKED` | Denied |
 
-## TRANSFERRED Safety Invariant
+## TRANSFERRED And GRADUATED Safety Invariant
 
-A `TRANSFERRED` relationship without `effective_to` fails closed.
+A `TRANSFERRED` or `GRADUATED` relationship without `effective_to` fails closed.
 
-The database migration adds a constraint so new malformed transferred rows are rejected. The shared helper also denies such a relationship so in-memory/application behavior remains safe if it receives malformed data from a test fixture or older source.
+The database migrations add constraints so new malformed transferred or graduated rows are rejected. The shared helper also denies such a relationship so in-memory/application behavior remains safe if it receives malformed data from a test fixture or older source.
 
 ## Aligned Layers
 
@@ -36,6 +36,7 @@ The database migration adds a constraint so new malformed transferred rows are r
 - `apps/api/src/application/identity-organization/services.ts` uses that helper for in-memory representative access checks.
 - `packages/persistence/src/repositories.ts` applies the same state and timestamp rule in the PostgreSQL query.
 - `packages/persistence/drizzle/0002_phase_b_event_foundation.sql` rejects `TRANSFERRED` relationships without an end timestamp.
+- `packages/persistence/drizzle/0003_phase_b_hardening.sql` also rejects `GRADUATED` relationships without an end timestamp.
 
 ## Known Ambiguity
 

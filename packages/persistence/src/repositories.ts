@@ -1,4 +1,5 @@
 import { and, eq, gt, isNotNull, isNull, lte, or, sql } from 'drizzle-orm';
+import { createIntegrationEventEnvelope, requireCorrelationId, schemaForEvent } from '@planthepath/events/src/index.js';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from './schema.js';
 
@@ -398,7 +399,29 @@ export async function acceptInvitationWithIdempotency(
   });
 }
 
+export function validateAuditWriteInput(input: AuditWriteInput): void {
+  requireCorrelationId(input.correlationId);
+}
+
+export function validateOutboxWriteInput(input: OutboxWriteInput): void {
+  const eventVersion = input.eventVersion ?? 1;
+  const definition = schemaForEvent(input.eventType, eventVersion);
+  if (input.aggregateType !== definition.aggregateType) throw new Error('outbox aggregateType does not match registered event schema');
+  createIntegrationEventEnvelope({
+    eventId: input.id,
+    eventType: input.eventType,
+    eventVersion,
+    occurredAt: '2026-01-01T00:00:00.000Z',
+    aggregateId: input.aggregateId,
+    ...(input.actorUserId ? { actorId: input.actorUserId } : {}),
+    ...(input.organizationId ? { organizationId: input.organizationId } : {}),
+    correlationId: input.correlationId,
+    payload: input.payload,
+  });
+}
+
 async function writeAuditEvent(db: PersistenceDb, input: AuditWriteInput): Promise<void> {
+  validateAuditWriteInput(input);
   await db.insert(schema.auditEvents).values({
     id: input.id,
     actorUserId: input.actorUserId,
@@ -413,6 +436,7 @@ async function writeAuditEvent(db: PersistenceDb, input: AuditWriteInput): Promi
 }
 
 async function writeOutboxEvent(db: PersistenceDb, input: OutboxWriteInput): Promise<void> {
+  validateOutboxWriteInput(input);
   await db.insert(schema.outboxEvents).values({
     id: input.id,
     aggregateType: input.aggregateType,

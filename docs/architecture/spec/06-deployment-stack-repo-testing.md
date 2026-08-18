@@ -30,6 +30,8 @@ Managed Redis-compatible cache only for justified use cases: rate limits, short-
 
 SQS queues + DLQs for background work; EventBridge may be used for scheduled/event routing where useful.
 
+Outbox dispatch must treat a successful external publish followed by a failed database acknowledgement as a reconciliation-required state. The dispatcher should surface that condition explicitly for operator review instead of silently retrying as if the publish definitely failed.
+
 ### Object storage
 
 S3 private buckets for documents, exports, and controlled static assets.

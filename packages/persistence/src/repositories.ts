@@ -38,7 +38,7 @@ export interface RoleScopeInput {
   readonly employerId?: string;
 }
 
-export async function hasActiveInstitutionRelationship(
+export async function hasInstitutionRelationshipAuthorizationForActivity(
   db: PersistenceDb,
   institutionId: string,
   studentUserId: string,
@@ -53,9 +53,12 @@ export async function hasActiveInstitutionRelationship(
       or(
         eq(schema.institutionRelationships.state, 'VERIFIED'),
         eq(schema.institutionRelationships.state, 'ACTIVE'),
-        eq(schema.institutionRelationships.state, 'GRADUATED'),
         and(
           eq(schema.institutionRelationships.state, 'TRANSFERRED'),
+          isNotNull(schema.institutionRelationships.effectiveTo),
+        ),
+        and(
+          eq(schema.institutionRelationships.state, 'GRADUATED'),
           isNotNull(schema.institutionRelationships.effectiveTo),
         ),
       ),
@@ -65,6 +68,16 @@ export async function hasActiveInstitutionRelationship(
     .limit(1);
 
   return rows.length === 1;
+}
+
+/** @deprecated Use hasInstitutionRelationshipAuthorizationForActivity. */
+export async function hasActiveInstitutionRelationship(
+  db: PersistenceDb,
+  institutionId: string,
+  studentUserId: string,
+  activityAt: Date,
+): Promise<boolean> {
+  return hasInstitutionRelationshipAuthorizationForActivity(db, institutionId, studentUserId, activityAt);
 }
 
 export async function hasEmployerApplicantAccess(
@@ -236,7 +249,7 @@ export async function suspendMembershipWithOutbox(
     readonly organizationId: string;
     readonly eventId: string;
     readonly audit?: AuditWriteInput;
-    readonly correlationId?: string;
+    readonly correlationId: string;
   },
 ): Promise<void> {
   await db.transaction(async (tx) => {
@@ -260,7 +273,7 @@ export async function suspendMembershipWithOutbox(
       eventVersion: 1,
       payload: { membershipId: membership.id },
       organizationId: membership.organizationId,
-      correlationId: input.correlationId ?? 'system',
+      correlationId: input.correlationId,
     });
   });
 }

@@ -3,7 +3,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import * as schema from '../src/schema.js';
 import {
   acceptInvitationWithIdempotency,
@@ -19,6 +19,8 @@ import {
 } from '../src/repositories.js';
 import {
   InMemoryIntegrationEventPublisher,
+  EventConsumerEffectError,
+  OutboxReconciliationRequiredError,
   OutboxPublishError,
   claimOutboxBatch,
   computeRetryDelayMs,
@@ -746,9 +748,11 @@ describe('Phase 1 identity organization persistence invariants', () => {
       correlationId: randomUUID(),
       occurredAt: new Date('2026-08-18T00:00:00Z'),
       availableAt: new Date('2026-08-18T00:00:00Z'),
-      deliveryState: 'PENDING',
+      deliveryState: 'PROCESSING',
       leaseOwner: 'dead-worker',
+      leaseToken: randomUUID(),
       leaseExpiresAt: new Date('2026-08-18T00:00:01Z'),
+      attempts: 1,
     });
 
     const claimed = await claimOutboxBatch(db, {
@@ -760,7 +764,9 @@ describe('Phase 1 identity organization persistence invariants', () => {
 
     expect(claimed).toHaveLength(1);
     expect(claimed[0]?.id).toBe(eventId);
-    expect(claimed[0]?.attempts).toBe(1);
+    expect(claimed[0]?.attempts).toBe(2);
+    expect(claimed[0]?.leaseOwner).toBe('worker-b');
+    expect(claimed[0]?.leaseToken).toMatch(/[0-9a-f-]{36}/);
   });
 
   it('publishes valid events and rejects stale lease completion', async () => {
@@ -783,11 +789,12 @@ describe('Phase 1 identity organization persistence invariants', () => {
       now: new Date('2026-08-18T00:00:01Z'),
     });
     expect(claimed).toBeDefined();
-    await expect(markOutboxPublished(db, eventId, 'worker-b', new Date('2026-08-18T00:00:02Z'))).resolves.toBe(false);
+    await expect(markOutboxPublished(db, eventId, 'worker-b', claimed!.leaseToken, new Date('2026-08-18T00:00:02Z'), new Date('2026-08-18T00:00:02Z'))).resolves.toBe(false);
 
     const publisher = new InMemoryIntegrationEventPublisher();
     await dispatchClaimedOutboxEvent(db, claimed!, publisher, {
       leaseOwner: 'worker-a',
+      leaseToken: claimed!.leaseToken,
       now: new Date('2026-08-18T00:00:02Z'),
       retryPolicy: { maxAttempts: 3, maxEventAgeMs: 60_000, baseDelayMs: 1_000, maxDelayMs: 10_000, jitterRatio: 0, random: () => 0 },
     });
@@ -797,6 +804,37 @@ describe('Phase 1 identity organization persistence invariants', () => {
     expect(row?.deliveryState).toBe('PUBLISHED');
     expect(row?.leaseOwner).toBeNull();
     expect(row?.publishedAt).toBeInstanceOf(Date);
+  });
+
+  it('surfaces reconciliation when publish succeeds but the claimed row is stolen before acknowledgement', async () => {
+    const eventId = randomUUID();
+    await db.insert(schema.outboxEvents).values({
+      id: eventId,
+      aggregateType: 'user',
+      aggregateId: randomUUID(),
+      eventType: 'identity.user.provisioned',
+      payload: { userId: randomUUID() },
+      correlationId: randomUUID(),
+      occurredAt: new Date('2026-08-18T00:00:00Z'),
+      availableAt: new Date('2026-08-18T00:00:00Z'),
+    });
+    const [claimed] = await claimOutboxBatch(db, { leaseOwner: 'worker-a', batchSize: 1, leaseDurationMs: 30_000, now: new Date('2026-08-18T00:00:01Z') });
+    const publisher = {
+      async publish() {
+        await db.execute(sql`
+          UPDATE outbox_events
+          SET lease_token = ${randomUUID()}
+          WHERE id = ${eventId}::uuid
+        `);
+      },
+    };
+
+    await expect(dispatchClaimedOutboxEvent(db, claimed!, publisher, {
+      leaseOwner: claimed!.leaseOwner,
+      leaseToken: claimed!.leaseToken,
+      now: new Date('2026-08-18T00:00:02Z'),
+      retryPolicy: { maxAttempts: 3, maxEventAgeMs: 60_000, baseDelayMs: 1_000, maxDelayMs: 10_000, jitterRatio: 0, random: () => 0 },
+    })).rejects.toBeInstanceOf(OutboxReconciliationRequiredError);
   });
 
   it('schedules retryable failures with deterministic exponential backoff and terminal states', async () => {
@@ -834,6 +872,7 @@ describe('Phase 1 identity organization persistence invariants', () => {
     retryPublisher.failNext = new OutboxPublishError('provider timeout', true);
     await dispatchClaimedOutboxEvent(db, retryClaim!, retryPublisher, {
       leaseOwner: 'worker-a',
+      leaseToken: retryClaim!.leaseToken,
       now,
       retryPolicy: { maxAttempts: 3, maxEventAgeMs: 60_000, baseDelayMs: 1_000, maxDelayMs: 10_000, jitterRatio: 0, random: () => 0 },
     });
@@ -848,6 +887,7 @@ describe('Phase 1 identity organization persistence invariants', () => {
     terminalPublisher.failNext = new OutboxPublishError('bad destination', false);
     await dispatchClaimedOutboxEvent(db, terminalClaim!, terminalPublisher, {
       leaseOwner: 'worker-b',
+      leaseToken: terminalClaim!.leaseToken,
       now,
       retryPolicy: { maxAttempts: 3, maxEventAgeMs: 60_000, baseDelayMs: 1_000, maxDelayMs: 10_000, jitterRatio: 0, random: () => 0 },
     });
@@ -893,7 +933,7 @@ describe('Phase 1 identity organization persistence invariants', () => {
     const claims = await claimOutboxBatch(db, { leaseOwner: 'worker-a', batchSize: 2, leaseDurationMs: 30_000, now });
     const publisher = new InMemoryIntegrationEventPublisher();
     for (const event of claims) {
-      await dispatchClaimedOutboxEvent(db, event, publisher, { leaseOwner: 'worker-a', now });
+      await dispatchClaimedOutboxEvent(db, event, publisher, { leaseOwner: 'worker-a', leaseToken: event.leaseToken, now });
     }
 
     expect(publisher.published).toHaveLength(0);
@@ -921,8 +961,8 @@ describe('Phase 1 identity organization persistence invariants', () => {
     const first = await handleEventIdempotently(db, {
       consumerName: 'projection-a',
       eventId,
-      effect: async () => {
-        await pool.query('SELECT 1');
+      effect: async (tx) => {
+        await tx.execute(sql`SELECT 1`);
         return 'done';
       },
     });
@@ -946,7 +986,8 @@ describe('Phase 1 identity organization persistence invariants', () => {
     await expect(replayOutboxEvent(db, {
       eventId,
       actorUserId: actor,
-      reason: 'manual operator replay after provider outage',
+      reasonCode: 'PROVIDER_OUTAGE',
+      ticketReference: 'INC-123',
       auditId: randomUUID(),
       now: new Date('2026-08-18T00:05:00Z'),
     })).resolves.toBe(true);
@@ -966,6 +1007,57 @@ describe('Phase 1 identity organization persistence invariants', () => {
       },
     });
     expect(replayConsumer).toEqual({ executed: false });
+  });
+
+  it('persists consumer failure receipt while rolling back failed effect writes and allows retry', async () => {
+    const actor = await seedUser('consumer-failure-actor@example.test');
+    const eventId = randomUUID();
+    const auditId = randomUUID();
+    await db.insert(schema.outboxEvents).values({
+      id: eventId,
+      aggregateType: 'user',
+      aggregateId: actor,
+      eventType: 'identity.user.provisioned',
+      payload: { userId: actor },
+      correlationId: randomUUID(),
+      occurredAt: new Date('2026-08-18T00:00:00Z'),
+    });
+
+    await expect(handleEventIdempotently(db, {
+      consumerName: 'projection-failure',
+      eventId,
+      failureClass: 'projection failed with raw details that should be bounded and redacted',
+      effect: async (tx) => {
+        await tx.insert(schema.auditEvents).values({
+          id: auditId,
+          actorUserId: actor,
+          action: 'consumer.side.effect',
+          resourceType: 'outbox_event',
+          resourceId: eventId,
+          outcome: 'SUCCESS',
+          correlationId: 'consumer-fail-1',
+        });
+        throw new Error('boom with secret@example.test');
+      },
+    })).rejects.toBeInstanceOf(EventConsumerEffectError);
+
+    const failedReceipts = await db.select().from(schema.eventConsumerReceipts).where(eq(schema.eventConsumerReceipts.eventId, eventId));
+    const failedAudit = await db.select().from(schema.auditEvents).where(eq(schema.auditEvents.id, auditId));
+    expect(failedReceipts).toHaveLength(1);
+    expect(failedReceipts[0]?.status).toBe('FAILED');
+    expect(failedReceipts[0]?.attempts).toBe(1);
+    expect(failedReceipts[0]?.lastFailureClass).not.toContain('secret');
+    expect(failedAudit).toHaveLength(0);
+
+    const retry = await handleEventIdempotently(db, {
+      consumerName: 'projection-failure',
+      eventId,
+      effect: async () => 'ok',
+    });
+    const [receipt] = await db.select().from(schema.eventConsumerReceipts).where(eq(schema.eventConsumerReceipts.eventId, eventId));
+    expect(retry).toEqual({ executed: true, result: 'ok' });
+    expect(receipt?.status).toBe('SUCCEEDED');
+    expect(receipt?.attempts).toBe(2);
   });
 
   it('allows only one concurrent duplicate role assignment to commit', async () => {

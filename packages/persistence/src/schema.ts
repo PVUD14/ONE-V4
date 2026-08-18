@@ -158,6 +158,8 @@ export const institutionRelationships = pgTable('institution_relationships', {
   uniqueIndex('institution_relationship_identity_window_uq').on(t.institutionId, t.studentUserId, t.effectiveFrom),
   index('institution_relationship_scope_idx').on(t.institutionId, t.studentUserId, t.effectiveFrom, t.effectiveTo),
   check('institution_relationship_window_ck', sql`${t.effectiveTo} is null or ${t.effectiveTo} > ${t.effectiveFrom}`),
+  check('institution_relationship_transferred_end_ck', sql`${t.state} <> 'TRANSFERRED' or ${t.effectiveTo} is not null`),
+  check('institution_relationship_graduated_end_ck', sql`${t.state} <> 'GRADUATED' or ${t.effectiveTo} is not null`),
 ]);
 
 export const employerApplicantAccessGrants = pgTable('employer_applicant_access_grants', {
@@ -209,6 +211,7 @@ export const outboxEvents = pgTable('outbox_events', {
   attempts: integer('attempts').notNull().default(0),
   availableAt: timestamp('available_at', { withTimezone: true }).notNull().defaultNow(),
   leaseOwner: text('lease_owner'),
+  leaseToken: text('lease_token'),
   leaseExpiresAt: timestamp('lease_expires_at', { withTimezone: true }),
   lastFailureClass: text('last_failure_class'),
   lastFailureMessage: text('last_failure_message'),
@@ -220,8 +223,8 @@ export const outboxEvents = pgTable('outbox_events', {
   index('outbox_lease_expiry_idx').on(t.deliveryState, t.leaseExpiresAt),
   check('outbox_event_version_ck', sql`${t.eventVersion} > 0`),
   check('outbox_attempts_ck', sql`${t.attempts} >= 0`),
-  check('outbox_lease_pair_ck', sql`(${t.leaseOwner} is null and ${t.leaseExpiresAt} is null) or (${t.leaseOwner} is not null and ${t.leaseExpiresAt} is not null)`),
-  check('outbox_published_state_ck', sql`(${t.deliveryState} = 'PUBLISHED' and ${t.publishedAt} is not null) or (${t.deliveryState} <> 'PUBLISHED')`),
+  check('outbox_lease_state_ck', sql`(${t.deliveryState} = 'PROCESSING' and ${t.leaseOwner} is not null and ${t.leaseToken} is not null and ${t.leaseExpiresAt} is not null) or (${t.deliveryState} <> 'PROCESSING' and ${t.leaseOwner} is null and ${t.leaseToken} is null and ${t.leaseExpiresAt} is null)`),
+  check('outbox_published_state_ck', sql`(${t.deliveryState} = 'PUBLISHED' and ${t.publishedAt} is not null) or (${t.deliveryState} <> 'PUBLISHED' and ${t.publishedAt} is null)`),
 ]);
 
 export const idempotencyRecords = pgTable('idempotency_records', {

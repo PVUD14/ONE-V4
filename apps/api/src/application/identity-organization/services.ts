@@ -5,7 +5,7 @@ export type OrganizationKind = 'INSTITUTION' | 'EMPLOYER';
 export type VerificationState = 'PENDING' | 'UNDER_REVIEW' | 'VERIFIED' | 'REJECTED' | 'SUSPENDED';
 export type MembershipState = 'ACTIVE' | 'SUSPENDED' | 'ENDED';
 export type InvitationState = 'PENDING' | 'ACCEPTED' | 'REVOKED' | 'EXPIRED';
-export type RelationshipState = 'PENDING' | 'VERIFIED' | 'ACTIVE' | 'ENDED' | 'TRANSFERRED' | 'GRADUATED';
+export type RelationshipState = 'PENDING' | 'VERIFIED' | 'ACTIVE' | 'ENDED' | 'TRANSFERRED' | 'GRADUATED' | 'REVOKED';
 export type InstitutionUnitKind = 'INSTITUTION' | 'CAMPUS' | 'DEPARTMENT' | 'PROGRAM' | 'BATCH' | 'SECTION';
 
 export type OrganizationRole =

@@ -7,8 +7,8 @@ export interface TemporalInstitutionScope {
 
 export const canonicalInstitutionRelationshipPolicy = {
   effectiveToBoundary: 'exclusive',
-  continuingAccessStates: ['VERIFIED', 'ACTIVE', 'GRADUATED'],
-  historicalAccessStates: ['TRANSFERRED'],
+  continuingAccessStates: ['VERIFIED', 'ACTIVE'],
+  historicalAccessStates: ['TRANSFERRED', 'GRADUATED'],
 } as const;
 
 export function institutionRelationshipAuthorizesActivity(
@@ -17,7 +17,7 @@ export function institutionRelationshipAuthorizesActivity(
 ): boolean {
   if (activityOccurredAt < scope.effectiveFrom) return false;
 
-  if (scope.relationshipState === 'TRANSFERRED') {
+  if (canonicalInstitutionRelationshipPolicy.historicalAccessStates.includes(scope.relationshipState as never)) {
     if (!scope.effectiveTo) return false;
     return activityOccurredAt < scope.effectiveTo;
   }

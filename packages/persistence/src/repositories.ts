@@ -1,4 +1,4 @@
-import { and, eq, gt, isNull, lte, or, sql } from 'drizzle-orm';
+import { and, eq, gt, isNotNull, isNull, lte, or, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from './schema.js';
 
@@ -53,8 +53,11 @@ export async function hasActiveInstitutionRelationship(
       or(
         eq(schema.institutionRelationships.state, 'VERIFIED'),
         eq(schema.institutionRelationships.state, 'ACTIVE'),
-        eq(schema.institutionRelationships.state, 'TRANSFERRED'),
         eq(schema.institutionRelationships.state, 'GRADUATED'),
+        and(
+          eq(schema.institutionRelationships.state, 'TRANSFERRED'),
+          isNotNull(schema.institutionRelationships.effectiveTo),
+        ),
       ),
       lte(schema.institutionRelationships.effectiveFrom, activityAt),
       or(isNull(schema.institutionRelationships.effectiveTo), gt(schema.institutionRelationships.effectiveTo, activityAt)),

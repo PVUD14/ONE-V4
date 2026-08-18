@@ -12,6 +12,7 @@
     "test": "vitest run --fileParallelism=false"
   },
   "dependencies": {
+    "@planthepath/events": "workspace:*",
     "drizzle-orm": "^0.44.0",
     "pg": "^8.16.0"
   },

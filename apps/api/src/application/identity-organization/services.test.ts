@@ -107,6 +107,70 @@ describe('identity and organization application services', () => {
     })).toBe(false);
   });
 
+  it('uses exclusive effective-to semantics and permits transferred historical activity only before the end', async () => {
+    const { store, service } = createHarness();
+    const institution = addOrganization(store, { id: 'inst-a', kind: 'INSTITUTION', legalName: 'Institution A', verificationState: 'VERIFIED' });
+    const staff = addUser(store, 'staff-a', 'sub:staff-a');
+    const student = addUser(store, 'student-a', 'sub:student-a');
+    addMembership(store, {
+      id: 'member-a',
+      organizationId: institution.id,
+      userId: staff.id,
+      role: 'INSTITUTION_ADMIN',
+      state: 'ACTIVE',
+      scope: { organizationId: institution.id, institutionId: institution.id },
+    });
+    store.state.studentInstitutionRelationships.set('rel-a', {
+      id: 'rel-a',
+      institutionId: institution.id,
+      studentUserId: student.id,
+      state: 'TRANSFERRED',
+      effectiveFrom: new Date('2025-06-01T00:00:00Z'),
+      effectiveTo: new Date('2026-06-01T00:00:00Z'),
+    } satisfies StudentInstitutionRelationshipRecord);
+
+    const context = await service.loadAuthorizationContext('sub:staff-a');
+    expect(service.canReadStudentActivity(context, {
+      institutionId: institution.id,
+      studentUserId: student.id,
+      activityAt: new Date('2026-05-31T23:59:59.999Z'),
+    })).toBe(true);
+    expect(service.canReadStudentActivity(context, {
+      institutionId: institution.id,
+      studentUserId: student.id,
+      activityAt: new Date('2026-06-01T00:00:00Z'),
+    })).toBe(false);
+  });
+
+  it('fails closed for transferred relationships missing an effective end timestamp', async () => {
+    const { store, service } = createHarness();
+    const institution = addOrganization(store, { id: 'inst-a', kind: 'INSTITUTION', legalName: 'Institution A', verificationState: 'VERIFIED' });
+    const staff = addUser(store, 'staff-a', 'sub:staff-a');
+    const student = addUser(store, 'student-a', 'sub:student-a');
+    addMembership(store, {
+      id: 'member-a',
+      organizationId: institution.id,
+      userId: staff.id,
+      role: 'INSTITUTION_ADMIN',
+      state: 'ACTIVE',
+      scope: { organizationId: institution.id, institutionId: institution.id },
+    });
+    store.state.studentInstitutionRelationships.set('rel-a', {
+      id: 'rel-a',
+      institutionId: institution.id,
+      studentUserId: student.id,
+      state: 'TRANSFERRED',
+      effectiveFrom: new Date('2025-06-01T00:00:00Z'),
+    } satisfies StudentInstitutionRelationshipRecord);
+
+    const context = await service.loadAuthorizationContext('sub:staff-a');
+    expect(service.canReadStudentActivity(context, {
+      institutionId: institution.id,
+      studentUserId: student.id,
+      activityAt: new Date('2025-12-01T00:00:00Z'),
+    })).toBe(false);
+  });
+
   it('denies institution identifier manipulation across institutions', async () => {
     const { store, service } = createHarness();
     addOrganization(store, { id: 'inst-a', kind: 'INSTITUTION', legalName: 'Institution A', verificationState: 'VERIFIED' });

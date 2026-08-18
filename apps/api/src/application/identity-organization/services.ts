@@ -1,3 +1,5 @@
+import { institutionRelationshipAuthorizesActivity } from '@planthepath/authorization/src/index.js';
+
 export type AccountState = 'INVITED' | 'ACTIVE' | 'SUSPENDED' | 'DELETION_PENDING' | 'DELETED';
 export type OrganizationKind = 'INSTITUTION' | 'EMPLOYER';
 export type VerificationState = 'PENDING' | 'UNDER_REVIEW' | 'VERIFIED' | 'REJECTED' | 'SUSPENDED';
@@ -481,9 +483,12 @@ export class IdentityOrganizationService {
 
     return [...this.store.state.studentInstitutionRelationships.values()].some((relationship) => {
       if (relationship.institutionId !== input.institutionId || relationship.studentUserId !== input.studentUserId) return false;
-      if (!['VERIFIED', 'ACTIVE', 'GRADUATED'].includes(relationship.state)) return false;
-      if (input.activityAt < relationship.effectiveFrom) return false;
-      return !relationship.effectiveTo || input.activityAt <= relationship.effectiveTo;
+      return institutionRelationshipAuthorizesActivity({
+        institutionId: relationship.institutionId,
+        relationshipState: relationship.state,
+        effectiveFrom: relationship.effectiveFrom,
+        ...(relationship.effectiveTo ? { effectiveTo: relationship.effectiveTo } : {}),
+      }, input.activityAt);
     });
   }
 

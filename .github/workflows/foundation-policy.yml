@@ -1,0 +1,77 @@
+name: foundation-policy
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  repository-policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reject obvious committed private keys
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git grep -nE -- '-----BEGIN (RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----' -- ':!*.md'; then
+            echo 'Potential private key material detected in repository content.' >&2
+            exit 1
+          fi
+      - name: Reject merge conflict markers
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- ':!docs/architecture/spec/*'; then
+            echo 'Merge conflict marker detected.' >&2
+            exit 1
+          fi
+      - name: Verify architecture authority files
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f docs/architecture/APPLICATION_ARCHITECTURE_SPEC.md
+          test -f docs/phase-0/README.md
+          test -f docs/phase-0/authorization-matrix.md
+          test -f docs/phase-0/threat-model.md
+          test -f docs/phase-0/data-classification-retention.md
+          test -f docs/phase-0/environments-secrets.md
+          test -f docs/phase-0/api-conventions.md
+          test -f docs/phase-0/observability-audit.md
+          test -f docs/security/DATA_PROTECTION_SECURITY_ARCHITECTURE.md
+          test -f docs/security/DATA_PROTECTION_ENGINEERING_REQUIREMENTS.md
+      - name: Verify mandatory data-protection invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q '^## 24. Architecture invariants' docs/security/DATA_PROTECTION_SECURITY_ARCHITECTURE.md
+          grep -q 'Authentication is not authorization' docs/security/DATA_PROTECTION_SECURITY_ARCHITECTURE.md
+          grep -q 'Institution access is relationship- and time-scoped' docs/security/DATA_PROTECTION_SECURITY_ARCHITECTURE.md
+          grep -q 'Employer candidate access is opportunity- and consent-scoped' docs/security/DATA_PROTECTION_SECURITY_ARCHITECTURE.md
+          grep -q 'Private AI conversations remain private by default' docs/security/DATA_PROTECTION_SECURITY_ARCHITECTURE.md
+          grep -q '^## DP-009 Server authorization' docs/security/DATA_PROTECTION_ENGINEERING_REQUIREMENTS.md
+          grep -q '^## DP-010 Institution temporal scope' docs/security/DATA_PROTECTION_ENGINEERING_REQUIREMENTS.md
+          grep -q '^## DP-011 Employer scope' docs/security/DATA_PROTECTION_ENGINEERING_REQUIREMENTS.md
+          grep -q '^## DP-022 AI privacy' docs/security/DATA_PROTECTION_ENGINEERING_REQUIREMENTS.md
+
+  phase0-no-feature-code:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Keep Phase 0 branch limited to foundation scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_HEAD_REF:-}" == "agent/phase-0-foundation" ]]; then
+            git diff --name-only "${{ github.event.pull_request.base.sha }}"...HEAD > /tmp/changed
+            if grep -Ev '^(docs/|\.github/|SECURITY\.md$|CONTRIBUTING\.md$|README\.md$)' /tmp/changed; then
+              echo 'Product/application code is not allowed on the Phase 0 foundation branch.' >&2
+              exit 1
+            fi
+          fi

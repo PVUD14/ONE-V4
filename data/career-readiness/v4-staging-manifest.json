@@ -1,0 +1,51 @@
+{
+  "sourceRepository": "https://github.com/PVUD14/V4--Database",
+  "sourceCommit": "0c067ce24f92662daa933edf0fc8b75636d99469",
+  "transformVersion": "v4-question-registry-stage-v1",
+  "sourcePaths": [
+    "data/question-registry-approved.json"
+  ],
+  "checksums": {
+    "data/question-registry-approved.json": "ad9b2ac75613fafbf132e6538db589461e562fe959c78fe49eb71760d264fdad"
+  },
+  "recordCounts": {
+    "discovered": 11,
+    "quarantined": 11,
+    "releaseEligible": 0
+  },
+  "records": [
+    {
+      "sourceRepository": "https://github.com/PVUD14/V4--Database", "sourceCommit": "0c067ce24f92662daa933edf0fc8b75636d99469", "sourcePath": "data/question-registry-approved.json", "sourceRecordId": "Q-0040", "sourceHash": "4a55a3694cda3cdeeb02aa2aa0f7a1f4c7c3cc03e494a57e744f9d2c71f188ce", "transformVersion": "v4-question-registry-stage-v1", "licenseLabel": "MIT", "attributionRequired": true, "rightsState": "PENDING", "smeState": "PENDING", "qualityState": "PENDING", "mappingState": "UNMAPPED", "duplicateState": "UNCHECKED", "releaseState": "QUARANTINED", "rejectionReasonCodes": ["RIGHTS_REVIEW_PENDING", "SME_REVIEW_PENDING", "QUALITY_REVIEW_PENDING"]
+    },
+    {
+      "sourceRepository": "https://github.com/PVUD14/V4--Database", "sourceCommit": "0c067ce24f92662daa933edf0fc8b75636d99469", "sourcePath": "data/question-registry-approved.json", "sourceRecordId": "Q-0051", "sourceHash": "8323c5d975c449c4d485bb1ec2c7fd698f3de927164ecaa1b9346a6aac96c6e6", "transformVersion": "v4-question-registry-stage-v1", "licenseLabel": "CC BY", "attributionRequired": true, "rightsState": "PENDING", "smeState": "PENDING", "qualityState": "PENDING", "mappingState": "UNMAPPED", "duplicateState": "UNCHECKED", "releaseState": "QUARANTINED", "rejectionReasonCodes": ["RIGHTS_REVIEW_PENDING", "SME_REVIEW_PENDING", "QUALITY_REVIEW_PENDING"]
+    },
+    {
+      "sourceRepository": "https://github.com/PVUD14/V4--Database", "sourceCommit": "0c067ce24f92662daa933edf0fc8b75636d99469", "sourcePath": "data/question-registry-approved.json", "sourceRecordId": "Q-0052", "sourceHash": "252efda3ca602a0615186d470889d8021aaf2759bbc28ba8cd3e6ad091eee520", "transformVersion": "v4-question-registry-stage-v1", "licenseLabel": "CC BY", "attributionRequired": true, "rightsState": "PENDING", "smeState": "PENDING", "qualityState": "PENDING", "mappingState": "UNMAPPED", "duplicateState": "UNCHECKED", "releaseState": "QUARANTINED", "rejectionReasonCodes": ["RIGHTS_REVIEW_PENDING", "SME_REVIEW_PENDING", "QUALITY_REVIEW_PENDING"]
+    },
+    {
+      "sourceRepository": "https://github.com/PVUD14/V4--Database", "sourceCommit": "0c067ce24f92662daa933edf0fc8b75636d99469", "sourcePath": "data/question-registry-approved.json", "sourceRecordId": "Q-0053", "sourceHash": "2427cc0253be2ad9ad9c3357859e1d6ec56fba2800a1510845552b88d2fd90a5", "transformVersion": "v4-question-registry-stage-v1", "licenseLabel": "CC BY", "attributionRequired": true, "rightsState": "PENDING", "smeState": "PENDING", "qualityState": "PENDING", "mappingState": "UNMAPPED", "duplicateState": "UNCHECKED", "releaseState": "QUARANTINED", "rejectionReasonCodes": ["RIGHTS_REVIEW_PENDING", "SME_REVIEW_PENDING", "QUALITY_REVIEW_PENDING"]
+    },
+    {
+      "sourceRepository": "https://github.com/PVUD14/V4--Database", "sourceCommit": "0c067ce24f92662daa933edf0fc8b75636d99469", "sourcePath": "data/question-registry-approved.json", "sourceRecordId": "Q-0054", "sourceHash": "25ab6cdad81cec9f87c6076375e5d2016295fbc98e99d1fa5735073cfbbc26e2", "transformVersion": "v4-question-registry-stage-v1", "licenseLabel": "CC BY", "attributionRequired": true, "rightsState": "PENDING", "smeState": "PENDING", "qualityState": "PENDING", "mappingState": "UNMAPPED", "duplicateState": "UNCHECKED", "releaseState": "QUARANTINED", "rejectionReasonCodes": ["RIGHTS_REVIEW_PENDING", "SME_REVIEW_PENDING", "QUALITY_REVIEW_PENDING"]
+    },
+    {
+      "sourceRepository": "https://github.com/PVUD14/V4--Database", "sourceCommit": "0c067ce24f92662daa933edf0fc8b75636d99469", "sourcePath": "data/question-registry-approved.json", "sourceRecordId": "Q-0055", "sourceHash": "f9b8628d086c17d8f99206698ed62a8ef30c1f239fab588e53b938746087fa19", "transformVersion": "v4-question-registry-stage-v1", "licenseLabel": "CC BY", "attributionRequired": true, "rightsState": "PENDING", "smeState": "PENDING", "qualityState": "PENDING", "mappingState": "UNMAPPED", "duplicateState": "UNCHECKED", "releaseState": "QUARANTINED", "rejectionReasonCodes": ["RIGHTS_REVIEW_PENDING", "SME_REVIEW_PENDING", "QUALITY_REVIEW_PENDING"]
+    },
+    {
+      "sourceRepository": "https://github.com/PVUD14/V4--Database", "sourceCommit": "0c067ce24f92662daa933edf0fc8b75636d99469", "sourcePath": "data/question-registry-approved.json", "sourceRecordId": "Q-0056", "sourceHash": "778740c9a041ea4fb0480b6f030003eebfec5377357332b2a696a766271c87aa", "transformVersion": "v4-question-registry-stage-v1", "licenseLabel": "CC BY", "attributionRequired": true, "rightsState": "PENDING", "smeState": "PENDING", "qualityState": "PENDING", "mappingState": "UNMAPPED", "duplicateState": "UNCHECKED", "releaseState": "QUARANTINED", "rejectionReasonCodes": ["RIGHTS_REVIEW_PENDING", "SME_REVIEW_PENDING", "QUALITY_REVIEW_PENDING"]
+    },
+    {
+      "sourceRepository": "https://github.com/PVUD14/V4--Database", "sourceCommit": "0c067ce24f92662daa933edf0fc8b75636d99469", "sourcePath": "data/question-registry-approved.json", "sourceRecordId": "Q-0057", "sourceHash": "05dcd8d5f8ba495d37737018a75a28315f763d4af9ea457cbe9f5c5ac5d1223f", "transformVersion": "v4-question-registry-stage-v1", "licenseLabel": "CC BY", "attributionRequired": true, "rightsState": "PENDING", "smeState": "PENDING", "qualityState": "PENDING", "mappingState": "UNMAPPED", "duplicateState": "UNCHECKED", "releaseState": "QUARANTINED", "rejectionReasonCodes": ["RIGHTS_REVIEW_PENDING", "SME_REVIEW_PENDING", "QUALITY_REVIEW_PENDING"]
+    },
+    {
+      "sourceRepository": "https://github.com/PVUD14/V4--Database", "sourceCommit": "0c067ce24f92662daa933edf0fc8b75636d99469", "sourcePath": "data/question-registry-approved.json", "sourceRecordId": "Q-0058", "sourceHash": "26fbea9c40c1b537167a933d7f199aac0d55bcde43b798c26b3d19096ee46cc1", "transformVersion": "v4-question-registry-stage-v1", "licenseLabel": "CC BY", "attributionRequired": true, "rightsState": "PENDING", "smeState": "PENDING", "qualityState": "PENDING", "mappingState": "UNMAPPED", "duplicateState": "UNCHECKED", "releaseState": "QUARANTINED", "rejectionReasonCodes": ["RIGHTS_REVIEW_PENDING", "SME_REVIEW_PENDING", "QUALITY_REVIEW_PENDING"]
+    },
+    {
+      "sourceRepository": "https://github.com/PVUD14/V4--Database", "sourceCommit": "0c067ce24f92662daa933edf0fc8b75636d99469", "sourcePath": "data/question-registry-approved.json", "sourceRecordId": "Q-0059", "sourceHash": "ca32471c9778d7a56391bc7ef11b28694112a63e2bdacdb2e762e3d25f177def", "transformVersion": "v4-question-registry-stage-v1", "licenseLabel": "CC BY", "attributionRequired": true, "rightsState": "PENDING", "smeState": "PENDING", "qualityState": "PENDING", "mappingState": "UNMAPPED", "duplicateState": "UNCHECKED", "releaseState": "QUARANTINED", "rejectionReasonCodes": ["RIGHTS_REVIEW_PENDING", "SME_REVIEW_PENDING", "QUALITY_REVIEW_PENDING"]
+    },
+    {
+      "sourceRepository": "https://github.com/PVUD14/V4--Database", "sourceCommit": "0c067ce24f92662daa933edf0fc8b75636d99469", "sourcePath": "data/question-registry-approved.json", "sourceRecordId": "Q-0060", "sourceHash": "fbd65f1c29066e55672bf064a691248583ee84f91fce96acfc07955fcec9ad7d", "transformVersion": "v4-question-registry-stage-v1", "licenseLabel": "CC BY", "attributionRequired": true, "rightsState": "PENDING", "smeState": "PENDING", "qualityState": "PENDING", "mappingState": "UNMAPPED", "duplicateState": "UNCHECKED", "releaseState": "QUARANTINED", "rejectionReasonCodes": ["RIGHTS_REVIEW_PENDING", "SME_REVIEW_PENDING", "QUALITY_REVIEW_PENDING"]
+    }
+  ]
+}

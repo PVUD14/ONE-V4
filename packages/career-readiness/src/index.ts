@@ -1,0 +1,303 @@
+import { createHash } from 'node:crypto';
+
+export type RightsReviewState = 'PENDING' | 'APPROVED' | 'REJECTED';
+export type ReviewState = 'PENDING' | 'APPROVED' | 'CHANGES_REQUESTED' | 'REJECTED';
+export type MappingState = 'UNMAPPED' | 'MAPPED' | 'REJECTED';
+export type DuplicateState = 'UNCHECKED' | 'UNIQUE' | 'DUPLICATE' | 'MERGED';
+export type ReleaseState = 'QUARANTINED' | 'ELIGIBLE' | 'RELEASED' | 'EXCLUDED';
+
+export interface SourceRecordEvidence {
+  readonly sourceRepository: string;
+  readonly sourceCommit: string;
+  readonly sourcePath: string;
+  readonly sourceRecordId: string;
+  readonly sourceHash: string;
+  readonly transformVersion: string;
+  readonly licenseLabel: string;
+  readonly attributionRequired: boolean;
+  readonly rightsState: RightsReviewState;
+  readonly smeState: ReviewState;
+  readonly qualityState: ReviewState;
+  readonly mappingState: MappingState;
+  readonly duplicateState: DuplicateState;
+  readonly releaseState: ReleaseState;
+  readonly rejectionReasonCodes: readonly string[];
+}
+
+export interface ImportPackageManifest {
+  readonly sourceRepository: string;
+  readonly sourceCommit: string;
+  readonly transformVersion: string;
+  readonly sourcePaths: readonly string[];
+  readonly checksums: Readonly<Record<string, string>>;
+  readonly recordCounts: Readonly<Record<string, number>>;
+  readonly records: readonly SourceRecordEvidence[];
+}
+
+export function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
+  const entries = Object.entries(value as Record<string, unknown>).sort(([left], [right]) => left.localeCompare(right));
+  return `{${entries.map(([key, entry]) => `${JSON.stringify(key)}:${stableStringify(entry)}`).join(',')}}`;
+}
+
+export function sha256Hex(value: string): string {
+  return createHash('sha256').update(value, 'utf8').digest('hex');
+}
+
+export function deterministicPackageIdentity(manifest: ImportPackageManifest): string {
+  validateImportManifest(manifest);
+  return `v4-${sha256Hex(stableStringify(manifest)).slice(0, 32)}`;
+}
+
+export function validateImportManifest(manifest: ImportPackageManifest): void {
+  if (!/^[0-9a-f]{40}$/i.test(manifest.sourceCommit)) throw new Error('sourceCommit must be a full Git commit SHA');
+  if (!/^[a-z0-9._-]{1,64}$/i.test(manifest.transformVersion)) throw new Error('transformVersion is invalid');
+  if (manifest.sourcePaths.length === 0) throw new Error('sourcePaths must not be empty');
+  if (new Set(manifest.sourcePaths).size !== manifest.sourcePaths.length) throw new Error('sourcePaths must be unique');
+  for (const path of manifest.sourcePaths) {
+    if (!manifest.checksums[path] || !/^[0-9a-f]{64}$/i.test(manifest.checksums[path])) throw new Error(`missing SHA-256 checksum for ${path}`);
+  }
+  const identities = new Set<string>();
+  for (const record of manifest.records) {
+    validateSourceRecordEvidence(record);
+    const identity = `${record.sourcePath}:${record.sourceRecordId}`;
+    if (identities.has(identity)) throw new Error(`duplicate source record identity ${identity}`);
+    identities.add(identity);
+    if (record.sourceCommit !== manifest.sourceCommit || record.sourceRepository !== manifest.sourceRepository) throw new Error('record source does not match package source');
+    if (record.transformVersion !== manifest.transformVersion) throw new Error('record transform version does not match package');
+  }
+}
+
+export function validateSourceRecordEvidence(record: SourceRecordEvidence): void {
+  if (!/^[0-9a-f]{40}$/i.test(record.sourceCommit)) throw new Error('record sourceCommit must be a full Git commit SHA');
+  if (!/^[0-9a-f]{64}$/i.test(record.sourceHash)) throw new Error('record sourceHash must be SHA-256');
+  if (!record.sourceRepository || !record.sourcePath || !record.sourceRecordId || !record.licenseLabel) throw new Error('source identity and license label are required');
+  for (const code of record.rejectionReasonCodes) {
+    if (!/^[A-Z0-9_:-]{3,64}$/.test(code)) throw new Error(`invalid rejection reason code ${code}`);
+  }
+}
+
+export function isSourceRecordReleaseEligible(record: SourceRecordEvidence): boolean {
+  return record.rightsState === 'APPROVED'
+    && record.smeState === 'APPROVED'
+    && record.qualityState === 'APPROVED'
+    && record.mappingState === 'MAPPED'
+    && (record.duplicateState === 'UNIQUE' || record.duplicateState === 'MERGED')
+    && record.rejectionReasonCodes.length === 0
+    && (record.releaseState === 'ELIGIBLE' || record.releaseState === 'RELEASED');
+}
+
+export function assertReleaseManifestEligible(records: readonly SourceRecordEvidence[]): void {
+  if (records.length === 0) throw new Error('release manifest must include at least one record');
+  const blocked = records.filter((record) => !isSourceRecordReleaseEligible(record));
+  if (blocked.length > 0) throw new Error(`release contains ${blocked.length} ineligible record(s)`);
+}
+
+export type ContentLifecycleState = 'DRAFT' | 'IN_REVIEW' | 'CHANGES_REQUESTED' | 'APPROVED' | 'PUBLISHED' | 'ARCHIVED';
+const allowedContentTransitions: Readonly<Record<ContentLifecycleState, readonly ContentLifecycleState[]>> = {
+  DRAFT: ['IN_REVIEW'], IN_REVIEW: ['CHANGES_REQUESTED', 'APPROVED'], CHANGES_REQUESTED: ['IN_REVIEW'],
+  APPROVED: ['PUBLISHED'], PUBLISHED: ['ARCHIVED'], ARCHIVED: [],
+};
+
+export function assertContentTransition(input: {
+  readonly from: ContentLifecycleState;
+  readonly to: ContentLifecycleState;
+  readonly authorUserId: string;
+  readonly actorUserId: string;
+  readonly releaseManifestId?: string;
+}): void {
+  if (!allowedContentTransitions[input.from].includes(input.to)) throw new Error(`invalid content transition ${input.from} -> ${input.to}`);
+  if (input.to === 'APPROVED' && input.authorUserId === input.actorUserId) throw new Error('authors cannot approve their own content');
+  if (input.to === 'PUBLISHED' && !input.releaseManifestId) throw new Error('publication requires a release manifest');
+}
+
+export interface PrerequisiteEdge { readonly lessonId: string; readonly prerequisiteLessonId: string }
+
+export function assertAcyclicPrerequisites(lessonIds: readonly string[], edges: readonly PrerequisiteEdge[]): void {
+  const known = new Set(lessonIds);
+  const adjacency = new Map<string, string[]>(lessonIds.map((id) => [id, []]));
+  for (const edge of edges) {
+    if (edge.lessonId === edge.prerequisiteLessonId) throw new Error('lesson cannot require itself');
+    if (!known.has(edge.lessonId) || !known.has(edge.prerequisiteLessonId)) throw new Error('prerequisite edge references an unknown lesson');
+    adjacency.get(edge.lessonId)?.push(edge.prerequisiteLessonId);
+  }
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+  function visit(id: string): void {
+    if (visiting.has(id)) throw new Error('prerequisite graph contains a cycle');
+    if (visited.has(id)) return;
+    visiting.add(id);
+    for (const dependency of adjacency.get(id) ?? []) visit(dependency);
+    visiting.delete(id);
+    visited.add(id);
+  }
+  for (const id of lessonIds) visit(id);
+}
+
+export interface ProtectedQuestionVersion {
+  readonly id: string;
+  readonly topicId: string;
+  readonly prompt: string;
+  readonly options: readonly { readonly id: string; readonly text: string }[];
+  readonly correctOptionId: string;
+  readonly publishedRevision: number;
+}
+
+export type LearnerQuestionDto = Omit<ProtectedQuestionVersion, 'correctOptionId'>;
+
+export function toLearnerQuestionDto(question: ProtectedQuestionVersion): LearnerQuestionDto {
+  const { correctOptionId: _protectedAnswer, ...learnerQuestion } = question;
+  return learnerQuestion;
+}
+
+export function selectQuestionsDeterministically(questions: readonly ProtectedQuestionVersion[], count: number, seed: string): readonly ProtectedQuestionVersion[] {
+  if (!seed || seed.length > 256) throw new Error('assessment seed must be non-empty and bounded');
+  if (!Number.isInteger(count) || count < 1 || count > questions.length) throw new Error('assessment question count is invalid');
+  if (new Set(questions.map((question) => question.id)).size !== questions.length) throw new Error('question IDs must be unique');
+  return [...questions]
+    .map((question) => ({ question, key: sha256Hex(`${seed}:${question.id}`) }))
+    .sort((left, right) => left.key.localeCompare(right.key) || left.question.id.localeCompare(right.question.id))
+    .slice(0, count).map(({ question }) => question);
+}
+
+export interface AttemptSubmission {
+  readonly attemptId: string;
+  readonly status: 'IN_PROGRESS' | 'SUBMITTED';
+  readonly idempotencyKey?: string;
+  readonly selectedOptions?: Readonly<Record<string, string>>;
+  readonly submittedAt?: string;
+}
+
+export interface ScoredAttempt extends AttemptSubmission {
+  readonly status: 'SUBMITTED';
+  readonly idempotencyKey: string;
+  readonly selectedOptions: Readonly<Record<string, string>>;
+  readonly submittedAt: string;
+  readonly correctCount: number;
+  readonly itemCount: number;
+}
+
+export function submitAttemptOnce(input: {
+  readonly attempt: AttemptSubmission;
+  readonly questions: readonly ProtectedQuestionVersion[];
+  readonly selectedOptions: Readonly<Record<string, string>>;
+  readonly idempotencyKey: string;
+  readonly submittedAt: string;
+}): ScoredAttempt {
+  if (input.attempt.status === 'SUBMITTED') {
+    if (input.attempt.idempotencyKey === input.idempotencyKey) return input.attempt as ScoredAttempt;
+    throw new Error('assessment attempt was already submitted');
+  }
+  if (!/^[A-Za-z0-9._:-]{8,128}$/.test(input.idempotencyKey)) throw new Error('invalid submission idempotency key');
+  if (!Number.isFinite(new Date(input.submittedAt).getTime())) throw new Error('submittedAt must be a valid server timestamp');
+  const questionIds = new Set(input.questions.map((question) => question.id));
+  if (Object.keys(input.selectedOptions).some((questionId) => !questionIds.has(questionId))) throw new Error('response references an unknown question');
+  let correctCount = 0;
+  for (const question of input.questions) {
+    const selected = input.selectedOptions[question.id];
+    if (selected && !question.options.some((option) => option.id === selected)) throw new Error('response references an unknown option');
+    if (selected === question.correctOptionId) correctCount += 1;
+  }
+  return { attemptId: input.attempt.attemptId, status: 'SUBMITTED', idempotencyKey: input.idempotencyKey,
+    selectedOptions: { ...input.selectedOptions }, submittedAt: input.submittedAt, correctCount, itemCount: input.questions.length };
+}
+
+export interface EvidenceInput {
+  readonly id: string;
+  readonly subjectUserId: string;
+  readonly evidenceType: 'LESSON_COMPLETION' | 'ASSESSMENT_OUTCOME' | 'TOPIC_DEMONSTRATION';
+  readonly topicId: string;
+  readonly demonstrated: number;
+  readonly possible: number;
+  readonly sourceAggregateType: string;
+  readonly sourceAggregateId: string;
+  readonly contentVersion: string;
+  readonly occurredAt: string;
+  readonly supersedesEvidenceId?: string;
+}
+
+export interface MasteryProjection {
+  readonly topicId: string;
+  readonly evidenceIds: readonly string[];
+  readonly algorithmVersion: 'career-readiness-mastery-v1';
+  readonly band: 'NOT_ENOUGH_EVIDENCE' | 'DEVELOPING' | 'PROGRESSING' | 'DEMONSTRATED';
+}
+
+export function projectTopicMastery(evidence: readonly EvidenceInput[]): readonly MasteryProjection[] {
+  const active = evidence.filter((candidate) => !evidence.some((other) => other.supersedesEvidenceId === candidate.id));
+  const byTopic = new Map<string, EvidenceInput[]>();
+  for (const item of active) {
+    if (item.possible <= 0 || item.demonstrated < 0 || item.demonstrated > item.possible) throw new Error('evidence values are invalid');
+    byTopic.set(item.topicId, [...(byTopic.get(item.topicId) ?? []), item]);
+  }
+  return [...byTopic.entries()].sort(([left], [right]) => left.localeCompare(right)).map(([topicId, items]) => {
+    const demonstrated = items.reduce((sum, item) => sum + item.demonstrated, 0);
+    const possible = items.reduce((sum, item) => sum + item.possible, 0);
+    const ratio = demonstrated / possible;
+    const band = items.length < 2 ? 'NOT_ENOUGH_EVIDENCE' : ratio >= 0.8 ? 'DEMONSTRATED' : ratio >= 0.6 ? 'PROGRESSING' : 'DEVELOPING';
+    return { topicId, evidenceIds: items.map((item) => item.id).sort(), algorithmVersion: 'career-readiness-mastery-v1', band };
+  });
+}
+
+export type ReadinessBand = 'NOT_ENOUGH_EVIDENCE' | 'DEVELOPING' | 'PROGRESSING' | 'READY_FOR_NEXT_STEP';
+export interface ReadinessResult {
+  readonly modelVersion: 'career-readiness-fundamentals-v1';
+  readonly band: ReadinessBand;
+  readonly evidenceIds: readonly string[];
+  readonly factors: readonly { readonly topicId: string; readonly masteryBand: MasteryProjection['band']; readonly explanation: string }[];
+  readonly advisory: true;
+  readonly employerVisible: false;
+}
+
+export function calculateAdvisoryReadiness(projections: readonly MasteryProjection[]): ReadinessResult {
+  const evidenceIds = [...new Set(projections.flatMap((projection) => projection.evidenceIds))].sort();
+  const demonstrated = projections.filter((projection) => projection.band === 'DEMONSTRATED').length;
+  const progressing = projections.filter((projection) => projection.band === 'PROGRESSING').length;
+  const insufficient = projections.filter((projection) => projection.band === 'NOT_ENOUGH_EVIDENCE').length;
+  const band: ReadinessBand = evidenceIds.length < 4 || projections.length < 2 || insufficient > 0 ? 'NOT_ENOUGH_EVIDENCE'
+    : demonstrated === projections.length ? 'READY_FOR_NEXT_STEP'
+      : demonstrated + progressing === projections.length ? 'PROGRESSING' : 'DEVELOPING';
+  return { modelVersion: 'career-readiness-fundamentals-v1', band, evidenceIds,
+    factors: projections.map((projection) => ({ topicId: projection.topicId, masteryBand: projection.band,
+      explanation: `${projection.evidenceIds.length} active evidence record(s) evaluated by ${projection.algorithmVersion}` })),
+    advisory: true, employerVisible: false };
+}
+
+export interface RoadmapRecommendation {
+  readonly topicId: string;
+  readonly actionCode: 'COMPLETE_LESSON' | 'RETRY_PRACTICE' | 'REVIEW_EVIDENCE';
+  readonly reasonCode: string;
+  readonly evidenceIds: readonly string[];
+  readonly policyVersion: 'career-readiness-roadmap-v1';
+}
+
+export function recommendRoadmapActions(projections: readonly MasteryProjection[]): readonly RoadmapRecommendation[] {
+  return projections.filter((projection) => projection.band !== 'DEMONSTRATED').map((projection) => ({ topicId: projection.topicId,
+    actionCode: projection.band === 'NOT_ENOUGH_EVIDENCE' ? 'COMPLETE_LESSON' : projection.band === 'DEVELOPING' ? 'RETRY_PRACTICE' : 'REVIEW_EVIDENCE',
+    reasonCode: `MASTERY_${projection.band}`, evidenceIds: projection.evidenceIds, policyVersion: 'career-readiness-roadmap-v1' }));
+}
+
+export interface NotificationPreference {
+  readonly emailEnabled: boolean;
+  readonly quietHoursStartMinute: number;
+  readonly quietHoursEndMinute: number;
+  readonly dailyCap: number;
+}
+
+export function mayCreateNotificationCommand(input: {
+  readonly preference: NotificationPreference;
+  readonly localMinuteOfDay: number;
+  readonly sentToday: number;
+  readonly legalPurpose: string;
+}): { readonly allowed: boolean; readonly reason: 'ALLOWED' | 'CHANNEL_DISABLED' | 'QUIET_HOURS' | 'FREQUENCY_CAP' | 'MISSING_PURPOSE' } {
+  if (!input.legalPurpose.trim()) return { allowed: false, reason: 'MISSING_PURPOSE' };
+  if (!input.preference.emailEnabled) return { allowed: false, reason: 'CHANNEL_DISABLED' };
+  if (input.sentToday >= input.preference.dailyCap) return { allowed: false, reason: 'FREQUENCY_CAP' };
+  const { quietHoursStartMinute: start, quietHoursEndMinute: end } = input.preference;
+  const inQuietHours = start === end ? false : start < end
+    ? input.localMinuteOfDay >= start && input.localMinuteOfDay < end
+    : input.localMinuteOfDay >= start || input.localMinuteOfDay < end;
+  if (inQuietHours) return { allowed: false, reason: 'QUIET_HOURS' };
+  return { allowed: true, reason: 'ALLOWED' };
+}

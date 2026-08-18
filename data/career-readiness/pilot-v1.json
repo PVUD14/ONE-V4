@@ -1,0 +1,89 @@
+{
+  "pilot": "Career Readiness Fundamentals",
+  "version": 1,
+  "ownership": "PlanThePath-Owned",
+  "locale": "en-IN",
+  "topics": [
+    {
+      "id": "20000000-0000-4000-8000-000000000001",
+      "stableKey": "professional-communication",
+      "name": "Professional Communication",
+      "description": "Clear, audience-aware workplace communication."
+    },
+    {
+      "id": "20000000-0000-4000-8000-000000000002",
+      "stableKey": "interview-foundations",
+      "name": "Interview Foundations",
+      "description": "Evidence-based preparation and concise interview responses."
+    }
+  ],
+  "module": {
+    "id": "21000000-0000-4000-8000-000000000001",
+    "stableKey": "career-readiness-fundamentals",
+    "title": "Career Readiness Fundamentals",
+    "description": "A short pilot covering workplace messages, evidence-backed stories, and interview preparation."
+  },
+  "lessons": [
+    {
+      "id": "22000000-0000-4000-8000-000000000001",
+      "stableKey": "write-for-action",
+      "title": "Write for action",
+      "topicId": "20000000-0000-4000-8000-000000000001",
+      "body": {
+        "summary": "Frame a professional message around context, requested action, owner, and deadline.",
+        "practice": "Rewrite a vague follow-up so the recipient can act without another clarification."
+      },
+      "prerequisiteLessonIds": []
+    },
+    {
+      "id": "22000000-0000-4000-8000-000000000002",
+      "stableKey": "build-an-evidence-story",
+      "title": "Build an evidence story",
+      "topicId": "20000000-0000-4000-8000-000000000002",
+      "body": {
+        "summary": "Describe a situation, your action, and a verifiable result without exaggeration.",
+        "practice": "Turn one project experience into a concise situation-action-result story."
+      },
+      "prerequisiteLessonIds": ["22000000-0000-4000-8000-000000000001"]
+    },
+    {
+      "id": "22000000-0000-4000-8000-000000000003",
+      "stableKey": "prepare-the-interview-loop",
+      "title": "Prepare the interview loop",
+      "topicId": "20000000-0000-4000-8000-000000000002",
+      "body": {
+        "summary": "Map role requirements to truthful examples, questions, and a practical rehearsal plan.",
+        "practice": "Choose two requirements and pair each with one evidence story."
+      },
+      "prerequisiteLessonIds": ["22000000-0000-4000-8000-000000000002"]
+    }
+  ],
+  "assessment": {
+    "id": "23000000-0000-4000-8000-000000000001",
+    "blueprintId": "23000000-0000-4000-8000-000000000002",
+    "stableKey": "career-readiness-fundamentals-check",
+    "title": "Career Readiness Fundamentals check",
+    "selectionCount": 4,
+    "timeLimitSeconds": 900,
+    "questions": [
+      {
+        "id": "24000000-0000-4000-8000-000000000001", "stableKey": "crf-q1", "topicId": "20000000-0000-4000-8000-000000000001", "prompt": "Which follow-up makes the requested action clearest?", "options": [{"id":"a","text":"Please review when possible."},{"id":"b","text":"Please confirm the two budget figures by 3 PM Thursday so I can submit the plan."},{"id":"c","text":"Any update?"}], "correctOptionId": "b", "explanation": "The request names the action, scope, deadline, and purpose."
+      },
+      {
+        "id": "24000000-0000-4000-8000-000000000002", "stableKey": "crf-q2", "topicId": "20000000-0000-4000-8000-000000000001", "prompt": "What is the best first sentence when reporting a missed deadline?", "options": [{"id":"a","text":"The deliverable will be one day late; I own the delay and will send the verified file by 11 AM tomorrow."},{"id":"b","text":"Things happened, but it should be fine."},{"id":"c","text":"Nobody reminded me."}], "correctOptionId": "a", "explanation": "It states the impact, accountability, and a concrete recovery commitment."
+      },
+      {
+        "id": "24000000-0000-4000-8000-000000000003", "stableKey": "crf-q3", "topicId": "20000000-0000-4000-8000-000000000001", "prompt": "Which detail should be removed from a concise status update?", "options": [{"id":"a","text":"The decision needed."},{"id":"b","text":"A long chronology that does not change the decision."},{"id":"c","text":"The accountable owner."}], "correctOptionId": "b", "explanation": "A status update should preserve decision-relevant context and remove unrelated chronology."
+      },
+      {
+        "id": "24000000-0000-4000-8000-000000000004", "stableKey": "crf-q4", "topicId": "20000000-0000-4000-8000-000000000002", "prompt": "Which interview example is strongest?", "options": [{"id":"a","text":"I am always a great leader."},{"id":"b","text":"My team is talented."},{"id":"c","text":"I reorganized weekly triage, cutting unresolved requests from 18 to 6 in four weeks."}], "correctOptionId": "c", "explanation": "It connects a specific action to a bounded, verifiable result."
+      },
+      {
+        "id": "24000000-0000-4000-8000-000000000005", "stableKey": "crf-q5", "topicId": "20000000-0000-4000-8000-000000000002", "prompt": "How should you handle a requirement you have not performed before?", "options": [{"id":"a","text":"Invent a similar experience."},{"id":"b","text":"State the gap honestly, connect transferable evidence, and explain how you would learn."},{"id":"c","text":"Avoid the question."}], "correctOptionId": "b", "explanation": "Truthful transferable evidence and a learning plan preserve credibility."
+      },
+      {
+        "id": "24000000-0000-4000-8000-000000000006", "stableKey": "crf-q6", "topicId": "20000000-0000-4000-8000-000000000002", "prompt": "Which preparation step best improves answer quality?", "options": [{"id":"a","text":"Memorize one answer for every role."},{"id":"b","text":"Map each priority requirement to a truthful evidence story and rehearse concise delivery."},{"id":"c","text":"Use claims that cannot be checked."}], "correctOptionId": "b", "explanation": "Role-specific mapping produces relevant and supportable answers."
+      }
+    ]
+  }
+}

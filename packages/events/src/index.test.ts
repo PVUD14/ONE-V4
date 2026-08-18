@@ -158,4 +158,20 @@ describe('integration event envelope', () => {
     expect(first).toBe(second);
     expect(() => invitationEvent({ expiresAt: '2026-08-17T23:59:59.000Z' })).toThrow(/expiresAt must be after occurredAt/);
   });
+
+  it('keeps career-readiness event payloads opaque and purpose-bound', () => {
+    const event = createIntegrationEventEnvelope({
+      eventId: randomUUID(), eventType: 'assessment.attempt.submitted', eventVersion: 1,
+      occurredAt: '2026-08-18T00:00:00.000Z', aggregateId: randomUUID(),
+      subjectId: randomUUID(), correlationId: 'career-readiness-event-1',
+      payload: { attemptId: randomUUID(), evidenceId: randomUUID(), outcomeBand: 'PROGRESSING' },
+    });
+    expect(event.payload).not.toHaveProperty('answers');
+    expect(event).toMatchObject({ producer: 'career-readiness', purpose: 'assessment-scoring-and-projection' });
+    expect(() => createIntegrationEventEnvelope({
+      eventId: randomUUID(), eventType: 'assessment.attempt.submitted', eventVersion: 1,
+      occurredAt: '2026-08-18T00:00:00.000Z', aggregateId: randomUUID(), correlationId: 'career-readiness-event-2',
+      payload: { attemptId: randomUUID(), evidenceId: randomUUID(), outcomeBand: 'PROGRESSING', answers: 'raw' },
+    })).toThrow(/unexpected payload field answers/);
+  });
 });

@@ -4097,3 +4097,25 @@ button.secondary {
     overflow-x: auto;
   }
 }
+
+.career-api-panel { margin-bottom: 24px; border: 1px solid #c9d8ee; border-radius: 16px; background: linear-gradient(135deg, #f8fbff, #eef5ff); padding: 20px; box-shadow: 0 10px 28px rgba(25, 63, 111, .08); }
+.career-api-heading { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
+.career-api-heading h2 { margin: 4px 0 0; font-size: 1.25rem; color: #17365d; }
+.career-api-state { border-radius: 999px; padding: 5px 10px; font-size: .75rem; font-weight: 700; white-space: nowrap; }
+.career-api-state.connected { background: #dff5e7; color: #17643a; }
+.career-api-state.unavailable { background: #f7e9e9; color: #8a3333; }
+.career-api-status { margin: 12px 0; color: #40556f; }
+.career-api-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.career-api-grid article, .career-readiness-result { border: 1px solid #d8e3f1; border-radius: 12px; background: #fff; padding: 14px; }
+.career-api-grid article > span, .career-readiness-result > span { color: #58708d; font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.career-api-grid h3 { margin: 6px 0; color: #193c68; }
+.career-api-grid small { display: block; margin: 8px 0; color: #5d6f84; }
+.career-api-grid button, .career-assessment-form button { margin-top: 8px; }
+.career-api-boundary { margin: 14px 0 0; border-top: 1px solid #d8e3f1; padding-top: 12px; color: #5b6d82; font-size: .82rem; }
+.career-readiness-result strong { display: block; margin: 6px 0; font-size: 1.5rem; color: #1a477c; }
+.career-api-empty { border: 1px dashed #b7c9df; border-radius: 10px; background: #fff; padding: 14px; }
+.career-assessment-form { display: grid; gap: 14px; }
+.career-assessment-form fieldset { border: 1px solid #d8e3f1; border-radius: 10px; background: #fff; padding: 12px; }
+.career-assessment-form legend { color: #193c68; font-weight: 700; padding: 0 5px; }
+.career-assessment-form label { display: flex; align-items: flex-start; gap: 8px; margin-top: 9px; }
+@media (max-width: 640px) { .career-api-heading { flex-direction: column; } .career-api-state { align-self: flex-start; } }

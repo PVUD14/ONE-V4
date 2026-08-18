@@ -13,6 +13,8 @@ import { digestInvitationToken } from '@planthepath/identity/src/invitation-toke
 import { findIdentityByExternalSubject, loadActiveMembershipsForUser } from '@planthepath/persistence/src/identity-authentication.js';
 import * as schema from '@planthepath/persistence/src/schema.js';
 import { Phase1ApiSecurityModule } from './api-security.module.js';
+import { CareerReadinessController } from './career-readiness.controller.js';
+import { PG_POOL } from '../persistence.provider.js';
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) throw new Error('DATABASE_URL is required for API security integration tests');
@@ -44,6 +46,8 @@ beforeAll(async () => {
 
   const moduleRef = await Test.createTestingModule({
     imports: [Phase1ApiSecurityModule.register({ verifier, identityStore, db })],
+    controllers: [CareerReadinessController],
+    providers: [{ provide: PG_POOL, useValue: pool }],
   }).compile();
 
   app = moduleRef.createNestApplication();
@@ -100,6 +104,21 @@ describe('Phase 1 API protected request path', () => {
     await request(app.getHttpServer())
       .get(`/api/v1/employers/${employerId}/applicant-access/${opportunityId}/${studentUserId}`)
       .expect(401);
+    await request(app.getHttpServer()).get('/api/v1/career-readiness/me').expect(401);
+    await request(app.getHttpServer()).post(`/api/v1/career-readiness/lessons/${studentUserId}/complete`).expect(401);
+    await request(app.getHttpServer()).post(`/api/v1/career-readiness/assessments/${opportunityId}/attempts`).expect(401);
+    await request(app.getHttpServer()).post(`/api/v1/career-readiness/attempts/${opportunityId}/submit`).expect(401);
+    await request(app.getHttpServer()).get('/api/v1/operations/career-readiness/imports').expect(401);
+    await request(app.getHttpServer())
+      .post(`/api/v1/institutions/${institutionId}/career-readiness/reports?periodStart=2026-08-01&periodEnd=2026-08-31`)
+      .expect(401);
+  });
+
+  it('serves only published public catalog fields without requiring identity', async () => {
+    const response = await request(app.getHttpServer()).get('/api/v1/career-readiness/catalog').expect(200);
+    expect(response.body).toMatchObject({ pilot: 'Career Readiness Fundamentals', modules: [], assessments: [] });
+    expect(JSON.stringify(response.body)).not.toContain('correctOptionId');
+    expect(JSON.stringify(response.body)).not.toContain('answer_hash');
   });
 
   it('denies invalid signatures after parsing otherwise valid claims', async () => {

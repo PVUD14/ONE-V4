@@ -11,3 +11,82 @@ export async function getApiHealth(signal?: AbortSignal): Promise<ApiHealth> {
     return 'offline';
   }
 }
+
+export interface CareerReadinessCatalog {
+  readonly pilot: string;
+  readonly releaseManifestId: string;
+  readonly modules: readonly {
+    readonly id: string; readonly stableKey: string; readonly version: number; readonly title: string; readonly description: string;
+    readonly lessons: readonly { readonly id: string; readonly stableKey: string; readonly version: number; readonly title: string;
+      readonly body: { readonly summary?: string; readonly practice?: string }; readonly topicId: string; readonly prerequisiteLessonIds: readonly string[] }[];
+  }[];
+  readonly assessments: readonly { readonly id: string; readonly stableKey: string; readonly title: string;
+    readonly blueprintId: string; readonly selectionCount: number; readonly timeLimitSeconds: number }[];
+}
+
+export interface LearnerCareerReadinessState {
+  readonly catalog: CareerReadinessCatalog;
+  readonly progress: readonly { readonly lessonVersionId: string; readonly state: string; readonly completedAt?: string }[];
+  readonly attempts: readonly { readonly id: string; readonly state: string; readonly scoreCorrect?: number; readonly scorePossible?: number }[];
+  readonly evidence: readonly { readonly id: string; readonly evidenceType: string; readonly topicId: string; readonly demonstrated: number; readonly possible: number }[];
+  readonly mastery: readonly { readonly id: string; readonly topicId: string; readonly band: string; readonly evidenceIds: readonly string[] }[];
+  readonly readiness: { readonly id: string; readonly band: string; readonly advisory: true; readonly employerVisible: false;
+    readonly explanation: { readonly factors?: readonly unknown[] } } | null;
+  readonly roadmap: readonly { readonly id: string; readonly topicId: string; readonly actionCode: string; readonly reasonCode: string; readonly state: string; readonly dueAt?: string }[];
+}
+
+export interface AssessmentAttemptDto {
+  readonly attemptId: string;
+  readonly assignmentId: string;
+  readonly startedAt: string;
+  readonly expiresAt: string;
+  readonly questions: readonly { readonly id: string; readonly topicId: string; readonly prompt: string;
+    readonly options: readonly { readonly id: string; readonly text: string }[]; readonly publishedRevision: number }[];
+}
+
+export function getCareerReadinessAccessToken(): string | null {
+  return window.sessionStorage.getItem('planthepath.accessToken');
+}
+
+export function getCareerReadinessCatalog(signal?: AbortSignal): Promise<CareerReadinessCatalog> {
+  return requestJson('/api/v1/career-readiness/catalog', signal ? { signal } : {});
+}
+
+export function getLearnerCareerReadinessState(token: string, signal?: AbortSignal): Promise<LearnerCareerReadinessState> {
+  return requestJson('/api/v1/career-readiness/me', { token, ...(signal ? { signal } : {}) });
+}
+
+export function completeCareerReadinessLesson(token: string, lessonVersionId: string): Promise<Record<string, unknown>> {
+  return requestJson(`/api/v1/career-readiness/lessons/${encodeURIComponent(lessonVersionId)}/complete`, { token, method: 'POST' });
+}
+
+export function startCareerReadinessAssessment(token: string, assessmentDefinitionId: string): Promise<AssessmentAttemptDto> {
+  return requestJson(`/api/v1/career-readiness/assessments/${encodeURIComponent(assessmentDefinitionId)}/attempts`, { token, method: 'POST' });
+}
+
+export function submitCareerReadinessAssessment(
+  token: string,
+  attemptId: string,
+  selectedOptions: Readonly<Record<string, string>>,
+  idempotencyKey: string,
+): Promise<Record<string, unknown>> {
+  return requestJson(`/api/v1/career-readiness/attempts/${encodeURIComponent(attemptId)}/submit`, {
+    token, method: 'POST', idempotencyKey, body: { selectedOptions },
+  });
+}
+
+async function requestJson<T>(path: string, input: {
+  readonly token?: string; readonly method?: 'GET' | 'POST'; readonly body?: unknown;
+  readonly idempotencyKey?: string; readonly signal?: AbortSignal;
+} = {}): Promise<T> {
+  const headers: Record<string, string> = { Accept: 'application/json', 'X-Correlation-Id': crypto.randomUUID() };
+  if (input.token) headers.Authorization = `Bearer ${input.token}`;
+  if (input.body !== undefined) headers['Content-Type'] = 'application/json';
+  if (input.idempotencyKey) headers['Idempotency-Key'] = input.idempotencyKey;
+  const response = await fetch(`${apiBaseUrl}${path}`, {
+    method: input.method ?? 'GET', headers, ...(input.body !== undefined ? { body: JSON.stringify(input.body) } : {}),
+    ...(input.signal ? { signal: input.signal } : {}),
+  });
+  if (!response.ok) throw new Error(`API request failed with status ${response.status}`);
+  return response.json() as Promise<T>;
+}

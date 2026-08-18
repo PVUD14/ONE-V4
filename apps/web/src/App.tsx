@@ -8,6 +8,7 @@ import { studentProfile } from './studentData.js';
 import { ApplicationsPage, AssessmentsPage, CareerPath, CoachPage, Dashboard, DocumentsPage, ExperiencePage, InterviewsPage, Learning, OpportunitiesPage, ProfilePage, ReadinessPage, SettingsPage, SkillsPage } from './studentPages.js';
 import { StudentPreviewProvider, useStudentPreview } from './studentPreviewState.js';
 import { PlacementOfficerPortal } from './staffPages.js';
+import { CareerReadinessApiPanel } from './careerReadinessApiPanel.js';
 
 type RouteKey = 'dashboard' | 'career-path' | 'ai-coach' | 'readiness' | 'skills' | 'assessments' | 'learning' | 'experience' | 'opportunities' | 'applications' | 'interviews' | 'documents' | 'profile' | 'settings';
 
@@ -209,10 +210,10 @@ function RouteScreen({ route }: { readonly route: RouteKey }): React.ReactElemen
   if (route === 'dashboard') return <Dashboard />;
   if (route === 'career-path') return <CareerPath />;
   if (route === 'ai-coach') return <CoachPage />;
-  if (route === 'readiness') return <ReadinessPage />;
-  if (route === 'skills') return <SkillsPage />;
-  if (route === 'assessments') return <AssessmentsPage />;
-  if (route === 'learning') return <Learning />;
+  if (route === 'readiness') return <><CareerReadinessApiPanel route="readiness" /><ReadinessPage /></>;
+  if (route === 'skills') return <><CareerReadinessApiPanel route="skills" /><SkillsPage /></>;
+  if (route === 'assessments') return <><CareerReadinessApiPanel route="assessments" /><AssessmentsPage /></>;
+  if (route === 'learning') return <><CareerReadinessApiPanel route="learning" /><Learning /></>;
   if (route === 'experience') return <ExperiencePage />;
   if (route === 'opportunities') return <OpportunitiesPage />;
   if (route === 'applications') return <ApplicationsPage />;

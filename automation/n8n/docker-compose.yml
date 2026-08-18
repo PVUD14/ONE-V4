@@ -1,0 +1,5 @@
+# Stable entry point retained for tooling that expects docker-compose.yml.
+# The hardened service definitions live in compose.yaml; add compose.local.yaml
+# only for loopback-bound local verification.
+include:
+  - path: compose.yaml

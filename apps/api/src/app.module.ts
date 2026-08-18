@@ -5,6 +5,7 @@ import { createDatabaseRuntime, PG_POOL, PostgresRuntimeLifecycle, RUNTIME_CONFI
 import { createRuntimeIdentityVerifier } from './runtime-auth.js';
 import { HealthController } from './health.controller.js';
 import { CareerReadinessController } from './http/career-readiness.controller.js';
+import { AutomationCallbackController } from './http/automation-callback.controller.js';
 
 const runtimeConfig = loadRuntimeConfig();
 const databaseRuntime = createDatabaseRuntime(runtimeConfig.databaseUrl);
@@ -17,7 +18,7 @@ const databaseRuntime = createDatabaseRuntime(runtimeConfig.databaseUrl);
       db: databaseRuntime.db,
     }),
   ],
-  controllers: [HealthController, CareerReadinessController],
+  controllers: [HealthController, CareerReadinessController, AutomationCallbackController],
   providers: [
     { provide: RUNTIME_CONFIG, useValue: runtimeConfig },
     { provide: PG_POOL, useValue: databaseRuntime.pool },

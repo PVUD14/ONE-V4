@@ -5,6 +5,7 @@
   "scripts": {
     "api:dev": "corepack pnpm --filter @planthepath/api dev",
     "api:start": "corepack pnpm --filter @planthepath/api start",
+    "automation:validate": "node automation/n8n/scripts/validate-workflows.mjs",
     "build": "corepack pnpm -r build",
     "db:migrate": "corepack pnpm --filter @planthepath/persistence db:migrate",
     "test": "corepack pnpm -r --workspace-concurrency=1 test",

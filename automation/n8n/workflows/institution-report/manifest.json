@@ -1,0 +1,12 @@
+{
+  "allowlistId": "institution-report", "registryId": "47000000-0000-4000-8000-000000000003", "version": 1,
+  "workflowSha256": "358a6a1749e152c90edfdf41a6780207b4e9f35ea9969e64f032da97ee226e07", "operation": "DELIVER_REPORT", "destinationClass": "EMAIL",
+  "activeByDefault": false, "killSwitchByDefault": true, "legalPurpose": "authorized institution aggregate report delivery",
+  "acceptedFields": ["commandId", "idempotencyId", "recipientEmail", "subject", "textBody", "expiresAt", "callbackId", "callbackToken"],
+  "approvedNodes": ["n8n-nodes-base.webhook", "n8n-nodes-base.emailSend", "n8n-nodes-base.respondToWebhook"], "credentialTypes": ["httpHeaderAuth", "smtp"],
+  "egressDestinations": ["deployment-managed SMTP relay"], "dataClassification": "CONFIDENTIAL_AGGREGATE", "retention": "execution payloads disabled; metadata pruned after 24 hours",
+  "owner": "Institution reporting operations", "runbook": "RUNBOOK.md", "testEvidence": "../../VERIFICATION.md", "rollback": "enable native kill switch, unpublish workflow, revoke expiring report reference",
+  "sourceEvidence": { "repository": "https://github.com/Zie619/n8n-workflows", "commit": "94007c1445d9258a7da116646b79473e7c7c3282", "path": "workflows/Code/1724_Code_Schedule_Automation_Scheduled.json", "sha256": "97e97565083e306db4d3ac08d6f6bbe74bf49a4b45e1ca55b6e3377e5c2d9d97", "usage": "pattern-reference-only" },
+  "excludedSourceCapabilities": ["Todoist", "Code nodes", "schedule trigger", "external HTTP", "source credentials"],
+  "testCase": "authorized aggregate artifact link is delivered without any student-level field"
+}

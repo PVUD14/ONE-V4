@@ -1,0 +1,7 @@
+# PlanThePath n8n delivery boundary
+
+This reference pins n8n `2.35.3` to digest `sha256:31375a4f730081a139bba2d379bf2efaa8e662cc9e131d12bb5e15859d4f0282`. n8n is a thin, private email delivery engine: it never owns domain state, reads the PlanThePath database, computes eligibility/readiness, calls AI, or integrates with CRM, calendars, contacts, chat, or external feeds.
+
+The base Compose file has no published ports. `compose.local.yaml` binds n8n and Mailpit UI to loopback only for local validation. Production must place authenticated TLS ingress in front of the private webhook interface, inject secrets from a secret manager, bind the two credential placeholders at deployment, import only hash-validated workflows, register hashes with kill switches on, test, and then explicitly activate.
+
+Run `node scripts/validate-workflows.mjs` before import. Sanitized exports contain credential types and names, never credential IDs or values. Set `PTP_ADAPTER_HEADER_CREDENTIAL_ID` and `PTP_SMTP_CREDENTIAL_ID`, then run `node scripts/materialize-workflows.mjs --output <private-temporary-directory>`; import only those mode-0600 deployment copies and delete them immediately afterward. Run `n8n audit` after credential binding and activation. Execution input contains a recipient address and bounded email text, so success/error/manual execution data is disabled and pruned. Native PlanThePath services retain command, attempt, callback, and audit state.

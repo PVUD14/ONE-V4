@@ -1,0 +1,12 @@
+{
+  "allowlistId": "content-review", "registryId": "47000000-0000-4000-8000-000000000004", "version": 1,
+  "workflowSha256": "906e6cfe8ba6b819129122ab58ce45dba38f8845c481b6045b840cc1547826c2", "operation": "SEND_EMAIL", "destinationClass": "EMAIL",
+  "activeByDefault": false, "killSwitchByDefault": true, "legalPurpose": "content governance review assignment",
+  "acceptedFields": ["commandId", "idempotencyId", "recipientEmail", "subject", "textBody", "expiresAt", "callbackId", "callbackToken"],
+  "approvedNodes": ["n8n-nodes-base.webhook", "n8n-nodes-base.emailSend", "n8n-nodes-base.respondToWebhook"], "credentialTypes": ["httpHeaderAuth", "smtp"],
+  "egressDestinations": ["deployment-managed SMTP relay"], "dataClassification": "INTERNAL_MINIMIZED", "retention": "execution payloads disabled; metadata pruned after 24 hours",
+  "owner": "Content governance operations", "runbook": "RUNBOOK.md", "testEvidence": "../../VERIFICATION.md", "rollback": "enable native kill switch, unpublish workflow, retain command for reconciliation",
+  "sourceEvidence": { "repository": "https://github.com/Zie619/n8n-workflows", "commit": "94007c1445d9258a7da116646b79473e7c7c3282", "path": "workflows/Schedule/1629_Schedule_Stickynote_Automation_Scheduled.json", "sha256": "8ad4a26acbe21338527d3852e905af5d29cbd5e017e9474efd610fef43ff0f41", "usage": "pattern-reference-only" },
+  "excludedSourceCapabilities": ["Asana", "schedule trigger", "task mutation", "source credentials"],
+  "testCase": "review assignment email contains an opaque review reference and no draft content"
+}

@@ -1,0 +1,12 @@
+{
+  "allowlistId": "ops-failure", "registryId": "47000000-0000-4000-8000-000000000005", "version": 1,
+  "workflowSha256": "a71bd8051fb972a7316348ae511d70a79e64be24da74ae68873f9f4764de315c", "operation": "SEND_EMAIL", "destinationClass": "EMAIL",
+  "activeByDefault": false, "killSwitchByDefault": true, "legalPurpose": "operational failure notification",
+  "acceptedFields": ["commandId", "idempotencyId", "recipientEmail", "subject", "textBody", "expiresAt", "callbackId", "callbackToken"],
+  "approvedNodes": ["n8n-nodes-base.webhook", "n8n-nodes-base.emailSend", "n8n-nodes-base.respondToWebhook"], "credentialTypes": ["httpHeaderAuth", "smtp"],
+  "egressDestinations": ["deployment-managed SMTP relay"], "dataClassification": "INTERNAL_REDACTED", "retention": "execution payloads disabled; metadata pruned after 24 hours",
+  "owner": "Platform operations", "runbook": "RUNBOOK.md", "testEvidence": "../../VERIFICATION.md", "rollback": "enable native kill switch, unpublish workflow, use independent native alerting",
+  "sourceEvidence": { "repository": "https://github.com/Zie619/n8n-workflows", "commit": "94007c1445d9258a7da116646b79473e7c7c3282", "path": "workflows/Error/1849_Error_Stickynote_Automation_Webhook.json", "sha256": "73492e6a26dea6b811c1e0dd55c57186bb88c5fa40deb20be981956691d78a60", "usage": "pattern-reference-only" },
+  "excludedSourceCapabilities": ["Line", "generic HTTP", "raw error payloads", "source credentials"],
+  "testCase": "safe failure classification is emailed without stack traces or event payloads"
+}

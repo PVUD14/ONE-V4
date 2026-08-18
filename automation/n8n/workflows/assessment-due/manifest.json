@@ -1,0 +1,12 @@
+{
+  "allowlistId": "assessment-due", "registryId": "47000000-0000-4000-8000-000000000001", "version": 1,
+  "workflowSha256": "dafa1d9ad82479a5c07eb9ee34519bbe2c14011a17415fdea9e5ae3b3662bd04", "operation": "SEND_EMAIL", "destinationClass": "EMAIL",
+  "activeByDefault": false, "killSwitchByDefault": true, "legalPurpose": "transactional assessment due reminder",
+  "acceptedFields": ["commandId", "idempotencyId", "recipientEmail", "subject", "textBody", "expiresAt", "callbackId", "callbackToken"],
+  "approvedNodes": ["n8n-nodes-base.webhook", "n8n-nodes-base.emailSend", "n8n-nodes-base.respondToWebhook"], "credentialTypes": ["httpHeaderAuth", "smtp"],
+  "egressDestinations": ["deployment-managed SMTP relay"], "dataClassification": "CONFIDENTIAL_MINIMIZED", "retention": "execution payloads disabled; metadata pruned after 24 hours",
+  "owner": "Career Readiness operations", "runbook": "RUNBOOK.md", "testEvidence": "../../VERIFICATION.md", "rollback": "enable native kill switch, unpublish workflow, retain command for reconciliation",
+  "sourceEvidence": { "repository": "https://github.com/Zie619/n8n-workflows", "commit": "94007c1445d9258a7da116646b79473e7c7c3282", "path": "workflows/Googlecontacts/1239_Googlecontacts_Schedule_Send_Scheduled.json", "sha256": "c2f15e66e922163b43c5ef9d4d548e759b4388f6cb4eb4828b73c6c934f20d8b", "usage": "pattern-reference-only" },
+  "excludedSourceCapabilities": ["Google Contacts", "Slack", "schedule trigger", "contact filtering", "source credentials"],
+  "testCase": "authenticated command produces one Mailpit email and duplicate idempotency is suppressed upstream"
+}

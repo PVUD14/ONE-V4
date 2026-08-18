@@ -23,6 +23,15 @@ describe('runtime configuration', () => {
     })).toThrow('COGNITO_USER_POOL_ID and COGNITO_CLIENT_ID are required in production');
   });
 
+  it('requires a strong automation callback secret in production', () => {
+    expect(() => loadRuntimeConfig({
+      NODE_ENV: 'production',
+      DATABASE_URL: 'postgresql://planthepath:local@127.0.0.1:55432/planthepath_dev',
+      COGNITO_USER_POOL_ID: 'ap-south-1_example',
+      COGNITO_CLIENT_ID: 'client-id',
+    })).toThrow('AUTOMATION_SIGNING_SECRET is required in production');
+  });
+
   it('rejects unsafe or malformed runtime inputs', () => {
     expect(() => loadRuntimeConfig({ DATABASE_URL: 'https://example.test/db' }))
       .toThrow('DATABASE_URL must use the postgres or postgresql protocol');
@@ -34,5 +43,9 @@ describe('runtime configuration', () => {
       API_PORT: '70000',
       DATABASE_URL: 'postgresql://planthepath:local@127.0.0.1:55432/planthepath_dev',
     })).toThrow('API_PORT must be between 1 and 65535');
+    expect(() => loadRuntimeConfig({
+      AUTOMATION_SIGNING_SECRET: 'too-short',
+      DATABASE_URL: 'postgresql://planthepath:local@127.0.0.1:55432/planthepath_dev',
+    })).toThrow('AUTOMATION_SIGNING_SECRET must contain at least 32 bytes');
   });
 });

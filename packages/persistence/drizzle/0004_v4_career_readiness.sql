@@ -504,8 +504,23 @@ CREATE TABLE IF NOT EXISTS automation_commands (
   payload_ref text NOT NULL CHECK (payload_ref ~ '^[A-Za-z0-9._:-]{8,128}$'),
   state text NOT NULL CHECK (state IN ('PENDING','ACCEPTED','SUCCEEDED','FAILED_RETRYABLE','FAILED_TERMINAL','EXPIRED','CANCELLED')),
   expires_at timestamptz NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now()
+  attempts integer NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+  available_at timestamptz NOT NULL DEFAULT now(),
+  lease_owner text,
+  lease_token uuid,
+  lease_expires_at timestamptz,
+  last_failure_class text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT automation_command_event_uq UNIQUE (event_id)
 );
+ALTER TABLE automation_commands ADD COLUMN IF NOT EXISTS attempts integer NOT NULL DEFAULT 0;
+ALTER TABLE automation_commands ADD COLUMN IF NOT EXISTS available_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE automation_commands ADD COLUMN IF NOT EXISTS lease_owner text;
+ALTER TABLE automation_commands ADD COLUMN IF NOT EXISTS lease_token uuid;
+ALTER TABLE automation_commands ADD COLUMN IF NOT EXISTS lease_expires_at timestamptz;
+ALTER TABLE automation_commands ADD COLUMN IF NOT EXISTS last_failure_class text;
+CREATE INDEX IF NOT EXISTS automation_commands_claim_idx ON automation_commands(state, available_at, expires_at);
+CREATE UNIQUE INDEX IF NOT EXISTS automation_commands_event_uq ON automation_commands(event_id);
 
 CREATE TABLE IF NOT EXISTS automation_callbacks (
   id uuid PRIMARY KEY,
@@ -517,6 +532,15 @@ CREATE TABLE IF NOT EXISTS automation_callbacks (
   issued_at timestamptz NOT NULL,
   received_at timestamptz NOT NULL DEFAULT now()
 );
+
+CREATE TABLE IF NOT EXISTS automation_token_replays (
+  token_id text PRIMARY KEY CHECK (token_id ~ '^[A-Za-z0-9._:-]{8,128}$'),
+  command_id uuid NOT NULL REFERENCES automation_commands(id),
+  purpose text NOT NULL CHECK (purpose IN ('WORKFLOW_INVOCATION','WORKFLOW_CALLBACK')),
+  expires_at timestamptz NOT NULL,
+  consumed_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS automation_token_replays_expiry_idx ON automation_token_replays(expires_at);
 
 CREATE TABLE IF NOT EXISTS institution_aggregate_reports (
   id uuid PRIMARY KEY,
@@ -541,12 +565,55 @@ $$ LANGUAGE plpgsql;
 DO $$
 DECLARE table_name text;
 BEGIN
-  FOREACH table_name IN ARRAY ARRAY['source_packages','source_records','content_provenance','rights_reviews','quality_reviews','import_validation_results','canonical_id_mappings','content_review_actions','assessment_attempt_items','assessment_responses','evidence_records','mastery_projections','readiness_snapshots','readiness_factors','notification_commands','notification_delivery_attempts','automation_callbacks']
+  FOREACH table_name IN ARRAY ARRAY['source_packages','source_records','content_provenance','rights_reviews','quality_reviews','import_validation_results','canonical_id_mappings','content_review_actions','assessment_attempt_items','assessment_responses','evidence_records','mastery_projections','readiness_snapshots','readiness_factors','notification_delivery_attempts','automation_callbacks']
   LOOP
     EXECUTE format('DROP TRIGGER IF EXISTS %I_immutable_guard ON %I', table_name, table_name);
     EXECUTE format('CREATE TRIGGER %I_immutable_guard BEFORE UPDATE OR DELETE ON %I FOR EACH ROW EXECUTE FUNCTION reject_immutable_row_change()', table_name, table_name);
   END LOOP;
 END $$;
+DROP TRIGGER IF EXISTS notification_commands_immutable_guard ON notification_commands;
+
+CREATE OR REPLACE FUNCTION enforce_notification_command_transition()
+RETURNS trigger AS $$
+BEGIN
+  IF OLD.id <> NEW.id OR OLD.subject_user_id <> NEW.subject_user_id OR OLD.template_id <> NEW.template_id
+    OR OLD.channel <> NEW.channel OR OLD.legal_purpose <> NEW.legal_purpose OR OLD.destination_ref <> NEW.destination_ref
+    OR OLD.render_parameters <> NEW.render_parameters OR OLD.dedupe_key <> NEW.dedupe_key OR OLD.expires_at <> NEW.expires_at
+    OR OLD.correlation_id <> NEW.correlation_id OR OLD.supersedes_command_id IS DISTINCT FROM NEW.supersedes_command_id THEN
+    RAISE EXCEPTION 'notification command business fields are immutable';
+  END IF;
+  IF NOT (
+    (OLD.state = 'PENDING' AND NEW.state IN ('DISPATCHED','CANCELLED','SUPERSEDED','EXPIRED')) OR
+    (OLD.state = 'DISPATCHED' AND NEW.state IN ('DELIVERED','FAILED_RETRYABLE','FAILED_TERMINAL','EXPIRED')) OR
+    (OLD.state = 'FAILED_RETRYABLE' AND NEW.state IN ('DISPATCHED','FAILED_TERMINAL','EXPIRED')) OR
+    OLD.state = NEW.state
+  ) THEN RAISE EXCEPTION 'invalid notification command state transition'; END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+DROP TRIGGER IF EXISTS notification_command_transition_guard ON notification_commands;
+CREATE TRIGGER notification_command_transition_guard BEFORE UPDATE ON notification_commands
+FOR EACH ROW EXECUTE FUNCTION enforce_notification_command_transition();
+
+CREATE OR REPLACE FUNCTION enforce_automation_command_transition()
+RETURNS trigger AS $$
+BEGIN
+  IF OLD.id <> NEW.id OR OLD.workflow_registry_id <> NEW.workflow_registry_id OR OLD.event_id <> NEW.event_id
+    OR OLD.correlation_id <> NEW.correlation_id OR OLD.idempotency_id <> NEW.idempotency_id
+    OR OLD.operation <> NEW.operation OR OLD.destination_class <> NEW.destination_class OR OLD.payload_ref <> NEW.payload_ref
+    OR OLD.expires_at <> NEW.expires_at THEN RAISE EXCEPTION 'automation command business fields are immutable'; END IF;
+  IF NOT (
+    (OLD.state = 'PENDING' AND NEW.state IN ('ACCEPTED','FAILED_RETRYABLE','FAILED_TERMINAL','EXPIRED','CANCELLED')) OR
+    (OLD.state = 'ACCEPTED' AND NEW.state IN ('SUCCEEDED','FAILED_RETRYABLE','FAILED_TERMINAL','EXPIRED')) OR
+    (OLD.state = 'FAILED_RETRYABLE' AND NEW.state IN ('ACCEPTED','FAILED_TERMINAL','EXPIRED','CANCELLED')) OR
+    OLD.state = NEW.state
+  ) THEN RAISE EXCEPTION 'invalid automation command state transition'; END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+DROP TRIGGER IF EXISTS automation_command_transition_guard ON automation_commands;
+CREATE TRIGGER automation_command_transition_guard BEFORE UPDATE ON automation_commands
+FOR EACH ROW EXECUTE FUNCTION enforce_automation_command_transition();
 
 CREATE OR REPLACE FUNCTION protect_published_content_revision()
 RETURNS trigger AS $$

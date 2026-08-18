@@ -10,6 +10,9 @@ export interface RuntimeConfig {
     readonly userPoolId?: string;
     readonly clientId?: string;
   };
+  readonly automation: {
+    readonly signingSecret?: string;
+  };
 }
 
 const allowedNodeEnvs = new Set<NodeEnv>(['development', 'test', 'production']);
@@ -22,9 +25,16 @@ export function loadRuntimeConfig(env: NodeJS.ProcessEnv = process.env): Runtime
   const databaseUrl = requireDatabaseUrl(env.DATABASE_URL);
   const userPoolId = optionalNonEmpty(env.COGNITO_USER_POOL_ID);
   const clientId = optionalNonEmpty(env.COGNITO_CLIENT_ID);
+  const automationSigningSecret = optionalNonEmpty(env.AUTOMATION_SIGNING_SECRET);
 
   if (nodeEnv === 'production' && (!userPoolId || !clientId)) {
     throw new Error('COGNITO_USER_POOL_ID and COGNITO_CLIENT_ID are required in production');
+  }
+  if (automationSigningSecret && Buffer.byteLength(automationSigningSecret, 'utf8') < 32) {
+    throw new Error('AUTOMATION_SIGNING_SECRET must contain at least 32 bytes');
+  }
+  if (nodeEnv === 'production' && !automationSigningSecret) {
+    throw new Error('AUTOMATION_SIGNING_SECRET is required in production');
   }
 
   return {
@@ -36,6 +46,9 @@ export function loadRuntimeConfig(env: NodeJS.ProcessEnv = process.env): Runtime
     cognito: {
       ...(userPoolId ? { userPoolId } : {}),
       ...(clientId ? { clientId } : {}),
+    },
+    automation: {
+      ...(automationSigningSecret ? { signingSecret: automationSigningSecret } : {}),
     },
   };
 }

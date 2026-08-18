@@ -1,0 +1,26 @@
+{
+  "id": "47000000-0000-4000-8000-000000000003",
+  "name": "PlanThePath - Institution aggregate report email",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": { "httpMethod": "POST", "path": "institution-report", "authentication": "headerAuth", "responseMode": "responseNode", "options": {} },
+      "id": "43000000-0000-4000-8000-000000000001", "name": "Authenticated adapter command", "type": "n8n-nodes-base.webhook", "typeVersion": 2.1,
+      "position": [0, 0], "webhookId": "43000000-0000-4000-8000-000000000002",
+      "credentials": { "httpHeaderAuth": { "name": "PlanThePath Adapter Header" } }
+    },
+    {
+      "parameters": { "fromEmail": "PlanThePath <no-reply@planthepath.local>", "toEmail": "={{ $json.body.recipientEmail }}", "subject": "={{ $json.body.subject }}", "emailFormat": "text", "text": "={{ $json.body.textBody }}", "options": { "appendAttribution": false } },
+      "id": "43000000-0000-4000-8000-000000000003", "name": "Deliver aggregate report link", "type": "n8n-nodes-base.emailSend", "typeVersion": 2.1,
+      "position": [260, 0], "credentials": { "smtp": { "name": "PlanThePath SMTP" } }
+    },
+    {
+      "parameters": { "respondWith": "json", "responseBody": "={{ { status: 'SUCCEEDED', callbackId: $('Authenticated adapter command').item.json.body.callbackId, callbackToken: $('Authenticated adapter command').item.json.body.callbackToken, providerReference: $json.messageId } }}", "options": { "responseCode": 200 } },
+      "id": "43000000-0000-4000-8000-000000000004", "name": "Return verified delivery callback", "type": "n8n-nodes-base.respondToWebhook", "typeVersion": 1.5,
+      "position": [520, 0]
+    }
+  ],
+  "connections": { "Authenticated adapter command": { "main": [[{ "node": "Deliver aggregate report link", "type": "main", "index": 0 }]] }, "Deliver aggregate report link": { "main": [[{ "node": "Return verified delivery callback", "type": "main", "index": 0 }]] } },
+  "settings": { "executionOrder": "v1", "saveManualExecutions": false, "callerPolicy": "workflowsFromSameOwner", "availableInMCP": false },
+  "pinData": {}, "tags": []
+}

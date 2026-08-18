@@ -33,6 +33,24 @@ export interface LearnerCareerReadinessState {
   readonly readiness: { readonly id: string; readonly band: string; readonly advisory: true; readonly employerVisible: false;
     readonly explanation: { readonly factors?: readonly unknown[] } } | null;
   readonly roadmap: readonly { readonly id: string; readonly topicId: string; readonly actionCode: string; readonly reasonCode: string; readonly state: string; readonly dueAt?: string }[];
+  readonly notificationPreferences: { readonly emailEnabled: boolean; readonly quietHoursStartMinute: number;
+    readonly quietHoursEndMinute: number; readonly dailyCap: number } | null;
+  readonly notifications: readonly { readonly id: string; readonly templateKey: string; readonly channel: 'EMAIL';
+    readonly legalPurpose: string; readonly state: string; readonly createdAt: string; readonly expiresAt: string }[];
+}
+
+export interface CareerReadinessOperationsStatus {
+  readonly releases: readonly { readonly id: string; readonly name: string; readonly version: number; readonly manifestHash: string;
+    readonly status: string; readonly publishedAt?: string }[];
+  readonly sourceGovernance: readonly { readonly rightsState: string; readonly smeState: string; readonly qualityState: string;
+    readonly releaseState: string; readonly releaseEligible: boolean; readonly count: number }[];
+  readonly reviewQueue: readonly { readonly id: string; readonly entityType: string; readonly revision: number; readonly state: string }[];
+  readonly outboxFailures: readonly { readonly id: string; readonly eventType: string; readonly aggregateType: string;
+    readonly attempts: number; readonly failureClass?: string; readonly correlationId: string }[];
+  readonly workflows: readonly { readonly id: string; readonly allowlistId: string; readonly version: number; readonly workflowHash: string;
+    readonly operation: string; readonly destinationClass: 'EMAIL'; readonly active: boolean; readonly killSwitch: boolean }[];
+  readonly automationCommands: readonly { readonly id: string; readonly allowlistId: string; readonly state: string;
+    readonly attempts: number; readonly failureClass?: string; readonly correlationId: string }[];
 }
 
 export interface AssessmentAttemptDto {
@@ -73,6 +91,17 @@ export function submitCareerReadinessAssessment(
   return requestJson(`/api/v1/career-readiness/attempts/${encodeURIComponent(attemptId)}/submit`, {
     token, method: 'POST', idempotencyKey, body: { selectedOptions },
   });
+}
+
+export function getCareerReadinessImportOperations(token: string, signal?: AbortSignal): Promise<readonly {
+  readonly id: string; readonly packageIdentity: string; readonly sourceRepository: string; readonly sourceCommit: string;
+  readonly manifestHash: string; readonly transformVersion: string; readonly status: string; readonly blockedRecords: number;
+}[]> {
+  return requestJson('/api/v1/operations/career-readiness/imports', { token, ...(signal ? { signal } : {}) });
+}
+
+export function getCareerReadinessOperationsStatus(token: string, signal?: AbortSignal): Promise<CareerReadinessOperationsStatus> {
+  return requestJson('/api/v1/operations/career-readiness/status', { token, ...(signal ? { signal } : {}) });
 }
 
 async function requestJson<T>(path: string, input: {

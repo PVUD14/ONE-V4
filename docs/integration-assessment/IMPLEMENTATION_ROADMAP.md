@@ -1,6 +1,6 @@
 # Implementation Roadmap
 
-This roadmap sequences the V4 and n8n integration as a controlled, documentation-first program. It does not authorize schema changes, imports, workflow deployment, or production runtime changes.
+This roadmap was the pre-implementation sequencing document. The approved pilot implementation status as of 2026-08-18 is recorded in `IMPLEMENTATION_STATUS_2026-08-18.md`; production activation still requires its deployment gates and does not authorize importing uncleared V4 records.
 
 ## Roadmap Principles
 

@@ -4,6 +4,7 @@ import type { ApiHealth } from './api.js';
 import { portalFamilyIcons, rolePortals, type RoleFixture, type RoleNavItem, type RolePortalConfig } from './rolePortalConfig.js';
 import { RolePreviewProvider, useRolePreviewState } from './rolePortalPreviewState.js';
 import { StatusBadge } from './studentComponents.js';
+import { OperationsCareerReadinessPanel } from './operationsCareerReadinessPanel.js';
 
 export function DemoPortalLauncher({ onNavigate }: { readonly onNavigate: (path: string) => void }): React.ReactElement {
   const groups = ['Student', 'Institution', 'Employer', 'Operations'] as const;
@@ -140,6 +141,8 @@ function RoleModulePage({ portal, route }: { readonly portal: RolePortalConfig; 
 
   return (
     <section className="role-module">
+      {portal.key === 'operations-admin' && /content management|system health|audit logs|security/i.test(route.label)
+        ? <OperationsCareerReadinessPanel /> : null}
       <div className="role-page-heading"><div><span className="eyebrow">{portal.roleName}</span><h1>{route.label}</h1><p>{moduleDescription(portal, route)} Preview data only; backend authorization remains authoritative.</p></div><button type="button" onClick={(event) => { openerRef.current = event.currentTarget; setEditing(portal.records[0]!); }}>{primaryAction(portal, route)}</button></div>
       <div className="role-card role-filters"><label className="role-local-search"><span>Search {route.label}</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${route.label.toLowerCase()}...`} /></label><div className="filter-row" aria-label={`${route.label} filters`}>{categories.map((category) => <button key={category} type="button" aria-pressed={filters.includes(category)} className={filters.includes(category) ? 'selected' : ''} onClick={() => setFilters((value) => value.includes(category) ? value.filter((item) => item !== category) : [...value, category])}><Filter size={14} />{category}</button>)}{filters.length ? <button type="button" className="secondary" onClick={() => setFilters([])}>Clear filters</button> : null}</div><p className="result-count" role="status">{records.length} records shown</p></div>
       {records.length ? <RoleRecordList portal={portal} records={records} onDetail={(record, opener) => { openerRef.current = opener; setDetail(record); }} onEdit={(record, opener) => { openerRef.current = opener; setEditing(record); }} /> : <section className="role-empty"><h2>No records match these filters</h2><p>Clear filters or search text to restore the preview records.</p><button type="button" onClick={() => { setQuery(''); setFilters([]); }}>Clear filters</button></section>}

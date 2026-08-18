@@ -20,7 +20,9 @@ import {
   generateInstitutionAggregateReport,
   getLearnerCareerReadinessState,
   getPublishedCareerReadinessCatalog,
+  getCareerReadinessOperationalStatus,
   listImportOperations,
+  listImportSourceRecords,
   startAssessmentAttempt,
   submitAssessmentAttempt,
 } from '@planthepath/persistence/src/career-readiness.js';
@@ -98,6 +100,23 @@ export class CareerReadinessController {
   importOperations(@Req() request: ProtectedHttpRequest): Promise<readonly Record<string, unknown>[]> {
     requireAnyActiveRole(request, operationsRoles);
     return listImportOperations(this.pool);
+  }
+
+  @Get('/operations/career-readiness/imports/:migrationRunId/records')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  importSourceRecords(
+    @Req() request: ProtectedHttpRequest,
+    @Param('migrationRunId') migrationRunId: string,
+  ): Promise<readonly Record<string, unknown>[]> {
+    requireAnyActiveRole(request, operationsRoles);
+    return listImportSourceRecords(this.pool, requireUuid(migrationRunId));
+  }
+
+  @Get('/operations/career-readiness/status')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  operationalStatus(@Req() request: ProtectedHttpRequest): Promise<Record<string, unknown>> {
+    requireAnyActiveRole(request, operationsRoles);
+    return getCareerReadinessOperationalStatus(this.pool);
   }
 
   @Post('/institutions/:institutionId/career-readiness/reports')

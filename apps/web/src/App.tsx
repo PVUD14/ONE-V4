@@ -208,12 +208,13 @@ function PreviewBadge({ apiHealth }: { readonly apiHealth: ApiHealth }): React.R
 
 function RouteScreen({ route }: { readonly route: RouteKey }): React.ReactElement {
   if (route === 'dashboard') return <Dashboard />;
-  if (route === 'career-path') return <CareerPath />;
   if (route === 'ai-coach') return <CoachPage />;
+  if (route === 'career-path') return <><CareerReadinessApiPanel route="roadmap" /><CareerPath /></>;
   if (route === 'readiness') return <><CareerReadinessApiPanel route="readiness" /><ReadinessPage /></>;
   if (route === 'skills') return <><CareerReadinessApiPanel route="skills" /><SkillsPage /></>;
   if (route === 'assessments') return <><CareerReadinessApiPanel route="assessments" /><AssessmentsPage /></>;
   if (route === 'learning') return <><CareerReadinessApiPanel route="learning" /><Learning /></>;
+  if (route === 'settings') return <><CareerReadinessApiPanel route="notifications" /><SettingsPage /></>;
   if (route === 'experience') return <ExperiencePage />;
   if (route === 'opportunities') return <OpportunitiesPage />;
   if (route === 'applications') return <ApplicationsPage />;

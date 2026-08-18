@@ -11,7 +11,7 @@ import {
   type LearnerCareerReadinessState,
 } from './api.js';
 
-type CareerRoute = 'readiness' | 'skills' | 'assessments' | 'learning';
+type CareerRoute = 'readiness' | 'skills' | 'assessments' | 'learning' | 'roadmap' | 'notifications';
 
 export function CareerReadinessApiPanel({ route }: { readonly route: CareerRoute }): React.ReactElement {
   const [catalog, setCatalog] = useState<CareerReadinessCatalog | null>(null);
@@ -101,6 +101,8 @@ export function CareerReadinessApiPanel({ route }: { readonly route: CareerRoute
         onStart={start} onSubmit={submit} /> : null}
       {route === 'readiness' ? <ReadinessApiView learner={learner} /> : null}
       {route === 'skills' ? <SkillsApiView learner={learner} /> : null}
+      {route === 'roadmap' ? <RoadmapApiView learner={learner} /> : null}
+      {route === 'notifications' ? <NotificationsApiView learner={learner} /> : null}
       <p className="career-api-boundary">Named bands are advisory, never employer-visible, and derived only from versioned PlanThePath evidence. The preview content below is not written to the API.</p>
     </section>
   );
@@ -146,6 +148,20 @@ function ReadinessApiView({ learner }: { readonly learner: LearnerCareerReadines
 function SkillsApiView({ learner }: { readonly learner: LearnerCareerReadinessState | null }): React.ReactElement {
   return <div className="career-api-grid">{learner?.mastery.map((mastery) => <article key={mastery.id}><span>Evidence-derived mastery</span>
     <h3>{formatBand(mastery.band)}</h3><p>{mastery.evidenceIds.length} active evidence record{mastery.evidenceIds.length === 1 ? '' : 's'}.</p></article>) ?? null}</div>;
+}
+
+function RoadmapApiView({ learner }: { readonly learner: LearnerCareerReadinessState | null }): React.ReactElement {
+  if (!learner?.roadmap.length) return <p className="career-api-empty">No API-backed next action yet. Recommendations appear only after versioned evidence is evaluated.</p>;
+  return <div className="career-api-grid">{learner.roadmap.map((action) => <article key={action.id}><span>Advisory next action</span>
+    <h3>{formatBand(action.actionCode)}</h3><p>Reason: {formatBand(action.reasonCode)}. State: {formatBand(action.state)}.</p>
+    {action.dueAt ? <small>Due {new Date(action.dueAt).toLocaleDateString()}</small> : null}</article>)}</div>;
+}
+
+function NotificationsApiView({ learner }: { readonly learner: LearnerCareerReadinessState | null }): React.ReactElement {
+  const preference = learner?.notificationPreferences;
+  return <><p className="career-api-status">Email is {preference?.emailEnabled ? 'enabled' : 'not enabled'}; daily cap {preference?.dailyCap ?? 0}. Destinations stay server-side.</p>
+    <div className="career-api-grid">{learner?.notifications.map((notification) => <article key={notification.id}><span>Native email command</span>
+      <h3>{formatBand(notification.templateKey)}</h3><p>{notification.legalPurpose}</p><small>{formatBand(notification.state)}</small></article>) ?? null}</div></>;
 }
 
 function formatBand(value: string): string {

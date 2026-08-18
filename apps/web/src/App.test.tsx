@@ -352,7 +352,8 @@ describe('Student portal completion', () => {
     fireEvent.change(screen.getByLabelText('Target career'), { target: { value: 'Cloud Security Analyst' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save target career' }));
     expect(screen.getByRole('heading', { name: 'Cloud Security Analyst' })).toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent('Updated target career');
+    const sessionStatus = screen.getByText('Updated target career: Cloud Security Analyst').closest('[role="status"]');
+    expect(sessionStatus).toHaveTextContent('Updated target career');
   });
 
   it('adds and removes self-declared skills while preserving verified skills as read-only', () => {

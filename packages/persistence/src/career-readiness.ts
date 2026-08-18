@@ -308,8 +308,8 @@ export async function publishCareerReadinessPilot(
     await client.query(
       `INSERT INTO notification_templates
        (id, stable_key, version, locale, subject_template, body_template, approved_by_user_id, published_at)
-       VALUES ($1,'assessment-result-available',1,$2,'Your Career Readiness result is available',
-         'Open PlanThePath to review your advisory band and next actions. No score or personal data is included in this email.', $3, now())`,
+       VALUES ($1,'assessment-due',1,$2,'Your Career Readiness assessment is due',
+         'Open PlanThePath to complete your assigned Career Readiness assessment before it expires. No score or personal data is included in this email.', $3, now())`,
       [NOTIFICATION_TEMPLATE_ID, fixture.locale, actors.reviewerUserId],
     );
     return { releaseManifestId: PILOT_RELEASE_ID, idempotentReplay: false };
@@ -444,8 +444,9 @@ export async function startAssessmentAttempt(pool: Pool, input: {
     await insertOutbox(client, { aggregateType: 'assessment_attempt', aggregateId: attemptId,
       eventType: 'assessment.attempt.started', actorUserId: input.subjectUserId, correlationId: input.correlationId,
       payload: { attemptId, assignmentId, blueprintId: assessment.rows[0].blueprint_id } });
+    const notificationCommandId = await maybeCreateAssessmentDueNotification(client, input.subjectUserId, assignmentId, input.correlationId);
     return { attemptId, assignmentId, startedAt: startedAt.toISOString(), expiresAt: expiresAt.toISOString(),
-      questions: selected.map(({ correctOptionId: _answer, ...question }) => question) };
+      notificationCommandId, questions: selected.map(({ correctOptionId: _answer, ...question }) => question) };
   });
 }
 
@@ -572,15 +573,14 @@ export async function submitAssessmentAttempt(pool: Pool, input: {
     await insertOutbox(client, { aggregateType: 'readiness_snapshot', aggregateId: snapshotId,
       eventType: 'readiness.snapshot.created', actorUserId: input.subjectUserId, correlationId: input.correlationId,
       payload: { readinessSnapshotId: snapshotId, modelVersionId: READINESS_MODEL_ID, band: readiness.band } });
-    const notificationCommandId = await maybeCreateResultNotification(client, input.subjectUserId, input.attemptId, input.correlationId);
     return { attemptId: input.attemptId, scoreCorrect, scorePossible: items.rows.length, outcomeBand,
       readiness: { band: readiness.band, advisory: true, employerVisible: false, snapshotId },
-      evidenceIds, roadmapActionIds, notificationCommandId, idempotentReplay: false };
+      evidenceIds, roadmapActionIds, idempotentReplay: false };
   });
 }
 
 export async function getLearnerCareerReadinessState(pool: Pool, subjectUserId: string): Promise<Record<string, unknown>> {
-  const [catalog, progress, attempts, evidence, projections, readiness, roadmap] = await Promise.all([
+  const [catalog, progress, attempts, evidence, projections, readiness, roadmap, notificationPreferences, notifications] = await Promise.all([
     getPublishedCareerReadinessCatalog(pool),
     pool.query(`SELECT lesson_version_id AS "lessonVersionId", state, started_at AS "startedAt", completed_at AS "completedAt"
       FROM learner_progress WHERE subject_user_id=$1 ORDER BY updated_at`, [subjectUserId]),
@@ -594,9 +594,15 @@ export async function getLearnerCareerReadinessState(pool: Pool, subjectUserId: 
       FROM readiness_snapshots WHERE subject_user_id=$1 ORDER BY generated_at DESC LIMIT 1`, [subjectUserId]),
     pool.query(`SELECT id, topic_id AS "topicId", action_code AS "actionCode", reason_code AS "reasonCode", state, due_at AS "dueAt"
       FROM roadmap_actions WHERE subject_user_id=$1 AND state NOT IN ('SUPERSEDED','DISMISSED') ORDER BY created_at DESC`, [subjectUserId]),
+    pool.query(`SELECT email_enabled AS "emailEnabled", quiet_hours_start_minute AS "quietHoursStartMinute",
+      quiet_hours_end_minute AS "quietHoursEndMinute", daily_cap AS "dailyCap" FROM notification_preferences WHERE user_id=$1`, [subjectUserId]),
+    pool.query(`SELECT n.id,t.stable_key AS "templateKey",n.channel,n.legal_purpose AS "legalPurpose",n.state,
+      n.created_at AS "createdAt",n.expires_at AS "expiresAt" FROM notification_commands n
+      JOIN notification_templates t ON t.id=n.template_id WHERE n.subject_user_id=$1 ORDER BY n.created_at DESC LIMIT 25`, [subjectUserId]),
   ]);
   return { catalog, progress: progress.rows, attempts: attempts.rows, evidence: evidence.rows,
-    mastery: projections.rows, readiness: readiness.rows[0] ?? null, roadmap: roadmap.rows };
+    mastery: projections.rows, readiness: readiness.rows[0] ?? null, roadmap: roadmap.rows,
+    notificationPreferences: notificationPreferences.rows[0] ?? null, notifications: notifications.rows };
 }
 
 export async function listImportOperations(pool: Pool): Promise<readonly Record<string, unknown>[]> {
@@ -608,6 +614,45 @@ export async function listImportOperations(pool: Pool): Promise<readonly Record<
      FROM migration_runs m ORDER BY m.started_at DESC`,
   );
   return result.rows;
+}
+
+export async function listImportSourceRecords(pool: Pool, migrationRunId: string): Promise<readonly Record<string, unknown>[]> {
+  const result = await pool.query(
+    `SELECT sr.id,sr.source_entity_type AS "sourceEntityType",sr.source_record_id AS "sourceRecordId",sr.source_path AS "sourcePath",
+      sr.source_hash AS "sourceHash",sr.license_label AS "licenseLabel",sr.attribution_required AS "attributionRequired",
+      sr.rights_state AS "rightsState",sr.sme_state AS "smeState",sr.quality_state AS "qualityState",
+      sr.mapping_state AS "mappingState",sr.duplicate_state AS "duplicateState",sr.release_state AS "releaseState",
+      sr.rejection_reason_codes AS "rejectionReasonCodes",sr.release_eligible AS "releaseEligible",
+      cm.canonical_entity_type AS "canonicalEntityType",cm.canonical_entity_id AS "canonicalEntityId",cm.disposition AS "canonicalDisposition"
+     FROM source_records sr JOIN source_packages sp ON sp.id=sr.package_id
+     LEFT JOIN canonical_id_mappings cm ON cm.source_record_id=sr.id
+     WHERE sp.migration_run_id=$1 ORDER BY sr.source_path,sr.source_record_id`, [migrationRunId],
+  );
+  return result.rows;
+}
+
+export async function getCareerReadinessOperationalStatus(pool: Pool): Promise<Record<string, unknown>> {
+  const [releases, sourceGovernance, reviews, outboxFailures, workflows, commands] = await Promise.all([
+    pool.query(`SELECT id,name,version,manifest_hash AS "manifestHash",status,published_at AS "publishedAt"
+      FROM release_manifests ORDER BY created_at DESC LIMIT 25`),
+    pool.query(`SELECT rights_state AS "rightsState",sme_state AS "smeState",quality_state AS "qualityState",
+      release_state AS "releaseState",release_eligible AS "releaseEligible",count(*)::int AS count
+      FROM source_records GROUP BY rights_state,sme_state,quality_state,release_state,release_eligible ORDER BY rights_state,release_state`),
+    pool.query(`SELECT cr.id,cr.entity_type AS "entityType",cr.entity_id AS "entityId",cr.revision,cr.state,
+      cr.created_at AS "createdAt" FROM content_revisions cr WHERE cr.state IN ('IN_REVIEW','CHANGES_REQUESTED','APPROVED')
+      ORDER BY cr.created_at LIMIT 50`),
+    pool.query(`SELECT id,event_type AS "eventType",aggregate_type AS "aggregateType",attempts,
+      last_failure_class AS "failureClass",correlation_id AS "correlationId",occurred_at AS "occurredAt"
+      FROM outbox_events WHERE delivery_state='FAILED' ORDER BY occurred_at DESC LIMIT 50`),
+    pool.query(`SELECT id,allowlist_id AS "allowlistId",version,workflow_hash AS "workflowHash",operation,
+      destination_class AS "destinationClass",active,kill_switch AS "killSwitch" FROM automation_workflow_registry
+      ORDER BY allowlist_id,version DESC`),
+    pool.query(`SELECT ac.id,w.allowlist_id AS "allowlistId",ac.state,ac.attempts,ac.last_failure_class AS "failureClass",
+      ac.correlation_id AS "correlationId",ac.created_at AS "createdAt" FROM automation_commands ac
+      JOIN automation_workflow_registry w ON w.id=ac.workflow_registry_id ORDER BY ac.created_at DESC LIMIT 50`),
+  ]);
+  return { releases: releases.rows, sourceGovernance: sourceGovernance.rows, reviewQueue: reviews.rows,
+    outboxFailures: outboxFailures.rows, workflows: workflows.rows, automationCommands: commands.rows };
 }
 
 export async function generateInstitutionAggregateReport(pool: Pool, input: {
@@ -667,7 +712,7 @@ async function loadEvidence(client: DbClient, subjectUserId: string): Promise<Ev
     ...(row.supersedes_evidence_id ? { supersedesEvidenceId: row.supersedes_evidence_id } : {}) }));
 }
 
-async function maybeCreateResultNotification(client: DbClient, subjectUserId: string, attemptId: string, correlationId: string): Promise<string | null> {
+async function maybeCreateAssessmentDueNotification(client: DbClient, subjectUserId: string, assignmentId: string, correlationId: string): Promise<string | null> {
   const preferenceResult = await client.query<{
     email_enabled: boolean; quiet_hours_start_minute: number; quiet_hours_end_minute: number; daily_cap: number;
   }>(
@@ -684,15 +729,15 @@ async function maybeCreateResultNotification(client: DbClient, subjectUserId: st
   const allowed = mayCreateNotificationCommand({ preference: {
     emailEnabled: preference.email_enabled, quietHoursStartMinute: preference.quiet_hours_start_minute,
     quietHoursEndMinute: preference.quiet_hours_end_minute, dailyCap: preference.daily_cap,
-  }, localMinuteOfDay, sentToday: sent.rows[0]?.count ?? 0, legalPurpose: 'transactional assessment result availability' });
+  }, localMinuteOfDay, sentToday: sent.rows[0]?.count ?? 0, legalPurpose: 'transactional assessment due reminder' });
   if (!allowed.allowed) return null;
   const commandId = randomUUID();
   await client.query(
     `INSERT INTO notification_commands
      (id, subject_user_id, template_id, channel, legal_purpose, destination_ref, render_parameters, dedupe_key, state, expires_at, correlation_id)
-     VALUES ($1,$2,$3,'EMAIL','transactional assessment result availability',$4,$5::jsonb,$6,'PENDING',now()+interval '24 hours',$7)`,
-    [commandId, subjectUserId, NOTIFICATION_TEMPLATE_ID, `user:${subjectUserId}`, JSON.stringify({ attemptId }),
-      `assessment-result:${attemptId}`, correlationId],
+     VALUES ($1,$2,$3,'EMAIL','transactional assessment due reminder',$4,$5::jsonb,$6,'PENDING',now()+interval '24 hours',$7)`,
+    [commandId, subjectUserId, NOTIFICATION_TEMPLATE_ID, `user:${subjectUserId}`, JSON.stringify({ assignmentId }),
+      `assessment-due:${assignmentId}`, correlationId],
   );
   await insertOutbox(client, { aggregateType: 'notification_command', aggregateId: commandId,
     eventType: 'notification.delivery.requested', actorUserId: subjectUserId, correlationId,

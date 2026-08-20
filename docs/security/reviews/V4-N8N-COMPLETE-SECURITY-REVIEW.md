@@ -45,3 +45,5 @@ No production ingress, browser fleet, SMTP relay, AWS account deployment, or pro
 ## Final workflow-only delta review
 
 After PR creation, CI exposed that `.github/workflows/phase1-ci.yml` still supplied the obsolete synthetic `PTP_ADAPTER_HEADER_CREDENTIAL_ID` for n8n materialization. The final workflow-only delta replaces it with synthetic `PTP_N8N_JWT_CREDENTIAL_ID=ci_jwt_credential` and leaves `PTP_SMTP_CREDENTIAL_ID=ci_smtp_credential` unchanged. No real credential or secret is introduced, and the CI check now exercises the hardened JWT credential materialization path required by `automation/n8n/scripts/materialize-workflows.mjs`.
+
+The same final CI pass also exposed a real production dependency audit failure for `drizzle-orm <0.45.2` (`GHSA-gpj5-g38j-94v9`). The final branch raises the `apps/api` and `packages/persistence` production dependency declarations to `^0.45.2`; `pnpm audit --prod --audit-level=high` then reports no known vulnerabilities.

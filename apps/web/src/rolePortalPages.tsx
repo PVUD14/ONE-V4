@@ -132,6 +132,7 @@ function RoleModulePage({ portal, route }: { readonly portal: RolePortalConfig; 
   const [detail, setDetail] = useState<RoleFixture | null>(null);
   const [editing, setEditing] = useState<RoleFixture | null>(null);
   const openerRef = useRef<HTMLElement | null>(null);
+  const dense = isDenseManagementRoute(portal, route);
   const categories = [...new Set(portal.records.map((record) => record.category))];
   const records = portal.records.filter((record) => {
     const filterMatch = filters.length === 0 || filters.includes(record.category) || filters.includes(record.status);
@@ -140,12 +141,12 @@ function RoleModulePage({ portal, route }: { readonly portal: RolePortalConfig; 
   });
 
   return (
-    <section className="role-module">
+    <section className={`role-module ${dense ? 'role-module--dense' : ''}`}>
       {portal.key === 'operations-admin' && /content management|system health|audit logs|security/i.test(route.label)
         ? <OperationsCareerReadinessPanel /> : null}
       <div className="role-page-heading"><div><span className="eyebrow">{portal.roleName}</span><h1>{route.label}</h1><p>{moduleDescription(portal, route)} Preview data only; backend authorization remains authoritative.</p></div><button type="button" onClick={(event) => { openerRef.current = event.currentTarget; setEditing(portal.records[0]!); }}>{primaryAction(portal, route)}</button></div>
       <div className="role-card role-filters"><label className="role-local-search"><span>Search {route.label}</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${route.label.toLowerCase()}...`} /></label><div className="filter-row" aria-label={`${route.label} filters`}>{categories.map((category) => <button key={category} type="button" aria-pressed={filters.includes(category)} className={filters.includes(category) ? 'selected' : ''} onClick={() => setFilters((value) => value.includes(category) ? value.filter((item) => item !== category) : [...value, category])}><Filter size={14} />{category}</button>)}{filters.length ? <button type="button" className="secondary" onClick={() => setFilters([])}>Clear filters</button> : null}</div><p className="result-count" role="status">{records.length} records shown</p></div>
-      {records.length ? <RoleRecordList portal={portal} records={records} onDetail={(record, opener) => { openerRef.current = opener; setDetail(record); }} onEdit={(record, opener) => { openerRef.current = opener; setEditing(record); }} /> : <section className="role-empty"><h2>No records match these filters</h2><p>Clear filters or search text to restore the preview records.</p><button type="button" onClick={() => { setQuery(''); setFilters([]); }}>Clear filters</button></section>}
+      {records.length ? <RoleRecordList portal={portal} records={records} dense={dense} onDetail={(record, opener) => { openerRef.current = opener; setDetail(record); }} onEdit={(record, opener) => { openerRef.current = opener; setEditing(record); }} /> : <section className="role-empty"><h2>No records match these filters</h2><p>Clear filters or search text to restore the preview records.</p><button type="button" onClick={() => { setQuery(''); setFilters([]); }}>Clear filters</button></section>}
       <section className="role-card role-wide"><h2>Ownership boundaries</h2><div className="role-boundary-grid"><div><strong>Allowed in preview</strong><ul>{portal.allowedOperations.map((item) => <li key={item}>{item}</li>)}</ul></div><div><strong>Read-only</strong><ul>{portal.readOnlyData.map((item) => <li key={item}>{item}</li>)}</ul></div><div><strong>Forbidden</strong><ul>{portal.forbiddenOperations.map((item) => <li key={item}>{item}</li>)}</ul></div></div></section>
       {detail ? <DetailDialog portal={portal} record={detail} openerRef={openerRef} onClose={() => setDetail(null)} /> : null}
       {editing ? <EditDialog portal={portal} record={editing} route={route} openerRef={openerRef} onClose={() => setEditing(null)} /> : null}
@@ -153,8 +154,9 @@ function RoleModulePage({ portal, route }: { readonly portal: RolePortalConfig; 
   );
 }
 
-function RoleRecordList({ portal, records, primaryRecord, onDetail, onEdit }: { readonly portal: RolePortalConfig; readonly records: readonly RoleFixture[]; readonly primaryRecord?: RoleFixture; readonly onDetail?: (record: RoleFixture, opener: HTMLElement) => void; readonly onEdit?: (record: RoleFixture, opener: HTMLElement) => void }): React.ReactElement {
+function RoleRecordList({ portal, records, primaryRecord, dense = false, onDetail, onEdit }: { readonly portal: RolePortalConfig; readonly records: readonly RoleFixture[]; readonly primaryRecord?: RoleFixture; readonly dense?: boolean; readonly onDetail?: (record: RoleFixture, opener: HTMLElement) => void; readonly onEdit?: (record: RoleFixture, opener: HTMLElement) => void }): React.ReactElement {
   const { openDetail } = useRolePreviewState();
+  if (dense) return <div className="role-record-table-wrap"><table className="role-record-table"><caption className="sr-only">{portal.roleName} preview records</caption><thead><tr><th scope="col">Record</th><th scope="col">Category / Type</th><th scope="col">Owner</th><th scope="col">Status</th><th scope="col">Actions</th></tr></thead><tbody>{records.map((record) => <tr className="role-record-row" key={record.id} data-primary={primaryRecord?.id === record.id || undefined}><th scope="row"><strong>{record.title}</strong><span>{record.detail}</span><small>{record.protectedNote}</small></th><td>{record.category}</td><td>{record.owner}</td><td><StatusBadge label={record.status} tone="info" /></td><td><div className="role-record-actions"><button type="button" onClick={(event) => { openDetail(portal.key, record); onDetail?.(record, event.currentTarget); }}>View detail</button><button type="button" className="secondary" onClick={(event) => onEdit?.(record, event.currentTarget)}>Edit preview</button></div></td></tr>)}</tbody></table></div>;
   return <div className="role-record-grid">{records.map((record) => <article className="role-record-card" key={record.id} data-primary={primaryRecord?.id === record.id || undefined}><div><span>{record.category}</span><h3>{record.title}</h3><p>{record.detail}</p></div><dl><div><dt>Owner</dt><dd>{record.owner}</dd></div><div><dt>Status</dt><dd><StatusBadge label={record.status} tone="info" /></dd></div></dl><p className="staff-readonly-note">{record.protectedNote}</p><div className="role-record-actions"><button type="button" onClick={(event) => { openDetail(portal.key, record); onDetail?.(record, event.currentTarget); }}>View detail</button><button type="button" className="secondary" onClick={(event) => onEdit?.(record, event.currentTarget)}>Edit preview</button></div></article>)}</div>;
 }
 
@@ -232,4 +234,13 @@ function primaryAction(portal: RolePortalConfig, route: RoleNavItem): string {
 
 function moduleDescription(portal: RolePortalConfig, route: RoleNavItem): string {
   return `${route.label} for ${portal.previewUser} at ${portal.organization}. This page exposes ${portal.roleName}-appropriate records, filters, detail review and owned preview actions.`;
+}
+
+function isDenseManagementRoute(portal: RolePortalConfig, route: RoleNavItem): boolean {
+  if (portal.key === 'operations-admin') {
+    return /organizations|users|verification|trust and safety|audit logs|security|system health/i.test(route.label);
+  }
+  if (portal.family === 'Institution') return /students|cohort/i.test(route.label);
+  if (portal.family === 'Employer') return /applicants|candidate|pipeline/i.test(route.label);
+  return false;
 }

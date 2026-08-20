@@ -69,7 +69,7 @@ describe('All-role portal registry and preview workflows', () => {
     expect(screen.getByText('3 records shown')).toBeInTheDocument();
     fireEvent.change(screen.getByPlaceholderText('Search applicants...'), { target: { value: 'Rahul' } });
     expect(screen.getByText('1 records shown')).toBeInTheDocument();
-    const record = screen.getByText('Rahul Kumar').closest('.role-record-card') as HTMLElement;
+    const record = screen.getByText('Rahul Kumar').closest('.role-record-row, .role-record-card') as HTMLElement;
     fireEvent.click(within(record).getByRole('button', { name: 'View detail' }));
     expect(screen.getByRole('dialog', { name: 'Rahul Kumar' })).toHaveTextContent('Consented applicant profile');
     fireEvent.keyDown(window, { key: 'Escape' });
@@ -83,6 +83,22 @@ describe('All-role portal registry and preview workflows', () => {
     expect(screen.getByText(/Update candidate stage/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Reset demo data' }));
     expect(screen.queryByText(/Unsaved session changes/)).not.toBeInTheDocument();
+  });
+
+  it('uses the dense management layout for Operations organizations without losing preview semantics', () => {
+    fetchMock.mockResolvedValue({ ok: true });
+    window.history.pushState(null, '', '/operations/admin/organizations');
+    render(<App />);
+    expect(document.querySelector('.role-module--dense')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Organizations' })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Search organizations...')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Organization' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('table', { name: /operations administrator preview records/i })).toBeInTheDocument();
+    const organization = screen.getByText('ABC Engineering College').closest('tr') as HTMLElement;
+    expect(organization).toHaveTextContent('Preview actions do not mutate production organizations.');
+    expect(within(organization).getByRole('button', { name: 'View detail' })).toBeInTheDocument();
+    expect(within(organization).getByRole('button', { name: 'Edit preview' })).toBeInTheDocument();
+    expect(screen.getByText(/Preview data only; backend authorization remains authoritative/i)).toBeInTheDocument();
   });
 
   it('opens dashboard record workflows and returns focus after Escape', () => {

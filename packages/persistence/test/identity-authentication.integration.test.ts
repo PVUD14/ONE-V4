@@ -159,7 +159,7 @@ describe('managed identity persistence adapters', () => {
     expect(JSON.stringify(audit)).not.toContain('a'.repeat(64));
   });
 
-  it('prevents invitation replay and duplicate external-subject mapping through persistence constraints', async () => {
+  it('lets an existing matching verified identity accept while rejecting conflicting identity bindings', async () => {
     const inviterId = await seedUser('admin2@example.test', 'sub:admin2');
     const existingUserId = await seedUser('existing@example.test', 'sub:existing');
     await db.insert(schema.invitations).values({
@@ -173,19 +173,34 @@ describe('managed identity persistence adapters', () => {
 
     await expect(acceptInvitationByTokenHashForVerifiedRecipientWithIdempotency(db, {
       invitationTokenHash: 'd'.repeat(64),
-      normalizedRecipientEmail: 'existing@example.test',
+      normalizedRecipientEmail: 'other@example.test',
       userId: randomUUID(),
       externalSubject: 'sub:existing',
       now: new Date('2026-08-16T00:00:00Z'),
       idempotencyRecordId: randomUUID(),
       idempotencyScope: 'invitation:accept',
-      idempotencyKey: 'duplicate-subject',
+      idempotencyKey: 'wrong-email',
       requestHash: 'e'.repeat(64),
       auditId: randomUUID(),
       outboxEventId: randomUUID(),
       correlationId: 'corr-duplicate-subject',
     })).rejects.toThrow();
 
+    const accepted = await acceptInvitationByTokenHashForVerifiedRecipientWithIdempotency(db, {
+      invitationTokenHash: 'd'.repeat(64),
+      normalizedRecipientEmail: 'existing@example.test',
+      userId: randomUUID(),
+      externalSubject: 'sub:existing',
+      now: new Date('2026-08-16T00:00:00Z'),
+      idempotencyRecordId: randomUUID(),
+      idempotencyScope: 'invitation:accept',
+      idempotencyKey: 'existing-subject',
+      requestHash: 'f'.repeat(64),
+      auditId: randomUUID(),
+      outboxEventId: randomUUID(),
+      correlationId: 'corr-existing-subject',
+    });
+    expect(accepted).toEqual({ userId: existingUserId, idempotentReplay: false });
     await expect(db.select().from(schema.users).where(eq(schema.users.id, existingUserId))).resolves.toHaveLength(1);
   });
 });

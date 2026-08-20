@@ -11,16 +11,18 @@ import {
   cryptoApiIdGenerator,
 } from './api-security.js';
 import { Phase1SecurityController } from './phase1-security.controller.js';
-import { OperationsInstitutionOnboardingController } from './operations-institution-onboarding.controller.js';
+import { API_INVITATION_MAIL_SINK, OperationsInstitutionOnboardingController, createConfiguredInvitationMailSink } from './operations-institution-onboarding.controller.js';
 
 @Module({})
 export class Phase1ApiSecurityModule {
   static register(dependencies: ApiSecurityDependencies): DynamicModule {
+    const configuredInvitationMailSink = dependencies.invitationMailSink ?? createConfiguredInvitationMailSink();
     const providers: Provider[] = [
       { provide: API_IDENTITY_VERIFIER, useValue: dependencies.verifier },
       { provide: API_INTERNAL_IDENTITY_STORE, useValue: dependencies.identityStore },
       { provide: API_PERSISTENCE_DB, useValue: dependencies.db },
       { provide: API_ID_GENERATOR, useValue: dependencies.ids ?? cryptoApiIdGenerator },
+      ...(configuredInvitationMailSink ? [{ provide: API_INVITATION_MAIL_SINK, useValue: configuredInvitationMailSink }] : []),
       ProtectedApiAuthenticationGuard,
       VerifiedIdentityAuthenticationGuard,
       Phase1ProtectedApiRoutes,

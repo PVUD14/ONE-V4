@@ -1,6 +1,7 @@
-import { createHash, randomBytes } from 'node:crypto';
-import { Body, Controller, ForbiddenException, Get, Inject, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { createConnection } from 'node:net';
+import { Body, Controller, ForbiddenException, Get, Inject, Optional, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
+import { digestInvitationToken, generateInvitationToken } from '@planthepath/identity/src/invitation-token.js';
 import { validateOutboxWriteInput, type PersistenceDb } from '@planthepath/persistence/src/repositories.js';
 import {
   API_ID_GENERATOR,
@@ -18,20 +19,68 @@ type VerificationState = 'PENDING' | 'UNDER_REVIEW' | 'VERIFIED' | 'REJECTED' | 
 type InstitutionType = 'UNIVERSITY' | 'ENGINEERING_COLLEGE' | 'ARTS_SCIENCE_COLLEGE' | 'BUSINESS_SCHOOL' | 'POLYTECHNIC' | 'OTHER';
 type UnitKind = 'DEPARTMENT' | 'PROGRAM' | 'BATCH' | 'SECTION' | 'CAMPUS';
 type RelationshipEndState = 'TRANSFERRED' | 'GRADUATED' | 'ENDED' | 'REVOKED';
+type InvitationRole = 'INSTITUTION_ADMIN' | 'EMPLOYER_ADMIN' | 'PLACEMENT_ADMIN' | 'DEPARTMENT_HEAD' | 'FACULTY_LECTURER';
+
+export const API_INVITATION_MAIL_SINK = Symbol('API_INVITATION_MAIL_SINK');
+
+export interface InvitationMailSink {
+  send(input: {
+    readonly toEmail: string;
+    readonly subject: string;
+    readonly textBody: string;
+    readonly invitationId: string;
+    readonly correlationId: string;
+  }): Promise<{ readonly providerReference?: string }>;
+}
+
+export class LoopbackSmtpInvitationMailSink implements InvitationMailSink {
+  constructor(readonly host = process.env.PTP_LOCAL_MAILPIT_HOST ?? '127.0.0.1', readonly port = Number(process.env.PTP_LOCAL_MAILPIT_SMTP_PORT ?? '1025')) {
+    if (!['127.0.0.1', 'localhost'].includes(host) || !Number.isInteger(port) || port < 1 || port > 65_535) {
+      throw new Error('local invitation mail sink must be loopback-bound');
+    }
+  }
+
+  async send(input: { readonly toEmail: string; readonly subject: string; readonly textBody: string; readonly invitationId: string; readonly correlationId: string }): Promise<{ readonly providerReference?: string }> {
+    const transcript = await smtpSend({
+      host: this.host,
+      port: this.port,
+      from: 'no-reply@planthepath.local',
+      to: input.toEmail,
+      message: [
+        `From: PlanThePath <no-reply@planthepath.local>`,
+        `To: ${input.toEmail}`,
+        `Subject: ${sanitizeHeader(input.subject)}`,
+        `X-PlanThePath-Correlation-Id: ${sanitizeHeader(input.correlationId)}`,
+        'Content-Type: text/plain; charset=utf-8',
+        '',
+        input.textBody,
+      ].join('\r\n'),
+    });
+    return { providerReference: `mailpit:${input.invitationId}:${transcript}`.slice(0, 256) };
+  }
+}
+
+export function createConfiguredInvitationMailSink(): InvitationMailSink | undefined {
+  if (process.env.PTP_LOCAL_INVITATION_MAILPIT_ENABLED !== 'true') return undefined;
+  return new LoopbackSmtpInvitationMailSink();
+}
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const emailPattern = /^[^@ \t\r\n]+@[^@ \t\r\n]+\.[^@ \t\r\n]+$/;
 const countryPattern = /^[A-Z]{2}$/;
-const platformMutationRoles = ['PLATFORM_SUPER_ADMIN', 'OPERATIONS_ADMIN'];
-const institutionAdminRoles = ['INSTITUTION_OWNER', 'INSTITUTION_ADMIN'];
-const institutionStaffRoles = ['INSTITUTION_OWNER', 'INSTITUTION_ADMIN', 'PLACEMENT_ADMIN', 'DEPARTMENT_HEAD', 'FACULTY_LECTURER'];
-const institutionAssignableRoles = ['PLACEMENT_ADMIN', 'DEPARTMENT_HEAD', 'FACULTY_LECTURER'];
+const platformMutationRoles: readonly string[] = ['PLATFORM_SUPER_ADMIN', 'OPERATIONS_ADMIN'];
+const institutionAdminRoles: readonly string[] = ['INSTITUTION_OWNER', 'INSTITUTION_ADMIN'];
+const institutionStaffRoles: readonly string[] = ['INSTITUTION_OWNER', 'INSTITUTION_ADMIN', 'PLACEMENT_ADMIN', 'DEPARTMENT_HEAD', 'FACULTY_LECTURER'];
+const institutionAssignableRoles = ['PLACEMENT_ADMIN', 'DEPARTMENT_HEAD', 'FACULTY_LECTURER'] as const;
+const adminInvitationTemplateId = '26000000-0000-4000-8000-000000000004';
+const staffInvitationTemplateId = '26000000-0000-4000-8000-000000000005';
 
 @Controller('/api/v1')
 export class OperationsInstitutionOnboardingController {
   constructor(
     @Inject(API_PERSISTENCE_DB) private readonly db: PersistenceDb,
     @Inject(API_ID_GENERATOR) private readonly ids: ApiIdGenerator,
+    @Optional() @Inject(API_INVITATION_MAIL_SINK) private readonly invitationMailSink?: InvitationMailSink,
   ) {}
 
   @Get('/operations/organizations')
@@ -196,19 +245,19 @@ export class OperationsInstitutionOnboardingController {
     const [row] = org.rows;
     if (!row) throw forbidden(context.correlationId);
     const role = row.kind === 'INSTITUTION' ? 'INSTITUTION_ADMIN' : 'EMPLOYER_ADMIN';
-    const token = randomBytes(32).toString('base64url');
-    const tokenHash = createHash('sha256').update(token).digest('hex');
-    const invitationId = this.ids.uuid();
-    await this.db.transaction(async (tx) => {
-      await tx.execute(sql`
-        INSERT INTO invitations (id, email, token_hash, invited_by_user_id, organization_id, role, scope_organization_id, scope_institution_id, scope_employer_id, expires_at)
-        VALUES (${invitationId}::uuid, ${email}, ${tokenHash}, ${context.authorization.principal.userId}::uuid, ${id}::uuid, ${role}, ${id}::uuid,
-                ${row.kind === 'INSTITUTION' ? id : null}::uuid, ${row.kind === 'EMPLOYER' ? id : null}::uuid, now() + interval '14 days')
-      `);
-      await writeAudit(tx, { id: this.ids.uuid(), actorUserId: context.authorization.principal.userId, action: 'identity.invitation.created', resourceType: 'invitation', resourceId: invitationId, organizationId: id, correlationId: context.correlationId });
-      await writeOutbox(tx, { id: this.ids.uuid(), aggregateType: 'invitation', aggregateId: invitationId, eventType: 'identity.invitation.created', payload: { invitationId }, actorUserId: context.authorization.principal.userId, organizationId: id, correlationId: context.correlationId });
+    const invitation = await this.createScopedInvitation({
+      actorUserId: context.authorization.principal.userId,
+      organizationId: id,
+      email,
+      role,
+      scopeInstitutionId: row.kind === 'INSTITUTION' ? id : null,
+      scopeEmployerId: row.kind === 'EMPLOYER' ? id : null,
+      templateId: adminInvitationTemplateId,
+      legalPurpose: 'transactional organization administrator invitation',
+      dedupePrefix: 'initial-admin',
+      correlationId: context.correlationId,
     });
-    return { invitation: { id: invitationId, email, role, state: 'PENDING', tokenPreviewAvailable: false }, correlationId: context.correlationId };
+    return { invitation: { id: invitation.id, email, role, state: 'PENDING', tokenPreviewAvailable: false }, correlationId: context.correlationId };
   }
 
   @Get('/operations/organizations/:targetOrganizationId/onboarding-status')
@@ -407,19 +456,81 @@ export class OperationsInstitutionOnboardingController {
   async assignStaffRole(@Req() request: ProtectedHttpRequest, @Param('institutionId') institutionId: string, @Body() body: unknown): Promise<Record<string, unknown>> {
     const context = requireInstitutionAdmin(request, institutionId);
     const id = requireUuid(institutionId, context.correlationId);
-    const targetUserId = requireUuid(readString(body, 'userId', context.correlationId), context.correlationId);
-    if (targetUserId === context.authorization.principal.userId) throw forbidden(context.correlationId);
+    if (typeof requireObject(body, 'request').userId === 'string') throw forbidden(context.correlationId);
+    const email = normalizeEmail(readString(body, 'email', context.correlationId), context.correlationId);
+    if (email === normalizeEmail(context.verifiedIdentity.email ?? '', context.correlationId)) throw forbidden(context.correlationId);
     const role = readEnum(readString(body, 'role', context.correlationId), institutionAssignableRoles, context.correlationId);
-    const membershipId = this.ids.uuid();
+    const invitation = await this.createScopedInvitation({
+      actorUserId: context.authorization.principal.userId,
+      organizationId: id,
+      email,
+      role,
+      scopeInstitutionId: id,
+      scopeEmployerId: null,
+      templateId: staffInvitationTemplateId,
+      legalPurpose: 'transactional institution staff invitation',
+      dedupePrefix: 'institution-staff',
+      correlationId: context.correlationId,
+    });
+    return { invitation: { id: invitation.id, email, role, state: 'PENDING', tokenPreviewAvailable: false }, correlationId: context.correlationId };
+  }
+
+  private async createScopedInvitation(input: {
+    readonly actorUserId: string;
+    readonly organizationId: string;
+    readonly email: string;
+    readonly role: InvitationRole;
+    readonly scopeInstitutionId: string | null;
+    readonly scopeEmployerId: string | null;
+    readonly templateId: string;
+    readonly legalPurpose: string;
+    readonly dedupePrefix: string;
+    readonly correlationId: string;
+  }): Promise<{ readonly id: string; readonly notificationCommandId: string }> {
+    const token = generateInvitationToken();
+    const tokenHash = digestInvitationToken(token);
+    const invitationId = this.ids.uuid();
+    const notificationCommandId = this.ids.uuid();
+    const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1_000);
+    const subject = input.role === 'EMPLOYER_ADMIN' ? 'PlanThePath employer administrator invitation' : 'PlanThePath institution administrator invitation';
+    const invitationUrl = buildInvitationUrl(token);
+    const textBody = [
+      'You have been invited to administer a PlanThePath organization.',
+      `Open this invitation link with the identity whose verified email is ${input.email}:`,
+      invitationUrl,
+      'This invitation is single-use and expires in 14 days.',
+    ].join('\n\n');
     await this.db.transaction(async (tx) => {
       await tx.execute(sql`
-        INSERT INTO organization_memberships (id, organization_id, user_id, role, state, scope_organization_id, scope_institution_id)
-        VALUES (${membershipId}::uuid, ${id}::uuid, ${targetUserId}::uuid, ${role}, 'ACTIVE', ${id}::uuid, ${id}::uuid)
+        INSERT INTO invitations (id, email, token_hash, invited_by_user_id, organization_id, role, scope_organization_id, scope_institution_id, scope_employer_id, expires_at)
+        VALUES (${invitationId}::uuid, ${input.email}, ${tokenHash}, ${input.actorUserId}::uuid, ${input.organizationId}::uuid, ${input.role}, ${input.organizationId}::uuid,
+                ${input.scopeInstitutionId}::uuid, ${input.scopeEmployerId}::uuid, ${expiresAt})
       `);
-      await writeAudit(tx, { id: this.ids.uuid(), actorUserId: context.authorization.principal.userId, action: 'organization.role.assigned', resourceType: 'organization_membership', resourceId: membershipId, organizationId: id, correlationId: context.correlationId, context: { role } });
-      await writeOutbox(tx, { id: this.ids.uuid(), aggregateType: 'organization_membership', aggregateId: membershipId, eventType: 'organization.role.assigned', payload: { membershipId, role }, actorUserId: context.authorization.principal.userId, organizationId: id, correlationId: context.correlationId });
+      await ensureInvitationNotificationTemplate(tx, input.templateId, input.actorUserId, subject);
+      await tx.execute(sql`
+        INSERT INTO notification_commands
+          (id, subject_user_id, template_id, channel, legal_purpose, destination_ref, render_parameters, dedupe_key, state, expires_at, correlation_id)
+        VALUES (${notificationCommandId}::uuid, ${input.actorUserId}::uuid, ${input.templateId}::uuid, 'EMAIL', ${input.legalPurpose},
+                ${`invitation:${invitationId}`}, ${JSON.stringify({ invitationId, role: input.role })}::jsonb,
+                ${`${input.dedupePrefix}:${input.organizationId}:${input.email}:${input.role}`}, 'PENDING', ${expiresAt}, ${input.correlationId})
+      `);
+      await writeAudit(tx, { id: this.ids.uuid(), actorUserId: input.actorUserId, action: 'identity.invitation.created', resourceType: 'invitation', resourceId: invitationId, organizationId: input.organizationId, correlationId: input.correlationId });
+      await writeOutbox(tx, { id: this.ids.uuid(), aggregateType: 'invitation', aggregateId: invitationId, eventType: 'identity.invitation.created', payload: { invitationId }, actorUserId: input.actorUserId, organizationId: input.organizationId, correlationId: input.correlationId });
     });
-    return { membership: { id: membershipId, organizationId: id, userId: targetUserId, role }, correlationId: context.correlationId };
+    if (this.invitationMailSink) {
+      const delivered = await this.invitationMailSink.send({ toEmail: input.email, subject, textBody, invitationId, correlationId: input.correlationId });
+      await this.db.execute(sql`
+        UPDATE notification_commands SET state='DISPATCHED' WHERE id=${notificationCommandId}::uuid AND state='PENDING'
+      `);
+      await this.db.execute(sql`
+        UPDATE notification_commands SET state='DELIVERED' WHERE id=${notificationCommandId}::uuid AND state='DISPATCHED'
+      `);
+      await this.db.execute(sql`
+        INSERT INTO notification_delivery_attempts (id, command_id, attempt, provider_kind, provider_reference, outcome)
+        VALUES (${this.ids.uuid()}::uuid, ${notificationCommandId}::uuid, 1, 'MAILPIT', ${delivered.providerReference ?? null}, 'SUCCEEDED')
+      `);
+    }
+    return { id: invitationId, notificationCommandId };
   }
 
   @Post('/institutions/:institutionId/student-imports')
@@ -569,6 +680,27 @@ async function upsertOrganizationProfile(db: PersistenceDb, organizationId: stri
       institution_type=EXCLUDED.institution_type,
       updated_at=now()
   `);
+}
+
+async function ensureInvitationNotificationTemplate(db: PersistenceDb, templateId: string, actorUserId: string, subject: string): Promise<void> {
+  await db.execute(sql`
+    INSERT INTO notification_templates (id, stable_key, version, locale, subject_template, body_template, approved_by_user_id, published_at)
+    VALUES (${templateId}::uuid, ${templateId === adminInvitationTemplateId ? 'organization-admin-invitation' : 'institution-staff-invitation'},
+            1, 'en-IN', ${subject}, 'Invitation link is rendered only in the ephemeral local/test delivery sink.', ${actorUserId}::uuid, now())
+    ON CONFLICT (stable_key, version, locale) DO NOTHING
+  `);
+}
+
+function buildInvitationUrl(token: string): string {
+  const configured = process.env.PTP_INVITATION_BASE_URL ?? 'http://127.0.0.1:5173';
+  const base = new URL(configured);
+  const localHttp = base.protocol === 'http:' && ['127.0.0.1', 'localhost'].includes(base.hostname);
+  if (base.username || base.password || base.search || base.hash || (base.protocol !== 'https:' && !localHttp)) {
+    throw new Error('invitation base URL must be HTTPS or loopback HTTP');
+  }
+  const invitationUrl = new URL('/invitations/accept', base);
+  invitationUrl.searchParams.set('token', token);
+  return invitationUrl.toString();
 }
 
 async function writeAudit(db: PersistenceDb, input: { id: string; actorUserId: string; action: string; resourceType: string; resourceId: string; organizationId: string; correlationId: string; context?: Record<string, unknown> }): Promise<void> {
@@ -830,6 +962,56 @@ function normalizeEmail(value: string, correlationId: string): string {
   const normalized = value.trim().toLowerCase();
   if (!emailPattern.test(normalized) || normalized.length > 254) throw forbidden(correlationId);
   return normalized;
+}
+
+async function smtpSend(input: { readonly host: string; readonly port: number; readonly from: string; readonly to: string; readonly message: string }): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const socket = createConnection({ host: input.host, port: input.port });
+    let buffer = '';
+    let lastResponse = '';
+    const commands = [
+      `HELO planthepath.local\r\n`,
+      `MAIL FROM:<${input.from}>\r\n`,
+      `RCPT TO:<${input.to}>\r\n`,
+      'DATA\r\n',
+      `${input.message.replace(/\r?\n\./g, '\r\n..')}\r\n.\r\n`,
+      'QUIT\r\n',
+    ];
+    let commandIndex = 0;
+    const timeout = setTimeout(() => {
+      socket.destroy();
+      reject(new Error('local invitation mail sink timed out'));
+    }, 5_000);
+    socket.setEncoding('utf8');
+    socket.on('data', (chunk) => {
+      buffer += chunk;
+      if (!buffer.endsWith('\n')) return;
+      const lines = buffer.trimEnd().split(/\r?\n/);
+      buffer = '';
+      lastResponse = lines.at(-1) ?? '';
+      const code = Number(lastResponse.slice(0, 3));
+      if (!Number.isInteger(code) || code >= 500) {
+        clearTimeout(timeout);
+        socket.destroy();
+        reject(new Error('local invitation mail sink rejected message'));
+        return;
+      }
+      if (commandIndex < commands.length) socket.write(commands[commandIndex++]!);
+      else {
+        clearTimeout(timeout);
+        socket.end();
+        resolve(lastResponse.replace(/[^A-Za-z0-9._:-]/g, '').slice(0, 80) || 'accepted');
+      }
+    });
+    socket.on('error', (error) => {
+      clearTimeout(timeout);
+      reject(error);
+    });
+  });
+}
+
+function sanitizeHeader(value: string): string {
+  return value.replace(/[\r\n]+/g, ' ').slice(0, 160);
 }
 
 function mapOrganizationRow(row: Record<string, unknown>): Record<string, unknown> {

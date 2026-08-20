@@ -139,16 +139,38 @@ export async function acceptInvitationByTokenHashForVerifiedRecipientWithIdempot
     const [invitation] = invitationResult.rows;
     if (!invitation) throw new Error('invitation is not usable');
 
-    await tx.insert(schema.users).values({
-      id: input.userId,
-      externalSubject: input.externalSubject,
-      email: invitation.email,
-      state: 'ACTIVE',
-    });
+    const existingUsers = await tx.execute(sql`
+      SELECT id, external_subject, email
+      FROM users
+      WHERE external_subject = ${input.externalSubject}
+         OR lower(email) = ${input.normalizedRecipientEmail}
+      FOR UPDATE
+    `) as QueryResult<{ id: string; external_subject: string | null; email: string }>;
+    if (existingUsers.rows.some((user) => user.external_subject !== null && user.external_subject !== input.externalSubject)) {
+      throw new Error('invitation recipient is already bound to a different identity');
+    }
+    if (new Set(existingUsers.rows.map((user) => user.id)).size > 1) {
+      throw new Error('invitation recipient identity is ambiguous');
+    }
+    const acceptedUserId = existingUsers.rows[0]?.id ?? input.userId;
+    if (existingUsers.rows[0]) {
+      await tx.execute(sql`
+        UPDATE users
+        SET external_subject=${input.externalSubject}, email=${invitation.email}, state='ACTIVE', updated_at=now()
+        WHERE id=${acceptedUserId}::uuid
+      `);
+    } else {
+      await tx.insert(schema.users).values({
+        id: acceptedUserId,
+        externalSubject: input.externalSubject,
+        email: invitation.email,
+        state: 'ACTIVE',
+      });
+    }
 
     const consumed = await tx.execute(sql`
       UPDATE invitations
-      SET state = 'ACCEPTED', accepted_by_user_id = ${input.userId}::uuid, accepted_at = ${input.now}, updated_at = now()
+      SET state = 'ACCEPTED', accepted_by_user_id = ${acceptedUserId}::uuid, accepted_at = ${input.now}, updated_at = now()
       WHERE id = ${invitation.id}::uuid
         AND token_hash = ${input.invitationTokenHash}
         AND lower(email) = ${input.normalizedRecipientEmail}
@@ -164,7 +186,7 @@ export async function acceptInvitationByTokenHashForVerifiedRecipientWithIdempot
       await tx.insert(schema.organizationMemberships).values({
         id: input.membershipId,
         organizationId: invitation.organization_id,
-        userId: input.userId,
+        userId: acceptedUserId,
         role: invitation.role,
         state: 'ACTIVE',
         scopeOrganizationId: invitation.scope_organization_id,
@@ -177,7 +199,7 @@ export async function acceptInvitationByTokenHashForVerifiedRecipientWithIdempot
 
     await writeAuditEvent(tx, {
       id: input.auditId,
-      actorUserId: input.userId,
+      actorUserId: acceptedUserId,
       action: 'identity.invitation.accepted',
       resourceType: 'invitation',
       resourceId: invitation.id,
@@ -188,20 +210,20 @@ export async function acceptInvitationByTokenHashForVerifiedRecipientWithIdempot
     await writeOutboxEvent(tx, {
       id: input.outboxEventId,
       aggregateType: 'user',
-      aggregateId: input.userId,
+      aggregateId: acceptedUserId,
       eventType: 'identity.invitation.accepted',
       eventVersion: 1,
-      payload: { userId: input.userId, invitationId: invitation.id },
-      actorUserId: input.userId,
+      payload: { userId: acceptedUserId, invitationId: invitation.id },
+      actorUserId: acceptedUserId,
       ...(invitation.organization_id ? { organizationId: invitation.organization_id } : {}),
       correlationId: input.correlationId,
     });
 
     await tx.update(schema.idempotencyRecords)
-      .set({ status: 'SUCCEEDED', responseResourceType: 'user', responseResourceId: input.userId })
+      .set({ status: 'SUCCEEDED', responseResourceType: 'user', responseResourceId: acceptedUserId })
       .where(and(eq(schema.idempotencyRecords.scope, input.idempotencyScope), eq(schema.idempotencyRecords.key, input.idempotencyKey)));
 
-    return { userId: input.userId, idempotentReplay: false };
+    return { userId: acceptedUserId, idempotentReplay: false };
   });
 }
 

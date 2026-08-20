@@ -79,6 +79,7 @@ export interface ApiSecurityDependencies {
   readonly identityStore: InternalIdentityStore;
   readonly db: PersistenceDb;
   readonly ids?: ApiIdGenerator;
+  readonly invitationMailSink?: unknown;
 }
 
 @Injectable()

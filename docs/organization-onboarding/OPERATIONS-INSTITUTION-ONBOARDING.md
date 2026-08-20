@@ -22,7 +22,7 @@ Institution Admin owns institution administration:
 - validate and commit CSV roster imports;
 - maintain institution-owned academic placement metadata;
 - transfer, graduate, end or revoke a student relationship without deleting global identity/history;
-- assign only allowed institution staff roles.
+- invite only allowed institution staff roles for verified-recipient acceptance.
 
 ## Organization lifecycle
 
@@ -50,6 +50,24 @@ Each transition appends `organization_verification_events`, writes `audit_events
 ## Invitation boundary
 
 Initial organization administrators are invited through `invitations`; the API does not fabricate an active authenticated identity. Invitation acceptance remains bound to the existing verified identity flow.
+
+The raw invitation token is generated once with cryptographic randomness and only `token_hash` is stored. The normal API response, PostgreSQL tables, audit rows, outbox payloads, notification command rows, browser storage and Operations list/detail tables do not contain the raw token.
+
+For local UAT, invitation delivery is explicitly opt-in and loopback-only:
+
+1. Start the local Mailpit profile so SMTP listens on `127.0.0.1:1025`.
+2. Start the API with:
+   - `PTP_LOCAL_INVITATION_MAILPIT_ENABLED=true`
+   - `PTP_LOCAL_MAILPIT_HOST=127.0.0.1`
+   - `PTP_LOCAL_MAILPIT_SMTP_PORT=1025`
+   - optionally `PTP_INVITATION_BASE_URL=http://127.0.0.1:5173`
+3. Create the invitation through the Operations API.
+4. Inspect Mailpit on loopback and copy the invitation link as the synthetic recipient.
+5. Accept the invitation only while authenticated as an identity whose verified email matches the invitation recipient.
+
+The local sink refuses non-loopback hosts. Production must not enable this local Mailpit sink; production delivery needs a deployment-owned private email path that preserves the same no-persistence raw-token rule.
+
+Institution staff onboarding uses the same consent boundary. `POST /institutions/:institutionId/staff-role-assignments` no longer attaches an arbitrary global `userId`; it creates an invitation for `PLACEMENT_ADMIN`, `DEPARTMENT_HEAD`, or `FACULTY_LECTURER`, and the membership is created only after the intended verified recipient accepts.
 
 ## Student lifecycle
 

@@ -31,6 +31,7 @@ let adminPool: Pool;
 let pool: Pool;
 let db: ReturnType<typeof drizzle<typeof schema>>;
 let app: INestApplication;
+const deliveredInvitations: { toEmail: string; textBody: string; invitationId: string }[] = [];
 
 beforeAll(async () => {
   adminPool = new Pool({ connectionString });
@@ -45,7 +46,12 @@ beforeAll(async () => {
   };
 
   const moduleRef = await Test.createTestingModule({
-    imports: [Phase1ApiSecurityModule.register({ verifier, identityStore, db })],
+    imports: [Phase1ApiSecurityModule.register({ verifier, identityStore, db, invitationMailSink: {
+      async send(input: { toEmail: string; textBody: string; invitationId: string }) {
+        deliveredInvitations.push({ toEmail: input.toEmail, textBody: input.textBody, invitationId: input.invitationId });
+        return { providerReference: `mailpit:${input.invitationId}` };
+      },
+    } })],
     controllers: [CareerReadinessController],
     providers: [{ provide: PG_POOL, useValue: pool }],
   }).compile();
@@ -55,9 +61,13 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
+  deliveredInvitations.length = 0;
   await pool.query(`
     TRUNCATE
       idempotency_records,
+      notification_delivery_attempts,
+      notification_commands,
+      notification_templates,
       student_roster_import_rows,
       student_roster_imports,
       institution_student_profiles,
@@ -371,6 +381,125 @@ describe('Phase 1 API protected request path', () => {
       .expect(403);
   });
 
+  it('delivers initial administrator invitations without persisting or returning the raw token', async () => {
+    const platformId = await seedOrg('PLATFORM', 'PlanThePath Platform');
+    const opsUserId = await seedUser('ops-invite@example.test', 'sub:ops-invite');
+    await seedMembership(opsUserId, platformId, 'OPERATIONS_ADMIN');
+    const institutionId = await seedOrg('INSTITUTION', 'Invitation College');
+    const institutionAdminId = await seedUser('not-ops@example.test', 'sub:not-ops');
+    await seedMembership(institutionAdminId, institutionId, 'INSTITUTION_ADMIN');
+    const opsToken = signAccessToken(privateKey, { sub: 'sub:ops-invite', email: 'ops-invite@example.test' });
+
+    const inviteResponse = await request(app.getHttpServer())
+      .post(`/api/v1/operations/organizations/${institutionId}/initial-admin-invitations`)
+      .set('Authorization', `Bearer ${opsToken}`)
+      .send({ email: 'Initial.Admin@Example.Test' })
+      .expect(201);
+
+    expect(inviteResponse.body.invitation).toMatchObject({ email: 'initial.admin@example.test', role: 'INSTITUTION_ADMIN', tokenPreviewAvailable: false });
+    expect(JSON.stringify(inviteResponse.body)).not.toMatch(/[A-Za-z0-9_-]{40,}/);
+    expect(deliveredInvitations).toHaveLength(1);
+    expect(deliveredInvitations[0]).toMatchObject({ toEmail: 'initial.admin@example.test', invitationId: inviteResponse.body.invitation.id });
+    const rawToken = new URL(deliveredInvitations[0]!.textBody.match(/https?:\/\/\S+/)?.[0] ?? '').searchParams.get('token');
+    expect(rawToken).toBeTruthy();
+    const rawNeedle = rawToken!;
+
+    const persisted = await pool.query(`
+      SELECT
+        (SELECT jsonb_agg(to_jsonb(i)) FROM invitations i) AS invitations,
+        (SELECT jsonb_agg(to_jsonb(a)) FROM audit_events a) AS audit,
+        (SELECT jsonb_agg(to_jsonb(o)) FROM outbox_events o) AS outbox,
+        (SELECT jsonb_agg(to_jsonb(n)) FROM notification_commands n) AS commands
+    `);
+    expect(JSON.stringify(persisted.rows[0])).not.toContain(rawNeedle);
+    const invitation = await pool.query('SELECT token_hash FROM invitations WHERE id=$1', [inviteResponse.body.invitation.id]);
+    expect(invitation.rows[0].token_hash).toBe(digestInvitationToken(rawNeedle));
+
+    await request(app.getHttpServer())
+      .post('/api/v1/invitations/accept')
+      .set('Authorization', `Bearer ${signAccessToken(privateKey, { sub: 'sub:wrong-recipient', email: 'wrong@example.test', emailVerified: true })}`)
+      .set('Idempotency-Key', 'wrong-recipient-accept')
+      .send({ token: rawNeedle })
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .post('/api/v1/invitations/accept')
+      .set('Authorization', `Bearer ${signAccessToken(privateKey, { sub: 'sub:initial-admin', email: 'initial.admin@example.test', emailVerified: false })}`)
+      .set('Idempotency-Key', 'unverified-recipient')
+      .send({ token: rawNeedle })
+      .expect(403);
+
+    const accepted = await request(app.getHttpServer())
+      .post('/api/v1/invitations/accept')
+      .set('Authorization', `Bearer ${signAccessToken(privateKey, { sub: 'sub:initial-admin', email: 'initial.admin@example.test', emailVerified: true })}`)
+      .set('Idempotency-Key', 'correct-recipient')
+      .send({ token: rawNeedle })
+      .expect(201);
+    expect(accepted.body).toMatchObject({ accepted: true, idempotentReplay: false });
+
+    await request(app.getHttpServer())
+      .post('/api/v1/invitations/accept')
+      .set('Authorization', `Bearer ${signAccessToken(privateKey, { sub: 'sub:initial-admin', email: 'initial.admin@example.test', emailVerified: true })}`)
+      .set('Idempotency-Key', 'correct-recipient')
+      .send({ token: rawNeedle })
+      .expect(201)
+      .expect((response) => expect(response.body.idempotentReplay).toBe(true));
+
+    await request(app.getHttpServer())
+      .post('/api/v1/invitations/accept')
+      .set('Authorization', `Bearer ${signAccessToken(privateKey, { sub: 'sub:initial-admin', email: 'initial.admin@example.test', emailVerified: true })}`)
+      .set('Idempotency-Key', 'replay-new-key')
+      .send({ token: rawNeedle })
+      .expect(403);
+
+    const expiredToken = 'ExpiredInvitationToken_abcdefghijklmnopqrstuvwxyz012345';
+    await db.insert(schema.invitations).values({
+      id: randomUUID(),
+      email: 'expired-admin@example.test',
+      tokenHash: digestInvitationToken(expiredToken),
+      state: 'PENDING',
+      invitedByUserId: opsUserId,
+      organizationId: institutionId,
+      role: 'INSTITUTION_ADMIN',
+      scopeOrganizationId: institutionId,
+      scopeInstitutionId: institutionId,
+      expiresAt: new Date('2026-01-01T00:00:00Z'),
+    });
+    await request(app.getHttpServer())
+      .post('/api/v1/invitations/accept')
+      .set('Authorization', `Bearer ${signAccessToken(privateKey, { sub: 'sub:expired-admin', email: 'expired-admin@example.test', emailVerified: true })}`)
+      .set('Idempotency-Key', 'expired-admin')
+      .send({ token: expiredToken })
+      .expect(403);
+
+    const revokedToken = 'RevokedInvitationToken_abcdefghijklmnopqrstuvwxyz012345';
+    await db.insert(schema.invitations).values({
+      id: randomUUID(),
+      email: 'revoked-admin@example.test',
+      tokenHash: digestInvitationToken(revokedToken),
+      state: 'REVOKED',
+      invitedByUserId: opsUserId,
+      organizationId: institutionId,
+      role: 'INSTITUTION_ADMIN',
+      scopeOrganizationId: institutionId,
+      scopeInstitutionId: institutionId,
+      expiresAt: new Date('2026-12-31T00:00:00Z'),
+      revokedAt: new Date('2026-08-16T00:00:00Z'),
+    });
+    await request(app.getHttpServer())
+      .post('/api/v1/invitations/accept')
+      .set('Authorization', `Bearer ${signAccessToken(privateKey, { sub: 'sub:revoked-admin', email: 'revoked-admin@example.test', emailVerified: true })}`)
+      .set('Idempotency-Key', 'revoked-admin')
+      .send({ token: revokedToken })
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/operations/organizations/${platformId}/initial-admin-invitations`)
+      .set('Authorization', `Bearer ${signAccessToken(privateKey, { sub: 'sub:not-ops', email: 'not-ops@example.test' })}`)
+      .send({ email: 'other-admin@example.test' })
+      .expect(403);
+  });
+
   it('keeps student lifecycle under Institution Admin instead of Operations', async () => {
     const platformId = await seedOrg('PLATFORM', 'PlanThePath Platform');
     const opsUserId = await seedUser('ops-students@example.test', 'sub:ops-students');
@@ -412,7 +541,7 @@ describe('Phase 1 API protected request path', () => {
       .expect(403);
   });
 
-  it('rejects self-escalation and platform role assignment by Institution Admin', async () => {
+  it('uses invitation consent instead of direct arbitrary-user staff role attachment', async () => {
     const institutionId = await seedOrg('INSTITUTION', 'Role College');
     const adminUserId = await seedUser('role-admin@example.test', 'sub:role-admin');
     const targetUserId = await seedUser('faculty@example.test', 'sub:faculty');
@@ -422,20 +551,30 @@ describe('Phase 1 API protected request path', () => {
     await request(app.getHttpServer())
       .post(`/api/v1/institutions/${institutionId}/staff-role-assignments`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ userId: adminUserId, role: 'DEPARTMENT_HEAD' })
+      .send({ email: 'role-admin@example.test', role: 'DEPARTMENT_HEAD' })
       .expect(403);
 
     await request(app.getHttpServer())
       .post(`/api/v1/institutions/${institutionId}/staff-role-assignments`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ userId: targetUserId, role: 'OPERATIONS_ADMIN' })
+      .send({ email: 'faculty@example.test', role: 'OPERATIONS_ADMIN' })
       .expect(403);
 
-    await request(app.getHttpServer())
+    const invite = await request(app.getHttpServer())
       .post(`/api/v1/institutions/${institutionId}/staff-role-assignments`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ userId: targetUserId, role: 'FACULTY_LECTURER' })
+      .send({ email: 'faculty@example.test', role: 'FACULTY_LECTURER' })
       .expect(201);
+    expect(invite.body.invitation).toMatchObject({ email: 'faculty@example.test', role: 'FACULTY_LECTURER', tokenPreviewAvailable: false });
+    await expect(db.select().from(schema.organizationMemberships).where(eq(schema.organizationMemberships.userId, targetUserId))).resolves.toHaveLength(0);
+    const rawToken = new URL(deliveredInvitations[0]!.textBody.match(/https?:\/\/\S+/)?.[0] ?? '').searchParams.get('token')!;
+    await request(app.getHttpServer())
+      .post('/api/v1/invitations/accept')
+      .set('Authorization', `Bearer ${signAccessToken(privateKey, { sub: 'sub:faculty', email: 'faculty@example.test', emailVerified: true })}`)
+      .set('Idempotency-Key', 'faculty-accept')
+      .send({ token: rawToken })
+      .expect(201);
+    await expect(db.select().from(schema.organizationMemberships).where(eq(schema.organizationMemberships.userId, targetUserId))).resolves.toHaveLength(1);
   });
 
   it('validates and commits roster CSV without raw preview mutation', async () => {

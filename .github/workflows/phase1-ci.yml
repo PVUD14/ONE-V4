@@ -41,7 +41,7 @@ jobs:
       - name: Validate n8n source artifacts and deployment materialization
         shell: bash
         env:
-          PTP_ADAPTER_HEADER_CREDENTIAL_ID: ci_header_credential
+          PTP_N8N_JWT_CREDENTIAL_ID: ci_jwt_credential
           PTP_SMTP_CREDENTIAL_ID: ci_smtp_credential
         run: |
           set -euo pipefail

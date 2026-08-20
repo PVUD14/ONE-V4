@@ -26,6 +26,7 @@ const actors = {
 const studentUserId = '31000000-0000-4000-8000-000000000004';
 let fixture: PilotFixture;
 let stagingManifest: ImportPackageManifest;
+let pilotHash: string;
 
 beforeAll(async () => {
   const migrationDir = new URL('../drizzle/', import.meta.url);
@@ -41,9 +42,10 @@ beforeAll(async () => {
   }
   const pilotBytes = await readFile(new URL('../../../data/career-readiness/pilot-v1.json', import.meta.url));
   fixture = JSON.parse(pilotBytes.toString('utf8')) as PilotFixture;
+  pilotHash = createHash('sha256').update(pilotBytes).digest('hex');
   stagingManifest = JSON.parse(await readFile(new URL('../../../data/career-readiness/v4-staging-manifest.json', import.meta.url), 'utf8')) as ImportPackageManifest;
   await stageImportManifest(pool, stagingManifest, actors.authorUserId);
-  await publishCareerReadinessPilot(pool, fixture, createHash('sha256').update(pilotBytes).digest('hex'), actors);
+  await publishCareerReadinessPilot(pool, fixture, pilotHash, actors);
 });
 
 afterAll(async () => pool.end());
@@ -64,6 +66,26 @@ describe('Career Readiness Fundamentals production path', () => {
     expect(catalog).toMatchObject({ pilot: 'Career Readiness Fundamentals' });
     expect(JSON.stringify(catalog)).not.toContain('correctOptionId');
     expect(JSON.stringify(catalog)).not.toContain('answer_hash');
+  });
+
+  it('records authored pilot provenance against the commit that introduced the source fixture', async () => {
+    const provenance = await pool.query<{
+      source_repository: string;
+      source_commit: string;
+      source_paths: string[];
+      checksums: Record<string, string>;
+    }>(
+      `SELECT source_repository, source_commit, source_paths, checksums
+       FROM source_packages
+       WHERE deterministic_key LIKE 'career-readiness-pilot-v1-%'`,
+    );
+    expect(provenance.rows).toHaveLength(1);
+    expect(provenance.rows[0]).toMatchObject({
+      source_repository: 'https://github.com/PVUD14/planthepath-next',
+      source_commit: '3d1a754b6d1eccb9a44249b0caed521a7df9ffd8',
+      source_paths: ['data/career-readiness/pilot-v1.json'],
+      checksums: { 'data/career-readiness/pilot-v1.json': pilotHash },
+    });
   });
 
   it('rejects bypasses around the content review and finalized manifest boundaries', async () => {

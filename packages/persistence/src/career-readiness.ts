@@ -47,7 +47,7 @@ export interface PilotPublicationActors {
 }
 
 const PILOT_SOURCE_REPOSITORY = 'https://github.com/PVUD14/planthepath-next';
-const PILOT_SOURCE_COMMIT = '988d1ce03a233581209c99ff5a4d0b74d06c9b4d';
+const PILOT_SOURCE_COMMIT = '3d1a754b6d1eccb9a44249b0caed521a7df9ffd8';
 const PILOT_TRANSFORM_VERSION = 'career-readiness-pilot-v1';
 const PILOT_SOURCE_PATH = 'data/career-readiness/pilot-v1.json';
 const PILOT_RELEASE_ID = '25000000-0000-4000-8000-000000000001';

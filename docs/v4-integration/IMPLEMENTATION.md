@@ -38,7 +38,7 @@ All routes require a current active Platform Super Admin or Operations Admin rol
 
 ## Authored pilot release
 
-Because V4 clearance is unresolved, the released `Career Readiness Fundamentals` pilot is newly authored PlanThePath content at `data/career-readiness/pilot-v1.json`. It contains two topics, three prerequisite-aware lessons, six reviewed questions, and a deterministic four-question assessment blueprint. The release uses separate existing author, reviewer, and publisher users. It does not convert a quarantined V4 record into released content.
+Because V4 clearance is unresolved, the released `Career Readiness Fundamentals` pilot is newly authored PlanThePath content at `data/career-readiness/pilot-v1.json`, introduced at immutable source commit `3d1a754b6d1eccb9a44249b0caed521a7df9ffd8`. It contains two topics, three prerequisite-aware lessons, six reviewed questions, and a deterministic four-question assessment blueprint. The release uses separate existing author, reviewer, and publisher users. It does not convert a quarantined V4 record into released content.
 
 ## Governance and rollback
 

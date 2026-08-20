@@ -557,6 +557,12 @@ describe('Phase 1 API protected request path', () => {
     await request(app.getHttpServer())
       .post(`/api/v1/institutions/${institutionId}/staff-role-assignments`)
       .set('Authorization', `Bearer ${token}`)
+      .send({ userId: targetUserId, email: 'faculty@example.test', role: 'FACULTY_LECTURER' })
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/institutions/${institutionId}/staff-role-assignments`)
+      .set('Authorization', `Bearer ${token}`)
       .send({ email: 'faculty@example.test', role: 'OPERATIONS_ADMIN' })
       .expect(403);
 

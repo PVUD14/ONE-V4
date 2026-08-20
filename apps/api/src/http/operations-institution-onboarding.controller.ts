@@ -456,7 +456,8 @@ export class OperationsInstitutionOnboardingController {
   async assignStaffRole(@Req() request: ProtectedHttpRequest, @Param('institutionId') institutionId: string, @Body() body: unknown): Promise<Record<string, unknown>> {
     const context = requireInstitutionAdmin(request, institutionId);
     const id = requireUuid(institutionId, context.correlationId);
-    if (typeof requireObject(body, 'request').userId === 'string') throw forbidden(context.correlationId);
+    const input = requireObject(body, 'request');
+    if (typeof input.userId === 'string') throw forbidden(context.correlationId);
     const email = normalizeEmail(readString(body, 'email', context.correlationId), context.correlationId);
     if (email === normalizeEmail(context.verifiedIdentity.email ?? '', context.correlationId)) throw forbidden(context.correlationId);
     const role = readEnum(readString(body, 'role', context.correlationId), institutionAssignableRoles, context.correlationId);

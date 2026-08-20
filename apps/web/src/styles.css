@@ -82,11 +82,13 @@
 .role-profile strong, .role-profile small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .role-profile small { color: #64748b; }
 .role-main { width: 100%; max-width: 1600px; margin: 0 auto; padding: clamp(20px, 2vw, 32px); }
-.role-preview-notice, .role-page-heading { border-radius: 22px; padding: 18px 20px; margin-bottom: 18px; }
+.role-preview-notice, .role-page-heading { max-width: 100%; overflow-wrap: anywhere; border-radius: 22px; padding: 18px 20px; margin-bottom: 18px; }
 .role-page-heading { align-items: flex-start; }
 .role-page-heading > div { min-width: 0; }
 .role-page-heading p { max-width: 86ch; }
+.role-page-heading .eyebrow { overflow-wrap: anywhere; }
 .role-dashboard, .role-module { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 18px; align-items: start; }
+.role-dashboard > *, .role-module > * { min-width: 0; }
 .role-module--dense { gap: 16px; }
 .role-page-heading, .role-filters, .role-wide, .role-empty { grid-column: 1 / -1; }
 .role-kpi-grid { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
@@ -98,16 +100,16 @@
 .role-record-card { display: grid; gap: 12px; border-radius: 18px; padding: 16px; min-width: 0; }
 .role-record-card[data-primary="true"] { border-color: var(--role-accent); }
 .role-record-actions, .role-modal-actions { gap: 10px; flex-wrap: wrap; }
-.role-filters { display: grid; grid-template-columns: minmax(240px, 420px) minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 14px 16px; }
+.role-filters { display: grid; grid-template-columns: minmax(240px, 420px) minmax(220px, 1fr); align-items: center; gap: 12px; padding: 14px 16px; }
 .role-local-search { display: grid; grid-template-columns: auto minmax(180px, 1fr); gap: 8px; align-items: center; }
 .role-local-search span { color: #475569; font-size: .82rem; font-weight: 700; white-space: nowrap; }
 .role-local-search input { min-height: 42px; }
-.filter-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.filter-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; width: 100%; }
 .filter-row button { min-height: 38px; display: inline-flex; align-items: center; gap: 6px; padding: 8px 11px; white-space: nowrap; }
-.result-count { margin: 0; color: #64748b; font-weight: 700; white-space: nowrap; }
+.result-count { margin: 0; color: #64748b; font-weight: 700; justify-self: end; white-space: nowrap; }
 .role-boundary-grid { display: grid; gap: 12px; }
 .role-boundary-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.role-record-table-wrap { grid-column: 1 / -1; overflow-x: auto; border: 1px solid rgba(148, 163, 184, 0.25); border-radius: 18px; background: #fff; box-shadow: 0 18px 42px rgba(15, 23, 42, 0.08); }
+.role-record-table-wrap { grid-column: 1 / -1; min-width: 0; max-width: 100%; overflow-x: auto; border: 1px solid rgba(148, 163, 184, 0.25); border-radius: 18px; background: #fff; box-shadow: 0 18px 42px rgba(15, 23, 42, 0.08); }
 .role-record-table { width: 100%; min-width: 780px; border-collapse: collapse; }
 .role-record-table th, .role-record-table td { padding: 14px 16px; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: top; }
 .role-record-table thead th { color: #475569; background: #f8fafc; font-size: .76rem; letter-spacing: .04em; text-transform: uppercase; }
@@ -133,17 +135,18 @@
   .role-topbar { flex-wrap: wrap; }
   .role-profile { max-width: 42vw; }
   .role-filters { grid-template-columns: 1fr; align-items: start; }
-  .result-count { white-space: normal; }
+  .result-count { justify-self: start; white-space: normal; }
   .role-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 760px) {
   .demo-launcher, .role-main { padding: 16px; }
+  .role-workspace, .role-main { overflow-x: hidden; }
   .role-topbar-actions, .role-org, .role-context { display: none; }
   .role-search { order: 4; flex-basis: 100%; max-width: none; }
   .role-filters { padding: 12px; }
   .role-local-search { grid-template-columns: 1fr; }
-  .filter-row button { flex: 1 1 auto; justify-content: center; }
+  .filter-row button { flex: 1 1 132px; justify-content: center; min-width: 0; white-space: normal; }
   .role-page-heading, .role-preview-notice { align-items: flex-start; flex-direction: column; }
   .role-kpi-grid, .role-boundary-grid { grid-template-columns: 1fr; }
   .role-card:not(.role-wide) { grid-column: 1 / -1; }

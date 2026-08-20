@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import {
   boolean,
   check,
+  date,
   foreignKey,
   index,
   integer,
@@ -24,6 +25,10 @@ export const institutionUnitKind = pgEnum('institution_unit_kind', ['INSTITUTION
 export const outboxDeliveryState = pgEnum('outbox_delivery_state', ['PENDING', 'PROCESSING', 'PUBLISHED', 'FAILED']);
 export const idempotencyStatus = pgEnum('idempotency_status', ['STARTED', 'SUCCEEDED', 'FAILED']);
 export const eventConsumerReceiptStatus = pgEnum('event_consumer_receipt_status', ['STARTED', 'SUCCEEDED', 'FAILED']);
+export const institutionType = pgEnum('institution_type', ['UNIVERSITY', 'ENGINEERING_COLLEGE', 'ARTS_SCIENCE_COLLEGE', 'BUSINESS_SCHOOL', 'POLYTECHNIC', 'OTHER']);
+export const rosterStudentStatus = pgEnum('roster_student_status', ['INVITED', 'ACTIVE', 'TRANSFERRED', 'GRADUATED', 'ENDED', 'REVOKED']);
+export const rosterImportState = pgEnum('roster_import_state', ['VALIDATED', 'COMMITTED', 'REJECTED']);
+export const rosterImportRowState = pgEnum('roster_import_row_state', ['VALID', 'WARNING', 'REJECTED', 'COMMITTED']);
 
 const zeroUuid = '00000000-0000-0000-0000-000000000000';
 
@@ -48,6 +53,42 @@ export const organizations = pgTable('organizations', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const organizationProfiles = pgTable('organization_profiles', {
+  organizationId: uuid('organization_id').primaryKey().references(() => organizations.id, { onDelete: 'cascade' }),
+  displayName: text('display_name'),
+  websiteUrl: text('website_url'),
+  countryCode: text('country_code').notNull(),
+  stateOrProvince: text('state_or_province'),
+  city: text('city'),
+  postalCode: text('postal_code'),
+  addressLine1: text('address_line_1'),
+  addressLine2: text('address_line_2'),
+  primaryContactEmail: text('primary_contact_email'),
+  institutionType: institutionType('institution_type'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index('organization_profiles_country_city_idx').on(t.countryCode, t.city),
+  check('organization_profile_display_name_len_ck', sql`${t.displayName} is null or length(${t.displayName}) between 1 and 160`),
+  check('organization_profile_website_url_ck', sql`${t.websiteUrl} is null or (length(${t.websiteUrl}) <= 256 and ${t.websiteUrl} ~* '^https://[^[:space:]]+$')`),
+  check('organization_profile_country_code_ck', sql`${t.countryCode} ~ '^[A-Z]{2}$'`),
+  check('organization_profile_email_ck', sql`${t.primaryContactEmail} is null or (length(${t.primaryContactEmail}) <= 254 and ${t.primaryContactEmail} = lower(${t.primaryContactEmail}) and ${t.primaryContactEmail} ~* '^[^@[:space:]]+@[^@[:space:]]+\\.[^@[:space:]]+$')`),
+]);
+
+export const organizationVerificationEvents = pgTable('organization_verification_events', {
+  id: uuid('id').primaryKey(),
+  organizationId: uuid('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  fromState: verificationState('from_state'),
+  toState: verificationState('to_state').notNull(),
+  reasonCode: text('reason_code').notNull(),
+  actorUserId: uuid('actor_user_id').notNull().references(() => users.id),
+  correlationId: text('correlation_id').notNull(),
+  occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index('organization_verification_events_org_time_idx').on(t.organizationId, t.occurredAt),
+  check('organization_verification_reason_len_ck', sql`length(${t.reasonCode}) between 3 and 64 and ${t.reasonCode} ~ '^[A-Z0-9_:-]+$'`),
+]);
 
 export const institutionUnits = pgTable('institution_units', {
   id: uuid('id').primaryKey(),
@@ -160,6 +201,90 @@ export const institutionRelationships = pgTable('institution_relationships', {
   check('institution_relationship_window_ck', sql`${t.effectiveTo} is null or ${t.effectiveTo} > ${t.effectiveFrom}`),
   check('institution_relationship_transferred_end_ck', sql`${t.state} <> 'TRANSFERRED' or ${t.effectiveTo} is not null`),
   check('institution_relationship_graduated_end_ck', sql`${t.state} <> 'GRADUATED' or ${t.effectiveTo} is not null`),
+]);
+
+export const institutionStudentProfiles = pgTable('institution_student_profiles', {
+  id: uuid('id').primaryKey(),
+  institutionId: uuid('institution_id').notNull().references(() => organizations.id),
+  studentUserId: uuid('student_user_id').notNull().references(() => users.id),
+  institutionStudentId: text('institution_student_id').notNull(),
+  fullName: text('full_name').notNull(),
+  departmentUnitId: uuid('department_unit_id'),
+  programUnitId: uuid('program_unit_id'),
+  batchUnitId: uuid('batch_unit_id'),
+  sectionUnitId: uuid('section_unit_id'),
+  academicStartDate: date('academic_start_date', { mode: 'date' }),
+  expectedGraduationDate: date('expected_graduation_date', { mode: 'date' }),
+  status: rosterStudentStatus('status').notNull().default('INVITED'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex('institution_student_profiles_student_id_uq').on(t.institutionId, sql`lower(${t.institutionStudentId})`),
+  uniqueIndex('institution_student_profiles_user_uq').on(t.institutionId, t.studentUserId),
+  index('institution_student_profiles_units_idx').on(t.institutionId, t.departmentUnitId, t.programUnitId, t.batchUnitId, t.sectionUnitId),
+  check('institution_student_profile_student_id_len_ck', sql`length(${t.institutionStudentId}) between 1 and 64`),
+  check('institution_student_profile_full_name_len_ck', sql`length(${t.fullName}) between 1 and 160`),
+  check('institution_student_profile_graduation_after_start_ck', sql`${t.expectedGraduationDate} is null or ${t.academicStartDate} is null or ${t.expectedGraduationDate} > ${t.academicStartDate}`),
+  foreignKey({
+    columns: [t.departmentUnitId, t.institutionId],
+    foreignColumns: [institutionUnits.id, institutionUnits.institutionId],
+    name: 'institution_student_profiles_department_fk',
+  }),
+  foreignKey({
+    columns: [t.programUnitId, t.institutionId],
+    foreignColumns: [institutionUnits.id, institutionUnits.institutionId],
+    name: 'institution_student_profiles_program_fk',
+  }),
+  foreignKey({
+    columns: [t.batchUnitId, t.institutionId],
+    foreignColumns: [institutionUnits.id, institutionUnits.institutionId],
+    name: 'institution_student_profiles_batch_fk',
+  }),
+  foreignKey({
+    columns: [t.sectionUnitId, t.institutionId],
+    foreignColumns: [institutionUnits.id, institutionUnits.institutionId],
+    name: 'institution_student_profiles_section_fk',
+  }),
+]);
+
+export const studentRosterImports = pgTable('student_roster_imports', {
+  id: uuid('id').primaryKey(),
+  institutionId: uuid('institution_id').notNull().references(() => organizations.id),
+  actorUserId: uuid('actor_user_id').notNull().references(() => users.id),
+  state: rosterImportState('state').notNull().default('VALIDATED'),
+  sourceFilename: text('source_filename').notNull(),
+  rowCount: integer('row_count').notNull(),
+  acceptedCount: integer('accepted_count').notNull().default(0),
+  warningCount: integer('warning_count').notNull().default(0),
+  rejectedCount: integer('rejected_count').notNull().default(0),
+  correlationId: text('correlation_id').notNull(),
+  committedAt: timestamp('committed_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index('student_roster_imports_institution_time_idx').on(t.institutionId, t.createdAt),
+  check('student_roster_imports_filename_len_ck', sql`length(${t.sourceFilename}) between 1 and 160`),
+  check('student_roster_imports_counts_ck', sql`${t.rowCount} >= 0 and ${t.acceptedCount} >= 0 and ${t.warningCount} >= 0 and ${t.rejectedCount} >= 0`),
+  check('student_roster_imports_committed_ck', sql`(${t.state} = 'COMMITTED' and ${t.committedAt} is not null) or (${t.state} <> 'COMMITTED' and ${t.committedAt} is null)`),
+]);
+
+export const studentRosterImportRows = pgTable('student_roster_import_rows', {
+  id: uuid('id').primaryKey(),
+  importId: uuid('import_id').notNull().references(() => studentRosterImports.id, { onDelete: 'cascade' }),
+  rowNumber: integer('row_number').notNull(),
+  state: rosterImportRowState('state').notNull(),
+  institutionStudentId: text('institution_student_id'),
+  fullName: text('full_name'),
+  email: text('email'),
+  department: text('department'),
+  program: text('program'),
+  batch: text('batch'),
+  section: text('section'),
+  issues: text('issues').array().notNull().default(sql`ARRAY[]::text[]`),
+  createdProfileId: uuid('created_profile_id').references(() => institutionStudentProfiles.id),
+}, (t) => [
+  uniqueIndex('student_roster_import_rows_import_row_uq').on(t.importId, t.rowNumber),
+  check('student_roster_import_rows_row_number_ck', sql`${t.rowNumber} > 0`),
+  check('student_roster_import_rows_email_ck', sql`${t.email} is null or (length(${t.email}) <= 254 and ${t.email} = lower(${t.email}) and ${t.email} ~* '^[^@[:space:]]+@[^@[:space:]]+\\.[^@[:space:]]+$')`),
 ]);
 
 export const employerApplicantAccessGrants = pgTable('employer_applicant_access_grants', {

@@ -58,6 +58,11 @@ beforeEach(async () => {
   await pool.query(`
     TRUNCATE
       idempotency_records,
+      student_roster_import_rows,
+      student_roster_imports,
+      institution_student_profiles,
+      organization_verification_events,
+      organization_profiles,
       outbox_events,
       audit_events,
       employer_applicant_access_grants,
@@ -333,6 +338,141 @@ describe('Phase 1 API protected request path', () => {
       .set('Authorization', `Bearer ${token}`)
       .expect(403);
   });
+
+  it('allows Operations to create and verify organizations while denying institution admins', async () => {
+    const platformId = await seedOrg('PLATFORM', 'PlanThePath Platform');
+    const opsUserId = await seedUser('ops@example.test', 'sub:ops');
+    await seedMembership(opsUserId, platformId, 'OPERATIONS_ADMIN');
+    const institutionAdminId = await seedUser('inst-admin@example.test', 'sub:inst-admin');
+    const existingInstitutionId = await seedOrg('INSTITUTION', 'Existing College');
+    await seedMembership(institutionAdminId, existingInstitutionId, 'INSTITUTION_ADMIN');
+
+    const opsToken = signAccessToken(privateKey, { sub: 'sub:ops', email: 'ops@example.test' });
+    const response = await request(app.getHttpServer())
+      .post('/api/v1/operations/organizations')
+      .set('Authorization', `Bearer ${opsToken}`)
+      .send({ kind: 'INSTITUTION', legalName: 'API College', profile: { countryCode: 'IN', city: 'Pune', primaryContactEmail: 'admin@api-college.example' } })
+      .expect(201);
+
+    expect(response.body.organization).toMatchObject({ kind: 'INSTITUTION', legalName: 'API College', verificationState: 'PENDING' });
+    const organizationId = response.body.organization.id as string;
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/operations/organizations/${organizationId}/verification`)
+      .set('Authorization', `Bearer ${opsToken}`)
+      .send({ toState: 'UNDER_REVIEW', reasonCode: 'DOCS_READY' })
+      .expect(201);
+
+    const deniedToken = signAccessToken(privateKey, { sub: 'sub:inst-admin', email: 'inst-admin@example.test' });
+    await request(app.getHttpServer())
+      .post('/api/v1/operations/organizations')
+      .set('Authorization', `Bearer ${deniedToken}`)
+      .send({ kind: 'EMPLOYER', legalName: 'Denied Employer', profile: { countryCode: 'IN' } })
+      .expect(403);
+  });
+
+  it('keeps student lifecycle under Institution Admin instead of Operations', async () => {
+    const platformId = await seedOrg('PLATFORM', 'PlanThePath Platform');
+    const opsUserId = await seedUser('ops-students@example.test', 'sub:ops-students');
+    await seedMembership(opsUserId, platformId, 'OPERATIONS_ADMIN');
+    const institutionId = await seedOrg('INSTITUTION', 'Student College');
+    const adminUserId = await seedUser('student-admin@example.test', 'sub:student-admin');
+    await seedMembership(adminUserId, institutionId, 'INSTITUTION_ADMIN');
+
+    const opsToken = signAccessToken(privateKey, { sub: 'sub:ops-students', email: 'ops-students@example.test' });
+    await request(app.getHttpServer())
+      .post(`/api/v1/institutions/${institutionId}/students`)
+      .set('Authorization', `Bearer ${opsToken}`)
+      .send({ fullName: 'Denied Student', institutionStudentId: 'DENIED1', email: 'denied@student.example' })
+      .expect(403);
+
+    const adminToken = signAccessToken(privateKey, { sub: 'sub:student-admin', email: 'student-admin@example.test' });
+    const addResponse = await request(app.getHttpServer())
+      .post(`/api/v1/institutions/${institutionId}/students`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ fullName: 'Aanya Teststudent', institutionStudentId: 'S1001', email: 'aanya.student@example.test' })
+      .expect(201);
+
+    const profileId = addResponse.body.student.id as string;
+    await request(app.getHttpServer())
+      .post(`/api/v1/institutions/${institutionId}/students/${profileId}/relationship`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ state: 'GRADUATED', effectiveTo: '2026-08-21T12:30:00Z' })
+      .expect(201);
+
+    const current = await pool.query('SELECT state, effective_to FROM institution_relationships WHERE institution_id=$1', [institutionId]);
+    expect(current.rows[0]).toMatchObject({ state: 'GRADUATED' });
+    expect(current.rows[0].effective_to).toBeTruthy();
+    await expect(db.select().from(schema.users).where(eq(schema.users.email, 'aanya.student@example.test'))).resolves.toHaveLength(1);
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/institutions/${institutionId}/students`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ fullName: 'Duplicate Email', institutionStudentId: 'S1002', email: 'aanya.student@example.test' })
+      .expect(403);
+  });
+
+  it('rejects self-escalation and platform role assignment by Institution Admin', async () => {
+    const institutionId = await seedOrg('INSTITUTION', 'Role College');
+    const adminUserId = await seedUser('role-admin@example.test', 'sub:role-admin');
+    const targetUserId = await seedUser('faculty@example.test', 'sub:faculty');
+    await seedMembership(adminUserId, institutionId, 'INSTITUTION_ADMIN');
+    const token = signAccessToken(privateKey, { sub: 'sub:role-admin', email: 'role-admin@example.test' });
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/institutions/${institutionId}/staff-role-assignments`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ userId: adminUserId, role: 'DEPARTMENT_HEAD' })
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/institutions/${institutionId}/staff-role-assignments`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ userId: targetUserId, role: 'OPERATIONS_ADMIN' })
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/institutions/${institutionId}/staff-role-assignments`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ userId: targetUserId, role: 'FACULTY_LECTURER' })
+      .expect(201);
+  });
+
+  it('validates and commits roster CSV without raw preview mutation', async () => {
+    const institutionId = await seedOrg('INSTITUTION', 'Import College');
+    const adminUserId = await seedUser('import-admin@example.test', 'sub:import-admin');
+    await seedMembership(adminUserId, institutionId, 'INSTITUTION_ADMIN');
+    await db.insert(schema.institutionUnits).values([
+      { id: randomUUID(), institutionId, kind: 'DEPARTMENT', name: 'CSE' },
+      { id: randomUUID(), institutionId, kind: 'PROGRAM', name: 'BTech' },
+      { id: randomUUID(), institutionId, kind: 'BATCH', name: '2026' },
+      { id: randomUUID(), institutionId, kind: 'SECTION', name: 'A' },
+    ]);
+    const token = signAccessToken(privateKey, { sub: 'sub:import-admin', email: 'import-admin@example.test' });
+    await seedUser('existing-import@example.test', 'sub:existing-import');
+
+    const preview = await request(app.getHttpServer())
+      .post(`/api/v1/institutions/${institutionId}/student-imports`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        filename: 'students.csv',
+        csv: 'institution_student_id,full_name,email,department,program,batch,section\nS2001,Rohan Teststudent,rohan.student@example.test,CSE,BTech,2026,A\nS2002,Formula Guard,formula@example.test,=CMD,BTech,2026,A\nS2003,Existing Email,existing-import@example.test,CSE,BTech,2026,A',
+      })
+      .expect(201);
+
+    expect(preview.body.import.acceptedCount).toBe(1);
+    expect(preview.body.import.rejectedCount).toBe(2);
+    expect(preview.body.import.rows[1].issues).toContain('unknown_department');
+    expect(preview.body.import.rows[2].issues).toContain('email_already_exists');
+    const importId = preview.body.import.id as string;
+    await request(app.getHttpServer())
+      .post(`/api/v1/institutions/${institutionId}/student-imports/${importId}/commit`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(201);
+
+    const profiles = await pool.query('SELECT count(*)::int AS count FROM institution_student_profiles WHERE institution_id=$1', [institutionId]);
+    expect(profiles.rows[0].count).toBe(1);
+  });
 });
 
 async function applyMigrations(targetPool: Pool): Promise<void> {
@@ -360,7 +500,7 @@ async function seedOrg(kind: 'PLATFORM' | 'INSTITUTION' | 'EMPLOYER', legalName:
 async function seedMembership(
   userId: string,
   organizationId: string,
-  role: 'INSTITUTION_ADMIN' | 'RECRUITER',
+  role: 'PLATFORM_SUPER_ADMIN' | 'OPERATIONS_ADMIN' | 'INSTITUTION_ADMIN' | 'PLACEMENT_ADMIN' | 'DEPARTMENT_HEAD' | 'FACULTY_LECTURER' | 'RECRUITER',
   state: 'ACTIVE' | 'SUSPENDED' = 'ACTIVE',
 ): Promise<void> {
   await db.insert(schema.organizationMemberships).values({
@@ -370,7 +510,7 @@ async function seedMembership(
     role,
     state,
     scopeOrganizationId: organizationId,
-    ...(role === 'INSTITUTION_ADMIN' ? { scopeInstitutionId: organizationId } : { scopeEmployerId: organizationId }),
+    ...(['PLATFORM_SUPER_ADMIN', 'OPERATIONS_ADMIN'].includes(role) ? {} : role === 'RECRUITER' ? { scopeEmployerId: organizationId } : { scopeInstitutionId: organizationId }),
   });
 }
 

@@ -115,6 +115,12 @@
 .role-record-table thead th { color: #475569; background: #f8fafc; font-size: .76rem; letter-spacing: .04em; text-transform: uppercase; }
 .role-record-table tbody tr:last-child th, .role-record-table tbody tr:last-child td { border-bottom: 0; }
 .role-record-table tbody tr[data-primary="true"] { box-shadow: inset 4px 0 0 var(--role-accent); }
+.role-management-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: 12px; }
+.role-management-form h2 { grid-column: 1 / -1; margin: 0; }
+.role-management-form label { display: grid; gap: 6px; color: #475569; font-size: .82rem; font-weight: 700; }
+.role-management-form input, .role-management-form select, .role-management-form textarea { width: 100%; min-width: 0; border: 1px solid #cbd5e1; border-radius: 12px; background: #fff; color: #172033; padding: 11px 12px; font: inherit; }
+.role-management-form textarea, .role-management-form button { grid-column: 1 / -1; }
+.role-api-success { grid-column: 1 / -1; margin: 0; border: 1px solid #bbf7d0; border-radius: 14px; background: #f0fdf4; color: #166534; padding: 12px 14px; font-weight: 700; }
 .role-record-table th[scope="row"] { width: 42%; }
 .role-record-table th[scope="row"] strong, .role-record-table th[scope="row"] span, .role-record-table th[scope="row"] small { display: block; }
 .role-record-table th[scope="row"] span { margin-top: 4px; color: #334155; font-weight: 500; }

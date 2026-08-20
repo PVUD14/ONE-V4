@@ -8,8 +8,10 @@ import {
   ProtectedApiAuthenticationGuard,
   VerifiedIdentityAuthenticationGuard,
   type ApiSecurityDependencies,
+  cryptoApiIdGenerator,
 } from './api-security.js';
 import { Phase1SecurityController } from './phase1-security.controller.js';
+import { OperationsInstitutionOnboardingController } from './operations-institution-onboarding.controller.js';
 
 @Module({})
 export class Phase1ApiSecurityModule {
@@ -18,16 +20,15 @@ export class Phase1ApiSecurityModule {
       { provide: API_IDENTITY_VERIFIER, useValue: dependencies.verifier },
       { provide: API_INTERNAL_IDENTITY_STORE, useValue: dependencies.identityStore },
       { provide: API_PERSISTENCE_DB, useValue: dependencies.db },
+      { provide: API_ID_GENERATOR, useValue: dependencies.ids ?? cryptoApiIdGenerator },
       ProtectedApiAuthenticationGuard,
       VerifiedIdentityAuthenticationGuard,
       Phase1ProtectedApiRoutes,
     ];
 
-    if (dependencies.ids) providers.push({ provide: API_ID_GENERATOR, useValue: dependencies.ids });
-
     return {
       module: Phase1ApiSecurityModule,
-      controllers: [Phase1SecurityController],
+      controllers: [Phase1SecurityController, OperationsInstitutionOnboardingController],
       providers,
       exports: [
         API_IDENTITY_VERIFIER,

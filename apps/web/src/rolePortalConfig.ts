@@ -4,6 +4,7 @@ export type PortalFamily = 'Student' | 'Institution' | 'Employer' | 'Operations'
 export type EnforcementStatus = 'Backend enforced' | 'Partially backend enforced' | 'Domain-model only' | 'UI preview only';
 export type RolePortalKey =
   | 'student'
+  | 'institution-admin'
   | 'placement-officer'
   | 'faculty'
   | 'career-counselor'
@@ -99,6 +100,13 @@ export const rolePortals: readonly RolePortalConfig[] = [
     key: 'student', family: 'Student', roleName: 'Student', backendRole: 'STUDENT', enforcementStatus: 'Backend enforced', basePath: '/student', subtitle: 'Student Portal', organization: 'ABC Engineering College', previewUser: 'Rahul Kumar', initials: 'RK', accent: 'student', dashboardTitle: 'Student Dashboard', dashboardSummary: 'Guided career readiness, applications, learning and Student-owned profile workflows.',
     allowedOperations: ['Edit Student-owned profile fields', 'Manage drafts and metadata', 'Save opportunities'], readOnlyData: ['Calculated readiness', 'Verified academic data', 'Employer decisions'], forbiddenOperations: ['Change verification state', 'Edit employer terms'],
     nav: [], kpis: [], records: [],
+  },
+  {
+    key: 'institution-admin', family: 'Institution', roleName: 'Institution Administrator', backendRole: 'INSTITUTION_ADMIN', enforcementStatus: 'Backend enforced', basePath: '/institution/admin', subtitle: 'Institution Admin Portal', organization: 'ABC Engineering College', previewUser: 'Priya Nair', initials: 'PN', accent: 'emerald', dashboardTitle: 'Institution Administration', dashboardSummary: 'Academic structure, student roster, staff administration, readiness access, reports and institution settings.',
+    allowedOperations: ['Manage academic structure', 'Add student', 'Import student roster', 'Update institution-owned academic details', 'Transfer or graduate students', 'Assign allowed institution staff roles'], readOnlyData: ['Student career-development private state beyond authorized purpose', 'Platform verification controls', 'Employer hiring records'], forbiddenOperations: ['Verify platform organizations', 'Grant platform roles', 'Delete historical student identity', 'Edit assessment answers'],
+    nav: nav('/institution/admin', [['Home', ['Dashboard']], ['Administration', ['Students', 'Student Detail', 'Academic Structure', 'Staff']], ['Insights', ['Career Readiness', 'Placement', 'Reports', 'Settings']]]),
+    kpis: [{ label: 'Students', value: 'API', detail: 'Institution scoped roster' }, { label: 'Academic units', value: 'API', detail: 'Departments, programs, batches, sections' }, { label: 'Staff roles', value: 'Scoped', detail: 'No platform grants' }, { label: 'Imports', value: 'CSV', detail: 'Preview before commit' }],
+    records: institutionRecords,
   },
   {
     key: 'placement-officer', family: 'Institution', roleName: 'Placement Officer', backendRole: 'PLACEMENT_ADMIN / PLACEMENT_OFFICER', enforcementStatus: 'Partially backend enforced', basePath: '/institution/placement-officer', subtitle: 'Institution Portal', organization: 'ABC Engineering College', previewUser: 'Anita Sharma', initials: 'AS', accent: 'emerald', dashboardTitle: 'Placement Dashboard', dashboardSummary: 'Operational placement readiness, interventions, applications and employer engagement.',

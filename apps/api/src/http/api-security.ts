@@ -311,12 +311,12 @@ function requireIdempotencyKey(value: string | readonly string[] | undefined, co
   return key;
 }
 
-function requireTrustedIdentity(request: ProtectedHttpRequest): TrustedApiRequestContext {
+export function requireTrustedIdentity(request: ProtectedHttpRequest): TrustedApiRequestContext {
   if (!request.planThePath?.verifiedIdentity) throw new UnauthorizedException(safeError('UNAUTHENTICATED', undefined));
   return request.planThePath;
 }
 
-function requireTrustedAuthorization(request: ProtectedHttpRequest): TrustedApiRequestContext & { readonly authorization: RequestAuthorizationContext } {
+export function requireTrustedAuthorization(request: ProtectedHttpRequest): TrustedApiRequestContext & { readonly authorization: RequestAuthorizationContext } {
   const context = requireTrustedIdentity(request);
   if (!context.authorization) throw new ForbiddenException(safeError('FORBIDDEN', context.correlationId));
   return context as TrustedApiRequestContext & { readonly authorization: RequestAuthorizationContext };
@@ -340,7 +340,7 @@ function parseIsoDate(value: string, correlationId: string): Date {
   return parsed;
 }
 
-function safeError(code: 'UNAUTHENTICATED' | 'FORBIDDEN', correlationId: string | undefined): { readonly error: { readonly code: string; readonly message: string; readonly correlationId?: string } } {
+export function safeError(code: 'UNAUTHENTICATED' | 'FORBIDDEN', correlationId: string | undefined): { readonly error: { readonly code: string; readonly message: string; readonly correlationId?: string } } {
   return {
     error: {
       code,

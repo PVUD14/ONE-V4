@@ -84,6 +84,8 @@ export function getCareerReadinessAccessToken(): string | null {
   return window.sessionStorage.getItem('planthepath.accessToken');
 }
 
+export const getProtectedAccessToken = getCareerReadinessAccessToken;
+
 export function getCareerReadinessCatalog(signal?: AbortSignal): Promise<CareerReadinessCatalog> {
   return requestJson('/api/v1/career-readiness/catalog', signal ? { signal } : {});
 }
@@ -122,8 +124,95 @@ export function getCareerReadinessOperationsStatus(token: string, signal?: Abort
   return requestJson('/api/v1/operations/career-readiness/status', { token, ...(signal ? { signal } : {}) });
 }
 
+export interface OrganizationManagementDto {
+  readonly id: string;
+  readonly kind: 'INSTITUTION' | 'EMPLOYER';
+  readonly legalName: string;
+  readonly verificationState: string;
+  readonly active: boolean;
+  readonly updatedAt: string;
+  readonly profile: {
+    readonly displayName?: string | null; readonly countryCode?: string | null; readonly stateOrProvince?: string | null; readonly city?: string | null;
+    readonly websiteUrl?: string | null; readonly institutionType?: string | null; readonly primaryContactEmail?: string | null;
+  };
+  readonly initialAdminInvitation?: { readonly id: string; readonly email: string; readonly state: string } | null;
+}
+
+export interface InstitutionUnitDto {
+  readonly id: string; readonly institutionId: string; readonly kind: string; readonly name: string; readonly parentUnitId?: string | null;
+}
+
+export interface InstitutionStudentDto {
+  readonly id: string; readonly institutionId: string; readonly institutionStudentId: string; readonly fullName: string; readonly email: string; readonly status: string;
+  readonly relationship?: { readonly id: string; readonly state: string; readonly effectiveFrom: string; readonly effectiveTo?: string | null } | null;
+  readonly units?: Record<string, string | null | undefined>;
+}
+
+export interface RosterImportPreviewDto {
+  readonly id: string; readonly rowCount: number; readonly acceptedCount: number; readonly warningCount: number; readonly rejectedCount: number;
+  readonly rows: readonly { readonly rowNumber: number; readonly institutionStudentId: string; readonly fullName: string; readonly email: string; readonly state: string; readonly issues: readonly string[] }[];
+}
+
+export interface SecurityContextDto {
+  readonly userId: string;
+  readonly selectedOrganizationId?: string | null;
+  readonly memberships: readonly { readonly organizationId: string; readonly role: string; readonly scope: Record<string, string | undefined> }[];
+}
+
+export function getSecurityContext(token: string, signal?: AbortSignal): Promise<SecurityContextDto> {
+  return requestJson('/api/v1/security/context', { token, ...(signal ? { signal } : {}) });
+}
+
+export function listOperationsOrganizations(token: string, signal?: AbortSignal): Promise<{ readonly organizations: readonly OrganizationManagementDto[] }> {
+  return requestJson('/api/v1/operations/organizations', { token, ...(signal ? { signal } : {}) });
+}
+
+export function createOperationsOrganization(token: string, body: unknown): Promise<{ readonly organization: OrganizationManagementDto }> {
+  return requestJson('/api/v1/operations/organizations', { token, method: 'POST', body });
+}
+
+export function updateOperationsOrganization(token: string, organizationId: string, body: unknown): Promise<{ readonly organization: OrganizationManagementDto }> {
+  return requestJson(`/api/v1/operations/organizations/${encodeURIComponent(organizationId)}`, { token, method: 'PATCH', body });
+}
+
+export function transitionOrganizationVerification(token: string, organizationId: string, toState: string): Promise<{ readonly organization: OrganizationManagementDto }> {
+  return requestJson(`/api/v1/operations/organizations/${encodeURIComponent(organizationId)}/verification`, { token, method: 'POST', body: { toState, reasonCode: 'OPERATIONS_UAT' } });
+}
+
+export function inviteInitialOrganizationAdmin(token: string, organizationId: string, email: string): Promise<Record<string, unknown>> {
+  return requestJson(`/api/v1/operations/organizations/${encodeURIComponent(organizationId)}/initial-admin-invitations`, { token, method: 'POST', body: { email } });
+}
+
+export function listInstitutionUnits(token: string, institutionId: string, signal?: AbortSignal): Promise<{ readonly units: readonly InstitutionUnitDto[] }> {
+  return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/units`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function createInstitutionUnit(token: string, institutionId: string, body: unknown): Promise<{ readonly unit: InstitutionUnitDto }> {
+  return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/units`, { token, method: 'POST', body });
+}
+
+export function listInstitutionStudents(token: string, institutionId: string, signal?: AbortSignal): Promise<{ readonly students: readonly InstitutionStudentDto[] }> {
+  return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/students`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function addInstitutionStudent(token: string, institutionId: string, body: unknown): Promise<{ readonly student: InstitutionStudentDto }> {
+  return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/students`, { token, method: 'POST', body });
+}
+
+export function endInstitutionStudentRelationship(token: string, institutionId: string, studentProfileId: string, state: string): Promise<{ readonly student: InstitutionStudentDto }> {
+  return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/students/${encodeURIComponent(studentProfileId)}/relationship`, { token, method: 'POST', body: { state } });
+}
+
+export function previewStudentRosterImport(token: string, institutionId: string, filename: string, csv: string): Promise<{ readonly import: RosterImportPreviewDto }> {
+  return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/student-imports`, { token, method: 'POST', body: { filename, csv } });
+}
+
+export function commitStudentRosterImport(token: string, institutionId: string, importId: string): Promise<{ readonly import: { readonly id: string; readonly committedCount: number } }> {
+  return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/student-imports/${encodeURIComponent(importId)}/commit`, { token, method: 'POST' });
+}
+
 async function requestJson<T>(path: string, input: {
-  readonly token?: string; readonly method?: 'GET' | 'POST'; readonly body?: unknown;
+  readonly token?: string; readonly method?: 'GET' | 'POST' | 'PATCH'; readonly body?: unknown;
   readonly idempotencyKey?: string; readonly signal?: AbortSignal;
 } = {}): Promise<T> {
   const headers: Record<string, string> = { Accept: 'application/json', 'X-Correlation-Id': crypto.randomUUID() };

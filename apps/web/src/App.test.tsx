@@ -85,20 +85,15 @@ describe('All-role portal registry and preview workflows', () => {
     expect(screen.queryByText(/Unsaved session changes/)).not.toBeInTheDocument();
   });
 
-  it('uses the dense management layout for Operations organizations without losing preview semantics', () => {
+  it('fails closed for API-backed Operations organizations without an access token', () => {
     fetchMock.mockResolvedValue({ ok: true });
     window.history.pushState(null, '', '/operations/admin/organizations');
     render(<App />);
-    expect(document.querySelector('.role-module--dense')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Organizations' })).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('Search organizations...')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Organization' })).toHaveAttribute('aria-pressed', 'false');
-    expect(screen.getByRole('table', { name: /operations administrator preview records/i })).toBeInTheDocument();
-    const organization = screen.getByText('ABC Engineering College').closest('tr') as HTMLElement;
-    expect(organization).toHaveTextContent('Preview actions do not mutate production organizations.');
-    expect(within(organization).getByRole('button', { name: 'View detail' })).toBeInTheDocument();
-    expect(within(organization).getByRole('button', { name: 'Edit preview' })).toBeInTheDocument();
-    expect(screen.getByText(/Preview data only; backend authorization remains authoritative/i)).toBeInTheDocument();
+    expect(screen.getByText(/Sign in with an Operations identity to manage organizations/i)).toBeInTheDocument();
+    expect(screen.getByText(/No fake mutation or preview role selection is used/i)).toBeInTheDocument();
+    expect(screen.queryByText('ABC Engineering College')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Update preview queue status/i })).not.toBeInTheDocument();
   });
 
   it('opens dashboard record workflows and returns focus after Escape', () => {

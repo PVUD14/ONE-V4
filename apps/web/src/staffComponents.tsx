@@ -1,10 +1,12 @@
 import { Bell, CalendarDays, ChevronsLeft, Filter, GraduationCap, Menu, MessageSquare, MoreVertical, Search, X } from 'lucide-react';
 import { useEffect, useRef, useState, useId, type ReactNode } from 'react';
+import type { AuthStatus } from './auth.js';
+import { AuthControls } from './authControls.js';
 import type { ApiHealth } from './api.js';
 import { dashboardFilters, dateRanges, riskFilters, staffNavGroups, staffNavItems } from './staffConfig.js';
 import { placementIdentity, type StaffKpi } from './staffData.js';
 
-export function StaffShell({ apiHealth, showDevelopmentIndicators, activePath, onNavigate, children }: { readonly apiHealth: ApiHealth; readonly showDevelopmentIndicators: boolean; readonly activePath: string; readonly onNavigate: (path: string) => void; readonly children: ReactNode }): React.ReactElement {
+export function StaffShell({ apiHealth, authStatus, authNotice, showDevelopmentIndicators, activePath, onNavigate, onSignIn, onSignOut, children }: { readonly apiHealth: ApiHealth; readonly authStatus: AuthStatus; readonly authNotice: string; readonly showDevelopmentIndicators: boolean; readonly activePath: string; readonly onNavigate: (path: string) => void; readonly onSignIn: () => void; readonly onSignOut: () => void; readonly children: ReactNode }): React.ReactElement {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [topbarNotice, setTopbarNotice] = useState('');
@@ -33,7 +35,7 @@ export function StaffShell({ apiHealth, showDevelopmentIndicators, activePath, o
       <StaffSidebar activePath={activePath} collapsed={collapsed} drawerOpen={drawerOpen} onNavigate={(path) => { onNavigate(path); setDrawerOpen(false); }} onCollapse={() => setCollapsed((value) => !value)} onClose={closeDrawer} />
       {drawerOpen ? <button className="drawer-scrim staff-scrim" type="button" aria-label="Close institution navigation" onClick={closeDrawer} /> : null}
       <div className="staff-workspace">
-        <StaffTopBar apiHealth={apiHealth} showDevelopmentIndicators={showDevelopmentIndicators} menuButtonRef={menuButtonRef} onOpenMenu={() => setDrawerOpen(true)} onNavigate={onNavigate} onNotifications={() => setTopbarNotice('Placement notifications preview: 5 local demo alerts are summarized only; no backend notification state was changed.')} activePath={activePath} />
+        <StaffTopBar apiHealth={apiHealth} authStatus={authStatus} authNotice={authNotice} showDevelopmentIndicators={showDevelopmentIndicators} menuButtonRef={menuButtonRef} onOpenMenu={() => setDrawerOpen(true)} onNavigate={onNavigate} onNotifications={() => setTopbarNotice('Placement notifications preview: 5 local demo alerts are summarized only; no backend notification state was changed.')} activePath={activePath} onSignIn={onSignIn} onSignOut={onSignOut} />
         <main id="staff-main" className="staff-main">{topbarNotice ? <section className="staff-preview-notice" role="status">{topbarNotice}</section> : null}{children}</main>
       </div>
     </div>
@@ -52,14 +54,14 @@ function StaffSidebar({ activePath, collapsed, drawerOpen, onNavigate, onCollaps
   );
 }
 
-function StaffTopBar({ apiHealth, showDevelopmentIndicators, menuButtonRef, onOpenMenu, onNavigate, onNotifications, activePath }: { readonly apiHealth: ApiHealth; readonly showDevelopmentIndicators: boolean; readonly menuButtonRef: React.RefObject<HTMLButtonElement | null>; readonly onOpenMenu: () => void; readonly onNavigate: (path: string) => void; readonly onNotifications: () => void; readonly activePath: string }): React.ReactElement {
+function StaffTopBar({ apiHealth, authStatus, authNotice, showDevelopmentIndicators, menuButtonRef, onOpenMenu, onNavigate, onNotifications, activePath, onSignIn, onSignOut }: { readonly apiHealth: ApiHealth; readonly authStatus: AuthStatus; readonly authNotice: string; readonly showDevelopmentIndicators: boolean; readonly menuButtonRef: React.RefObject<HTMLButtonElement | null>; readonly onOpenMenu: () => void; readonly onNavigate: (path: string) => void; readonly onNotifications: () => void; readonly activePath: string; readonly onSignIn: () => void; readonly onSignOut: () => void }): React.ReactElement {
   return (
     <header className="staff-topbar">
       <button ref={menuButtonRef} className="icon-button mobile-menu-button" type="button" aria-label="Open institution navigation" onClick={onOpenMenu}><Menu size={20} /></button>
       <span className="staff-context-select" aria-label="Active staff role">{placementIdentity.role}</span>
       <span className="staff-college-select" aria-label="Active institution">{placementIdentity.organization}</span>
       <label className="staff-search" role="search"><Search size={16} aria-hidden="true" /><span className="sr-only">Search institution placement workspace</span><input placeholder="Search students, assessments, opportunities..." /></label>
-      <div className="staff-topbar-actions"><button className="icon-button" type="button" aria-label="Calendar" onClick={() => onNavigate('/institution/placement-officer/events')} disabled={activePath === '/institution/placement-officer/events'}><CalendarDays size={17} /></button><button className="icon-button notification" type="button" aria-label="Notifications" onClick={onNotifications}><Bell size={17} /><span>5</span></button><button className="icon-button" type="button" aria-label="Messages" onClick={() => onNavigate('/institution/placement-officer/communications')} disabled={activePath === '/institution/placement-officer/communications'}><MessageSquare size={17} /></button>{showDevelopmentIndicators ? <span className={`staff-api-dot ${apiHealth}`}>{apiHealth === 'online' ? 'API Online' : apiHealth === 'offline' ? 'API Offline' : 'Checking'}</span> : null}<span className="staff-profile" aria-label="Placement Officer identity"><span>{placementIdentity.initials}</span><span><strong>{placementIdentity.previewUser}</strong><small>{placementIdentity.role}</small></span></span></div>
+      <div className="staff-topbar-actions"><button className="icon-button" type="button" aria-label="Calendar" onClick={() => onNavigate('/institution/placement-officer/events')} disabled={activePath === '/institution/placement-officer/events'}><CalendarDays size={17} /></button><button className="icon-button notification" type="button" aria-label="Notifications" onClick={onNotifications}><Bell size={17} /><span>5</span></button><button className="icon-button" type="button" aria-label="Messages" onClick={() => onNavigate('/institution/placement-officer/communications')} disabled={activePath === '/institution/placement-officer/communications'}><MessageSquare size={17} /></button><AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />{showDevelopmentIndicators ? <span className={`staff-api-dot ${apiHealth}`}>{apiHealth === 'online' ? 'API Online' : apiHealth === 'offline' ? 'API Offline' : 'Checking'}</span> : null}<span className="staff-profile" aria-label="Placement Officer identity"><span>{placementIdentity.initials}</span><span><strong>{placementIdentity.previewUser}</strong><small>{placementIdentity.role}</small></span></span></div>
     </header>
   );
 }

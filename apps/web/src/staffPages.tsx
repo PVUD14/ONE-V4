@@ -1,5 +1,6 @@
 import { BarChart3, CalendarDays, CheckCircle2, MessageSquare, Search } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { AuthStatus } from './auth.js';
 import type { ApiHealth } from './api.js';
 import { staffBasePath, staffNavItems, type StaffRouteKey } from './staffConfig.js';
 import { MiniActionButton, MoreButton, StaffKpiCard, StaffPageHeader, StaffPreviewBadge, StaffSection, StaffShell } from './staffComponents.js';
@@ -66,11 +67,11 @@ const pageContent: Record<Exclude<StaffRouteKey, 'dashboard'>, { title: string; 
   dashboards: { title: 'Dashboards', description: 'Saved dashboard summaries, department and batch views, and report shortcuts.', metrics: ['4 saved views', '2 department boards', '3 report shortcuts'], workflow: 'Saved views summarize operational slices without duplicating the main dashboard.', rows: [{ Dashboard: 'CSE readiness watch', Owner: 'Anita Sharma', Focus: 'High-risk CSE students' }, { Dashboard: '2027 placement cycle', Owner: 'Placement Cell', Focus: 'Applications to offers' }, { Dashboard: 'Employer engagement', Owner: 'Placement Cell', Focus: 'Recruiter activity' }] },
 };
 
-export function PlacementOfficerPortal(props: { readonly apiHealth: ApiHealth; readonly showDevelopmentIndicators: boolean }): React.ReactElement {
+export function PlacementOfficerPortal(props: { readonly apiHealth: ApiHealth; readonly authStatus: AuthStatus; readonly authNotice: string; readonly onSignIn: () => void; readonly onSignOut: () => void; readonly showDevelopmentIndicators: boolean }): React.ReactElement {
   return <StaffPreviewProvider><PlacementOfficerPortalInner {...props} /></StaffPreviewProvider>;
 }
 
-function PlacementOfficerPortalInner({ apiHealth, showDevelopmentIndicators }: { readonly apiHealth: ApiHealth; readonly showDevelopmentIndicators: boolean }): React.ReactElement {
+function PlacementOfficerPortalInner({ apiHealth, authStatus, authNotice, onSignIn, onSignOut, showDevelopmentIndicators }: { readonly apiHealth: ApiHealth; readonly authStatus: AuthStatus; readonly authNotice: string; readonly onSignIn: () => void; readonly onSignOut: () => void; readonly showDevelopmentIndicators: boolean }): React.ReactElement {
   const [path, setPath] = useState(normalizeStaffPath(window.location.pathname));
   const [dateRange, setDateRange] = useState('Aug 1 - Aug 16, 2025');
   const [department, setDepartment] = useState('All departments');
@@ -115,7 +116,7 @@ function PlacementOfficerPortalInner({ apiHealth, showDevelopmentIndicators }: {
     return queryMatch && departmentMatch && riskMatch;
   }), [department, risk, studentQuery]);
 
-  const shellProps = { apiHealth, showDevelopmentIndicators, activePath: path, onNavigate: navigate };
+  const shellProps = { apiHealth, authStatus, authNotice, showDevelopmentIndicators, activePath: path, onNavigate: navigate, onSignIn, onSignOut };
 
   if (route !== 'dashboard') {
     return <StaffShell {...shellProps}>{showDevelopmentIndicators ? <StaffPreviewBadge apiHealth={apiHealth} /> : null}<DemoModeNotice /><StaffOperationalPage route={route} onNavigate={navigate} /></StaffShell>;

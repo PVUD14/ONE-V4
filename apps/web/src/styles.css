@@ -405,6 +405,38 @@ button {
   gap: 10px;
 }
 
+.auth-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 260px;
+  padding: 4px 6px 4px 10px;
+  border: 1px solid #d8e3f1;
+  border-radius: 999px;
+  background: #fff;
+  color: #35516f;
+  font-size: .78rem;
+}
+
+.auth-controls span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.auth-controls button {
+  margin: 0;
+  padding: 6px 10px;
+  white-space: nowrap;
+}
+
+.invitation-acceptance {
+  min-height: 100vh;
+  padding: 32px;
+  background: #f6f9fd;
+}
+
 .icon-button,
 .mobile-menu-button {
   position: relative;

@@ -1,3 +1,5 @@
+import { getAccessToken } from './auth.js';
+
 export type ApiHealth = 'checking' | 'online' | 'offline';
 
 const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL;
@@ -81,7 +83,7 @@ export interface AssessmentAttemptDto {
 }
 
 export function getCareerReadinessAccessToken(): string | null {
-  return window.sessionStorage.getItem('planthepath.accessToken');
+  return getAccessToken();
 }
 
 export const getProtectedAccessToken = getCareerReadinessAccessToken;
@@ -183,6 +185,10 @@ export function inviteInitialOrganizationAdmin(token: string, organizationId: st
   return requestJson(`/api/v1/operations/organizations/${encodeURIComponent(organizationId)}/initial-admin-invitations`, { token, method: 'POST', body: { email } });
 }
 
+export function acceptInvitation(token: string, invitationToken: string, idempotencyKey: string): Promise<Record<string, unknown>> {
+  return requestJson('/api/v1/invitations/accept', { token, method: 'POST', idempotencyKey, body: { token: invitationToken } });
+}
+
 export function listInstitutionUnits(token: string, institutionId: string, signal?: AbortSignal): Promise<{ readonly units: readonly InstitutionUnitDto[] }> {
   return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/units`, { token, ...(signal ? { signal } : {}) });
 }
@@ -199,8 +205,16 @@ export function addInstitutionStudent(token: string, institutionId: string, body
   return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/students`, { token, method: 'POST', body });
 }
 
+export function updateInstitutionStudent(token: string, institutionId: string, studentProfileId: string, body: unknown): Promise<{ readonly student: InstitutionStudentDto }> {
+  return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/students/${encodeURIComponent(studentProfileId)}`, { token, method: 'PATCH', body });
+}
+
 export function endInstitutionStudentRelationship(token: string, institutionId: string, studentProfileId: string, state: string): Promise<{ readonly student: InstitutionStudentDto }> {
   return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/students/${encodeURIComponent(studentProfileId)}/relationship`, { token, method: 'POST', body: { state } });
+}
+
+export function inviteInstitutionStaff(token: string, institutionId: string, email: string, role: string): Promise<Record<string, unknown>> {
+  return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/staff-role-assignments`, { token, method: 'POST', body: { email, role } });
 }
 
 export function previewStudentRosterImport(token: string, institutionId: string, filename: string, csv: string): Promise<{ readonly import: RosterImportPreviewDto }> {

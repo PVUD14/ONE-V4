@@ -1,5 +1,7 @@
 import { Bell, ChevronDown, Filter, Menu, MessageSquare, Search, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import type { AuthStatus } from './auth.js';
+import { AuthControls } from './authControls.js';
 import {
   addInstitutionStudent,
   commitStudentRosterImport,
@@ -8,12 +10,14 @@ import {
   endInstitutionStudentRelationship,
   getProtectedAccessToken,
   getSecurityContext,
+  inviteInstitutionStaff,
   inviteInitialOrganizationAdmin,
   listInstitutionStudents,
   listInstitutionUnits,
   listOperationsOrganizations,
   previewStudentRosterImport,
   transitionOrganizationVerification,
+  updateInstitutionStudent,
   updateOperationsOrganization,
   type ApiHealth,
   type InstitutionStudentDto,
@@ -46,11 +50,11 @@ export function DemoPortalLauncher({ onNavigate }: { readonly onNavigate: (path:
   );
 }
 
-export function RolePortal({ portal, apiHealth, showDevelopmentIndicators, onNavigate }: { readonly portal: RolePortalConfig; readonly apiHealth: ApiHealth; readonly showDevelopmentIndicators: boolean; readonly onNavigate: (path: string) => void }): React.ReactElement {
-  return <RolePreviewProvider><RolePortalInner portal={portal} apiHealth={apiHealth} showDevelopmentIndicators={showDevelopmentIndicators} onNavigate={onNavigate} /></RolePreviewProvider>;
+export function RolePortal({ portal, apiHealth, authStatus, authNotice, showDevelopmentIndicators, onNavigate, onSignIn, onSignOut }: { readonly portal: RolePortalConfig; readonly apiHealth: ApiHealth; readonly authStatus: AuthStatus; readonly authNotice: string; readonly showDevelopmentIndicators: boolean; readonly onNavigate: (path: string) => void; readonly onSignIn: () => void; readonly onSignOut: () => void }): React.ReactElement {
+  return <RolePreviewProvider><RolePortalInner portal={portal} apiHealth={apiHealth} authStatus={authStatus} authNotice={authNotice} showDevelopmentIndicators={showDevelopmentIndicators} onNavigate={onNavigate} onSignIn={onSignIn} onSignOut={onSignOut} /></RolePreviewProvider>;
 }
 
-function RolePortalInner({ portal, apiHealth, showDevelopmentIndicators, onNavigate }: { readonly portal: RolePortalConfig; readonly apiHealth: ApiHealth; readonly showDevelopmentIndicators: boolean; readonly onNavigate: (path: string) => void }): React.ReactElement {
+function RolePortalInner({ portal, apiHealth, authStatus, authNotice, showDevelopmentIndicators, onNavigate, onSignIn, onSignOut }: { readonly portal: RolePortalConfig; readonly apiHealth: ApiHealth; readonly authStatus: AuthStatus; readonly authNotice: string; readonly showDevelopmentIndicators: boolean; readonly onNavigate: (path: string) => void; readonly onSignIn: () => void; readonly onSignOut: () => void }): React.ReactElement {
   const [path, setPath] = useState(normalize(window.location.pathname));
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -94,7 +98,7 @@ function RolePortalInner({ portal, apiHealth, showDevelopmentIndicators, onNavig
       <RoleSidebar portal={portal} activePath={path} collapsed={collapsed} drawerOpen={drawerOpen} onNavigate={navigate} onCollapse={() => setCollapsed((value) => !value)} onClose={() => { setDrawerOpen(false); menuButtonRef.current?.focus(); }} />
       {drawerOpen ? <button className="drawer-scrim role-scrim" type="button" aria-label={`Close ${portal.roleName} navigation`} onClick={() => setDrawerOpen(false)} /> : null}
       <div className="role-workspace">
-        <RoleTopbar portal={portal} apiHealth={apiHealth} showDevelopmentIndicators={showDevelopmentIndicators} menuButtonRef={menuButtonRef} onOpenMenu={() => setDrawerOpen(true)} onMessages={() => { const messagesRoute = portal.nav.find((item) => /messages|communications/i.test(item.label)); if (messagesRoute) navigate(messagesRoute.path); else setTopbarNotice(`${portal.roleName} messaging is backend-dependent and no message route exists for this preview role.`); }} onNotifications={() => setTopbarNotice(`${portal.roleName} notifications preview: 4 local demo alerts are summarized only; no backend notification state was changed.`)} onSwitch={() => navigate('/demo')} />
+        <RoleTopbar portal={portal} apiHealth={apiHealth} authStatus={authStatus} authNotice={authNotice} showDevelopmentIndicators={showDevelopmentIndicators} menuButtonRef={menuButtonRef} onOpenMenu={() => setDrawerOpen(true)} onMessages={() => { const messagesRoute = portal.nav.find((item) => /messages|communications/i.test(item.label)); if (messagesRoute) navigate(messagesRoute.path); else setTopbarNotice(`${portal.roleName} messaging is backend-dependent and no message route exists for this preview role.`); }} onNotifications={() => setTopbarNotice(`${portal.roleName} notifications preview: 4 local demo alerts are summarized only; no backend notification state was changed.`)} onSwitch={() => navigate('/demo')} onSignIn={onSignIn} onSignOut={onSignOut} />
         <main id="role-main" className="role-main">
           <PreviewNotice portal={portal} notice={topbarNotice} />
           {activeRoute?.path === portal.basePath ? <RoleDashboard portal={portal} onNavigate={navigate} /> : <RoleModulePage portal={portal} route={activeRoute ?? portal.nav[0]!} />}
@@ -117,8 +121,8 @@ function RoleSidebar({ portal, activePath, collapsed, drawerOpen, onNavigate, on
   );
 }
 
-function RoleTopbar({ portal, apiHealth, showDevelopmentIndicators, menuButtonRef, onOpenMenu, onMessages, onNotifications, onSwitch }: { readonly portal: RolePortalConfig; readonly apiHealth: ApiHealth; readonly showDevelopmentIndicators: boolean; readonly menuButtonRef: React.RefObject<HTMLButtonElement | null>; readonly onOpenMenu: () => void; readonly onMessages: () => void; readonly onNotifications: () => void; readonly onSwitch: () => void }): React.ReactElement {
-  return <header className="role-topbar"><button ref={menuButtonRef} className="icon-button mobile-menu-button" type="button" aria-label={`Open ${portal.roleName} navigation`} onClick={onOpenMenu}><Menu size={20} /></button><span className="role-context">{portal.roleName}</span><span className="role-org">{portal.organization}</span><label className="role-search" role="search"><Search size={16} /><span className="sr-only">Search {portal.roleName} workspace</span><input placeholder={`Search ${portal.family.toLowerCase()} records...`} /></label><div className="role-topbar-actions"><button type="button" className="secondary" onClick={onSwitch}>Switch preview portal</button><button className="icon-button" type="button" aria-label="Messages" onClick={onMessages}><MessageSquare size={17} /></button><button className="icon-button notification" type="button" aria-label="Notifications" onClick={onNotifications}><Bell size={17} /><span>4</span></button>{showDevelopmentIndicators ? <span className={`staff-api-dot ${apiHealth}`}>{apiHealth}</span> : null}<span className="role-profile"><span>{portal.initials}</span><span><strong>{portal.previewUser}</strong><small>{portal.roleName}</small></span><ChevronDown size={14} /></span></div></header>;
+function RoleTopbar({ portal, apiHealth, authStatus, authNotice, showDevelopmentIndicators, menuButtonRef, onOpenMenu, onMessages, onNotifications, onSwitch, onSignIn, onSignOut }: { readonly portal: RolePortalConfig; readonly apiHealth: ApiHealth; readonly authStatus: AuthStatus; readonly authNotice: string; readonly showDevelopmentIndicators: boolean; readonly menuButtonRef: React.RefObject<HTMLButtonElement | null>; readonly onOpenMenu: () => void; readonly onMessages: () => void; readonly onNotifications: () => void; readonly onSwitch: () => void; readonly onSignIn: () => void; readonly onSignOut: () => void }): React.ReactElement {
+  return <header className="role-topbar"><button ref={menuButtonRef} className="icon-button mobile-menu-button" type="button" aria-label={`Open ${portal.roleName} navigation`} onClick={onOpenMenu}><Menu size={20} /></button><span className="role-context">{portal.roleName}</span><span className="role-org">{portal.organization}</span><label className="role-search" role="search"><Search size={16} /><span className="sr-only">Search {portal.roleName} workspace</span><input placeholder={`Search ${portal.family.toLowerCase()} records...`} /></label><div className="role-topbar-actions"><button type="button" className="secondary" onClick={onSwitch}>Switch preview portal</button><button className="icon-button" type="button" aria-label="Messages" onClick={onMessages}><MessageSquare size={17} /></button><button className="icon-button notification" type="button" aria-label="Notifications" onClick={onNotifications}><Bell size={17} /><span>4</span></button><AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />{showDevelopmentIndicators ? <span className={`staff-api-dot ${apiHealth}`}>{apiHealth}</span> : null}<span className="role-profile"><span>{portal.initials}</span><span><strong>{portal.previewUser}</strong><small>{portal.roleName}</small></span><ChevronDown size={14} /></span></div></header>;
 }
 
 function PreviewNotice({ portal, notice }: { readonly portal: RolePortalConfig; readonly notice: string }): React.ReactElement {
@@ -127,6 +131,7 @@ function PreviewNotice({ portal, notice }: { readonly portal: RolePortalConfig; 
 }
 
 function RoleDashboard({ portal, onNavigate }: { readonly portal: RolePortalConfig; readonly onNavigate: (path: string) => void }): React.ReactElement {
+  if (portal.key === 'recruiter') return <EmployerRecruiterRealityPage portal={portal} routeLabel="Dashboard" />;
   const { activity, saveView } = useRolePreviewState();
   const [detail, setDetail] = useState<RoleFixture | null>(null);
   const [editing, setEditing] = useState<RoleFixture | null>(null);
@@ -157,6 +162,7 @@ function RoleModulePage({ portal, route }: { readonly portal: RolePortalConfig; 
   if (portal.key === 'institution-admin' && route.label === 'Students') return <InstitutionStudentsPage portal={portal} />;
   if (portal.key === 'institution-admin' && route.label === 'Academic Structure') return <InstitutionAcademicStructurePage portal={portal} />;
   if (portal.key === 'institution-admin' && route.label === 'Staff') return <InstitutionStaffPage portal={portal} />;
+  if (portal.key === 'recruiter') return <EmployerRecruiterRealityPage portal={portal} routeLabel={route.label} />;
   const categories = [...new Set(portal.records.map((record) => record.category))];
   const records = portal.records.filter((record) => {
     const filterMatch = filters.length === 0 || filters.includes(record.category) || filters.includes(record.status);
@@ -286,6 +292,7 @@ function InstitutionStudentsPage({ portal }: { readonly portal: RolePortalConfig
   if (!token) return <RestrictedApiState title="Students" message="Sign in with an Institution Admin identity to manage students." />;
   async function addStudent(event: React.FormEvent): Promise<void> {
     event.preventDefault();
+    setError('');
     try {
       await addInstitutionStudent(token!, institutionId, { institutionStudentId: form.institutionStudentId, fullName: form.fullName, email: form.email });
       setForm({ fullName: '', institutionStudentId: '', email: '' });
@@ -294,9 +301,25 @@ function InstitutionStudentsPage({ portal }: { readonly portal: RolePortalConfig
       setError('Add student failed. Check authorization and duplicate IDs.');
     }
   }
+  async function editStudent(student: InstitutionStudentDto): Promise<void> {
+    const fullName = window.prompt('Student full name', student.fullName);
+    if (!fullName || fullName.trim() === student.fullName) return;
+    setError('');
+    try {
+      await updateInstitutionStudent(token!, institutionId, student.id, { fullName: fullName.trim() });
+      setNotice('Student institution data updated.');
+    } catch {
+      setError('Student update failed. Check authorization and institution scope.');
+    }
+  }
   async function relationship(studentId: string, state: string): Promise<void> {
-    await endInstitutionStudentRelationship(token!, institutionId, studentId, state);
-    setNotice(`Student relationship marked ${state}.`);
+    setError('');
+    try {
+      await endInstitutionStudentRelationship(token!, institutionId, studentId, state);
+      setNotice(`Student relationship marked ${state}.`);
+    } catch {
+      setError('Relationship update failed. Check current relationship state and institution scope.');
+    }
   }
   async function previewImport(): Promise<void> {
     try {
@@ -316,7 +339,7 @@ function InstitutionStudentsPage({ portal }: { readonly portal: RolePortalConfig
     {error ? <p className="form-error" role="alert">{error}</p> : null}{notice ? <p className="role-api-success" role="status">{notice}</p> : null}
     <form className="role-card role-wide role-management-form" onSubmit={(event) => void addStudent(event)}><h2>Add Student</h2><label><span>Full name *</span><input value={form.fullName} onChange={(event) => setForm((value) => ({ ...value, fullName: event.target.value }))} required /></label><label><span>Institution ID *</span><input value={form.institutionStudentId} onChange={(event) => setForm((value) => ({ ...value, institutionStudentId: event.target.value }))} required /></label><label><span>Email *</span><input type="email" value={form.email} onChange={(event) => setForm((value) => ({ ...value, email: event.target.value }))} required /></label><button type="submit" disabled={!institutionId}>Add student</button></form>
     <section className="role-card role-wide"><h2>Import Students</h2><textarea value={csv} onChange={(event) => setCsv(event.target.value)} rows={5} /><div className="role-record-actions"><button type="button" onClick={() => void previewImport()}>Validate CSV</button>{preview ? <button type="button" onClick={() => void commitImport()}>Commit {preview.acceptedCount} rows</button> : null}</div>{preview ? <p>{preview.acceptedCount} accepted, {preview.warningCount} warnings, {preview.rejectedCount} rejected.</p> : null}</section>
-    <div className="role-record-table-wrap"><table className="role-record-table"><caption className="sr-only">{portal.roleName} real students</caption><thead><tr><th>Student</th><th>Institution ID</th><th>Relationship</th><th>Invitation</th><th>Actions</th></tr></thead><tbody>{students.map((student) => <tr key={student.id} className="role-record-row"><th scope="row"><strong>{student.fullName}</strong><span>{student.email}</span></th><td>{student.institutionStudentId}</td><td>{student.relationship?.state ?? student.status}</td><td>{student.status}</td><td><div className="role-record-actions"><button type="button" onClick={() => void relationship(student.id, 'TRANSFERRED')}>Transfer</button><button type="button" onClick={() => void relationship(student.id, 'GRADUATED')}>Graduate</button><button type="button" className="secondary" onClick={() => void relationship(student.id, 'ENDED')}>End relationship</button></div></td></tr>)}</tbody></table></div>
+    <div className="role-record-table-wrap"><table className="role-record-table"><caption className="sr-only">{portal.roleName} real students</caption><thead><tr><th>Student</th><th>Institution ID</th><th>Relationship</th><th>Invitation</th><th>Actions</th></tr></thead><tbody>{students.map((student) => <tr key={student.id} className="role-record-row"><th scope="row"><strong>{student.fullName}</strong><span>{student.email}</span></th><td>{student.institutionStudentId}</td><td>{student.relationship?.state ?? student.status}</td><td>{student.status}</td><td><div className="role-record-actions"><button type="button" className="secondary" onClick={() => void editStudent(student)}>Edit student</button><button type="button" onClick={() => void relationship(student.id, 'TRANSFERRED')}>Transfer</button><button type="button" onClick={() => void relationship(student.id, 'GRADUATED')}>Graduate</button><button type="button" className="secondary" onClick={() => void relationship(student.id, 'ENDED')}>End relationship</button></div></td></tr>)}</tbody></table></div>
   </section>;
 }
 
@@ -333,7 +356,66 @@ function InstitutionAcademicStructurePage({ portal }: { readonly portal: RolePor
 }
 
 function InstitutionStaffPage({ portal: _portal }: { readonly portal: RolePortalConfig }): React.ReactElement {
-  return <section className="role-module"><div className="role-page-heading"><div><span className="eyebrow">Authenticated API-backed</span><h1>Staff</h1><p>Institution Admin staff-role API is available for scoped role assignment. The UI intentionally does not expose platform, employer or self-escalation controls.</p></div></div><section className="role-card role-wide"><h2>Allowed staff roles</h2><ul className="role-check-list"><li>PLACEMENT_ADMIN</li><li>DEPARTMENT_HEAD</li><li>FACULTY_LECTURER</li></ul><p>Use only with verified institution users. Platform roles are rejected by the API.</p></section></section>;
+  const token = getProtectedAccessToken();
+  const [institutionId, setInstitutionId] = useState('');
+  const [form, setForm] = useState({ email: '', role: 'FACULTY_LECTURER' });
+  const [notice, setNotice] = useState('');
+  const [error, setError] = useState('');
+  useEffect(() => {
+    if (!token) return;
+    const controller = new AbortController();
+    getSecurityContext(token, controller.signal).then((context) => {
+      const membership = context.memberships.find((item) => ['INSTITUTION_OWNER', 'INSTITUTION_ADMIN'].includes(item.role));
+      if (membership) setInstitutionId(membership.organizationId);
+    }).catch(() => setError('Unable to resolve institution context.'));
+    return () => controller.abort();
+  }, [token]);
+  if (!token) return <RestrictedApiState title="Staff" message="Sign in with an Institution Admin identity to invite institution staff." />;
+  async function invite(event: React.FormEvent): Promise<void> {
+    event.preventDefault();
+    setError('');
+    try {
+      await inviteInstitutionStaff(token!, institutionId, form.email, form.role);
+      setNotice('Staff invitation created. Membership is created only after the verified recipient accepts.');
+      setForm({ email: '', role: 'FACULTY_LECTURER' });
+    } catch {
+      setError('Staff invitation failed. Platform roles, self-escalation and cross-institution requests are rejected.');
+    }
+  }
+  return <section className="role-module role-module--dense"><div className="role-page-heading"><div><span className="eyebrow">Authenticated API-backed</span><h1>Staff</h1><p>Invite institution staff through the verified-recipient invitation lifecycle. This screen does not attach arbitrary global user IDs.</p></div></div>
+    {notice ? <p className="role-api-success" role="status">{notice}</p> : null}{error ? <p className="form-error" role="alert">{error}</p> : null}
+    <form className="role-card role-wide role-management-form" onSubmit={(event) => void invite(event)}>
+      <h2>Invite institution staff</h2>
+      <label><span>Recipient email *</span><input type="email" value={form.email} onChange={(event) => setForm((value) => ({ ...value, email: event.target.value }))} required /></label>
+      <label><span>Institution role *</span><select value={form.role} onChange={(event) => setForm((value) => ({ ...value, role: event.target.value }))}><option value="FACULTY_LECTURER">Faculty Lecturer</option><option value="DEPARTMENT_HEAD">Department Head</option><option value="PLACEMENT_ADMIN">Placement Admin</option></select></label>
+      <button type="submit" disabled={!institutionId}>Send staff invitation</button>
+    </form>
+    <section className="role-card role-wide"><h2>Staff onboarding boundary</h2><ul className="role-check-list"><li>Allowed roles: PLACEMENT_ADMIN, DEPARTMENT_HEAD, FACULTY_LECTURER.</li><li>No platform, employer or self-escalation role is exposed.</li><li>The recipient must authenticate with a verified matching email before membership is created.</li></ul></section>
+  </section>;
+}
+
+function EmployerRecruiterRealityPage({ portal, routeLabel }: { readonly portal: RolePortalConfig; readonly routeLabel: string }): React.ReactElement {
+  const token = getProtectedAccessToken();
+  const [employerMembership, setEmployerMembership] = useState<{ readonly organizationId: string; readonly role: string } | null>(null);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    if (!token) return;
+    const controller = new AbortController();
+    getSecurityContext(token, controller.signal).then((context) => {
+      const membership = context.memberships.find((item) => ['EMPLOYER_OWNER', 'EMPLOYER_ADMIN', 'RECRUITER'].includes(item.role));
+      if (membership) setEmployerMembership({ organizationId: membership.organizationId, role: membership.role });
+      else setError('This identity has no active employer-scoped membership.');
+    }).catch(() => setError('Unable to resolve employer context.'));
+    return () => controller.abort();
+  }, [token]);
+  if (!token) return <RestrictedApiState title="Employer hiring flow partially implemented" message="Sign in with Maya UAT Recruiter to view the real employer scope. Preview role switching is not authentication." />;
+  return <section className="role-module role-module--dense">
+    <div className="role-page-heading"><div><span className="eyebrow">Authenticated API-backed / PARTIAL</span><h1>Employer hiring flow partially implemented</h1><p>{routeLabel} for {portal.roleName}. The backend currently enforces employer membership plus applicant grants, but opportunity, application, interview and offer persistence are not implemented in this product slice.</p></div></div>
+    {error ? <p className="form-error" role="alert">{error}</p> : null}
+    <section className="role-kpi-grid" aria-label="Employer implementation status"><article className="role-card role-kpi"><span>Employer identity</span><strong>{employerMembership ? 'Resolved' : 'Checking'}</strong><p>{employerMembership ? `${employerMembership.role} at ${employerMembership.organizationId}` : 'Loaded from protected security context'}</p></article><article className="role-card role-kpi"><span>Applicant access</span><strong>Scoped grants</strong><p>Only explicit active employer applicant grants are readable.</p></article><article className="role-card role-kpi"><span>Hiring workflow</span><strong>PARTIAL</strong><p>No real opportunities/applications/interviews table yet.</p></article></section>
+    <section className="role-card role-wide"><h2>What is real now</h2><ul className="role-check-list"><li>Authenticated employer identity and active recruiter membership are resolved from the backend.</li><li>Applicant access is enforced by `employer_applicant_access_grants` and denies expired, revoked, unrelated or cross-employer access.</li><li>No Student Readiness score or generic student directory is exposed to employers.</li></ul></section>
+    <section className="role-card role-wide"><h2>Smallest next vertical slice</h2><p>To make Employer hiring PASS instead of PARTIAL, add employer-owned opportunity persistence, student-consented applications, and a list endpoint that returns only applicants with active grants for that employer and opportunity. Until then, this page intentionally avoids fake candidate tables.</p></section>
+  </section>;
 }
 
 function RestrictedApiState({ title, message }: { readonly title: string; readonly message: string }): React.ReactElement {

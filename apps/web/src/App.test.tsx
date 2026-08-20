@@ -7,6 +7,11 @@ import { studentProfile } from './studentData.js';
 
 const fetchMock = vi.fn();
 
+function jwtWithEmail(email: string): string {
+  const payload = window.btoa(JSON.stringify({ email })).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+  return `header.${payload}.signature`;
+}
+
 beforeEach(() => {
   window.history.pushState(null, '', '/student');
   fetchMock.mockReset();
@@ -14,6 +19,8 @@ beforeEach(() => {
 });
 
 describe('All-role portal registry and preview workflows', () => {
+  const previewPortals = activeRolePortals.filter((portal) => portal.key !== 'recruiter');
+
   it('renders the demo launcher with every portal card and no login claim', () => {
     fetchMock.mockResolvedValue({ ok: true });
     window.history.pushState(null, '', '/demo');
@@ -29,7 +36,7 @@ describe('All-role portal registry and preview workflows', () => {
 
   it('opens each new role dashboard with role identity, active navigation, and route-aware title', () => {
     fetchMock.mockResolvedValue({ ok: true });
-    for (const portal of activeRolePortals) {
+    for (const portal of previewPortals) {
       cleanup();
       window.history.pushState(null, '', portal.basePath);
       render(<App />);
@@ -43,7 +50,7 @@ describe('All-role portal registry and preview workflows', () => {
 
   it('resolves every visible navigation item for every new role without disabled nav', () => {
     fetchMock.mockResolvedValue({ ok: true });
-    for (const portal of activeRolePortals) {
+    for (const portal of previewPortals) {
       for (const item of portal.nav) {
         cleanup();
         window.history.pushState(null, '', item.path);
@@ -58,8 +65,8 @@ describe('All-role portal registry and preview workflows', () => {
 
   it('filters, clears, opens detail, edits preview state, records activity, and resets on a new role page', () => {
     fetchMock.mockResolvedValue({ ok: true });
-    const portal = activeRolePortals.find((item) => item.key === 'recruiter')!;
-    window.history.pushState(null, '', `${portal.basePath}/applicants`);
+    const portal = activeRolePortals.find((item) => item.key === 'hiring-manager')!;
+    window.history.pushState(null, '', `${portal.basePath}/candidates`);
     render(<App />);
     expect(screen.getByText('3 records shown')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Candidate' }));
@@ -67,7 +74,7 @@ describe('All-role portal registry and preview workflows', () => {
     expect(screen.getByRole('button', { name: 'Candidate' })).toHaveAttribute('aria-pressed', 'true');
     fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
     expect(screen.getByText('3 records shown')).toBeInTheDocument();
-    fireEvent.change(screen.getByPlaceholderText('Search applicants...'), { target: { value: 'Rahul' } });
+    fireEvent.change(screen.getByPlaceholderText('Search candidates...'), { target: { value: 'Rahul' } });
     expect(screen.getByText('1 records shown')).toBeInTheDocument();
     const record = screen.getByText('Rahul Kumar').closest('.role-record-row, .role-record-card') as HTMLElement;
     fireEvent.click(within(record).getByRole('button', { name: 'View detail' }));
@@ -77,7 +84,7 @@ describe('All-role portal registry and preview workflows', () => {
     fireEvent.click(within(record).getByRole('button', { name: 'Edit preview' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save preview change' }));
     expect(screen.getByRole('alert')).toHaveTextContent('Status and preview note are required.');
-    fireEvent.change(screen.getByLabelText('Preview note'), { target: { value: 'Recruiter-owned shortlist note' } });
+    fireEvent.change(screen.getByLabelText('Preview note'), { target: { value: 'Hiring-manager shortlist note' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save preview change' }));
     expect(screen.getByText(/Unsaved session changes/)).toBeInTheDocument();
     expect(screen.getByText(/Update candidate stage/)).toBeInTheDocument();
@@ -94,6 +101,65 @@ describe('All-role portal registry and preview workflows', () => {
     expect(screen.getByText(/No fake mutation or preview role selection is used/i)).toBeInTheDocument();
     expect(screen.queryByText('ABC Engineering College')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Update preview queue status/i })).not.toBeInTheDocument();
+  });
+
+  it('marks employer hiring as partial instead of showing a fake applicant directory', () => {
+    fetchMock.mockResolvedValue({ ok: true });
+    window.history.pushState(null, '', '/employer/recruiter');
+    render(<App />);
+    expect(screen.getByRole('heading', { name: 'Employer hiring flow partially implemented' })).toBeInTheDocument();
+    expect(screen.getByText(/Sign in with Maya UAT Recruiter/i)).toBeInTheDocument();
+    expect(screen.getByText(/Preview role switching is not authentication/i)).toBeInTheDocument();
+    expect(screen.queryByText('Rahul Kumar')).not.toBeInTheDocument();
+    expect(screen.queryByText('312')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Student Readiness/i)).not.toBeInTheDocument();
+  });
+
+  it('renders invitation acceptance as a protected verified-recipient workflow without accepting from preview state', () => {
+    fetchMock.mockResolvedValue({ ok: true });
+    window.history.pushState(null, '', '/invitations/accept?token=raw-invite-token');
+    render(<App />);
+    expect(screen.getByRole('heading', { name: 'Accept organization invitation' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Sign in required' })).toBeInTheDocument();
+    expect(screen.getByText(/raw invitation token is read only from this link and is not stored/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sign in' })).toBeDisabled();
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/health'), expect.anything());
+    expect(fetchMock).not.toHaveBeenCalledWith(expect.stringContaining('/api/v1/invitations/accept'), expect.anything());
+  });
+
+  it('lets an authenticated Institution Admin send a staff invitation without direct userId attachment', async () => {
+    vi.stubEnv('VITE_COGNITO_DOMAIN', 'https://uat-auth.example.test');
+    vi.stubEnv('VITE_COGNITO_CLIENT_ID', 'uat-client');
+    vi.stubEnv('VITE_COGNITO_REDIRECT_URI', 'http://127.0.0.1:5173/auth/callback');
+    window.sessionStorage.setItem('planthepath.oauthState', 'state-123');
+    window.sessionStorage.setItem('planthepath.oauthVerifier', 'verifier-12345678901234567890');
+    window.history.pushState(null, '', '/auth/callback?code=code-123&state=state-123');
+    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url === 'https://uat-auth.example.test/oauth2/token') return { ok: true, json: async () => ({ access_token: 'institution-token', id_token: jwtWithEmail('institution.admin@example.test') }) };
+      if (url.endsWith('/health')) return { ok: true };
+      if (url.endsWith('/api/v1/security/context')) {
+        expect((init?.headers as Record<string, string>).Authorization).toBe('Bearer institution-token');
+        return { ok: true, json: async () => ({ userId: 'admin-user', memberships: [{ organizationId: 'institution-1', role: 'INSTITUTION_ADMIN', scope: { organizationId: 'institution-1', institutionId: 'institution-1' } }] }) };
+      }
+      if (url.endsWith('/api/v1/institutions/institution-1/staff-role-assignments')) {
+        expect((init?.headers as Record<string, string>).Authorization).toBe('Bearer institution-token');
+        expect(init?.body).toBe(JSON.stringify({ email: 'faculty@example.test', role: 'DEPARTMENT_HEAD' }));
+        expect(String(init?.body)).not.toContain('userId');
+        return { ok: true, json: async () => ({ invitation: { id: 'invite-1', email: 'faculty@example.test', role: 'DEPARTMENT_HEAD', tokenPreviewAvailable: false } }) };
+      }
+      return { ok: false };
+    });
+    render(<App />);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument());
+    cleanup();
+    window.history.pushState(null, '', '/institution/admin/staff');
+    render(<App />);
+    fireEvent.change(screen.getByLabelText(/Recipient email/i), { target: { value: 'faculty@example.test' } });
+    fireEvent.change(screen.getByLabelText(/Institution role/i), { target: { value: 'DEPARTMENT_HEAD' } });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Send staff invitation' })).not.toBeDisabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Send staff invitation' }));
+    await waitFor(() => expect(screen.getByText(/Membership is created only after the verified recipient accepts/i)).toBeInTheDocument());
+    expect(screen.queryByText('OPERATIONS_ADMIN')).not.toBeInTheDocument();
   });
 
   it('opens dashboard record workflows and returns focus after Escape', () => {
@@ -126,9 +192,9 @@ describe('All-role portal registry and preview workflows', () => {
     render(<App />);
     fireEvent.click(screen.getAllByRole('button', { name: 'Messages' }).find((button) => button.className.includes('icon-button'))!);
     expect(window.location.pathname).toBe('/employer/recruiter/messages');
-    expect(screen.getByRole('heading', { name: 'Messages' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Employer hiring flow partially implemented' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Notifications' }));
-    expect(screen.getByText(/Recruiter notifications preview/)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Employer hiring flow partially implemented' })).toBeInTheDocument();
   });
 
   it('keeps Student and Placement Officer portals available after adding all-role routing', () => {
@@ -142,8 +208,10 @@ describe('All-role portal registry and preview workflows', () => {
     expect(screen.getByRole('heading', { name: 'Reports' })).toBeInTheDocument();
   });
 });
-afterEach(() => {
+afterEach(async () => {
   cleanup();
+  vi.unstubAllEnvs();
+  await import('./auth.js').then(({ signOut }) => signOut());
   vi.unstubAllGlobals();
 });
 

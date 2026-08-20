@@ -1,5 +1,6 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { completeHostedLoginFromLocation } from './auth.js';
 import { CareerReadinessApiPanel } from './careerReadinessApiPanel.js';
 import { OperationsCareerReadinessPanel } from './operationsCareerReadinessPanel.js';
 
@@ -10,12 +11,17 @@ const learner = { catalog, progress: [], attempts: [], evidence: [], mastery: []
   notifications: [{ id: 'notification-1', templateKey: 'assessment-due', channel: 'EMAIL', legalPurpose: 'transactional assessment due reminder',
     state: 'PENDING', createdAt: '2026-08-18T12:00:00.000Z', expiresAt: '2026-08-19T12:00:00.000Z' }] };
 
-beforeEach(() => window.sessionStorage.setItem('planthepath.accessToken', 'test-access-token'));
-afterEach(() => { cleanup(); window.sessionStorage.clear(); vi.unstubAllGlobals(); });
+beforeEach(() => {
+  vi.stubEnv('VITE_COGNITO_DOMAIN', 'https://uat-auth.example.test');
+  vi.stubEnv('VITE_COGNITO_CLIENT_ID', 'uat-client');
+  vi.stubEnv('VITE_COGNITO_REDIRECT_URI', 'http://127.0.0.1:5173/auth/callback');
+});
+afterEach(() => { cleanup(); window.sessionStorage.clear(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); window.history.pushState(null, '', '/student'); });
 
 describe('API-backed Career Readiness surfaces', () => {
   it('renders explainable roadmap and native notification state without exposing a destination', async () => {
-    vi.stubGlobal('fetch', vi.fn(async (url: string) => ({ ok: true, json: async () => url.endsWith('/catalog') ? catalog : learner })));
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => ({ ok: true, json: async () => url.endsWith('/oauth2/token') ? { access_token: 'test-access-token' } : url.endsWith('/catalog') ? catalog : learner })));
+    await authenticateThroughHostedUiCallback();
     const { rerender } = render(<CareerReadinessApiPanel route="roadmap" />);
     expect(await screen.findByRole('heading', { name: 'Complete Lesson' })).toBeInTheDocument();
     expect(screen.getByText(/Reason: Missing Foundation/)).toBeInTheDocument();
@@ -31,10 +37,18 @@ describe('API-backed Career Readiness surfaces', () => {
     const status = { releases: [{ id: 'release-1', name: 'Career Readiness Fundamentals', version: 1, manifestHash: 'b'.repeat(64), status: 'PUBLISHED' }],
       sourceGovernance: [], reviewQueue: [], outboxFailures: [], workflows: [{ id: 'workflow-1', allowlistId: 'assessment-due', version: 1,
         workflowHash: 'c'.repeat(64), operation: 'SEND_EMAIL', destinationClass: 'EMAIL', active: false, killSwitch: true }], automationCommands: [] };
-    vi.stubGlobal('fetch', vi.fn(async (url: string) => ({ ok: true, json: async () => url.endsWith('/imports') ? imports : status })));
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => ({ ok: true, json: async () => url.endsWith('/oauth2/token') ? { access_token: 'test-access-token' } : url.endsWith('/imports') ? imports : status })));
+    await authenticateThroughHostedUiCallback();
     render(<OperationsCareerReadinessPanel />);
     await waitFor(() => expect(screen.getByText('11 quarantined records.')).toBeInTheDocument());
     expect(screen.getByText('1 workflow')).toBeInTheDocument();
     expect(screen.getByText(/No source database, event payload, recipient address, or secret/)).toBeInTheDocument();
   });
 });
+
+async function authenticateThroughHostedUiCallback(): Promise<void> {
+  window.sessionStorage.setItem('planthepath.oauthState', 'state-123');
+  window.sessionStorage.setItem('planthepath.oauthVerifier', 'verifier-12345678901234567890');
+  window.history.pushState(null, '', '/auth/callback?code=code-123&state=state-123');
+  await completeHostedLoginFromLocation();
+}

@@ -109,14 +109,14 @@ function SettingControl({ row }: { readonly row: SettingRow }): React.ReactEleme
   return <div className="setting-row value-row"><span>{row.label}</span><StatusBadge label={row.value ?? (row.kind === 'policy' ? 'Managed' : 'Active')} tone={row.kind === 'policy' ? 'neutral' : 'info'} /></div>;
 }
 
-export function Dashboard(): React.ReactElement {
+export function Dashboard({ authenticated = false }: { readonly authenticated?: boolean }): React.ReactElement {
   const { state, dispatch } = useStudentPreview();
   return (
     <div className="dashboard-layout">
       <section className="dashboard-upper">
         <section className="card hero-summary"><div className="hero-copy"><span className="eyebrow">Good morning, {state.preferredName.split(' ')[0]}</span><h2>Your {state.targetCareer} path is moving forward.</h2><p>Focus today on the SIEM assessment, one security lab update, and one matched SOC opportunity review.</p><div className="hero-actions"><button type="button" onClick={() => navigateTo('/student/assessments')}>Continue next action</button><button type="button" className="secondary" onClick={() => navigateTo('/student/career-path')}>View roadmap</button></div></div><img src={images.careerIllustration} alt="" className="hero-art" /></section>
         <div className="dashboard-snapshots" aria-label="Student dashboard snapshot">
-          <MetricCard label="Career readiness" value={`${studentProfile.readiness}`} suffix="/100" detail="+8 points this month" />
+          {authenticated ? <MetricCard label="Advisory readiness" value="API-backed" detail="See current protected advisory band above" /> : <MetricCard label="Career readiness" value={`${studentProfile.readiness}`} suffix="/100" detail="+8 points this month" />}
           <MetricCard label="Target career" value={state.targetCareer} detail={`${studentProfile.pathwayProgress}% roadmap progress`} tone="blue" />
           <MetricCard label="Next milestone" value={studentProfile.nextMilestone} detail="Due in 3 days" tone="amber" />
           <section className="card dashboard-coach-snapshot"><img src={images.coachIllustration} alt="" /><div><span className="snapshot-label">AI Career Coach</span><h3>Communication gap</h3><p>Practice incident triage and attach the lab summary.</p><button type="button" onClick={() => navigateTo('/student/ai-coach')}>Open coach</button></div></section>

@@ -1,6 +1,8 @@
 import { Bell, BookOpen, BriefcaseBusiness, CalendarDays, ChevronDown, ClipboardCheck, FileText, Gauge, GraduationCap, Home, LayoutDashboard, Menu, MessageSquare, Search, Settings, Sparkles, Target, Trophy, UserRound, X, type LucideIcon } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { getApiHealth, type ApiHealth } from './api.js';
+import { acceptInvitation, getApiHealth, type ApiHealth } from './api.js';
+import { beginHostedLogin, completeHostedLoginFromLocation, getAccessToken, getAuthStatus, getAuthDebugStatus, signOut, type AuthStatus } from './auth.js';
+import { AuthControls } from './authControls.js';
 import { PageHeader, type PageMeta } from './studentComponents.js';
 import { rolePortalFromPath } from './rolePortalConfig.js';
 import { DemoPortalLauncher, RolePortal } from './rolePortalPages.js';
@@ -62,12 +64,30 @@ export function App(): React.ReactElement {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [apiHealth, setApiHealth] = useState<ApiHealth>('checking');
+  const [authStatus, setAuthStatus] = useState<AuthStatus>(() => getAuthStatus());
+  const [authNotice, setAuthNotice] = useState(getAuthDebugStatus());
   const menuButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const abort = new AbortController();
     getApiHealth(abort.signal).then(setApiHealth);
     return () => abort.abort();
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    completeHostedLoginFromLocation()
+      .then((completed) => {
+        if (!mounted) return;
+        setAuthStatus(getAuthStatus());
+        if (completed) setAuthNotice('Signed in with the configured non-production identity provider.');
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setAuthStatus(getAuthStatus());
+        setAuthNotice('Sign-in could not be completed. Try again or verify the non-production Cognito configuration.');
+      });
+    return () => { mounted = false; };
   }, []);
 
   useEffect(() => {
@@ -98,7 +118,11 @@ export function App(): React.ReactElement {
   }, [path, rolePortal, route]);
 
   if (path.startsWith('/institution/placement-officer')) {
-    return <PlacementOfficerPortal apiHealth={apiHealth} showDevelopmentIndicators={showDevelopmentIndicators} />;
+    return <PlacementOfficerPortal apiHealth={apiHealth} authStatus={authStatus} authNotice={authNotice} onSignIn={handleSignIn} onSignOut={handleSignOut} showDevelopmentIndicators={showDevelopmentIndicators} />;
+  }
+
+  if (path === '/invitations/accept') {
+    return <InvitationAcceptancePage authStatus={authStatus} authNotice={authNotice} onSignIn={handleSignIn} onSignOut={handleSignOut} />;
   }
 
   if (path === '/demo' && enableDemoPortal) {
@@ -109,13 +133,15 @@ export function App(): React.ReactElement {
   }
 
   if (rolePortal) {
-    return <RolePortal portal={rolePortal} apiHealth={apiHealth} showDevelopmentIndicators={showDevelopmentIndicators} onNavigate={() => setPath(currentPath())} />;
+    return <RolePortal portal={rolePortal} apiHealth={apiHealth} authStatus={authStatus} authNotice={authNotice} onSignIn={handleSignIn} onSignOut={handleSignOut} showDevelopmentIndicators={showDevelopmentIndicators} onNavigate={() => setPath(currentPath())} />;
   }
 
   return (
     <StudentPreviewProvider>
       <StudentShell
         apiHealth={apiHealth}
+        authNotice={authNotice}
+        authStatus={authStatus}
         drawerOpen={drawerOpen}
         menuButtonRef={menuButtonRef}
         path={path}
@@ -124,12 +150,62 @@ export function App(): React.ReactElement {
         setPath={setPath}
         setSidebarCollapsed={setSidebarCollapsed}
         sidebarCollapsed={sidebarCollapsed}
+        onSignIn={handleSignIn}
+        onSignOut={handleSignOut}
       />
     </StudentPreviewProvider>
   );
+
+  async function handleSignIn(): Promise<void> {
+    try {
+      await beginHostedLogin(`${window.location.pathname}${window.location.search}`);
+    } catch {
+      setAuthNotice('Cognito UAT login is not configured. Supply the approved non-production Hosted UI settings.');
+    }
+  }
+
+  function handleSignOut(): void {
+    signOut();
+    setAuthStatus(getAuthStatus());
+    setAuthNotice(getAuthDebugStatus());
+  }
 }
 
-function StudentShell({ apiHealth, drawerOpen, menuButtonRef, path, route, setDrawerOpen, setPath, setSidebarCollapsed, sidebarCollapsed }: { readonly apiHealth: ApiHealth; readonly drawerOpen: boolean; readonly menuButtonRef: React.RefObject<HTMLButtonElement | null>; readonly path: string; readonly route: RouteKey; readonly setDrawerOpen: React.Dispatch<React.SetStateAction<boolean>>; readonly setPath: React.Dispatch<React.SetStateAction<string>>; readonly setSidebarCollapsed: React.Dispatch<React.SetStateAction<boolean>>; readonly sidebarCollapsed: boolean }): React.ReactElement {
+function InvitationAcceptancePage({ authStatus, authNotice, onSignIn, onSignOut }: { readonly authStatus: AuthStatus; readonly authNotice: string; readonly onSignIn: () => void; readonly onSignOut: () => void }): React.ReactElement {
+  const [status, setStatus] = useState('Ready to accept your invitation after sign-in.');
+  const [accepted, setAccepted] = useState(false);
+  const idempotencyKey = useRef(`web-invite-${crypto.randomUUID()}`);
+  const invitationToken = new URLSearchParams(window.location.search).get('token') ?? '';
+  useEffect(() => {
+    if (authStatus.state !== 'authenticated' || !invitationToken || accepted) return;
+    const apiToken = getAccessToken();
+    if (!apiToken) return;
+    let cancelled = false;
+    setStatus('Accepting invitation with your verified identity...');
+    acceptInvitation(apiToken, invitationToken, idempotencyKey.current)
+      .then(() => {
+        if (cancelled) return;
+        setAccepted(true);
+        setStatus('Invitation accepted. Your organization access is now active.');
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setStatus('Invitation could not be accepted. Confirm you are signed in as the invited, verified email and that the invitation has not expired or been used.');
+      });
+    return () => { cancelled = true; };
+  }, [accepted, authStatus.state, invitationToken]);
+
+  return <main className="invitation-acceptance">
+    <section className="role-page-heading"><div><span className="eyebrow">Verified invitation</span><h1>Accept organization invitation</h1>
+      <p>This page uses the existing protected invitation-acceptance API. The raw invitation token is read only from this link and is not stored in browser storage.</p></div>
+      <AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} /></section>
+    {!invitationToken ? <section className="role-empty"><h2>Invitation token missing</h2><p>Open the exact link delivered to the intended UAT email recipient.</p></section> : null}
+    {authStatus.state !== 'authenticated' && invitationToken ? <section className="role-empty"><h2>Sign in required</h2><p>Sign in with the verified email address that received this invitation. If sign-in redirects away, reopen the Mailpit invitation link after the session is established.</p></section> : null}
+    <section className="role-card role-wide" role="status"><h2>{accepted ? 'Accepted' : 'Status'}</h2><p>{status}</p></section>
+  </main>;
+}
+
+function StudentShell({ apiHealth, authNotice, authStatus, drawerOpen, menuButtonRef, path, route, setDrawerOpen, setPath, setSidebarCollapsed, sidebarCollapsed, onSignIn, onSignOut }: { readonly apiHealth: ApiHealth; readonly authNotice: string; readonly authStatus: AuthStatus; readonly drawerOpen: boolean; readonly menuButtonRef: React.RefObject<HTMLButtonElement | null>; readonly path: string; readonly route: RouteKey; readonly setDrawerOpen: React.Dispatch<React.SetStateAction<boolean>>; readonly setPath: React.Dispatch<React.SetStateAction<string>>; readonly setSidebarCollapsed: React.Dispatch<React.SetStateAction<boolean>>; readonly sidebarCollapsed: boolean; readonly onSignIn: () => void; readonly onSignOut: () => void }): React.ReactElement {
   const { dispatch } = useStudentPreview();
   function navigate(item: NavItem): void {
     window.history.pushState(null, '', item.path);
@@ -150,6 +226,8 @@ function StudentShell({ apiHealth, drawerOpen, menuButtonRef, path, route, setDr
       <div className="student-workspace">
         <TopBar
           apiHealth={apiHealth}
+          authNotice={authNotice}
+          authStatus={authStatus}
           showDevelopmentIndicators={showDevelopmentIndicators}
           menuButtonRef={menuButtonRef}
           onOpenMenu={() => setDrawerOpen(true)}
@@ -157,20 +235,25 @@ function StudentShell({ apiHealth, drawerOpen, menuButtonRef, path, route, setDr
           onNotifications={() => dispatch({ type: 'status', status: 'Student notifications preview: 3 reminders are represented by local demo data only.' })}
           onProfile={() => navigate(navItems.find((item) => item.route === 'profile')!)}
           profileActive={route === 'profile'}
+          onSignIn={onSignIn}
+          onSignOut={onSignOut}
         />
         <main id="main-content" className="student-main">
           {showDevelopmentIndicators ? <PreviewBadge apiHealth={apiHealth} /> : null}
-          <StudentPreviewStatus />
+          <StudentPreviewStatus authenticated={authStatus.state === 'authenticated'} />
           <PageHeader meta={routeTitles[route]} />
-          <RouteScreen route={route} />
+          <RouteScreen route={route} authenticated={authStatus.state === 'authenticated'} />
         </main>
       </div>
     </div>
   );
 }
 
-function StudentPreviewStatus(): React.ReactElement {
+function StudentPreviewStatus({ authenticated }: { readonly authenticated: boolean }): React.ReactElement {
   const { state, dispatch } = useStudentPreview();
+  if (authenticated) {
+    return <section className="student-preview-status" role="status" aria-live="polite"><div><strong>Authenticated API-backed mode</strong><span>Career Readiness data is loaded from the protected backend. Remaining preview-only modules stay labelled separately.</span></div></section>;
+  }
   return (
     <section className="student-preview-status" role="status" aria-live="polite">
       <div><strong>{state.dirty ? 'Unsaved session changes' : 'Session-local preview'}</strong><span>{state.status}</span></div>
@@ -192,22 +275,34 @@ function Sidebar({ path, collapsed, drawerOpen, onNavigate, onCollapse, onClose 
   );
 }
 
-function TopBar({ apiHealth, showDevelopmentIndicators, menuButtonRef, onOpenMenu, onMessages, onNotifications, onProfile, profileActive }: { readonly apiHealth: ApiHealth; readonly showDevelopmentIndicators: boolean; readonly menuButtonRef: React.RefObject<HTMLButtonElement | null>; readonly onOpenMenu: () => void; readonly onMessages: () => void; readonly onNotifications: () => void; readonly onProfile: () => void; readonly profileActive: boolean }): React.ReactElement {
+function TopBar({ apiHealth, authNotice, authStatus, showDevelopmentIndicators, menuButtonRef, onOpenMenu, onMessages, onNotifications, onProfile, profileActive, onSignIn, onSignOut }: { readonly apiHealth: ApiHealth; readonly authNotice: string; readonly authStatus: AuthStatus; readonly showDevelopmentIndicators: boolean; readonly menuButtonRef: React.RefObject<HTMLButtonElement | null>; readonly onOpenMenu: () => void; readonly onMessages: () => void; readonly onNotifications: () => void; readonly onProfile: () => void; readonly profileActive: boolean; readonly onSignIn: () => void; readonly onSignOut: () => void }): React.ReactElement {
+  const identity = studentIdentityFromAuth(authStatus);
   return (
     <header className="student-topbar">
       <button ref={menuButtonRef} className="icon-button mobile-menu-button" type="button" onClick={onOpenMenu} aria-label="Open student navigation"><Menu size={20} /></button>
       <label className="global-search" role="search"><Search size={17} aria-hidden="true" /><span className="sr-only">Search student workspace</span><input placeholder="Search opportunities, skills, assessments..." /></label>
-      <div className="topbar-actions"><button className="icon-button" type="button" aria-label="Messages" onClick={onMessages}><MessageSquare size={18} /></button><button className="icon-button notification" type="button" aria-label="Notifications" onClick={onNotifications}><Bell size={18} /><span>3</span></button>{showDevelopmentIndicators ? <span className={`api-dot ${apiHealth}`}>{apiHealth === 'online' ? 'API Online' : apiHealth === 'offline' ? 'API Offline' : 'Checking'}</span> : null}<button className="profile-menu" type="button" aria-label="Student profile menu" onClick={onProfile} disabled={profileActive}><span className="avatar">{studentProfile.initials}</span><span><strong>{studentProfile.name}</strong><small>{studentProfile.program} | {studentProfile.graduationYear}</small></span><ChevronDown size={15} aria-hidden="true" /></button></div>
+      <div className="topbar-actions"><button className="icon-button" type="button" aria-label="Messages" onClick={onMessages}><MessageSquare size={18} /></button><button className="icon-button notification" type="button" aria-label="Notifications" onClick={onNotifications}><Bell size={18} /><span>3</span></button><AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />{showDevelopmentIndicators ? <span className={`api-dot ${apiHealth}`}>{apiHealth === 'online' ? 'API Online' : apiHealth === 'offline' ? 'API Offline' : 'Checking'}</span> : null}<button className="profile-menu" type="button" aria-label="Student profile menu" onClick={onProfile} disabled={profileActive}><span className="avatar">{identity.initials}</span><span><strong>{identity.name}</strong><small>{identity.detail}</small></span><ChevronDown size={15} aria-hidden="true" /></button></div>
     </header>
   );
+}
+
+function studentIdentityFromAuth(authStatus: AuthStatus): { readonly name: string; readonly initials: string; readonly detail: string } {
+  if (authStatus.state !== 'authenticated' || !authStatus.email) {
+    return { name: studentProfile.name, initials: studentProfile.initials, detail: `${studentProfile.program} | ${studentProfile.graduationYear}` };
+  }
+  const local = authStatus.email.split('@')[0] ?? authStatus.email;
+  const words = local.split(/[._-]+/).filter(Boolean);
+  const name = words.length ? words.map((word) => `${word.slice(0, 1).toUpperCase()}${word.slice(1)}`).join(' ') : authStatus.email;
+  const initials = words.slice(0, 2).map((word) => word[0]?.toUpperCase() ?? '').join('') || 'ST';
+  return { name, initials, detail: `Verified email: ${authStatus.email}` };
 }
 
 function PreviewBadge({ apiHealth }: { readonly apiHealth: ApiHealth }): React.ReactElement {
   return <div className="preview-badge" aria-label="Preview mode"><span>Demo preview</span><span className={`tiny-state ${apiHealth}`}>{apiHealth}</span></div>;
 }
 
-function RouteScreen({ route }: { readonly route: RouteKey }): React.ReactElement {
-  if (route === 'dashboard') return <Dashboard />;
+function RouteScreen({ route, authenticated }: { readonly route: RouteKey; readonly authenticated: boolean }): React.ReactElement {
+  if (route === 'dashboard') return authenticated ? <><CareerReadinessApiPanel route="readiness" /><Dashboard authenticated /></> : <Dashboard />;
   if (route === 'ai-coach') return <CoachPage />;
   if (route === 'career-path') return <><CareerReadinessApiPanel route="roadmap" /><CareerPath /></>;
   if (route === 'readiness') return <><CareerReadinessApiPanel route="readiness" /><ReadinessPage /></>;

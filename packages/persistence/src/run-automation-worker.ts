@@ -26,10 +26,11 @@ async function main(): Promise<void> {
       const consumer = createNotificationEventConsumer({ pool, queueUrl: requireValue('PTP_AUTOMATION_QUEUE_URL') });
       while (!stopping) log(mode, await consumer.pollOnce());
     } else {
-      const adapter = new N8nAutomationAdapter(requireValue('PTP_N8N_BASE_URL'), requireValue('PTP_N8N_TRANSPORT_CREDENTIAL'));
-      const signingSecret = Buffer.from(requireValue('AUTOMATION_SIGNING_SECRET'), 'utf8');
+      const adapter = new N8nAutomationAdapter(requireValue('PTP_N8N_BASE_URL'));
+      const invocationSigningSecret = Buffer.from(requireValue('PTP_N8N_INVOCATION_SECRET'), 'utf8');
+      const callbackSigningSecret = Buffer.from(requireValue('AUTOMATION_SIGNING_SECRET'), 'utf8');
       while (!stopping) {
-        log(mode, await dispatchAutomationOnce({ pool, adapter, signingSecret, leaseOwner, now: new Date() }));
+        log(mode, await dispatchAutomationOnce({ pool, adapter, invocationSigningSecret, callbackSigningSecret, leaseOwner, now: new Date() }));
         await delay(1_000);
       }
     }

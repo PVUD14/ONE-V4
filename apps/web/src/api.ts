@@ -1,7 +1,25 @@
 export type ApiHealth = 'checking' | 'online' | 'offline';
 
 const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL;
-export const apiBaseUrl = configuredBaseUrl || 'http://127.0.0.1:3000';
+export const apiBaseUrl = resolveApiBaseUrl(configuredBaseUrl, import.meta.env.DEV);
+
+export function resolveApiBaseUrl(configured: string | undefined, development: boolean): string {
+  const value = configured?.trim();
+  if (!value) return development ? 'http://127.0.0.1:3000' : '';
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error('VITE_API_BASE_URL must be an absolute HTTP(S) URL');
+  }
+  if (parsed.username || parsed.password || parsed.search || parsed.hash || parsed.pathname !== '/') {
+    throw new Error('VITE_API_BASE_URL must contain only a trusted origin');
+  }
+  if (parsed.protocol !== 'https:' && !(development && parsed.protocol === 'http:')) {
+    throw new Error('VITE_API_BASE_URL must use HTTPS outside development');
+  }
+  return parsed.origin;
+}
 
 export async function getApiHealth(signal?: AbortSignal): Promise<ApiHealth> {
   try {

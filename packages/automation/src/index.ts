@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { EventBridgeClient, PutEventsCommand, type PutEventsCommandOutput } from '@aws-sdk/client-eventbridge';
 import { DeleteMessageCommand, ReceiveMessageCommand, SQSClient, type DeleteMessageCommandOutput, type ReceiveMessageCommandOutput } from '@aws-sdk/client-sqs';
 import {
@@ -112,6 +112,10 @@ export interface AutomationTokenClaims {
   readonly exp: number;
   readonly purpose: 'WORKFLOW_INVOCATION' | 'WORKFLOW_CALLBACK';
   readonly workflowKey: string;
+  readonly workflowRegistryId: string;
+  readonly workflowVersion?: number;
+  readonly workflowHash?: string;
+  readonly requestDigest?: string;
   readonly commandId: string;
   readonly correlationId: string;
   readonly payloadRef: string;
@@ -134,18 +138,31 @@ export class InMemoryReplayStore implements ReplayStore {
 export function mintAutomationToken(input: {
   readonly secret: Uint8Array; readonly audience: string; readonly subject: string; readonly tokenId: string;
   readonly nowEpochSeconds: number; readonly lifetimeSeconds: number; readonly purpose: AutomationTokenClaims['purpose'];
-  readonly workflowKey: string; readonly commandId: string; readonly correlationId: string; readonly payloadRef: string;
+  readonly workflowKey: string; readonly workflowRegistryId: string; readonly workflowVersion?: number; readonly workflowHash?: string;
+  readonly requestDigest?: string; readonly commandId: string; readonly correlationId: string; readonly payloadRef: string;
 }): string {
   requireSecret(input.secret);
   if (!Number.isInteger(input.lifetimeSeconds) || input.lifetimeSeconds < 15 || input.lifetimeSeconds > 300) throw new Error('automation token lifetime must be 15 to 300 seconds');
   for (const [field, value] of Object.entries({ audience: input.audience, subject: input.subject, tokenId: input.tokenId,
-    workflowKey: input.workflowKey, commandId: input.commandId, correlationId: input.correlationId, payloadRef: input.payloadRef })) {
+    workflowKey: input.workflowKey, workflowRegistryId: input.workflowRegistryId, commandId: input.commandId,
+    correlationId: input.correlationId, payloadRef: input.payloadRef })) {
     if (!/^[A-Za-z0-9._:-]{3,256}$/.test(value)) throw new Error(`invalid automation token ${field}`);
+  }
+  if (input.purpose === 'WORKFLOW_INVOCATION') {
+    if (!Number.isInteger(input.workflowVersion) || (input.workflowVersion ?? 0) < 1
+      || !/^[0-9a-f]{64}$/i.test(input.workflowHash ?? '') || !/^[0-9a-f]{64}$/i.test(input.requestDigest ?? '')) {
+      throw new Error('invocation token must bind the workflow version, hash, and request digest');
+    }
   }
   const claims: AutomationTokenClaims = { iss: 'planthepath-automation-adapter', aud: input.audience, sub: input.subject,
     jti: input.tokenId, iat: input.nowEpochSeconds, exp: input.nowEpochSeconds + input.lifetimeSeconds, purpose: input.purpose,
-    workflowKey: input.workflowKey, commandId: input.commandId, correlationId: input.correlationId, payloadRef: input.payloadRef };
-  const encodedHeader = base64Url(JSON.stringify({ alg: 'HS256', typ: 'JWT', kid: 'automation-hmac-v1' }));
+    workflowKey: input.workflowKey, workflowRegistryId: input.workflowRegistryId,
+    ...(input.workflowVersion !== undefined ? { workflowVersion: input.workflowVersion } : {}),
+    ...(input.workflowHash ? { workflowHash: input.workflowHash } : {}),
+    ...(input.requestDigest ? { requestDigest: input.requestDigest } : {}),
+    commandId: input.commandId, correlationId: input.correlationId, payloadRef: input.payloadRef };
+  const kid = input.purpose === 'WORKFLOW_INVOCATION' ? 'n8n-invocation-hmac-v1' : 'automation-callback-hmac-v1';
+  const encodedHeader = base64Url(JSON.stringify({ alg: 'HS256', typ: 'JWT', kid }));
   const encodedPayload = base64Url(JSON.stringify(claims));
   const signingInput = `${encodedHeader}.${encodedPayload}`;
   return `${signingInput}.${base64Url(createHmac('sha256', input.secret).update(signingInput).digest())}`;
@@ -170,7 +187,8 @@ export function validateAutomationToken(token: string, input: {
   if (parts.length !== 3 || parts.some((part) => !part)) throw new Error('automation token is malformed');
   const [encodedHeader, encodedPayload, encodedSignature] = parts as [string, string, string];
   const header = JSON.parse(fromBase64Url(encodedHeader).toString('utf8')) as Record<string, unknown>;
-  if (header.alg !== 'HS256' || header.typ !== 'JWT' || header.kid !== 'automation-hmac-v1') throw new Error('automation token header is invalid');
+  const expectedKid = input.purpose === 'WORKFLOW_INVOCATION' ? 'n8n-invocation-hmac-v1' : 'automation-callback-hmac-v1';
+  if (header.alg !== 'HS256' || header.typ !== 'JWT' || header.kid !== expectedKid) throw new Error('automation token header is invalid');
   const expected = createHmac('sha256', input.secret).update(`${encodedHeader}.${encodedPayload}`).digest();
   const supplied = fromBase64Url(encodedSignature);
   if (base64Url(supplied) !== encodedSignature || supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) {
@@ -182,8 +200,12 @@ export function validateAutomationToken(token: string, input: {
   }
   if (!Number.isInteger(claims.iat) || !Number.isInteger(claims.exp) || claims.exp <= input.nowEpochSeconds || claims.iat > input.nowEpochSeconds + 30
     || claims.exp - claims.iat > 300) throw new Error('automation token time window is invalid');
-  for (const value of [claims.sub, claims.jti, claims.workflowKey, claims.commandId, claims.correlationId, claims.payloadRef]) {
+  for (const value of [claims.sub, claims.jti, claims.workflowKey, claims.workflowRegistryId, claims.commandId, claims.correlationId, claims.payloadRef]) {
     if (typeof value !== 'string' || !/^[A-Za-z0-9._:-]{3,256}$/.test(value)) throw new Error('automation token claims are invalid');
+  }
+  if (input.purpose === 'WORKFLOW_INVOCATION' && (!Number.isInteger(claims.workflowVersion) || (claims.workflowVersion ?? 0) < 1
+    || !/^[0-9a-f]{64}$/i.test(claims.workflowHash ?? '') || !/^[0-9a-f]{64}$/i.test(claims.requestDigest ?? ''))) {
+    throw new Error('automation invocation token binding is invalid');
   }
   return claims;
 }
@@ -206,12 +228,29 @@ export interface N8nDeliveryCallback {
   readonly providerReference?: string;
 }
 
+export function createAutomationRequestDigest(delivery: EmailDeliveryInvocation): string {
+  return createHash('sha256').update(JSON.stringify(delivery)).digest('hex');
+}
+
+export class N8nRateLimitedError extends Error {
+  constructor(message = 'n8n rate limited delivery') { super(message); this.name = 'N8nRateLimitedError'; }
+}
+
+export class N8nAmbiguousDeliveryError extends Error {
+  constructor(message = 'n8n delivery outcome is ambiguous', options?: ErrorOptions) {
+    super(message, options); this.name = 'N8nAmbiguousDeliveryError';
+  }
+}
+
+export class N8nTerminalDeliveryError extends Error {
+  constructor(message = 'n8n rejected delivery') { super(message); this.name = 'N8nTerminalDeliveryError'; }
+}
+
 export class N8nAutomationAdapter {
   readonly baseUrl: URL;
 
-  constructor(baseUrl: string, readonly transportCredential: string, readonly fetcher: typeof fetch = fetch) {
+  constructor(baseUrl: string, readonly fetcher: typeof fetch = fetch) {
     this.baseUrl = new URL(baseUrl);
-    if (transportCredential.length < 32 || transportCredential.length > 256) throw new Error('n8n transport credential must contain 32 to 256 characters');
     if (this.baseUrl.username || this.baseUrl.password || this.baseUrl.search || this.baseUrl.hash) throw new Error('n8n base URL must not contain credentials, query, or fragment');
     const localHttp = this.baseUrl.protocol === 'http:' && ['n8n', '127.0.0.1', 'localhost'].includes(this.baseUrl.hostname);
     if (this.baseUrl.protocol !== 'https:' && !localHttp) throw new Error('n8n base URL must use HTTPS outside the private local runtime');
@@ -241,16 +280,27 @@ export class N8nAutomationAdapter {
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const endpoint = new URL(`/webhook/${input.workflowKey}`, this.baseUrl);
-      const response = await this.fetcher(endpoint, { method: 'POST', signal: controller.signal,
-        headers: { Authorization: `Bearer ${input.invocationToken}`, 'X-PlanThePath-Adapter-Key': this.transportCredential,
+      let response: Response;
+      try {
+        response = await this.fetcher(endpoint, { method: 'POST', signal: controller.signal,
+        headers: { Authorization: `Bearer ${input.invocationToken}`,
           'Content-Type': 'application/json', 'Idempotency-Key': input.delivery.idempotencyId },
         body: JSON.stringify(input.delivery) });
-      if (!response.ok) throw new Error(response.status >= 500 || response.status === 429 ? 'n8n retryable delivery failure' : 'n8n terminal delivery failure');
-      const callback = await readN8nCallback(response);
-      if (callback.callbackId !== input.delivery.callbackId || callback.callbackToken !== input.delivery.callbackToken) {
-        throw new Error('n8n callback binding is invalid');
+      } catch (error) {
+        throw new N8nAmbiguousDeliveryError('n8n request failed before a delivery outcome was confirmed', { cause: error });
       }
-      return callback;
+      if (response.status === 429) throw new N8nRateLimitedError();
+      if (response.status >= 500) throw new N8nAmbiguousDeliveryError(`n8n returned ${response.status} after accepting the request`);
+      if (!response.ok) throw new N8nTerminalDeliveryError(`n8n rejected delivery with status ${response.status}`);
+      try {
+        const callback = await readN8nCallback(response);
+        if (callback.callbackId !== input.delivery.callbackId || callback.callbackToken !== input.delivery.callbackToken) {
+          throw new Error('n8n callback binding is invalid');
+        }
+        return callback;
+      } catch (error) {
+        throw new N8nAmbiguousDeliveryError('n8n delivery succeeded without a verifiable callback', { cause: error });
+      }
     } finally {
       clearTimeout(timer);
     }

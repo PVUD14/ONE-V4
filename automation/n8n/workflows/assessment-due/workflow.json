@@ -4,13 +4,13 @@
   "active": false,
   "nodes": [
     {
-      "parameters": { "httpMethod": "POST", "path": "assessment-due", "authentication": "headerAuth", "responseMode": "responseNode", "options": {} },
+      "parameters": { "httpMethod": "POST", "path": "assessment-due", "authentication": "jwtAuth", "responseMode": "responseNode", "options": {} },
       "id": "41000000-0000-4000-8000-000000000001", "name": "Authenticated adapter command", "type": "n8n-nodes-base.webhook", "typeVersion": 2.1,
       "position": [0, 0], "webhookId": "41000000-0000-4000-8000-000000000002",
-      "credentials": { "httpHeaderAuth": { "name": "PlanThePath Adapter Header" } }
+      "credentials": { "jwtAuth": { "name": "PlanThePath Invocation JWT" } }
     },
     {
-      "parameters": { "fromEmail": "PlanThePath <no-reply@planthepath.local>", "toEmail": "={{ $json.body.recipientEmail }}", "subject": "={{ $json.body.subject }}", "emailFormat": "text", "text": "={{ $json.body.textBody }}", "options": { "appendAttribution": false } },
+      "parameters": { "fromEmail": "PlanThePath <no-reply@planthepath.local>", "toEmail": "={{ $json.jwtPayload.iss === 'planthepath-automation-adapter' && $json.jwtPayload.aud === 'n8n-private' && $json.jwtPayload.purpose === 'WORKFLOW_INVOCATION' && $json.jwtPayload.workflowKey === 'assessment-due' && $json.jwtPayload.workflowRegistryId === '47000000-0000-4000-8000-000000000001' && $json.jwtPayload.workflowVersion === 1 && $json.jwtPayload.commandId === $json.body.commandId && $json.jwtPayload.requestDigest === $json.body.toJsonString().hash('sha256') ? $json.body.recipientEmail : '' }}", "subject": "={{ $json.body.subject }}", "emailFormat": "text", "text": "={{ $json.body.textBody }}", "options": { "appendAttribution": false } },
       "id": "41000000-0000-4000-8000-000000000003", "name": "Send assessment reminder email", "type": "n8n-nodes-base.emailSend", "typeVersion": 2.1,
       "position": [260, 0], "credentials": { "smtp": { "name": "PlanThePath SMTP" } }
     },

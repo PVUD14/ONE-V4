@@ -618,14 +618,21 @@ FOR EACH ROW EXECUTE FUNCTION enforce_automation_command_transition();
 CREATE OR REPLACE FUNCTION protect_published_content_revision()
 RETURNS trigger AS $$
 BEGIN
+  IF TG_OP = 'INSERT' THEN
+    IF NEW.state IN ('PUBLISHED','ARCHIVED') THEN
+      RAISE EXCEPTION 'content revisions must enter the review lifecycle before publication';
+    END IF;
+    RETURN NEW;
+  END IF;
   IF OLD.state IN ('PUBLISHED','ARCHIVED') THEN
     RAISE EXCEPTION 'published content revisions are immutable';
   END IF;
+  IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 DROP TRIGGER IF EXISTS content_revisions_published_guard ON content_revisions;
-CREATE TRIGGER content_revisions_published_guard BEFORE UPDATE OR DELETE ON content_revisions
+CREATE TRIGGER content_revisions_published_guard BEFORE INSERT OR UPDATE OR DELETE ON content_revisions
 FOR EACH ROW EXECUTE FUNCTION protect_published_content_revision();
 
 CREATE OR REPLACE FUNCTION enforce_content_review_separation()
@@ -662,8 +669,31 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 DROP TRIGGER IF EXISTS release_manifest_eligibility_guard ON release_manifests;
-CREATE TRIGGER release_manifest_eligibility_guard BEFORE UPDATE ON release_manifests
+CREATE TRIGGER release_manifest_eligibility_guard BEFORE INSERT OR UPDATE ON release_manifests
 FOR EACH ROW EXECUTE FUNCTION enforce_release_manifest_eligibility();
+
+CREATE OR REPLACE FUNCTION protect_finalized_release_manifest_items()
+RETURNS trigger AS $$
+BEGIN
+  IF TG_OP <> 'INSERT' AND EXISTS (
+    SELECT 1 FROM release_manifests
+    WHERE id = OLD.manifest_id AND status IN ('PUBLISHED','ROLLED_BACK','ARCHIVED')
+  ) THEN
+    RAISE EXCEPTION 'finalized release manifest items are immutable';
+  END IF;
+  IF TG_OP <> 'DELETE' AND EXISTS (
+    SELECT 1 FROM release_manifests
+    WHERE id = NEW.manifest_id AND status IN ('PUBLISHED','ROLLED_BACK','ARCHIVED')
+  ) THEN
+    RAISE EXCEPTION 'finalized release manifest items are immutable';
+  END IF;
+  IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+DROP TRIGGER IF EXISTS release_manifest_items_finalized_guard ON release_manifest_items;
+CREATE TRIGGER release_manifest_items_finalized_guard BEFORE INSERT OR UPDATE OR DELETE ON release_manifest_items
+FOR EACH ROW EXECUTE FUNCTION protect_finalized_release_manifest_items();
 
 CREATE OR REPLACE FUNCTION enforce_lesson_prerequisite_dag()
 RETURNS trigger AS $$

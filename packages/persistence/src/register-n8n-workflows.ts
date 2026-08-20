@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,10 +11,14 @@ Promise<readonly AutomationWorkflowDeployment[]> {
   const deployments: AutomationWorkflowDeployment[] = [];
   for (const directory of directories) {
     const manifest = JSON.parse(await readFile(new URL(`${directory}/manifest.json`, root), 'utf8')) as Record<string, unknown>;
+    const workflowBytes = await readFile(new URL(`${directory}/workflow.json`, root));
     if (manifest.allowlistId !== directory || typeof manifest.registryId !== 'string' || typeof manifest.version !== 'number'
       || typeof manifest.workflowSha256 !== 'string' || typeof manifest.operation !== 'string'
       || manifest.destinationClass !== 'EMAIL' || manifest.activeByDefault !== false || manifest.killSwitchByDefault !== true) {
       throw new Error(`${directory}: invalid n8n workflow manifest`);
+    }
+    if (createHash('sha256').update(workflowBytes).digest('hex') !== manifest.workflowSha256) {
+      throw new Error(`${directory}: deployed workflow source does not match its registered hash`);
     }
     deployments.push({ id: manifest.registryId, allowlistId: directory as AutomationWorkflowDeployment['allowlistId'],
       version: manifest.version, workflowHash: manifest.workflowSha256,

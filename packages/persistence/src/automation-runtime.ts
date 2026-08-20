@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import { createIntegrationEventEnvelope } from '@planthepath/events/src/index.js';
-import type { AutomationTokenClaims, ReplayStore } from '@planthepath/automation/src/index.js';
+import type { AutomationTokenClaims, AutomationWorkflowRegistration, ReplayStore } from '@planthepath/automation/src/index.js';
 
 type DbClient = Pick<PoolClient, 'query'>;
 type AutomationOutcome = 'ACCEPTED' | 'SUCCEEDED' | 'FAILED_RETRYABLE' | 'FAILED_TERMINAL' | 'EXPIRED';
@@ -20,6 +20,7 @@ export interface AutomationWorkflowDeployment {
 
 export interface ClaimedAutomationCommand {
   readonly id: string;
+  readonly workflowRegistryId: string;
   readonly workflowKey: string;
   readonly workflowVersion: number;
   readonly workflowHash: string;
@@ -135,7 +136,7 @@ export async function claimAutomationCommands(pool: Pool, input: {
     || !Number.isInteger(input.leaseDurationMs) || input.leaseDurationMs < 1_000 || input.leaseDurationMs > 300_000) throw new Error('invalid automation claim parameters');
   const leaseToken = randomUUID();
   const result = await pool.query<{
-    id: string; allowlist_id: string; version: number; workflow_hash: string; operation: string; destination_class: 'EMAIL';
+    id: string; workflow_registry_id: string; allowlist_id: string; version: number; workflow_hash: string; operation: string; destination_class: 'EMAIL';
     payload_ref: string; correlation_id: string; idempotency_id: string; expires_at: Date; attempts: number; lease_owner: string; lease_token: string;
   }>(
     `WITH candidates AS (
@@ -146,14 +147,33 @@ export async function claimAutomationCommands(pool: Pool, input: {
      )
      UPDATE automation_commands c SET lease_owner=$3,lease_token=$4,lease_expires_at=$5,attempts=attempts+1,last_failure_class=NULL
      FROM candidates, automation_workflow_registry w WHERE c.id=candidates.id AND w.id=c.workflow_registry_id
-     RETURNING c.id,w.allowlist_id,w.version,w.workflow_hash,c.operation,c.destination_class,c.payload_ref,c.correlation_id,
+     RETURNING c.id,w.id AS workflow_registry_id,w.allowlist_id,w.version,w.workflow_hash,c.operation,c.destination_class,c.payload_ref,c.correlation_id,
        c.idempotency_id,c.expires_at,c.attempts,c.lease_owner,c.lease_token`,
     [input.now, input.batchSize, input.leaseOwner, leaseToken, new Date(input.now.getTime() + input.leaseDurationMs)],
   );
-  return result.rows.map((row) => ({ id: row.id, workflowKey: row.allowlist_id, workflowVersion: row.version,
+  return result.rows.map((row) => ({ id: row.id, workflowRegistryId: row.workflow_registry_id,
+    workflowKey: row.allowlist_id, workflowVersion: row.version,
     workflowHash: row.workflow_hash, operation: row.operation, destinationClass: row.destination_class, payloadRef: row.payload_ref,
     correlationId: row.correlation_id, idempotencyId: row.idempotency_id, expiresAt: new Date(row.expires_at), attempts: row.attempts,
     leaseOwner: row.lease_owner, leaseToken: row.lease_token }));
+}
+
+export async function loadCurrentAutomationWorkflowRegistration(
+  pool: Pool,
+  claim: ClaimedAutomationCommand,
+): Promise<AutomationWorkflowRegistration> {
+  const result = await pool.query<{
+    allowlist_id: string; version: number; workflow_hash: string; operation: string;
+    destination_class: 'EMAIL'; active: boolean; kill_switch: boolean;
+  }>(
+    `SELECT allowlist_id,version,workflow_hash,operation,destination_class,active,kill_switch
+     FROM automation_workflow_registry WHERE id=$1`,
+    [claim.workflowRegistryId],
+  );
+  const row = result.rows[0];
+  if (!row) throw new Error('automation workflow registration no longer exists');
+  return { allowlistId: row.allowlist_id, version: row.version, workflowHash: row.workflow_hash,
+    operation: row.operation, destinationClass: row.destination_class, active: row.active, killSwitch: row.kill_switch };
 }
 
 export async function resolveClaimedEmailDelivery(pool: Pool, claim: ClaimedAutomationCommand, now = new Date()): Promise<ResolvedEmailDelivery> {
@@ -271,6 +291,7 @@ export async function completeClaimedAutomationCommand(pool: Pool, claim: Claime
 }): Promise<boolean> {
   if (input.claims.purpose !== 'WORKFLOW_CALLBACK' || input.claims.aud !== 'planthepath-automation-callback'
     || input.claims.commandId !== claim.id || input.claims.workflowKey !== claim.workflowKey
+    || input.claims.workflowRegistryId !== claim.workflowRegistryId
     || input.claims.correlationId !== claim.correlationId || input.claims.payloadRef !== claim.payloadRef) {
     throw new Error('callback token is not bound to the claimed command');
   }

@@ -66,6 +66,29 @@ describe('Career Readiness Fundamentals production path', () => {
     expect(JSON.stringify(catalog)).not.toContain('answer_hash');
   });
 
+  it('rejects bypasses around the content review and finalized manifest boundaries', async () => {
+    await expect(pool.query(
+      `INSERT INTO release_manifests
+       (id, name, version, manifest_hash, status, approved_by_user_id, published_by_user_id, approved_at, published_at)
+       VALUES ($1,'Direct Published Bypass',1,$2,'PUBLISHED',$3,$4,now(),now())`,
+      [randomUUID(), 'c'.repeat(64), actors.reviewerUserId, actors.publisherUserId],
+    )).rejects.toThrow(/must contain items/);
+    await expect(pool.query(
+      `INSERT INTO content_revisions
+       (id, entity_type, entity_id, revision, author_user_id, state, content_hash, body, release_manifest_id, published_at)
+       VALUES ($1,'LESSON',$2,1,$3,'PUBLISHED',$4,'{}'::jsonb,$5,now())`,
+      [randomUUID(), randomUUID(), actors.authorUserId, 'a'.repeat(64), '25000000-0000-4000-8000-000000000001'],
+    )).rejects.toThrow(/review lifecycle/);
+
+    const item = await pool.query<{ manifest_id: string; content_revision_id: string }>(
+      `SELECT manifest_id, content_revision_id FROM release_manifest_items LIMIT 1`,
+    );
+    await expect(pool.query(
+      `UPDATE release_manifest_items SET item_hash=$3 WHERE manifest_id=$1 AND content_revision_id=$2`,
+      [item.rows[0]?.manifest_id, item.rows[0]?.content_revision_id, 'b'.repeat(64)],
+    )).rejects.toThrow(/finalized release manifest items are immutable/);
+  });
+
   it('enforces prerequisites, completes lessons, and emits immutable evidence atomically', async () => {
     await expect(completeLesson(pool, { subjectUserId: studentUserId, lessonVersionId: fixture.lessons[1]!.id, correlationId: 'lesson-order-check' }))
       .rejects.toThrow('prerequisites');
@@ -108,5 +131,59 @@ describe('Career Readiness Fundamentals production path', () => {
     const report = await generateInstitutionAggregateReport(pool, { institutionId, periodStart: '2026-08-01', periodEnd: '2026-08-31' });
     expect(report).toMatchObject({ aggregate: { suppressed: true, minimumCohortSize: 5, cohortSize: 0, bands: [] } });
     expect(JSON.stringify(report)).not.toContain(studentUserId);
+  });
+
+  it('aggregates only snapshots created while the institution relationship authorized access', async () => {
+    const institutionId = randomUUID();
+    await pool.query(
+      `INSERT INTO organizations (id, kind, legal_name, verification_state)
+       VALUES ($1,'INSTITUTION','Temporal Aggregate Test','VERIFIED')`,
+      [institutionId],
+    );
+    const model = await pool.query<{ id: string }>(
+      `SELECT id FROM readiness_model_versions WHERE active ORDER BY published_at DESC LIMIT 1`,
+    );
+    const modelVersionId = model.rows[0]?.id;
+    expect(modelVersionId).toBeTruthy();
+
+    for (let index = 0; index < 10; index += 1) {
+      const userId = randomUUID();
+      await pool.query(
+        `INSERT INTO users (id, external_subject, email, state) VALUES ($1,$2,$3,'ACTIVE')`,
+        [userId, `institution-temporal:${index}`, `institution-temporal-${index}@example.test`],
+      );
+      await pool.query(
+        `INSERT INTO institution_relationships
+         (id, institution_id, student_user_id, state, effective_from, effective_to)
+         VALUES ($1,$2,$3,$4,'2026-05-01T00:00:00Z',$5)`,
+        [randomUUID(), institutionId, userId, index < 5 ? 'TRANSFERRED' : 'ENDED', index < 5 ? '2026-06-01T00:00:00Z' : null],
+      );
+      await pool.query(
+        `INSERT INTO readiness_snapshots
+         (id, subject_user_id, model_version_id, evidence_ids, evidence_set_hash, band, explanation, generated_at)
+         VALUES ($1,$2,$3,'{}'::uuid[],$4,'DEVELOPING','{}'::jsonb,'2026-05-15T00:00:00Z')`,
+        [randomUUID(), userId, modelVersionId, createHash('sha256').update(`authorized:${index}`).digest('hex')],
+      );
+      await pool.query(
+        `INSERT INTO readiness_snapshots
+         (id, subject_user_id, model_version_id, evidence_ids, evidence_set_hash, band, explanation, generated_at)
+         VALUES ($1,$2,$3,'{}'::uuid[],$4,'READY_FOR_NEXT_STEP','{}'::jsonb,'2026-06-01T00:00:00Z')`,
+        [randomUUID(), userId, modelVersionId, createHash('sha256').update(`unauthorized:${index}`).digest('hex')],
+      );
+    }
+
+    const report = await generateInstitutionAggregateReport(pool, {
+      institutionId,
+      periodStart: '2026-05-01',
+      periodEnd: '2026-06-30',
+    });
+    expect(report).toMatchObject({
+      aggregate: {
+        suppressed: false,
+        minimumCohortSize: 5,
+        cohortSize: 5,
+        bands: [{ band: 'DEVELOPING', count: 5 }],
+      },
+    });
   });
 });

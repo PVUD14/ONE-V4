@@ -10,8 +10,8 @@ The native signed callback HTTP endpoint also exists for a future reviewed async
 
 ## Rationale
 
-This provides a verified native completion boundary while keeping n8n unable to select a destination or call arbitrary PlanThePath/domain endpoints. The static private Header Auth credential authenticates adapter transport; the short-lived token binds the individual command and callback. Execution data is not retained by n8n.
+This provides a verified native completion boundary while keeping n8n unable to select a destination or call arbitrary PlanThePath/domain endpoints. n8n JWT Auth verifies the dedicated HS256 invocation secret and token expiry before execution. The 15-second token also binds the deployed registry ID/version, command, and exact request-body digest. The callback uses a separate signing secret that n8n never receives. Execution data is not retained by n8n.
 
 ## Consequences
 
-The adapter request remains open through SMTP acceptance and has a bounded timeout. A missing/invalid response is retried only under native policy and ambiguous delivery outcomes require reconciliation. A later asynchronous callback design must add a destination-specific egress proxy/custom reviewed node, threat model, and new workflow hash/version.
+The adapter request remains open through SMTP acceptance and has a bounded timeout. Only a definite pre-execution `429` is automatically retried. A network failure, timeout, `5xx`, malformed callback, or callback-binding failure is terminal and requires reconciliation because SMTP acceptance may already have occurred. A later asynchronous callback design must add a destination-specific egress proxy/custom reviewed node, threat model, and new workflow hash/version.

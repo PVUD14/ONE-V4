@@ -7,6 +7,34 @@ Parameters:
     AllowedPattern: '^[a-z0-9-]{2,24}$'
 
 Resources:
+  IntegrationEventQueueKey:
+    Type: AWS::KMS::Key
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Description: !Sub 'PlanThePath ${EnvironmentName} integration-event queues'
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AccountAdministration
+            Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:root'
+            Action: kms:*
+            Resource: '*'
+          - Sid: EventBridgeQueueEncryption
+            Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action:
+              - kms:Decrypt
+              - kms:GenerateDataKey
+            Resource: '*'
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+
   IntegrationEventBus:
     Type: AWS::Events::EventBus
     Properties:
@@ -18,14 +46,14 @@ Resources:
     UpdateReplacePolicy: Retain
     Properties:
       QueueName: !Sub 'planthepath-${EnvironmentName}-events-dlq'
-      KmsMasterKeyId: alias/aws/sqs
+      KmsMasterKeyId: !GetAtt IntegrationEventQueueKey.Arn
       MessageRetentionPeriod: 1209600
 
   IntegrationEventQueue:
     Type: AWS::SQS::Queue
     Properties:
       QueueName: !Sub 'planthepath-${EnvironmentName}-events'
-      KmsMasterKeyId: alias/aws/sqs
+      KmsMasterKeyId: !GetAtt IntegrationEventQueueKey.Arn
       MessageRetentionPeriod: 345600
       ReceiveMessageWaitTimeSeconds: 20
       VisibilityTimeout: 60
@@ -57,6 +85,7 @@ Resources:
     Properties:
       Queues:
         - !Ref IntegrationEventQueue
+        - !Ref IntegrationEventDeadLetterQueue
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -66,6 +95,15 @@ Resources:
               Service: events.amazonaws.com
             Action: sqs:SendMessage
             Resource: !GetAtt IntegrationEventQueue.Arn
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !GetAtt IntegrationEventRule.Arn
+          - Sid: EventBridgeDeadLetterOnly
+            Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: sqs:SendMessage
+            Resource: !GetAtt IntegrationEventDeadLetterQueue.Arn
             Condition:
               ArnEquals:
                 aws:SourceArn: !GetAtt IntegrationEventRule.Arn
@@ -98,6 +136,10 @@ Resources:
                   - sqs:ChangeMessageVisibility
                   - sqs:GetQueueAttributes
                 Resource: !GetAtt IntegrationEventQueue.Arn
+              - Sid: DecryptIntegrationEvents
+                Effect: Allow
+                Action: kms:Decrypt
+                Resource: !GetAtt IntegrationEventQueueKey.Arn
 
   IntegrationEventDeadLetterAlarm:
     Type: AWS::CloudWatch::Alarm
@@ -140,3 +182,5 @@ Outputs:
     Value: !Ref IntegrationEventDeadLetterQueue
   AutomationWorkerRoleArn:
     Value: !GetAtt AutomationWorkerRole.Arn
+  QueueKeyArn:
+    Value: !GetAtt IntegrationEventQueueKey.Arn

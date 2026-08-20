@@ -662,13 +662,17 @@ export async function generateInstitutionAggregateReport(pool: Pool, input: {
   if (!Number.isInteger(minimumCohortSize) || minimumCohortSize < 5) throw new Error('minimum cohort size must be at least 5');
   return transaction(pool, async (client) => {
     const result = await client.query<{ cohort_size: number; band: string; count: number }>(
-      `WITH eligible AS (
-         SELECT DISTINCT ir.student_user_id FROM institution_relationships ir
-         WHERE ir.institution_id=$1 AND ir.effective_from < ($3::date + interval '1 day')
-           AND (ir.effective_to IS NULL OR ir.effective_to >= $2::date)
-       ), latest AS (
+      `WITH latest AS (
          SELECT DISTINCT ON (rs.subject_user_id) rs.subject_user_id, rs.band
-         FROM readiness_snapshots rs JOIN eligible e ON e.student_user_id=rs.subject_user_id
+         FROM readiness_snapshots rs
+         JOIN institution_relationships ir ON ir.student_user_id=rs.subject_user_id
+           AND ir.institution_id=$1
+           AND (
+             ir.state IN ('VERIFIED','ACTIVE')
+             OR (ir.state IN ('TRANSFERRED','GRADUATED') AND ir.effective_to IS NOT NULL)
+           )
+           AND ir.effective_from <= rs.generated_at
+           AND (ir.effective_to IS NULL OR ir.effective_to > rs.generated_at)
          WHERE rs.generated_at >= $2::date AND rs.generated_at < ($3::date + interval '1 day')
          ORDER BY rs.subject_user_id, rs.generated_at DESC
        )

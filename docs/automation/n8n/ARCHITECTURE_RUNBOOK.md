@@ -4,7 +4,7 @@
 
 PostgreSQL outbox -> native publisher -> explicit EventBridge bus -> encrypted SQS queue/DLQ -> native idempotent consumer -> native automation command -> allowlisted adapter -> private n8n -> SMTP.
 
-`infra/event-boundary.yaml` creates the bus, exact notification-delivery rule, encrypted queue and retained DLQ, retry/redrive policy, least-privilege ECS workload role, and queue-age/DLQ alarms. AWS SDK clients use the default workload identity chain; static AWS keys are neither accepted nor documented.
+`infra/event-boundary.yaml` creates the bus, exact notification-delivery rule, customer-managed rotating KMS key, encrypted queue and retained DLQ, EventBridge resource policies for both queues, retry/redrive policy, least-privilege ECS workload role, and queue-age/DLQ alarms. AWS SDK clients use the default workload identity chain; static AWS keys are neither accepted nor documented.
 
 Run workers with `pnpm --filter @planthepath/persistence worker:automation` and one `AUTOMATION_WORKER_MODE` per process:
 
@@ -12,7 +12,7 @@ Run workers with `pnpm --filter @planthepath/persistence worker:automation` and 
 - `notification-consumer`: long-polls SQS, accepts only `notification.delivery.requested` v1, creates one native command per event, and acknowledges only after success.
 - `automation-dispatcher`: leases an enabled allowlisted command, resolves the recipient/template late, validates bounded content, verifies a single-use short-lived invocation token, calls private n8n, verifies the bound callback token, and atomically records callback/delivery outcome.
 
-Token claims bind issuer, audience, subject, purpose, workflow/version context, command, correlation ID, payload reference, `jti`, issued time, and expiry. PostgreSQL replay rows make invocation/callback use single-shot across worker restarts. Callback statuses are `ACCEPTED`, `SUCCEEDED`, `FAILED_RETRYABLE`, `FAILED_TERMINAL`, or `EXPIRED`. The signed native endpoint is `POST /api/v1/internal/automation/callbacks`; production API startup requires `AUTOMATION_SIGNING_SECRET`.
+Token claims bind issuer, audience, subject, purpose, registry/workflow/version context, command, correlation ID, payload reference, `jti`, issued time, and expiry. Invocation tokens additionally bind the source-controlled workflow hash and SHA-256 digest of the exact request body. n8n JWT Auth verifies the dedicated `PTP_N8N_INVOCATION_SECRET` and 15-second expiry before the email node; PostgreSQL replay rows also make native invocation/callback processing single-shot across worker restarts. Callback tokens use the separate `AUTOMATION_SIGNING_SECRET`. Callback statuses are `ACCEPTED`, `SUCCEEDED`, `FAILED_RETRYABLE`, `FAILED_TERMINAL`, or `EXPIRED`. The signed native endpoint is `POST /api/v1/internal/automation/callbacks`.
 
 The current workflows use a safer synchronous callback response over the authenticated private invocation connection. They do not enable an HTTP Request node. See `docs/architecture/ADR-002-N8N-SYNCHRONOUS-CALLBACK.md`.
 
@@ -20,7 +20,7 @@ The current workflows use a safer synchronous callback response over the authent
 
 1. Run `pnpm automation:validate`.
 2. Seed registry rows with `pnpm --filter @planthepath/persistence db:register:n8n`; all six are inactive with kill switches enabled.
-3. Create n8n Header Auth and SMTP credentials in the target secret-controlled instance.
+3. Create an n8n JWT Auth credential using HS256 and the secret-manager value `PTP_N8N_INVOCATION_SECRET`; create the SMTP credential separately. Never reuse `AUTOMATION_SIGNING_SECRET` in n8n.
 4. Materialize private imports with `node automation/n8n/scripts/materialize-workflows.mjs --output <temporary-private-directory>` and deployment-managed credential IDs.
 5. Import all workflows inactive. Delete the temporary directory.
 6. Confirm source artifact hashes equal manifest/registry hashes and the deployed differences are credential binding only.
@@ -33,16 +33,16 @@ The six allowlist IDs are assessment-due, roadmap-overdue, institution-report, c
 
 - EventBridge/SQS retries are bounded; poison messages reach the 14-day DLQ.
 - Outbox and command claims expire and can be safely reclaimed. Database idempotency prevents a duplicate event from creating a second command.
-- Retry delays are bounded exponential backoff; five attempts or expiry is terminal.
+- Only a definite pre-execution n8n `429` is retried with bounded exponential backoff; five attempts or expiry is terminal.
 - A successful callback makes the command and notification delivered; callback ID and token replay are idempotent/rejected without a second effect.
-- An ambiguous provider outcome requires reconciliation before operator replay. Never reset a command merely because the email outcome is unknown.
+- A network failure, timeout, n8n `5xx`, malformed callback, or callback-binding failure is immediately `FAILED_TERMINAL` with `N8N_TIMEOUT`/rejection classification and requires reconciliation before operator replay. Never reset a command merely because the email outcome is unknown.
 - Independent native queue/DLQ/age monitoring remains authoritative if n8n is down.
 
 Manual outbox replay must use the native audited replay function with operator user, reason code, ticket reference, and audit ID. Do not edit delivery state directly.
 
 ## Kill switch and rollback
 
-First set `kill_switch=true` in the native registry. This prevents new claims even if the n8n workflow remains published. Then unpublish the n8n workflow and revoke/rotate Header Auth and SMTP credentials if compromise is suspected. Retain pending/failed native commands for reconciliation; never delete the audit trail. Roll forward by registering a new version/hash, testing inactive, activating it, then retiring the old version.
+First set `kill_switch=true` in the native registry. This prevents new claims even if the n8n workflow remains published; the dispatcher also rechecks the live registration after resolving a claimed delivery. Then unpublish the n8n workflow and revoke/rotate JWT Auth and SMTP credentials if compromise is suspected. Retain pending/failed native commands for reconciliation; never delete the audit trail. Roll forward by registering a new version/hash, testing inactive, activating it, then retiring the old version.
 
 ## Retention matrix
 

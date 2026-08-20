@@ -4,9 +4,12 @@ import type { PersistenceDb } from './repositories.js';
 import { claimOutboxBatch, dispatchClaimedOutboxEvent, markExpiredOutboxEvents, type IntegrationEventPublisher } from './outbox-dispatcher.js';
 import {
   EventBridgeIntegrationEventPublisher,
+  N8nAmbiguousDeliveryError,
   N8nAutomationAdapter,
+  N8nRateLimitedError,
   SqsIntegrationEventConsumer,
   assertWorkflowInvocationAllowed,
+  createAutomationRequestDigest,
   mintAutomationToken,
   validateAutomationToken,
   verifyAutomationToken,
@@ -17,6 +20,7 @@ import {
   completeClaimedAutomationCommand,
   createAutomationCommandForNotificationEvent,
   deleteExpiredAutomationTokenReplays,
+  loadCurrentAutomationWorkflowRegistration,
   releaseAutomationClaimForFailure,
   resolveClaimedEmailDelivery,
 } from './automation-runtime.js';
@@ -47,33 +51,37 @@ export function createNotificationEventConsumer(input: { readonly pool: Pool; re
 }
 
 export async function dispatchAutomationOnce(input: {
-  readonly pool: Pool; readonly adapter: N8nAutomationAdapter; readonly signingSecret: Uint8Array; readonly leaseOwner: string; readonly now: Date;
+  readonly pool: Pool; readonly adapter: N8nAutomationAdapter; readonly invocationSigningSecret: Uint8Array;
+  readonly callbackSigningSecret: Uint8Array; readonly leaseOwner: string; readonly now: Date;
 }): Promise<{ readonly claimed: number; readonly succeeded: number; readonly retried: number; readonly terminal: number }> {
   await deleteExpiredAutomationTokenReplays(input.pool, input.now);
-  const claims = await claimAutomationCommands(input.pool, { leaseOwner: input.leaseOwner, batchSize: 10, leaseDurationMs: 60_000, now: input.now });
+  const claims = await claimAutomationCommands(input.pool, { leaseOwner: input.leaseOwner, batchSize: 1, leaseDurationMs: 60_000, now: input.now });
   let succeeded = 0;
   let retried = 0;
   let terminal = 0;
   for (const claim of claims) {
     try {
-      assertWorkflowInvocationAllowed({ allowlistId: claim.workflowKey, version: claim.workflowVersion, workflowHash: claim.workflowHash,
-        operation: claim.operation, destinationClass: claim.destinationClass, active: true, killSwitch: false },
-      { allowlistId: claim.workflowKey, version: claim.workflowVersion, workflowHash: claim.workflowHash,
-        operation: claim.operation, destinationClass: claim.destinationClass });
       const nowEpochSeconds = Math.floor(input.now.getTime() / 1_000);
-      const invocationToken = mintAutomationToken({ secret: input.signingSecret, audience: 'n8n-private', subject: 'automation-command',
-        tokenId: randomUUID(), nowEpochSeconds, lifetimeSeconds: 60, purpose: 'WORKFLOW_INVOCATION', workflowKey: claim.workflowKey,
-        commandId: claim.id, correlationId: claim.correlationId, payloadRef: claim.payloadRef });
-      await verifyAutomationToken(invocationToken,
-        { secret: input.signingSecret, audience: 'n8n-private', purpose: 'WORKFLOW_INVOCATION', nowEpochSeconds,
-          replayStore: new PostgresAutomationReplayStore(input.pool, claim.id, 'WORKFLOW_INVOCATION') });
       const callbackId = `callback:${randomUUID()}`;
-      const callbackToken = mintAutomationToken({ secret: input.signingSecret, audience: 'planthepath-automation-callback',
+      const callbackToken = mintAutomationToken({ secret: input.callbackSigningSecret, audience: 'planthepath-automation-callback',
         subject: 'automation-command', tokenId: randomUUID(), nowEpochSeconds, lifetimeSeconds: 120, purpose: 'WORKFLOW_CALLBACK',
-        workflowKey: claim.workflowKey, commandId: claim.id, correlationId: claim.correlationId, payloadRef: claim.payloadRef });
-      const delivery = await resolveClaimedEmailDelivery(input.pool, claim, input.now);
-      const callback = await input.adapter.invoke({ workflowKey: claim.workflowKey, invocationToken, delivery: { ...delivery, callbackId, callbackToken } });
-      const callbackClaims = validateAutomationToken(callback.callbackToken, { secret: input.signingSecret,
+        workflowKey: claim.workflowKey, workflowRegistryId: claim.workflowRegistryId, commandId: claim.id,
+        correlationId: claim.correlationId, payloadRef: claim.payloadRef });
+      const resolvedDelivery = await resolveClaimedEmailDelivery(input.pool, claim, input.now);
+      const delivery = { ...resolvedDelivery, callbackId, callbackToken };
+      const currentRegistration = await loadCurrentAutomationWorkflowRegistration(input.pool, claim);
+      assertWorkflowInvocationAllowed(currentRegistration, { allowlistId: claim.workflowKey, version: claim.workflowVersion,
+        workflowHash: claim.workflowHash, operation: claim.operation, destinationClass: claim.destinationClass });
+      const invocationToken = mintAutomationToken({ secret: input.invocationSigningSecret, audience: 'n8n-private', subject: 'automation-command',
+        tokenId: randomUUID(), nowEpochSeconds, lifetimeSeconds: 15, purpose: 'WORKFLOW_INVOCATION', workflowKey: claim.workflowKey,
+        workflowRegistryId: claim.workflowRegistryId, workflowVersion: claim.workflowVersion, workflowHash: claim.workflowHash,
+        requestDigest: createAutomationRequestDigest(delivery), commandId: claim.id,
+        correlationId: claim.correlationId, payloadRef: claim.payloadRef });
+      await verifyAutomationToken(invocationToken,
+        { secret: input.invocationSigningSecret, audience: 'n8n-private', purpose: 'WORKFLOW_INVOCATION', nowEpochSeconds,
+          replayStore: new PostgresAutomationReplayStore(input.pool, claim.id, 'WORKFLOW_INVOCATION') });
+      const callback = await input.adapter.invoke({ workflowKey: claim.workflowKey, invocationToken, delivery });
+      const callbackClaims = validateAutomationToken(callback.callbackToken, { secret: input.callbackSigningSecret,
         audience: 'planthepath-automation-callback', purpose: 'WORKFLOW_CALLBACK', nowEpochSeconds });
       const completed = await completeClaimedAutomationCommand(input.pool, claim, { claims: callbackClaims,
         callbackId: callback.callbackId, status: callback.status,
@@ -81,10 +89,10 @@ export async function dispatchAutomationOnce(input: {
       if (!completed) throw new Error('automation command lease expired before callback commit');
       succeeded += 1;
     } catch (error) {
-      const retryable = isRetryableAutomationFailure(error);
-      const released = await releaseAutomationClaimForFailure(input.pool, claim, { retryable,
-        failureClass: retryable ? 'N8N_UNAVAILABLE' : 'N8N_REJECTED', now: input.now });
-      if (released && retryable && claim.attempts < 5 && claim.expiresAt > input.now) retried += 1;
+      const failure = classifyAutomationFailure(error);
+      const released = await releaseAutomationClaimForFailure(input.pool, claim, { retryable: failure.retryable,
+        failureClass: failure.failureClass, now: input.now });
+      if (released && failure.retryable && claim.attempts < 5 && claim.expiresAt > input.now) retried += 1;
       else terminal += 1;
     }
   }
@@ -95,6 +103,11 @@ export function createEventBridgePublisher(eventBusName: string): EventBridgeInt
   return new EventBridgeIntegrationEventPublisher(eventBusName);
 }
 
-function isRetryableAutomationFailure(error: unknown): boolean {
-  return error instanceof Error && /retryable|timeout|unavailable|abort|lease expired/i.test(error.message);
+function classifyAutomationFailure(error: unknown): {
+  readonly retryable: boolean;
+  readonly failureClass: 'N8N_TIMEOUT' | 'N8N_RATE_LIMITED' | 'N8N_UNAVAILABLE' | 'N8N_REJECTED';
+} {
+  if (error instanceof N8nRateLimitedError) return { retryable: true, failureClass: 'N8N_RATE_LIMITED' };
+  if (error instanceof N8nAmbiguousDeliveryError) return { retryable: false, failureClass: 'N8N_TIMEOUT' };
+  return { retryable: false, failureClass: 'N8N_REJECTED' };
 }

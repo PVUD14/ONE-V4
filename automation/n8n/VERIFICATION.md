@@ -1,6 +1,6 @@
 # n8n verification evidence
 
-Verified on 2026-08-18 against the checked-in compose and workflow files.
+Initially verified on 2026-08-18 and reverified on 2026-08-20 after the JWT receiver hardening, against the checked-in compose and workflow files.
 
 ## Runtime under test
 
@@ -16,8 +16,12 @@ The test used only synthetic credentials and recipients. The compose networks we
 - Fresh n8n CLI import: six workflows imported with their stable registry IDs.
 - Immediately after import: `6` workflows, `0` active.
 - One workflow (`assessment-due`) was temporarily published for the delivery test.
-- Authenticated webhook invocation returned HTTP `200` with a bound JSON callback containing `status=SUCCEEDED`, the exact synthetic callback ID/token, and an SMTP message reference.
-- Mailpit API returned exactly `1` message with subject `PlanThePath assessment due` and the synthetic recipient `learner@example.test`.
+- The pinned image's credential definition confirmed `jwtAuth` with `keyType=passphrase`, `algorithm=HS256`, and a secret; the Webhook implementation exposes verified claims as `jwtPayload`.
+- A request without Authorization returned `401`; a correctly signed but expired request returned `403`.
+- A valid 15-second invocation JWT returned HTTP `200` with a bound JSON callback containing `status=SUCCEEDED`, the exact synthetic callback ID/token, and an SMTP message reference.
+- Reusing that request after token expiry returned `403` and created no additional email.
+- Changing the recipient while retaining the signed digest produced no email; direct Mailpit counts remained unchanged until the original signed body was submitted.
+- Each canary pass increased the Mailpit count by exactly `1`, with subject `PlanThePath JWT receiver canary` and synthetic recipient `learner@example.test`; missing, expired, replayed, and body-tampered requests added none.
 - The workflow was unpublished immediately after the test. Final database query: `6` workflows, `0` active.
 - Final startup log showed n8n `2.35.3`, no MCP-registry fetch, and `0` published workflows in the dependency index.
 

@@ -1,9 +1,9 @@
 {
   "allowlistId": "security-notification", "registryId": "47000000-0000-4000-8000-000000000006", "version": 1,
-  "workflowSha256": "e49f8786d03111a85c7a309440ba5621716b7da6b2efa658b6cb1338fe36829c", "operation": "SEND_EMAIL", "destinationClass": "EMAIL",
+  "workflowSha256": "8be23470a8c82f983ecaf30fc6c472cda74dc85bde148f753fdb73dbf700fd52", "operation": "SEND_EMAIL", "destinationClass": "EMAIL",
   "activeByDefault": false, "killSwitchByDefault": true, "legalPurpose": "security incident notification",
   "acceptedFields": ["commandId", "idempotencyId", "recipientEmail", "subject", "textBody", "expiresAt", "callbackId", "callbackToken"],
-  "approvedNodes": ["n8n-nodes-base.webhook", "n8n-nodes-base.emailSend", "n8n-nodes-base.respondToWebhook"], "credentialTypes": ["httpHeaderAuth", "smtp"],
+  "approvedNodes": ["n8n-nodes-base.webhook", "n8n-nodes-base.emailSend", "n8n-nodes-base.respondToWebhook"], "credentialTypes": ["jwtAuth", "smtp"],
   "egressDestinations": ["deployment-managed SMTP relay"], "dataClassification": "SECURITY_REDACTED", "retention": "execution payloads disabled; metadata pruned after 24 hours",
   "owner": "Security operations", "runbook": "RUNBOOK.md", "testEvidence": "../../VERIFICATION.md", "rollback": "enable native kill switch, unpublish workflow, retain native primary alert route",
   "sourceEvidence": { "repository": "https://github.com/Zie619/n8n-workflows", "commit": "94007c1445d9258a7da116646b79473e7c7c3282", "path": "workflows/Awssns/0984_Awssns_Automate_Triggered.json", "sha256": "bebe8681e9080ae8526ee7e12afff10ebddfd76de9bfaf46cdf63ddd4c65182a", "usage": "pattern-reference-only" },

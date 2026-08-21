@@ -523,15 +523,49 @@ describe('Phase 1 API protected request path', () => {
       .expect(201);
 
     const profileId = addResponse.body.student.id as string;
+    const initialRelationship = await pool.query<{ effective_from: Date }>(
+      `SELECT ir.effective_from
+       FROM institution_relationships ir
+       JOIN institution_student_profiles sp ON sp.student_user_id=ir.student_user_id
+       WHERE ir.institution_id=$1 AND sp.id=$2 AND ir.effective_to IS NULL`,
+      [institutionId, profileId],
+    );
+    expect(initialRelationship.rows).toHaveLength(1);
+    const effectiveFrom = initialRelationship.rows[0]!.effective_from;
+    const invalidEffectiveTo = new Date(effectiveFrom);
+    const effectiveTo = new Date(effectiveFrom.getTime() + 60 * 60 * 1000);
+
+    await expect(
+      pool.query(`UPDATE institution_relationships
+                  SET effective_to=$1
+                  WHERE institution_id=$2
+                    AND student_user_id=(SELECT student_user_id FROM institution_student_profiles WHERE id=$3)`, [
+        invalidEffectiveTo,
+        institutionId,
+        profileId,
+      ]),
+    ).rejects.toThrow(/institution_relationship_window_ck/);
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/institutions/${institutionId}/students/${profileId}/relationship`)
+      .set('Authorization', `Bearer ${opsToken}`)
+      .send({ state: 'GRADUATED', effectiveTo: effectiveTo.toISOString() })
+      .expect(403);
+
     await request(app.getHttpServer())
       .post(`/api/v1/institutions/${institutionId}/students/${profileId}/relationship`)
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ state: 'GRADUATED', effectiveTo: '2026-08-21T12:30:00Z' })
+      .send({ state: 'GRADUATED', effectiveTo: effectiveTo.toISOString() })
       .expect(201);
 
-    const current = await pool.query('SELECT state, effective_to FROM institution_relationships WHERE institution_id=$1', [institutionId]);
-    expect(current.rows[0]).toMatchObject({ state: 'GRADUATED' });
-    expect(current.rows[0].effective_to).toBeTruthy();
+    const current = await pool.query<{ state: string; effective_from: Date; effective_to: Date }>(
+      'SELECT state, effective_from, effective_to FROM institution_relationships WHERE institution_id=$1',
+      [institutionId],
+    );
+    const currentRelationship = current.rows[0]!;
+    expect(currentRelationship).toMatchObject({ state: 'GRADUATED' });
+    expect(currentRelationship.effective_to.toISOString()).toBe(effectiveTo.toISOString());
+    expect(currentRelationship.effective_to.getTime()).toBeGreaterThan(currentRelationship.effective_from.getTime());
     await expect(db.select().from(schema.users).where(eq(schema.users.email, 'aanya.student@example.test'))).resolves.toHaveLength(1);
 
     await request(app.getHttpServer())

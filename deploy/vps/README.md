@@ -34,7 +34,7 @@ If restoring the synthetic UAT dump:
 
 ```bash
 docker compose cp /path/to/planthepath_uat.dump postgres:/tmp/planthepath_uat.dump
-docker compose exec postgres pg_restore --clean --if-exists --no-owner --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" /tmp/planthepath_uat.dump
+docker compose exec postgres sh -lc 'pg_restore --clean --if-exists --no-owner --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" /tmp/planthepath_uat.dump'
 docker compose exec postgres rm -f /tmp/planthepath_uat.dump
 docker compose exec api pnpm db:migrate
 ```
@@ -103,7 +103,7 @@ Create backups outside any publicly served directory, for example:
 ```bash
 mkdir -p /srv/planthepath-next/backups
 chmod 700 /srv/planthepath-next/backups
-docker compose exec postgres pg_dump --format=custom --no-owner --username "$POSTGRES_USER" "$POSTGRES_DB" > /srv/planthepath-next/backups/planthepath_uat_$(date -u +%Y%m%dT%H%M%SZ).dump
+docker compose exec postgres sh -lc 'pg_dump --format=custom --no-owner --username "$POSTGRES_USER" "$POSTGRES_DB"' > /srv/planthepath-next/backups/planthepath_uat_$(date -u +%Y%m%dT%H%M%SZ).dump
 chmod 600 /srv/planthepath-next/backups/*.dump
 ```
 

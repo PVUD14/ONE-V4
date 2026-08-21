@@ -21,9 +21,6 @@ services:
       context: ../..
       dockerfile: deploy/vps/Dockerfile.api
     restart: unless-stopped
-    env_file:
-      - path: .env
-        required: false
     environment:
       API_HOST: 0.0.0.0
       API_PORT: 3000

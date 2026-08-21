@@ -1,0 +1,14 @@
+.git
+.gitignore
+node_modules
+**/node_modules
+dist
+**/dist
+.env
+.env.*
+*.log
+.agents
+.codex
+coverage
+**/coverage
+E:/8-PTPN-UAT-TEMP

@@ -163,7 +163,7 @@ export const rolePortals: readonly RolePortalConfig[] = [
     records: employerRecords,
   },
   {
-    key: 'operations-admin', family: 'Operations', roleName: 'Platform Administrator / Operations Administrator', backendRole: 'OPERATIONS_ADMIN', enforcementStatus: 'Backend enforced', basePath: '/operations/admin', subtitle: 'Operations Portal', organization: 'PlanThePath Platform', previewUser: 'Samir Das', initials: 'SD', accent: 'slate', dashboardTitle: 'Operations Dashboard', dashboardSummary: 'Organizations, users, verification, trust queues, usage, system health, audit and feature flags.',
+    key: 'operations-admin', family: 'Operations', roleName: 'Platform Administrator / Operations Administrator', backendRole: 'OPERATIONS_ADMIN', enforcementStatus: 'Backend enforced', basePath: '/operations/admin', subtitle: 'Operations Portal', organization: 'ONE Platform', previewUser: 'Samir Das', initials: 'SD', accent: 'slate', dashboardTitle: 'Operations Dashboard', dashboardSummary: 'Organizations, users, verification, trust queues, usage, system health, audit and feature flags.',
     allowedOperations: ['Review organization', 'Add operational note', 'Update preview queue status', 'Create support case', 'Configure preview feature flag', 'Acknowledge simulated event', 'Create saved operational view'], readOnlyData: ['Secrets', 'Production billing effects', 'Real privileged mutations'], forbiddenOperations: ['Expose tokens', 'Fake production health', 'Weaken backend authorization'],
     nav: nav('/operations/admin', [['Home', ['Overview']], ['Organizations', ['Organizations', 'Organization Detail', 'Users', 'User Detail', 'Verification', 'Trust and Safety', 'Content Management', 'AI Operations']], ['Platform', ['Subscriptions', 'Billing', 'Analytics', 'System Health', 'Audit Logs', 'Security', 'Feature Flags', 'Support', 'Settings']]]),
     kpis: [{ label: 'Total students', value: '42.8k', detail: 'Preview platform total' }, { label: 'Institutions', value: '38', detail: '7 under review' }, { label: 'Employers', value: '124', detail: '18 active campaigns' }, { label: 'Requests today', value: '18.2k', detail: 'Healthy simulated load' }],
@@ -175,6 +175,9 @@ export const activeRolePortals = rolePortals.filter((portal) => portal.key !== '
 
 export function rolePortalFromPath(path: string): RolePortalConfig | undefined {
   const normalized = path.replace(/\/$/, '');
+  if (normalized === '/institution') return activeRolePortals.find((portal) => portal.key === 'institution-admin');
+  if (normalized === '/employer') return activeRolePortals.find((portal) => portal.key === 'recruiter');
+  if (normalized === '/operations') return activeRolePortals.find((portal) => portal.key === 'operations-admin');
   return activeRolePortals.find((portal) => normalized === portal.basePath || normalized.startsWith(`${portal.basePath}/`));
 }
 

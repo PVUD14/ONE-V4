@@ -1,4 +1,4 @@
-import { Bell, BookOpen, BriefcaseBusiness, CalendarDays, ChevronDown, ClipboardCheck, FileText, Gauge, GraduationCap, Home, LayoutDashboard, Menu, MessageSquare, Search, Settings, Sparkles, Target, Trophy, UserRound, X, type LucideIcon } from 'lucide-react';
+import { Bell, BookOpen, BriefcaseBusiness, Building2, CalendarDays, ChevronDown, ClipboardCheck, FileText, Gauge, GraduationCap, Home, LayoutDashboard, Menu, MessageSquare, Search, Settings, ShieldCheck, Sparkles, Target, Trophy, UserRound, X, type LucideIcon } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { acceptInvitation, getApiHealth, type ApiHealth } from './api.js';
 import { beginHostedLogin, completeHostedLoginFromLocation, getAccessToken, getAuthStatus, getAuthDebugStatus, signOut, type AuthStatus } from './auth.js';
@@ -56,8 +56,11 @@ const routeTitles: Record<RouteKey, PageMeta> = {
   settings: { title: 'Settings', eyebrow: 'Account and privacy', description: 'Preferences, notifications, privacy, consent, accessibility, and security overview.' },
 };
 
+const productName = 'ONE';
+const productTagline = 'LEARN | PREPARE | BUILD | GROW';
 const showDevelopmentIndicators = import.meta.env.DEV;
 const enableDemoPortal = import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEMO_PORTAL === 'true';
+const protectedPortalRoots = ['/student', '/institution', '/employer', '/operations'] as const;
 
 export function App(): React.ReactElement {
   const [path, setPath] = useState(currentPath());
@@ -108,16 +111,37 @@ export function App(): React.ReactElement {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [drawerOpen]);
 
-  const route = useMemo(() => routeFromPath(path), [path]);
-  const rolePortal = useMemo(() => rolePortalFromPath(path), [path]);
+  const demoPath = useMemo(() => demoTargetFromPath(path), [path]);
+  const effectivePath = demoPath ?? path;
+  const route = useMemo(() => routeFromPath(effectivePath), [effectivePath]);
+  const rolePortal = useMemo(() => rolePortalFromPath(effectivePath), [effectivePath]);
+  const authenticated = authStatus.state === 'authenticated';
 
   useEffect(() => {
-    if (path === '/demo' || path.startsWith('/institution/placement-officer') || rolePortal) return;
+    if (path === '/' || path === '/login' || path === '/demo' || effectivePath.startsWith('/institution/placement-officer') || rolePortal) return;
     const title = route === 'dashboard' ? 'Student Dashboard' : routeTitles[route].title;
-    document.title = route === 'dashboard' ? `${title} | PlanThePath` : `${title} — Student | PlanThePath`;
-  }, [path, rolePortal, route]);
+    document.title = route === 'dashboard' ? `${title} | ${productName}` : `${title} - Student | ${productName}`;
+  }, [effectivePath, path, rolePortal, route]);
 
-  if (path.startsWith('/institution/placement-officer')) {
+  if (path === '/' || path === '/login') {
+    return <LoginEntry authStatus={authStatus} authNotice={authNotice} onSignIn={handleSignIn} onSignOut={handleSignOut} onNavigate={(nextPath) => {
+      window.history.pushState(null, '', nextPath);
+      setPath(currentPath());
+    }} />;
+  }
+
+  if (path === '/auth/callback' && authenticated) {
+    return <WorkspaceChooser authStatus={authStatus} authNotice={authNotice} onSignIn={handleSignIn} onSignOut={handleSignOut} onNavigate={(nextPath) => {
+      window.history.pushState(null, '', nextPath);
+      setPath(currentPath());
+    }} />;
+  }
+
+  if (isProtectedPortalPath(path) && !demoPath && !authenticated) {
+    return <AuthRequiredPage requestedPath={path} authStatus={authStatus} authNotice={authNotice} onSignIn={handleSignIn} onSignOut={handleSignOut} />;
+  }
+
+  if (effectivePath.startsWith('/institution/placement-officer')) {
     return <PlacementOfficerPortal apiHealth={apiHealth} authStatus={authStatus} authNotice={authNotice} onSignIn={handleSignIn} onSignOut={handleSignOut} showDevelopmentIndicators={showDevelopmentIndicators} />;
   }
 
@@ -125,26 +149,28 @@ export function App(): React.ReactElement {
     return <InvitationAcceptancePage authStatus={authStatus} authNotice={authNotice} onSignIn={handleSignIn} onSignOut={handleSignOut} />;
   }
 
-  if (path === '/demo' && enableDemoPortal) {
+  if ((path === '/demo' || path.startsWith('/demo/')) && enableDemoPortal && !demoPath) {
     return <DemoPortalLauncher onNavigate={(nextPath) => {
-      window.history.pushState(null, '', nextPath);
+      window.history.pushState(null, '', demoRouteFor(nextPath));
       setPath(currentPath());
     }} />;
   }
 
   if (rolePortal) {
-    return <RolePortal portal={rolePortal} apiHealth={apiHealth} authStatus={authStatus} authNotice={authNotice} onSignIn={handleSignIn} onSignOut={handleSignOut} showDevelopmentIndicators={showDevelopmentIndicators} onNavigate={() => setPath(currentPath())} />;
+    return <RolePortal portal={rolePortal} apiHealth={apiHealth} authStatus={authStatus} authNotice={authNotice} onSignIn={handleSignIn} onSignOut={handleSignOut} showDevelopmentIndicators={showDevelopmentIndicators} onNavigate={() => setPath(currentPath())} demoMode={Boolean(demoPath)} />;
   }
 
   return (
     <StudentPreviewProvider>
+      {demoPath ? <DemoBoundaryBanner /> : null}
       <StudentShell
         apiHealth={apiHealth}
         authNotice={authNotice}
         authStatus={authStatus}
+        demoMode={Boolean(demoPath)}
         drawerOpen={drawerOpen}
         menuButtonRef={menuButtonRef}
-        path={path}
+        path={effectivePath}
         route={route}
         setDrawerOpen={setDrawerOpen}
         setPath={setPath}
@@ -169,6 +195,58 @@ export function App(): React.ReactElement {
     setAuthStatus(getAuthStatus());
     setAuthNotice(getAuthDebugStatus());
   }
+}
+
+function LoginEntry({ authStatus, authNotice, onSignIn, onSignOut, onNavigate }: { readonly authStatus: AuthStatus; readonly authNotice: string; readonly onSignIn: () => void; readonly onSignOut: () => void; readonly onNavigate: (path: string) => void }): React.ReactElement {
+  useEffect(() => { document.title = `Sign in | ${productName}`; }, []);
+  if (authStatus.state === 'authenticated') return <WorkspaceChooser authStatus={authStatus} authNotice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} onNavigate={onNavigate} />;
+  return <main className="login-shell">
+    <section className="login-card">
+      <span className="eyebrow">{productTagline}</span>
+      <h1>{productName}</h1>
+      <p>Sign in to enter your verified Student, Institution, Employer, or Operations workspace.</p>
+      <AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />
+      {authStatus.state === 'unconfigured' ? <p className="auth-boundary">Authentication is unavailable because Cognito is not configured. Protected portals stay closed and no fixture account is used.</p> : null}
+      {enableDemoPortal ? <button type="button" className="secondary" onClick={() => onNavigate('/demo')}>Open demo previews</button> : null}
+    </section>
+  </main>;
+}
+
+function WorkspaceChooser({ authStatus, authNotice, onSignIn, onSignOut, onNavigate }: { readonly authStatus: AuthStatus; readonly authNotice: string; readonly onSignIn: () => void; readonly onSignOut: () => void; readonly onNavigate: (path: string) => void }): React.ReactElement {
+  useEffect(() => { document.title = `Choose workspace | ${productName}`; }, []);
+  const choices = [
+    { path: '/student', label: 'Student', detail: 'Learning, readiness, applications and personal growth.', icon: GraduationCap },
+    { path: '/institution', label: 'Institution', detail: 'Institution administration and student support.', icon: Building2 },
+    { path: '/employer', label: 'Employer', detail: 'Hiring workflows where backend support exists.', icon: BriefcaseBusiness },
+    { path: '/operations', label: 'Operations', detail: 'Platform administration and governance.', icon: ShieldCheck },
+  ] as const;
+  return <main className="login-shell">
+    <section className="login-card workspace-card">
+      <span className="eyebrow">{productTagline}</span>
+      <h1>Choose your ONE workspace</h1>
+      <p>Workspace access is still enforced by the backend; this chooser does not grant roles or bypass server authorization.</p>
+      <AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />
+      <div className="workspace-grid">{choices.map((choice) => { const Icon = choice.icon; return <button key={choice.path} type="button" onClick={() => onNavigate(choice.path)}><Icon size={20} /><strong>{choice.label}</strong><span>{choice.detail}</span></button>; })}</div>
+    </section>
+  </main>;
+}
+
+function AuthRequiredPage({ requestedPath, authStatus, authNotice, onSignIn, onSignOut }: { readonly requestedPath: string; readonly authStatus: AuthStatus; readonly authNotice: string; readonly onSignIn: () => void; readonly onSignOut: () => void }): React.ReactElement {
+  useEffect(() => { document.title = `Sign in required | ${productName}`; }, []);
+  const family = requestedPath.split('/')[1] || 'workspace';
+  return <main className="login-shell">
+    <section className="login-card">
+      <span className="eyebrow">{productTagline}</span>
+      <h1>Sign in required</h1>
+      <p>The {family} portal is protected. ONE does not use role selection, fixture data, or browser-stored demo identities to authenticate a user.</p>
+      <AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />
+      {authStatus.state === 'unconfigured' ? <p className="auth-boundary">Cognito is not configured, so this route fails closed.</p> : null}
+    </section>
+  </main>;
+}
+
+function DemoBoundaryBanner(): React.ReactElement {
+  return <section className="demo-boundary" role="note"><strong>DEMO PREVIEW</strong><span>Fictional data. This route is not authenticated and does not authorize a user.</span></section>;
 }
 
 function InvitationAcceptancePage({ authStatus, authNotice, onSignIn, onSignOut }: { readonly authStatus: AuthStatus; readonly authNotice: string; readonly onSignIn: () => void; readonly onSignOut: () => void }): React.ReactElement {
@@ -205,11 +283,12 @@ function InvitationAcceptancePage({ authStatus, authNotice, onSignIn, onSignOut 
   </main>;
 }
 
-function StudentShell({ apiHealth, authNotice, authStatus, drawerOpen, menuButtonRef, path, route, setDrawerOpen, setPath, setSidebarCollapsed, sidebarCollapsed, onSignIn, onSignOut }: { readonly apiHealth: ApiHealth; readonly authNotice: string; readonly authStatus: AuthStatus; readonly drawerOpen: boolean; readonly menuButtonRef: React.RefObject<HTMLButtonElement | null>; readonly path: string; readonly route: RouteKey; readonly setDrawerOpen: React.Dispatch<React.SetStateAction<boolean>>; readonly setPath: React.Dispatch<React.SetStateAction<string>>; readonly setSidebarCollapsed: React.Dispatch<React.SetStateAction<boolean>>; readonly sidebarCollapsed: boolean; readonly onSignIn: () => void; readonly onSignOut: () => void }): React.ReactElement {
+function StudentShell({ apiHealth, authNotice, authStatus, demoMode, drawerOpen, menuButtonRef, path, route, setDrawerOpen, setPath, setSidebarCollapsed, sidebarCollapsed, onSignIn, onSignOut }: { readonly apiHealth: ApiHealth; readonly authNotice: string; readonly authStatus: AuthStatus; readonly demoMode: boolean; readonly drawerOpen: boolean; readonly menuButtonRef: React.RefObject<HTMLButtonElement | null>; readonly path: string; readonly route: RouteKey; readonly setDrawerOpen: React.Dispatch<React.SetStateAction<boolean>>; readonly setPath: React.Dispatch<React.SetStateAction<string>>; readonly setSidebarCollapsed: React.Dispatch<React.SetStateAction<boolean>>; readonly sidebarCollapsed: boolean; readonly onSignIn: () => void; readonly onSignOut: () => void }): React.ReactElement {
   const { dispatch } = useStudentPreview();
   function navigate(item: NavItem): void {
-    window.history.pushState(null, '', item.path);
-    setPath(item.path);
+    const nextPath = demoMode ? demoRouteFor(item.path) : item.path;
+    window.history.pushState(null, '', nextPath);
+    setPath(nextPath);
     setDrawerOpen(false);
   }
 
@@ -266,7 +345,7 @@ function Sidebar({ path, collapsed, drawerOpen, onNavigate, onCollapse, onClose 
   const groups = ['Plan', 'Prepare', 'Apply', 'Account'] as const;
   return (
     <aside className={`student-sidebar ${drawerOpen ? 'drawer-open' : ''}`} aria-label="Student navigation">
-      <div className="sidebar-brand"><span className="brand-mark" aria-hidden="true"><GraduationCap size={20} /></span><span className="brand-copy"><strong>PlanThePath</strong><small>Student Portal</small></span><button className="icon-button sidebar-close" type="button" aria-label="Close navigation" onClick={onClose} autoFocus={drawerOpen}><X size={18} /></button></div>
+      <div className="sidebar-brand"><span className="brand-mark" aria-hidden="true"><GraduationCap size={20} /></span><span className="brand-copy"><strong>ONE</strong><small>LEARN | PREPARE | BUILD | GROW</small></span><button className="icon-button sidebar-close" type="button" aria-label="Close navigation" onClick={onClose} autoFocus={drawerOpen}><X size={18} /></button></div>
       <nav className="sidebar-nav" aria-label="Grouped Student navigation">
         {groups.map((group) => <div className="nav-group" key={group}><span className="nav-group-label">{group}</span>{navItems.filter((item) => item.group === group).map((item) => { const Icon = item.icon; const active = normalizePath(path) === item.path; return <button key={item.path} type="button" className={`side-nav-item ${active ? 'active' : ''}`} aria-current={active ? 'page' : undefined} onClick={() => onNavigate(item)}><Icon size={18} aria-hidden="true" /><span>{item.label}</span></button>; })}</div>)}
       </nav>
@@ -298,7 +377,7 @@ function studentIdentityFromAuth(authStatus: AuthStatus): { readonly name: strin
 }
 
 function PreviewBadge({ apiHealth }: { readonly apiHealth: ApiHealth }): React.ReactElement {
-  return <div className="preview-badge" aria-label="Preview mode"><span>Demo preview</span><span className={`tiny-state ${apiHealth}`}>{apiHealth}</span></div>;
+  return <div className="preview-badge" aria-label="Preview mode"><span>DEMO PREVIEW</span><span className={`tiny-state ${apiHealth}`}>{apiHealth}</span></div>;
 }
 
 function RouteScreen({ route, authenticated }: { readonly route: RouteKey; readonly authenticated: boolean }): React.ReactElement {
@@ -324,10 +403,37 @@ function currentPath(): string {
 }
 
 function normalizePath(path: string): string {
-  return path.replace(/\/$/, '') || '/student';
+  return path.replace(/\/$/, '') || '/';
 }
 
 function routeFromPath(path: string): RouteKey {
   const normalized = normalizePath(path);
   return navItems.find((item) => item.path === normalized)?.route ?? 'dashboard';
+}
+
+function isProtectedPortalPath(path: string): boolean {
+  const normalized = normalizePath(path);
+  return protectedPortalRoots.some((root) => normalized === root || normalized.startsWith(`${root}/`));
+}
+
+function demoTargetFromPath(path: string): string | null {
+  const normalized = normalizePath(path);
+  if (normalized === '/demo/student') return '/student';
+  if (normalized.startsWith('/demo/student/')) return normalized.slice('/demo'.length);
+  if (normalized === '/demo/institution') return '/institution/admin';
+  if (normalized.startsWith('/demo/institution/')) return normalized.slice('/demo'.length);
+  if (normalized === '/demo/employer') return '/employer/recruiter';
+  if (normalized.startsWith('/demo/employer/')) return normalized.slice('/demo'.length);
+  if (normalized === '/demo/operations') return '/operations/admin';
+  if (normalized.startsWith('/demo/operations/')) return normalized.slice('/demo'.length);
+  return null;
+}
+
+function demoRouteFor(path: string): string {
+  if (path === '/student') return '/demo/student';
+  if (path.startsWith('/student/')) return `/demo${path}`;
+  if (path.startsWith('/institution/')) return `/demo${path}`;
+  if (path.startsWith('/employer/')) return `/demo${path}`;
+  if (path.startsWith('/operations/')) return `/demo${path}`;
+  return path;
 }

@@ -82,7 +82,7 @@ function PlacementOfficerPortalInner({ apiHealth, authStatus, authNotice, onSign
   const route = staffNavItems.find((item) => item.path === path)?.route ?? 'dashboard';
 
   useEffect(() => {
-    document.title = route === 'dashboard' ? 'Placement Dashboard | PlanThePath' : `${staffRouteTitle[route]} — Placement Officer | PlanThePath`;
+    document.title = route === 'dashboard' ? 'Placement Dashboard | ONE' : `${staffRouteTitle[route]} - Placement Officer | ONE`;
   }, [route]);
 
   useEffect(() => {
@@ -99,8 +99,10 @@ function PlacementOfficerPortalInner({ apiHealth, authStatus, authNotice, onSign
   }, []);
 
   function navigate(nextPath: string): void {
-    window.history.pushState(null, '', nextPath);
-    setPath(normalizeStaffPath(nextPath));
+    const currentDemo = window.location.pathname.startsWith('/demo/');
+    const routedPath = currentDemo && !nextPath.startsWith('/demo/') ? `/demo${nextPath}` : nextPath;
+    window.history.pushState(null, '', routedPath);
+    setPath(normalizeStaffPath(routedPath));
     if (window.navigator.userAgent.includes('jsdom')) return;
     try {
       window.scrollTo({ top: 0 });
@@ -276,10 +278,12 @@ function PlacementTrendChart(): React.ReactElement {
 }
 
 function normalizeStaffPath(path: string): string {
-  const normalized = path.replace(/\/$/, '') || staffBasePath;
+  const normalizedPath = path.replace(/\/$/, '') || staffBasePath;
+  const normalized = normalizedPath.startsWith('/demo/') ? normalizedPath.slice('/demo'.length) : normalizedPath;
   return staffNavItems.some((item) => item.path === normalized) ? normalized : staffBasePath;
 }
 
 function initials(name: string): string {
   return name.split(' ').map((part) => part[0]).join('');
 }
+

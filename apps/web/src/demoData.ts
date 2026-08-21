@@ -56,9 +56,9 @@ export const priorityActions = [
 ];
 
 export const skills = [
-  { name: 'Networking fundamentals', level: 82, evidence: 'Assessment verified', source: 'PlanThePath assessed' },
+  { name: 'Networking fundamentals', level: 82, evidence: 'Assessment verified', source: 'ONE assessed' },
   { name: 'Linux fundamentals', level: 74, evidence: 'Lab evidence pending', source: 'Self-declared' },
-  { name: 'SIEM investigation', level: 68, evidence: 'Assessment assigned', source: 'PlanThePath assessed' },
+  { name: 'SIEM investigation', level: 68, evidence: 'Assessment assigned', source: 'ONE assessed' },
   { name: 'Interview communication', level: 58, evidence: 'Practice needed', source: 'Self-declared' },
   { name: 'Python security automation', level: 63, evidence: 'Course artifact', source: 'Institution verified' },
 ];
@@ -124,3 +124,4 @@ export const securitySettings = [
   { label: 'Session security', value: 'Protected routes remain API-enforced', icon: ShieldCheck },
   { label: 'Private AI preview', value: 'Frontend placeholder only', icon: Sparkles },
 ];
+

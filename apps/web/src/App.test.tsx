@@ -12,8 +12,12 @@ function jwtWithEmail(email: string): string {
   return `header.${payload}.signature`;
 }
 
+function demoPathFor(path: string): string {
+  return path.startsWith('/demo/') ? path : `/demo${path}`;
+}
+
 beforeEach(() => {
-  window.history.pushState(null, '', '/student');
+  window.history.pushState(null, '', '/demo/student');
   fetchMock.mockReset();
   vi.stubGlobal('fetch', fetchMock);
 });
@@ -21,12 +25,56 @@ beforeEach(() => {
 describe('All-role portal registry and preview workflows', () => {
   const previewPortals = activeRolePortals.filter((portal) => portal.key !== 'recruiter');
 
+  it('renders ONE login first at root and /login without a fixture workspace', () => {
+    fetchMock.mockResolvedValue({ ok: true });
+    for (const path of ['/', '/login']) {
+      cleanup();
+      window.history.pushState(null, '', path);
+      render(<App />);
+      expect(screen.getByRole('heading', { name: 'ONE' })).toBeInTheDocument();
+      expect(screen.getByText('LEARN | PREPARE | BUILD | GROW')).toBeInTheDocument();
+      expect(screen.getByText(/Authentication is unavailable because Cognito is not configured/i)).toBeInTheDocument();
+      expect(screen.queryByText('Rahul Kumar')).not.toBeInTheDocument();
+    }
+  });
+
+  it('fails closed on protected portal families without leaking demo identities', () => {
+    fetchMock.mockResolvedValue({ ok: true });
+    for (const path of ['/student', '/institution', '/employer', '/operations']) {
+      cleanup();
+      window.history.pushState(null, '', path);
+      render(<App />);
+      expect(screen.getByRole('heading', { name: 'Sign in required' })).toBeInTheDocument();
+      expect(screen.getByText(/does not use role selection, fixture data, or browser-stored demo identities/i)).toBeInTheDocument();
+      expect(screen.queryByText('Rahul Kumar')).not.toBeInTheDocument();
+    }
+  });
+
+  it('keeps Rahul fixture data only inside explicit demo routes', () => {
+    fetchMock.mockResolvedValue({ ok: true });
+    window.history.pushState(null, '', '/demo/student');
+    render(<App />);
+    expect(screen.getAllByText('DEMO PREVIEW').length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: 'Student profile menu' })).toHaveTextContent('Rahul Kumar');
+  });
+
+  it('resolves four product portal family roots at the demo boundary', () => {
+    fetchMock.mockResolvedValue({ ok: true });
+    for (const [path, heading] of [['/demo/student', 'Student Dashboard'], ['/demo/institution', 'Institution Administration'], ['/demo/employer', 'Employer hiring flow partially implemented'], ['/demo/operations', 'Operations Dashboard']] as const) {
+      cleanup();
+      window.history.pushState(null, '', path);
+      render(<App />);
+      expect(screen.getByRole('heading', { name: heading })).toBeInTheDocument();
+      expect(screen.getAllByText('DEMO PREVIEW').length).toBeGreaterThan(0);
+    }
+  });
+
   it('renders the demo launcher with every portal card and no login claim', () => {
     fetchMock.mockResolvedValue({ ok: true });
     window.history.pushState(null, '', '/demo');
     render(<App />);
     expect(screen.getByRole('heading', { name: 'Multi-role portal launcher' })).toBeInTheDocument();
-    expect(screen.getByText('Portal preview - role selection here does not authenticate or authorize a user.')).toBeInTheDocument();
+    expect(screen.getByText(/Role selection here does not authenticate or authorize a user/i)).toBeInTheDocument();
     for (const portal of rolePortals) {
       expect(screen.getAllByRole('heading', { name: portal.roleName }).length).toBeGreaterThan(0);
       expect(screen.getAllByText(portal.enforcementStatus).length).toBeGreaterThan(0);
@@ -38,13 +86,13 @@ describe('All-role portal registry and preview workflows', () => {
     fetchMock.mockResolvedValue({ ok: true });
     for (const portal of previewPortals) {
       cleanup();
-      window.history.pushState(null, '', portal.basePath);
+      window.history.pushState(null, '', demoPathFor(portal.basePath));
       render(<App />);
       expect(screen.getByRole('heading', { name: portal.dashboardTitle })).toBeInTheDocument();
       expect(screen.getByLabelText(`${portal.roleName} navigation`)).toBeInTheDocument();
       expect(screen.getByText(portal.previewUser)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: portal.nav[0]!.label })).toHaveAttribute('aria-current', 'page');
-      expect(document.title).toBe(`${portal.dashboardTitle} | PlanThePath`);
+      expect(document.title).toBe(`${portal.dashboardTitle} | ONE`);
     }
   });
 
@@ -53,7 +101,7 @@ describe('All-role portal registry and preview workflows', () => {
     for (const portal of previewPortals) {
       for (const item of portal.nav) {
         cleanup();
-        window.history.pushState(null, '', item.path);
+        window.history.pushState(null, '', demoPathFor(item.path));
         render(<App />);
         expect(screen.getByRole('heading', { name: item.path === portal.basePath ? portal.dashboardTitle : item.label })).toBeInTheDocument();
         const nav = screen.getByLabelText(`${portal.roleName} navigation`);
@@ -66,7 +114,7 @@ describe('All-role portal registry and preview workflows', () => {
   it('filters, clears, opens detail, edits preview state, records activity, and resets on a new role page', () => {
     fetchMock.mockResolvedValue({ ok: true });
     const portal = activeRolePortals.find((item) => item.key === 'hiring-manager')!;
-    window.history.pushState(null, '', `${portal.basePath}/candidates`);
+    window.history.pushState(null, '', demoPathFor(`${portal.basePath}/candidates`));
     render(<App />);
     expect(screen.getByText('3 records shown')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Candidate' }));
@@ -96,16 +144,16 @@ describe('All-role portal registry and preview workflows', () => {
     fetchMock.mockResolvedValue({ ok: true });
     window.history.pushState(null, '', '/operations/admin/organizations');
     render(<App />);
-    expect(screen.getByRole('heading', { name: 'Organizations' })).toBeInTheDocument();
-    expect(screen.getByText(/Sign in with an Operations identity to manage organizations/i)).toBeInTheDocument();
-    expect(screen.getByText(/No fake mutation or preview role selection is used/i)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Sign in required' })).toBeInTheDocument();
+    expect(screen.getByText(/operations portal is protected/i)).toBeInTheDocument();
+    expect(screen.getByText(/Cognito is not configured, so this route fails closed/i)).toBeInTheDocument();
     expect(screen.queryByText('ABC Engineering College')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Update preview queue status/i })).not.toBeInTheDocument();
   });
 
   it('marks employer hiring as partial instead of showing a fake applicant directory', () => {
     fetchMock.mockResolvedValue({ ok: true });
-    window.history.pushState(null, '', '/employer/recruiter');
+    window.history.pushState(null, '', '/demo/employer/recruiter');
     render(<App />);
     expect(screen.getByRole('heading', { name: 'Employer hiring flow partially implemented' })).toBeInTheDocument();
     expect(screen.getByText(/Sign in with Maya UAT Recruiter/i)).toBeInTheDocument();
@@ -152,7 +200,7 @@ describe('All-role portal registry and preview workflows', () => {
     render(<App />);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument());
     cleanup();
-    window.history.pushState(null, '', '/institution/admin/staff');
+    window.history.pushState(null, '', '/demo/institution/admin/staff');
     render(<App />);
     fireEvent.change(screen.getByLabelText(/Recipient email/i), { target: { value: 'faculty@example.test' } });
     fireEvent.change(screen.getByLabelText(/Institution role/i), { target: { value: 'DEPARTMENT_HEAD' } });
@@ -165,7 +213,7 @@ describe('All-role portal registry and preview workflows', () => {
   it('opens dashboard record workflows and returns focus after Escape', () => {
     fetchMock.mockResolvedValue({ ok: true });
     const portal = activeRolePortals.find((item) => item.key === 'faculty')!;
-    window.history.pushState(null, '', portal.basePath);
+    window.history.pushState(null, '', demoPathFor(portal.basePath));
     render(<App />);
     const record = screen.getByText('Rahul Kumar').closest('.role-record-card') as HTMLElement;
     const detailButton = within(record).getByRole('button', { name: 'View detail' });
@@ -188,10 +236,10 @@ describe('All-role portal registry and preview workflows', () => {
   it('connects new-role topbar messages and notifications to observable preview behavior', () => {
     fetchMock.mockResolvedValue({ ok: true });
     const recruiter = activeRolePortals.find((item) => item.key === 'recruiter')!;
-    window.history.pushState(null, '', recruiter.basePath);
+    window.history.pushState(null, '', demoPathFor(recruiter.basePath));
     render(<App />);
     fireEvent.click(screen.getAllByRole('button', { name: 'Messages' }).find((button) => button.className.includes('icon-button'))!);
-    expect(window.location.pathname).toBe('/employer/recruiter/messages');
+    expect(window.location.pathname).toBe('/demo/employer/recruiter/messages');
     expect(screen.getByRole('heading', { name: 'Employer hiring flow partially implemented' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Notifications' }));
     expect(screen.getByRole('heading', { name: 'Employer hiring flow partially implemented' })).toBeInTheDocument();
@@ -199,11 +247,11 @@ describe('All-role portal registry and preview workflows', () => {
 
   it('keeps Student and Placement Officer portals available after adding all-role routing', () => {
     fetchMock.mockResolvedValue({ ok: true });
-    window.history.pushState(null, '', '/student/applications');
+    window.history.pushState(null, '', '/demo/student/applications');
     render(<App />);
     expect(screen.getByRole('heading', { name: 'Applications' })).toBeInTheDocument();
     cleanup();
-    window.history.pushState(null, '', '/institution/placement-officer/reports');
+    window.history.pushState(null, '', '/demo/institution/placement-officer/reports');
     render(<App />);
     expect(screen.getByRole('heading', { name: 'Reports' })).toBeInTheDocument();
   });
@@ -248,20 +296,20 @@ describe('Student portal completion', () => {
   });
 
   it.each([
-    ['/student', 'Student Dashboard', /Cybersecurity Analyst path/i],
-    ['/student/career-path', 'My Career Path', /Milestone roadmap/i],
-    ['/student/ai-coach', 'AI Career Coach', /Preview-only guidance/i],
-    ['/student/readiness', 'Readiness', /Score explanation/i],
-    ['/student/skills', 'Skills', /Skill inventory/i],
-    ['/student/assessments', 'Assessments', /Assessment workspace/i],
-    ['/student/learning', 'Learning', /Continue learning/i],
-    ['/student/experience', 'Experience', /Experience and evidence/i],
-    ['/student/opportunities', 'Opportunities', /Career marketplace/i],
-    ['/student/applications', 'Applications', /Application pipeline/i],
-    ['/student/interviews', 'Interviews', /Preparation checklist/i],
-    ['/student/documents', 'Documents', /Documents and privacy/i],
-    ['/student/profile', 'Profile', /Student-owned profile/i],
-    ['/student/settings', 'Settings', /Security overview/i],
+    ['/demo/student', 'Student Dashboard', /Cybersecurity Analyst path/i],
+    ['/demo/student/career-path', 'My Career Path', /Milestone roadmap/i],
+    ['/demo/student/ai-coach', 'AI Career Coach', /Preview-only guidance/i],
+    ['/demo/student/readiness', 'Readiness', /Score explanation/i],
+    ['/demo/student/skills', 'Skills', /Skill inventory/i],
+    ['/demo/student/assessments', 'Assessments', /Assessment workspace/i],
+    ['/demo/student/learning', 'Learning', /Continue learning/i],
+    ['/demo/student/experience', 'Experience', /Experience and evidence/i],
+    ['/demo/student/opportunities', 'Opportunities', /Career marketplace/i],
+    ['/demo/student/applications', 'Applications', /Application pipeline/i],
+    ['/demo/student/interviews', 'Interviews', /Preparation checklist/i],
+    ['/demo/student/documents', 'Documents', /Documents and privacy/i],
+    ['/demo/student/profile', 'Profile', /Student-owned profile/i],
+    ['/demo/student/settings', 'Settings', /Security overview/i],
   ])('renders route %s', (path, heading, content) => {
     fetchMock.mockResolvedValue({ ok: true });
     window.history.pushState(null, '', path);
@@ -274,7 +322,7 @@ describe('Student portal completion', () => {
     fetchMock.mockResolvedValue({ ok: true });
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: 'AI Career Coach' }));
-    expect(window.location.pathname).toBe('/student/ai-coach');
+    expect(window.location.pathname).toBe('/demo/student/ai-coach');
     expect(screen.getByRole('button', { name: 'AI Career Coach' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByText(/No protected Student data is sent to an external model/i)).toBeInTheDocument();
   });
@@ -301,17 +349,17 @@ describe('Student portal completion', () => {
 
   it('renders filters, application stages, and verification states', () => {
     fetchMock.mockResolvedValue({ ok: true });
-    window.history.pushState(null, '', '/student/opportunities');
+    window.history.pushState(null, '', '/demo/student/opportunities');
     render(<App />);
     expect(screen.getByLabelText('Filters')).toHaveTextContent('Eligible');
     expect(screen.getAllByText('Supporting factors, not AI certainty').length).toBeGreaterThan(0);
     cleanup();
-    window.history.pushState(null, '', '/student/applications');
+    window.history.pushState(null, '', '/demo/student/applications');
     render(<App />);
     expect(screen.getByText('Shortlisted')).toBeInTheDocument();
     expect(screen.getByText('Closed')).toBeInTheDocument();
     cleanup();
-    window.history.pushState(null, '', '/student/skills');
+    window.history.pushState(null, '', '/demo/student/skills');
     render(<App />);
     expect(screen.getAllByText(/Assessment-verified/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Self-declared/i).length).toBeGreaterThan(0);
@@ -332,21 +380,21 @@ describe('Student portal completion', () => {
     ];
 
     fetchMock.mockResolvedValue({ ok: true });
-    window.history.pushState(null, '', '/student/opportunities');
+    window.history.pushState(null, '', '/demo/student/opportunities');
     render(<App />);
     expect(screen.getAllByText('Apply').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Secure workflow required').length).toBeGreaterThan(0);
     for (const label of bannedLabels) expect(screen.queryByText(label)).not.toBeInTheDocument();
 
     cleanup();
-    window.history.pushState(null, '', '/student/applications');
+    window.history.pushState(null, '', '/demo/student/applications');
     render(<App />);
     expect(screen.getAllByText('Withdraw application').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Secure workflow required').length).toBeGreaterThan(0);
     for (const label of bannedLabels) expect(screen.queryByText(label)).not.toBeInTheDocument();
 
     cleanup();
-    window.history.pushState(null, '', '/student/documents');
+    window.history.pushState(null, '', '/demo/student/documents');
     render(<App />);
     expect(screen.getAllByText('Upload document').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Preview').length).toBeGreaterThan(0);
@@ -357,20 +405,20 @@ describe('Student portal completion', () => {
 
   it('renders the refined settings groups, profile workspace, and connected application pipeline', () => {
     fetchMock.mockResolvedValue({ ok: true });
-    window.history.pushState(null, '', '/student/settings');
+    window.history.pushState(null, '', '/demo/student/settings');
     render(<App />);
     for (const group of ['Notifications', 'Privacy and visibility', 'Institution relationship', 'Consent', 'Communication', 'Accessibility', 'Language', 'Security', 'Data and account']) {
       expect(screen.getByText(group)).toBeInTheDocument();
     }
 
     cleanup();
-    window.history.pushState(null, '', '/student/profile');
+    window.history.pushState(null, '', '/demo/student/profile');
     render(<App />);
     expect(screen.getByText(/Target career: Cybersecurity Analyst/i)).toBeInTheDocument();
     expect(screen.getAllByText(/Career objective/i).length).toBeGreaterThan(0);
 
     cleanup();
-    window.history.pushState(null, '', '/student/applications');
+    window.history.pushState(null, '', '/demo/student/applications');
     render(<App />);
     const pipeline = screen.getByLabelText('Application stage pipeline');
     for (const stage of ['Draft', 'Applied', 'Shortlisted', 'Assessment', 'Interview', 'Offer', 'Closed']) {
@@ -380,7 +428,7 @@ describe('Student portal completion', () => {
 
   it('renders final polish semantics for settings, readiness, profile, and interviews', () => {
     fetchMock.mockResolvedValue({ ok: true });
-    window.history.pushState(null, '', '/student/settings');
+    window.history.pushState(null, '', '/demo/student/settings');
     render(<App />);
     expect(screen.getByRole('checkbox', { name: 'Email weekly summary' })).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Assessment reminders' })).toBeInTheDocument();
@@ -389,18 +437,18 @@ describe('Student portal completion', () => {
     expect(screen.getByText('Manage consent')).toBeInTheDocument();
 
     cleanup();
-    window.history.pushState(null, '', '/student/readiness');
+    window.history.pushState(null, '', '/demo/student/readiness');
     render(<App />);
     expect(screen.getByRole('img', { name: /connected readiness score trend/i })).toBeInTheDocument();
 
     cleanup();
-    window.history.pushState(null, '', '/student/profile');
+    window.history.pushState(null, '', '/demo/student/profile');
     render(<App />);
     expect(screen.getByText(/Missing items: portfolio source labels/i)).toBeInTheDocument();
     expect(screen.getByText(/Recommended next action: attach the SIEM lab evidence summary/i)).toBeInTheDocument();
 
     cleanup();
-    window.history.pushState(null, '', '/student/interviews');
+    window.history.pushState(null, '', '/demo/student/interviews');
     render(<App />);
     expect(screen.getByText('Upcoming interviews')).toBeInTheDocument();
     expect(screen.getByText('Preparation progress')).toBeInTheDocument();
@@ -411,18 +459,18 @@ describe('Student portal completion', () => {
     fetchMock.mockResolvedValue({ ok: false });
     render(<App />);
     await waitFor(() => expect(screen.getByText('API Offline')).toBeInTheDocument());
-    expect(screen.getByText('Demo preview')).toBeInTheDocument();
+    expect(screen.getAllByText('DEMO PREVIEW').length).toBeGreaterThan(0);
   });
 
-  it('sets route-aware Student document titles', () => {
+  it('sets route-aware Student document titles', async () => {
     fetchMock.mockResolvedValue({ ok: true });
-    window.history.pushState(null, '', '/student/learning');
+    window.history.pushState(null, '', '/demo/student/learning');
     render(<App />);
-    expect(document.title).toBe('Learning — Student | PlanThePath');
+    await waitFor(() => expect(document.title).toBe('Learning - Student | ONE'));
   });
   it('edits Student-owned target career with validation and session-local feedback', () => {
     fetchMock.mockResolvedValue({ ok: true });
-    window.history.pushState(null, '', '/student/career-path');
+    window.history.pushState(null, '', '/demo/student/career-path');
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: 'Edit career goal' }));
     fireEvent.change(screen.getByLabelText('Target career'), { target: { value: 'AI' } });
@@ -437,7 +485,7 @@ describe('Student portal completion', () => {
 
   it('adds and removes self-declared skills while preserving verified skills as read-only', () => {
     fetchMock.mockResolvedValue({ ok: true });
-    window.history.pushState(null, '', '/student/skills');
+    window.history.pushState(null, '', '/demo/student/skills');
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: 'Add or update skill' }));
     fireEvent.change(screen.getByLabelText('Skill name'), { target: { value: 'Threat hunting notes' } });
@@ -452,13 +500,13 @@ describe('Student portal completion', () => {
 
   it('saves opportunities and creates editable local application drafts', () => {
     fetchMock.mockResolvedValue({ ok: true });
-    window.history.pushState(null, '', '/student/opportunities');
+    window.history.pushState(null, '', '/demo/student/opportunities');
     render(<App />);
     const marketWorks = screen.getByText('Incident Response Associate').closest('article') as HTMLElement;
     fireEvent.click(within(marketWorks).getByRole('button', { name: 'Save' }));
     expect(within(marketWorks).getByText('Saved')).toBeInTheDocument();
     fireEvent.click(within(marketWorks).getByRole('button', { name: 'Apply' }));
-    window.history.pushState(null, '', '/student/applications');
+    window.history.pushState(null, '', '/demo/student/applications');
     fireEvent.popState(window);
     const draftRow = screen.getAllByText('Incident Response Associate').map((node) => node.closest('.data-list-item') as HTMLElement).find((row) => within(row).queryByRole('button', { name: 'Edit draft' }));
     if (!draftRow) throw new Error('Created draft row was not rendered');
@@ -470,7 +518,7 @@ describe('Student portal completion', () => {
 
   it('supports AI Coach local conversation and destructive clear confirmation', () => {
     fetchMock.mockResolvedValue({ ok: true });
-    window.history.pushState(null, '', '/student/ai-coach');
+    window.history.pushState(null, '', '/demo/student/ai-coach');
     render(<App />);
     fireEvent.change(screen.getByPlaceholderText('Ask why a role matches your readiness...'), { target: { value: 'What evidence should I attach?' } });
     fireEvent.click(screen.getByRole('button', { name: 'Preview prompt' }));
@@ -485,7 +533,7 @@ describe('Student portal completion', () => {
 
   it('keeps protected Student profile and document data read-only while metadata remains editable', () => {
     fetchMock.mockResolvedValue({ ok: true });
-    window.history.pushState(null, '', '/student/profile');
+    window.history.pushState(null, '', '/demo/student/profile');
     render(<App />);
     expect(screen.getByRole('heading', { name: 'Academic profile' }).closest('.data-list-item')).toHaveTextContent('Read-only');
     fireEvent.click(screen.getByRole('button', { name: 'Edit profile' }));
@@ -494,7 +542,7 @@ describe('Student portal completion', () => {
     expect(screen.getByRole('heading', { name: 'Rahul K.' })).toBeInTheDocument();
 
     cleanup();
-    window.history.pushState(null, '', '/student/documents');
+    window.history.pushState(null, '', '/demo/student/documents');
     render(<App />);
     expect(screen.getAllByText('Verified read-only').length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole('button', { name: 'Upload document' }));
@@ -506,7 +554,7 @@ describe('Student portal completion', () => {
 
   it('filters Student skills by category, verified state, search, and clear filters', () => {
     fetchMock.mockResolvedValue({ ok: true });
-    window.history.pushState(null, '', '/student/skills');
+    window.history.pushState(null, '', '/demo/student/skills');
     render(<App />);
     expect(screen.getByRole('heading', { name: 'Communication' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Technical' }));
@@ -524,7 +572,7 @@ describe('Student portal completion', () => {
 
   it('filters assessments and opens preview/result dialogs', () => {
     fetchMock.mockResolvedValue({ ok: true });
-    window.history.pushState(null, '', '/student/assessments');
+    window.history.pushState(null, '', '/demo/student/assessments');
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: 'Scheduled' }));
     expect(screen.getByText('SIEM Investigation Assessment')).toBeInTheDocument();
@@ -543,7 +591,7 @@ describe('Student portal completion', () => {
 
   it('filters learning courses and continue learning changes visible progress', () => {
     fetchMock.mockResolvedValue({ ok: true });
-    window.history.pushState(null, '', '/student/learning');
+    window.history.pushState(null, '', '/demo/student/learning');
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: 'SIEM' }));
     expect(screen.getAllByText('SIEM Investigation Sprint').length).toBeGreaterThan(0);
@@ -559,7 +607,7 @@ describe('Student portal completion', () => {
 
   it('filters experience records and request verification updates visible status', () => {
     fetchMock.mockResolvedValue({ ok: true });
-    window.history.pushState(null, '', '/student/experience');
+    window.history.pushState(null, '', '/demo/student/experience');
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: 'Certifications' }));
     expect(screen.getByText('Networking Fundamentals Certificate')).toBeInTheDocument();
@@ -574,7 +622,7 @@ describe('Student portal completion', () => {
 
   it('filters opportunities, toggles saved results, explains match, and routes apply to drafts', () => {
     fetchMock.mockResolvedValue({ ok: true });
-    window.history.pushState(null, '', '/student/opportunities');
+    window.history.pushState(null, '', '/demo/student/opportunities');
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: 'Remote' }));
     expect(screen.getByText('Cybersecurity Intern')).toBeInTheDocument();
@@ -592,13 +640,13 @@ describe('Student portal completion', () => {
     expect(screen.getByRole('dialog', { name: 'Explain opportunity match' })).toHaveTextContent('not AI certainty');
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     fireEvent.click(within(soc).getByRole('button', { name: 'Apply' }));
-    expect(window.location.pathname).toBe('/student/applications');
+    expect(window.location.pathname).toBe('/demo/student/applications');
     expect(screen.getAllByText('SOC Analyst Intern').length).toBeGreaterThan(0);
   });
 
   it('opens application details, edits drafts, preserves cancel, confirms withdrawal, and expands timelines', () => {
     fetchMock.mockResolvedValue({ ok: true });
-    window.history.pushState(null, '', '/student/applications');
+    window.history.pushState(null, '', '/demo/student/applications');
     render(<App />);
     const draftRow = screen.getByText('SOC Analyst Intern').closest('.data-list-item') as HTMLElement;
     fireEvent.click(within(draftRow).getByRole('button', { name: 'View detail' }));
@@ -626,7 +674,7 @@ describe('Student portal completion', () => {
 
 describe('Institution placement officer portal foundation', () => {
   beforeEach(() => {
-    window.history.pushState(null, '', '/institution/placement-officer');
+    window.history.pushState(null, '', '/demo/institution/placement-officer');
     fetchMock.mockResolvedValue({ ok: true });
   });
 
@@ -639,13 +687,13 @@ describe('Institution placement officer portal foundation', () => {
     expect(screen.getByLabelText('Placement Officer identity')).toHaveTextContent('Anita Sharma');
     await waitFor(() => expect(screen.getByText('API Online')).toBeInTheDocument());
     expect(screen.queryByText(/127\.0\.0\.1:3000/i)).not.toBeInTheDocument();
-    expect(document.title).toBe('Placement Dashboard | PlanThePath');
+    expect(document.title).toBe('Placement Dashboard | ONE');
   });
 
   it.each([
-    ['/institution/placement-officer/students', 'Students — Placement Officer | PlanThePath'],
-    ['/institution/placement-officer/assessments', 'Assessments — Placement Officer | PlanThePath'],
-    ['/institution/placement-officer/reports', 'Reports — Placement Officer | PlanThePath'],
+    ['/demo/institution/placement-officer/students', 'Students - Placement Officer | ONE'],
+    ['/demo/institution/placement-officer/assessments', 'Assessments - Placement Officer | ONE'],
+    ['/demo/institution/placement-officer/reports', 'Reports - Placement Officer | ONE'],
   ])('sets staff document title for %s', (path, title) => {
     window.history.pushState(null, '', path);
     render(<App />);
@@ -743,7 +791,7 @@ describe('Institution placement officer portal foundation', () => {
   });
 
   it.each(staffNavItems)('loads staff route $path with active navigation', (item) => {
-    window.history.pushState(null, '', item.path);
+    window.history.pushState(null, '', demoPathFor(item.path));
     render(<App />);
     expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: item.label })).toHaveAttribute('aria-current', 'page');
@@ -753,47 +801,47 @@ describe('Institution placement officer portal foundation', () => {
   it('supports staff browser history and dashboard action navigation', () => {
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: 'Students' }));
-    expect(window.location.pathname).toBe('/institution/placement-officer/students');
+    expect(window.location.pathname).toBe('/demo/institution/placement-officer/students');
     expect(screen.getByRole('heading', { name: 'Students' })).toBeInTheDocument();
-    window.history.pushState(null, '', '/institution/placement-officer');
+    window.history.pushState(null, '', '/demo/institution/placement-officer');
     fireEvent.popState(window);
     expect(screen.getByRole('heading', { name: 'Placement Dashboard' })).toBeInTheDocument();
     const assignAction = screen.getAllByRole('button', { name: /Assign preview action/i })[0];
     if (!assignAction) throw new Error('Assign action was not rendered');
     fireEvent.click(assignAction);
-    expect(window.location.pathname).toBe('/institution/placement-officer/interventions');
+    expect(window.location.pathname).toBe('/demo/institution/placement-officer/interventions');
   });
 
   it('routes previously topbar and section-only staff controls to visible destinations', () => {
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: 'Calendar' }));
-    expect(window.location.pathname).toBe('/institution/placement-officer/events');
+    expect(window.location.pathname).toBe('/demo/institution/placement-officer/events');
     expect(screen.getByRole('heading', { name: 'Events' })).toBeInTheDocument();
-    window.history.pushState(null, '', '/institution/placement-officer');
+    window.history.pushState(null, '', '/demo/institution/placement-officer');
     fireEvent.popState(window);
     fireEvent.click(screen.getByRole('button', { name: 'View full report' }));
-    expect(window.location.pathname).toBe('/institution/placement-officer/reports');
+    expect(window.location.pathname).toBe('/demo/institution/placement-officer/reports');
     cleanup();
-    window.history.pushState(null, '', '/institution/placement-officer');
+    window.history.pushState(null, '', '/demo/institution/placement-officer');
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: /Low.*20-39.*374.*13\.3%/i }));
     expect(screen.getByText(/Selected readiness band: Low/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Messages' }));
-    expect(window.location.pathname).toBe('/institution/placement-officer/communications');
+    expect(window.location.pathname).toBe('/demo/institution/placement-officer/communications');
     expect(screen.getByRole('heading', { name: 'Communications' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Notifications' }));
     expect(screen.getByRole('status')).toHaveTextContent('Placement notifications preview');
   });
 
   it('opens staff record review workflows from table action buttons', () => {
-    window.history.pushState(null, '', '/institution/placement-officer/students');
+    window.history.pushState(null, '', '/demo/institution/placement-officer/students');
     render(<App />);
     fireEvent.click(screen.getAllByRole('button', { name: 'Review preview action' })[0]!);
     expect(screen.getByRole('dialog', { name: 'Edit placement status' })).toBeInTheDocument();
   });
 
   it('opens, validates, saves, audits and resets a staff preview form', () => {
-    window.history.pushState(null, '', '/institution/placement-officer/assessments');
+    window.history.pushState(null, '', '/demo/institution/placement-officer/assessments');
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: 'Create assessment' }));
     expect(screen.getByRole('dialog', { name: 'Create assessment' })).toBeInTheDocument();
@@ -814,7 +862,7 @@ describe('Institution placement officer portal foundation', () => {
   });
 
   it('closes staff modal with Escape and returns focus', () => {
-    window.history.pushState(null, '', '/institution/placement-officer/interventions');
+    window.history.pushState(null, '', '/demo/institution/placement-officer/interventions');
     render(<App />);
     const openButton = screen.getByRole('button', { name: 'Create intervention' });
     fireEvent.click(openButton);
@@ -825,14 +873,14 @@ describe('Institution placement officer portal foundation', () => {
   });
 
   it('renders read-only ownership boundaries and removes generic/technical copy', () => {
-    window.history.pushState(null, '', '/institution/placement-officer/students');
+    window.history.pushState(null, '', '/demo/institution/placement-officer/students');
     render(<App />);
     expect(screen.getByText(/student identity, consent decisions, profile fields/i)).toBeInTheDocument();
     expect(screen.queryByText(/Create workflow/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/PLACEMENT_ADMIN/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/PLACEMENT_OFFICER appears/i)).not.toBeInTheDocument();
     cleanup();
-    window.history.pushState(null, '', '/institution/placement-officer/opportunities');
+    window.history.pushState(null, '', '/demo/institution/placement-officer/opportunities');
     render(<App />);
     expect(screen.getByText(/employer-owned title, compensation/i)).toBeInTheDocument();
   });
@@ -855,13 +903,15 @@ describe('Institution placement officer portal foundation', () => {
   });
 
   it('keeps the Student route regression intact after adding staff portal routing', () => {
-    window.history.pushState(null, '', '/student');
+    window.history.pushState(null, '', '/demo/student');
     render(<App />);
     expect(screen.getByRole('heading', { name: 'Student Dashboard' })).toBeInTheDocument();
     expect(screen.getByRole('complementary', { name: 'Student navigation' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Student profile menu' }));
-    expect(window.location.pathname).toBe('/student/profile');
+    expect(window.location.pathname).toBe('/demo/student/profile');
     expect(screen.getByRole('heading', { name: 'Profile' })).toBeInTheDocument();
     expect(screen.queryByRole('complementary', { name: 'Institution placement navigation' })).not.toBeInTheDocument();
   });
 });
+
+

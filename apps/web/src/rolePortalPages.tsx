@@ -33,14 +33,14 @@ import { OperationsCareerReadinessPanel } from './operationsCareerReadinessPanel
 export function DemoPortalLauncher({ onNavigate }: { readonly onNavigate: (path: string) => void }): React.ReactElement {
   const groups = ['Student', 'Institution', 'Employer', 'Operations'] as const;
   useEffect(() => {
-    document.title = 'Portal Preview Launcher | PlanThePath';
+    document.title = 'Demo previews | ONE';
   }, []);
   return (
     <main className="demo-launcher">
       <section className="demo-hero">
-        <span className="eyebrow">PlanThePath product preview</span>
+        <span className="eyebrow">ONE product preview</span>
         <h1>Multi-role portal launcher</h1>
-        <p>Portal preview - role selection here does not authenticate or authorize a user.</p>
+        <p><strong>DEMO PREVIEW</strong> - fictional data. Role selection here does not authenticate or authorize a user.</p>
       </section>
       {groups.map((family) => {
         const Icon = portalFamilyIcons[family];
@@ -50,12 +50,12 @@ export function DemoPortalLauncher({ onNavigate }: { readonly onNavigate: (path:
   );
 }
 
-export function RolePortal({ portal, apiHealth, authStatus, authNotice, showDevelopmentIndicators, onNavigate, onSignIn, onSignOut }: { readonly portal: RolePortalConfig; readonly apiHealth: ApiHealth; readonly authStatus: AuthStatus; readonly authNotice: string; readonly showDevelopmentIndicators: boolean; readonly onNavigate: (path: string) => void; readonly onSignIn: () => void; readonly onSignOut: () => void }): React.ReactElement {
-  return <RolePreviewProvider><RolePortalInner portal={portal} apiHealth={apiHealth} authStatus={authStatus} authNotice={authNotice} showDevelopmentIndicators={showDevelopmentIndicators} onNavigate={onNavigate} onSignIn={onSignIn} onSignOut={onSignOut} /></RolePreviewProvider>;
+export function RolePortal({ portal, apiHealth, authStatus, authNotice, showDevelopmentIndicators, onNavigate, onSignIn, onSignOut, demoMode = false }: { readonly portal: RolePortalConfig; readonly apiHealth: ApiHealth; readonly authStatus: AuthStatus; readonly authNotice: string; readonly showDevelopmentIndicators: boolean; readonly onNavigate: (path: string) => void; readonly onSignIn: () => void; readonly onSignOut: () => void; readonly demoMode?: boolean }): React.ReactElement {
+  return <RolePreviewProvider><RolePortalInner portal={portal} apiHealth={apiHealth} authStatus={authStatus} authNotice={authNotice} showDevelopmentIndicators={showDevelopmentIndicators} onNavigate={onNavigate} onSignIn={onSignIn} onSignOut={onSignOut} demoMode={demoMode} /></RolePreviewProvider>;
 }
 
-function RolePortalInner({ portal, apiHealth, authStatus, authNotice, showDevelopmentIndicators, onNavigate, onSignIn, onSignOut }: { readonly portal: RolePortalConfig; readonly apiHealth: ApiHealth; readonly authStatus: AuthStatus; readonly authNotice: string; readonly showDevelopmentIndicators: boolean; readonly onNavigate: (path: string) => void; readonly onSignIn: () => void; readonly onSignOut: () => void }): React.ReactElement {
-  const [path, setPath] = useState(normalize(window.location.pathname));
+function RolePortalInner({ portal, apiHealth, authStatus, authNotice, showDevelopmentIndicators, onNavigate, onSignIn, onSignOut, demoMode }: { readonly portal: RolePortalConfig; readonly apiHealth: ApiHealth; readonly authStatus: AuthStatus; readonly authNotice: string; readonly showDevelopmentIndicators: boolean; readonly onNavigate: (path: string) => void; readonly onSignIn: () => void; readonly onSignOut: () => void; readonly demoMode: boolean }): React.ReactElement {
+  const [path, setPath] = useState(normalizeRolePath(window.location.pathname, portal));
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [topbarNotice, setTopbarNotice] = useState('');
@@ -64,11 +64,11 @@ function RolePortalInner({ portal, apiHealth, authStatus, authNotice, showDevelo
 
   useEffect(() => {
     const label = activeRoute?.label ?? (portal.nav[0]?.label ?? 'Dashboard');
-    document.title = label === 'Dashboard' || label === 'Overview' ? `${portal.dashboardTitle} | PlanThePath` : `${label} - ${portal.roleName} | PlanThePath`;
+    document.title = label === 'Dashboard' || label === 'Overview' ? `${portal.dashboardTitle} | ONE` : `${label} - ${portal.roleName} | ONE`;
   }, [activeRoute, portal]);
 
   useEffect(() => {
-    const onPop = (): void => setPath(normalize(window.location.pathname));
+    const onPop = (): void => setPath(normalizeRolePath(window.location.pathname, portal));
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, []);
@@ -86,10 +86,11 @@ function RolePortalInner({ portal, apiHealth, authStatus, authNotice, showDevelo
   }, [drawerOpen]);
 
   function navigate(nextPath: string): void {
-    window.history.pushState(null, '', nextPath);
-    setPath(normalize(nextPath));
+    const routedPath = demoMode && !nextPath.startsWith('/demo/') ? `/demo${nextPath}` : nextPath;
+    window.history.pushState(null, '', routedPath);
+    setPath(normalizeRolePath(routedPath, portal));
     setDrawerOpen(false);
-    onNavigate(nextPath);
+    onNavigate(routedPath);
   }
 
   return (
@@ -100,6 +101,7 @@ function RolePortalInner({ portal, apiHealth, authStatus, authNotice, showDevelo
       <div className="role-workspace">
         <RoleTopbar portal={portal} apiHealth={apiHealth} authStatus={authStatus} authNotice={authNotice} showDevelopmentIndicators={showDevelopmentIndicators} menuButtonRef={menuButtonRef} onOpenMenu={() => setDrawerOpen(true)} onMessages={() => { const messagesRoute = portal.nav.find((item) => /messages|communications/i.test(item.label)); if (messagesRoute) navigate(messagesRoute.path); else setTopbarNotice(`${portal.roleName} messaging is backend-dependent and no message route exists for this preview role.`); }} onNotifications={() => setTopbarNotice(`${portal.roleName} notifications preview: 4 local demo alerts are summarized only; no backend notification state was changed.`)} onSwitch={() => navigate('/demo')} onSignIn={onSignIn} onSignOut={onSignOut} />
         <main id="role-main" className="role-main">
+          {demoMode ? <section className="demo-boundary" role="note"><strong>DEMO PREVIEW</strong><span>Fictional data. This route is not authenticated and does not authorize a user.</span></section> : null}
           <PreviewNotice portal={portal} notice={topbarNotice} />
           {activeRoute?.path === portal.basePath ? <RoleDashboard portal={portal} onNavigate={navigate} /> : <RoleModulePage portal={portal} route={activeRoute ?? portal.nav[0]!} />}
         </main>
@@ -112,7 +114,7 @@ function RoleSidebar({ portal, activePath, collapsed, drawerOpen, onNavigate, on
   const groups = [...new Set(portal.nav.map((item) => item.group))];
   return (
     <aside className={`role-sidebar ${drawerOpen ? 'drawer-open' : ''}`} aria-label={`${portal.roleName} navigation`}>
-      <div className="role-brand"><span className="role-brand-mark">{portal.initials}</span><span><strong>PlanThePath</strong><small>{portal.subtitle}</small></span><button className="icon-button sidebar-close" type="button" aria-label={`Close ${portal.roleName} navigation`} onClick={onClose} autoFocus={drawerOpen}><X size={18} /></button></div>
+      <div className="role-brand"><span className="role-brand-mark">{portal.initials}</span><span><strong>ONE</strong><small>{portal.subtitle}</small></span><button className="icon-button sidebar-close" type="button" aria-label={`Close ${portal.roleName} navigation`} onClick={onClose} autoFocus={drawerOpen}><X size={18} /></button></div>
       <nav className="role-nav" aria-label={`Grouped ${portal.roleName} navigation`}>
         {groups.map((group) => <div className="role-nav-group" key={group}><span>{group}</span>{portal.nav.filter((item) => item.group === group).map((item) => { const Icon = item.icon; const active = activePath === item.path; return <button key={item.path} type="button" className={`role-nav-item ${active ? 'active' : ''}`} aria-current={active ? 'page' : undefined} onClick={() => onNavigate(item.path)}><Icon size={16} aria-hidden="true" /><span>{item.label}</span></button>; })}</div>)}
       </nav>
@@ -123,6 +125,13 @@ function RoleSidebar({ portal, activePath, collapsed, drawerOpen, onNavigate, on
 
 function RoleTopbar({ portal, apiHealth, authStatus, authNotice, showDevelopmentIndicators, menuButtonRef, onOpenMenu, onMessages, onNotifications, onSwitch, onSignIn, onSignOut }: { readonly portal: RolePortalConfig; readonly apiHealth: ApiHealth; readonly authStatus: AuthStatus; readonly authNotice: string; readonly showDevelopmentIndicators: boolean; readonly menuButtonRef: React.RefObject<HTMLButtonElement | null>; readonly onOpenMenu: () => void; readonly onMessages: () => void; readonly onNotifications: () => void; readonly onSwitch: () => void; readonly onSignIn: () => void; readonly onSignOut: () => void }): React.ReactElement {
   return <header className="role-topbar"><button ref={menuButtonRef} className="icon-button mobile-menu-button" type="button" aria-label={`Open ${portal.roleName} navigation`} onClick={onOpenMenu}><Menu size={20} /></button><span className="role-context">{portal.roleName}</span><span className="role-org">{portal.organization}</span><label className="role-search" role="search"><Search size={16} /><span className="sr-only">Search {portal.roleName} workspace</span><input placeholder={`Search ${portal.family.toLowerCase()} records...`} /></label><div className="role-topbar-actions"><button type="button" className="secondary" onClick={onSwitch}>Switch preview portal</button><button className="icon-button" type="button" aria-label="Messages" onClick={onMessages}><MessageSquare size={17} /></button><button className="icon-button notification" type="button" aria-label="Notifications" onClick={onNotifications}><Bell size={17} /><span>4</span></button><AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />{showDevelopmentIndicators ? <span className={`staff-api-dot ${apiHealth}`}>{apiHealth}</span> : null}<span className="role-profile"><span>{portal.initials}</span><span><strong>{portal.previewUser}</strong><small>{portal.roleName}</small></span><ChevronDown size={14} /></span></div></header>;
+}
+
+function normalizeRolePath(path: string, portal: RolePortalConfig): string {
+  const normalized = normalize(path);
+  const withoutDemo = normalized.startsWith('/demo/') ? normalized.slice('/demo'.length) : normalized;
+  if (withoutDemo === `/${portal.family.toLowerCase()}`) return portal.basePath;
+  return withoutDemo;
 }
 
 function PreviewNotice({ portal, notice }: { readonly portal: RolePortalConfig; readonly notice: string }): React.ReactElement {

@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -50,9 +50,11 @@ describe('Cognito Hosted UI browser authentication', () => {
     render(React.createElement(App));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument());
     expect(screen.getByText('aanya.student01@example.test')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Student profile menu' })).toHaveTextContent('Aanya Student01');
+    expect(screen.getByRole('heading', { name: 'Choose your ONE workspace' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Student Learning, readiness/i }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Student profile menu' })).toHaveTextContent('Aanya Student01'));
     expect(screen.getByText('Authenticated API-backed mode')).toBeInTheDocument();
-    expect(screen.getByText('API-backed')).toBeInTheDocument();
+    expect(screen.getAllByText('API-backed').length).toBeGreaterThan(0);
     expect(screen.queryByText('/100')).not.toBeInTheDocument();
     window.history.pushState(null, '', '/student/readiness');
     render(React.createElement(App));

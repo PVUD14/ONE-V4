@@ -5,7 +5,9 @@ import { activityTimeline, applications, assessments, careerStages, coachMessage
 import { useStudentPreview, type StudentApplication, type StudentDocument, type StudentExperience, type StudentSkill } from './studentPreviewState.js';
 
 function navigateTo(path: string): void {
-  window.history.pushState(null, '', path);
+  const currentDemo = window.location.pathname.startsWith('/demo/');
+  const routedPath = currentDemo && !path.startsWith('/demo/') ? `/demo${path}` : path;
+  window.history.pushState(null, '', routedPath);
   window.dispatchEvent(new PopStateEvent('popstate'));
 }
 

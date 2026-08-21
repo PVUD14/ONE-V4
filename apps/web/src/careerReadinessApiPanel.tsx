@@ -103,7 +103,7 @@ export function CareerReadinessApiPanel({ route }: { readonly route: CareerRoute
       {route === 'skills' ? <SkillsApiView learner={learner} /> : null}
       {route === 'roadmap' ? <RoadmapApiView learner={learner} /> : null}
       {route === 'notifications' ? <NotificationsApiView learner={learner} /> : null}
-      <p className="career-api-boundary">Named bands are advisory, never employer-visible, and derived only from versioned PlanThePath evidence. The preview content below is not written to the API.</p>
+      <p className="career-api-boundary">Named bands are advisory, never employer-visible, and derived only from versioned ONE evidence. The preview content below is not written to the API.</p>
     </section>
   );
 }
@@ -167,3 +167,4 @@ function NotificationsApiView({ learner }: { readonly learner: LearnerCareerRead
 function formatBand(value: string): string {
   return value.toLowerCase().split('_').map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`).join(' ');
 }
+

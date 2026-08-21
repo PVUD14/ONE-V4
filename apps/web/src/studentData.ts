@@ -14,7 +14,7 @@ export const studentProfile = {
   readiness: 68,
   pathwayProgress: 62,
   nextMilestone: 'Complete SIEM Assessment',
-  institution: 'PlanThePath Demo Institute',
+  institution: 'ONE Demo Institute',
   consentState: 'Employer visibility limited to saved/applied opportunities',
 };
 
@@ -116,3 +116,4 @@ export const activityTimeline = [
   { date: 'Aug 16', title: 'Networking fundamentals verified', detail: 'Assessment score added to readiness model' },
   { date: 'Aug 15', title: 'Security lab portfolio updated', detail: 'Evidence source labels still pending' },
 ];
+

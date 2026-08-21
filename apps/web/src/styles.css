@@ -134,6 +134,66 @@
 .role-modal textarea { min-height: 96px; resize: vertical; }
 .role-empty { text-align: center; border: 1px dashed #cbd5e1; background: #fff; }
 
+.login-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  background: radial-gradient(circle at 20% 0%, rgba(16, 185, 129, 0.18), transparent 34%), linear-gradient(135deg, #06131f 0%, #0f2740 50%, #132238 100%);
+  color: #f8fafc;
+}
+
+.login-card {
+  width: min(760px, 100%);
+  display: grid;
+  gap: 18px;
+  padding: 34px;
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.28);
+}
+
+.login-card h1 {
+  margin: 0;
+  font-size: clamp(3rem, 10vw, 6rem);
+  letter-spacing: 0.18em;
+}
+
+.login-card p { max-width: 62ch; color: #dbeafe; }
+.login-card .auth-controls { justify-content: flex-start; }
+.auth-boundary { border-left: 3px solid #38bdf8; padding-left: 14px; }
+
+.workspace-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.workspace-grid button {
+  display: grid;
+  gap: 8px;
+  text-align: left;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.12);
+  color: inherit;
+  padding: 16px;
+}
+
+.workspace-grid span { color: #dbeafe; font-size: 0.9rem; }
+
+.demo-boundary {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  background: #fff7ed;
+  color: #7c2d12;
+  border-bottom: 1px solid #fed7aa;
+}
+
 @media (max-width: 1180px) {
   .role-shell { grid-template-columns: 1fr; }
   .role-sidebar { position: fixed; inset: 0 auto 0 0; z-index: 50; width: min(320px, 86vw); transform: translateX(-105%); transition: transform 180ms ease; }

@@ -22,7 +22,10 @@ describe('Cognito Hosted UI browser authentication', () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true })));
     render(React.createElement(App));
     expect(screen.getByRole('button', { name: 'Sign in' })).toBeDisabled();
-    expect(screen.getByText('Cognito UAT login is not configured')).toBeInTheDocument();
+    expect(screen.getByText('ONE PLATFORM')).toBeInTheDocument();
+    expect(screen.getByLabelText('Email')).toBeDisabled();
+    expect(screen.getByLabelText('Password')).toBeDisabled();
+    expect(screen.getByText('Secure sign-in is not available in this UAT environment yet.')).toBeInTheDocument();
   });
 
   it('exchanges a Hosted UI authorization code and uses the returned access token for protected API calls', async () => {

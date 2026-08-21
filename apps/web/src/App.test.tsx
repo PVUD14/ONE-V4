@@ -31,11 +31,26 @@ describe('All-role portal registry and preview workflows', () => {
       cleanup();
       window.history.pushState(null, '', path);
       render(<App />);
-      expect(screen.getByRole('heading', { name: 'ONE' })).toBeInTheDocument();
+      expect(screen.getByText('ONE PLATFORM')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
       expect(screen.getByText('LEARN | PREPARE | BUILD | GROW')).toBeInTheDocument();
-      expect(screen.getByText(/Authentication is unavailable because Cognito is not configured/i)).toBeInTheDocument();
+      expect(screen.getByLabelText('Email')).toHaveAttribute('autocomplete', 'username');
+      expect(screen.getByLabelText('Password')).toHaveAttribute('autocomplete', 'current-password');
+      expect(screen.getByRole('button', { name: 'Sign in' })).toBeDisabled();
+      expect(screen.getByText(/Secure sign-in is not available in this UAT environment yet/i)).toBeInTheDocument();
+      expect(screen.queryByText(/Cognito UAT login is not configured/i)).not.toBeInTheDocument();
       expect(screen.queryByText('Rahul Kumar')).not.toBeInTheDocument();
     }
+  });
+
+  it('does not persist login password input while Cognito is unavailable', () => {
+    fetchMock.mockResolvedValue({ ok: true });
+    window.history.pushState(null, '', '/');
+    render(<App />);
+    const password = screen.getByLabelText('Password');
+    expect(password).toBeDisabled();
+    expect(window.localStorage.length).toBe(0);
+    expect(Array.from({ length: window.sessionStorage.length }, (_, index) => window.sessionStorage.key(index)).join(' ')).not.toMatch(/password|secret/i);
   });
 
   it('fails closed on protected portal families without leaking demo identities', () => {

@@ -1,4 +1,5 @@
 import { Bell, BookOpen, BriefcaseBusiness, Building2, CalendarDays, ChevronDown, ClipboardCheck, FileText, Gauge, GraduationCap, Home, LayoutDashboard, Menu, MessageSquare, Search, Settings, ShieldCheck, Sparkles, Target, Trophy, UserRound, X, type LucideIcon } from 'lucide-react';
+import type { FormEvent } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { acceptInvitation, getApiHealth, type ApiHealth } from './api.js';
 import { beginHostedLogin, completeHostedLoginFromLocation, getAccessToken, getAuthStatus, getAuthDebugStatus, signOut, type AuthStatus } from './auth.js';
@@ -200,13 +201,25 @@ export function App(): React.ReactElement {
 function LoginEntry({ authStatus, authNotice, onSignIn, onSignOut, onNavigate }: { readonly authStatus: AuthStatus; readonly authNotice: string; readonly onSignIn: () => void; readonly onSignOut: () => void; readonly onNavigate: (path: string) => void }): React.ReactElement {
   useEffect(() => { document.title = `Sign in | ${productName}`; }, []);
   if (authStatus.state === 'authenticated') return <WorkspaceChooser authStatus={authStatus} authNotice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} onNavigate={onNavigate} />;
+  const signInUnavailable = authStatus.state === 'unconfigured';
+  function submitLogin(event: FormEvent<HTMLFormElement>): void {
+    event.preventDefault();
+    if (!signInUnavailable) onSignIn();
+  }
   return <main className="login-shell">
-    <section className="login-card">
-      <span className="eyebrow">{productTagline}</span>
-      <h1>{productName}</h1>
-      <p>Sign in to enter your verified Student, Institution, Employer, or Operations workspace.</p>
-      <AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />
-      {authStatus.state === 'unconfigured' ? <p className="auth-boundary">Authentication is unavailable because Cognito is not configured. Protected portals stay closed and no fixture account is used.</p> : null}
+    <section className="login-card" aria-labelledby="one-login-title">
+      <p className="auth-eyebrow">ONE PLATFORM</p>
+      <h1 id="one-login-title">Sign in</h1>
+      <p className="auth-subtitle">Sign in to your verified ONE career-readiness workspace.</p>
+      <form className="login-form" onSubmit={submitLogin} noValidate>
+        <label htmlFor="one-login-email">Email</label>
+        <input id="one-login-email" name="email" type="email" autoComplete="username" inputMode="email" disabled={signInUnavailable} aria-describedby={signInUnavailable ? 'one-auth-unavailable' : undefined} />
+        <label htmlFor="one-login-password">Password</label>
+        <input id="one-login-password" name="password" type="password" autoComplete="current-password" disabled={signInUnavailable} aria-describedby={signInUnavailable ? 'one-auth-unavailable' : undefined} />
+        <button type="submit" disabled={signInUnavailable}>Sign in</button>
+      </form>
+      {signInUnavailable ? <p id="one-auth-unavailable" className="auth-boundary" role="status">Secure sign-in is not available in this UAT environment yet.</p> : null}
+      <p className="auth-footnote">{productTagline}</p>
       {enableDemoPortal ? <button type="button" className="secondary" onClick={() => onNavigate('/demo')}>Open demo previews</button> : null}
     </section>
   </main>;

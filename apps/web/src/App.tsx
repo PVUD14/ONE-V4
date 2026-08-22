@@ -1,8 +1,8 @@
 import { Bell, BookOpen, BriefcaseBusiness, Building2, CalendarDays, ChevronDown, ClipboardCheck, FileText, Gauge, GraduationCap, Home, LayoutDashboard, Menu, MessageSquare, Search, Settings, ShieldCheck, Sparkles, Target, Trophy, UserRound, X, type LucideIcon } from 'lucide-react';
 import type { FormEvent } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { acceptInvitation, getApiHealth, getSecurityContext, type ApiHealth, type SecurityContextDto } from './api.js';
-import { beginHostedLogin, completeHostedLoginFromLocation, getAccessToken, getAuthStatus, getAuthDebugStatus, signOut, type AuthStatus } from './auth.js';
+import { acceptInvitation, getApiHealth, getSecurityContext, getCurrentStudent, type ApiHealth, type CurrentStudentDto, type SecurityContextDto } from './api.js';
+import { beginHostedLogin, completeHostedLoginFromLocation, getAccessToken, getAuthStatus, getAuthDebugStatus, hasStoredAuthSession, restoreAuthenticatedSession, signInWithPassword, signOut, type AuthStatus } from './auth.js';
 import { AuthControls } from './authControls.js';
 import { PageHeader, type PageMeta } from './studentComponents.js';
 import { rolePortalFromPath } from './rolePortalConfig.js';
@@ -85,15 +85,20 @@ type WorkspaceResolution =
   | { readonly state: 'loading' }
   | { readonly state: 'resolved'; readonly choices: readonly AuthorizedWorkspace[] }
   | { readonly state: 'error'; readonly message: string };
+type CurrentStudentState =
+  | { readonly state: 'idle' | 'loading' }
+  | { readonly state: 'resolved'; readonly student: CurrentStudentDto }
+  | { readonly state: 'error'; readonly message: string };
 
 export function App(): React.ReactElement {
   const [path, setPath] = useState(currentPath());
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [apiHealth, setApiHealth] = useState<ApiHealth>('checking');
-  const [authStatus, setAuthStatus] = useState<AuthStatus>(() => getAuthStatus());
+  const [authStatus, setAuthStatus] = useState<AuthStatus>(() => (hasStoredAuthSession() && !currentPath().startsWith('/demo') ? { state: 'restoring' } : getAuthStatus()));
   const [authNotice, setAuthNotice] = useState(getAuthDebugStatus());
   const [workspaceResolution, setWorkspaceResolution] = useState<WorkspaceResolution>({ state: 'loading' });
+  const [currentStudent, setCurrentStudent] = useState<CurrentStudentState>({ state: 'idle' });
   const menuButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -104,15 +109,20 @@ export function App(): React.ReactElement {
 
   useEffect(() => {
     let mounted = true;
-    completeHostedLoginFromLocation()
-      .then((completed) => {
-        if (!mounted) return;
-        setAuthStatus(getAuthStatus());
-        if (completed) setAuthNotice('Signed in with the configured non-production identity provider.');
-      })
+    (async () => {
+      if (currentPath().startsWith('/demo')) return;
+      const completed = await completeHostedLoginFromLocation();
+      const restored = completed ? getAuthStatus() : await restoreAuthenticatedSession();
+      if (!mounted) return;
+      setAuthStatus(restored);
+      if (completed) setAuthNotice('Signed in with the configured non-production identity provider.');
+      else if (restored.state === 'authenticated') setAuthNotice('Restored your ONE session.');
+    })()
       .catch(() => {
         if (!mounted) return;
         setAuthStatus(getAuthStatus());
+        window.history.replaceState(null, '', '/login');
+        setPath(currentPath());
         setAuthNotice('Sign-in could not be completed. Try again or verify the non-production Cognito configuration.');
       });
     return () => { mounted = false; };
@@ -142,6 +152,24 @@ export function App(): React.ReactElement {
       .catch(() => setWorkspaceResolution({ state: 'error', message: 'ONE could not resolve an active workspace for this identity.' }));
     return () => controller.abort();
   }, [authStatus]);
+
+  useEffect(() => {
+    if (authStatus.state !== 'authenticated' || !workspaceResolution || !workspaceForPath('/student', workspaceResolution.state === 'resolved' ? workspaceResolution.choices : [])) {
+      setCurrentStudent({ state: 'idle' });
+      return;
+    }
+    const token = getAccessToken();
+    if (!token) {
+      setCurrentStudent({ state: 'error', message: 'No protected access token is available for Student identity.' });
+      return;
+    }
+    const controller = new AbortController();
+    setCurrentStudent({ state: 'loading' });
+    getCurrentStudent(token, controller.signal)
+      .then(({ student }) => setCurrentStudent({ state: 'resolved', student }))
+      .catch(() => setCurrentStudent({ state: 'error', message: 'Student identity is not available for this authenticated session.' }));
+    return () => controller.abort();
+  }, [authStatus, workspaceResolution]);
 
   useEffect(() => {
     const onPop = (): void => setPath(currentPath());
@@ -174,49 +202,53 @@ export function App(): React.ReactElement {
     document.title = route === 'dashboard' ? `${title} | ${productName}` : `${title} - Student | ${productName}`;
   }, [effectivePath, path, rolePortal, route]);
 
+  if (authStatus.state === 'restoring') {
+    return <SessionRestorationPage />;
+  }
+
   if (path === '/' || path === '/login') {
-    return <LoginEntry authStatus={authStatus} authNotice={authNotice} workspaceResolution={workspaceResolution} onSignIn={handleSignIn} onSignOut={handleSignOut} onNavigate={(nextPath) => {
+    return <LoginEntry authStatus={authStatus} authNotice={authNotice} workspaceResolution={workspaceResolution} onSignIn={handleSignIn} onHostedSignIn={handleHostedSignIn} onSignOut={handleSignOut} onNavigate={(nextPath) => {
       window.history.pushState(null, '', nextPath);
       setPath(currentPath());
     }} />;
   }
 
   if (path === '/auth/callback' && authenticated) {
-    return <WorkspaceChooser authStatus={authStatus} authNotice={authNotice} workspaceResolution={workspaceResolution} onSignIn={handleSignIn} onSignOut={handleSignOut} onNavigate={(nextPath) => {
+    return <WorkspaceChooser authStatus={authStatus} authNotice={authNotice} workspaceResolution={workspaceResolution} onSignIn={handleHostedSignIn} onSignOut={handleSignOut} onNavigate={(nextPath) => {
       window.history.pushState(null, '', nextPath);
       setPath(currentPath());
     }} />;
   }
 
   if (isProtectedPortalPath(path) && !demoPath && !authenticated) {
-    return <AuthRequiredPage requestedPath={path} authStatus={authStatus} authNotice={authNotice} onSignIn={handleSignIn} onSignOut={handleSignOut} />;
+    return <AuthRequiredPage requestedPath={path} authStatus={authStatus} authNotice={authNotice} onSignIn={handleHostedSignIn} onSignOut={handleSignOut} />;
   }
 
   if (isProtectedPortalPath(path) && !demoPath && authenticated) {
     if (workspaceResolution.state === 'loading') {
-      return <WorkspaceResolutionPage authStatus={authStatus} authNotice={authNotice} onSignIn={handleSignIn} onSignOut={handleSignOut} />;
+      return <WorkspaceResolutionPage authStatus={authStatus} authNotice={authNotice} onSignIn={handleHostedSignIn} onSignOut={handleSignOut} />;
     }
     if (workspaceResolution.state === 'error') {
-      return <AccessDeniedPage requestedPath={path} authStatus={authStatus} authNotice={authNotice} message={workspaceResolution.message} onSignIn={handleSignIn} onSignOut={handleSignOut} />;
+      return <AccessDeniedPage requestedPath={path} authStatus={authStatus} authNotice={authNotice} message={workspaceResolution.message} onSignIn={handleHostedSignIn} onSignOut={handleSignOut} />;
     }
     const familyRoot = protectedFamilyRoot(path);
     const firstFamilyWorkspace = familyRoot ? workspaceResolution.choices.find((choice) => choice.family.toLowerCase() === familyRoot) : undefined;
     if (firstFamilyWorkspace && normalizePath(path) === `/${familyRoot}` && firstFamilyWorkspace.path !== normalizePath(path)) {
       window.history.replaceState(null, '', firstFamilyWorkspace.path);
       setPath(currentPath());
-      return <WorkspaceResolutionPage authStatus={authStatus} authNotice={authNotice} onSignIn={handleSignIn} onSignOut={handleSignOut} />;
+      return <WorkspaceResolutionPage authStatus={authStatus} authNotice={authNotice} onSignIn={handleHostedSignIn} onSignOut={handleSignOut} />;
     }
     if (!activeWorkspace) {
-      return <AccessDeniedPage requestedPath={path} authStatus={authStatus} authNotice={authNotice} onSignIn={handleSignIn} onSignOut={handleSignOut} />;
+      return <AccessDeniedPage requestedPath={path} authStatus={authStatus} authNotice={authNotice} onSignIn={handleHostedSignIn} onSignOut={handleSignOut} />;
     }
   }
 
   if (effectivePath.startsWith('/institution/placement-officer')) {
-    return <PlacementOfficerPortal apiHealth={apiHealth} authStatus={authStatus} authNotice={authNotice} onSignIn={handleSignIn} onSignOut={handleSignOut} showDevelopmentIndicators={showDevelopmentIndicators} />;
+    return <PlacementOfficerPortal apiHealth={apiHealth} authStatus={authStatus} authNotice={authNotice} onSignIn={handleHostedSignIn} onSignOut={handleSignOut} showDevelopmentIndicators={showDevelopmentIndicators} />;
   }
 
   if (path === '/invitations/accept') {
-    return <InvitationAcceptancePage authStatus={authStatus} authNotice={authNotice} onSignIn={handleSignIn} onSignOut={handleSignOut} />;
+    return <InvitationAcceptancePage authStatus={authStatus} authNotice={authNotice} onSignIn={handleHostedSignIn} onSignOut={handleSignOut} />;
   }
 
   if ((path === '/demo' || path.startsWith('/demo/')) && enableDemoPortal && !demoPath) {
@@ -227,33 +259,53 @@ export function App(): React.ReactElement {
   }
 
   if (rolePortal) {
-    return <RolePortal portal={rolePortal} apiHealth={apiHealth} authStatus={authStatus} authNotice={authNotice} onSignIn={handleSignIn} onSignOut={handleSignOut} showDevelopmentIndicators={showDevelopmentIndicators} onNavigate={() => setPath(currentPath())} demoMode={Boolean(demoPath)} authenticatedWorkspace={activeWorkspace ? { role: activeWorkspace.role, organizationId: activeWorkspace.organizationId } : undefined} />;
+    return <RolePortal portal={rolePortal} apiHealth={apiHealth} authStatus={authStatus} authNotice={authNotice} onSignIn={handleHostedSignIn} onSignOut={handleSignOut} showDevelopmentIndicators={showDevelopmentIndicators} onNavigate={() => setPath(currentPath())} demoMode={Boolean(demoPath)} authenticatedWorkspace={activeWorkspace ? { role: activeWorkspace.role, organizationId: activeWorkspace.organizationId } : undefined} />;
+  }
+
+  if (!demoPath && authenticated) {
+    return <StudentShell
+      apiHealth={apiHealth}
+      authNotice={authNotice}
+      authStatus={authStatus}
+      currentStudent={currentStudent}
+      demoMode={false}
+      drawerOpen={drawerOpen}
+      menuButtonRef={menuButtonRef}
+      path={effectivePath}
+      route={route}
+      setDrawerOpen={setDrawerOpen}
+      setPath={setPath}
+      setSidebarCollapsed={setSidebarCollapsed}
+      sidebarCollapsed={sidebarCollapsed}
+      onSignIn={handleHostedSignIn}
+      onSignOut={handleSignOut}
+      workspace={activeWorkspace ?? undefined}
+    />;
   }
 
   return (
     <StudentPreviewProvider>
       {demoPath ? <DemoBoundaryBanner /> : null}
-      <StudentShell
-        apiHealth={apiHealth}
-        authNotice={authNotice}
-        authStatus={authStatus}
-        demoMode={Boolean(demoPath)}
-        drawerOpen={drawerOpen}
-        menuButtonRef={menuButtonRef}
-        path={effectivePath}
-        route={route}
-        setDrawerOpen={setDrawerOpen}
-        setPath={setPath}
-        setSidebarCollapsed={setSidebarCollapsed}
-        sidebarCollapsed={sidebarCollapsed}
-        onSignIn={handleSignIn}
-        onSignOut={handleSignOut}
-        workspace={activeWorkspace ?? undefined}
-      />
+      <DemoStudentShell apiHealth={apiHealth} authNotice={authNotice} authStatus={authStatus} currentStudent={currentStudent} demoMode={Boolean(demoPath)} drawerOpen={drawerOpen} menuButtonRef={menuButtonRef} path={effectivePath} route={route} setDrawerOpen={setDrawerOpen} setPath={setPath} setSidebarCollapsed={setSidebarCollapsed} sidebarCollapsed={sidebarCollapsed} onSignIn={handleHostedSignIn} onSignOut={handleSignOut} workspace={activeWorkspace ?? undefined} />
     </StudentPreviewProvider>
   );
 
-  async function handleSignIn(): Promise<void> {
+  async function handleSignIn(email: string, password: string): Promise<void> {
+    const result = await signInWithPassword(email, password);
+    if (result.state === 'success') {
+      setAuthStatus(getAuthStatus());
+      setAuthNotice('Signed in to ONE.');
+      window.history.replaceState(null, '', '/');
+      setPath(currentPath());
+      return;
+    }
+    setAuthStatus(getAuthStatus());
+    window.history.replaceState(null, '', '/login');
+    setPath(currentPath());
+    setAuthNotice(loginNoticeFor(result.state));
+  }
+
+  async function handleHostedSignIn(): Promise<void> {
     try {
       await beginHostedLogin(`${window.location.pathname}${window.location.search}`);
     } catch {
@@ -268,13 +320,17 @@ export function App(): React.ReactElement {
   }
 }
 
-function LoginEntry({ authStatus, authNotice, workspaceResolution, onSignIn, onSignOut, onNavigate }: { readonly authStatus: AuthStatus; readonly authNotice: string; readonly workspaceResolution: WorkspaceResolution; readonly onSignIn: () => void; readonly onSignOut: () => void; readonly onNavigate: (path: string) => void }): React.ReactElement {
+function LoginEntry({ authStatus, authNotice, workspaceResolution, onSignIn, onHostedSignIn, onSignOut, onNavigate }: { readonly authStatus: AuthStatus; readonly authNotice: string; readonly workspaceResolution: WorkspaceResolution; readonly onSignIn: (email: string, password: string) => void | Promise<void>; readonly onHostedSignIn: () => void; readonly onSignOut: () => void; readonly onNavigate: (path: string) => void }): React.ReactElement {
   useEffect(() => { document.title = `Sign in | ${productName}`; }, []);
-  if (authStatus.state === 'authenticated') return <WorkspaceChooser authStatus={authStatus} authNotice={authNotice} workspaceResolution={workspaceResolution} onSignIn={onSignIn} onSignOut={onSignOut} onNavigate={onNavigate} />;
+  if (authStatus.state === 'authenticated') return <WorkspaceChooser authStatus={authStatus} authNotice={authNotice} workspaceResolution={workspaceResolution} onSignIn={onHostedSignIn} onSignOut={onSignOut} onNavigate={onNavigate} />;
   const signInUnavailable = authStatus.state === 'unconfigured';
   function submitLogin(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
-    if (!signInUnavailable) onSignIn();
+    if (signInUnavailable) return;
+    const form = new FormData(event.currentTarget);
+    const email = String(form.get('email') ?? '');
+    const password = String(form.get('password') ?? '');
+    void onSignIn(email, password);
   }
   return <main className="login-shell">
     <section className="login-card" aria-labelledby="one-login-title">
@@ -289,10 +345,27 @@ function LoginEntry({ authStatus, authNotice, workspaceResolution, onSignIn, onS
         <button type="submit" disabled={signInUnavailable}>Sign in</button>
       </form>
       {signInUnavailable ? <p id="one-auth-unavailable" className="auth-boundary" role="status">Secure sign-in is not available in this UAT environment yet.</p> : null}
+      {!signInUnavailable && authNotice ? <p className="auth-boundary" role={/failed|incorrect|required|expired|not configured/i.test(authNotice) ? 'alert' : 'status'}>{authNotice}</p> : null}
       <p className="auth-footnote">{productTagline}</p>
+      {!signInUnavailable ? <button type="button" className="secondary" onClick={onHostedSignIn}>Use hosted sign-in fallback</button> : null}
       {enableDemoPortal ? <button type="button" className="secondary" onClick={() => onNavigate('/demo')}>Open demo previews</button> : null}
     </section>
   </main>;
+}
+
+function loginNoticeFor(state: string): string {
+  if (state === 'invalid_credentials') return 'Sign-in failed. Check your email and password.';
+  if (state === 'password_reset_required') return 'Password reset is required before this account can sign in.';
+  if (state === 'new_password_required') return 'A new password is required before this UAT account can continue.';
+  if (state === 'mfa_required') return 'MFA is required for this account and is not completed in this UAT form yet.';
+  if (state === 'session_expired') return 'The Cognito session expired. Please sign in again.';
+  if (state === 'unconfigured') return 'Cognito UAT password sign-in is not configured.';
+  return 'Sign-in could not be completed. Try again or verify the non-production Cognito configuration.';
+}
+
+function SessionRestorationPage(): React.ReactElement {
+  useEffect(() => { document.title = `Restoring session | ${productName}`; }, []);
+  return <main className="login-shell"><section className="login-card"><span className="eyebrow">{productTagline}</span><h1>Restoring your ONE session...</h1><p>ONE is checking your session-scoped Cognito tokens before opening a workspace.</p></section></main>;
 }
 
 function WorkspaceChooser({ authStatus, authNotice, workspaceResolution, onSignIn, onSignOut, onNavigate }: { readonly authStatus: AuthStatus; readonly authNotice: string; readonly workspaceResolution: WorkspaceResolution; readonly onSignIn: () => void; readonly onSignOut: () => void; readonly onNavigate: (path: string) => void }): React.ReactElement {
@@ -426,8 +499,16 @@ function InvitationAcceptancePage({ authStatus, authNotice, onSignIn, onSignOut 
   </main>;
 }
 
-function StudentShell({ apiHealth, authNotice, authStatus, demoMode, drawerOpen, menuButtonRef, path, route, setDrawerOpen, setPath, setSidebarCollapsed, sidebarCollapsed, onSignIn, onSignOut, workspace }: { readonly apiHealth: ApiHealth; readonly authNotice: string; readonly authStatus: AuthStatus; readonly demoMode: boolean; readonly drawerOpen: boolean; readonly menuButtonRef: React.RefObject<HTMLButtonElement | null>; readonly path: string; readonly route: RouteKey; readonly setDrawerOpen: React.Dispatch<React.SetStateAction<boolean>>; readonly setPath: React.Dispatch<React.SetStateAction<string>>; readonly setSidebarCollapsed: React.Dispatch<React.SetStateAction<boolean>>; readonly sidebarCollapsed: boolean; readonly onSignIn: () => void; readonly onSignOut: () => void; readonly workspace?: AuthorizedWorkspace | undefined }): React.ReactElement {
+function DemoStudentShell(props: Parameters<typeof StudentShell>[0]): React.ReactElement {
   const { dispatch } = useStudentPreview();
+  return <StudentShell
+    {...props}
+    onMessages={() => dispatch({ type: 'status', status: 'Student messages require the secure backend messaging workflow; no message inbox was opened in preview.' })}
+    onNotifications={() => dispatch({ type: 'status', status: 'Student notifications preview: 3 reminders are represented by local demo data only.' })}
+  />;
+}
+
+function StudentShell({ apiHealth, authNotice, authStatus, currentStudent, demoMode, drawerOpen, menuButtonRef, path, route, setDrawerOpen, setPath, setSidebarCollapsed, sidebarCollapsed, onSignIn, onSignOut, workspace, onMessages, onNotifications }: { readonly apiHealth: ApiHealth; readonly authNotice: string; readonly authStatus: AuthStatus; readonly currentStudent: CurrentStudentState; readonly demoMode: boolean; readonly drawerOpen: boolean; readonly menuButtonRef: React.RefObject<HTMLButtonElement | null>; readonly path: string; readonly route: RouteKey; readonly setDrawerOpen: React.Dispatch<React.SetStateAction<boolean>>; readonly setPath: React.Dispatch<React.SetStateAction<string>>; readonly setSidebarCollapsed: React.Dispatch<React.SetStateAction<boolean>>; readonly sidebarCollapsed: boolean; readonly onSignIn: () => void; readonly onSignOut: () => void; readonly workspace?: AuthorizedWorkspace | undefined; readonly onMessages?: () => void; readonly onNotifications?: () => void }): React.ReactElement {
   function navigate(item: NavItem): void {
     const nextPath = demoMode ? demoRouteFor(item.path) : item.path;
     window.history.pushState(null, '', nextPath);
@@ -453,19 +534,20 @@ function StudentShell({ apiHealth, authNotice, authStatus, demoMode, drawerOpen,
           showDevelopmentIndicators={showDevelopmentIndicators}
           menuButtonRef={menuButtonRef}
           onOpenMenu={() => setDrawerOpen(true)}
-          onMessages={() => dispatch({ type: 'status', status: 'Student messages require the secure backend messaging workflow; no message inbox was opened in preview.' })}
-          onNotifications={() => dispatch({ type: 'status', status: 'Student notifications preview: 3 reminders are represented by local demo data only.' })}
+          onMessages={onMessages ?? (() => undefined)}
+          onNotifications={onNotifications ?? (() => undefined)}
           onProfile={() => navigate(navItems.find((item) => item.route === 'profile')!)}
           profileActive={route === 'profile'}
           onSignIn={onSignIn}
           onSignOut={onSignOut}
           workspace={workspace}
+          currentStudent={currentStudent}
         />
         <main id="main-content" className="student-main">
-          {showDevelopmentIndicators ? <PreviewBadge apiHealth={apiHealth} /> : null}
-          <StudentPreviewStatus authenticated={authStatus.state === 'authenticated'} />
+          {demoMode && showDevelopmentIndicators ? <PreviewBadge apiHealth={apiHealth} /> : null}
+          {demoMode ? <StudentPreviewStatus authenticated={false} /> : <AuthenticatedStudentStatus currentStudent={currentStudent} />}
           <PageHeader meta={routeTitles[route]} />
-          <RouteScreen route={route} authenticated={authStatus.state === 'authenticated'} />
+          <RouteScreen route={route} authenticated={authStatus.state === 'authenticated'} currentStudent={currentStudent} />
         </main>
       </div>
     </div>
@@ -498,8 +580,8 @@ function Sidebar({ path, collapsed, drawerOpen, onNavigate, onCollapse, onClose 
   );
 }
 
-function TopBar({ apiHealth, authNotice, authStatus, showDevelopmentIndicators, menuButtonRef, onOpenMenu, onMessages, onNotifications, onProfile, profileActive, onSignIn, onSignOut, workspace }: { readonly apiHealth: ApiHealth; readonly authNotice: string; readonly authStatus: AuthStatus; readonly showDevelopmentIndicators: boolean; readonly menuButtonRef: React.RefObject<HTMLButtonElement | null>; readonly onOpenMenu: () => void; readonly onMessages: () => void; readonly onNotifications: () => void; readonly onProfile: () => void; readonly profileActive: boolean; readonly onSignIn: () => void; readonly onSignOut: () => void; readonly workspace?: AuthorizedWorkspace | undefined }): React.ReactElement {
-  const identity = studentIdentityFromAuth(authStatus);
+function TopBar({ apiHealth, authNotice, authStatus, showDevelopmentIndicators, menuButtonRef, onOpenMenu, onMessages, onNotifications, onProfile, profileActive, onSignIn, onSignOut, workspace, currentStudent }: { readonly apiHealth: ApiHealth; readonly authNotice: string; readonly authStatus: AuthStatus; readonly showDevelopmentIndicators: boolean; readonly menuButtonRef: React.RefObject<HTMLButtonElement | null>; readonly onOpenMenu: () => void; readonly onMessages: () => void; readonly onNotifications: () => void; readonly onProfile: () => void; readonly profileActive: boolean; readonly onSignIn: () => void; readonly onSignOut: () => void; readonly workspace?: AuthorizedWorkspace | undefined; readonly currentStudent: CurrentStudentState }): React.ReactElement {
+  const identity = studentIdentityFromAuth(authStatus, currentStudent);
   return (
     <header className="student-topbar">
       <button ref={menuButtonRef} className="icon-button mobile-menu-button" type="button" onClick={onOpenMenu} aria-label="Open student navigation"><Menu size={20} /></button>
@@ -509,7 +591,23 @@ function TopBar({ apiHealth, authNotice, authStatus, showDevelopmentIndicators, 
   );
 }
 
-function studentIdentityFromAuth(authStatus: AuthStatus): { readonly name: string; readonly initials: string; readonly detail: string } {
+function AuthenticatedStudentStatus({ currentStudent }: { readonly currentStudent: CurrentStudentState }): React.ReactElement {
+  if (currentStudent.state === 'loading' || currentStudent.state === 'idle') {
+    return <section className="student-preview-status" role="status" aria-live="polite"><div><strong>Loading real Student identity</strong><span>ONE is loading your protected Student profile from the API.</span></div></section>;
+  }
+  if (currentStudent.state === 'error') {
+    return <section className="student-preview-status" role="alert"><div><strong>Student identity unavailable</strong><span>{currentStudent.message}</span></div></section>;
+  }
+  if (currentStudent.state !== 'resolved') {
+    return <section className="student-preview-status" role="status" aria-live="polite"><div><strong>Loading real Student identity</strong><span>ONE is loading your protected Student profile from the API.</span></div></section>;
+  }
+  return <section className="student-preview-status" role="status" aria-live="polite"><div><strong>Authenticated Student workspace</strong><span>{currentStudent.student.fullName} - {currentStudent.student.verifiedEmail ?? 'verified email unavailable'} - {currentStudent.student.academicStatus}</span></div></section>;
+}
+
+function studentIdentityFromAuth(authStatus: AuthStatus, currentStudent: CurrentStudentState): { readonly name: string; readonly initials: string; readonly detail: string } {
+  if (authStatus.state === 'authenticated' && currentStudent.state === 'resolved') {
+    return { name: currentStudent.student.fullName, initials: initialsForName(currentStudent.student.fullName), detail: `Verified email: ${currentStudent.student.verifiedEmail ?? authStatus.email ?? 'unavailable'}` };
+  }
   if (authStatus.state !== 'authenticated' || !authStatus.email) {
     return { name: studentProfile.name, initials: studentProfile.initials, detail: `${studentProfile.program} | ${studentProfile.graduationYear}` };
   }
@@ -520,12 +618,17 @@ function studentIdentityFromAuth(authStatus: AuthStatus): { readonly name: strin
   return { name, initials, detail: `Verified email: ${authStatus.email}` };
 }
 
+function initialsForName(value: string): string {
+  return value.split(/\s+/).filter(Boolean).slice(0, 2).map((word) => word[0]?.toUpperCase() ?? '').join('') || 'ST';
+}
+
 function PreviewBadge({ apiHealth }: { readonly apiHealth: ApiHealth }): React.ReactElement {
   return <div className="preview-badge" aria-label="Preview mode"><span>DEMO PREVIEW</span><span className={`tiny-state ${apiHealth}`}>{apiHealth}</span></div>;
 }
 
-function RouteScreen({ route, authenticated }: { readonly route: RouteKey; readonly authenticated: boolean }): React.ReactElement {
-  if (route === 'dashboard') return authenticated ? <><CareerReadinessApiPanel route="readiness" /><Dashboard authenticated /></> : <Dashboard />;
+function RouteScreen({ route, authenticated, currentStudent }: { readonly route: RouteKey; readonly authenticated: boolean; readonly currentStudent: CurrentStudentState }): React.ReactElement {
+  if (authenticated) return <AuthenticatedStudentRoute route={route} currentStudent={currentStudent} />;
+  if (route === 'dashboard') return <Dashboard />;
   if (route === 'ai-coach') return <CoachPage />;
   if (route === 'career-path') return <><CareerReadinessApiPanel route="roadmap" /><CareerPath /></>;
   if (route === 'readiness') return <><CareerReadinessApiPanel route="readiness" /><ReadinessPage /></>;
@@ -540,6 +643,35 @@ function RouteScreen({ route, authenticated }: { readonly route: RouteKey; reado
   if (route === 'documents') return <DocumentsPage />;
   if (route === 'profile') return <ProfilePage />;
   return <SettingsPage />;
+}
+
+function AuthenticatedStudentRoute({ route, currentStudent }: { readonly route: RouteKey; readonly currentStudent: CurrentStudentState }): React.ReactElement {
+  if (route === 'dashboard') return <AuthenticatedStudentDashboard currentStudent={currentStudent} />;
+  if (route === 'career-path') return <><CareerReadinessApiPanel route="roadmap" /><AuthenticatedStudentUnavailable route={route} /></>;
+  if (route === 'readiness') return <><CareerReadinessApiPanel route="readiness" /><AuthenticatedStudentUnavailable route={route} /></>;
+  if (route === 'skills') return <><CareerReadinessApiPanel route="skills" /><AuthenticatedStudentUnavailable route={route} /></>;
+  if (route === 'assessments') return <><CareerReadinessApiPanel route="assessments" /><AuthenticatedStudentUnavailable route={route} /></>;
+  if (route === 'learning') return <><CareerReadinessApiPanel route="learning" /><AuthenticatedStudentUnavailable route={route} /></>;
+  if (route === 'settings') return <><CareerReadinessApiPanel route="notifications" /><AuthenticatedStudentUnavailable route={route} /></>;
+  return <AuthenticatedStudentUnavailable route={route} />;
+}
+
+function AuthenticatedStudentDashboard({ currentStudent }: { readonly currentStudent: CurrentStudentState }): React.ReactElement {
+  if (currentStudent.state !== 'resolved') {
+    return <section className="card wide-card"><h2>Student profile</h2><p>{currentStudent.state === 'error' ? currentStudent.message : 'Loading protected Student profile...'}</p></section>;
+  }
+  const student = currentStudent.student;
+  return <div className="workspace-grid">
+    <section className="card wide-card"><span className="eyebrow">Real Student identity</span><h2>{student.fullName}</h2><p>Verified email: {student.verifiedEmail ?? 'Not available'}</p><p>Institution student ID: {student.institutionStudentId}</p><p>Institution: {student.institutionId}</p><p>Status: {student.academicStatus}</p></section>
+    <section className="card"><h2>Academic placement</h2><p>Department: {student.department ?? 'Not yet available'}</p><p>Program: {student.program ?? 'Not yet available'}</p><p>Batch: {student.batch ?? 'Not yet available'}</p><p>Section: {student.section ?? 'Not yet available'}</p></section>
+    <section className="card"><h2>Target career</h2><p>Target career not set.</p></section>
+    <section className="card wide-card"><h2>Applications and documents</h2><p>Applications, interviews and documents are not yet available in this authenticated UAT build. Demo examples remain isolated under /demo/student.</p></section>
+    <section className="card wide-card"><h2>Career readiness</h2><CareerReadinessApiPanel route="readiness" /></section>
+  </div>;
+}
+
+function AuthenticatedStudentUnavailable({ route }: { readonly route: RouteKey }): React.ReactElement {
+  return <section className="card wide-card"><h2>{routeTitles[route].title}</h2><p>This authenticated Student module does not substitute fictional Rahul data. Real persistence for this page is not yet available in this UAT build.</p></section>;
 }
 
 function currentPath(): string {

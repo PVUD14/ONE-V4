@@ -16,6 +16,12 @@ export class Phase1SecurityController {
     return this.routes.currentContext(request);
   }
 
+  @Get('/students/me')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  currentStudent(@Req() request: ProtectedHttpRequest): Promise<Record<string, unknown>> {
+    return this.routes.currentStudent(request);
+  }
+
   @Get('/institutions/:institutionId/student-activity-access/:studentUserId')
   @UseGuards(ProtectedApiAuthenticationGuard)
   institutionStudentActivityAccess(

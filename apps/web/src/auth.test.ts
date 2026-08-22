@@ -1,22 +1,98 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 function jwtWithEmail(email: string): string {
   const payload = window.btoa(JSON.stringify({ email })).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
   return `header.${payload}.signature`;
 }
 
+function jwtWithEmailAndExpiry(email: string): string {
+  const payload = window.btoa(JSON.stringify({ email, exp: Math.floor(Date.now() / 1000) + 3600 })).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+  return `header.${payload}.signature`;
+}
+
+beforeEach(() => {
+  cleanup();
+  window.sessionStorage.clear();
+  window.localStorage.clear();
+  vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
+  vi.doUnmock('amazon-cognito-identity-js');
+  vi.resetModules();
+  window.history.pushState(null, '', '/login');
+});
+
 afterEach(() => {
   cleanup();
   window.sessionStorage.clear();
+  window.localStorage.clear();
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
+  vi.doUnmock('amazon-cognito-identity-js');
   vi.resetModules();
-  window.history.pushState(null, '', '/student');
+  window.history.pushState(null, '', '/login');
 });
 
 describe('Cognito Hosted UI browser authentication', () => {
+  it('passes the visible ONE email and password fields into Cognito SRP without storing the password', async () => {
+    const captured: { username?: string; password?: string; flow?: string } = {};
+    vi.doMock('amazon-cognito-identity-js', () => ({
+      AuthenticationDetails: class {
+        readonly Username: string;
+        readonly Password: string;
+        constructor(input: { Username: string; Password: string }) {
+          captured.username = input.Username;
+          captured.password = input.Password;
+          this.Username = input.Username;
+          this.Password = input.Password;
+        }
+      },
+      CognitoUserPool: class {
+        constructor(readonly input: unknown) {}
+      },
+      CognitoRefreshToken: class {
+        constructor(readonly input: unknown) {}
+      },
+      CognitoUser: class {
+        constructor(readonly input: { Username: string }) {}
+        setAuthenticationFlowType(flow: string): void { captured.flow = flow; }
+        authenticateUser(_details: unknown, callbacks: { onSuccess: (session: unknown) => void }): void {
+          callbacks.onSuccess({
+            getAccessToken: () => ({ getJwtToken: () => jwtWithEmailAndExpiry('student.aanya@uat.example.test'), getExpiration: () => Math.floor(Date.now() / 1000) + 3600 }),
+            getIdToken: () => ({ getJwtToken: () => jwtWithEmail('student.aanya@uat.example.test') }),
+            getRefreshToken: () => ({ getToken: () => 'refresh-token' }),
+          });
+        }
+        refreshSession(): void {}
+      },
+    }));
+    vi.stubEnv('VITE_COGNITO_DOMAIN', 'https://uat-auth.example.test');
+    vi.stubEnv('VITE_COGNITO_CLIENT_ID', 'uat-client');
+    vi.stubEnv('VITE_COGNITO_USER_POOL_ID', 'ap-south-1_uatpool');
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.endsWith('/health')) return { ok: true };
+      if (url.endsWith('/api/v1/security/context')) {
+        expect((init?.headers as Record<string, string>).Authorization).toMatch(/^Bearer /);
+        return { ok: true, json: async () => ({ userId: 'student-user', memberships: [], studentRelationships: [{ institutionId: 'institution-1', state: 'ACTIVE', effectiveFrom: '2026-08-21T00:00:00.000Z' }] }) };
+      }
+      if (url.endsWith('/api/v1/students/me')) return { ok: true, json: async () => ({ student: { userId: 'student-user', verifiedEmail: 'student.aanya@uat.example.test', fullName: 'Aanya Rao', institutionStudentId: 'UAT-S-001', institutionId: 'institution-1', academicStatus: 'ACTIVE' } }) };
+      if (url.endsWith('/api/v1/career-readiness/catalog')) return { ok: true, json: async () => ({ pilot: 'Career Readiness Fundamentals', releaseManifestId: 'release', modules: [], assessments: [] }) };
+      if (url.endsWith('/api/v1/career-readiness/me')) return { ok: true, json: async () => ({ catalog: {}, progress: [], attempts: [], evidence: [], mastery: [], readiness: null, roadmap: [], notificationPreferences: null, notifications: [] }) };
+      return { ok: false };
+    }));
+    window.history.pushState(null, '', '/login');
+    const { App } = await import('./App.js');
+    render(React.createElement(App));
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'student.aanya@uat.example.test' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'Correct-Horse-1' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+    await waitFor(() => expect(window.location.pathname).toBe('/student'));
+    expect(captured).toMatchObject({ username: 'student.aanya@uat.example.test', password: 'Correct-Horse-1', flow: 'USER_SRP_AUTH' });
+    expect(JSON.stringify(window.sessionStorage)).not.toContain('Correct-Horse-1');
+    expect(window.localStorage.length).toBe(0);
+  });
+
   it('keeps sign-in disabled when non-production Cognito is not configured', async () => {
     const { App } = await import('./App.js');
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true })));
@@ -45,6 +121,10 @@ describe('Cognito Hosted UI browser authentication', () => {
         expect((init?.headers as Record<string, string>).Authorization).toBe('Bearer uat-access-token');
         return { ok: true, json: async () => ({ userId: 'student-user-1', memberships: [], studentRelationships: [{ institutionId: 'institution-1', state: 'ACTIVE', effectiveFrom: '2026-08-21T00:00:00.000Z' }] }) };
       }
+      if (url.endsWith('/api/v1/students/me')) {
+        expect((init?.headers as Record<string, string>).Authorization).toBe('Bearer uat-access-token');
+        return { ok: true, json: async () => ({ student: { userId: 'student-user-1', verifiedEmail: 'aanya.student01@example.test', fullName: 'Aanya Rao', institutionStudentId: 'UAT-S-001', institutionId: 'institution-1', academicStatus: 'ACTIVE', department: 'CSE', program: 'BTech', batch: '2027', section: 'A' } }) };
+      }
       if (url.endsWith('/api/v1/career-readiness/catalog')) return { ok: true, json: async () => ({ pilot: 'Career Readiness Fundamentals', releaseManifestId: 'release', modules: [], assessments: [] }) };
       if (url.endsWith('/api/v1/career-readiness/me')) {
         expect((init?.headers as Record<string, string>).Authorization).toBe('Bearer uat-access-token');
@@ -58,9 +138,11 @@ describe('Cognito Hosted UI browser authentication', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument());
     expect(screen.getByText('aanya.student01@example.test')).toBeInTheDocument();
     await waitFor(() => expect(window.location.pathname).toBe('/student'));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Student profile menu' })).toHaveTextContent('Aanya Student01'));
-    expect(screen.getByText('Authenticated API-backed mode')).toBeInTheDocument();
-    expect(screen.getAllByText('API-backed').length).toBeGreaterThan(0);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Student profile menu' })).toHaveTextContent('Aanya Rao'));
+    expect(screen.getByText('Authenticated Student workspace')).toBeInTheDocument();
+    expect(screen.getByText('Real Student identity')).toBeInTheDocument();
+    expect(screen.queryByText('Rahul Kumar')).not.toBeInTheDocument();
+    expect(screen.queryByText('DEMO PREVIEW')).not.toBeInTheDocument();
     expect(screen.queryByText('/100')).not.toBeInTheDocument();
     window.history.pushState(null, '', '/student/readiness');
     render(React.createElement(App));

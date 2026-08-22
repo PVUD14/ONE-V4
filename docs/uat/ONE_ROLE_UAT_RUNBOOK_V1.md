@@ -4,30 +4,33 @@ Credentials are not in Git. Retrieve them from the operator-local file: `E:\8-PT
 
 ## Common login
 
-Phase 1.1 correction note: manual UAT previously observed an Institution Administrator session appearing to show the Student portal. Diagnostics found the Cognito and internal mappings were distinct and correct; the defect was frontend authenticated routing/deep-link fallback that could mount a protected portal shell before proving the requested family/role from `/api/v1/security/context`. After Phase 1.1, repeat this runbook in a clean browser before marking role login PASS.
+Phase 1.1 was not accepted: manual UAT found the visible ONE form was not real credential authentication, refresh lost the authenticated session, and failed authentication could leave a demo Student screen visible. Phase 1.2 changes the normal login path to the visible ONE email/password form backed by Cognito SRP, persists only session-scoped Cognito token data, restores/refreshes the session on startup, and keeps demo routes isolated under `/demo/*`.
 
 1. Open `https://one.ai8ht.pro`.
-2. Click Sign in.
-3. Authenticate through Cognito managed login.
+2. Enter the persona email and password directly in the ONE form.
+3. Submit Sign in. Hosted UI may exist only as fallback/reference; the visible form is the normal UAT login path.
 4. Confirm route and workspace are server-authorized.
 5. Test forbidden deep links by manually entering a different portal family URL.
-6. Sign out and confirm return to login.
+6. Refresh the browser and confirm the same authorized workspace remains visible.
+7. Sign out and confirm return to `/login`.
+8. Authenticate as the next persona in the same browser session and confirm no prior persona, demo, or preview content remains.
 
 ## Student A / Student B
 
 - Precondition: Cognito user maps to internal user with active institution relationship.
 - Expected landing: `/student`.
+- Expected identity: real Student profile from `/api/v1/students/me`; Student A must render as Aanya, not Rahul.
 - Allowed actions to test: Career Readiness view, lesson completion/start assessment where seeded catalog allows.
 - Forbidden actions: `/institution/admin`, `/employer/recruiter`, `/operations/admin`.
 - Expected result: Student portal only; other portals controlled denial or no authorized workspace.
-- Evidence: dashboard, navigation, Career Readiness panel/action, denied portal route.
+- Evidence: dashboard, navigation, real name, refresh persistence, visible Sign out, Career Readiness panel/action, denied portal route, no `DEMO PREVIEW`, no `Session-local preview`, no Rahul.
 
 ## Institution Administrator
 
 - Expected landing: `/institution/admin`.
 - Allowed actions: create academic unit, add student, edit student, graduate/transfer/end relationship, validate/commit roster CSV, invite staff.
 - Forbidden actions: Operations organization verification, employer applicant access.
-- Evidence: dashboard, academic unit creation, student mutation, denied `/operations/admin`.
+- Evidence: dashboard, authenticated email/role, institution navigation, academic unit creation, student mutation, denied `/operations/admin`, refresh persistence, no Student sidebar, no Rahul, no demo/preview labels.
 
 ## Placement Admin
 
@@ -58,7 +61,7 @@ Phase 1.1 correction note: manual UAT previously observed an Institution Adminis
 - Allowed actions: employer context and applicant grant authorization where seeded grants exist.
 - Partial actions: opportunity/application/interview/offer workflows.
 - Forbidden actions: institution student directory and operations routes.
-- Evidence: employer partial implementation page, denied institution/operations route.
+- Evidence: employer partial implementation page, authenticated email/role, refresh persistence, denied institution/operations route, no Student shell/sidebar, no Rahul.
 
 ## Operations Admin
 

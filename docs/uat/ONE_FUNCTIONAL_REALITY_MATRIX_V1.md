@@ -2,14 +2,15 @@
 
 Status definitions: REAL = protected API + DB persistence + authorization; READ_ONLY = real API/DB read path only; PARTIAL = some real backend exists but flow incomplete; PREVIEW = fictional/session-local/demo; MISSING = no real implementation.
 
-Phase 1.1 correction: authenticated portal mounting now requires a server-authorized family/role match from `/api/v1/security/context`; unauthorized deep links render a controlled denial instead of mounting another portal family. Authenticated role shells must not show demo preview identities or fixture records. Manual clean-browser UAT is still required before claiming end-to-end role-login PASS.
+Phase 1.2 correction: Phase 1.1 is not accepted. The normal ONE login path now uses the visible email/password form with Cognito SRP, authenticated sessions are restored from session-scoped Cognito token data on refresh, and authenticated Student surfaces no longer instantiate Student preview state or Rahul fixture dashboards. Demo and preview labels/actions are allowed only under `/demo/*`. Manual clean-browser browser UAT is still required before claiming end-to-end role-login PASS.
 
 | Portal | Role | Module | Action | UI exists? | API exists? | DB persistence? | Auth enforced? | Audit? | Status | Next implementation |
 |---|---|---|---|---:|---:|---:|---:|---:|---|---|
-| Student | Student | Login/workspace | Cognito sign-in and auto-route | Yes | Yes | Yes | Yes | N/A | REAL | Browser UAT evidence per persona |
+| Student | Student | Login/workspace | ONE form Cognito SRP sign-in, session restore and auto-route | Yes | Yes | Session-scoped Cognito tokens only | Yes | N/A | REAL | Browser UAT evidence per persona |
+| Student | Student | Current identity | `/api/v1/students/me` derives Student from verified Cognito subject and active relationship | Yes | Yes | Yes | Yes | N/A | REAL | Seed richer Student profile details |
 | Student | Student | Career Readiness | View learner state | Yes | Yes | Yes | Yes | N/A | READ_ONLY | Seed richer learner data |
 | Student | Student | Career Readiness | Complete lesson/start/submit assessment | Yes | Yes | Yes | Yes | Partial | REAL/PARTIAL | Exercise with seeded assessment options |
-| Student | Student | Profile/documents/opportunities/applications | Edit/save/apply/upload metadata | Yes | No | No | Client only | No | PREVIEW_CONTROL | Add protected Student-owned persistence |
+| Student | Student | Profile/documents/opportunities/applications | Authenticated pages show truthful unavailable states instead of Rahul/demo substitutions | Yes | No | No | Yes for route only | No | MISSING/PARTIAL | Add protected Student-owned persistence |
 | Institution | Institution Admin | Academic Structure | Create unit | Yes | Yes | Yes | Yes | Yes | REAL | Add edit/delete controls with policy |
 | Institution | Institution Admin | Students | Add/update/list student | Yes | Yes | Yes | Yes | Yes | REAL | Improve detail UX and identity activation path |
 | Institution | Institution Admin | Students | Transfer/graduate/end relationship | Yes | Yes | Yes | Yes | Yes | REAL | Add clearer effective date controls |
@@ -41,4 +42,4 @@ Phase 1.1 correction: authenticated portal mounting now requires a server-author
 
 ## PREVIEW_CONTROL
 
-Most non-admin institution, employer hiring, Student profile/documents/opportunity/application, messaging, notifications, reports, feature flags, support/trust queues, and analytics controls are preview/session-local unless listed as REAL above.
+Most non-admin institution, employer hiring, messaging, notifications, reports, feature flags, support/trust queues, and analytics controls are preview/session-local unless listed as REAL above. Student preview workflows and Rahul data are demo-only and must remain under `/demo/student/*`, not authenticated `/student`.

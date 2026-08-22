@@ -185,6 +185,59 @@ describe('Phase 1 API protected request path', () => {
     });
   });
 
+  it('returns the current authenticated student profile from the verified principal only', async () => {
+    const studentUserId = await seedUser('aanya.student@example.test', 'sub:aanya-student');
+    const otherStudentUserId = await seedUser('other.student@example.test', 'sub:other-student');
+    const institutionId = await seedOrg('INSTITUTION', 'Student College');
+    const profileId = randomUUID();
+    await db.insert(schema.institutionStudentProfiles).values({
+      id: profileId,
+      institutionId,
+      studentUserId,
+      institutionStudentId: 'UAT-S-001',
+      fullName: 'Aanya Rao',
+      status: 'ACTIVE',
+    });
+    await db.insert(schema.institutionStudentProfiles).values({
+      id: randomUUID(),
+      institutionId,
+      studentUserId: otherStudentUserId,
+      institutionStudentId: 'UAT-S-002',
+      fullName: 'Other Student',
+      status: 'ACTIVE',
+    });
+    await db.insert(schema.institutionRelationships).values({
+      id: randomUUID(),
+      institutionId,
+      studentUserId,
+      state: 'ACTIVE',
+      effectiveFrom: new Date('2026-01-01T00:00:00Z'),
+    });
+    await db.insert(schema.institutionRelationships).values({
+      id: randomUUID(),
+      institutionId,
+      studentUserId: otherStudentUserId,
+      state: 'ACTIVE',
+      effectiveFrom: new Date('2026-01-01T00:00:00Z'),
+    });
+
+    const response = await request(app.getHttpServer())
+      .get(`/api/v1/students/me?studentUserId=${otherStudentUserId}`)
+      .set('Authorization', `Bearer ${signAccessToken(privateKey, { sub: 'sub:aanya-student', email: 'aanya.student@example.test' })}`)
+      .expect(200);
+
+    expect(response.body.student).toMatchObject({
+      userId: studentUserId,
+      verifiedEmail: 'aanya.student@example.test',
+      fullName: 'Aanya Rao',
+      institutionStudentId: 'UAT-S-001',
+      institutionId,
+      academicStatus: 'ACTIVE',
+    });
+    expect(JSON.stringify(response.body)).not.toContain(otherStudentUserId);
+    expect(JSON.stringify(response.body)).not.toContain('Other Student');
+  });
+
   it('denies valid provider tokens for suspended accounts and suspended memberships', async () => {
     await seedUser('suspended@example.test', 'sub:suspended', 'SUSPENDED');
 

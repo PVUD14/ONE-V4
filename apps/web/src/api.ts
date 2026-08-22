@@ -150,6 +150,20 @@ export interface InstitutionStudentDto {
   readonly units?: Record<string, string | null | undefined>;
 }
 
+export interface CurrentStudentDto {
+  readonly userId: string;
+  readonly verifiedEmail: string | null;
+  readonly fullName: string;
+  readonly institutionStudentId: string;
+  readonly institutionId: string;
+  readonly academicStatus: string;
+  readonly department?: string | null;
+  readonly program?: string | null;
+  readonly batch?: string | null;
+  readonly section?: string | null;
+  readonly relationship?: { readonly id: string; readonly state: string; readonly effectiveFrom: string; readonly effectiveTo?: string | null } | null;
+}
+
 export interface RosterImportPreviewDto {
   readonly id: string; readonly rowCount: number; readonly acceptedCount: number; readonly warningCount: number; readonly rejectedCount: number;
   readonly rows: readonly { readonly rowNumber: number; readonly institutionStudentId: string; readonly fullName: string; readonly email: string; readonly state: string; readonly issues: readonly string[] }[];
@@ -164,6 +178,10 @@ export interface SecurityContextDto {
 
 export function getSecurityContext(token: string, signal?: AbortSignal): Promise<SecurityContextDto> {
   return requestJson('/api/v1/security/context', { token, ...(signal ? { signal } : {}) });
+}
+
+export function getCurrentStudent(token: string, signal?: AbortSignal): Promise<{ readonly student: CurrentStudentDto }> {
+  return requestJson('/api/v1/students/me', { token, ...(signal ? { signal } : {}) });
 }
 
 export function listOperationsOrganizations(token: string, signal?: AbortSignal): Promise<{ readonly organizations: readonly OrganizationManagementDto[] }> {

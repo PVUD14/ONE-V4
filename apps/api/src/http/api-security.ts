@@ -187,6 +187,63 @@ export class Phase1ProtectedApiRoutes {
     };
   }
 
+  async currentStudent(request: ProtectedHttpRequest): Promise<Record<string, unknown>> {
+    const context = requireTrustedAuthorization(request);
+    const rows = await this.db.execute(sql`
+      SELECT sp.id, sp.institution_id, sp.student_user_id, sp.institution_student_id, sp.full_name,
+             sp.status, u.email,
+             dept.name AS department, program.name AS program, batch.name AS batch, section.name AS section,
+             ir.id AS relationship_id, ir.state AS relationship_state, ir.effective_from, ir.effective_to
+      FROM institution_student_profiles sp
+      JOIN users u ON u.id = sp.student_user_id
+      JOIN LATERAL (
+        SELECT id, state, effective_from, effective_to
+        FROM institution_relationships
+        WHERE institution_id = sp.institution_id
+          AND student_user_id = sp.student_user_id
+          AND state IN ('ACTIVE','VERIFIED')
+          AND effective_from <= now()
+          AND (effective_to IS NULL OR effective_to > now())
+        ORDER BY effective_from DESC
+        LIMIT 1
+      ) ir ON true
+      LEFT JOIN institution_units dept ON dept.id = sp.department_unit_id AND dept.institution_id = sp.institution_id
+      LEFT JOIN institution_units program ON program.id = sp.program_unit_id AND program.institution_id = sp.institution_id
+      LEFT JOIN institution_units batch ON batch.id = sp.batch_unit_id AND batch.institution_id = sp.institution_id
+      LEFT JOIN institution_units section ON section.id = sp.section_unit_id AND section.institution_id = sp.institution_id
+      WHERE sp.student_user_id = ${context.authorization.principal.userId}::uuid
+      ORDER BY ir.effective_from DESC, sp.updated_at DESC
+      LIMIT 1
+    `) as QueryResult<{
+      id: string; institution_id: string; student_user_id: string; institution_student_id: string; full_name: string; status: string; email: string | null;
+      department: string | null; program: string | null; batch: string | null; section: string | null;
+      relationship_id: string; relationship_state: string; effective_from: Date; effective_to: Date | null;
+    }>;
+    const [row] = rows.rows;
+    if (!row) throw new ForbiddenException(safeError('FORBIDDEN', context.correlationId));
+    return {
+      student: {
+        userId: row.student_user_id,
+        verifiedEmail: row.email,
+        fullName: row.full_name,
+        institutionStudentId: row.institution_student_id,
+        institutionId: row.institution_id,
+        academicStatus: row.status,
+        department: row.department,
+        program: row.program,
+        batch: row.batch,
+        section: row.section,
+        relationship: {
+          id: row.relationship_id,
+          state: row.relationship_state,
+          effectiveFrom: row.effective_from,
+          effectiveTo: row.effective_to,
+        },
+      },
+      correlationId: context.correlationId,
+    };
+  }
+
   async institutionStudentActivityAccess(
     request: ProtectedHttpRequest,
     input: { readonly institutionId: string; readonly studentUserId: string; readonly activityAt: string },

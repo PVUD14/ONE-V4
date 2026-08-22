@@ -309,7 +309,7 @@ export async function publishCareerReadinessPilot(
       `INSERT INTO notification_templates
        (id, stable_key, version, locale, subject_template, body_template, approved_by_user_id, published_at)
        VALUES ($1,'assessment-due',1,$2,'Your Career Readiness assessment is due',
-         'Open PlanThePath to complete your assigned Career Readiness assessment before it expires. No score or personal data is included in this email.', $3, now())`,
+         'Open ONE to complete your assigned Career Readiness assessment before it expires. No score or personal data is included in this email.', $3, now())`,
       [NOTIFICATION_TEMPLATE_ID, fixture.locale, actors.reviewerUserId],
     );
     return { releaseManifestId: PILOT_RELEASE_ID, idempotentReplay: false };

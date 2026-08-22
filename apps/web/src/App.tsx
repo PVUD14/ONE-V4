@@ -1,7 +1,7 @@
 import { Bell, BookOpen, BriefcaseBusiness, Building2, CalendarDays, ChevronDown, ClipboardCheck, FileText, Gauge, GraduationCap, Home, LayoutDashboard, Menu, MessageSquare, Search, Settings, ShieldCheck, Sparkles, Target, Trophy, UserRound, X, type LucideIcon } from 'lucide-react';
 import type { FormEvent } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { acceptInvitation, getApiHealth, type ApiHealth } from './api.js';
+import { acceptInvitation, getApiHealth, getSecurityContext, type ApiHealth, type SecurityContextDto } from './api.js';
 import { beginHostedLogin, completeHostedLoginFromLocation, getAccessToken, getAuthStatus, getAuthDebugStatus, signOut, type AuthStatus } from './auth.js';
 import { AuthControls } from './authControls.js';
 import { PageHeader, type PageMeta } from './studentComponents.js';
@@ -62,6 +62,18 @@ const productTagline = 'LEARN | PREPARE | BUILD | GROW';
 const showDevelopmentIndicators = import.meta.env.DEV;
 const enableDemoPortal = import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEMO_PORTAL === 'true';
 const protectedPortalRoots = ['/student', '/institution', '/employer', '/operations'] as const;
+const portalChoices = [
+  { family: 'Student', path: '/student', label: 'Student', detail: 'Learning, readiness, applications and personal growth.', icon: GraduationCap },
+  { family: 'Institution', path: '/institution/admin', label: 'Institution', detail: 'Institution administration and student support.', icon: Building2 },
+  { family: 'Employer', path: '/employer/recruiter', label: 'Employer', detail: 'Hiring workflows where backend support exists.', icon: BriefcaseBusiness },
+  { family: 'Operations', path: '/operations/admin', label: 'Operations', detail: 'Platform administration and governance.', icon: ShieldCheck },
+] as const;
+
+type WorkspaceFamily = typeof portalChoices[number]['family'];
+type WorkspaceResolution =
+  | { readonly state: 'loading' }
+  | { readonly state: 'resolved'; readonly choices: readonly typeof portalChoices[number][] }
+  | { readonly state: 'error'; readonly message: string };
 
 export function App(): React.ReactElement {
   const [path, setPath] = useState(currentPath());
@@ -70,6 +82,7 @@ export function App(): React.ReactElement {
   const [apiHealth, setApiHealth] = useState<ApiHealth>('checking');
   const [authStatus, setAuthStatus] = useState<AuthStatus>(() => getAuthStatus());
   const [authNotice, setAuthNotice] = useState(getAuthDebugStatus());
+  const [workspaceResolution, setWorkspaceResolution] = useState<WorkspaceResolution>({ state: 'loading' });
   const menuButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -93,6 +106,31 @@ export function App(): React.ReactElement {
       });
     return () => { mounted = false; };
   }, []);
+
+  useEffect(() => {
+    if (authStatus.state !== 'authenticated') {
+      setWorkspaceResolution({ state: 'loading' });
+      return;
+    }
+    const token = getAccessToken();
+    if (!token) {
+      setWorkspaceResolution({ state: 'error', message: 'No protected access token is available for workspace resolution.' });
+      return;
+    }
+    const controller = new AbortController();
+    setWorkspaceResolution({ state: 'loading' });
+    getSecurityContext(token, controller.signal)
+      .then((context) => {
+        const choices = resolveWorkspaceChoices(context);
+        setWorkspaceResolution({ state: 'resolved', choices });
+        if (choices.length === 1 && (currentPath() === '/auth/callback' || currentPath() === '/' || currentPath() === '/login')) {
+          window.history.replaceState(null, '', choices[0]!.path);
+          setPath(currentPath());
+        }
+      })
+      .catch(() => setWorkspaceResolution({ state: 'error', message: 'ONE could not resolve an active workspace for this identity.' }));
+    return () => controller.abort();
+  }, [authStatus]);
 
   useEffect(() => {
     const onPop = (): void => setPath(currentPath());
@@ -125,14 +163,14 @@ export function App(): React.ReactElement {
   }, [effectivePath, path, rolePortal, route]);
 
   if (path === '/' || path === '/login') {
-    return <LoginEntry authStatus={authStatus} authNotice={authNotice} onSignIn={handleSignIn} onSignOut={handleSignOut} onNavigate={(nextPath) => {
+    return <LoginEntry authStatus={authStatus} authNotice={authNotice} workspaceResolution={workspaceResolution} onSignIn={handleSignIn} onSignOut={handleSignOut} onNavigate={(nextPath) => {
       window.history.pushState(null, '', nextPath);
       setPath(currentPath());
     }} />;
   }
 
   if (path === '/auth/callback' && authenticated) {
-    return <WorkspaceChooser authStatus={authStatus} authNotice={authNotice} onSignIn={handleSignIn} onSignOut={handleSignOut} onNavigate={(nextPath) => {
+    return <WorkspaceChooser authStatus={authStatus} authNotice={authNotice} workspaceResolution={workspaceResolution} onSignIn={handleSignIn} onSignOut={handleSignOut} onNavigate={(nextPath) => {
       window.history.pushState(null, '', nextPath);
       setPath(currentPath());
     }} />;
@@ -198,9 +236,9 @@ export function App(): React.ReactElement {
   }
 }
 
-function LoginEntry({ authStatus, authNotice, onSignIn, onSignOut, onNavigate }: { readonly authStatus: AuthStatus; readonly authNotice: string; readonly onSignIn: () => void; readonly onSignOut: () => void; readonly onNavigate: (path: string) => void }): React.ReactElement {
+function LoginEntry({ authStatus, authNotice, workspaceResolution, onSignIn, onSignOut, onNavigate }: { readonly authStatus: AuthStatus; readonly authNotice: string; readonly workspaceResolution: WorkspaceResolution; readonly onSignIn: () => void; readonly onSignOut: () => void; readonly onNavigate: (path: string) => void }): React.ReactElement {
   useEffect(() => { document.title = `Sign in | ${productName}`; }, []);
-  if (authStatus.state === 'authenticated') return <WorkspaceChooser authStatus={authStatus} authNotice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} onNavigate={onNavigate} />;
+  if (authStatus.state === 'authenticated') return <WorkspaceChooser authStatus={authStatus} authNotice={authNotice} workspaceResolution={workspaceResolution} onSignIn={onSignIn} onSignOut={onSignOut} onNavigate={onNavigate} />;
   const signInUnavailable = authStatus.state === 'unconfigured';
   function submitLogin(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
@@ -225,23 +263,32 @@ function LoginEntry({ authStatus, authNotice, onSignIn, onSignOut, onNavigate }:
   </main>;
 }
 
-function WorkspaceChooser({ authStatus, authNotice, onSignIn, onSignOut, onNavigate }: { readonly authStatus: AuthStatus; readonly authNotice: string; readonly onSignIn: () => void; readonly onSignOut: () => void; readonly onNavigate: (path: string) => void }): React.ReactElement {
+function WorkspaceChooser({ authStatus, authNotice, workspaceResolution, onSignIn, onSignOut, onNavigate }: { readonly authStatus: AuthStatus; readonly authNotice: string; readonly workspaceResolution: WorkspaceResolution; readonly onSignIn: () => void; readonly onSignOut: () => void; readonly onNavigate: (path: string) => void }): React.ReactElement {
   useEffect(() => { document.title = `Choose workspace | ${productName}`; }, []);
-  const choices = [
-    { path: '/student', label: 'Student', detail: 'Learning, readiness, applications and personal growth.', icon: GraduationCap },
-    { path: '/institution', label: 'Institution', detail: 'Institution administration and student support.', icon: Building2 },
-    { path: '/employer', label: 'Employer', detail: 'Hiring workflows where backend support exists.', icon: BriefcaseBusiness },
-    { path: '/operations', label: 'Operations', detail: 'Platform administration and governance.', icon: ShieldCheck },
-  ] as const;
+  const choices = workspaceResolution.state === 'resolved' ? workspaceResolution.choices : [];
   return <main className="login-shell">
     <section className="login-card workspace-card">
       <span className="eyebrow">{productTagline}</span>
       <h1>Choose your ONE workspace</h1>
-      <p>Workspace access is still enforced by the backend; this chooser does not grant roles or bypass server authorization.</p>
+      <p>Workspace access is populated only from server-authorized active memberships. This chooser does not grant roles or bypass server authorization.</p>
       <AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />
-      <div className="workspace-grid">{choices.map((choice) => { const Icon = choice.icon; return <button key={choice.path} type="button" onClick={() => onNavigate(choice.path)}><Icon size={20} /><strong>{choice.label}</strong><span>{choice.detail}</span></button>; })}</div>
+      {workspaceResolution.state === 'loading' ? <p className="auth-boundary" role="status">Resolving authorized workspaces...</p> : null}
+      {workspaceResolution.state === 'error' ? <p className="auth-boundary" role="alert">{workspaceResolution.message}</p> : null}
+      {workspaceResolution.state === 'resolved' && choices.length === 0 ? <p className="auth-boundary" role="status">No active ONE workspace is available for this identity.</p> : null}
+      {choices.length > 0 ? <div className="workspace-grid">{choices.map((choice) => { const Icon = choice.icon; return <button key={choice.path} type="button" onClick={() => onNavigate(choice.path)}><Icon size={20} /><strong>{choice.label}</strong><span>{choice.detail}</span></button>; })}</div> : null}
     </section>
   </main>;
+}
+
+function resolveWorkspaceChoices(context: SecurityContextDto): readonly typeof portalChoices[number][] {
+  const families = new Set<WorkspaceFamily>();
+  for (const membership of context.memberships) {
+    if (['INSTITUTION_OWNER', 'INSTITUTION_ADMIN', 'PLACEMENT_ADMIN', 'DEPARTMENT_HEAD', 'FACULTY_LECTURER'].includes(membership.role)) families.add('Institution');
+    if (['EMPLOYER_OWNER', 'EMPLOYER_ADMIN', 'RECRUITER'].includes(membership.role)) families.add('Employer');
+    if (['PLATFORM_SUPER_ADMIN', 'OPERATIONS_ADMIN', 'SECURITY_ADMIN'].includes(membership.role)) families.add('Operations');
+  }
+  if ((context.studentRelationships?.length ?? 0) > 0) families.add('Student');
+  return portalChoices.filter((choice) => families.has(choice.family));
 }
 
 function AuthRequiredPage({ requestedPath, authStatus, authNotice, onSignIn, onSignOut }: { readonly requestedPath: string; readonly authStatus: AuthStatus; readonly authNotice: string; readonly onSignIn: () => void; readonly onSignOut: () => void }): React.ReactElement {

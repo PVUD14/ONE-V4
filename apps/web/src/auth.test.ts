@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -41,6 +41,10 @@ describe('Cognito Hosted UI browser authentication', () => {
         return { ok: true, json: async () => ({ access_token: 'uat-access-token', id_token: jwtWithEmail('aanya.student01@example.test') }) };
       }
       if (url.endsWith('/health')) return { ok: true };
+      if (url.endsWith('/api/v1/security/context')) {
+        expect((init?.headers as Record<string, string>).Authorization).toBe('Bearer uat-access-token');
+        return { ok: true, json: async () => ({ userId: 'student-user-1', memberships: [], studentRelationships: [{ institutionId: 'institution-1', state: 'ACTIVE', effectiveFrom: '2026-08-21T00:00:00.000Z' }] }) };
+      }
       if (url.endsWith('/api/v1/career-readiness/catalog')) return { ok: true, json: async () => ({ pilot: 'Career Readiness Fundamentals', releaseManifestId: 'release', modules: [], assessments: [] }) };
       if (url.endsWith('/api/v1/career-readiness/me')) {
         expect((init?.headers as Record<string, string>).Authorization).toBe('Bearer uat-access-token');
@@ -53,8 +57,7 @@ describe('Cognito Hosted UI browser authentication', () => {
     render(React.createElement(App));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument());
     expect(screen.getByText('aanya.student01@example.test')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Choose your ONE workspace' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /Student Learning, readiness/i }));
+    await waitFor(() => expect(window.location.pathname).toBe('/student'));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Student profile menu' })).toHaveTextContent('Aanya Student01'));
     expect(screen.getByText('Authenticated API-backed mode')).toBeInTheDocument();
     expect(screen.getAllByText('API-backed').length).toBeGreaterThan(0);

@@ -159,6 +159,7 @@ export interface SecurityContextDto {
   readonly userId: string;
   readonly selectedOrganizationId?: string | null;
   readonly memberships: readonly { readonly organizationId: string; readonly role: string; readonly scope: Record<string, string | undefined> }[];
+  readonly studentRelationships?: readonly { readonly institutionId: string; readonly state: string; readonly effectiveFrom: string; readonly effectiveTo?: string | null }[];
 }
 
 export function getSecurityContext(token: string, signal?: AbortSignal): Promise<SecurityContextDto> {

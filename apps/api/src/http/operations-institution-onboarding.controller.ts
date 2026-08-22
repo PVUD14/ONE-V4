@@ -44,13 +44,13 @@ export class LoopbackSmtpInvitationMailSink implements InvitationMailSink {
     const transcript = await smtpSend({
       host: this.host,
       port: this.port,
-      from: 'no-reply@planthepath.local',
+      from: 'no-reply@one.local',
       to: input.toEmail,
       message: [
-        `From: PlanThePath <no-reply@planthepath.local>`,
+        `From: ONE <no-reply@one.local>`,
         `To: ${input.toEmail}`,
         `Subject: ${sanitizeHeader(input.subject)}`,
-        `X-PlanThePath-Correlation-Id: ${sanitizeHeader(input.correlationId)}`,
+        `X-ONE-Correlation-Id: ${sanitizeHeader(input.correlationId)}`,
         'Content-Type: text/plain; charset=utf-8',
         '',
         input.textBody,
@@ -493,10 +493,10 @@ export class OperationsInstitutionOnboardingController {
     const invitationId = this.ids.uuid();
     const notificationCommandId = this.ids.uuid();
     const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1_000);
-    const subject = input.role === 'EMPLOYER_ADMIN' ? 'PlanThePath employer administrator invitation' : 'PlanThePath institution administrator invitation';
+    const subject = input.role === 'EMPLOYER_ADMIN' ? 'ONE employer administrator invitation' : 'ONE institution administrator invitation';
     const invitationUrl = buildInvitationUrl(token);
     const textBody = [
-      'You have been invited to administer a PlanThePath organization.',
+      'You have been invited to administer a ONE organization.',
       `Open this invitation link with the identity whose verified email is ${input.email}:`,
       invitationUrl,
       'This invitation is single-use and expires in 14 days.',

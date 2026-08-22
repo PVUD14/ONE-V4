@@ -8,6 +8,7 @@ import {
   Optional,
   UnauthorizedException,
 } from '@nestjs/common';
+import { sql } from 'drizzle-orm';
 import {
   AuthenticationBoundaryError,
   hasScopedRole,
@@ -57,6 +58,8 @@ const institutionStaffRoles = [
 export interface ApiIdGenerator {
   uuid(): string;
 }
+
+type QueryResult<T> = { rows: T[] };
 
 export const cryptoApiIdGenerator: ApiIdGenerator = { uuid: randomUUID };
 
@@ -156,6 +159,16 @@ export class Phase1ProtectedApiRoutes {
 
   async currentContext(request: ProtectedHttpRequest): Promise<Record<string, unknown>> {
     const context = requireTrustedAuthorization(request);
+    const studentRelationships = await this.db.execute(sql`
+      SELECT institution_id, state, effective_from, effective_to
+      FROM institution_relationships
+      WHERE student_user_id = ${context.authorization.principal.userId}::uuid
+        AND state IN ('ACTIVE','VERIFIED')
+        AND effective_from <= now()
+        AND (effective_to IS NULL OR effective_to > now())
+      ORDER BY effective_from DESC
+      LIMIT 25
+    `) as QueryResult<{ institution_id: string; state: string; effective_from: Date; effective_to: Date | null }>;
     return {
       userId: context.authorization.principal.userId,
       selectedOrganizationId: context.authorization.selectedMembership?.organizationId ?? null,
@@ -163,6 +176,12 @@ export class Phase1ProtectedApiRoutes {
         organizationId: membership.organizationId,
         role: membership.role,
         scope: membership.scope,
+      })),
+      studentRelationships: studentRelationships.rows.map((relationship) => ({
+        institutionId: relationship.institution_id,
+        state: relationship.state,
+        effectiveFrom: relationship.effective_from,
+        effectiveTo: relationship.effective_to,
       })),
       correlationId: context.correlationId,
     };

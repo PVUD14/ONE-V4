@@ -150,8 +150,16 @@ describe('Phase 1 API protected request path', () => {
 
   it('resolves current active internal identity and selected membership from persistence', async () => {
     const userId = await seedUser('member@example.test', 'sub:member');
+    const studentUserId = await seedUser('student-context@example.test', 'sub:student-context');
     const institutionId = await seedOrg('INSTITUTION', 'College A');
     await seedMembership(userId, institutionId, 'INSTITUTION_ADMIN');
+    await db.insert(schema.institutionRelationships).values({
+      id: randomUUID(),
+      institutionId,
+      studentUserId,
+      state: 'ACTIVE',
+      effectiveFrom: new Date('2026-01-01T00:00:00Z'),
+    });
 
     const response = await request(app.getHttpServer())
       .get(`/api/v1/security/context?organizationId=${institutionId}`)
@@ -162,6 +170,18 @@ describe('Phase 1 API protected request path', () => {
       userId,
       selectedOrganizationId: institutionId,
       memberships: [expect.objectContaining({ organizationId: institutionId, role: 'INSTITUTION_ADMIN' })],
+      studentRelationships: [],
+    });
+
+    const studentResponse = await request(app.getHttpServer())
+      .get('/api/v1/security/context')
+      .set('Authorization', `Bearer ${signAccessToken(privateKey, { sub: 'sub:student-context', email: 'student-context@example.test' })}`)
+      .expect(200);
+
+    expect(studentResponse.body).toMatchObject({
+      userId: studentUserId,
+      memberships: [],
+      studentRelationships: [expect.objectContaining({ institutionId, state: 'ACTIVE' })],
     });
   });
 

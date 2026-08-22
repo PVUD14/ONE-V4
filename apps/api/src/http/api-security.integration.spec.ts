@@ -644,11 +644,12 @@ describe('Phase 1 API protected request path', () => {
     expect(currentRelationship.effective_to.getTime()).toBeGreaterThan(currentRelationship.effective_from.getTime());
     await expect(db.select().from(schema.users).where(eq(schema.users.email, 'aanya.student@example.test'))).resolves.toHaveLength(1);
 
-    await request(app.getHttpServer())
+    const duplicateStudentEmail = await request(app.getHttpServer())
       .post(`/api/v1/institutions/${institutionId}/students`)
       .set('Authorization', `Bearer ${adminToken}`)
       .send({ fullName: 'Duplicate Email', institutionStudentId: 'S1002', email: 'aanya.student@example.test' })
-      .expect(403);
+      .expect(409);
+    expect(duplicateStudentEmail.body.error).toMatchObject({ code: 'STUDENT_EMAIL_ALREADY_EXISTS', field: 'email' });
   });
 
   it('uses invitation consent instead of direct arbitrary-user staff role attachment', async () => {
@@ -878,6 +879,129 @@ describe('Phase 1 API protected request path', () => {
       batch_unit_id: batchId,
       section_unit_id: sectionId,
     });
+  });
+
+  it('creates direct institution students with flat contracts and defined validation errors', async () => {
+    const institutionId = await seedOrg('INSTITUTION', 'Direct Student College');
+    const otherInstitutionId = await seedOrg('INSTITUTION', 'Other Direct Student College');
+    const adminUserId = await seedUser('direct-admin@example.test', 'sub:direct-admin');
+    await seedMembership(adminUserId, institutionId, 'INSTITUTION_ADMIN');
+    const departmentId = randomUUID();
+    const programId = randomUUID();
+    const otherDepartmentId = randomUUID();
+    await db.insert(schema.institutionUnits).values([
+      { id: departmentId, institutionId, kind: 'DEPARTMENT', name: 'Computer Science' },
+      { id: programId, institutionId, kind: 'PROGRAM', name: 'BTech' },
+      { id: otherDepartmentId, institutionId: otherInstitutionId, kind: 'DEPARTMENT', name: 'Other CSE' },
+    ]);
+    const token = signAccessToken(privateKey, { sub: 'sub:direct-admin', email: 'direct-admin@example.test' });
+
+    const created = await request(app.getHttpServer())
+      .post(`/api/v1/institutions/${institutionId}/students`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        institutionStudentId: 'UAT-P2A-DIRECT-002',
+        fullName: 'Phase2A Direct Student',
+        email: 'phase2a.direct.002@uat.example.test',
+        departmentUnitId: departmentId,
+        programUnitId: programId,
+        academicStartDate: '2026-08-22',
+        expectedGraduationDate: '2028-08-22',
+      })
+      .expect(201);
+    expect(created.body.student).toMatchObject({ institutionStudentId: 'UAT-P2A-DIRECT-002', fullName: 'Phase2A Direct Student' });
+
+    const persisted = await pool.query(`
+      SELECT u.state, sp.department_unit_id, sp.program_unit_id, ir.state AS relationship_state
+      FROM institution_student_profiles sp
+      JOIN users u ON u.id=sp.student_user_id
+      JOIN institution_relationships ir ON ir.student_user_id=sp.student_user_id AND ir.institution_id=sp.institution_id
+      WHERE sp.institution_id=$1 AND sp.institution_student_id=$2
+    `, [institutionId, 'UAT-P2A-DIRECT-002']);
+    expect(persisted.rows[0]).toMatchObject({ state: 'INVITED', department_unit_id: departmentId, program_unit_id: programId, relationship_state: 'ACTIVE' });
+
+    const duplicateId = await request(app.getHttpServer())
+      .post(`/api/v1/institutions/${institutionId}/students`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ institutionStudentId: 'UAT-P2A-DIRECT-002', fullName: 'Duplicate Id', email: 'duplicate-id@example.test' })
+      .expect(409);
+    expect(duplicateId.body.error).toMatchObject({ code: 'INSTITUTION_STUDENT_ID_ALREADY_EXISTS', field: 'institutionStudentId' });
+
+    const duplicateEmail = await request(app.getHttpServer())
+      .post(`/api/v1/institutions/${institutionId}/students`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ institutionStudentId: 'UAT-P2A-DIRECT-003', fullName: 'Duplicate Email', email: 'phase2a.direct.002@uat.example.test' })
+      .expect(409);
+    expect(duplicateEmail.body.error).toMatchObject({ code: 'STUDENT_EMAIL_ALREADY_EXISTS', field: 'email' });
+
+    const wrongKind = await request(app.getHttpServer())
+      .post(`/api/v1/institutions/${institutionId}/students`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ institutionStudentId: 'UAT-P2A-DIRECT-004', fullName: 'Wrong Kind', email: 'wrong-kind@example.test', departmentUnitId: programId })
+      .expect(400);
+    expect(wrongKind.body.error).toMatchObject({ code: 'INVALID_ACADEMIC_UNIT_SCOPE', field: 'departmentUnitId' });
+
+    const crossInstitution = await request(app.getHttpServer())
+      .post(`/api/v1/institutions/${institutionId}/students`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ institutionStudentId: 'UAT-P2A-DIRECT-005', fullName: 'Cross Unit', email: 'cross-unit-direct@example.test', departmentUnitId: otherDepartmentId })
+      .expect(400);
+    expect(crossInstitution.body.error).toMatchObject({ code: 'INVALID_ACADEMIC_UNIT_SCOPE', field: 'departmentUnitId' });
+
+    const invalidDate = await request(app.getHttpServer())
+      .post(`/api/v1/institutions/${institutionId}/students`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ institutionStudentId: 'UAT-P2A-DIRECT-006', fullName: 'Bad Dates', email: 'bad-dates@example.test', academicStartDate: '2028-08-22', expectedGraduationDate: '2026-08-22' })
+      .expect(400);
+    expect(invalidDate.body.error).toMatchObject({ code: 'INVALID_ACADEMIC_DATE_WINDOW', field: 'expectedGraduationDate' });
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/institutions/${institutionId}/students/${created.body.student.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ fullName: 'Phase2A Direct Student Edited', departmentUnitId: null })
+      .expect(200);
+    const edited = await pool.query('SELECT full_name, department_unit_id FROM institution_student_profiles WHERE id=$1', [created.body.student.id]);
+    expect(edited.rows[0]).toMatchObject({ full_name: 'Phase2A Direct Student Edited', department_unit_id: null });
+  });
+
+  it('persists staff invitations without raw token exposure and handles pending duplicates explicitly', async () => {
+    const institutionId = await seedOrg('INSTITUTION', 'Staff Invite College');
+    const adminUserId = await seedUser('staff-invite-admin@example.test', 'sub:staff-invite-admin');
+    await seedMembership(adminUserId, institutionId, 'INSTITUTION_ADMIN');
+    const token = signAccessToken(privateKey, { sub: 'sub:staff-invite-admin', email: 'staff-invite-admin@example.test' });
+
+    const fresh = await request(app.getHttpServer())
+      .post(`/api/v1/institutions/${institutionId}/staff-role-assignments`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ email: 'phase2a.faculty.001@uat.example.test', role: 'FACULTY_LECTURER' })
+      .expect(201);
+    expect(fresh.body.invitation).toMatchObject({ email: 'phase2a.faculty.001@uat.example.test', role: 'FACULTY_LECTURER', state: 'PENDING', tokenPreviewAvailable: false });
+    expect(JSON.stringify(fresh.body)).not.toMatch(/tokenHash|token_hash|[A-Za-z0-9_-]{80,}/);
+
+    const invitationRows = await pool.query('SELECT token_hash, state FROM invitations WHERE id=$1', [fresh.body.invitation.id]);
+    expect(invitationRows.rows[0]).toMatchObject({ state: 'PENDING' });
+    const commandRows = await pool.query('SELECT state, dedupe_key FROM notification_commands WHERE destination_ref=$1', [`invitation:${fresh.body.invitation.id}`]);
+    expect(['PENDING', 'DISPATCHED', 'DELIVERED']).toContain(commandRows.rows[0].state);
+    const membershipRows = await pool.query('SELECT id FROM organization_memberships WHERE organization_id=$1 AND role=$2', [institutionId, 'FACULTY_LECTURER']);
+    expect(membershipRows.rows).toEqual([]);
+
+    const duplicate = await request(app.getHttpServer())
+      .post(`/api/v1/institutions/${institutionId}/staff-role-assignments`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ email: 'phase2a.faculty.001@uat.example.test', role: 'FACULTY_LECTURER' })
+      .expect(201);
+    expect(duplicate.body).toMatchObject({ code: 'STAFF_INVITATION_ALREADY_PENDING', invitation: { id: fresh.body.invitation.id, state: 'PENDING' } });
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/institutions/${institutionId}/staff-role-assignments`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ email: 'staff-invite-admin@example.test', role: 'FACULTY_LECTURER' })
+      .expect(403);
+    await request(app.getHttpServer())
+      .post(`/api/v1/institutions/${institutionId}/staff-role-assignments`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ email: 'platform-role@example.test', role: 'OPERATIONS_ADMIN' })
+      .expect(403);
   });
 });
 

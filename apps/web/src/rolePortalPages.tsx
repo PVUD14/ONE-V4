@@ -24,8 +24,10 @@ import {
   updateInstitutionUnit,
   updateInstitutionStudent,
   updateOperationsOrganization,
+  ApiRequestError,
   type ApiHealth,
   type InstitutionStaffDto,
+  type InstitutionStudentCreateRequest,
   type InstitutionStudentDto,
   type InstitutionUnitDto,
   type OrganizationManagementDto,
@@ -347,7 +349,10 @@ function InstitutionStudentsPage({ portal, authenticatedWorkspace }: { readonly 
   const [units, setUnits] = useState<readonly InstitutionUnitDto[]>([]);
   const [preview, setPreview] = useState<RosterImportPreviewDto | null>(null);
   const [notice, setNotice] = useState('');
-  const [error, setError] = useState('');
+  const [loadError, setLoadError] = useState('');
+  const [studentError, setStudentError] = useState('');
+  const [csvError, setCsvError] = useState('');
+  const [relationshipError, setRelationshipError] = useState('');
   const [query, setQuery] = useState('');
   const [form, setForm] = useState({ fullName: '', institutionStudentId: '', email: '', departmentUnitId: '', programUnitId: '', batchUnitId: '', sectionUnitId: '', academicStartDate: '', expectedGraduationDate: '' });
   const [csv, setCsv] = useState('institution_student_id,full_name,email,department,program,batch,section\n');
@@ -360,7 +365,7 @@ function InstitutionStudentsPage({ portal, authenticatedWorkspace }: { readonly 
     ]).then(([studentResult, unitResult]) => {
       setStudents(studentResult.students);
       setUnits(unitResult.units);
-    }).catch(() => setError('Unable to load institution students.'));
+    }).catch((error: unknown) => setLoadError(formatApiError(error, 'Unable to load institution students.')));
     return () => controller.abort();
   }, [token, institutionId, notice]);
   if (!token) return <RestrictedApiState title="Students" message="Sign in with an Institution Admin identity to manage students." />;
@@ -370,56 +375,64 @@ function InstitutionStudentsPage({ portal, authenticatedWorkspace }: { readonly 
   const unitsByKind = (kind: string): readonly InstitutionUnitDto[] => units.filter((unit) => unit.kind === kind);
   async function addStudent(event: React.FormEvent): Promise<void> {
     event.preventDefault();
-    setError('');
+    setStudentError('');
+    setNotice('');
     try {
-      await addInstitutionStudent(token!, institutionId, { student: cleanStudentPayload(form) });
+      await addInstitutionStudent(token!, institutionId, cleanStudentPayload(form));
       setForm({ fullName: '', institutionStudentId: '', email: '', departmentUnitId: '', programUnitId: '', batchUnitId: '', sectionUnitId: '', academicStartDate: '', expectedGraduationDate: '' });
       setNotice('Student added with institution relationship; global identity was not hard-deleted or bypassed.');
-    } catch {
-      setError('Add student failed. Check authorization and duplicate IDs.');
+    } catch (error) {
+      setStudentError(formatApiError(error, 'Add student failed.'));
     }
   }
   async function editStudent(student: InstitutionStudentDto): Promise<void> {
     const fullName = window.prompt('Student full name', student.fullName);
     if (!fullName || fullName.trim() === student.fullName) return;
-    setError('');
+    setStudentError('');
+    setNotice('');
     try {
-      await updateInstitutionStudent(token!, institutionId, student.id, { student: { fullName: fullName.trim() } });
+      await updateInstitutionStudent(token!, institutionId, student.id, { fullName: fullName.trim() });
       setNotice('Student institution data updated.');
-    } catch {
-      setError('Student update failed. Check authorization and institution scope.');
+    } catch (error) {
+      setStudentError(formatApiError(error, 'Student update failed.'));
     }
   }
   async function relationship(studentId: string, state: string): Promise<void> {
     const effectiveTo = window.prompt(`Confirm ${state}. Effective date/time (ISO or YYYY-MM-DD)`, new Date().toISOString());
     if (!effectiveTo) return;
     if (!window.confirm(`This will mark the current relationship ${state} effective ${effectiveTo}. Historical identity is retained. Continue?`)) return;
-    setError('');
+    setRelationshipError('');
+    setNotice('');
     try {
       await endInstitutionStudentRelationship(token!, institutionId, studentId, state, effectiveTo);
       setNotice(`Student relationship marked ${state}.`);
-    } catch {
-      setError('Relationship update failed. Check current relationship state and institution scope.');
+    } catch (error) {
+      setRelationshipError(formatApiError(error, 'Relationship update failed.'));
     }
   }
   async function previewImport(): Promise<void> {
+    setCsvError('');
+    setNotice('');
     try {
       const result = await previewStudentRosterImport(token!, institutionId, 'uat-roster.csv', csv);
       setPreview(result.import);
-    } catch {
-      setError('CSV preview failed validation.');
+    } catch (error) {
+      setCsvError(formatApiError(error, 'CSV preview failed validation.'));
     }
   }
   async function commitImport(): Promise<void> {
     if (!preview) return;
+    setCsvError('');
+    setStudentError('');
+    setRelationshipError('');
     await commitStudentRosterImport(token!, institutionId, preview.id);
     setNotice('Roster import committed.');
     setPreview(null);
   }
   return <section className="role-module role-module--dense"><div className="role-page-heading"><div><span className="eyebrow">Authenticated API-backed</span><h1>Students</h1><p>Institution-owned roster and relationship lifecycle. This is not an Operations workflow.</p></div></div>
-    {error ? <p className="form-error" role="alert">{error}</p> : null}{notice ? <p className="role-api-success" role="status">{notice}</p> : null}
-    <form className="role-card role-wide role-management-form" onSubmit={(event) => void addStudent(event)}><h2>Add Student</h2><label><span>Full name *</span><input value={form.fullName} onChange={(event) => setForm((value) => ({ ...value, fullName: event.target.value }))} required /></label><label><span>Institution ID *</span><input value={form.institutionStudentId} onChange={(event) => setForm((value) => ({ ...value, institutionStudentId: event.target.value }))} required /></label><label><span>Email *</span><input type="email" value={form.email} onChange={(event) => setForm((value) => ({ ...value, email: event.target.value }))} required /></label><UnitSelect label="Department" value={form.departmentUnitId} units={unitsByKind('DEPARTMENT')} onChange={(departmentUnitId) => setForm((value) => ({ ...value, departmentUnitId }))} /><UnitSelect label="Program" value={form.programUnitId} units={unitsByKind('PROGRAM')} onChange={(programUnitId) => setForm((value) => ({ ...value, programUnitId }))} /><UnitSelect label="Batch" value={form.batchUnitId} units={unitsByKind('BATCH')} onChange={(batchUnitId) => setForm((value) => ({ ...value, batchUnitId }))} /><UnitSelect label="Section" value={form.sectionUnitId} units={unitsByKind('SECTION')} onChange={(sectionUnitId) => setForm((value) => ({ ...value, sectionUnitId }))} /><label><span>Academic start date</span><input type="date" value={form.academicStartDate} onChange={(event) => setForm((value) => ({ ...value, academicStartDate: event.target.value }))} /></label><label><span>Expected graduation date</span><input type="date" value={form.expectedGraduationDate} onChange={(event) => setForm((value) => ({ ...value, expectedGraduationDate: event.target.value }))} /></label><button type="submit">Add student</button></form>
-    <section className="role-card role-wide"><h2>Import Students</h2><p>CSV validates academic unit names, stores resolved institution unit IDs, and rejects unknown/cross-institution names.</p><textarea value={csv} onChange={(event) => setCsv(event.target.value)} rows={5} /><div className="role-record-actions"><button type="button" onClick={() => void previewImport()}>Validate CSV</button>{preview ? <button type="button" disabled={preview.rejectedCount > 0} onClick={() => void commitImport()}>Commit {preview.acceptedCount} rows</button> : null}</div>{preview ? <div><p>{preview.acceptedCount} accepted, {preview.warningCount} warnings, {preview.rejectedCount} rejected.</p><table className="role-record-table"><thead><tr><th>Row</th><th>Email</th><th>State</th><th>Resolved units</th><th>Issues</th></tr></thead><tbody>{preview.rows.map((row) => <tr key={row.rowNumber}><td>{row.rowNumber}</td><td>{row.email}</td><td>{row.state}</td><td>{[row.departmentUnitId, row.programUnitId, row.batchUnitId, row.sectionUnitId].filter(Boolean).length} IDs</td><td>{row.issues.join(', ') || 'None'}</td></tr>)}</tbody></table></div> : null}</section>
+    {loadError ? <p className="form-error" role="alert">{loadError}</p> : null}{relationshipError ? <p className="form-error" role="alert">{relationshipError}</p> : null}{notice ? <p className="role-api-success" role="status">{notice}</p> : null}
+    <form className="role-card role-wide role-management-form" onSubmit={(event) => void addStudent(event)}><h2>Add Student</h2>{studentError ? <p className="form-error" role="alert">{studentError}</p> : null}<label><span>Full name *</span><input value={form.fullName} onChange={(event) => setForm((value) => ({ ...value, fullName: event.target.value }))} required /></label><label><span>Institution ID *</span><input value={form.institutionStudentId} onChange={(event) => setForm((value) => ({ ...value, institutionStudentId: event.target.value }))} required /></label><label><span>Email *</span><input type="email" value={form.email} onChange={(event) => setForm((value) => ({ ...value, email: event.target.value }))} required /></label><UnitSelect label="Department" value={form.departmentUnitId} units={unitsByKind('DEPARTMENT')} onChange={(departmentUnitId) => setForm((value) => ({ ...value, departmentUnitId }))} /><UnitSelect label="Program" value={form.programUnitId} units={unitsByKind('PROGRAM')} onChange={(programUnitId) => setForm((value) => ({ ...value, programUnitId }))} /><UnitSelect label="Batch" value={form.batchUnitId} units={unitsByKind('BATCH')} onChange={(batchUnitId) => setForm((value) => ({ ...value, batchUnitId }))} /><UnitSelect label="Section" value={form.sectionUnitId} units={unitsByKind('SECTION')} onChange={(sectionUnitId) => setForm((value) => ({ ...value, sectionUnitId }))} /><label><span>Academic start date</span><input type="date" value={form.academicStartDate} onChange={(event) => setForm((value) => ({ ...value, academicStartDate: event.target.value }))} /></label><label><span>Expected graduation date</span><input type="date" value={form.expectedGraduationDate} onChange={(event) => setForm((value) => ({ ...value, expectedGraduationDate: event.target.value }))} /></label><button type="submit">Add student</button></form>
+    <section className="role-card role-wide"><h2>Import Students</h2>{csvError ? <p className="form-error" role="alert">{csvError}</p> : null}<p>CSV validates academic unit names, stores resolved institution unit IDs, and rejects unknown/cross-institution names.</p><textarea value={csv} onChange={(event) => setCsv(event.target.value)} rows={5} /><div className="role-record-actions"><button type="button" onClick={() => void previewImport()}>Validate CSV</button>{preview ? <button type="button" disabled={preview.rejectedCount > 0} onClick={() => void commitImport()}>Commit {preview.acceptedCount} rows</button> : null}</div>{preview ? <div><p>{preview.acceptedCount} accepted, {preview.warningCount} warnings, {preview.rejectedCount} rejected.</p><table className="role-record-table"><thead><tr><th>Row</th><th>Email</th><th>State</th><th>Resolved units</th><th>Issues</th></tr></thead><tbody>{preview.rows.map((row) => <tr key={row.rowNumber}><td>{row.rowNumber}</td><td>{row.email}</td><td>{row.state}</td><td>{[row.departmentUnitId, row.programUnitId, row.batchUnitId, row.sectionUnitId].filter(Boolean).length} IDs</td><td>{row.issues.join(', ') || 'None'}</td></tr>)}</tbody></table></div> : null}</section>
     <section className="role-card role-wide"><h2>Search students</h2><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search name, email, or institution ID" /></section>
     <div className="role-record-table-wrap"><table className="role-record-table"><caption className="sr-only">{portal.roleName} real students</caption><thead><tr><th>Student</th><th>Institution ID</th><th>Units</th><th>Relationship</th><th>Invitation</th><th>Actions</th></tr></thead><tbody>{filteredStudents.map((student) => <tr key={student.id} className="role-record-row"><th scope="row"><strong>{student.fullName}</strong><span>{student.email}</span></th><td>{student.institutionStudentId}</td><td>{Object.values(student.units ?? {}).filter(Boolean).length} assigned</td><td>{student.relationship?.state ?? student.status}</td><td>{student.status}</td><td><div className="role-record-actions"><button type="button" className="secondary" onClick={() => void editStudent(student)}>Edit student</button><button type="button" onClick={() => void relationship(student.id, 'TRANSFERRED')}>Transfer</button><button type="button" onClick={() => void relationship(student.id, 'GRADUATED')}>Graduate</button><button type="button" className="secondary" onClick={() => void relationship(student.id, 'ENDED')}>End relationship</button><button type="button" className="secondary" onClick={() => void relationship(student.id, 'REVOKED')}>Revoke</button></div></td></tr>)}</tbody></table></div>
   </section>;
@@ -471,7 +484,7 @@ function InstitutionStaffPage({ portal: _portal, authenticatedWorkspace }: { rea
   useEffect(() => {
     if (!token || !institutionId) return;
     const controller = new AbortController();
-    listInstitutionStaff(token, institutionId, controller.signal).then((result) => setStaff(result.staff)).catch(() => setError('Unable to load staff assignments.'));
+    listInstitutionStaff(token, institutionId, controller.signal).then((result) => setStaff(result.staff)).catch((error: unknown) => setError(formatApiError(error, 'Unable to load staff assignments.')));
     return () => controller.abort();
   }, [token, institutionId, notice]);
   if (!token) return <RestrictedApiState title="Staff" message="Sign in with an Institution Admin identity to invite institution staff." />;
@@ -484,8 +497,8 @@ function InstitutionStaffPage({ portal: _portal, authenticatedWorkspace }: { rea
       await inviteInstitutionStaff(token!, institutionId, form.email, form.role);
       setNotice('Staff invitation created. Membership is created only after the verified recipient accepts.');
       setForm({ email: '', role: 'FACULTY_LECTURER' });
-    } catch {
-      setError('Staff invitation failed. Platform roles, self-escalation and cross-institution requests are rejected.');
+    } catch (error) {
+      setError(formatApiError(error, 'Staff invitation failed.'));
     }
   }
   return <section className="role-module role-module--dense"><div className="role-page-heading"><div><span className="eyebrow">Authenticated API-backed</span><h1>Staff</h1><p>Invite institution staff through the verified-recipient invitation lifecycle. This screen does not attach arbitrary global user IDs.</p></div></div>
@@ -572,8 +585,47 @@ function UnitSelect({ label, value, units, onChange }: { readonly label: string;
   return <label><span>{label}</span><select value={value} onChange={(event) => onChange(event.target.value)}><option value="">None</option>{units.map((unit) => <option key={unit.id} value={unit.id}>{unit.kind}: {unit.name}</option>)}</select></label>;
 }
 
-function cleanStudentPayload(form: Record<string, string>): Record<string, string> {
-  return Object.fromEntries(Object.entries(form).filter(([, value]) => value.trim().length > 0));
+function cleanStudentPayload(form: Record<string, string>): InstitutionStudentCreateRequest {
+  const payload: {
+    institutionStudentId: string;
+    fullName: string;
+    email: string;
+    departmentUnitId?: string;
+    programUnitId?: string;
+    batchUnitId?: string;
+    sectionUnitId?: string;
+    academicStartDate?: string;
+    expectedGraduationDate?: string;
+  } = {
+    institutionStudentId: (form.institutionStudentId ?? '').trim(),
+    fullName: (form.fullName ?? '').trim(),
+    email: (form.email ?? '').trim(),
+  };
+  if (form.departmentUnitId?.trim()) payload.departmentUnitId = form.departmentUnitId.trim();
+  if (form.programUnitId?.trim()) payload.programUnitId = form.programUnitId.trim();
+  if (form.batchUnitId?.trim()) payload.batchUnitId = form.batchUnitId.trim();
+  if (form.sectionUnitId?.trim()) payload.sectionUnitId = form.sectionUnitId.trim();
+  if (form.academicStartDate?.trim()) payload.academicStartDate = form.academicStartDate.trim();
+  if (form.expectedGraduationDate?.trim()) payload.expectedGraduationDate = form.expectedGraduationDate.trim();
+  return payload;
+}
+
+function formatApiError(error: unknown, fallback: string): string {
+  if (!(error instanceof ApiRequestError)) return fallback;
+  const message = safeErrorMessage(error.code) ?? fallback;
+  return `${message}${error.field ? ` Field: ${error.field}.` : ''} Reference: ${error.correlationId}`;
+}
+
+function safeErrorMessage(code: string | undefined): string | undefined {
+  switch (code) {
+    case 'STUDENT_EMAIL_ALREADY_EXISTS': return 'This email is already associated with a ONE identity and cannot be attached automatically. Use the approved onboarding/recovery workflow.';
+    case 'INSTITUTION_STUDENT_ID_ALREADY_EXISTS': return 'A Student with this institution ID already exists.';
+    case 'INVALID_ACADEMIC_DATE_WINDOW': return 'Expected graduation date must be on or after academic start date.';
+    case 'INVALID_ACADEMIC_UNIT_SCOPE': return 'Selected academic unit is not valid for this Institution and field.';
+    case 'STAFF_INVITATION_ALREADY_PENDING': return 'Staff invitation already pending.';
+    case 'FORBIDDEN': return 'You do not have permission to perform this action.';
+    default: return undefined;
+  }
 }
 
 function InvitationInventoryTable({ invitations }: { readonly invitations: readonly OperationsInvitationDto[] }): React.ReactElement {

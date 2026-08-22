@@ -9,13 +9,15 @@ export class ApiRequestError extends Error {
   readonly status: number;
   readonly correlationId: string;
   readonly code?: string;
+  readonly field?: string;
 
-  constructor(input: { readonly status: number; readonly correlationId: string; readonly code?: string }) {
+  constructor(input: { readonly status: number; readonly correlationId: string; readonly code?: string; readonly field?: string }) {
     super(`API request failed with status ${input.status}`);
     this.name = 'ApiRequestError';
     this.status = input.status;
     this.correlationId = input.correlationId;
     if (input.code) this.code = input.code;
+    if (input.field) this.field = input.field;
   }
 }
 
@@ -201,6 +203,43 @@ export interface InstitutionStudentDto {
   readonly units?: Record<string, string | null | undefined>;
 }
 
+export interface InstitutionStudentCreateRequest {
+  readonly institutionStudentId: string;
+  readonly fullName: string;
+  readonly email: string;
+  readonly departmentUnitId?: string;
+  readonly programUnitId?: string | null;
+  readonly batchUnitId?: string | null;
+  readonly sectionUnitId?: string | null;
+  readonly academicStartDate?: string;
+  readonly expectedGraduationDate?: string;
+}
+
+export interface InstitutionStudentUpdateRequest {
+  readonly fullName?: string;
+  readonly departmentUnitId?: string | null;
+  readonly programUnitId?: string | null;
+  readonly batchUnitId?: string | null;
+  readonly sectionUnitId?: string | null;
+  readonly academicStartDate?: string | null;
+  readonly expectedGraduationDate?: string | null;
+}
+
+export interface InstitutionUnitCreateRequest {
+  readonly kind: string;
+  readonly name: string;
+  readonly parentUnitId?: string;
+}
+
+export interface InstitutionUnitUpdateRequest {
+  readonly name: string;
+}
+
+export interface InstitutionStaffInvitationRequest {
+  readonly email: string;
+  readonly role: string;
+}
+
 export interface CurrentStudentDto {
   readonly userId: string;
   readonly verifiedEmail: string | null;
@@ -354,11 +393,11 @@ export function listInstitutionUnits(token: string, institutionId: string, signa
   return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/units`, { token, ...(signal ? { signal } : {}) });
 }
 
-export function createInstitutionUnit(token: string, institutionId: string, body: unknown): Promise<{ readonly unit: InstitutionUnitDto }> {
+export function createInstitutionUnit(token: string, institutionId: string, body: InstitutionUnitCreateRequest): Promise<{ readonly unit: InstitutionUnitDto }> {
   return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/units`, { token, method: 'POST', body });
 }
 
-export function updateInstitutionUnit(token: string, institutionId: string, unitId: string, body: unknown): Promise<{ readonly unit: InstitutionUnitDto }> {
+export function updateInstitutionUnit(token: string, institutionId: string, unitId: string, body: InstitutionUnitUpdateRequest): Promise<{ readonly unit: InstitutionUnitDto }> {
   return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/units/${encodeURIComponent(unitId)}`, { token, method: 'PATCH', body });
 }
 
@@ -370,11 +409,11 @@ export function listInstitutionStudents(token: string, institutionId: string, si
   return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/students`, { token, ...(signal ? { signal } : {}) });
 }
 
-export function addInstitutionStudent(token: string, institutionId: string, body: unknown): Promise<{ readonly student: InstitutionStudentDto }> {
+export function addInstitutionStudent(token: string, institutionId: string, body: InstitutionStudentCreateRequest): Promise<{ readonly student: InstitutionStudentDto }> {
   return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/students`, { token, method: 'POST', body });
 }
 
-export function updateInstitutionStudent(token: string, institutionId: string, studentProfileId: string, body: unknown): Promise<{ readonly student: InstitutionStudentDto }> {
+export function updateInstitutionStudent(token: string, institutionId: string, studentProfileId: string, body: InstitutionStudentUpdateRequest): Promise<{ readonly student: InstitutionStudentDto }> {
   return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/students/${encodeURIComponent(studentProfileId)}`, { token, method: 'PATCH', body });
 }
 
@@ -383,7 +422,8 @@ export function endInstitutionStudentRelationship(token: string, institutionId: 
 }
 
 export function inviteInstitutionStaff(token: string, institutionId: string, email: string, role: string): Promise<Record<string, unknown>> {
-  return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/staff-role-assignments`, { token, method: 'POST', body: { email, role } });
+  const body: InstitutionStaffInvitationRequest = { email, role };
+  return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/staff-role-assignments`, { token, method: 'POST', body });
 }
 
 export function previewStudentRosterImport(token: string, institutionId: string, filename: string, csv: string): Promise<{ readonly import: RosterImportPreviewDto }> {
@@ -408,11 +448,13 @@ async function requestJson<T>(path: string, input: {
     ...(input.signal ? { signal: input.signal } : {}),
   });
   if (!response.ok) {
-    const body = await response.json().catch(() => null) as { readonly message?: { readonly code?: string; readonly correlationId?: string } } | null;
+    const body = await response.json().catch(() => null) as { readonly message?: { readonly code?: string; readonly correlationId?: string; readonly field?: string }; readonly error?: { readonly code?: string; readonly correlationId?: string; readonly field?: string } } | null;
+    const safeError = body?.error ?? body?.message;
     throw new ApiRequestError({
       status: response.status,
-      correlationId: body?.message?.correlationId ?? response.headers?.get('x-correlation-id') ?? correlationId,
-      ...(body?.message?.code ? { code: body.message.code } : {}),
+      correlationId: safeError?.correlationId ?? response.headers?.get('x-correlation-id') ?? correlationId,
+      ...(safeError?.code ? { code: safeError.code } : {}),
+      ...(safeError?.field ? { field: safeError.field } : {}),
     });
   }
   return response.json() as Promise<T>;

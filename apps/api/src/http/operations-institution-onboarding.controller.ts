@@ -1,5 +1,5 @@
 import { createConnection } from 'node:net';
-import { Body, Controller, ForbiddenException, Get, Inject, Optional, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, ConflictException, Controller, ForbiddenException, Get, Inject, Optional, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { digestInvitationToken, generateInvitationToken } from '@planthepath/identity/src/invitation-token.js';
 import { validateOutboxWriteInput, type PersistenceDb } from '@planthepath/persistence/src/repositories.js';
@@ -445,7 +445,11 @@ export class OperationsInstitutionOnboardingController {
     const relationshipId = this.ids.uuid();
     await this.db.transaction(async (tx) => {
       const existing = await tx.execute(sql`SELECT id FROM users WHERE lower(email)=lower(${input.email}) FOR UPDATE`) as QueryResult<{ id: string }>;
-      if (existing.rows[0]) throw forbidden(context.correlationId);
+      if (existing.rows[0]) throw conflict('STUDENT_EMAIL_ALREADY_EXISTS', context.correlationId, 'email');
+      const existingStudentId = await tx.execute(sql`SELECT id FROM institution_student_profiles WHERE institution_id=${id}::uuid AND lower(institution_student_id)=lower(${input.institutionStudentId}) FOR UPDATE`) as QueryResult<{ id: string }>;
+      if (existingStudentId.rows[0]) throw conflict('INSTITUTION_STUDENT_ID_ALREADY_EXISTS', context.correlationId, 'institutionStudentId');
+      validateDateWindow(input.academicStartDate ?? null, input.expectedGraduationDate ?? null, context.correlationId);
+      await validateStudentUnitScope(tx, id, input, context.correlationId);
       await tx.execute(sql`INSERT INTO users (id, email, state) VALUES (${userId}::uuid, ${input.email}, 'INVITED')`);
       await tx.execute(sql`
         INSERT INTO institution_student_profiles (id, institution_id, student_user_id, institution_student_id, full_name, department_unit_id, program_unit_id, batch_unit_id, section_unit_id, academic_start_date, expected_graduation_date, status)
@@ -505,6 +509,18 @@ export class OperationsInstitutionOnboardingController {
     const profileId = requireUuid(studentProfileId, context.correlationId);
     const input = readStudentPatch(body, context.correlationId);
     await this.db.transaction(async (tx) => {
+      const existing = await tx.execute(sql`
+        SELECT academic_start_date, expected_graduation_date
+        FROM institution_student_profiles
+        WHERE id=${profileId}::uuid AND institution_id=${id}::uuid
+        FOR UPDATE
+      `) as QueryResult<{ academic_start_date: string | null; expected_graduation_date: string | null }>;
+      const current = existing.rows[0];
+      if (!current) throw forbidden(context.correlationId);
+      const nextStart = Object.hasOwn(input, 'academicStartDate') ? input.academicStartDate ?? null : current.academic_start_date;
+      const nextGraduation = Object.hasOwn(input, 'expectedGraduationDate') ? input.expectedGraduationDate ?? null : current.expected_graduation_date;
+      validateDateWindow(nextStart, nextGraduation, context.correlationId);
+      await validateStudentUnitScope(tx, id, input, context.correlationId);
       const updated = await tx.execute(sql`
         UPDATE institution_student_profiles
         SET full_name=coalesce(${input.fullName ?? null}, full_name),
@@ -564,8 +580,36 @@ export class OperationsInstitutionOnboardingController {
     const input = requireObject(body, 'request');
     if (typeof input.userId === 'string') throw forbidden(context.correlationId);
     const email = normalizeEmail(readString(body, 'email', context.correlationId), context.correlationId);
-    if (email === normalizeEmail(context.verifiedIdentity.email ?? '', context.correlationId)) throw forbidden(context.correlationId);
+    const actor = await this.db.execute(sql`
+      SELECT email
+      FROM users
+      WHERE id=${context.authorization.principal.userId}::uuid
+      LIMIT 1
+    `) as QueryResult<{ email: string }>;
+    const actorEmail = actor.rows[0]?.email ? normalizeEmail(actor.rows[0].email, context.correlationId) : null;
+    if (!actorEmail || email === actorEmail) throw forbidden(context.correlationId);
     const role = readEnum(readString(body, 'role', context.correlationId), institutionAssignableRoles, context.correlationId);
+    const pendingInvitation = await this.db.execute(sql`
+      SELECT id, state, role, expires_at
+      FROM invitations
+      WHERE organization_id=${id}::uuid AND lower(email)=lower(${email}) AND state='PENDING' AND expires_at > now()
+      ORDER BY created_at DESC
+      LIMIT 1
+    `) as QueryResult<{ id: string; state: string; role: string; expires_at: Date | string }>;
+    if (pendingInvitation.rows[0]) {
+      return {
+        invitation: {
+          id: pendingInvitation.rows[0].id,
+          email,
+          role: pendingInvitation.rows[0].role,
+          state: pendingInvitation.rows[0].state,
+          expiresAt: new Date(pendingInvitation.rows[0].expires_at).toISOString(),
+          tokenPreviewAvailable: false,
+        },
+        code: 'STAFF_INVITATION_ALREADY_PENDING',
+        correlationId: context.correlationId,
+      };
+    }
     const invitation = await this.createScopedInvitation({
       actorUserId: context.authorization.principal.userId,
       organizationId: id,
@@ -578,7 +622,7 @@ export class OperationsInstitutionOnboardingController {
       dedupePrefix: 'institution-staff',
       correlationId: context.correlationId,
     });
-    return { invitation: { id: invitation.id, email, role, state: 'PENDING', tokenPreviewAvailable: false }, correlationId: context.correlationId };
+    return { invitation: { id: invitation.id, email, role, state: 'PENDING', delivery: { state: this.invitationMailSink ? 'PENDING' : 'NOT_CONFIGURED' }, tokenPreviewAvailable: false }, correlationId: context.correlationId };
   }
 
   private async createScopedInvitation(input: {
@@ -739,6 +783,49 @@ function requireInstitutionRole(request: ProtectedHttpRequest, institutionId: st
 
 function forbidden(correlationId: string): ForbiddenException {
   return new ForbiddenException(safeError('FORBIDDEN', correlationId));
+}
+
+function conflict(code: string, correlationId: string, field?: string): ConflictException {
+  return new ConflictException(safeOperationError(code, correlationId, field));
+}
+
+function badRequest(code: string, correlationId: string, field?: string): BadRequestException {
+  return new BadRequestException(safeOperationError(code, correlationId, field));
+}
+
+function safeOperationError(code: string, correlationId: string, field?: string): { readonly error: { readonly code: string; readonly message: string; readonly correlationId: string; readonly field?: string } } {
+  return { error: { code, message: 'Request could not be completed', correlationId, ...(field ? { field } : {}) } };
+}
+
+function validateDateWindow(academicStartDate: string | null | undefined, expectedGraduationDate: string | null | undefined, correlationId: string): void {
+  if (academicStartDate && expectedGraduationDate && expectedGraduationDate < academicStartDate) {
+    throw badRequest('INVALID_ACADEMIC_DATE_WINDOW', correlationId, 'expectedGraduationDate');
+  }
+}
+
+async function validateStudentUnitScope(
+  db: PersistenceDb,
+  institutionId: string,
+  input: { readonly departmentUnitId?: string | null; readonly programUnitId?: string | null; readonly batchUnitId?: string | null; readonly sectionUnitId?: string | null },
+  correlationId: string,
+): Promise<void> {
+  const checks: readonly { readonly field: 'departmentUnitId' | 'programUnitId' | 'batchUnitId' | 'sectionUnitId'; readonly kind: UnitKind }[] = [
+    { field: 'departmentUnitId', kind: 'DEPARTMENT' },
+    { field: 'programUnitId', kind: 'PROGRAM' },
+    { field: 'batchUnitId', kind: 'BATCH' },
+    { field: 'sectionUnitId', kind: 'SECTION' },
+  ];
+  for (const check of checks) {
+    const value = input[check.field];
+    if (!value) continue;
+    const found = await db.execute(sql`
+      SELECT id
+      FROM institution_units
+      WHERE id=${value}::uuid AND institution_id=${institutionId}::uuid AND kind=${check.kind}
+      LIMIT 1
+    `) as QueryResult<{ id: string }>;
+    if (!found.rows[0]) throw badRequest('INVALID_ACADEMIC_UNIT_SCOPE', correlationId, check.field);
+  }
 }
 
 function requireUuid(value: string, correlationId: string): string {

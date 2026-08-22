@@ -5,6 +5,20 @@ export type ApiHealth = 'checking' | 'online' | 'offline';
 const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL;
 export const apiBaseUrl = resolveApiBaseUrl(configuredBaseUrl, import.meta.env.DEV);
 
+export class ApiRequestError extends Error {
+  readonly status: number;
+  readonly correlationId: string;
+  readonly code?: string;
+
+  constructor(input: { readonly status: number; readonly correlationId: string; readonly code?: string }) {
+    super(`API request failed with status ${input.status}`);
+    this.name = 'ApiRequestError';
+    this.status = input.status;
+    this.correlationId = input.correlationId;
+    if (input.code) this.code = input.code;
+  }
+}
+
 export function resolveApiBaseUrl(configured: string | undefined, development: boolean): string {
   const value = configured?.trim();
   if (!value) return development ? 'http://127.0.0.1:3000' : '';
@@ -248,7 +262,8 @@ async function requestJson<T>(path: string, input: {
   readonly token?: string; readonly method?: 'GET' | 'POST' | 'PATCH'; readonly body?: unknown;
   readonly idempotencyKey?: string; readonly signal?: AbortSignal;
 } = {}): Promise<T> {
-  const headers: Record<string, string> = { Accept: 'application/json', 'X-Correlation-Id': crypto.randomUUID() };
+  const correlationId = crypto.randomUUID();
+  const headers: Record<string, string> = { Accept: 'application/json', 'X-Correlation-Id': correlationId };
   if (input.token) headers.Authorization = `Bearer ${input.token}`;
   if (input.body !== undefined) headers['Content-Type'] = 'application/json';
   if (input.idempotencyKey) headers['Idempotency-Key'] = input.idempotencyKey;
@@ -256,6 +271,13 @@ async function requestJson<T>(path: string, input: {
     method: input.method ?? 'GET', headers, ...(input.body !== undefined ? { body: JSON.stringify(input.body) } : {}),
     ...(input.signal ? { signal: input.signal } : {}),
   });
-  if (!response.ok) throw new Error(`API request failed with status ${response.status}`);
+  if (!response.ok) {
+    const body = await response.json().catch(() => null) as { readonly message?: { readonly code?: string; readonly correlationId?: string } } | null;
+    throw new ApiRequestError({
+      status: response.status,
+      correlationId: body?.message?.correlationId ?? response.headers.get('x-correlation-id') ?? correlationId,
+      ...(body?.message?.code ? { code: body.message.code } : {}),
+    });
+  }
   return response.json() as Promise<T>;
 }

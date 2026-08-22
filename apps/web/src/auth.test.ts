@@ -262,6 +262,57 @@ describe('Cognito Hosted UI browser authentication', () => {
     expect(screen.getAllByText('DEMO PREVIEW').length).toBeGreaterThan(0);
   });
 
+  it('routes Operations Admin to operations without a Student fallback', async () => {
+    vi.stubEnv('VITE_COGNITO_DOMAIN', 'https://uat-auth.example.test');
+    vi.stubEnv('VITE_COGNITO_CLIENT_ID', 'uat-client');
+    vi.stubEnv('VITE_COGNITO_REDIRECT_URI', 'http://127.0.0.1:5173/auth/callback');
+    window.sessionStorage.setItem('planthepath.oauthState', 'state-123');
+    window.sessionStorage.setItem('planthepath.oauthVerifier', 'verifier-12345678901234567890');
+    window.history.pushState(null, '', '/auth/callback?code=code-123&state=state-123');
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url === 'https://uat-auth.example.test/oauth2/token') return { ok: true, json: async () => ({ access_token: 'operations-token', id_token: jwtWithEmail('operations.admin@uat.example.test') }) };
+      if (url.endsWith('/health')) return { ok: true };
+      if (url.endsWith('/api/v1/security/context')) return { ok: true, json: async () => ({
+        userId: 'operations-user',
+        memberships: [{ organizationId: 'operations-org', role: 'OPERATIONS_ADMIN', scope: {} }],
+        studentRelationships: [],
+      }) };
+      return { ok: false };
+    }));
+    const { App } = await import('./App.js');
+    render(React.createElement(App));
+    await waitFor(() => expect(window.location.pathname).toBe('/operations/admin'));
+    expect(screen.getByText('OPERATIONS_ADMIN')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Student Dashboard' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Rahul Kumar')).not.toBeInTheDocument();
+  });
+
+  it('shows a safe correlation reference when security context is rejected', async () => {
+    vi.stubEnv('VITE_COGNITO_DOMAIN', 'https://uat-auth.example.test');
+    vi.stubEnv('VITE_COGNITO_CLIENT_ID', 'uat-client');
+    vi.stubEnv('VITE_COGNITO_REDIRECT_URI', 'http://127.0.0.1:5173/auth/callback');
+    window.sessionStorage.setItem('planthepath.oauthState', 'state-123');
+    window.sessionStorage.setItem('planthepath.oauthVerifier', 'verifier-12345678901234567890');
+    window.history.pushState(null, '', '/auth/callback?code=code-123&state=state-123');
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url === 'https://uat-auth.example.test/oauth2/token') return { ok: true, json: async () => ({ access_token: 'rejected-token', id_token: jwtWithEmail('unmapped@uat.example.test') }) };
+      if (url.endsWith('/health')) return { ok: true };
+      if (url.endsWith('/api/v1/security/context')) return {
+        ok: false,
+        status: 403,
+        headers: new Headers(),
+        json: async () => ({ message: { code: 'FORBIDDEN', correlationId: 'ctx-ref-123456' } }),
+      };
+      return { ok: false };
+    }));
+    const { App } = await import('./App.js');
+    render(React.createElement(App));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('We could not load your ONE workspace. Reference: ctx-ref-123456'));
+    expect(screen.queryByRole('heading', { name: 'Student Dashboard' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Rahul Kumar')).not.toBeInTheDocument();
+    expect(screen.queryByText('ONE could not resolve an active workspace for this identity.')).not.toBeInTheDocument();
+  });
+
   it('signs out through Cognito logout, returns to /login, and clears transient auth state', async () => {
     vi.stubEnv('VITE_COGNITO_DOMAIN', 'https://uat-auth.example.test');
     vi.stubEnv('VITE_COGNITO_CLIENT_ID', 'uat-client');

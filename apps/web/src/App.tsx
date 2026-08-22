@@ -1,7 +1,7 @@
 import { Bell, BookOpen, BriefcaseBusiness, Building2, CalendarDays, ChevronDown, ClipboardCheck, FileText, Gauge, GraduationCap, Home, LayoutDashboard, Menu, MessageSquare, Search, Settings, ShieldCheck, Sparkles, Target, Trophy, UserRound, X, type LucideIcon } from 'lucide-react';
 import type { FormEvent } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { acceptInvitation, getApiHealth, getSecurityContext, getCurrentStudent, type ApiHealth, type CurrentStudentDto, type SecurityContextDto } from './api.js';
+import { acceptInvitation, ApiRequestError, getApiHealth, getSecurityContext, getCurrentStudent, type ApiHealth, type CurrentStudentDto, type SecurityContextDto } from './api.js';
 import { beginHostedLogin, completeHostedLoginFromLocation, getAccessToken, getAuthStatus, getAuthDebugStatus, hasStoredAuthSession, restoreAuthenticatedSession, signInWithPassword, signOut, type AuthStatus } from './auth.js';
 import { AuthControls } from './authControls.js';
 import { PageHeader, type PageMeta } from './studentComponents.js';
@@ -84,7 +84,13 @@ type AuthorizedWorkspace = PortalChoice & {
 type WorkspaceResolution =
   | { readonly state: 'loading' }
   | { readonly state: 'resolved'; readonly choices: readonly AuthorizedWorkspace[] }
-  | { readonly state: 'error'; readonly message: string };
+  | { readonly state: 'error'; readonly message: string; readonly correlationId?: string; readonly reason: WorkspaceResolutionFailureReason };
+type WorkspaceResolutionFailureReason =
+  | 'TOKEN_REJECTED'
+  | 'IDENTITY_NOT_MAPPED'
+  | 'NO_ACTIVE_MEMBERSHIP'
+  | 'NO_ACTIVE_STUDENT_RELATIONSHIP'
+  | 'CONTEXT_REQUEST_FAILED';
 type CurrentStudentState =
   | { readonly state: 'idle' | 'loading' }
   | { readonly state: 'resolved'; readonly student: CurrentStudentDto }
@@ -135,7 +141,11 @@ export function App(): React.ReactElement {
     }
     const token = getAccessToken();
     if (!token) {
-      setWorkspaceResolution({ state: 'error', message: 'No protected access token is available for workspace resolution.' });
+      setWorkspaceResolution({
+        state: 'error',
+        reason: 'TOKEN_REJECTED',
+        message: 'We could not load your ONE workspace. Please sign in again.',
+      });
       return;
     }
     const controller = new AbortController();
@@ -149,7 +159,7 @@ export function App(): React.ReactElement {
           setPath(currentPath());
         }
       })
-      .catch(() => setWorkspaceResolution({ state: 'error', message: 'ONE could not resolve an active workspace for this identity.' }));
+      .catch((error: unknown) => setWorkspaceResolution(workspaceResolutionFailureFromError(error)));
     return () => controller.abort();
   }, [authStatus]);
 
@@ -398,6 +408,25 @@ function resolveAuthorizedWorkspaces(context: SecurityContextDto): readonly Auth
     if (workspace) pushUnique(workspace);
   }
   return workspaces;
+}
+
+function workspaceResolutionFailureFromError(error: unknown): Extract<WorkspaceResolution, { readonly state: 'error' }> {
+  if (error instanceof ApiRequestError) {
+    if (error.status === 401) return workspaceError('TOKEN_REJECTED', error.correlationId);
+    if (error.status === 403) return workspaceError('IDENTITY_NOT_MAPPED', error.correlationId);
+    return workspaceError('CONTEXT_REQUEST_FAILED', error.correlationId);
+  }
+  if (error instanceof DOMException && error.name === 'AbortError') return workspaceError('CONTEXT_REQUEST_FAILED');
+  return workspaceError('CONTEXT_REQUEST_FAILED');
+}
+
+function workspaceError(reason: WorkspaceResolutionFailureReason, correlationId?: string): Extract<WorkspaceResolution, { readonly state: 'error' }> {
+  return {
+    state: 'error',
+    reason,
+    ...(correlationId ? { correlationId } : {}),
+    message: `We could not load your ONE workspace.${correlationId ? ` Reference: ${correlationId}` : ''}`,
+  };
 }
 
 function workspaceForMembership(membership: SecurityContextDto['memberships'][number]): AuthorizedWorkspace | null {

@@ -274,6 +274,9 @@ export function App(): React.ReactElement {
   }
 
   if (effectivePath.startsWith('/institution/placement-officer')) {
+    if (!demoPath && authenticated) {
+      return <AuthenticatedPlacementOfficerPage authStatus={authStatus} authNotice={authNotice} onSignIn={handleHostedSignIn} onSignOut={handleSignOut} />;
+    }
     return <PlacementOfficerPortal apiHealth={apiHealth} authStatus={authStatus} authNotice={authNotice} onSignIn={handleHostedSignIn} onSignOut={handleSignOut} showDevelopmentIndicators={showDevelopmentIndicators} />;
   }
 
@@ -505,6 +508,19 @@ function AccessDeniedPage({ requestedPath, authStatus, authNotice, message, onSi
       <span className="eyebrow">{productTagline}</span>
       <h1>You do not have access to this workspace</h1>
       <p>{message ?? `Your verified identity is not authorized for ${requestedPath}. ONE did not mount the requested portal UI.`}</p>
+      <AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />
+    </section>
+  </main>;
+}
+
+function AuthenticatedPlacementOfficerPage({ authStatus, authNotice, onSignIn, onSignOut }: { readonly authStatus: AuthStatus; readonly authNotice: string; readonly onSignIn: () => void; readonly onSignOut: () => void }): React.ReactElement {
+  useEffect(() => { document.title = `Placement Admin | ${productName}`; }, []);
+  return <main className="login-shell">
+    <section className="login-card">
+      <span className="eyebrow">Authenticated workspace</span>
+      <h1>Placement Admin</h1>
+      <p>This protected workspace is intentionally limited in Phase 2A. It does not mount the fictional placement preview, mutate placement records, or grant access through role selection.</p>
+      <p className="auth-boundary">Use Institution Admin for API-backed student roster, academic unit, and staff invitation workflows. Placement workflows remain NOT YET AVAILABLE until their backend ownership and consent rules are implemented.</p>
       <AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />
     </section>
   </main>;

@@ -28,27 +28,37 @@ Passwords and raw tokens remain outside Git.
 
 ## Institution Admin checks
 
-Use existing authenticated Institution APIs to verify:
+Use the authenticated Institution Admin UI to verify:
 
 - list/create/edit academic units;
-- add/edit students;
+- add/edit students with resolved institution unit IDs;
 - lifecycle transition with confirmation/effective state;
-- CSV roster preview and commit;
-- staff invitation using verified-recipient invitation lifecycle.
+- CSV roster preview and commit, including rejection of unknown or cross-institution unit names;
+- staff invitation using verified-recipient invitation lifecycle;
+- staff invitation/membership inventory is visible without raw invitation tokens;
+- revoke/resend/end-staff-membership actions remain explicitly not yet available.
 
 ## Operations checks
 
-Use existing authenticated Operations APIs to verify:
+Use the authenticated Operations UI to verify:
 
-- organization create/edit;
+- organization search/filter/create/edit;
 - verification transition with reason;
 - initial admin invitation;
 - organization detail activity/audit;
-- onboarding status.
+- onboarding status;
+- read-only Users & Access identity/membership inventory;
+- read-only invitation delivery inventory;
+- read-only Content Operations and Technical Operations status.
+
+## Non-admin reality checks
+
+- Authenticated Faculty and Department Head routes show read-only/limited states only.
+- Authenticated Recruiter routes show the hiring workflow as not yet available, without fake applicant mutations.
+- Authenticated Placement Admin routes do not mount the session-local placement preview; fictional placement previews remain under `/demo` only.
 
 ## Known Phase 2A limitations
 
 - Binary document upload is intentionally not implemented until secure object storage is approved.
 - Full Employer hiring workflow is Phase 2B.
 - Full content authoring/review CMS is Phase 2C.
-

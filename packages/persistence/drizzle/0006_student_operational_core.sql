@@ -54,3 +54,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS student_saved_opportunities_active_ref_uq
   ON student_saved_opportunities(student_user_id, lower(opportunity_ref))
   WHERE archived_at IS NULL;
 CREATE INDEX IF NOT EXISTS student_saved_opportunities_student_idx ON student_saved_opportunities(student_user_id, archived_at, updated_at DESC);
+
+ALTER TABLE student_roster_import_rows
+  ADD COLUMN IF NOT EXISTS department_unit_id uuid REFERENCES institution_units(id),
+  ADD COLUMN IF NOT EXISTS program_unit_id uuid REFERENCES institution_units(id),
+  ADD COLUMN IF NOT EXISTS batch_unit_id uuid REFERENCES institution_units(id),
+  ADD COLUMN IF NOT EXISTS section_unit_id uuid REFERENCES institution_units(id);

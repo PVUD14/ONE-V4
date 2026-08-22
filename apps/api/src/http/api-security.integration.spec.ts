@@ -682,6 +682,14 @@ describe('Phase 1 API protected request path', () => {
       .send({ email: 'faculty@example.test', role: 'FACULTY_LECTURER' })
       .expect(201);
     expect(invite.body.invitation).toMatchObject({ email: 'faculty@example.test', role: 'FACULTY_LECTURER', tokenPreviewAvailable: false });
+    const staffInventory = await request(app.getHttpServer())
+      .get(`/api/v1/institutions/${institutionId}/staff-role-assignments`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(staffInventory.body.staff.invitations).toHaveLength(1);
+    expect(staffInventory.body.staff.invitations[0]).toMatchObject({ email: 'faculty@example.test', role: 'FACULTY_LECTURER', state: 'PENDING' });
+    expect(JSON.stringify(staffInventory.body)).not.toContain('token');
+    expect(JSON.stringify(staffInventory.body)).not.toContain('token_hash');
     await expect(db.select().from(schema.organizationMemberships).where(eq(schema.organizationMemberships.userId, targetUserId))).resolves.toHaveLength(0);
     const rawToken = new URL(deliveredInvitations[0]!.textBody.match(/https?:\/\/\S+/)?.[0] ?? '').searchParams.get('token')!;
     await request(app.getHttpServer())
@@ -691,6 +699,25 @@ describe('Phase 1 API protected request path', () => {
       .send({ token: rawToken })
       .expect(201);
     await expect(db.select().from(schema.organizationMemberships).where(eq(schema.organizationMemberships.userId, targetUserId))).resolves.toHaveLength(1);
+
+    const platformId = await seedOrg('PLATFORM', 'ONE Platform');
+    const opsUserId = await seedUser('ops-governance@example.test', 'sub:ops-governance');
+    await seedMembership(opsUserId, platformId, 'OPERATIONS_ADMIN');
+    const opsToken = signAccessToken(privateKey, { sub: 'sub:ops-governance', email: 'ops-governance@example.test' });
+    const usersAccess = await request(app.getHttpServer())
+      .get('/api/v1/operations/users-access?q=faculty@example.test')
+      .set('Authorization', `Bearer ${opsToken}`)
+      .expect(200);
+    expect(usersAccess.body.users[0]).toMatchObject({ email: 'faculty@example.test', identityLinkStatus: 'LINKED' });
+    expect(usersAccess.body.users[0].memberships[0]).toMatchObject({ role: 'FACULTY_LECTURER', state: 'ACTIVE', organizationId: institutionId });
+    const invitations = await request(app.getHttpServer())
+      .get('/api/v1/operations/invitations?q=faculty@example.test')
+      .set('Authorization', `Bearer ${opsToken}`)
+      .expect(200);
+    expect(invitations.body.invitations[0]).toMatchObject({ recipientEmail: 'faculty@example.test', role: 'FACULTY_LECTURER' });
+    const governanceJson = JSON.stringify({ usersAccess: usersAccess.body, invitations: invitations.body });
+    expect(governanceJson).not.toContain(rawToken);
+    expect(governanceJson).not.toContain('token_hash');
   });
 
   it('persists Student-owned profile, document metadata and saved opportunities only for the verified principal', async () => {
@@ -784,38 +811,69 @@ describe('Phase 1 API protected request path', () => {
 
   it('validates and commits roster CSV without raw preview mutation', async () => {
     const institutionId = await seedOrg('INSTITUTION', 'Import College');
+    const otherInstitutionId = await seedOrg('INSTITUTION', 'Other Import College');
     const adminUserId = await seedUser('import-admin@example.test', 'sub:import-admin');
     await seedMembership(adminUserId, institutionId, 'INSTITUTION_ADMIN');
+    const departmentId = randomUUID();
+    const programId = randomUUID();
+    const batchId = randomUUID();
+    const sectionId = randomUUID();
     await db.insert(schema.institutionUnits).values([
-      { id: randomUUID(), institutionId, kind: 'DEPARTMENT', name: 'CSE' },
-      { id: randomUUID(), institutionId, kind: 'PROGRAM', name: 'BTech' },
-      { id: randomUUID(), institutionId, kind: 'BATCH', name: '2026' },
-      { id: randomUUID(), institutionId, kind: 'SECTION', name: 'A' },
+      { id: departmentId, institutionId, kind: 'DEPARTMENT', name: 'CSE' },
+      { id: programId, institutionId, kind: 'PROGRAM', name: 'BTech' },
+      { id: batchId, institutionId, kind: 'BATCH', name: '2026' },
+      { id: sectionId, institutionId, kind: 'SECTION', name: 'A' },
+      { id: randomUUID(), institutionId: otherInstitutionId, kind: 'DEPARTMENT', name: 'ECE' },
     ]);
     const token = signAccessToken(privateKey, { sub: 'sub:import-admin', email: 'import-admin@example.test' });
     await seedUser('existing-import@example.test', 'sub:existing-import');
+    await db.insert(schema.institutionStudentProfiles).values({
+      id: randomUUID(),
+      institutionId,
+      studentUserId: await seedUser('existing-id@example.test', 'sub:existing-id'),
+      institutionStudentId: 'S-EXISTS',
+      fullName: 'Existing Id',
+      status: 'ACTIVE',
+    });
 
     const preview = await request(app.getHttpServer())
       .post(`/api/v1/institutions/${institutionId}/student-imports`)
       .set('Authorization', `Bearer ${token}`)
       .send({
         filename: 'students.csv',
-        csv: 'institution_student_id,full_name,email,department,program,batch,section\nS2001,Rohan Teststudent,rohan.student@example.test,CSE,BTech,2026,A\nS2002,Formula Guard,formula@example.test,=CMD,BTech,2026,A\nS2003,Existing Email,existing-import@example.test,CSE,BTech,2026,A',
+        csv: [
+          'institution_student_id,full_name,email,department,program,batch,section',
+          'S2001,Rohan Teststudent,rohan.student@example.test,CSE,BTech,2026,A',
+          'S2002,Formula Guard,formula@example.test,=CMD,BTech,2026,A',
+          'S2003,Existing Email,existing-import@example.test,CSE,BTech,2026,A',
+          'S2004,Bad Email,not-an-email,CSE,BTech,2026,A',
+          'S2004,Duplicate In File,duplicate-file@example.test,CSE,BTech,2026,A',
+          'S-EXISTS,Duplicate Existing,dup-existing@example.test,CSE,BTech,2026,A',
+          'S2005,Cross Institution,cross-unit@example.test,ECE,BTech,2026,A',
+        ].join('\n'),
       })
       .expect(201);
 
     expect(preview.body.import.acceptedCount).toBe(1);
-    expect(preview.body.import.rejectedCount).toBe(2);
+    expect(preview.body.import.rejectedCount).toBe(6);
+    expect(preview.body.import.rows[0]).toMatchObject({ departmentUnitId: departmentId, programUnitId: programId, batchUnitId: batchId, sectionUnitId: sectionId });
     expect(preview.body.import.rows[1].issues).toContain('unknown_department');
     expect(preview.body.import.rows[2].issues).toContain('email_already_exists');
+    expect(preview.body.import.rows[3].issues).toContain('malformed_email');
+    expect(preview.body.import.rows[4].issues).toContain('duplicate_student_id_in_file');
+    expect(preview.body.import.rows[5].issues).toContain('student_id_already_exists');
+    expect(preview.body.import.rows[6].issues).toContain('unknown_department');
     const importId = preview.body.import.id as string;
     await request(app.getHttpServer())
       .post(`/api/v1/institutions/${institutionId}/student-imports/${importId}/commit`)
       .set('Authorization', `Bearer ${token}`)
       .expect(201);
 
-    const profiles = await pool.query('SELECT count(*)::int AS count FROM institution_student_profiles WHERE institution_id=$1', [institutionId]);
-    expect(profiles.rows[0].count).toBe(1);
+    const profiles = await pool.query('SELECT institution_student_id, department_unit_id, program_unit_id, batch_unit_id, section_unit_id FROM institution_student_profiles WHERE institution_id=$1 ORDER BY institution_student_id', [institutionId]);
+    expect(profiles.rows).toEqual([
+      expect.objectContaining({ institution_student_id: 'S-EXISTS' }),
+      expect.objectContaining({ institution_student_id: 'S2001', department_unit_id: departmentId, program_unit_id: programId, batch_unit_id: batchId, section_unit_id: sectionId }),
+    ]);
   });
 });
 

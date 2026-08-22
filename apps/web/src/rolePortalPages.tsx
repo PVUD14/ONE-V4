@@ -8,21 +8,29 @@ import {
   createInstitutionUnit,
   createOperationsOrganization,
   endInstitutionStudentRelationship,
+  getOperationsOrganizationOnboardingStatus,
   getProtectedAccessToken,
   getSecurityContext,
   inviteInstitutionStaff,
   inviteInitialOrganizationAdmin,
+  listInstitutionStaff,
   listInstitutionStudents,
   listInstitutionUnits,
+  listOperationsInvitations,
   listOperationsOrganizations,
+  listOperationsUsersAccess,
   previewStudentRosterImport,
   transitionOrganizationVerification,
+  updateInstitutionUnit,
   updateInstitutionStudent,
   updateOperationsOrganization,
   type ApiHealth,
+  type InstitutionStaffDto,
   type InstitutionStudentDto,
   type InstitutionUnitDto,
   type OrganizationManagementDto,
+  type OperationsInvitationDto,
+  type OperationsUserAccessDto,
   type RosterImportPreviewDto,
 } from './api.js';
 import { portalFamilyIcons, rolePortals, type RoleFixture, type RoleNavItem, type RolePortalConfig } from './rolePortalConfig.js';
@@ -108,7 +116,7 @@ function RolePortalInner({ portal, apiHealth, authStatus, authNotice, showDevelo
         <main id="role-main" className="role-main">
           {demoMode ? <section className="demo-boundary" role="note"><strong>DEMO PREVIEW</strong><span>Fictional data. This route is not authenticated and does not authorize a user.</span></section> : null}
           <PortalModeNotice portal={portal} notice={topbarNotice} demoMode={demoMode} authenticatedWorkspace={authenticatedWorkspace} />
-          {!demoMode && activeRoute?.path === portal.basePath ? <AuthenticatedRoleSurface portal={portal} routeLabel={activeRoute?.label ?? 'Dashboard'} onNavigate={navigate} /> : activeRoute?.path === portal.basePath ? <RoleDashboard portal={portal} onNavigate={navigate} /> : <RoleModulePage portal={portal} route={activeRoute ?? portal.nav[0]!} />}
+          {!demoMode && activeRoute?.path === portal.basePath ? <AuthenticatedRoleSurface portal={portal} routeLabel={activeRoute?.label ?? 'Dashboard'} onNavigate={navigate} /> : activeRoute?.path === portal.basePath ? <RoleDashboard portal={portal} onNavigate={navigate} /> : <RoleModulePage portal={portal} route={activeRoute ?? portal.nav[0]!} demoMode={demoMode} />}
         </main>
       </div>
     </div>
@@ -186,18 +194,30 @@ function RoleDashboard({ portal, onNavigate }: { readonly portal: RolePortalConf
   );
 }
 
-function RoleModulePage({ portal, route }: { readonly portal: RolePortalConfig; readonly route: RoleNavItem }): React.ReactElement {
+function RoleModulePage({ portal, route, demoMode }: { readonly portal: RolePortalConfig; readonly route: RoleNavItem; readonly demoMode: boolean }): React.ReactElement {
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState<readonly string[]>([]);
   const [detail, setDetail] = useState<RoleFixture | null>(null);
   const [editing, setEditing] = useState<RoleFixture | null>(null);
   const openerRef = useRef<HTMLElement | null>(null);
   const dense = isDenseManagementRoute(portal, route);
-  if (portal.key === 'operations-admin' && route.label === 'Organizations') return <OperationsOrganizationsPage portal={portal} />;
-  if (portal.key === 'institution-admin' && route.label === 'Students') return <InstitutionStudentsPage portal={portal} />;
-  if (portal.key === 'institution-admin' && route.label === 'Academic Structure') return <InstitutionAcademicStructurePage portal={portal} />;
-  if (portal.key === 'institution-admin' && route.label === 'Staff') return <InstitutionStaffPage portal={portal} />;
-  if (portal.key === 'recruiter') return <EmployerRecruiterRealityPage portal={portal} routeLabel={route.label} />;
+  if (!demoMode && portal.key === 'operations-admin' && route.label === 'Organizations') return <OperationsOrganizationsPage portal={portal} />;
+  if (!demoMode && portal.key === 'operations-admin' && route.label === 'Organization Detail') return <OperationsOrganizationsPage portal={portal} />;
+  if (!demoMode && portal.key === 'operations-admin' && route.label === 'Users') return <OperationsUsersAccessPage />;
+  if (!demoMode && portal.key === 'operations-admin' && route.label === 'User Detail') return <OperationsUsersAccessPage />;
+  if (!demoMode && portal.key === 'operations-admin' && route.label === 'Content Management') return <OperationsContentReadOnlyPage />;
+  if (!demoMode && portal.key === 'operations-admin' && /system health|audit logs|security|ai operations/i.test(route.label)) return <OperationsTechnicalReadOnlyPage routeLabel={route.label} />;
+  if (!demoMode && portal.key === 'operations-admin' && /verification/i.test(route.label)) return <OperationsOrganizationsPage portal={portal} />;
+  if (!demoMode && portal.key === 'operations-admin' && /trust and safety|subscriptions|billing|analytics|feature flags|support|settings/i.test(route.label)) return <AuthenticatedNotYetAvailable title={route.label} detail="This Operations module is not yet backed by a Phase 2A persistent workflow." />;
+  if (!demoMode && portal.key === 'institution-admin' && route.label === 'Students') return <InstitutionStudentsPage portal={portal} />;
+  if (!demoMode && portal.key === 'institution-admin' && route.label === 'Student Detail') return <InstitutionStudentsPage portal={portal} />;
+  if (!demoMode && portal.key === 'institution-admin' && route.label === 'Academic Structure') return <InstitutionAcademicStructurePage portal={portal} />;
+  if (!demoMode && portal.key === 'institution-admin' && route.label === 'Staff') return <InstitutionStaffPage portal={portal} />;
+  if (!demoMode && portal.key === 'institution-admin' && /career readiness|placement|reports/i.test(route.label)) return <AuthenticatedReadOnlyModule title={route.label} detail="Institution reports and readiness information are read-only in Phase 2A unless a dedicated persistent mutation is available." />;
+  if (!demoMode && portal.key === 'institution-admin' && /settings/i.test(route.label)) return <AuthenticatedNotYetAvailable title={route.label} detail="Institution settings mutation is not yet available in this UAT slice." />;
+  if (!demoMode && portal.key === 'recruiter') return <EmployerRecruiterRealityPage portal={portal} routeLabel={route.label} />;
+  if (!demoMode && ['faculty', 'department-head'].includes(portal.key)) return <AuthenticatedReadOnlyModule title={route.label} detail="This authenticated staff role can view authorized context only in Phase 2A. Assessment, task, resource, workload, intervention, and meeting mutations are disabled until persistent APIs exist." />;
+  if (!demoMode) return <AuthenticatedNotYetAvailable title={route.label} detail="This authenticated module has no approved persistent Phase 2A workflow yet." />;
   const categories = [...new Set(portal.records.map((record) => record.category))];
   const records = portal.records.filter((record) => {
     const filterMatch = filters.length === 0 || filters.includes(record.category) || filters.includes(record.status);
@@ -230,12 +250,13 @@ function OperationsOrganizationsPage({ portal }: { readonly portal: RolePortalCo
   const [organizations, setOrganizations] = useState<readonly OrganizationManagementDto[]>([]);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
+  const [filters, setFilters] = useState({ q: '', kind: '', verification: '' });
   const [form, setForm] = useState({ kind: 'INSTITUTION', legalName: '', displayName: '', countryCode: 'IN', city: '', adminEmail: '' });
   const load = useMemo(() => async (signal?: AbortSignal) => {
     if (!token) return;
-    const result = await listOperationsOrganizations(token, signal);
+    const result = await listOperationsOrganizations(token, filters, signal);
     setOrganizations(result.organizations);
-  }, [token]);
+  }, [filters, token]);
   useEffect(() => {
     const controller = new AbortController();
     load(controller.signal).catch(() => setError('Unable to load organizations for this Operations identity.'));
@@ -278,6 +299,14 @@ function OperationsOrganizationsPage({ portal }: { readonly portal: RolePortalCo
       setError('Initial administrator invitation failed.');
     }
   }
+  async function onboarding(id: string): Promise<void> {
+    try {
+      const result = await getOperationsOrganizationOnboardingStatus(token!, id);
+      setNotice(`Onboarding status: ${JSON.stringify(result.status)}`);
+    } catch {
+      setError('Onboarding status could not be loaded.');
+    }
+  }
   async function edit(org: OrganizationManagementDto): Promise<void> {
     const legalName = window.prompt('Legal name', org.legalName);
     if (!legalName) return;
@@ -293,9 +322,10 @@ function OperationsOrganizationsPage({ portal }: { readonly portal: RolePortalCo
   return <section className="role-module role-module--dense">
     <div className="role-page-heading"><div><span className="eyebrow">Authenticated API-backed</span><h1>Organizations</h1><p>Manage platform organization onboarding. Operations can create, verify, suspend and invite initial administrators, but cannot manage students here.</p></div></div>
     <section className="role-kpi-grid" aria-label="Organization lifecycle summary"><article className="role-card role-kpi"><span>Total</span><strong>{organizations.length}</strong><p>Institutions and employers</p></article><article className="role-card role-kpi"><span>Pending / Review</span><strong>{pending}</strong><p>Need Operations action</p></article><article className="role-card role-kpi"><span>Verified</span><strong>{verified}</strong><p>Approved organizations</p></article><article className="role-card role-kpi"><span>Suspended</span><strong>{suspended}</strong><p>No student controls exposed</p></article></section>
+    <section className="role-card role-wide"><h2>Search and filters</h2><div className="role-management-form"><label><span>Search</span><input value={filters.q} onChange={(event) => setFilters((value) => ({ ...value, q: event.target.value }))} placeholder="Legal/display name" /></label><label><span>Type</span><select value={filters.kind} onChange={(event) => setFilters((value) => ({ ...value, kind: event.target.value }))}><option value="">All</option><option>INSTITUTION</option><option>EMPLOYER</option></select></label><label><span>Verification</span><select value={filters.verification} onChange={(event) => setFilters((value) => ({ ...value, verification: event.target.value }))}><option value="">All</option><option>PENDING</option><option>UNDER_REVIEW</option><option>VERIFIED</option><option>REJECTED</option><option>SUSPENDED</option></select></label></div></section>
     <form className="role-card role-wide role-management-form" onSubmit={(event) => void create(event)}><h2>Add Organization</h2><label><span>Type *</span><select value={form.kind} onChange={(event) => setForm((value) => ({ ...value, kind: event.target.value }))}><option value="INSTITUTION">Institution</option><option value="EMPLOYER">Employer</option></select></label><label><span>Legal Name *</span><input value={form.legalName} onChange={(event) => setForm((value) => ({ ...value, legalName: event.target.value }))} required /></label><label><span>Display Name</span><input value={form.displayName} onChange={(event) => setForm((value) => ({ ...value, displayName: event.target.value }))} /></label><label><span>Country *</span><input value={form.countryCode} onChange={(event) => setForm((value) => ({ ...value, countryCode: event.target.value.toUpperCase() }))} maxLength={2} required /></label><label><span>City</span><input value={form.city} onChange={(event) => setForm((value) => ({ ...value, city: event.target.value }))} /></label><label><span>Primary Admin Email</span><input type="email" value={form.adminEmail} onChange={(event) => setForm((value) => ({ ...value, adminEmail: event.target.value }))} /></label><button type="submit">Create organization</button></form>
     {notice ? <p className="role-api-success" role="status">{notice}</p> : null}{error ? <p className="form-error" role="alert">{error}</p> : null}
-    <div className="role-record-table-wrap"><table className="role-record-table"><caption className="sr-only">{portal.roleName} real organizations</caption><thead><tr><th>Organization</th><th>Kind</th><th>Location</th><th>Verification</th><th>Initial Admin</th><th>Updated</th><th>Actions</th></tr></thead><tbody>{organizations.map((org) => <tr key={org.id} className="role-record-row"><th scope="row"><strong>{org.profile.displayName || org.legalName}</strong><span>{org.legalName}</span></th><td>{org.kind}</td><td>{[org.profile.city, org.profile.countryCode].filter(Boolean).join(', ') || 'Not set'}</td><td><StatusBadge label={org.verificationState} tone="info" /></td><td>{org.initialAdminInvitation?.email ?? 'Not invited'}</td><td>{new Date(org.updatedAt).toLocaleDateString()}</td><td><div className="role-record-actions"><button type="button" className="secondary" onClick={() => void edit(org)}>Edit details</button>{org.verificationState === 'PENDING' ? <button type="button" onClick={() => void transition(org.id, 'UNDER_REVIEW')}>Begin review</button> : null}{org.verificationState === 'UNDER_REVIEW' ? <><button type="button" onClick={() => void transition(org.id, 'VERIFIED')}>Verify</button><button type="button" className="secondary" onClick={() => void transition(org.id, 'REJECTED')}>Reject</button></> : null}{org.verificationState === 'VERIFIED' ? <button type="button" className="secondary" onClick={() => void transition(org.id, 'SUSPENDED')}>Suspend</button> : null}<button type="button" className="secondary" onClick={() => void invite(org.id)}>Invite admin</button></div></td></tr>)}</tbody></table></div>
+    <div className="role-record-table-wrap"><table className="role-record-table"><caption className="sr-only">{portal.roleName} real organizations</caption><thead><tr><th>Organization</th><th>Kind</th><th>Location</th><th>Contact</th><th>Verification</th><th>Initial Admin</th><th>Updated</th><th>Actions</th></tr></thead><tbody>{organizations.map((org) => <tr key={org.id} className="role-record-row"><th scope="row"><strong>{org.profile.displayName || org.legalName}</strong><span>{org.legalName}</span><small>{org.profile.websiteUrl ?? 'No website'}</small></th><td>{org.kind}</td><td>{[org.profile.city, org.profile.stateOrProvince, org.profile.countryCode, org.profile.postalCode].filter(Boolean).join(', ') || 'Not set'}</td><td>{org.profile.primaryContactEmail ?? 'Not set'}</td><td><StatusBadge label={org.verificationState} tone="info" /></td><td>{org.initialAdminInvitation?.email ?? 'Not invited'}</td><td>{new Date(org.updatedAt).toLocaleDateString()}</td><td><div className="role-record-actions"><button type="button" className="secondary" onClick={() => void edit(org)}>Edit details</button><button type="button" className="secondary" onClick={() => void onboarding(org.id)}>Onboarding</button>{org.verificationState === 'PENDING' ? <button type="button" onClick={() => void transition(org.id, 'UNDER_REVIEW')}>Begin review</button> : null}{org.verificationState === 'UNDER_REVIEW' ? <><button type="button" onClick={() => void transition(org.id, 'VERIFIED')}>Verify</button><button type="button" className="secondary" onClick={() => void transition(org.id, 'REJECTED')}>Reject</button></> : null}{org.verificationState === 'VERIFIED' ? <button type="button" className="secondary" onClick={() => void transition(org.id, 'SUSPENDED')}>Suspend</button> : null}<button type="button" className="secondary" onClick={() => void invite(org.id)}>Invite admin</button></div></td></tr>)}</tbody></table></div>
     <section className="role-card role-wide"><h2>Operations boundary</h2><p>Student add/import/transfer controls are intentionally absent from Operations. Those workflows belong to Institution Administration.</p></section>
   </section>;
 }
@@ -304,10 +334,12 @@ function InstitutionStudentsPage({ portal }: { readonly portal: RolePortalConfig
   const token = getProtectedAccessToken();
   const [institutionId, setInstitutionId] = useState('');
   const [students, setStudents] = useState<readonly InstitutionStudentDto[]>([]);
+  const [units, setUnits] = useState<readonly InstitutionUnitDto[]>([]);
   const [preview, setPreview] = useState<RosterImportPreviewDto | null>(null);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
-  const [form, setForm] = useState({ fullName: '', institutionStudentId: '', email: '' });
+  const [query, setQuery] = useState('');
+  const [form, setForm] = useState({ fullName: '', institutionStudentId: '', email: '', departmentUnitId: '', programUnitId: '', batchUnitId: '', sectionUnitId: '', academicStartDate: '', expectedGraduationDate: '' });
   const [csv, setCsv] = useState('institution_student_id,full_name,email,department,program,batch,section\n');
   useEffect(() => {
     if (!token) return;
@@ -321,16 +353,24 @@ function InstitutionStudentsPage({ portal }: { readonly portal: RolePortalConfig
   useEffect(() => {
     if (!token || !institutionId) return;
     const controller = new AbortController();
-    listInstitutionStudents(token, institutionId, controller.signal).then((result) => setStudents(result.students)).catch(() => setError('Unable to load institution students.'));
+    Promise.all([
+      listInstitutionStudents(token, institutionId, controller.signal),
+      listInstitutionUnits(token, institutionId, controller.signal),
+    ]).then(([studentResult, unitResult]) => {
+      setStudents(studentResult.students);
+      setUnits(unitResult.units);
+    }).catch(() => setError('Unable to load institution students.'));
     return () => controller.abort();
   }, [token, institutionId, notice]);
   if (!token) return <RestrictedApiState title="Students" message="Sign in with an Institution Admin identity to manage students." />;
+  const filteredStudents = students.filter((student) => `${student.fullName} ${student.email} ${student.institutionStudentId}`.toLowerCase().includes(query.toLowerCase()));
+  const unitsByKind = (kind: string): readonly InstitutionUnitDto[] => units.filter((unit) => unit.kind === kind);
   async function addStudent(event: React.FormEvent): Promise<void> {
     event.preventDefault();
     setError('');
     try {
-      await addInstitutionStudent(token!, institutionId, { institutionStudentId: form.institutionStudentId, fullName: form.fullName, email: form.email });
-      setForm({ fullName: '', institutionStudentId: '', email: '' });
+      await addInstitutionStudent(token!, institutionId, { student: cleanStudentPayload(form) });
+      setForm({ fullName: '', institutionStudentId: '', email: '', departmentUnitId: '', programUnitId: '', batchUnitId: '', sectionUnitId: '', academicStartDate: '', expectedGraduationDate: '' });
       setNotice('Student added with institution relationship; global identity was not hard-deleted or bypassed.');
     } catch {
       setError('Add student failed. Check authorization and duplicate IDs.');
@@ -341,16 +381,19 @@ function InstitutionStudentsPage({ portal }: { readonly portal: RolePortalConfig
     if (!fullName || fullName.trim() === student.fullName) return;
     setError('');
     try {
-      await updateInstitutionStudent(token!, institutionId, student.id, { fullName: fullName.trim() });
+      await updateInstitutionStudent(token!, institutionId, student.id, { student: { fullName: fullName.trim() } });
       setNotice('Student institution data updated.');
     } catch {
       setError('Student update failed. Check authorization and institution scope.');
     }
   }
   async function relationship(studentId: string, state: string): Promise<void> {
+    const effectiveTo = window.prompt(`Confirm ${state}. Effective date/time (ISO or YYYY-MM-DD)`, new Date().toISOString());
+    if (!effectiveTo) return;
+    if (!window.confirm(`This will mark the current relationship ${state} effective ${effectiveTo}. Historical identity is retained. Continue?`)) return;
     setError('');
     try {
-      await endInstitutionStudentRelationship(token!, institutionId, studentId, state);
+      await endInstitutionStudentRelationship(token!, institutionId, studentId, state, effectiveTo);
       setNotice(`Student relationship marked ${state}.`);
     } catch {
       setError('Relationship update failed. Check current relationship state and institution scope.');
@@ -372,9 +415,10 @@ function InstitutionStudentsPage({ portal }: { readonly portal: RolePortalConfig
   }
   return <section className="role-module role-module--dense"><div className="role-page-heading"><div><span className="eyebrow">Authenticated API-backed</span><h1>Students</h1><p>Institution-owned roster and relationship lifecycle. This is not an Operations workflow.</p></div></div>
     {error ? <p className="form-error" role="alert">{error}</p> : null}{notice ? <p className="role-api-success" role="status">{notice}</p> : null}
-    <form className="role-card role-wide role-management-form" onSubmit={(event) => void addStudent(event)}><h2>Add Student</h2><label><span>Full name *</span><input value={form.fullName} onChange={(event) => setForm((value) => ({ ...value, fullName: event.target.value }))} required /></label><label><span>Institution ID *</span><input value={form.institutionStudentId} onChange={(event) => setForm((value) => ({ ...value, institutionStudentId: event.target.value }))} required /></label><label><span>Email *</span><input type="email" value={form.email} onChange={(event) => setForm((value) => ({ ...value, email: event.target.value }))} required /></label><button type="submit" disabled={!institutionId}>Add student</button></form>
-    <section className="role-card role-wide"><h2>Import Students</h2><textarea value={csv} onChange={(event) => setCsv(event.target.value)} rows={5} /><div className="role-record-actions"><button type="button" onClick={() => void previewImport()}>Validate CSV</button>{preview ? <button type="button" onClick={() => void commitImport()}>Commit {preview.acceptedCount} rows</button> : null}</div>{preview ? <p>{preview.acceptedCount} accepted, {preview.warningCount} warnings, {preview.rejectedCount} rejected.</p> : null}</section>
-    <div className="role-record-table-wrap"><table className="role-record-table"><caption className="sr-only">{portal.roleName} real students</caption><thead><tr><th>Student</th><th>Institution ID</th><th>Relationship</th><th>Invitation</th><th>Actions</th></tr></thead><tbody>{students.map((student) => <tr key={student.id} className="role-record-row"><th scope="row"><strong>{student.fullName}</strong><span>{student.email}</span></th><td>{student.institutionStudentId}</td><td>{student.relationship?.state ?? student.status}</td><td>{student.status}</td><td><div className="role-record-actions"><button type="button" className="secondary" onClick={() => void editStudent(student)}>Edit student</button><button type="button" onClick={() => void relationship(student.id, 'TRANSFERRED')}>Transfer</button><button type="button" onClick={() => void relationship(student.id, 'GRADUATED')}>Graduate</button><button type="button" className="secondary" onClick={() => void relationship(student.id, 'ENDED')}>End relationship</button></div></td></tr>)}</tbody></table></div>
+    <form className="role-card role-wide role-management-form" onSubmit={(event) => void addStudent(event)}><h2>Add Student</h2><label><span>Full name *</span><input value={form.fullName} onChange={(event) => setForm((value) => ({ ...value, fullName: event.target.value }))} required /></label><label><span>Institution ID *</span><input value={form.institutionStudentId} onChange={(event) => setForm((value) => ({ ...value, institutionStudentId: event.target.value }))} required /></label><label><span>Email *</span><input type="email" value={form.email} onChange={(event) => setForm((value) => ({ ...value, email: event.target.value }))} required /></label><UnitSelect label="Department" value={form.departmentUnitId} units={unitsByKind('DEPARTMENT')} onChange={(departmentUnitId) => setForm((value) => ({ ...value, departmentUnitId }))} /><UnitSelect label="Program" value={form.programUnitId} units={unitsByKind('PROGRAM')} onChange={(programUnitId) => setForm((value) => ({ ...value, programUnitId }))} /><UnitSelect label="Batch" value={form.batchUnitId} units={unitsByKind('BATCH')} onChange={(batchUnitId) => setForm((value) => ({ ...value, batchUnitId }))} /><UnitSelect label="Section" value={form.sectionUnitId} units={unitsByKind('SECTION')} onChange={(sectionUnitId) => setForm((value) => ({ ...value, sectionUnitId }))} /><label><span>Academic start date</span><input type="date" value={form.academicStartDate} onChange={(event) => setForm((value) => ({ ...value, academicStartDate: event.target.value }))} /></label><label><span>Expected graduation date</span><input type="date" value={form.expectedGraduationDate} onChange={(event) => setForm((value) => ({ ...value, expectedGraduationDate: event.target.value }))} /></label><button type="submit" disabled={!institutionId}>Add student</button></form>
+    <section className="role-card role-wide"><h2>Import Students</h2><p>CSV validates academic unit names, stores resolved institution unit IDs, and rejects unknown/cross-institution names.</p><textarea value={csv} onChange={(event) => setCsv(event.target.value)} rows={5} /><div className="role-record-actions"><button type="button" onClick={() => void previewImport()}>Validate CSV</button>{preview ? <button type="button" disabled={preview.rejectedCount > 0} onClick={() => void commitImport()}>Commit {preview.acceptedCount} rows</button> : null}</div>{preview ? <div><p>{preview.acceptedCount} accepted, {preview.warningCount} warnings, {preview.rejectedCount} rejected.</p><table className="role-record-table"><thead><tr><th>Row</th><th>Email</th><th>State</th><th>Resolved units</th><th>Issues</th></tr></thead><tbody>{preview.rows.map((row) => <tr key={row.rowNumber}><td>{row.rowNumber}</td><td>{row.email}</td><td>{row.state}</td><td>{[row.departmentUnitId, row.programUnitId, row.batchUnitId, row.sectionUnitId].filter(Boolean).length} IDs</td><td>{row.issues.join(', ') || 'None'}</td></tr>)}</tbody></table></div> : null}</section>
+    <section className="role-card role-wide"><h2>Search students</h2><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search name, email, or institution ID" /></section>
+    <div className="role-record-table-wrap"><table className="role-record-table"><caption className="sr-only">{portal.roleName} real students</caption><thead><tr><th>Student</th><th>Institution ID</th><th>Units</th><th>Relationship</th><th>Invitation</th><th>Actions</th></tr></thead><tbody>{filteredStudents.map((student) => <tr key={student.id} className="role-record-row"><th scope="row"><strong>{student.fullName}</strong><span>{student.email}</span></th><td>{student.institutionStudentId}</td><td>{Object.values(student.units ?? {}).filter(Boolean).length} assigned</td><td>{student.relationship?.state ?? student.status}</td><td>{student.status}</td><td><div className="role-record-actions"><button type="button" className="secondary" onClick={() => void editStudent(student)}>Edit student</button><button type="button" onClick={() => void relationship(student.id, 'TRANSFERRED')}>Transfer</button><button type="button" onClick={() => void relationship(student.id, 'GRADUATED')}>Graduate</button><button type="button" className="secondary" onClick={() => void relationship(student.id, 'ENDED')}>End relationship</button><button type="button" className="secondary" onClick={() => void relationship(student.id, 'REVOKED')}>Revoke</button></div></td></tr>)}</tbody></table></div>
   </section>;
 }
 
@@ -382,17 +426,41 @@ function InstitutionAcademicStructurePage({ portal }: { readonly portal: RolePor
   const token = getProtectedAccessToken();
   const [institutionId, setInstitutionId] = useState('');
   const [units, setUnits] = useState<readonly InstitutionUnitDto[]>([]);
-  const [form, setForm] = useState({ kind: 'DEPARTMENT', name: '' });
+  const [form, setForm] = useState({ kind: 'DEPARTMENT', name: '', parentUnitId: '' });
+  const [notice, setNotice] = useState('');
+  const [error, setError] = useState('');
   useEffect(() => { if (token) void getSecurityContext(token).then((context) => setInstitutionId(context.memberships.find((item) => ['INSTITUTION_OWNER', 'INSTITUTION_ADMIN'].includes(item.role))?.organizationId ?? '')); }, [token]);
-  useEffect(() => { if (token && institutionId) void listInstitutionUnits(token, institutionId).then((result) => setUnits(result.units)); }, [token, institutionId, form.name]);
+  useEffect(() => { if (token && institutionId) void listInstitutionUnits(token, institutionId).then((result) => setUnits(result.units)).catch(() => setError('Unable to load academic units.')); }, [token, institutionId, notice]);
   if (!token) return <RestrictedApiState title="Academic Structure" message="Sign in with an Institution Admin identity to manage academic structure." />;
-  async function create(event: React.FormEvent): Promise<void> { event.preventDefault(); await createInstitutionUnit(token!, institutionId, form); setForm({ kind: 'DEPARTMENT', name: '' }); }
-  return <section className="role-module role-module--dense"><div className="role-page-heading"><div><span className="eyebrow">Authenticated API-backed</span><h1>Academic Structure</h1><p>Manage institution-scoped departments, programs, batches and sections.</p></div></div><form className="role-card role-wide role-management-form" onSubmit={(event) => void create(event)}><h2>Add academic unit</h2><label><span>Kind</span><select value={form.kind} onChange={(event) => setForm((value) => ({ ...value, kind: event.target.value }))}><option>DEPARTMENT</option><option>PROGRAM</option><option>BATCH</option><option>SECTION</option></select></label><label><span>Name</span><input value={form.name} onChange={(event) => setForm((value) => ({ ...value, name: event.target.value }))} required /></label><button type="submit" disabled={!institutionId}>Create unit</button></form><div className="role-record-table-wrap"><table className="role-record-table"><caption className="sr-only">{portal.roleName} academic units</caption><thead><tr><th>Name</th><th>Kind</th><th>Parent</th></tr></thead><tbody>{units.map((unit) => <tr key={unit.id}><th>{unit.name}</th><td>{unit.kind}</td><td>{unit.parentUnitId ?? 'Institution'}</td></tr>)}</tbody></table></div></section>;
+  async function create(event: React.FormEvent): Promise<void> {
+    event.preventDefault();
+    setError('');
+    try {
+      await createInstitutionUnit(token!, institutionId, { kind: form.kind, name: form.name, ...(form.parentUnitId ? { parentUnitId: form.parentUnitId } : {}) });
+      setForm({ kind: 'DEPARTMENT', name: '', parentUnitId: '' });
+      setNotice('Academic unit created.');
+    } catch {
+      setError('Academic unit creation failed. Check parent scope and duplicate/invalid data.');
+    }
+  }
+  async function edit(unit: InstitutionUnitDto): Promise<void> {
+    const name = window.prompt('Unit name', unit.name);
+    if (!name || name.trim() === unit.name) return;
+    setError('');
+    try {
+      await updateInstitutionUnit(token!, institutionId, unit.id, { name: name.trim() });
+      setNotice('Academic unit updated.');
+    } catch {
+      setError('Academic unit update failed.');
+    }
+  }
+  return <section className="role-module role-module--dense"><div className="role-page-heading"><div><span className="eyebrow">Authenticated API-backed</span><h1>Academic Structure</h1><p>Manage institution-scoped departments, programs, batches, sections and campuses. Parent choices are institution-scoped.</p></div></div>{notice ? <p className="role-api-success" role="status">{notice}</p> : null}{error ? <p className="form-error" role="alert">{error}</p> : null}<form className="role-card role-wide role-management-form" onSubmit={(event) => void create(event)}><h2>Add academic unit</h2><label><span>Kind</span><select value={form.kind} onChange={(event) => setForm((value) => ({ ...value, kind: event.target.value }))}><option>DEPARTMENT</option><option>PROGRAM</option><option>BATCH</option><option>SECTION</option><option>CAMPUS</option></select></label><label><span>Name</span><input value={form.name} onChange={(event) => setForm((value) => ({ ...value, name: event.target.value }))} required /></label><UnitSelect label="Parent unit" value={form.parentUnitId} units={units} onChange={(parentUnitId) => setForm((value) => ({ ...value, parentUnitId }))} /><button type="submit" disabled={!institutionId}>Create unit</button></form><div className="role-record-table-wrap"><table className="role-record-table"><caption className="sr-only">{portal.roleName} academic units</caption><thead><tr><th>Name</th><th>Kind</th><th>Parent</th><th>Action</th></tr></thead><tbody>{units.map((unit) => <tr key={unit.id}><th>{unit.name}</th><td>{unit.kind}</td><td>{units.find((candidate) => candidate.id === unit.parentUnitId)?.name ?? 'Institution'}</td><td><button type="button" className="secondary" onClick={() => void edit(unit)}>Edit unit</button></td></tr>)}</tbody></table></div></section>;
 }
 
 function InstitutionStaffPage({ portal: _portal }: { readonly portal: RolePortalConfig }): React.ReactElement {
   const token = getProtectedAccessToken();
   const [institutionId, setInstitutionId] = useState('');
+  const [staff, setStaff] = useState<InstitutionStaffDto | null>(null);
   const [form, setForm] = useState({ email: '', role: 'FACULTY_LECTURER' });
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
@@ -405,6 +473,12 @@ function InstitutionStaffPage({ portal: _portal }: { readonly portal: RolePortal
     }).catch(() => setError('Unable to resolve institution context.'));
     return () => controller.abort();
   }, [token]);
+  useEffect(() => {
+    if (!token || !institutionId) return;
+    const controller = new AbortController();
+    listInstitutionStaff(token, institutionId, controller.signal).then((result) => setStaff(result.staff)).catch(() => setError('Unable to load staff assignments.'));
+    return () => controller.abort();
+  }, [token, institutionId, notice]);
   if (!token) return <RestrictedApiState title="Staff" message="Sign in with an Institution Admin identity to invite institution staff." />;
   async function invite(event: React.FormEvent): Promise<void> {
     event.preventDefault();
@@ -426,6 +500,8 @@ function InstitutionStaffPage({ portal: _portal }: { readonly portal: RolePortal
       <button type="submit" disabled={!institutionId}>Send staff invitation</button>
     </form>
     <section className="role-card role-wide"><h2>Staff onboarding boundary</h2><ul className="role-check-list"><li>Allowed roles: PLACEMENT_ADMIN, DEPARTMENT_HEAD, FACULTY_LECTURER.</li><li>No platform, employer or self-escalation role is exposed.</li><li>The recipient must authenticate with a verified matching email before membership is created.</li></ul></section>
+    <section className="role-card role-wide"><h2>Staff invitations</h2>{staff?.invitations.length ? <table className="role-record-table"><thead><tr><th>Email</th><th>Role</th><th>State</th><th>Delivery</th><th>Expires</th></tr></thead><tbody>{staff.invitations.map((invite) => <tr key={invite.id}><td>{invite.email}</td><td>{invite.role}</td><td>{invite.state}</td><td>{invite.delivery?.state ?? 'Pending command'}</td><td>{new Date(invite.expiresAt).toLocaleDateString()}</td></tr>)}</tbody></table> : <p>No staff invitations yet.</p>}</section>
+    <section className="role-card role-wide"><h2>Active staff memberships</h2>{staff?.memberships.length ? <table className="role-record-table"><thead><tr><th>Email</th><th>Role</th><th>State</th><th>Actions</th></tr></thead><tbody>{staff.memberships.map((member) => <tr key={member.id}><td>{member.email}</td><td>{member.role}</td><td>{member.state}</td><td><span className="staff-readonly-note">Revoke/resend/end membership: NOT YET AVAILABLE</span></td></tr>)}</tbody></table> : <p>No accepted staff memberships yet.</p>}</section>
   </section>;
 }
 
@@ -453,9 +529,61 @@ function EmployerRecruiterRealityPage({ portal, routeLabel }: { readonly portal:
   </section>;
 }
 
+function OperationsUsersAccessPage(): React.ReactElement {
+  const token = getProtectedAccessToken();
+  const [query, setQuery] = useState('');
+  const [users, setUsers] = useState<readonly OperationsUserAccessDto[]>([]);
+  const [invitations, setInvitations] = useState<readonly OperationsInvitationDto[]>([]);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    if (!token) return;
+    const controller = new AbortController();
+    Promise.all([
+      listOperationsUsersAccess(token, query, controller.signal),
+      listOperationsInvitations(token, query, controller.signal),
+    ]).then(([userResult, invitationResult]) => {
+      setUsers(userResult.users);
+      setInvitations(invitationResult.invitations);
+    }).catch(() => setError('Unable to load Operations governance data.'));
+    return () => controller.abort();
+  }, [token, query]);
+  if (!token) return <RestrictedApiState title="Users & Access" message="Sign in with an Operations identity to inspect users and access." />;
+  return <section className="role-module role-module--dense"><div className="role-page-heading"><div><span className="eyebrow">READ_ONLY governance</span><h1>Users & Access</h1><p>Search users, identity links, memberships and Student relationship counts. No tokens, password data, raw invitation tokens or platform-role mutation are exposed.</p></div></div>{error ? <p className="form-error" role="alert">{error}</p> : null}<section className="role-card role-wide"><label className="role-local-search"><span>Search by email or internal user ID</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="person@example.test or UUID" /></label></section><section className="role-card role-wide"><h2>Users</h2><table className="role-record-table"><thead><tr><th>Email</th><th>User ID</th><th>Identity link</th><th>Memberships</th><th>Student relationships</th></tr></thead><tbody>{users.map((user) => <tr key={user.id}><td>{user.email}</td><td>{user.id}</td><td>{user.identityLinkStatus}</td><td>{user.memberships.map((item) => `${String(item.role)} / ${String(item.state)}`).join(', ') || 'None'}</td><td>{user.studentRelationshipCount}</td></tr>)}</tbody></table></section><section className="role-card role-wide"><h2>Invitation tracking</h2><InvitationInventoryTable invitations={invitations} /></section></section>;
+}
+
+function OperationsContentReadOnlyPage(): React.ReactElement {
+  return <section className="role-module role-module--dense"><div className="role-page-heading"><div><span className="eyebrow">READ_ONLY content operations</span><h1>Content Operations</h1><p>Career Readiness governance state and automation status are shown from protected Operations APIs. Content authoring is NOT YET AVAILABLE.</p></div></div><OperationsCareerReadinessPanel /><section className="role-card role-wide"><h2>Authoring boundary</h2><p>CMS-style editing, review submission and publication mutations are intentionally not simulated in Phase 2A.</p></section></section>;
+}
+
+function OperationsTechnicalReadOnlyPage({ routeLabel }: { readonly routeLabel: string }): React.ReactElement {
+  return <section className="role-module role-module--dense"><div className="role-page-heading"><div><span className="eyebrow">READ_ONLY technical operations</span><h1>{routeLabel}</h1><p>Safe operational status only: API health is visible in the shell, and outbox/workflow/automation status is loaded through the existing Operations status endpoint. Secrets and n8n credentials are never displayed.</p></div></div><OperationsCareerReadinessPanel /><section className="role-card role-wide"><h2>Mutation boundary</h2><p>n8n remains inactive unless explicitly enabled outside this UI. Kill-switch, workflow activation and credential operations are not exposed as Phase 2A buttons.</p></section></section>;
+}
+
+function AuthenticatedReadOnlyModule({ title, detail }: { readonly title: string; readonly detail: string }): React.ReactElement {
+  return <section className="role-module"><div className="role-page-heading"><div><span className="eyebrow">READ_ONLY</span><h1>{title}</h1><p>{detail}</p></div></div><section className="role-card role-wide"><h2>No preview mutation</h2><p>This authenticated route deliberately avoids session-local fake success. Use demo routes only for fictional previews.</p></section></section>;
+}
+
+function AuthenticatedNotYetAvailable({ title, detail }: { readonly title: string; readonly detail: string }): React.ReactElement {
+  return <section className="role-module"><div className="role-page-heading"><div><span className="eyebrow">NOT_YET_AVAILABLE</span><h1>{title}</h1><p>{detail}</p></div></div><section className="role-empty"><h2>Not yet available</h2><p>No persistent API and database-backed workflow has been approved for this authenticated action in Phase 2A.</p></section></section>;
+}
+
 function RestrictedApiState({ title, message }: { readonly title: string; readonly message: string }): React.ReactElement {
   return <section className="role-module"><div className="role-page-heading"><div><span className="eyebrow">Authenticated API-backed</span><h1>{title}</h1><p>{message}</p></div></div><section className="role-empty"><h2>Restricted</h2><p>No fake mutation or preview role selection is used for this protected workflow.</p></section></section>;
 }
+
+function UnitSelect({ label, value, units, onChange }: { readonly label: string; readonly value: string; readonly units: readonly InstitutionUnitDto[]; readonly onChange: (value: string) => void }): React.ReactElement {
+  return <label><span>{label}</span><select value={value} onChange={(event) => onChange(event.target.value)}><option value="">None</option>{units.map((unit) => <option key={unit.id} value={unit.id}>{unit.kind}: {unit.name}</option>)}</select></label>;
+}
+
+function cleanStudentPayload(form: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(Object.entries(form).filter(([, value]) => value.trim().length > 0));
+}
+
+function InvitationInventoryTable({ invitations }: { readonly invitations: readonly OperationsInvitationDto[] }): React.ReactElement {
+  if (!invitations.length) return <p>No invitations match the current search.</p>;
+  return <table className="role-record-table"><thead><tr><th>Recipient</th><th>Organization</th><th>Role</th><th>State</th><th>Delivery</th><th>Expires</th></tr></thead><tbody>{invitations.map((invite) => <tr key={invite.id}><td>{invite.recipientEmail}</td><td>{invite.organization?.legalName ?? 'No organization'}</td><td>{invite.role}</td><td>{invite.state}</td><td>{invite.delivery?.state ?? 'No command'}</td><td>{new Date(invite.expiresAt).toLocaleDateString()}</td></tr>)}</tbody></table>;
+}
+
 
 function DetailDialog({ portal, record, openerRef, onClose }: { readonly portal: RolePortalConfig; readonly record: RoleFixture; readonly openerRef: React.RefObject<HTMLElement | null>; readonly onClose: () => void }): React.ReactElement {
   const dialogRef = useRef<HTMLElement>(null);

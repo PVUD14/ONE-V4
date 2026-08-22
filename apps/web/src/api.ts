@@ -148,7 +148,8 @@ export interface OrganizationManagementDto {
   readonly active: boolean;
   readonly updatedAt: string;
   readonly profile: {
-    readonly displayName?: string | null; readonly countryCode?: string | null; readonly stateOrProvince?: string | null; readonly city?: string | null;
+    readonly displayName?: string | null; readonly countryCode?: string | null; readonly stateOrProvince?: string | null; readonly city?: string | null; readonly postalCode?: string | null;
+    readonly addressLine1?: string | null; readonly addressLine2?: string | null;
     readonly websiteUrl?: string | null; readonly institutionType?: string | null; readonly primaryContactEmail?: string | null;
   };
   readonly initialAdminInvitation?: { readonly id: string; readonly email: string; readonly state: string } | null;
@@ -156,6 +157,42 @@ export interface OrganizationManagementDto {
 
 export interface InstitutionUnitDto {
   readonly id: string; readonly institutionId: string; readonly kind: string; readonly name: string; readonly parentUnitId?: string | null;
+}
+
+export interface InstitutionStaffDto {
+  readonly invitations: readonly {
+    readonly id: string; readonly email: string; readonly role: string; readonly state: string;
+    readonly createdAt: string; readonly expiresAt: string; readonly acceptedAt?: string | null; readonly revokedAt?: string | null;
+    readonly delivery?: { readonly commandId: string; readonly state: string; readonly providerKind?: string | null; readonly providerReference?: string | null; readonly outcome?: string | null } | null;
+  }[];
+  readonly memberships: readonly {
+    readonly id: string; readonly userId: string; readonly email: string; readonly role: string; readonly state: string; readonly createdAt: string; readonly updatedAt: string;
+  }[];
+  readonly unavailableActions: readonly string[];
+}
+
+export interface OperationsUserAccessDto {
+  readonly id: string;
+  readonly email: string;
+  readonly verifiedEmail: string | null;
+  readonly identityLinkStatus: string;
+  readonly state: string;
+  readonly memberships: readonly Record<string, unknown>[];
+  readonly studentRelationshipCount: number;
+  readonly studentRelationships: readonly Record<string, unknown>[];
+}
+
+export interface OperationsInvitationDto {
+  readonly id: string;
+  readonly recipientEmail: string;
+  readonly organization: { readonly id: string; readonly legalName: string; readonly kind: string } | null;
+  readonly role: string;
+  readonly state: string;
+  readonly createdAt: string;
+  readonly expiresAt: string;
+  readonly acceptedAt?: string | null;
+  readonly revokedAt?: string | null;
+  readonly delivery?: { readonly commandId: string; readonly state: string; readonly destinationRef?: string; readonly providerKind?: string | null; readonly providerReference?: string | null; readonly outcome?: string | null } | null;
 }
 
 export interface InstitutionStudentDto {
@@ -216,7 +253,7 @@ export interface StudentSavedOpportunityDto {
 
 export interface RosterImportPreviewDto {
   readonly id: string; readonly rowCount: number; readonly acceptedCount: number; readonly warningCount: number; readonly rejectedCount: number;
-  readonly rows: readonly { readonly rowNumber: number; readonly institutionStudentId: string; readonly fullName: string; readonly email: string; readonly state: string; readonly issues: readonly string[] }[];
+  readonly rows: readonly { readonly rowNumber: number; readonly institutionStudentId: string; readonly fullName: string; readonly email: string; readonly state: string; readonly issues: readonly string[]; readonly departmentUnitId?: string | null; readonly programUnitId?: string | null; readonly batchUnitId?: string | null; readonly sectionUnitId?: string | null }[];
 }
 
 export interface SecurityContextDto {
@@ -270,8 +307,23 @@ export function removeStudentSavedOpportunity(token: string, savedOpportunityId:
   return requestJson(`/api/v1/students/me/saved-opportunities/${encodeURIComponent(savedOpportunityId)}`, { token, method: 'DELETE' });
 }
 
-export function listOperationsOrganizations(token: string, signal?: AbortSignal): Promise<{ readonly organizations: readonly OrganizationManagementDto[] }> {
-  return requestJson('/api/v1/operations/organizations', { token, ...(signal ? { signal } : {}) });
+export function listOperationsOrganizations(token: string, filters: { readonly q?: string; readonly kind?: string; readonly verification?: string } = {}, signal?: AbortSignal): Promise<{ readonly organizations: readonly OrganizationManagementDto[] }> {
+  const query = new URLSearchParams();
+  if (filters.q?.trim()) query.set('q', filters.q.trim());
+  if (filters.kind?.trim()) query.set('kind', filters.kind.trim());
+  if (filters.verification?.trim()) query.set('verification', filters.verification.trim());
+  const suffix = query.toString() ? `?${query.toString()}` : '';
+  return requestJson(`/api/v1/operations/organizations${suffix}`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function listOperationsUsersAccess(token: string, q = '', signal?: AbortSignal): Promise<{ readonly users: readonly OperationsUserAccessDto[] }> {
+  const query = q.trim() ? `?q=${encodeURIComponent(q.trim())}` : '';
+  return requestJson(`/api/v1/operations/users-access${query}`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function listOperationsInvitations(token: string, q = '', signal?: AbortSignal): Promise<{ readonly invitations: readonly OperationsInvitationDto[] }> {
+  const query = q.trim() ? `?q=${encodeURIComponent(q.trim())}` : '';
+  return requestJson(`/api/v1/operations/invitations${query}`, { token, ...(signal ? { signal } : {}) });
 }
 
 export function createOperationsOrganization(token: string, body: unknown): Promise<{ readonly organization: OrganizationManagementDto }> {
@@ -290,6 +342,10 @@ export function inviteInitialOrganizationAdmin(token: string, organizationId: st
   return requestJson(`/api/v1/operations/organizations/${encodeURIComponent(organizationId)}/initial-admin-invitations`, { token, method: 'POST', body: { email } });
 }
 
+export function getOperationsOrganizationOnboardingStatus(token: string, organizationId: string): Promise<{ readonly status: Record<string, unknown> }> {
+  return requestJson(`/api/v1/operations/organizations/${encodeURIComponent(organizationId)}/onboarding-status`, { token });
+}
+
 export function acceptInvitation(token: string, invitationToken: string, idempotencyKey: string): Promise<Record<string, unknown>> {
   return requestJson('/api/v1/invitations/accept', { token, method: 'POST', idempotencyKey, body: { token: invitationToken } });
 }
@@ -300,6 +356,14 @@ export function listInstitutionUnits(token: string, institutionId: string, signa
 
 export function createInstitutionUnit(token: string, institutionId: string, body: unknown): Promise<{ readonly unit: InstitutionUnitDto }> {
   return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/units`, { token, method: 'POST', body });
+}
+
+export function updateInstitutionUnit(token: string, institutionId: string, unitId: string, body: unknown): Promise<{ readonly unit: InstitutionUnitDto }> {
+  return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/units/${encodeURIComponent(unitId)}`, { token, method: 'PATCH', body });
+}
+
+export function listInstitutionStaff(token: string, institutionId: string, signal?: AbortSignal): Promise<{ readonly staff: InstitutionStaffDto }> {
+  return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/staff-role-assignments`, { token, ...(signal ? { signal } : {}) });
 }
 
 export function listInstitutionStudents(token: string, institutionId: string, signal?: AbortSignal): Promise<{ readonly students: readonly InstitutionStudentDto[] }> {
@@ -314,8 +378,8 @@ export function updateInstitutionStudent(token: string, institutionId: string, s
   return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/students/${encodeURIComponent(studentProfileId)}`, { token, method: 'PATCH', body });
 }
 
-export function endInstitutionStudentRelationship(token: string, institutionId: string, studentProfileId: string, state: string): Promise<{ readonly student: InstitutionStudentDto }> {
-  return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/students/${encodeURIComponent(studentProfileId)}/relationship`, { token, method: 'POST', body: { state } });
+export function endInstitutionStudentRelationship(token: string, institutionId: string, studentProfileId: string, state: string, effectiveTo?: string): Promise<{ readonly student: InstitutionStudentDto }> {
+  return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/students/${encodeURIComponent(studentProfileId)}/relationship`, { token, method: 'POST', body: { state, ...(effectiveTo ? { effectiveTo } : {}) } });
 }
 
 export function inviteInstitutionStaff(token: string, institutionId: string, email: string, role: string): Promise<Record<string, unknown>> {

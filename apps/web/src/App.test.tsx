@@ -215,9 +215,10 @@ describe('All-role portal registry and preview workflows', () => {
     render(<App />);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument());
     cleanup();
-    window.history.pushState(null, '', '/demo/institution/admin/staff');
+    window.history.pushState(null, '', '/institution/admin/staff');
     render(<App />);
-    fireEvent.change(screen.getByLabelText(/Recipient email/i), { target: { value: 'faculty@example.test' } });
+    const recipientInput = await screen.findByLabelText(/Recipient email/i);
+    fireEvent.change(recipientInput, { target: { value: 'faculty@example.test' } });
     fireEvent.change(screen.getByLabelText(/Institution role/i), { target: { value: 'DEPARTMENT_HEAD' } });
     await waitFor(() => expect(screen.getByRole('button', { name: 'Send staff invitation' })).not.toBeDisabled());
     fireEvent.click(screen.getByRole('button', { name: 'Send staff invitation' }));
@@ -255,9 +256,9 @@ describe('All-role portal registry and preview workflows', () => {
     render(<App />);
     fireEvent.click(screen.getAllByRole('button', { name: 'Messages' }).find((button) => button.className.includes('icon-button'))!);
     expect(window.location.pathname).toBe('/demo/employer/recruiter/messages');
-    expect(screen.getByRole('heading', { name: 'Employer hiring flow partially implemented' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Messages' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Notifications' }));
-    expect(screen.getByRole('heading', { name: 'Employer hiring flow partially implemented' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Messages' })).toBeInTheDocument();
   });
 
   it('keeps Student and Placement Officer portals available after adding all-role routing', () => {

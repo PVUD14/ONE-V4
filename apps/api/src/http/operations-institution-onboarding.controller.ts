@@ -260,6 +260,76 @@ export class OperationsInstitutionOnboardingController {
     return { invitation: { id: invitation.id, email, role, state: 'PENDING', tokenPreviewAvailable: false }, correlationId: context.correlationId };
   }
 
+  @Get('/operations/users-access')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async listUsersAccess(@Req() request: ProtectedHttpRequest, @Query('q') q?: string): Promise<Record<string, unknown>> {
+    const context = requireOperations(request);
+    const search = q?.trim() || null;
+    const rows = await this.db.execute(sql`
+      SELECT u.id, u.email, u.external_subject IS NOT NULL AS identity_linked, u.state, u.created_at, u.updated_at,
+             COALESCE(jsonb_agg(DISTINCT jsonb_build_object(
+               'organizationId', m.organization_id,
+               'organizationLegalName', o.legal_name,
+               'organizationKind', o.kind,
+               'role', m.role,
+               'state', m.state,
+               'scopeOrganizationId', m.scope_organization_id,
+               'scopeInstitutionId', m.scope_institution_id,
+               'scopeDepartmentUnitId', m.scope_department_unit_id,
+               'scopeBatchUnitId', m.scope_batch_unit_id,
+               'scopeEmployerId', m.scope_employer_id
+             )) FILTER (WHERE m.id IS NOT NULL), '[]'::jsonb) AS memberships,
+             count(DISTINCT ir.id) AS student_relationship_count,
+             COALESCE(jsonb_agg(DISTINCT jsonb_build_object(
+               'institutionId', ir.institution_id,
+               'state', ir.state,
+               'effectiveFrom', ir.effective_from,
+               'effectiveTo', ir.effective_to
+             )) FILTER (WHERE ir.id IS NOT NULL), '[]'::jsonb) AS student_relationships
+      FROM users u
+      LEFT JOIN organization_memberships m ON m.user_id = u.id
+      LEFT JOIN organizations o ON o.id = m.organization_id
+      LEFT JOIN institution_relationships ir ON ir.student_user_id = u.id
+      WHERE ${search}::text IS NULL
+        OR lower(u.email) LIKE '%' || lower(${search}) || '%'
+        OR u.id::text = ${search}
+      GROUP BY u.id, u.email, u.external_subject, u.state, u.created_at, u.updated_at
+      ORDER BY u.updated_at DESC
+      LIMIT 200
+    `) as QueryResult<Record<string, unknown>>;
+    return { users: rows.rows.map(mapUserAccessRow), correlationId: context.correlationId };
+  }
+
+  @Get('/operations/invitations')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async listInvitationInventory(@Req() request: ProtectedHttpRequest, @Query('q') q?: string): Promise<Record<string, unknown>> {
+    const context = requireOperations(request);
+    const search = q?.trim() || null;
+    const rows = await this.db.execute(sql`
+      SELECT i.id, i.email, i.organization_id, o.legal_name AS organization_legal_name, o.kind AS organization_kind,
+             i.role, i.state, i.created_at, i.expires_at, i.accepted_at, i.revoked_at,
+             nc.id AS notification_command_id, nc.state AS notification_state, nc.destination_ref,
+             nda.provider_kind, nda.provider_reference, nda.outcome AS delivery_outcome
+      FROM invitations i
+      LEFT JOIN organizations o ON o.id = i.organization_id
+      LEFT JOIN notification_commands nc ON nc.destination_ref = 'invitation:' || i.id::text
+      LEFT JOIN LATERAL (
+        SELECT provider_kind, provider_reference, outcome
+        FROM notification_delivery_attempts nda_inner
+        WHERE nda_inner.command_id = nc.id
+        ORDER BY nda_inner.attempt DESC
+        LIMIT 1
+      ) nda ON true
+      WHERE ${search}::text IS NULL
+        OR lower(i.email) LIKE '%' || lower(${search}) || '%'
+        OR i.id::text = ${search}
+        OR lower(coalesce(o.legal_name,'')) LIKE '%' || lower(${search}) || '%'
+      ORDER BY i.created_at DESC
+      LIMIT 200
+    `) as QueryResult<Record<string, unknown>>;
+    return { invitations: rows.rows.map(mapInvitationInventoryRow), correlationId: context.correlationId };
+  }
+
   @Get('/operations/organizations/:targetOrganizationId/onboarding-status')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async onboardingStatus(@Req() request: ProtectedHttpRequest, @Param('targetOrganizationId') organizationId: string): Promise<Record<string, unknown>> {
@@ -286,6 +356,41 @@ export class OperationsInstitutionOnboardingController {
     const id = requireUuid(institutionId, context.correlationId);
     const units = await this.db.execute(sql`SELECT id, institution_id, kind, name, parent_unit_id, created_at, updated_at FROM institution_units WHERE institution_id=${id}::uuid ORDER BY kind, name`) as QueryResult<Record<string, unknown>>;
     return { units: units.rows.map(mapUnitRow), correlationId: context.correlationId };
+  }
+
+  @Get('/institutions/:institutionId/staff-role-assignments')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async listStaffRoleAssignments(@Req() request: ProtectedHttpRequest, @Param('institutionId') institutionId: string): Promise<Record<string, unknown>> {
+    const context = requireInstitutionAdmin(request, institutionId);
+    const id = requireUuid(institutionId, context.correlationId);
+    const invitations = await this.db.execute(sql`
+      SELECT i.id, i.email, i.role, i.state, i.created_at, i.expires_at, i.accepted_at, i.revoked_at,
+             nc.id AS notification_command_id, nc.state AS notification_state,
+             nda.provider_kind, nda.provider_reference, nda.outcome AS delivery_outcome
+      FROM invitations i
+      LEFT JOIN notification_commands nc ON nc.destination_ref = 'invitation:' || i.id::text
+      LEFT JOIN LATERAL (
+        SELECT provider_kind, provider_reference, outcome
+        FROM notification_delivery_attempts nda_inner
+        WHERE nda_inner.command_id = nc.id
+        ORDER BY nda_inner.attempt DESC
+        LIMIT 1
+      ) nda ON true
+      WHERE i.organization_id = ${id}::uuid AND i.role IN ('PLACEMENT_ADMIN','DEPARTMENT_HEAD','FACULTY_LECTURER')
+      ORDER BY i.created_at DESC
+      LIMIT 200
+    `) as QueryResult<Record<string, unknown>>;
+    const memberships = await this.db.execute(sql`
+      SELECT m.id, m.user_id, u.email, m.role, m.state, m.created_at, m.updated_at
+      FROM organization_memberships m
+      JOIN users u ON u.id = m.user_id
+      WHERE m.organization_id = ${id}::uuid
+        AND m.scope_institution_id = ${id}::uuid
+        AND m.role IN ('PLACEMENT_ADMIN','DEPARTMENT_HEAD','FACULTY_LECTURER')
+      ORDER BY m.updated_at DESC, u.email
+      LIMIT 200
+    `) as QueryResult<Record<string, unknown>>;
+    return { staff: { invitations: invitations.rows.map(mapStaffInvitationRow), memberships: memberships.rows.map(mapStaffMembershipRow), unavailableActions: ['revoke', 'resend', 'endMembership'] }, correlationId: context.correlationId };
   }
 
   @Post('/institutions/:institutionId/units')
@@ -556,9 +661,10 @@ export class OperationsInstitutionOnboardingController {
         const issuesSql = row.issues.length
           ? sql`ARRAY[${sql.join(row.issues.map((issue) => sql`${issue}`), sql`, `)}]::text[]`
           : sql`ARRAY[]::text[]`;
+        const persistedEmail = row.issues.includes('malformed_email') ? null : row.email;
         await tx.execute(sql`
-          INSERT INTO student_roster_import_rows (id, import_id, row_number, state, institution_student_id, full_name, email, department, program, batch, section, issues)
-          VALUES (${this.ids.uuid()}::uuid, ${importId}::uuid, ${row.rowNumber}, ${row.state}::roster_import_row_state, ${row.institutionStudentId}, ${row.fullName}, ${row.email}, ${row.department}, ${row.program}, ${row.batch}, ${row.section}, ${issuesSql})
+          INSERT INTO student_roster_import_rows (id, import_id, row_number, state, institution_student_id, full_name, email, department, program, batch, section, department_unit_id, program_unit_id, batch_unit_id, section_unit_id, issues)
+          VALUES (${this.ids.uuid()}::uuid, ${importId}::uuid, ${row.rowNumber}, ${row.state}::roster_import_row_state, ${row.institutionStudentId}, ${row.fullName}, ${persistedEmail}, ${row.department}, ${row.program}, ${row.batch}, ${row.section}, ${row.departmentUnitId ?? null}::uuid, ${row.programUnitId ?? null}::uuid, ${row.batchUnitId ?? null}::uuid, ${row.sectionUnitId ?? null}::uuid, ${issuesSql})
         `);
       }
       await writeAudit(tx, { id: this.ids.uuid(), actorUserId: context.authorization.principal.userId, action: 'institution.roster_import.validated', resourceType: 'student_roster_import', resourceId: importId, organizationId: id, correlationId: context.correlationId, context: { rowCount: evaluated.length, accepted, rejected } });
@@ -575,23 +681,24 @@ export class OperationsInstitutionOnboardingController {
     let committed = 0;
     await this.db.transaction(async (tx) => {
       const importRows = await tx.execute(sql`
-        SELECT row_number, institution_student_id, full_name, email
+        SELECT row_number, institution_student_id, full_name, email, department_unit_id, program_unit_id, batch_unit_id, section_unit_id
         FROM student_roster_import_rows r
         JOIN student_roster_imports i ON i.id=r.import_id
         WHERE r.import_id=${importId}::uuid AND i.institution_id=${id}::uuid AND i.state='VALIDATED' AND r.state='VALID'
         ORDER BY r.row_number
         FOR UPDATE
-      `) as QueryResult<{ row_number: number; institution_student_id: string; full_name: string; email: string }>;
+      `) as QueryResult<{ row_number: number; institution_student_id: string; full_name: string; email: string; department_unit_id: string | null; program_unit_id: string | null; batch_unit_id: string | null; section_unit_id: string | null }>;
       for (const row of importRows.rows) {
         const userId = this.ids.uuid();
         const profileId = this.ids.uuid();
         const relationshipId = this.ids.uuid();
         await tx.execute(sql`INSERT INTO users (id, email, state) VALUES (${userId}::uuid, ${row.email}, 'INVITED')`);
         await tx.execute(sql`
-          INSERT INTO institution_student_profiles (id, institution_id, student_user_id, institution_student_id, full_name, status)
-          VALUES (${profileId}::uuid, ${id}::uuid, ${userId}::uuid, ${row.institution_student_id}, ${row.full_name}, 'INVITED')
+          INSERT INTO institution_student_profiles (id, institution_id, student_user_id, institution_student_id, full_name, department_unit_id, program_unit_id, batch_unit_id, section_unit_id, status)
+          VALUES (${profileId}::uuid, ${id}::uuid, ${userId}::uuid, ${row.institution_student_id}, ${row.full_name}, ${row.department_unit_id}::uuid, ${row.program_unit_id}::uuid, ${row.batch_unit_id}::uuid, ${row.section_unit_id}::uuid, 'INVITED')
         `);
         await tx.execute(sql`INSERT INTO institution_relationships (id, institution_id, student_user_id, state, effective_from) VALUES (${relationshipId}::uuid, ${id}::uuid, ${userId}::uuid, 'ACTIVE', now())`);
+        await tx.execute(sql`UPDATE student_roster_import_rows SET state='COMMITTED', created_profile_id=${profileId}::uuid WHERE import_id=${importId}::uuid AND row_number=${row.row_number}`);
         await writeOutbox(tx, { id: this.ids.uuid(), aggregateType: 'institution_student_profile', aggregateId: profileId, eventType: 'institution.student_profile.created', payload: { profileId }, actorUserId: context.authorization.principal.userId, organizationId: id, correlationId: context.correlationId });
         committed += 1;
       }
@@ -787,6 +894,10 @@ interface ParsedRosterRow {
 interface EvaluatedRosterRow extends ParsedRosterRow {
   readonly state: 'VALID' | 'WARNING' | 'REJECTED';
   readonly issues: readonly string[];
+  readonly departmentUnitId: string | null;
+  readonly programUnitId: string | null;
+  readonly batchUnitId: string | null;
+  readonly sectionUnitId: string | null;
 }
 
 function parseRosterCsv(csv: string, correlationId: string): readonly ParsedRosterRow[] {
@@ -844,12 +955,12 @@ async function evaluateRosterRows(db: PersistenceDb, institutionId: string, rows
   const seenIds = new Set<string>();
   const seenEmails = new Set<string>();
   const evaluated: EvaluatedRosterRow[] = [];
-  const units = await db.execute(sql`SELECT kind, lower(name) AS name FROM institution_units WHERE institution_id=${institutionId}::uuid`) as QueryResult<{ kind: UnitKind; name: string }>;
+  const units = await db.execute(sql`SELECT id, kind, lower(name) AS name FROM institution_units WHERE institution_id=${institutionId}::uuid`) as QueryResult<{ id: string; kind: UnitKind; name: string }>;
   const unitNames = {
-    DEPARTMENT: new Set(units.rows.filter((unit) => unit.kind === 'DEPARTMENT').map((unit) => unit.name)),
-    PROGRAM: new Set(units.rows.filter((unit) => unit.kind === 'PROGRAM').map((unit) => unit.name)),
-    BATCH: new Set(units.rows.filter((unit) => unit.kind === 'BATCH').map((unit) => unit.name)),
-    SECTION: new Set(units.rows.filter((unit) => unit.kind === 'SECTION').map((unit) => unit.name)),
+    DEPARTMENT: new Map(units.rows.filter((unit) => unit.kind === 'DEPARTMENT').map((unit) => [unit.name, unit.id])),
+    PROGRAM: new Map(units.rows.filter((unit) => unit.kind === 'PROGRAM').map((unit) => [unit.name, unit.id])),
+    BATCH: new Map(units.rows.filter((unit) => unit.kind === 'BATCH').map((unit) => [unit.name, unit.id])),
+    SECTION: new Map(units.rows.filter((unit) => unit.kind === 'SECTION').map((unit) => [unit.name, unit.id])),
   };
   for (const row of rows) {
     const issues: string[] = [];
@@ -863,10 +974,14 @@ async function evaluateRosterRows(db: PersistenceDb, institutionId: string, rows
     if (seenEmails.has(normalizedEmail)) issues.push('duplicate_email_in_file');
     seenIds.add(normalizedId.toLowerCase());
     seenEmails.add(normalizedEmail);
-    if (row.department && !unitNames.DEPARTMENT.has(row.department.toLowerCase())) issues.push('unknown_department');
-    if (row.program && !unitNames.PROGRAM.has(row.program.toLowerCase())) issues.push('unknown_program');
-    if (row.batch && !unitNames.BATCH.has(row.batch.toLowerCase())) issues.push('unknown_batch');
-    if (row.section && !unitNames.SECTION.has(row.section.toLowerCase())) issues.push('unknown_section');
+    const departmentUnitId = row.department ? unitNames.DEPARTMENT.get(row.department.toLowerCase()) ?? null : null;
+    const programUnitId = row.program ? unitNames.PROGRAM.get(row.program.toLowerCase()) ?? null : null;
+    const batchUnitId = row.batch ? unitNames.BATCH.get(row.batch.toLowerCase()) ?? null : null;
+    const sectionUnitId = row.section ? unitNames.SECTION.get(row.section.toLowerCase()) ?? null : null;
+    if (row.department && !departmentUnitId) issues.push('unknown_department');
+    if (row.program && !programUnitId) issues.push('unknown_program');
+    if (row.batch && !batchUnitId) issues.push('unknown_batch');
+    if (row.section && !sectionUnitId) issues.push('unknown_section');
     const existing = await db.execute(sql`
       SELECT EXISTS (SELECT 1 FROM institution_student_profiles WHERE institution_id=${institutionId}::uuid AND lower(institution_student_id)=lower(${normalizedId})) AS student_id_exists,
              EXISTS (SELECT 1 FROM users WHERE lower(email)=lower(${normalizedEmail})) AS email_exists
@@ -880,6 +995,10 @@ async function evaluateRosterRows(db: PersistenceDb, institutionId: string, rows
       email: normalizedEmail,
       state: issues.length ? 'REJECTED' : 'VALID',
       issues,
+      departmentUnitId,
+      programUnitId,
+      batchUnitId,
+      sectionUnitId,
     });
   }
   return evaluated;
@@ -1055,5 +1174,78 @@ function mapStudentRow(row: Record<string, unknown>): Record<string, unknown> {
     status: row.status,
     relationship: row.relationship_id ? { id: row.relationship_id, state: row.relationship_state, effectiveFrom: row.effective_from, effectiveTo: row.effective_to } : null,
     units: { departmentUnitId: row.department_unit_id, programUnitId: row.program_unit_id, batchUnitId: row.batch_unit_id, sectionUnitId: row.section_unit_id },
+  };
+}
+
+function mapUserAccessRow(row: Record<string, unknown>): Record<string, unknown> {
+  return {
+    id: row.id,
+    email: row.email,
+    verifiedEmail: row.email,
+    identityLinkStatus: row.identity_linked ? 'LINKED' : 'UNLINKED',
+    state: row.state,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    memberships: row.memberships ?? [],
+    studentRelationshipCount: Number(row.student_relationship_count ?? 0),
+    studentRelationships: row.student_relationships ?? [],
+  };
+}
+
+function mapInvitationInventoryRow(row: Record<string, unknown>): Record<string, unknown> {
+  return {
+    id: row.id,
+    recipientEmail: row.email,
+    organization: row.organization_id ? {
+      id: row.organization_id,
+      legalName: row.organization_legal_name,
+      kind: row.organization_kind,
+    } : null,
+    role: row.role,
+    state: row.state,
+    createdAt: row.created_at,
+    expiresAt: row.expires_at,
+    acceptedAt: row.accepted_at,
+    revokedAt: row.revoked_at,
+    delivery: row.notification_command_id ? {
+      commandId: row.notification_command_id,
+      state: row.notification_state,
+      destinationRef: row.destination_ref,
+      providerKind: row.provider_kind,
+      providerReference: row.provider_reference,
+      outcome: row.delivery_outcome,
+    } : null,
+  };
+}
+
+function mapStaffInvitationRow(row: Record<string, unknown>): Record<string, unknown> {
+  return {
+    id: row.id,
+    email: row.email,
+    role: row.role,
+    state: row.state,
+    createdAt: row.created_at,
+    expiresAt: row.expires_at,
+    acceptedAt: row.accepted_at,
+    revokedAt: row.revoked_at,
+    delivery: row.notification_command_id ? {
+      commandId: row.notification_command_id,
+      state: row.notification_state,
+      providerKind: row.provider_kind,
+      providerReference: row.provider_reference,
+      outcome: row.delivery_outcome,
+    } : null,
+  };
+}
+
+function mapStaffMembershipRow(row: Record<string, unknown>): Record<string, unknown> {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    email: row.email,
+    role: row.role,
+    state: row.state,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
   };
 }

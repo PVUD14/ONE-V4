@@ -104,7 +104,7 @@ type AuthorizedWorkspace = PortalChoice & {
 type WorkspaceResolution =
   | { readonly state: 'loading' }
   | { readonly state: 'resolved'; readonly choices: readonly AuthorizedWorkspace[] }
-  | { readonly state: 'error'; readonly message: string; readonly correlationId?: string; readonly reason: WorkspaceResolutionFailureReason };
+  | { readonly state: 'error'; readonly message: string; readonly correlationId?: string; readonly reason: WorkspaceResolutionFailureReason; readonly retryable: boolean };
 type WorkspaceResolutionFailureReason =
   | 'TOKEN_REJECTED'
   | 'IDENTITY_NOT_MAPPED'
@@ -124,8 +124,11 @@ export function App(): React.ReactElement {
   const [authStatus, setAuthStatus] = useState<AuthStatus>(() => (hasStoredAuthSession() && !currentPath().startsWith('/demo') ? { state: 'restoring' } : getAuthStatus()));
   const [authNotice, setAuthNotice] = useState(getAuthDebugStatus());
   const [workspaceResolution, setWorkspaceResolution] = useState<WorkspaceResolution>({ state: 'loading' });
+  const [workspaceRetryNonce, setWorkspaceRetryNonce] = useState(0);
   const [currentStudent, setCurrentStudent] = useState<CurrentStudentState>({ state: 'idle' });
   const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const workspaceRequestGeneration = useRef(0);
+  const authenticatedEmail = authStatus.state === 'authenticated' ? authStatus.email : null;
 
   useEffect(() => {
     const abort = new AbortController();
@@ -156,6 +159,7 @@ export function App(): React.ReactElement {
 
   useEffect(() => {
     if (authStatus.state !== 'authenticated') {
+      workspaceRequestGeneration.current += 1;
       setWorkspaceResolution({ state: 'loading' });
       return;
     }
@@ -164,24 +168,38 @@ export function App(): React.ReactElement {
       setWorkspaceResolution({
         state: 'error',
         reason: 'TOKEN_REJECTED',
+        retryable: false,
         message: 'We could not load your ONE workspace. Please sign in again.',
       });
       return;
     }
+    const workspaceToken = token;
+    const generation = ++workspaceRequestGeneration.current;
     const controller = new AbortController();
+    let active = true;
     setWorkspaceResolution({ state: 'loading' });
-    getSecurityContext(token, controller.signal)
-      .then((context) => {
+    async function resolveWorkspace(): Promise<void> {
+      try {
+        const context = await getSecurityContext(workspaceToken, controller.signal);
+        if (!active || generation !== workspaceRequestGeneration.current) return;
         const choices = resolveAuthorizedWorkspaces(context);
         setWorkspaceResolution({ state: 'resolved', choices });
         if (choices.length === 1 && (currentPath() === '/auth/callback' || currentPath() === '/' || currentPath() === '/login')) {
           window.history.replaceState(null, '', choices[0]!.path);
           setPath(currentPath());
         }
-      })
-      .catch((error: unknown) => setWorkspaceResolution(workspaceResolutionFailureFromError(error)));
-    return () => controller.abort();
-  }, [authStatus]);
+      } catch (error) {
+        if (!active || generation !== workspaceRequestGeneration.current) return;
+        if (isAbortError(error)) return;
+        setWorkspaceResolution(workspaceResolutionFailureFromError(error));
+      }
+    }
+    void resolveWorkspace();
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [authenticatedEmail, authStatus.state, workspaceRetryNonce]);
 
   useEffect(() => {
     if (authStatus.state !== 'authenticated' || !workspaceResolution || !workspaceForPath('/student', workspaceResolution.state === 'resolved' ? workspaceResolution.choices : [])) {
@@ -237,14 +255,14 @@ export function App(): React.ReactElement {
   }
 
   if (path === '/' || path === '/login') {
-    return <LoginEntry authStatus={authStatus} authNotice={authNotice} workspaceResolution={workspaceResolution} onSignIn={handleSignIn} onHostedSignIn={handleHostedSignIn} onSignOut={handleSignOut} onNavigate={(nextPath) => {
+    return <LoginEntry authStatus={authStatus} authNotice={authNotice} workspaceResolution={workspaceResolution} onSignIn={handleSignIn} onHostedSignIn={handleHostedSignIn} onSignOut={handleSignOut} onRetryWorkspace={handleRetryWorkspace} onNavigate={(nextPath) => {
       window.history.pushState(null, '', nextPath);
       setPath(currentPath());
     }} />;
   }
 
   if (path === '/auth/callback' && authenticated) {
-    return <WorkspaceChooser authStatus={authStatus} authNotice={authNotice} workspaceResolution={workspaceResolution} onSignIn={handleHostedSignIn} onSignOut={handleSignOut} onNavigate={(nextPath) => {
+    return <WorkspaceChooser authStatus={authStatus} authNotice={authNotice} workspaceResolution={workspaceResolution} onSignIn={handleHostedSignIn} onSignOut={handleSignOut} onRetryWorkspace={handleRetryWorkspace} onNavigate={(nextPath) => {
       window.history.pushState(null, '', nextPath);
       setPath(currentPath());
     }} />;
@@ -259,7 +277,7 @@ export function App(): React.ReactElement {
       return <WorkspaceResolutionPage authStatus={authStatus} authNotice={authNotice} onSignIn={handleHostedSignIn} onSignOut={handleSignOut} />;
     }
     if (workspaceResolution.state === 'error') {
-      return <AccessDeniedPage requestedPath={path} authStatus={authStatus} authNotice={authNotice} message={workspaceResolution.message} onSignIn={handleHostedSignIn} onSignOut={handleSignOut} />;
+      return <AccessDeniedPage requestedPath={path} authStatus={authStatus} authNotice={authNotice} message={workspaceResolution.message} retryable={workspaceResolution.retryable} onRetryWorkspace={handleRetryWorkspace} onSignIn={handleHostedSignIn} onSignOut={handleSignOut} />;
     }
     const familyRoot = protectedFamilyRoot(path);
     const firstFamilyWorkspace = familyRoot ? workspaceResolution.choices.find((choice) => choice.family.toLowerCase() === familyRoot) : undefined;
@@ -351,11 +369,16 @@ export function App(): React.ReactElement {
     setAuthStatus(getAuthStatus());
     setAuthNotice(getAuthDebugStatus());
   }
+
+  function handleRetryWorkspace(): void {
+    if (authStatus.state !== 'authenticated') return;
+    setWorkspaceRetryNonce((value) => value + 1);
+  }
 }
 
-function LoginEntry({ authStatus, authNotice, workspaceResolution, onSignIn, onHostedSignIn, onSignOut, onNavigate }: { readonly authStatus: AuthStatus; readonly authNotice: string; readonly workspaceResolution: WorkspaceResolution; readonly onSignIn: (email: string, password: string) => void | Promise<void>; readonly onHostedSignIn: () => void; readonly onSignOut: () => void; readonly onNavigate: (path: string) => void }): React.ReactElement {
+function LoginEntry({ authStatus, authNotice, workspaceResolution, onSignIn, onHostedSignIn, onSignOut, onRetryWorkspace, onNavigate }: { readonly authStatus: AuthStatus; readonly authNotice: string; readonly workspaceResolution: WorkspaceResolution; readonly onSignIn: (email: string, password: string) => void | Promise<void>; readonly onHostedSignIn: () => void; readonly onSignOut: () => void; readonly onRetryWorkspace: () => void; readonly onNavigate: (path: string) => void }): React.ReactElement {
   useEffect(() => { document.title = `Sign in | ${productName}`; }, []);
-  if (authStatus.state === 'authenticated') return <WorkspaceChooser authStatus={authStatus} authNotice={authNotice} workspaceResolution={workspaceResolution} onSignIn={onHostedSignIn} onSignOut={onSignOut} onNavigate={onNavigate} />;
+  if (authStatus.state === 'authenticated') return <WorkspaceChooser authStatus={authStatus} authNotice={authNotice} workspaceResolution={workspaceResolution} onSignIn={onHostedSignIn} onSignOut={onSignOut} onRetryWorkspace={onRetryWorkspace} onNavigate={onNavigate} />;
   const signInUnavailable = authStatus.state === 'unconfigured';
   function submitLogin(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
@@ -401,7 +424,7 @@ function SessionRestorationPage(): React.ReactElement {
   return <main className="login-shell"><section className="login-card"><span className="eyebrow">{productTagline}</span><h1>Restoring your ONE session...</h1><p>ONE is checking your session-scoped Cognito tokens before opening a workspace.</p></section></main>;
 }
 
-function WorkspaceChooser({ authStatus, authNotice, workspaceResolution, onSignIn, onSignOut, onNavigate }: { readonly authStatus: AuthStatus; readonly authNotice: string; readonly workspaceResolution: WorkspaceResolution; readonly onSignIn: () => void; readonly onSignOut: () => void; readonly onNavigate: (path: string) => void }): React.ReactElement {
+function WorkspaceChooser({ authStatus, authNotice, workspaceResolution, onSignIn, onSignOut, onRetryWorkspace, onNavigate }: { readonly authStatus: AuthStatus; readonly authNotice: string; readonly workspaceResolution: WorkspaceResolution; readonly onSignIn: () => void; readonly onSignOut: () => void; readonly onRetryWorkspace: () => void; readonly onNavigate: (path: string) => void }): React.ReactElement {
   useEffect(() => { document.title = `Choose workspace | ${productName}`; }, []);
   const choices = workspaceResolution.state === 'resolved' ? workspaceResolution.choices : [];
   return <main className="login-shell">
@@ -412,6 +435,7 @@ function WorkspaceChooser({ authStatus, authNotice, workspaceResolution, onSignI
       <AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />
       {workspaceResolution.state === 'loading' ? <p className="auth-boundary" role="status">Resolving authorized workspaces...</p> : null}
       {workspaceResolution.state === 'error' ? <p className="auth-boundary" role="alert">{workspaceResolution.message}</p> : null}
+      {workspaceResolution.state === 'error' && workspaceResolution.retryable ? <button type="button" onClick={onRetryWorkspace}>Retry workspace</button> : null}
       {workspaceResolution.state === 'resolved' && choices.length === 0 ? <p className="auth-boundary" role="status">No active ONE workspace is available for this identity.</p> : null}
       {choices.length > 0 ? <div className="workspace-grid">{choices.map((choice) => { const Icon = choice.icon; return <button key={choice.path} type="button" onClick={() => onNavigate(choice.path)}><Icon size={20} /><strong>{choice.label}</strong><span>{choice.detail}</span></button>; })}</div> : null}
     </section>
@@ -435,18 +459,22 @@ function resolveAuthorizedWorkspaces(context: SecurityContextDto): readonly Auth
 
 function workspaceResolutionFailureFromError(error: unknown): Extract<WorkspaceResolution, { readonly state: 'error' }> {
   if (error instanceof ApiRequestError) {
-    if (error.status === 401) return workspaceError('TOKEN_REJECTED', error.correlationId);
-    if (error.status === 403) return workspaceError('IDENTITY_NOT_MAPPED', error.correlationId);
-    return workspaceError('CONTEXT_REQUEST_FAILED', error.correlationId);
+    if (error.status === 401) return workspaceError('TOKEN_REJECTED', error.correlationId, false);
+    if (error.status === 403) return workspaceError('IDENTITY_NOT_MAPPED', error.correlationId, false);
+    return workspaceError('CONTEXT_REQUEST_FAILED', error.correlationId, error.status >= 500);
   }
-  if (error instanceof DOMException && error.name === 'AbortError') return workspaceError('CONTEXT_REQUEST_FAILED');
-  return workspaceError('CONTEXT_REQUEST_FAILED');
+  return workspaceError('CONTEXT_REQUEST_FAILED', undefined, true);
 }
 
-function workspaceError(reason: WorkspaceResolutionFailureReason, correlationId?: string): Extract<WorkspaceResolution, { readonly state: 'error' }> {
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'AbortError';
+}
+
+function workspaceError(reason: WorkspaceResolutionFailureReason, correlationId?: string, retryable = false): Extract<WorkspaceResolution, { readonly state: 'error' }> {
   return {
     state: 'error',
     reason,
+    retryable,
     ...(correlationId ? { correlationId } : {}),
     message: `We could not load your ONE workspace.${correlationId ? ` Reference: ${correlationId}` : ''}`,
   };
@@ -501,13 +529,14 @@ function WorkspaceResolutionPage({ authStatus, authNotice, onSignIn, onSignOut }
   </main>;
 }
 
-function AccessDeniedPage({ requestedPath, authStatus, authNotice, message, onSignIn, onSignOut }: { readonly requestedPath: string; readonly authStatus: AuthStatus; readonly authNotice: string; readonly message?: string; readonly onSignIn: () => void; readonly onSignOut: () => void }): React.ReactElement {
+function AccessDeniedPage({ requestedPath, authStatus, authNotice, message, retryable = false, onRetryWorkspace, onSignIn, onSignOut }: { readonly requestedPath: string; readonly authStatus: AuthStatus; readonly authNotice: string; readonly message?: string; readonly retryable?: boolean; readonly onRetryWorkspace?: () => void; readonly onSignIn: () => void; readonly onSignOut: () => void }): React.ReactElement {
   useEffect(() => { document.title = `Workspace unavailable | ${productName}`; }, []);
   return <main className="login-shell">
     <section className="login-card">
       <span className="eyebrow">{productTagline}</span>
       <h1>You do not have access to this workspace</h1>
       <p>{message ?? `Your verified identity is not authorized for ${requestedPath}. ONE did not mount the requested portal UI.`}</p>
+      {retryable && onRetryWorkspace ? <button type="button" onClick={onRetryWorkspace}>Retry workspace</button> : null}
       <AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />
     </section>
   </main>;

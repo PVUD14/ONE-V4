@@ -16,6 +16,20 @@ function demoPathFor(path: string): string {
   return path.startsWith('/demo/') ? path : `/demo${path}`;
 }
 
+function configureHostedCallback(email = 'institution.admin@uat.example.test'): void {
+  vi.stubEnv('VITE_COGNITO_DOMAIN', 'https://uat-auth.example.test');
+  vi.stubEnv('VITE_COGNITO_CLIENT_ID', 'uat-client');
+  vi.stubEnv('VITE_COGNITO_REDIRECT_URI', 'http://127.0.0.1:5173/auth/callback');
+  window.sessionStorage.setItem('planthepath.oauthState', 'state-123');
+  window.sessionStorage.setItem('planthepath.oauthVerifier', 'verifier-12345678901234567890');
+  window.history.pushState(null, '', '/auth/callback?code=code-123&state=state-123');
+  void email;
+}
+
+function institutionSecurityContext(): { readonly userId: string; readonly memberships: readonly { readonly organizationId: string; readonly role: string; readonly scope: { readonly organizationId: string; readonly institutionId: string } }[] } {
+  return { userId: 'admin-user', memberships: [{ organizationId: 'institution-1', role: 'INSTITUTION_ADMIN', scope: { organizationId: 'institution-1', institutionId: 'institution-1' } }] };
+}
+
 beforeEach(() => {
   window.history.pushState(null, '', '/demo/student');
   fetchMock.mockReset();
@@ -232,6 +246,55 @@ describe('All-role portal registry and preview workflows', () => {
     await waitFor(() => expect(screen.getByText(/Membership is created only after the verified recipient accepts/i)).toBeInTheDocument());
     expect(contextCalls).toBe(contextCallsAfterCallback + 1);
     expect(screen.queryByText('OPERATIONS_ADMIN')).not.toBeInTheDocument();
+  });
+
+  it('ignores an aborted workspace context request instead of showing a false workspace failure', async () => {
+    configureHostedCallback();
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url === 'https://uat-auth.example.test/oauth2/token') return { ok: true, json: async () => ({ access_token: 'institution-token', id_token: jwtWithEmail('institution.admin@uat.example.test') }) };
+      if (url.endsWith('/health')) return { ok: true };
+      if (url.endsWith('/api/v1/security/context')) throw new DOMException('Request was aborted by effect cleanup.', 'AbortError');
+      return { ok: false };
+    });
+    render(<App />);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument());
+    expect(screen.getByRole('heading', { name: 'Choose your ONE workspace' })).toBeInTheDocument();
+    expect(screen.getByText(/Resolving authorized workspaces/i)).toBeInTheDocument();
+    expect(screen.queryByText(/We could not load your ONE workspace/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Retry workspace' })).not.toBeInTheDocument();
+  });
+
+  it('keeps real workspace HTTP failures visible with a safe correlation reference', async () => {
+    configureHostedCallback();
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url === 'https://uat-auth.example.test/oauth2/token') return { ok: true, json: async () => ({ access_token: 'institution-token', id_token: jwtWithEmail('institution.admin@uat.example.test') }) };
+      if (url.endsWith('/health')) return { ok: true };
+      if (url.endsWith('/api/v1/security/context')) return { ok: false, status: 500, headers: { get: () => 'ctx-500' }, json: async () => ({ message: { correlationId: 'ctx-500' } }) };
+      return { ok: false };
+    });
+    render(<App />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('We could not load your ONE workspace. Reference: ctx-500');
+    expect(screen.getByRole('button', { name: 'Retry workspace' })).toBeInTheDocument();
+  });
+
+  it('retries a transient workspace network failure and auto-routes the single Institution workspace', async () => {
+    configureHostedCallback();
+    let contextCalls = 0;
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url === 'https://uat-auth.example.test/oauth2/token') return { ok: true, json: async () => ({ access_token: 'institution-token', id_token: jwtWithEmail('institution.admin@uat.example.test') }) };
+      if (url.endsWith('/health')) return { ok: true };
+      if (url.endsWith('/api/v1/security/context')) {
+        contextCalls += 1;
+        if (contextCalls === 1) throw new TypeError('temporary network failure');
+        return { ok: true, json: async () => institutionSecurityContext() };
+      }
+      return { ok: false };
+    });
+    render(<App />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Retry workspace' }));
+    await waitFor(() => expect(window.location.pathname).toBe('/institution/admin'));
+    expect(screen.getByRole('heading', { name: 'Institution Administration' })).toBeInTheDocument();
+    expect(screen.queryByText(/Rahul Kumar/)).not.toBeInTheDocument();
   });
 
   it('opens dashboard record workflows and returns focus after Escape', () => {

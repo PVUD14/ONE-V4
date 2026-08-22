@@ -178,6 +178,42 @@ export interface CurrentStudentDto {
   readonly relationship?: { readonly id: string; readonly state: string; readonly effectiveFrom: string; readonly effectiveTo?: string | null } | null;
 }
 
+export interface StudentProfileDto {
+  readonly userId: string;
+  readonly verifiedEmail: string | null;
+  readonly targetCareer: string | null;
+  readonly careerInterests: readonly string[];
+  readonly profileHeadline: string | null;
+  readonly profileSummary: string | null;
+  readonly portfolioUrl: string | null;
+  readonly visibilityState: string;
+  readonly employerDiscoveryEnabled: boolean;
+  readonly updatedAt: string | null;
+}
+
+export interface StudentDocumentDto {
+  readonly id: string;
+  readonly title: string;
+  readonly documentType: string;
+  readonly description: string | null;
+  readonly verificationState: string;
+  readonly archivedAt: string | null;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+export interface StudentSavedOpportunityDto {
+  readonly id: string;
+  readonly opportunityRef: string;
+  readonly title: string;
+  readonly organizationName: string | null;
+  readonly source: string;
+  readonly notes: string | null;
+  readonly archivedAt: string | null;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
 export interface RosterImportPreviewDto {
   readonly id: string; readonly rowCount: number; readonly acceptedCount: number; readonly warningCount: number; readonly rejectedCount: number;
   readonly rows: readonly { readonly rowNumber: number; readonly institutionStudentId: string; readonly fullName: string; readonly email: string; readonly state: string; readonly issues: readonly string[] }[];
@@ -196,6 +232,42 @@ export function getSecurityContext(token: string, signal?: AbortSignal): Promise
 
 export function getCurrentStudent(token: string, signal?: AbortSignal): Promise<{ readonly student: CurrentStudentDto }> {
   return requestJson('/api/v1/students/me', { token, ...(signal ? { signal } : {}) });
+}
+
+export function getStudentProfile(token: string, signal?: AbortSignal): Promise<{ readonly profile: StudentProfileDto }> {
+  return requestJson('/api/v1/students/me/profile', { token, ...(signal ? { signal } : {}) });
+}
+
+export function updateStudentProfile(token: string, body: unknown): Promise<{ readonly profile: StudentProfileDto }> {
+  return requestJson('/api/v1/students/me/profile', { token, method: 'PATCH', body });
+}
+
+export function listStudentDocuments(token: string, signal?: AbortSignal): Promise<{ readonly documents: readonly StudentDocumentDto[]; readonly storage: { readonly fileStorage: string; readonly message: string } }> {
+  return requestJson('/api/v1/students/me/documents', { token, ...(signal ? { signal } : {}) });
+}
+
+export function createStudentDocument(token: string, body: unknown): Promise<{ readonly document: StudentDocumentDto }> {
+  return requestJson('/api/v1/students/me/documents', { token, method: 'POST', body });
+}
+
+export function updateStudentDocument(token: string, documentId: string, body: unknown): Promise<{ readonly document: StudentDocumentDto }> {
+  return requestJson(`/api/v1/students/me/documents/${encodeURIComponent(documentId)}`, { token, method: 'PATCH', body });
+}
+
+export function archiveStudentDocument(token: string, documentId: string): Promise<Record<string, unknown>> {
+  return requestJson(`/api/v1/students/me/documents/${encodeURIComponent(documentId)}`, { token, method: 'DELETE' });
+}
+
+export function listStudentSavedOpportunities(token: string, signal?: AbortSignal): Promise<{ readonly savedOpportunities: readonly StudentSavedOpportunityDto[] }> {
+  return requestJson('/api/v1/students/me/saved-opportunities', { token, ...(signal ? { signal } : {}) });
+}
+
+export function saveStudentOpportunity(token: string, body: unknown): Promise<{ readonly savedOpportunities: readonly StudentSavedOpportunityDto[] }> {
+  return requestJson('/api/v1/students/me/saved-opportunities', { token, method: 'POST', body });
+}
+
+export function removeStudentSavedOpportunity(token: string, savedOpportunityId: string): Promise<Record<string, unknown>> {
+  return requestJson(`/api/v1/students/me/saved-opportunities/${encodeURIComponent(savedOpportunityId)}`, { token, method: 'DELETE' });
 }
 
 export function listOperationsOrganizations(token: string, signal?: AbortSignal): Promise<{ readonly organizations: readonly OrganizationManagementDto[] }> {
@@ -259,7 +331,7 @@ export function commitStudentRosterImport(token: string, institutionId: string, 
 }
 
 async function requestJson<T>(path: string, input: {
-  readonly token?: string; readonly method?: 'GET' | 'POST' | 'PATCH'; readonly body?: unknown;
+  readonly token?: string; readonly method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'; readonly body?: unknown;
   readonly idempotencyKey?: string; readonly signal?: AbortSignal;
 } = {}): Promise<T> {
   const correlationId = crypto.randomUUID();
@@ -275,7 +347,7 @@ async function requestJson<T>(path: string, input: {
     const body = await response.json().catch(() => null) as { readonly message?: { readonly code?: string; readonly correlationId?: string } } | null;
     throw new ApiRequestError({
       status: response.status,
-      correlationId: body?.message?.correlationId ?? response.headers.get('x-correlation-id') ?? correlationId,
+      correlationId: body?.message?.correlationId ?? response.headers?.get('x-correlation-id') ?? correlationId,
       ...(body?.message?.code ? { code: body.message.code } : {}),
     });
   }

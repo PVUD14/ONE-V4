@@ -104,6 +104,67 @@ describe('Cognito Hosted UI browser authentication', () => {
     expect(screen.getByText('Secure sign-in is not available in this UAT environment yet.')).toBeInTheDocument();
   });
 
+  it('saves authenticated Student profile fields through the protected API', async () => {
+    vi.doMock('amazon-cognito-identity-js', () => ({
+      AuthenticationDetails: class {
+        constructor(readonly input: { Username: string; Password: string }) {}
+      },
+      CognitoUserPool: class {
+        constructor(readonly input: unknown) {}
+      },
+      CognitoRefreshToken: class {
+        constructor(readonly input: unknown) {}
+      },
+      CognitoUser: class {
+        constructor(readonly input: { Username: string }) {}
+        setAuthenticationFlowType(): void {}
+        authenticateUser(_details: unknown, callbacks: { onSuccess: (session: unknown) => void }): void {
+          callbacks.onSuccess({
+            getAccessToken: () => ({ getJwtToken: () => jwtWithEmailAndExpiry('student.aanya@uat.example.test'), getExpiration: () => Math.floor(Date.now() / 1000) + 3600 }),
+            getIdToken: () => ({ getJwtToken: () => jwtWithEmail('student.aanya@uat.example.test') }),
+            getRefreshToken: () => ({ getToken: () => 'refresh-token' }),
+          });
+        }
+        refreshSession(): void {}
+      },
+    }));
+    const profileRequests: unknown[] = [];
+    vi.stubEnv('VITE_COGNITO_DOMAIN', 'https://uat-auth.example.test');
+    vi.stubEnv('VITE_COGNITO_CLIENT_ID', 'uat-client');
+    vi.stubEnv('VITE_COGNITO_USER_POOL_ID', 'ap-south-1_uatpool');
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.endsWith('/health')) return { ok: true };
+      if (url.endsWith('/api/v1/security/context')) return { ok: true, json: async () => ({ userId: 'student-user', memberships: [], studentRelationships: [{ institutionId: 'institution-1', state: 'ACTIVE', effectiveFrom: '2026-08-21T00:00:00.000Z' }] }) };
+      if (url.endsWith('/api/v1/students/me')) return { ok: true, json: async () => ({ student: { userId: 'student-user', verifiedEmail: 'student.aanya@uat.example.test', fullName: 'Aanya Rao', institutionStudentId: 'UAT-S-001', institutionId: 'institution-1', academicStatus: 'ACTIVE' } }) };
+      if (url.endsWith('/api/v1/students/me/profile') && (!init?.method || init.method === 'GET')) return { ok: true, json: async () => ({ profile: { userId: 'student-user', verifiedEmail: 'student.aanya@uat.example.test', targetCareer: null, careerInterests: [], profileHeadline: null, profileSummary: null, portfolioUrl: null, visibilityState: 'PRIVATE', employerDiscoveryEnabled: false, updatedAt: null } }) };
+      if (url.endsWith('/api/v1/students/me/profile') && init?.method === 'PATCH') {
+        profileRequests.push(JSON.parse(String(init.body)));
+        return { ok: true, json: async () => ({ profile: { userId: 'student-user', verifiedEmail: 'student.aanya@uat.example.test', targetCareer: 'Security Analyst', careerInterests: ['SOC'], profileHeadline: 'Security learner', profileSummary: 'Evidence-backed learner', portfolioUrl: null, visibilityState: 'INSTITUTION_VISIBLE', employerDiscoveryEnabled: false, updatedAt: '2026-08-22T00:00:00Z' } }) };
+      }
+      if (url.endsWith('/api/v1/career-readiness/catalog')) return { ok: true, json: async () => ({ pilot: 'Career Readiness Fundamentals', releaseManifestId: 'release', modules: [], assessments: [] }) };
+      if (url.endsWith('/api/v1/career-readiness/me')) return { ok: true, json: async () => ({ catalog: {}, progress: [], attempts: [], evidence: [], mastery: [], readiness: null, roadmap: [], notificationPreferences: null, notifications: [] }) };
+      return { ok: false, status: 404, headers: new Headers(), json: async () => ({}) };
+    }));
+    const { App } = await import('./App.js');
+    render(React.createElement(App));
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'student.aanya@uat.example.test' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'Correct-Horse-1' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+    await waitFor(() => expect(window.location.pathname).toBe('/student'));
+    window.history.pushState(null, '', '/student/profile');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Student-owned profile' })).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText('Target career'), { target: { value: 'Security Analyst' } });
+    fireEvent.change(screen.getByLabelText('Headline'), { target: { value: 'Security learner' } });
+    fireEvent.change(screen.getByLabelText('Career interests, comma separated'), { target: { value: 'SOC' } });
+    fireEvent.change(screen.getByLabelText('Summary'), { target: { value: 'Evidence-backed learner' } });
+    fireEvent.change(screen.getByLabelText('Visibility'), { target: { value: 'INSTITUTION_VISIBLE' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save profile' }));
+    await waitFor(() => expect(screen.getByText('Profile saved.')).toBeInTheDocument());
+    expect(profileRequests[0]).toMatchObject({ targetCareer: 'Security Analyst', careerInterests: ['SOC'], visibilityState: 'INSTITUTION_VISIBLE' });
+    expect(JSON.stringify(profileRequests[0])).not.toContain('studentUserId');
+  });
+
   it('exchanges a Hosted UI authorization code and uses the returned access token for protected API calls', async () => {
     vi.stubEnv('VITE_COGNITO_DOMAIN', 'https://uat-auth.example.test');
     vi.stubEnv('VITE_COGNITO_CLIENT_ID', 'uat-client');

@@ -1,7 +1,27 @@
 import { Bell, BookOpen, BriefcaseBusiness, Building2, CalendarDays, ChevronDown, ClipboardCheck, FileText, Gauge, GraduationCap, Home, LayoutDashboard, Menu, MessageSquare, Search, Settings, ShieldCheck, Sparkles, Target, Trophy, UserRound, X, type LucideIcon } from 'lucide-react';
 import type { FormEvent } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { acceptInvitation, ApiRequestError, getApiHealth, getSecurityContext, getCurrentStudent, type ApiHealth, type CurrentStudentDto, type SecurityContextDto } from './api.js';
+import {
+  acceptInvitation,
+  ApiRequestError,
+  archiveStudentDocument,
+  createStudentDocument,
+  getApiHealth,
+  getSecurityContext,
+  getCurrentStudent,
+  getStudentProfile,
+  listStudentDocuments,
+  listStudentSavedOpportunities,
+  removeStudentSavedOpportunity,
+  saveStudentOpportunity,
+  updateStudentProfile,
+  type ApiHealth,
+  type CurrentStudentDto,
+  type SecurityContextDto,
+  type StudentDocumentDto,
+  type StudentProfileDto,
+  type StudentSavedOpportunityDto,
+} from './api.js';
 import { beginHostedLogin, completeHostedLoginFromLocation, getAccessToken, getAuthStatus, getAuthDebugStatus, hasStoredAuthSession, restoreAuthenticatedSession, signInWithPassword, signOut, type AuthStatus } from './auth.js';
 import { AuthControls } from './authControls.js';
 import { PageHeader, type PageMeta } from './studentComponents.js';
@@ -676,6 +696,9 @@ function RouteScreen({ route, authenticated, currentStudent }: { readonly route:
 
 function AuthenticatedStudentRoute({ route, currentStudent }: { readonly route: RouteKey; readonly currentStudent: CurrentStudentState }): React.ReactElement {
   if (route === 'dashboard') return <AuthenticatedStudentDashboard currentStudent={currentStudent} />;
+  if (route === 'profile') return <AuthenticatedStudentProfile />;
+  if (route === 'documents') return <AuthenticatedStudentDocuments />;
+  if (route === 'opportunities') return <AuthenticatedStudentSavedOpportunities />;
   if (route === 'career-path') return <><CareerReadinessApiPanel route="roadmap" /><AuthenticatedStudentUnavailable route={route} /></>;
   if (route === 'readiness') return <><CareerReadinessApiPanel route="readiness" /><AuthenticatedStudentUnavailable route={route} /></>;
   if (route === 'skills') return <><CareerReadinessApiPanel route="skills" /><AuthenticatedStudentUnavailable route={route} /></>;
@@ -693,9 +716,161 @@ function AuthenticatedStudentDashboard({ currentStudent }: { readonly currentStu
   return <div className="workspace-grid">
     <section className="card wide-card"><span className="eyebrow">Real Student identity</span><h2>{student.fullName}</h2><p>Verified email: {student.verifiedEmail ?? 'Not available'}</p><p>Institution student ID: {student.institutionStudentId}</p><p>Institution: {student.institutionId}</p><p>Status: {student.academicStatus}</p></section>
     <section className="card"><h2>Academic placement</h2><p>Department: {student.department ?? 'Not yet available'}</p><p>Program: {student.program ?? 'Not yet available'}</p><p>Batch: {student.batch ?? 'Not yet available'}</p><p>Section: {student.section ?? 'Not yet available'}</p></section>
-    <section className="card"><h2>Target career</h2><p>Target career not set.</p></section>
-    <section className="card wide-card"><h2>Applications and documents</h2><p>Applications, interviews and documents are not yet available in this authenticated UAT build. Demo examples remain isolated under /demo/student.</p></section>
+    <section className="card"><h2>Target career</h2><AuthenticatedStudentProfileSummary /></section>
+    <section className="card wide-card"><h2>Operational Student tools</h2><p>Profile, document metadata, and saved opportunity references now persist through protected Student-owned APIs. File storage will be enabled in a later secure-storage phase.</p></section>
     <section className="card wide-card"><h2>Career readiness</h2><CareerReadinessApiPanel route="readiness" /></section>
+  </div>;
+}
+
+function AuthenticatedStudentProfileSummary(): React.ReactElement {
+  const [profile, setProfile] = useState<StudentProfileDto | null>(null);
+  useEffect(() => {
+    const token = getAccessToken();
+    if (!token) return undefined;
+    const controller = new AbortController();
+    getStudentProfile(token, controller.signal).then(({ profile: next }) => setProfile(next)).catch(() => setProfile(null));
+    return () => controller.abort();
+  }, []);
+  return <p>{profile?.targetCareer ?? 'Target career not set.'}</p>;
+}
+
+function AuthenticatedStudentProfile(): React.ReactElement {
+  const [profile, setProfile] = useState<StudentProfileDto | null>(null);
+  const [status, setStatus] = useState('Loading protected Student profile...');
+  useEffect(() => {
+    const token = getAccessToken();
+    if (!token) {
+      setStatus('No protected access token is available.');
+      return undefined;
+    }
+    const controller = new AbortController();
+    getStudentProfile(token, controller.signal).then(({ profile: next }) => {
+      setProfile(next);
+      setStatus('Profile loaded.');
+    }).catch(() => setStatus('Profile could not be loaded.'));
+    return () => controller.abort();
+  }, []);
+  async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    const token = getAccessToken();
+    if (!token) return setStatus('No protected access token is available.');
+    const form = new FormData(event.currentTarget);
+    const body = {
+      targetCareer: String(form.get('targetCareer') ?? '').trim(),
+      profileHeadline: String(form.get('profileHeadline') ?? '').trim(),
+      profileSummary: String(form.get('profileSummary') ?? '').trim(),
+      portfolioUrl: String(form.get('portfolioUrl') ?? '').trim(),
+      visibilityState: String(form.get('visibilityState') ?? 'PRIVATE'),
+      employerDiscoveryEnabled: form.get('employerDiscoveryEnabled') === 'on',
+      careerInterests: String(form.get('careerInterests') ?? '').split(',').map((item) => item.trim()).filter(Boolean),
+    };
+    try {
+      const response = await updateStudentProfile(token, body);
+      setProfile(response.profile);
+      setStatus('Profile saved.');
+    } catch {
+      setStatus('Profile save failed. Check field validation and try again.');
+    }
+  }
+  return <div className="workspace-grid">
+    <section className="card wide-card"><span className="eyebrow">REAL</span><h2>Student-owned profile</h2><p>Saved through `/api/v1/students/me/profile`; the API derives the Student from the verified principal.</p><p role="status">{status}</p></section>
+    <form className="card wide-card student-form" onSubmit={(event) => { void submit(event); }}>
+      <label className="student-form-field"><span>Target career</span><input name="targetCareer" defaultValue={profile?.targetCareer ?? ''} maxLength={120} /></label>
+      <label className="student-form-field"><span>Headline</span><input name="profileHeadline" defaultValue={profile?.profileHeadline ?? ''} maxLength={160} /></label>
+      <label className="student-form-field"><span>Career interests, comma separated</span><input name="careerInterests" defaultValue={profile?.careerInterests.join(', ') ?? ''} /></label>
+      <label className="student-form-field"><span>Portfolio URL</span><input name="portfolioUrl" defaultValue={profile?.portfolioUrl ?? ''} placeholder="https://..." /></label>
+      <label className="student-form-field"><span>Summary</span><textarea name="profileSummary" defaultValue={profile?.profileSummary ?? ''} maxLength={2000} /></label>
+      <label className="student-form-field"><span>Visibility</span><select name="visibilityState" defaultValue={profile?.visibilityState ?? 'PRIVATE'}><option>PRIVATE</option><option>INSTITUTION_VISIBLE</option><option>EMPLOYER_DISCOVERY</option></select></label>
+      <label className="setting-row preference-row"><span>Employer discovery</span><input name="employerDiscoveryEnabled" type="checkbox" defaultChecked={profile?.employerDiscoveryEnabled ?? false} /></label>
+      <button type="submit">Save profile</button>
+    </form>
+  </div>;
+}
+
+function AuthenticatedStudentDocuments(): React.ReactElement {
+  const [documents, setDocuments] = useState<readonly StudentDocumentDto[]>([]);
+  const [status, setStatus] = useState('Loading document metadata...');
+  const reload = async (): Promise<void> => {
+    const token = getAccessToken();
+    if (!token) return setStatus('No protected access token is available.');
+    const response = await listStudentDocuments(token);
+    setDocuments(response.documents);
+    setStatus(response.storage.message);
+  };
+  useEffect(() => { void reload().catch(() => setStatus('Document metadata could not be loaded.')); }, []);
+  async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    const token = getAccessToken();
+    if (!token) return setStatus('No protected access token is available.');
+    const form = new FormData(event.currentTarget);
+    try {
+      await createStudentDocument(token, {
+        title: String(form.get('title') ?? ''),
+        documentType: String(form.get('documentType') ?? 'OTHER'),
+        description: String(form.get('description') ?? ''),
+      });
+      event.currentTarget.reset();
+      await reload();
+      setStatus('Document metadata saved. File storage will be enabled in a later secure-storage phase.');
+    } catch {
+      setStatus('Document metadata save failed.');
+    }
+  }
+  return <div className="workspace-grid">
+    <section className="card wide-card"><span className="eyebrow">REAL metadata / NOT_YET_AVAILABLE file storage</span><h2>Documents</h2><p role="status">{status}</p></section>
+    <form className="card student-form" onSubmit={(event) => { void submit(event); }}>
+      <h2>Create document metadata</h2>
+      <label className="student-form-field"><span>Title</span><input name="title" required maxLength={160} /></label>
+      <label className="student-form-field"><span>Type</span><select name="documentType"><option>RESUME</option><option>CERTIFICATE</option><option>TRANSCRIPT</option><option>PORTFOLIO</option><option>OTHER</option></select></label>
+      <label className="student-form-field"><span>Description</span><textarea name="description" maxLength={1000} /></label>
+      <button type="submit">Save metadata</button>
+    </form>
+    <section className="card wide-card"><h2>My document metadata</h2>{documents.length ? <div className="data-table-wrap"><table><thead><tr><th>Title</th><th>Type</th><th>Verification</th><th>Updated</th><th>Action</th></tr></thead><tbody>{documents.map((doc) => <tr key={doc.id}><td>{doc.title}</td><td>{doc.documentType}</td><td>{doc.verificationState}</td><td>{doc.updatedAt}</td><td><button type="button" className="secondary" disabled={Boolean(doc.archivedAt)} onClick={() => { const token = getAccessToken(); if (token) void archiveStudentDocument(token, doc.id).then(reload); }}>Archive</button></td></tr>)}</tbody></table></div> : <p>No document metadata yet.</p>}</section>
+  </div>;
+}
+
+function AuthenticatedStudentSavedOpportunities(): React.ReactElement {
+  const [saved, setSaved] = useState<readonly StudentSavedOpportunityDto[]>([]);
+  const [status, setStatus] = useState('Loading saved opportunities...');
+  const reload = async (): Promise<void> => {
+    const token = getAccessToken();
+    if (!token) return setStatus('No protected access token is available.');
+    const response = await listStudentSavedOpportunities(token);
+    setSaved(response.savedOpportunities);
+    setStatus('Saved opportunities loaded.');
+  };
+  useEffect(() => { void reload().catch(() => setStatus('Saved opportunities could not be loaded.')); }, []);
+  async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    const token = getAccessToken();
+    if (!token) return setStatus('No protected access token is available.');
+    const form = new FormData(event.currentTarget);
+    try {
+      const response = await saveStudentOpportunity(token, {
+        opportunityRef: String(form.get('opportunityRef') ?? ''),
+        title: String(form.get('title') ?? ''),
+        organizationName: String(form.get('organizationName') ?? ''),
+        source: 'UAT_REFERENCE',
+        notes: String(form.get('notes') ?? ''),
+      });
+      setSaved(response.savedOpportunities);
+      event.currentTarget.reset();
+      setStatus('Opportunity reference saved.');
+    } catch {
+      setStatus('Opportunity reference could not be saved.');
+    }
+  }
+  return <div className="workspace-grid">
+    <section className="card wide-card"><span className="eyebrow">REAL Student-owned references</span><h2>Saved opportunities</h2><p role="status">{status}</p><p>Employer applications, interviews, offers, and decisions are not yet available in Phase 2A.</p></section>
+    <form className="card student-form" onSubmit={(event) => { void submit(event); }}>
+      <h2>Save opportunity reference</h2>
+      <label className="student-form-field"><span>Reference</span><input name="opportunityRef" required maxLength={128} /></label>
+      <label className="student-form-field"><span>Title</span><input name="title" required maxLength={200} /></label>
+      <label className="student-form-field"><span>Organization</span><input name="organizationName" maxLength={200} /></label>
+      <label className="student-form-field"><span>Notes</span><textarea name="notes" maxLength={1000} /></label>
+      <button type="submit">Save opportunity</button>
+    </form>
+    <section className="card wide-card"><h2>Saved list</h2>{saved.length ? <div className="data-table-wrap"><table><thead><tr><th>Title</th><th>Organization</th><th>Reference</th><th>Updated</th><th>Action</th></tr></thead><tbody>{saved.map((item) => <tr key={item.id}><td>{item.title}</td><td>{item.organizationName ?? 'Not provided'}</td><td>{item.opportunityRef}</td><td>{item.updatedAt}</td><td><button type="button" className="secondary" disabled={Boolean(item.archivedAt)} onClick={() => { const token = getAccessToken(); if (token) void removeStudentSavedOpportunity(token, item.id).then(reload); }}>Remove</button></td></tr>)}</tbody></table></div> : <p>No saved opportunity references yet.</p>}</section>
   </div>;
 }
 

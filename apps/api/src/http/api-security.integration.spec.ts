@@ -68,6 +68,9 @@ beforeEach(async () => {
       notification_delivery_attempts,
       notification_commands,
       notification_templates,
+      student_saved_opportunities,
+      student_document_metadata,
+      student_profiles,
       student_roster_import_rows,
       student_roster_imports,
       institution_student_profiles,
@@ -688,6 +691,95 @@ describe('Phase 1 API protected request path', () => {
       .send({ token: rawToken })
       .expect(201);
     await expect(db.select().from(schema.organizationMemberships).where(eq(schema.organizationMemberships.userId, targetUserId))).resolves.toHaveLength(1);
+  });
+
+  it('persists Student-owned profile, document metadata and saved opportunities only for the verified principal', async () => {
+    const institutionId = await seedOrg('INSTITUTION', 'Student Ops College');
+    const studentUserId = await seedUser('student.ops@example.test', 'sub:student-ops');
+    const otherStudentUserId = await seedUser('other.student.ops@example.test', 'sub:other-student-ops');
+    await db.insert(schema.institutionStudentProfiles).values({
+      id: randomUUID(),
+      institutionId,
+      studentUserId,
+      institutionStudentId: 'OPS-S-001',
+      fullName: 'Student Ops',
+      status: 'ACTIVE',
+    });
+    await db.insert(schema.institutionRelationships).values({
+      id: randomUUID(),
+      institutionId,
+      studentUserId,
+      state: 'ACTIVE',
+      effectiveFrom: new Date('2026-08-01T00:00:00Z'),
+    });
+    await db.insert(schema.institutionRelationships).values({
+      id: randomUUID(),
+      institutionId,
+      studentUserId: otherStudentUserId,
+      state: 'ACTIVE',
+      effectiveFrom: new Date('2026-08-01T00:00:00Z'),
+    });
+    const token = signAccessToken(privateKey, { sub: 'sub:student-ops', email: 'student.ops@example.test' });
+    const otherToken = signAccessToken(privateKey, { sub: 'sub:other-student-ops', email: 'other.student.ops@example.test' });
+
+    const profile = await request(app.getHttpServer())
+      .patch('/api/v1/students/me/profile')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        targetCareer: 'Security Analyst',
+        careerInterests: ['SOC', 'Cloud Security'],
+        profileHeadline: 'Entry-level security analyst',
+        profileSummary: 'Interested in monitored, evidence-backed security work.',
+        portfolioUrl: 'https://portfolio.example.test/student-ops',
+        visibilityState: 'INSTITUTION_VISIBLE',
+        employerDiscoveryEnabled: false,
+        studentUserId: otherStudentUserId,
+      })
+      .expect(200);
+    expect(profile.body.profile).toMatchObject({ userId: studentUserId, targetCareer: 'Security Analyst', verifiedEmail: 'student.ops@example.test' });
+
+    const document = await request(app.getHttpServer())
+      .post('/api/v1/students/me/documents')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ title: 'Resume v1', documentType: 'RESUME', description: 'Metadata only' })
+      .expect(201);
+    expect(document.body.document).toMatchObject({ title: 'Resume v1', documentType: 'RESUME', verificationState: 'SELF_REPORTED' });
+
+    const saved = await request(app.getHttpServer())
+      .post('/api/v1/students/me/saved-opportunities')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ opportunityRef: 'uat-soc-intern', title: 'SOC Analyst Intern', organizationName: 'Secure Labs' })
+      .expect(201);
+    expect(saved.body.savedOpportunities).toHaveLength(1);
+    expect(saved.body.savedOpportunities[0]).toMatchObject({ opportunityRef: 'uat-soc-intern', title: 'SOC Analyst Intern' });
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/students/me/documents/${document.body.document.id}`)
+      .set('Authorization', `Bearer ${otherToken}`)
+      .send({ title: 'Hijack', documentType: 'RESUME' })
+      .expect(403);
+    const otherList = await request(app.getHttpServer())
+      .get('/api/v1/students/me/saved-opportunities')
+      .set('Authorization', `Bearer ${otherToken}`)
+      .expect(200);
+    expect(otherList.body.savedOpportunities).toEqual([]);
+
+    await request(app.getHttpServer())
+      .delete(`/api/v1/students/me/documents/${document.body.document.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    await request(app.getHttpServer())
+      .delete(`/api/v1/students/me/saved-opportunities/${saved.body.savedOpportunities[0].id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    const audits = await pool.query("SELECT action FROM audit_events WHERE actor_user_id=$1 ORDER BY occurred_at", [studentUserId]);
+    expect(audits.rows.map((row) => row.action)).toEqual(expect.arrayContaining([
+      'student.profile.updated',
+      'student.document_metadata.created',
+      'student.document_metadata.archived',
+      'student.saved_opportunity.saved',
+      'student.saved_opportunity.archived',
+    ]));
   });
 
   it('validates and commits roster CSV without raw preview mutation', async () => {

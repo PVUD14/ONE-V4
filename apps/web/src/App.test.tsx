@@ -197,15 +197,20 @@ describe('All-role portal registry and preview workflows', () => {
     window.sessionStorage.setItem('planthepath.oauthState', 'state-123');
     window.sessionStorage.setItem('planthepath.oauthVerifier', 'verifier-12345678901234567890');
     window.history.pushState(null, '', '/auth/callback?code=code-123&state=state-123');
+    let contextCalls = 0;
     fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
       if (url === 'https://uat-auth.example.test/oauth2/token') return { ok: true, json: async () => ({ access_token: 'institution-token', id_token: jwtWithEmail('institution.admin@example.test') }) };
       if (url.endsWith('/health')) return { ok: true };
       if (url.endsWith('/api/v1/security/context')) {
+        contextCalls += 1;
         expect((init?.headers as Record<string, string>).Authorization).toBe('Bearer institution-token');
         return { ok: true, json: async () => ({ userId: 'admin-user', memberships: [{ organizationId: 'institution-1', role: 'INSTITUTION_ADMIN', scope: { organizationId: 'institution-1', institutionId: 'institution-1' } }] }) };
       }
       if (url.endsWith('/api/v1/institutions/institution-1/staff-role-assignments')) {
         expect((init?.headers as Record<string, string>).Authorization).toBe('Bearer institution-token');
+        if (init?.method === 'GET' || !init?.method) {
+          return { ok: true, json: async () => ({ staff: { invitations: [], memberships: [], unavailableActions: ['revoke', 'resend', 'endMembership'] } }) };
+        }
         expect(init?.body).toBe(JSON.stringify({ email: 'faculty@example.test', role: 'DEPARTMENT_HEAD' }));
         expect(String(init?.body)).not.toContain('userId');
         return { ok: true, json: async () => ({ invitation: { id: 'invite-1', email: 'faculty@example.test', role: 'DEPARTMENT_HEAD', tokenPreviewAvailable: false } }) };
@@ -214,6 +219,7 @@ describe('All-role portal registry and preview workflows', () => {
     });
     render(<App />);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument());
+    const contextCallsAfterCallback = contextCalls;
     cleanup();
     window.history.pushState(null, '', '/institution/admin/staff');
     render(<App />);
@@ -221,8 +227,10 @@ describe('All-role portal registry and preview workflows', () => {
     fireEvent.change(recipientInput, { target: { value: 'faculty@example.test' } });
     fireEvent.change(screen.getByLabelText(/Institution role/i), { target: { value: 'DEPARTMENT_HEAD' } });
     await waitFor(() => expect(screen.getByRole('button', { name: 'Send staff invitation' })).not.toBeDisabled());
+    expect(contextCalls).toBe(contextCallsAfterCallback + 1);
     fireEvent.click(screen.getByRole('button', { name: 'Send staff invitation' }));
     await waitFor(() => expect(screen.getByText(/Membership is created only after the verified recipient accepts/i)).toBeInTheDocument());
+    expect(contextCalls).toBe(contextCallsAfterCallback + 1);
     expect(screen.queryByText('OPERATIONS_ADMIN')).not.toBeInTheDocument();
   });
 

@@ -4,6 +4,8 @@ Credentials are not in Git. Retrieve them from the operator-local file: `E:\8-PT
 
 ## Common login
 
+Phase 1.1 correction note: manual UAT previously observed an Institution Administrator session appearing to show the Student portal. Diagnostics found the Cognito and internal mappings were distinct and correct; the defect was frontend authenticated routing/deep-link fallback that could mount a protected portal shell before proving the requested family/role from `/api/v1/security/context`. After Phase 1.1, repeat this runbook in a clean browser before marking role login PASS.
+
 1. Open `https://one.ai8ht.pro`.
 2. Click Sign in.
 3. Authenticate through Cognito managed login.

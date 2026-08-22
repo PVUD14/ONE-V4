@@ -20,7 +20,7 @@ export function getCognitoHostedUiConfig(): CognitoHostedUiConfig | null {
   const domain = import.meta.env.VITE_COGNITO_DOMAIN?.trim();
   const clientId = import.meta.env.VITE_COGNITO_CLIENT_ID?.trim();
   const redirectUri = (import.meta.env.VITE_COGNITO_REDIRECT_URI?.trim() || `${window.location.origin}/auth/callback`);
-  const logoutUri = (import.meta.env.VITE_COGNITO_LOGOUT_URI?.trim() || window.location.origin);
+  const logoutUri = (import.meta.env.VITE_COGNITO_LOGOUT_URI?.trim() || `${window.location.origin}/login`);
   if (!domain || !clientId) return null;
   const normalizedDomain = normalizeTrustedUrl(domain, 'Cognito domain');
   const normalizedRedirect = normalizeTrustedUrl(redirectUri, 'Cognito redirect URI');

@@ -2,6 +2,8 @@
 
 Status definitions: REAL = protected API + DB persistence + authorization; READ_ONLY = real API/DB read path only; PARTIAL = some real backend exists but flow incomplete; PREVIEW = fictional/session-local/demo; MISSING = no real implementation.
 
+Phase 1.1 correction: authenticated portal mounting now requires a server-authorized family/role match from `/api/v1/security/context`; unauthorized deep links render a controlled denial instead of mounting another portal family. Authenticated role shells must not show demo preview identities or fixture records. Manual clean-browser UAT is still required before claiming end-to-end role-login PASS.
+
 | Portal | Role | Module | Action | UI exists? | API exists? | DB persistence? | Auth enforced? | Audit? | Status | Next implementation |
 |---|---|---|---|---:|---:|---:|---:|---:|---|---|
 | Student | Student | Login/workspace | Cognito sign-in and auto-route | Yes | Yes | Yes | Yes | N/A | REAL | Browser UAT evidence per persona |

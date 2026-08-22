@@ -30,6 +30,11 @@ import { RolePreviewProvider, useRolePreviewState } from './rolePortalPreviewSta
 import { StatusBadge } from './studentComponents.js';
 import { OperationsCareerReadinessPanel } from './operationsCareerReadinessPanel.js';
 
+interface AuthenticatedWorkspaceSummary {
+  readonly role: string;
+  readonly organizationId: string | null;
+}
+
 export function DemoPortalLauncher({ onNavigate }: { readonly onNavigate: (path: string) => void }): React.ReactElement {
   const groups = ['Student', 'Institution', 'Employer', 'Operations'] as const;
   useEffect(() => {
@@ -50,11 +55,11 @@ export function DemoPortalLauncher({ onNavigate }: { readonly onNavigate: (path:
   );
 }
 
-export function RolePortal({ portal, apiHealth, authStatus, authNotice, showDevelopmentIndicators, onNavigate, onSignIn, onSignOut, demoMode = false }: { readonly portal: RolePortalConfig; readonly apiHealth: ApiHealth; readonly authStatus: AuthStatus; readonly authNotice: string; readonly showDevelopmentIndicators: boolean; readonly onNavigate: (path: string) => void; readonly onSignIn: () => void; readonly onSignOut: () => void; readonly demoMode?: boolean }): React.ReactElement {
-  return <RolePreviewProvider><RolePortalInner portal={portal} apiHealth={apiHealth} authStatus={authStatus} authNotice={authNotice} showDevelopmentIndicators={showDevelopmentIndicators} onNavigate={onNavigate} onSignIn={onSignIn} onSignOut={onSignOut} demoMode={demoMode} /></RolePreviewProvider>;
+export function RolePortal({ portal, apiHealth, authStatus, authNotice, showDevelopmentIndicators, onNavigate, onSignIn, onSignOut, demoMode = false, authenticatedWorkspace }: { readonly portal: RolePortalConfig; readonly apiHealth: ApiHealth; readonly authStatus: AuthStatus; readonly authNotice: string; readonly showDevelopmentIndicators: boolean; readonly onNavigate: (path: string) => void; readonly onSignIn: () => void; readonly onSignOut: () => void; readonly demoMode?: boolean; readonly authenticatedWorkspace?: AuthenticatedWorkspaceSummary | undefined }): React.ReactElement {
+  return <RolePreviewProvider><RolePortalInner portal={portal} apiHealth={apiHealth} authStatus={authStatus} authNotice={authNotice} showDevelopmentIndicators={showDevelopmentIndicators} onNavigate={onNavigate} onSignIn={onSignIn} onSignOut={onSignOut} demoMode={demoMode} authenticatedWorkspace={authenticatedWorkspace} /></RolePreviewProvider>;
 }
 
-function RolePortalInner({ portal, apiHealth, authStatus, authNotice, showDevelopmentIndicators, onNavigate, onSignIn, onSignOut, demoMode }: { readonly portal: RolePortalConfig; readonly apiHealth: ApiHealth; readonly authStatus: AuthStatus; readonly authNotice: string; readonly showDevelopmentIndicators: boolean; readonly onNavigate: (path: string) => void; readonly onSignIn: () => void; readonly onSignOut: () => void; readonly demoMode: boolean }): React.ReactElement {
+function RolePortalInner({ portal, apiHealth, authStatus, authNotice, showDevelopmentIndicators, onNavigate, onSignIn, onSignOut, demoMode, authenticatedWorkspace }: { readonly portal: RolePortalConfig; readonly apiHealth: ApiHealth; readonly authStatus: AuthStatus; readonly authNotice: string; readonly showDevelopmentIndicators: boolean; readonly onNavigate: (path: string) => void; readonly onSignIn: () => void; readonly onSignOut: () => void; readonly demoMode: boolean; readonly authenticatedWorkspace?: AuthenticatedWorkspaceSummary | undefined }): React.ReactElement {
   const [path, setPath] = useState(normalizeRolePath(window.location.pathname, portal));
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -99,11 +104,11 @@ function RolePortalInner({ portal, apiHealth, authStatus, authNotice, showDevelo
       <RoleSidebar portal={portal} activePath={path} collapsed={collapsed} drawerOpen={drawerOpen} onNavigate={navigate} onCollapse={() => setCollapsed((value) => !value)} onClose={() => { setDrawerOpen(false); menuButtonRef.current?.focus(); }} />
       {drawerOpen ? <button className="drawer-scrim role-scrim" type="button" aria-label={`Close ${portal.roleName} navigation`} onClick={() => setDrawerOpen(false)} /> : null}
       <div className="role-workspace">
-        <RoleTopbar portal={portal} apiHealth={apiHealth} authStatus={authStatus} authNotice={authNotice} showDevelopmentIndicators={showDevelopmentIndicators} menuButtonRef={menuButtonRef} onOpenMenu={() => setDrawerOpen(true)} onMessages={() => { const messagesRoute = portal.nav.find((item) => /messages|communications/i.test(item.label)); if (messagesRoute) navigate(messagesRoute.path); else setTopbarNotice(`${portal.roleName} messaging is backend-dependent and no message route exists for this preview role.`); }} onNotifications={() => setTopbarNotice(`${portal.roleName} notifications preview: 4 local demo alerts are summarized only; no backend notification state was changed.`)} onSwitch={() => navigate('/demo')} onSignIn={onSignIn} onSignOut={onSignOut} />
+        <RoleTopbar portal={portal} apiHealth={apiHealth} authStatus={authStatus} authNotice={authNotice} showDevelopmentIndicators={showDevelopmentIndicators} menuButtonRef={menuButtonRef} onOpenMenu={() => setDrawerOpen(true)} onMessages={() => { const messagesRoute = portal.nav.find((item) => /messages|communications/i.test(item.label)); if (messagesRoute) navigate(messagesRoute.path); else setTopbarNotice(`${portal.roleName} messaging is backend-dependent and no message route exists for this role.`); }} onNotifications={() => setTopbarNotice(demoMode ? `${portal.roleName} notifications preview: 4 local demo alerts are summarized only; no backend notification state was changed.` : `${portal.roleName} notifications are not fully implemented in this authenticated UAT surface yet.`)} onSwitch={() => navigate(demoMode ? '/demo' : '/')} onSignIn={onSignIn} onSignOut={onSignOut} demoMode={demoMode} authenticatedWorkspace={authenticatedWorkspace} />
         <main id="role-main" className="role-main">
           {demoMode ? <section className="demo-boundary" role="note"><strong>DEMO PREVIEW</strong><span>Fictional data. This route is not authenticated and does not authorize a user.</span></section> : null}
-          <PreviewNotice portal={portal} notice={topbarNotice} />
-          {activeRoute?.path === portal.basePath ? <RoleDashboard portal={portal} onNavigate={navigate} /> : <RoleModulePage portal={portal} route={activeRoute ?? portal.nav[0]!} />}
+          <PortalModeNotice portal={portal} notice={topbarNotice} demoMode={demoMode} authenticatedWorkspace={authenticatedWorkspace} />
+          {!demoMode && activeRoute?.path === portal.basePath ? <AuthenticatedRoleSurface portal={portal} routeLabel={activeRoute?.label ?? 'Dashboard'} onNavigate={navigate} /> : activeRoute?.path === portal.basePath ? <RoleDashboard portal={portal} onNavigate={navigate} /> : <RoleModulePage portal={portal} route={activeRoute ?? portal.nav[0]!} />}
         </main>
       </div>
     </div>
@@ -123,8 +128,11 @@ function RoleSidebar({ portal, activePath, collapsed, drawerOpen, onNavigate, on
   );
 }
 
-function RoleTopbar({ portal, apiHealth, authStatus, authNotice, showDevelopmentIndicators, menuButtonRef, onOpenMenu, onMessages, onNotifications, onSwitch, onSignIn, onSignOut }: { readonly portal: RolePortalConfig; readonly apiHealth: ApiHealth; readonly authStatus: AuthStatus; readonly authNotice: string; readonly showDevelopmentIndicators: boolean; readonly menuButtonRef: React.RefObject<HTMLButtonElement | null>; readonly onOpenMenu: () => void; readonly onMessages: () => void; readonly onNotifications: () => void; readonly onSwitch: () => void; readonly onSignIn: () => void; readonly onSignOut: () => void }): React.ReactElement {
-  return <header className="role-topbar"><button ref={menuButtonRef} className="icon-button mobile-menu-button" type="button" aria-label={`Open ${portal.roleName} navigation`} onClick={onOpenMenu}><Menu size={20} /></button><span className="role-context">{portal.roleName}</span><span className="role-org">{portal.organization}</span><label className="role-search" role="search"><Search size={16} /><span className="sr-only">Search {portal.roleName} workspace</span><input placeholder={`Search ${portal.family.toLowerCase()} records...`} /></label><div className="role-topbar-actions"><button type="button" className="secondary" onClick={onSwitch}>Switch preview portal</button><button className="icon-button" type="button" aria-label="Messages" onClick={onMessages}><MessageSquare size={17} /></button><button className="icon-button notification" type="button" aria-label="Notifications" onClick={onNotifications}><Bell size={17} /><span>4</span></button><AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />{showDevelopmentIndicators ? <span className={`staff-api-dot ${apiHealth}`}>{apiHealth}</span> : null}<span className="role-profile"><span>{portal.initials}</span><span><strong>{portal.previewUser}</strong><small>{portal.roleName}</small></span><ChevronDown size={14} /></span></div></header>;
+function RoleTopbar({ portal, apiHealth, authStatus, authNotice, showDevelopmentIndicators, menuButtonRef, onOpenMenu, onMessages, onNotifications, onSwitch, onSignIn, onSignOut, demoMode, authenticatedWorkspace }: { readonly portal: RolePortalConfig; readonly apiHealth: ApiHealth; readonly authStatus: AuthStatus; readonly authNotice: string; readonly showDevelopmentIndicators: boolean; readonly menuButtonRef: React.RefObject<HTMLButtonElement | null>; readonly onOpenMenu: () => void; readonly onMessages: () => void; readonly onNotifications: () => void; readonly onSwitch: () => void; readonly onSignIn: () => void; readonly onSignOut: () => void; readonly demoMode: boolean; readonly authenticatedWorkspace?: AuthenticatedWorkspaceSummary | undefined }): React.ReactElement {
+  const displayName = demoMode ? portal.previewUser : (authStatus.state === 'authenticated' && authStatus.email ? authStatus.email : portal.roleName);
+  const displayRole = authenticatedWorkspace?.role ?? portal.roleName;
+  const displayOrg = authenticatedWorkspace?.organizationId ? `Organization: ${authenticatedWorkspace.organizationId}` : portal.organization;
+  return <header className="role-topbar"><button ref={menuButtonRef} className="icon-button mobile-menu-button" type="button" aria-label={`Open ${portal.roleName} navigation`} onClick={onOpenMenu}><Menu size={20} /></button><span className="role-context">{portal.roleName}</span><span className="role-org">{displayOrg}</span><label className="role-search" role="search"><Search size={16} /><span className="sr-only">Search {portal.roleName} workspace</span><input placeholder={`Search ${portal.family.toLowerCase()} records...`} /></label><div className="role-topbar-actions"><button type="button" className="secondary" onClick={onSwitch}>{demoMode ? 'Switch preview portal' : 'Switch workspace'}</button><button className="icon-button" type="button" aria-label="Messages" onClick={onMessages}><MessageSquare size={17} /></button><button className="icon-button notification" type="button" aria-label="Notifications" onClick={onNotifications}><Bell size={17} /><span>4</span></button><AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />{showDevelopmentIndicators ? <span className={`staff-api-dot ${apiHealth}`}>{apiHealth}</span> : null}<span className="role-profile"><span>{demoMode ? portal.initials : initialsFor(displayName)}</span><span><strong>{displayName}</strong><small>{displayRole}</small></span><ChevronDown size={14} /></span></div></header>;
 }
 
 function normalizeRolePath(path: string, portal: RolePortalConfig): string {
@@ -134,9 +142,27 @@ function normalizeRolePath(path: string, portal: RolePortalConfig): string {
   return withoutDemo;
 }
 
-function PreviewNotice({ portal, notice }: { readonly portal: RolePortalConfig; readonly notice: string }): React.ReactElement {
+function PortalModeNotice({ portal, notice, demoMode, authenticatedWorkspace }: { readonly portal: RolePortalConfig; readonly notice: string; readonly demoMode: boolean; readonly authenticatedWorkspace?: AuthenticatedWorkspaceSummary | undefined }): React.ReactElement {
   const { dirty, reset } = useRolePreviewState();
+  if (!demoMode && authenticatedWorkspace) {
+    return <section className="role-preview-notice" role="note"><span><strong>Authenticated workspace</strong> - Role: {authenticatedWorkspace.role}. Organization: {authenticatedWorkspace.organizationId ?? 'not selected'}. Unsupported modules show truthful limited states instead of another role dashboard.</span>{notice ? <span role="status">{notice}</span> : null}</section>;
+  }
   return <section className="role-preview-notice" role="note"><span><strong>{dirty ? 'Unsaved session changes' : 'Portal preview'}</strong> — role selection here does not authenticate or authorize a user. {portal.enforcementStatus}.</span>{notice ? <span role="status">{notice}</span> : null}{dirty ? <button type="button" className="secondary" onClick={reset}>Reset demo data</button> : null}</section>;
+}
+
+function initialsFor(value: string): string {
+  const words = value.split(/[@._\-\s]+/).filter(Boolean);
+  return words.slice(0, 2).map((word) => word[0]?.toUpperCase() ?? '').join('') || 'U';
+}
+
+function AuthenticatedRoleSurface({ portal, routeLabel, onNavigate }: { readonly portal: RolePortalConfig; readonly routeLabel: string; readonly onNavigate: (path: string) => void }): React.ReactElement {
+  return <div className="role-dashboard">
+    <section className="role-page-heading"><div><span className="eyebrow">Authenticated workspace</span><h1>{portal.dashboardTitle}</h1><p>{routeLabel === 'Dashboard' || routeLabel === 'Overview' ? portal.dashboardSummary : `${routeLabel} is available for this authorized role, but the full role-specific surface is not yet implemented.`}</p></div></section>
+    <section className="role-card role-wide"><h2>Role authorization</h2><p>This workspace is mounted only after `/api/v1/security/context` confirms the matching role and organization scope. Fixture people and preview records are not shown in authenticated mode.</p></section>
+    <section className="role-card"><h2>Role-owned capabilities</h2><ul className="role-check-list">{portal.allowedOperations.slice(0, 6).map((item) => <li key={item}>{item}</li>)}</ul></section>
+    <section className="role-card"><h2>Protected boundaries</h2><ul className="role-check-list">{portal.readOnlyData.map((item) => <li key={item}>{item}</li>)}</ul></section>
+    {portal.nav.length > 1 ? <section className="role-card role-wide"><h2>Authorized navigation</h2><div className="role-record-actions">{portal.nav.slice(0, 6).map((item) => <button key={item.path} type="button" className="secondary" onClick={() => onNavigate(item.path)}>{item.label}</button>)}</div></section> : null}
+  </div>;
 }
 
 function RoleDashboard({ portal, onNavigate }: { readonly portal: RolePortalConfig; readonly onNavigate: (path: string) => void }): React.ReactElement {

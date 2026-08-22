@@ -12,6 +12,8 @@ No credentials are stored in this document. Passwords are in the operator-local 
 
 ## Role availability
 
+Phase 1.1 status: role identities are provisioned, but browser UAT must be rerun after the authenticated routing/sign-out correction before any row is promoted from "login available" to manual login PASS. The Institution Administrator and Student A mappings were verified to use different Cognito subjects and different internal users; Institution Administrator has no active Student relationship.
+
 | Role | Login available? | Backend role? | Portal | Real capabilities | Partial capabilities | Preview-only capabilities | Blockers |
 |---|---:|---|---|---|---|---|---|
 | Student A | Yes | Active institution relationship, no org membership | Student | Career Readiness learner endpoints where seeded data exists; lesson/assessment mutations are API-backed | Opportunity/application/profile UI mutations are session-local | Most Student modules beyond Career Readiness | Broader student persistence not implemented |

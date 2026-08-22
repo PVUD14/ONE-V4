@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -93,6 +93,124 @@ describe('Cognito Hosted UI browser authentication', () => {
     await expect(completeHostedLoginFromLocation()).resolves.toBe(true);
     expect(window.location.pathname).toBe('/invitations/accept');
     expect(window.location.search).toBe('');
+    expect(window.sessionStorage.getItem('planthepath.oauthReturnPath')).toBeNull();
+  });
+
+  it('routes an Institution Admin by verified membership and denies Student deep links', async () => {
+    vi.stubEnv('VITE_COGNITO_DOMAIN', 'https://uat-auth.example.test');
+    vi.stubEnv('VITE_COGNITO_CLIENT_ID', 'uat-client');
+    vi.stubEnv('VITE_COGNITO_REDIRECT_URI', 'http://127.0.0.1:5173/auth/callback');
+    window.sessionStorage.setItem('planthepath.oauthState', 'state-123');
+    window.sessionStorage.setItem('planthepath.oauthVerifier', 'verifier-12345678901234567890');
+    window.history.pushState(null, '', '/auth/callback?code=code-123&state=state-123');
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url === 'https://uat-auth.example.test/oauth2/token') return { ok: true, json: async () => ({ access_token: 'institution-token', id_token: jwtWithEmail('institution.admin@uat.example.test') }) };
+      if (url.endsWith('/health')) return { ok: true };
+      if (url.endsWith('/api/v1/security/context')) return { ok: true, json: async () => ({
+        userId: 'institution-user',
+        memberships: [{ organizationId: 'institution-1', role: 'INSTITUTION_ADMIN', scope: {} }],
+        studentRelationships: [],
+      }) };
+      return { ok: false };
+    }));
+    const { App } = await import('./App.js');
+    render(React.createElement(App));
+    await waitFor(() => expect(window.location.pathname).toBe('/institution/admin'));
+    await waitFor(() => expect(screen.getAllByText('institution.admin@uat.example.test').length).toBeGreaterThan(0));
+    expect(screen.getByText('INSTITUTION_ADMIN')).toBeInTheDocument();
+    expect(screen.queryByText('Rahul Kumar')).not.toBeInTheDocument();
+
+    window.history.pushState(null, '', '/student');
+    render(React.createElement(App));
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'You do not have access to this workspace' })).toBeInTheDocument());
+    expect(screen.queryByRole('heading', { name: 'Student Dashboard' })).not.toBeInTheDocument();
+  });
+
+  it('selects role-specific landings instead of routing every institution role to admin', async () => {
+    vi.stubEnv('VITE_COGNITO_DOMAIN', 'https://uat-auth.example.test');
+    vi.stubEnv('VITE_COGNITO_CLIENT_ID', 'uat-client');
+    vi.stubEnv('VITE_COGNITO_REDIRECT_URI', 'http://127.0.0.1:5173/auth/callback');
+    window.sessionStorage.setItem('planthepath.oauthState', 'state-123');
+    window.sessionStorage.setItem('planthepath.oauthVerifier', 'verifier-12345678901234567890');
+    window.history.pushState(null, '', '/auth/callback?code=code-123&state=state-123');
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url === 'https://uat-auth.example.test/oauth2/token') return { ok: true, json: async () => ({ access_token: 'placement-token', id_token: jwtWithEmail('placement.admin@uat.example.test') }) };
+      if (url.endsWith('/health')) return { ok: true };
+      if (url.endsWith('/api/v1/security/context')) return { ok: true, json: async () => ({
+        userId: 'placement-user',
+        memberships: [{ organizationId: 'institution-1', role: 'PLACEMENT_ADMIN', scope: {} }],
+        studentRelationships: [],
+      }) };
+      return { ok: false };
+    }));
+    const { App } = await import('./App.js');
+    render(React.createElement(App));
+    await waitFor(() => expect(window.location.pathname).toBe('/institution/placement-officer'));
+    expect(screen.queryByRole('heading', { name: 'Institution Administration' })).not.toBeInTheDocument();
+  });
+
+  it('keeps demo fixture identities out of authenticated role shells while preserving demo routes', async () => {
+    vi.stubEnv('VITE_COGNITO_DOMAIN', 'https://uat-auth.example.test');
+    vi.stubEnv('VITE_COGNITO_CLIENT_ID', 'uat-client');
+    vi.stubEnv('VITE_COGNITO_REDIRECT_URI', 'http://127.0.0.1:5173/auth/callback');
+    window.sessionStorage.setItem('planthepath.oauthState', 'state-123');
+    window.sessionStorage.setItem('planthepath.oauthVerifier', 'verifier-12345678901234567890');
+    window.history.pushState(null, '', '/auth/callback?code=code-123&state=state-123');
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url === 'https://uat-auth.example.test/oauth2/token') return { ok: true, json: async () => ({ access_token: 'recruiter-token', id_token: jwtWithEmail('recruiter@uat.example.test') }) };
+      if (url.endsWith('/health')) return { ok: true };
+      if (url.endsWith('/api/v1/security/context')) return { ok: true, json: async () => ({
+        userId: 'recruiter-user',
+        memberships: [{ organizationId: 'employer-1', role: 'RECRUITER', scope: {} }],
+        studentRelationships: [],
+      }) };
+      return { ok: false };
+    }));
+    const { App } = await import('./App.js');
+    render(React.createElement(App));
+    await waitFor(() => expect(window.location.pathname).toBe('/employer/recruiter'));
+    expect(screen.getAllByText('recruiter@uat.example.test').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Rohan Shah')).not.toBeInTheDocument();
+    expect(screen.queryByText(/role selection here does not authenticate/i)).not.toBeInTheDocument();
+
+    cleanup();
+    window.history.pushState(null, '', '/demo/employer/recruiter');
+    render(React.createElement(App));
+    expect(screen.getByText('Rohan Shah')).toBeInTheDocument();
+    expect(screen.getAllByText('DEMO PREVIEW').length).toBeGreaterThan(0);
+  });
+
+  it('signs out through Cognito logout, returns to /login, and clears transient auth state', async () => {
+    vi.stubEnv('VITE_COGNITO_DOMAIN', 'https://uat-auth.example.test');
+    vi.stubEnv('VITE_COGNITO_CLIENT_ID', 'uat-client');
+    vi.stubEnv('VITE_COGNITO_REDIRECT_URI', 'http://127.0.0.1:5173/auth/callback');
+    vi.stubEnv('VITE_COGNITO_LOGOUT_URI', 'http://127.0.0.1:5173/login');
+    window.sessionStorage.setItem('planthepath.oauthState', 'state-123');
+    window.sessionStorage.setItem('planthepath.oauthVerifier', 'verifier-12345678901234567890');
+    window.history.pushState(null, '', '/auth/callback?code=code-123&state=state-123');
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url === 'https://uat-auth.example.test/oauth2/token') return { ok: true, json: async () => ({ access_token: 'student-token', id_token: jwtWithEmail('student.aanya@uat.example.test') }) };
+      if (url.endsWith('/health')) return { ok: true };
+      if (url.endsWith('/api/v1/security/context')) return { ok: true, json: async () => ({
+        userId: 'student-user',
+        memberships: [],
+        studentRelationships: [{ institutionId: 'institution-1', state: 'ACTIVE', effectiveFrom: '2026-08-21T00:00:00.000Z' }],
+      }) };
+      if (url.endsWith('/api/v1/career-readiness/catalog')) return { ok: true, json: async () => ({ pilot: 'Career Readiness Fundamentals', releaseManifestId: 'release', modules: [], assessments: [] }) };
+      if (url.endsWith('/api/v1/career-readiness/me')) return { ok: true, json: async () => ({ catalog: {}, progress: [], attempts: [], evidence: [], mastery: [], readiness: null, roadmap: [], notificationPreferences: null, notifications: [] }) };
+      return { ok: false };
+    }));
+    const assign = vi.fn();
+    Object.defineProperty(window, 'location', { configurable: true, value: { ...window.location, assign, origin: 'http://127.0.0.1:5173', pathname: '/student', search: '' } });
+    const { App } = await import('./App.js');
+    render(React.createElement(App));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    expect(assign).toHaveBeenCalledWith('https://uat-auth.example.test/logout?client_id=uat-client&logout_uri=http%3A%2F%2F127.0.0.1%3A5173%2Flogin');
+    const { getAccessToken } = await import('./auth.js');
+    expect(getAccessToken()).toBeNull();
+    expect(window.sessionStorage.getItem('planthepath.oauthState')).toBeNull();
+    expect(window.sessionStorage.getItem('planthepath.oauthVerifier')).toBeNull();
     expect(window.sessionStorage.getItem('planthepath.oauthReturnPath')).toBeNull();
   });
 });

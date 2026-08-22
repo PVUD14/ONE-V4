@@ -70,9 +70,20 @@ const portalChoices = [
 ] as const;
 
 type WorkspaceFamily = typeof portalChoices[number]['family'];
+interface PortalChoice {
+  readonly family: WorkspaceFamily;
+  readonly path: string;
+  readonly label: string;
+  readonly detail: string;
+  readonly icon: LucideIcon;
+}
+type AuthorizedWorkspace = PortalChoice & {
+  readonly role: string;
+  readonly organizationId: string | null;
+};
 type WorkspaceResolution =
   | { readonly state: 'loading' }
-  | { readonly state: 'resolved'; readonly choices: readonly typeof portalChoices[number][] }
+  | { readonly state: 'resolved'; readonly choices: readonly AuthorizedWorkspace[] }
   | { readonly state: 'error'; readonly message: string };
 
 export function App(): React.ReactElement {
@@ -121,7 +132,7 @@ export function App(): React.ReactElement {
     setWorkspaceResolution({ state: 'loading' });
     getSecurityContext(token, controller.signal)
       .then((context) => {
-        const choices = resolveWorkspaceChoices(context);
+        const choices = resolveAuthorizedWorkspaces(context);
         setWorkspaceResolution({ state: 'resolved', choices });
         if (choices.length === 1 && (currentPath() === '/auth/callback' || currentPath() === '/' || currentPath() === '/login')) {
           window.history.replaceState(null, '', choices[0]!.path);
@@ -155,6 +166,7 @@ export function App(): React.ReactElement {
   const route = useMemo(() => routeFromPath(effectivePath), [effectivePath]);
   const rolePortal = useMemo(() => rolePortalFromPath(effectivePath), [effectivePath]);
   const authenticated = authStatus.state === 'authenticated';
+  const activeWorkspace = workspaceResolution.state === 'resolved' ? workspaceForPath(path, workspaceResolution.choices) : null;
 
   useEffect(() => {
     if (path === '/' || path === '/login' || path === '/demo' || effectivePath.startsWith('/institution/placement-officer') || rolePortal) return;
@@ -180,6 +192,25 @@ export function App(): React.ReactElement {
     return <AuthRequiredPage requestedPath={path} authStatus={authStatus} authNotice={authNotice} onSignIn={handleSignIn} onSignOut={handleSignOut} />;
   }
 
+  if (isProtectedPortalPath(path) && !demoPath && authenticated) {
+    if (workspaceResolution.state === 'loading') {
+      return <WorkspaceResolutionPage authStatus={authStatus} authNotice={authNotice} onSignIn={handleSignIn} onSignOut={handleSignOut} />;
+    }
+    if (workspaceResolution.state === 'error') {
+      return <AccessDeniedPage requestedPath={path} authStatus={authStatus} authNotice={authNotice} message={workspaceResolution.message} onSignIn={handleSignIn} onSignOut={handleSignOut} />;
+    }
+    const familyRoot = protectedFamilyRoot(path);
+    const firstFamilyWorkspace = familyRoot ? workspaceResolution.choices.find((choice) => choice.family.toLowerCase() === familyRoot) : undefined;
+    if (firstFamilyWorkspace && normalizePath(path) === `/${familyRoot}` && firstFamilyWorkspace.path !== normalizePath(path)) {
+      window.history.replaceState(null, '', firstFamilyWorkspace.path);
+      setPath(currentPath());
+      return <WorkspaceResolutionPage authStatus={authStatus} authNotice={authNotice} onSignIn={handleSignIn} onSignOut={handleSignOut} />;
+    }
+    if (!activeWorkspace) {
+      return <AccessDeniedPage requestedPath={path} authStatus={authStatus} authNotice={authNotice} onSignIn={handleSignIn} onSignOut={handleSignOut} />;
+    }
+  }
+
   if (effectivePath.startsWith('/institution/placement-officer')) {
     return <PlacementOfficerPortal apiHealth={apiHealth} authStatus={authStatus} authNotice={authNotice} onSignIn={handleSignIn} onSignOut={handleSignOut} showDevelopmentIndicators={showDevelopmentIndicators} />;
   }
@@ -196,7 +227,7 @@ export function App(): React.ReactElement {
   }
 
   if (rolePortal) {
-    return <RolePortal portal={rolePortal} apiHealth={apiHealth} authStatus={authStatus} authNotice={authNotice} onSignIn={handleSignIn} onSignOut={handleSignOut} showDevelopmentIndicators={showDevelopmentIndicators} onNavigate={() => setPath(currentPath())} demoMode={Boolean(demoPath)} />;
+    return <RolePortal portal={rolePortal} apiHealth={apiHealth} authStatus={authStatus} authNotice={authNotice} onSignIn={handleSignIn} onSignOut={handleSignOut} showDevelopmentIndicators={showDevelopmentIndicators} onNavigate={() => setPath(currentPath())} demoMode={Boolean(demoPath)} authenticatedWorkspace={activeWorkspace ? { role: activeWorkspace.role, organizationId: activeWorkspace.organizationId } : undefined} />;
   }
 
   return (
@@ -217,6 +248,7 @@ export function App(): React.ReactElement {
         sidebarCollapsed={sidebarCollapsed}
         onSignIn={handleSignIn}
         onSignOut={handleSignOut}
+        workspace={activeWorkspace ?? undefined}
       />
     </StudentPreviewProvider>
   );
@@ -280,15 +312,42 @@ function WorkspaceChooser({ authStatus, authNotice, workspaceResolution, onSignI
   </main>;
 }
 
-function resolveWorkspaceChoices(context: SecurityContextDto): readonly typeof portalChoices[number][] {
-  const families = new Set<WorkspaceFamily>();
-  for (const membership of context.memberships) {
-    if (['INSTITUTION_OWNER', 'INSTITUTION_ADMIN', 'PLACEMENT_ADMIN', 'DEPARTMENT_HEAD', 'FACULTY_LECTURER'].includes(membership.role)) families.add('Institution');
-    if (['EMPLOYER_OWNER', 'EMPLOYER_ADMIN', 'RECRUITER'].includes(membership.role)) families.add('Employer');
-    if (['PLATFORM_SUPER_ADMIN', 'OPERATIONS_ADMIN', 'SECURITY_ADMIN'].includes(membership.role)) families.add('Operations');
+function resolveAuthorizedWorkspaces(context: SecurityContextDto): readonly AuthorizedWorkspace[] {
+  const workspaces: AuthorizedWorkspace[] = [];
+  const pushUnique = (workspace: AuthorizedWorkspace): void => {
+    if (!workspaces.some((item) => item.path === workspace.path && item.role === workspace.role && item.organizationId === workspace.organizationId)) workspaces.push(workspace);
+  };
+  if ((context.studentRelationships?.length ?? 0) > 0) {
+    pushUnique({ ...portalChoices[0], role: 'STUDENT', organizationId: context.studentRelationships?.[0]?.institutionId ?? null });
   }
-  if ((context.studentRelationships?.length ?? 0) > 0) families.add('Student');
-  return portalChoices.filter((choice) => families.has(choice.family));
+  for (const membership of context.memberships) {
+    const workspace = workspaceForMembership(membership);
+    if (workspace) pushUnique(workspace);
+  }
+  return workspaces;
+}
+
+function workspaceForMembership(membership: SecurityContextDto['memberships'][number]): AuthorizedWorkspace | null {
+  const organizationId = membership.organizationId;
+  if (membership.role === 'INSTITUTION_OWNER' || membership.role === 'INSTITUTION_ADMIN') return { ...portalChoices[1], role: membership.role, organizationId };
+  if (membership.role === 'PLACEMENT_ADMIN') return { ...portalChoices[1], path: '/institution/placement-officer', label: 'Placement Admin', detail: 'Placement operations for the authorized institution.', role: membership.role, organizationId };
+  if (membership.role === 'FACULTY_LECTURER') return { ...portalChoices[1], path: '/institution/faculty', label: 'Faculty', detail: 'Faculty workspace for assigned academic support.', role: membership.role, organizationId };
+  if (membership.role === 'DEPARTMENT_HEAD') return { ...portalChoices[1], path: '/institution/department-head', label: 'Department Head', detail: 'Department workspace for authorized academic oversight.', role: membership.role, organizationId };
+  if (membership.role === 'RECRUITER') return { ...portalChoices[2], role: membership.role, organizationId };
+  if (membership.role === 'OPERATIONS_ADMIN') return { ...portalChoices[3], role: membership.role, organizationId };
+  if (membership.role === 'PLATFORM_SUPER_ADMIN') return { ...portalChoices[3], label: 'Platform Super Admin', detail: 'Platform operations workspace; distinct super-admin UI is not yet implemented.', role: membership.role, organizationId };
+  if (membership.role === 'SECURITY_ADMIN') return { ...portalChoices[3], label: 'Security Admin', detail: 'Operations workspace available; dedicated security-admin surface is not yet implemented.', role: membership.role, organizationId };
+  return null;
+}
+
+function workspaceForPath(path: string, workspaces: readonly AuthorizedWorkspace[]): AuthorizedWorkspace | null {
+  const normalized = normalizePath(path);
+  return workspaces.find((workspace) => normalized === workspace.path || normalized.startsWith(`${workspace.path}/`)) ?? null;
+}
+
+function protectedFamilyRoot(path: string): string | null {
+  const root = normalizePath(path).split('/')[1] ?? '';
+  return protectedPortalRoots.some((portalRoot) => portalRoot === `/${root}`) ? root : null;
 }
 
 function AuthRequiredPage({ requestedPath, authStatus, authNotice, onSignIn, onSignOut }: { readonly requestedPath: string; readonly authStatus: AuthStatus; readonly authNotice: string; readonly onSignIn: () => void; readonly onSignOut: () => void }): React.ReactElement {
@@ -301,6 +360,30 @@ function AuthRequiredPage({ requestedPath, authStatus, authNotice, onSignIn, onS
       <p>The {family} portal is protected. ONE does not use role selection, fixture data, or browser-stored demo identities to authenticate a user.</p>
       <AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />
       {authStatus.state === 'unconfigured' ? <p className="auth-boundary">Cognito is not configured, so this route fails closed.</p> : null}
+    </section>
+  </main>;
+}
+
+function WorkspaceResolutionPage({ authStatus, authNotice, onSignIn, onSignOut }: { readonly authStatus: AuthStatus; readonly authNotice: string; readonly onSignIn: () => void; readonly onSignOut: () => void }): React.ReactElement {
+  useEffect(() => { document.title = `Resolving workspace | ${productName}`; }, []);
+  return <main className="login-shell">
+    <section className="login-card">
+      <span className="eyebrow">{productTagline}</span>
+      <h1>Resolving workspace</h1>
+      <p>ONE is verifying this route against your server-authorized memberships before opening a portal.</p>
+      <AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />
+    </section>
+  </main>;
+}
+
+function AccessDeniedPage({ requestedPath, authStatus, authNotice, message, onSignIn, onSignOut }: { readonly requestedPath: string; readonly authStatus: AuthStatus; readonly authNotice: string; readonly message?: string; readonly onSignIn: () => void; readonly onSignOut: () => void }): React.ReactElement {
+  useEffect(() => { document.title = `Workspace unavailable | ${productName}`; }, []);
+  return <main className="login-shell">
+    <section className="login-card">
+      <span className="eyebrow">{productTagline}</span>
+      <h1>You do not have access to this workspace</h1>
+      <p>{message ?? `Your verified identity is not authorized for ${requestedPath}. ONE did not mount the requested portal UI.`}</p>
+      <AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />
     </section>
   </main>;
 }
@@ -343,7 +426,7 @@ function InvitationAcceptancePage({ authStatus, authNotice, onSignIn, onSignOut 
   </main>;
 }
 
-function StudentShell({ apiHealth, authNotice, authStatus, demoMode, drawerOpen, menuButtonRef, path, route, setDrawerOpen, setPath, setSidebarCollapsed, sidebarCollapsed, onSignIn, onSignOut }: { readonly apiHealth: ApiHealth; readonly authNotice: string; readonly authStatus: AuthStatus; readonly demoMode: boolean; readonly drawerOpen: boolean; readonly menuButtonRef: React.RefObject<HTMLButtonElement | null>; readonly path: string; readonly route: RouteKey; readonly setDrawerOpen: React.Dispatch<React.SetStateAction<boolean>>; readonly setPath: React.Dispatch<React.SetStateAction<string>>; readonly setSidebarCollapsed: React.Dispatch<React.SetStateAction<boolean>>; readonly sidebarCollapsed: boolean; readonly onSignIn: () => void; readonly onSignOut: () => void }): React.ReactElement {
+function StudentShell({ apiHealth, authNotice, authStatus, demoMode, drawerOpen, menuButtonRef, path, route, setDrawerOpen, setPath, setSidebarCollapsed, sidebarCollapsed, onSignIn, onSignOut, workspace }: { readonly apiHealth: ApiHealth; readonly authNotice: string; readonly authStatus: AuthStatus; readonly demoMode: boolean; readonly drawerOpen: boolean; readonly menuButtonRef: React.RefObject<HTMLButtonElement | null>; readonly path: string; readonly route: RouteKey; readonly setDrawerOpen: React.Dispatch<React.SetStateAction<boolean>>; readonly setPath: React.Dispatch<React.SetStateAction<string>>; readonly setSidebarCollapsed: React.Dispatch<React.SetStateAction<boolean>>; readonly sidebarCollapsed: boolean; readonly onSignIn: () => void; readonly onSignOut: () => void; readonly workspace?: AuthorizedWorkspace | undefined }): React.ReactElement {
   const { dispatch } = useStudentPreview();
   function navigate(item: NavItem): void {
     const nextPath = demoMode ? demoRouteFor(item.path) : item.path;
@@ -376,6 +459,7 @@ function StudentShell({ apiHealth, authNotice, authStatus, demoMode, drawerOpen,
           profileActive={route === 'profile'}
           onSignIn={onSignIn}
           onSignOut={onSignOut}
+          workspace={workspace}
         />
         <main id="main-content" className="student-main">
           {showDevelopmentIndicators ? <PreviewBadge apiHealth={apiHealth} /> : null}
@@ -414,13 +498,13 @@ function Sidebar({ path, collapsed, drawerOpen, onNavigate, onCollapse, onClose 
   );
 }
 
-function TopBar({ apiHealth, authNotice, authStatus, showDevelopmentIndicators, menuButtonRef, onOpenMenu, onMessages, onNotifications, onProfile, profileActive, onSignIn, onSignOut }: { readonly apiHealth: ApiHealth; readonly authNotice: string; readonly authStatus: AuthStatus; readonly showDevelopmentIndicators: boolean; readonly menuButtonRef: React.RefObject<HTMLButtonElement | null>; readonly onOpenMenu: () => void; readonly onMessages: () => void; readonly onNotifications: () => void; readonly onProfile: () => void; readonly profileActive: boolean; readonly onSignIn: () => void; readonly onSignOut: () => void }): React.ReactElement {
+function TopBar({ apiHealth, authNotice, authStatus, showDevelopmentIndicators, menuButtonRef, onOpenMenu, onMessages, onNotifications, onProfile, profileActive, onSignIn, onSignOut, workspace }: { readonly apiHealth: ApiHealth; readonly authNotice: string; readonly authStatus: AuthStatus; readonly showDevelopmentIndicators: boolean; readonly menuButtonRef: React.RefObject<HTMLButtonElement | null>; readonly onOpenMenu: () => void; readonly onMessages: () => void; readonly onNotifications: () => void; readonly onProfile: () => void; readonly profileActive: boolean; readonly onSignIn: () => void; readonly onSignOut: () => void; readonly workspace?: AuthorizedWorkspace | undefined }): React.ReactElement {
   const identity = studentIdentityFromAuth(authStatus);
   return (
     <header className="student-topbar">
       <button ref={menuButtonRef} className="icon-button mobile-menu-button" type="button" onClick={onOpenMenu} aria-label="Open student navigation"><Menu size={20} /></button>
       <label className="global-search" role="search"><Search size={17} aria-hidden="true" /><span className="sr-only">Search student workspace</span><input placeholder="Search opportunities, skills, assessments..." /></label>
-      <div className="topbar-actions"><button className="icon-button" type="button" aria-label="Messages" onClick={onMessages}><MessageSquare size={18} /></button><button className="icon-button notification" type="button" aria-label="Notifications" onClick={onNotifications}><Bell size={18} /><span>3</span></button><AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />{showDevelopmentIndicators ? <span className={`api-dot ${apiHealth}`}>{apiHealth === 'online' ? 'API Online' : apiHealth === 'offline' ? 'API Offline' : 'Checking'}</span> : null}<button className="profile-menu" type="button" aria-label="Student profile menu" onClick={onProfile} disabled={profileActive}><span className="avatar">{identity.initials}</span><span><strong>{identity.name}</strong><small>{identity.detail}</small></span><ChevronDown size={15} aria-hidden="true" /></button></div>
+      <div className="topbar-actions"><button className="icon-button" type="button" aria-label="Messages" onClick={onMessages}><MessageSquare size={18} /></button><button className="icon-button notification" type="button" aria-label="Notifications" onClick={onNotifications}><Bell size={18} /><span>3</span></button><AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />{showDevelopmentIndicators ? <span className={`api-dot ${apiHealth}`}>{apiHealth === 'online' ? 'API Online' : apiHealth === 'offline' ? 'API Offline' : 'Checking'}</span> : null}<button className="profile-menu" type="button" aria-label="Student profile menu" onClick={onProfile} disabled={profileActive}><span className="avatar">{identity.initials}</span><span><strong>{identity.name}</strong><small>{workspace ? `Role: ${workspace.role}` : identity.detail}</small></span><ChevronDown size={15} aria-hidden="true" /></button></div>
     </header>
   );
 }

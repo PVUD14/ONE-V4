@@ -870,10 +870,14 @@ describe('Phase 1 API protected request path', () => {
       .expect(201);
 
     const profiles = await pool.query('SELECT institution_student_id, department_unit_id, program_unit_id, batch_unit_id, section_unit_id FROM institution_student_profiles WHERE institution_id=$1 ORDER BY institution_student_id', [institutionId]);
-    expect(profiles.rows).toEqual([
-      expect.objectContaining({ institution_student_id: 'S-EXISTS' }),
-      expect.objectContaining({ institution_student_id: 'S2001', department_unit_id: departmentId, program_unit_id: programId, batch_unit_id: batchId, section_unit_id: sectionId }),
-    ]);
+    expect(profiles.rows).toHaveLength(2);
+    expect(profiles.rows.find((row) => row.institution_student_id === 'S-EXISTS')).toBeTruthy();
+    expect(profiles.rows.find((row) => row.institution_student_id === 'S2001')).toMatchObject({
+      department_unit_id: departmentId,
+      program_unit_id: programId,
+      batch_unit_id: batchId,
+      section_unit_id: sectionId,
+    });
   });
 });
 

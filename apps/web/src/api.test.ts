@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { addInstitutionStudent, inviteInstitutionStaff, resolveApiBaseUrl, updateInstitutionStudent } from './api.js';
+import { addInstitutionStudent, allowLoopbackApiFallback, inviteInstitutionStaff, resolveApiBaseUrl, updateInstitutionStudent } from './api.js';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -13,6 +13,20 @@ describe('API base URL policy', () => {
   it('keeps the explicit loopback fallback development-only', () => {
     expect(resolveApiBaseUrl(undefined, true)).toBe('http://127.0.0.1:3000');
     expect(() => resolveApiBaseUrl('http://127.0.0.1:3000', false)).toThrow('HTTPS');
+  });
+
+  it('refuses the loopback fallback when the app is served from a public host', () => {
+    // A production build that inherited NODE_ENV=development would otherwise point
+    // every visitor's browser at their own machine.
+    const original = window.location.hostname;
+    try {
+      Object.defineProperty(window, 'location', { value: { ...window.location, hostname: 'one.ai8ht.pro' }, writable: true, configurable: true });
+      expect(allowLoopbackApiFallback()).toBe(false);
+      Object.defineProperty(window, 'location', { value: { ...window.location, hostname: '127.0.0.1' }, writable: true, configurable: true });
+      expect(allowLoopbackApiFallback()).toBe(import.meta.env.DEV);
+    } finally {
+      Object.defineProperty(window, 'location', { value: { ...window.location, hostname: original }, writable: true, configurable: true });
+    }
   });
 
   it('accepts only a credential-free HTTPS origin in production', () => {

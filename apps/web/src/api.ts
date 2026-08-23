@@ -3,7 +3,23 @@ import { getAccessToken } from './auth.js';
 export type ApiHealth = 'checking' | 'online' | 'offline';
 
 const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL;
-export const apiBaseUrl = resolveApiBaseUrl(configuredBaseUrl, import.meta.env.DEV);
+export const apiBaseUrl = resolveApiBaseUrl(configuredBaseUrl, allowLoopbackApiFallback());
+
+/**
+ * Whether the loopback API fallback may be used.
+ *
+ * This has to depend on where the app is *running*, not on how it was *built*.
+ * `vite build` inherits an ambient NODE_ENV, so a production build performed on a
+ * host whose environment sets NODE_ENV=development leaves `import.meta.env.DEV`
+ * true and bakes http://127.0.0.1:3000 into the bundle. Every visitor's browser
+ * then tries to call its own machine, and the app fails with no server-side trace.
+ * Requiring a local hostname as well makes the bundle correct either way.
+ */
+export function allowLoopbackApiFallback(): boolean {
+  if (!import.meta.env.DEV) return false;
+  if (typeof window === 'undefined' || !window.location) return true;
+  return /^(localhost|127\.0\.0\.1|\[::1\]|::1)$/i.test(window.location.hostname);
+}
 
 export class ApiRequestError extends Error {
   readonly status: number;

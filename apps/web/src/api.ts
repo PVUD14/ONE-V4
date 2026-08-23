@@ -283,6 +283,13 @@ export interface StudentProfileDto {
   readonly updatedAt: string | null;
 }
 
+export interface StudentDocumentFileDto {
+  readonly versionNumber: number;
+  readonly filename: string;
+  readonly byteSize: number;
+  readonly contentType: string;
+}
+
 export interface StudentDocumentDto {
   readonly id: string;
   readonly title: string;
@@ -292,6 +299,49 @@ export interface StudentDocumentDto {
   readonly archivedAt: string | null;
   readonly createdAt: string;
   readonly updatedAt: string;
+  /** Present only when a scanned, clean file is attached. */
+  readonly file: StudentDocumentFileDto | null;
+}
+
+/** File types the API accepts; the same allowlist the database enforces. */
+export const ACCEPTED_DOCUMENT_TYPES = 'application/pdf,image/png,image/jpeg,application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+export const MAX_DOCUMENT_BYTES = 20 * 1024 * 1024;
+
+/**
+ * Sends the file as a raw body rather than multipart: the API reads the bytes
+ * directly, so there is no multipart parser in front of an untrusted upload.
+ */
+export async function uploadDocumentFile(token: string, documentId: string, file: File): Promise<{ readonly file: { readonly id: string; readonly versionNumber: number; readonly filename: string; readonly byteSize: number } }> {
+  const correlationId = crypto.randomUUID();
+  const response = await fetch(`${apiBaseUrl}/api/v1/students/me/documents/${encodeURIComponent(documentId)}/file`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${token}`,
+      'Content-Type': file.type,
+      'X-Filename': file.name,
+      'X-Correlation-Id': correlationId,
+    },
+    body: file,
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null) as { readonly error?: { readonly code?: string; readonly correlationId?: string } } | null;
+    throw new ApiRequestError({
+      status: response.status,
+      correlationId: body?.error?.correlationId ?? correlationId,
+      ...(body?.error?.code ? { code: body.error.code } : {}),
+    });
+  }
+  return response.json() as Promise<{ readonly file: { readonly id: string; readonly versionNumber: number; readonly filename: string; readonly byteSize: number } }>;
+}
+
+/** Returns the bytes so the caller decides how to present them. */
+export async function downloadDocumentFile(token: string, documentId: string): Promise<Blob> {
+  const response = await fetch(`${apiBaseUrl}/api/v1/students/me/documents/${encodeURIComponent(documentId)}/file`, {
+    headers: { Authorization: `Bearer ${token}`, 'X-Correlation-Id': crypto.randomUUID() },
+  });
+  if (!response.ok) throw new ApiRequestError({ status: response.status, correlationId: response.headers?.get('x-correlation-id') ?? '' });
+  return response.blob();
 }
 
 export interface StudentSavedOpportunityDto {

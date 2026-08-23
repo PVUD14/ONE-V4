@@ -2,10 +2,14 @@ import { Bell, BookOpen, BriefcaseBusiness, Building2, CalendarDays, ChevronDown
 import type { FormEvent } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ACCEPTED_DOCUMENT_TYPES,
+  MAX_DOCUMENT_BYTES,
   acceptInvitation,
   ApiRequestError,
   archiveStudentDocument,
   createStudentDocument,
+  downloadDocumentFile,
+  uploadDocumentFile,
   getApiHealth,
   getSecurityContext,
   getCurrentStudent,
@@ -837,12 +841,14 @@ function AuthenticatedStudentProfile(): React.ReactElement {
 function AuthenticatedStudentDocuments(): React.ReactElement {
   const [documents, setDocuments] = useState<readonly StudentDocumentDto[]>([]);
   const [status, setStatus] = useState('Loading document metadata...');
-  const reload = async (): Promise<void> => {
+  // `message` wins over the storage summary, so a confirmation survives the refresh
+  // that follows it instead of being overwritten a moment later.
+  const reload = async (message?: string): Promise<void> => {
     const token = getAccessToken();
-    if (!token) return setStatus('No protected access token is available.');
+    if (!token) return setStatus('You are not signed in.');
     const response = await listStudentDocuments(token);
     setDocuments(response.documents);
-    setStatus(response.storage.message);
+    setStatus(message ?? response.storage.message);
   };
   useEffect(() => { void reload().catch(() => setStatus('Document metadata could not be loaded.')); }, []);
   async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
@@ -864,16 +870,95 @@ function AuthenticatedStudentDocuments(): React.ReactElement {
     }
   }
   return <div className="workspace-grid">
-    <section className="card wide-card"><span className="eyebrow">REAL metadata / NOT_YET_AVAILABLE file storage</span><h2>Documents</h2><p role="status">{status}</p></section>
+    <section className="card wide-card"><span className="eyebrow">Your documents</span><h2>Documents</h2><p role="status">{status}</p>
+      <p>Add a document, then attach the file. Every file is checked for malware before it is stored, so it may take a moment to appear.</p></section>
     <form className="card student-form" onSubmit={(event) => { void submit(event); }}>
-      <h2>Create document metadata</h2>
-      <label className="student-form-field"><span>Title</span><input name="title" required maxLength={160} /></label>
+      <h2>Add a document</h2>
+      <label className="student-form-field"><span>Title</span><input name="title" required maxLength={160} placeholder="My CV" /></label>
       <label className="student-form-field"><span>Type</span><select name="documentType"><option>RESUME</option><option>CERTIFICATE</option><option>TRANSCRIPT</option><option>PORTFOLIO</option><option>OTHER</option></select></label>
       <label className="student-form-field"><span>Description</span><textarea name="description" maxLength={1000} /></label>
-      <button type="submit">Save metadata</button>
+      <button type="submit">Add document</button>
     </form>
-    <section className="card wide-card"><h2>My document metadata</h2>{documents.length ? <div className="data-table-wrap"><table><thead><tr><th>Title</th><th>Type</th><th>Verification</th><th>Updated</th><th>Action</th></tr></thead><tbody>{documents.map((doc) => <tr key={doc.id}><td>{doc.title}</td><td>{doc.documentType}</td><td>{doc.verificationState}</td><td>{doc.updatedAt}</td><td><button type="button" className="secondary" disabled={Boolean(doc.archivedAt)} onClick={() => { const token = getAccessToken(); if (token) void archiveStudentDocument(token, doc.id).then(reload); }}>Archive</button></td></tr>)}</tbody></table></div> : <p>No document metadata yet.</p>}</section>
+    <section className="card wide-card"><h2>Your documents</h2>{documents.length
+      ? <div className="data-table-wrap"><table>
+        <thead><tr><th>Title</th><th>Type</th><th>File</th><th>Verification</th><th>Actions</th></tr></thead>
+        <tbody>{documents.map((doc) => <StudentDocumentRow key={doc.id} document={doc} onChanged={reload} onStatus={setStatus} />)}</tbody>
+      </table></div>
+      : <p>You have not added any documents yet.</p>}</section>
   </div>;
+}
+
+const DOCUMENT_UPLOAD_MESSAGES: Readonly<Record<string, string>> = {
+  FILE_REJECTED_MALWARE: 'That file was rejected because a malware scan flagged it. Nothing was stored.',
+  FILE_SCAN_UNAVAILABLE: 'The malware scanner is unavailable right now, so the file was not stored. Please try again shortly.',
+  FILE_STORAGE_NOT_CONFIGURED: 'File uploads are not switched on yet.',
+  UNSUPPORTED_FILE_TYPE: 'That file type is not accepted. Use a PDF, PNG, JPEG or Word document.',
+  FILE_TOO_LARGE: 'That file is larger than 20 MB.',
+  EMPTY_FILE: 'That file is empty.',
+  FORBIDDEN: 'You cannot change that document.',
+};
+
+function StudentDocumentRow({ document: doc, onChanged, onStatus }: {
+  readonly document: StudentDocumentDto;
+  readonly onChanged: (message?: string) => Promise<void>;
+  readonly onStatus: (message: string) => void;
+}): React.ReactElement {
+  const [busy, setBusy] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  async function attach(file: File): Promise<void> {
+    const token = getAccessToken();
+    if (!token) return onStatus('You are not signed in.');
+    if (file.size > MAX_DOCUMENT_BYTES) return onStatus(DOCUMENT_UPLOAD_MESSAGES.FILE_TOO_LARGE ?? 'That file is too large.');
+    setBusy(true);
+    onStatus(`Scanning ${file.name}…`);
+    try {
+      const result = await uploadDocumentFile(token, doc.id, file);
+      await onChanged(`${result.file.filename} attached and scanned clean (version ${result.file.versionNumber}).`);
+    } catch (error) {
+      const code = error instanceof ApiRequestError ? error.code : undefined;
+      onStatus((code && DOCUMENT_UPLOAD_MESSAGES[code]) ?? 'That file could not be attached.');
+    } finally {
+      setBusy(false);
+      if (inputRef.current) inputRef.current.value = '';
+    }
+  }
+
+  async function download(): Promise<void> {
+    const token = getAccessToken();
+    if (!token) return onStatus('You are not signed in.');
+    try {
+      const blob = await downloadDocumentFile(token, doc.id);
+      const url = URL.createObjectURL(blob);
+      const link = window.document.createElement('a');
+      link.href = url;
+      link.download = doc.file?.filename ?? 'document';
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      onStatus('That file could not be downloaded.');
+    }
+  }
+
+  return <tr>
+    <td>{doc.title}</td>
+    <td>{doc.documentType}</td>
+    <td>{doc.file
+      ? <><strong>{doc.file.filename}</strong><br /><span className="hiring-meta">v{doc.file.versionNumber} · {Math.round(doc.file.byteSize / 1024)} KB · scanned clean</span></>
+      : <span className="hiring-meta">No file attached</span>}</td>
+    <td>{doc.verificationState}</td>
+    <td><div className="hiring-actions">
+      <input ref={inputRef} type="file" accept={ACCEPTED_DOCUMENT_TYPES} className="visually-hidden-file"
+        aria-label={`Attach a file to ${doc.title}`} disabled={busy || Boolean(doc.archivedAt)}
+        onChange={(event) => { const file = event.target.files?.[0]; if (file) void attach(file); }} />
+      <button type="button" className="secondary" disabled={busy || Boolean(doc.archivedAt)} onClick={() => inputRef.current?.click()}>
+        {busy ? 'Scanning…' : doc.file ? 'Replace file' : 'Attach file'}
+      </button>
+      {doc.file ? <button type="button" className="secondary" onClick={() => { void download(); }}>Download</button> : null}
+      <button type="button" className="secondary" disabled={Boolean(doc.archivedAt)}
+        onClick={() => { const token = getAccessToken(); if (token) void archiveStudentDocument(token, doc.id).then(() => onChanged('Document archived.')); }}>Archive</button>
+    </div></td>
+  </tr>;
 }
 
 function AuthenticatedStudentSavedOpportunities(): React.ReactElement {

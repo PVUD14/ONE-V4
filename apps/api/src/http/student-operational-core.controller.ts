@@ -83,13 +83,16 @@ export class StudentOperationalCoreController {
     const context = requireTrustedAuthorization(request);
     await requireActiveStudentRelationship(this.db, context.authorization.principal.userId, context.correlationId);
     const rows = await this.db.execute(sql`
-      SELECT id, title, document_type, description, verification_state, archived_at, created_at, updated_at
-      FROM student_document_metadata
-      WHERE student_user_id = ${context.authorization.principal.userId}::uuid
-      ORDER BY archived_at NULLS FIRST, updated_at DESC
+      SELECT d.id, d.title, d.document_type, d.description, d.verification_state, d.archived_at, d.created_at, d.updated_at,
+             v.version_number, f.original_filename, f.byte_size, f.content_type
+      FROM student_document_metadata d
+      LEFT JOIN student_document_versions v ON v.id = d.current_version_id
+      LEFT JOIN readable_stored_files f ON f.id = v.file_id
+      WHERE d.student_user_id = ${context.authorization.principal.userId}::uuid
+      ORDER BY d.archived_at NULLS FIRST, d.updated_at DESC
       LIMIT 200
     `) as QueryResult<Record<string, unknown>>;
-    return { documents: rows.rows.map(mapDocument), storage: { fileStorage: 'NOT_YET_AVAILABLE', message: 'File storage will be enabled in a later secure-storage phase.' }, correlationId: context.correlationId };
+    return { documents: rows.rows.map(mapDocument), storage: { fileStorage: 'AVAILABLE', message: 'Files are scanned for malware before they are stored.' }, correlationId: context.correlationId };
   }
 
   @Post('/students/me/documents')
@@ -114,9 +117,12 @@ export class StudentOperationalCoreController {
     const id = requireUuid(documentId, context.correlationId);
     await requireActiveStudentRelationship(this.db, context.authorization.principal.userId, context.correlationId);
     const rows = await this.db.execute(sql`
-      SELECT id, title, document_type, description, verification_state, archived_at, created_at, updated_at
-      FROM student_document_metadata
-      WHERE id = ${id}::uuid AND student_user_id = ${context.authorization.principal.userId}::uuid
+      SELECT d.id, d.title, d.document_type, d.description, d.verification_state, d.archived_at, d.created_at, d.updated_at,
+             v.version_number, f.original_filename, f.byte_size, f.content_type
+      FROM student_document_metadata d
+      LEFT JOIN student_document_versions v ON v.id = d.current_version_id
+      LEFT JOIN readable_stored_files f ON f.id = v.file_id
+      WHERE d.id = ${id}::uuid AND d.student_user_id = ${context.authorization.principal.userId}::uuid
     `) as QueryResult<Record<string, unknown>>;
     const [row] = rows.rows;
     if (!row) throw forbidden(context.correlationId);
@@ -364,6 +370,16 @@ function mapDocument(row: Record<string, unknown>): Record<string, unknown> {
     archivedAt: row.archived_at ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    // Populated only from readable_stored_files, so a pending or infected upload
+    // never appears here as an attached file.
+    file: row.original_filename
+      ? {
+        versionNumber: Number(row.version_number),
+        filename: row.original_filename,
+        byteSize: Number(row.byte_size),
+        contentType: row.content_type,
+      }
+      : null,
   };
 }
 

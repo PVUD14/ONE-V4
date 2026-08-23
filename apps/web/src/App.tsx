@@ -548,8 +548,8 @@ function AuthenticatedPlacementOfficerPage({ authStatus, authNotice, onSignIn, o
     <section className="login-card">
       <span className="eyebrow">Authenticated workspace</span>
       <h1>Placement Admin</h1>
-      <p>This protected workspace is intentionally limited in Phase 2A. It does not mount the fictional placement preview, mutate placement records, or grant access through role selection.</p>
-      <p className="auth-boundary">Use Institution Admin for API-backed student roster, academic unit, and staff invitation workflows. Placement workflows remain NOT YET AVAILABLE until their backend ownership and consent rules are implemented.</p>
+      <p>Placement tools are not built yet, so there is nothing here for you to use today. We would rather show you an empty page than a convincing one filled with data that is not real.</p>
+      <p className="auth-boundary">Student rosters, academic structure and staff invitations are live now, and your Institution Administrator can use them. Placement tracking will open up once its records and consent rules are in place.</p>
       <AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />
     </section>
   </main>;
@@ -759,10 +759,10 @@ function AuthenticatedStudentDashboard({ currentStudent }: { readonly currentStu
   }
   const student = currentStudent.student;
   return <div className="workspace-grid">
-    <section className="card wide-card"><span className="eyebrow">Real Student identity</span><h2>{student.fullName}</h2><p>Verified email: {student.verifiedEmail ?? 'Not available'}</p><p>Institution student ID: {student.institutionStudentId}</p><p>Institution: {student.institutionId}</p><p>Status: {student.academicStatus}</p></section>
-    <section className="card"><h2>Academic placement</h2><p>Department: {student.department ?? 'Not yet available'}</p><p>Program: {student.program ?? 'Not yet available'}</p><p>Batch: {student.batch ?? 'Not yet available'}</p><p>Section: {student.section ?? 'Not yet available'}</p></section>
+    <section className="card wide-card"><span className="eyebrow">Your profile</span><h2>{student.fullName}</h2><p>Email: {student.verifiedEmail ?? 'Not available'}</p><p>Student ID: {student.institutionStudentId}</p><p>Status: {student.academicStatus}</p></section>
+    <section className="card"><h2>Your course</h2><p>Department: {student.department ?? 'Your college has not added this yet'}</p><p>Program: {student.program ?? 'Your college has not added this yet'}</p><p>Batch: {student.batch ?? 'Your college has not added this yet'}</p><p>Section: {student.section ?? 'Your college has not added this yet'}</p></section>
     <section className="card"><h2>Target career</h2><AuthenticatedStudentProfileSummary /></section>
-    <section className="card wide-card"><h2>Operational Student tools</h2><p>Profile, document metadata, and saved opportunity references now persist through protected Student-owned APIs. File storage will be enabled in a later secure-storage phase.</p></section>
+    <section className="card wide-card"><h2>What you can do today</h2><p>Your profile, document details and saved opportunities are all saved to your account and stay with you. Uploading actual files is not switched on yet.</p></section>
     <section className="card wide-card"><h2>Career readiness</h2><CareerReadinessApiPanel route="readiness" /></section>
   </div>;
 }
@@ -818,7 +818,7 @@ function AuthenticatedStudentProfile(): React.ReactElement {
     }
   }
   return <div className="workspace-grid">
-    <section className="card wide-card"><span className="eyebrow">REAL</span><h2>Student-owned profile</h2><p>Saved through `/api/v1/students/me/profile`; the API derives the Student from the verified principal.</p><p role="status">{status}</p></section>
+    <section className="card wide-card"><span className="eyebrow">Your profile</span><h2>Your career profile</h2><p>Only you can edit this. Your college and employers never see anything here that you have not chosen to share.</p><p role="status">{status}</p></section>
     <form className="card wide-card student-form" onSubmit={(event) => { void submit(event); }}>
       <label className="student-form-field"><span>Target career</span><input name="targetCareer" defaultValue={profile?.targetCareer ?? ''} maxLength={120} /></label>
       <label className="student-form-field"><span>Headline</span><input name="profileHeadline" defaultValue={profile?.profileHeadline ?? ''} maxLength={160} /></label>

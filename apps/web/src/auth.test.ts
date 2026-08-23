@@ -153,7 +153,7 @@ describe('Cognito Hosted UI browser authentication', () => {
     await waitFor(() => expect(window.location.pathname).toBe('/student'));
     window.history.pushState(null, '', '/student/profile');
     window.dispatchEvent(new PopStateEvent('popstate'));
-    await waitFor(() => expect(screen.getByRole('heading', { name: 'Student-owned profile' })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Your career profile' })).toBeInTheDocument());
     fireEvent.change(screen.getByLabelText('Target career'), { target: { value: 'Security Analyst' } });
     fireEvent.change(screen.getByLabelText('Headline'), { target: { value: 'Security learner' } });
     fireEvent.change(screen.getByLabelText('Career interests, comma separated'), { target: { value: 'SOC' } });
@@ -201,7 +201,7 @@ describe('Cognito Hosted UI browser authentication', () => {
     await waitFor(() => expect(window.location.pathname).toBe('/student'));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Student profile menu' })).toHaveTextContent('Aanya Rao'));
     expect(screen.getByText('Authenticated Student workspace')).toBeInTheDocument();
-    expect(screen.getByText('Real Student identity')).toBeInTheDocument();
+    expect(screen.getByText('Your profile')).toBeInTheDocument();
     expect(screen.queryByText('Rahul Kumar')).not.toBeInTheDocument();
     expect(screen.queryByText('DEMO PREVIEW')).not.toBeInTheDocument();
     expect(screen.queryByText('/100')).not.toBeInTheDocument();

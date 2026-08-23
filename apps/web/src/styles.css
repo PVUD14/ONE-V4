@@ -13,7 +13,9 @@
   --canvas: #f5f7fb;
   --line: #e1e7f2;
   --line-strong: #cdd7ea;
-  --muted: #69758b;
+  /* #69758b measured 4.33:1 on the app canvas, just under the WCAG 2.2 AA floor of
+     4.5:1 for body text. #5f6b80 measures ~5.0:1 on the same ground. */
+  --muted: #5f6b80;
   --green: #14a578;
   --amber: #f59e0b;
   --purple: #7c5ce8;
@@ -64,8 +66,11 @@
 .role-accent-slate { --role-accent: #334155; --role-soft: #f8fafc; }
 .role-shell { min-height: 100vh; display: grid; grid-template-columns: 268px minmax(0, 1fr); background: #f6f8fb; color: #172033; }
 .role-sidebar { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; gap: 14px; padding: 16px; background: #0f172a; color: #e2e8f0; overflow-y: auto; }
-.role-brand-mark, .role-profile > span:first-child { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 14px; background: var(--role-accent); color: #fff; font-weight: 800; }
-.role-brand > span:last-of-type, .role-profile > span:last-child { min-width: 0; display: flex; flex-direction: column; }
+.role-brand-mark, .role-profile > span:first-child { flex: 0 0 auto; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 14px; background: var(--role-accent); color: #fff; font-weight: 800; }
+/* `:last-child` never matched here: the account chip ends with a chevron <svg>, so the
+   text wrapper was left without `min-width: 0` and could not shrink, overflowing the
+   topbar. `:not(:first-child)` targets the text wrapper wherever it sits. */
+.role-brand > span:last-of-type, .role-profile > span:not(:first-child) { min-width: 0; display: flex; flex-direction: column; }
 .role-nav, .role-nav-group { display: grid; gap: 8px; }
 .role-nav-group > span { margin-top: 10px; color: #94a3b8; font-size: 0.74rem; letter-spacing: 0.08em; text-transform: uppercase; }
 .role-nav-item, .role-collapse { width: 100%; min-height: 40px; display: flex; align-items: center; gap: 10px; padding: 9px 10px; border: 0; border-radius: 12px; background: transparent; color: #cbd5e1; text-align: left; }
@@ -73,12 +78,18 @@
 .role-nav-item.active, .role-nav-item:hover, .role-collapse:hover { background: color-mix(in srgb, var(--role-accent) 28%, #1e293b); color: #fff; }
 .role-workspace { min-width: 0; display: flex; flex-direction: column; }
 .role-topbar { position: sticky; top: 0; z-index: 10; min-height: 72px; padding: 12px clamp(20px, 2vw, 32px); background: rgba(255,255,255,.92); border-bottom: 1px solid rgba(148,163,184,.28); backdrop-filter: blur(16px); }
-.role-context, .role-org { padding: 9px 12px; border-radius: 999px; background: var(--role-soft); color: var(--role-accent); font-weight: 800; white-space: nowrap; }
+/* These pills are `white-space: nowrap`, so without a cap a long role name (e.g.
+   "Platform Administrator / Operations Administrator") cannot shrink and pushes the
+   account chip past the viewport, clipping it on every staff route. */
+.role-context, .role-org { min-width: 0; max-width: 240px; overflow: hidden; text-overflow: ellipsis; flex-shrink: 1; padding: 9px 12px; border-radius: 999px; background: var(--role-soft); color: var(--role-accent); font-weight: 800; white-space: nowrap; }
 .role-search, .role-local-search { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .role-search { flex: 1; max-width: 480px; padding: 9px 12px; border-radius: 999px; background: #f8fafc; border: 1px solid #e2e8f0; }
 .role-search input, .role-local-search input, .role-modal input, .role-modal textarea { width: 100%; min-width: 0; border: 0; background: transparent; color: inherit; }
 .role-topbar-actions { min-width: 0; gap: 10px; flex-wrap: nowrap; }
-.role-profile { min-width: 0; max-width: min(300px, 28vw); flex: 0 1 auto; flex-direction: row; align-items: center; gap: 9px; }
+/* `display: flex` is required: .role-profile is a <span>, and max-width does not
+   apply to inline boxes. Without it the account chip ignores its 300px cap and
+   pushes the staff topbar to ~1750px, clipping content on every staff route. */
+.role-profile { display: flex; min-width: 0; max-width: min(300px, 28vw); flex: 0 1 auto; flex-direction: row; align-items: center; gap: 9px; }
 .role-profile strong, .role-profile small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .role-profile small { color: #64748b; }
 .role-main { width: 100%; max-width: 1600px; margin: 0 auto; padding: clamp(20px, 2vw, 32px); }
@@ -281,7 +292,13 @@
   padding: 16px;
 }
 
-.workspace-grid span { color: #dbeafe; font-size: 0.9rem; }
+/* Scoped to the dark workspace chooser only. `.workspace-grid` is also reused as a
+   light-surface layout grid on authenticated Student pages, where #dbeafe measures
+   1.22:1 against white and made eyebrows and form labels effectively invisible. */
+.workspace-card .workspace-grid span { color: #dbeafe; font-size: 0.9rem; }
+
+/* Student-owned form field labels sit on white cards and must stay legible. */
+.student-form-field > span { color: #334155; font-size: 0.9rem; font-weight: 600; }
 
 .demo-boundary {
   display: flex;
@@ -1980,8 +1997,10 @@ button.secondary {
   box-shadow: inset 0 0 0 1px rgba(255,255,255,.2);
 }
 
-.brand-chip.green { background: linear-gradient(145deg, #14a578, #0b6b56); }
-.brand-chip.amber { background: linear-gradient(145deg, #f59e0b, #955f05); }
+/* These chips carry white monogram text, so the lightest stop governs contrast.
+   #14a578 gave 3.14:1 and #f59e0b only 2.15:1; both stops below now clear 5:1. */
+.brand-chip.green { background: linear-gradient(145deg, #0f7a58, #0b6b56); }
+.brand-chip.amber { background: linear-gradient(145deg, #9a6206, #6b4404); }
 .brand-chip.purple { background: linear-gradient(145deg, #7c5ce8, #4730a7); }
 
 .type-icon {
@@ -3167,7 +3186,7 @@ button.secondary {
 
 .staff-filter-row label span,
 .staff-filter-panel label span {
-  color: #6b788c;
+  color: #5f6b80;
   font-size: 10px;
   font-weight: 650;
 }
@@ -3579,7 +3598,8 @@ button.secondary {
 }
 
 .risk-score {
-  color: #e05243;
+  /* #e05243 measured 3.85:1 at this size; #b03d31 keeps the warm red and passes AA. */
+  color: #b03d31;
   font-weight: 650;
 }
 
@@ -3644,7 +3664,7 @@ button.secondary {
 .interview-list small,
 .announcement-list small {
   display: block;
-  color: #6d7b8f;
+  color: #5f6b80;
   font-size: 11px;
 }
 

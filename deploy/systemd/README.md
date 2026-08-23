@@ -2,6 +2,56 @@
 
 Units for work that runs on a schedule rather than in response to a request.
 
+## Health monitor
+
+Every five minutes: public `/health`, the API directly (so a proxy fault and an API
+fault read differently), service state, any failed `planthepath-*` unit, disk usage,
+backup freshness, certificate expiry, and the clamd socket when uploads are on. All
+failures are collected into one line rather than stopping at the first.
+
+```bash
+sudo cp /srv/planthepath-next/current/deploy/systemd/planthepath-monitor.* /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now planthepath-monitor.timer
+sudo systemctl start planthepath-monitor.service && journalctl -u planthepath-monitor.service -n 3 --no-pager
+```
+
+**Alerting needs one thing only you can do**: create two free checks at
+healthchecks.io (or any dead-man's-switch service) — one expecting a ping every
+5 minutes, one expecting a daily ping — and add to `app.env`:
+
+```bash
+MONITOR_PING_URL=https://hc-ping.com/<uuid-monitor>
+BACKUP_PING_URL=https://hc-ping.com/<uuid-backup>
+```
+
+The service then emails you when pings stop arriving (host dead) or when the fail
+endpoint is hit (host alive but broken). Without these URLs the monitor still runs
+and logs, but nobody is told.
+
+## Off-host backup copy
+
+The backup script copies each verified dump off the machine when either is set in
+`app.env`:
+
+```bash
+BACKUP_RCLONE_REMOTE=remote:bucket/one-db     # any rclone remote (B2, S3, Drive…)
+BACKUP_SCP_TARGET=user@othermachine:/backups/ # or plain scp with key auth
+```
+
+Unconfigured, every run logs a warning that a lost machine is still total loss; a
+failed copy exits non-zero even though the local dump is good.
+
+## Switching the API to production mode
+
+`deploy/scripts/preflight-production.sh` names exactly what `app.env` is missing.
+Production startup requires `NODE_ENV=production`, server-side
+`COGNITO_USER_POOL_ID` and `COGNITO_CLIENT_ID` (the `VITE_` variants are the
+browser's, not the API's), and `AUTOMATION_SIGNING_SECRET` (≥32 bytes;
+`openssl rand -base64 48`). Release deploy scripts run the preflight before
+building, and pass `ALLOW_PRODUCTION_MIGRATIONS=true` to the migrate step per-run —
+that guard exists so production migrations are a conscious act, never ambient.
+
 ## Database backup with restore verification
 
 A dump that has never been restored is not a backup; it is a file that might be one.

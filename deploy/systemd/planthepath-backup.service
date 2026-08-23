@@ -9,6 +9,8 @@ Type=oneshot
 User=aight
 Group=aight
 WorkingDirectory=/srv/planthepath-next
+# Optional: BACKUP_RCLONE_REMOTE / BACKUP_SCP_TARGET / BACKUP_PING_URL live here.
+EnvironmentFile=-/srv/planthepath-next/shared/app.env
 ExecStart=/bin/bash /srv/planthepath-next/current/deploy/scripts/backup-and-verify.sh
 
 # A failed backup is worth retrying the same day rather than waiting for tomorrow.

@@ -1,0 +1,11 @@
+[Unit]
+Description=Run the ONE health monitor every five minutes
+Documentation=https://github.com/PVUD14/planthepath-next
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+# No Persistent: a missed monitor tick carries no debt; the next one covers it.
+
+[Install]
+WantedBy=timers.target

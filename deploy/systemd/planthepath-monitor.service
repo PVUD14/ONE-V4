@@ -1,0 +1,25 @@
+[Unit]
+Description=ONE health monitor
+Documentation=https://github.com/PVUD14/planthepath-next
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=aight
+Group=aight
+WorkingDirectory=/srv/planthepath-next
+EnvironmentFile=-/srv/planthepath-next/shared/app.env
+ExecStart=/bin/bash /srv/planthepath-next/current/deploy/scripts/monitor.sh
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

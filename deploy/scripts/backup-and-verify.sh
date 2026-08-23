@@ -15,6 +15,10 @@ BACKUP_DIR=${BACKUP_DIR:-${ROOT}/shared/backups}
 RETENTION_DAYS=${BACKUP_RETENTION_DAYS:-14}
 TS=$(date -u +%Y%m%dT%H%M%SZ)
 
+fail_ping() {
+  [ -n "${BACKUP_PING_URL:-}" ] && curl -fsS -m 10 "${BACKUP_PING_URL}/fail" >/dev/null 2>&1 || true
+}
+
 install -d -m 700 "${BACKUP_DIR}"
 
 DATABASE_URL=${DATABASE_URL:-}
@@ -23,6 +27,7 @@ if [ -z "${DATABASE_URL}" ] && [ -f "${ROOT}/shared/app.env" ]; then
 fi
 if [ -z "${DATABASE_URL}" ]; then
   echo '{"event":"backup.failed","reason":"DATABASE_URL not found"}' >&2
+  fail_ping
   exit 20
 fi
 
@@ -73,6 +78,7 @@ AVAILABLE=$(df -P "${BACKUP_DIR}" | awk 'NR==2 {print $4 * 1024}')
 if [ "${AVAILABLE}" -lt "$((SIZE * 5))" ]; then
   rm -f "${BACKUP}"
   echo "{\"event\":\"backup.failed\",\"reason\":\"insufficient disk to verify restore\",\"availableBytes\":${AVAILABLE}}" >&2
+  fail_ping
   exit 21
 fi
 
@@ -115,7 +121,30 @@ if [ "${VERIFIED}" != true ]; then
   # A dump that cannot be restored is worse than no dump, because it looks like one.
   rm -f "${BACKUP}"
   echo "{\"event\":\"backup.verify.failed\",\"reason\":\"${REASON}\",\"restoreExit\":${RESTORE_STATUS},\"deletedUnverifiedDump\":true}" >&2
+  fail_ping
   exit 22
+fi
+
+# --- Copy off the host ------------------------------------------------------
+
+# Backups on the database host protect against corruption and mistakes, not against
+# losing the machine. Only after this step does the dump protect against that too.
+OFFSITE="unconfigured"
+if [ -n "${BACKUP_RCLONE_REMOTE:-}" ]; then
+  if rclone copyto "${BACKUP}" "${BACKUP_RCLONE_REMOTE}/$(basename "${BACKUP}")" 2>/dev/null; then
+    OFFSITE="rclone:ok"
+  else
+    OFFSITE="rclone:FAILED"
+  fi
+elif [ -n "${BACKUP_SCP_TARGET:-}" ]; then
+  if scp -q -o BatchMode=yes -o ConnectTimeout=15 "${BACKUP}" "${BACKUP_SCP_TARGET}" 2>/dev/null; then
+    OFFSITE="scp:ok"
+  else
+    OFFSITE="scp:FAILED"
+  fi
+fi
+if [ "${OFFSITE}" = "unconfigured" ]; then
+  echo '{"event":"backup.offsite.unconfigured","warning":"backups exist only on this host; a lost machine is still total loss"}' >&2
 fi
 
 # --- Retention --------------------------------------------------------------
@@ -123,5 +152,22 @@ fi
 PRUNED=$(find "${BACKUP_DIR}" -maxdepth 1 -name "${DB}_*.dump" -type f -mtime "+${RETENTION_DAYS}" -print -delete | wc -l)
 REMAINING=$(find "${BACKUP_DIR}" -maxdepth 1 -name "${DB}_*.dump" -type f | wc -l)
 
-printf '{"event":"backup.verified","file":"%s","bytes":%s,"sha256":"%s","tables":%s,"rows":"%s","prunedOlderThanDays":%s,"pruned":%s,"retained":%s}\n' \
-  "${BACKUP}" "${SIZE}" "${CHECKSUM}" "${SOURCE_TABLES}" "${SOURCE_ROWS}" "${RETENTION_DAYS}" "${PRUNED}" "${REMAINING}"
+printf '{"event":"backup.verified","file":"%s","bytes":%s,"sha256":"%s","tables":%s,"rows":"%s","offsite":"%s","prunedOlderThanDays":%s,"pruned":%s,"retained":%s}\n' \
+  "${BACKUP}" "${SIZE}" "${CHECKSUM}" "${SOURCE_TABLES}" "${SOURCE_ROWS}" "${OFFSITE}" "${RETENTION_DAYS}" "${PRUNED}" "${REMAINING}"
+
+# Dead-man's switch: an external service that expects this ping daily will alert when
+# it stops arriving, which is how a silently broken backup job becomes somebody's
+# problem instead of nobody's. Ping failures never fail a good backup.
+if [ -n "${BACKUP_PING_URL:-}" ]; then
+  if [ "${OFFSITE}" = "rclone:FAILED" ] || [ "${OFFSITE}" = "scp:FAILED" ]; then
+    curl -fsS -m 10 "${BACKUP_PING_URL}/fail" >/dev/null 2>&1 || true
+  else
+    curl -fsS -m 10 "${BACKUP_PING_URL}" >/dev/null 2>&1 || true
+  fi
+fi
+
+# An off-host copy that failed is a degraded backup even though the local dump is
+# good; surface it as a failure so the timer shows red rather than green.
+if [ "${OFFSITE}" = "rclone:FAILED" ] || [ "${OFFSITE}" = "scp:FAILED" ]; then
+  exit 23
+fi

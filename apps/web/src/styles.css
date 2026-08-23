@@ -4468,3 +4468,28 @@ button.secondary {
   white-space: nowrap;
   border: 0;
 }
+
+/* --- Student privacy controls -------------------------------------------- */
+
+.privacy-panel h3 { margin: 20px 0 6px; font-size: 1rem; }
+.privacy-panel > p { max-width: 68ch; }
+
+/* Deletion is irreversible once its window elapses, so the confirmation is given
+   visual weight rather than reading like any other form. */
+.privacy-confirm {
+  border: 1px solid #eec9c3;
+  background: #fdf3f1;
+  border-radius: 14px;
+  padding: 16px 18px;
+  margin-top: 8px;
+}
+.privacy-confirm p { max-width: 68ch; color: #7a2318; }
+
+.privacy-scheduled {
+  border: 1px solid #f2ddb4;
+  background: #fdf7ec;
+  border-radius: 14px;
+  padding: 16px 18px;
+  margin-top: 8px;
+}
+.privacy-scheduled p { max-width: 68ch; color: #7a4b04; }

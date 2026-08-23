@@ -36,6 +36,7 @@ import { ApplicationsPage, AssessmentsPage, CareerPath, CoachPage, Dashboard, Do
 import { StudentPreviewProvider, useStudentPreview } from './studentPreviewState.js';
 import { PlacementOfficerPortal } from './staffPages.js';
 import { StudentApplicationsPage, StudentOpportunitiesPage } from './hiringPages.js';
+import { StudentPrivacyPanel } from './privacyPanel.js';
 import { CareerReadinessApiPanel } from './careerReadinessApiPanel.js';
 
 type RouteKey = 'dashboard' | 'career-path' | 'ai-coach' | 'readiness' | 'skills' | 'assessments' | 'learning' | 'experience' | 'opportunities' | 'applications' | 'interviews' | 'documents' | 'profile' | 'settings';
@@ -755,7 +756,7 @@ function AuthenticatedStudentRoute({ route, currentStudent }: { readonly route: 
   if (route === 'skills') return <><CareerReadinessApiPanel route="skills" /><AuthenticatedStudentUnavailable route={route} /></>;
   if (route === 'assessments') return <><CareerReadinessApiPanel route="assessments" /><AuthenticatedStudentUnavailable route={route} /></>;
   if (route === 'learning') return <><CareerReadinessApiPanel route="learning" /><AuthenticatedStudentUnavailable route={route} /></>;
-  if (route === 'settings') return <><CareerReadinessApiPanel route="notifications" /><AuthenticatedStudentUnavailable route={route} /></>;
+  if (route === 'settings') return <><CareerReadinessApiPanel route="notifications" /><StudentPrivacyPanel /></>;
   return <AuthenticatedStudentUnavailable route={route} />;
 }
 

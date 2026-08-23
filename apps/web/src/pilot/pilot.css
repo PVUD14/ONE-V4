@@ -1,0 +1,349 @@
+/* Pilot experience styling. Everything is scoped under .pilot so nothing here can
+   reach the real application's pages; the pilot borrows the ONE brand blue and
+   otherwise carries its own tokens at sample fidelity. */
+
+.pilot {
+  --p-blue: #1f55e5;
+  --p-blue-soft: #eaf1ff;
+  --p-ink: #101828;
+  --p-ink-2: #344054;
+  --p-muted: #5d6b82;
+  --p-line: #e5eaf2;
+  --p-canvas: #f6f8fb;
+  --p-card: #ffffff;
+  --p-green: #0d6b4f;
+  --p-green-soft: #e4f6ee;
+  --p-amber: #92400e;
+  --p-amber-soft: #fdf1dc;
+  --p-purple: #5936cf;
+  --p-purple-soft: #efeafc;
+  --p-rose: #a81f4d;
+  --p-rose-soft: #fdeaf0;
+  --p-teal: #0b6669;
+  --p-teal-soft: #e2f5f5;
+  --p-indigo: #4438ca;
+  --p-indigo-soft: #eceafc;
+  --p-shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 8px 24px -14px rgba(16, 24, 40, .14);
+
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 236px minmax(0, 1fr);
+  background: var(--p-canvas);
+  color: var(--p-ink);
+  font-family: Inter, "Segoe UI", system-ui, sans-serif;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+/* --- Sidebar --------------------------------------------------------------- */
+
+.pilot-sidebar {
+  position: sticky; top: 0; height: 100vh; overflow-y: auto;
+  background: var(--p-card); border-right: 1px solid var(--p-line);
+  padding: 18px 14px; display: flex; flex-direction: column; gap: 4px;
+}
+.pilot-brand { display: flex; align-items: center; gap: 10px; padding: 2px 8px 16px; }
+.pilot-brand-mark {
+  width: 40px; height: 40px; border-radius: 12px; background: #0b0f1a; color: #fff;
+  display: grid; place-items: center; font-weight: 700; font-size: 17px; letter-spacing: .02em;
+}
+.pilot-brand strong { font-size: 16px; letter-spacing: .01em; }
+.pilot-brand small { display: block; color: var(--p-muted); font-size: 10px; letter-spacing: .08em; }
+
+.pilot .pilot-nav-item {
+  display: flex; align-items: center; gap: 11px; width: 100%;
+  padding: 9px 12px; border: 0; border-radius: 10px; background: transparent;
+  color: var(--p-ink-2); font: inherit; font-weight: 500; text-align: left; cursor: pointer;
+}
+.pilot .pilot-nav-item:hover { background: var(--p-canvas); }
+.pilot .pilot-nav-item.active { background: var(--p-blue-soft); color: var(--p-blue); font-weight: 600; }
+.pilot .pilot-nav-item .lucide { flex: 0 0 auto; }
+.pilot .pilot-nav-item small { margin-left: auto; color: var(--p-muted); font-size: 10px; }
+
+.pilot-side-note {
+  margin-top: auto; border: 1px solid var(--p-line); border-radius: 14px;
+  background: linear-gradient(180deg, #f8faff, #eef3fe); padding: 14px; text-align: center;
+}
+.pilot-side-note strong { display: block; margin-bottom: 4px; font-size: 13px; }
+.pilot-side-note p { margin: 0 0 10px; color: var(--p-muted); font-size: 12px; }
+
+/* --- Topbar ---------------------------------------------------------------- */
+
+.pilot-main { min-width: 0; display: flex; flex-direction: column; }
+.pilot-topbar {
+  position: sticky; top: 0; z-index: 8; display: flex; align-items: center; gap: 14px;
+  padding: 12px 26px; background: rgba(246, 248, 251, .92); backdrop-filter: blur(10px);
+}
+.pilot-search {
+  flex: 1; max-width: 430px; display: flex; align-items: center; gap: 9px;
+  background: var(--p-card); border: 1px solid var(--p-line); border-radius: 12px;
+  padding: 9px 13px; color: var(--p-muted);
+}
+.pilot-topbar-actions { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+.pilot .pilot-icon-button {
+  position: relative; display: grid; place-items: center; width: 38px; height: 38px;
+  border: 1px solid var(--p-line); border-radius: 11px; background: var(--p-card);
+  color: var(--p-ink-2); cursor: pointer;
+}
+.pilot-dot {
+  position: absolute; top: -5px; right: -5px; min-width: 17px; height: 17px; padding: 0 4px;
+  border-radius: 999px; background: #b91c1c; color: #fff; font-size: 10px; font-weight: 700;
+  display: grid; place-items: center;
+}
+.pilot-user { display: flex; align-items: center; gap: 10px; }
+.pilot-avatar {
+  width: 38px; height: 38px; border-radius: 50%; color: #fff; font-weight: 700; font-size: 13px;
+  display: grid; place-items: center; background: linear-gradient(135deg, #1d4ed8, #5936cf);
+}
+.pilot-user strong { display: block; font-size: 13px; line-height: 1.2; }
+.pilot-user small { color: var(--p-muted); font-size: 11px; }
+.pilot-sample-chip {
+  border: 1px solid var(--p-amber); color: var(--p-amber); background: var(--p-amber-soft);
+  border-radius: 999px; padding: 3px 10px; font-size: 10.5px; font-weight: 600; letter-spacing: .04em;
+}
+.pilot .pilot-signout { border: 0; background: none; color: var(--p-muted); font: inherit; font-size: 12px; cursor: pointer; text-decoration: underline; }
+
+/* The application stylesheet paints every unrecognised button with the student
+   accent at specificity (0,1,1). These resets sit at (0,2,0) so pilot controls
+   render exactly as declared here and nothing bleeds in. */
+.pilot .pilot-link, .pilot .pilot-tab, .pilot .pilot-signout {
+  background: none; min-height: 0; border-radius: 0; padding: 0;
+}
+.pilot .pilot-tab { padding: 8px 2px 10px; }
+.pilot .pilot-nav-item { background: transparent; color: var(--p-ink-2); font-size: 13px; min-height: 0; }
+.pilot .pilot-nav-item.active { background: var(--p-blue-soft); color: var(--p-blue); }
+.pilot .pilot-icon-button { background: var(--p-card); color: var(--p-ink-2); min-height: 0; font-size: 12px; }
+
+/* --- Page scaffold --------------------------------------------------------- */
+
+.pilot-page { display: grid; grid-template-columns: minmax(0, 1fr) 316px; gap: 20px; padding: 10px 26px 40px; align-items: start; }
+.pilot-content { min-width: 0; display: flex; flex-direction: column; gap: 18px; }
+.pilot-rail { min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+
+.pilot-page-head h1 { margin: 4px 0 4px; font-size: 26px; letter-spacing: -.01em; }
+.pilot-page-head p { margin: 0; color: var(--p-muted); }
+.pilot-page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.pilot-greeting h1 { margin: 4px 0 4px; font-size: 24px; }
+.pilot-greeting p { margin: 0; color: var(--p-muted); }
+
+.pilot-card {
+  background: var(--p-card); border: 1px solid var(--p-line); border-radius: 16px;
+  box-shadow: var(--p-shadow); padding: 16px 18px; min-width: 0;
+}
+.pilot-card h2 { margin: 0 0 12px; font-size: 15px; }
+.pilot-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.pilot-card-head h2 { margin: 0; }
+.pilot .pilot-link { border: 0; background: none; color: var(--p-blue); font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+
+.pilot-row { display: grid; gap: 14px; }
+.pilot-row.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.pilot-row.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.pilot-row.cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.pilot-row.cols-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+
+/* --- Buttons & chips ------------------------------------------------------- */
+
+.pilot .pilot-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  border: 0; border-radius: 10px; background: var(--p-blue); color: #fff;
+  font: inherit; font-size: 12.5px; font-weight: 600; padding: 9px 15px; cursor: pointer;
+}
+.pilot .pilot-btn.ghost { background: var(--p-card); color: var(--p-blue); border: 1px solid var(--p-line); }
+.pilot .pilot-btn.soft { background: var(--p-blue-soft); color: var(--p-blue); }
+.pilot .pilot-btn.small { padding: 6px 12px; font-size: 12px; }
+.pilot .pilot-btn:disabled { opacity: .55; cursor: default; }
+
+.pilot-chip {
+  display: inline-flex; align-items: center; gap: 5px; border-radius: 999px;
+  padding: 3px 10px; font-size: 11px; font-weight: 600; white-space: nowrap;
+}
+.pilot-chip.green { background: var(--p-green-soft); color: var(--p-green); }
+.pilot-chip.amber { background: var(--p-amber-soft); color: var(--p-amber); }
+.pilot-chip.blue { background: var(--p-blue-soft); color: var(--p-blue); }
+.pilot-chip.purple { background: var(--p-purple-soft); color: var(--p-purple); }
+.pilot-chip.rose { background: var(--p-rose-soft); color: var(--p-rose); }
+.pilot-chip.teal { background: var(--p-teal-soft); color: var(--p-teal); }
+.pilot-chip.indigo { background: var(--p-indigo-soft); color: var(--p-indigo); }
+.pilot-chip.slate { background: #eef1f6; color: var(--p-ink-2); }
+
+.pilot-mark {
+  width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center;
+  font-weight: 700; font-size: 13px; color: #fff; flex: 0 0 auto;
+}
+.pilot-mark.blue { background: linear-gradient(135deg, #1d4ed8, #1e3a8a); }
+.pilot-mark.indigo { background: linear-gradient(135deg, #4f46e5, #3730a3); }
+.pilot-mark.teal { background: linear-gradient(135deg, #0f766e, #115e59); }
+.pilot-mark.amber { background: linear-gradient(135deg, #b45309, #7c2d12); }
+.pilot-mark.rose { background: linear-gradient(135deg, #be185d, #9d174d); }
+.pilot-mark.green { background: linear-gradient(135deg, #15803d, #14532d); }
+.pilot-mark.slate { background: linear-gradient(135deg, #475569, #1e293b); }
+
+.pilot-tile {
+  width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; flex: 0 0 auto;
+}
+.pilot-tile.blue { background: var(--p-blue-soft); color: var(--p-blue); }
+.pilot-tile.green { background: var(--p-green-soft); color: var(--p-green); }
+.pilot-tile.amber { background: var(--p-amber-soft); color: var(--p-amber); }
+.pilot-tile.purple { background: var(--p-purple-soft); color: var(--p-purple); }
+.pilot-tile.rose { background: var(--p-rose-soft); color: var(--p-rose); }
+.pilot-tile.teal { background: var(--p-teal-soft); color: var(--p-teal); }
+.pilot-tile.indigo { background: var(--p-indigo-soft); color: var(--p-indigo); }
+
+/* --- Meters ---------------------------------------------------------------- */
+
+.pilot-bar { height: 7px; border-radius: 999px; background: #edf1f7; overflow: hidden; }
+.pilot-bar i { display: block; height: 100%; border-radius: 999px; background: var(--p-blue); }
+.pilot-bar.green i { background: var(--p-green); }
+.pilot-bar.amber i { background: #f59e0b; }
+.pilot-bar.purple i { background: var(--p-purple); }
+.pilot-bar.rose i { background: #e5484d; }
+.pilot-bar.indigo i { background: var(--p-indigo); }
+.pilot-bar.thin { height: 5px; }
+
+.pilot-list { display: flex; flex-direction: column; }
+.pilot-list-row {
+  display: flex; align-items: center; gap: 12px; padding: 11px 2px;
+  border-bottom: 1px solid var(--p-line);
+}
+.pilot-list-row:last-child { border-bottom: 0; }
+.pilot-list-row .grow { flex: 1; min-width: 0; }
+.pilot-list-row strong { display: block; font-size: 13px; }
+.pilot-list-row small { color: var(--p-muted); font-size: 11.5px; }
+
+.pilot-tabs { display: flex; gap: 20px; border-bottom: 1px solid var(--p-line); margin-bottom: 4px; overflow-x: auto; }
+.pilot .pilot-tab {
+  border: 0; background: none; font: inherit; font-size: 13px; color: var(--p-muted);
+  padding: 8px 2px 10px; cursor: pointer; white-space: nowrap; border-bottom: 2px solid transparent;
+}
+.pilot .pilot-tab.active { color: var(--p-blue); font-weight: 600; border-bottom-color: var(--p-blue); }
+
+/* --- Specific compositions ------------------------------------------------- */
+
+.pilot-hero {
+  border: 1px solid var(--p-line); border-radius: 16px; padding: 18px 20px;
+  background: linear-gradient(120deg, #eef3ff 0%, #f7f9ff 55%, #f2ecff 100%);
+  display: flex; align-items: center; gap: 20px; justify-content: space-between; flex-wrap: wrap;
+}
+.pilot-hero h2 { margin: 0 0 4px; font-size: 17px; }
+.pilot-hero p { margin: 0; color: var(--p-muted); }
+
+.pilot-score-card { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 14px 10px; }
+.pilot-score-card header { font-size: 12.5px; font-weight: 600; color: var(--p-ink-2); }
+.pilot-score-card .value { font-size: 13px; font-weight: 700; }
+.pilot-score-card .value span { color: var(--p-muted); font-weight: 500; font-size: 11px; }
+
+.pilot-readiness { display: flex; align-items: center; gap: 18px; }
+.pilot-readiness .big { font-size: 40px; font-weight: 800; line-height: 1; }
+.pilot-readiness .big span { font-size: 15px; color: var(--p-muted); font-weight: 600; }
+
+.pilot-streak-days { display: flex; gap: 7px; margin-top: 10px; }
+.pilot-streak-days i {
+  width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--p-green-soft); color: var(--p-green); font-style: normal; font-size: 11px; font-weight: 700;
+}
+.pilot-streak-days i.off { background: #eef1f6; color: var(--p-muted); }
+
+.pilot-quote {
+  border-radius: 16px; padding: 20px; color: #fff;
+  background: linear-gradient(120deg, #4a63e7, #7a5cf0);
+  font-size: 15px; font-weight: 600; font-style: italic;
+}
+
+.pilot-step { display: flex; gap: 14px; }
+.pilot-step-no {
+  width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; flex: 0 0 auto;
+  font-size: 12.5px; font-weight: 700; border: 2px solid var(--p-line); color: var(--p-muted); background: var(--p-card);
+  position: relative; z-index: 1;
+}
+.pilot-step.completed .pilot-step-no { background: var(--p-green); border-color: var(--p-green); color: #fff; }
+.pilot-step.current .pilot-step-no { background: var(--p-blue); border-color: var(--p-blue); color: #fff; }
+.pilot-step-line { position: relative; }
+.pilot-step-line::before {
+  content: ""; position: absolute; left: 14px; top: 34px; bottom: -12px; width: 2px; background: var(--p-line);
+}
+.pilot-step:last-child .pilot-step-line::before { display: none; }
+.pilot-step-card {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 14px;
+  border: 1px solid var(--p-line); border-radius: 13px; padding: 12px 15px; margin-bottom: 12px;
+  background: var(--p-card);
+}
+.pilot-step.current .pilot-step-card { border-color: #c4d4fb; background: #f5f8ff; }
+.pilot-step-card .grow { flex: 1; min-width: 0; }
+.pilot-step-card strong { display: block; font-size: 13.5px; }
+.pilot-step-card small { color: var(--p-muted); font-size: 11.5px; }
+
+.pilot-phase {
+  display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 12px;
+  border: 1px solid var(--p-line); background: var(--p-card); white-space: nowrap;
+}
+.pilot-phase strong { font-size: 12.5px; display: block; }
+.pilot-phase small { color: var(--p-muted); font-size: 11px; }
+.pilot-phase.active { border-color: #b9f0d7; background: #f0fbf6; }
+.pilot-phase.active strong { color: var(--p-green); }
+.pilot-phases { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 2px; }
+
+.pilot-course-card { display: flex; flex-direction: column; gap: 9px; }
+.pilot-course-art { height: 74px; border-radius: 12px; display: grid; place-items: center; color: #fff; }
+.pilot-course-card strong { font-size: 13px; line-height: 1.35; }
+.pilot-course-card small { color: var(--p-muted); font-size: 11px; }
+
+.pilot-cat {
+  display: flex; align-items: center; gap: 10px; border: 1px solid var(--p-line);
+  border-radius: 12px; padding: 11px 13px; background: var(--p-card);
+}
+.pilot-cat strong { font-size: 12.5px; display: block; }
+.pilot-cat small { color: var(--p-muted); font-size: 11px; }
+
+.pilot-date {
+  width: 44px; border-radius: 10px; overflow: hidden; text-align: center; flex: 0 0 auto;
+  border: 1px solid var(--p-line); font-weight: 700;
+}
+.pilot-date b { display: block; background: var(--p-blue-soft); color: var(--p-blue); font-size: 9.5px; letter-spacing: .06em; padding: 2px 0; }
+.pilot-date span { display: block; font-size: 15px; padding: 3px 0 4px; }
+
+.pilot-stat { display: flex; align-items: center; gap: 11px; }
+.pilot-stat b { font-size: 19px; display: block; line-height: 1.1; }
+.pilot-stat small { color: var(--p-muted); font-size: 11.5px; }
+
+.pilot-legend { display: flex; flex-direction: column; gap: 8px; font-size: 12.5px; }
+.pilot-legend > div { display: flex; align-items: center; gap: 8px; }
+.pilot-legend i { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
+.pilot-legend .num { margin-left: auto; font-weight: 700; }
+
+.pilot-skill { margin-bottom: 11px; }
+.pilot-skill:last-child { margin-bottom: 0; }
+.pilot-skill header { display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 5px; }
+.pilot-skill header b { font-weight: 600; }
+
+.pilot-two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+
+.pilot-banner {
+  border-radius: 14px; padding: 14px 16px; display: flex; align-items: center; gap: 12px;
+  background: var(--p-green-soft); color: var(--p-green); font-weight: 600; font-size: 12.5px;
+}
+.pilot-banner.blue { background: var(--p-blue-soft); color: var(--p-blue); }
+
+.pilot-coming {
+  display: grid; place-items: center; min-height: 320px; text-align: center;
+}
+.pilot-coming h2 { margin: 12px 0 6px; }
+.pilot-coming p { margin: 0; color: var(--p-muted); max-width: 46ch; }
+
+/* --- Responsiveness -------------------------------------------------------- */
+
+@media (max-width: 1180px) {
+  .pilot-page { grid-template-columns: 1fr; }
+  .pilot-row.cols-5 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .pilot-row.cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 860px) {
+  .pilot { grid-template-columns: 1fr; }
+  .pilot-sidebar { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; }
+  .pilot-side-note { display: none; }
+  .pilot-row.cols-3, .pilot-row.cols-5 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pilot-two { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .pilot-row.cols-2, .pilot-row.cols-3, .pilot-row.cols-4, .pilot-row.cols-5 { grid-template-columns: 1fr; }
+  .pilot-search { display: none; }
+}

@@ -1,0 +1,862 @@
+import { ArrowRight, Award, BookOpen, Bookmark, Building2, CalendarDays, CheckCircle2, ClipboardCheck, Clock, Flame, Lock, Play, Sparkles, Star, Target, TrendingUp, Trophy } from 'lucide-react';
+import { MultiRing, Ring, Spark, WeekBars, toneColor } from './pilotComponents.js';
+import {
+  pilotAchievements, pilotBadges, pilotCanon, pilotCompanies, pilotContinueLearning,
+  pilotDemandSkills, pilotDrives, pilotImprovements, pilotLearnRecommended,
+  pilotLearningPaths, pilotLearningProgress, pilotLeftOff, pilotMilestones,
+  pilotOpportunities, pilotOpportunityCategories, pilotPersona, pilotPopularCourses,
+  pilotProfileChecklist, pilotProfileTips, pilotRecentActivity, pilotRecentTests,
+  pilotRecommendedCourses, pilotRecommendedTests, pilotRoadmapPhases, pilotRoadmapSteps,
+  pilotRoadmapTips, pilotSavedOpportunities, pilotScoreDistribution, pilotScores,
+  pilotSkills, pilotStrengths, pilotTestCategories, pilotTodayPlan, pilotUpcoming,
+  pilotUpcomingTests, pilotWeekProgress,
+} from './pilotData.js';
+
+/** All six Tier 1 pages. Presentation over the pilot dataset; no real records touched. */
+
+// ---------------------------------------------------------------------------
+// Dashboard
+// ---------------------------------------------------------------------------
+
+export function PilotDashboard(): React.ReactElement {
+  const canon = pilotCanon;
+  return <div className="pilot-page">
+    <div className="pilot-content">
+      <div className="pilot-page-head">
+        <div className="pilot-greeting">
+          <h1>Good morning, {pilotPersona.firstName}! 👋</h1>
+          <p>Let&apos;s continue your journey and get one step closer to your dream career.</p>
+        </div>
+        <button type="button" className="pilot-btn ghost"><CalendarDays size={15} /> View Calendar</button>
+      </div>
+
+      <div className="pilot-row" style={{ gridTemplateColumns: 'minmax(0, 2.4fr) repeat(5, minmax(0, 1fr))' }}>
+        <section className="pilot-card">
+          <h2>Career Readiness Score</h2>
+          <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'nowrap' }}>
+            <div style={{ minWidth: 0 }}>
+              <span style={{ fontSize: 32, fontWeight: 800, lineHeight: 1 }}>{canon.readiness}<span style={{ fontSize: 14, color: 'var(--p-muted)', fontWeight: 600 }}>/100</span></span>
+              <div style={{ marginTop: 7 }}><span className="pilot-chip green">{canon.readinessLabel}</span></div>
+              <div style={{ marginTop: 11 }}><button type="button" className="pilot-btn soft small">View Full Report</button></div>
+            </div>
+            <Ring value={canon.readiness} size={66} stroke={8} tone="blue"><span style={{ fontSize: 18 }}>{canon.readiness}</span></Ring>
+          </div>
+        </section>
+        {pilotScores.map((score) => (
+          <section key={score.label} className="pilot-card pilot-score-card">
+            <header>{score.label}</header>
+            <Ring value={score.value} size={62} stroke={7} tone={score.tone}><span style={{ fontSize: 12 }}>{score.value}</span></Ring>
+            <div className="value">{score.value}<span>/100</span></div>
+            <span className={`pilot-chip ${score.tone === 'green' || score.tone === 'blue' ? 'green' : 'amber'}`}>{score.band}</span>
+          </section>
+        ))}
+      </div>
+
+      <div className="pilot-row cols-3">
+        <section className="pilot-card">
+          <div className="pilot-card-head"><h2>Today&apos;s Plan</h2><span className="pilot-chip blue">4 Tasks</span></div>
+          <div className="pilot-list">
+            {pilotTodayPlan.map((task) => (
+              <div key={task.title} className="pilot-list-row">
+                <CheckCircle2 size={17} color={task.done ? '#12996b' : '#c2ccda'} />
+                <div className="grow"><strong>{task.title}</strong></div>
+                <small>{task.minutes} min</small>
+              </div>
+            ))}
+          </div>
+          <button type="button" className="pilot-btn soft small" style={{ marginTop: 10 }}>View Full Plan</button>
+        </section>
+
+        <section className="pilot-card">
+          <h2>Continue Learning</h2>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <span className="pilot-tile purple"><BookOpen size={19} /></span>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <strong style={{ fontSize: 13 }}>Data Structures in C</strong>
+              <small style={{ display: 'block', color: 'var(--p-muted)' }}>Arrays and Strings</small>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '12px 0' }}>
+            <div className="pilot-bar" style={{ flex: 1 }}><i style={{ width: '66%' }} /></div>
+            <small style={{ color: 'var(--p-muted)' }}>66%</small>
+          </div>
+          <button type="button" className="pilot-btn soft small"><Play size={13} /> Resume Lesson</button>
+        </section>
+
+        <section className="pilot-card">
+          <div className="pilot-card-head"><h2>Upcoming</h2><button type="button" className="pilot-link">View All</button></div>
+          <div className="pilot-list">
+            {pilotUpcoming.map((item) => (
+              <div key={item.title} className="pilot-list-row">
+                <span className="pilot-tile blue"><CalendarDays size={17} /></span>
+                <div className="grow"><strong>{item.title}</strong><small>{item.when}</small></div>
+                <ArrowRight size={15} color="#98a5ba" />
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+
+      <div className="pilot-row cols-2">
+        <section className="pilot-card">
+          <div className="pilot-card-head"><h2>Recommended for You</h2><button type="button" className="pilot-link">View All</button></div>
+          <div className="pilot-row cols-4">
+            {pilotRecommendedCourses.map((course) => (
+              <div key={course.title} className="pilot-course-card">
+                <span className="pilot-tile" style={{ background: `${toneColor(course.tone)}1a`, color: toneColor(course.tone) }}><BookOpen size={18} /></span>
+                <strong>{course.title}</strong>
+                <small>{course.lessons} Lessons</small>
+                <button type="button" className="pilot-btn soft small">Start</button>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="pilot-card">
+          <h2>Quick Actions</h2>
+          <div className="pilot-row cols-2">
+            {[
+              ['Take a Mock Test', ClipboardCheck], ['Practice Questions', Target],
+              ['Build Resume', BookOpen], ['Explore Roles', Building2],
+              ['Update Profile', Star], ['View Scholarships', Award],
+            ].map(([label, Icon]) => (
+              <button key={label as string} type="button" className="pilot-btn ghost" style={{ justifyContent: 'flex-start' }}>
+                {(() => { const Component = Icon as typeof Target; return <Component size={15} />; })()}
+                {label as string}
+              </button>
+            ))}
+          </div>
+        </section>
+      </div>
+
+      <div className="pilot-row cols-2">
+        <section className="pilot-card">
+          <h2>Recent Activity</h2>
+          <div className="pilot-list">
+            {pilotRecentActivity.map((entry) => (
+              <div key={entry.title} className="pilot-list-row">
+                <span className={`pilot-tile ${entry.tone}`}><TrendingUp size={16} /></span>
+                <div className="grow"><strong>{entry.title}</strong></div>
+                <small>{entry.when}</small>
+              </div>
+            ))}
+          </div>
+        </section>
+        <section className="pilot-card">
+          <div className="pilot-card-head"><h2>Badges Earned</h2><button type="button" className="pilot-link">View All Badges</button></div>
+          <div className="pilot-row cols-4">
+            {pilotBadges.map((badge) => (
+              <div key={badge.label} style={{ textAlign: 'center' }}>
+                <span className={`pilot-tile ${badge.tone}`} style={{ margin: '0 auto 8px' }}><Trophy size={18} /></span>
+                <small style={{ display: 'block', fontSize: 11, color: 'var(--p-ink-2)', fontWeight: 600 }}>{badge.label}</small>
+              </div>
+            ))}
+          </div>
+          <div style={{ borderTop: '1px solid var(--p-line)', marginTop: 14, paddingTop: 14 }}>
+            <div className="pilot-card-head" style={{ marginBottom: 8 }}><h2 style={{ fontSize: 13.5 }}>Career Goal · {pilotPersona.careerGoal}</h2><button type="button" className="pilot-link">Change Goal</button></div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {pilotCompanies.slice(0, 4).map((company) => (
+                <span key={company.name} className={`pilot-chip ${company.tone}`}>{company.mark} · {company.name}</span>
+              ))}
+              <span className="pilot-chip slate">+ Add More</span>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <aside className="pilot-rail">
+      <section className="pilot-card">
+        <div className="pilot-card-head">
+          <h2><Flame size={15} color="#f59e0b" style={{ verticalAlign: '-2px' }} /> {pilotCanon.streakDays} Day Streak</h2>
+          <small style={{ color: 'var(--p-muted)' }}>Keep it up!</small>
+        </div>
+        <div className="pilot-streak-days">
+          {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, index) => (
+            <i key={index} className={index === 6 ? 'off' : ''}>{index === 6 ? day : '✓'}</i>
+          ))}
+        </div>
+      </section>
+      <section className="pilot-card">
+        <div className="pilot-card-head"><h2>Your Progress This Week</h2><span className="pilot-chip blue">72%</span></div>
+        <Spark points={pilotWeekProgress} />
+      </section>
+      <div className="pilot-quote">&ldquo;Discipline today. Success tomorrow.&rdquo;</div>
+    </aside>
+  </div>;
+}
+
+// ---------------------------------------------------------------------------
+// Roadmap
+// ---------------------------------------------------------------------------
+
+export function PilotRoadmap(): React.ReactElement {
+  const roadmap = pilotCanon.roadmap;
+  return <div className="pilot-page">
+    <div className="pilot-content">
+      <div className="pilot-page-head">
+        <div>
+          <h1>My Roadmap</h1>
+          <p>Your personalized path to become a {pilotPersona.careerGoal}</p>
+        </div>
+        <div style={{ display: 'flex', gap: 9 }}>
+          <button type="button" className="pilot-btn ghost">Roadmap Settings</button>
+          <button type="button" className="pilot-btn">Change Goal</button>
+        </div>
+      </div>
+
+      <section className="pilot-card">
+        <div className="pilot-row cols-3">
+          <div style={{ display: 'flex', gap: 13, alignItems: 'center' }}>
+            <span className="pilot-tile green"><Target size={19} /></span>
+            <div>
+              <small style={{ color: 'var(--p-muted)' }}>Current Goal</small>
+              <strong style={{ display: 'block', fontSize: 16 }}>{pilotPersona.careerGoal}</strong>
+              <div style={{ display: 'flex', gap: 6, marginTop: 7, flexWrap: 'wrap' }}>
+                {pilotCompanies.slice(0, 3).map((company) => <span key={company.mark} className={`pilot-chip ${company.tone}`}>{company.mark}</span>)}
+                <span className="pilot-chip slate">+3</span>
+              </div>
+            </div>
+          </div>
+          <div>
+            <small style={{ color: 'var(--p-muted)' }}>Overall Progress</small>
+            <strong style={{ display: 'block', fontSize: 24 }}>{roadmap.progress}%</strong>
+            <div className="pilot-bar" style={{ margin: '8px 0 6px' }}><i style={{ width: `${roadmap.progress}%` }} /></div>
+            <small style={{ color: 'var(--p-muted)' }}>You&apos;re progressing well! Keep it up.</small>
+          </div>
+          <div>
+            <small style={{ color: 'var(--p-muted)' }}>Estimated Time to Goal</small>
+            <strong style={{ display: 'block', fontSize: 24 }}>{roadmap.monthsToGoal} <span style={{ fontSize: 13, fontWeight: 600 }}>months</span></strong>
+            <span className="pilot-chip green" style={{ marginTop: 7 }}>On track</span>
+          </div>
+        </div>
+      </section>
+
+      <div className="pilot-phases">
+        {pilotRoadmapPhases.map((phase) => (
+          <div key={phase.label} className={`pilot-phase ${phase.active ? 'active' : ''}`}>
+            <span className={`pilot-tile ${phase.active ? 'green' : 'blue'}`} style={{ width: 32, height: 32 }}><ClipboardCheck size={15} /></span>
+            <div><strong>{phase.label}</strong><small>{phase.done} / {phase.total} Completed</small></div>
+          </div>
+        ))}
+      </div>
+
+      <div>
+        {pilotRoadmapSteps.map((step, index) => (
+          <div key={step.title} className={`pilot-step ${step.status}`}>
+            <div className="pilot-step-line"><span className="pilot-step-no">{step.status === 'completed' ? '✓' : index + 1}</span></div>
+            <div className="pilot-step-card">
+              <div className="grow">
+                <strong>{step.title}</strong>
+                <small>{step.detail}</small>
+                {step.status === 'current' ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginTop: 7 }}>
+                    <div className="pilot-bar thin" style={{ flex: 1, maxWidth: 220 }}><i style={{ width: `${step.progress}%` }} /></div>
+                    <small>{step.progress}%</small>
+                  </div>
+                ) : null}
+              </div>
+              {step.status === 'completed' ? (
+                <>
+                  <span className="pilot-chip green">Completed</span>
+                  <small style={{ color: 'var(--p-muted)' }}>Score <b>{step.score}/100</b></small>
+                  <button type="button" className="pilot-btn ghost small">Review</button>
+                </>
+              ) : step.status === 'current' ? (
+                <button type="button" className="pilot-btn small">Continue</button>
+              ) : (
+                <span className="pilot-chip slate"><Lock size={11} /> Locked</span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+
+    <aside className="pilot-rail">
+      <section className="pilot-card" style={{ textAlign: 'center' }}>
+        <h2 style={{ textAlign: 'left' }}>Roadmap Progress</h2>
+        <Ring value={roadmap.progress} size={112} stroke={12}><span style={{ fontSize: 21 }}>{roadmap.progress}%</span></Ring>
+        <div className="pilot-row cols-3" style={{ marginTop: 12 }}>
+          <div><b style={{ fontSize: 17 }}>{roadmap.tasksDone}</b><small style={{ display: 'block', color: 'var(--p-muted)', fontSize: 10.5 }}>Tasks Completed</small></div>
+          <div><b style={{ fontSize: 17 }}>{roadmap.tasksTotal}</b><small style={{ display: 'block', color: 'var(--p-muted)', fontSize: 10.5 }}>Total Tasks</small></div>
+          <div><b style={{ fontSize: 17 }}>{roadmap.milestones}</b><small style={{ display: 'block', color: 'var(--p-muted)', fontSize: 10.5 }}>Milestones</small></div>
+        </div>
+      </section>
+      <section className="pilot-card">
+        <div className="pilot-card-head"><h2>Upcoming Milestones</h2></div>
+        {pilotMilestones.map((milestone) => (
+          <div key={milestone.title} className="pilot-skill">
+            <header><b>{milestone.title}</b><span>{milestone.progress}%</span></header>
+            <small style={{ color: 'var(--p-muted)', display: 'block', marginBottom: 5 }}>{milestone.target}</small>
+            <div className="pilot-bar thin"><i style={{ width: `${milestone.progress}%` }} /></div>
+          </div>
+        ))}
+        <button type="button" className="pilot-link" style={{ marginTop: 6 }}>View All Milestones</button>
+      </section>
+      <section className="pilot-card">
+        <h2>Recommended Next</h2>
+        <div style={{ display: 'flex', gap: 12 }}>
+          <span className="pilot-tile purple"><Sparkles size={18} /></span>
+          <div>
+            <strong style={{ fontSize: 13 }}>Practice Array Problems</strong>
+            <small style={{ display: 'block', color: 'var(--p-muted)', margin: '3px 0 8px' }}>Strengthen your problem solving skills with arrays.</small>
+            <button type="button" className="pilot-btn soft small">Start Practice <ArrowRight size={13} /></button>
+          </div>
+        </div>
+      </section>
+      <section className="pilot-card">
+        <h2>Roadmap Tips</h2>
+        <div className="pilot-list">
+          {pilotRoadmapTips.map((tip) => (
+            <div key={tip} className="pilot-list-row" style={{ padding: '8px 2px' }}>
+              <CheckCircle2 size={15} color="#1f55e5" />
+              <small style={{ color: 'var(--p-ink-2)' }}>{tip}</small>
+            </div>
+          ))}
+        </div>
+      </section>
+    </aside>
+  </div>;
+}
+
+// ---------------------------------------------------------------------------
+// Learn
+// ---------------------------------------------------------------------------
+
+export function PilotLearn(): React.ReactElement {
+  return <div className="pilot-page">
+    <div className="pilot-content">
+      <div className="pilot-page-head">
+        <div><h1>Learn</h1><p>Build skills with our expert-led courses and learning paths.</p></div>
+      </div>
+      <div className="pilot-tabs">
+        {['Overview', 'My Learning', 'Learning Paths', 'Bookmarks', 'Certificates'].map((tab, index) => (
+          <button key={tab} type="button" className={`pilot-tab ${index === 0 ? 'active' : ''}`}>{tab}</button>
+        ))}
+      </div>
+
+      <section className="pilot-hero">
+        <div>
+          <small style={{ color: 'var(--p-muted)', fontWeight: 600 }}>Continue Learning</small>
+          <h2>{pilotContinueLearning.course}</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 9, maxWidth: 380 }}>
+            <div className="pilot-bar" style={{ flex: 1 }}><i style={{ width: `${pilotContinueLearning.progress}%` }} /></div>
+            <small>{pilotContinueLearning.progress}% complete</small>
+          </div>
+          <small style={{ color: 'var(--p-muted)' }}>{pilotContinueLearning.minutesLeft} mins left</small>
+        </div>
+        <button type="button" className="pilot-btn"><Play size={15} /> Continue</button>
+      </section>
+
+      <section className="pilot-card">
+        <div className="pilot-card-head"><h2>Popular Courses</h2><button type="button" className="pilot-link">View All Courses →</button></div>
+        <div className="pilot-row cols-5">
+          {pilotPopularCourses.map((course) => (
+            <div key={course.title} className="pilot-course-card">
+              <div className="pilot-course-art" style={{ background: `linear-gradient(135deg, ${toneColor(course.tone)}cc, ${toneColor(course.tone)})` }}><BookOpen size={24} /></div>
+              <strong>{course.title}</strong>
+              <small><Star size={11} color="#f59e0b" fill="#f59e0b" style={{ verticalAlign: '-1px' }} /> {course.rating} ({course.learners}) · {course.level}</small>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div className="pilot-bar thin" style={{ flex: 1 }}><i style={{ width: `${course.progress}%` }} /></div>
+                <small>{course.progress}%</small>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="pilot-card">
+        <div className="pilot-card-head"><h2>Learning Paths</h2><button type="button" className="pilot-link">View All Paths →</button></div>
+        <div className="pilot-row cols-4">
+          {pilotLearningPaths.map((path) => (
+            <div key={path.title} className="pilot-course-card">
+              <span className="pilot-tile blue"><Target size={18} /></span>
+              <strong>{path.title}</strong>
+              <small>{path.detail}</small>
+              <small>{path.courses} Courses · {path.hours} hrs</small>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div className="pilot-bar thin green" style={{ flex: 1 }}><i style={{ width: `${path.progress}%` }} /></div>
+                <small>{path.progress}%</small>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="pilot-card">
+        <div className="pilot-card-head"><h2>Continue Where You Left Off</h2><button type="button" className="pilot-link">View All →</button></div>
+        <div className="pilot-list">
+          {pilotLeftOff.map((entry) => (
+            <div key={entry.title} className="pilot-list-row">
+              <span className="pilot-tile indigo"><Play size={16} /></span>
+              <div className="grow"><strong>{entry.title}</strong><small>{entry.course} · Last watched {entry.watched}</small></div>
+              <div className="pilot-bar thin" style={{ width: 110 }}><i style={{ width: `${entry.progress}%` }} /></div>
+              <small>{entry.progress}%</small>
+              <button type="button" className="pilot-btn ghost small">Resume</button>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+
+    <aside className="pilot-rail">
+      <section className="pilot-card">
+        <div className="pilot-card-head"><h2>Learning Progress</h2><button type="button" className="pilot-link">View Details</button></div>
+        <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+          <MultiRing segments={[
+            { value: pilotLearningProgress.completed, color: '#12996b' },
+            { value: pilotLearningProgress.inProgress, color: '#1f55e5' },
+            { value: pilotLearningProgress.notStarted, color: '#6d4fd8' },
+          ]}>62%<div style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--p-muted)' }}>Overall</div></MultiRing>
+          <div className="pilot-legend" style={{ flex: 1 }}>
+            <div><i style={{ background: '#12996b' }} /> Completed <span className="num">{pilotLearningProgress.completed}</span></div>
+            <div><i style={{ background: '#1f55e5' }} /> In Progress <span className="num">{pilotLearningProgress.inProgress}</span></div>
+            <div><i style={{ background: '#6d4fd8' }} /> Not Started <span className="num">{pilotLearningProgress.notStarted}</span></div>
+          </div>
+        </div>
+      </section>
+      <section className="pilot-card">
+        <div className="pilot-card-head"><h2>Weekly Goal</h2><button type="button" className="pilot-link">Edit Goal</button></div>
+        <small style={{ color: 'var(--p-muted)' }}>Learn {pilotCanon.weeklyGoalHours} hours every week</small>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '9px 0' }}>
+          <div className="pilot-bar" style={{ flex: 1 }}><i style={{ width: `${(pilotCanon.weeklyDoneHours / pilotCanon.weeklyGoalHours) * 100}%` }} /></div>
+          <small><b>{pilotCanon.weeklyDoneHours}</b> / {pilotCanon.weeklyGoalHours} hrs</small>
+        </div>
+      </section>
+      <section className="pilot-card">
+        <div className="pilot-card-head"><h2>Recommended for You</h2><button type="button" className="pilot-link">View All</button></div>
+        <div className="pilot-list">
+          {pilotLearnRecommended.map((course) => (
+            <div key={course.title} className="pilot-list-row">
+              <span className="pilot-tile teal"><BookOpen size={16} /></span>
+              <div className="grow"><strong>{course.title}</strong><small>{course.level}</small></div>
+              <small><Star size={11} color="#f59e0b" fill="#f59e0b" style={{ verticalAlign: '-1px' }} /> {course.rating}</small>
+              <Bookmark size={14} color="#98a5ba" />
+            </div>
+          ))}
+        </div>
+      </section>
+      <section className="pilot-card">
+        <h2>Achievements</h2>
+        <div className="pilot-row cols-3" style={{ textAlign: 'center' }}>
+          <div><span className="pilot-tile amber" style={{ margin: '0 auto 6px' }}><Flame size={17} /></span><b style={{ fontSize: 16 }}>{pilotCanon.streakDays}</b><small style={{ display: 'block', color: 'var(--p-muted)', fontSize: 10.5 }}>Day Streak</small></div>
+          <div><span className="pilot-tile purple" style={{ margin: '0 auto 6px' }}><Trophy size={17} /></span><b style={{ fontSize: 16 }}>{pilotCanon.coursesCompleted}</b><small style={{ display: 'block', color: 'var(--p-muted)', fontSize: 10.5 }}>Courses Completed</small></div>
+          <div><span className="pilot-tile green" style={{ margin: '0 auto 6px' }}><Star size={17} /></span><b style={{ fontSize: 16 }}>{pilotCanon.points}</b><small style={{ display: 'block', color: 'var(--p-muted)', fontSize: 10.5 }}>Points Earned</small></div>
+        </div>
+      </section>
+    </aside>
+  </div>;
+}
+
+// ---------------------------------------------------------------------------
+// Assessments
+// ---------------------------------------------------------------------------
+
+export function PilotAssessments(): React.ReactElement {
+  const distribution = pilotScoreDistribution;
+  return <div className="pilot-page">
+    <div className="pilot-content">
+      <div className="pilot-page-head">
+        <div><h1>Assessments</h1><p>Practice, evaluate and improve with our wide range of tests.</p></div>
+      </div>
+      <div className="pilot-tabs">
+        {['Overview', 'All Tests', 'Mock Tests', 'Past Attempts', 'Analytics'].map((tab, index) => (
+          <button key={tab} type="button" className={`pilot-tab ${index === 0 ? 'active' : ''}`}>{tab}</button>
+        ))}
+      </div>
+
+      <section className="pilot-hero">
+        <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
+          <span className="pilot-tile blue" style={{ width: 48, height: 48 }}><ClipboardCheck size={22} /></span>
+          <div>
+            <h2>Assess. Analyze. Advance.</h2>
+            <p>Regular practice helps you identify strengths, improve weak areas and stay ahead.</p>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 26 }}>
+          <div className="pilot-stat"><div><b>{pilotCanon.testsAttempted}</b><small>Tests Attempted</small></div></div>
+          <div className="pilot-stat"><div><b>{pilotCanon.averageScore}%</b><small>Average Score</small></div></div>
+          <div className="pilot-stat"><div><b>{pilotCanon.practiceHours} hrs</b><small>Total Practice Time</small></div></div>
+        </div>
+      </section>
+
+      <section className="pilot-card">
+        <div className="pilot-card-head"><h2>Recommended for You</h2><button type="button" className="pilot-link">View All</button></div>
+        <div className="pilot-row cols-5">
+          {pilotRecommendedTests.map((test) => (
+            <div key={test.title} className="pilot-course-card">
+              <span className="pilot-tile" style={{ background: `${toneColor(test.tone)}1a`, color: toneColor(test.tone) }}><ClipboardCheck size={17} /></span>
+              <strong>{test.title}</strong>
+              <span className={`pilot-chip ${test.difficulty === 'Easy' ? 'green' : test.difficulty === 'Medium' ? 'amber' : 'rose'}`}>{test.difficulty}</span>
+              <small>{test.questions} Qs · {test.minutes} mins</small>
+              <small>{test.cohort}</small>
+              <button type="button" className="pilot-btn ghost small">Start Test</button>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="pilot-card">
+        <div className="pilot-card-head"><h2>Browse by Category</h2><button type="button" className="pilot-link">View All Categories →</button></div>
+        <div className="pilot-row cols-5">
+          {pilotTestCategories.map((category) => (
+            <div key={category.label} className="pilot-cat">
+              <span className="pilot-tile blue" style={{ width: 32, height: 32 }}><Target size={14} /></span>
+              <div><strong>{category.label}</strong><small>{category.count} Tests</small></div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="pilot-card">
+        <div className="pilot-card-head"><h2>Upcoming Tests</h2><button type="button" className="pilot-link">View All</button></div>
+        <div className="pilot-row cols-4">
+          {pilotUpcomingTests.map((test) => (
+            <div key={test.title} style={{ display: 'flex', gap: 11 }}>
+              <div className="pilot-date"><b>{test.date.split(' ')[0]}</b><span>{test.date.split(' ')[1]}</span></div>
+              <div style={{ minWidth: 0 }}>
+                <strong style={{ fontSize: 12.5, display: 'block' }}>{test.title}</strong>
+                <small style={{ color: 'var(--p-muted)', display: 'block' }}>By {test.by}</small>
+                <small style={{ color: 'var(--p-muted)', display: 'block', marginBottom: 6 }}>{test.detail}</small>
+                <button type="button" className="pilot-btn ghost small">Register</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+
+    <aside className="pilot-rail">
+      <section className="pilot-card">
+        <div className="pilot-card-head"><h2>Performance Summary</h2><button type="button" className="pilot-link">View Full Report</button></div>
+        <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+          <MultiRing segments={[
+            { value: distribution.high, color: '#12996b' },
+            { value: distribution.medium, color: '#f59e0b' },
+            { value: distribution.low, color: '#e5484d' },
+          ]}>{pilotCanon.averageScore}%<div style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--p-muted)' }}>Average</div></MultiRing>
+          <div className="pilot-legend" style={{ flex: 1 }}>
+            <div><i style={{ background: '#12996b' }} /> High (&gt;= 70%) <span className="num">{distribution.high}</span></div>
+            <div><i style={{ background: '#f59e0b' }} /> Medium (40–69%) <span className="num">{distribution.medium}</span></div>
+            <div><i style={{ background: '#e5484d' }} /> Low (&lt; 40%) <span className="num">{distribution.low}</span></div>
+          </div>
+        </div>
+      </section>
+      <section className="pilot-card">
+        <div className="pilot-card-head"><h2>Recent Test Activity</h2><button type="button" className="pilot-link">View All</button></div>
+        <div className="pilot-list">
+          {pilotRecentTests.map((test) => (
+            <div key={test.title} className="pilot-list-row">
+              <span className="pilot-tile indigo" style={{ width: 34, height: 34 }}><ClipboardCheck size={15} /></span>
+              <div className="grow"><strong style={{ fontSize: 12.5 }}>{test.title}</strong><small>{test.when}</small></div>
+              <span className={`pilot-chip ${test.score >= 70 ? 'green' : test.score >= 40 ? 'amber' : 'rose'}`}>{test.score}%</span>
+            </div>
+          ))}
+        </div>
+      </section>
+      <section className="pilot-card">
+        <div className="pilot-card-head"><h2>Strength &amp; Weakness</h2><button type="button" className="pilot-link">View Details</button></div>
+        <div className="pilot-two">
+          <div style={{ background: 'var(--p-green-soft)', borderRadius: 12, padding: '11px 13px' }}>
+            <small style={{ fontWeight: 700, color: 'var(--p-green)' }}>↑ Top Strengths</small>
+            {pilotStrengths.map((entry) => (
+              <div key={entry.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginTop: 7 }}>
+                <span>{entry.label}</span><b>{entry.value}%</b>
+              </div>
+            ))}
+          </div>
+          <div style={{ background: 'var(--p-rose-soft)', borderRadius: 12, padding: '11px 13px' }}>
+            <small style={{ fontWeight: 700, color: 'var(--p-rose)' }}>↓ Areas to Improve</small>
+            {pilotImprovements.map((entry) => (
+              <div key={entry.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginTop: 7 }}>
+                <span>{entry.label}</span><b>{entry.value}%</b>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+      <section className="pilot-card">
+        <div className="pilot-card-head"><h2>Daily Goal</h2><button type="button" className="pilot-link">Edit Goal</button></div>
+        <small style={{ color: 'var(--p-muted)' }}>Attempt 2 tests every day</small>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 9 }}>
+          <div className="pilot-bar" style={{ flex: 1 }}><i style={{ width: '50%' }} /></div>
+          <span className="pilot-chip amber"><Flame size={11} /> {pilotCanon.streakDays} Day Streak</span>
+        </div>
+        <small style={{ color: 'var(--p-muted)' }}>1 / 2 tests completed</small>
+      </section>
+    </aside>
+  </div>;
+}
+
+// ---------------------------------------------------------------------------
+// Opportunities
+// ---------------------------------------------------------------------------
+
+export function PilotOpportunities(): React.ReactElement {
+  const applications = pilotCanon.applications;
+  const insightTotal = applications.applied + applications.shortlisted + applications.interviews + applications.offers;
+  return <div className="pilot-page">
+    <div className="pilot-content">
+      <div className="pilot-page-head">
+        <div><h1>Opportunities</h1><p>Discover jobs, internships and opportunities that match your skills and goals.</p></div>
+      </div>
+      <div className="pilot-tabs">
+        {['Overview', 'Jobs', 'Internships', 'On Campus', 'Off Campus', 'Achievements'].map((tab, index) => (
+          <button key={tab} type="button" className={`pilot-tab ${index === 0 ? 'active' : ''}`}>{tab}</button>
+        ))}
+      </div>
+
+      <section className="pilot-hero">
+        <div style={{ flex: 1 }}>
+          <h2>Your Opportunity Overview</h2>
+          <div className="pilot-row cols-4" style={{ marginTop: 12 }}>
+            {[
+              ['Applied', applications.applied, 'blue'], ['Shortlisted', applications.shortlisted, 'green'],
+              ['Interviews', applications.interviews, 'purple'], ['Offers', applications.offers, 'amber'],
+            ].map(([label, value, tone]) => (
+              <div key={label as string} className="pilot-stat">
+                <span className={`pilot-tile ${tone as string}`}><Building2 size={17} /></span>
+                <div><b>{value as number}</b><small>{label as string}</small></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="pilot-card">
+        <div className="pilot-card-head"><h2>Recommended Opportunities</h2><button type="button" className="pilot-link">View All Jobs →</button></div>
+        <div className="pilot-list">
+          {pilotOpportunities.map((opportunity) => (
+            <div key={`${opportunity.company.name}-${opportunity.role}`} className="pilot-list-row">
+              <span className={`pilot-mark ${opportunity.company.tone}`}>{opportunity.company.mark}</span>
+              <div className="grow">
+                <strong>{opportunity.role}</strong>
+                <small>{opportunity.company.name} · {opportunity.location} · {opportunity.type} · {opportunity.experience}</small>
+              </div>
+              <span className={`pilot-chip ${opportunity.matchBand === 'High Match' ? 'green' : opportunity.matchBand === 'Medium Match' ? 'amber' : 'blue'}`}>{opportunity.matchBand}</span>
+              <b style={{ fontSize: 13 }}>{opportunity.match}%</b>
+              <small style={{ color: 'var(--p-muted)' }}>{opportunity.posted}</small>
+              <Bookmark size={15} color="#98a5ba" />
+              <button type="button" className="pilot-btn small">Apply Now</button>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="pilot-card">
+        <h2>Explore by Category</h2>
+        <div className="pilot-row cols-3">
+          {pilotOpportunityCategories.map((category) => (
+            <div key={category.label} className="pilot-cat">
+              <span className="pilot-tile indigo" style={{ width: 32, height: 32 }}><Building2 size={14} /></span>
+              <div><strong>{category.label}</strong><small>{category.count} Jobs</small></div>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+
+    <aside className="pilot-rail">
+      <section className="pilot-card">
+        <div className="pilot-card-head"><h2>Opportunity Insights</h2><small style={{ color: 'var(--p-muted)' }}>This Month</small></div>
+        <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+          <MultiRing segments={[
+            { value: applications.applied, color: '#1f55e5' },
+            { value: applications.shortlisted, color: '#12996b' },
+            { value: applications.interviews, color: '#6d4fd8' },
+            { value: applications.offers, color: '#f59e0b' },
+          ]}>71%<div style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--p-muted)' }}>Activity</div></MultiRing>
+          <div className="pilot-legend" style={{ flex: 1 }}>
+            <div><i style={{ background: '#1f55e5' }} /> Applied <span className="num">{applications.applied} ({Math.round((applications.applied / insightTotal) * 100)}%)</span></div>
+            <div><i style={{ background: '#12996b' }} /> Shortlisted <span className="num">{applications.shortlisted}</span></div>
+            <div><i style={{ background: '#6d4fd8' }} /> Interviews <span className="num">{applications.interviews}</span></div>
+            <div><i style={{ background: '#f59e0b' }} /> Offers <span className="num">{applications.offers}</span></div>
+          </div>
+        </div>
+      </section>
+      <div className="pilot-banner"><TrendingUp size={17} /> Keep applying! You&apos;re 20% more active than last month.</div>
+      <section className="pilot-card">
+        <div className="pilot-card-head"><h2>Saved Opportunities</h2><button type="button" className="pilot-link">View All</button></div>
+        <div className="pilot-list">
+          {pilotSavedOpportunities.map((saved) => (
+            <div key={`${saved.company.name}-${saved.role}`} className="pilot-list-row">
+              <span className={`pilot-mark ${saved.company.tone}`} style={{ width: 36, height: 36, fontSize: 11.5 }}>{saved.company.mark}</span>
+              <div className="grow"><strong style={{ fontSize: 12.5 }}>{saved.role}</strong><small>{saved.company.name} · {saved.location}</small></div>
+              <Bookmark size={14} color="#1f55e5" fill="#1f55e5" />
+            </div>
+          ))}
+        </div>
+      </section>
+      <section className="pilot-card">
+        <div className="pilot-card-head"><h2>Upcoming Drives</h2><button type="button" className="pilot-link">View All</button></div>
+        <div className="pilot-list">
+          {pilotDrives.map((drive) => (
+            <div key={drive.title} className="pilot-list-row">
+              <div className="pilot-date"><b>{drive.date.split(' ')[0]}</b><span>{drive.date.split(' ')[1]}</span></div>
+              <div className="grow"><strong style={{ fontSize: 12.5 }}>{drive.title}</strong><small>{drive.company} · {drive.mode}</small></div>
+              <button type="button" className="pilot-btn ghost small">Register</button>
+            </div>
+          ))}
+        </div>
+      </section>
+      <section className="pilot-card" style={{ background: 'linear-gradient(135deg, #f2ecff, #eef3ff)' }}>
+        <strong style={{ display: 'block', marginBottom: 4 }}>Get noticed by top recruiters!</strong>
+        <small style={{ color: 'var(--p-muted)', display: 'block', marginBottom: 10 }}>Complete your profile and increase your visibility.</small>
+        <button type="button" className="pilot-btn small">Complete Profile</button>
+      </section>
+    </aside>
+  </div>;
+}
+
+// ---------------------------------------------------------------------------
+// Profile
+// ---------------------------------------------------------------------------
+
+export function PilotProfile(): React.ReactElement {
+  const done = pilotProfileChecklist.filter((item) => item.state === 'done').length;
+  return <div className="pilot-page">
+    <div className="pilot-content">
+      <div className="pilot-page-head">
+        <div><h1>My Profile</h1><p>Manage your profile, track your progress and showcase your achievements.</p></div>
+      </div>
+
+      <section className="pilot-card" style={{ background: 'linear-gradient(120deg, #f5f8ff, #fdfdff)' }}>
+        <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+          <span className="pilot-avatar" style={{ width: 64, height: 64, fontSize: 21 }}>{pilotPersona.initials}</span>
+          <div style={{ flex: 1, minWidth: 220 }}>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+              <strong style={{ fontSize: 19 }}>{pilotPersona.name}</strong>
+              <span className="pilot-chip green">Profile Complete {pilotPersona.profileComplete}%</span>
+            </div>
+            <small style={{ color: 'var(--p-muted)', display: 'block', marginTop: 3 }}>
+              B.Tech Computer Science Engineering · {pilotPersona.institution} · Class of 2027
+            </small>
+            <small style={{ color: 'var(--p-muted)' }}>{pilotPersona.location} · {pilotPersona.email} · {pilotPersona.phone}</small>
+          </div>
+          <button type="button" className="pilot-btn ghost">Edit Profile</button>
+        </div>
+      </section>
+
+      <div className="pilot-tabs">
+        {['Overview', 'Education', 'Skills', 'Achievements', 'Certificates', 'Projects', 'Internships', 'Preferences'].map((tab, index) => (
+          <button key={tab} type="button" className={`pilot-tab ${index === 0 ? 'active' : ''}`}>{tab}</button>
+        ))}
+      </div>
+
+      <div className="pilot-row cols-2">
+        <section className="pilot-card">
+          <h2>Profile Completion</h2>
+          <div style={{ display: 'flex', gap: 18, alignItems: 'center' }}>
+            <Ring value={pilotPersona.profileComplete} size={104} stroke={11} tone="green"><span style={{ fontSize: 19 }}>{pilotPersona.profileComplete}%</span></Ring>
+            <div className="pilot-legend" style={{ flex: 1 }}>
+              {pilotProfileChecklist.map((item) => (
+                <div key={item.label}>
+                  <CheckCircle2 size={14} color={item.state === 'done' ? '#12996b' : item.state === 'progress' ? '#1f55e5' : '#c2ccda'} />
+                  <span style={{ color: item.state === 'todo' ? 'var(--p-muted)' : 'inherit' }}>{item.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <small style={{ color: 'var(--p-muted)', display: 'block', marginTop: 10 }}>{done} of {pilotProfileChecklist.length} sections complete.</small>
+        </section>
+
+        <section className="pilot-card">
+          <h2>Career Snapshot</h2>
+          <div className="pilot-row cols-2">
+            {[
+              ['Assessments Taken', `${pilotCanon.testsAttempted}`, 'blue', ClipboardCheck],
+              ['Average Score', `${pilotCanon.averageScore}%`, 'rose', TrendingUp],
+              ['Companies Followed', '24', 'purple', Building2],
+              ['Applications', `${pilotCanon.applications.applied}`, 'green', Target],
+            ].map(([label, value, tone, Icon]) => (
+              <div key={label as string} className="pilot-stat" style={{ border: '1px solid var(--p-line)', borderRadius: 12, padding: '11px 13px' }}>
+                {(() => { const Component = Icon as typeof Target; return <span className={`pilot-tile ${tone as string}`}><Component size={16} /></span>; })()}
+                <div><b>{value as string}</b><small>{label as string}</small></div>
+              </div>
+            ))}
+          </div>
+          <button type="button" className="pilot-link" style={{ marginTop: 10 }}>View Full Analytics →</button>
+        </section>
+      </div>
+
+      <div className="pilot-row cols-2">
+        <section className="pilot-card">
+          <div className="pilot-card-head"><h2>Skills Overview</h2><button type="button" className="pilot-link">View All Skills →</button></div>
+          <div className="pilot-two">
+            {pilotSkills.map((skill) => (
+              <div key={skill.label} className="pilot-skill">
+                <header><b>{skill.label}</b><span>{skill.value}%</span></header>
+                <div className={`pilot-bar thin ${skill.tone}`}><i style={{ width: `${skill.value}%` }} /></div>
+              </div>
+            ))}
+          </div>
+        </section>
+        <section className="pilot-card">
+          <div className="pilot-card-head"><h2>Latest Activity</h2><button type="button" className="pilot-link">View All →</button></div>
+          <div className="pilot-list">
+            {pilotRecentActivity.map((entry) => (
+              <div key={entry.title} className="pilot-list-row" style={{ padding: '9px 2px' }}>
+                <span className={`pilot-tile ${entry.tone}`} style={{ width: 32, height: 32 }}><TrendingUp size={14} /></span>
+                <div className="grow"><strong style={{ fontSize: 12.5 }}>{entry.title}</strong></div>
+                <small>{entry.when}</small>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+
+      <section className="pilot-card">
+        <div className="pilot-card-head"><h2>Recent Achievements</h2><button type="button" className="pilot-link">View All →</button></div>
+        <div className="pilot-row cols-4">
+          {pilotAchievements.map((achievement) => (
+            <div key={achievement.title} className="pilot-course-card">
+              <span className={`pilot-tile ${achievement.tone}`}><Trophy size={17} /></span>
+              <strong>{achievement.title}</strong>
+              <small>{achievement.detail}</small>
+              <small style={{ color: 'var(--p-muted)' }}>{achievement.when}</small>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+
+    <aside className="pilot-rail">
+      <section className="pilot-card" style={{ textAlign: 'center' }}>
+        <h2 style={{ textAlign: 'left' }}>Profile Strength</h2>
+        <Ring value={pilotPersona.profileComplete} size={104} stroke={11} tone="green"><span style={{ fontSize: 15 }}>Strong</span></Ring>
+        <small style={{ display: 'block', marginTop: 8, color: 'var(--p-muted)' }}>Great job! Keep it updated.</small>
+        <button type="button" className="pilot-link" style={{ marginTop: 6 }}>How to improve? →</button>
+      </section>
+      <section className="pilot-card">
+        <div className="pilot-card-head"><h2>Top Skills in Demand</h2><button type="button" className="pilot-link">View All</button></div>
+        {pilotDemandSkills.map((skill, index) => (
+          <div key={skill.label} className="pilot-skill">
+            <header><b>{index + 1}. {skill.label}</b><span className="pilot-chip green">High</span></header>
+            <div className={`pilot-bar thin ${skill.tone}`}><i style={{ width: `${skill.value}%` }} /></div>
+          </div>
+        ))}
+      </section>
+      <section className="pilot-card">
+        <h2>Profile Tips</h2>
+        <div className="pilot-list">
+          {pilotProfileTips.map((tip) => (
+            <div key={tip.title} className="pilot-list-row" style={{ padding: '9px 2px' }}>
+              <span className="pilot-tile amber" style={{ width: 32, height: 32 }}><Sparkles size={14} /></span>
+              <div className="grow"><strong style={{ fontSize: 12.5 }}>{tip.title}</strong><small>{tip.detail}</small></div>
+              <ArrowRight size={14} color="#98a5ba" />
+            </div>
+          ))}
+        </div>
+      </section>
+      <section className="pilot-card">
+        <h2>Quick Actions</h2>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <button type="button" className="pilot-btn ghost" style={{ justifyContent: 'flex-start' }}><Clock size={15} /> Download Resume</button>
+          <button type="button" className="pilot-btn ghost" style={{ justifyContent: 'flex-start' }}><Award size={15} /> Share Profile</button>
+          <button type="button" className="pilot-btn ghost" style={{ justifyContent: 'flex-start' }}><Target size={15} /> Manage Preferences</button>
+        </div>
+      </section>
+    </aside>
+  </div>;
+}

@@ -37,6 +37,8 @@ import { StudentPreviewProvider, useStudentPreview } from './studentPreviewState
 import { PlacementOfficerPortal } from './staffPages.js';
 import { StudentApplicationsPage, StudentOpportunitiesPage } from './hiringPages.js';
 import { StudentPrivacyPanel } from './privacyPanel.js';
+import { PilotApp } from './pilot/PilotApp.js';
+import { isPilotIdentity } from './pilot/pilotIdentity.js';
 import { CareerReadinessApiPanel } from './careerReadinessApiPanel.js';
 
 type RouteKey = 'dashboard' | 'career-path' | 'ai-coach' | 'readiness' | 'skills' | 'assessments' | 'learning' | 'experience' | 'opportunities' | 'applications' | 'interviews' | 'documents' | 'profile' | 'settings';
@@ -265,6 +267,18 @@ export function App(): React.ReactElement {
 
   if (authStatus.state === 'restoring') {
     return <SessionRestorationPage />;
+  }
+
+  // Demo identities render the pilot experience and nothing else; every other
+  // signed-in user falls through to the real application untouched.
+  if (authenticated && isPilotIdentity(authenticatedEmail)) {
+    return <PilotApp email={authenticatedEmail ?? ''} onSignOut={handleSignOut} />;
+  }
+
+  // Local preview only: `import.meta.env.DEV` is false in production builds, so this
+  // branch is eliminated from the shipped bundle entirely.
+  if (import.meta.env.DEV && path === '/pilot-preview') {
+    return <PilotApp email="demo.preview@dev.local" onSignOut={handleSignOut} />;
   }
 
   if (path === '/' || path === '/login') {

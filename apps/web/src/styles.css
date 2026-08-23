@@ -4434,3 +4434,25 @@ button.secondary {
   .hiring-list-item { flex-direction: column; }
   .hiring-actions { width: 100%; }
 }
+
+/* --- Role portal sidebar collapse ---------------------------------------- */
+/* The shell has always toggled `role-sidebar-collapsed`, but nothing styled it, so
+   the control changed its own label and nothing else moved. Scoped above the drawer
+   breakpoint, below which the sidebar is an overlay and collapsing is meaningless. */
+
+@media (min-width: 1181px) {
+  .role-shell.role-sidebar-collapsed { grid-template-columns: 76px minmax(0, 1fr); }
+
+  .role-sidebar-collapsed .role-brand > span:last-of-type,
+  .role-sidebar-collapsed .role-nav-group > span,
+  .role-sidebar-collapsed .role-nav-item span,
+  .role-sidebar-collapsed .role-collapse span { display: none; }
+
+  .role-sidebar-collapsed .role-sidebar { padding: 16px 10px; }
+  .role-sidebar-collapsed .role-brand { justify-content: center; }
+  .role-sidebar-collapsed .role-nav-item,
+  .role-sidebar-collapsed .role-collapse { justify-content: center; padding-left: 0; padding-right: 0; }
+  .role-sidebar-collapsed .role-nav-group { gap: 6px; }
+}
+
+.role-collapse { display: flex; align-items: center; justify-content: center; gap: 8px; }

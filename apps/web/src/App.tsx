@@ -86,7 +86,14 @@ const routeTitles: Record<RouteKey, PageMeta> = {
 const productName = 'ONE';
 const productTagline = 'LEARN | PREPARE | BUILD | GROW';
 const showDevelopmentIndicators = import.meta.env.DEV;
-const enableDemoPortal = import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEMO_PORTAL === 'true';
+/**
+ * Exported so the predicate itself is testable: the constant below is fixed at
+ * build time, which is exactly why the gate must be right per environment.
+ */
+export function demoPortalEnabled(env: { readonly DEV: boolean; readonly VITE_ENABLE_DEMO_PORTAL?: string } = import.meta.env): boolean {
+  return env.DEV || env.VITE_ENABLE_DEMO_PORTAL === 'true';
+}
+const enableDemoPortal = demoPortalEnabled();
 const protectedPortalRoots = ['/student', '/institution', '/employer', '/operations'] as const;
 const portalChoices = [
   { family: 'Student', path: '/student', label: 'Student', detail: 'Learning, readiness, applications and personal growth.', icon: GraduationCap },
@@ -295,6 +302,14 @@ export function App(): React.ReactElement {
     if (!activeWorkspace) {
       return <AccessDeniedPage requestedPath={path} authStatus={authStatus} authNotice={authNotice} onSignIn={handleHostedSignIn} onSignOut={handleSignOut} />;
     }
+  }
+
+  // The flag previously gated only the /demo launcher, while deep links such as
+  // /demo/operations/admin fell through to the portal renderer with demoMode set and
+  // no guard at all — fictional portals stayed publicly reachable with the flag off.
+  // Every /demo path is refused here, before any demo-aware branch can run.
+  if ((path === '/demo' || path.startsWith('/demo/')) && !enableDemoPortal) {
+    return <DemoDisabledPage onNavigate={(nextPath) => { window.history.pushState(null, '', nextPath); setPath(currentPath()); }} />;
   }
 
   if (effectivePath.startsWith('/institution/placement-officer')) {
@@ -557,6 +572,18 @@ function AuthenticatedPlacementOfficerPage({ authStatus, authNotice, onSignIn, o
       <p>Placement tools are not built yet, so there is nothing here for you to use today. We would rather show you an empty page than a convincing one filled with data that is not real.</p>
       <p className="auth-boundary">Student rosters, academic structure and staff invitations are live now, and your Institution Administrator can use them. Placement tracking will open up once its records and consent rules are in place.</p>
       <AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />
+    </section>
+  </main>;
+}
+
+function DemoDisabledPage({ onNavigate }: { readonly onNavigate: (path: string) => void }): React.ReactElement {
+  useEffect(() => { document.title = `Sign in | ${productName}`; }, []);
+  return <main className="login-shell">
+    <section className="login-card">
+      <span className="eyebrow">ONE platform</span>
+      <h1>Demo previews are switched off</h1>
+      <p>This environment shows real accounts only. Sign in to use your workspace.</p>
+      <button type="button" onClick={() => onNavigate('/login')}>Go to sign in</button>
     </section>
   </main>;
 }

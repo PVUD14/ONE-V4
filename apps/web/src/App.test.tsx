@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, within, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { App } from './App.js';
+import { App, demoPortalEnabled } from './App.js';
 import { activeRolePortals, rolePortals } from './rolePortalConfig.js';
 import { staffNavItems } from './staffConfig.js';
 import { studentProfile } from './studentData.js';
@@ -1000,3 +1000,15 @@ describe('Institution placement officer portal foundation', () => {
 });
 
 
+
+describe('demo portal gating', () => {
+  it('is enabled in development and by explicit flag, off otherwise', () => {
+    expect(demoPortalEnabled({ DEV: true })).toBe(true);
+    expect(demoPortalEnabled({ DEV: false, VITE_ENABLE_DEMO_PORTAL: 'true' })).toBe(true);
+    // A production build without the flag must refuse every /demo route, not just
+    // hide the launcher button.
+    expect(demoPortalEnabled({ DEV: false })).toBe(false);
+    expect(demoPortalEnabled({ DEV: false, VITE_ENABLE_DEMO_PORTAL: 'false' })).toBe(false);
+    expect(demoPortalEnabled({ DEV: false, VITE_ENABLE_DEMO_PORTAL: '1' })).toBe(false);
+  });
+});

@@ -981,7 +981,12 @@ button {
   margin-top: 14px;
 }
 
-button:not(.icon-button, .mobile-menu-button, .side-nav-item, .collapse-button, .profile-menu, .drawer-scrim, .sidebar-close) {
+/* `.role-nav-item` / `.role-collapse` are the staff-portal equivalents of
+   `.side-nav-item` and must be excluded too. Without them this rule wins on
+   specificity — :not() with classes scores (0,1,1) against .role-nav-item's
+   (0,1,0) — and paints every staff sidebar item with the student accent, so the
+   whole navigation reads as selected and the active state is invisible. */
+button:not(.icon-button, .mobile-menu-button, .side-nav-item, .role-nav-item, .role-collapse, .collapse-button, .profile-menu, .drawer-scrim, .sidebar-close) {
   min-height: 34px;
   padding: 8px 12px;
   border: 0;

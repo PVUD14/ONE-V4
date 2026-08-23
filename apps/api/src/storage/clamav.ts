@@ -23,13 +23,15 @@ export interface FileScanner {
   scan(bytes: Buffer): Promise<ScanVerdict>;
 }
 
-export interface ClamAvOptions {
-  readonly host: string;
-  readonly port: number;
-  readonly timeoutMs?: number;
-  /** clamd's own StreamMaxLength must be at least this; 64 KiB chunks are conventional. */
-  readonly chunkSize?: number;
-}
+/**
+ * Either a unix socket or a TCP endpoint. Debian and Ubuntu ship clamd on a unix
+ * socket at /var/run/clamav/clamd.ctl and leave TCP disabled, so the socket is the
+ * expected configuration; enabling TCP only to reach a daemon on the same host
+ * widens exposure for nothing.
+ */
+export type ClamAvOptions =
+  | { readonly socketPath: string; readonly timeoutMs?: number; readonly chunkSize?: number }
+  | { readonly host: string; readonly port: number; readonly timeoutMs?: number; readonly chunkSize?: number };
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_CHUNK = 65_536;
@@ -51,7 +53,9 @@ export function createClamAvScanner(options: ClamAvOptions): FileScanner {
         };
 
         const chunks: Buffer[] = [];
-        const socket: Socket = connect({ host: options.host, port: options.port });
+        const socket: Socket = 'socketPath' in options
+          ? connect({ path: options.socketPath })
+          : connect({ host: options.host, port: options.port });
         socket.setTimeout(timeoutMs);
 
         socket.on('connect', () => {

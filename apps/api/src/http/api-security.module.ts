@@ -1,5 +1,7 @@
 import { DynamicModule, Module, Provider } from '@nestjs/common';
 import {
+  API_FILE_SCANNER,
+  API_FILE_STORAGE,
   API_ID_GENERATOR,
   API_IDENTITY_VERIFIER,
   API_INTERNAL_IDENTITY_STORE,
@@ -15,6 +17,7 @@ import { API_INVITATION_MAIL_SINK, OperationsInstitutionOnboardingController, cr
 import { StudentOperationalCoreController } from './student-operational-core.controller.js';
 import { StudentHiringController } from './student-hiring.controller.js';
 import { EmployerHiringController } from './employer-hiring.controller.js';
+import { StudentDocumentsController } from './student-documents.controller.js';
 
 @Module({})
 export class Phase1ApiSecurityModule {
@@ -26,6 +29,8 @@ export class Phase1ApiSecurityModule {
       { provide: API_PERSISTENCE_DB, useValue: dependencies.db },
       { provide: API_ID_GENERATOR, useValue: dependencies.ids ?? cryptoApiIdGenerator },
       ...(configuredInvitationMailSink ? [{ provide: API_INVITATION_MAIL_SINK, useValue: configuredInvitationMailSink }] : []),
+      ...(dependencies.fileStorage ? [{ provide: API_FILE_STORAGE, useValue: dependencies.fileStorage }] : []),
+      ...(dependencies.fileScanner ? [{ provide: API_FILE_SCANNER, useValue: dependencies.fileScanner }] : []),
       ProtectedApiAuthenticationGuard,
       VerifiedIdentityAuthenticationGuard,
       Phase1ProtectedApiRoutes,
@@ -33,7 +38,7 @@ export class Phase1ApiSecurityModule {
 
     return {
       module: Phase1ApiSecurityModule,
-      controllers: [Phase1SecurityController, OperationsInstitutionOnboardingController, StudentOperationalCoreController, StudentHiringController, EmployerHiringController],
+      controllers: [Phase1SecurityController, OperationsInstitutionOnboardingController, StudentOperationalCoreController, StudentHiringController, EmployerHiringController, StudentDocumentsController],
       providers,
       exports: [
         API_IDENTITY_VERIFIER,

@@ -41,6 +41,10 @@ export const API_IDENTITY_VERIFIER = Symbol('API_IDENTITY_VERIFIER');
 export const API_INTERNAL_IDENTITY_STORE = Symbol('API_INTERNAL_IDENTITY_STORE');
 export const API_PERSISTENCE_DB = Symbol('API_PERSISTENCE_DB');
 export const API_ID_GENERATOR = Symbol('API_ID_GENERATOR');
+// Optional: absent means document upload and download report themselves unavailable
+// rather than degrading to an unscanned or unstored file path.
+export const API_FILE_STORAGE = Symbol('API_FILE_STORAGE');
+export const API_FILE_SCANNER = Symbol('API_FILE_SCANNER');
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const correlationIdPattern = /^[A-Za-z0-9._:-]{8,128}$/;
@@ -78,6 +82,8 @@ export interface TrustedApiRequestContext {
 }
 
 export interface ApiSecurityDependencies {
+  readonly fileStorage?: unknown;
+  readonly fileScanner?: unknown;
   readonly verifier: IdentityTokenVerifier;
   readonly identityStore: InternalIdentityStore;
   readonly db: PersistenceDb;

@@ -13,6 +13,14 @@ export interface RuntimeConfig {
   readonly automation: {
     readonly signingSecret?: string;
   };
+  readonly documents: {
+    /** Absolute directory holding uploaded files. Absent means uploads are refused. */
+    readonly storageRoot?: string;
+    /** clamd unix socket, or host+port. Absent means uploads are refused. */
+    readonly clamavSocketPath?: string;
+    readonly clamavHost?: string;
+    readonly clamavPort?: number;
+  };
 }
 
 const allowedNodeEnvs = new Set<NodeEnv>(['development', 'test', 'production']);
@@ -37,6 +45,21 @@ export function loadRuntimeConfig(env: NodeJS.ProcessEnv = process.env): Runtime
     throw new Error('AUTOMATION_SIGNING_SECRET is required in production');
   }
 
+  const storageRoot = optionalNonEmpty(env.FILE_STORAGE_ROOT);
+  const clamavSocketPath = optionalNonEmpty(env.CLAMAV_SOCKET_PATH);
+  const clamavHost = optionalNonEmpty(env.CLAMAV_HOST);
+  const clamavPort = env.CLAMAV_PORT ? parsePort(env.CLAMAV_PORT, 'CLAMAV_PORT') : undefined;
+
+  if (storageRoot && !storageRoot.startsWith('/') && !/^[A-Za-z]:[\\/]/.test(storageRoot)) {
+    throw new Error('FILE_STORAGE_ROOT must be an absolute path');
+  }
+  if (clamavHost && !clamavPort) throw new Error('CLAMAV_PORT is required when CLAMAV_HOST is set');
+  // Storage without a scanner would accept files nobody has checked. Rather than
+  // silently degrade, refuse the configuration outright.
+  if (storageRoot && !clamavSocketPath && !clamavHost) {
+    throw new Error('FILE_STORAGE_ROOT requires CLAMAV_SOCKET_PATH or CLAMAV_HOST; uploads must be scanned');
+  }
+
   return {
     nodeEnv,
     apiHost,
@@ -49,6 +72,12 @@ export function loadRuntimeConfig(env: NodeJS.ProcessEnv = process.env): Runtime
     },
     automation: {
       ...(automationSigningSecret ? { signingSecret: automationSigningSecret } : {}),
+    },
+    documents: {
+      ...(storageRoot ? { storageRoot } : {}),
+      ...(clamavSocketPath ? { clamavSocketPath } : {}),
+      ...(clamavHost ? { clamavHost } : {}),
+      ...(clamavPort ? { clamavPort } : {}),
     },
   };
 }

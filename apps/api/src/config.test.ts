@@ -16,6 +16,25 @@ describe('runtime configuration', () => {
     });
   });
 
+  it('refuses a file store with no malware scanner', () => {
+    const base = { DATABASE_URL: 'postgresql://planthepath:local@127.0.0.1:55432/planthepath_dev' };
+    // Storage without a scanner would accept files nobody has checked.
+    expect(() => loadRuntimeConfig({ ...base, FILE_STORAGE_ROOT: '/srv/one/files' }))
+      .toThrow('must be scanned');
+    expect(() => loadRuntimeConfig({ ...base, FILE_STORAGE_ROOT: 'relative/path', CLAMAV_SOCKET_PATH: '/var/run/clamav/clamd.ctl' }))
+      .toThrow('absolute path');
+    expect(() => loadRuntimeConfig({ ...base, FILE_STORAGE_ROOT: '/srv/one/files', CLAMAV_HOST: '127.0.0.1' }))
+      .toThrow('CLAMAV_PORT is required');
+
+    const configured = loadRuntimeConfig({ ...base, FILE_STORAGE_ROOT: '/srv/one/files', CLAMAV_SOCKET_PATH: '/var/run/clamav/clamd.ctl' });
+    expect(configured.documents).toEqual({ storageRoot: '/srv/one/files', clamavSocketPath: '/var/run/clamav/clamd.ctl' });
+  });
+
+  it('leaves documents unconfigured when no storage root is set', () => {
+    const config = loadRuntimeConfig({ DATABASE_URL: 'postgresql://planthepath:local@127.0.0.1:55432/planthepath_dev' });
+    expect(config.documents).toEqual({});
+  });
+
   it('fails production startup without Cognito configuration', () => {
     expect(() => loadRuntimeConfig({
       NODE_ENV: 'production',

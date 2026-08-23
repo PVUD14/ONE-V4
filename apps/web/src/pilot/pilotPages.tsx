@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { ArrowRight, Award, BookOpen, Bookmark, Building2, CalendarDays, CheckCircle2, ClipboardCheck, Clock, Flame, Lock, Play, Sparkles, Star, Target, TrendingUp, Trophy } from 'lucide-react';
 import { MultiRing, Ring, Spark, WeekBars, toneColor } from './pilotComponents.js';
+import { OverlayForm, PilotTabs, useOverlay } from './pilotOverlay.js';
 import {
   pilotAchievements, pilotBadges, pilotCanon, pilotCompanies, pilotContinueLearning,
   pilotDemandSkills, pilotDrives, pilotImprovements, pilotLearnRecommended,
@@ -20,6 +22,15 @@ import {
 
 export function PilotDashboard(): React.ReactElement {
   const canon = pilotCanon;
+  const overlay = useOverlay();
+  const [doneTasks, setDoneTasks] = useState<ReadonlySet<string>>(() => new Set(pilotTodayPlan.filter((task) => task.done).map((task) => task.title)));
+  const toggleTask = (title: string): void => {
+    setDoneTasks((previous) => {
+      const next = new Set(previous);
+      if (next.has(title)) next.delete(title); else { next.add(title); overlay.toast(`${title} marked done (sample).`); }
+      return next;
+    });
+  };
   return <div className="pilot-page">
     <div className="pilot-content">
       <div className="pilot-page-head">
@@ -58,8 +69,11 @@ export function PilotDashboard(): React.ReactElement {
           <div className="pilot-list">
             {pilotTodayPlan.map((task) => (
               <div key={task.title} className="pilot-list-row">
-                <CheckCircle2 size={17} color={task.done ? '#12996b' : '#c2ccda'} />
-                <div className="grow"><strong>{task.title}</strong></div>
+                <button type="button" className="pilot-check" aria-label={`Mark ${task.title} done`}
+                  onClick={(event) => { event.stopPropagation(); toggleTask(task.title); }}>
+                  <CheckCircle2 size={17} color={doneTasks.has(task.title) ? '#12996b' : '#c2ccda'} />
+                </button>
+                <div className="grow"><strong style={doneTasks.has(task.title) ? { textDecoration: 'line-through', color: 'var(--p-muted)' } : undefined}>{task.title}</strong></div>
                 <small>{task.minutes} min</small>
               </div>
             ))}
@@ -330,11 +344,7 @@ export function PilotLearn(): React.ReactElement {
       <div className="pilot-page-head">
         <div><h1>Learn</h1><p>Build skills with our expert-led courses and learning paths.</p></div>
       </div>
-      <div className="pilot-tabs">
-        {['Overview', 'My Learning', 'Learning Paths', 'Bookmarks', 'Certificates'].map((tab, index) => (
-          <button key={tab} type="button" className={`pilot-tab ${index === 0 ? 'active' : ''}`}>{tab}</button>
-        ))}
-      </div>
+      <PilotTabs labels={['Overview', 'My Learning', 'Learning Paths', 'Bookmarks', 'Certificates']} />
 
       <section className="pilot-hero">
         <div>
@@ -460,11 +470,7 @@ export function PilotAssessments(): React.ReactElement {
       <div className="pilot-page-head">
         <div><h1>Assessments</h1><p>Practice, evaluate and improve with our wide range of tests.</p></div>
       </div>
-      <div className="pilot-tabs">
-        {['Overview', 'All Tests', 'Mock Tests', 'Past Attempts', 'Analytics'].map((tab, index) => (
-          <button key={tab} type="button" className={`pilot-tab ${index === 0 ? 'active' : ''}`}>{tab}</button>
-        ))}
-      </div>
+      <PilotTabs labels={['Overview', 'All Tests', 'Mock Tests', 'Past Attempts', 'Analytics']} />
 
       <section className="pilot-hero">
         <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
@@ -596,16 +602,29 @@ export function PilotAssessments(): React.ReactElement {
 export function PilotOpportunities(): React.ReactElement {
   const applications = pilotCanon.applications;
   const insightTotal = applications.applied + applications.shortlisted + applications.interviews + applications.offers;
+  const overlay = useOverlay();
+  const [appliedRoles, setAppliedRoles] = useState<ReadonlySet<string>>(new Set());
+  const applyTo = (key: string, role: string, company: string): void => {
+    overlay.openModal({
+      title: `Apply — ${role}`,
+      subtitle: `${company} · Sample application`,
+      body: <OverlayForm
+        fields={[
+          { label: 'Applying as', value: 'Arjun Reddy · VIT Chennai' },
+          { label: 'Resume', type: 'select', value: 'Software Engineer Resume (score 78)', options: ['Software Engineer Resume (score 78)', 'Internship Resume (score 72)', 'Campus Placement Resume (score 68)'] },
+          { label: 'Cover note', type: 'textarea', placeholder: 'A short note to the recruiter (optional)' },
+        ]}
+        submitLabel="Submit Application"
+        success={`Application submitted to ${company} (sample).`}
+        onSubmit={() => setAppliedRoles((previous) => new Set(previous).add(key))} />,
+    });
+  };
   return <div className="pilot-page">
     <div className="pilot-content">
       <div className="pilot-page-head">
         <div><h1>Opportunities</h1><p>Discover jobs, internships and opportunities that match your skills and goals.</p></div>
       </div>
-      <div className="pilot-tabs">
-        {['Overview', 'Jobs', 'Internships', 'On Campus', 'Off Campus', 'Achievements'].map((tab, index) => (
-          <button key={tab} type="button" className={`pilot-tab ${index === 0 ? 'active' : ''}`}>{tab}</button>
-        ))}
-      </div>
+      <PilotTabs labels={['Overview', 'Jobs', 'Internships', 'On Campus', 'Off Campus', 'Achievements']} />
 
       <section className="pilot-hero">
         <div style={{ flex: 1 }}>
@@ -638,7 +657,12 @@ export function PilotOpportunities(): React.ReactElement {
               <b style={{ fontSize: 13 }}>{opportunity.match}%</b>
               <small style={{ color: 'var(--p-muted)' }}>{opportunity.posted}</small>
               <Bookmark size={15} color="#98a5ba" />
-              <button type="button" className="pilot-btn small">Apply Now</button>
+              {appliedRoles.has(`${opportunity.company.name}-${opportunity.role}`) ? (
+                <button type="button" className="pilot-btn ghost small" disabled>Applied ✓</button>
+              ) : (
+                <button type="button" className="pilot-btn small"
+                  onClick={(event) => { event.stopPropagation(); applyTo(`${opportunity.company.name}-${opportunity.role}`, opportunity.role, opportunity.company.name); }}>Apply Now</button>
+              )}
             </div>
           ))}
         </div>
@@ -738,11 +762,7 @@ export function PilotProfile(): React.ReactElement {
         </div>
       </section>
 
-      <div className="pilot-tabs">
-        {['Overview', 'Education', 'Skills', 'Achievements', 'Certificates', 'Projects', 'Internships', 'Preferences'].map((tab, index) => (
-          <button key={tab} type="button" className={`pilot-tab ${index === 0 ? 'active' : ''}`}>{tab}</button>
-        ))}
-      </div>
+      <PilotTabs labels={['Overview', 'Education', 'Skills', 'Achievements', 'Certificates', 'Projects', 'Internships', 'Preferences']} />
 
       <div className="pilot-row cols-2">
         <section className="pilot-card">

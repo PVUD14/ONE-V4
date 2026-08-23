@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { ArrowRight, Briefcase, Building2, CalendarDays, ClipboardCheck, Plus, TrendingUp, Users, Video } from 'lucide-react';
 import { MultiRing } from './pilotComponents.js';
+import { DetailRows, useOverlay } from './pilotOverlay.js';
 import {
   pilotApplicants, pilotCampusDrives, pilotEmployerFunnel, pilotEmployerInterviews,
-  pilotEmployerPersona, pilotEmployerRoles, pilotEmployerStats,
+  pilotEmployerPersona, pilotEmployerRoles, pilotEmployerStats, type PilotApplicant,
 } from './pilotStaffData.js';
 
 /** Employer pilot pages: the talent lead's view at Zenvia Labs. */
@@ -11,6 +13,8 @@ const STAGE_TONE: Readonly<Record<string, string>> = {
   Applied: 'slate', Screening: 'blue', Shortlisted: 'indigo',
   Assessment: 'amber', Interview: 'purple', Offer: 'green',
 };
+
+const STAGE_FLOW = ['Applied', 'Screening', 'Shortlisted', 'Assessment', 'Interview', 'Offer'] as const;
 
 function Funnel({ rows }: { readonly rows: readonly { readonly label: string; readonly value: number }[] }): React.ReactElement {
   const max = Math.max(...rows.map((row) => row.value), 1);
@@ -149,6 +153,38 @@ export function EmployerOpportunities(): React.ReactElement {
 }
 
 export function EmployerApplicants(): React.ReactElement {
+  const overlay = useOverlay();
+  // Advancing a candidate moves them through the real stage flow, so a client
+  // can watch the chip change live. Session-local; the sample data resets on reload.
+  const [stages, setStages] = useState<Readonly<Record<string, PilotApplicant['stage']>>>({});
+  const stageOf = (applicant: PilotApplicant): PilotApplicant['stage'] => stages[applicant.name] ?? applicant.stage;
+
+  const advance = (applicant: PilotApplicant): void => {
+    const current = stageOf(applicant);
+    const index = STAGE_FLOW.indexOf(current);
+    if (index < 0 || index >= STAGE_FLOW.length - 1) return;
+    const next = STAGE_FLOW[index + 1]!;
+    setStages((previous) => ({ ...previous, [applicant.name]: next }));
+    overlay.toast(`${applicant.name} advanced to ${next} (sample).`);
+  };
+
+  const showProfile = (applicant: PilotApplicant): void => {
+    overlay.openModal({
+      title: applicant.name,
+      subtitle: `${applicant.college} · ${applicant.roleApplied}`,
+      body: <div>
+        <DetailRows rows={[
+          ['Current stage', stageOf(applicant)],
+          ['Applied', applicant.appliedWhen.replace('Applied ', '')],
+          ['Institution', applicant.college],
+          ['Role', applicant.roleApplied],
+        ]} />
+        {applicant.highlight ? <p className="pilot-modal-text" style={{ marginTop: 12 }}><strong>Recruiter note:</strong> {applicant.highlight}</p> : null}
+        <p className="pilot-modal-text" style={{ marginTop: 8 }}>The full profile includes the resume, assessment scores and interview feedback.</p>
+      </div>,
+    });
+  };
+
   return <div className="pilot-page" style={{ gridTemplateColumns: '1fr' }}>
     <div className="pilot-content">
       <div className="pilot-page-head">
@@ -162,22 +198,26 @@ export function EmployerApplicants(): React.ReactElement {
         <div className="pilot-table-wrap"><table className="pilot-table">
           <thead><tr><th>Candidate</th><th>Institution</th><th>Role</th><th>Stage</th><th>Applied</th><th></th></tr></thead>
           <tbody>
-            {pilotApplicants.map((applicant) => (
-              <tr key={applicant.name}>
-                <td><div className="pilot-person">
-                  <span className="pilot-avatar">{applicant.initials}</span>
-                  <span><strong>{applicant.name}</strong>{applicant.highlight ? <small>{applicant.highlight}</small> : null}</span>
-                </div></td>
-                <td>{applicant.college}</td>
-                <td>{applicant.roleApplied}</td>
-                <td><span className={`pilot-chip ${STAGE_TONE[applicant.stage]}`}>{applicant.stage}</span></td>
-                <td><small>{applicant.appliedWhen}</small></td>
-                <td><div style={{ display: 'flex', gap: 7, justifyContent: 'flex-end' }}>
-                  <button type="button" className="pilot-btn ghost small">Profile</button>
-                  <button type="button" className="pilot-btn small">Advance</button>
-                </div></td>
-              </tr>
-            ))}
+            {pilotApplicants.map((applicant) => {
+              const stage = stageOf(applicant);
+              return (
+                <tr key={applicant.name}>
+                  <td><div className="pilot-person">
+                    <span className="pilot-avatar">{applicant.initials}</span>
+                    <span><strong>{applicant.name}</strong>{applicant.highlight ? <small>{applicant.highlight}</small> : null}</span>
+                  </div></td>
+                  <td>{applicant.college}</td>
+                  <td>{applicant.roleApplied}</td>
+                  <td><span className={`pilot-chip ${STAGE_TONE[stage]}`}>{stage}</span></td>
+                  <td><small>{applicant.appliedWhen}</small></td>
+                  <td><div style={{ display: 'flex', gap: 7, justifyContent: 'flex-end' }}>
+                    <button type="button" className="pilot-btn ghost small" onClick={(event) => { event.stopPropagation(); showProfile(applicant); }}>Profile</button>
+                    <button type="button" className="pilot-btn small" disabled={stage === 'Offer'}
+                      onClick={(event) => { event.stopPropagation(); advance(applicant); }}>{stage === 'Offer' ? 'Offer Sent' : 'Advance'}</button>
+                  </div></td>
+                </tr>
+              );
+            })}
           </tbody>
         </table></div>
       </section>

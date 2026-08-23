@@ -49,10 +49,36 @@ describe('pilot experience', () => {
     expect(screen.getByRole('heading', { name: 'My Profile' })).toBeInTheDocument();
   });
 
-  it('labels Tier 2 modules as in build instead of faking them', () => {
+  it('renders the Tier 2 pages with real sample content', () => {
     render(<PilotApp email="demo.student@uat.example.test" onSignOut={() => undefined} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Scholarships Soon' }));
-    expect(screen.getByRole('heading', { name: /Scholarships is coming to the pilot/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Practice' }));
+    expect(screen.getByRole('heading', { name: 'Practice' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Company Prep' }));
+    expect(screen.getByRole('heading', { name: 'Company Preparation' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Career Tools' }));
+    expect(screen.getByRole('heading', { name: 'Career Tools' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Scholarships' }));
+    expect(screen.getByRole('heading', { name: 'Scholarships' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Resume Builder' }));
+    expect(screen.getByRole('heading', { name: 'Resume Builder' })).toBeInTheDocument();
+  });
+
+  it('opens a relevant sample dialog for any unwired control', () => {
+    render(<PilotApp email="demo.student@uat.example.test" onSignOut={() => undefined} />);
+    fireEvent.click(screen.getByRole('button', { name: 'View Calendar' }));
+    expect(screen.getByRole('dialog', { name: 'Calendar' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Close dialog' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('walks an application through the sample form to the applied state', () => {
+    render(<PilotApp email="demo.student@uat.example.test" onSignOut={() => undefined} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Opportunities' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Apply Now' })[0]!);
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Submit Application' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Applied ✓' })).toBeInTheDocument();
   });
 
   it('uses only fictional companies', () => {
@@ -101,6 +127,9 @@ describe('persona resolution and cross-portal coherence', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Applicants' }));
     expect(screen.getByText('Arjun Reddy')).toBeInTheDocument();
     expect(screen.getAllByText('Shortlisted').length).toBeGreaterThan(0);
+    // Advancing a candidate moves the stage chip live - the demo moment.
+    fireEvent.click(screen.getAllByRole('button', { name: 'Advance' })[0]!);
+    expect(screen.getAllByText('Assessment').length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole('button', { name: 'Opportunities' }));
     expect(screen.getByText('Graduate Software Engineer')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Interviews' }));

@@ -373,3 +373,49 @@
 .pilot-kpi { display: flex; align-items: center; gap: 12px; }
 .pilot-kpi b { font-size: 21px; display: block; line-height: 1.1; }
 .pilot-kpi small { color: var(--p-muted); font-size: 11.5px; }
+
+/* --- interaction layer: modal, toast, forms -------------------------------- */
+.pilot .pilot-modal-backdrop {
+  position: fixed; inset: 0; z-index: 60; display: flex; align-items: flex-start;
+  justify-content: center; padding: 8vh 18px 18px; background: rgba(15, 23, 42, 0.44);
+  animation: pilot-fade 0.16s ease-out;
+}
+.pilot .pilot-modal {
+  width: min(480px, 100%); background: #fff; border-radius: 16px;
+  border: 1px solid var(--p-line); box-shadow: 0 24px 64px rgba(15, 23, 42, 0.28);
+  animation: pilot-rise 0.18s ease-out; max-height: 82vh; display: flex; flex-direction: column;
+}
+.pilot .pilot-modal-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  padding: 16px 18px 12px; border-bottom: 1px solid var(--p-line);
+}
+.pilot .pilot-modal-head h2 { margin: 0; font-size: 15.5px; font-weight: 750; color: var(--p-ink); }
+.pilot .pilot-modal-head small { display: block; margin-top: 2px; font-size: 12px; color: var(--p-muted); }
+.pilot .pilot-modal-body { padding: 14px 18px 18px; overflow-y: auto; }
+.pilot .pilot-modal-text { margin: 0 0 4px; font-size: 13px; line-height: 1.55; color: var(--p-ink-2); }
+.pilot .pilot-modal-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 14px; }
+.pilot .pilot-field { display: block; margin-bottom: 11px; }
+.pilot .pilot-field span { display: block; font-size: 11.5px; font-weight: 700; color: var(--p-ink-2); margin-bottom: 5px; }
+.pilot .pilot-field input, .pilot .pilot-field select, .pilot .pilot-field textarea {
+  width: 100%; border: 1px solid var(--p-line); border-radius: 10px; background: #fbfcfe;
+  padding: 9px 11px; font: inherit; font-size: 13px; color: var(--p-ink); resize: vertical;
+}
+.pilot .pilot-field input:focus, .pilot .pilot-field select:focus, .pilot .pilot-field textarea:focus {
+  outline: 2px solid #1f55e5; outline-offset: 1px; background: #fff;
+}
+.pilot .pilot-detail-rows { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; }
+.pilot .pilot-detail-rows small { display: block; font-size: 11px; color: var(--p-muted); font-weight: 600; }
+.pilot .pilot-detail-rows strong { font-size: 13px; color: var(--p-ink); }
+.pilot .pilot-toast {
+  position: fixed; right: 22px; bottom: 22px; z-index: 70; max-width: 340px;
+  background: #10233f; color: #fff; font-size: 12.5px; font-weight: 600;
+  padding: 11px 15px; border-radius: 12px; box-shadow: 0 10px 30px rgba(15, 23, 42, 0.35);
+  animation: pilot-rise 0.18s ease-out;
+}
+@keyframes pilot-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pilot-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .pilot .pilot-modal-backdrop, .pilot .pilot-modal, .pilot .pilot-toast { animation: none; }
+}
+.pilot .pilot-check { background: none; border: none; padding: 0; cursor: pointer; display: flex; align-items: center; }
+.pilot .pilot-btn:disabled { opacity: 0.6; cursor: default; }

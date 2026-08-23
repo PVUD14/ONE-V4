@@ -34,6 +34,9 @@ importers:
       '@planthepath/persistence':
         specifier: workspace:*
         version: link:../../packages/persistence
+      '@planthepath/privacy':
+        specifier: workspace:*
+        version: link:../../packages/privacy
       drizzle-orm:
         specifier: ^0.45.2
         version: 0.45.2(@types/pg@8.23.1)(pg@8.23.0)
@@ -216,6 +219,18 @@ importers:
       tsx:
         specifier: ^4.20.5
         version: 4.23.12
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@22.20.1)(jsdom@26.1.0)(tsx@4.23.12)
+
+  packages/privacy:
+    devDependencies:
+      '@types/node':
+        specifier: ^22.13.0
+        version: 22.20.1
       typescript:
         specifier: ^5.9.2
         version: 5.9.3

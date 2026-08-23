@@ -1,0 +1,18 @@
+[Unit]
+Description=Run the ONE privacy deletion sweep daily
+Documentation=https://github.com/PVUD14/planthepath-next
+
+[Timer]
+# Daily, early morning India time (02:30 IST). A deletion is already 30 days overdue
+# by the time it runs, so the hour matters less than it running every day without fail.
+OnCalendar=*-*-* 21:00:00 UTC
+
+# If the host was down at the scheduled time, run on the next boot rather than
+# skipping the day. A missed sweep means somebody's deletion did not happen.
+Persistent=true
+
+# Avoid every host firing at the same instant if this is ever more than one machine.
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

@@ -7,8 +7,9 @@
     "dev": "tsx watch src/main.ts",
     "start": "node dist/main.js",
     "start:prod": "node dist/main.js",
+    "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "worker:privacy": "tsx src/run-privacy-worker.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.6",

@@ -1,0 +1,34 @@
+[Unit]
+Description=ONE privacy deletion sweep
+Documentation=https://github.com/PVUD14/planthepath-next
+# The sweep touches the database; there is nothing to do if it is unreachable.
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=aight
+Group=aight
+WorkingDirectory=/srv/planthepath-next/current
+EnvironmentFile=/srv/planthepath-next/shared/app.env
+ExecStart=/usr/bin/env corepack pnpm --filter @planthepath/api worker:privacy
+
+# The sweep is idempotent, so a transient database failure is worth retrying rather
+# than leaving a due deletion until tomorrow.
+Restart=on-failure
+RestartSec=300
+StartLimitBurst=3
+
+# It needs the database, the storage root, and nothing else.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/srv/planthepath-next/shared/files
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,57 @@
+{
+  "catalogue": "ONE starter career catalogue",
+  "version": 1,
+  "note": "Requirements reference taxonomy topics by stableKey. Only topics that exist in the published taxonomy are seeded; the rest are reported and skipped, so the catalogue grows as content does rather than referencing topics that are not there.",
+  "roles": [
+    {
+      "code": "SOC_ANALYST",
+      "title": "Security Operations Analyst",
+      "family": "Cyber Security",
+      "summary": "Monitors security alerts, investigates suspicious activity and escalates genuine incidents. Entry routes usually expect clear written handover and calm escalation under time pressure.",
+      "requirements": [
+        { "topic": "professional-communication", "level": "ESSENTIAL", "targetMastery": 0.75, "rationale": "Incident handover and escalation notes are read by people acting on them under pressure." },
+        { "topic": "interview-foundations", "level": "IMPORTANT", "targetMastery": 0.6, "rationale": "Security interviews probe reasoning aloud through scenario questions." }
+      ]
+    },
+    {
+      "code": "SOFTWARE_ENGINEER",
+      "title": "Software Engineer",
+      "family": "Engineering",
+      "summary": "Builds and maintains software with a team. Entry routes weigh problem solving alongside the ability to explain a decision to people who did not write the code.",
+      "requirements": [
+        { "topic": "professional-communication", "level": "IMPORTANT", "targetMastery": 0.65, "rationale": "Code review and design discussion are written and spoken work." },
+        { "topic": "interview-foundations", "level": "ESSENTIAL", "targetMastery": 0.7, "rationale": "Technical interviews are largely explaining your approach while you work." }
+      ]
+    },
+    {
+      "code": "DATA_ANALYST",
+      "title": "Data Analyst",
+      "family": "Data",
+      "summary": "Turns data into answers people can act on. The analysis matters less than whether the conclusion is understood and trusted by whoever has to decide.",
+      "requirements": [
+        { "topic": "professional-communication", "level": "ESSENTIAL", "targetMastery": 0.8, "rationale": "An analysis nobody understands changes no decision." },
+        { "topic": "interview-foundations", "level": "IMPORTANT", "targetMastery": 0.6, "rationale": "Case-style interviews ask you to reason through an ambiguous question aloud." }
+      ]
+    },
+    {
+      "code": "BUSINESS_ANALYST",
+      "title": "Business Analyst",
+      "family": "Business",
+      "summary": "Works between business teams and delivery teams, turning what people ask for into something that can be built and checked.",
+      "requirements": [
+        { "topic": "professional-communication", "level": "ESSENTIAL", "targetMastery": 0.8, "rationale": "The role is almost entirely eliciting, writing down and confirming what was meant." },
+        { "topic": "interview-foundations", "level": "IMPORTANT", "targetMastery": 0.65, "rationale": "Interviews test whether you can structure an unclear problem in conversation." }
+      ]
+    },
+    {
+      "code": "CUSTOMER_SUCCESS",
+      "title": "Customer Success Associate",
+      "family": "Business",
+      "summary": "Helps customers get value from a product and keeps a relationship healthy, including when something has gone wrong.",
+      "requirements": [
+        { "topic": "professional-communication", "level": "ESSENTIAL", "targetMastery": 0.85, "rationale": "Difficult conversations handled well are the substance of the role." },
+        { "topic": "interview-foundations", "level": "HELPFUL", "targetMastery": 0.5, "rationale": "Interviews lean on worked examples from your own experience." }
+      ]
+    }
+  ]
+}

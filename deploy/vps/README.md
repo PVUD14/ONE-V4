@@ -1,6 +1,21 @@
 # PlanThePath Next VPS UAT deployment
 
-This directory contains the focused deployment pack for the temporary public UAT deployment at `https://one.ai8ht.pro`.
+> **This Compose pack is not what currently runs `https://one.ai8ht.pro`.**
+>
+> The live UAT host uses a release-directory deployment, not Docker Compose:
+>
+> - releases unpack to `/srv/planthepath-next/releases/<sha>/`, with `/srv/planthepath-next/current` symlinked to the active one;
+> - environment comes from `/srv/planthepath-next/shared/app.env`;
+> - the API runs under `systemctl` as `planthepath-api.service` on `127.0.0.1:7310`;
+> - the web app is served as static files from `current/apps/web/dist`;
+> - a release tarball is staged at `/home/aight/planthepath-deploy/planthepath-next-<sha>.tar` and verified by SHA-256 before extraction.
+>
+> Deploy and switch scripts for each release live in `.deploy/` in the repository
+> working tree (untracked). `git pull` on the host does nothing, because the host
+> holds unpacked release directories rather than a clone.
+>
+> The Compose pack below remains valid for standing up an independent environment
+> from scratch; keep the two in step if the live host is ever migrated onto it.
 
 ## Security posture
 

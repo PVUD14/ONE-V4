@@ -1,0 +1,30 @@
+[Unit]
+Description=ONE database backup with restore verification
+Documentation=https://github.com/PVUD14/planthepath-next
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=aight
+Group=aight
+WorkingDirectory=/srv/planthepath-next
+ExecStart=/bin/bash /srv/planthepath-next/current/deploy/scripts/backup-and-verify.sh
+
+# A failed backup is worth retrying the same day rather than waiting for tomorrow.
+Restart=on-failure
+RestartSec=900
+StartLimitBurst=3
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/srv/planthepath-next/shared/backups
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

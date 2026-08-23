@@ -25,6 +25,9 @@ importers:
       '@planthepath/automation':
         specifier: workspace:*
         version: link:../../packages/automation
+      '@planthepath/hiring':
+        specifier: workspace:*
+        version: link:../../packages/hiring
       '@planthepath/identity':
         specifier: workspace:*
         version: link:../../packages/identity

@@ -16,6 +16,7 @@
     "@nestjs/platform-express": "^11.1.6",
     "@planthepath/authorization": "workspace:*",
     "@planthepath/automation": "workspace:*",
+    "@planthepath/hiring": "workspace:*",
     "@planthepath/identity": "workspace:*",
     "@planthepath/persistence": "workspace:*",
     "drizzle-orm": "^0.45.2",

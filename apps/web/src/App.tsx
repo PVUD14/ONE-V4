@@ -276,9 +276,11 @@ export function App(): React.ReactElement {
   }
 
   // Local preview only: `import.meta.env.DEV` is false in production builds, so this
-  // branch is eliminated from the shipped bundle entirely.
-  if (import.meta.env.DEV && path === '/pilot-preview') {
-    return <PilotApp email="demo.preview@dev.local" onSignOut={handleSignOut} />;
+  // branch is eliminated from the shipped bundle entirely. The sub-path picks the
+  // persona the same way a demo identity's address would.
+  if (import.meta.env.DEV && path.startsWith('/pilot-preview')) {
+    const previewPersona = path.endsWith('/institution') ? 'demo.institution' : path.endsWith('/employer') ? 'demo.employer' : 'demo.student';
+    return <PilotApp email={`${previewPersona}@dev.local`} onSignOut={handleSignOut} />;
   }
 
   if (path === '/' || path === '/login') {

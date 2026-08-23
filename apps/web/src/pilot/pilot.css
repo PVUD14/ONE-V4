@@ -347,3 +347,29 @@
   .pilot-row.cols-2, .pilot-row.cols-3, .pilot-row.cols-4, .pilot-row.cols-5 { grid-template-columns: 1fr; }
   .pilot-search { display: none; }
 }
+
+/* --- Staff portal additions ------------------------------------------------ */
+
+.pilot-table-wrap { overflow-x: auto; }
+.pilot-table { width: 100%; border-collapse: collapse; font-size: 12.5px; min-width: 640px; }
+.pilot-table th {
+  text-align: left; color: var(--p-muted); font-size: 11px; font-weight: 600;
+  letter-spacing: .04em; text-transform: uppercase; padding: 8px 10px;
+  border-bottom: 1px solid var(--p-line); white-space: nowrap;
+}
+.pilot-table td { padding: 10px; border-bottom: 1px solid var(--p-line); vertical-align: middle; }
+.pilot-table tr:last-child td { border-bottom: 0; }
+
+.pilot-person { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.pilot-person .pilot-avatar { width: 32px; height: 32px; font-size: 11px; flex: 0 0 auto; }
+.pilot-person strong { display: block; font-size: 12.5px; }
+.pilot-person small { color: var(--p-muted); font-size: 11px; }
+
+.pilot-funnel { display: flex; flex-direction: column; gap: 9px; }
+.pilot-funnel-row { display: grid; grid-template-columns: 86px 1fr 44px; gap: 10px; align-items: center; font-size: 12px; }
+.pilot-funnel-row .pilot-bar { height: 16px; border-radius: 6px; }
+.pilot-funnel-row .num { text-align: right; font-weight: 700; }
+
+.pilot-kpi { display: flex; align-items: center; gap: 12px; }
+.pilot-kpi b { font-size: 21px; display: block; line-height: 1.1; }
+.pilot-kpi small { color: var(--p-muted); font-size: 11.5px; }

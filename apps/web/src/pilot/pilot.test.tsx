@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { PilotApp } from './PilotApp.js';
+import { PilotApp, pilotPersonaFor } from './PilotApp.js';
 import { isPilotIdentity } from './pilotIdentity.js';
 import { pilotCanon, pilotCompanies, pilotOpportunities, pilotSavedOpportunities } from './pilotData.js';
 
@@ -68,5 +68,42 @@ describe('pilot experience', () => {
       expect(screen.queryByText(new RegExp(`\\b${banned}\\b`))).not.toBeInTheDocument();
     }
     expect(pilotSavedOpportunities.every((saved) => fictional.has(saved.company.name))).toBe(true);
+  });
+});
+
+describe('persona resolution and cross-portal coherence', () => {
+  it('maps demo addresses to the right portal', () => {
+    expect(pilotPersonaFor('demo.student@uat.example.test')).toBe('student');
+    expect(pilotPersonaFor('demo.institution@uat.example.test')).toBe('institution');
+    expect(pilotPersonaFor('demo.placement@uat.example.test')).toBe('institution');
+    expect(pilotPersonaFor('demo.employer@uat.example.test')).toBe('employer');
+    expect(pilotPersonaFor('demo.recruiter@uat.example.test')).toBe('employer');
+    expect(pilotPersonaFor('demo.client@partner.example')).toBe('student');
+  });
+
+  it('shows the placement officer her college, with Arjun in the roster at his real number', () => {
+    render(<PilotApp email="demo.institution@uat.example.test" onSignOut={() => undefined} />);
+    expect(screen.getByRole('heading', { name: 'Placement Dashboard' })).toBeInTheDocument();
+    expect(screen.getByText('Sample data')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Students' }));
+    // The same student the client met in the first demo, same readiness figure.
+    expect(screen.getByText('Arjun Reddy')).toBeInTheDocument();
+    expect(screen.getByText(/Shortlisted · Zenvia Labs/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Placement Drives' }));
+    expect(screen.getByRole('heading', { name: 'Placement Drives' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Reports' }));
+    expect(screen.getByRole('heading', { name: 'Reports' })).toBeInTheDocument();
+  });
+
+  it('shows the recruiter Zenvia Labs, with Arjun shortlisted in the pipeline', () => {
+    render(<PilotApp email="demo.employer@uat.example.test" onSignOut={() => undefined} />);
+    expect(screen.getByRole('heading', { name: 'Recruiter Dashboard' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Applicants' }));
+    expect(screen.getByText('Arjun Reddy')).toBeInTheDocument();
+    expect(screen.getAllByText('Shortlisted').length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Opportunities' }));
+    expect(screen.getByText('Graduate Software Engineer')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Interviews' }));
+    expect(screen.getByRole('heading', { name: 'Interviews' })).toBeInTheDocument();
   });
 });

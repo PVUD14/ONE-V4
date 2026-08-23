@@ -1,0 +1,224 @@
+import { ArrowRight, Briefcase, Building2, CalendarDays, ClipboardCheck, Plus, TrendingUp, Users, Video } from 'lucide-react';
+import { MultiRing } from './pilotComponents.js';
+import {
+  pilotApplicants, pilotCampusDrives, pilotEmployerFunnel, pilotEmployerInterviews,
+  pilotEmployerPersona, pilotEmployerRoles, pilotEmployerStats,
+} from './pilotStaffData.js';
+
+/** Employer pilot pages: the talent lead's view at Zenvia Labs. */
+
+const STAGE_TONE: Readonly<Record<string, string>> = {
+  Applied: 'slate', Screening: 'blue', Shortlisted: 'indigo',
+  Assessment: 'amber', Interview: 'purple', Offer: 'green',
+};
+
+function Funnel({ rows }: { readonly rows: readonly { readonly label: string; readonly value: number }[] }): React.ReactElement {
+  const max = Math.max(...rows.map((row) => row.value), 1);
+  return <div className="pilot-funnel">
+    {rows.map((row) => (
+      <div key={row.label} className="pilot-funnel-row">
+        <span>{row.label}</span>
+        <div className="pilot-bar indigo"><i style={{ width: `${(row.value / max) * 100}%` }} /></div>
+        <span className="num">{row.value}</span>
+      </div>
+    ))}
+  </div>;
+}
+
+export function EmployerDashboard(): React.ReactElement {
+  return <div className="pilot-page">
+    <div className="pilot-content">
+      <div className="pilot-page-head">
+        <div className="pilot-greeting">
+          <h1>Recruiter Dashboard</h1>
+          <p>Your open roles, pipeline health and the interviews coming up this week.</p>
+        </div>
+        <button type="button" className="pilot-btn"><Plus size={15} /> Post a Role</button>
+      </div>
+
+      <div className="pilot-row cols-5">
+        {[
+          ['Open Roles', pilotEmployerStats.openRoles, 'blue', Briefcase],
+          ['Total Applicants', pilotEmployerStats.totalApplicants, 'indigo', Users],
+          ['In Pipeline', pilotEmployerStats.inPipeline, 'purple', ClipboardCheck],
+          ['Offers Extended', pilotEmployerStats.offersExtended, 'amber', TrendingUp],
+          ['Hires', pilotEmployerStats.hires, 'green', Building2],
+        ].map(([label, value, tone, Icon]) => (
+          <section key={label as string} className="pilot-card pilot-kpi">
+            {(() => { const Component = Icon as typeof Users; return <span className={`pilot-tile ${tone as string}`}><Component size={17} /></span>; })()}
+            <div><b>{value as number}</b><small>{label as string}</small></div>
+          </section>
+        ))}
+      </div>
+
+      <div className="pilot-row cols-2">
+        <section className="pilot-card">
+          <div className="pilot-card-head"><h2>Hiring Funnel</h2><small style={{ color: 'var(--p-muted)' }}>All roles · this season</small></div>
+          <Funnel rows={pilotEmployerFunnel} />
+        </section>
+        <section className="pilot-card">
+          <div className="pilot-card-head"><h2>This Week&apos;s Interviews</h2><button type="button" className="pilot-link">View Calendar</button></div>
+          <div className="pilot-list">
+            {pilotEmployerInterviews.map((interview) => (
+              <div key={`${interview.candidate}-${interview.when}`} className="pilot-list-row">
+                <span className="pilot-tile purple"><Video size={16} /></span>
+                <div className="grow"><strong>{interview.candidate}</strong><small>{interview.round} · {interview.role}</small></div>
+                <small>{interview.when}</small>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+
+      <section className="pilot-card">
+        <div className="pilot-card-head"><h2>Recently Shortlisted</h2><button type="button" className="pilot-link">Open Applicants</button></div>
+        <div className="pilot-list">
+          {pilotApplicants.filter((applicant) => applicant.stage === 'Shortlisted' || applicant.stage === 'Interview').map((applicant) => (
+            <div key={applicant.name} className="pilot-list-row">
+              <span className="pilot-avatar" style={{ width: 34, height: 34, fontSize: 11.5 }}>{applicant.initials}</span>
+              <div className="grow"><strong>{applicant.name}</strong><small>{applicant.college} · {applicant.roleApplied}</small></div>
+              {applicant.highlight ? <small style={{ color: 'var(--p-ink-2)' }}>{applicant.highlight}</small> : null}
+              <span className={`pilot-chip ${STAGE_TONE[applicant.stage]}`}>{applicant.stage}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+
+    <aside className="pilot-rail">
+      <section className="pilot-card">
+        <div className="pilot-card-head"><h2>Pipeline Mix</h2><small style={{ color: 'var(--p-muted)' }}>Active candidates</small></div>
+        <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+          <MultiRing segments={[
+            { value: 45, color: '#1f55e5' }, { value: 24, color: '#4f46e5' },
+            { value: 15, color: '#b45309' }, { value: 8, color: '#5936cf' },
+          ]}>{pilotEmployerStats.inPipeline}<div style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--p-muted)' }}>In pipeline</div></MultiRing>
+          <div className="pilot-legend" style={{ flex: 1 }}>
+            <div><i style={{ background: '#1f55e5' }} /> Screening <span className="num">45</span></div>
+            <div><i style={{ background: '#4f46e5' }} /> Shortlisted <span className="num">24</span></div>
+            <div><i style={{ background: '#b45309' }} /> Assessment <span className="num">15</span></div>
+            <div><i style={{ background: '#5936cf' }} /> Interview <span className="num">8</span></div>
+          </div>
+        </div>
+      </section>
+      <section className="pilot-card">
+        <div className="pilot-card-head"><h2>Campus Drives</h2><button type="button" className="pilot-link">View All</button></div>
+        <div className="pilot-list">
+          {pilotCampusDrives.map((drive) => (
+            <div key={drive.institution} className="pilot-list-row">
+              <div className="pilot-date"><b>{drive.date.split(' ')[0]}</b><span>{drive.date.split(' ')[1]}</span></div>
+              <div className="grow"><strong style={{ fontSize: 12.5 }}>{drive.institution}</strong><small>{drive.role} · {drive.registered} registered</small></div>
+              <ArrowRight size={14} color="#98a5ba" />
+            </div>
+          ))}
+        </div>
+      </section>
+      <div className="pilot-banner blue"><TrendingUp size={17} /> Applications up 32% since the VIT drive was announced.</div>
+    </aside>
+  </div>;
+}
+
+export function EmployerOpportunities(): React.ReactElement {
+  return <div className="pilot-page" style={{ gridTemplateColumns: '1fr' }}>
+    <div className="pilot-content">
+      <div className="pilot-page-head">
+        <div><h1>Opportunities</h1><p>Roles {pilotEmployerPersona.company.name} is hiring for this season.</p></div>
+        <button type="button" className="pilot-btn"><Plus size={15} /> Post a Role</button>
+      </div>
+      <section className="pilot-card">
+        <div className="pilot-table-wrap"><table className="pilot-table">
+          <thead><tr><th>Role</th><th>Location</th><th>Type</th><th>Applicants</th><th>Shortlisted</th><th>Current Stage</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+            {pilotEmployerRoles.map((role) => (
+              <tr key={role.title}>
+                <td><strong>{role.title}</strong><small style={{ display: 'block', color: 'var(--p-muted)' }}>{role.posted}</small></td>
+                <td>{role.location}</td>
+                <td>{role.type}</td>
+                <td><b>{role.applicants}</b></td>
+                <td>{role.shortlisted}</td>
+                <td><small>{role.stage}</small></td>
+                <td><span className={`pilot-chip ${role.status === 'Live' ? 'green' : role.status === 'Closing soon' ? 'amber' : 'slate'}`}>{role.status}</span></td>
+                <td><button type="button" className="pilot-btn ghost small">Manage</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table></div>
+      </section>
+    </div>
+  </div>;
+}
+
+export function EmployerApplicants(): React.ReactElement {
+  return <div className="pilot-page" style={{ gridTemplateColumns: '1fr' }}>
+    <div className="pilot-content">
+      <div className="pilot-page-head">
+        <div><h1>Applicants</h1><p>Candidates across your open roles, by pipeline stage.</p></div>
+        <div style={{ display: 'flex', gap: 9 }}>
+          <button type="button" className="pilot-btn ghost">Filter: All Roles</button>
+          <button type="button" className="pilot-btn ghost">Stage: All</button>
+        </div>
+      </div>
+      <section className="pilot-card">
+        <div className="pilot-table-wrap"><table className="pilot-table">
+          <thead><tr><th>Candidate</th><th>Institution</th><th>Role</th><th>Stage</th><th>Applied</th><th></th></tr></thead>
+          <tbody>
+            {pilotApplicants.map((applicant) => (
+              <tr key={applicant.name}>
+                <td><div className="pilot-person">
+                  <span className="pilot-avatar">{applicant.initials}</span>
+                  <span><strong>{applicant.name}</strong>{applicant.highlight ? <small>{applicant.highlight}</small> : null}</span>
+                </div></td>
+                <td>{applicant.college}</td>
+                <td>{applicant.roleApplied}</td>
+                <td><span className={`pilot-chip ${STAGE_TONE[applicant.stage]}`}>{applicant.stage}</span></td>
+                <td><small>{applicant.appliedWhen}</small></td>
+                <td><div style={{ display: 'flex', gap: 7, justifyContent: 'flex-end' }}>
+                  <button type="button" className="pilot-btn ghost small">Profile</button>
+                  <button type="button" className="pilot-btn small">Advance</button>
+                </div></td>
+              </tr>
+            ))}
+          </tbody>
+        </table></div>
+      </section>
+    </div>
+  </div>;
+}
+
+export function EmployerInterviews(): React.ReactElement {
+  return <div className="pilot-page">
+    <div className="pilot-content">
+      <div className="pilot-page-head">
+        <div><h1>Interviews</h1><p>Scheduled rounds across your roles.</p></div>
+        <button type="button" className="pilot-btn ghost"><CalendarDays size={15} /> Sync Calendar</button>
+      </div>
+      <section className="pilot-card">
+        <div className="pilot-list">
+          {pilotEmployerInterviews.map((interview) => (
+            <div key={`${interview.candidate}-${interview.when}`} className="pilot-list-row">
+              <span className="pilot-tile purple"><Video size={17} /></span>
+              <div className="grow"><strong>{interview.candidate}</strong><small>{interview.round} · {interview.role} · {interview.mode}</small></div>
+              <small>{interview.when}</small>
+              <button type="button" className="pilot-btn ghost small">Reschedule</button>
+              <button type="button" className="pilot-btn small">Join</button>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+    <aside className="pilot-rail">
+      <section className="pilot-card">
+        <h2>Interview Load This Week</h2>
+        <div className="pilot-legend">
+          <div><i style={{ background: '#5936cf' }} /> Technical rounds <span className="num">6</span></div>
+          <div><i style={{ background: '#1f55e5' }} /> Screening calls <span className="num">4</span></div>
+          <div><i style={{ background: '#0d6b4f' }} /> Final rounds <span className="num">2</span></div>
+        </div>
+      </section>
+      <section className="pilot-card">
+        <h2>Panel Availability</h2>
+        <p style={{ margin: 0, color: 'var(--p-muted)', fontSize: 12.5 }}>3 interviewers free on Thursday afternoon. Friday is fully booked.</p>
+      </section>
+    </aside>
+  </div>;
+}

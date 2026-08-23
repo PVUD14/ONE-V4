@@ -6,12 +6,16 @@ import {
   calculateAdvisoryReadiness,
   deterministicPackageIdentity,
   mayCreateNotificationCommand,
+  careerNextActions,
+  careerTargetProgress,
+  computeCareerGap,
   projectTopicMastery,
   recommendRoadmapActions,
   selectQuestionsDeterministically,
   submitAttemptOnce,
   toLearnerQuestionDto,
   type ImportPackageManifest,
+  type MasteryProjection,
   type ProtectedQuestionVersion,
   type SourceRecordEvidence,
 } from '../src/index.js';
@@ -95,5 +99,104 @@ describe('evidence, advisory readiness, roadmap and notification policy', () => 
     expect(mayCreateNotificationCommand({ preference, localMinuteOfDay: 23 * 60, sentToday: 0, legalPurpose: 'assessment reminder' }).reason).toBe('QUIET_HOURS');
     expect(mayCreateNotificationCommand({ preference, localMinuteOfDay: 12 * 60, sentToday: 2, legalPurpose: 'assessment reminder' }).reason).toBe('FREQUENCY_CAP');
     expect(mayCreateNotificationCommand({ preference, localMinuteOfDay: 12 * 60, sentToday: 0, legalPurpose: 'assessment reminder' }).allowed).toBe(true);
+  });
+});
+
+describe('career gap', () => {
+  const requirements = [
+    { topicId: 'siem', requirementLevel: 'ESSENTIAL' as const, targetMastery: 0.8 },
+    { topicId: 'networking', requirementLevel: 'ESSENTIAL' as const, targetMastery: 0.7 },
+    { topicId: 'communication', requirementLevel: 'IMPORTANT' as const, targetMastery: 0.6 },
+    { topicId: 'scripting', requirementLevel: 'HELPFUL' as const, targetMastery: 0.5 },
+  ];
+
+  function projection(topicId: string, ratio: number, band: MasteryProjection['band']): MasteryProjection {
+    return { topicId, evidenceIds: ['e1', 'e2'], algorithmVersion: 'career-readiness-mastery-v1', band, ratio };
+  }
+
+  it('reports a requirement with no evidence as unknown, never as missing', () => {
+    const gap = computeCareerGap(requirements, []);
+    expect(gap.requirementsUnknown).toBe(4);
+    expect(gap.items.every((item) => item.status === 'UNKNOWN')).toBe(true);
+    // Nothing has been measured, so nothing can be claimed to be absent.
+    expect(gap.items.some((item) => item.status === 'MISSING')).toBe(false);
+    expect(gap.items.every((item) => item.observedMastery === null)).toBe(true);
+  });
+
+  it('treats insufficient evidence as unknown rather than as a low score', () => {
+    const gap = computeCareerGap(requirements, [projection('siem', 0.2, 'NOT_ENOUGH_EVIDENCE')]);
+    const siem = gap.items.find((item) => item.topicId === 'siem');
+    expect(siem?.status).toBe('UNKNOWN');
+    expect(siem?.observedMastery).toBeNull();
+  });
+
+  it('separates met, partial and missing', () => {
+    const gap = computeCareerGap(requirements, [
+      projection('siem', 0.85, 'DEMONSTRATED'),
+      projection('networking', 0.5, 'DEVELOPING'),
+      projection('communication', 0.1, 'DEVELOPING'),
+    ]);
+    const byTopic = Object.fromEntries(gap.items.map((item) => [item.topicId, item]));
+    expect(byTopic.siem?.status).toBe('MET');
+    expect(byTopic.networking?.status).toBe('PARTIAL');
+    expect(byTopic.communication?.status).toBe('MISSING');
+    expect(gap.requirementsMet).toBe(1);
+  });
+
+  it('ranks unmet essentials first and pushes satisfied requirements to the end', () => {
+    const gap = computeCareerGap(requirements, [
+      projection('siem', 0.9, 'DEMONSTRATED'),
+      projection('scripting', 0.05, 'DEVELOPING'),
+    ]);
+    // An unmet essential leads; the satisfied essential sorts behind even an
+    // unmet optional, because this ranks what to do next.
+    expect(gap.items[0]?.requirementLevel).toBe('ESSENTIAL');
+    expect(gap.items[0]?.status).not.toBe('MET');
+    expect(gap.items[gap.items.length - 1]?.topicId).toBe('siem');
+    expect(gap.items[gap.items.length - 1]?.status).toBe('MET');
+  });
+
+  it('is deterministic for the same inputs', () => {
+    const first = computeCareerGap(requirements, [projection('siem', 0.4, 'DEVELOPING')]);
+    const second = computeCareerGap([...requirements].reverse(), [projection('siem', 0.4, 'DEVELOPING')]);
+    expect(first.items.map((item) => item.topicId)).toEqual(second.items.map((item) => item.topicId));
+  });
+
+  it('suggests demonstrating what is unknown and closing what fell short', () => {
+    const gap = computeCareerGap(requirements, [
+      projection('siem', 0.1, 'DEVELOPING'),
+      projection('networking', 0.65, 'PROGRESSING'),
+    ]);
+    const actions = careerNextActions(gap, 3);
+    expect(actions).toHaveLength(3);
+    const bySiem = actions.find((action) => action.topicId === 'siem');
+    expect(bySiem?.actionCode).toBe('CLOSE_GAP');
+    expect(actions.find((action) => action.topicId === 'communication')?.actionCode).toBe('DEMONSTRATE_TOPIC');
+    expect(actions.find((action) => action.topicId === 'networking')?.actionCode).toBe('DEEPEN_TOPIC');
+  });
+
+  it('never suggests something already satisfied', () => {
+    const gap = computeCareerGap(
+      [{ topicId: 'siem', requirementLevel: 'ESSENTIAL', targetMastery: 0.5 }],
+      [projection('siem', 0.9, 'DEMONSTRATED')],
+    );
+    expect(careerNextActions(gap)).toEqual([]);
+  });
+
+  it('reports progress only over what could be evaluated', () => {
+    const gap = computeCareerGap(requirements, [
+      projection('siem', 0.9, 'DEMONSTRATED'),
+      projection('networking', 0.1, 'DEVELOPING'),
+    ]);
+    const progress = careerTargetProgress(gap);
+    expect(progress.evaluated).toBe(2);
+    expect(progress.met).toBe(1);
+    expect(progress.unknown).toBe(2);
+    // 1 of 2 measurable, not 1 of 4; unknowns are reported, never averaged in.
+    expect(progress.percentOfEvaluated).toBe(50);
+  });
+
+  it('declines to state a percentage when nothing could be evaluated', () => {
+    expect(careerTargetProgress(computeCareerGap(requirements, [])).percentOfEvaluated).toBeNull();
   });
 });

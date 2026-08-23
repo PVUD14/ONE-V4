@@ -222,6 +222,12 @@ export interface MasteryProjection {
   readonly evidenceIds: readonly string[];
   readonly algorithmVersion: 'career-readiness-mastery-v1';
   readonly band: 'NOT_ENOUGH_EVIDENCE' | 'DEVELOPING' | 'PROGRESSING' | 'DEMONSTRATED';
+  /**
+   * Demonstrated over possible across active evidence. The band remains the thing
+   * shown to people; the ratio exists so a career requirement expressed as a depth
+   * can be compared against it.
+   */
+  readonly ratio: number;
 }
 
 export function projectTopicMastery(evidence: readonly EvidenceInput[]): readonly MasteryProjection[] {
@@ -236,7 +242,7 @@ export function projectTopicMastery(evidence: readonly EvidenceInput[]): readonl
     const possible = items.reduce((sum, item) => sum + item.possible, 0);
     const ratio = demonstrated / possible;
     const band = items.length < 2 ? 'NOT_ENOUGH_EVIDENCE' : ratio >= 0.8 ? 'DEMONSTRATED' : ratio >= 0.6 ? 'PROGRESSING' : 'DEVELOPING';
-    return { topicId, evidenceIds: items.map((item) => item.id).sort(), algorithmVersion: 'career-readiness-mastery-v1', band };
+    return { topicId, evidenceIds: items.map((item) => item.id).sort(), algorithmVersion: 'career-readiness-mastery-v1', band, ratio };
   });
 }
 
@@ -300,4 +306,156 @@ export function mayCreateNotificationCommand(input: {
     : input.localMinuteOfDay >= start || input.localMinuteOfDay < end;
   if (inQuietHours) return { allowed: false, reason: 'QUIET_HOURS' };
   return { allowed: true, reason: 'ALLOWED' };
+}
+
+// ---------------------------------------------------------------------------
+// Career targets and gaps
+// ---------------------------------------------------------------------------
+
+/**
+ * The gap between what a career asks for and what a student has demonstrated.
+ *
+ * This is the computation behind "what should I do next?". It deliberately reports
+ * three different kinds of shortfall rather than one, because "you have not shown
+ * this yet" and "you tried this and fell short" call for different next steps, and
+ * neither is the same as "we have nothing to go on".
+ */
+
+export type CareerRequirementLevel = 'ESSENTIAL' | 'IMPORTANT' | 'HELPFUL';
+
+/** MISSING and UNKNOWN are separate on purpose: absence of evidence is not evidence of absence. */
+export type CareerGapStatus = 'MET' | 'PARTIAL' | 'MISSING' | 'UNKNOWN';
+
+export interface CareerRequirement {
+  readonly topicId: string;
+  readonly requirementLevel: CareerRequirementLevel;
+  /** Depth expected, as a proportion of what can be demonstrated for the topic. */
+  readonly targetMastery: number;
+}
+
+export interface CareerGapItem {
+  readonly topicId: string;
+  readonly requirementLevel: CareerRequirementLevel;
+  readonly targetMastery: number;
+  readonly observedMastery: number | null;
+  readonly status: CareerGapStatus;
+  readonly priorityRank: number;
+}
+
+export interface CareerGap {
+  readonly modelVersion: 'career-gap-v1';
+  readonly items: readonly CareerGapItem[];
+  readonly requirementsTotal: number;
+  readonly requirementsMet: number;
+  readonly requirementsUnknown: number;
+}
+
+const LEVEL_ORDER: Readonly<Record<CareerRequirementLevel, number>> = { ESSENTIAL: 0, IMPORTANT: 1, HELPFUL: 2 };
+/** MET sorts last: a satisfied requirement is never the next thing to do. */
+const STATUS_ORDER: Readonly<Record<CareerGapStatus, number>> = { MISSING: 0, UNKNOWN: 1, PARTIAL: 2, MET: 3 };
+
+/** Below half the target counts as not yet started rather than partially there. */
+const PARTIAL_THRESHOLD = 0.5;
+
+export function computeCareerGap(
+  requirements: readonly CareerRequirement[],
+  projections: readonly MasteryProjection[],
+): CareerGap {
+  const byTopic = new Map(projections.map((projection) => [projection.topicId, projection]));
+
+  const scored = requirements.map((requirement) => {
+    const projection = byTopic.get(requirement.topicId);
+    // No evidence, or too little to draw a conclusion from, is unknown rather than a
+    // shortfall. Telling a student they lack a skill nobody has measured is wrong.
+    const measurable = projection && projection.band !== 'NOT_ENOUGH_EVIDENCE';
+    const observedMastery = measurable ? projection.ratio : null;
+    const status: CareerGapStatus = observedMastery === null
+      ? 'UNKNOWN'
+      : observedMastery >= requirement.targetMastery
+        ? 'MET'
+        : observedMastery >= requirement.targetMastery * PARTIAL_THRESHOLD
+          ? 'PARTIAL'
+          : 'MISSING';
+    // An unknown requirement is ranked by its full target, since the whole of it is
+    // still to be shown.
+    const shortfall = observedMastery === null ? requirement.targetMastery : Math.max(0, requirement.targetMastery - observedMastery);
+    return { requirement, observedMastery, status, shortfall };
+  });
+
+  // Satisfied requirements sort to the end regardless of level: this is a ranking of
+  // what to do next, and a met essential is not a thing to do. Among the rest, level
+  // decides, so an unknown essential still outranks a missing optional.
+  const satisfied = (status: CareerGapStatus): number => (status === 'MET' ? 1 : 0);
+  scored.sort((left, right) => (
+    satisfied(left.status) - satisfied(right.status)
+    || LEVEL_ORDER[left.requirement.requirementLevel] - LEVEL_ORDER[right.requirement.requirementLevel]
+    || STATUS_ORDER[left.status] - STATUS_ORDER[right.status]
+    || right.shortfall - left.shortfall
+    // Deterministic ordering so the same inputs always produce the same advice.
+    || left.requirement.topicId.localeCompare(right.requirement.topicId)
+  ));
+
+  const items = scored.map((entry, index) => ({
+    topicId: entry.requirement.topicId,
+    requirementLevel: entry.requirement.requirementLevel,
+    targetMastery: entry.requirement.targetMastery,
+    observedMastery: entry.observedMastery,
+    status: entry.status,
+    priorityRank: index + 1,
+  }));
+
+  return {
+    modelVersion: 'career-gap-v1',
+    items,
+    requirementsTotal: items.length,
+    requirementsMet: items.filter((item) => item.status === 'MET').length,
+    requirementsUnknown: items.filter((item) => item.status === 'UNKNOWN').length,
+  };
+}
+
+export type CareerNextActionCode = 'DEMONSTRATE_TOPIC' | 'CLOSE_GAP' | 'DEEPEN_TOPIC';
+
+export interface CareerNextAction {
+  readonly topicId: string;
+  readonly actionCode: CareerNextActionCode;
+  readonly requirementLevel: CareerRequirementLevel;
+  readonly reason: CareerGapStatus;
+  readonly priorityRank: number;
+}
+
+/**
+ * The top few things worth doing next. Satisfied requirements are excluded, so the
+ * list is always actionable rather than a progress report with actions buried in it.
+ */
+export function careerNextActions(gap: CareerGap, limit = 3): readonly CareerNextAction[] {
+  return gap.items
+    .filter((item) => item.status !== 'MET')
+    .slice(0, Math.max(0, limit))
+    .map((item) => ({
+      topicId: item.topicId,
+      actionCode: item.status === 'UNKNOWN' ? 'DEMONSTRATE_TOPIC' : item.status === 'MISSING' ? 'CLOSE_GAP' : 'DEEPEN_TOPIC',
+      requirementLevel: item.requirementLevel,
+      reason: item.status,
+      priorityRank: item.priorityRank,
+    }));
+}
+
+/**
+ * Progress toward a target, counted only over requirements that could be evaluated.
+ * Unknowns are reported separately rather than folded in, so the figure never implies
+ * more confidence than the evidence supports.
+ */
+export function careerTargetProgress(gap: CareerGap): {
+  readonly evaluated: number;
+  readonly met: number;
+  readonly unknown: number;
+  readonly percentOfEvaluated: number | null;
+} {
+  const evaluated = gap.requirementsTotal - gap.requirementsUnknown;
+  return {
+    evaluated,
+    met: gap.requirementsMet,
+    unknown: gap.requirementsUnknown,
+    percentOfEvaluated: evaluated === 0 ? null : Math.round((gap.requirementsMet / evaluated) * 100),
+  };
 }

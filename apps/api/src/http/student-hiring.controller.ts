@@ -5,8 +5,11 @@ import {
   HiringRuleError,
   assertApplicationTransition,
   assertCanSubmitApplication,
+  assertOfferTransition,
   evaluateEligibility,
+  isOfferExpired,
   type EligibilityRule,
+  type OfferState,
   type StudentEligibilityFacts,
 } from '@planthepath/hiring';
 import {
@@ -198,10 +201,13 @@ export class StudentHiringController {
       VALUES (${this.ids.uuid()}::uuid, ${applicationId}::uuid, 'DRAFT', 'APPLIED', ${studentUserId}::uuid, 'STUDENT')
     `);
     // Consent to be seen by this employer for this opportunity, and nothing wider.
+    // The unique index is partial (WHERE revoked_at IS NULL), so the conflict target
+    // must repeat that predicate. DO NOTHING rather than DO UPDATE: a previously
+    // revoked grant stays revoked as an audit record, and re-applying writes a new row.
     await this.db.execute(sql`
       INSERT INTO employer_applicant_access_grants (id, employer_id, student_user_id, opportunity_id, granted_at)
       VALUES (${this.ids.uuid()}::uuid, ${employerId}::uuid, ${studentUserId}::uuid, ${input.opportunityId}::uuid, now())
-      ON CONFLICT (employer_id, student_user_id, opportunity_id) DO UPDATE SET revoked_at = NULL
+      ON CONFLICT (employer_id, student_user_id, opportunity_id) WHERE revoked_at IS NULL DO NOTHING
     `);
     await this.writeAudit(studentUserId, 'application.submitted', 'application', applicationId, context.correlationId);
     await this.writeOutbox('application', applicationId, 'application.submitted', {
@@ -233,9 +239,11 @@ export class StudentHiringController {
       throw ruleFailure(error, context.correlationId);
     }
 
+    // Withdrawing is itself a withdrawal of consent, recorded on the application so
+    // the row describes its own privacy state without consulting the grant table.
     await this.db.execute(sql`
       UPDATE applications
-      SET state = 'WITHDRAWN', closed_at = now(), withdrawn_reason = ${reason}, updated_at = now()
+      SET state = 'WITHDRAWN', closed_at = now(), consent_revoked_at = now(), withdrawn_reason = ${reason}, updated_at = now()
       WHERE id = ${id}::uuid AND student_user_id = ${studentUserId}::uuid
     `);
     await this.db.execute(sql`
@@ -255,6 +263,68 @@ export class StudentHiringController {
     await this.writeOutbox('application', id, 'application.withdrawn', { applicationId: id }, studentUserId, String(application.employer_id), context.correlationId);
 
     return { application: { id, state: 'WITHDRAWN' }, correlationId: context.correlationId };
+  }
+
+  @Get('/students/me/offers')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async listOffers(@Req() request: ProtectedHttpRequest): Promise<Record<string, unknown>> {
+    const context = requireTrustedAuthorization(request);
+    const rows = await this.db.execute(sql`
+      SELECT o.id, o.state, o.compensation_currency, o.compensation_amount, o.compensation_period,
+             o.joining_date, o.offer_expires_at, o.conditions, o.extended_at,
+             org.legal_name AS employer_name, v.title, a.id AS application_id
+      FROM offers o
+      JOIN applications a ON a.id = o.application_id
+      JOIN organizations org ON org.id = o.employer_id
+      JOIN opportunity_versions v ON v.id = a.applied_version_id
+      WHERE a.student_user_id = ${context.authorization.principal.userId}::uuid
+      ORDER BY o.updated_at DESC
+      LIMIT 100
+    `) as QueryResult<Record<string, unknown>>;
+    return { offers: rows.rows.map(mapOffer), correlationId: context.correlationId };
+  }
+
+  @Post('/students/me/offers/:offerId/respond')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async respondToOffer(@Req() request: ProtectedHttpRequest, @Param('offerId') offerId: string, @Body() body: unknown): Promise<Record<string, unknown>> {
+    const context = requireTrustedAuthorization(request);
+    const studentUserId = context.authorization.principal.userId;
+    const id = requireUuid(offerId, context.correlationId);
+    const decision = readDecision(body, context.correlationId);
+    const reason = readOptionalText(body, 'reason', 1000, context.correlationId);
+
+    const rows = await this.db.execute(sql`
+      SELECT o.id, o.state, o.offer_expires_at, o.employer_id, a.id AS application_id
+      FROM offers o
+      JOIN applications a ON a.id = o.application_id
+      WHERE o.id = ${id}::uuid AND a.student_user_id = ${studentUserId}::uuid
+    `) as QueryResult<Record<string, unknown>>;
+    const [offer] = rows.rows;
+    if (!offer) throw forbidden(context.correlationId);
+
+    // An offer past its expiry is settled by time, not by the candidate clicking.
+    if (String(offer.state) === 'EXTENDED' && isOfferExpired(offer.offer_expires_at ? new Date(String(offer.offer_expires_at)) : null, new Date())) {
+      await this.db.execute(sql`UPDATE offers SET state = 'EXPIRED', updated_at = now() WHERE id = ${id}::uuid AND state = 'EXTENDED'`);
+      throw badRequest('OFFER_EXPIRED', context.correlationId);
+    }
+
+    const to: OfferState = decision === 'ACCEPT' ? 'ACCEPTED' : 'DECLINED';
+    try {
+      assertOfferTransition({ from: String(offer.state) as OfferState, to, actor: 'STUDENT' });
+    } catch (error) {
+      throw ruleFailure(error, context.correlationId);
+    }
+
+    await this.db.execute(sql`
+      UPDATE offers SET state = ${to}, responded_at = now(), decline_reason = ${to === 'DECLINED' ? reason : null}, updated_at = now()
+      WHERE id = ${id}::uuid
+    `);
+    await this.writeAudit(studentUserId, to === 'ACCEPTED' ? 'offer.accepted' : 'offer.declined', 'offer', id, context.correlationId);
+    await this.writeOutbox('offer', id, to === 'ACCEPTED' ? 'offer.accepted' : 'offer.declined', { offerId: id, applicationId: String(offer.application_id) }, studentUserId, String(offer.employer_id), context.correlationId);
+
+    // Accepting does not mark the application hired. That remains the employer's
+    // action, so the record reflects who actually made the hiring decision.
+    return { offer: { id, state: to }, correlationId: context.correlationId };
   }
 
   private async readEligibilityFacts(studentUserId: string): Promise<StudentEligibilityFacts> {
@@ -368,6 +438,28 @@ function mapEligibilityRule(row: Record<string, unknown>): EligibilityRule {
     valueText: row.value_text == null ? null : String(row.value_text),
     isBlocking: Boolean(row.is_blocking),
   };
+}
+
+function mapOffer(row: Record<string, unknown>): Record<string, unknown> {
+  return {
+    id: row.id,
+    state: row.state,
+    applicationId: row.application_id,
+    employerName: row.employer_name,
+    title: row.title,
+    compensation: { currency: row.compensation_currency, amount: row.compensation_amount, period: row.compensation_period },
+    joiningDate: row.joining_date ?? null,
+    offerExpiresAt: row.offer_expires_at ?? null,
+    conditions: row.conditions ?? null,
+    extendedAt: row.extended_at ?? null,
+  };
+}
+
+function readDecision(body: unknown, correlationId: string): 'ACCEPT' | 'DECLINE' {
+  if (typeof body !== 'object' || body === null) throw badRequest('INVALID_BODY', correlationId);
+  const value = (body as Record<string, unknown>).decision;
+  if (value !== 'ACCEPT' && value !== 'DECLINE') throw badRequest('INVALID_DECISION', correlationId);
+  return value;
 }
 
 function readApplyInput(body: unknown, correlationId: string): { opportunityId: string; consentGranted: boolean } {

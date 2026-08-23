@@ -14,6 +14,7 @@ import { Phase1SecurityController } from './phase1-security.controller.js';
 import { API_INVITATION_MAIL_SINK, OperationsInstitutionOnboardingController, createConfiguredInvitationMailSink } from './operations-institution-onboarding.controller.js';
 import { StudentOperationalCoreController } from './student-operational-core.controller.js';
 import { StudentHiringController } from './student-hiring.controller.js';
+import { EmployerHiringController } from './employer-hiring.controller.js';
 
 @Module({})
 export class Phase1ApiSecurityModule {
@@ -32,7 +33,7 @@ export class Phase1ApiSecurityModule {
 
     return {
       module: Phase1ApiSecurityModule,
-      controllers: [Phase1SecurityController, OperationsInstitutionOnboardingController, StudentOperationalCoreController, StudentHiringController],
+      controllers: [Phase1SecurityController, OperationsInstitutionOnboardingController, StudentOperationalCoreController, StudentHiringController, EmployerHiringController],
       providers,
       exports: [
         API_IDENTITY_VERIFIER,

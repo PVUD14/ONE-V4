@@ -1,0 +1,196 @@
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { completeHostedLoginFromLocation } from './auth.js';
+import { EmployerApplicantsPage, StudentApplicationsPage, StudentOpportunitiesPage } from './hiringPages.js';
+
+const opportunity = {
+  id: '11111111-1111-4111-8111-111111111111',
+  referenceCode: 'SOC-2026-01',
+  employerName: 'Aster Mobility',
+  title: 'SOC Analyst Intern',
+  summary: 'Work alongside the security operations team.',
+  employmentType: 'INTERNSHIP',
+  workMode: 'ONSITE',
+  locationCity: 'Bengaluru',
+  durationMonths: 6,
+  applicationDeadline: '2026-10-01T00:00:00.000Z',
+  publishedAt: '2026-08-01T00:00:00.000Z',
+  compensation: { currency: 'INR', min: '25000.00', max: null, period: 'MONTH' },
+  alreadyApplied: false,
+};
+
+const detail = {
+  opportunity: { ...opportunity, responsibilities: 'Triage alerts.', positionsAvailable: 2, joiningConditions: null,
+    skills: [{ name: 'SIEM', level: 'REQUIRED' }, { name: 'Python', level: 'PREFERRED' }],
+    selectionStages: [{ order: 1, kind: 'INTERVIEW', label: 'Technical interview', detail: null }] },
+  eligibility: { eligible: true, blockingFailures: [], advisoryFailures: [], needsMoreInformation: [] },
+};
+
+beforeEach(() => {
+  vi.stubEnv('VITE_COGNITO_DOMAIN', 'https://uat-auth.example.test');
+  vi.stubEnv('VITE_COGNITO_CLIENT_ID', 'uat-client');
+  vi.stubEnv('VITE_COGNITO_REDIRECT_URI', 'http://127.0.0.1:5173/auth/callback');
+});
+afterEach(() => { cleanup(); window.sessionStorage.clear(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); window.history.pushState(null, '', '/student'); });
+
+describe('student opportunity discovery', () => {
+  it('lists open opportunities with pay and deadline', async () => {
+    stubFetch({ '/api/v1/opportunities': { opportunities: [opportunity] } });
+    await authenticate();
+    render(<StudentOpportunitiesPage />);
+    expect(await screen.findByRole('heading', { name: 'SOC Analyst Intern' })).toBeInTheDocument();
+    expect(screen.getByText(/Aster Mobility/)).toBeInTheDocument();
+    expect(screen.getByText(/INR 25,000 \/ month/)).toBeInTheDocument();
+    expect(screen.getByText('1 open opportunity.')).toBeInTheDocument();
+  });
+
+  it('says nothing is open rather than showing invented roles', async () => {
+    stubFetch({ '/api/v1/opportunities': { opportunities: [] } });
+    await authenticate();
+    render(<StudentOpportunitiesPage />);
+    await waitFor(() => expect(screen.getByText('No opportunities are open to you right now.')).toBeInTheDocument());
+    expect(document.body.textContent).not.toContain('Rahul');
+  });
+
+  it('explains what the employer wants and confirms eligibility', async () => {
+    stubFetch({ '/api/v1/opportunities': { opportunities: [opportunity] }, [`/api/v1/opportunities/${opportunity.id}`]: detail });
+    await authenticate();
+    render(<StudentOpportunitiesPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'View details' }));
+    expect(await screen.findByText('You meet everything the employer asked for.')).toBeInTheDocument();
+    expect(screen.getByText('SIEM')).toBeInTheDocument();
+    expect(screen.getByText('Python (preferred)')).toBeInTheDocument();
+    expect(screen.getByText(/Applying shares your profile with Aster Mobility for this role only/)).toBeInTheDocument();
+  });
+
+  it('says it cannot confirm a missing fact instead of rejecting the student', async () => {
+    stubFetch({
+      '/api/v1/opportunities': { opportunities: [opportunity] },
+      [`/api/v1/opportunities/${opportunity.id}`]: { ...detail, eligibility: { eligible: false, blockingFailures: [], advisoryFailures: [], needsMoreInformation: ['MIN_CGPA'] } },
+    });
+    await authenticate();
+    render(<StudentOpportunitiesPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'View details' }));
+    expect(await screen.findByText(/We cannot confirm Min cgpa yet/)).toBeInTheDocument();
+    expect(screen.queryByText(/You do not currently meet/)).not.toBeInTheDocument();
+  });
+
+  it('translates an API rule code into a sentence the student can act on', async () => {
+    stubFetch(
+      { '/api/v1/opportunities': { opportunities: [opportunity] }, [`/api/v1/opportunities/${opportunity.id}`]: detail },
+      { '/api/v1/students/me/applications': { status: 400, body: { error: { code: 'DEADLINE_PASSED', correlationId: 'c-1' } } } },
+    );
+    await authenticate();
+    render(<StudentOpportunitiesPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'View details' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Apply and share my profile' }));
+    expect(await screen.findByText('The deadline for this opportunity has passed.')).toBeInTheDocument();
+  });
+});
+
+describe('student applications', () => {
+  const application = {
+    id: '22222222-2222-4222-8222-222222222222',
+    state: 'SHORTLISTED', opportunityId: opportunity.id, employerName: 'Aster Mobility',
+    title: 'SOC Analyst Intern', employmentType: 'INTERNSHIP', workMode: 'ONSITE', locationCity: 'Bengaluru',
+    submittedAt: '2026-08-10T00:00:00.000Z', closedAt: null, consentRevokedAt: null,
+    updatedAt: '2026-08-12T00:00:00.000Z', termsAcknowledgementPending: false,
+  };
+
+  it('shows the stage each application has reached', async () => {
+    stubFetch({ '/api/v1/students/me/applications': { applications: [application] }, '/api/v1/students/me/offers': { offers: [] } });
+    await authenticate();
+    render(<StudentApplicationsPage />);
+    expect(await screen.findByText('Shortlisted')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Withdraw' })).toBeInTheDocument();
+  });
+
+  it('tells the student that withdrawing ends employer access', async () => {
+    stubFetch({
+      '/api/v1/students/me/applications': { applications: [application] },
+      '/api/v1/students/me/offers': { offers: [] },
+      [`/api/v1/students/me/applications/${application.id}/withdraw`]: { ok: true },
+    });
+    await authenticate();
+    render(<StudentApplicationsPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Withdraw' }));
+    expect(await screen.findByText(/The employer no longer has access to your profile for this role/)).toBeInTheDocument();
+  });
+
+  it('offers accept and decline only while an offer is live', async () => {
+    stubFetch({
+      '/api/v1/students/me/applications': { applications: [] },
+      '/api/v1/students/me/offers': { offers: [{
+        id: '33333333-3333-4333-8333-333333333333', state: 'EXTENDED', applicationId: application.id,
+        employerName: 'Aster Mobility', title: 'SOC Analyst Intern',
+        compensation: { currency: 'INR', amount: '28000.00', period: 'MONTH' },
+        joiningDate: null, offerExpiresAt: '2026-10-01T00:00:00.000Z', conditions: null, extendedAt: '2026-09-01T00:00:00.000Z',
+      }] },
+    });
+    await authenticate();
+    render(<StudentApplicationsPage />);
+    expect(await screen.findByRole('button', { name: 'Accept' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Decline' })).toBeInTheDocument();
+    expect(screen.getByText(/INR 28,000 \/ month/)).toBeInTheDocument();
+  });
+});
+
+describe('employer applicant pipeline', () => {
+  const employerId = '44444444-4444-4444-8444-444444444444';
+  const employerOpportunity = { id: opportunity.id, referenceCode: 'SOC-2026-01', lifecycleState: 'PUBLISHED',
+    title: 'SOC Analyst Intern', employmentType: 'INTERNSHIP', workMode: 'ONSITE', locationCity: 'Bengaluru',
+    applicationDeadline: null, publishedAt: '2026-08-01T00:00:00.000Z', applicationCount: 2, openApplicationCount: 1 };
+
+  it('withholds the candidate once they withdraw, while keeping the row', async () => {
+    stubFetch({
+      [`/api/v1/employers/${employerId}/opportunities`]: { opportunities: [employerOpportunity] },
+      [`/api/v1/employers/${employerId}/opportunities/${opportunity.id}/applications`]: { applications: [
+        { id: 'a-1', state: 'APPLIED', consentRevoked: false, candidateName: 'Aanya Student', candidateEmail: 'aanya@uat.example.test',
+          institutionStudentId: 'UAT-STU-001', submittedAt: '2026-08-10T00:00:00.000Z', closedAt: null, interviewCount: 0, offerState: null, updatedAt: '2026-08-10T00:00:00.000Z' },
+        { id: 'a-2', state: 'WITHDRAWN', consentRevoked: true, candidateName: null, candidateEmail: null,
+          institutionStudentId: null, submittedAt: '2026-08-09T00:00:00.000Z', closedAt: '2026-08-11T00:00:00.000Z', interviewCount: 0, offerState: null, updatedAt: '2026-08-11T00:00:00.000Z' },
+      ] },
+    });
+    await authenticate();
+    render(<EmployerApplicantsPage employerId={employerId} />);
+    expect(await screen.findByText('Aanya Student')).toBeInTheDocument();
+    expect(screen.getByText('Withdrawn — details no longer shared')).toBeInTheDocument();
+  });
+
+  it('offers only the next steps that are legal from the current stage', async () => {
+    stubFetch({
+      [`/api/v1/employers/${employerId}/opportunities`]: { opportunities: [employerOpportunity] },
+      [`/api/v1/employers/${employerId}/opportunities/${opportunity.id}/applications`]: { applications: [
+        { id: 'a-1', state: 'INTERVIEW', consentRevoked: false, candidateName: 'Aanya Student', candidateEmail: 'aanya@uat.example.test',
+          institutionStudentId: null, submittedAt: '2026-08-10T00:00:00.000Z', closedAt: null, interviewCount: 1, offerState: null, updatedAt: '2026-08-10T00:00:00.000Z' },
+      ] },
+    });
+    await authenticate();
+    render(<EmployerApplicantsPage employerId={employerId} />);
+    expect(await screen.findByRole('button', { name: 'Offer' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Rejected' })).toBeInTheDocument();
+    // Moving backwards is not offered at all, so the rule cannot be reached by clicking.
+    expect(screen.queryByRole('button', { name: 'Screening' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Shortlisted' })).not.toBeInTheDocument();
+  });
+});
+
+type ErrorStub = Readonly<Record<string, { readonly status: number; readonly body: unknown }>>;
+
+function stubFetch(routes: Readonly<Record<string, unknown>>, errors: ErrorStub = {}): void {
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+    if (url.endsWith('/oauth2/token')) return { ok: true, json: async () => ({ access_token: 'test-access-token' }) };
+    const path = url.replace(/^https?:\/\/[^/]+/, '').split('?')[0] ?? '';
+    const failure = errors[path];
+    if (failure) return { ok: false, status: failure.status, json: async () => failure.body };
+    const match = Object.keys(routes).find((route) => path === route);
+    return { ok: true, status: 200, json: async () => (match ? routes[match] : {}) };
+  }));
+}
+
+async function authenticate(): Promise<void> {
+  window.sessionStorage.setItem('planthepath.oauthState', 'state-123');
+  window.sessionStorage.setItem('planthepath.oauthVerifier', 'verifier-12345678901234567890');
+  window.history.pushState(null, '', '/auth/callback?code=code-123&state=state-123');
+  await completeHostedLoginFromLocation();
+}

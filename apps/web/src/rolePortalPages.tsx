@@ -39,6 +39,7 @@ import { portalFamilyIcons, rolePortals, type RoleFixture, type RoleNavItem, typ
 import { RolePreviewProvider, useRolePreviewState } from './rolePortalPreviewState.js';
 import { StatusBadge } from './studentComponents.js';
 import { OperationsCareerReadinessPanel } from './operationsCareerReadinessPanel.js';
+import { EmployerApplicantsPage, EmployerOpportunitiesPage } from './hiringPages.js';
 
 interface AuthenticatedWorkspaceSummary {
   readonly role: string;
@@ -530,13 +531,22 @@ function EmployerRecruiterRealityPage({ portal, routeLabel }: { readonly portal:
     }).catch(() => setError('Unable to resolve employer context.'));
     return () => controller.abort();
   }, [token]);
-  if (!token) return <RestrictedApiState title="Employer hiring flow partially implemented" message="Sign in with Maya UAT Recruiter to view the real employer scope. Preview role switching is not authentication." />;
+  if (!token) return <RestrictedApiState title="Sign in to manage hiring" message="Sign in with an employer identity to see your opportunities and applicants. Preview role switching is not authentication." />;
+  if (error) return <section className="role-module role-module--dense"><div className="role-page-heading"><div><h1>{routeLabel}</h1><p role="alert" className="form-error">{error}</p></div></div></section>;
+  if (!employerMembership) return <section className="role-module role-module--dense"><div className="role-page-heading"><div><h1>{routeLabel}</h1><p role="status">Loading your employer workspace…</p></div></div></section>;
+
+  const employerId = employerMembership.organizationId;
+  if (/opportunit/i.test(routeLabel)) return <EmployerOpportunitiesPage employerId={employerId} />;
+  if (/applicant|candidate|talent/i.test(routeLabel)) return <EmployerApplicantsPage employerId={employerId} />;
+
+  // Routes whose backend does not exist yet keep saying so rather than borrowing
+  // another page's data.
   return <section className="role-module role-module--dense">
-    <div className="role-page-heading"><div><span className="eyebrow">Not available yet</span><h1>Employer hiring flow partially implemented</h1><p>{routeLabel} for {portal.roleName}. Your employer identity and applicant access rules are enforced, but posting opportunities and managing applications, interviews and offers are not built yet. This page reads no hiring data because none exists.</p></div></div>
-    {error ? <p className="form-error" role="alert">{error}</p> : null}
-    <section className="role-kpi-grid" aria-label="Employer implementation status"><article className="role-card role-kpi"><span>Employer identity</span><strong>{employerMembership ? 'Resolved' : 'Checking'}</strong><p>{employerMembership ? `${employerMembership.role} at ${employerMembership.organizationId}` : 'Loaded from protected security context'}</p></article><article className="role-card role-kpi"><span>Applicant access</span><strong>Scoped grants</strong><p>Only explicit active employer applicant grants are readable.</p></article><article className="role-card role-kpi"><span>Hiring workflow</span><strong>PARTIAL</strong><p>No real opportunities/applications/interviews table yet.</p></article></section>
-    <section className="role-card role-wide"><h2>What is real now</h2><ul className="role-check-list"><li>Authenticated employer identity and active recruiter membership are resolved from the backend.</li><li>Applicant access is enforced by `employer_applicant_access_grants` and denies expired, revoked, unrelated or cross-employer access.</li><li>No Student Readiness score or generic student directory is exposed to employers.</li></ul></section>
-    <section className="role-card role-wide"><h2>Smallest next vertical slice</h2><p>To make Employer hiring PASS instead of PARTIAL, add employer-owned opportunity persistence, student-consented applications, and a list endpoint that returns only applicants with active grants for that employer and opportunity. Until then, this page intentionally avoids fake candidate tables.</p></section>
+    <div className="role-page-heading"><div>
+      <span className="eyebrow">Not available yet</span>
+      <h1>{routeLabel}</h1>
+      <p>{routeLabel} is not built yet. Opportunities and Applicants are live — use those to post a role and work your pipeline. Interviews and offers are managed from the applicant row.</p>
+    </div></div>
   </section>;
 }
 

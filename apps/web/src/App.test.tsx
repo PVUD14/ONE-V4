@@ -89,7 +89,7 @@ describe('All-role portal registry and preview workflows', () => {
 
   it('resolves four product portal family roots at the demo boundary', () => {
     fetchMock.mockResolvedValue({ ok: true });
-    for (const [path, heading] of [['/demo/student', 'Student Dashboard'], ['/demo/institution', 'Institution Administration'], ['/demo/employer', 'Employer hiring flow partially implemented'], ['/demo/operations', 'Operations Dashboard']] as const) {
+    for (const [path, heading] of [['/demo/student', 'Student Dashboard'], ['/demo/institution', 'Institution Administration'], ['/demo/employer', 'Sign in to manage hiring'], ['/demo/operations', 'Operations Dashboard']] as const) {
       cleanup();
       window.history.pushState(null, '', path);
       render(<App />);
@@ -180,12 +180,12 @@ describe('All-role portal registry and preview workflows', () => {
     expect(screen.queryByRole('button', { name: /Update preview queue status/i })).not.toBeInTheDocument();
   });
 
-  it('marks employer hiring as partial instead of showing a fake applicant directory', () => {
+  it('requires authentication for employer hiring instead of showing a fake applicant directory', () => {
     fetchMock.mockResolvedValue({ ok: true });
     window.history.pushState(null, '', '/demo/employer/recruiter');
     render(<App />);
-    expect(screen.getByRole('heading', { name: 'Employer hiring flow partially implemented' })).toBeInTheDocument();
-    expect(screen.getByText(/Sign in with Maya UAT Recruiter/i)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Sign in to manage hiring' })).toBeInTheDocument();
+    expect(screen.getByText(/Sign in with an employer identity/i)).toBeInTheDocument();
     expect(screen.getByText(/Preview role switching is not authentication/i)).toBeInTheDocument();
     expect(screen.queryByText('Rahul Kumar')).not.toBeInTheDocument();
     expect(screen.queryByText('312')).not.toBeInTheDocument();

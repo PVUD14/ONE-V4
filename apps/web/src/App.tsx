@@ -31,6 +31,7 @@ import { studentProfile } from './studentData.js';
 import { ApplicationsPage, AssessmentsPage, CareerPath, CoachPage, Dashboard, DocumentsPage, ExperiencePage, InterviewsPage, Learning, OpportunitiesPage, ProfilePage, ReadinessPage, SettingsPage, SkillsPage } from './studentPages.js';
 import { StudentPreviewProvider, useStudentPreview } from './studentPreviewState.js';
 import { PlacementOfficerPortal } from './staffPages.js';
+import { StudentApplicationsPage, StudentOpportunitiesPage } from './hiringPages.js';
 import { CareerReadinessApiPanel } from './careerReadinessApiPanel.js';
 
 type RouteKey = 'dashboard' | 'career-path' | 'ai-coach' | 'readiness' | 'skills' | 'assessments' | 'learning' | 'experience' | 'opportunities' | 'applications' | 'interviews' | 'documents' | 'profile' | 'settings';
@@ -743,7 +744,8 @@ function AuthenticatedStudentRoute({ route, currentStudent }: { readonly route: 
   if (route === 'dashboard') return <AuthenticatedStudentDashboard currentStudent={currentStudent} />;
   if (route === 'profile') return <AuthenticatedStudentProfile />;
   if (route === 'documents') return <AuthenticatedStudentDocuments />;
-  if (route === 'opportunities') return <AuthenticatedStudentSavedOpportunities />;
+  if (route === 'opportunities') return <><StudentOpportunitiesPage /><AuthenticatedStudentSavedOpportunities /></>;
+  if (route === 'applications') return <StudentApplicationsPage />;
   if (route === 'career-path') return <><CareerReadinessApiPanel route="roadmap" /><AuthenticatedStudentUnavailable route={route} /></>;
   if (route === 'readiness') return <><CareerReadinessApiPanel route="readiness" /><AuthenticatedStudentUnavailable route={route} /></>;
   if (route === 'skills') return <><CareerReadinessApiPanel route="skills" /><AuthenticatedStudentUnavailable route={route} /></>;
@@ -906,7 +908,7 @@ function AuthenticatedStudentSavedOpportunities(): React.ReactElement {
     }
   }
   return <div className="workspace-grid">
-    <section className="card wide-card"><span className="eyebrow">REAL Student-owned references</span><h2>Saved opportunities</h2><p role="status">{status}</p><p>Employer applications, interviews, offers, and decisions are not yet available in Phase 2A.</p></section>
+    <section className="card wide-card"><span className="eyebrow">Tracked elsewhere</span><h2>Roles you are tracking outside ONE</h2><p role="status">{status}</p><p>Applied somewhere else? Keep a note of it here so your whole search lives in one place.</p></section>
     <form className="card student-form" onSubmit={(event) => { void submit(event); }}>
       <h2>Save opportunity reference</h2>
       <label className="student-form-field"><span>Reference</span><input name="opportunityRef" required maxLength={128} /></label>

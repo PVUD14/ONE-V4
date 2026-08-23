@@ -4376,3 +4376,61 @@ button.secondary {
 .career-assessment-form legend { color: #193c68; font-weight: 700; padding: 0 5px; }
 .career-assessment-form label { display: flex; align-items: flex-start; gap: 8px; margin-top: 9px; }
 @media (max-width: 640px) { .career-api-heading { flex-direction: column; } .career-api-state { align-self: flex-start; } }
+
+/* --- Hiring: opportunities, applications, offers, applicant pipeline ------- */
+
+.hiring-search { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+.hiring-search .student-form-field { flex: 1 1 260px; min-width: 0; }
+
+.hiring-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.hiring-list-item {
+  display: flex; gap: 16px; align-items: flex-start; justify-content: space-between;
+  flex-wrap: wrap; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px;
+  background: var(--surface);
+}
+.hiring-list-item h3 { margin: 0 0 4px; font-size: 1rem; }
+.hiring-list-item > div:first-child { min-width: 0; flex: 1 1 260px; }
+
+.hiring-meta { margin: 2px 0; color: var(--muted); font-size: 0.86rem; }
+.hiring-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.hiring-consent-note { margin-top: 10px; color: var(--muted); font-size: 0.86rem; }
+
+.hiring-chips { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.hiring-chip {
+  padding: 3px 10px; border-radius: 999px; font-size: 0.8rem;
+  background: var(--canvas); color: var(--student-ink); border: 1px solid var(--line);
+}
+.hiring-chip.required { background: var(--student-soft); border-color: #bcd0f7; font-weight: 600; }
+
+.hiring-stages { margin: 0 0 8px; padding-left: 20px; color: var(--student-ink); }
+.hiring-stages li { margin-bottom: 4px; }
+
+.hiring-tag {
+  display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 0.75rem;
+  font-weight: 600; background: var(--student-soft); color: var(--student-deep);
+}
+.hiring-tag.warn { background: #fdf1dc; color: #7a4b04; }
+
+.hiring-eligible { color: #0d6b4f; font-weight: 600; }
+.hiring-blocked { color: #9a2a1c; font-weight: 600; }
+.hiring-unknown { color: #7a4b04; }
+
+.hiring-state {
+  display: inline-block; padding: 2px 9px; border-radius: 999px;
+  font-size: 0.75rem; font-weight: 600; background: var(--canvas); color: var(--student-ink);
+  border: 1px solid var(--line); white-space: nowrap;
+}
+.hiring-state.state-applied, .hiring-state.state-screening { background: #eaf1ff; color: #1d3f8f; border-color: #c7d8fb; }
+.hiring-state.state-shortlisted, .hiring-state.state-assessment, .hiring-state.state-interview { background: #fdf1dc; color: #7a4b04; border-color: #f2ddb4; }
+.hiring-state.state-offer, .hiring-state.state-extended { background: #ede7fd; color: #4a2f9c; border-color: #d5c9f7; }
+.hiring-state.state-hired, .hiring-state.state-accepted, .hiring-state.state-published { background: #ddf1e8; color: #0d6b4f; border-color: #bde2d2; }
+.hiring-state.state-rejected, .hiring-state.state-declined, .hiring-state.state-withdrawn, .hiring-state.state-expired { background: #f7e2df; color: #9a2a1c; border-color: #eec9c3; }
+.hiring-state.state-draft, .hiring-state.state-paused { background: var(--canvas); color: var(--muted); }
+
+.hiring-checkbox { display: flex; align-items: center; gap: 8px; }
+.hiring-checkbox input { width: auto; }
+
+@media (max-width: 760px) {
+  .hiring-list-item { flex-direction: column; }
+  .hiring-actions { width: 100%; }
+}

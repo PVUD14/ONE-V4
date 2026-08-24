@@ -136,3 +136,49 @@ describe('persona resolution and cross-portal coherence', () => {
     expect(screen.getByRole('heading', { name: 'Interviews' })).toBeInTheDocument();
   });
 });
+
+describe('UAT feedback round: tabs, forms and filters really work', () => {
+  it('switches Learn tab content and shows completion certificates', () => {
+    render(<PilotApp email="demo.student@uat.example.test" onSignOut={() => undefined} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Learn' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Certificates' }));
+    expect(screen.getByText(/ONE-CERT-2026-0141/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'My Learning' }));
+    expect(screen.getAllByRole('button', { name: 'Resume' }).length).toBeGreaterThan(0);
+  });
+
+  it('opens the plan itself from View Full Plan, not the readiness report', () => {
+    render(<PilotApp email="demo.student@uat.example.test" onSignOut={() => undefined} />);
+    fireEvent.click(screen.getByRole('button', { name: 'View Full Plan' }));
+    expect(screen.getByRole('dialog', { name: "Today's Plan" })).toBeInTheDocument();
+  });
+
+  it('lets the placement officer schedule an assessment that lands in the table', () => {
+    render(<PilotApp email="demo.institution@uat.example.test" onSignOut={() => undefined} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Assessments' }));
+    fireEvent.click(screen.getByRole('button', { name: /Create Assessment/ }));
+    fireEvent.change(screen.getByLabelText('Assessment name'), { target: { value: 'Aptitude Mock — Round 3' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Schedule Assessment' }));
+    expect(screen.getByText('Aptitude Mock — Round 3')).toBeInTheDocument();
+    expect(screen.getByText('Just scheduled')).toBeInTheDocument();
+  });
+
+  it('filters the roster by batch, including 2026 alumni', () => {
+    render(<PilotApp email="demo.institution@uat.example.test" onSignOut={() => undefined} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Students' }));
+    expect(screen.queryByText('Deepak Raju')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Batch'), { target: { value: '2026' } });
+    expect(screen.getByText('Deepak Raju')).toBeInTheDocument();
+    expect(screen.queryByText('Arjun Reddy')).not.toBeInTheDocument();
+  });
+
+  it('posts a role from the recruiter dashboard and finds it under Opportunities', () => {
+    render(<PilotApp email="demo.employer@uat.example.test" onSignOut={() => undefined} />);
+    fireEvent.click(screen.getAllByRole('button', { name: /Post a Role/ })[0]!);
+    fireEvent.change(screen.getByLabelText('Role title'), { target: { value: 'Data Engineer' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Post Role' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Opportunities' }));
+    expect(screen.getByText('Data Engineer')).toBeInTheDocument();
+    expect(screen.getByText('Posted just now')).toBeInTheDocument();
+  });
+});

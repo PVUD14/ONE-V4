@@ -1,8 +1,12 @@
+import { useState } from 'react';
 import { AlertTriangle, ArrowRight, Building2, CalendarDays, ClipboardCheck, Download, TrendingUp, Users } from 'lucide-react';
 import { MultiRing, Ring, Spark } from './pilotComponents.js';
+import { DetailRows, downloadCsv, useOverlay } from './pilotOverlay.js';
+import { usePilotSession } from './pilotSession.js';
 import {
   pilotCohort, pilotDepartmentReadiness, pilotInstitutionDrives, pilotInterventions,
-  pilotOffersTrend, pilotPipelineFunnel, pilotReadinessBands, pilotRoster,
+  pilotOffersTrend, pilotPipelineFunnel, pilotReadinessBands, pilotRoster, pilotRosterAlumni,
+  type PilotRosterStudent,
 } from './pilotStaffData.js';
 
 /** Institution pilot pages: the placement officer's view of Arjun's college. */
@@ -26,6 +30,39 @@ function Funnel({ rows }: { readonly rows: readonly { readonly label: string; re
 
 export function InstitutionDashboard(): React.ReactElement {
   const bandTotal = pilotReadinessBands.reduce((sum, band) => sum + band.value, 0);
+  const overlay = useOverlay();
+  const session = usePilotSession();
+  const exportReport = (): void => {
+    downloadCsv('placement-dashboard-report.csv', [
+      ['ONE by Ai8ht — Placement Dashboard Report (sample data)'],
+      ['Active students', String(pilotCohort.activeStudents)],
+      ['Placement eligible', String(pilotCohort.placementEligible)],
+      ['Offers this season', String(pilotCohort.offersThisSeason)],
+      ['Students placed', String(pilotCohort.placedSoFar)],
+      ['Average readiness', String(pilotCohort.averageReadiness)],
+      ['Need intervention', String(pilotCohort.atRisk)],
+      [],
+      ['Department', 'Average readiness'],
+      ...pilotDepartmentReadiness.map((department) => [department.label, `${department.value}%`]),
+    ]);
+    overlay.toast('placement-dashboard-report.csv downloaded (sample data).');
+  };
+  const openIntervention = (item: typeof pilotInterventions[number]): void => {
+    overlay.openModal({
+      title: item.student, subtitle: 'Intervention detail', body: <div>
+        <DetailRows rows={[
+          ['Intervention', item.action],
+          ['Due', item.due.replace('Due ', '')],
+          ['Owner', 'Prof. Meera Nair'],
+          ['Status', 'Open'],
+        ]} />
+        <p className="pilot-modal-text" style={{ marginTop: 12 }}>Full history, notes and outcome tracking live on the Interventions page.</p>
+        <div className="pilot-modal-actions">
+          <button type="button" className="pilot-btn" onClick={() => { overlay.closeModal(); session.navigate('interventions'); }}>Open Interventions</button>
+        </div>
+      </div>,
+    });
+  };
   return <div className="pilot-page">
     <div className="pilot-content">
       <div className="pilot-page-head">
@@ -33,7 +70,7 @@ export function InstitutionDashboard(): React.ReactElement {
           <h1>Placement Dashboard</h1>
           <p>Cohort readiness, placement activity and the students who need you this week.</p>
         </div>
-        <button type="button" className="pilot-btn ghost"><Download size={15} /> Export Report</button>
+        <button type="button" className="pilot-btn ghost" onClick={(event) => { event.stopPropagation(); exportReport(); }}><Download size={15} /> Export Report</button>
       </div>
 
       <div className="pilot-row cols-5">
@@ -72,14 +109,15 @@ export function InstitutionDashboard(): React.ReactElement {
       </div>
 
       <section className="pilot-card">
-        <div className="pilot-card-head"><h2>Students Needing Attention</h2><button type="button" className="pilot-link">View All Interventions</button></div>
+        <div className="pilot-card-head"><h2>Students Needing Attention</h2><button type="button" className="pilot-link"
+          onClick={(event) => { event.stopPropagation(); session.navigate('interventions'); }}>View All Interventions</button></div>
         <div className="pilot-list">
           {pilotInterventions.map((item) => (
             <div key={item.student} className="pilot-list-row">
               <span className={`pilot-tile ${item.tone}`}><AlertTriangle size={16} /></span>
               <div className="grow"><strong>{item.student}</strong><small>{item.action}</small></div>
               <span className="pilot-chip amber">{item.due}</span>
-              <button type="button" className="pilot-btn ghost small">Review</button>
+              <button type="button" className="pilot-btn ghost small" onClick={(event) => { event.stopPropagation(); openIntervention(item); }}>Review</button>
             </div>
           ))}
         </div>
@@ -117,20 +155,51 @@ export function InstitutionDashboard(): React.ReactElement {
 }
 
 export function InstitutionStudents(): React.ReactElement {
+  const overlay = useOverlay();
+  const [batch, setBatch] = useState<'All' | '2027' | '2026'>('2027');
+  const allStudents = [...pilotRoster, ...pilotRosterAlumni];
+  const visible = batch === 'All' ? allStudents : allStudents.filter((student) => student.batch === batch);
+  const exportStudents = (): void => {
+    downloadCsv(`students-batch-${batch.toLowerCase()}.csv`, [
+      ['Student', 'Registration', 'Department', 'Batch', 'Readiness', 'Band', 'Placement status'],
+      ...visible.map((student) => [student.name, student.registration, student.department, student.batch, String(student.readiness), student.band, student.status]),
+    ]);
+    overlay.toast(`students-batch-${batch.toLowerCase()}.csv downloaded (${visible.length} students, sample data).`);
+  };
+  const viewStudent = (student: PilotRosterStudent): void => {
+    overlay.openModal({
+      title: student.name, subtitle: `${student.registration} · ${student.department} · Batch ${student.batch}`, body: <div>
+        <DetailRows rows={[
+          ['Readiness', `${student.readiness} / 100`],
+          ['Band', student.band],
+          ['Placement status', student.status],
+          ['Department', student.department],
+        ]} />
+        <p className="pilot-modal-text" style={{ marginTop: 12 }}>The full profile shows assessment history, applications and intervention notes.</p>
+      </div>,
+    });
+  };
   return <div className="pilot-page" style={{ gridTemplateColumns: '1fr' }}>
     <div className="pilot-content">
       <div className="pilot-page-head">
         <div><h1>Students</h1><p>Placement-eligible students with readiness and current placement activity.</p></div>
-        <div style={{ display: 'flex', gap: 9 }}>
-          <button type="button" className="pilot-btn ghost">Filter: 2027 Batch</button>
-          <button type="button" className="pilot-btn ghost"><Download size={15} /> Export</button>
+        <div style={{ display: 'flex', gap: 9, alignItems: 'center' }}>
+          <label className="pilot-inline-filter">
+            <span>Batch</span>
+            <select value={batch} onChange={(event) => setBatch(event.target.value as typeof batch)} onClick={(event) => event.stopPropagation()}>
+              <option>2027</option>
+              <option>2026</option>
+              <option>All</option>
+            </select>
+          </label>
+          <button type="button" className="pilot-btn ghost" onClick={(event) => { event.stopPropagation(); exportStudents(); }}><Download size={15} /> Export</button>
         </div>
       </div>
       <section className="pilot-card">
         <div className="pilot-table-wrap"><table className="pilot-table">
           <thead><tr><th>Student</th><th>Department</th><th>Readiness</th><th>Band</th><th>Placement Status</th><th></th></tr></thead>
           <tbody>
-            {pilotRoster.map((student) => (
+            {visible.map((student) => (
               <tr key={student.registration}>
                 <td><div className="pilot-person">
                   <span className="pilot-avatar">{student.initials}</span>
@@ -145,7 +214,7 @@ export function InstitutionStudents(): React.ReactElement {
                 </td>
                 <td><span className={`pilot-chip ${BAND_TONE[student.band]}`}>{student.band}</span></td>
                 <td><small style={{ color: 'var(--p-ink-2)' }}>{student.status}</small></td>
-                <td><button type="button" className="pilot-btn ghost small">View</button></td>
+                <td><button type="button" className="pilot-btn ghost small" onClick={(event) => { event.stopPropagation(); viewStudent(student); }}>View</button></td>
               </tr>
             ))}
           </tbody>
@@ -156,6 +225,26 @@ export function InstitutionStudents(): React.ReactElement {
 }
 
 export function InstitutionDrives(): React.ReactElement {
+  const overlay = useOverlay();
+  const manageDrive = (drive: typeof pilotInstitutionDrives[number]): void => {
+    overlay.openModal({
+      title: `${drive.company.name} — ${drive.role}`, subtitle: 'Drive management', body: <div>
+        <DetailRows rows={[
+          ['Date', drive.date],
+          ['Mode', drive.mode],
+          ['Stage', drive.stage],
+          ['Eligible students', String(drive.eligible)],
+          ['Registered', `${drive.registered} (${Math.round((drive.registered / drive.eligible) * 100)}%)`],
+          ['Not yet registered', String(drive.eligible - drive.registered)],
+        ]} />
+        <p className="pilot-modal-text" style={{ marginTop: 12 }}>Full management covers eligibility criteria, registration reminders, panel schedules and result publishing.</p>
+        <div className="pilot-modal-actions">
+          <button type="button" className="pilot-btn ghost" onClick={() => { overlay.closeModal(); overlay.toast(`Registration reminder sent to ${drive.eligible - drive.registered} students (sample).`); }}>Send Reminder</button>
+          <button type="button" className="pilot-btn" onClick={overlay.closeModal}>Done</button>
+        </div>
+      </div>,
+    });
+  };
   return <div className="pilot-page" style={{ gridTemplateColumns: '1fr' }}>
     <div className="pilot-content">
       <div className="pilot-page-head">
@@ -183,7 +272,7 @@ export function InstitutionDrives(): React.ReactElement {
                   </div>
                 </td>
                 <td><span className="pilot-chip blue">{drive.stage}</span></td>
-                <td><button type="button" className="pilot-btn ghost small">Manage</button></td>
+                <td><button type="button" className="pilot-btn ghost small" onClick={(event) => { event.stopPropagation(); manageDrive(drive); }}>Manage</button></td>
               </tr>
             ))}
           </tbody>
@@ -194,11 +283,27 @@ export function InstitutionDrives(): React.ReactElement {
 }
 
 export function InstitutionReports(): React.ReactElement {
+  const overlay = useOverlay();
+  const downloadReport = (): void => {
+    downloadCsv('placement-season-report.csv', [
+      ['ONE by Ai8ht — Placement Season Report (sample data)'],
+      [],
+      ['Pipeline stage', 'Students'],
+      ...pilotPipelineFunnel.map((row) => [row.label, String(row.value)]),
+      [],
+      ['Department', 'Average readiness'],
+      ...pilotDepartmentReadiness.map((department) => [department.label, `${department.value}%`]),
+      [],
+      ['Placement rate', `${Math.round((pilotCohort.placedSoFar / pilotCohort.placementEligible) * 100)}%`],
+      ['Offers this season', String(pilotCohort.offersThisSeason)],
+    ]);
+    overlay.toast('placement-season-report.csv downloaded (sample data).');
+  };
   return <div className="pilot-page">
     <div className="pilot-content">
       <div className="pilot-page-head">
         <div><h1>Reports</h1><p>Placement outcomes and readiness for management and accreditation reviews.</p></div>
-        <button type="button" className="pilot-btn ghost"><Download size={15} /> Download PDF</button>
+        <button type="button" className="pilot-btn ghost" onClick={(event) => { event.stopPropagation(); downloadReport(); }}><Download size={15} /> Download Report</button>
       </div>
       <div className="pilot-row cols-2">
         <section className="pilot-card">

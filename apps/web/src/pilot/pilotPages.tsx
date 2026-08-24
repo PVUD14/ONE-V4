@@ -1,7 +1,12 @@
 import { useState } from 'react';
-import { ArrowRight, Award, BookOpen, Bookmark, Building2, CalendarDays, CheckCircle2, ClipboardCheck, Clock, Flame, Lock, Play, Sparkles, Star, Target, TrendingUp, Trophy } from 'lucide-react';
+import { ArrowRight, Award, BookOpen, Bookmark, Building2, CalendarDays, CheckCircle2, ClipboardCheck, Clock, Download, Flame, Lock, Play, Sparkles, Star, Target, TrendingUp, Trophy } from 'lucide-react';
 import { MultiRing, Ring, Spark, WeekBars, toneColor } from './pilotComponents.js';
-import { OverlayForm, PilotTabs, useOverlay } from './pilotOverlay.js';
+import { DetailRows, OverlayForm, PilotTabs, downloadCsv, listModal, useOverlay } from './pilotOverlay.js';
+import { usePilotSession } from './pilotSession.js';
+import {
+  tabAllTests, tabBookmarks, tabCategoryRoles, tabCertificateRecords, tabCertificates,
+  tabEducation, tabInternships, tabMyLearning, tabPastAttempts, tabProjects, tabScoreTrend,
+} from './pilotTabData.js';
 import {
   pilotAchievements, pilotBadges, pilotCanon, pilotCompanies, pilotContinueLearning,
   pilotDemandSkills, pilotDrives, pilotImprovements, pilotLearnRecommended,
@@ -23,12 +28,30 @@ import {
 export function PilotDashboard(): React.ReactElement {
   const canon = pilotCanon;
   const overlay = useOverlay();
+  const session = usePilotSession();
   const [doneTasks, setDoneTasks] = useState<ReadonlySet<string>>(() => new Set(pilotTodayPlan.filter((task) => task.done).map((task) => task.title)));
   const toggleTask = (title: string): void => {
     setDoneTasks((previous) => {
       const next = new Set(previous);
       if (next.has(title)) next.delete(title); else { next.add(title); overlay.toast(`${title} marked done (sample).`); }
       return next;
+    });
+  };
+  const baseGoalCompanies = pilotCompanies.slice(0, 4);
+  const extraGoalCompanies = pilotCompanies.filter((company) => session.goalCompanies.includes(company.name));
+  const remaining = pilotCompanies.filter((company) => !baseGoalCompanies.includes(company) && !session.goalCompanies.includes(company.name));
+  const openAddCompany = (): void => {
+    overlay.openModal({
+      title: 'Add a target company', subtitle: 'Companies hiring for your goal', body: <div className="pilot-list">
+        {remaining.length === 0 ? <p className="pilot-modal-text">All sample companies are already on your goal list.</p> : remaining.map((company) => (
+          <div key={company.name} className="pilot-list-row" style={{ padding: '8px 2px' }}>
+            <span className={`pilot-mark ${company.tone}`} style={{ width: 32, height: 32, fontSize: 11 }}>{company.mark}</span>
+            <div className="grow"><strong style={{ fontSize: 12.5 }}>{company.name}</strong></div>
+            <button type="button" className="pilot-btn ghost small"
+              onClick={(event) => { event.stopPropagation(); session.addGoalCompany(company.name); overlay.closeModal(); overlay.toast(`${company.name} added to your career goal (sample).`); }}>Add</button>
+          </div>
+        ))}
+      </div>,
     });
   };
   return <div className="pilot-page">
@@ -73,7 +96,7 @@ export function PilotDashboard(): React.ReactElement {
                   onClick={(event) => { event.stopPropagation(); toggleTask(task.title); }}>
                   <CheckCircle2 size={17} color={doneTasks.has(task.title) ? '#12996b' : '#c2ccda'} />
                 </button>
-                <div className="grow"><strong style={doneTasks.has(task.title) ? { textDecoration: 'line-through', color: 'var(--p-muted)' } : undefined}>{task.title}</strong></div>
+                <div className="grow"><strong style={doneTasks.has(task.title) ? { color: 'var(--p-muted)' } : undefined}>{task.title}</strong></div>
                 <small>{task.minutes} min</small>
               </div>
             ))}
@@ -157,7 +180,8 @@ export function PilotDashboard(): React.ReactElement {
           </div>
         </section>
         <section className="pilot-card">
-          <div className="pilot-card-head"><h2>Badges Earned</h2><button type="button" className="pilot-link">View All Badges</button></div>
+          <div className="pilot-card-head"><h2>Badges Earned</h2><button type="button" className="pilot-link"
+            onClick={(event) => { event.stopPropagation(); overlay.openModal(listModal('All Badges', `${pilotBadges.length} earned so far`, pilotBadges.map((badge) => ({ title: badge.label, detail: 'Earned this term' })))); }}>View All Badges</button></div>
           <div className="pilot-row cols-4">
             {pilotBadges.map((badge) => (
               <div key={badge.label} style={{ textAlign: 'center' }}>
@@ -169,10 +193,11 @@ export function PilotDashboard(): React.ReactElement {
           <div style={{ borderTop: '1px solid var(--p-line)', marginTop: 14, paddingTop: 14 }}>
             <div className="pilot-card-head" style={{ marginBottom: 8 }}><h2 style={{ fontSize: 13.5 }}>Career Goal · {pilotPersona.careerGoal}</h2><button type="button" className="pilot-link">Change Goal</button></div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {pilotCompanies.slice(0, 4).map((company) => (
+              {[...baseGoalCompanies, ...extraGoalCompanies].map((company) => (
                 <span key={company.name} className={`pilot-chip ${company.tone}`}>{company.mark} · {company.name}</span>
               ))}
-              <span className="pilot-chip slate">+ Add More</span>
+              <button type="button" className="pilot-chip slate" style={{ border: 0, cursor: 'pointer', font: 'inherit' }}
+                onClick={(event) => { event.stopPropagation(); openAddCompany(); }}>+ Add More</button>
             </div>
           </div>
         </section>
@@ -204,8 +229,49 @@ export function PilotDashboard(): React.ReactElement {
 // Roadmap
 // ---------------------------------------------------------------------------
 
+const PHASE_STEPS: Readonly<Record<string, readonly { readonly title: string; readonly detail: string; readonly status: 'completed' | 'current' | 'locked'; readonly score?: number; readonly progress?: number }[]>> = {
+  Foundation: pilotRoadmapSteps,
+  'Core Skills': [
+    { title: 'Data Structures and Algorithms', detail: 'Trees, Graphs, Sorting, Searching', status: 'completed', score: 72 },
+    { title: 'Advanced SQL', detail: 'Window functions, indexing, query tuning', status: 'current', progress: 35 },
+    { title: 'API Development Basics', detail: 'REST, HTTP, JSON, versioning', status: 'locked' },
+    { title: 'Version Control with Git', detail: 'Branching, merging, pull requests', status: 'locked' },
+  ],
+  Specialization: [
+    { title: 'Backend Engineering Track', detail: 'Node.js, databases, deployment', status: 'locked' },
+    { title: 'Cloud Fundamentals', detail: 'Compute, storage, networking basics', status: 'locked' },
+    { title: 'System Design Basics', detail: 'Scaling, caching, load balancing', status: 'locked' },
+  ],
+  'Practice & Projects': [
+    { title: 'Build a Portfolio Project', detail: 'End-to-end app with documentation', status: 'locked' },
+    { title: 'Open Source Contribution', detail: 'One merged pull request', status: 'locked' },
+    { title: 'Timed Coding Practice', detail: '100 problems across difficulty bands', status: 'locked' },
+  ],
+  'Career Ready': [
+    { title: 'Resume and Portfolio Review', detail: 'Reviewed by placement cell', status: 'locked' },
+    { title: 'Mock Interview Circuit', detail: 'Three rounds with feedback', status: 'locked' },
+    { title: 'Application Sprint', detail: 'Apply to matched roles with tracking', status: 'locked' },
+  ],
+};
+
 export function PilotRoadmap(): React.ReactElement {
   const roadmap = pilotCanon.roadmap;
+  const overlay = useOverlay();
+  const [activePhase, setActivePhase] = useState('Foundation');
+  const phaseSteps = PHASE_STEPS[activePhase] ?? pilotRoadmapSteps;
+  const openReview = (step: { readonly title: string; readonly detail: string; readonly score?: number }): void => {
+    overlay.openModal({
+      title: step.title, subtitle: 'Completed step · review', body: <div>
+        <DetailRows rows={[
+          ['Score', `${step.score ?? 0}/100`],
+          ['Covered', step.detail],
+          ['Completed', 'This term'],
+          ['Time spent', '~9 hours'],
+        ]} />
+        <p className="pilot-modal-text" style={{ marginTop: 12 }}><strong>Reviewer note:</strong> strong fundamentals; revisit edge cases in control flow before the next assessment.</p>
+      </div>,
+    });
+  };
   return <div className="pilot-page">
     <div className="pilot-content">
       <div className="pilot-page-head">
@@ -248,15 +314,16 @@ export function PilotRoadmap(): React.ReactElement {
 
       <div className="pilot-phases">
         {pilotRoadmapPhases.map((phase) => (
-          <div key={phase.label} className={`pilot-phase ${phase.active ? 'active' : ''}`}>
-            <span className={`pilot-tile ${phase.active ? 'green' : 'blue'}`} style={{ width: 32, height: 32 }}><ClipboardCheck size={15} /></span>
+          <button key={phase.label} type="button" className={`pilot-phase ${activePhase === phase.label ? 'active' : ''}`}
+            onClick={(event) => { event.stopPropagation(); setActivePhase(phase.label); }}>
+            <span className={`pilot-tile ${activePhase === phase.label ? 'green' : 'blue'}`} style={{ width: 32, height: 32 }}><ClipboardCheck size={15} /></span>
             <div><strong>{phase.label}</strong><small>{phase.done} / {phase.total} Completed</small></div>
-          </div>
+          </button>
         ))}
       </div>
 
       <div>
-        {pilotRoadmapSteps.map((step, index) => (
+        {phaseSteps.map((step, index) => (
           <div key={step.title} className={`pilot-step ${step.status}`}>
             <div className="pilot-step-line"><span className="pilot-step-no">{step.status === 'completed' ? '✓' : index + 1}</span></div>
             <div className="pilot-step-card">
@@ -274,7 +341,8 @@ export function PilotRoadmap(): React.ReactElement {
                 <>
                   <span className="pilot-chip green">Completed</span>
                   <small style={{ color: 'var(--p-muted)' }}>Score <b>{step.score}/100</b></small>
-                  <button type="button" className="pilot-btn ghost small">Review</button>
+                  <button type="button" className="pilot-btn ghost small"
+                    onClick={(event) => { event.stopPropagation(); openReview(step); }}>Review</button>
                 </>
               ) : step.status === 'current' ? (
                 <button type="button" className="pilot-btn small">Continue</button>
@@ -339,13 +407,91 @@ export function PilotRoadmap(): React.ReactElement {
 // ---------------------------------------------------------------------------
 
 export function PilotLearn(): React.ReactElement {
-  return <div className="pilot-page">
+  const overlay = useOverlay();
+  const [tab, setTab] = useState(0);
+  return <div className="pilot-page" style={tab === 0 ? undefined : { gridTemplateColumns: '1fr' }}>
     <div className="pilot-content">
       <div className="pilot-page-head">
         <div><h1>Learn</h1><p>Build skills with our expert-led courses and learning paths.</p></div>
       </div>
-      <PilotTabs labels={['Overview', 'My Learning', 'Learning Paths', 'Bookmarks', 'Certificates']} />
+      <PilotTabs labels={['Overview', 'My Learning', 'Learning Paths', 'Bookmarks', 'Certificates']} active={tab} onChange={setTab} />
 
+      {tab === 1 ? (
+        <section className="pilot-card">
+          <h2>My Learning</h2>
+          <div className="pilot-list">
+            {tabMyLearning.map((course) => (
+              <div key={course.title} className="pilot-list-row">
+                <span className="pilot-tile purple"><BookOpen size={16} /></span>
+                <div className="grow"><strong>{course.title}</strong><small>{course.detail}</small></div>
+                <div className="pilot-bar thin" style={{ width: 110 }}><i style={{ width: `${course.progress}%` }} /></div>
+                <button type="button" className="pilot-btn ghost small">Resume</button>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+      {tab === 2 ? (
+        <section className="pilot-card">
+          <h2>Learning Paths</h2>
+          <div className="pilot-row cols-2">
+            {pilotLearningPaths.map((path) => (
+              <div key={path.title} className="pilot-course-card">
+                <span className="pilot-tile blue"><Target size={18} /></span>
+                <strong>{path.title}</strong>
+                <small>{path.detail}</small>
+                <small>{path.courses} Courses · {path.hours} hrs</small>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div className="pilot-bar thin green" style={{ flex: 1 }}><i style={{ width: `${path.progress}%` }} /></div>
+                  <small>{path.progress}%</small>
+                </div>
+                <button type="button" className="pilot-btn ghost small">Continue Path</button>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+      {tab === 3 ? (
+        <section className="pilot-card">
+          <h2>Bookmarks</h2>
+          <div className="pilot-list">
+            {tabBookmarks.map((entry) => (
+              <div key={entry.title} className="pilot-list-row">
+                <Bookmark size={15} color="#1f55e5" fill="#1f55e5" />
+                <div className="grow"><strong>{entry.title}</strong><small>{entry.detail}</small></div>
+                <button type="button" className="pilot-btn ghost small">Start</button>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+      {tab === 4 ? (
+        <section className="pilot-card">
+          <div className="pilot-card-head"><h2>Certificates</h2><span className="pilot-chip green">{tabCertificates.length} earned</span></div>
+          <div className="pilot-list">
+            {tabCertificates.map((certificate) => (
+              <div key={certificate.title} className="pilot-list-row">
+                <span className="pilot-tile green"><Award size={16} /></span>
+                <div className="grow"><strong>{certificate.title}</strong><small>{certificate.detail} · {certificate.id}</small></div>
+                <button type="button" className="pilot-btn ghost small" onClick={(event) => {
+                  event.stopPropagation();
+                  downloadCsv(`${certificate.id}.csv`, [
+                    ['ONE by Ai8ht — Course Completion Certificate (sample)'],
+                    ['Certificate ID', certificate.id],
+                    ['Awarded to', 'Arjun Reddy'],
+                    ['Course', certificate.title],
+                    ['Detail', certificate.detail],
+                  ]);
+                  overlay.toast(`${certificate.id} downloaded (sample certificate).`);
+                }}><Download size={13} /> Download</button>
+              </div>
+            ))}
+          </div>
+          <small style={{ color: 'var(--p-muted)', display: 'block', marginTop: 10 }}>Certificates are issued automatically when a course or assessment is completed.</small>
+        </section>
+      ) : null}
+
+      {tab === 0 ? <>
       <section className="pilot-hero">
         <div>
           <small style={{ color: 'var(--p-muted)', fontWeight: 600 }}>Continue Learning</small>
@@ -360,7 +506,8 @@ export function PilotLearn(): React.ReactElement {
       </section>
 
       <section className="pilot-card">
-        <div className="pilot-card-head"><h2>Popular Courses</h2><button type="button" className="pilot-link">View All Courses →</button></div>
+        <div className="pilot-card-head"><h2>Popular Courses</h2><button type="button" className="pilot-link"
+          onClick={(event) => { event.stopPropagation(); overlay.openModal(listModal('All Courses', `${pilotPopularCourses.length + pilotLearnRecommended.length} available`, [...pilotPopularCourses.map((course) => ({ title: course.title, detail: `${course.level} · ${course.rating} rating`, trailing: `${course.progress}%` })), ...pilotLearnRecommended.map((course) => ({ title: course.title, detail: `${course.level} · ${course.rating} rating`, trailing: 'New' }))])); }}>View All Courses →</button></div>
         <div className="pilot-row cols-5">
           {pilotPopularCourses.map((course) => (
             <div key={course.title} className="pilot-course-card">
@@ -377,7 +524,8 @@ export function PilotLearn(): React.ReactElement {
       </section>
 
       <section className="pilot-card">
-        <div className="pilot-card-head"><h2>Learning Paths</h2><button type="button" className="pilot-link">View All Paths →</button></div>
+        <div className="pilot-card-head"><h2>Learning Paths</h2><button type="button" className="pilot-link"
+          onClick={(event) => { event.stopPropagation(); setTab(2); }}>View All Paths →</button></div>
         <div className="pilot-row cols-4">
           {pilotLearningPaths.map((path) => (
             <div key={path.title} className="pilot-course-card">
@@ -408,9 +556,10 @@ export function PilotLearn(): React.ReactElement {
           ))}
         </div>
       </section>
+      </> : null}
     </div>
 
-    <aside className="pilot-rail">
+    {tab === 0 ? <aside className="pilot-rail">
       <section className="pilot-card">
         <div className="pilot-card-head"><h2>Learning Progress</h2><button type="button" className="pilot-link">View Details</button></div>
         <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
@@ -455,7 +604,7 @@ export function PilotLearn(): React.ReactElement {
           <div><span className="pilot-tile green" style={{ margin: '0 auto 6px' }}><Star size={17} /></span><b style={{ fontSize: 16 }}>{pilotCanon.points}</b><small style={{ display: 'block', color: 'var(--p-muted)', fontSize: 10.5 }}>Points Earned</small></div>
         </div>
       </section>
-    </aside>
+    </aside> : null}
   </div>;
 }
 
@@ -463,15 +612,76 @@ export function PilotLearn(): React.ReactElement {
 // Assessments
 // ---------------------------------------------------------------------------
 
+function TestTable({ rows }: { readonly rows: readonly typeof tabAllTests[number][] }): React.ReactElement {
+  return <div className="pilot-table-wrap"><table className="pilot-table">
+    <thead><tr><th>Test</th><th>Type</th><th>Questions</th><th>Duration</th><th>Difficulty</th><th></th></tr></thead>
+    <tbody>
+      {rows.map((test) => (
+        <tr key={test.title}>
+          <td><strong>{test.title}</strong></td>
+          <td>{test.kind}</td>
+          <td>{test.questions}</td>
+          <td>{test.minutes} min</td>
+          <td><span className={`pilot-chip ${test.difficulty === 'Easy' ? 'green' : test.difficulty === 'Medium' ? 'amber' : 'rose'}`}>{test.difficulty}</span></td>
+          <td><button type="button" className="pilot-btn ghost small">Start Test</button></td>
+        </tr>
+      ))}
+    </tbody>
+  </table></div>;
+}
+
 export function PilotAssessments(): React.ReactElement {
   const distribution = pilotScoreDistribution;
-  return <div className="pilot-page">
+  const [tab, setTab] = useState(0);
+  return <div className="pilot-page" style={tab === 0 ? undefined : { gridTemplateColumns: '1fr' }}>
     <div className="pilot-content">
       <div className="pilot-page-head">
         <div><h1>Assessments</h1><p>Practice, evaluate and improve with our wide range of tests.</p></div>
       </div>
-      <PilotTabs labels={['Overview', 'All Tests', 'Mock Tests', 'Past Attempts', 'Analytics']} />
+      <PilotTabs labels={['Overview', 'All Tests', 'Mock Tests', 'Past Attempts', 'Analytics']} active={tab} onChange={setTab} />
 
+      {tab === 1 ? <section className="pilot-card"><h2>All Tests</h2><TestTable rows={tabAllTests} /></section> : null}
+      {tab === 2 ? <section className="pilot-card"><h2>Mock Tests</h2><TestTable rows={tabAllTests.filter((test) => test.kind === 'Mock')} /></section> : null}
+      {tab === 3 ? (
+        <section className="pilot-card">
+          <h2>Past Attempts</h2>
+          <div className="pilot-list">
+            {tabPastAttempts.map((attempt) => (
+              <div key={attempt.title} className="pilot-list-row">
+                <span className="pilot-tile indigo" style={{ width: 34, height: 34 }}><ClipboardCheck size={15} /></span>
+                <div className="grow"><strong style={{ fontSize: 12.5 }}>{attempt.title}</strong><small>{attempt.when}</small></div>
+                <span className={`pilot-chip ${attempt.score >= 70 ? 'green' : attempt.score >= 40 ? 'amber' : 'rose'}`}>{attempt.score}%</span>
+                <button type="button" className="pilot-btn ghost small">Review Answers</button>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+      {tab === 4 ? (
+        <div className="pilot-row cols-2">
+          <section className="pilot-card">
+            <div className="pilot-card-head"><h2>Score Trend</h2><span className="pilot-chip green">+30 since first attempt</span></div>
+            <Spark points={tabScoreTrend} tone="blue" height={140} />
+          </section>
+          <section className="pilot-card">
+            <h2>Score Distribution</h2>
+            <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+              <MultiRing segments={[
+                { value: distribution.high, color: '#0d6b4f' },
+                { value: distribution.medium, color: '#b45309' },
+                { value: distribution.low, color: '#a81f4d' },
+              ]}>{pilotCanon.averageScore}%<div style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--p-muted)' }}>Average</div></MultiRing>
+              <div className="pilot-legend" style={{ flex: 1 }}>
+                <div><i style={{ background: '#0d6b4f' }} /> High (&gt;= 70%) <span className="num">{distribution.high}</span></div>
+                <div><i style={{ background: '#b45309' }} /> Medium (40–69%) <span className="num">{distribution.medium}</span></div>
+                <div><i style={{ background: '#a81f4d' }} /> Low (&lt; 40%) <span className="num">{distribution.low}</span></div>
+              </div>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {tab === 0 ? <>
       <section className="pilot-hero">
         <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
           <span className="pilot-tile blue" style={{ width: 48, height: 48 }}><ClipboardCheck size={22} /></span>
@@ -531,9 +741,10 @@ export function PilotAssessments(): React.ReactElement {
           ))}
         </div>
       </section>
+      </> : null}
     </div>
 
-    <aside className="pilot-rail">
+    {tab === 0 ? <aside className="pilot-rail">
       <section className="pilot-card">
         <div className="pilot-card-head"><h2>Performance Summary</h2><button type="button" className="pilot-link">View Full Report</button></div>
         <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
@@ -591,7 +802,7 @@ export function PilotAssessments(): React.ReactElement {
         </div>
         <small style={{ color: 'var(--p-muted)' }}>1 / 2 tests completed</small>
       </section>
-    </aside>
+    </aside> : null}
   </div>;
 }
 
@@ -603,6 +814,8 @@ export function PilotOpportunities(): React.ReactElement {
   const applications = pilotCanon.applications;
   const insightTotal = applications.applied + applications.shortlisted + applications.interviews + applications.offers;
   const overlay = useOverlay();
+  const session = usePilotSession();
+  const [tab, setTab] = useState(0);
   const [appliedRoles, setAppliedRoles] = useState<ReadonlySet<string>>(new Set());
   const applyTo = (key: string, role: string, company: string): void => {
     overlay.openModal({
@@ -619,13 +832,76 @@ export function PilotOpportunities(): React.ReactElement {
         onSubmit={() => setAppliedRoles((previous) => new Set(previous).add(key))} />,
     });
   };
-  return <div className="pilot-page">
+  const opportunityRow = (opportunity: typeof pilotOpportunities[number]): React.ReactElement => (
+    <div key={`${opportunity.company.name}-${opportunity.role}`} className="pilot-list-row">
+      <span className={`pilot-mark ${opportunity.company.tone}`}>{opportunity.company.mark}</span>
+      <div className="grow">
+        <strong>{opportunity.role}</strong>
+        <small>{opportunity.company.name} · {opportunity.location} · {opportunity.experience}</small>
+      </div>
+      <b style={{ fontSize: 13 }}>{opportunity.match}%</b>
+      {appliedRoles.has(`${opportunity.company.name}-${opportunity.role}`) ? (
+        <button type="button" className="pilot-btn ghost small" disabled>Applied ✓</button>
+      ) : (
+        <button type="button" className="pilot-btn small"
+          onClick={(event) => { event.stopPropagation(); applyTo(`${opportunity.company.name}-${opportunity.role}`, opportunity.role, opportunity.company.name); }}>Apply Now</button>
+      )}
+    </div>
+  );
+  return <div className="pilot-page" style={tab === 0 ? undefined : { gridTemplateColumns: '1fr' }}>
     <div className="pilot-content">
       <div className="pilot-page-head">
         <div><h1>Opportunities</h1><p>Discover jobs, internships and opportunities that match your skills and goals.</p></div>
       </div>
-      <PilotTabs labels={['Overview', 'Jobs', 'Internships', 'On Campus', 'Off Campus', 'Achievements']} />
+      <PilotTabs labels={['Overview', 'Jobs', 'Internships', 'On Campus', 'Off Campus', 'Achievements']} active={tab} onChange={setTab} />
 
+      {tab === 1 ? <section className="pilot-card"><h2>Jobs</h2><div className="pilot-list">{pilotOpportunities.filter((opportunity) => opportunity.type === 'Full-time').map(opportunityRow)}</div></section> : null}
+      {tab === 2 ? <section className="pilot-card"><h2>Internships</h2><div className="pilot-list">{pilotOpportunities.filter((opportunity) => opportunity.type === 'Internship').map(opportunityRow)}</div></section> : null}
+      {tab === 3 ? (
+        <section className="pilot-card">
+          <h2>On Campus</h2>
+          <div className="pilot-list">
+            {pilotDrives.map((drive) => (
+              <div key={drive.title} className="pilot-list-row">
+                <div className="pilot-date"><b>{drive.date.split(' ')[0]}</b><span>{drive.date.split(' ')[1]}</span></div>
+                <div className="grow"><strong>{drive.title}</strong><small>{drive.company} · {drive.mode}</small></div>
+                <button type="button" className="pilot-btn ghost small">Register</button>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+      {tab === 4 ? (
+        <section className="pilot-card">
+          <h2>Off Campus</h2>
+          <div className="pilot-list">
+            {pilotSavedOpportunities.map((saved) => (
+              <div key={`${saved.company.name}-${saved.role}`} className="pilot-list-row">
+                <span className={`pilot-mark ${saved.company.tone}`} style={{ width: 36, height: 36, fontSize: 11.5 }}>{saved.company.mark}</span>
+                <div className="grow"><strong>{saved.role}</strong><small>{saved.company.name} · {saved.location} · Direct application</small></div>
+                <button type="button" className="pilot-btn small">Apply Now</button>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+      {tab === 5 ? (
+        <section className="pilot-card">
+          <h2>Achievements</h2>
+          <div className="pilot-row cols-4">
+            {pilotAchievements.map((achievement) => (
+              <div key={achievement.title} className="pilot-course-card">
+                <span className={`pilot-tile ${achievement.tone}`}><Trophy size={17} /></span>
+                <strong>{achievement.title}</strong>
+                <small>{achievement.detail}</small>
+                <small style={{ color: 'var(--p-muted)' }}>{achievement.when}</small>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {tab === 0 ? <>
       <section className="pilot-hero">
         <div style={{ flex: 1 }}>
           <h2>Your Opportunity Overview</h2>
@@ -672,16 +948,21 @@ export function PilotOpportunities(): React.ReactElement {
         <h2>Explore by Category</h2>
         <div className="pilot-row cols-3">
           {pilotOpportunityCategories.map((category) => (
-            <div key={category.label} className="pilot-cat">
+            <button key={category.label} type="button" className="pilot-cat"
+              onClick={(event) => {
+                event.stopPropagation();
+                overlay.openModal(listModal(category.label, `${category.count} roles in this category (sample)`, (tabCategoryRoles[category.label] ?? []).map((role) => ({ title: role }))));
+              }}>
               <span className="pilot-tile indigo" style={{ width: 32, height: 32 }}><Building2 size={14} /></span>
               <div><strong>{category.label}</strong><small>{category.count} Jobs</small></div>
-            </div>
+            </button>
           ))}
         </div>
       </section>
+      </> : null}
     </div>
 
-    <aside className="pilot-rail">
+    {tab === 0 ? <aside className="pilot-rail">
       <section className="pilot-card">
         <div className="pilot-card-head"><h2>Opportunity Insights</h2><small style={{ color: 'var(--p-muted)' }}>This Month</small></div>
         <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
@@ -727,9 +1008,10 @@ export function PilotOpportunities(): React.ReactElement {
       <section className="pilot-card" style={{ background: 'linear-gradient(135deg, #f2ecff, #eef3ff)' }}>
         <strong style={{ display: 'block', marginBottom: 4 }}>Get noticed by top recruiters!</strong>
         <small style={{ color: 'var(--p-muted)', display: 'block', marginBottom: 10 }}>Complete your profile and increase your visibility.</small>
-        <button type="button" className="pilot-btn small">Complete Profile</button>
+        <button type="button" className="pilot-btn small"
+          onClick={(event) => { event.stopPropagation(); session.navigate('profile'); }}>Complete Profile</button>
       </section>
-    </aside>
+    </aside> : null}
   </div>;
 }
 
@@ -737,9 +1019,39 @@ export function PilotOpportunities(): React.ReactElement {
 // Profile
 // ---------------------------------------------------------------------------
 
+function ProfileRecordList({ title, rows, action }: { readonly title: string; readonly rows: readonly { readonly title: string; readonly detail: string }[]; readonly action?: string }): React.ReactElement {
+  return <section className="pilot-card">
+    <h2>{title}</h2>
+    <div className="pilot-list">
+      {rows.map((row) => (
+        <div key={row.title} className="pilot-list-row">
+          <span className="pilot-tile blue" style={{ width: 34, height: 34 }}><Star size={15} /></span>
+          <div className="grow"><strong style={{ fontSize: 12.5 }}>{row.title}</strong><small>{row.detail}</small></div>
+          {action ? <button type="button" className="pilot-btn ghost small">{action}</button> : null}
+        </div>
+      ))}
+    </div>
+  </section>;
+}
+
 export function PilotProfile(): React.ReactElement {
   const done = pilotProfileChecklist.filter((item) => item.state === 'done').length;
-  return <div className="pilot-page">
+  const overlay = useOverlay();
+  const [tab, setTab] = useState(0);
+  const editProfile = (): void => {
+    overlay.openModal({
+      title: 'Edit Profile', subtitle: 'Changes stay in this sample session', body: <OverlayForm
+        fields={[
+          { label: 'Full name', value: pilotPersona.name },
+          { label: 'Email', type: 'email', value: pilotPersona.email },
+          { label: 'Phone', value: pilotPersona.phone },
+          { label: 'Location', value: pilotPersona.location },
+          { label: 'Headline', value: `B.Tech CSE student at ${pilotPersona.institution}, aiming for ${pilotPersona.careerGoal} roles` },
+        ]}
+        submitLabel="Save Profile" success="Profile updated (sample)." />,
+    });
+  };
+  return <div className="pilot-page" style={tab === 0 ? undefined : { gridTemplateColumns: '1fr' }}>
     <div className="pilot-content">
       <div className="pilot-page-head">
         <div><h1>My Profile</h1><p>Manage your profile, track your progress and showcase your achievements.</p></div>
@@ -758,12 +1070,58 @@ export function PilotProfile(): React.ReactElement {
             </small>
             <small style={{ color: 'var(--p-muted)' }}>{pilotPersona.location} · {pilotPersona.email} · {pilotPersona.phone}</small>
           </div>
-          <button type="button" className="pilot-btn ghost">Edit Profile</button>
+          <button type="button" className="pilot-btn ghost" onClick={(event) => { event.stopPropagation(); editProfile(); }}>Edit Profile</button>
         </div>
       </section>
 
-      <PilotTabs labels={['Overview', 'Education', 'Skills', 'Achievements', 'Certificates', 'Projects', 'Internships', 'Preferences']} />
+      <PilotTabs labels={['Overview', 'Education', 'Skills', 'Achievements', 'Certificates', 'Projects', 'Internships', 'Preferences']} active={tab} onChange={setTab} />
 
+      {tab === 1 ? <ProfileRecordList title="Education" rows={tabEducation} /> : null}
+      {tab === 2 ? (
+        <section className="pilot-card">
+          <h2>Skills</h2>
+          <div className="pilot-two">
+            {pilotSkills.map((skill) => (
+              <div key={skill.label} className="pilot-skill">
+                <header><b>{skill.label}</b><span>{skill.value}%</span></header>
+                <div className={`pilot-bar thin ${skill.tone}`}><i style={{ width: `${skill.value}%` }} /></div>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+      {tab === 3 ? (
+        <section className="pilot-card">
+          <h2>Achievements</h2>
+          <div className="pilot-row cols-4">
+            {pilotAchievements.map((achievement) => (
+              <div key={achievement.title} className="pilot-course-card">
+                <span className={`pilot-tile ${achievement.tone}`}><Trophy size={17} /></span>
+                <strong>{achievement.title}</strong>
+                <small>{achievement.detail}</small>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+      {tab === 4 ? <ProfileRecordList title="Certificates" rows={tabCertificateRecords} action="View" /> : null}
+      {tab === 5 ? <ProfileRecordList title="Projects" rows={tabProjects} action="Open" /> : null}
+      {tab === 6 ? <ProfileRecordList title="Internships" rows={tabInternships} /> : null}
+      {tab === 7 ? (
+        <section className="pilot-card" style={{ maxWidth: 560 }}>
+          <h2>Preferences</h2>
+          <OverlayForm
+            fields={[
+              { label: 'Preferred work location', type: 'select', value: 'Bengaluru', options: ['Bengaluru', 'Chennai', 'Hyderabad', 'Pune', 'Remote'] },
+              { label: 'Role interests', value: 'Software Engineer, Backend Developer' },
+              { label: 'Open to internships', type: 'select', value: 'Yes', options: ['Yes', 'No'] },
+              { label: 'Notification frequency', type: 'select', value: 'Daily digest', options: ['Real-time', 'Daily digest', 'Weekly summary'] },
+            ]}
+            submitLabel="Save Preferences" success="Preferences saved (sample)." />
+        </section>
+      ) : null}
+
+      {tab === 0 ? <>
       <div className="pilot-row cols-2">
         <section className="pilot-card">
           <h2>Profile Completion</h2>
@@ -827,7 +1185,8 @@ export function PilotProfile(): React.ReactElement {
       </div>
 
       <section className="pilot-card">
-        <div className="pilot-card-head"><h2>Recent Achievements</h2><button type="button" className="pilot-link">View All →</button></div>
+        <div className="pilot-card-head"><h2>Recent Achievements</h2><button type="button" className="pilot-link"
+          onClick={(event) => { event.stopPropagation(); setTab(3); }}>View All →</button></div>
         <div className="pilot-row cols-4">
           {pilotAchievements.map((achievement) => (
             <div key={achievement.title} className="pilot-course-card">
@@ -839,9 +1198,10 @@ export function PilotProfile(): React.ReactElement {
           ))}
         </div>
       </section>
+      </> : null}
     </div>
 
-    <aside className="pilot-rail">
+    {tab === 0 ? <aside className="pilot-rail">
       <section className="pilot-card" style={{ textAlign: 'center' }}>
         <h2 style={{ textAlign: 'left' }}>Profile Strength</h2>
         <Ring value={pilotPersona.profileComplete} size={104} stroke={11} tone="green"><span style={{ fontSize: 15 }}>Strong</span></Ring>
@@ -874,9 +1234,10 @@ export function PilotProfile(): React.ReactElement {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <button type="button" className="pilot-btn ghost" style={{ justifyContent: 'flex-start' }}><Clock size={15} /> Download Resume</button>
           <button type="button" className="pilot-btn ghost" style={{ justifyContent: 'flex-start' }}><Award size={15} /> Share Profile</button>
-          <button type="button" className="pilot-btn ghost" style={{ justifyContent: 'flex-start' }}><Target size={15} /> Manage Preferences</button>
+          <button type="button" className="pilot-btn ghost" style={{ justifyContent: 'flex-start' }}
+            onClick={(event) => { event.stopPropagation(); setTab(7); }}><Target size={15} /> Manage Preferences</button>
         </div>
       </section>
-    </aside>
+    </aside> : null}
   </div>;
 }

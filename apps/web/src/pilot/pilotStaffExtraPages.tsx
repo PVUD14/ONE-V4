@@ -1,6 +1,8 @@
 import { AlertTriangle, Building2, CalendarDays, CheckCircle2, ClipboardCheck, Download, FileText, MapPin, PenTool, Plus, TrendingUp, Users } from 'lucide-react';
 import { Ring } from './pilotComponents.js';
-import { pilotCohort, pilotEmployerPersona, pilotEmployerStats } from './pilotStaffData.js';
+import { DetailRows, OverlayForm, useOverlay } from './pilotOverlay.js';
+import { usePilotSession } from './pilotSession.js';
+import { pilotCohort, pilotEmployerPersona, pilotEmployerStats, pilotRoster } from './pilotStaffData.js';
 
 /**
  * The remaining staff pages: institution assessments and interventions, employer
@@ -20,11 +22,45 @@ const COHORT_ASSESSMENTS = [
 ] as const;
 
 export function InstitutionAssessments(): React.ReactElement {
+  const overlay = useOverlay();
+  const session = usePilotSession();
+  const createAssessment = (): void => {
+    overlay.openModal({
+      title: 'Create Assessment', subtitle: 'Schedules for the selected cohort', body: <OverlayForm
+        fields={[
+          { label: 'Assessment name', name: 'name', placeholder: 'e.g. Aptitude Mock — Round 3' },
+          { label: 'Type', name: 'kind', type: 'select', value: 'Aptitude', options: ['Aptitude', 'Technical', 'Communication', 'Verbal', 'Mock'] },
+          { label: 'Date', name: 'date', type: 'date', value: '2026-06-02' },
+          { label: 'Invite', name: 'cohort', type: 'select', value: 'All placement-eligible (412)', options: ['All placement-eligible (412)', 'CSE only (186)', 'At-risk students (57)'] },
+        ]}
+        submitLabel="Schedule Assessment"
+        success="Assessment scheduled and invitations queued (sample)."
+        onSubmit={(values) => session.addAssessment({
+          name: values['name'] || 'Untitled Assessment',
+          kind: values['kind'] || 'Aptitude',
+          date: values['date'] || '2026-06-02',
+          invited: values['cohort']?.includes('CSE') ? 186 : values['cohort']?.includes('At-risk') ? 57 : 412,
+        })} />,
+    });
+  };
+  const viewResults = (assessment: typeof COHORT_ASSESSMENTS[number]): void => {
+    overlay.openModal({
+      title: assessment.name, subtitle: 'Results summary', body: <div>
+        <DetailRows rows={[
+          ['Average score', String(assessment.status === 'Completed' ? assessment.average : '—')],
+          ['Participation', assessment.status === 'Completed' ? `${assessment.participation}%` : '—'],
+          ['Invited', String(assessment.invited)],
+          ['Type', assessment.kind],
+        ]} />
+        <p className="pilot-modal-text" style={{ marginTop: 12 }}>The full results view breaks scores down by department and question, and flags students below the intervention threshold.</p>
+      </div>,
+    });
+  };
   return <div className="pilot-page">
     <div className="pilot-content">
       <div className="pilot-page-head">
         <div><h1>Assessments</h1><p>Schedule cohort assessments and track participation and outcomes.</p></div>
-        <button type="button" className="pilot-btn"><Plus size={15} /> Create Assessment</button>
+        <button type="button" className="pilot-btn" onClick={(event) => { event.stopPropagation(); createAssessment(); }}><Plus size={15} /> Create Assessment</button>
       </div>
 
       <div className="pilot-row cols-4">
@@ -43,6 +79,17 @@ export function InstitutionAssessments(): React.ReactElement {
         <div className="pilot-table-wrap"><table className="pilot-table">
           <thead><tr><th>Assessment</th><th>Date</th><th>Type</th><th>Invited</th><th>Result</th><th>Status</th><th></th></tr></thead>
           <tbody>
+            {session.createdAssessments.map((created) => (
+              <tr key={`${created.name}-${created.date}`}>
+                <td><strong>{created.name}</strong></td>
+                <td>{created.date}</td>
+                <td>{created.kind}</td>
+                <td>{created.invited}</td>
+                <td><small style={{ color: 'var(--p-muted)' }}>—</small></td>
+                <td><span className="pilot-chip purple">Just scheduled</span></td>
+                <td><button type="button" className="pilot-btn ghost small">Manage</button></td>
+              </tr>
+            ))}
             {COHORT_ASSESSMENTS.map((assessment) => (
               <tr key={assessment.name}>
                 <td><strong>{assessment.name}</strong></td>
@@ -51,7 +98,7 @@ export function InstitutionAssessments(): React.ReactElement {
                 <td>{assessment.invited}</td>
                 <td>{assessment.status === 'Completed' ? <small>avg <b>{assessment.average}</b> · {assessment.participation}% attended</small> : <small style={{ color: 'var(--p-muted)' }}>—</small>}</td>
                 <td><span className={`pilot-chip ${assessment.status === 'Completed' ? 'green' : 'blue'}`}>{assessment.status}</span></td>
-                <td><button type="button" className="pilot-btn ghost small">{assessment.status === 'Completed' ? 'View Results' : 'Manage'}</button></td>
+                <td><button type="button" className="pilot-btn ghost small" onClick={assessment.status === 'Completed' ? (event) => { event.stopPropagation(); viewResults(assessment); } : undefined}>{assessment.status === 'Completed' ? 'View Results' : 'Manage'}</button></td>
               </tr>
             ))}
           </tbody>
@@ -95,11 +142,49 @@ const INTERVENTION_ROWS = [
 ] as const;
 
 export function InstitutionInterventions(): React.ReactElement {
+  const overlay = useOverlay();
+  const session = usePilotSession();
+  const assignIntervention = (): void => {
+    overlay.openModal({
+      title: 'Assign Intervention', subtitle: 'Creates a tracked support action', body: <OverlayForm
+        fields={[
+          { label: 'Student', name: 'student', type: 'select', value: pilotRoster[4]?.name ?? 'Aditya Rao', options: pilotRoster.map((student) => student.name) },
+          { label: 'Intervention', name: 'action', type: 'select', value: 'Career counselling session', options: ['Career counselling session', 'Aptitude improvement plan', 'Resume review with faculty', 'Communication coaching', 'Mock interview practice'] },
+          { label: 'Owner', name: 'owner', type: 'select', value: 'Prof. Meera Nair', options: ['Prof. Meera Nair', 'Prof. S. Raman', 'Dr. L. Thomas'] },
+          { label: 'Due date', name: 'due', type: 'date', value: '2026-06-05' },
+        ]}
+        submitLabel="Assign"
+        success="Intervention assigned and the student notified (sample)."
+        onSubmit={(values) => session.addIntervention({
+          student: values['student'] || 'Student',
+          action: values['action'] || 'Career counselling session',
+          owner: values['owner'] || 'Prof. Meera Nair',
+          due: values['due'] || '2026-06-05',
+        })} />,
+    });
+  };
+  const reviewIntervention = (row: { readonly student: string; readonly action: string; readonly owner: string; readonly due: string; readonly status: string }): void => {
+    overlay.openModal({
+      title: row.student, subtitle: 'Intervention review', body: <div>
+        <DetailRows rows={[
+          ['Intervention', row.action],
+          ['Owner', row.owner],
+          ['Due', row.due],
+          ['Status', row.status],
+        ]} />
+        <p className="pilot-modal-text" style={{ marginTop: 12 }}>The full review adds session notes, readiness movement since assignment and a completion checklist.</p>
+        <div className="pilot-modal-actions">
+          <button type="button" className="pilot-btn ghost" onClick={() => { overlay.closeModal(); overlay.toast(`${row.student}: follow-up reminder sent (sample).`); }}>Send Reminder</button>
+          <button type="button" className="pilot-btn" onClick={overlay.closeModal}>Done</button>
+        </div>
+      </div>,
+    });
+  };
   return <div className="pilot-page">
     <div className="pilot-content">
       <div className="pilot-page-head">
         <div><h1>Interventions</h1><p>Structured support for students who need attention before the placement season.</p></div>
-        <button type="button" className="pilot-btn"><Plus size={15} /> Assign Intervention</button>
+        <button type="button" className="pilot-btn" onClick={(event) => { event.stopPropagation(); assignIntervention(); }}><Plus size={15} /> Assign Intervention</button>
       </div>
 
       <div className="pilot-row cols-4">
@@ -118,6 +203,19 @@ export function InstitutionInterventions(): React.ReactElement {
         <div className="pilot-table-wrap"><table className="pilot-table">
           <thead><tr><th>Student</th><th>Intervention</th><th>Owner</th><th>Due</th><th>Status</th><th></th></tr></thead>
           <tbody>
+            {session.createdInterventions.map((created) => (
+              <tr key={`${created.student}-${created.action}`}>
+                <td><div className="pilot-person">
+                  <span className="pilot-avatar">{created.student.split(' ').map((word) => word[0]).join('').slice(0, 2).toUpperCase()}</span>
+                  <span><strong>{created.student}</strong><small>Just assigned</small></span>
+                </div></td>
+                <td>{created.action}</td>
+                <td>{created.owner}</td>
+                <td><small>{created.due}</small></td>
+                <td><span className="pilot-chip purple">New</span></td>
+                <td><button type="button" className="pilot-btn ghost small" onClick={(event) => { event.stopPropagation(); reviewIntervention({ ...created, status: 'New' }); }}>Review</button></td>
+              </tr>
+            ))}
             {INTERVENTION_ROWS.map((row) => (
               <tr key={row.student}>
                 <td><div className="pilot-person">
@@ -128,7 +226,7 @@ export function InstitutionInterventions(): React.ReactElement {
                 <td>{row.owner}</td>
                 <td><small>{row.due}</small></td>
                 <td><span className={`pilot-chip ${row.status === 'Completed' ? 'green' : row.status === 'In progress' ? 'blue' : 'amber'}`}>{row.status}</span></td>
-                <td><button type="button" className="pilot-btn ghost small">Review</button></td>
+                <td><button type="button" className="pilot-btn ghost small" onClick={(event) => { event.stopPropagation(); reviewIntervention(row); }}>Review</button></td>
               </tr>
             ))}
           </tbody>

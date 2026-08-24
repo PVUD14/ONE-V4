@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { ArrowRight, Briefcase, Building2, CalendarDays, ClipboardCheck, Plus, TrendingUp, Users, Video } from 'lucide-react';
 import { MultiRing } from './pilotComponents.js';
-import { DetailRows, useOverlay } from './pilotOverlay.js';
+import { DetailRows, OverlayForm, useOverlay } from './pilotOverlay.js';
+import { usePilotSession } from './pilotSession.js';
 import {
   pilotApplicants, pilotCampusDrives, pilotEmployerFunnel, pilotEmployerInterviews,
   pilotEmployerPersona, pilotEmployerRoles, pilotEmployerStats, type PilotApplicant,
@@ -15,6 +16,29 @@ const STAGE_TONE: Readonly<Record<string, string>> = {
 };
 
 const STAGE_FLOW = ['Applied', 'Screening', 'Shortlisted', 'Assessment', 'Interview', 'Offer'] as const;
+
+/** Shared "Post a Role" flow: the submitted role appears in the Opportunities table. */
+function usePostRole(): () => void {
+  const overlay = useOverlay();
+  const session = usePilotSession();
+  return () => overlay.openModal({
+    title: 'Post a Role', subtitle: `${pilotEmployerPersona.company.name} · new opening`, body: <OverlayForm
+      fields={[
+        { label: 'Role title', name: 'title', placeholder: 'e.g. Data Engineer' },
+        { label: 'Location', name: 'location', type: 'select', value: 'Bengaluru', options: ['Bengaluru', 'Hyderabad', 'Chennai', 'Remote'] },
+        { label: 'Type', name: 'type', type: 'select', value: 'Full-time', options: ['Full-time', 'Internship', 'Contract'] },
+        { label: 'Visibility', name: 'visibility', type: 'select', value: 'Publish now', options: ['Publish now', 'Save as draft'] },
+      ]}
+      submitLabel="Post Role"
+      success="Role posted - it is now in your Opportunities list (sample)."
+      onSubmit={(values) => session.addRole({
+        title: values['title'] || 'Untitled Role',
+        location: values['location'] || 'Bengaluru',
+        type: values['type'] || 'Full-time',
+        status: values['visibility'] === 'Save as draft' ? 'Draft' : 'Live',
+      })} />,
+  });
+}
 
 function Funnel({ rows }: { readonly rows: readonly { readonly label: string; readonly value: number }[] }): React.ReactElement {
   const max = Math.max(...rows.map((row) => row.value), 1);
@@ -30,6 +54,8 @@ function Funnel({ rows }: { readonly rows: readonly { readonly label: string; re
 }
 
 export function EmployerDashboard(): React.ReactElement {
+  const session = usePilotSession();
+  const postRole = usePostRole();
   return <div className="pilot-page">
     <div className="pilot-content">
       <div className="pilot-page-head">
@@ -37,7 +63,7 @@ export function EmployerDashboard(): React.ReactElement {
           <h1>Recruiter Dashboard</h1>
           <p>Your open roles, pipeline health and the interviews coming up this week.</p>
         </div>
-        <button type="button" className="pilot-btn"><Plus size={15} /> Post a Role</button>
+        <button type="button" className="pilot-btn" onClick={(event) => { event.stopPropagation(); postRole(); }}><Plus size={15} /> Post a Role</button>
       </div>
 
       <div className="pilot-row cols-5">
@@ -75,7 +101,8 @@ export function EmployerDashboard(): React.ReactElement {
       </div>
 
       <section className="pilot-card">
-        <div className="pilot-card-head"><h2>Recently Shortlisted</h2><button type="button" className="pilot-link">Open Applicants</button></div>
+        <div className="pilot-card-head"><h2>Recently Shortlisted</h2><button type="button" className="pilot-link"
+          onClick={(event) => { event.stopPropagation(); session.navigate('applicants'); }}>Open Applicants</button></div>
         <div className="pilot-list">
           {pilotApplicants.filter((applicant) => applicant.stage === 'Shortlisted' || applicant.stage === 'Interview').map((applicant) => (
             <div key={applicant.name} className="pilot-list-row">
@@ -123,16 +150,30 @@ export function EmployerDashboard(): React.ReactElement {
 }
 
 export function EmployerOpportunities(): React.ReactElement {
+  const session = usePilotSession();
+  const postRole = usePostRole();
   return <div className="pilot-page" style={{ gridTemplateColumns: '1fr' }}>
     <div className="pilot-content">
       <div className="pilot-page-head">
         <div><h1>Opportunities</h1><p>Roles {pilotEmployerPersona.company.name} is hiring for this season.</p></div>
-        <button type="button" className="pilot-btn"><Plus size={15} /> Post a Role</button>
+        <button type="button" className="pilot-btn" onClick={(event) => { event.stopPropagation(); postRole(); }}><Plus size={15} /> Post a Role</button>
       </div>
       <section className="pilot-card">
         <div className="pilot-table-wrap"><table className="pilot-table">
           <thead><tr><th>Role</th><th>Location</th><th>Type</th><th>Applicants</th><th>Shortlisted</th><th>Current Stage</th><th>Status</th><th></th></tr></thead>
           <tbody>
+            {session.postedRoles.map((posted) => (
+              <tr key={`${posted.title}-${posted.location}`}>
+                <td><strong>{posted.title}</strong><small style={{ display: 'block', color: 'var(--p-muted)' }}>Posted just now</small></td>
+                <td>{posted.location}</td>
+                <td>{posted.type}</td>
+                <td><b>0</b></td>
+                <td>0</td>
+                <td><small>{posted.status === 'Live' ? 'Applications open' : 'Not published'}</small></td>
+                <td><span className={`pilot-chip ${posted.status === 'Live' ? 'green' : 'slate'}`}>{posted.status}</span></td>
+                <td><button type="button" className="pilot-btn ghost small">Manage</button></td>
+              </tr>
+            ))}
             {pilotEmployerRoles.map((role) => (
               <tr key={role.title}>
                 <td><strong>{role.title}</strong><small style={{ display: 'block', color: 'var(--p-muted)' }}>{role.posted}</small></td>
@@ -226,6 +267,29 @@ export function EmployerApplicants(): React.ReactElement {
 }
 
 export function EmployerInterviews(): React.ReactElement {
+  const overlay = useOverlay();
+  // Rescheduling updates the row in place - session-local, resets on reload.
+  const [times, setTimes] = useState<Readonly<Record<string, string>>>({});
+  const reschedule = (interview: typeof pilotEmployerInterviews[number]): void => {
+    overlay.openModal({
+      title: `Reschedule — ${interview.candidate}`, subtitle: `${interview.round} · currently ${times[interview.candidate] ?? interview.when}`, body: <OverlayForm
+        fields={[
+          { label: 'Date', name: 'date', type: 'date', value: '2026-05-27' },
+          { label: 'Time', name: 'time', type: 'time', value: '15:00' },
+          { label: 'Mode', name: 'mode', type: 'select', value: interview.mode, options: ['Video', 'Phone', 'In person'] },
+        ]}
+        submitLabel="Confirm New Slot"
+        success={`${interview.candidate}'s interview rescheduled and both sides notified (sample).`}
+        onSubmit={(values) => {
+          const [, month = '05', day = '27'] = (values['date'] ?? '').split('-');
+          const time = values['time'] ?? '15:00';
+          const [rawHour = '15', minute = '00'] = time.split(':');
+          const hour = Number(rawHour);
+          const formatted = `${day} ${['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][Number(month)] ?? 'May'}, ${String(hour % 12 || 12).padStart(2, '0')}:${minute} ${hour >= 12 ? 'PM' : 'AM'}`;
+          setTimes((previous) => ({ ...previous, [interview.candidate]: formatted }));
+        }} />,
+    });
+  };
   return <div className="pilot-page">
     <div className="pilot-content">
       <div className="pilot-page-head">
@@ -238,8 +302,8 @@ export function EmployerInterviews(): React.ReactElement {
             <div key={`${interview.candidate}-${interview.when}`} className="pilot-list-row">
               <span className="pilot-tile purple"><Video size={17} /></span>
               <div className="grow"><strong>{interview.candidate}</strong><small>{interview.round} · {interview.role} · {interview.mode}</small></div>
-              <small>{interview.when}</small>
-              <button type="button" className="pilot-btn ghost small">Reschedule</button>
+              {times[interview.candidate] ? <span className="pilot-chip purple">{times[interview.candidate]}</span> : <small>{interview.when}</small>}
+              <button type="button" className="pilot-btn ghost small" onClick={(event) => { event.stopPropagation(); reschedule(interview); }}>Reschedule</button>
               <button type="button" className="pilot-btn small">Join</button>
             </div>
           ))}

@@ -1,5 +1,10 @@
+import { useState } from 'react';
 import { Award, BookOpen, Bookmark, Briefcase, Building2, CheckCircle2, ClipboardCheck, Code2, Database, FileText, Flame, Landmark, Layers, LineChart, Mail, Map, PenTool, Search, Sparkles, Star, Target, Trophy, Upload, Wrench } from 'lucide-react';
 import { MultiRing, Ring, WeekBars, toneColor } from './pilotComponents.js';
+import {
+  tabAptitudeSets, tabMockInterviews, tabPrepQuestionSets, tabProblemSets,
+  tabResumeExamples, tabSavedResources, tabToolGroups,
+} from './pilotTabData.js';
 import { pilotCanon, pilotCompanies, pilotPersona } from './pilotData.js';
 import { PilotTabs } from './pilotOverlay.js';
 
@@ -42,14 +47,35 @@ const PRACTICE_CONTESTS = [
   { name: 'Mega Contest 61', date: 'JUN 01', time: '11:00 AM - 2:00 PM' },
 ] as const;
 
+const PRACTICE_TABS = ['Overview', 'Coding', 'Problems', 'Projects', 'System Design', 'Contests', 'Interview Prep'] as const;
+
 export function PilotPractice(): React.ReactElement {
-  return <div className="pilot-page">
+  const [tab, setTab] = useState(0);
+  const tabLabel = PRACTICE_TABS[tab] ?? 'Overview';
+  return <div className="pilot-page" style={tab === 0 ? undefined : { gridTemplateColumns: '1fr' }}>
     <div className="pilot-content">
       <div className="pilot-page-head">
         <div><h1>Practice</h1><p>Sharpen your skills with coding, problems, projects and real-world challenges.</p></div>
       </div>
-      <PilotTabs labels={['Overview', 'Coding', 'Problems', 'Projects', 'System Design', 'Contests', 'Interview Prep']} />
+      <PilotTabs labels={PRACTICE_TABS} active={tab} onChange={setTab} />
 
+      {tab > 0 ? (
+        <section className="pilot-card">
+          <h2>{tabLabel}</h2>
+          <div className="pilot-list">
+            {(tabProblemSets[tabLabel] ?? []).map((entry) => (
+              <div key={entry.title} className="pilot-list-row">
+                <span className="pilot-tile blue" style={{ width: 34, height: 34 }}><Code2 size={15} /></span>
+                <div className="grow"><strong style={{ fontSize: 12.5 }}>{entry.title}</strong><small>{entry.detail}</small></div>
+                <span className="pilot-chip slate">{entry.meta}</span>
+                <button type="button" className="pilot-btn ghost small">{tabLabel === 'Contests' ? (entry.meta === 'Results' ? 'View Results' : 'Register') : 'Open'}</button>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {tab === 0 ? <>
       <section className="pilot-hero">
         <div style={{ display: 'flex', gap: 26, flexWrap: 'wrap' }}>
           <div className="pilot-stat"><span className="pilot-tile green"><Code2 size={17} /></span><div><b>384</b><small>Problems Solved</small></div></div>
@@ -104,9 +130,10 @@ export function PilotPractice(): React.ReactElement {
           ))}
         </div>
       </section>
+      </> : null}
     </div>
 
-    <aside className="pilot-rail">
+    {tab === 0 ? <aside className="pilot-rail">
       <section className="pilot-card">
         <div className="pilot-card-head"><h2>Practice Overview</h2><button type="button" className="pilot-link">View Details</button></div>
         <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
@@ -139,7 +166,7 @@ export function PilotPractice(): React.ReactElement {
         </div>
       </section>
       <div className="pilot-banner"><Sparkles size={17} /> Consistency is the key to mastery. Solve daily, learn continuously.</div>
-    </aside>
+    </aside> : null}
   </div>;
 }
 
@@ -165,14 +192,64 @@ const PREP_RESOURCES = [
   ['BlueRiver - Analyst Case Prep', '1.2K views'], ['Veridian - System Design Basics', '900 views'],
 ] as const;
 
+function PrepList({ title, rows, action }: { readonly title: string; readonly rows: readonly { readonly title: string; readonly detail: string }[]; readonly action: string }): React.ReactElement {
+  return <section className="pilot-card">
+    <h2>{title}</h2>
+    <div className="pilot-list">
+      {rows.map((row) => (
+        <div key={row.title} className="pilot-list-row">
+          <span className="pilot-tile purple" style={{ width: 34, height: 34 }}><Briefcase size={15} /></span>
+          <div className="grow"><strong style={{ fontSize: 12.5 }}>{row.title}</strong><small>{row.detail}</small></div>
+          <button type="button" className="pilot-btn ghost small">{action}</button>
+        </div>
+      ))}
+    </div>
+  </section>;
+}
+
 export function PilotCompanyPrep(): React.ReactElement {
-  return <div className="pilot-page">
+  const [tab, setTab] = useState(0);
+  return <div className="pilot-page" style={tab === 0 ? undefined : { gridTemplateColumns: '1fr' }}>
     <div className="pilot-content">
       <div className="pilot-page-head">
         <div><h1>Company Preparation</h1><p>Prepare for your dream companies with tailored resources and practice.</p></div>
       </div>
-      <PilotTabs labels={['Overview', 'Companies', 'Interview Prep', 'Aptitude Prep', 'Mock Interviews', 'Saved']} />
+      <PilotTabs labels={['Overview', 'Companies', 'Interview Prep', 'Aptitude Prep', 'Mock Interviews', 'Saved']} active={tab} onChange={setTab} />
 
+      {tab === 1 ? (
+        <section className="pilot-card">
+          <h2>Companies</h2>
+          <div className="pilot-row cols-3">
+            {pilotCompanies.map((company) => (
+              <div key={company.name} className="pilot-course-card" style={{ textAlign: 'center' }}>
+                <span className={`pilot-mark ${company.tone}`} style={{ margin: '0 auto' }}>{company.mark}</span>
+                <strong>{company.name}</strong>
+                <small>Interview guides, question sets and drive history</small>
+                <button type="button" className="pilot-btn ghost small">Explore</button>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+      {tab === 2 ? <PrepList title="Interview Prep" rows={tabPrepQuestionSets} action="Practice" /> : null}
+      {tab === 3 ? <PrepList title="Aptitude Prep" rows={tabAptitudeSets} action="Start Test" /> : null}
+      {tab === 4 ? (
+        <section className="pilot-card">
+          <h2>Mock Interviews</h2>
+          <div className="pilot-list">
+            {tabMockInterviews.map((session) => (
+              <div key={session.title} className="pilot-list-row">
+                <span className={`pilot-tile ${session.done ? 'green' : 'purple'}`} style={{ width: 34, height: 34 }}><CheckCircle2 size={15} /></span>
+                <div className="grow"><strong style={{ fontSize: 12.5 }}>{session.title}</strong><small>{session.detail}</small></div>
+                <button type="button" className="pilot-btn ghost small">{session.done ? 'View Feedback' : 'Book Slot'}</button>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+      {tab === 5 ? <PrepList title="Saved" rows={tabSavedResources} action="Open" /> : null}
+
+      {tab === 0 ? <>
       <section className="pilot-hero">
         <div style={{ flex: 1 }}>
           <h2>Your gateway to top companies</h2>
@@ -219,9 +296,10 @@ export function PilotCompanyPrep(): React.ReactElement {
           ))}
         </div>
       </section>
+      </> : null}
     </div>
 
-    <aside className="pilot-rail">
+    {tab === 0 ? <aside className="pilot-rail">
       <section className="pilot-card">
         <div className="pilot-card-head"><h2>Preparation Progress</h2><button type="button" className="pilot-link">View Details</button></div>
         <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
@@ -262,7 +340,7 @@ export function PilotCompanyPrep(): React.ReactElement {
         </div>
       </section>
       <div className="pilot-banner"><Sparkles size={17} /> Consistent practice and mock interviews sharply improve selection chances.</div>
-    </aside>
+    </aside> : null}
   </div>;
 }
 
@@ -285,14 +363,36 @@ const TOOLS_RECENT = [
   ['Resume Builder', 'Used 2 days ago'], ['Skill Gap Analyzer', 'Used 5 days ago'], ['Career Roadmap', 'Used 1 week ago'],
 ] as const;
 
+const TOOL_TABS = ['Overview', 'Resume & Docs', 'Skill Tools', 'Planning', 'Career Insights', 'Job Search'] as const;
+
 export function PilotCareerTools(): React.ReactElement {
-  return <div className="pilot-page">
+  const [tab, setTab] = useState(0);
+  const tabLabel = TOOL_TABS[tab] ?? 'Overview';
+  const groupTools = CAREER_TOOLS.filter((tool) => (tabToolGroups[tabLabel] ?? []).includes(tool.title));
+  return <div className="pilot-page" style={tab === 0 ? undefined : { gridTemplateColumns: '1fr' }}>
     <div className="pilot-content">
       <div className="pilot-page-head">
         <div><h1>Career Tools</h1><p>Everything you need to plan, build and accelerate your career.</p></div>
       </div>
-      <PilotTabs labels={['Overview', 'Resume & Docs', 'Skill Tools', 'Planning', 'Career Insights', 'Job Search']} />
+      <PilotTabs labels={TOOL_TABS} active={tab} onChange={setTab} />
 
+      {tab > 0 ? (
+        <section className="pilot-card">
+          <h2>{tabLabel}</h2>
+          <div className="pilot-row cols-3">
+            {groupTools.map((tool) => (
+              <div key={tool.title} className="pilot-course-card">
+                {(() => { const Component = tool.icon; return <span className="pilot-tile" style={{ background: `${toneColor(tool.tone)}1a`, color: toneColor(tool.tone) }}><Component size={17} /></span>; })()}
+                <strong>{tool.title}</strong>
+                <small>{tool.detail}</small>
+                <button type="button" className="pilot-btn ghost small">{tool.action} →</button>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {tab === 0 ? <>
       <section className="pilot-hero">
         <div style={{ flex: 1 }}>
           <h2>Tools that empower your career growth</h2>
@@ -331,9 +431,10 @@ export function PilotCareerTools(): React.ReactElement {
           ))}
         </div>
       </section>
+      </> : null}
     </div>
 
-    <aside className="pilot-rail">
+    {tab === 0 ? <aside className="pilot-rail">
       <section className="pilot-card">
         <div className="pilot-card-head"><h2>Tools Usage Overview</h2><small style={{ color: 'var(--p-muted)' }}>This month</small></div>
         <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
@@ -372,7 +473,7 @@ export function PilotCareerTools(): React.ReactElement {
           <button type="button" className="pilot-btn ghost" style={{ justifyContent: 'flex-start' }}><Target size={15} /> Add New Goal</button>
         </div>
       </section>
-    </aside>
+    </aside> : null}
   </div>;
 }
 
@@ -393,14 +494,51 @@ const SCHOLARSHIP_DEADLINES = [
   ['BlueRiver Women in Analytics', '30 Jun', '15 days left'], ['Nimbus First-Gen Scholars', '10 Jul', '25 days left'],
 ] as const;
 
+function ScholarshipList({ title, rows }: { readonly title: string; readonly rows: readonly typeof SCHOLARSHIPS[number][] }): React.ReactElement {
+  return <section className="pilot-card">
+    <h2>{title}</h2>
+    <div className="pilot-list">
+      {rows.map((scholarship) => (
+        <div key={scholarship.name} className="pilot-list-row">
+          <span className={`pilot-mark ${scholarship.tone}`}>{scholarship.mark}</span>
+          <div className="grow"><strong>{scholarship.name}</strong><small>{scholarship.provider} · Apply by {scholarship.deadline}</small></div>
+          <b style={{ fontSize: 13, whiteSpace: 'nowrap' }}>Up to {scholarship.amount}</b>
+          <button type="button" className="pilot-btn small">Apply Now</button>
+        </div>
+      ))}
+    </div>
+  </section>;
+}
+
 export function PilotScholarships(): React.ReactElement {
-  return <div className="pilot-page">
+  const [tab, setTab] = useState(0);
+  return <div className="pilot-page" style={tab === 0 ? undefined : { gridTemplateColumns: '1fr' }}>
     <div className="pilot-content">
       <div className="pilot-page-head">
         <div><h1>Scholarships</h1><p>Discover and apply for scholarships to support your education journey.</p></div>
       </div>
-      <PilotTabs labels={['Overview', 'Recommended', 'Merit Based', 'Need Based', 'Deadlines']} />
+      <PilotTabs labels={['Overview', 'Recommended', 'Merit Based', 'Need Based', 'Deadlines']} active={tab} onChange={setTab} />
 
+      {tab === 1 ? <ScholarshipList title="Recommended for You" rows={SCHOLARSHIPS.slice(0, 3)} /> : null}
+      {tab === 2 ? <ScholarshipList title="Merit Based" rows={SCHOLARSHIPS.filter((scholarship) => scholarship.kind.includes('Merit'))} /> : null}
+      {tab === 3 ? <ScholarshipList title="Need Based" rows={SCHOLARSHIPS.filter((scholarship) => scholarship.kind.includes('Need'))} /> : null}
+      {tab === 4 ? (
+        <section className="pilot-card">
+          <h2>Deadlines</h2>
+          <div className="pilot-list">
+            {SCHOLARSHIP_DEADLINES.map(([name, date, left]) => (
+              <div key={name} className="pilot-list-row">
+                <div className="pilot-date"><b>{date.split(' ')[1]}</b><span>{date.split(' ')[0]}</span></div>
+                <div className="grow"><strong style={{ fontSize: 12.5 }}>{name}</strong></div>
+                <span className="pilot-chip rose">{left}</span>
+                <button type="button" className="pilot-btn ghost small">Apply Now</button>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {tab === 0 ? <>
       <section className="pilot-hero">
         <div style={{ flex: 1 }}>
           <h2>Your Scholarship Overview</h2>
@@ -452,9 +590,10 @@ export function PilotScholarships(): React.ReactElement {
           ))}
         </div>
       </section>
+      </> : null}
     </div>
 
-    <aside className="pilot-rail">
+    {tab === 0 ? <aside className="pilot-rail">
       <section className="pilot-card">
         <div className="pilot-card-head"><h2>Scholarship Insights</h2><small style={{ color: 'var(--p-muted)' }}>This month</small></div>
         <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
@@ -491,7 +630,7 @@ export function PilotScholarships(): React.ReactElement {
         </div>
       </section>
       <div className="pilot-banner"><Sparkles size={17} /> Complete your profile to get better scholarship recommendations.</div>
-    </aside>
+    </aside> : null}
   </div>;
 }
 
@@ -518,16 +657,60 @@ const RESUME_TOOLS = [
 ] as const;
 
 export function PilotResumeBuilder(): React.ReactElement {
-  return <div className="pilot-page">
+  const [tab, setTab] = useState(0);
+  return <div className="pilot-page" style={tab === 0 ? undefined : { gridTemplateColumns: '1fr' }}>
     <div className="pilot-content">
       <div className="pilot-page-head">
         <div><h1>Resume Builder</h1><p>Create professional resumes that showcase your skills and land your dream job.</p></div>
         <button type="button" className="pilot-btn"><FileText size={15} /> Create New Resume</button>
       </div>
-      <PilotTabs labels={['My Resumes', 'Templates', 'Examples', 'Resume Score']} />
+      <PilotTabs labels={['My Resumes', 'Templates', 'Examples', 'Resume Score']} active={tab} onChange={setTab} />
 
+      {tab === 2 ? (
+        <section className="pilot-card">
+          <h2>Examples</h2>
+          <div className="pilot-list">
+            {tabResumeExamples.map((example) => (
+              <div key={example.title} className="pilot-list-row">
+                <span className="pilot-tile teal" style={{ width: 34, height: 34 }}><FileText size={15} /></span>
+                <div className="grow"><strong style={{ fontSize: 12.5 }}>{example.title}</strong><small>{example.detail}</small></div>
+                <button type="button" className="pilot-btn ghost small">Open Example</button>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+      {tab === 3 ? (
+        <section className="pilot-card" style={{ maxWidth: 640 }}>
+          <div className="pilot-card-head"><h2>Resume Score</h2><span className="pilot-chip blue">Software Engineer Resume</span></div>
+          <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
+            <Ring value={78} size={104} stroke={11} tone="blue"><span style={{ fontSize: 21 }}>78</span></Ring>
+            <div className="pilot-legend" style={{ flex: 1 }}>
+              <div><i style={{ background: '#0d6b4f' }} /> Content <span className="num">85/100</span></div>
+              <div><i style={{ background: '#1f55e5' }} /> Format <span className="num">75/100</span></div>
+              <div><i style={{ background: '#5936cf' }} /> Skills <span className="num">80/100</span></div>
+              <div><i style={{ background: '#b45309' }} /> Impact <span className="num">72/100</span></div>
+            </div>
+          </div>
+          <div className="pilot-list" style={{ marginTop: 12 }}>
+            {[
+              'Quantify the placement portal project - add users, load, or team size.',
+              'Move skills above coursework for ATS parsing.',
+              'Impact verbs: replace "worked on" with "built", "shipped", "led".',
+            ].map((tip) => (
+              <div key={tip} className="pilot-list-row" style={{ padding: '8px 2px' }}>
+                <Sparkles size={14} color="#b45309" style={{ flexShrink: 0 }} />
+                <small style={{ color: 'var(--p-ink-2)' }}>{tip}</small>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {tab === 0 || tab === 1 ? <>
       <section className="pilot-card">
-        <div className="pilot-card-head"><h2>Choose a Template</h2><button type="button" className="pilot-link">View All Templates →</button></div>
+        <div className="pilot-card-head"><h2>Choose a Template</h2><button type="button" className="pilot-link"
+          onClick={(event) => { event.stopPropagation(); setTab(1); }}>View All Templates →</button></div>
         <div className="pilot-row cols-5">
           {RESUME_TEMPLATES.map((template) => (
             <div key={template.name} className="pilot-course-card" style={template.selected ? { outline: '2px solid #1f55e5', outlineOffset: 1 } : undefined}>
@@ -568,9 +751,10 @@ export function PilotResumeBuilder(): React.ReactElement {
           ))}
         </div>
       </section>
+      </> : null}
     </div>
 
-    <aside className="pilot-rail">
+    {tab === 0 || tab === 1 ? <aside className="pilot-rail">
       <section className="pilot-card">
         <div className="pilot-card-head"><h2>Resume Overview</h2><button type="button" className="pilot-link">View Details</button></div>
         <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
@@ -611,6 +795,6 @@ export function PilotResumeBuilder(): React.ReactElement {
           ))}
         </div>
       </section>
-    </aside>
+    </aside> : null}
   </div>;
 }

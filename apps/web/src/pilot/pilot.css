@@ -419,3 +419,30 @@
 }
 .pilot .pilot-check { background: none; border: none; padding: 0; cursor: pointer; display: flex; align-items: center; }
 .pilot .pilot-btn:disabled { opacity: 0.6; cursor: default; }
+
+/* --- UAT feedback fixes ---------------------------------------------------- */
+/* Category and stat tiles: long labels wrap inside the tile instead of escaping it. */
+.pilot .pilot-cat { min-width: 0; }
+.pilot .pilot-cat > div { min-width: 0; }
+.pilot .pilot-cat strong, .pilot .pilot-cat small, .pilot .pilot-stat b, .pilot .pilot-stat small {
+  overflow-wrap: break-word; display: block;
+}
+/* Long single-word labels (Programming, Development) fit inside the five-column
+   tile grids instead of breaking mid-word: smaller type plus tighter tile chrome. */
+.pilot .pilot-cat { padding: 10px 11px; gap: 9px; }
+.pilot .pilot-cat strong { font-size: 11px; line-height: 1.3; letter-spacing: -0.01em; }
+.pilot .pilot-cat small { font-size: 10.5px; }
+.pilot .pilot-stat > div { min-width: 0; }
+/* Roadmap phases are buttons now. */
+.pilot button.pilot-cat, .pilot button.pilot-phase {
+  font: inherit; text-align: left; cursor: pointer; border-width: 1px; min-height: 0;
+}
+.pilot .pilot-user { cursor: pointer; border-radius: 12px; padding: 3px 6px; }
+.pilot .pilot-user:hover { background: var(--p-canvas); }
+/* Inline filter control (e.g. the Students batch filter). */
+.pilot .pilot-inline-filter { display: inline-flex; align-items: center; gap: 7px; }
+.pilot .pilot-inline-filter span { font-size: 11.5px; font-weight: 700; color: var(--p-ink-2); }
+.pilot .pilot-inline-filter select {
+  border: 1px solid var(--p-line); border-radius: 10px; background: var(--p-card);
+  padding: 8px 10px; font: inherit; font-size: 12.5px; color: var(--p-ink); cursor: pointer;
+}

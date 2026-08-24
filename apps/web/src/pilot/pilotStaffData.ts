@@ -58,6 +58,13 @@ export const pilotRoster: readonly PilotRosterStudent[] = [
   { name: 'Rohit Verma', initials: 'RV', registration: 'VIT2027-0590', department: 'EEE', batch: '2027', readiness: 47, band: 'At risk', status: 'Intervention assigned' },
 ];
 
+/** Placed alumni from the previous batch, so the batch filter has real data. */
+export const pilotRosterAlumni: readonly PilotRosterStudent[] = [
+  { name: 'Deepak Raju', initials: 'DR', registration: 'VIT2026-0218', department: 'CSE', batch: '2026', readiness: 88, band: 'Ready', status: 'Placed · Kortex Systems' },
+  { name: 'Lakshmi Priya', initials: 'LP', registration: 'VIT2026-0341', department: 'IT', batch: '2026', readiness: 84, band: 'Ready', status: 'Placed · BlueRiver Analytics' },
+  { name: 'Mohammed Irfan', initials: 'MI', registration: 'VIT2026-0455', department: 'ECE', batch: '2026', readiness: 79, band: 'Ready', status: 'Placed · Veridian Tech' },
+];
+
 export const pilotInterventions = [
   { student: 'Aditya Rao', action: 'Career counselling session', due: 'Due 28 May', tone: 'rose' },
   { student: 'Rohit Verma', action: 'Aptitude improvement plan', due: 'Due 30 May', tone: 'amber' },

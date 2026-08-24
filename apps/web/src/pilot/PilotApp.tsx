@@ -13,7 +13,8 @@ import { PilotCareerTools, PilotCompanyPrep, PilotPractice, PilotResumeBuilder, 
 import { InstitutionDashboard, InstitutionDrives, InstitutionReports, InstitutionStudents } from './pilotInstitutionPages.js';
 import { EmployerApplicants, EmployerDashboard, EmployerInterviews, EmployerOpportunities } from './pilotEmployerPages.js';
 import { EmployerCompany, EmployerOffers, InstitutionAssessments, InstitutionInterventions } from './pilotStaffExtraPages.js';
-import { DetailRows, PilotOverlayProvider, usePilotClickFallback, type PilotShellConfig, type SearchEntry } from './pilotOverlay.js';
+import { PilotOverlayProvider, usePilotClickFallback, type PilotShellConfig, type SearchEntry } from './pilotOverlay.js';
+import { IdentityCardBody, PilotAvatar } from './pilotShare.js';
 import { PilotSessionProvider } from './pilotSession.js';
 
 /**
@@ -62,7 +63,7 @@ function ShellMain({ config, identity, onSignOut, email, children }: {
         <button type="button" className="pilot-icon-button" aria-label="Messages"><MessageSquare size={16} /></button>
         <button type="button" className="pilot-icon-button" aria-label="Notifications"><Bell size={16} /><span className="pilot-dot">{config.notifications.length}</span></button>
         <div className="pilot-user" role="button" tabIndex={0}>
-          <span className="pilot-avatar">{identity.initials}</span>
+          <PilotAvatar initials={identity.initials} />
           <span><strong>{identity.name}</strong><small>{identity.subtitle}</small></span>
         </div>
         <button type="button" className="pilot-signout" onClick={(event) => { event.stopPropagation(); onSignOut(); }}>Sign out</button>
@@ -147,10 +148,7 @@ function PilotShell({ identity, nav, page, onNavigate, onSignOut, email, notific
     identityCard: {
       title: identity.name,
       subtitle: identity.subtitle,
-      body: <div>
-        <DetailRows rows={identityRows} />
-        <p className="pilot-modal-text" style={{ marginTop: 12 }}>Signed in as {email}. This is a demo identity - everything it sees is sample data.</p>
-      </div>,
+      body: <IdentityCardBody rows={identityRows} email={email} />,
     },
   };
   return <div className="pilot">

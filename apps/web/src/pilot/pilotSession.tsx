@@ -38,6 +38,8 @@ interface PilotSession {
   addIntervention(intervention: CreatedIntervention): void;
   readonly goalCompanies: readonly string[];
   addGoalCompany(name: string): void;
+  readonly profilePhotoUrl: string | null;
+  setProfilePhoto(url: string): void;
 }
 
 const PilotSessionContext = createContext<PilotSession | null>(null);
@@ -56,6 +58,7 @@ export function PilotSessionProvider({ navigate, children }: {
   const [createdAssessments, setCreatedAssessments] = useState<readonly CreatedAssessment[]>([]);
   const [createdInterventions, setCreatedInterventions] = useState<readonly CreatedIntervention[]>([]);
   const [goalCompanies, setGoalCompanies] = useState<readonly string[]>([]);
+  const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
 
   const session = useMemo<PilotSession>(() => ({
     navigate,
@@ -67,7 +70,9 @@ export function PilotSessionProvider({ navigate, children }: {
     addIntervention: (intervention) => setCreatedInterventions((previous) => [...previous, intervention]),
     goalCompanies,
     addGoalCompany: (name) => setGoalCompanies((previous) => previous.includes(name) ? previous : [...previous, name]),
-  }), [navigate, postedRoles, createdAssessments, createdInterventions, goalCompanies]);
+    profilePhotoUrl,
+    setProfilePhoto: (url) => setProfilePhotoUrl(url),
+  }), [navigate, postedRoles, createdAssessments, createdInterventions, goalCompanies, profilePhotoUrl]);
 
   return <PilotSessionContext.Provider value={session}>{children}</PilotSessionContext.Provider>;
 }

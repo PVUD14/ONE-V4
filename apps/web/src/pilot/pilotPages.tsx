@@ -3,6 +3,7 @@ import { ArrowRight, Award, BookOpen, Bookmark, Building2, CalendarDays, CheckCi
 import { MultiRing, Ring, Spark, WeekBars, toneColor } from './pilotComponents.js';
 import { DetailRows, OverlayForm, PilotTabs, downloadCsv, listModal, useOverlay } from './pilotOverlay.js';
 import { usePilotSession } from './pilotSession.js';
+import { PhotoUploadControl, PilotAvatar, shareProfileModal } from './pilotShare.js';
 import {
   tabAllTests, tabBookmarks, tabCategoryRoles, tabCertificateRecords, tabCertificates,
   tabEducation, tabInternships, tabMyLearning, tabPastAttempts, tabProjects, tabScoreTrend,
@@ -1059,7 +1060,7 @@ export function PilotProfile(): React.ReactElement {
 
       <section className="pilot-card" style={{ background: 'linear-gradient(120deg, #f5f8ff, #fdfdff)' }}>
         <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
-          <span className="pilot-avatar" style={{ width: 64, height: 64, fontSize: 21 }}>{pilotPersona.initials}</span>
+          <PilotAvatar initials={pilotPersona.initials} size={64} fontSize={21} />
           <div style={{ flex: 1, minWidth: 220 }}>
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
               <strong style={{ fontSize: 19 }}>{pilotPersona.name}</strong>
@@ -1070,7 +1071,10 @@ export function PilotProfile(): React.ReactElement {
             </small>
             <small style={{ color: 'var(--p-muted)' }}>{pilotPersona.location} · {pilotPersona.email} · {pilotPersona.phone}</small>
           </div>
-          <button type="button" className="pilot-btn ghost" onClick={(event) => { event.stopPropagation(); editProfile(); }}>Edit Profile</button>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <PhotoUploadControl compact />
+            <button type="button" className="pilot-btn ghost" onClick={(event) => { event.stopPropagation(); editProfile(); }}>Edit Profile</button>
+          </div>
         </div>
       </section>
 
@@ -1233,7 +1237,8 @@ export function PilotProfile(): React.ReactElement {
         <h2>Quick Actions</h2>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <button type="button" className="pilot-btn ghost" style={{ justifyContent: 'flex-start' }}><Clock size={15} /> Download Resume</button>
-          <button type="button" className="pilot-btn ghost" style={{ justifyContent: 'flex-start' }}><Award size={15} /> Share Profile</button>
+          <button type="button" className="pilot-btn ghost" style={{ justifyContent: 'flex-start' }}
+            onClick={(event) => { event.stopPropagation(); overlay.openModal(shareProfileModal()); }}><Award size={15} /> Share Profile · QR</button>
           <button type="button" className="pilot-btn ghost" style={{ justifyContent: 'flex-start' }}
             onClick={(event) => { event.stopPropagation(); setTab(7); }}><Target size={15} /> Manage Preferences</button>
         </div>

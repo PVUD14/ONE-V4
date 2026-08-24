@@ -1,4 +1,4 @@
-import { Bell, CalendarDays, ChevronsLeft, Filter, GraduationCap, Menu, MessageSquare, MoreVertical, Search, X } from 'lucide-react';
+import { Bell, CalendarDays, ChevronsLeft, Filter, Menu, MessageSquare, MoreVertical, Search, X } from 'lucide-react';
 import { useEffect, useRef, useState, useId, type ReactNode } from 'react';
 import type { AuthStatus } from './auth.js';
 import { AuthControls } from './authControls.js';
@@ -45,7 +45,7 @@ export function StaffShell({ apiHealth, authStatus, authNotice, showDevelopmentI
 function StaffSidebar({ activePath, collapsed, drawerOpen, onNavigate, onCollapse, onClose }: { readonly activePath: string; readonly collapsed: boolean; readonly drawerOpen: boolean; readonly onNavigate: (path: string) => void; readonly onCollapse: () => void; readonly onClose: () => void }): React.ReactElement {
   return (
     <aside className={`staff-sidebar ${drawerOpen ? 'drawer-open' : ''}`} aria-label="Institution placement navigation">
-      <div className="staff-brand"><span className="staff-brand-mark"><GraduationCap size={19} /></span><span className="staff-brand-copy"><strong>ONE</strong><small>Institution Portal</small></span><button className="icon-button sidebar-close" type="button" aria-label="Close institution navigation" onClick={onClose} autoFocus={drawerOpen}><X size={18} /></button></div>
+      <div className="staff-brand"><img className="brand-logo" src="/assets/ai8ht-logo.jpg" alt="AI8HT" /><span className="staff-brand-copy"><strong>ONE</strong><small>Institution Portal</small></span><button className="icon-button sidebar-close" type="button" aria-label="Close institution navigation" onClick={onClose} autoFocus={drawerOpen}><X size={18} /></button></div>
       <nav className="staff-nav" aria-label="Grouped Institution placement navigation">
         {staffNavGroups.map((group) => <div className="staff-nav-group" key={group}><span>{group}</span>{staffNavItems.filter((item) => item.group === group).map((item) => { const Icon = item.icon; const active = activePath === item.path; return <button key={item.path} type="button" className={`staff-nav-item ${active ? 'active' : ''}`} aria-current={active ? 'page' : undefined} onClick={() => onNavigate(item.path)}><Icon size={16} aria-hidden="true" /><span>{item.label}</span></button>; })}</div>)}
       </nav>

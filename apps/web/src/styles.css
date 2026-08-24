@@ -1,6 +1,6 @@
 :root {
-  color: #12213f;
-  background: #f5f7fb;
+  color: #101828;
+  background: #f6f8fb;
   font-family: Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   font-synthesis: none;
   line-height: 1.4;
@@ -10,8 +10,8 @@
   --student-ink: #0d2349;
   --student-soft: #eef4ff;
   --surface: #ffffff;
-  --canvas: #f5f7fb;
-  --line: #e1e7f2;
+  --canvas: #f6f8fb;
+  --line: #e5eaf2;
   --line-strong: #cdd7ea;
   /* #69758b measured 4.33:1 on the app canvas, just under the WCAG 2.2 AA floor of
      4.5:1 for body text. #5f6b80 measures ~5.0:1 on the same ground. */
@@ -20,8 +20,8 @@
   --amber: #f59e0b;
   --purple: #7c5ce8;
   --red: #e04f5f;
-  --shadow: 0 14px 34px rgba(31, 45, 77, 0.08);
-  --soft-shadow: 0 8px 22px rgba(31, 45, 77, 0.06);
+  --shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 8px 24px -14px rgba(16, 24, 40, .14);
+  --soft-shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 6px 18px -12px rgba(16, 24, 40, .12);
   --radius: 16px;
   --text-body: 14px;
   --text-meta: 12.5px;
@@ -43,13 +43,13 @@
 /* Multi-role preview portals */
 .demo-launcher { min-height: 100vh; padding: 32px; background: radial-gradient(circle at 20% 0%, rgba(37, 99, 235, 0.14), transparent 32%), linear-gradient(135deg, #f7fbff 0%, #eef4f8 45%, #f8fafc 100%); color: #132238; }
 .demo-hero, .demo-family { max-width: 1240px; margin: 0 auto 24px; }
-.demo-hero { padding: 28px; border-radius: 28px; background: #fff; box-shadow: 0 24px 70px rgba(15, 23, 42, 0.1); }
+.demo-hero { padding: 28px; border-radius: 16px; background: #fff; border: 1px solid var(--line); box-shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 8px 24px -14px rgba(16, 24, 40, .14); }
 .demo-hero h1, .role-page-heading h1 { margin: 4px 0 8px; font-size: clamp(2rem, 4vw, 3.4rem); letter-spacing: -0.05em; }
 .demo-family-title, .role-brand, .role-topbar, .role-topbar-actions, .role-record-actions, .role-modal-actions, .role-section-title, .role-preview-notice, .role-page-heading { display: flex; align-items: center; gap: 12px; }
 .demo-family-title, .role-brand, .role-topbar, .role-preview-notice, .role-page-heading { justify-content: space-between; }
 .demo-role-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; }
-.demo-role-card, .role-card, .role-record-card, .role-preview-notice, .role-page-heading { background: #fff; border: 1px solid rgba(148, 163, 184, 0.25); box-shadow: 0 18px 42px rgba(15, 23, 42, 0.08); }
-.demo-role-card { display: grid; gap: 12px; padding: 20px; border-radius: 22px; border-top: 5px solid var(--role-accent, #2563eb); }
+.demo-role-card, .role-card, .role-record-card, .role-preview-notice, .role-page-heading { background: #fff; border: 1px solid var(--line); box-shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 8px 24px -14px rgba(16, 24, 40, .14); }
+.demo-role-card { display: grid; gap: 12px; padding: 20px; border-radius: 16px; border-top: 4px solid var(--role-accent, #2563eb); }
 .demo-role-card h3, .role-record-card h3 { margin: 0; }
 .demo-role-card dl, .role-record-card dl, .role-modal dl { display: grid; gap: 8px; margin: 0; }
 .demo-role-card dt, .role-record-card dt, .role-modal dt { color: #64748b; font-size: 0.78rem; }
@@ -65,17 +65,20 @@
 .role-accent-gold { --role-accent: #a16207; --role-soft: #fefce8; }
 .role-accent-slate { --role-accent: #334155; --role-soft: #f8fafc; }
 .role-shell { min-height: 100vh; display: grid; grid-template-columns: 268px minmax(0, 1fr); background: #f6f8fb; color: #172033; }
-.role-sidebar { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; gap: 14px; padding: 16px; background: #0f172a; color: #e2e8f0; overflow-y: auto; }
+.role-sidebar { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; gap: 14px; padding: 16px; background: var(--surface); color: #344054; border-right: 1px solid var(--line); overflow-y: auto; }
 .role-brand-mark, .role-profile > span:first-child { flex: 0 0 auto; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 14px; background: var(--role-accent); color: #fff; font-weight: 800; }
 /* `:last-child` never matched here: the account chip ends with a chevron <svg>, so the
    text wrapper was left without `min-width: 0` and could not shrink, overflowing the
    topbar. `:not(:first-child)` targets the text wrapper wherever it sits. */
 .role-brand > span:last-of-type, .role-profile > span:not(:first-child) { min-width: 0; display: flex; flex-direction: column; }
 .role-nav, .role-nav-group { display: grid; gap: 8px; }
-.role-nav-group > span { margin-top: 10px; color: #94a3b8; font-size: 0.74rem; letter-spacing: 0.08em; text-transform: uppercase; }
-.role-nav-item, .role-collapse { width: 100%; min-height: 40px; display: flex; align-items: center; gap: 10px; padding: 9px 10px; border: 0; border-radius: 12px; background: transparent; color: #cbd5e1; text-align: left; }
+.role-nav-group > span { margin-top: 10px; color: var(--muted); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; }
+.role-nav-item, .role-collapse { width: 100%; min-height: 40px; display: flex; align-items: center; gap: 10px; padding: 9px 10px; border: 0; border-radius: 10px; background: transparent; color: #344054; font-weight: 500; text-align: left; }
 .role-nav-item span { min-width: 0; overflow-wrap: anywhere; }
-.role-nav-item.active, .role-nav-item:hover, .role-collapse:hover { background: color-mix(in srgb, var(--role-accent) 28%, #1e293b); color: #fff; }
+.role-nav-item:hover, .role-collapse:hover { background: var(--canvas); color: #101828; }
+/* Text mixes toward ink so every role accent (including light amber/emerald)
+   clears 4.5:1 on its soft tint. */
+.role-nav-item.active { background: color-mix(in srgb, var(--role-accent) 11%, #fff); color: color-mix(in srgb, var(--role-accent) 58%, #16233c); font-weight: 650; }
 .role-workspace { min-width: 0; display: flex; flex-direction: column; }
 .role-topbar { position: sticky; top: 0; z-index: 10; min-height: 72px; padding: 12px clamp(20px, 2vw, 32px); background: rgba(255,255,255,.92); border-bottom: 1px solid rgba(148,163,184,.28); backdrop-filter: blur(16px); }
 /* These pills are `white-space: nowrap`, so without a cap a long role name (e.g.
@@ -93,7 +96,7 @@
 .role-profile strong, .role-profile small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .role-profile small { color: #64748b; }
 .role-main { width: 100%; max-width: 1600px; margin: 0 auto; padding: clamp(20px, 2vw, 32px); }
-.role-preview-notice, .role-page-heading { max-width: 100%; overflow-wrap: anywhere; border-radius: 22px; padding: 18px 20px; margin-bottom: 18px; }
+.role-preview-notice, .role-page-heading { max-width: 100%; overflow-wrap: anywhere; border-radius: 16px; padding: 18px 20px; margin-bottom: 18px; }
 .role-page-heading { align-items: flex-start; }
 .role-page-heading > div { min-width: 0; }
 .role-page-heading p { max-width: 86ch; }
@@ -103,12 +106,12 @@
 .role-module--dense { gap: 16px; }
 .role-page-heading, .role-filters, .role-wide, .role-empty { grid-column: 1 / -1; }
 .role-kpi-grid { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
-.role-card, .role-empty { border-radius: 20px; padding: 18px; min-width: 0; align-self: start; }
+.role-card, .role-empty { border-radius: 16px; padding: 18px; min-width: 0; align-self: start; }
 .role-card:not(.role-wide) { grid-column: span 6; }
 .role-kpi { display: grid; gap: 6px; border-left: 5px solid var(--role-accent); }
 .role-kpi strong { font-size: 2rem; letter-spacing: -0.04em; }
 .role-record-grid { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 14px; align-items: start; }
-.role-record-card { display: grid; gap: 12px; border-radius: 18px; padding: 16px; min-width: 0; }
+.role-record-card { display: grid; gap: 12px; border-radius: 16px; padding: 16px; min-width: 0; }
 .role-record-card[data-primary="true"] { border-color: var(--role-accent); }
 .role-record-actions, .role-modal-actions { gap: 10px; flex-wrap: wrap; }
 .role-filters { display: grid; grid-template-columns: minmax(240px, 420px) minmax(220px, 1fr); align-items: center; gap: 12px; padding: 14px 16px; }
@@ -120,7 +123,7 @@
 .result-count { margin: 0; color: #64748b; font-weight: 700; justify-self: end; white-space: nowrap; }
 .role-boundary-grid { display: grid; gap: 12px; }
 .role-boundary-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.role-record-table-wrap { grid-column: 1 / -1; min-width: 0; max-width: 100%; overflow-x: auto; border: 1px solid rgba(148, 163, 184, 0.25); border-radius: 18px; background: #fff; box-shadow: 0 18px 42px rgba(15, 23, 42, 0.08); }
+.role-record-table-wrap { grid-column: 1 / -1; min-width: 0; max-width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: 16px; background: #fff; box-shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 8px 24px -14px rgba(16, 24, 40, .14); }
 .role-record-table { width: 100%; min-width: 780px; border-collapse: collapse; }
 .role-record-table th, .role-record-table td { padding: 14px 16px; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: top; }
 .role-record-table thead th { color: #475569; background: #f8fafc; font-size: .76rem; letter-spacing: .04em; text-transform: uppercase; }
@@ -139,7 +142,7 @@
 .role-check-list, .role-boundary-grid ul { margin: 10px 0 0; padding-left: 18px; display: grid; gap: 8px; }
 .role-activity { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid #e2e8f0; }
 .role-modal-backdrop { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 18px; background: rgba(15, 23, 42, .52); }
-.role-modal { width: min(560px, 100%); display: grid; gap: 14px; padding: 22px; border-radius: 24px; background: #fff; box-shadow: 0 28px 80px rgba(15, 23, 42, .24); }
+.role-modal { width: min(560px, 100%); display: grid; gap: 14px; padding: 22px; border-radius: 16px; background: #fff; box-shadow: 0 24px 64px rgba(15, 23, 42, .28); }
 .role-modal form, .role-modal label { display: grid; gap: 10px; }
 .role-modal input, .role-modal textarea, .role-local-search input { padding: 11px 12px; border: 1px solid #cbd5e1; border-radius: 12px; background: #fff; }
 .role-modal textarea { min-height: 96px; resize: vertical; }
@@ -407,11 +410,9 @@ button {
   display: flex;
   flex-direction: column;
   padding: 18px 14px;
-  color: #eef6ff;
-  background:
-    radial-gradient(circle at 12% 0%, rgba(84, 170, 255, 0.22), transparent 28%),
-    linear-gradient(180deg, #0b326e 0%, #09234f 54%, #071936 100%);
-  box-shadow: 10px 0 30px rgba(16, 34, 66, 0.12);
+  color: #344054;
+  background: var(--surface);
+  border-right: 1px solid var(--line);
 }
 
 .sidebar-brand {
@@ -429,8 +430,8 @@ button {
   place-items: center;
   flex: 0 0 auto;
   border-radius: 11px;
-  color: #0d2b66;
-  background: linear-gradient(135deg, #ffffff, #a8dbff);
+  color: #fff;
+  background: #0b0f1a;
 }
 
 .brand-copy {
@@ -441,11 +442,13 @@ button {
 .brand-copy strong {
   font-size: 15px;
   letter-spacing: -0.02em;
+  color: #101828;
 }
 
 .brand-copy small {
-  color: #aebfe0;
-  font-size: 11px;
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.08em;
 }
 
 .sidebar-close {
@@ -467,7 +470,7 @@ button {
 
 .nav-group-label {
   padding: 0 9px 4px;
-  color: #8ea2c9;
+  color: var(--muted);
   font-size: 10px;
   font-weight: var(--weight-label);
   text-transform: uppercase;
@@ -483,7 +486,7 @@ button {
   padding: 9px 10px;
   border: 0;
   border-radius: 10px;
-  color: #e8efff;
+  color: #344054;
   background: transparent;
   font-weight: var(--weight-label);
   font-size: 13px;
@@ -491,13 +494,13 @@ button {
 }
 
 .side-nav-item:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--canvas);
 }
 
 .side-nav-item.active {
-  color: #0d2b66;
-  background: #ffffff;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.14);
+  color: var(--student);
+  background: var(--student-soft);
+  font-weight: 650;
 }
 
 .sidebar-footer {
@@ -508,10 +511,10 @@ button {
 .collapse-button {
   width: 100%;
   min-height: 34px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid var(--line);
   border-radius: 10px;
-  color: #dfe9ff;
-  background: rgba(255, 255, 255, 0.08);
+  color: #344054;
+  background: var(--surface);
   font-size: 12px;
   font-weight: var(--weight-action);
 }
@@ -2878,9 +2881,9 @@ button.secondary {
   display: flex;
   flex-direction: column;
   padding: 14px 10px;
-  color: #ecfdf7;
-  background: radial-gradient(circle at 0% 0%, rgba(61, 219, 166, 0.24), transparent 30%), linear-gradient(180deg, #073f39 0%, #06372f 48%, #032a29 100%);
-  box-shadow: 9px 0 30px rgba(4, 42, 39, 0.16);
+  color: #344054;
+  background: var(--surface);
+  border-right: 1px solid var(--line);
 }
 
 .staff-brand {
@@ -2897,8 +2900,8 @@ button.secondary {
   display: grid;
   place-items: center;
   border-radius: 999px;
-  color: #0b4b40;
-  background: #ecfff8;
+  color: #fff;
+  background: #0b0f1a;
 }
 
 .staff-brand-copy {
@@ -2910,11 +2913,12 @@ button.secondary {
 .staff-profile strong {
   font-size: 14px;
   font-weight: 650;
+  color: #101828;
 }
 
 .staff-brand-copy small,
 .staff-profile small {
-  color: rgba(236, 253, 247, 0.72);
+  color: var(--muted);
   font-size: 11px;
 }
 
@@ -2932,7 +2936,7 @@ button.secondary {
 
 .staff-nav-group > span {
   padding: 0 8px 4px;
-  color: rgba(236, 253, 247, 0.68);
+  color: var(--muted);
   font-size: 10px;
   font-weight: 650;
   letter-spacing: 0.08em;
@@ -2948,7 +2952,7 @@ button.secondary {
   padding: 8px 9px;
   border: 0;
   border-radius: 9px;
-  color: #e8fff7;
+  color: #344054;
   background: transparent;
   font-size: 12px;
   font-weight: 560;
@@ -2957,14 +2961,19 @@ button.secondary {
 }
 
 .staff-nav .staff-nav-item {
-  color: #e8fff7;
+  color: #344054;
   background: transparent;
 }
 
-.staff-nav-item.active {
-  color: #ffffff;
-  background: linear-gradient(135deg, #17966f, #0f745f);
-  box-shadow: 0 12px 20px rgba(2, 67, 54, 0.26);
+.staff-nav .staff-nav-item:hover {
+  background: var(--canvas);
+  color: #101828;
+}
+
+.staff-nav .staff-nav-item.active {
+  color: #0f745f;
+  background: #e4f6ee;
+  font-weight: 650;
 }
 
 .staff-collapse {
@@ -2973,15 +2982,15 @@ button.secondary {
   align-items: center;
   gap: 8px;
   justify-content: center;
-  border: 1px solid rgba(236, 253, 247, 0.2);
+  border: 1px solid var(--line);
   border-radius: 9px;
-  color: #ecfdf7;
-  background: rgba(255, 255, 255, 0.08);
+  color: #344054;
+  background: var(--surface);
 }
 
 .staff-sidebar .staff-collapse {
-  color: #ecfdf7 !important;
-  background: rgba(255, 255, 255, 0.08) !important;
+  color: #344054 !important;
+  background: var(--surface) !important;
 }
 
 .staff-sidebar-collapsed .staff-brand-copy,
@@ -4493,3 +4502,22 @@ button.secondary {
   margin-top: 8px;
 }
 .privacy-scheduled p { max-width: 68ch; color: #7a4b04; }
+
+/* --- Standard AI8HT brand logo (source: silver wordmark on solid black) ------ */
+/* The image is square with the wordmark across its middle band; object-fit: cover
+   at a wide aspect crops top/bottom so the wordmark stays legible at brand size. */
+.brand-logo {
+  width: 104px;
+  height: 34px;
+  object-fit: cover;
+  object-position: center;
+  border-radius: 9px;
+  display: block;
+  flex: 0 0 auto;
+  background: #000;
+}
+.sidebar-brand, .staff-brand, .role-brand, .pilot-brand { flex-wrap: wrap; row-gap: 8px; }
+.login-logo { width: 138px; height: 44px; border-radius: 11px; margin-bottom: 14px; }
+.sidebar-collapsed .brand-logo,
+.staff-sidebar-collapsed .brand-logo,
+.role-sidebar-collapsed .brand-logo { width: 40px; height: 40px; border-radius: 11px; }

@@ -80,7 +80,7 @@ function PilotShell({ identity, nav, page, onNavigate, onSignOut, email, childre
     <PilotOverlayProvider>
       <aside className="pilot-sidebar" aria-label="Pilot navigation">
         <div className="pilot-brand">
-          <span className="pilot-brand-mark">8</span>
+          <img className="brand-logo" src="/assets/ai8ht-logo.jpg" alt="AI8HT" />
           <span><strong>ONE</strong><small>LEARN | PREPARE | BUILD | GROW</small></span>
         </div>
         {nav.map((item) => {

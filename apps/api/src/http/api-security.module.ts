@@ -19,6 +19,8 @@ import { StudentHiringController } from './student-hiring.controller.js';
 import { EmployerHiringController } from './employer-hiring.controller.js';
 import { StudentDocumentsController } from './student-documents.controller.js';
 import { StudentPrivacyController } from './student-privacy.controller.js';
+import { InstitutionAssessmentsController } from './institution-assessments.controller.js';
+import { StudentAssessmentAttemptsController } from './student-assessment-attempts.controller.js';
 
 @Module({})
 export class Phase1ApiSecurityModule {
@@ -39,7 +41,7 @@ export class Phase1ApiSecurityModule {
 
     return {
       module: Phase1ApiSecurityModule,
-      controllers: [Phase1SecurityController, OperationsInstitutionOnboardingController, StudentOperationalCoreController, StudentHiringController, EmployerHiringController, StudentDocumentsController, StudentPrivacyController],
+      controllers: [Phase1SecurityController, OperationsInstitutionOnboardingController, StudentOperationalCoreController, StudentHiringController, EmployerHiringController, StudentDocumentsController, StudentPrivacyController, InstitutionAssessmentsController, StudentAssessmentAttemptsController],
       providers,
       exports: [
         API_IDENTITY_VERIFIER,

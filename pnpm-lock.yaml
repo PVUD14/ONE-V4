@@ -19,6 +19,9 @@ importers:
       '@nestjs/platform-express':
         specifier: ^11.1.6
         version: 11.2.1(@nestjs/common@11.2.1(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.1)
+      '@planthepath/assessments':
+        specifier: workspace:*
+        version: link:../../packages/assessments
       '@planthepath/authorization':
         specifier: workspace:*
         version: link:../../packages/authorization
@@ -117,6 +120,18 @@ importers:
       vite:
         specifier: ^7.1.2
         version: 7.3.6(@types/node@22.20.1)(tsx@4.23.12)
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@22.20.1)(jsdom@26.1.0)(tsx@4.23.12)
+
+  packages/assessments:
+    devDependencies:
+      '@types/node':
+        specifier: ^22.13.0
+        version: 22.20.1
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.3
       vitest:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@22.20.1)(jsdom@26.1.0)(tsx@4.23.12)

@@ -1,4 +1,5 @@
 import { Bell, BookOpen, BriefcaseBusiness, Building2, CalendarDays, ChevronDown, ClipboardCheck, FileText, Gauge, GraduationCap, Home, LayoutDashboard, Menu, MessageSquare, Search, Settings, ShieldCheck, Sparkles, Target, Trophy, UserRound, X, type LucideIcon } from 'lucide-react';
+import { BrandWordmark } from './brand.js';
 import type { FormEvent } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -427,7 +428,7 @@ function LoginEntry({ authStatus, authNotice, workspaceResolution, onSignIn, onH
   }
   return <main className="login-shell">
     <section className="login-card" aria-labelledby="one-login-title">
-      <img className="brand-logo login-logo" src="/assets/ai8ht-logo.jpg" alt="AI8HT" />
+      <BrandWordmark className="login-logo" height={44} />
       <p className="auth-eyebrow">ONE PLATFORM</p>
       <h1 id="one-login-title">Sign in</h1>
       <p className="auth-subtitle">Sign in to your verified ONE career-readiness workspace.</p>
@@ -467,7 +468,7 @@ function WorkspaceChooser({ authStatus, authNotice, workspaceResolution, onSignI
   const choices = workspaceResolution.state === 'resolved' ? workspaceResolution.choices : [];
   return <main className="login-shell">
     <section className="login-card workspace-card">
-      <img className="brand-logo login-logo" src="/assets/ai8ht-logo.jpg" alt="AI8HT" />
+      <BrandWordmark className="login-logo" height={44} />
       <span className="eyebrow">{productTagline}</span>
       <h1>Choose your ONE workspace</h1>
       <p>Workspace access is populated only from server-authorized active memberships. This chooser does not grant roles or bypass server authorization.</p>
@@ -716,7 +717,7 @@ function Sidebar({ path, collapsed, drawerOpen, onNavigate, onCollapse, onClose 
   const groups = ['Plan', 'Prepare', 'Apply', 'Account'] as const;
   return (
     <aside className={`student-sidebar ${drawerOpen ? 'drawer-open' : ''}`} aria-label="Student navigation">
-      <div className="sidebar-brand"><img className="brand-logo" src="/assets/ai8ht-logo.jpg" alt="AI8HT" /><span className="brand-copy"><strong>ONE</strong><small>LEARN | PREPARE | BUILD | GROW</small></span><button className="icon-button sidebar-close" type="button" aria-label="Close navigation" onClick={onClose} autoFocus={drawerOpen}><X size={18} /></button></div>
+      <div className="sidebar-brand"><BrandWordmark height={30} /><span className="brand-copy"><strong>ONE</strong><small>LEARN | PREPARE | BUILD | GROW</small></span><button className="icon-button sidebar-close" type="button" aria-label="Close navigation" onClick={onClose} autoFocus={drawerOpen}><X size={18} /></button></div>
       <nav className="sidebar-nav" aria-label="Grouped Student navigation">
         {groups.map((group) => <div className="nav-group" key={group}><span className="nav-group-label">{group}</span>{navItems.filter((item) => item.group === group).map((item) => { const Icon = item.icon; const active = normalizePath(path) === item.path; return <button key={item.path} type="button" className={`side-nav-item ${active ? 'active' : ''}`} aria-current={active ? 'page' : undefined} onClick={() => onNavigate(item)}><Icon size={18} aria-hidden="true" /><span>{item.label}</span></button>; })}</div>)}
       </nav>

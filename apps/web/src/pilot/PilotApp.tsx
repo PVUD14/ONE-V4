@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Bell, BookOpen, Briefcase, Building2, CalendarDays, ClipboardCheck, FileText, GraduationCap, Home, MapPinned, MessageSquare, Route, Search, User, Users, Video, Wrench } from 'lucide-react';
 import './pilot.css';
+import { BrandWordmark } from '../brand.js';
 import { pilotPersona } from './pilotData.js';
 import { pilotEmployerPersona, pilotInstitutionPersona } from './pilotStaffData.js';
 import { PilotAssessments, PilotDashboard, PilotLearn, PilotOpportunities, PilotProfile, PilotRoadmap } from './pilotPages.js';
@@ -80,7 +81,7 @@ function PilotShell({ identity, nav, page, onNavigate, onSignOut, email, childre
     <PilotOverlayProvider>
       <aside className="pilot-sidebar" aria-label="Pilot navigation">
         <div className="pilot-brand">
-          <img className="brand-logo" src="/assets/ai8ht-logo.jpg" alt="AI8HT" />
+          <BrandWordmark height={30} />
           <span><strong>ONE</strong><small>LEARN | PREPARE | BUILD | GROW</small></span>
         </div>
         {nav.map((item) => {

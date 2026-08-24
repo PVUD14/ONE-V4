@@ -4503,21 +4503,20 @@ button.secondary {
 }
 .privacy-scheduled p { max-width: 68ch; color: #7a4b04; }
 
-/* --- Standard AI8HT brand logo (source: silver wordmark on solid black) ------ */
-/* The image is square with the wordmark across its middle band; object-fit: cover
-   at a wide aspect crops top/bottom so the wordmark stays legible at brand size. */
-.brand-logo {
-  width: 104px;
-  height: 34px;
-  object-fit: cover;
-  object-position: center;
-  border-radius: 9px;
-  display: block;
-  flex: 0 0 auto;
-  background: #000;
-}
+/* --- Standard AI8HT wordmark -------------------------------------------------- */
+/* Three transparent slices (AI / 8 / HT) cut from the master logo at native
+   resolution; the source art is silver on black, so an invert renders it dark on
+   the app's light surfaces. The 8 spins on its vertical axis in place - a 3D
+   coin turn never grows wider than the glyph, so it cannot sweep over the
+   neighbouring letters. */
+.brand-wordmark { display: inline-flex; align-items: stretch; flex: 0 0 auto; perspective: 320px; }
+.brand-wordmark img { height: 100%; width: auto; display: block; filter: invert(1); user-select: none; }
+.brand-wordmark .brand-eight { animation: brand-eight-spin 5.5s linear infinite; }
+@keyframes brand-eight-spin { from { transform: rotateY(0deg); } to { transform: rotateY(360deg); } }
+@media (prefers-reduced-motion: reduce) { .brand-wordmark .brand-eight { animation: none; } }
 .sidebar-brand, .staff-brand, .role-brand, .pilot-brand { flex-wrap: wrap; row-gap: 8px; }
-.login-logo { width: 138px; height: 44px; border-radius: 11px; margin-bottom: 14px; }
-.sidebar-collapsed .brand-logo,
-.staff-sidebar-collapsed .brand-logo,
-.role-sidebar-collapsed .brand-logo { width: 40px; height: 40px; border-radius: 11px; }
+.login-logo { margin-bottom: 14px; }
+/* Collapsed rails keep only the spinning 8 as the mark. */
+.sidebar-collapsed .brand-wordmark img:not(.brand-eight),
+.staff-sidebar-collapsed .brand-wordmark img:not(.brand-eight),
+.role-sidebar-collapsed .brand-wordmark img:not(.brand-eight) { display: none; }

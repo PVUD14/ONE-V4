@@ -1,4 +1,5 @@
 import { Bell, ChevronDown, ChevronsLeft, ChevronsRight, Filter, Menu, MessageSquare, Search, X } from 'lucide-react';
+import { BrandWordmark } from './brand.js';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { AuthStatus } from './auth.js';
 import { AuthControls } from './authControls.js';
@@ -140,7 +141,7 @@ function RoleSidebar({ portal, activePath, collapsed, drawerOpen, onNavigate, on
   const groups = [...new Set(portal.nav.map((item) => item.group))];
   return (
     <aside className={`role-sidebar ${drawerOpen ? 'drawer-open' : ''}`} aria-label={`${portal.roleName} navigation`}>
-      <div className="role-brand"><img className="brand-logo" src="/assets/ai8ht-logo.jpg" alt="AI8HT" /><span><strong>ONE</strong><small>{portal.subtitle}</small></span><button className="icon-button sidebar-close" type="button" aria-label={`Close ${portal.roleName} navigation`} onClick={onClose} autoFocus={drawerOpen}><X size={18} /></button></div>
+      <div className="role-brand"><BrandWordmark height={28} /><span><strong>ONE</strong><small>{portal.subtitle}</small></span><button className="icon-button sidebar-close" type="button" aria-label={`Close ${portal.roleName} navigation`} onClick={onClose} autoFocus={drawerOpen}><X size={18} /></button></div>
       <nav className="role-nav" aria-label={`Grouped ${portal.roleName} navigation`}>
         {groups.map((group) => <div className="role-nav-group" key={group}><span>{group}</span>{portal.nav.filter((item) => item.group === group).map((item) => { const Icon = item.icon; const active = activePath === item.path; return <button key={item.path} type="button" className={`role-nav-item ${active ? 'active' : ''}`} aria-current={active ? 'page' : undefined} aria-label={item.label} title={item.label} onClick={() => onNavigate(item.path)}><Icon size={16} aria-hidden="true" /><span>{item.label}</span></button>; })}</div>)}
       </nav>

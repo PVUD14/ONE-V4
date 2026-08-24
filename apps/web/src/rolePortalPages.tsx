@@ -1,5 +1,6 @@
 import { Bell, ChevronDown, ChevronsLeft, ChevronsRight, Filter, Menu, MessageSquare, Search, X } from 'lucide-react';
 import { BrandWordmark } from './brand.js';
+import { InstitutionExamEnginePage } from './examManagerPage.js';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { AuthStatus } from './auth.js';
 import { AuthControls } from './authControls.js';
@@ -230,6 +231,7 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   if (!demoMode && portal.key === 'institution-admin' && route.label === 'Students') return <InstitutionStudentsPage portal={portal} authenticatedWorkspace={authenticatedWorkspace} />;
   if (!demoMode && portal.key === 'institution-admin' && route.label === 'Student Detail') return <InstitutionStudentsPage portal={portal} authenticatedWorkspace={authenticatedWorkspace} />;
   if (!demoMode && portal.key === 'institution-admin' && route.label === 'Academic Structure') return <InstitutionAcademicStructurePage portal={portal} authenticatedWorkspace={authenticatedWorkspace} />;
+  if (!demoMode && portal.key === 'institution-admin' && route.label === 'Assessments') return isInstitutionWorkspace(authenticatedWorkspace) ? <InstitutionExamEnginePage institutionId={authenticatedWorkspace.organizationId} /> : <InstitutionWorkspaceError title='Assessments' />;
   if (!demoMode && portal.key === 'institution-admin' && route.label === 'Staff') return <InstitutionStaffPage portal={portal} authenticatedWorkspace={authenticatedWorkspace} />;
   if (!demoMode && portal.key === 'institution-admin' && /career readiness|placement|reports/i.test(route.label)) return <AuthenticatedReadOnlyModule title={route.label} detail="Institution reports and readiness information are read-only in Phase 2A unless a dedicated persistent mutation is available." />;
   if (!demoMode && portal.key === 'institution-admin' && /settings/i.test(route.label)) return <AuthenticatedNotYetAvailable title={route.label} detail="Institution settings mutation is not yet available in this UAT slice." />;

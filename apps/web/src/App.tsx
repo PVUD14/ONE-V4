@@ -41,6 +41,7 @@ import { StudentPrivacyPanel } from './privacyPanel.js';
 import { PilotApp } from './pilot/PilotApp.js';
 import { isPilotIdentity } from './pilot/pilotIdentity.js';
 import { CareerReadinessApiPanel } from './careerReadinessApiPanel.js';
+import { ExamAttemptPanel } from './examAttemptPanel.js';
 
 type RouteKey = 'dashboard' | 'career-path' | 'ai-coach' | 'readiness' | 'skills' | 'assessments' | 'learning' | 'experience' | 'opportunities' | 'applications' | 'interviews' | 'documents' | 'profile' | 'settings';
 
@@ -779,7 +780,7 @@ function RouteScreen({ route, authenticated, currentStudent }: { readonly route:
   if (route === 'career-path') return <><CareerReadinessApiPanel route="roadmap" /><CareerPath /></>;
   if (route === 'readiness') return <><CareerReadinessApiPanel route="readiness" /><ReadinessPage /></>;
   if (route === 'skills') return <><CareerReadinessApiPanel route="skills" /><SkillsPage /></>;
-  if (route === 'assessments') return <><CareerReadinessApiPanel route="assessments" /><AssessmentsPage /></>;
+  if (route === 'assessments') return <><ExamAttemptPanel /><CareerReadinessApiPanel route="assessments" /><AssessmentsPage /></>;
   if (route === 'learning') return <><CareerReadinessApiPanel route="learning" /><Learning /></>;
   if (route === 'settings') return <><CareerReadinessApiPanel route="notifications" /><SettingsPage /></>;
   if (route === 'experience') return <ExperiencePage />;

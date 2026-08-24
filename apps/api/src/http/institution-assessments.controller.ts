@@ -419,23 +419,24 @@ export class InstitutionAssessmentsController {
     const context = this.requireInstitutionStaff(request, institutionId, assessmentStaffRoles);
     const actorId = context.authorization.principal.userId;
     const id = requireUuid(definitionId, context.correlationId);
-    const studentUserIds = Array.isArray(body['studentUserIds'])
-      ? [...new Set((body['studentUserIds'] as unknown[]).map((value) => String(value)).filter((value) => uuidPattern.test(value)))].slice(0, 500)
+    const studentProfileIds = Array.isArray(body['studentProfileIds'])
+      ? [...new Set((body['studentProfileIds'] as unknown[]).map((value) => String(value)).filter((value) => uuidPattern.test(value)))].slice(0, 500)
       : [];
-    if (!studentUserIds.length) throw badRequest('NO_STUDENTS_GIVEN', context.correlationId);
+    if (!studentProfileIds.length) throw badRequest('NO_STUDENTS_GIVEN', context.correlationId);
 
     const definition = await this.db.execute(sql`
       SELECT lifecycle_state FROM exam_definitions WHERE id = ${id}::uuid AND institution_id = ${institutionId}::uuid
     `) as QueryResult<{ lifecycle_state: string }>;
     if (definition.rows[0]?.lifecycle_state !== 'PUBLISHED') throw badRequest('ASSESSMENT_NOT_PUBLISHED', context.correlationId);
 
-    // Only students with an active roster relationship at this institution.
+    // Roster profile ids resolve to user ids server-side; only ACTIVE
+    // relationships at this institution are eligible.
     const eligible = await this.db.execute(sql`
       SELECT student_user_id FROM institution_student_profiles
       WHERE institution_id = ${institutionId}::uuid AND status = 'ACTIVE'
-        AND student_user_id = ANY(${sql.raw(`ARRAY[${studentUserIds.map((value) => `'${value}'::uuid`).join(',')}]`)})
+        AND id = ANY(${sql.raw(`ARRAY[${studentProfileIds.map((value) => `'${value}'::uuid`).join(',')}]`)})
     `) as QueryResult<{ student_user_id: string }>;
-    const eligibleIds = eligible.rows.map((row) => row.student_user_id);
+    const eligibleIds = [...new Set(eligible.rows.map((row) => row.student_user_id))];
 
     let assigned = 0;
     for (const studentUserId of eligibleIds) {
@@ -448,7 +449,7 @@ export class InstitutionAssessmentsController {
       assigned += inserted.rows.length;
     }
     return {
-      assignment: { assessmentId: id, requested: studentUserIds.length, eligible: eligibleIds.length, newlyAssigned: assigned },
+      assignment: { assessmentId: id, requested: studentProfileIds.length, eligible: eligibleIds.length, newlyAssigned: assigned },
       correlationId: context.correlationId,
     };
   }

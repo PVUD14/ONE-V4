@@ -182,3 +182,53 @@ describe('UAT feedback round: tabs, forms and filters really work', () => {
     expect(screen.getByText('Posted just now')).toBeInTheDocument();
   });
 });
+
+describe('UAT feedback round 2', () => {
+  it('shows a scheduled drive in the Placement Drives list and on the dashboard', () => {
+    render(<PilotApp email="demo.institution@uat.example.test" onSignOut={() => undefined} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Placement Drives' }));
+    fireEvent.click(screen.getByRole('button', { name: /Schedule Drive/ }));
+    fireEvent.change(screen.getByLabelText('Role(s)'), { target: { value: 'Platform Trainee' } });
+    fireEvent.click(screen.getAllByRole('button', { name: 'Schedule Drive' }).at(-1)!);
+    expect(screen.getByText('Platform Trainee')).toBeInTheDocument();
+    expect(screen.getByText('Just scheduled')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Dashboard' }));
+    expect(screen.getByText(/Platform Trainee/)).toBeInTheDocument();
+  });
+
+  it('extends an offer that appears in the offers table', () => {
+    render(<PilotApp email="demo.employer@uat.example.test" onSignOut={() => undefined} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Offers' }));
+    fireEvent.click(screen.getByRole('button', { name: /Extend Offer/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Send Offer' }));
+    expect(screen.getAllByText('Priya Sharma').length).toBeGreaterThan(0);
+    expect(screen.getByText(/Joining proposed/)).toBeInTheDocument();
+  });
+
+  it('manages notifications: dismiss one, clear all', () => {
+    render(<PilotApp email="demo.student@uat.example.test" onSignOut={() => undefined} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Notifications' }));
+    const dismissButtons = screen.getAllByRole('button', { name: /^Dismiss notification/ });
+    expect(dismissButtons.length).toBe(3);
+    fireEvent.click(dismissButtons[0]!);
+    expect(screen.getAllByRole('button', { name: /^Dismiss notification/ }).length).toBe(2);
+    fireEvent.click(screen.getByRole('button', { name: 'Clear All' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Notifications' }));
+    expect(screen.getByText(/all caught up/)).toBeInTheDocument();
+  });
+
+  it('makes profile tips navigate somewhere real', () => {
+    render(<PilotApp email="demo.student@uat.example.test" onSignOut={() => undefined} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Profile' }));
+    fireEvent.click(screen.getByRole('button', { name: /Add more projects/ }));
+    expect(screen.getByRole('heading', { name: 'Projects' })).toBeInTheDocument();
+  });
+
+  it('offers account deletion with a 30-day grace period', () => {
+    render(<PilotApp email="demo.student@uat.example.test" onSignOut={() => undefined} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Profile' }));
+    fireEvent.click(screen.getByRole('button', { name: /Privacy & Account/ }));
+    expect(screen.getByText(/30-day grace period/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Request Account Deletion' })).toBeInTheDocument();
+  });
+});

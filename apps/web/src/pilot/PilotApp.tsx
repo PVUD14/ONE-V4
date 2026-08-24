@@ -14,8 +14,8 @@ import { InstitutionDashboard, InstitutionDrives, InstitutionReports, Institutio
 import { EmployerApplicants, EmployerDashboard, EmployerInterviews, EmployerOpportunities } from './pilotEmployerPages.js';
 import { EmployerCompany, EmployerOffers, InstitutionAssessments, InstitutionInterventions } from './pilotStaffExtraPages.js';
 import { PilotOverlayProvider, usePilotClickFallback, type PilotShellConfig, type SearchEntry } from './pilotOverlay.js';
-import { IdentityCardBody, PilotAvatar } from './pilotShare.js';
-import { PilotSessionProvider } from './pilotSession.js';
+import { IdentityCardBody, NotificationsBody, PilotAvatar } from './pilotShare.js';
+import { PilotSessionProvider, usePilotSession } from './pilotSession.js';
 
 /**
  * The pilot shell shown to demo identities, at sample fidelity over curated data.
@@ -55,13 +55,15 @@ function ShellMain({ config, identity, onSignOut, email, children }: {
   readonly children: React.ReactNode;
 }): React.ReactElement {
   const fallback = usePilotClickFallback(config);
+  const session = usePilotSession();
+  const unread = session.notifications.filter((entry) => !entry.read).length;
   return <div className="pilot-main" onClick={fallback}>
     <header className="pilot-topbar">
       <div className="pilot-search"><Search size={15} /> Search…</div>
       <div className="pilot-topbar-actions">
         <span className="pilot-sample-chip" title={`Signed in as ${email}`}>Sample data</span>
         <button type="button" className="pilot-icon-button" aria-label="Messages"><MessageSquare size={16} /></button>
-        <button type="button" className="pilot-icon-button" aria-label="Notifications"><Bell size={16} /><span className="pilot-dot">{config.notifications.length}</span></button>
+        <button type="button" className="pilot-icon-button" aria-label="Notifications"><Bell size={16} />{unread > 0 ? <span className="pilot-dot">{unread}</span> : null}</button>
         <div className="pilot-user" role="button" tabIndex={0}>
           <PilotAvatar initials={identity.initials} />
           <span><strong>{identity.name}</strong><small>{identity.subtitle}</small></span>
@@ -90,7 +92,7 @@ const STUDENT_NAV: readonly NavEntry[] = [
 function StudentPilot({ email, onSignOut }: { readonly email: string; readonly onSignOut: () => void }): React.ReactElement {
   const [page, setPage] = useState('dashboard');
   const navigate = useCallback((key: string) => setPage(key), []);
-  return <PilotSessionProvider navigate={navigate}>
+  return <PilotSessionProvider navigate={navigate} initialNotifications={studentNotifications}>
     <PilotShell
       identity={{ name: pilotPersona.name, initials: pilotPersona.initials, subtitle: pilotPersona.programme }}
       nav={STUDENT_NAV} page={page} onNavigate={setPage} onSignOut={onSignOut} email={email}
@@ -139,6 +141,7 @@ function PilotShell({ identity, nav, page, onNavigate, onSignOut, email, notific
   const config: PilotShellConfig = {
     pageTitle: activeLabel,
     notifications,
+    notificationsBody: <NotificationsBody />,
     messages,
     onNavigate,
     searchIndex: [
@@ -148,7 +151,7 @@ function PilotShell({ identity, nav, page, onNavigate, onSignOut, email, notific
     identityCard: {
       title: identity.name,
       subtitle: identity.subtitle,
-      body: <IdentityCardBody rows={identityRows} email={email} />,
+      body: <IdentityCardBody rows={identityRows} email={email} initials={identity.initials} />,
     },
   };
   return <div className="pilot">
@@ -191,7 +194,7 @@ const INSTITUTION_NAV: readonly NavEntry[] = [
 function InstitutionPilot({ email, onSignOut }: { readonly email: string; readonly onSignOut: () => void }): React.ReactElement {
   const [page, setPage] = useState('dashboard');
   const navigate = useCallback((key: string) => setPage(key), []);
-  return <PilotSessionProvider navigate={navigate}>
+  return <PilotSessionProvider navigate={navigate} initialNotifications={institutionNotifications}>
     <PilotShell
       identity={{ name: pilotInstitutionPersona.name, initials: pilotInstitutionPersona.initials, subtitle: `${pilotInstitutionPersona.role} · VIT Chennai` }}
       nav={INSTITUTION_NAV} page={page} onNavigate={setPage} onSignOut={onSignOut} email={email}
@@ -225,7 +228,7 @@ const EMPLOYER_NAV: readonly NavEntry[] = [
 function EmployerPilot({ email, onSignOut }: { readonly email: string; readonly onSignOut: () => void }): React.ReactElement {
   const [page, setPage] = useState('dashboard');
   const navigate = useCallback((key: string) => setPage(key), []);
-  return <PilotSessionProvider navigate={navigate}>
+  return <PilotSessionProvider navigate={navigate} initialNotifications={employerNotifications}>
     <PilotShell
       identity={{ name: pilotEmployerPersona.name, initials: pilotEmployerPersona.initials, subtitle: pilotEmployerPersona.subtitle }}
       nav={EMPLOYER_NAV} page={page} onNavigate={setPage} onSignOut={onSignOut} email={email}

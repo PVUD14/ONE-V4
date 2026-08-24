@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import qrcode from 'qrcode-generator';
-import { Camera, CheckCircle2, Copy, Download, EyeOff, Link2 } from 'lucide-react';
-import { DetailRows, useOverlay, type ModalState } from './pilotOverlay.js';
+import { Bell, Camera, CheckCircle2, Copy, Download, EyeOff, Link2, X } from 'lucide-react';
+import { DetailRows, downloadCsv, useOverlay, type ModalState } from './pilotOverlay.js';
 import { usePilotSession } from './pilotSession.js';
 import { pilotPersona } from './pilotData.js';
 
@@ -108,14 +108,81 @@ export function PhotoUploadControl({ compact }: { readonly compact?: boolean }):
   </>;
 }
 
-export function IdentityCardBody({ rows, email }: {
+export function IdentityCardBody({ rows, email, initials }: {
   readonly rows: readonly (readonly [string, string])[];
   readonly email: string;
+  readonly initials: string;
 }): React.ReactElement {
   return <div>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>
+      <PilotAvatar initials={initials} size={56} fontSize={19} />
+      <PhotoUploadControl compact />
+    </div>
     <DetailRows rows={rows} />
-    <div style={{ marginTop: 12 }}><PhotoUploadControl /></div>
     <p className="pilot-modal-text" style={{ marginTop: 10 }}>Signed in as {email}. This is a demo identity - everything it sees is sample data.</p>
+  </div>;
+}
+
+/** Notification centre: dismiss one, mark all read, clear all. */
+export function NotificationsBody(): React.ReactElement {
+  const session = usePilotSession();
+  const overlay = useOverlay();
+  if (session.notifications.length === 0) {
+    return <p className="pilot-modal-text">You&apos;re all caught up - no notifications.</p>;
+  }
+  return <div>
+    <div className="pilot-list">
+      {session.notifications.map((entry) => (
+        <div key={entry.id} className="pilot-list-row" style={{ alignItems: 'flex-start', opacity: entry.read ? 0.55 : 1 }}>
+          <span className="pilot-tile amber"><Bell size={15} /></span>
+          <div className="grow"><strong style={{ fontWeight: entry.read ? 500 : 650, fontSize: 12.5 }}>{entry.text}</strong><small>{entry.when}</small></div>
+          <button type="button" className="pilot-icon-button" style={{ width: 28, height: 28 }} aria-label={`Dismiss notification: ${entry.text}`}
+            onClick={(event) => { event.stopPropagation(); session.dismissNotification(entry.id); }}><X size={13} /></button>
+        </div>
+      ))}
+    </div>
+    <div className="pilot-modal-actions">
+      <button type="button" className="pilot-btn ghost" onClick={(event) => { event.stopPropagation(); session.markAllNotificationsRead(); }}>Mark All as Read</button>
+      <button type="button" className="pilot-btn" onClick={(event) => { event.stopPropagation(); session.clearNotifications(); overlay.closeModal(); overlay.toast('Notifications cleared.'); }}>Clear All</button>
+    </div>
+  </div>;
+}
+
+/** Report download with a choice of formats: CSV, Excel-compatible CSV, printable PDF. */
+export function ReportFormatBody({ filenameBase, title, rows }: {
+  readonly filenameBase: string;
+  readonly title: string;
+  readonly rows: readonly (readonly string[])[];
+}): React.ReactElement {
+  const overlay = useOverlay();
+  const asCsv = (extension: string): void => {
+    downloadCsv(`${filenameBase}.${extension}`, rows);
+    overlay.closeModal();
+    overlay.toast(`${filenameBase}.${extension} downloaded (sample data).`);
+  };
+  const asPdf = (): void => {
+    const printable = window.open('', '_blank', 'width=900,height=700');
+    if (!printable) { overlay.toast('Allow pop-ups to print the PDF.'); return; }
+    const bodyRows = rows.map((row) => `<tr>${row.map((cell) => `<td>${cell.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</td>`).join('')}</tr>`).join('');
+    printable.document.write(`<!doctype html><title>${title}</title><style>
+      body { font-family: Inter, "Segoe UI", sans-serif; color: #101828; padding: 32px; }
+      h1 { font-size: 20px; margin: 0 0 4px; } p { color: #5d6b82; margin: 0 0 18px; font-size: 12px; }
+      table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+      td { border-bottom: 1px solid #e5eaf2; padding: 8px 10px; text-align: left; }
+      tr:first-child td { font-weight: 700; }
+    </style><h1>${title}</h1><p>ONE by Ai8ht · sample data · use your browser's dialog to save as PDF</p><table>${bodyRows}</table>`);
+    printable.document.close();
+    printable.focus();
+    printable.print();
+    overlay.closeModal();
+  };
+  return <div>
+    <p className="pilot-modal-text">Choose the format for <strong>{title}</strong>.</p>
+    <div className="pilot-modal-actions" style={{ justifyContent: 'flex-start' }}>
+      <button type="button" className="pilot-btn ghost" onClick={(event) => { event.stopPropagation(); asCsv('csv'); }}><Download size={14} /> CSV</button>
+      <button type="button" className="pilot-btn ghost" onClick={(event) => { event.stopPropagation(); asCsv('xls'); }}><Download size={14} /> Excel</button>
+      <button type="button" className="pilot-btn" onClick={(event) => { event.stopPropagation(); asPdf(); }}><Download size={14} /> PDF (print)</button>
+    </div>
   </div>;
 }
 

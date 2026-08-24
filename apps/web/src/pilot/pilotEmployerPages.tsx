@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ArrowRight, Briefcase, Building2, CalendarDays, ClipboardCheck, Plus, TrendingUp, Users, Video } from 'lucide-react';
 import { MultiRing } from './pilotComponents.js';
-import { DetailRows, OverlayForm, useOverlay } from './pilotOverlay.js';
+import { DetailRows, OverlayForm, listModal, useOverlay } from './pilotOverlay.js';
 import { usePilotSession } from './pilotSession.js';
 import {
   pilotApplicants, pilotCampusDrives, pilotEmployerFunnel, pilotEmployerInterviews,
@@ -54,6 +54,7 @@ function Funnel({ rows }: { readonly rows: readonly { readonly label: string; re
 }
 
 export function EmployerDashboard(): React.ReactElement {
+  const overlay = useOverlay();
   const session = usePilotSession();
   const postRole = usePostRole();
   return <div className="pilot-page">
@@ -133,7 +134,8 @@ export function EmployerDashboard(): React.ReactElement {
         </div>
       </section>
       <section className="pilot-card">
-        <div className="pilot-card-head"><h2>Campus Drives</h2><button type="button" className="pilot-link">View All</button></div>
+        <div className="pilot-card-head"><h2>Campus Drives</h2><button type="button" className="pilot-link"
+          onClick={(event) => { event.stopPropagation(); overlay.openModal(listModal('Campus Drives', `${pilotCampusDrives.length} scheduled this season`, pilotCampusDrives.map((drive) => ({ title: drive.institution, detail: `${drive.role} · ${drive.registered} registered`, trailing: drive.date })))); }}>View All</button></div>
         <div className="pilot-list">
           {pilotCampusDrives.map((drive) => (
             <div key={drive.institution} className="pilot-list-row">

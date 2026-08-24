@@ -28,6 +28,21 @@ export interface CreatedIntervention {
   readonly due: string;
 }
 
+export interface CreatedDrive {
+  readonly company: string;
+  readonly role: string;
+  readonly date: string;
+  readonly mode: string;
+  readonly eligible: number;
+}
+
+export interface PilotNotification {
+  readonly id: number;
+  readonly text: string;
+  readonly when: string;
+  readonly read: boolean;
+}
+
 interface PilotSession {
   navigate(pageKey: string): void;
   readonly postedRoles: readonly PostedRole[];
@@ -40,6 +55,12 @@ interface PilotSession {
   addGoalCompany(name: string): void;
   readonly profilePhotoUrl: string | null;
   setProfilePhoto(url: string): void;
+  readonly createdDrives: readonly CreatedDrive[];
+  addDrive(drive: CreatedDrive): void;
+  readonly notifications: readonly PilotNotification[];
+  dismissNotification(id: number): void;
+  markAllNotificationsRead(): void;
+  clearNotifications(): void;
 }
 
 const PilotSessionContext = createContext<PilotSession | null>(null);
@@ -50,8 +71,9 @@ export function usePilotSession(): PilotSession {
   return session;
 }
 
-export function PilotSessionProvider({ navigate, children }: {
+export function PilotSessionProvider({ navigate, initialNotifications = [], children }: {
   readonly navigate: (pageKey: string) => void;
+  readonly initialNotifications?: readonly (readonly [string, string])[];
   readonly children: React.ReactNode;
 }): React.ReactElement {
   const [postedRoles, setPostedRoles] = useState<readonly PostedRole[]>([]);
@@ -59,6 +81,10 @@ export function PilotSessionProvider({ navigate, children }: {
   const [createdInterventions, setCreatedInterventions] = useState<readonly CreatedIntervention[]>([]);
   const [goalCompanies, setGoalCompanies] = useState<readonly string[]>([]);
   const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
+  const [createdDrives, setCreatedDrives] = useState<readonly CreatedDrive[]>([]);
+  const [notifications, setNotifications] = useState<readonly PilotNotification[]>(
+    () => initialNotifications.map(([text, when], index) => ({ id: index, text, when, read: false })),
+  );
 
   const session = useMemo<PilotSession>(() => ({
     navigate,
@@ -72,7 +98,13 @@ export function PilotSessionProvider({ navigate, children }: {
     addGoalCompany: (name) => setGoalCompanies((previous) => previous.includes(name) ? previous : [...previous, name]),
     profilePhotoUrl,
     setProfilePhoto: (url) => setProfilePhotoUrl(url),
-  }), [navigate, postedRoles, createdAssessments, createdInterventions, goalCompanies, profilePhotoUrl]);
+    createdDrives,
+    addDrive: (drive) => setCreatedDrives((previous) => [...previous, drive]),
+    notifications,
+    dismissNotification: (id) => setNotifications((previous) => previous.filter((entry) => entry.id !== id)),
+    markAllNotificationsRead: () => setNotifications((previous) => previous.map((entry) => ({ ...entry, read: true }))),
+    clearNotifications: () => setNotifications([]),
+  }), [navigate, postedRoles, createdAssessments, createdInterventions, goalCompanies, profilePhotoUrl, createdDrives, notifications]);
 
   return <PilotSessionContext.Provider value={session}>{children}</PilotSessionContext.Provider>;
 }

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { AlertTriangle, Building2, CalendarDays, CheckCircle2, ClipboardCheck, Download, FileText, MapPin, PenTool, Plus, TrendingUp, Users } from 'lucide-react';
 import { Ring } from './pilotComponents.js';
 import { DetailRows, OverlayForm, useOverlay } from './pilotOverlay.js';
@@ -269,12 +270,55 @@ const OFFER_ROWS = [
   { candidate: 'Meghna Rao', initials: 'MR', college: 'Anna University', role: 'Graduate Software Engineer', sent: 'Draft', expires: '—', status: 'Draft', tone: 'slate' },
 ] as const;
 
+interface ExtendedOffer {
+  readonly candidate: string;
+  readonly role: string;
+  readonly joining: string;
+}
+
 export function EmployerOffers(): React.ReactElement {
+  const overlay = useOverlay();
+  const [extendedOffers, setExtendedOffers] = useState<readonly ExtendedOffer[]>([]);
+  const extendOffer = (): void => {
+    overlay.openModal({
+      title: 'Extend Offer', subtitle: 'Sends the offer letter to the candidate', body: <OverlayForm
+        fields={[
+          { label: 'Candidate', name: 'candidate', type: 'select', value: 'Priya Sharma', options: ['Priya Sharma', 'Devika Pillai', 'Arnav Gupta', 'Vikram Nair'] },
+          { label: 'Role', name: 'role', type: 'select', value: 'Graduate Software Engineer', options: ['Graduate Software Engineer', 'Software Engineer', 'SDE Intern', 'QA Engineer'] },
+          { label: 'Proposed joining date', name: 'joining', type: 'date', value: '2027-07-01' },
+          { label: 'Note to candidate', name: 'note', type: 'textarea', placeholder: 'Optional personal note included with the offer letter' },
+        ]}
+        submitLabel="Send Offer"
+        success="Offer sent to the candidate and the placement cell notified (sample)."
+        onSubmit={(values) => setExtendedOffers((previous) => [...previous, {
+          candidate: values['candidate'] ?? 'Candidate',
+          role: values['role'] ?? 'Graduate Software Engineer',
+          joining: values['joining'] ?? '2027-07-01',
+        }])} />,
+    });
+  };
+  const viewOffer = (offer: typeof OFFER_ROWS[number]): void => {
+    overlay.openModal({
+      title: `Offer — ${offer.candidate}`, subtitle: offer.role, body: <div>
+        <DetailRows rows={[
+          ['Status', offer.status],
+          ['Sent', offer.sent],
+          ['Institution', offer.college],
+          ['Validity', offer.expires],
+        ]} />
+        <p className="pilot-modal-text" style={{ marginTop: 12 }}>The full offer view includes the letter PDF, compensation details and the acceptance audit trail.</p>
+        {offer.status === 'Awaiting response' ? <div className="pilot-modal-actions">
+          <button type="button" className="pilot-btn ghost" onClick={() => { overlay.closeModal(); overlay.toast(`Follow-up reminder sent to ${offer.candidate} (sample).`); }}>Send Reminder</button>
+          <button type="button" className="pilot-btn" onClick={overlay.closeModal}>Done</button>
+        </div> : null}
+      </div>,
+    });
+  };
   return <div className="pilot-page">
     <div className="pilot-content">
       <div className="pilot-page-head">
         <div><h1>Offers</h1><p>Offers extended this season across your open roles.</p></div>
-        <button type="button" className="pilot-btn"><Plus size={15} /> Extend Offer</button>
+        <button type="button" className="pilot-btn" onClick={(event) => { event.stopPropagation(); extendOffer(); }}><Plus size={15} /> Extend Offer</button>
       </div>
 
       <div className="pilot-row cols-4">
@@ -293,6 +337,19 @@ export function EmployerOffers(): React.ReactElement {
         <div className="pilot-table-wrap"><table className="pilot-table">
           <thead><tr><th>Candidate</th><th>Institution</th><th>Role</th><th>Sent</th><th>Status</th><th></th></tr></thead>
           <tbody>
+            {extendedOffers.map((offer) => (
+              <tr key={`${offer.candidate}-${offer.role}`}>
+                <td><div className="pilot-person">
+                  <span className="pilot-avatar">{offer.candidate.split(' ').map((word) => word[0]).join('').slice(0, 2).toUpperCase()}</span>
+                  <span><strong>{offer.candidate}</strong><small>Joining proposed {offer.joining}</small></span>
+                </div></td>
+                <td>VIT Chennai</td>
+                <td>{offer.role}</td>
+                <td><small>Just now</small></td>
+                <td><span className="pilot-chip purple">Sent</span></td>
+                <td><button type="button" className="pilot-btn ghost small">View Offer</button></td>
+              </tr>
+            ))}
             {OFFER_ROWS.map((offer) => (
               <tr key={offer.candidate}>
                 <td><div className="pilot-person">
@@ -303,7 +360,7 @@ export function EmployerOffers(): React.ReactElement {
                 <td>{offer.role}</td>
                 <td><small>{offer.sent}</small></td>
                 <td><span className={`pilot-chip ${offer.tone}`}>{offer.status}</span></td>
-                <td><button type="button" className="pilot-btn ghost small">{offer.status === 'Draft' ? 'Edit Offer' : 'View Offer'}</button></td>
+                <td><button type="button" className="pilot-btn ghost small" onClick={(event) => { event.stopPropagation(); viewOffer(offer); }}>{offer.status === 'Draft' ? 'Edit Offer' : 'View Offer'}</button></td>
               </tr>
             ))}
           </tbody>

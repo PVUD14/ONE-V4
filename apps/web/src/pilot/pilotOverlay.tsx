@@ -190,6 +190,7 @@ export interface SearchEntry {
 export interface PilotShellConfig {
   readonly pageTitle: string;
   readonly notifications: readonly (readonly [string, string])[];
+  readonly notificationsBody?: React.ReactNode;
   readonly messages: readonly (readonly [string, string])[];
   readonly searchIndex: readonly SearchEntry[];
   readonly onNavigate?: (pageKey: string) => void;
@@ -242,6 +243,9 @@ function shellModal(kind: 'notifications' | 'messages' | 'search', config: Pilot
         ))}
       </div>,
     };
+  }
+  if (config.notificationsBody) {
+    return { title: 'Notifications', subtitle: 'Dismiss, mark read, or clear', body: config.notificationsBody };
   }
   return {
     title: 'Notifications', subtitle: `${config.notifications.length} unread`, body: <div className="pilot-list">

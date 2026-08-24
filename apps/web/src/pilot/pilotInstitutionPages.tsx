@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { AlertTriangle, ArrowRight, Building2, CalendarDays, ClipboardCheck, Download, TrendingUp, Users } from 'lucide-react';
 import { MultiRing, Ring, Spark } from './pilotComponents.js';
-import { DetailRows, downloadCsv, useOverlay } from './pilotOverlay.js';
+import { DetailRows, OverlayForm, downloadCsv, useOverlay } from './pilotOverlay.js';
+import { ReportFormatBody } from './pilotShare.js';
 import { usePilotSession } from './pilotSession.js';
 import {
   pilotCohort, pilotDepartmentReadiness, pilotInstitutionDrives, pilotInterventions,
@@ -33,19 +34,20 @@ export function InstitutionDashboard(): React.ReactElement {
   const overlay = useOverlay();
   const session = usePilotSession();
   const exportReport = (): void => {
-    downloadCsv('placement-dashboard-report.csv', [
-      ['ONE by Ai8ht — Placement Dashboard Report (sample data)'],
-      ['Active students', String(pilotCohort.activeStudents)],
-      ['Placement eligible', String(pilotCohort.placementEligible)],
-      ['Offers this season', String(pilotCohort.offersThisSeason)],
-      ['Students placed', String(pilotCohort.placedSoFar)],
-      ['Average readiness', String(pilotCohort.averageReadiness)],
-      ['Need intervention', String(pilotCohort.atRisk)],
-      [],
-      ['Department', 'Average readiness'],
-      ...pilotDepartmentReadiness.map((department) => [department.label, `${department.value}%`]),
-    ]);
-    overlay.toast('placement-dashboard-report.csv downloaded (sample data).');
+    overlay.openModal({
+      title: 'Export Report', subtitle: 'Placement Dashboard Report', body: <ReportFormatBody
+        filenameBase="placement-dashboard-report" title="Placement Dashboard Report"
+        rows={[
+          ['Metric', 'Value'],
+          ['Active students', String(pilotCohort.activeStudents)],
+          ['Placement eligible', String(pilotCohort.placementEligible)],
+          ['Offers this season', String(pilotCohort.offersThisSeason)],
+          ['Students placed', String(pilotCohort.placedSoFar)],
+          ['Average readiness', String(pilotCohort.averageReadiness)],
+          ['Need intervention', String(pilotCohort.atRisk)],
+          ...pilotDepartmentReadiness.map((department) => [`${department.label} average readiness`, `${department.value}%`]),
+        ]} />,
+    });
   };
   const openIntervention = (item: typeof pilotInterventions[number]): void => {
     overlay.openModal({
@@ -130,8 +132,16 @@ export function InstitutionDashboard(): React.ReactElement {
         <Spark points={pilotOffersTrend} tone="green" />
       </section>
       <section className="pilot-card">
-        <div className="pilot-card-head"><h2>Upcoming Drives</h2><button type="button" className="pilot-link">View All</button></div>
+        <div className="pilot-card-head"><h2>Upcoming Drives</h2><button type="button" className="pilot-link"
+          onClick={(event) => { event.stopPropagation(); session.navigate('drives'); }}>View All</button></div>
         <div className="pilot-list">
+          {session.createdDrives.slice(0, 2).map((created) => (
+            <div key={`${created.company}-${created.date}`} className="pilot-list-row">
+              <div className="pilot-date"><b>{created.date.split('-')[2]}</b><span>{['', 'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'][Number(created.date.split('-')[1])] ?? ''}</span></div>
+              <div className="grow"><strong style={{ fontSize: 12.5 }}>{created.company}</strong><small>{created.role} · {created.mode}</small></div>
+              <span className="pilot-chip purple">New</span>
+            </div>
+          ))}
           {pilotInstitutionDrives.slice(0, 3).map((drive) => (
             <div key={drive.company.name} className="pilot-list-row">
               <div className="pilot-date"><b>{drive.date.split(' ')[0]}</b><span>{drive.date.split(' ')[1]}</span></div>
@@ -226,6 +236,28 @@ export function InstitutionStudents(): React.ReactElement {
 
 export function InstitutionDrives(): React.ReactElement {
   const overlay = useOverlay();
+  const session = usePilotSession();
+  const scheduleDrive = (): void => {
+    overlay.openModal({
+      title: 'Schedule Drive', subtitle: 'Adds the drive to this season', body: <OverlayForm
+        fields={[
+          { label: 'Company', name: 'company', type: 'select', value: 'Zenvia Labs', options: ['Zenvia Labs', 'Kortex Systems', 'BlueRiver Analytics', 'Nimbus Digital', 'Orbitech Solutions', 'Veridian Tech'] },
+          { label: 'Role(s)', name: 'role', placeholder: 'e.g. Graduate Engineer Trainee' },
+          { label: 'Date', name: 'date', type: 'date', value: '2026-06-20' },
+          { label: 'Mode', name: 'mode', type: 'select', value: 'On campus', options: ['On campus', 'Online', 'Hybrid'] },
+          { label: 'Eligible cohort', name: 'eligible', type: 'select', value: 'All placement-eligible (412)', options: ['All placement-eligible (412)', 'CSE + IT (238)', 'Final year only (186)'] },
+        ]}
+        submitLabel="Schedule Drive"
+        success="Drive scheduled - it is now in the Placement Drives list (sample)."
+        onSubmit={(values) => session.addDrive({
+          company: values['company'] ?? 'Zenvia Labs',
+          role: values['role'] || 'Graduate Engineer Trainee',
+          date: values['date'] ?? '2026-06-20',
+          mode: values['mode'] ?? 'On campus',
+          eligible: values['eligible']?.includes('CSE') ? 238 : values['eligible']?.includes('Final') ? 186 : 412,
+        })} />,
+    });
+  };
   const manageDrive = (drive: typeof pilotInstitutionDrives[number]): void => {
     overlay.openModal({
       title: `${drive.company.name} — ${drive.role}`, subtitle: 'Drive management', body: <div>
@@ -249,12 +281,27 @@ export function InstitutionDrives(): React.ReactElement {
     <div className="pilot-content">
       <div className="pilot-page-head">
         <div><h1>Placement Drives</h1><p>Company visits, eligibility and registration for the 2027 season.</p></div>
-        <button type="button" className="pilot-btn"><CalendarDays size={15} /> Schedule Drive</button>
+        <button type="button" className="pilot-btn" onClick={(event) => { event.stopPropagation(); scheduleDrive(); }}><CalendarDays size={15} /> Schedule Drive</button>
       </div>
       <section className="pilot-card">
         <div className="pilot-table-wrap"><table className="pilot-table">
           <thead><tr><th>Company</th><th>Roles</th><th>Date</th><th>Mode</th><th>Eligible</th><th>Registered</th><th>Stage</th><th></th></tr></thead>
           <tbody>
+            {session.createdDrives.map((created) => (
+              <tr key={`${created.company}-${created.role}-${created.date}`}>
+                <td><div className="pilot-person">
+                  <span className="pilot-mark slate" style={{ width: 34, height: 34, fontSize: 11.5 }}>{created.company.split(' ').map((word) => word[0]).join('').slice(0, 2).toUpperCase()}</span>
+                  <strong>{created.company}</strong>
+                </div></td>
+                <td>{created.role}</td>
+                <td>{created.date}</td>
+                <td>{created.mode}</td>
+                <td>{created.eligible}</td>
+                <td><small style={{ color: 'var(--p-muted)' }}>Opens soon</small></td>
+                <td><span className="pilot-chip purple">Just scheduled</span></td>
+                <td><button type="button" className="pilot-btn ghost small">Manage</button></td>
+              </tr>
+            ))}
             {pilotInstitutionDrives.map((drive) => (
               <tr key={drive.company.name}>
                 <td><div className="pilot-person">
@@ -285,19 +332,17 @@ export function InstitutionDrives(): React.ReactElement {
 export function InstitutionReports(): React.ReactElement {
   const overlay = useOverlay();
   const downloadReport = (): void => {
-    downloadCsv('placement-season-report.csv', [
-      ['ONE by Ai8ht — Placement Season Report (sample data)'],
-      [],
-      ['Pipeline stage', 'Students'],
-      ...pilotPipelineFunnel.map((row) => [row.label, String(row.value)]),
-      [],
-      ['Department', 'Average readiness'],
-      ...pilotDepartmentReadiness.map((department) => [department.label, `${department.value}%`]),
-      [],
-      ['Placement rate', `${Math.round((pilotCohort.placedSoFar / pilotCohort.placementEligible) * 100)}%`],
-      ['Offers this season', String(pilotCohort.offersThisSeason)],
-    ]);
-    overlay.toast('placement-season-report.csv downloaded (sample data).');
+    overlay.openModal({
+      title: 'Download Report', subtitle: 'Placement Season Report', body: <ReportFormatBody
+        filenameBase="placement-season-report" title="Placement Season Report"
+        rows={[
+          ['Metric', 'Value'],
+          ...pilotPipelineFunnel.map((row) => [`Pipeline · ${row.label}`, String(row.value)]),
+          ...pilotDepartmentReadiness.map((department) => [`${department.label} average readiness`, `${department.value}%`]),
+          ['Placement rate', `${Math.round((pilotCohort.placedSoFar / pilotCohort.placementEligible) * 100)}%`],
+          ['Offers this season', String(pilotCohort.offersThisSeason)],
+        ]} />,
+    });
   };
   return <div className="pilot-page">
     <div className="pilot-content">

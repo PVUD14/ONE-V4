@@ -1038,7 +1038,20 @@ function ProfileRecordList({ title, rows, action }: { readonly title: string; re
 export function PilotProfile(): React.ReactElement {
   const done = pilotProfileChecklist.filter((item) => item.state === 'done').length;
   const overlay = useOverlay();
+  const session = usePilotSession();
   const [tab, setTab] = useState(0);
+  const requestDeletion = (): void => {
+    overlay.openModal({
+      title: 'Privacy & Account', subtitle: 'Your data, your control', body: <div>
+        <p className="pilot-modal-text">You can export everything ONE holds about you, or ask for your account to be removed. Deletion starts a <strong>30-day grace period</strong> - sign in during that window to cancel, after which your data is permanently anonymised.</p>
+        <div className="pilot-modal-actions" style={{ justifyContent: 'flex-start' }}>
+          <button type="button" className="pilot-btn ghost" onClick={(event) => { event.stopPropagation(); overlay.closeModal(); overlay.toast('Data export prepared and emailed to you (sample).'); }}>Export My Data</button>
+          <button type="button" className="pilot-btn" style={{ background: '#b91c1c' }}
+            onClick={(event) => { event.stopPropagation(); overlay.closeModal(); overlay.toast('Deletion requested - 30-day grace period started (sample). Sign in anytime before then to cancel.'); }}>Request Account Deletion</button>
+        </div>
+      </div>,
+    });
+  };
   const editProfile = (): void => {
     overlay.openModal({
       title: 'Edit Profile', subtitle: 'Changes stay in this sample session', body: <OverlayForm
@@ -1224,12 +1237,19 @@ export function PilotProfile(): React.ReactElement {
       <section className="pilot-card">
         <h2>Profile Tips</h2>
         <div className="pilot-list">
-          {pilotProfileTips.map((tip) => (
-            <div key={tip.title} className="pilot-list-row" style={{ padding: '9px 2px' }}>
+          {pilotProfileTips.map((tip, index) => (
+            <button key={tip.title} type="button" className="pilot-list-row pilot-tip-row" style={{ padding: '9px 2px' }}
+              onClick={(event) => {
+                event.stopPropagation();
+                if (index === 0) setTab(5);
+                else if (index === 1) setTab(4);
+                else if (index === 2) session.navigate('learn');
+                else setTab(7);
+              }}>
               <span className="pilot-tile amber" style={{ width: 32, height: 32 }}><Sparkles size={14} /></span>
               <div className="grow"><strong style={{ fontSize: 12.5 }}>{tip.title}</strong><small>{tip.detail}</small></div>
               <ArrowRight size={14} color="#98a5ba" />
-            </div>
+            </button>
           ))}
         </div>
       </section>
@@ -1241,6 +1261,8 @@ export function PilotProfile(): React.ReactElement {
             onClick={(event) => { event.stopPropagation(); overlay.openModal(shareProfileModal()); }}><Award size={15} /> Share Profile · QR</button>
           <button type="button" className="pilot-btn ghost" style={{ justifyContent: 'flex-start' }}
             onClick={(event) => { event.stopPropagation(); setTab(7); }}><Target size={15} /> Manage Preferences</button>
+          <button type="button" className="pilot-btn ghost" style={{ justifyContent: 'flex-start' }}
+            onClick={(event) => { event.stopPropagation(); requestDeletion(); }}><Lock size={15} /> Privacy &amp; Account</button>
         </div>
       </section>
     </aside> : null}

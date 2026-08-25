@@ -471,22 +471,25 @@ export class InstitutionAssessmentsController {
     const id = requireUuid(definitionId, context.correlationId);
     const extendMinutes = Math.round(clampNumber(body['extendMinutes'], 0, 10080, 0));
     const extraAttempts = Math.round(clampNumber(body['extraAttempts'], 0, 9, 0));
-    if (extendMinutes === 0 && extraAttempts === 0) throw badRequest('NOTHING_TO_REOPEN', context.correlationId);
+    const durationMinutes = body['durationMinutes'] == null ? null : Math.round(clampNumber(body['durationMinutes'], 1, 360, 0));
+    if (extendMinutes === 0 && extraAttempts === 0 && durationMinutes == null) throw badRequest('NOTHING_TO_REOPEN', context.correlationId);
 
     const current = await this.db.execute(sql`
-      SELECT lifecycle_state, attempts_allowed FROM exam_definitions
+      SELECT lifecycle_state, attempts_allowed, duration_seconds FROM exam_definitions
       WHERE id = ${id}::uuid AND institution_id = ${institutionId}::uuid
-    `) as QueryResult<{ lifecycle_state: string; attempts_allowed: number }>;
+    `) as QueryResult<{ lifecycle_state: string; attempts_allowed: number; duration_seconds: number }>;
     const state = current.rows[0];
     if (!state) throw badRequest('ASSESSMENT_NOT_FOUND', context.correlationId);
     if (state.lifecycle_state !== 'PUBLISHED') throw badRequest('ASSESSMENT_NOT_PUBLISHED', context.correlationId);
     const newAttempts = Math.min(10, Number(state.attempts_allowed) + extraAttempts);
+    const newDurationSeconds = durationMinutes != null ? durationMinutes * 60 : Number(state.duration_seconds);
 
     await this.db.transaction(async (tx) => {
       await tx.execute(sql`
         UPDATE exam_definitions
         SET ends_at = GREATEST(ends_at, now()) + make_interval(mins => ${extendMinutes}),
             attempts_allowed = ${newAttempts},
+            duration_seconds = ${newDurationSeconds},
             updated_at = now()
         WHERE id = ${id}::uuid AND institution_id = ${institutionId}::uuid
       `);
@@ -495,7 +498,10 @@ export class InstitutionAssessmentsController {
         VALUES (${this.ids.uuid()}::uuid, ${id}::uuid, ${actorId}::uuid, 'PUBLISHED', 'PUBLISHED')
       `);
     });
-    return { assessment: { id, attemptsAllowed: newAttempts, extendedMinutes: extendMinutes }, correlationId: context.correlationId };
+    return {
+      assessment: { id, attemptsAllowed: newAttempts, extendedMinutes: extendMinutes, durationSeconds: newDurationSeconds },
+      correlationId: context.correlationId,
+    };
   }
 
   @Get('/institutions/:institutionId/assessments/:definitionId/results')

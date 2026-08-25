@@ -807,7 +807,7 @@ export function assignInstitutionExam(token: string, institutionId: string, defi
 
 export interface ExamNotAttemptedDto { readonly studentName: string; readonly institutionStudentId: string; readonly inProgress: boolean }
 
-export function reopenInstitutionExam(token: string, institutionId: string, definitionId: string, body: { extendMinutes?: number; extraAttempts?: number }): Promise<{ assessment: { id: string; attemptsAllowed: number; extendedMinutes: number } }> {
+export function reopenInstitutionExam(token: string, institutionId: string, definitionId: string, body: { extendMinutes?: number; extraAttempts?: number; durationMinutes?: number }): Promise<{ assessment: { id: string; attemptsAllowed: number; extendedMinutes: number; durationSeconds: number } }> {
   return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/assessments/${encodeURIComponent(definitionId)}/reopen`, { token, method: 'POST', body });
 }
 

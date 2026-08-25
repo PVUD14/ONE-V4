@@ -322,3 +322,30 @@ describe('not-attempted visibility and reopening', () => {
     expect(retake.body.attempt.attemptNumber).toBe(2);
   });
 });
+
+describe('stale attempts and duration changes', () => {
+  it('expires a timed-out open attempt and starts a fresh full-length one', async () => {
+    // Attempt 2 from the reopen test is open. Age it beyond its duration.
+    await pool.query(
+      `UPDATE exam_attempts SET started_at = now() - interval '2 hours'
+       WHERE definition_id = $1 AND student_user_id = $2 AND status = 'IN_PROGRESS'`,
+      [examId, studentUserId],
+    );
+    // One more allowance so a fresh attempt is possible after the stale one expires.
+    await api().post(`/api/v1/institutions/${institutionId}/assessments/${examId}/reopen`)
+      .set(auth(staffToken)).send({ extendMinutes: 30, extraAttempts: 1, durationMinutes: 45 });
+
+    const started = await api().post(`/api/v1/student/assessments/${examId}/attempts`).set(auth(studentToken));
+    expect(started.status).toBe(201);
+    // Not the stale attempt: a brand-new paper with the new 45-minute clock.
+    expect(started.body.attempt.attemptNumber).toBe(3);
+    expect(started.body.attempt.durationSeconds).toBe(45 * 60);
+    expect(started.body.attempt.remainingSeconds).toBeGreaterThan(29 * 60);
+
+    // The stale attempt was auto-finalized with its own result row.
+    const results = await api().get(`/api/v1/institutions/${institutionId}/assessments/${examId}/results`).set(auth(staffToken));
+    const autoSubmitted = (results.body.results as { attemptNumber: number; autoSubmitted: boolean }[])
+      .find((row) => row.attemptNumber === 2);
+    expect(autoSubmitted?.autoSubmitted).toBe(true);
+  });
+});

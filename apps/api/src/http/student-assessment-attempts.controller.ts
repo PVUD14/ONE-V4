@@ -116,12 +116,25 @@ export class StudentAssessmentAttemptsController {
     const found = definition.rows[0];
     if (!found) throw new NotFoundException(assessmentApiError('ASSESSMENT_NOT_FOUND', context.correlationId));
 
+    // An open attempt resumes only while it still has time. A stale one - its
+    // duration spent, or the window closed and later reopened - is finalized
+    // with whatever was answered, so the student gets a fresh, full-length
+    // attempt when the allowance permits instead of a dead timer.
     const open = await this.db.execute(sql`
-      SELECT id FROM exam_attempts
-      WHERE definition_id = ${id}::uuid AND student_user_id = ${studentUserId}::uuid AND status = 'IN_PROGRESS'
+      SELECT t.id, t.institution_id, t.definition_id, t.student_user_id, t.status, t.paper_seed,
+             t.started_at, t.screen_shift_count,
+             d.duration_seconds, d.ends_at, d.publish_results_immediately, d.auto_submit_on_focus_loss
+      FROM exam_attempts t
+      JOIN exam_definitions d ON d.id = t.definition_id
+      WHERE t.definition_id = ${id}::uuid AND t.student_user_id = ${studentUserId}::uuid AND t.status = 'IN_PROGRESS'
       LIMIT 1
-    `) as QueryResult<{ id: string }>;
-    if (open.rows[0]) return this.attemptPayload(open.rows[0].id, studentUserId, context.correlationId);
+    `) as unknown as QueryResult<AttemptRow>;
+    const openAttempt = open.rows[0];
+    if (openAttempt) {
+      const timeLeft = remainingSeconds(openAttempt.started_at, Number(openAttempt.duration_seconds), openAttempt.ends_at);
+      if (timeLeft > 0) return this.attemptPayload(openAttempt.id, studentUserId, context.correlationId);
+      await this.finalizeAttempt({ ...openAttempt, duration_seconds: Number(openAttempt.duration_seconds) }, true);
+    }
 
     const used = await this.db.execute(sql`
       SELECT count(*) AS n FROM exam_attempts

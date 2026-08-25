@@ -312,11 +312,20 @@ function ExamListCard({ token, institutionId, exams, students, onDone, onFail }:
   const [results, setResults] = useState<{ rows: Record<string, unknown>[]; pending: ExamNotAttemptedDto[]; average: number; assigned: number } | null>(null);
 
   function reopen(exam: InstitutionExamDto): void {
-    const minutes = Number(window.prompt('Extend the window by how many minutes from now?', '60') ?? 0);
-    const attempts = Number(window.prompt('Grant how many extra attempts per student? (0 = none)', '1') ?? 0);
-    if (!minutes && !attempts) return;
-    reopenInstitutionExam(token, institutionId, exam.id, { extendMinutes: minutes, extraAttempts: attempts })
-      .then((response) => onDone(`${exam.title} reopened - window extended ${response.assessment.extendedMinutes} min, attempts now ${response.assessment.attemptsAllowed} per student.`))
+    const currentDuration = Math.round(exam.durationSeconds / 60);
+    const minutes = Number(window.prompt(
+      `WINDOW: keep "${exam.title}" open for how many more minutes from now? (This is how long students may start; each attempt still runs its own duration.)`, '60') ?? 0);
+    const attempts = Number(window.prompt('ATTEMPTS: grant how many extra attempts per student? (0 = none)', '1') ?? 0);
+    const durationInput = window.prompt(
+      `DURATION: minutes on the clock per attempt (currently ${currentDuration} min). Leave blank to keep ${currentDuration}.`, '');
+    const durationMinutes = durationInput && Number(durationInput) > 0 ? Number(durationInput) : null;
+    if (!minutes && !attempts && durationMinutes == null) return;
+    reopenInstitutionExam(token, institutionId, exam.id, {
+      extendMinutes: minutes,
+      extraAttempts: attempts,
+      ...(durationMinutes != null ? { durationMinutes } : {}),
+    })
+      .then((response) => onDone(`${exam.title} reopened - window extended ${response.assessment.extendedMinutes} min, attempts now ${response.assessment.attemptsAllowed} per student, attempt duration ${Math.round(response.assessment.durationSeconds / 60)} min.`))
       .catch(() => onFail('Reopen failed - only a published assessment can be reopened, and only by a senior role.'));
   }
 

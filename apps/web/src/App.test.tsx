@@ -360,12 +360,11 @@ describe('Student portal completion', () => {
     expect(screen.queryByText(/127\.0\.0\.1:3000/i)).not.toBeInTheDocument();
   });
 
-  it('connects Student topbar messages to preview status and notifications to the real inbox', () => {
+  it('opens real inbox flyouts from the Student topbar messages and notifications icons', () => {
     fetchMock.mockResolvedValue({ ok: true });
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: 'Messages' }));
-    expect(screen.getByRole('status')).toHaveTextContent('Student messages require the secure backend messaging workflow');
-    // The bell now opens a real notification inbox; signed out it is simply empty.
+    expect(screen.getByRole('dialog', { name: 'Messages' })).toHaveTextContent(/No messages yet/);
     fireEvent.click(screen.getByRole('button', { name: 'Notifications' }));
     expect(screen.getByRole('dialog', { name: 'Notifications' })).toHaveTextContent(/caught up/);
   });

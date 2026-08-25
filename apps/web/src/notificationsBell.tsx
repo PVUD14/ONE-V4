@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Bell } from 'lucide-react';
+import { Bell, MessageSquare } from 'lucide-react';
 import { getProtectedAccessToken, listStudentExams } from './api.js';
 
 interface DerivedNotification {
@@ -70,6 +70,39 @@ export function StudentNotificationsBell(): React.ReactElement {
           ) : (
             <p>You&apos;re all caught up — nothing needs your attention.</p>
           )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * The student messages flyout. There is no messaging backend yet, so this is
+ * an honest empty inbox rather than a dead button or a fake unread badge.
+ */
+export function StudentMessagesFlyout(): React.ReactElement {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onOutside = (event: MouseEvent): void => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onOutside);
+    return () => document.removeEventListener('mousedown', onOutside);
+  }, [open]);
+
+  return (
+    <div className="notify-bell" ref={containerRef}>
+      <button className="icon-button" type="button" aria-label="Messages" aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}>
+        <MessageSquare size={18} />
+      </button>
+      {open ? (
+        <div className="notify-flyout" role="dialog" aria-label="Messages">
+          <strong>Messages</strong>
+          <p>No messages yet. Conversations with your placement cell and recruiters will arrive here once messaging launches.</p>
         </div>
       ) : null}
     </div>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   getProtectedAccessToken,
   listStudentExams,
@@ -19,7 +19,7 @@ import {
  * never sees a correct answer before submission.
  */
 export function ExamAttemptPanel(): React.ReactElement | null {
-  const token = useMemo(() => getProtectedAccessToken(), []);
+  const token = getProtectedAccessToken();
   const [exams, setExams] = useState<StudentExamDto[] | null>(null);
   const [attempt, setAttempt] = useState<ExamAttemptDto | null>(null);
   const [result, setResult] = useState<ExamResultDto | null>(null);
@@ -44,9 +44,18 @@ export function ExamAttemptPanel(): React.ReactElement | null {
     const abort = new AbortController();
     void refresh(abort.signal);
     return () => abort.abort();
-  }, []);
+  }, [token]);
 
-  if (!token) return null;
+  if (!token) {
+    return (
+      <section className="career-api-panel" aria-labelledby="exam-panel-title">
+        <div className="career-api-heading">
+          <div><span className="eyebrow">Institution assessments</span><h2 id="exam-panel-title">Scheduled Assessments</h2></div>
+        </div>
+        <p className="career-api-status" role="status">Sign in to see the assessments your institution has assigned to you.</p>
+      </section>
+    );
+  }
 
   async function start(definitionId: string): Promise<void> {
     setBusy(true);

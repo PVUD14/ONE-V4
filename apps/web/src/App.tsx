@@ -801,7 +801,7 @@ function AuthenticatedStudentRoute({ route, currentStudent }: { readonly route: 
   if (route === 'career-path') return <><CareerReadinessApiPanel route="roadmap" /><AuthenticatedStudentUnavailable route={route} /></>;
   if (route === 'readiness') return <><CareerReadinessApiPanel route="readiness" /><AuthenticatedStudentUnavailable route={route} /></>;
   if (route === 'skills') return <><CareerReadinessApiPanel route="skills" /><AuthenticatedStudentUnavailable route={route} /></>;
-  if (route === 'assessments') return <><CareerReadinessApiPanel route="assessments" /><AuthenticatedStudentUnavailable route={route} /></>;
+  if (route === 'assessments') return <><ExamAttemptPanel /><CareerReadinessApiPanel route="assessments" /></>;
   if (route === 'learning') return <><CareerReadinessApiPanel route="learning" /><AuthenticatedStudentUnavailable route={route} /></>;
   if (route === 'settings') return <><CareerReadinessApiPanel route="notifications" /><StudentPrivacyPanel /></>;
   return <AuthenticatedStudentUnavailable route={route} />;

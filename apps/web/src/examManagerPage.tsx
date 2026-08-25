@@ -173,17 +173,37 @@ function QuestionBankCard({ token, institutionId, subjects, questions, onDone, o
           <option>True</option><option>False</option>
         </select></label>
       ) : (
-        options.map((option, index) => (
-          <label key={index}><span>Option {String.fromCharCode(65 + index)} {option.isCorrect ? '(correct)' : ''}</span>
-            <span className="exam-option-edit">
-              <input value={option.text} onChange={(event) => setOptions((value) => value.map((entry, i) => i === index ? { ...entry, text: event.target.value } : entry))} required={index < 2} />
-              <input type={form.questionType === 'MULTIPLE_SELECT' ? 'checkbox' : 'radio'} name="correct-option" checked={option.isCorrect}
-                onChange={() => setOptions((value) => value.map((entry, i) => form.questionType === 'MULTIPLE_SELECT'
-                  ? (i === index ? { ...entry, isCorrect: !entry.isCorrect } : entry)
-                  : { ...entry, isCorrect: i === index }))} />
-            </span>
-          </label>
-        ))
+        <div className="exam-option-authoring">
+          <span className="exam-authoring-label">
+            Options — {form.questionType === 'MULTIPLE_SELECT' ? 'tick every correct answer (at least two, plus one wrong)' : 'select the one correct answer'}
+          </span>
+          {options.map((option, index) => {
+            const letter = String.fromCharCode(65 + index);
+            return (
+              <div key={index} className="exam-option-author-row">
+                <input
+                  type={form.questionType === 'MULTIPLE_SELECT' ? 'checkbox' : 'radio'}
+                  name="correct-option"
+                  checked={option.isCorrect}
+                  aria-label={`Mark option ${letter} as correct`}
+                  onChange={() => setOptions((value) => value.map((entry, i) => form.questionType === 'MULTIPLE_SELECT'
+                    ? (i === index ? { ...entry, isCorrect: !entry.isCorrect } : entry)
+                    : { ...entry, isCorrect: i === index }))}
+                />
+                <span className="exam-option-letter">{letter}</span>
+                <input
+                  className="exam-option-text"
+                  type="text"
+                  value={option.text}
+                  placeholder={`Option ${letter} text${index < 2 ? '' : ' (optional)'}`}
+                  aria-label={`Option ${letter} text`}
+                  required={index < 2}
+                  onChange={(event) => setOptions((value) => value.map((entry, i) => i === index ? { ...entry, text: event.target.value } : entry))}
+                />
+              </div>
+            );
+          })}
+        </div>
       )}
       <button type="submit" disabled={!subjects.length}>Draft question</button>
     </form>

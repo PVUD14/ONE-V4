@@ -1,6 +1,7 @@
 import { Bell, ChevronDown, ChevronsLeft, ChevronsRight, Filter, Menu, MessageSquare, Search, X } from 'lucide-react';
 import { BrandWordmark } from './brand.js';
 import { InstitutionExamEnginePage } from './examManagerPage.js';
+import { listExamQuestions, listInstitutionExams } from './api.js';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { AuthStatus } from './auth.js';
 import { AuthControls } from './authControls.js';
@@ -127,7 +128,23 @@ function RolePortalInner({ portal, apiHealth, authStatus, authNotice, showDevelo
       <RoleSidebar portal={portal} activePath={path} collapsed={collapsed} drawerOpen={drawerOpen} onNavigate={navigate} onCollapse={() => setCollapsed((value) => !value)} onClose={() => { setDrawerOpen(false); menuButtonRef.current?.focus(); }} />
       {drawerOpen ? <button className="drawer-scrim role-scrim" type="button" aria-label={`Close ${portal.roleName} navigation`} onClick={() => setDrawerOpen(false)} /> : null}
       <div className="role-workspace">
-        <RoleTopbar portal={portal} apiHealth={apiHealth} authStatus={authStatus} authNotice={authNotice} showDevelopmentIndicators={showDevelopmentIndicators} menuButtonRef={menuButtonRef} onOpenMenu={() => setDrawerOpen(true)} onMessages={() => { const messagesRoute = portal.nav.find((item) => /messages|communications/i.test(item.label)); if (messagesRoute) navigate(messagesRoute.path); else setTopbarNotice(`${portal.roleName} messaging is backend-dependent and no message route exists for this role.`); }} onNotifications={() => setTopbarNotice(demoMode ? `${portal.roleName} notifications preview: 4 local demo alerts are summarized only; no backend notification state was changed.` : `${portal.roleName} notifications are not fully implemented in this authenticated UAT surface yet.`)} onSwitch={() => navigate(demoMode ? '/demo' : '/')} onSignIn={onSignIn} onSignOut={onSignOut} demoMode={demoMode} authenticatedWorkspace={authenticatedWorkspace} />
+        <RoleTopbar portal={portal} apiHealth={apiHealth} authStatus={authStatus} authNotice={authNotice} showDevelopmentIndicators={showDevelopmentIndicators} menuButtonRef={menuButtonRef} onOpenMenu={() => setDrawerOpen(true)} onMessages={() => { const messagesRoute = portal.nav.find((item) => /messages|communications/i.test(item.label)); if (messagesRoute) navigate(messagesRoute.path); else setTopbarNotice(`${portal.roleName} messaging is backend-dependent and no message route exists for this role.`); }} onNotifications={() => {
+          if (demoMode) { setTopbarNotice(`${portal.roleName} notifications preview: 4 local demo alerts are summarized only; no backend notification state was changed.`); return; }
+          if (portal.key === 'institution-admin' && isInstitutionWorkspace(authenticatedWorkspace)) {
+            const token = getProtectedAccessToken();
+            if (!token) { setTopbarNotice('Sign in to load notifications.'); return; }
+            void Promise.all([
+              listInstitutionExams(token, authenticatedWorkspace.organizationId),
+              listExamQuestions(token, authenticatedWorkspace.organizationId, { status: 'UNDER_REVIEW' }),
+            ]).then(([examsResponse, reviewResponse]) => {
+              const published = examsResponse.assessments.filter((exam) => exam.lifecycleState === 'PUBLISHED').length;
+              const completed = examsResponse.assessments.reduce((sum, exam) => sum + exam.completedAttempts, 0);
+              setTopbarNotice(`Notifications: ${published} published assessment(s), ${completed} completed attempt(s), ${reviewResponse.questions.length} question(s) awaiting review.`);
+            }).catch(() => setTopbarNotice('Notifications could not be loaded right now.'));
+            return;
+          }
+          setTopbarNotice(`${portal.roleName} has no notification sources yet - nothing needs your attention.`);
+        }} onSwitch={() => navigate(demoMode ? '/demo' : '/')} onSignIn={onSignIn} onSignOut={onSignOut} demoMode={demoMode} authenticatedWorkspace={authenticatedWorkspace} />
         <main id="role-main" className="role-main">
           {demoMode ? <section className="demo-boundary" role="note"><strong>DEMO PREVIEW</strong><span>Fictional data. This route is not authenticated and does not authorize a user.</span></section> : null}
           <PortalModeNotice portal={portal} notice={topbarNotice} demoMode={demoMode} authenticatedWorkspace={authenticatedWorkspace} />
@@ -159,7 +176,7 @@ function RoleTopbar({ portal, apiHealth, authStatus, authNotice, showDevelopment
   const displayRole = authenticatedWorkspace?.role ?? portal.roleName;
   // Never surface the raw organization UUID to an end user; it is an internal identifier.
   const displayOrg = authenticatedWorkspace?.organizationId ? portal.subtitle : portal.organization;
-  return <header className="role-topbar"><button ref={menuButtonRef} className="icon-button mobile-menu-button" type="button" aria-label={`Open ${portal.roleName} navigation`} onClick={onOpenMenu}><Menu size={20} /></button><span className="role-context">{portal.roleName}</span><span className="role-org">{displayOrg}</span><label className="role-search" role="search"><Search size={16} /><span className="sr-only">Search {portal.roleName} workspace</span><input placeholder={`Search ${portal.family.toLowerCase()} records...`} /></label><div className="role-topbar-actions"><button type="button" className="secondary" onClick={onSwitch}>{demoMode ? 'Switch preview portal' : 'Switch workspace'}</button><button className="icon-button" type="button" aria-label="Messages" onClick={onMessages}><MessageSquare size={17} /></button><button className="icon-button notification" type="button" aria-label="Notifications" onClick={onNotifications}><Bell size={17} /><span>4</span></button><AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />{showDevelopmentIndicators ? <span className={`staff-api-dot ${apiHealth}`}>{apiHealth}</span> : null}<span className="role-profile"><span>{demoMode ? portal.initials : initialsFor(displayName)}</span><span><strong>{displayName}</strong><small>{displayRole}</small></span><ChevronDown size={14} /></span></div></header>;
+  return <header className="role-topbar"><button ref={menuButtonRef} className="icon-button mobile-menu-button" type="button" aria-label={`Open ${portal.roleName} navigation`} onClick={onOpenMenu}><Menu size={20} /></button><span className="role-context">{portal.roleName}</span><span className="role-org">{displayOrg}</span><label className="role-search" role="search"><Search size={16} /><span className="sr-only">Search {portal.roleName} workspace</span><input placeholder={`Search ${portal.family.toLowerCase()} records...`} /></label><div className="role-topbar-actions"><button type="button" className="secondary" onClick={onSwitch}>{demoMode ? 'Switch preview portal' : 'Switch workspace'}</button><button className="icon-button" type="button" aria-label="Messages" onClick={onMessages}><MessageSquare size={17} /></button><button className="icon-button notification" type="button" aria-label="Notifications" onClick={onNotifications}><Bell size={17} /></button><AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />{showDevelopmentIndicators ? <span className={`staff-api-dot ${apiHealth}`}>{apiHealth}</span> : null}<span className="role-profile"><span>{demoMode ? portal.initials : initialsFor(displayName)}</span><span><strong>{displayName}</strong><small>{displayRole}</small></span><ChevronDown size={14} /></span></div></header>;
 }
 
 function normalizeRolePath(path: string, portal: RolePortalConfig): string {

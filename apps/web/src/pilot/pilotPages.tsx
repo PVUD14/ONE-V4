@@ -122,7 +122,8 @@ export function PilotDashboard(): React.ReactElement {
         </section>
 
         <section className="pilot-card">
-          <div className="pilot-card-head"><h2>Upcoming</h2><button type="button" className="pilot-link">View All</button></div>
+          <div className="pilot-card-head"><h2>Upcoming</h2><button type="button" className="pilot-link"
+            onClick={(event) => { event.stopPropagation(); overlay.openModal(listModal('Upcoming This Week', `${pilotUpcoming.length + pilotDrives.length} scheduled items`, [...pilotUpcoming.map((item) => ({ title: item.title, detail: item.when })), ...pilotDrives.map((drive) => ({ title: drive.title, detail: `${drive.company} · ${drive.mode}`, trailing: drive.date }))])); }}>View All</button></div>
           <div className="pilot-list">
             {pilotUpcoming.map((item) => (
               <div key={item.title} className="pilot-list-row">

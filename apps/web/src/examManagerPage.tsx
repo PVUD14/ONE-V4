@@ -10,10 +10,12 @@ import {
   listInstitutionExamResults,
   listInstitutionExams,
   listInstitutionStudents,
+  reopenInstitutionExam,
   publishInstitutionExam,
   transitionExamQuestion,
   type ExamQuestionDto,
   type ExamSubjectDto,
+  type ExamNotAttemptedDto,
   type InstitutionExamDto,
   type InstitutionStudentDto,
 } from './api.js';
@@ -307,7 +309,16 @@ function ExamListCard({ token, institutionId, exams, students, onDone, onFail }:
   const [assigning, setAssigning] = useState<string | null>(null);
   const [chosenStudents, setChosenStudents] = useState<readonly string[]>([]);
   const [resultsFor, setResultsFor] = useState<string | null>(null);
-  const [results, setResults] = useState<{ rows: Record<string, unknown>[]; average: number } | null>(null);
+  const [results, setResults] = useState<{ rows: Record<string, unknown>[]; pending: ExamNotAttemptedDto[]; average: number; assigned: number } | null>(null);
+
+  function reopen(exam: InstitutionExamDto): void {
+    const minutes = Number(window.prompt('Extend the window by how many minutes from now?', '60') ?? 0);
+    const attempts = Number(window.prompt('Grant how many extra attempts per student? (0 = none)', '1') ?? 0);
+    if (!minutes && !attempts) return;
+    reopenInstitutionExam(token, institutionId, exam.id, { extendMinutes: minutes, extraAttempts: attempts })
+      .then((response) => onDone(`${exam.title} reopened - window extended ${response.assessment.extendedMinutes} min, attempts now ${response.assessment.attemptsAllowed} per student.`))
+      .catch(() => onFail('Reopen failed - only a published assessment can be reopened, and only by a senior role.'));
+  }
 
   function publish(exam: InstitutionExamDto): void {
     publishInstitutionExam(token, institutionId, exam.id)
@@ -323,7 +334,15 @@ function ExamListCard({ token, institutionId, exams, students, onDone, onFail }:
 
   function showResults(exam: InstitutionExamDto): void {
     listInstitutionExamResults(token, institutionId, exam.id)
-      .then((response) => { setResultsFor(exam.id); setResults({ rows: response.results, average: response.summary.averagePercentage }); })
+      .then((response) => {
+        setResultsFor(exam.id);
+        setResults({
+          rows: response.results,
+          pending: response.notAttempted,
+          average: response.summary.averagePercentage,
+          assigned: response.summary.assigned,
+        });
+      })
       .catch(() => onFail('Results could not be loaded.'));
   }
 
@@ -343,7 +362,8 @@ function ExamListCard({ token, institutionId, exams, students, onDone, onFail }:
             <td><div className="role-record-actions">
               {exam.lifecycleState === 'DRAFT' ? <button type="button" onClick={() => publish(exam)}>Publish</button> : null}
               {exam.lifecycleState === 'PUBLISHED' ? <button type="button" onClick={() => { setAssigning(assigning === exam.id ? null : exam.id); setChosenStudents([]); }}>Assign students</button> : null}
-              {exam.completedAttempts > 0 ? <button type="button" className="secondary" onClick={() => showResults(exam)}>Results</button> : null}
+              {exam.lifecycleState === 'PUBLISHED' ? <button type="button" className="secondary" onClick={() => reopen(exam)}>Reopen / Extend</button> : null}
+              {exam.assignedCount > 0 ? <button type="button" className="secondary" onClick={() => showResults(exam)}>Results</button> : null}
             </div></td>
           </tr>
           {assigning === exam.id ? (
@@ -363,7 +383,15 @@ function ExamListCard({ token, institutionId, exams, students, onDone, onFail }:
           ) : null}
           {resultsFor === exam.id && results ? (
             <tr key={`${exam.id}-results`}><td colSpan={7}>
-              <p><strong>{results.rows.length}</strong> completed attempts · average {results.average}%</p>
+              <p>
+                <strong>{results.assigned}</strong> assigned · <strong>{results.rows.length}</strong> completed attempts (average {results.average}%) ·{' '}
+                <strong>{results.pending.length}</strong> not attempted
+              </p>
+              {results.pending.length ? (
+                <p className="exam-pending-line">
+                  Not attempted: {results.pending.map((entry) => `${entry.studentName} (${entry.institutionStudentId})${entry.inProgress ? ' — in progress now' : ''}`).join(', ')}
+                </p>
+              ) : null}
               <table className="role-record-table"><thead><tr><th>Student</th><th>Score</th><th>%</th><th>Right / Wrong / Blank</th><th>Focus losses</th><th>Auto-submitted</th></tr></thead><tbody>
                 {results.rows.map((row, index) => (
                   <tr key={index}>

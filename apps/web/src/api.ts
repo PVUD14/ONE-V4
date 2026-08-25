@@ -805,7 +805,13 @@ export function assignInstitutionExam(token: string, institutionId: string, defi
   return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/assessments/${encodeURIComponent(definitionId)}/assignments`, { token, method: 'POST', body: { studentProfileIds } });
 }
 
-export function listInstitutionExamResults(token: string, institutionId: string, definitionId: string, signal?: AbortSignal): Promise<{ results: Record<string, unknown>[]; summary: { attempts: number; averagePercentage: number } }> {
+export interface ExamNotAttemptedDto { readonly studentName: string; readonly institutionStudentId: string; readonly inProgress: boolean }
+
+export function reopenInstitutionExam(token: string, institutionId: string, definitionId: string, body: { extendMinutes?: number; extraAttempts?: number }): Promise<{ assessment: { id: string; attemptsAllowed: number; extendedMinutes: number } }> {
+  return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/assessments/${encodeURIComponent(definitionId)}/reopen`, { token, method: 'POST', body });
+}
+
+export function listInstitutionExamResults(token: string, institutionId: string, definitionId: string, signal?: AbortSignal): Promise<{ results: Record<string, unknown>[]; notAttempted: ExamNotAttemptedDto[]; summary: { attempts: number; averagePercentage: number; assigned: number; notAttemptedCount: number } }> {
   return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/assessments/${encodeURIComponent(definitionId)}/results`, { token, ...(signal ? { signal } : {}) });
 }
 

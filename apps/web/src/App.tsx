@@ -42,6 +42,7 @@ import { PilotApp } from './pilot/PilotApp.js';
 import { isPilotIdentity } from './pilot/pilotIdentity.js';
 import { CareerReadinessApiPanel } from './careerReadinessApiPanel.js';
 import { ExamAttemptPanel } from './examAttemptPanel.js';
+import { StudentNotificationsBell } from './notificationsBell.js';
 
 type RouteKey = 'dashboard' | 'career-path' | 'ai-coach' | 'readiness' | 'skills' | 'assessments' | 'learning' | 'experience' | 'opportunities' | 'applications' | 'interviews' | 'documents' | 'profile' | 'settings';
 
@@ -733,7 +734,7 @@ function TopBar({ apiHealth, authNotice, authStatus, showDevelopmentIndicators, 
     <header className="student-topbar">
       <button ref={menuButtonRef} className="icon-button mobile-menu-button" type="button" onClick={onOpenMenu} aria-label="Open student navigation"><Menu size={20} /></button>
       <label className="global-search" role="search"><Search size={17} aria-hidden="true" /><span className="sr-only">Search student workspace</span><input placeholder="Search opportunities, skills, assessments..." /></label>
-      <div className="topbar-actions"><button className="icon-button" type="button" aria-label="Messages" onClick={onMessages}><MessageSquare size={18} /></button><button className="icon-button notification" type="button" aria-label="Notifications" onClick={onNotifications}><Bell size={18} /><span>3</span></button><AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />{showDevelopmentIndicators ? <span className={`api-dot ${apiHealth}`}>{apiHealth === 'online' ? 'API Online' : apiHealth === 'offline' ? 'API Offline' : 'Checking'}</span> : null}<button className="profile-menu" type="button" aria-label="Student profile menu" onClick={onProfile} disabled={profileActive}><span className="avatar">{identity.initials}</span><span><strong>{identity.name}</strong><small>{workspace ? `Role: ${workspace.role}` : identity.detail}</small></span><ChevronDown size={15} aria-hidden="true" /></button></div>
+      <div className="topbar-actions"><button className="icon-button" type="button" aria-label="Messages" onClick={onMessages}><MessageSquare size={18} /></button><StudentNotificationsBell /><AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />{showDevelopmentIndicators ? <span className={`api-dot ${apiHealth}`}>{apiHealth === 'online' ? 'API Online' : apiHealth === 'offline' ? 'API Offline' : 'Checking'}</span> : null}<button className="profile-menu" type="button" aria-label="Student profile menu" onClick={onProfile} disabled={profileActive}><span className="avatar">{identity.initials}</span><span><strong>{identity.name}</strong><small>{workspace ? `Role: ${workspace.role}` : identity.detail}</small></span><ChevronDown size={15} aria-hidden="true" /></button></div>
     </header>
   );
 }

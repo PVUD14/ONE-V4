@@ -6,7 +6,7 @@ import {
   tabResumeExamples, tabSavedResources, tabToolGroups,
 } from './pilotTabData.js';
 import { pilotCanon, pilotCompanies, pilotPersona } from './pilotData.js';
-import { PilotTabs } from './pilotOverlay.js';
+import { PilotTabs, listModal, useOverlay } from './pilotOverlay.js';
 
 /**
  * Tier 2 student pages, built to the same sample fidelity as Tier 1.
@@ -512,6 +512,7 @@ function ScholarshipList({ title, rows }: { readonly title: string; readonly row
 
 export function PilotScholarships(): React.ReactElement {
   const [tab, setTab] = useState(0);
+  const overlay = useOverlay();
   return <div className="pilot-page" style={tab === 0 ? undefined : { gridTemplateColumns: '1fr' }}>
     <div className="pilot-content">
       <div className="pilot-page-head">
@@ -559,7 +560,8 @@ export function PilotScholarships(): React.ReactElement {
       </section>
 
       <section className="pilot-card">
-        <div className="pilot-card-head"><h2>Top Scholarships for You</h2><button type="button" className="pilot-link">View All →</button></div>
+        <div className="pilot-card-head"><h2>Top Scholarships for You</h2><button type="button" className="pilot-link"
+          onClick={(event) => { event.stopPropagation(); overlay.openModal(listModal('All Scholarships', `${SCHOLARSHIPS.length} matching your profile`, SCHOLARSHIPS.map((scholarship) => ({ title: scholarship.name, detail: `${scholarship.provider} · ${scholarship.kind} · apply by ${scholarship.deadline}`, trailing: `up to ${scholarship.amount}` })))); }}>View All →</button></div>
         <div className="pilot-list">
           {SCHOLARSHIPS.map((scholarship) => (
             <div key={scholarship.name} className="pilot-list-row">
@@ -610,7 +612,8 @@ export function PilotScholarships(): React.ReactElement {
         </div>
       </section>
       <section className="pilot-card">
-        <div className="pilot-card-head"><h2>Upcoming Deadlines</h2><button type="button" className="pilot-link">View All</button></div>
+        <div className="pilot-card-head"><h2>Upcoming Deadlines</h2><button type="button" className="pilot-link"
+          onClick={(event) => { event.stopPropagation(); setTab(4); }}>View All</button></div>
         <div className="pilot-list">
           {SCHOLARSHIP_DEADLINES.map(([name, date, left]) => (
             <div key={name} className="pilot-list-row" style={{ padding: '8px 2px' }}>
@@ -658,6 +661,8 @@ const RESUME_TOOLS = [
 
 export function PilotResumeBuilder(): React.ReactElement {
   const [tab, setTab] = useState(0);
+  const [selectedTemplate, setSelectedTemplate] = useState('Modern');
+  const overlay = useOverlay();
   return <div className="pilot-page" style={tab === 0 ? undefined : { gridTemplateColumns: '1fr' }}>
     <div className="pilot-content">
       <div className="pilot-page-head">
@@ -712,14 +717,20 @@ export function PilotResumeBuilder(): React.ReactElement {
         <div className="pilot-card-head"><h2>Choose a Template</h2><button type="button" className="pilot-link"
           onClick={(event) => { event.stopPropagation(); setTab(1); }}>View All Templates →</button></div>
         <div className="pilot-row cols-5">
-          {RESUME_TEMPLATES.map((template) => (
-            <div key={template.name} className="pilot-course-card" style={template.selected ? { outline: '2px solid #1f55e5', outlineOffset: 1 } : undefined}>
-              <div className="pilot-course-art" style={{ background: template.selected ? 'linear-gradient(135deg, #1d4ed8, #1e3a8a)' : 'linear-gradient(135deg, #64748b, #334155)' }}><FileText size={22} /></div>
-              <strong>{template.name}</strong>
-              <small>{template.note}</small>
-              <button type="button" className={`pilot-btn small ${template.selected ? '' : 'ghost'}`}>{template.selected ? 'Selected' : 'Use Template'}</button>
-            </div>
-          ))}
+          {RESUME_TEMPLATES.map((template) => {
+            const isSelected = template.name === selectedTemplate;
+            return (
+              <div key={template.name} className="pilot-course-card" style={isSelected ? { outline: '2px solid #1f55e5', outlineOffset: 1 } : undefined}>
+                <div className="pilot-course-art" style={{ background: isSelected ? 'linear-gradient(135deg, #1d4ed8, #1e3a8a)' : 'linear-gradient(135deg, #64748b, #334155)' }}><FileText size={22} /></div>
+                <strong>{template.name}</strong>
+                <small>{template.note}</small>
+                <button type="button" className={`pilot-btn small ${isSelected ? '' : 'ghost'}`} disabled={isSelected}
+                  onClick={(event) => { event.stopPropagation(); setSelectedTemplate(template.name); overlay.toast(template.name + ' template applied to your resume (sample).'); }}>
+                  {isSelected ? 'Selected' : 'Use Template'}
+                </button>
+              </div>
+            );
+          })}
         </div>
       </section>
 

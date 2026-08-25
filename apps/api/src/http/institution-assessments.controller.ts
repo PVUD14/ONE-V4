@@ -454,6 +454,50 @@ export class InstitutionAssessmentsController {
     };
   }
 
+  /**
+   * Reopens a published assessment for late or repeat attempts: extends the
+   * window and/or raises the attempt allowance. Recorded as a definition event.
+   */
+  @Post('/institutions/:institutionId/assessments/:definitionId/reopen')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async reopenDefinition(
+    @Req() request: ProtectedHttpRequest,
+    @Param('institutionId') institutionId: string,
+    @Param('definitionId') definitionId: string,
+    @Body() body: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    const context = this.requireInstitutionStaff(request, institutionId, assessmentApprovalRoles);
+    const actorId = context.authorization.principal.userId;
+    const id = requireUuid(definitionId, context.correlationId);
+    const extendMinutes = Math.round(clampNumber(body['extendMinutes'], 0, 10080, 0));
+    const extraAttempts = Math.round(clampNumber(body['extraAttempts'], 0, 9, 0));
+    if (extendMinutes === 0 && extraAttempts === 0) throw badRequest('NOTHING_TO_REOPEN', context.correlationId);
+
+    const current = await this.db.execute(sql`
+      SELECT lifecycle_state, attempts_allowed FROM exam_definitions
+      WHERE id = ${id}::uuid AND institution_id = ${institutionId}::uuid
+    `) as QueryResult<{ lifecycle_state: string; attempts_allowed: number }>;
+    const state = current.rows[0];
+    if (!state) throw badRequest('ASSESSMENT_NOT_FOUND', context.correlationId);
+    if (state.lifecycle_state !== 'PUBLISHED') throw badRequest('ASSESSMENT_NOT_PUBLISHED', context.correlationId);
+    const newAttempts = Math.min(10, Number(state.attempts_allowed) + extraAttempts);
+
+    await this.db.transaction(async (tx) => {
+      await tx.execute(sql`
+        UPDATE exam_definitions
+        SET ends_at = GREATEST(ends_at, now()) + make_interval(mins => ${extendMinutes}),
+            attempts_allowed = ${newAttempts},
+            updated_at = now()
+        WHERE id = ${id}::uuid AND institution_id = ${institutionId}::uuid
+      `);
+      await tx.execute(sql`
+        INSERT INTO exam_definition_events (id, definition_id, actor_user_id, from_state, to_state)
+        VALUES (${this.ids.uuid()}::uuid, ${id}::uuid, ${actorId}::uuid, 'PUBLISHED', 'PUBLISHED')
+      `);
+    });
+    return { assessment: { id, attemptsAllowed: newAttempts, extendedMinutes: extendMinutes }, correlationId: context.correlationId };
+  }
+
   @Get('/institutions/:institutionId/assessments/:definitionId/results')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async listResults(
@@ -483,7 +527,40 @@ export class InstitutionAssessmentsController {
       completedAt: row['created_at'],
     }));
     const average = results.length ? Math.round(results.reduce((sum, entry) => sum + entry.percentage, 0) / results.length * 100) / 100 : 0;
-    return { results, summary: { attempts: results.length, averagePercentage: average }, correlationId: context.correlationId };
+
+    // Assigned students with no completed attempt - the "who has not taken it" view.
+    const pending = await this.db.execute(sql`
+      SELECT p.full_name, p.institution_student_id,
+             EXISTS (SELECT 1 FROM exam_attempts t
+                      WHERE t.definition_id = ${id}::uuid AND t.student_user_id = a.student_user_id AND t.status = 'IN_PROGRESS') AS in_progress
+      FROM exam_assignments a
+      JOIN institution_student_profiles p ON p.student_user_id = a.student_user_id AND p.institution_id = a.institution_id
+      WHERE a.definition_id = ${id}::uuid AND a.institution_id = ${institutionId}::uuid
+        AND NOT EXISTS (SELECT 1 FROM exam_attempts t
+                         WHERE t.definition_id = ${id}::uuid AND t.student_user_id = a.student_user_id AND t.status <> 'IN_PROGRESS')
+      ORDER BY p.full_name
+      LIMIT 500
+    `) as QueryResult<Record<string, unknown>>;
+    const notAttempted = pending.rows.map((row) => ({
+      studentName: row['full_name'], institutionStudentId: row['institution_student_id'], inProgress: Boolean(row['in_progress']),
+    }));
+
+    const assignedCount = await this.db.execute(sql`
+      SELECT count(*) AS n FROM exam_assignments
+      WHERE definition_id = ${id}::uuid AND institution_id = ${institutionId}::uuid
+    `) as QueryResult<{ n: string }>;
+
+    return {
+      results,
+      notAttempted,
+      summary: {
+        attempts: results.length,
+        averagePercentage: average,
+        assigned: Number(assignedCount.rows[0]?.n ?? 0),
+        notAttemptedCount: notAttempted.length,
+      },
+      correlationId: context.correlationId,
+    };
   }
 
   // -------------------------------------------------------------------------

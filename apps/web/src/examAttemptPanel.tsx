@@ -112,7 +112,9 @@ export function ExamAttemptPanel(): React.ReactElement | null {
                   ) : windowOpen && attemptsLeft > 0 ? (
                     <button type="button" disabled={busy} onClick={() => void start(exam.id)}>Start Attempt</button>
                   ) : (
-                    <span className="exam-chip muted">{attemptsLeft <= 0 ? 'Attempts used' : Date.now() < Date.parse(exam.startsAt) ? 'Not started' : 'Window closed'}</span>
+                    <span className="exam-chip muted" title={attemptsLeft <= 0 ? 'All allowed attempts are used. Your institution can grant a retake.' : Date.now() < Date.parse(exam.startsAt) ? 'The window has not opened yet.' : 'The window has closed. Your institution can reopen it.'}>
+                      {attemptsLeft <= 0 ? (exam.latestResult ? 'Completed' : 'Attempts used') : Date.now() < Date.parse(exam.startsAt) ? 'Opens soon' : 'Window closed'}
+                    </span>
                   )}
                 </div>
               </div>

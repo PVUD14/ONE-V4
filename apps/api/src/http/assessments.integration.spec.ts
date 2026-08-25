@@ -287,3 +287,38 @@ function publicKeyToTrustedJwk(key: KeyObject, kid: string): TrustedJwk {
   if (jwk.kty !== 'RSA' || typeof jwk.n !== 'string' || typeof jwk.e !== 'string') throw new Error('invalid test key');
   return { kty: 'RSA', kid, n: jwk.n, e: jwk.e, alg: 'RS256', use: 'sig' };
 }
+
+describe('not-attempted visibility and reopening', () => {
+  it('lists assigned students who have not attempted', async () => {
+    const lateSub = `sub:${randomUUID()}`;
+    const lateUserId = await seedUser('bala@exam.test', lateSub);
+    const lateProfileId = randomUUID();
+    await pool.query(
+      `INSERT INTO institution_student_profiles (id, institution_id, student_user_id, institution_student_id, full_name, status)
+       VALUES ($1, $2, $3, 'EXM-002', 'Bala Student', 'ACTIVE')`,
+      [lateProfileId, institutionId, lateUserId],
+    );
+    const assigned = await api().post(`/api/v1/institutions/${institutionId}/assessments/${examId}/assignments`)
+      .set(auth(staffToken)).send({ studentProfileIds: [lateProfileId] });
+    expect(assigned.body.assignment.newlyAssigned).toBe(1);
+
+    const results = await api().get(`/api/v1/institutions/${institutionId}/assessments/${examId}/results`).set(auth(staffToken));
+    expect(results.body.summary.assigned).toBe(2);
+    expect(results.body.summary.notAttemptedCount).toBe(1);
+    expect(results.body.notAttempted[0]).toMatchObject({ studentName: 'Bala Student', institutionStudentId: 'EXM-002', inProgress: false });
+  });
+
+  it('reopening grants extra attempts so a finished student can retake', async () => {
+    const blocked = await api().post(`/api/v1/student/assessments/${examId}/attempts`).set(auth(studentToken));
+    expect(blocked.status).toBe(400);
+
+    const reopened = await api().post(`/api/v1/institutions/${institutionId}/assessments/${examId}/reopen`)
+      .set(auth(staffToken)).send({ extendMinutes: 30, extraAttempts: 1 });
+    expect(reopened.status).toBe(201);
+    expect(reopened.body.assessment.attemptsAllowed).toBe(2);
+
+    const retake = await api().post(`/api/v1/student/assessments/${examId}/attempts`).set(auth(studentToken));
+    expect(retake.status).toBe(201);
+    expect(retake.body.attempt.attemptNumber).toBe(2);
+  });
+});

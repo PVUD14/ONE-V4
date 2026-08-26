@@ -1,12 +1,17 @@
 package pro.ai8ht.one
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -79,5 +84,17 @@ internal fun LoadingSpinner() {
 internal fun CenteredNote(text: String) {
     Column(Modifier.fillMaxSize().padding(32.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
         Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center)
+    }
+}
+
+@Composable
+internal fun IconBubble(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    bg: Color,
+    fg: Color,
+    size: androidx.compose.ui.unit.Dp = 38.dp,
+) {
+    Box(Modifier.size(size).background(bg, CircleShape), contentAlignment = Alignment.Center) {
+        Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(size / 2))
     }
 }

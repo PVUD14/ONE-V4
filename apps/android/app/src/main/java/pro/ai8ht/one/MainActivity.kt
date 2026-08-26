@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -276,6 +277,12 @@ private fun HomeScreen(data: StudentData, onOpen: (Screen?) -> Unit) {
     val completed = data.learner?.progress?.count { it.state == "COMPLETED" } ?: 0
     val unread = data.notifications?.unreadCount ?: 0
     val firstName = data.student?.fullName?.split(" ")?.firstOrNull() ?: "Student"
+    val results = data.assessments.mapNotNull { exam -> exam.latestResult?.let { exam to it } }
+    val average = if (results.isEmpty()) null else results.map { it.second.percentage }.average()
+    val best = results.maxOfOrNull { it.second.percentage }
+    val nextDeadline = data.assessments
+        .filter { it.latestResult == null && runCatching { now.isBefore(Instant.parse(it.endsAt)) }.getOrDefault(false) }
+        .minByOrNull { it.endsAt }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp)) {
         Spacer(Modifier.height(16.dp))
@@ -287,23 +294,74 @@ private fun HomeScreen(data: StudentData, onOpen: (Screen?) -> Unit) {
             Column {
                 Text("Hi, $firstName", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = Color.White)
                 val line = listOfNotNull(data.student?.program, data.student?.batch).joinToString(" · ")
-                if (line.isNotBlank()) Text(line, style = MaterialTheme.typography.bodyMedium, color = Color(0xCCFFFFFF))
-                val band = data.learner?.readiness?.band
-                if (band != null) {
-                    Spacer(Modifier.height(12.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        StatusChip("Readiness: ${prettify(band)}", ChipKind.OnDark)
-                        Spacer(Modifier.width(8.dp))
-                        Text("Advisory · visible only to you", style = MaterialTheme.typography.labelSmall, color = Color(0xB3FFFFFF))
-                    }
+                Text(
+                    if (line.isNotBlank()) line else "Your placement-readiness workspace",
+                    style = MaterialTheme.typography.bodyMedium, color = Color(0xCCFFFFFF),
+                )
+                Spacer(Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    data.learner?.readiness?.band?.let { StatusChip("Readiness: ${prettify(it)}", ChipKind.OnDark) }
+                    average?.let { StatusChip("Avg ${it.toInt()}%", ChipKind.OnDark) }
                 }
+                Spacer(Modifier.height(6.dp))
+                Text("${data.assessments.size} assessments assigned · readiness is advisory, visible only to you",
+                    style = MaterialTheme.typography.labelSmall, color = Color(0xB3FFFFFF))
             }
         }
         Spacer(Modifier.height(14.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            StatTile("$openExams", "Exams open", Modifier.weight(1f)) { onOpen(Screen.Assessments) }
-            StatTile("$completed/${lessons.size}", "Lessons done", Modifier.weight(1f)) { onOpen(Screen.Learning) }
-            StatTile("$unread", "Unread", Modifier.weight(1f)) { onOpen(null) }
+            StatTile(Icons.Filled.Assignment, Color(0xFFEEF4FF), Color(0xFF1F55E5),
+                "$openExams", "Exams open now", Modifier.weight(1f)) { onOpen(Screen.Assessments) }
+            StatTile(Icons.Filled.MenuBook, Color(0xFFEAF4EE), Color(0xFF2E6B46),
+                "$completed of ${lessons.size}", "Lessons completed", Modifier.weight(1f)) { onOpen(Screen.Learning) }
+        }
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            StatTile(Icons.Filled.WorkOutline, Color(0xFFF3EEFF), Color(0xFF6941C6),
+                best?.let { "${it.toInt()}%" } ?: "—", "Best exam score", Modifier.weight(1f)) { onOpen(Screen.Assessments) }
+            StatTile(Icons.Filled.Notifications, Color(0xFFFDF6E0), Color(0xFF8A6400),
+                "$unread", "Unread updates", Modifier.weight(1f)) { onOpen(null) }
+        }
+
+        nextDeadline?.let { exam ->
+            SectionTitle("Next deadline")
+            PilotCard {
+                Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    IconBubble(Icons.Filled.Assignment, Color(0xFFEEF4FF), Color(0xFF1F55E5))
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(exam.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                        Text("Closes ${formatWhen(exam.endsAt)} · ${exam.durationSeconds / 60} min on the clock",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    StatusChip("Open", ChipKind.Accent)
+                }
+            }
+        }
+
+        if (results.isNotEmpty()) {
+            SectionTitle("Recent results")
+            PilotCard {
+                Column(Modifier.padding(vertical = 4.dp)) {
+                    results.take(3).forEachIndexed { index, (exam, result) ->
+                        Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(exam.title, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                StatusChip("${result.percentage}%",
+                                    if (result.percentage >= 50) ChipKind.Positive else ChipKind.Waiting)
+                            }
+                            Spacer(Modifier.height(6.dp))
+                            LinearProgressIndicator(
+                                progress = { (result.percentage / 100.0).toFloat().coerceIn(0f, 1f) },
+                                modifier = Modifier.fillMaxWidth(),
+                                color = if (result.percentage >= 50) Color(0xFF2E6B46) else Color(0xFF8A6400),
+                                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                            )
+                        }
+                        if (index != results.take(3).lastIndex) HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                    }
+                }
+            }
         }
         val nextSteps = data.learner?.roadmap?.filter { it.state == "PENDING" }?.take(3) ?: emptyList()
         if (nextSteps.isNotEmpty()) {
@@ -345,14 +403,22 @@ private fun HomeScreen(data: StudentData, onOpen: (Screen?) -> Unit) {
 }
 
 @Composable
-private fun StatTile(value: String, label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    PilotCard(modifier) {
-        Column(Modifier.fillMaxWidth().padding(vertical = 14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-            Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
-            Spacer(Modifier.height(4.dp))
-            TextButton(onClick = onClick, contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
-                Text("Open", style = MaterialTheme.typography.labelMedium)
+private fun StatTile(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    iconBg: Color,
+    iconFg: Color,
+    value: String,
+    label: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    PilotCard(modifier.clickable(onClick = onClick)) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconBubble(icon, iconBg, iconFg)
+            Spacer(Modifier.width(12.dp))
+            Column {
+                Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -366,12 +432,33 @@ private fun AssessmentsScreen(items: List<AssessmentDto>) {
         CenteredNote("No assessments assigned yet. Your placement cell assigns them; they appear here with their windows.")
         return
     }
+    val results = items.mapNotNull { it.latestResult }
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
+        if (results.isNotEmpty()) {
+            item {
+                Spacer(Modifier.height(10.dp))
+                PilotCard {
+                    Row(Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
+                        SummaryCell("${results.size}/${items.size}", "Completed", Modifier.weight(1f))
+                        SummaryCell("${results.map { it.percentage }.average().toInt()}%", "Average", Modifier.weight(1f))
+                        SummaryCell("${results.maxOf { it.percentage }.toInt()}%", "Best", Modifier.weight(1f))
+                    }
+                }
+            }
+        }
         items(items, key = { it.id }) { exam ->
             Spacer(Modifier.height(12.dp))
             AssessmentCard(exam)
         }
         item { Spacer(Modifier.height(18.dp)) }
+    }
+}
+
+@Composable
+private fun SummaryCell(value: String, label: String, modifier: Modifier = Modifier) {
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -403,9 +490,18 @@ private fun AssessmentCard(exam: AssessmentDto) {
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             val result = exam.latestResult
             if (result != null) {
-                Spacer(Modifier.height(6.dp))
-                Text("Score ${result.score.toInt()}/${result.maxScore.toInt()}",
-                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    LinearProgressIndicator(
+                        progress = { (result.percentage / 100.0).toFloat().coerceIn(0f, 1f) },
+                        modifier = Modifier.weight(1f),
+                        color = if (result.percentage >= 50) Color(0xFF2E6B46) else Color(0xFF8A6400),
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text("${result.score.toInt()}/${result.maxScore.toInt()}",
+                        style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                }
             } else if (ends != null && now.isBefore(ends)) {
                 Spacer(Modifier.height(6.dp))
                 Text("Open until ${formatWhen(exam.endsAt)} · take it on the web at one.ai8ht.pro",
@@ -429,8 +525,32 @@ private fun LearningScreen(learner: LearnerStateDto?, onChanged: () -> Unit) {
         return
     }
     val done = learner.progress.filter { it.state == "COMPLETED" }.map { it.lessonVersionId }.toSet()
+    val allLessons = learner.catalog.modules.flatMap { it.lessons }
+    val doneCount = allLessons.count { done.contains(it.id) }
 
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
+        item {
+            Spacer(Modifier.height(10.dp))
+            PilotCard {
+                Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    IconBubble(Icons.Filled.MenuBook, Color(0xFFEAF4EE), Color(0xFF2E6B46), size = 44.dp)
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("Overall progress", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.height(6.dp))
+                        LinearProgressIndicator(
+                            progress = { if (allLessons.isEmpty()) 0f else doneCount.toFloat() / allLessons.size },
+                            modifier = Modifier.fillMaxWidth(),
+                            color = Color(0xFF2E6B46),
+                            trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                        )
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Text("$doneCount/${allLessons.size}", style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                }
+            }
+        }
         message?.let { text ->
             item {
                 Spacer(Modifier.height(10.dp))

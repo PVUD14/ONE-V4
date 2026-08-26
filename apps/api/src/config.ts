@@ -1,3 +1,5 @@
+import { parseFileEncryptionKey } from './storage/encrypted-storage.js';
+
 export type NodeEnv = 'development' | 'test' | 'production';
 
 export interface RuntimeConfig {
@@ -20,6 +22,8 @@ export interface RuntimeConfig {
     readonly clamavSocketPath?: string;
     readonly clamavHost?: string;
     readonly clamavPort?: number;
+    /** base64 of 32 bytes; when set, stored files are encrypted at rest (AES-256-GCM). */
+    readonly fileEncryptionKey?: string;
   };
 }
 
@@ -54,6 +58,14 @@ export function loadRuntimeConfig(env: NodeJS.ProcessEnv = process.env): Runtime
     throw new Error('FILE_STORAGE_ROOT must be an absolute path');
   }
   if (clamavHost && !clamavPort) throw new Error('CLAMAV_PORT is required when CLAMAV_HOST is set');
+
+  const fileEncryptionKey = optionalNonEmpty(env.FILE_ENCRYPTION_KEY);
+  if (fileEncryptionKey) parseFileEncryptionKey(fileEncryptionKey);
+  // New production deployments must not store documents in plaintext; existing
+  // installs get a hard, named requirement rather than a silent downgrade.
+  if (nodeEnv === 'production' && storageRoot && !fileEncryptionKey) {
+    throw new Error('FILE_ENCRYPTION_KEY is required in production when FILE_STORAGE_ROOT is set; generate with: openssl rand -base64 32');
+  }
   // Storage without a scanner would accept files nobody has checked. Rather than
   // silently degrade, refuse the configuration outright.
   if (storageRoot && !clamavSocketPath && !clamavHost) {
@@ -78,6 +90,7 @@ export function loadRuntimeConfig(env: NodeJS.ProcessEnv = process.env): Runtime
       ...(clamavSocketPath ? { clamavSocketPath } : {}),
       ...(clamavHost ? { clamavHost } : {}),
       ...(clamavPort ? { clamavPort } : {}),
+      ...(fileEncryptionKey ? { fileEncryptionKey } : {}),
     },
   };
 }

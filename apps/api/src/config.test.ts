@@ -30,6 +30,30 @@ describe('runtime configuration', () => {
     expect(configured.documents).toEqual({ storageRoot: '/srv/one/files', clamavSocketPath: '/var/run/clamav/clamd.ctl' });
   });
 
+  it('validates the file encryption key and requires it for production storage', () => {
+    const base = {
+      DATABASE_URL: 'postgresql://planthepath:local@127.0.0.1:55432/planthepath_dev',
+      FILE_STORAGE_ROOT: '/srv/one/files',
+      CLAMAV_SOCKET_PATH: '/var/run/clamav/clamd.ctl',
+    };
+    const validKey = Buffer.alloc(32, 7).toString('base64');
+
+    expect(() => loadRuntimeConfig({ ...base, FILE_ENCRYPTION_KEY: 'not-32-bytes' }))
+      .toThrow('exactly 32 bytes');
+    expect(loadRuntimeConfig({ ...base, FILE_ENCRYPTION_KEY: validKey }).documents.fileEncryptionKey)
+      .toBe(validKey);
+    // Production must not store student documents in plaintext.
+    expect(() => loadRuntimeConfig({
+      ...base,
+      NODE_ENV: 'production',
+      API_HOST: '127.0.0.1',
+      API_PORT: '7310',
+      COGNITO_USER_POOL_ID: 'ap-south-1_test',
+      COGNITO_CLIENT_ID: 'client',
+      AUTOMATION_SIGNING_SECRET: 'x'.repeat(48),
+    })).toThrow('FILE_ENCRYPTION_KEY is required in production');
+  });
+
   it('leaves documents unconfigured when no storage root is set', () => {
     const config = loadRuntimeConfig({ DATABASE_URL: 'postgresql://planthepath:local@127.0.0.1:55432/planthepath_dev' });
     expect(config.documents).toEqual({});

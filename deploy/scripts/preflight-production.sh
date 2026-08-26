@@ -34,6 +34,13 @@ if [ -n "${SECRET}" ] && [ "${#SECRET}" -lt 32 ]; then
   MISSING+=("AUTOMATION_SIGNING_SECRET|present but shorter than 32 bytes")
 fi
 
+# Production refuses plaintext document storage: a storage root demands a key.
+STORAGE_ROOT_VALUE=$(grep -s '^FILE_STORAGE_ROOT=' "${APP_ENV}" | tail -n 1 | cut -d= -f2- || true)
+FILE_KEY_VALUE=$(grep -s '^FILE_ENCRYPTION_KEY=' "${APP_ENV}" | tail -n 1 | cut -d= -f2- || true)
+if [ -n "${STORAGE_ROOT_VALUE}" ] && [ -z "${FILE_KEY_VALUE}" ]; then
+  MISSING+=("FILE_ENCRYPTION_KEY|required when FILE_STORAGE_ROOT is set; generate with: openssl rand -base64 32")
+fi
+
 if [ ${#MISSING[@]} -gt 0 ]; then
   echo "app.env is not ready for production mode. Add or fix these lines in ${APP_ENV}:" >&2
   for entry in "${MISSING[@]}"; do

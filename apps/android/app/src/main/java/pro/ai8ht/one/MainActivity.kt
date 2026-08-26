@@ -212,8 +212,8 @@ private fun MainScaffold(onSignOut: () -> Unit, onSessionExpired: () -> Unit) {
     val unread = data?.notifications?.unreadCount ?: 0
 
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = { TopBar(unread = unread, onBell = { showInbox = true }) },
+        containerColor = Color(0xFF0B0C0F),
+        contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { showChat = true },
@@ -244,10 +244,51 @@ private fun MainScaffold(onSignOut: () -> Unit, onSessionExpired: () -> Unit) {
             }
         },
     ) { padding ->
+        Column(Modifier.padding(padding).fillMaxSize()) {
+        BrandBand {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                BrandWordmark(height = 17.dp, untinted = true)
+                Spacer(Modifier.weight(1f))
+                IconButton(onClick = { showInbox = true }) {
+                    BadgedBox(badge = { if (unread > 0) Badge { Text("$unread") } }) {
+                        Icon(Icons.Filled.Notifications, contentDescription = "Notifications", tint = SilverMuted)
+                    }
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+            if (screen == Screen.Home) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            "Hi, " + (data?.student?.fullName?.split(" ")?.firstOrNull() ?: "Student"),
+                            style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Silver,
+                        )
+                        val line = listOfNotNull(data?.student?.program, data?.student?.batch).joinToString(" · ")
+                        Text(
+                            if (line.isNotBlank()) line else "Your placement-readiness workspace",
+                            style = MaterialTheme.typography.bodyMedium, color = SilverMuted,
+                        )
+                    }
+                    AvatarView(context, data?.student?.fullName, 46.dp, avatarVersion)
+                    Spacer(Modifier.width(6.dp))
+                }
+                val bandChips = data?.learner?.readiness?.band
+                val chipResults = data?.assessments?.mapNotNull { it.latestResult } ?: emptyList()
+                Spacer(Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    bandChips?.let { StatusChip("Readiness: " + prettify(it), ChipKind.OnDark) }
+                    if (chipResults.isNotEmpty()) StatusChip("Avg " + chipResults.map { r -> r.percentage }.average().toInt() + "%", ChipKind.OnDark)
+                }
+            } else {
+                Text(screen.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = Silver)
+                Text(screen.subtitle, style = MaterialTheme.typography.bodySmall, color = SilverMuted)
+            }
+        }
+        BandSheet {
         androidx.compose.material3.pulltorefresh.PullToRefreshBox(
             isRefreshing = refreshing,
             onRefresh = { refreshing = true; reloadKey += 1 },
-            modifier = Modifier.padding(padding).fillMaxSize(),
+            modifier = Modifier.fillMaxSize(),
         ) {
             when {
                 data == null -> HomeSkeleton()
@@ -265,7 +306,7 @@ private fun MainScaffold(onSignOut: () -> Unit, onSessionExpired: () -> Unit) {
                     label = "tab-content",
                 ) { current ->
                     Column(Modifier.fillMaxSize()) {
-                        if (current != Screen.Home) PageHeader(current)
+                        if (current == Screen.Home) Spacer(Modifier.height(2.dp))
                         when (current) {
                             Screen.Home -> HomeScreen(data!!, avatarVersion, onOpen = { destination ->
                                 if (destination == null) showInbox = true else screen = destination
@@ -279,38 +320,8 @@ private fun MainScaffold(onSignOut: () -> Unit, onSessionExpired: () -> Unit) {
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun TopBar(unread: Int, onBell: () -> Unit) {
-    Surface(color = MaterialTheme.colorScheme.surface) {
-        Column(Modifier.statusBarsPadding()) {
-            Row(
-                Modifier.fillMaxWidth().padding(start = 18.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                BrandWordmark(height = 20.dp)
-                Spacer(Modifier.width(10.dp))
-                Text("ONE", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.weight(1f))
-                IconButton(onClick = onBell) {
-                    BadgedBox(badge = { if (unread > 0) Badge { Text("$unread") } }) {
-                        Icon(Icons.Filled.Notifications, contentDescription = "Notifications",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
         }
-    }
-}
-
-@Composable
-private fun PageHeader(screen: Screen) {
-    Column(Modifier.padding(start = 18.dp, end = 18.dp, top = 16.dp, bottom = 4.dp)) {
-        Text(screen.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        Text(screen.subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
 
@@ -336,34 +347,7 @@ private fun HomeScreen(data: StudentData, avatarVersion: Int, onOpen: (Screen?) 
         .minByOrNull { it.endsAt }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp)) {
-        Spacer(Modifier.height(16.dp))
-        Box(
-            Modifier.fillMaxWidth()
-                .background(Brush.linearGradient(listOf(OneBlue, OneBlueDeep)), RoundedCornerShape(18.dp))
-                .padding(20.dp),
-        ) {
-            Column {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("Hi, $firstName", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = Color.White)
-                        val line = listOfNotNull(data.student?.program, data.student?.batch).joinToString(" · ")
-                        Text(
-                            if (line.isNotBlank()) line else "Your placement-readiness workspace",
-                            style = MaterialTheme.typography.bodyMedium, color = Color(0xCCFFFFFF),
-                        )
-                    }
-                    AvatarView(heroContext, data.student?.fullName, 48.dp, avatarVersion)
-                }
-                Spacer(Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    data.learner?.readiness?.band?.let { StatusChip("Readiness: ${prettify(it)}", ChipKind.OnDark) }
-                    average?.let { StatusChip("Avg ${it.toInt()}%", ChipKind.OnDark) }
-                }
-                Spacer(Modifier.height(6.dp))
-                Text("${data.assessments.size} assessments assigned · readiness is advisory, visible only to you",
-                    style = MaterialTheme.typography.labelSmall, color = Color(0xB3FFFFFF))
-            }
-        }
+        Spacer(Modifier.height(14.dp))
         Spacer(Modifier.height(14.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             StatTile(Icons.Filled.Assignment, Color(0xFFEEF4FF), Color(0xFF1F55E5),
@@ -473,7 +457,7 @@ private fun StatTile(
             IconBubble(icon, iconBg, iconFg)
             Spacer(Modifier.width(12.dp))
             Column {
-                Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
@@ -684,41 +668,39 @@ private fun LearningScreen(learner: LearnerStateDto?, onChanged: () -> Unit) {
 private fun InboxOverlay(feed: NotificationsEnvelope?, onClose: () -> Unit, onAllRead: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        Column(Modifier.fillMaxSize().statusBarsPadding()) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
-                Text("Notifications", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.weight(1f))
-                if ((feed?.unreadCount ?: 0) > 0) {
-                    TextButton(onClick = {
-                        scope.launch { runCatching { Api.markAllRead(context) }.onSuccess { onAllRead(); onClose() } }
-                    }) { Text("Mark all read") }
-                }
+    OverlayScaffold(
+        "Notifications",
+        onClose,
+        actions = {
+            if ((feed?.unreadCount ?: 0) > 0) {
+                TextButton(
+                    onClick = { scope.launch { runCatching { Api.markAllRead(context) }.onSuccess { onAllRead(); onClose() } } },
+                    colors = ButtonDefaults.textButtonColors(contentColor = Silver),
+                ) { Text("Mark all read") }
             }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-            when {
-                feed == null || feed.notifications.isEmpty() ->
-                    EmptyState(Icons.Filled.Notifications, Color(0xFFFDF6E0), Color(0xFF8A6400),
-                        "All caught up",
-                        "Nothing needs your attention. Assignments, reopenings and results land here the moment they happen.")
-                else -> LazyColumn(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
-                    item { Spacer(Modifier.height(10.dp)) }
-                    items(feed.notifications, key = { it.id }) { note ->
-                        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-                            Box(Modifier.width(3.dp).fillMaxHeight()
-                                .background(if (note.readAt == null) MaterialTheme.colorScheme.primary else Color.Transparent))
-                            Column(Modifier.padding(start = 13.dp, end = 16.dp, top = 10.dp, bottom = 10.dp)) {
-                                Text(note.title, style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = if (note.readAt == null) FontWeight.Bold else FontWeight.Normal)
-                                Spacer(Modifier.height(2.dp))
-                                Text(note.body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
+        },
+    ) {
+        when {
+            feed == null || feed.notifications.isEmpty() ->
+                EmptyState(Icons.Filled.Notifications, Color(0xFFFDF6E0), Color(0xFF8A6400),
+                    "All caught up",
+                    "Nothing needs your attention. Assignments, reopenings and results land here the moment they happen.")
+            else -> LazyColumn(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
+                item { Spacer(Modifier.height(10.dp)) }
+                items(feed.notifications, key = { it.id }) { note ->
+                    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+                        Box(Modifier.width(3.dp).fillMaxHeight()
+                            .background(if (note.readAt == null) MaterialTheme.colorScheme.primary else Color.Transparent))
+                        Column(Modifier.padding(start = 13.dp, end = 16.dp, top = 10.dp, bottom = 10.dp)) {
+                            Text(note.title, style = MaterialTheme.typography.titleSmall,
+                                fontWeight = if (note.readAt == null) FontWeight.Bold else FontWeight.Normal)
+                            Spacer(Modifier.height(2.dp))
+                            Text(note.body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
                     }
-                    item { Spacer(Modifier.height(18.dp)) }
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline)
                 }
+                item { Spacer(Modifier.height(18.dp)) }
             }
         }
     }
@@ -738,15 +720,25 @@ private fun SignInScreen(expired: Boolean = false, onSignedIn: () -> Unit) {
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    Column(
-        Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(20.dp).verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        BrandWordmark(height = 40.dp, spinEight = true)
-        Spacer(Modifier.height(10.dp))
-        Text("The campus-to-career workspace", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.height(26.dp))
+    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        BrandBand {
+            Spacer(Modifier.height(34.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                BrandWordmark(height = 40.dp, spinEight = true, untinted = true)
+            }
+            Spacer(Modifier.height(12.dp))
+            Text(
+                "The campus-to-career workspace",
+                Modifier.fillMaxWidth(),
+                style = MaterialTheme.typography.bodyMedium,
+                color = SilverMuted,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(10.dp))
+        }
+        BandSheet {
+        Column(Modifier.fillMaxSize().padding(20.dp).verticalScroll(rememberScrollState())) {
+        Spacer(Modifier.height(8.dp))
         PilotCard {
             Column(Modifier.padding(20.dp)) {
                 Text("Sign in", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -818,6 +810,8 @@ private fun SignInScreen(expired: Boolean = false, onSignedIn: () -> Unit) {
                     ) { Text("Continue with token") }
                 }
             }
+        }
+        }
         }
     }
 }

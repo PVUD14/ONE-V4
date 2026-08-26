@@ -315,16 +315,22 @@ internal enum class MoreDest(val title: String) {
 }
 
 @Composable
-internal fun OverlayScaffold(title: String, onClose: () -> Unit, content: @Composable () -> Unit) {
-    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        Column(Modifier.fillMaxSize().statusBarsPadding()) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
-                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+internal fun OverlayScaffold(
+    title: String,
+    onClose: () -> Unit,
+    actions: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {},
+    content: @Composable () -> Unit,
+) {
+    Column(Modifier.fillMaxSize().background(Color(0xFF0B0C0F))) {
+        BrandBand {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Silver) }
+                Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Silver)
+                Spacer(Modifier.weight(1f))
+                actions()
             }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-            content()
         }
+        BandSheet { content() }
     }
 }
 

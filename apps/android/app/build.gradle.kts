@@ -61,6 +61,9 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation("androidx.browser:browser:1.8.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    // SRP sign-in against the existing Cognito client - same flow the web uses,
+    // so no server or console change is needed.
+    implementation("com.amazonaws:aws-android-sdk-cognitoidentityprovider:2.77.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     debugImplementation("androidx.compose.ui:ui-tooling")

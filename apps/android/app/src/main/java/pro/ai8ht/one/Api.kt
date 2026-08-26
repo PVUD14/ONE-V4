@@ -179,47 +179,53 @@ object Api {
 
     class SignInException(message: String) : Exception(message)
 
-    /** Signs in with email+password; stores access+refresh tokens on success. */
-    suspend fun passwordSignIn(context: Context, email: String, password: String): Unit = withContext(Dispatchers.IO) {
-        val payload = kotlinx.serialization.json.buildJsonObject {
-            put("AuthFlow", kotlinx.serialization.json.JsonPrimitive("USER_PASSWORD_AUTH"))
-            put("ClientId", kotlinx.serialization.json.JsonPrimitive(BuildConfig.COGNITO_SPA_CLIENT_ID))
-            put("AuthParameters", kotlinx.serialization.json.buildJsonObject {
-                put("USERNAME", kotlinx.serialization.json.JsonPrimitive(email.trim()))
-                put("PASSWORD", kotlinx.serialization.json.JsonPrimitive(password))
-            })
-        }.toString()
-        val request = Request.Builder()
-            .url(cognitoUrl())
-            .header("Content-Type", "application/x-amz-json-1.1")
-            .header("X-Amz-Target", "AWSCognitoIdentityProviderService.InitiateAuth")
-            .post(payload.toRequestBody("application/x-amz-json-1.1".toMediaType()))
-            .build()
-        http.newCall(request).execute().use { response ->
-            val text = response.body?.string() ?: ""
-            val body = runCatching { json.parseToJsonElement(text).jsonObject }.getOrNull()
-            val result = body?.get("AuthenticationResult")?.jsonObject
-            if (result != null) {
-                val access = result["AccessToken"]?.jsonPrimitive?.content
-                val refresh = result["RefreshToken"]?.jsonPrimitive?.content
-                if (access != null) {
-                    Session.setTokens(context, access, refresh)
-                    return@use
+    /** Signs in with email+password via SRP — the same flow the web app uses,
+     *  so it works against the existing Cognito client with no console changes.
+     *  Stores access+refresh tokens on success. */
+    suspend fun passwordSignIn(context: Context, email: String, password: String): Unit =
+        kotlinx.coroutines.suspendCancellableCoroutine { continuation ->
+            val pool = com.amazonaws.mobileconnectors.cognitoidentityprovider.CognitoUserPool(
+                context.applicationContext,
+                "ap-south-1_nPl3qFkvB",
+                BuildConfig.COGNITO_SPA_CLIENT_ID,
+                null,
+                com.amazonaws.regions.Regions.AP_SOUTH_1,
+            )
+            val handler = object : com.amazonaws.mobileconnectors.cognitoidentityprovider.handlers.AuthenticationHandler {
+                override fun onSuccess(
+                    session: com.amazonaws.mobileconnectors.cognitoidentityprovider.CognitoUserSession,
+                    newDevice: com.amazonaws.mobileconnectors.cognitoidentityprovider.CognitoDevice?,
+                ) {
+                    Session.setTokens(context, session.accessToken.jwtToken, session.refreshToken.token)
+                    continuation.resumeWith(Result.success(Unit))
+                }
+                override fun getAuthenticationDetails(
+                    continuationAuth: com.amazonaws.mobileconnectors.cognitoidentityprovider.continuations.AuthenticationContinuation,
+                    userId: String?,
+                ) {
+                    continuationAuth.setAuthenticationDetails(
+                        com.amazonaws.mobileconnectors.cognitoidentityprovider.continuations.AuthenticationDetails(email.trim(), password, null),
+                    )
+                    continuationAuth.continueTask()
+                }
+                override fun getMFACode(mfa: com.amazonaws.mobileconnectors.cognitoidentityprovider.continuations.MultiFactorAuthenticationContinuation) {
+                    continuation.resumeWith(Result.failure(SignInException("Multi-factor sign-in is not supported in the app yet - sign in on the web.")))
+                }
+                override fun authenticationChallenge(challenge: com.amazonaws.mobileconnectors.cognitoidentityprovider.continuations.ChallengeContinuation?) {
+                    continuation.resumeWith(Result.failure(SignInException("Your password must be changed first - sign in once on the web at one.ai8ht.pro, then try again.")))
+                }
+                override fun onFailure(exception: Exception) {
+                    val name = exception.javaClass.simpleName
+                    continuation.resumeWith(Result.failure(SignInException(when {
+                        name.contains("NotAuthorized") || name.contains("UserNotFound") -> "Incorrect email or password."
+                        name.contains("PasswordResetRequired") -> "Password reset required - complete it on the web first."
+                        name.contains("UserNotConfirmed") -> "This account is not confirmed yet - contact your placement cell."
+                        else -> "Sign-in failed. Check your connection and try again."
+                    })))
                 }
             }
-            val type = body?.get("__type")?.jsonPrimitive?.content ?: ""
-            val challenge = body?.get("ChallengeName")?.jsonPrimitive?.content
-            throw SignInException(when {
-                challenge == "NEW_PASSWORD_REQUIRED" -> "Your password must be changed first — sign in once on the web at one.ai8ht.pro, then try again."
-                type.contains("NotAuthorized") -> "Incorrect email or password."
-                type.contains("UserNotFound") -> "Incorrect email or password."
-                type.contains("PasswordResetRequired") -> "Password reset required — complete it on the web first."
-                type.contains("InvalidParameter") && text.contains("USER_PASSWORD_AUTH") ->
-                    "Password sign-in is not switched on for this app yet — use the UAT token option below."
-                else -> "Sign-in failed. Check your connection and try again."
-            })
+            pool.getUser(email.trim()).getSessionInBackground(handler)
         }
-    }
 
     /** Exchanges the stored refresh token for a fresh access token; null if unavailable. */
     fun refreshSession(context: Context): String? {

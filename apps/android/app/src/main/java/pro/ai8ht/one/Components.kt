@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -61,12 +63,42 @@ internal fun StatusChip(text: String, kind: ChipKind) {
 internal fun PilotCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     Card(
         modifier = modifier,
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
     ) { content() }
 }
+
+/** The brand band: black-to-navy gradient carrying silver content; every screen
+ *  opens with one, continuing the splash identity. */
+@Composable
+internal fun BrandBand(content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(
+                androidx.compose.ui.graphics.Brush.verticalGradient(
+                    listOf(Color(0xFF0B0C0F), Color(0xFF152238)),
+                ),
+            )
+            .statusBarsPadding()
+            .padding(start = 20.dp, end = 12.dp, top = 6.dp, bottom = 22.dp),
+        content = content,
+    )
+}
+
+/** Light rounded sheet that overlaps the band above it. */
+@Composable
+internal fun BandSheet(content: @Composable () -> Unit) {
+    Surface(
+        color = MaterialTheme.colorScheme.background,
+        shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
+        modifier = Modifier.fillMaxSize(),
+    ) { Box(Modifier.padding(top = 8.dp)) { content() } }
+}
+
+internal val Silver = Color(0xFFD9DCE1)
+internal val SilverMuted = Color(0xFF9AA2AF)
 
 @Composable
 internal fun SectionTitle(text: String) {

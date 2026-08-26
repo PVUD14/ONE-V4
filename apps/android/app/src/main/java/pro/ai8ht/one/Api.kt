@@ -38,6 +38,7 @@ object Api {
             when (method) {
                 "GET" -> builder.get()
                 "POST" -> builder.post((body ?: "{}").toRequestBody(jsonMedia))
+                "PATCH" -> builder.patch((body ?: "{}").toRequestBody(jsonMedia))
             }
             http.newCall(builder.build()).execute().use { response ->
                 val text = response.body?.string() ?: ""
@@ -78,6 +79,83 @@ object Api {
 
     suspend fun completeLesson(context: Context, lessonVersionId: String) {
         request(context, "POST", "/api/v1/career-readiness/lessons/$lessonVersionId/complete")
+    }
+
+    suspend fun listOpportunities(context: Context): List<OpportunityDto> =
+        json.decodeFromString<OpportunitiesEnvelope>(request(context, "GET", "/api/v1/opportunities")).opportunities
+
+    suspend fun applyToOpportunity(context: Context, opportunityId: String) {
+        request(context, "POST", "/api/v1/students/me/applications",
+            "{\"opportunityId\":\"$opportunityId\",\"consentGranted\":true}")
+    }
+
+    suspend fun listApplications(context: Context): List<ApplicationDto> =
+        json.decodeFromString<ApplicationsEnvelope>(request(context, "GET", "/api/v1/students/me/applications")).applications
+
+    suspend fun getProfile(context: Context): ProfileDto =
+        json.decodeFromString<ProfileEnvelope>(request(context, "GET", "/api/v1/students/me/profile")).profile
+
+    suspend fun updateProfile(context: Context, bodyJson: String): ProfileDto =
+        json.decodeFromString<ProfileEnvelope>(request(context, "PATCH", "/api/v1/students/me/profile", bodyJson)).profile
+
+    suspend fun privacyRequests(context: Context): List<PrivacyRequestDto> =
+        json.decodeFromString<PrivacyRequestsEnvelope>(request(context, "GET", "/api/v1/students/me/privacy/requests")).requests
+
+    suspend fun requestDataExport(context: Context) {
+        request(context, "POST", "/api/v1/students/me/privacy/exports")
+    }
+
+    suspend fun listDocuments(context: Context): List<DocumentDto> =
+        json.decodeFromString<DocumentsEnvelope>(request(context, "GET", "/api/v1/students/me/documents")).documents
+
+    /** Streams an assistant answer; onDelta receives each text chunk as it arrives. */
+    suspend fun assistantChat(
+        context: Context,
+        messages: List<Pair<String, String>>,
+        onDelta: (String) -> Unit,
+    ): String = withContext(Dispatchers.IO) {
+        val token = Session.token(context) ?: throw ApiException(401, "NO_TOKEN")
+        val payload = buildString {
+            append("{\"persona\":\"student\",\"messages\":[")
+            messages.forEachIndexed { index, (role, content) ->
+                if (index > 0) append(',')
+                append("{\"role\":")
+                append(json.encodeToString(kotlinx.serialization.serializer<String>(), role))
+                append(",\"content\":")
+                append(json.encodeToString(kotlinx.serialization.serializer<String>(), content))
+                append('}')
+            }
+            append("]}")
+        }
+        val call = http.newCall(
+            Request.Builder()
+                .url(baseUrl(context) + "/api/v1/assistant/chat")
+                .header("Authorization", "Bearer $token")
+                .header("X-Correlation-Id", "and-" + UUID.randomUUID())
+                .header("X-Client", "one-android/" + BuildConfig.VERSION_NAME)
+                .post(payload.toRequestBody(jsonMedia))
+                .build(),
+        )
+        call.execute().use { response ->
+            if (!response.isSuccessful) {
+                val text = response.body?.string() ?: ""
+                val parsed = runCatching { json.decodeFromString<ErrorEnvelope>(text).error }.getOrNull()
+                throw ApiException(response.code, parsed?.code, parsed?.message)
+            }
+            val source = response.body?.source() ?: return@use ""
+            val full = StringBuilder()
+            val buffer = okio.Buffer()
+            while (true) {
+                val read = source.read(buffer, 8192)
+                if (read == -1L) break
+                val chunk = buffer.readUtf8()
+                if (chunk.isNotEmpty()) {
+                    full.append(chunk)
+                    onDelta(chunk)
+                }
+            }
+            full.toString()
+        }
     }
 }
 
@@ -163,3 +241,61 @@ object Api {
     val state: String = "",
 )
 
+
+// --- Hiring -------------------------------------------------------------------
+
+@Serializable data class OpportunitiesEnvelope(val opportunities: List<OpportunityDto> = emptyList())
+@Serializable data class OpportunityDto(
+    val id: String,
+    val employerName: String = "",
+    val title: String = "",
+    val summary: String? = null,
+    val employmentType: String = "",
+    val workMode: String = "",
+    val locationCity: String? = null,
+    val applicationDeadline: String? = null,
+    val alreadyApplied: Boolean = false,
+)
+@Serializable data class ApplicationsEnvelope(val applications: List<ApplicationDto> = emptyList())
+@Serializable data class ApplicationDto(
+    val id: String,
+    val state: String = "",
+    val opportunityId: String = "",
+    val employerName: String = "",
+    val title: String = "",
+    val employmentType: String = "",
+    val workMode: String = "",
+    val locationCity: String? = null,
+    val submittedAt: String? = null,
+)
+
+// --- Profile ------------------------------------------------------------------
+
+@Serializable data class ProfileEnvelope(val profile: ProfileDto)
+@Serializable data class ProfileDto(
+    val targetCareer: String? = null,
+    val careerInterests: List<String> = emptyList(),
+    val profileHeadline: String? = null,
+    val profileSummary: String? = null,
+    val portfolioUrl: String? = null,
+    val visibilityState: String = "PRIVATE",
+    val employerDiscoveryEnabled: Boolean = false,
+)
+
+// --- Privacy & documents ------------------------------------------------------
+
+@Serializable data class PrivacyRequestsEnvelope(val requests: List<PrivacyRequestDto> = emptyList())
+@Serializable data class PrivacyRequestDto(
+    val id: String,
+    val requestType: String = "",
+    val state: String = "",
+    val requestedAt: String = "",
+    val completedAt: String? = null,
+)
+@Serializable data class DocumentsEnvelope(val documents: List<DocumentDto> = emptyList())
+@Serializable data class DocumentDto(
+    val id: String,
+    val title: String = "",
+    val documentType: String = "",
+    val verificationState: String = "",
+)

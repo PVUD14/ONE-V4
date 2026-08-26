@@ -3,9 +3,7 @@ package pro.ai8ht.one
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,29 +25,30 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Assignment
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.WorkOutline
 import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarDefaults
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
@@ -80,8 +79,6 @@ import pro.ai8ht.one.ui.OneBlue
 import pro.ai8ht.one.ui.OneBlueDeep
 import pro.ai8ht.one.ui.OneTheme
 import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -94,11 +91,10 @@ private enum class Screen(val title: String, val subtitle: String) {
     Home("Home", "Your day at a glance"),
     Assessments("Assessments", "Assigned tests, windows and your results"),
     Learning("Learning", "Modules, lessons and your progress"),
-    Inbox("Notifications", "Assignments, reopenings and published results"),
-    More("Profile", "Your account and app information"),
+    Jobs("Jobs", "Opportunities and your applications"),
+    More("Profile", "Your account, documents and privacy"),
 }
 
-/** Everything the student screens share, loaded once and refreshed on demand. */
 private class StudentData(
     val student: StudentDto?,
     val assessments: List<AssessmentDto>,
@@ -144,11 +140,8 @@ private fun BrandSplash() {
         BrandWordmark(height = 42.dp, spinEight = true)
         Spacer(Modifier.height(18.dp))
         Text("ONE", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        Text(
-            "The campus-to-career workspace",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Text("The campus-to-career workspace", style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -159,6 +152,9 @@ private fun MainScaffold(onSignOut: () -> Unit) {
     var data by remember { mutableStateOf<StudentData?>(null) }
     var loadError by remember { mutableStateOf(false) }
     var reloadKey by remember { mutableIntStateOf(0) }
+    var showInbox by remember { mutableStateOf(false) }
+    var showChat by remember { mutableStateOf(false) }
+    var showEditProfile by remember { mutableStateOf(false) }
 
     LaunchedEffect(reloadKey) {
         loadError = false
@@ -173,11 +169,25 @@ private fun MainScaffold(onSignOut: () -> Unit) {
         }
     }
 
+    when {
+        showChat -> { ChatOverlay(onClose = { showChat = false }); return }
+        showEditProfile -> { EditProfileOverlay(onClose = { showEditProfile = false; reloadKey += 1 }); return }
+        showInbox -> { InboxOverlay(data?.notifications, onClose = { showInbox = false }, onAllRead = { reloadKey += 1 }); return }
+    }
+
     val unread = data?.notifications?.unreadCount ?: 0
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        topBar = { TopBar() },
+        topBar = { TopBar(unread = unread, onBell = { showInbox = true }) },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = { showChat = true },
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = Color.White,
+                shape = CircleShape,
+            ) { Icon(Icons.Filled.AutoAwesome, contentDescription = "ONE Assistant") }
+        },
         bottomBar = {
             NavigationBar(containerColor = MaterialTheme.colorScheme.surface, windowInsets = NavigationBarDefaults.windowInsets) {
                 val colors = NavigationBarItemDefaults.colors(
@@ -193,12 +203,8 @@ private fun MainScaffold(onSignOut: () -> Unit) {
                     icon = { Icon(Icons.Filled.Assignment, null) }, label = { Text("Exams") }, colors = colors)
                 NavigationBarItem(selected = screen == Screen.Learning, onClick = { screen = Screen.Learning },
                     icon = { Icon(Icons.Filled.MenuBook, null) }, label = { Text("Learning") }, colors = colors)
-                NavigationBarItem(selected = screen == Screen.Inbox, onClick = { screen = Screen.Inbox },
-                    icon = {
-                        BadgedBox(badge = { if (unread > 0) Badge { Text("$unread") } }) {
-                            Icon(Icons.Filled.Notifications, null)
-                        }
-                    }, label = { Text("Inbox") }, colors = colors)
+                NavigationBarItem(selected = screen == Screen.Jobs, onClick = { screen = Screen.Jobs },
+                    icon = { Icon(Icons.Filled.WorkOutline, null) }, label = { Text("Jobs") }, colors = colors)
                 NavigationBarItem(selected = screen == Screen.More, onClick = { screen = Screen.More },
                     icon = { Icon(Icons.Filled.MoreHoriz, null) }, label = { Text("More") }, colors = colors)
             }
@@ -211,11 +217,13 @@ private fun MainScaffold(onSignOut: () -> Unit) {
                 else -> {
                     if (screen != Screen.Home) PageHeader(screen)
                     when (screen) {
-                        Screen.Home -> HomeScreen(data!!, onOpen = { screen = it })
+                        Screen.Home -> HomeScreen(data!!, onOpen = { destination ->
+                            if (destination == null) showInbox = true else screen = destination
+                        })
                         Screen.Assessments -> AssessmentsScreen(data!!.assessments)
                         Screen.Learning -> LearningScreen(data!!.learner, onChanged = { reloadKey += 1 })
-                        Screen.Inbox -> InboxScreen(data!!.notifications, onAllRead = { reloadKey += 1 })
-                        Screen.More -> MoreScreen(data!!.student, onSignOut = onSignOut)
+                        Screen.Jobs -> JobsScreen()
+                        Screen.More -> MoreScreenFull(data!!.student, onSignOut = onSignOut, onEditProfile = { showEditProfile = true })
                     }
                 }
             }
@@ -224,16 +232,23 @@ private fun MainScaffold(onSignOut: () -> Unit) {
 }
 
 @Composable
-private fun TopBar() {
+private fun TopBar(unread: Int, onBell: () -> Unit) {
     Surface(color = MaterialTheme.colorScheme.surface) {
         Column(Modifier.statusBarsPadding()) {
             Row(
-                Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 13.dp),
+                Modifier.fillMaxWidth().padding(start = 18.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 BrandWordmark(height = 20.dp)
                 Spacer(Modifier.width(10.dp))
                 Text("ONE", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.weight(1f))
+                IconButton(onClick = onBell) {
+                    BadgedBox(badge = { if (unread > 0) Badge { Text("$unread") } }) {
+                        Icon(Icons.Filled.Notifications, contentDescription = "Notifications",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
         }
@@ -248,54 +263,10 @@ private fun PageHeader(screen: Screen) {
     }
 }
 
-// --- Building blocks ----------------------------------------------------------
-
-private enum class ChipKind { Positive, Accent, Waiting, Muted, OnDark }
-
-@Composable
-private fun StatusChip(text: String, kind: ChipKind) {
-    val dark = isSystemInDarkTheme()
-    val (bg, fg) = when (kind) {
-        ChipKind.Positive -> if (dark) Color(0xFF16281D) to Color(0xFF7FD1A0) else Color(0xFFEAF4EE) to Color(0xFF2E6B46)
-        ChipKind.Accent -> if (dark) Color(0xFF15203A) to Color(0xFF8FB0FF) else Color(0xFFEEF4FF) to Color(0xFF1F55E5)
-        ChipKind.Waiting -> if (dark) Color(0xFF2A2310) to Color(0xFFE3CF8E) else Color(0xFFFDF6E0) to Color(0xFF8A6400)
-        ChipKind.Muted -> if (dark) Color(0xFF1B1E24) to Color(0xFF8E939C) else Color(0xFFF2F4F7) to Color(0xFF667085)
-        ChipKind.OnDark -> Color(0x33FFFFFF) to Color.White
-    }
-    Surface(color = bg, contentColor = fg, shape = RoundedCornerShape(999.dp)) {
-        Text(text, Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-            style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
-    }
-}
-
-@Composable
-private fun PilotCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-    ) { content() }
-}
-
-@Composable
-private fun SectionTitle(text: String) {
-    Text(
-        text,
-        Modifier.padding(top = 20.dp, bottom = 8.dp),
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.Bold,
-    )
-}
-
-private fun prettify(code: String): String =
-    code.lowercase().replace('_', ' ').replaceFirstChar { it.uppercase() }
-
 // --- Home ---------------------------------------------------------------------
 
 @Composable
-private fun HomeScreen(data: StudentData, onOpen: (Screen) -> Unit) {
+private fun HomeScreen(data: StudentData, onOpen: (Screen?) -> Unit) {
     val now = Instant.now()
     val openExams = data.assessments.count { exam ->
         exam.latestResult == null && exam.attemptsUsed < exam.attemptsAllowed &&
@@ -308,20 +279,15 @@ private fun HomeScreen(data: StudentData, onOpen: (Screen) -> Unit) {
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp)) {
         Spacer(Modifier.height(16.dp))
-
-        // Hero: greeting + advisory readiness, in the brand blue.
         Box(
-            Modifier
-                .fillMaxWidth()
+            Modifier.fillMaxWidth()
                 .background(Brush.linearGradient(listOf(OneBlue, OneBlueDeep)), RoundedCornerShape(18.dp))
                 .padding(20.dp),
         ) {
             Column {
                 Text("Hi, $firstName", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = Color.White)
                 val line = listOfNotNull(data.student?.program, data.student?.batch).joinToString(" · ")
-                if (line.isNotBlank()) {
-                    Text(line, style = MaterialTheme.typography.bodyMedium, color = Color(0xCCFFFFFF))
-                }
+                if (line.isNotBlank()) Text(line, style = MaterialTheme.typography.bodyMedium, color = Color(0xCCFFFFFF))
                 val band = data.learner?.readiness?.band
                 if (band != null) {
                     Spacer(Modifier.height(12.dp))
@@ -333,14 +299,12 @@ private fun HomeScreen(data: StudentData, onOpen: (Screen) -> Unit) {
                 }
             }
         }
-
         Spacer(Modifier.height(14.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             StatTile("$openExams", "Exams open", Modifier.weight(1f)) { onOpen(Screen.Assessments) }
             StatTile("$completed/${lessons.size}", "Lessons done", Modifier.weight(1f)) { onOpen(Screen.Learning) }
-            StatTile("$unread", "Unread", Modifier.weight(1f)) { onOpen(Screen.Inbox) }
+            StatTile("$unread", "Unread", Modifier.weight(1f)) { onOpen(null) }
         }
-
         val nextSteps = data.learner?.roadmap?.filter { it.state == "PENDING" }?.take(3) ?: emptyList()
         if (nextSteps.isNotEmpty()) {
             SectionTitle("Next steps")
@@ -360,7 +324,6 @@ private fun HomeScreen(data: StudentData, onOpen: (Screen) -> Unit) {
                 }
             }
         }
-
         val recent = data.notifications?.notifications?.take(3) ?: emptyList()
         if (recent.isNotEmpty()) {
             SectionTitle("Recent activity")
@@ -384,10 +347,7 @@ private fun HomeScreen(data: StudentData, onOpen: (Screen) -> Unit) {
 @Composable
 private fun StatTile(value: String, label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     PilotCard(modifier) {
-        Column(
-            Modifier.fillMaxWidth().padding(vertical = 14.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
+        Column(Modifier.fillMaxWidth().padding(vertical = 14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
             Spacer(Modifier.height(4.dp))
@@ -415,10 +375,6 @@ private fun AssessmentsScreen(items: List<AssessmentDto>) {
     }
 }
 
-private fun formatWhen(iso: String): String = runCatching {
-    DateTimeFormatter.ofPattern("d MMM, h:mm a").withZone(ZoneId.systemDefault()).format(Instant.parse(iso))
-}.getOrDefault(iso)
-
 @Composable
 private fun AssessmentCard(exam: AssessmentDto) {
     val now = Instant.now()
@@ -430,9 +386,7 @@ private fun AssessmentCard(exam: AssessmentDto) {
                 Column(Modifier.weight(1f)) {
                     Text(exam.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     val meta = listOfNotNull(exam.subjectName, exam.institutionName).joinToString(" · ")
-                    if (meta.isNotBlank()) {
-                        Text(meta, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+                    if (meta.isNotBlank()) Text(meta, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Spacer(Modifier.width(10.dp))
                 when {
@@ -445,17 +399,13 @@ private fun AssessmentCard(exam: AssessmentDto) {
             }
             Spacer(Modifier.height(10.dp))
             val markWord = if (exam.totalMarks.toInt() == 1) "mark" else "marks"
-            Text(
-                "${exam.durationSeconds / 60} min  ·  ${exam.totalMarks.toInt()} $markWord  ·  attempts ${exam.attemptsUsed}/${exam.attemptsAllowed}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Text("${exam.durationSeconds / 60} min  ·  ${exam.totalMarks.toInt()} $markWord  ·  attempts ${exam.attemptsUsed}/${exam.attemptsAllowed}",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             val result = exam.latestResult
             if (result != null) {
                 Spacer(Modifier.height(6.dp))
                 Text("Score ${result.score.toInt()}/${result.maxScore.toInt()}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
             } else if (ends != null && now.isBefore(ends)) {
                 Spacer(Modifier.height(6.dp))
                 Text("Open until ${formatWhen(exam.endsAt)} · take it on the web at one.ai8ht.pro",
@@ -548,110 +498,51 @@ private fun LearningScreen(learner: LearnerStateDto?, onChanged: () -> Unit) {
     }
 }
 
-// --- Inbox --------------------------------------------------------------------
+// --- Inbox overlay ------------------------------------------------------------
 
 @Composable
-private fun InboxScreen(feed: NotificationsEnvelope?, onAllRead: () -> Unit) {
+private fun InboxOverlay(feed: NotificationsEnvelope?, onClose: () -> Unit, onAllRead: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    when {
-        feed == null -> CenteredNote("Could not load notifications right now.")
-        feed.notifications.isEmpty() -> CenteredNote("You're all caught up — nothing needs your attention.")
-        else -> Column(Modifier.padding(horizontal = 18.dp)) {
-            if (feed.unreadCount > 0) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        Column(Modifier.fillMaxSize().statusBarsPadding()) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
+                Text("Notifications", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.weight(1f))
+                if ((feed?.unreadCount ?: 0) > 0) {
                     TextButton(onClick = {
-                        scope.launch { runCatching { Api.markAllRead(context) }.onSuccess { onAllRead() } }
-                    }) { Text("Mark all read (${feed.unreadCount})") }
+                        scope.launch { runCatching { Api.markAllRead(context) }.onSuccess { onAllRead(); onClose() } }
+                    }) { Text("Mark all read") }
                 }
-            } else {
-                Spacer(Modifier.height(6.dp))
             }
-            PilotCard {
-                LazyColumn(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            when {
+                feed == null || feed.notifications.isEmpty() ->
+                    CenteredNote("You're all caught up — nothing needs your attention.")
+                else -> LazyColumn(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
+                    item { Spacer(Modifier.height(10.dp)) }
                     items(feed.notifications, key = { it.id }) { note ->
                         Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-                            Box(
-                                Modifier.width(3.dp).fillMaxHeight()
-                                    .background(if (note.readAt == null) MaterialTheme.colorScheme.primary else Color.Transparent),
-                            )
-                            Column(Modifier.padding(start = 13.dp, end = 16.dp, top = 12.dp, bottom = 12.dp)) {
+                            Box(Modifier.width(3.dp).fillMaxHeight()
+                                .background(if (note.readAt == null) MaterialTheme.colorScheme.primary else Color.Transparent))
+                            Column(Modifier.padding(start = 13.dp, end = 16.dp, top = 10.dp, bottom = 10.dp)) {
                                 Text(note.title, style = MaterialTheme.typography.titleSmall,
                                     fontWeight = if (note.readAt == null) FontWeight.Bold else FontWeight.Normal)
                                 Spacer(Modifier.height(2.dp))
                                 Text(note.body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
-                        if (note != feed.notifications.last()) HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
                     }
+                    item { Spacer(Modifier.height(18.dp)) }
                 }
-            }
-            Spacer(Modifier.height(18.dp))
-        }
-    }
-}
-
-// --- More / profile -----------------------------------------------------------
-
-@Composable
-private fun MoreScreen(student: StudentDto?, onSignOut: () -> Unit) {
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp)) {
-        PilotCard {
-            Column(Modifier.padding(18.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        Modifier.size(52.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        val initials = (student?.fullName ?: "S").split(" ").take(2)
-                            .mapNotNull { it.firstOrNull()?.uppercase() }.joinToString("")
-                        Text(initials, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                    }
-                    Spacer(Modifier.width(14.dp))
-                    Column {
-                        Text(student?.fullName ?: "Student", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Text(student?.verifiedEmail ?: "", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-                Spacer(Modifier.height(14.dp))
-                val rows = listOfNotNull(
-                    student?.program?.let { "Program" to it },
-                    student?.department?.let { "Department" to it },
-                    student?.batch?.let { "Batch" to it },
-                    student?.institutionStudentId?.takeIf { it.isNotBlank() }?.let { "Student ID" to it },
-                )
-                rows.forEach { (label, value) ->
-                    Row(Modifier.padding(vertical = 3.dp)) {
-                        Text(label, Modifier.width(110.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(value, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
-                    }
-                }
-                if (student?.academicStatus?.isNotBlank() == true) {
-                    Spacer(Modifier.height(10.dp))
-                    StatusChip(prettify(student.academicStatus), ChipKind.Accent)
-                }
-            }
-        }
-        Spacer(Modifier.height(12.dp))
-        PilotCard {
-            Column(Modifier.padding(18.dp)) {
-                BrandWordmark(height = 20.dp)
-                Spacer(Modifier.height(8.dp))
-                Text("Version ${BuildConfig.VERSION_NAME} · one.ai8ht.pro", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "Full profile editing, exam taking and your data-copy download live on the web app. Push notifications arrive in the next version.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(14.dp))
-                OutlinedButton(onClick = onSignOut, shape = RoundedCornerShape(10.dp)) { Text("Sign out") }
             }
         }
     }
 }
 
-// --- Sign in / consent (unchanged flows, pilot styling) ------------------------
+// --- Sign in / consent ---------------------------------------------------------
 
 @Composable
 private fun SignInScreen(onSignedIn: () -> Unit) {
@@ -752,21 +643,5 @@ private fun ConsentScreen(version: String, onGranted: () -> Unit) {
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(10.dp),
         ) { Text(if (busy) "Recording…" else "I have read the notice and I consent") }
-    }
-}
-
-// --- Shared -------------------------------------------------------------------
-
-@Composable
-private fun LoadingSpinner() {
-    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-    }
-}
-
-@Composable
-private fun CenteredNote(text: String) {
-    Column(Modifier.fillMaxSize().padding(32.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center)
     }
 }

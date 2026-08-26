@@ -200,7 +200,9 @@ describe('Cognito Hosted UI browser authentication', () => {
     expect(screen.getByText('aanya.student01@example.test')).toBeInTheDocument();
     await waitFor(() => expect(window.location.pathname).toBe('/student'));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Student profile menu' })).toHaveTextContent('Aanya Rao'));
-    expect(screen.getByText('Authenticated Student workspace')).toBeInTheDocument();
+    // UAT #18: the resolved workspace shows no auth/debug banner; identity
+    // lives in the top bar only.
+    expect(screen.queryByText('Authenticated Student workspace')).not.toBeInTheDocument();
     expect(screen.getByText('Your profile')).toBeInTheDocument();
     expect(screen.queryByText('Rahul Kumar')).not.toBeInTheDocument();
     expect(screen.queryByText('DEMO PREVIEW')).not.toBeInTheDocument();

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+  ApiRequestError,
   completeCareerReadinessLesson,
   getCareerReadinessAccessToken,
   getCareerReadinessCatalog,
@@ -51,8 +52,13 @@ export function CareerReadinessApiPanel({ route }: { readonly route: CareerRoute
       await completeCareerReadinessLesson(token, lessonId);
       await refresh();
       setStatus('Lesson completion and evidence were committed by the API.');
-    } catch {
-      setStatus('The lesson could not be completed. Check prerequisites and try again.');
+    } catch (error) {
+      // Prefer the API's named reason ("finish \"X\" first") over a generic line.
+      if (error instanceof ApiRequestError && error.detail) {
+        setStatus(error.detail);
+      } else {
+        setStatus('The lesson could not be completed. Check prerequisites and try again.');
+      }
     } finally {
       setBusy(false);
     }

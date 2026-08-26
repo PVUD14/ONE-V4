@@ -26,14 +26,17 @@ export class ApiRequestError extends Error {
   readonly correlationId: string;
   readonly code?: string;
   readonly field?: string;
+  /** Human-readable detail from the API's error body, when it sent one. */
+  readonly detail?: string;
 
-  constructor(input: { readonly status: number; readonly correlationId: string; readonly code?: string; readonly field?: string }) {
-    super(`API request failed with status ${input.status}`);
+  constructor(input: { readonly status: number; readonly correlationId: string; readonly code?: string; readonly field?: string; readonly detail?: string }) {
+    super(input.detail ?? `API request failed with status ${input.status}`);
     this.name = 'ApiRequestError';
     this.status = input.status;
     this.correlationId = input.correlationId;
     if (input.code) this.code = input.code;
     if (input.field) this.field = input.field;
+    if (input.detail) this.detail = input.detail;
   }
 }
 
@@ -715,13 +718,14 @@ async function requestJson<T>(path: string, input: {
     ...(input.signal ? { signal: input.signal } : {}),
   });
   if (!response.ok) {
-    const body = await response.json().catch(() => null) as { readonly message?: { readonly code?: string; readonly correlationId?: string; readonly field?: string }; readonly error?: { readonly code?: string; readonly correlationId?: string; readonly field?: string } } | null;
+    const body = await response.json().catch(() => null) as { readonly message?: { readonly code?: string; readonly correlationId?: string; readonly field?: string; readonly message?: string }; readonly error?: { readonly code?: string; readonly correlationId?: string; readonly field?: string; readonly message?: string } } | null;
     const safeError = body?.error ?? body?.message;
     throw new ApiRequestError({
       status: response.status,
       correlationId: safeError?.correlationId ?? response.headers?.get('x-correlation-id') ?? correlationId,
       ...(safeError?.code ? { code: safeError.code } : {}),
       ...(safeError?.field ? { field: safeError.field } : {}),
+      ...(typeof safeError?.message === 'string' && safeError.message ? { detail: safeError.message } : {}),
     });
   }
   return response.json() as Promise<T>;
@@ -925,4 +929,20 @@ export function listMyNotifications(token: string, signal?: AbortSignal): Promis
 
 export function markAllNotificationsRead(token: string): Promise<{ marked: number }> {
   return requestJson('/api/v1/me/notifications/read-all', { token, method: 'POST' });
+}
+
+// --- DPDP consent -----------------------------------------------------------
+
+export interface ConsentStatusDto {
+  readonly requiredVersion: string | null;
+  readonly grantedVersion: string | null;
+  readonly required: boolean;
+}
+
+export function getPrivacyConsentStatus(token: string, signal?: AbortSignal): Promise<ConsentStatusDto> {
+  return requestJson('/api/v1/me/consents/privacy-notice', { token, ...(signal ? { signal } : {}) });
+}
+
+export function grantPrivacyConsent(token: string, version: string): Promise<{ granted: boolean; version: string }> {
+  return requestJson('/api/v1/me/consents/privacy-notice', { token, method: 'POST', body: { version } });
 }

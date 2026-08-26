@@ -184,6 +184,15 @@ function mapDomainError(error: unknown): BadRequestException | ConflictException
   if (/already submitted|attempt limit|idempotency/i.test(message)) {
     return new ConflictException({ error: { code: 'CONFLICT', message: 'Request conflicts with current state' } });
   }
+  // Prerequisite refusals name the missing lessons (their titles are the
+  // learner's own published curriculum, safe to echo).
+  if (/prerequisites are not complete/i.test(message)) {
+    const named = message.split(': ')[1];
+    return new BadRequestException({ error: {
+      code: 'PREREQUISITES_NOT_MET',
+      message: named ? `This lesson has prerequisites — ${named}.` : 'This lesson has prerequisites that are not complete yet.',
+    } });
+  }
   return safeBadRequest();
 }
 

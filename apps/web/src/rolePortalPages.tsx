@@ -44,6 +44,7 @@ import { StatusBadge } from './studentComponents.js';
 import { OperationsCareerReadinessPanel } from './operationsCareerReadinessPanel.js';
 import { EmployerApplicantsPage, EmployerOpportunitiesPage } from './hiringPages.js';
 import { AssistantWidget } from './assistantWidget.js';
+import { ConsentGate } from './consentGate.js';
 
 interface AuthenticatedWorkspaceSummary {
   readonly role: string;
@@ -124,6 +125,7 @@ function RolePortalInner({ portal, apiHealth, authStatus, authNotice, showDevelo
   }
 
   return (
+    <ConsentGate>
     <div className={`role-shell role-accent-${portal.accent} ${collapsed ? 'role-sidebar-collapsed' : ''}`}>
       <a className="skip-link" href="#role-main">Skip to content</a>
       <RoleSidebar portal={portal} activePath={path} collapsed={collapsed} drawerOpen={drawerOpen} onNavigate={navigate} onCollapse={() => setCollapsed((value) => !value)} onClose={() => { setDrawerOpen(false); menuButtonRef.current?.focus(); }} />
@@ -154,6 +156,7 @@ function RolePortalInner({ portal, apiHealth, authStatus, authNotice, showDevelo
       </div>
       <AssistantWidget persona={portal.family === 'Employer' ? 'employer' : portal.family === 'Institution' ? 'institution' : 'student'} />
     </div>
+    </ConsentGate>
   );
 }
 

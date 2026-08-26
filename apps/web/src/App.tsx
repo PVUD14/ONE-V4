@@ -44,6 +44,7 @@ import { CareerReadinessApiPanel } from './careerReadinessApiPanel.js';
 import { ExamAttemptPanel } from './examAttemptPanel.js';
 import { StudentMessagesFlyout, StudentNotificationsBell } from './notificationsBell.js';
 import { AssistantWidget } from './assistantWidget.js';
+import { ConsentGate } from './consentGate.js';
 
 type RouteKey = 'dashboard' | 'career-path' | 'ai-coach' | 'readiness' | 'skills' | 'assessments' | 'learning' | 'experience' | 'opportunities' | 'applications' | 'interviews' | 'documents' | 'profile' | 'settings';
 
@@ -671,6 +672,7 @@ function StudentShell({ apiHealth, authNotice, authStatus, currentStudent, demoM
   }
 
   return (
+    <ConsentGate>
     <div className={`student-shell ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
       <a className="skip-link" href="#main-content">Skip to content</a>
       <Sidebar path={path} collapsed={sidebarCollapsed} drawerOpen={drawerOpen} onNavigate={navigate} onCollapse={() => setSidebarCollapsed((value) => !value)} onClose={closeDrawer} />
@@ -701,6 +703,7 @@ function StudentShell({ apiHealth, authNotice, authStatus, currentStudent, demoM
       </div>
       <AssistantWidget persona="student" />
     </div>
+    </ConsentGate>
   );
 }
 
@@ -751,7 +754,9 @@ function AuthenticatedStudentStatus({ currentStudent }: { readonly currentStuden
   if (currentStudent.state !== 'resolved') {
     return <section className="student-preview-status" role="status" aria-live="polite"><div><strong>Loading real Student identity</strong><span>ONE is loading your protected Student profile from the API.</span></div></section>;
   }
-  return <section className="student-preview-status" role="status" aria-live="polite"><div><strong>Authenticated Student workspace</strong><span>{currentStudent.student.fullName} - {currentStudent.student.verifiedEmail ?? 'verified email unavailable'} - {currentStudent.student.academicStatus}</span></div></section>;
+  // Resolved: render nothing. The top bar already shows the user's name and
+  // role; repeating email and account state here read as debug output (UAT #18).
+  return <></>;
 }
 
 function studentIdentityFromAuth(authStatus: AuthStatus, currentStudent: CurrentStudentState): { readonly name: string; readonly initials: string; readonly detail: string } {

@@ -396,3 +396,43 @@ describe('notifications backbone (mobile foundation)', () => {
     expect(bad.status).toBe(400);
   });
 });
+
+describe('DPDP consent capture', () => {
+  it('is dormant until a notice version is configured', async () => {
+    delete process.env.CONSENT_PRIVACY_NOTICE_VERSION;
+    const status = await api().get('/api/v1/me/consents/privacy-notice').set(auth(studentToken));
+    expect(status.status).toBe(200);
+    expect(status.body.required).toBe(false);
+    expect(status.body.requiredVersion).toBeNull();
+  });
+
+  it('requires, records and clears consent for the configured version only', async () => {
+    process.env.CONSENT_PRIVACY_NOTICE_VERSION = '2026-09-v1';
+    try {
+      const before = await api().get('/api/v1/me/consents/privacy-notice').set(auth(studentToken));
+      expect(before.body.required).toBe(true);
+      expect(before.body.requiredVersion).toBe('2026-09-v1');
+
+      // Consent to a version the user was not shown is refused.
+      const stale = await api().post('/api/v1/me/consents/privacy-notice').set(auth(studentToken))
+        .send({ version: 'draft-0' });
+      expect(stale.status).toBe(400);
+
+      const granted = await api().post('/api/v1/me/consents/privacy-notice').set(auth(studentToken))
+        .send({ version: '2026-09-v1' });
+      expect(granted.status).toBe(201);
+      expect(granted.body.granted).toBe(true);
+
+      const after = await api().get('/api/v1/me/consents/privacy-notice').set(auth(studentToken));
+      expect(after.body.required).toBe(false);
+      expect(after.body.grantedVersion).toBe('2026-09-v1');
+
+      // A new notice version re-arms the gate: consent is per version.
+      process.env.CONSENT_PRIVACY_NOTICE_VERSION = '2026-12-v2';
+      const rearmed = await api().get('/api/v1/me/consents/privacy-notice').set(auth(studentToken));
+      expect(rearmed.body.required).toBe(true);
+    } finally {
+      delete process.env.CONSENT_PRIVACY_NOTICE_VERSION;
+    }
+  });
+});

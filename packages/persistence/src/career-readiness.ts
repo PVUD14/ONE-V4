@@ -359,14 +359,21 @@ export async function completeLesson(pool: Pool, input: {
       [input.lessonVersionId],
     );
     if (!lesson.rows[0]) throw new Error('published lesson was not found');
-    const unmet = await client.query(
-      `SELECT p.prerequisite_lesson_version_id FROM lesson_prerequisites p
+    const unmet = await client.query<{ title: string }>(
+      `SELECT lv.title FROM lesson_prerequisites p
+       JOIN lesson_versions lv ON lv.id = p.prerequisite_lesson_version_id
        WHERE p.lesson_version_id=$2 AND p.required AND NOT EXISTS (
          SELECT 1 FROM learner_progress lp WHERE lp.subject_user_id=$1
-           AND lp.lesson_version_id=p.prerequisite_lesson_version_id AND lp.state='COMPLETED')`,
+           AND lp.lesson_version_id=p.prerequisite_lesson_version_id AND lp.state='COMPLETED')
+       ORDER BY lv.title`,
       [input.subjectUserId, input.lessonVersionId],
     );
-    if (unmet.rows.length > 0) throw new Error('lesson prerequisites are not complete');
+    if (unmet.rows.length > 0) {
+      // Named so the learner is told WHICH lessons unlock this one (UAT #17),
+      // instead of a generic refusal.
+      const titles = unmet.rows.map((row) => `"${row.title}"`).join(', ');
+      throw new Error(`lesson prerequisites are not complete: finish ${titles} first`);
+    }
     const progressId = randomUUID();
     const evidenceId = randomUUID();
     await client.query(

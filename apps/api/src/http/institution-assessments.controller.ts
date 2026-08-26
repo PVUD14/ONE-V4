@@ -23,6 +23,7 @@ import {
   type ApiIdGenerator,
   type ProtectedHttpRequest,
 } from './api-security.js';
+import { recordNotification } from './notify.js';
 
 type QueryResult<T> = { rows: T[] };
 
@@ -425,8 +426,8 @@ export class InstitutionAssessmentsController {
     if (!studentProfileIds.length) throw badRequest('NO_STUDENTS_GIVEN', context.correlationId);
 
     const definition = await this.db.execute(sql`
-      SELECT lifecycle_state FROM exam_definitions WHERE id = ${id}::uuid AND institution_id = ${institutionId}::uuid
-    `) as QueryResult<{ lifecycle_state: string }>;
+      SELECT lifecycle_state, title, ends_at FROM exam_definitions WHERE id = ${id}::uuid AND institution_id = ${institutionId}::uuid
+    `) as QueryResult<{ lifecycle_state: string; title: string; ends_at: string }>;
     if (definition.rows[0]?.lifecycle_state !== 'PUBLISHED') throw badRequest('ASSESSMENT_NOT_PUBLISHED', context.correlationId);
 
     // Roster profile ids resolve to user ids server-side; only ACTIVE
@@ -447,6 +448,15 @@ export class InstitutionAssessmentsController {
         RETURNING id
       `) as QueryResult<{ id: string }>;
       assigned += inserted.rows.length;
+      if (inserted.rows.length) {
+        await recordNotification(this.db, this.ids, {
+          userId: studentUserId,
+          kind: 'EXAM_ASSIGNED',
+          title: `Assessment assigned: ${definition.rows[0].title}`,
+          body: `Open until ${new Date(definition.rows[0].ends_at).toISOString()}. Find it under Assessments in your workspace.`,
+          data: { assessmentId: id },
+        });
+      }
     }
     return {
       assignment: { assessmentId: id, requested: studentProfileIds.length, eligible: eligibleIds.length, newlyAssigned: assigned },
@@ -498,6 +508,22 @@ export class InstitutionAssessmentsController {
         VALUES (${this.ids.uuid()}::uuid, ${id}::uuid, ${actorId}::uuid, 'PUBLISHED', 'PUBLISHED')
       `);
     });
+    const reopenedTitle = await this.db.execute(sql`
+      SELECT d.title, a.student_user_id FROM exam_definitions d
+      JOIN exam_assignments a ON a.definition_id = d.id
+      WHERE d.id = ${id}::uuid AND d.institution_id = ${institutionId}::uuid
+    `) as QueryResult<{ title: string; student_user_id: string }>;
+    for (const row of reopenedTitle.rows) {
+      await recordNotification(this.db, this.ids, {
+        userId: row.student_user_id,
+        kind: 'EXAM_REOPENED',
+        title: `Assessment reopened: ${row.title}`,
+        body: extendMinutes > 0
+          ? `The window was extended by ${extendMinutes} minutes. Check Assessments for your remaining attempts.`
+          : 'The assessment settings were updated. Check Assessments for your remaining attempts.',
+        data: { assessmentId: id },
+      });
+    }
     return {
       assessment: { id, attemptsAllowed: newAttempts, extendedMinutes: extendMinutes, durationSeconds: newDurationSeconds },
       correlationId: context.correlationId,

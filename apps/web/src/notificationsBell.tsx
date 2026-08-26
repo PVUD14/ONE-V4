@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Bell, MessageSquare } from 'lucide-react';
-import { getProtectedAccessToken, listStudentExams } from './api.js';
+import { getProtectedAccessToken, listMyNotifications, listStudentExams, markAllNotificationsRead } from './api.js';
 
 interface DerivedNotification {
   readonly id: string;
@@ -9,38 +9,53 @@ interface DerivedNotification {
 }
 
 /**
- * The student notification bell, fed by real account state instead of a
- * hardcoded count: assigned assessments not yet taken, attempts in progress,
- * and freshly published results. Degrades to an empty inbox when signed out
- * or when the API is unreachable.
+ * The student notification bell: the persistent per-user feed (assignments,
+ * reopenings, published results — the same feed the mobile app consumes),
+ * merged with live derived state such as an attempt currently in progress.
+ * Opening the flyout marks the feed read. Degrades to an empty inbox when
+ * signed out or when the API is unreachable.
  */
 export function StudentNotificationsBell(): React.ReactElement {
   const token = getProtectedAccessToken();
   const [items, setItems] = useState<readonly DerivedNotification[]>([]);
+  const [unread, setUnread] = useState(0);
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!token) { setItems([]); return; }
+    if (!token) { setItems([]); setUnread(0); return; }
     const abort = new AbortController();
-    listStudentExams(token, abort.signal).then((response) => {
-      const now = Date.now();
-      const derived: DerivedNotification[] = [];
-      for (const exam of response.assessments) {
-        const windowOpen = now >= Date.parse(exam.startsAt) && now <= Date.parse(exam.endsAt);
-        if (exam.openAttemptId) {
-          derived.push({ id: `${exam.id}-open`, text: `Attempt in progress: ${exam.title} — resume before ${new Date(exam.endsAt).toLocaleString()}.`, actionable: true });
-        } else if (windowOpen && exam.attemptsUsed < exam.attemptsAllowed) {
-          derived.push({ id: `${exam.id}-due`, text: `Assessment assigned: ${exam.title} — open until ${new Date(exam.endsAt).toLocaleString()}.`, actionable: true });
-        }
-        if (exam.latestResult) {
-          derived.push({ id: `${exam.id}-result`, text: `Result published: ${exam.title} — ${exam.latestResult.percentage}%.`, actionable: false });
+    Promise.allSettled([
+      listMyNotifications(token, abort.signal),
+      listStudentExams(token, abort.signal),
+    ]).then(([feed, exams]) => {
+      const merged: DerivedNotification[] = [];
+      if (exams.status === 'fulfilled') {
+        for (const exam of exams.value.assessments) {
+          if (exam.openAttemptId) {
+            merged.push({ id: `${exam.id}-open`, text: `Attempt in progress: ${exam.title} — resume before ${new Date(exam.endsAt).toLocaleString()}.`, actionable: true });
+          }
         }
       }
-      setItems(derived);
-    }).catch(() => setItems([]));
+      if (feed.status === 'fulfilled') {
+        setUnread(feed.value.unreadCount);
+        for (const note of feed.value.notifications.slice(0, 20)) {
+          merged.push({ id: note.id, text: `${note.title} — ${note.body}`, actionable: note.readAt === null });
+        }
+      } else {
+        setUnread(0);
+      }
+      setItems(merged);
+    }).catch(() => { setItems([]); setUnread(0); });
     return () => abort.abort();
   }, [token]);
+
+  useEffect(() => {
+    if (!open || !token || unread === 0) return;
+    // Opening the flyout acknowledges the feed; the in-progress reminder is
+    // derived live and reappears on the next load regardless.
+    markAllNotificationsRead(token).then(() => setUnread(0)).catch(() => undefined);
+  }, [open, token, unread]);
 
   useEffect(() => {
     if (!open) return;
@@ -51,14 +66,15 @@ export function StudentNotificationsBell(): React.ReactElement {
     return () => document.removeEventListener('mousedown', onOutside);
   }, [open]);
 
-  const actionableCount = items.filter((item) => item.actionable).length;
+  const liveActionable = items.filter((item) => item.id.endsWith('-open')).length;
+  const badgeCount = unread + liveActionable;
 
   return (
     <div className="notify-bell" ref={containerRef}>
       <button className="icon-button notification" type="button" aria-label="Notifications" aria-expanded={open}
         onClick={() => setOpen((value) => !value)}>
         <Bell size={18} />
-        {actionableCount > 0 ? <span>{actionableCount}</span> : null}
+        {badgeCount > 0 ? <span>{badgeCount}</span> : null}
       </button>
       {open ? (
         <div className="notify-flyout" role="dialog" aria-label="Notifications">

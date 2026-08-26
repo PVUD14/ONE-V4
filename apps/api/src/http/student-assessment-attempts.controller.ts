@@ -23,6 +23,7 @@ import {
   type ApiIdGenerator,
   type ProtectedHttpRequest,
 } from './api-security.js';
+import { recordNotification } from './notify.js';
 
 type QueryResult<T> = { rows: T[] };
 
@@ -386,6 +387,19 @@ export class StudentAssessmentAttemptsController {
            ${summary.correct}, ${summary.wrong}, ${summary.notAttempted}, ${timeTaken}, ${published})
       `);
     });
+
+    if (published) {
+      const titled = await this.db.execute(sql`
+        SELECT title FROM exam_definitions WHERE id = ${attempt.definition_id}::uuid
+      `) as QueryResult<{ title: string }>;
+      await recordNotification(this.db, this.ids, {
+        userId: attempt.student_user_id,
+        kind: 'RESULT_PUBLISHED',
+        title: `Result published: ${titled.rows[0]?.title ?? 'Assessment'}`,
+        body: `You scored ${summary.score}/${summary.maxScore} (${summary.percentage}%). Open Assessments to review.`,
+        data: { assessmentId: attempt.definition_id, attemptId: attempt.id },
+      });
+    }
 
     return published
       ? { score: summary.score, maxScore: summary.maxScore, percentage: summary.percentage, correct: summary.correct, wrong: summary.wrong, notAttempted: summary.notAttempted }

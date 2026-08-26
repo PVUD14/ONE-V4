@@ -349,3 +349,50 @@ describe('stale attempts and duration changes', () => {
     expect(autoSubmitted?.autoSubmitted).toBe(true);
   });
 });
+
+describe('notifications backbone (mobile foundation)', () => {
+  it('recorded exam-assigned, result and reopened notifications for the student', async () => {
+    const inbox = await api().get('/api/v1/me/notifications').set(auth(studentToken));
+    expect(inbox.status).toBe(200);
+    const kinds = (inbox.body.notifications as { kind: string; title: string }[]).map((n) => n.kind);
+    expect(kinds).toContain('EXAM_ASSIGNED');
+    expect(kinds).toContain('RESULT_PUBLISHED');
+    expect(kinds).toContain('EXAM_REOPENED');
+    const assigned = (inbox.body.notifications as { kind: string; title: string }[]).find((n) => n.kind === 'EXAM_ASSIGNED');
+    expect(assigned?.title).toContain('Unit Test 1 - Arrays');
+    expect(inbox.body.unreadCount).toBeGreaterThan(0);
+  });
+
+  it('marks all notifications read, and keeps feeds tenant-private', async () => {
+    const marked = await api().post('/api/v1/me/notifications/read-all').set(auth(studentToken));
+    expect(marked.status).toBe(201);
+    expect(marked.body.marked).toBeGreaterThan(0);
+    const after = await api().get('/api/v1/me/notifications').set(auth(studentToken));
+    expect(after.body.unreadCount).toBe(0);
+
+    // Another user's feed does not leak this student's notifications.
+    const rivalInbox = await api().get('/api/v1/me/notifications').set(auth(rivalStaffToken));
+    const rivalKinds = (rivalInbox.body.notifications as { kind: string }[]).map((n) => n.kind);
+    expect(rivalKinds).not.toContain('EXAM_ASSIGNED');
+  });
+
+  it('registers, refreshes and revokes a device push token', async () => {
+    const token = `fcm-token-${randomUUID()}`;
+    const registered = await api().post('/api/v1/me/devices').set(auth(studentToken))
+      .send({ platform: 'ANDROID', token });
+    expect(registered.status).toBe(201);
+    expect(registered.body.registered).toBe(true);
+
+    // Same token again is an idempotent refresh, not an error.
+    const refreshed = await api().post('/api/v1/me/devices').set(auth(studentToken))
+      .send({ platform: 'ANDROID', token });
+    expect(refreshed.status).toBe(201);
+
+    const revoked = await api().post('/api/v1/me/devices/revoke').set(auth(studentToken)).send({ token });
+    expect(revoked.status).toBe(201);
+    expect(revoked.body.revoked).toBe(1);
+
+    const bad = await api().post('/api/v1/me/devices').set(auth(studentToken)).send({ platform: 'TV', token });
+    expect(bad.status).toBe(400);
+  });
+});

@@ -906,3 +906,23 @@ export async function sendAssistantFeedback(token: string, helpful: boolean, que
     body: JSON.stringify({ helpful, question, answer }),
   }).catch(() => undefined);
 }
+
+// --- Notifications feed (mobile foundation) ---------------------------------
+
+export interface UserNotificationDto {
+  readonly id: string;
+  readonly kind: 'EXAM_ASSIGNED' | 'EXAM_REOPENED' | 'RESULT_PUBLISHED' | 'SYSTEM';
+  readonly title: string;
+  readonly body: string;
+  readonly data: Record<string, string>;
+  readonly createdAt: string;
+  readonly readAt: string | null;
+}
+
+export function listMyNotifications(token: string, signal?: AbortSignal): Promise<{ notifications: UserNotificationDto[]; unreadCount: number }> {
+  return requestJson('/api/v1/me/notifications', { token, ...(signal ? { signal } : {}) });
+}
+
+export function markAllNotificationsRead(token: string): Promise<{ marked: number }> {
+  return requestJson('/api/v1/me/notifications/read-all', { token, method: 'POST' });
+}

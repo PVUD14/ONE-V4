@@ -23,8 +23,8 @@ object Api {
     fun baseUrl(context: Context): String =
         Session.apiOverride(context).ifBlank { BuildConfig.API_BASE_URL }
 
-    class ApiException(val status: Int, val code: String?) :
-        Exception("API request failed ($status${code?.let { ", $it" } ?: ""})")
+    class ApiException(val status: Int, val code: String?, val detail: String? = null) :
+        Exception(detail ?: "API request failed ($status${code?.let { ", $it" } ?: ""})")
 
     private suspend fun request(context: Context, method: String, path: String, body: String? = null): String =
         withContext(Dispatchers.IO) {
@@ -42,10 +42,8 @@ object Api {
             http.newCall(builder.build()).execute().use { response ->
                 val text = response.body?.string() ?: ""
                 if (!response.isSuccessful) {
-                    val code = runCatching {
-                        json.decodeFromString<ErrorEnvelope>(text).error?.code
-                    }.getOrNull()
-                    throw ApiException(response.code, code)
+                    val parsed = runCatching { json.decodeFromString<ErrorEnvelope>(text).error }.getOrNull()
+                    throw ApiException(response.code, parsed?.code, parsed?.message)
                 }
                 text
             }
@@ -71,10 +69,20 @@ object Api {
     suspend fun registerDevice(context: Context, fcmToken: String) {
         request(context, "POST", "/api/v1/me/devices", "{\"platform\":\"ANDROID\",\"token\":\"$fcmToken\"}")
     }
+
+    suspend fun studentMe(context: Context): StudentDto =
+        json.decodeFromString<StudentEnvelope>(request(context, "GET", "/api/v1/students/me")).student
+
+    suspend fun learnerState(context: Context): LearnerStateDto =
+        json.decodeFromString(request(context, "GET", "/api/v1/career-readiness/me"))
+
+    suspend fun completeLesson(context: Context, lessonVersionId: String) {
+        request(context, "POST", "/api/v1/career-readiness/lessons/$lessonVersionId/complete")
+    }
 }
 
 @Serializable data class ErrorEnvelope(val error: ErrorBody? = null)
-@Serializable data class ErrorBody(val code: String? = null)
+@Serializable data class ErrorBody(val code: String? = null, val message: String? = null)
 
 @Serializable data class AssessmentsEnvelope(val assessments: List<AssessmentDto> = emptyList())
 @Serializable data class AssessmentDto(
@@ -111,3 +119,47 @@ object Api {
     val grantedVersion: String? = null,
     val required: Boolean = false,
 )
+
+// --- Student identity ---------------------------------------------------------
+
+@Serializable data class StudentEnvelope(val student: StudentDto)
+@Serializable data class StudentDto(
+    val userId: String,
+    val fullName: String = "",
+    val verifiedEmail: String? = null,
+    val institutionStudentId: String = "",
+    val academicStatus: String = "",
+    val department: String? = null,
+    val program: String? = null,
+    val batch: String? = null,
+)
+
+// --- Career readiness / learning ---------------------------------------------
+
+@Serializable data class LearnerStateDto(
+    val catalog: CatalogDto = CatalogDto(),
+    val progress: List<ProgressDto> = emptyList(),
+    val readiness: ReadinessDto? = null,
+    val roadmap: List<RoadmapDto> = emptyList(),
+)
+@Serializable data class CatalogDto(val modules: List<ModuleDto> = emptyList())
+@Serializable data class ModuleDto(
+    val id: String,
+    val title: String = "",
+    val description: String = "",
+    val lessons: List<LessonDto> = emptyList(),
+)
+@Serializable data class LessonDto(
+    val id: String,
+    val title: String = "",
+    val prerequisiteLessonIds: List<String> = emptyList(),
+)
+@Serializable data class ProgressDto(val lessonVersionId: String, val state: String = "")
+@Serializable data class ReadinessDto(val band: String = "")
+@Serializable data class RoadmapDto(
+    val id: String,
+    val actionCode: String = "",
+    val reasonCode: String = "",
+    val state: String = "",
+)
+

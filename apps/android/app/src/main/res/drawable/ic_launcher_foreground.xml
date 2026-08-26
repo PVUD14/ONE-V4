@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The brand 8, simplified as a monochrome glyph for the launcher. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path
+        android:fillColor="#D9DCE1"
+        android:pathData="M54,26c-9.4,0 -15.5,5.2 -15.5,12.6c0,4.8 2.7,8.6 7,10.9c-5.2,2.4 -8.5,6.7 -8.5,12.2C37,70.6 44,76 54,76s17,-5.4 17,-14.3c0,-5.5 -3.3,-9.8 -8.5,-12.2c4.3,-2.3 7,-6.1 7,-10.9C69.5,31.2 63.4,26 54,26zM54,32.5c4.8,0 8,2.6 8,6.4s-3.2,6.4 -8,6.4s-8,-2.6 -8,-6.4S49.2,32.5 54,32.5zM54,51.6c5.6,0 9.4,3 9.4,7.5S59.6,66.6 54,66.6s-9.4,-3 -9.4,-7.5S48.4,51.6 54,51.6z"/>
+</vector>

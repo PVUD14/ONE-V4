@@ -46,6 +46,7 @@ private val DarkScheme = darkColorScheme(
 fun OneTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = if (isSystemInDarkTheme()) DarkScheme else LightScheme,
+        typography = oneTypography(),
         content = content,
     )
 }

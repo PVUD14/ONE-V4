@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.WorkOutline
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -108,7 +109,10 @@ internal fun JobsScreen() {
         if (tab == 0) {
             when {
                 opportunities == null -> LoadingSpinner()
-                opportunities!!.isEmpty() -> CenteredNote("No open opportunities right now. New roles from employers appear here.")
+                opportunities!!.isEmpty() -> EmptyState(
+                    androidx.compose.material.icons.Icons.Filled.WorkOutline, Color(0xFFF3EEFF), Color(0xFF6941C6),
+                    "No open roles right now",
+                    "When employers post opportunities for your institution, they appear here with one-tap apply.")
                 else -> LazyColumn(Modifier.fillMaxSize()) {
                     items(opportunities!!, key = { it.id }) { opp ->
                         Spacer(Modifier.height(12.dp))
@@ -159,7 +163,10 @@ internal fun JobsScreen() {
         } else {
             when {
                 applications == null -> LoadingSpinner()
-                applications!!.isEmpty() -> CenteredNote("No applications yet. Apply to an opportunity and track it here.")
+                applications!!.isEmpty() -> EmptyState(
+                    androidx.compose.material.icons.Icons.Filled.WorkOutline, Color(0xFFF3EEFF), Color(0xFF6941C6),
+                    "No applications yet",
+                    "Apply to an opportunity and every stage — submitted, shortlisted, offered — is tracked here.")
                 else -> LazyColumn(Modifier.fillMaxSize()) {
                     items(applications!!, key = { it.id }) { app ->
                         Spacer(Modifier.height(12.dp))

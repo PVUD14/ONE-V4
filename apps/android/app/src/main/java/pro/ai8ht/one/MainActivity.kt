@@ -3,6 +3,7 @@ package pro.ai8ht.one
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -156,6 +157,7 @@ private fun BrandSplash() {
     }
 }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 private fun MainScaffold(onSignOut: () -> Unit, onSessionExpired: () -> Unit) {
     val context = LocalContext.current
@@ -168,6 +170,7 @@ private fun MainScaffold(onSignOut: () -> Unit, onSessionExpired: () -> Unit) {
     var showEditProfile by remember { mutableStateOf(false) }
     var moreDest by remember { mutableStateOf<MoreDest?>(null) }
     var avatarVersion by remember { mutableIntStateOf(0) }
+    var refreshing by remember { mutableStateOf(false) }
 
     LaunchedEffect(reloadKey) {
         loadError = false
@@ -186,21 +189,24 @@ private fun MainScaffold(onSignOut: () -> Unit, onSessionExpired: () -> Unit) {
             if (loaded.student == null && loaded.learner == null && loaded.notifications == null) loadError = true
             data = loaded
         }
+        refreshing = false
     }
 
     when {
-        showChat -> { ChatOverlay(onClose = { showChat = false }); return }
-        showEditProfile -> { EditProfileOverlay(onClose = { showEditProfile = false; reloadKey += 1 }); return }
-        showInbox -> { InboxOverlay(data?.notifications, onClose = { showInbox = false }, onAllRead = { reloadKey += 1 }); return }
+        showChat -> { SlideIn { ChatOverlay(onClose = { showChat = false }) }; return }
+        showEditProfile -> { SlideIn { EditProfileOverlay(onClose = { showEditProfile = false; reloadKey += 1 }) }; return }
+        showInbox -> { SlideIn { InboxOverlay(data?.notifications, onClose = { showInbox = false }, onAllRead = { reloadKey += 1 }) }; return }
         moreDest == MoreDest.Profile -> {
-            ProfilePage(data?.student, avatarVersion, onPhotoPicked = { avatarVersion += 1 },
-                onEdit = { showEditProfile = true }, onClose = { moreDest = null })
+            SlideIn {
+                ProfilePage(data?.student, avatarVersion, onPhotoPicked = { avatarVersion += 1 },
+                    onEdit = { showEditProfile = true }, onClose = { moreDest = null })
+            }
             return
         }
-        moreDest == MoreDest.Documents -> { DocumentsPage(onClose = { moreDest = null }); return }
-        moreDest == MoreDest.Privacy -> { PrivacyPage(onClose = { moreDest = null }); return }
-        moreDest == MoreDest.Career -> { CareerPage(data?.learner, onClose = { moreDest = null }); return }
-        moreDest == MoreDest.Settings -> { SettingsPage(onClose = { moreDest = null }, onSignOut = onSignOut); return }
+        moreDest == MoreDest.Documents -> { SlideIn { DocumentsPage(onClose = { moreDest = null }) }; return }
+        moreDest == MoreDest.Privacy -> { SlideIn { PrivacyPage(onClose = { moreDest = null }) }; return }
+        moreDest == MoreDest.Career -> { SlideIn { CareerPage(data?.learner, onClose = { moreDest = null }) }; return }
+        moreDest == MoreDest.Settings -> { SlideIn { SettingsPage(onClose = { moreDest = null }, onSignOut = onSignOut) }; return }
     }
 
     val unread = data?.notifications?.unreadCount ?: 0
@@ -238,20 +244,37 @@ private fun MainScaffold(onSignOut: () -> Unit, onSessionExpired: () -> Unit) {
             }
         },
     ) { padding ->
-        Column(Modifier.padding(padding).fillMaxSize()) {
+        androidx.compose.material3.pulltorefresh.PullToRefreshBox(
+            isRefreshing = refreshing,
+            onRefresh = { refreshing = true; reloadKey += 1 },
+            modifier = Modifier.padding(padding).fillMaxSize(),
+        ) {
             when {
-                data == null -> LoadingSpinner()
+                data == null -> HomeSkeleton()
                 loadError -> CenteredNote("Could not reach ONE right now. Check your connection and reopen the app.")
-                else -> {
-                    if (screen != Screen.Home) PageHeader(screen)
-                    when (screen) {
-                        Screen.Home -> HomeScreen(data!!, avatarVersion, onOpen = { destination ->
-                            if (destination == null) showInbox = true else screen = destination
-                        })
-                        Screen.Assessments -> AssessmentsScreen(data!!.assessments)
-                        Screen.Learning -> LearningScreen(data!!.learner, onChanged = { reloadKey += 1 })
-                        Screen.Jobs -> JobsScreen()
-                        Screen.More -> MoreMenuScreen(data!!.student, avatarVersion, onOpen = { moreDest = it }, onSignOut = onSignOut)
+                else -> androidx.compose.animation.AnimatedContent(
+                    targetState = screen,
+                    transitionSpec = {
+                        (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(220)) +
+                            androidx.compose.animation.slideInVertically(
+                                animationSpec = androidx.compose.animation.core.tween(220),
+                                initialOffsetY = { it / 24 },
+                            ))
+                            .togetherWith(androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(120)))
+                    },
+                    label = "tab-content",
+                ) { current ->
+                    Column(Modifier.fillMaxSize()) {
+                        if (current != Screen.Home) PageHeader(current)
+                        when (current) {
+                            Screen.Home -> HomeScreen(data!!, avatarVersion, onOpen = { destination ->
+                                if (destination == null) showInbox = true else screen = destination
+                            })
+                            Screen.Assessments -> AssessmentsScreen(data!!.assessments)
+                            Screen.Learning -> LearningScreen(data!!.learner, onChanged = { reloadKey += 1 })
+                            Screen.Jobs -> JobsScreen()
+                            Screen.More -> MoreMenuScreen(data!!.student, avatarVersion, onOpen = { moreDest = it }, onSignOut = onSignOut)
+                        }
                     }
                 }
             }
@@ -462,7 +485,9 @@ private fun StatTile(
 @Composable
 private fun AssessmentsScreen(items: List<AssessmentDto>) {
     if (items.isEmpty()) {
-        CenteredNote("No assessments assigned yet. Your placement cell assigns them; they appear here with their windows.")
+        EmptyState(Icons.Filled.Assignment, Color(0xFFEEF4FF), Color(0xFF1F55E5),
+            "No assessments yet",
+            "Your placement cell assigns tests to you. They appear here with their windows, timers and results.")
         return
     }
     val results = items.mapNotNull { it.latestResult }
@@ -554,7 +579,9 @@ private fun LearningScreen(learner: LearnerStateDto?, onChanged: () -> Unit) {
     var message by remember { mutableStateOf<String?>(null) }
 
     if (learner == null || learner.catalog.modules.isEmpty()) {
-        CenteredNote("Learning modules will appear here once published for your institution.")
+        EmptyState(Icons.Filled.MenuBook, Color(0xFFEAF4EE), Color(0xFF2E6B46),
+            "No modules yet",
+            "Learning modules appear here once your institution publishes them. Completed lessons build your readiness.")
         return
     }
     val done = learner.progress.filter { it.state == "COMPLETED" }.map { it.lessonVersionId }.toSet()
@@ -672,7 +699,9 @@ private fun InboxOverlay(feed: NotificationsEnvelope?, onClose: () -> Unit, onAl
             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
             when {
                 feed == null || feed.notifications.isEmpty() ->
-                    CenteredNote("You're all caught up — nothing needs your attention.")
+                    EmptyState(Icons.Filled.Notifications, Color(0xFFFDF6E0), Color(0xFF8A6400),
+                        "All caught up",
+                        "Nothing needs your attention. Assignments, reopenings and results land here the moment they happen.")
                 else -> LazyColumn(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
                     item { Spacer(Modifier.height(10.dp)) }
                     items(feed.notifications, key = { it.id }) { note ->

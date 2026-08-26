@@ -56,10 +56,13 @@ export PGPASSWORD="${PASS}"
 BACKUP="${BACKUP_DIR}/${DB}_${TS}.dump"
 VERIFY_DB="${DB}_verify_${TS}"
 
+GPG_TEMP_HOME=""
+
 cleanup() {
   # The scratch database must never outlive the check, even on failure.
   psql -h "${HOST}" -p "${PORT}" -U "${USER}" -d postgres -q \
     -c "DROP DATABASE IF EXISTS \"${VERIFY_DB}\";" >/dev/null 2>&1 || true
+  [ -n "${GPG_TEMP_HOME}" ] && rm -rf "${GPG_TEMP_HOME}" || true
 }
 trap cleanup EXIT
 
@@ -125,19 +128,56 @@ if [ "${VERIFIED}" != true ]; then
   exit 22
 fi
 
+# --- Encrypt for anywhere that is not this host ------------------------------
+
+# The host keeps the plaintext dump (an attacker who can read this directory can
+# read the live database anyway; the operator needs fast restores). Everything that
+# LEAVES the host ships encrypted to the public key in BACKUP_GPG_PUBLIC_KEY — the
+# private key lives only in the operator vault, so the server can encrypt backups
+# it can never decrypt, and a lost offsite copy is ciphertext, not a breach.
+SHIP="${BACKUP}"
+ENCRYPTED="off"
+if [ -n "${BACKUP_GPG_PUBLIC_KEY:-}" ]; then
+  if [ ! -f "${BACKUP_GPG_PUBLIC_KEY}" ]; then
+    rm -f "${BACKUP}"
+    echo '{"event":"backup.failed","reason":"BACKUP_GPG_PUBLIC_KEY is set but the key file is missing"}' >&2
+    fail_ping
+    exit 24
+  fi
+  GPG_TEMP_HOME=$(mktemp -d)
+  ENCRYPT_OK=true
+  gpg --homedir "${GPG_TEMP_HOME}" --quiet --batch --import "${BACKUP_GPG_PUBLIC_KEY}" 2>/dev/null || ENCRYPT_OK=false
+  RECIPIENT=$(gpg --homedir "${GPG_TEMP_HOME}" --list-keys --with-colons 2>/dev/null | awk -F: '$1=="fpr"{print $10; exit}')
+  if [ "${ENCRYPT_OK}" = true ] && [ -n "${RECIPIENT}" ] \
+    && gpg --homedir "${GPG_TEMP_HOME}" --quiet --batch --yes --trust-model always \
+         --output "${BACKUP}.gpg" --encrypt --recipient "${RECIPIENT}" "${BACKUP}" 2>/dev/null \
+    && [ -s "${BACKUP}.gpg" ]; then
+    chmod 600 "${BACKUP}.gpg"
+    SHIP="${BACKUP}.gpg"
+    ENCRYPTED="gpg:${RECIPIENT}"
+  else
+    # A configured key that fails to encrypt means the operator believes offsite
+    # copies are encrypted when they would not be. Refuse to ship plaintext.
+    rm -f "${BACKUP}.gpg"
+    echo '{"event":"backup.encrypt.failed","reason":"gpg encryption failed with the configured public key; offsite copy skipped"}' >&2
+    fail_ping
+    exit 25
+  fi
+fi
+
 # --- Copy off the host ------------------------------------------------------
 
 # Backups on the database host protect against corruption and mistakes, not against
 # losing the machine. Only after this step does the dump protect against that too.
 OFFSITE="unconfigured"
 if [ -n "${BACKUP_RCLONE_REMOTE:-}" ]; then
-  if rclone copyto "${BACKUP}" "${BACKUP_RCLONE_REMOTE}/$(basename "${BACKUP}")" 2>/dev/null; then
+  if rclone copyto "${SHIP}" "${BACKUP_RCLONE_REMOTE}/$(basename "${SHIP}")" 2>/dev/null; then
     OFFSITE="rclone:ok"
   else
     OFFSITE="rclone:FAILED"
   fi
 elif [ -n "${BACKUP_SCP_TARGET:-}" ]; then
-  if scp -q -o BatchMode=yes -o ConnectTimeout=15 "${BACKUP}" "${BACKUP_SCP_TARGET}" 2>/dev/null; then
+  if scp -q -o BatchMode=yes -o ConnectTimeout=15 "${SHIP}" "${BACKUP_SCP_TARGET}" 2>/dev/null; then
     OFFSITE="scp:ok"
   else
     OFFSITE="scp:FAILED"
@@ -149,11 +189,11 @@ fi
 
 # --- Retention --------------------------------------------------------------
 
-PRUNED=$(find "${BACKUP_DIR}" -maxdepth 1 -name "${DB}_*.dump" -type f -mtime "+${RETENTION_DAYS}" -print -delete | wc -l)
+PRUNED=$(find "${BACKUP_DIR}" -maxdepth 1 \( -name "${DB}_*.dump" -o -name "${DB}_*.dump.gpg" \) -type f -mtime "+${RETENTION_DAYS}" -print -delete | wc -l)
 REMAINING=$(find "${BACKUP_DIR}" -maxdepth 1 -name "${DB}_*.dump" -type f | wc -l)
 
-printf '{"event":"backup.verified","file":"%s","bytes":%s,"sha256":"%s","tables":%s,"rows":"%s","offsite":"%s","prunedOlderThanDays":%s,"pruned":%s,"retained":%s}\n' \
-  "${BACKUP}" "${SIZE}" "${CHECKSUM}" "${SOURCE_TABLES}" "${SOURCE_ROWS}" "${OFFSITE}" "${RETENTION_DAYS}" "${PRUNED}" "${REMAINING}"
+printf '{"event":"backup.verified","file":"%s","bytes":%s,"sha256":"%s","tables":%s,"rows":"%s","encrypted":"%s","offsite":"%s","prunedOlderThanDays":%s,"pruned":%s,"retained":%s}\n' \
+  "${BACKUP}" "${SIZE}" "${CHECKSUM}" "${SOURCE_TABLES}" "${SOURCE_ROWS}" "${ENCRYPTED}" "${OFFSITE}" "${RETENTION_DAYS}" "${PRUNED}" "${REMAINING}"
 
 # Dead-man's switch: an external service that expects this ping daily will alert when
 # it stops arriving, which is how a silently broken backup job becomes somebody's

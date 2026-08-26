@@ -27,7 +27,40 @@ BACKUP_PING_URL=https://hc-ping.com/<one-backup-uuid>
 MONITOR_PING_URL=https://hc-ping.com/<one-monitor-uuid>
 ```
 
-### 3. Configure the offsite copy
+### 3. Configure backup encryption (before any offsite copy)
+
+Everything that leaves the host ships encrypted to a public key; the private key
+lives only in the operator vault. The server can encrypt backups it can never
+decrypt — a lost offsite copy is ciphertext, not a breach.
+
+On the **operator machine** (never on the server):
+
+```
+gpg --quick-gen-key "ONE Backups <ops@ai8ht.pro>" default default never
+gpg --export --armor "ONE Backups" > one-backup-public.key
+gpg --export-secret-keys --armor "ONE Backups" > one-backup-PRIVATE.key
+```
+
+Store `one-backup-PRIVATE.key` (and its passphrase, if set) in the vault, delete
+the local file, and copy **only** the public half to the server:
+
+```
+scp one-backup-public.key aight@one.ai8ht.pro:/srv/planthepath-next/shared/backup-public.key
+```
+
+Then add to `app.env`:
+
+```
+BACKUP_GPG_PUBLIC_KEY=/srv/planthepath-next/shared/backup-public.key
+```
+
+The nightly job now writes `<dump>.gpg` beside each verified dump and ships only
+the `.gpg` offsite; the `backup.verified` log line shows `"encrypted":"gpg:<key>"`.
+If the key is configured but encryption fails, the run fails loudly rather than
+shipping plaintext. The plaintext dump stays on the host for fast local restores
+(an attacker who can read that directory can read the live database anyway).
+
+### 3b. Configure the offsite copy
 
 A backup that lives only on the server does not survive losing the server. Pick one:
 

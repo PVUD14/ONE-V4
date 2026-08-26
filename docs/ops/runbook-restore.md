@@ -7,8 +7,21 @@ lead-operator decision only.
 Backups live in `/srv/planthepath-next/shared/backups/`:
 
 - `<db>_<timestamp>.dump` — nightly, restore-verified by the backup job itself.
+- `<db>_<timestamp>.dump.gpg` — the encrypted copy of the same dump; this is the
+  form that ships offsite.
 - `planthepath_uat_before_<short>_<timestamp>.dump` — taken by every deploy,
   immediately before that release's migration ran.
+
+An **offsite** `.dump.gpg` must be decrypted first, on the operator machine,
+with the private key from the vault (the server cannot decrypt it):
+
+```
+gpg --import one-backup-PRIVATE.key      # from the vault, once per machine
+gpg --output restored.dump --decrypt <db>_<timestamp>.dump.gpg
+```
+
+Then treat `restored.dump` like any dump below. Local restores use the plaintext
+`.dump` that is already on the host — no decryption step.
 
 All commands as `aight` unless stated. Connection settings come from
 `DATABASE_URL` in `/srv/planthepath-next/shared/app.env` — export them first:

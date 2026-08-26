@@ -26,6 +26,15 @@ object Session {
         prefs(context).edit().putString("access_token", token.trim()).apply()
     }
 
+    fun refreshToken(context: Context): String? = prefs(context).getString("refresh_token", null)?.ifBlank { null }
+
+    fun setTokens(context: Context, accessToken: String, refreshToken: String?) {
+        prefs(context).edit()
+            .putString("access_token", accessToken.trim())
+            .putString("refresh_token", refreshToken?.trim() ?: prefs(context).getString("refresh_token", null))
+            .apply()
+    }
+
     fun clear(context: Context) {
         prefs(context).edit().clear().apply()
     }

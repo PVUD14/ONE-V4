@@ -50,6 +50,7 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarDefaults
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
@@ -699,8 +700,15 @@ private fun InboxOverlay(feed: NotificationsEnvelope?, onClose: () -> Unit, onAl
 @Composable
 private fun SignInScreen(expired: Boolean = false, onSignedIn: () -> Unit) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
     var token by remember { mutableStateOf("") }
     var apiOverride by remember { mutableStateOf(Session.apiOverride(context)) }
+    var showAdvanced by remember { mutableStateOf(false) }
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+
     Column(
         Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(20.dp).verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.Center,
@@ -720,31 +728,56 @@ private fun SignInScreen(expired: Boolean = false, onSignedIn: () -> Unit) {
                             Modifier.padding(8.dp), style = MaterialTheme.typography.bodySmall)
                     }
                 }
-                Spacer(Modifier.height(6.dp))
-                if (Session.hostedUiConfigured) {
-                    Text("Use your institution account to continue.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.height(16.dp))
-                    Button(onClick = { Session.launchHostedSignIn(context) }, modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)) {
-                        Text("Sign in with your institution account")
-                    }
-                } else {
-                    Text("Institution sign-in activates once the mobile app client is registered. UAT testers: paste your access token below.",
-                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.height(14.dp))
-                    val fieldColors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                    )
+                Spacer(Modifier.height(12.dp))
+                val fieldColors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                )
+                OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("Email") },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true, shape = RoundedCornerShape(10.dp), colors = fieldColors)
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(value = password, onValueChange = { password = it }, label = { Text("Password") },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true,
+                    visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Password),
+                    shape = RoundedCornerShape(10.dp), colors = fieldColors)
+                error?.let {
+                    Spacer(Modifier.height(8.dp))
+                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
+                Spacer(Modifier.height(14.dp))
+                Button(
+                    onClick = {
+                        busy = true; error = null
+                        scope.launch {
+                            runCatching { Api.passwordSignIn(context, email, password) }
+                                .onSuccess { busy = false; onSignedIn() }
+                                .onFailure {
+                                    busy = false
+                                    error = (it as? Api.SignInException)?.message ?: "Sign-in failed. Try again."
+                                }
+                        }
+                    },
+                    enabled = !busy && email.isNotBlank() && password.isNotBlank(),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                ) { Text(if (busy) "Signing in…" else "Sign in") }
+
+                Spacer(Modifier.height(10.dp))
+                TextButton(onClick = { showAdvanced = !showAdvanced }) {
+                    Text(if (showAdvanced) "Hide UAT options" else "UAT options (token sign-in)")
+                }
+                if (showAdvanced) {
                     OutlinedTextField(value = token, onValueChange = { token = it }, label = { Text("Access token (UAT)") },
                         modifier = Modifier.fillMaxWidth(), minLines = 3, shape = RoundedCornerShape(10.dp), colors = fieldColors)
-                    Spacer(Modifier.height(10.dp))
+                    Spacer(Modifier.height(8.dp))
                     OutlinedTextField(value = apiOverride, onValueChange = { apiOverride = it },
                         label = { Text("API base URL (blank = production)") },
                         modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp), colors = fieldColors)
-                    Spacer(Modifier.height(16.dp))
-                    Button(
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedButton(
                         onClick = {
                             Session.setApiOverride(context, apiOverride)
                             Session.setToken(context, token)
@@ -753,7 +786,7 @@ private fun SignInScreen(expired: Boolean = false, onSignedIn: () -> Unit) {
                         enabled = token.isNotBlank(),
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(10.dp),
-                    ) { Text("Continue") }
+                    ) { Text("Continue with token") }
                 }
             }
         }

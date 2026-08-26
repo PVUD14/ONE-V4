@@ -24,6 +24,10 @@ android {
         // (AWS console, pool ap-south-1_nPl3qFkvB). The sign-in screen explains
         // itself while this is blank and offers the UAT token path instead.
         buildConfigField("String", "COGNITO_HOSTED_DOMAIN", "\"\"")
+        // The public SPA client (same one the web app ships to every browser).
+        // Password sign-in works once ALLOW_USER_PASSWORD_AUTH is enabled on it.
+        buildConfigField("String", "COGNITO_SPA_CLIENT_ID", "\"1i2kqvh3hknfq6ntf1eph6nt5t\"")
+        buildConfigField("String", "COGNITO_REGION", "\"ap-south-1\"")
         buildConfigField("String", "COGNITO_CLIENT_ID", "\"\"")
         buildConfigField("String", "OAUTH_REDIRECT_URI", "\"one.ai8ht.pro://signin\"")
     }

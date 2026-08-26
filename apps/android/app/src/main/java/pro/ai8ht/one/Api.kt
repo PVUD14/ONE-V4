@@ -5,6 +5,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -31,7 +33,6 @@ object Api {
             val token = Session.token(context) ?: throw ApiException(401, "NO_TOKEN")
             val builder = Request.Builder()
                 .url(baseUrl(context) + path)
-                .header("Authorization", "Bearer $token")
                 .header("Accept", "application/json")
                 .header("X-Correlation-Id", "and-" + UUID.randomUUID())
                 .header("X-Client", "one-android/" + BuildConfig.VERSION_NAME)
@@ -40,14 +41,28 @@ object Api {
                 "POST" -> builder.post((body ?: "{}").toRequestBody(jsonMedia))
                 "PATCH" -> builder.patch((body ?: "{}").toRequestBody(jsonMedia))
             }
-            http.newCall(builder.build()).execute().use { response ->
-                val text = response.body?.string() ?: ""
-                if (!response.isSuccessful) {
-                    val parsed = runCatching { json.decodeFromString<ErrorEnvelope>(text).error }.getOrNull()
-                    throw ApiException(response.code, parsed?.code, parsed?.message)
+            fun run(tokenValue: String): Pair<Int, String> {
+                val request = builder.header("Authorization", "Bearer " + tokenValue).build()
+                http.newCall(request).execute().use { response ->
+                    return response.code to (response.body?.string() ?: "")
                 }
-                text
             }
+            var (code, text) = run(token)
+            if (code == 401) {
+                // The access token lives one hour; a stored refresh token buys a
+                // new one silently before we give up and sign the user out.
+                val refreshed = refreshSession(context)
+                if (refreshed != null) {
+                    val retried = run(refreshed)
+                    code = retried.first
+                    text = retried.second
+                }
+            }
+            if (code !in 200..299) {
+                val parsed = runCatching { json.decodeFromString<ErrorEnvelope>(text).error }.getOrNull()
+                throw ApiException(code, parsed?.code, parsed?.message)
+            }
+            text
         }
 
     suspend fun listAssessments(context: Context): List<AssessmentDto> =
@@ -156,6 +171,81 @@ object Api {
             }
             full.toString()
         }
+    }
+
+    // --- Cognito password sign-in (UAT-friendly; production adds Hosted UI) ---
+
+    private fun cognitoUrl() = "https://cognito-idp." + BuildConfig.COGNITO_REGION + ".amazonaws.com/"
+
+    class SignInException(message: String) : Exception(message)
+
+    /** Signs in with email+password; stores access+refresh tokens on success. */
+    suspend fun passwordSignIn(context: Context, email: String, password: String): Unit = withContext(Dispatchers.IO) {
+        val payload = kotlinx.serialization.json.buildJsonObject {
+            put("AuthFlow", kotlinx.serialization.json.JsonPrimitive("USER_PASSWORD_AUTH"))
+            put("ClientId", kotlinx.serialization.json.JsonPrimitive(BuildConfig.COGNITO_SPA_CLIENT_ID))
+            put("AuthParameters", kotlinx.serialization.json.buildJsonObject {
+                put("USERNAME", kotlinx.serialization.json.JsonPrimitive(email.trim()))
+                put("PASSWORD", kotlinx.serialization.json.JsonPrimitive(password))
+            })
+        }.toString()
+        val request = Request.Builder()
+            .url(cognitoUrl())
+            .header("Content-Type", "application/x-amz-json-1.1")
+            .header("X-Amz-Target", "AWSCognitoIdentityProviderService.InitiateAuth")
+            .post(payload.toRequestBody("application/x-amz-json-1.1".toMediaType()))
+            .build()
+        http.newCall(request).execute().use { response ->
+            val text = response.body?.string() ?: ""
+            val body = runCatching { json.parseToJsonElement(text).jsonObject }.getOrNull()
+            val result = body?.get("AuthenticationResult")?.jsonObject
+            if (result != null) {
+                val access = result["AccessToken"]?.jsonPrimitive?.content
+                val refresh = result["RefreshToken"]?.jsonPrimitive?.content
+                if (access != null) {
+                    Session.setTokens(context, access, refresh)
+                    return@use
+                }
+            }
+            val type = body?.get("__type")?.jsonPrimitive?.content ?: ""
+            val challenge = body?.get("ChallengeName")?.jsonPrimitive?.content
+            throw SignInException(when {
+                challenge == "NEW_PASSWORD_REQUIRED" -> "Your password must be changed first — sign in once on the web at one.ai8ht.pro, then try again."
+                type.contains("NotAuthorized") -> "Incorrect email or password."
+                type.contains("UserNotFound") -> "Incorrect email or password."
+                type.contains("PasswordResetRequired") -> "Password reset required — complete it on the web first."
+                type.contains("InvalidParameter") && text.contains("USER_PASSWORD_AUTH") ->
+                    "Password sign-in is not switched on for this app yet — use the UAT token option below."
+                else -> "Sign-in failed. Check your connection and try again."
+            })
+        }
+    }
+
+    /** Exchanges the stored refresh token for a fresh access token; null if unavailable. */
+    fun refreshSession(context: Context): String? {
+        val refresh = Session.refreshToken(context) ?: return null
+        val payload = kotlinx.serialization.json.buildJsonObject {
+            put("AuthFlow", kotlinx.serialization.json.JsonPrimitive("REFRESH_TOKEN_AUTH"))
+            put("ClientId", kotlinx.serialization.json.JsonPrimitive(BuildConfig.COGNITO_SPA_CLIENT_ID))
+            put("AuthParameters", kotlinx.serialization.json.buildJsonObject {
+                put("REFRESH_TOKEN", kotlinx.serialization.json.JsonPrimitive(refresh))
+            })
+        }.toString()
+        val request = Request.Builder()
+            .url(cognitoUrl())
+            .header("Content-Type", "application/x-amz-json-1.1")
+            .header("X-Amz-Target", "AWSCognitoIdentityProviderService.InitiateAuth")
+            .post(payload.toRequestBody("application/x-amz-json-1.1".toMediaType()))
+            .build()
+        return runCatching {
+            http.newCall(request).execute().use { response ->
+                val text = response.body?.string() ?: ""
+                val access = json.parseToJsonElement(text).jsonObject["AuthenticationResult"]
+                    ?.jsonObject?.get("AccessToken")?.jsonPrimitive?.content
+                if (access != null) Session.setTokens(context, access, null)
+                access
+            }
+        }.getOrNull()
     }
 }
 

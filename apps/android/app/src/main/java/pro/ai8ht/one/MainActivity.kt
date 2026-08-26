@@ -107,6 +107,7 @@ private class StudentData(
 fun OneApp() {
     val context = LocalContext.current
     var signedIn by remember { mutableStateOf(Session.token(context) != null) }
+    var sessionExpired by remember { mutableStateOf(false) }
     var consent by remember { mutableStateOf<ConsentStatusDto?>(null) }
     var consentChecked by remember { mutableStateOf(false) }
 
@@ -118,36 +119,44 @@ fun OneApp() {
     }
 
     when {
-        !signedIn -> SignInScreen(onSignedIn = { signedIn = true; consentChecked = false })
+        !signedIn -> SignInScreen(expired = sessionExpired, onSignedIn = { sessionExpired = false; signedIn = true; consentChecked = false })
         !consentChecked -> BrandSplash()
         consent?.required == true -> ConsentScreen(
             version = consent?.requiredVersion ?: "",
             onGranted = { consent = null; consentChecked = true },
         )
-        else -> MainScaffold(onSignOut = {
-            Session.clear(context)
-            signedIn = false
-        })
+        else -> MainScaffold(
+            onSignOut = {
+                Session.clear(context)
+                signedIn = false
+            },
+            onSessionExpired = {
+                Session.clear(context)
+                sessionExpired = true
+                signedIn = false
+            },
+        )
     }
 }
 
+/** Continues the system splash's look: black brand ground, the original
+ *  silver wordmark, the 8 spinning in place while the app loads. */
 @Composable
 private fun BrandSplash() {
     Column(
-        Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
+        Modifier.fillMaxSize().background(Color(0xFF0B0C0F)),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        BrandWordmark(height = 42.dp, spinEight = true)
+        BrandWordmark(height = 46.dp, spinEight = true, untinted = true)
         Spacer(Modifier.height(18.dp))
-        Text("ONE", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        Text("The campus-to-career workspace", style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("ONE", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color(0xFFD9DCE1))
+        Text("The campus-to-career workspace", style = MaterialTheme.typography.bodySmall, color = Color(0xFF8E939C))
     }
 }
 
 @Composable
-private fun MainScaffold(onSignOut: () -> Unit) {
+private fun MainScaffold(onSignOut: () -> Unit, onSessionExpired: () -> Unit) {
     val context = LocalContext.current
     var screen by remember { mutableStateOf(Screen.Home) }
     var data by remember { mutableStateOf<StudentData?>(null) }
@@ -156,15 +165,23 @@ private fun MainScaffold(onSignOut: () -> Unit) {
     var showInbox by remember { mutableStateOf(false) }
     var showChat by remember { mutableStateOf(false) }
     var showEditProfile by remember { mutableStateOf(false) }
+    var moreDest by remember { mutableStateOf<MoreDest?>(null) }
+    var avatarVersion by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(reloadKey) {
         loadError = false
+        var unauthorized = false
+        suspend fun <T> guarded(block: suspend () -> T): T? = try { block() } catch (error: Api.ApiException) {
+            if (error.status == 401) unauthorized = true
+            null
+        } catch (error: Exception) { null }
         coroutineScope {
-            val student = async { runCatching { Api.studentMe(context) }.getOrNull() }
-            val exams = async { runCatching { Api.listAssessments(context) }.getOrNull() }
-            val learner = async { runCatching { Api.learnerState(context) }.getOrNull() }
-            val inbox = async { runCatching { Api.listNotifications(context) }.getOrNull() }
+            val student = async { guarded { Api.studentMe(context) } }
+            val exams = async { guarded { Api.listAssessments(context) } }
+            val learner = async { guarded { Api.learnerState(context) } }
+            val inbox = async { guarded { Api.listNotifications(context) } }
             val loaded = StudentData(student.await(), exams.await() ?: emptyList(), learner.await(), inbox.await())
+            if (unauthorized) { onSessionExpired(); return@coroutineScope }
             if (loaded.student == null && loaded.learner == null && loaded.notifications == null) loadError = true
             data = loaded
         }
@@ -174,6 +191,15 @@ private fun MainScaffold(onSignOut: () -> Unit) {
         showChat -> { ChatOverlay(onClose = { showChat = false }); return }
         showEditProfile -> { EditProfileOverlay(onClose = { showEditProfile = false; reloadKey += 1 }); return }
         showInbox -> { InboxOverlay(data?.notifications, onClose = { showInbox = false }, onAllRead = { reloadKey += 1 }); return }
+        moreDest == MoreDest.Profile -> {
+            ProfilePage(data?.student, avatarVersion, onPhotoPicked = { avatarVersion += 1 },
+                onEdit = { showEditProfile = true }, onClose = { moreDest = null })
+            return
+        }
+        moreDest == MoreDest.Documents -> { DocumentsPage(onClose = { moreDest = null }); return }
+        moreDest == MoreDest.Privacy -> { PrivacyPage(onClose = { moreDest = null }); return }
+        moreDest == MoreDest.Career -> { CareerPage(data?.learner, onClose = { moreDest = null }); return }
+        moreDest == MoreDest.Settings -> { SettingsPage(onClose = { moreDest = null }, onSignOut = onSignOut); return }
     }
 
     val unread = data?.notifications?.unreadCount ?: 0
@@ -218,13 +244,13 @@ private fun MainScaffold(onSignOut: () -> Unit) {
                 else -> {
                     if (screen != Screen.Home) PageHeader(screen)
                     when (screen) {
-                        Screen.Home -> HomeScreen(data!!, onOpen = { destination ->
+                        Screen.Home -> HomeScreen(data!!, avatarVersion, onOpen = { destination ->
                             if (destination == null) showInbox = true else screen = destination
                         })
                         Screen.Assessments -> AssessmentsScreen(data!!.assessments)
                         Screen.Learning -> LearningScreen(data!!.learner, onChanged = { reloadKey += 1 })
                         Screen.Jobs -> JobsScreen()
-                        Screen.More -> MoreScreenFull(data!!.student, onSignOut = onSignOut, onEditProfile = { showEditProfile = true })
+                        Screen.More -> MoreMenuScreen(data!!.student, avatarVersion, onOpen = { moreDest = it }, onSignOut = onSignOut)
                     }
                 }
             }
@@ -267,7 +293,8 @@ private fun PageHeader(screen: Screen) {
 // --- Home ---------------------------------------------------------------------
 
 @Composable
-private fun HomeScreen(data: StudentData, onOpen: (Screen?) -> Unit) {
+private fun HomeScreen(data: StudentData, avatarVersion: Int, onOpen: (Screen?) -> Unit) {
+    val heroContext = LocalContext.current
     val now = Instant.now()
     val openExams = data.assessments.count { exam ->
         exam.latestResult == null && exam.attemptsUsed < exam.attemptsAllowed &&
@@ -292,12 +319,17 @@ private fun HomeScreen(data: StudentData, onOpen: (Screen?) -> Unit) {
                 .padding(20.dp),
         ) {
             Column {
-                Text("Hi, $firstName", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = Color.White)
-                val line = listOfNotNull(data.student?.program, data.student?.batch).joinToString(" · ")
-                Text(
-                    if (line.isNotBlank()) line else "Your placement-readiness workspace",
-                    style = MaterialTheme.typography.bodyMedium, color = Color(0xCCFFFFFF),
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Hi, $firstName", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = Color.White)
+                        val line = listOfNotNull(data.student?.program, data.student?.batch).joinToString(" · ")
+                        Text(
+                            if (line.isNotBlank()) line else "Your placement-readiness workspace",
+                            style = MaterialTheme.typography.bodyMedium, color = Color(0xCCFFFFFF),
+                        )
+                    }
+                    AvatarView(heroContext, data.student?.fullName, 48.dp, avatarVersion)
+                }
                 Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     data.learner?.readiness?.band?.let { StatusChip("Readiness: ${prettify(it)}", ChipKind.OnDark) }
@@ -665,7 +697,7 @@ private fun InboxOverlay(feed: NotificationsEnvelope?, onClose: () -> Unit, onAl
 // --- Sign in / consent ---------------------------------------------------------
 
 @Composable
-private fun SignInScreen(onSignedIn: () -> Unit) {
+private fun SignInScreen(expired: Boolean = false, onSignedIn: () -> Unit) {
     val context = LocalContext.current
     var token by remember { mutableStateOf("") }
     var apiOverride by remember { mutableStateOf(Session.apiOverride(context)) }
@@ -681,6 +713,13 @@ private fun SignInScreen(onSignedIn: () -> Unit) {
         PilotCard {
             Column(Modifier.padding(20.dp)) {
                 Text("Sign in", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                if (expired) {
+                    Spacer(Modifier.height(6.dp))
+                    Surface(color = Color(0xFFFDF6E0), contentColor = Color(0xFF8A6400), shape = RoundedCornerShape(8.dp)) {
+                        Text("Your session expired — sign in again to continue.",
+                            Modifier.padding(8.dp), style = MaterialTheme.typography.bodySmall)
+                    }
+                }
                 Spacer(Modifier.height(6.dp))
                 if (Session.hostedUiConfigured) {
                     Text("Use your institution account to continue.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)

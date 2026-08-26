@@ -29,9 +29,9 @@ import pro.ai8ht.one.R
  * on the web (5.5s per revolution).
  */
 @Composable
-fun BrandWordmark(height: Dp, spinEight: Boolean = false, modifier: Modifier = Modifier) {
+fun BrandWordmark(height: Dp, spinEight: Boolean = false, untinted: Boolean = false, modifier: Modifier = Modifier) {
     val dark = isSystemInDarkTheme()
-    val tint = if (dark) null else ColorFilter.tint(MaterialTheme.colorScheme.onBackground)
+    val tint = if (dark || untinted) null else ColorFilter.tint(MaterialTheme.colorScheme.onBackground)
     val rotation: Float = if (spinEight) {
         val transition = rememberInfiniteTransition(label = "brand-eight")
         val value by transition.animateFloat(

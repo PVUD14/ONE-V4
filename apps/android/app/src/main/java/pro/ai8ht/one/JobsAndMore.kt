@@ -22,7 +22,17 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Insights
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
@@ -48,6 +58,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -289,147 +300,361 @@ internal fun ChatOverlay(onClose: () -> Unit) {
     }
 }
 
-// --- More: profile, documents, privacy ----------------------------------------
+// --- More: named sections ------------------------------------------------------
+
+internal enum class MoreDest(val title: String) {
+    Profile("Profile"), Career("Career readiness"), Documents("Documents"),
+    Privacy("Privacy & data"), Settings("Settings"),
+}
 
 @Composable
-internal fun MoreScreenFull(student: StudentDto?, onSignOut: () -> Unit, onEditProfile: () -> Unit) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var profile by remember { mutableStateOf<ProfileDto?>(null) }
-    var documents by remember { mutableStateOf<List<DocumentDto>>(emptyList()) }
-    var requests by remember { mutableStateOf<List<PrivacyRequestDto>>(emptyList()) }
-    var privacyNotice by remember { mutableStateOf<String?>(null) }
-    var reload by remember { mutableIntStateOf(0) }
+internal fun OverlayScaffold(title: String, onClose: () -> Unit, content: @Composable () -> Unit) {
+    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        Column(Modifier.fillMaxSize().statusBarsPadding()) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            content()
+        }
+    }
+}
 
-    LaunchedEffect(reload) {
-        profile = runCatching { Api.getProfile(context) }.getOrNull()
-        documents = runCatching { Api.listDocuments(context) }.getOrDefault(emptyList())
-        requests = runCatching { Api.privacyRequests(context) }.getOrDefault(emptyList())
+@Composable
+internal fun MoreMenuScreen(
+    student: StudentDto?,
+    avatarVersion: Int,
+    onOpen: (MoreDest) -> Unit,
+    onSignOut: () -> Unit,
+) {
+    val context = LocalContext.current
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp)) {
+        PilotCard {
+            Row(Modifier.fillMaxWidth().clickable { onOpen(MoreDest.Profile) }.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                AvatarView(context, student?.fullName, 52.dp, avatarVersion)
+                Spacer(Modifier.width(14.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(student?.fullName ?: "Student", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(student?.verifiedEmail ?: "", style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (student?.academicStatus?.isNotBlank() == true) {
+                        Spacer(Modifier.height(6.dp))
+                        StatusChip(prettify(student.academicStatus), ChipKind.Accent)
+                    }
+                }
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        Spacer(Modifier.height(14.dp))
+        PilotCard {
+            Column {
+                MenuRow(Icons.Filled.Person, Color(0xFFEEF4FF), Color(0xFF1F55E5), "Profile",
+                    "Your details, headline and photo") { onOpen(MoreDest.Profile) }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                MenuRow(Icons.Filled.Insights, Color(0xFFEAF4EE), Color(0xFF2E6B46), "Career readiness",
+                    "Your advisory band and roadmap") { onOpen(MoreDest.Career) }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                MenuRow(Icons.Filled.Description, Color(0xFFF3EEFF), Color(0xFF6941C6), "Documents",
+                    "Résumés, certificates and verification") { onOpen(MoreDest.Documents) }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                MenuRow(Icons.Filled.Lock, Color(0xFFFDF6E0), Color(0xFF8A6400), "Privacy & data",
+                    "Your data copy and consent") { onOpen(MoreDest.Privacy) }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                MenuRow(Icons.Filled.Settings, Color(0xFFF2F4F7), Color(0xFF667085), "Settings",
+                    "App info and sign out") { onOpen(MoreDest.Settings) }
+            }
+        }
+        Spacer(Modifier.height(14.dp))
+        OutlinedButton(onClick = onSignOut, shape = RoundedCornerShape(10.dp)) { Text("Sign out") }
+        Spacer(Modifier.height(20.dp))
+    }
+}
+
+@Composable
+private fun MenuRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    bg: Color,
+    fg: Color,
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit,
+) {
+    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically) {
+        IconBubble(icon, bg, fg)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+internal fun ProfilePage(
+    student: StudentDto?,
+    avatarVersion: Int,
+    onPhotoPicked: () -> Unit,
+    onEdit: () -> Unit,
+    onClose: () -> Unit,
+) {
+    val context = LocalContext.current
+    var profile by remember { mutableStateOf<ProfileDto?>(null) }
+    LaunchedEffect(Unit) { profile = runCatching { Api.getProfile(context) }.getOrNull() }
+
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    ProfilePhoto.save(context, input.readBytes())
+                }
+            }
+            onPhotoPicked()
+        }
     }
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp)) {
-        // Identity + headline
-        PilotCard {
-            Column(Modifier.padding(18.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(52.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
-                        contentAlignment = Alignment.Center) {
-                        val initials = (student?.fullName ?: "S").split(" ").take(2)
-                            .mapNotNull { it.firstOrNull()?.uppercase() }.joinToString("")
-                        Text(initials, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                    }
-                    Spacer(Modifier.width(14.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(student?.fullName ?: "Student", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Text(student?.verifiedEmail ?: "", style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    TextButton(onClick = onEditProfile) { Text("Edit") }
-                }
-                profile?.profileHeadline?.takeIf { it.isNotBlank() }?.let {
+    OverlayScaffold("Profile", onClose) {
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp)) {
+            PilotCard {
+                Column(Modifier.fillMaxWidth().padding(18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    AvatarView(context, student?.fullName, 84.dp, avatarVersion)
                     Spacer(Modifier.height(8.dp))
-                    Text(it, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                }
-                profile?.profileSummary?.takeIf { it.isNotBlank() }?.let {
-                    Spacer(Modifier.height(4.dp))
-                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Spacer(Modifier.height(12.dp))
-                val rows = listOfNotNull(
-                    profile?.targetCareer?.takeIf { it.isNotBlank() }?.let { "Target career" to it },
-                    student?.program?.let { "Program" to it },
-                    student?.department?.let { "Department" to it },
-                    student?.batch?.let { "Batch" to it },
-                    student?.institutionStudentId?.takeIf { it.isNotBlank() }?.let { "Student ID" to it },
-                )
-                rows.forEach { (label, value) ->
-                    Row(Modifier.padding(vertical = 3.dp)) {
-                        Text(label, Modifier.width(110.dp), style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(value, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
-                    }
-                }
-                Spacer(Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (student?.academicStatus?.isNotBlank() == true) StatusChip(prettify(student.academicStatus), ChipKind.Accent)
-                    profile?.let { StatusChip("Profile: ${prettify(it.visibilityState)}", ChipKind.Muted) }
-                }
-            }
-        }
-
-        // Documents
-        SectionTitle("Documents")
-        PilotCard {
-            Column(Modifier.padding(vertical = 4.dp)) {
-                if (documents.isEmpty()) {
-                    Text("No documents yet. Upload résumés and certificates from the web app.",
-                        Modifier.padding(16.dp), style = MaterialTheme.typography.bodySmall,
+                    TextButton(onClick = {
+                        picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    }) { Text("Change photo") }
+                    Text(student?.fullName ?: "Student", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text(student?.verifiedEmail ?: "", style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
-                } else {
-                    documents.forEachIndexed { index, doc ->
-                        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text(doc.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                                Text(prettify(doc.documentType), style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            StatusChip(prettify(doc.verificationState),
-                                if (doc.verificationState == "VERIFIED") ChipKind.Positive else ChipKind.Muted)
-                        }
-                        if (index != documents.lastIndex) HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                    profile?.profileHeadline?.takeIf { it.isNotBlank() }?.let {
+                        Spacer(Modifier.height(6.dp))
+                        Text(it, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                     }
                 }
             }
-        }
-
-        // Privacy
-        SectionTitle("Privacy & data")
-        PilotCard {
-            Column(Modifier.padding(16.dp)) {
-                Text("Request a copy of your personal data. You'll download it from the web app once it's ready.",
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                val latest = requests.firstOrNull { it.requestType == "EXPORT" }
-                latest?.let {
-                    Spacer(Modifier.height(8.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        StatusChip(prettify(it.state), if (it.state == "COMPLETED") ChipKind.Positive else ChipKind.Waiting)
-                        Spacer(Modifier.width(8.dp))
-                        Text("Requested ${formatWhen(it.requestedAt)}", style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+            profile?.profileSummary?.takeIf { it.isNotBlank() }?.let {
+                SectionTitle("About")
+                PilotCard { Text(it, Modifier.padding(16.dp), style = MaterialTheme.typography.bodyMedium) }
+            }
+            SectionTitle("Details")
+            PilotCard {
+                Column(Modifier.padding(16.dp)) {
+                    val rows = listOfNotNull(
+                        profile?.targetCareer?.takeIf { it.isNotBlank() }?.let { "Target career" to it },
+                        student?.program?.let { "Program" to it },
+                        student?.department?.let { "Department" to it },
+                        student?.batch?.let { "Batch" to it },
+                        student?.institutionStudentId?.takeIf { it.isNotBlank() }?.let { "Student ID" to it },
+                        profile?.portfolioUrl?.takeIf { it.isNotBlank() }?.let { "Portfolio" to it },
+                    )
+                    if (rows.isEmpty()) {
+                        Text("Add your headline, summary and target career with Edit below.",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    rows.forEach { (label, value) ->
+                        Row(Modifier.padding(vertical = 4.dp)) {
+                            Text(label, Modifier.width(110.dp), style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(value, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                    profile?.let {
+                        Spacer(Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            StatusChip("Visibility: ${prettify(it.visibilityState)}", ChipKind.Muted)
+                            if (it.employerDiscoveryEnabled) StatusChip("Employer discovery on", ChipKind.Positive)
+                        }
                     }
                 }
-                privacyNotice?.let {
-                    Spacer(Modifier.height(8.dp))
-                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+            }
+            Spacer(Modifier.height(16.dp))
+            Button(onClick = onEdit, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp)) {
+                Text("Edit profile")
+            }
+            Spacer(Modifier.height(8.dp))
+            Text("Your photo is stored on this device and will sync to your profile when photo upload launches.",
+                style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(20.dp))
+        }
+    }
+}
+
+@Composable
+internal fun DocumentsPage(onClose: () -> Unit) {
+    val context = LocalContext.current
+    var documents by remember { mutableStateOf<List<DocumentDto>?>(null) }
+    LaunchedEffect(Unit) { documents = runCatching { Api.listDocuments(context) }.getOrDefault(emptyList()) }
+    OverlayScaffold("Documents", onClose) {
+        when {
+            documents == null -> LoadingSpinner()
+            documents!!.isEmpty() -> CenteredNote("No documents yet. Upload résumés and certificates from the web app at one.ai8ht.pro.")
+            else -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp)) {
+                PilotCard {
+                    Column(Modifier.padding(vertical = 4.dp)) {
+                        documents!!.forEachIndexed { index, doc ->
+                            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically) {
+                                IconBubble(Icons.Filled.Description, Color(0xFFF3EEFF), Color(0xFF6941C6))
+                                Spacer(Modifier.width(12.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(doc.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                    Text(prettify(doc.documentType), style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                StatusChip(prettify(doc.verificationState),
+                                    if (doc.verificationState == "VERIFIED") ChipKind.Positive else ChipKind.Muted)
+                            }
+                            if (index != documents!!.lastIndex) HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                        }
+                    }
                 }
                 Spacer(Modifier.height(10.dp))
-                OutlinedButton(
-                    onClick = {
-                        privacyNotice = null
-                        scope.launch {
-                            runCatching { Api.requestDataExport(context) }
-                                .onSuccess { privacyNotice = "Export requested — it appears above once processed."; reload += 1 }
-                                .onFailure { privacyNotice = (it as? Api.ApiException)?.detail ?: "Could not request the export just now." }
-                        }
-                    },
-                    shape = RoundedCornerShape(10.dp),
-                ) { Text("Request data copy") }
+                Text("Uploads happen on the web app; verified documents strengthen your profile.",
+                    style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
+    }
+}
 
-        Spacer(Modifier.height(12.dp))
-        PilotCard {
-            Column(Modifier.padding(18.dp)) {
-                BrandWordmark(height = 20.dp)
-                Spacer(Modifier.height(8.dp))
-                Text("Version ${BuildConfig.VERSION_NAME} · one.ai8ht.pro",
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(12.dp))
-                OutlinedButton(onClick = onSignOut, shape = RoundedCornerShape(10.dp)) { Text("Sign out") }
+@Composable
+internal fun PrivacyPage(onClose: () -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var requests by remember { mutableStateOf<List<PrivacyRequestDto>>(emptyList()) }
+    var notice by remember { mutableStateOf<String?>(null) }
+    var reload by remember { mutableIntStateOf(0) }
+    LaunchedEffect(reload) { requests = runCatching { Api.privacyRequests(context) }.getOrDefault(emptyList()) }
+    OverlayScaffold("Privacy & data", onClose) {
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp)) {
+            PilotCard {
+                Column(Modifier.padding(16.dp)) {
+                    Text("Your data copy", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(4.dp))
+                    Text("Request an export of your personal data. Download it from the web app once ready.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    val latest = requests.firstOrNull { it.requestType == "EXPORT" }
+                    latest?.let {
+                        Spacer(Modifier.height(8.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            StatusChip(prettify(it.state), if (it.state == "COMPLETED") ChipKind.Positive else ChipKind.Waiting)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Requested ${formatWhen(it.requestedAt)}", style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    notice?.let {
+                        Spacer(Modifier.height(8.dp))
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedButton(
+                        onClick = {
+                            notice = null
+                            scope.launch {
+                                runCatching { Api.requestDataExport(context) }
+                                    .onSuccess { notice = "Export requested — its status appears above."; reload += 1 }
+                                    .onFailure { notice = (it as? Api.ApiException)?.detail ?: "Could not request the export just now." }
+                            }
+                        },
+                        shape = RoundedCornerShape(10.dp),
+                    ) { Text("Request data copy") }
+                }
             }
+            Spacer(Modifier.height(12.dp))
+            PilotCard {
+                Column(Modifier.padding(16.dp)) {
+                    Text("How your data is handled", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(6.dp))
+                    Text("Readiness guidance is advisory — never shown to employers, never public. Profile sharing is always your choice. AI features send no personal data. Erasure requests are available from the web app under Settings.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Spacer(Modifier.height(20.dp))
         }
-        Spacer(Modifier.height(20.dp))
+    }
+}
+
+@Composable
+internal fun CareerPage(learner: LearnerStateDto?, onClose: () -> Unit) {
+    OverlayScaffold("Career readiness", onClose) {
+        if (learner == null) { CenteredNote("Career readiness data is not available right now."); return@OverlayScaffold }
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp)) {
+            PilotCard {
+                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    IconBubble(Icons.Filled.Insights, Color(0xFFEAF4EE), Color(0xFF2E6B46), size = 44.dp)
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Text("Readiness band", style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(prettify(learner.readiness?.band ?: "NOT_ENOUGH_EVIDENCE"),
+                            style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text("Advisory · visible only to you and your institution",
+                            style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+            val steps = learner.roadmap
+            if (steps.isNotEmpty()) {
+                SectionTitle("Your roadmap")
+                PilotCard {
+                    Column(Modifier.padding(vertical = 4.dp)) {
+                        steps.forEachIndexed { index, step ->
+                            Row(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                StatusChip(prettify(step.state),
+                                    if (step.state == "COMPLETED") ChipKind.Positive else ChipKind.Accent)
+                                Spacer(Modifier.width(10.dp))
+                                Column {
+                                    Text(prettify(step.actionCode), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                    Text(prettify(step.reasonCode), style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                            if (index != steps.lastIndex) HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                        }
+                    }
+                }
+            } else {
+                SectionTitle("Your roadmap")
+                PilotCard {
+                    Text("Complete lessons and assessments — your personalised next steps appear here.",
+                        Modifier.padding(16.dp), style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Spacer(Modifier.height(20.dp))
+        }
+    }
+}
+
+@Composable
+internal fun SettingsPage(onClose: () -> Unit, onSignOut: () -> Unit) {
+    OverlayScaffold("Settings", onClose) {
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp)) {
+            PilotCard {
+                Column(Modifier.padding(18.dp)) {
+                    BrandWordmark(height = 22.dp)
+                    Spacer(Modifier.height(8.dp))
+                    Text("ONE by AI8HT", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Text("Version ${BuildConfig.VERSION_NAME} · one.ai8ht.pro",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            PilotCard {
+                Column(Modifier.padding(16.dp)) {
+                    Text("On the web, not yet in the app", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(6.dp))
+                    Text("Exam taking (with its timer and integrity checks), document upload, data-copy download and account erasure live at one.ai8ht.pro. Push notifications arrive in the next version.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Spacer(Modifier.height(14.dp))
+            OutlinedButton(onClick = onSignOut, shape = RoundedCornerShape(10.dp)) { Text("Sign out") }
+            Spacer(Modifier.height(20.dp))
+        }
     }
 }
 

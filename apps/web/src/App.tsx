@@ -43,6 +43,7 @@ import { isPilotIdentity } from './pilot/pilotIdentity.js';
 import { CareerReadinessApiPanel } from './careerReadinessApiPanel.js';
 import { ExamAttemptPanel } from './examAttemptPanel.js';
 import { StudentMessagesFlyout, StudentNotificationsBell } from './notificationsBell.js';
+import { AssistantWidget } from './assistantWidget.js';
 
 type RouteKey = 'dashboard' | 'career-path' | 'ai-coach' | 'readiness' | 'skills' | 'assessments' | 'learning' | 'experience' | 'opportunities' | 'applications' | 'interviews' | 'documents' | 'profile' | 'settings';
 
@@ -698,6 +699,7 @@ function StudentShell({ apiHealth, authNotice, authStatus, currentStudent, demoM
           <RouteScreen route={route} authenticated={authStatus.state === 'authenticated'} currentStudent={currentStudent} />
         </main>
       </div>
+      <AssistantWidget persona="student" />
     </div>
   );
 }

@@ -43,6 +43,7 @@ import { RolePreviewProvider, useRolePreviewState } from './rolePortalPreviewSta
 import { StatusBadge } from './studentComponents.js';
 import { OperationsCareerReadinessPanel } from './operationsCareerReadinessPanel.js';
 import { EmployerApplicantsPage, EmployerOpportunitiesPage } from './hiringPages.js';
+import { AssistantWidget } from './assistantWidget.js';
 
 interface AuthenticatedWorkspaceSummary {
   readonly role: string;
@@ -151,6 +152,7 @@ function RolePortalInner({ portal, apiHealth, authStatus, authNotice, showDevelo
           {!demoMode && activeRoute?.path === portal.basePath ? <AuthenticatedRoleSurface portal={portal} routeLabel={activeRoute?.label ?? 'Dashboard'} onNavigate={navigate} /> : activeRoute?.path === portal.basePath ? <RoleDashboard portal={portal} onNavigate={navigate} /> : <RoleModulePage portal={portal} route={activeRoute ?? portal.nav[0]!} demoMode={demoMode} authenticatedWorkspace={authenticatedWorkspace} />}
         </main>
       </div>
+      <AssistantWidget persona={portal.family === 'Employer' ? 'employer' : portal.family === 'Institution' ? 'institution' : 'student'} />
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { Bell, BookOpen, Briefcase, Building2, CalendarDays, ClipboardCheck, FileText, GraduationCap, Home, MapPinned, MessageSquare, Route, Search, User, Users, Video, Wrench } from 'lucide-react';
 import './pilot.css';
 import { BrandWordmark } from '../brand.js';
+import { AssistantWidget } from '../assistantWidget.js';
 import { pilotCompanies, pilotPersona, pilotPopularCourses } from './pilotData.js';
 import { pilotApplicants, pilotEmployerPersona, pilotEmployerRoles, pilotInstitutionPersona, pilotRoster } from './pilotStaffData.js';
 import {
@@ -255,7 +256,8 @@ function EmployerPilot({ email, onSignOut }: { readonly email: string; readonly 
 
 export function PilotApp({ email, onSignOut }: { readonly email: string; readonly onSignOut: () => void }): React.ReactElement {
   const persona = pilotPersonaFor(email);
-  if (persona === 'institution') return <InstitutionPilot email={email} onSignOut={onSignOut} />;
-  if (persona === 'employer') return <EmployerPilot email={email} onSignOut={onSignOut} />;
-  return <StudentPilot email={email} onSignOut={onSignOut} />;
+  const shell = persona === 'institution' ? <InstitutionPilot email={email} onSignOut={onSignOut} />
+    : persona === 'employer' ? <EmployerPilot email={email} onSignOut={onSignOut} />
+    : <StudentPilot email={email} onSignOut={onSignOut} />;
+  return <>{shell}<AssistantWidget persona={persona} /></>;
 }

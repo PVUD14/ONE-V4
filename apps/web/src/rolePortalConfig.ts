@@ -111,7 +111,7 @@ export const rolePortals: readonly RolePortalConfig[] = [
   {
     key: 'placement-officer', family: 'Institution', roleName: 'Placement Officer', backendRole: 'PLACEMENT_ADMIN / PLACEMENT_OFFICER', enforcementStatus: 'Partially backend enforced', basePath: '/institution/placement-officer', subtitle: 'Institution Portal', organization: 'ABC Engineering College', previewUser: 'Anita Sharma', initials: 'AS', accent: 'emerald', dashboardTitle: 'Placement Dashboard', dashboardSummary: 'Operational placement readiness, interventions, applications and employer engagement.',
     allowedOperations: ['Coordinate interventions', 'Create assessments', 'Recommend opportunities'], readOnlyData: ['Student consent', 'Employer offer terms'], forbiddenOperations: ['Override student identity', 'Issue offers'],
-    nav: [], kpis: [], records: [],
+    nav: nav('/institution/placement-officer', [['Home', ['Dashboard']], ['Placement', ['Assessments', 'Help & FAQ']]]), kpis: [], records: [],
   },
   {
     key: 'faculty', family: 'Institution', roleName: 'Lecturer / Faculty', backendRole: 'FACULTY_LECTURER', enforcementStatus: 'Partially backend enforced', basePath: '/institution/faculty', subtitle: 'Faculty Portal', organization: 'ABC Engineering College', previewUser: 'Dr. Meera Iyer', initials: 'MI', accent: 'blue', dashboardTitle: 'Faculty Dashboard', dashboardSummary: 'Assigned students, academic verification, assessments, tasks and interventions.',
@@ -175,6 +175,12 @@ export const activeRolePortals = rolePortals.filter((portal) => portal.key !== '
 
 export function rolePortalFromPath(path: string): RolePortalConfig | undefined {
   const normalized = path.replace(/\/$/, '');
+  // Placement-officer is excluded from activeRolePortals (its unauthenticated
+  // view is the standalone PlacementOfficerPortal), but authenticated placement
+  // admins fall through to the real role portal and must resolve a config here.
+  if (normalized === '/institution/placement-officer' || normalized.startsWith('/institution/placement-officer/')) {
+    return rolePortals.find((portal) => portal.key === 'placement-officer');
+  }
   if (normalized === '/institution') return activeRolePortals.find((portal) => portal.key === 'institution-admin');
   if (normalized === '/employer') return activeRolePortals.find((portal) => portal.key === 'recruiter');
   if (normalized === '/operations') return activeRolePortals.find((portal) => portal.key === 'operations-admin');

@@ -26,7 +26,7 @@ import {
  * questions, publication, roster assignment, and results. Authenticated and
  * API-backed; nothing here is sample data.
  */
-export function InstitutionExamEnginePage({ institutionId }: { readonly institutionId: string }): React.ReactElement {
+export function InstitutionExamEnginePage({ institutionId, canApprove = true }: { readonly institutionId: string; readonly canApprove?: boolean }): React.ReactElement {
   const token = getProtectedAccessToken();
   const [subjects, setSubjects] = useState<readonly ExamSubjectDto[]>([]);
   const [questions, setQuestions] = useState<readonly ExamQuestionDto[]>([]);
@@ -76,9 +76,9 @@ export function InstitutionExamEnginePage({ institutionId }: { readonly institut
     {error ? <p className="form-error" role="alert">{error}</p> : null}
 
     <SubjectsCard token={token} institutionId={institutionId} subjects={subjects} onDone={done} onFail={failed} />
-    <QuestionBankCard token={token} institutionId={institutionId} subjects={subjects} questions={questions} onDone={done} onFail={failed} />
+    <QuestionBankCard token={token} institutionId={institutionId} subjects={subjects} questions={questions} canApprove={canApprove} onDone={done} onFail={failed} />
     <ExamBuilderCard token={token} institutionId={institutionId} subjects={subjects} questions={questions} onDone={done} onFail={failed} />
-    <ExamListCard token={token} institutionId={institutionId} exams={exams} students={students} onDone={done} onFail={failed} />
+    <ExamListCard token={token} institutionId={institutionId} exams={exams} students={students} canApprove={canApprove} onDone={done} onFail={failed} />
   </section>;
 }
 
@@ -104,9 +104,10 @@ const questionTypeChoices = [
   ['SINGLE_CHOICE_MCQ', 'Single choice'], ['MULTIPLE_SELECT', 'Multiple select'], ['TRUE_FALSE', 'True / False'], ['FILL_IN_THE_BLANK', 'Fill in the blank'],
 ] as const;
 
-function QuestionBankCard({ token, institutionId, subjects, questions, onDone, onFail }: {
+function QuestionBankCard({ token, institutionId, subjects, questions, canApprove, onDone, onFail }: {
   readonly token: string; readonly institutionId: string; readonly subjects: readonly ExamSubjectDto[]; readonly questions: readonly ExamQuestionDto[];
   readonly onDone: (message: string) => void; readonly onFail: (message: string) => void;
+  readonly canApprove: boolean;
 }): React.ReactElement {
   const [form, setForm] = useState({ subjectId: '', questionType: 'SINGLE_CHOICE_MCQ', questionText: '', difficulty: 'MEDIUM', acceptedAnswers: '' });
   const [options, setOptions] = useState([
@@ -223,10 +224,10 @@ function QuestionBankCard({ token, institutionId, subjects, questions, onDone, o
             <td>{question.approvalStatus.replace('_', ' ')}</td>
             <td><div className="role-record-actions">
               {question.approvalStatus === 'DRAFT' ? <button type="button" onClick={() => transition(question, 'UNDER_REVIEW')}>Submit for review</button> : null}
-              {question.approvalStatus === 'UNDER_REVIEW' ? <>
+              {question.approvalStatus === 'UNDER_REVIEW' ? (canApprove ? <>
                 <button type="button" onClick={() => transition(question, 'APPROVED')}>Approve</button>
                 <button type="button" className="secondary" onClick={() => transition(question, 'REJECTED')}>Reject</button>
-              </> : null}
+              </> : <small>Awaiting senior review</small>) : null}
               {question.approvalStatus === 'APPROVED' || question.approvalStatus === 'REJECTED' ? <button type="button" className="secondary" onClick={() => transition(question, 'ARCHIVED')}>Archive</button> : null}
             </div></td>
           </tr>
@@ -302,9 +303,10 @@ function ExamBuilderCard({ token, institutionId, subjects, questions, onDone, on
   </form>;
 }
 
-function ExamListCard({ token, institutionId, exams, students, onDone, onFail }: {
+function ExamListCard({ token, institutionId, exams, students, canApprove, onDone, onFail }: {
   readonly token: string; readonly institutionId: string; readonly exams: readonly InstitutionExamDto[]; readonly students: readonly InstitutionStudentDto[];
   readonly onDone: (message: string) => void; readonly onFail: (message: string) => void;
+  readonly canApprove: boolean;
 }): React.ReactElement {
   const [assigning, setAssigning] = useState<string | null>(null);
   const [chosenStudents, setChosenStudents] = useState<readonly string[]>([]);
@@ -369,9 +371,9 @@ function ExamListCard({ token, institutionId, exams, students, onDone, onFail }:
             <td>{exam.assignedCount}</td>
             <td>{exam.completedAttempts}</td>
             <td><div className="role-record-actions">
-              {exam.lifecycleState === 'DRAFT' ? <button type="button" onClick={() => publish(exam)}>Publish</button> : null}
+              {exam.lifecycleState === 'DRAFT' && canApprove ? <button type="button" onClick={() => publish(exam)}>Publish</button> : null}
               {exam.lifecycleState === 'PUBLISHED' ? <button type="button" onClick={() => { setAssigning(assigning === exam.id ? null : exam.id); setChosenStudents([]); }}>Assign students</button> : null}
-              {exam.lifecycleState === 'PUBLISHED' ? <button type="button" className="secondary" onClick={() => reopen(exam)}>Reopen / Extend</button> : null}
+              {exam.lifecycleState === 'PUBLISHED' && canApprove ? <button type="button" className="secondary" onClick={() => reopen(exam)}>Reopen / Extend</button> : null}
               {exam.assignedCount > 0 ? <button type="button" className="secondary" onClick={() => showResults(exam)}>Results</button> : null}
             </div></td>
           </tr>

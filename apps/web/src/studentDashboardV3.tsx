@@ -128,7 +128,7 @@ export function StudentDashboardV3({ studentName }: { readonly studentName: stri
           <button type="button" className="pilot-btn ghost" onClick={() => go('/student/assessments')}><CalendarDays size={15} /> View Calendar</button>
         </div>
 
-        <div className="pilot-row" style={{ gridTemplateColumns: 'minmax(0, 2.4fr) repeat(5, minmax(0, 1fr))' }}>
+        <div className="pilot-row v3-score-row">
           <section className="pilot-card">
             <h2>Career Readiness Score</h2>
             <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'nowrap' }}>

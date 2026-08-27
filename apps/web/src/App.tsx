@@ -334,10 +334,11 @@ export function App(): React.ReactElement {
   }
 
   if (effectivePath.startsWith('/institution/placement-officer')) {
-    if (!demoPath && authenticated) {
-      return <AuthenticatedPlacementOfficerPage authStatus={authStatus} authNotice={authNotice} onSignIn={handleHostedSignIn} onSignOut={handleSignOut} />;
+    // Authenticated placement admins fall through to the real role portal below,
+    // which carries the live assessment engine their role is authorized for.
+    if (demoPath || !authenticated) {
+      return <PlacementOfficerPortal apiHealth={apiHealth} authStatus={authStatus} authNotice={authNotice} onSignIn={handleHostedSignIn} onSignOut={handleSignOut} showDevelopmentIndicators={showDevelopmentIndicators} />;
     }
-    return <PlacementOfficerPortal apiHealth={apiHealth} authStatus={authStatus} authNotice={authNotice} onSignIn={handleHostedSignIn} onSignOut={handleSignOut} showDevelopmentIndicators={showDevelopmentIndicators} />;
   }
 
   if (path === '/invitations/accept') {
@@ -581,19 +582,6 @@ function AccessDeniedPage({ requestedPath, authStatus, authNotice, message, retr
       <h1>You do not have access to this workspace</h1>
       <p>{message ?? `Your verified identity is not authorized for ${requestedPath}. ONE did not mount the requested portal UI.`}</p>
       {retryable && onRetryWorkspace ? <button type="button" onClick={onRetryWorkspace}>Retry workspace</button> : null}
-      <AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />
-    </section>
-  </main>;
-}
-
-function AuthenticatedPlacementOfficerPage({ authStatus, authNotice, onSignIn, onSignOut }: { readonly authStatus: AuthStatus; readonly authNotice: string; readonly onSignIn: () => void; readonly onSignOut: () => void }): React.ReactElement {
-  useEffect(() => { document.title = `Placement Admin | ${productName}`; }, []);
-  return <main className="login-shell">
-    <section className="login-card">
-      <span className="eyebrow">Authenticated workspace</span>
-      <h1>Placement Admin</h1>
-      <p>Placement tools are not built yet, so there is nothing here for you to use today. We would rather show you an empty page than a convincing one filled with data that is not real.</p>
-      <p className="auth-boundary">Student rosters, academic structure and staff invitations are live now, and your Institution Administrator can use them. Placement tracking will open up once its records and consent rules are in place.</p>
       <AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />
     </section>
   </main>;

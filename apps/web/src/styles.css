@@ -4838,6 +4838,14 @@ button.secondary {
 .role-kpi strong { font-size: 21px; line-height: 1.15; }
 .role-kpi p { color: var(--muted); font-size: 12px; margin: 4px 0 0; }
 
+/* Pilot components embedded inside the real shells: neutralize the pilot ROOT
+   shell (its own sidebar grid, viewport height, canvas background) so the page
+   body renders the pilot look inside the real application's layout. Without
+   this the wrapper takes the pilot's 236px sidebar grid and the whole page
+   collapses into that first column. */
+.pilot.pilot-embed { display: block; min-height: 0; grid-template-columns: none; background: transparent; }
+.pilot.pilot-embed .pilot-page { padding: 0; }
+
 /* Embedded pilot page: the pilot's breakpoints assume its own narrow sidebar,
    so shift them for the real shell, and give the score row proper collapse
    (the pilot used an inline column template that could never respond). */

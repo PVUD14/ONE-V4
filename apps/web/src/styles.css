@@ -4711,7 +4711,7 @@ button.secondary {
 .v2-page button.v2-btn.small { padding: 6px 12px; font-size: 12px; }
 
 .v2-ring { position: relative; display: grid; place-items: center; flex: 0 0 auto; }
-.v2-ring > div { position: absolute; text-align: center; line-height: 1.15; }
+.v2-ring > div { position: absolute; text-align: center; line-height: 1.15; max-width: 70px; }
 .v2-ring b { font-size: 17px; display: block; font-variant-numeric: tabular-nums; }
 .v2-ring small { color: var(--muted); font-size: 9px; letter-spacing: .04em; }
 

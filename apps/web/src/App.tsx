@@ -46,7 +46,8 @@ import { StudentMessagesFlyout, StudentNotificationsBell } from './notifications
 import { AssistantWidget } from './assistantWidget.js';
 import { ConsentGate } from './consentGate.js';
 import { HelpFaqPanel } from './helpFaqPanel.js';
-import { StudentDashboardV2, V2EmptyState, V2Stat } from './dashboardsV2.js';
+import { V2EmptyState, V2Stat } from './dashboardsV2.js';
+import { StudentDashboardV3 } from './studentDashboardV3.js';
 
 type RouteKey = 'dashboard' | 'career-path' | 'ai-coach' | 'readiness' | 'skills' | 'assessments' | 'learning' | 'experience' | 'opportunities' | 'applications' | 'interviews' | 'documents' | 'profile' | 'settings' | 'help';
 
@@ -813,7 +814,7 @@ function AuthenticatedStudentDashboard({ currentStudent }: { readonly currentStu
   if (currentStudent.state !== 'resolved') {
     return <section className="card wide-card"><h2>Student profile</h2><p>{currentStudent.state === 'error' ? currentStudent.message : 'Loading protected Student profile...'}</p></section>;
   }
-  return <StudentDashboardV2 studentName={currentStudent.student.fullName} />;
+  return <StudentDashboardV3 studentName={currentStudent.student.fullName} />;
 }
 
 function AuthenticatedStudentProfile(): React.ReactElement {

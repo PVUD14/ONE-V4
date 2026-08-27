@@ -203,10 +203,14 @@ describe('Cognito Hosted UI browser authentication', () => {
     // UAT #18: the resolved workspace shows no auth/debug banner; identity
     // lives in the top bar only.
     expect(screen.queryByText('Authenticated Student workspace')).not.toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText('Quick actions')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Quick Actions')).toBeInTheDocument());
     expect(screen.queryByText('Rahul Kumar')).not.toBeInTheDocument();
     expect(screen.queryByText('DEMO PREVIEW')).not.toBeInTheDocument();
-    expect(screen.queryByText('/100')).not.toBeInTheDocument();
+    // Pilot-parity rule (2026-08-27): score widgets render in the same slots as
+    // the pilot but show an explicit NA until a real scoring engine exists -
+    // "/100" may appear, a fabricated numeric score may not.
+    expect(screen.getAllByText('/100').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('NA').length).toBeGreaterThan(0);
     window.history.pushState(null, '', '/student/readiness');
     render(React.createElement(App));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/api/v1/career-readiness/me'), expect.objectContaining({

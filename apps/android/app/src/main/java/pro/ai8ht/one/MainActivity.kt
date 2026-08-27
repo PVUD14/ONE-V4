@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.WorkOutline
 import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material3.Badge
@@ -118,6 +119,16 @@ private class StudentData(
     val notifications: NotificationsEnvelope?,
 )
 
+private fun parseWorkspace(raw: String?): Workspace? {
+    if (raw == null) return null
+    val parts = raw.split("|")
+    if (parts.size < 3) return null
+    val kind = runCatching { WorkspaceKind.valueOf(parts[0]) }.getOrNull() ?: return null
+    return Workspace(kind, parts[1].ifBlank { null }, parts[2])
+}
+
+private fun encodeWorkspace(ws: Workspace): String = "${ws.kind.name}|${ws.organizationId ?: ""}|${ws.role}"
+
 @Composable
 fun OneApp(currentTheme: String, onThemeChange: (String) -> Unit) {
     val context = LocalContext.current
@@ -125,11 +136,30 @@ fun OneApp(currentTheme: String, onThemeChange: (String) -> Unit) {
     var sessionExpired by remember { mutableStateOf(false) }
     var consent by remember { mutableStateOf<ConsentStatusDto?>(null) }
     var consentChecked by remember { mutableStateOf(false) }
+    var workspace by remember { mutableStateOf(parseWorkspace(Session.workspace(context))) }
+    var workspaceOptions by remember { mutableStateOf<List<Workspace>?>(null) }
+    var multiWorkspace by remember { mutableStateOf(false) }
 
     LaunchedEffect(signedIn) {
         if (signedIn) {
             consent = runCatching { Api.consentStatus(context) }.getOrNull()
             consentChecked = true
+        }
+    }
+
+    // Role detection: institution/employer accounts get their own dashboards.
+    LaunchedEffect(signedIn, consentChecked) {
+        if (signedIn && consentChecked && workspace == null && workspaceOptions == null) {
+            val options = runCatching { classifyWorkspaces(Api.securityContext(context)) }
+                .getOrDefault(emptyList())
+                .ifEmpty { listOf(Workspace(WorkspaceKind.STUDENT, null, "STUDENT")) }
+            multiWorkspace = options.size > 1
+            if (options.size == 1) {
+                workspace = options.first()
+                Session.setWorkspace(context, encodeWorkspace(options.first()))
+            } else {
+                workspaceOptions = options
+            }
         }
     }
 
@@ -140,15 +170,38 @@ fun OneApp(currentTheme: String, onThemeChange: (String) -> Unit) {
             version = consent?.requiredVersion ?: "",
             onGranted = { consent = null; consentChecked = true },
         )
+        workspace == null && workspaceOptions == null -> BrandSplash()
+        workspace == null -> WorkspaceChooserScreen(workspaceOptions!!) { picked ->
+            workspace = picked
+            workspaceOptions = null
+            Session.setWorkspace(context, encodeWorkspace(picked))
+        }
+        workspace!!.kind == WorkspaceKind.INSTITUTION -> InstitutionScaffold(
+            organizationId = workspace!!.organizationId ?: "",
+            currentTheme = currentTheme,
+            onThemeChange = onThemeChange,
+            onSignOut = { Session.clear(context); workspace = null; signedIn = false },
+            onSwitchWorkspace = if (multiWorkspace) ({ Session.setWorkspace(context, null); workspace = null }) else null,
+        )
+        workspace!!.kind == WorkspaceKind.EMPLOYER -> EmployerScaffold(
+            organizationId = workspace!!.organizationId ?: "",
+            currentTheme = currentTheme,
+            onThemeChange = onThemeChange,
+            onSignOut = { Session.clear(context); workspace = null; signedIn = false },
+            onSwitchWorkspace = if (multiWorkspace) ({ Session.setWorkspace(context, null); workspace = null }) else null,
+        )
         else -> MainScaffold(
             currentTheme = currentTheme,
             onThemeChange = onThemeChange,
+            onSwitchWorkspace = if (multiWorkspace) ({ Session.setWorkspace(context, null); workspace = null }) else null,
             onSignOut = {
                 Session.clear(context)
+                workspace = null
                 signedIn = false
             },
             onSessionExpired = {
                 Session.clear(context)
+                workspace = null
                 sessionExpired = true
                 signedIn = false
             },
@@ -179,6 +232,7 @@ private fun MainScaffold(
     onThemeChange: (String) -> Unit,
     onSignOut: () -> Unit,
     onSessionExpired: () -> Unit,
+    onSwitchWorkspace: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val palette = pro.ai8ht.one.ui.LocalOnePalette.current
@@ -190,6 +244,7 @@ private fun MainScaffold(
     var showChat by remember { mutableStateOf(false) }
     var showEditProfile by remember { mutableStateOf(false) }
     var moreDest by remember { mutableStateOf<MoreDest?>(null) }
+    var showTheme by remember { mutableStateOf(false) }
     var avatarVersion by remember { mutableIntStateOf(0) }
     var refreshing by remember { mutableStateOf(false) }
 
@@ -214,15 +269,17 @@ private fun MainScaffold(
     }
 
     // System back closes the topmost overlay instead of quitting the app.
-    androidx.activity.compose.BackHandler(enabled = showChat || showEditProfile || showInbox || moreDest != null) {
+    androidx.activity.compose.BackHandler(enabled = showChat || showEditProfile || showInbox || showTheme || moreDest != null) {
         when {
             showChat -> showChat = false
             showEditProfile -> showEditProfile = false
             showInbox -> showInbox = false
+            showTheme -> showTheme = false
             else -> moreDest = null
         }
     }
     when {
+        showTheme -> { SlideIn { ThemeOverlay(currentTheme, onThemeChange, onClose = { showTheme = false }) }; return }
         showChat -> { SlideIn { ChatOverlay(onClose = { showChat = false }) }; return }
         showEditProfile -> { SlideIn { EditProfileOverlay(onClose = { showEditProfile = false; reloadKey += 1 }) }; return }
         showInbox -> { SlideIn { InboxOverlay(data?.notifications, onClose = { showInbox = false }, onAllRead = { reloadKey += 1 }) }; return }
@@ -236,7 +293,7 @@ private fun MainScaffold(
         moreDest == MoreDest.Documents -> { SlideIn { DocumentsPage(onClose = { moreDest = null }) }; return }
         moreDest == MoreDest.Privacy -> { SlideIn { PrivacyPage(onClose = { moreDest = null }) }; return }
         moreDest == MoreDest.Career -> { SlideIn { CareerPage(data?.learner, onClose = { moreDest = null }) }; return }
-        moreDest == MoreDest.Settings -> { SlideIn { SettingsPage(currentTheme = currentTheme, onThemeChange = onThemeChange, onClose = { moreDest = null }, onSignOut = onSignOut) }; return }
+        moreDest == MoreDest.Settings -> { SlideIn { SettingsPage(currentTheme = currentTheme, onThemeChange = onThemeChange, onClose = { moreDest = null }, onSignOut = onSignOut, onSwitchWorkspace = onSwitchWorkspace) }; return }
     }
 
     val unread = data?.notifications?.unreadCount ?: 0
@@ -279,6 +336,9 @@ private fun MainScaffold(
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 BrandWordmark(height = 17.dp, tint = palette.wordmarkTint)
                 Spacer(Modifier.weight(1f))
+                IconButton(onClick = { showTheme = true }) {
+                    Icon(Icons.Filled.Palette, contentDescription = "Theme", tint = palette.bandMuted)
+                }
                 IconButton(onClick = { showInbox = true }) {
                     BadgedBox(badge = { if (unread > 0) Badge { Text("$unread") } }) {
                         Icon(Icons.Filled.Notifications, contentDescription = "Notifications", tint = palette.bandMuted)

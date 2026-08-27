@@ -204,7 +204,7 @@ internal fun JobsScreen() {
 internal data class ChatMessage(val role: String, val content: String)
 
 @Composable
-internal fun ChatOverlay(onClose: () -> Unit) {
+internal fun ChatOverlay(persona: String = "student", onClose: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var messages by remember { mutableStateOf<List<ChatMessage>>(emptyList()) }
@@ -225,7 +225,7 @@ internal fun ChatOverlay(onClose: () -> Unit) {
         messages = messages + ChatMessage("user", trimmed) + ChatMessage("assistant", "")
         scope.launch {
             runCatching {
-                Api.assistantChat(context, history.map { it.role to it.content }) { delta ->
+                Api.assistantChat(context, history.map { it.role to it.content }, persona) { delta ->
                     messages = messages.dropLast(1) + messages.last().copy(content = messages.last().content + delta)
                 }
             }.onFailure {
@@ -643,7 +643,7 @@ internal fun CareerPage(learner: LearnerStateDto?, onClose: () -> Unit) {
 }
 
 @Composable
-internal fun SettingsPage(currentTheme: String, onThemeChange: (String) -> Unit, onClose: () -> Unit, onSignOut: () -> Unit) {
+internal fun SettingsPage(currentTheme: String, onThemeChange: (String) -> Unit, onClose: () -> Unit, onSignOut: () -> Unit, onSwitchWorkspace: (() -> Unit)? = null) {
     OverlayScaffold("Settings", onClose) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp)) {
             PilotCard {
@@ -653,44 +653,8 @@ internal fun SettingsPage(currentTheme: String, onThemeChange: (String) -> Unit,
                     Text("Pick the world ONE lives in on this device.",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(12.dp))
-                    pro.ai8ht.one.ui.AllPalettes.chunked(3).forEach { rowPalettes ->
-                        Row(Modifier.fillMaxWidth().padding(bottom = 10.dp),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            rowPalettes.forEach { option ->
-                                val selected = option.id == currentTheme
-                                Column(
-                                    Modifier.weight(1f).clickable { onThemeChange(option.id) },
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                ) {
-                                    Box(
-                                        Modifier.fillMaxWidth().height(46.dp)
-                                            .background(option.bandBrush, RoundedCornerShape(12.dp))
-                                            .then(
-                                                if (selected) Modifier.background(
-                                                    Color.Transparent, RoundedCornerShape(12.dp),
-                                                ) else Modifier,
-                                            ),
-                                        contentAlignment = Alignment.Center,
-                                    ) {
-                                        Box(Modifier.size(16.dp).background(option.accent, CircleShape))
-                                        if (selected) {
-                                            Box(
-                                                Modifier.matchParentSize().background(
-                                                    Color.Transparent, RoundedCornerShape(12.dp),
-                                                ),
-                                            )
-                                            Text("✓", color = option.bandInk, fontWeight = FontWeight.Bold,
-                                                modifier = Modifier.padding(start = 34.dp))
-                                        }
-                                    }
-                                    Spacer(Modifier.height(4.dp))
-                                    Text(option.displayName, style = MaterialTheme.typography.labelSmall,
-                                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium)
-                                }
-                            }
-                        }
-                    }
+                    ThemePicker(currentTheme, onThemeChange)
+
                 }
             }
             Spacer(Modifier.height(12.dp))
@@ -713,6 +677,10 @@ internal fun SettingsPage(currentTheme: String, onThemeChange: (String) -> Unit,
                 }
             }
             Spacer(Modifier.height(14.dp))
+            if (onSwitchWorkspace != null) {
+                OutlinedButton(onClick = onSwitchWorkspace, shape = RoundedCornerShape(10.dp)) { Text("Switch workspace") }
+                Spacer(Modifier.height(8.dp))
+            }
             OutlinedButton(onClick = onSignOut, shape = RoundedCornerShape(10.dp)) { Text("Sign out") }
             Spacer(Modifier.height(20.dp))
         }
@@ -803,6 +771,48 @@ internal fun EditProfileOverlay(onClose: () -> Unit) {
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp),
                 ) { Text(if (busy) "Saving…" else "Save profile") }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun ThemePicker(currentTheme: String, onThemeChange: (String) -> Unit) {
+    pro.ai8ht.one.ui.AllPalettes.chunked(3).forEach { rowPalettes ->
+        Row(Modifier.fillMaxWidth().padding(bottom = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            rowPalettes.forEach { option ->
+                val selected = option.id == currentTheme
+                Column(
+                    Modifier.weight(1f).clickable { onThemeChange(option.id) },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Box(
+                        Modifier.fillMaxWidth().height(46.dp)
+                            .background(option.bandBrush, RoundedCornerShape(12.dp))
+                            .then(
+                                if (selected) Modifier.background(
+                                    Color.Transparent, RoundedCornerShape(12.dp),
+                                ) else Modifier,
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Box(Modifier.size(16.dp).background(option.accent, CircleShape))
+                        if (selected) {
+                            Box(
+                                Modifier.matchParentSize().background(
+                                    Color.Transparent, RoundedCornerShape(12.dp),
+                                ),
+                            )
+                            Text("✓", color = option.bandInk, fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(start = 34.dp))
+                        }
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    Text(option.displayName, style = MaterialTheme.typography.labelSmall,
+                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium)
+                }
             }
         }
     }

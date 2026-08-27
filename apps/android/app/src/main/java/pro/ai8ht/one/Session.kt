@@ -45,6 +45,12 @@ object Session {
         prefs(context).edit().putString("theme", id).apply()
     }
 
+    fun workspace(context: Context): String? = prefs(context).getString("workspace", null)
+
+    fun setWorkspace(context: Context, value: String?) {
+        prefs(context).edit().putString("workspace", value).apply()
+    }
+
     fun apiOverride(context: Context): String = prefs(context).getString("api_override", "") ?: ""
 
     fun setApiOverride(context: Context, value: String) {

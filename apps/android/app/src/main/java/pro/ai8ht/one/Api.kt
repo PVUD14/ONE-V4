@@ -123,15 +123,46 @@ object Api {
     suspend fun listDocuments(context: Context): List<DocumentDto> =
         json.decodeFromString<DocumentsEnvelope>(request(context, "GET", "/api/v1/students/me/documents")).documents
 
+    suspend fun securityContext(context: Context): SecurityContextDto =
+        json.decodeFromString(request(context, "GET", "/api/v1/security/context"))
+
+    suspend fun listInstitutionExams(context: Context, institutionId: String): List<InstitutionExamDto> =
+        json.decodeFromString<InstitutionExamsEnvelope>(
+            request(context, "GET", "/api/v1/institutions/$institutionId/assessments"),
+        ).assessments
+
+    suspend fun listSubjects(context: Context, institutionId: String): List<SubjectDto> =
+        json.decodeFromString<SubjectsEnvelope>(
+            request(context, "GET", "/api/v1/institutions/$institutionId/assessment-subjects"),
+        ).subjects
+
+    suspend fun countQuestions(context: Context, institutionId: String, status: String): Int =
+        json.decodeFromString<QuestionsEnvelope>(
+            request(context, "GET", "/api/v1/institutions/$institutionId/assessment-questions?status=$status"),
+        ).questions.size
+
+    suspend fun examResults(context: Context, institutionId: String, definitionId: String): ExamResultsDto =
+        json.decodeFromString(
+            request(context, "GET", "/api/v1/institutions/$institutionId/assessments/$definitionId/results"),
+        )
+
+    suspend fun listEmployerOpportunities(context: Context, employerId: String): List<EmployerOpportunityDto> =
+        json.decodeFromString<EmployerOpportunitiesEnvelope>(
+            request(context, "GET", "/api/v1/employers/$employerId/opportunities"),
+        ).opportunities
+
     /** Streams an assistant answer; onDelta receives each text chunk as it arrives. */
     suspend fun assistantChat(
         context: Context,
         messages: List<Pair<String, String>>,
+        persona: String = "student",
         onDelta: (String) -> Unit,
     ): String = withContext(Dispatchers.IO) {
         val token = Session.token(context) ?: throw ApiException(401, "NO_TOKEN")
         val payload = buildString {
-            append("{\"persona\":\"student\",\"messages\":[")
+            append("{\"persona\":")
+            append(json.encodeToString(kotlinx.serialization.serializer<String>(), persona))
+            append(",\"messages\":[")
             messages.forEachIndexed { index, (role, content) ->
                 if (index > 0) append(',')
                 append("{\"role\":")
@@ -394,4 +425,69 @@ object Api {
     val title: String = "",
     val documentType: String = "",
     val verificationState: String = "",
+)
+
+// --- Security context & staff -------------------------------------------------
+
+@Serializable data class SecurityContextDto(
+    val userId: String = "",
+    val memberships: List<MembershipDto> = emptyList(),
+    val studentRelationships: List<StudentRelationshipDto> = emptyList(),
+)
+@Serializable data class MembershipDto(val organizationId: String = "", val role: String = "")
+@Serializable data class StudentRelationshipDto(val institutionId: String = "", val state: String = "")
+
+@Serializable data class InstitutionExamsEnvelope(val assessments: List<InstitutionExamDto> = emptyList())
+@Serializable data class InstitutionExamDto(
+    val id: String,
+    val title: String = "",
+    val subjectName: String = "",
+    val lifecycleState: String = "",
+    val totalMarks: Double = 0.0,
+    val durationSeconds: Int = 0,
+    val startsAt: String = "",
+    val endsAt: String = "",
+    val attemptsAllowed: Int = 1,
+    val assignedCount: Int = 0,
+    val completedAttempts: Int = 0,
+)
+@Serializable data class SubjectsEnvelope(val subjects: List<SubjectDto> = emptyList())
+@Serializable data class SubjectDto(val id: String, val name: String = "")
+@Serializable data class QuestionsEnvelope(val questions: List<QuestionIdDto> = emptyList())
+@Serializable data class QuestionIdDto(val id: String = "")
+
+@Serializable data class ExamResultsDto(
+    val results: List<ExamResultRowDto> = emptyList(),
+    val notAttempted: List<NotAttemptedDto> = emptyList(),
+    val summary: ExamResultsSummaryDto = ExamResultsSummaryDto(),
+)
+@Serializable data class ExamResultRowDto(
+    val studentName: String = "",
+    val percentage: Double = 0.0,
+    val score: Double = 0.0,
+    val maxScore: Double = 0.0,
+    val attemptNumber: Int = 0,
+    val autoSubmitted: Boolean = false,
+)
+@Serializable data class NotAttemptedDto(val studentName: String = "", val inProgress: Boolean = false)
+@Serializable data class ExamResultsSummaryDto(
+    val attempts: Int = 0,
+    val averagePercentage: Double = 0.0,
+    val assigned: Int = 0,
+    val notAttemptedCount: Int = 0,
+)
+
+@Serializable data class EmployerOpportunitiesEnvelope(val opportunities: List<EmployerOpportunityDto> = emptyList())
+@Serializable data class EmployerOpportunityDto(
+    val id: String,
+    val referenceCode: String = "",
+    val lifecycleState: String = "",
+    val title: String? = null,
+    val employmentType: String? = null,
+    val workMode: String? = null,
+    val locationCity: String? = null,
+    val applicationDeadline: String? = null,
+    val publishedAt: String? = null,
+    val applicationCount: Int = 0,
+    val openApplicationCount: Int = 0,
 )

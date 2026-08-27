@@ -39,6 +39,12 @@ object Session {
         prefs(context).edit().clear().apply()
     }
 
+    fun theme(context: Context): String = prefs(context).getString("theme", "nexus") ?: "nexus"
+
+    fun setTheme(context: Context, id: String) {
+        prefs(context).edit().putString("theme", id).apply()
+    }
+
     fun apiOverride(context: Context): String = prefs(context).getString("api_override", "") ?: ""
 
     fun setApiOverride(context: Context, value: String) {

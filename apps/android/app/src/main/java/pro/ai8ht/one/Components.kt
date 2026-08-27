@@ -1,57 +1,66 @@
 package pro.ai8ht.one
 
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.runtime.getValue
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import pro.ai8ht.one.ui.LocalOnePalette
+import pro.ai8ht.one.ui.Tone
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-/** Shared pilot-design building blocks used across all app screens. */
+/** Shared building blocks, all painted from the active OnePalette. */
 
 internal enum class ChipKind { Positive, Accent, Waiting, Muted, OnDark }
 
 @Composable
 internal fun StatusChip(text: String, kind: ChipKind) {
-    val dark = isSystemInDarkTheme()
+    val palette = LocalOnePalette.current
     val (bg, fg) = when (kind) {
-        ChipKind.Positive -> if (dark) Color(0xFF16281D) to Color(0xFF7FD1A0) else Color(0xFFEAF4EE) to Color(0xFF2E6B46)
-        ChipKind.Accent -> if (dark) Color(0xFF15203A) to Color(0xFF8FB0FF) else Color(0xFFEEF4FF) to Color(0xFF1F55E5)
-        ChipKind.Waiting -> if (dark) Color(0xFF2A2310) to Color(0xFFE3CF8E) else Color(0xFFFDF6E0) to Color(0xFF8A6400)
-        ChipKind.Muted -> if (dark) Color(0xFF1B1E24) to Color(0xFF8E939C) else Color(0xFFF2F4F7) to Color(0xFF667085)
-        ChipKind.OnDark -> Color(0x33FFFFFF) to Color.White
+        ChipKind.Positive -> palette.soft(Tone.Green)
+        ChipKind.Accent -> palette.soft(Tone.Accent)
+        ChipKind.Waiting -> palette.soft(Tone.Amber)
+        ChipKind.Muted -> palette.soft(Tone.Gray)
+        // On the band: glassy on colored/dark bands, soft grey on the white band.
+        ChipKind.OnDark ->
+            if (palette.bandTop == Color(0xFFFFFFFF)) Color(0xFFF1F4F9) to Color(0xFF475569)
+            else Color(0x33FFFFFF) to Color.White
     }
     Surface(color = bg, contentColor = fg, shape = RoundedCornerShape(999.dp)) {
         Text(text, Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
@@ -60,50 +69,62 @@ internal fun StatusChip(text: String, kind: ChipKind) {
 }
 
 @Composable
-internal fun PilotCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+internal fun PilotCard(modifier: Modifier = Modifier, glow: Boolean = false, content: @Composable () -> Unit) {
+    val palette = LocalOnePalette.current
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+        colors = CardDefaults.cardColors(containerColor = if (glow) palette.accentSoft else palette.card),
+        border = when {
+            glow -> BorderStroke(1.dp, palette.accent.copy(alpha = .45f))
+            palette.cardBorder != null -> BorderStroke(1.dp, palette.cardBorder)
+            else -> null
+        },
+        elevation = CardDefaults.cardElevation(defaultElevation = if (palette.cardBorder == null) 3.dp else 0.dp),
     ) { content() }
 }
 
-/** The brand band: black-to-navy gradient carrying silver content; every screen
- *  opens with one, continuing the splash identity. */
+/** The brand band opening every screen, in the active palette's world. */
 @Composable
 internal fun BrandBand(content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
+    val palette = LocalOnePalette.current
     Column(
         Modifier
             .fillMaxWidth()
-            .background(
-                androidx.compose.ui.graphics.Brush.verticalGradient(
-                    listOf(Color(0xFF0B0C0F), Color(0xFF152238)),
-                ),
-            )
+            .background(palette.bandBrush)
             .statusBarsPadding()
             .padding(start = 20.dp, end = 12.dp, top = 6.dp, bottom = 22.dp),
         content = content,
     )
 }
 
-/** Light rounded sheet that overlaps the band above it. */
+/** Rounded content sheet under the band. */
 @Composable
 internal fun BandSheet(content: @Composable () -> Unit) {
+    val palette = LocalOnePalette.current
     Surface(
-        color = MaterialTheme.colorScheme.background,
+        color = palette.sheet,
+        contentColor = palette.ink,
         shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
         modifier = Modifier.fillMaxSize(),
     ) { Box(Modifier.padding(top = 8.dp)) { content() } }
 }
 
-internal val Silver = Color(0xFFD9DCE1)
-internal val SilverMuted = Color(0xFF9AA2AF)
-
 @Composable
-internal fun SectionTitle(text: String) {
-    Text(text, Modifier.padding(top = 20.dp, bottom = 8.dp),
-        style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+internal fun SectionTitle(text: String, trailing: String? = null, onTrailing: (() -> Unit)? = null) {
+    Row(Modifier.fillMaxWidth().padding(top = 18.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(text, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        if (trailing != null) {
+            val palette = LocalOnePalette.current
+            Text(
+                trailing,
+                if (onTrailing != null) Modifier.clickable(onClick = onTrailing) else Modifier,
+                style = MaterialTheme.typography.labelMedium,
+                color = if (palette.dark) palette.onAccentSoft else palette.accent,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+    }
 }
 
 internal fun prettify(code: String): String =
@@ -130,10 +151,10 @@ internal fun CenteredNote(text: String) {
 @Composable
 internal fun IconBubble(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
-    bg: Color,
-    fg: Color,
-    size: androidx.compose.ui.unit.Dp = 38.dp,
+    tone: Tone,
+    size: Dp = 38.dp,
 ) {
+    val (bg, fg) = LocalOnePalette.current.soft(tone)
     Box(Modifier.size(size).background(bg, CircleShape), contentAlignment = Alignment.Center) {
         Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(size / 2))
     }
@@ -142,17 +163,16 @@ internal fun IconBubble(
 // --- Loading skeletons & empty states ------------------------------------------
 
 @Composable
-internal fun ShimmerBox(modifier: Modifier, corner: androidx.compose.ui.unit.Dp = 12.dp) {
-    val transition = androidx.compose.animation.core.rememberInfiniteTransition(label = "shimmer")
+internal fun ShimmerBox(modifier: Modifier, corner: Dp = 12.dp) {
+    val transition = rememberInfiniteTransition(label = "shimmer")
     val progress by transition.animateFloat(
         initialValue = -1f, targetValue = 2f,
-        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-            animation = androidx.compose.animation.core.tween(1100, easing = androidx.compose.animation.core.LinearEasing),
-        ),
+        animationSpec = infiniteRepeatable(animation = tween(1100, easing = LinearEasing)),
         label = "shimmer-x",
     )
-    val base = MaterialTheme.colorScheme.surfaceVariant
-    val glint = MaterialTheme.colorScheme.surface
+    val palette = LocalOnePalette.current
+    val base = if (palette.dark) Color(0x14FFFFFF) else Color(0xFFE9EDF3)
+    val glint = if (palette.dark) Color(0x28FFFFFF) else Color(0xFFF8FAFC)
     Box(
         modifier
             .clip(RoundedCornerShape(corner))
@@ -170,34 +190,30 @@ internal fun ShimmerBox(modifier: Modifier, corner: androidx.compose.ui.unit.Dp 
     )
 }
 
-/** Home-shaped loading placeholder: hero, stat grid, list block. */
 @Composable
 internal fun HomeSkeleton() {
     Column(Modifier.fillMaxSize().padding(18.dp)) {
-        ShimmerBox(Modifier.fillMaxWidth().height(150.dp), corner = 18.dp)
+        ShimmerBox(Modifier.fillMaxWidth().height(120.dp), corner = 18.dp)
         Spacer(Modifier.height(14.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            ShimmerBox(Modifier.weight(1f).height(72.dp))
-            ShimmerBox(Modifier.weight(1f).height(72.dp))
+            ShimmerBox(Modifier.weight(1f).height(78.dp))
+            ShimmerBox(Modifier.weight(1f).height(78.dp))
+            ShimmerBox(Modifier.weight(1f).height(78.dp))
+            ShimmerBox(Modifier.weight(1f).height(78.dp))
         }
+        Spacer(Modifier.height(14.dp))
+        ShimmerBox(Modifier.fillMaxWidth().height(84.dp))
+        Spacer(Modifier.height(14.dp))
+        ShimmerBox(Modifier.fillMaxWidth(0.4f).height(18.dp), corner = 6.dp)
         Spacer(Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            ShimmerBox(Modifier.weight(1f).height(72.dp))
-            ShimmerBox(Modifier.weight(1f).height(72.dp))
-        }
-        Spacer(Modifier.height(20.dp))
-        ShimmerBox(Modifier.fillMaxWidth(0.4f).height(20.dp), corner = 6.dp)
-        Spacer(Modifier.height(10.dp))
-        ShimmerBox(Modifier.fillMaxWidth().height(190.dp))
+        ShimmerBox(Modifier.fillMaxWidth().height(170.dp))
     }
 }
 
-/** Friendly empty state: icon bubble, title, body, all centered. */
 @Composable
 internal fun EmptyState(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
-    iconBg: Color,
-    iconFg: Color,
+    tone: Tone,
     title: String,
     body: String,
 ) {
@@ -206,13 +222,11 @@ internal fun EmptyState(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        IconBubble(icon, iconBg, iconFg, size = 64.dp)
+        IconBubble(icon, tone, size = 64.dp)
         Spacer(Modifier.padding(top = 14.dp))
-        Text(title, style = MaterialTheme.typography.titleMedium,
-            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, textAlign = TextAlign.Center)
+        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
         Spacer(Modifier.padding(top = 4.dp))
-        Text(body, style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+        Text(body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
     }
 }
 
@@ -225,9 +239,9 @@ internal fun SlideIn(content: @Composable () -> Unit) {
     androidx.compose.animation.AnimatedVisibility(
         visibleState = state,
         enter = androidx.compose.animation.slideInHorizontally(
-            animationSpec = androidx.compose.animation.core.tween(240),
+            animationSpec = tween(240),
             initialOffsetX = { it / 3 },
-        ) + androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(200)),
+        ) + androidx.compose.animation.fadeIn(tween(200)),
         exit = androidx.compose.animation.fadeOut(),
     ) { content() }
 }

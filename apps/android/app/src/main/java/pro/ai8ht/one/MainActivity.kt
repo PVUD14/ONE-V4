@@ -32,6 +32,9 @@ import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Insights
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Notifications
@@ -81,12 +84,22 @@ import pro.ai8ht.one.ui.BrandWordmark
 import pro.ai8ht.one.ui.OneBlue
 import pro.ai8ht.one.ui.OneBlueDeep
 import pro.ai8ht.one.ui.OneTheme
+import pro.ai8ht.one.ui.Tone
 import java.time.Instant
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { OneTheme { OneApp() } }
+        setContent {
+            val context = androidx.compose.ui.platform.LocalContext.current
+            var themeId by remember { mutableStateOf(Session.theme(context)) }
+            OneTheme(themeId) {
+                OneApp(currentTheme = themeId, onThemeChange = { id ->
+                    themeId = id
+                    Session.setTheme(context, id)
+                })
+            }
+        }
     }
 }
 
@@ -106,7 +119,7 @@ private class StudentData(
 )
 
 @Composable
-fun OneApp() {
+fun OneApp(currentTheme: String, onThemeChange: (String) -> Unit) {
     val context = LocalContext.current
     var signedIn by remember { mutableStateOf(Session.token(context) != null) }
     var sessionExpired by remember { mutableStateOf(false) }
@@ -128,6 +141,8 @@ fun OneApp() {
             onGranted = { consent = null; consentChecked = true },
         )
         else -> MainScaffold(
+            currentTheme = currentTheme,
+            onThemeChange = onThemeChange,
             onSignOut = {
                 Session.clear(context)
                 signedIn = false
@@ -150,7 +165,7 @@ private fun BrandSplash() {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        BrandWordmark(height = 46.dp, spinEight = true, untinted = true)
+        BrandWordmark(height = 46.dp, spinEight = true)
         Spacer(Modifier.height(18.dp))
         Text("ONE", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color(0xFFD9DCE1))
         Text("The campus-to-career workspace", style = MaterialTheme.typography.bodySmall, color = Color(0xFF8E939C))
@@ -159,8 +174,14 @@ private fun BrandSplash() {
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
-private fun MainScaffold(onSignOut: () -> Unit, onSessionExpired: () -> Unit) {
+private fun MainScaffold(
+    currentTheme: String,
+    onThemeChange: (String) -> Unit,
+    onSignOut: () -> Unit,
+    onSessionExpired: () -> Unit,
+) {
     val context = LocalContext.current
+    val palette = pro.ai8ht.one.ui.LocalOnePalette.current
     var screen by remember { mutableStateOf(Screen.Home) }
     var data by remember { mutableStateOf<StudentData?>(null) }
     var loadError by remember { mutableStateOf(false) }
@@ -192,6 +213,15 @@ private fun MainScaffold(onSignOut: () -> Unit, onSessionExpired: () -> Unit) {
         refreshing = false
     }
 
+    // System back closes the topmost overlay instead of quitting the app.
+    androidx.activity.compose.BackHandler(enabled = showChat || showEditProfile || showInbox || moreDest != null) {
+        when {
+            showChat -> showChat = false
+            showEditProfile -> showEditProfile = false
+            showInbox -> showInbox = false
+            else -> moreDest = null
+        }
+    }
     when {
         showChat -> { SlideIn { ChatOverlay(onClose = { showChat = false }) }; return }
         showEditProfile -> { SlideIn { EditProfileOverlay(onClose = { showEditProfile = false; reloadKey += 1 }) }; return }
@@ -206,30 +236,30 @@ private fun MainScaffold(onSignOut: () -> Unit, onSessionExpired: () -> Unit) {
         moreDest == MoreDest.Documents -> { SlideIn { DocumentsPage(onClose = { moreDest = null }) }; return }
         moreDest == MoreDest.Privacy -> { SlideIn { PrivacyPage(onClose = { moreDest = null }) }; return }
         moreDest == MoreDest.Career -> { SlideIn { CareerPage(data?.learner, onClose = { moreDest = null }) }; return }
-        moreDest == MoreDest.Settings -> { SlideIn { SettingsPage(onClose = { moreDest = null }, onSignOut = onSignOut) }; return }
+        moreDest == MoreDest.Settings -> { SlideIn { SettingsPage(currentTheme = currentTheme, onThemeChange = onThemeChange, onClose = { moreDest = null }, onSignOut = onSignOut) }; return }
     }
 
     val unread = data?.notifications?.unreadCount ?: 0
 
     Scaffold(
-        containerColor = Color(0xFF0B0C0F),
+        containerColor = palette.bandBottom,
         contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { showChat = true },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = Color.White,
+                containerColor = palette.accent,
+                contentColor = palette.onAccent,
                 shape = CircleShape,
             ) { Icon(Icons.Filled.AutoAwesome, contentDescription = "ONE Assistant") }
         },
         bottomBar = {
-            NavigationBar(containerColor = MaterialTheme.colorScheme.surface, windowInsets = NavigationBarDefaults.windowInsets) {
+            NavigationBar(containerColor = palette.navBg, windowInsets = NavigationBarDefaults.windowInsets) {
                 val colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = MaterialTheme.colorScheme.primary,
-                    selectedTextColor = MaterialTheme.colorScheme.primary,
-                    indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    selectedIconColor = palette.navSelected,
+                    selectedTextColor = palette.navSelected,
+                    indicatorColor = palette.accentSoft,
+                    unselectedIconColor = palette.muted,
+                    unselectedTextColor = palette.muted,
                 )
                 NavigationBarItem(selected = screen == Screen.Home, onClick = { screen = Screen.Home },
                     icon = { Icon(Icons.Filled.Home, null) }, label = { Text("Home") }, colors = colors)
@@ -247,11 +277,11 @@ private fun MainScaffold(onSignOut: () -> Unit, onSessionExpired: () -> Unit) {
         Column(Modifier.padding(padding).fillMaxSize()) {
         BrandBand {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                BrandWordmark(height = 17.dp, untinted = true)
+                BrandWordmark(height = 17.dp, tint = palette.wordmarkTint)
                 Spacer(Modifier.weight(1f))
                 IconButton(onClick = { showInbox = true }) {
                     BadgedBox(badge = { if (unread > 0) Badge { Text("$unread") } }) {
-                        Icon(Icons.Filled.Notifications, contentDescription = "Notifications", tint = SilverMuted)
+                        Icon(Icons.Filled.Notifications, contentDescription = "Notifications", tint = palette.bandMuted)
                     }
                 }
             }
@@ -261,12 +291,12 @@ private fun MainScaffold(onSignOut: () -> Unit, onSessionExpired: () -> Unit) {
                     Column(Modifier.weight(1f)) {
                         Text(
                             "Hi, " + (data?.student?.fullName?.split(" ")?.firstOrNull() ?: "Student"),
-                            style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Silver,
+                            style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = palette.bandInk,
                         )
                         val line = listOfNotNull(data?.student?.program, data?.student?.batch).joinToString(" · ")
                         Text(
                             if (line.isNotBlank()) line else "Your placement-readiness workspace",
-                            style = MaterialTheme.typography.bodyMedium, color = SilverMuted,
+                            style = MaterialTheme.typography.bodyMedium, color = palette.bandMuted,
                         )
                     }
                     AvatarView(context, data?.student?.fullName, 46.dp, avatarVersion)
@@ -280,8 +310,8 @@ private fun MainScaffold(onSignOut: () -> Unit, onSessionExpired: () -> Unit) {
                     if (chipResults.isNotEmpty()) StatusChip("Avg " + chipResults.map { r -> r.percentage }.average().toInt() + "%", ChipKind.OnDark)
                 }
             } else {
-                Text(screen.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = Silver)
-                Text(screen.subtitle, style = MaterialTheme.typography.bodySmall, color = SilverMuted)
+                Text(screen.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = palette.bandInk)
+                Text(screen.subtitle, style = MaterialTheme.typography.bodySmall, color = palette.bandMuted)
             }
         }
         BandSheet {
@@ -308,9 +338,13 @@ private fun MainScaffold(onSignOut: () -> Unit, onSessionExpired: () -> Unit) {
                     Column(Modifier.fillMaxSize()) {
                         if (current == Screen.Home) Spacer(Modifier.height(2.dp))
                         when (current) {
-                            Screen.Home -> HomeScreen(data!!, avatarVersion, onOpen = { destination ->
-                                if (destination == null) showInbox = true else screen = destination
-                            })
+                            Screen.Home -> HomeScreen(
+                                data!!,
+                                onOpen = { screen = it },
+                                onInbox = { showInbox = true },
+                                onChat = { showChat = true },
+                                onSection = { moreDest = it },
+                            )
                             Screen.Assessments -> AssessmentsScreen(data!!.assessments)
                             Screen.Learning -> LearningScreen(data!!.learner, onChanged = { reloadKey += 1 })
                             Screen.Jobs -> JobsScreen()
@@ -328,8 +362,14 @@ private fun MainScaffold(onSignOut: () -> Unit, onSessionExpired: () -> Unit) {
 // --- Home ---------------------------------------------------------------------
 
 @Composable
-private fun HomeScreen(data: StudentData, avatarVersion: Int, onOpen: (Screen?) -> Unit) {
-    val heroContext = LocalContext.current
+private fun HomeScreen(
+    data: StudentData,
+    onOpen: (Screen) -> Unit,
+    onInbox: () -> Unit,
+    onChat: () -> Unit,
+    onSection: (MoreDest) -> Unit,
+) {
+    val palette = pro.ai8ht.one.ui.LocalOnePalette.current
     val now = Instant.now()
     val openExams = data.assessments.count { exam ->
         exam.latestResult == null && exam.attemptsUsed < exam.attemptsAllowed &&
@@ -338,36 +378,66 @@ private fun HomeScreen(data: StudentData, avatarVersion: Int, onOpen: (Screen?) 
     val lessons = data.learner?.catalog?.modules?.flatMap { it.lessons } ?: emptyList()
     val completed = data.learner?.progress?.count { it.state == "COMPLETED" } ?: 0
     val unread = data.notifications?.unreadCount ?: 0
-    val firstName = data.student?.fullName?.split(" ")?.firstOrNull() ?: "Student"
     val results = data.assessments.mapNotNull { exam -> exam.latestResult?.let { exam to it } }
-    val average = if (results.isEmpty()) null else results.map { it.second.percentage }.average()
     val best = results.maxOfOrNull { it.second.percentage }
     val nextDeadline = data.assessments
         .filter { it.latestResult == null && runCatching { now.isBefore(Instant.parse(it.endsAt)) }.getOrDefault(false) }
         .minByOrNull { it.endsAt }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp)) {
-        Spacer(Modifier.height(14.dp))
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(12.dp))
+
+        // Progress hero: ring + status + jump into learning.
+        PilotCard(glow = true) {
+            Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                ProgressRing(
+                    progress = if (lessons.isEmpty()) 0f else completed.toFloat() / lessons.size,
+                    center = "$completed/${lessons.size}",
+                    caption = "LESSONS",
+                )
+                Spacer(Modifier.width(14.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Career progress", style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        if (lessons.isNotEmpty() && completed == lessons.size) "All lessons completed"
+                        else "Keep building your evidence",
+                        style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold,
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    data.learner?.readiness?.band?.let { StatusChip("Readiness: " + prettify(it), ChipKind.Accent) }
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "$openExams exams open · best " + (best?.let { "${it.toInt()}%" } ?: "—") + " · $unread unread",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                TextButton(onClick = { onOpen(Screen.Learning) }) { Text("Open") }
+            }
+        }
+
+        // Everything the student can do, one tap away.
+        SectionTitle("Quick actions")
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            StatTile(Icons.Filled.Assignment, Color(0xFFEEF4FF), Color(0xFF1F55E5),
-                "$openExams", "Exams open now", Modifier.weight(1f)) { onOpen(Screen.Assessments) }
-            StatTile(Icons.Filled.MenuBook, Color(0xFFEAF4EE), Color(0xFF2E6B46),
-                "$completed of ${lessons.size}", "Lessons completed", Modifier.weight(1f)) { onOpen(Screen.Learning) }
+            QuickTile(Icons.Filled.Assignment, Tone.Accent, "Exams", Modifier.weight(1f)) { onOpen(Screen.Assessments) }
+            QuickTile(Icons.Filled.MenuBook, Tone.Green, "Learning", Modifier.weight(1f)) { onOpen(Screen.Learning) }
+            QuickTile(Icons.Filled.WorkOutline, Tone.Violet, "Jobs", Modifier.weight(1f)) { onOpen(Screen.Jobs) }
+            QuickTile(Icons.Filled.AutoAwesome, Tone.Amber, "Assistant", Modifier.weight(1f)) { onChat() }
         }
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            StatTile(Icons.Filled.WorkOutline, Color(0xFFF3EEFF), Color(0xFF6941C6),
-                best?.let { "${it.toInt()}%" } ?: "—", "Best exam score", Modifier.weight(1f)) { onOpen(Screen.Assessments) }
-            StatTile(Icons.Filled.Notifications, Color(0xFFFDF6E0), Color(0xFF8A6400),
-                "$unread", "Unread updates", Modifier.weight(1f)) { onOpen(null) }
+            QuickTile(Icons.Filled.Notifications, Tone.Amber, "Inbox", Modifier.weight(1f), badge = unread) { onInbox() }
+            QuickTile(Icons.Filled.Person, Tone.Accent, "Profile", Modifier.weight(1f)) { onSection(MoreDest.Profile) }
+            QuickTile(Icons.Filled.Description, Tone.Violet, "Documents", Modifier.weight(1f)) { onSection(MoreDest.Documents) }
+            QuickTile(Icons.Filled.Insights, Tone.Green, "Readiness", Modifier.weight(1f)) { onSection(MoreDest.Career) }
         }
 
         nextDeadline?.let { exam ->
             SectionTitle("Next deadline")
-            PilotCard {
+            PilotCard(Modifier.clickable { onOpen(Screen.Assessments) }) {
                 Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    IconBubble(Icons.Filled.Assignment, Color(0xFFEEF4FF), Color(0xFF1F55E5))
+                    IconBubble(Icons.Filled.Assignment, Tone.Accent)
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(exam.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
@@ -379,8 +449,26 @@ private fun HomeScreen(data: StudentData, avatarVersion: Int, onOpen: (Screen?) 
             }
         }
 
+        // A visible way into the assistant, with real starter questions.
+        SectionTitle("Ask ONE")
+        PilotCard(Modifier.clickable { onChat() }) {
+            Column(Modifier.padding(14.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconBubble(Icons.Filled.AutoAwesome, Tone.Amber)
+                    Spacer(Modifier.width(10.dp))
+                    Text("Stuck? Ask the assistant", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                }
+                Spacer(Modifier.height(10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    StatusChip("How do I take an assessment?", ChipKind.Muted)
+                }
+                Spacer(Modifier.height(6.dp))
+                Row { StatusChip("Why can't I start my assessment?", ChipKind.Muted) }
+            }
+        }
+
         if (results.isNotEmpty()) {
-            SectionTitle("Recent results")
+            SectionTitle("Recent results", trailing = "View all", onTrailing = { onOpen(Screen.Assessments) })
             PilotCard {
                 Column(Modifier.padding(vertical = 4.dp)) {
                     results.take(3).forEachIndexed { index, (exam, result) ->
@@ -394,7 +482,7 @@ private fun HomeScreen(data: StudentData, avatarVersion: Int, onOpen: (Screen?) 
                             LinearProgressIndicator(
                                 progress = { (result.percentage / 100.0).toFloat().coerceIn(0f, 1f) },
                                 modifier = Modifier.fillMaxWidth(),
-                                color = if (result.percentage >= 50) Color(0xFF2E6B46) else Color(0xFF8A6400),
+                                color = if (result.percentage >= 50) palette.soft(Tone.Green).second else palette.soft(Tone.Amber).second,
                                 trackColor = MaterialTheme.colorScheme.surfaceVariant,
                             )
                         }
@@ -403,6 +491,7 @@ private fun HomeScreen(data: StudentData, avatarVersion: Int, onOpen: (Screen?) 
                 }
             }
         }
+
         val nextSteps = data.learner?.roadmap?.filter { it.state == "PENDING" }?.take(3) ?: emptyList()
         if (nextSteps.isNotEmpty()) {
             SectionTitle("Next steps")
@@ -422,9 +511,10 @@ private fun HomeScreen(data: StudentData, avatarVersion: Int, onOpen: (Screen?) 
                 }
             }
         }
+
         val recent = data.notifications?.notifications?.take(3) ?: emptyList()
         if (recent.isNotEmpty()) {
-            SectionTitle("Recent activity")
+            SectionTitle("Recent activity", trailing = "Inbox", onTrailing = onInbox)
             PilotCard {
                 Column(Modifier.padding(vertical = 4.dp)) {
                     recent.forEachIndexed { index, note ->
@@ -443,23 +533,53 @@ private fun HomeScreen(data: StudentData, avatarVersion: Int, onOpen: (Screen?) 
 }
 
 @Composable
-private fun StatTile(
+private fun ProgressRing(progress: Float, center: String, caption: String) {
+    val palette = pro.ai8ht.one.ui.LocalOnePalette.current
+    Box(contentAlignment = Alignment.Center) {
+        androidx.compose.material3.CircularProgressIndicator(
+            progress = { progress.coerceIn(0f, 1f) },
+            modifier = Modifier.size(72.dp),
+            color = palette.accent,
+            trackColor = if (palette.dark) Color(0x22FFFFFF) else Color(0xFFE7EBF3),
+            strokeWidth = 7.dp,
+        )
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(center, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text(caption, style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun QuickTile(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
-    iconBg: Color,
-    iconFg: Color,
-    value: String,
+    tone: Tone,
     label: String,
     modifier: Modifier = Modifier,
+    badge: Int = 0,
     onClick: () -> Unit,
 ) {
     PilotCard(modifier.clickable(onClick = onClick)) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconBubble(icon, iconBg, iconFg)
-            Spacer(Modifier.width(12.dp))
-            Column {
-                Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(
+            Modifier.fillMaxWidth().padding(vertical = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Box {
+                IconBubble(icon, tone, size = 34.dp)
+                if (badge > 0) {
+                    Box(
+                        Modifier.size(15.dp).background(MaterialTheme.colorScheme.primary, CircleShape)
+                            .padding(0.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text("$badge", style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
+                    }
+                }
             }
+            Spacer(Modifier.height(6.dp))
+            Text(label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
         }
     }
 }
@@ -469,7 +589,7 @@ private fun StatTile(
 @Composable
 private fun AssessmentsScreen(items: List<AssessmentDto>) {
     if (items.isEmpty()) {
-        EmptyState(Icons.Filled.Assignment, Color(0xFFEEF4FF), Color(0xFF1F55E5),
+        EmptyState(Icons.Filled.Assignment, Tone.Accent,
             "No assessments yet",
             "Your placement cell assigns tests to you. They appear here with their windows, timers and results.")
         return
@@ -506,6 +626,7 @@ private fun SummaryCell(value: String, label: String, modifier: Modifier = Modif
 
 @Composable
 private fun AssessmentCard(exam: AssessmentDto) {
+    val palette = pro.ai8ht.one.ui.LocalOnePalette.current
     val now = Instant.now()
     val starts = runCatching { Instant.parse(exam.startsAt) }.getOrNull()
     val ends = runCatching { Instant.parse(exam.endsAt) }.getOrNull()
@@ -537,7 +658,7 @@ private fun AssessmentCard(exam: AssessmentDto) {
                     LinearProgressIndicator(
                         progress = { (result.percentage / 100.0).toFloat().coerceIn(0f, 1f) },
                         modifier = Modifier.weight(1f),
-                        color = if (result.percentage >= 50) Color(0xFF2E6B46) else Color(0xFF8A6400),
+                        color = if (result.percentage >= 50) palette.soft(pro.ai8ht.one.ui.Tone.Green).second else palette.soft(pro.ai8ht.one.ui.Tone.Amber).second,
                         trackColor = MaterialTheme.colorScheme.surfaceVariant,
                     )
                     Spacer(Modifier.width(10.dp))
@@ -558,12 +679,13 @@ private fun AssessmentCard(exam: AssessmentDto) {
 @Composable
 private fun LearningScreen(learner: LearnerStateDto?, onChanged: () -> Unit) {
     val context = LocalContext.current
+    val palette = pro.ai8ht.one.ui.LocalOnePalette.current
     val scope = rememberCoroutineScope()
     var busyLesson by remember { mutableStateOf<String?>(null) }
     var message by remember { mutableStateOf<String?>(null) }
 
     if (learner == null || learner.catalog.modules.isEmpty()) {
-        EmptyState(Icons.Filled.MenuBook, Color(0xFFEAF4EE), Color(0xFF2E6B46),
+        EmptyState(Icons.Filled.MenuBook, Tone.Green,
             "No modules yet",
             "Learning modules appear here once your institution publishes them. Completed lessons build your readiness.")
         return
@@ -577,7 +699,7 @@ private fun LearningScreen(learner: LearnerStateDto?, onChanged: () -> Unit) {
             Spacer(Modifier.height(10.dp))
             PilotCard {
                 Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    IconBubble(Icons.Filled.MenuBook, Color(0xFFEAF4EE), Color(0xFF2E6B46), size = 44.dp)
+                    IconBubble(Icons.Filled.MenuBook, pro.ai8ht.one.ui.Tone.Green, size = 44.dp)
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text("Overall progress", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
@@ -585,7 +707,7 @@ private fun LearningScreen(learner: LearnerStateDto?, onChanged: () -> Unit) {
                         LinearProgressIndicator(
                             progress = { if (allLessons.isEmpty()) 0f else doneCount.toFloat() / allLessons.size },
                             modifier = Modifier.fillMaxWidth(),
-                            color = Color(0xFF2E6B46),
+                            color = palette.soft(pro.ai8ht.one.ui.Tone.Green).second,
                             trackColor = MaterialTheme.colorScheme.surfaceVariant,
                         )
                     }
@@ -598,7 +720,8 @@ private fun LearningScreen(learner: LearnerStateDto?, onChanged: () -> Unit) {
         message?.let { text ->
             item {
                 Spacer(Modifier.height(10.dp))
-                Surface(color = Color(0xFFFDF6E0), contentColor = Color(0xFF8A6400), shape = RoundedCornerShape(10.dp)) {
+                val (warnBg, warnFg) = palette.soft(pro.ai8ht.one.ui.Tone.Amber)
+                Surface(color = warnBg, contentColor = warnFg, shape = RoundedCornerShape(10.dp)) {
                     Text(text, Modifier.padding(12.dp), style = MaterialTheme.typography.bodySmall)
                 }
             }
@@ -630,7 +753,7 @@ private fun LearningScreen(learner: LearnerStateDto?, onChanged: () -> Unit) {
                             Icon(
                                 if (isDone) Icons.Filled.CheckCircle else Icons.Outlined.Circle,
                                 contentDescription = null,
-                                tint = if (isDone) Color(0xFF2E6B46) else MaterialTheme.colorScheme.outline,
+                                tint = if (isDone) palette.soft(pro.ai8ht.one.ui.Tone.Green).second else MaterialTheme.colorScheme.outline,
                                 modifier = Modifier.size(20.dp),
                             )
                             Spacer(Modifier.width(10.dp))
@@ -675,14 +798,14 @@ private fun InboxOverlay(feed: NotificationsEnvelope?, onClose: () -> Unit, onAl
             if ((feed?.unreadCount ?: 0) > 0) {
                 TextButton(
                     onClick = { scope.launch { runCatching { Api.markAllRead(context) }.onSuccess { onAllRead(); onClose() } } },
-                    colors = ButtonDefaults.textButtonColors(contentColor = Silver),
+                    colors = ButtonDefaults.textButtonColors(contentColor = pro.ai8ht.one.ui.LocalOnePalette.current.bandInk),
                 ) { Text("Mark all read") }
             }
         },
     ) {
         when {
             feed == null || feed.notifications.isEmpty() ->
-                EmptyState(Icons.Filled.Notifications, Color(0xFFFDF6E0), Color(0xFF8A6400),
+                EmptyState(Icons.Filled.Notifications, Tone.Amber,
                     "All caught up",
                     "Nothing needs your attention. Assignments, reopenings and results land here the moment they happen.")
             else -> LazyColumn(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
@@ -711,6 +834,7 @@ private fun InboxOverlay(feed: NotificationsEnvelope?, onClose: () -> Unit, onAl
 @Composable
 private fun SignInScreen(expired: Boolean = false, onSignedIn: () -> Unit) {
     val context = LocalContext.current
+    val signPalette = pro.ai8ht.one.ui.LocalOnePalette.current
     val scope = rememberCoroutineScope()
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -720,18 +844,18 @@ private fun SignInScreen(expired: Boolean = false, onSignedIn: () -> Unit) {
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    Column(Modifier.fillMaxSize().background(signPalette.bandBottom)) {
         BrandBand {
             Spacer(Modifier.height(34.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                BrandWordmark(height = 40.dp, spinEight = true, untinted = true)
+                BrandWordmark(height = 40.dp, spinEight = true, tint = signPalette.wordmarkTint)
             }
             Spacer(Modifier.height(12.dp))
             Text(
                 "The campus-to-career workspace",
                 Modifier.fillMaxWidth(),
                 style = MaterialTheme.typography.bodyMedium,
-                color = SilverMuted,
+                color = signPalette.bandMuted,
                 textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(10.dp))

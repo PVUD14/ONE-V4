@@ -1,14 +1,18 @@
 package pro.ai8ht.one.ui
 
-import androidx.compose.foundation.isSystemInDarkTheme
+import android.app.Activity
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
 
-// The pilot design language, translated: white surfaces, ONE blue accent,
-// calm neutrals. Dark scheme mirrors the brand's silver-on-black wordmark.
+// Kept for legacy references.
 val OneBlue = Color(0xFF1F55E5)
 val OneBlueDeep = Color(0xFF0A2B68)
 val OneInk = Color(0xFF101828)
@@ -16,37 +20,50 @@ val OneMuted = Color(0xFF667085)
 val OneCanvas = Color(0xFFF6F8FB)
 val OneLine = Color(0xFFE4E7EC)
 
-private val LightScheme = lightColorScheme(
-    primary = OneBlue,
-    onPrimary = Color.White,
-    primaryContainer = Color(0xFFEEF4FF),
-    onPrimaryContainer = OneBlueDeep,
-    background = OneCanvas,
-    onBackground = OneInk,
-    surface = Color.White,
-    onSurface = OneInk,
-    surfaceVariant = OneCanvas,
-    onSurfaceVariant = OneMuted,
-    outline = OneLine,
-)
-
-private val DarkScheme = darkColorScheme(
-    primary = Color(0xFF8FB0FF),
-    onPrimary = Color(0xFF0A1A3D),
-    background = Color(0xFF0B0C0F),
-    onBackground = Color(0xFFD9DCE1),
-    surface = Color(0xFF14161B),
-    onSurface = Color(0xFFD9DCE1),
-    surfaceVariant = Color(0xFF1B1E24),
-    onSurfaceVariant = Color(0xFF8E939C),
-    outline = Color(0xFF2A2E36),
-)
-
+/**
+ * Applies the selected palette: Material color scheme, Inter typography, the
+ * LocalOnePalette used by all custom components, and the status bar treatment
+ * matching the band at the top of every screen.
+ */
 @Composable
-fun OneTheme(content: @Composable () -> Unit) {
-    MaterialTheme(
-        colorScheme = if (isSystemInDarkTheme()) DarkScheme else LightScheme,
-        typography = oneTypography(),
-        content = content,
-    )
+fun OneTheme(paletteId: String, content: @Composable () -> Unit) {
+    val palette = paletteById(paletteId)
+    val scheme = if (palette.dark) {
+        darkColorScheme(
+            primary = palette.accent, onPrimary = palette.onAccent,
+            primaryContainer = palette.accentSoft, onPrimaryContainer = palette.onAccentSoft,
+            background = palette.sheet, onBackground = palette.ink,
+            surface = palette.card, onSurface = palette.ink,
+            surfaceVariant = palette.accentSoft, onSurfaceVariant = palette.muted,
+            outline = palette.outline,
+            error = Color(0xFFF87171),
+        )
+    } else {
+        lightColorScheme(
+            primary = palette.accent, onPrimary = palette.onAccent,
+            primaryContainer = palette.accentSoft, onPrimaryContainer = palette.onAccentSoft,
+            background = palette.sheet, onBackground = palette.ink,
+            surface = palette.card, onSurface = palette.ink,
+            surfaceVariant = Color(0xFFEDF0F5), onSurfaceVariant = palette.muted,
+            outline = palette.outline,
+            error = Color(0xFFB42318),
+        )
+    }
+
+    val view = LocalView.current
+    if (!view.isInEditMode) {
+        SideEffect {
+            val window = (view.context as Activity).window
+            window.statusBarColor = palette.bandTop.toArgb()
+            window.navigationBarColor = palette.navBg.toArgb()
+            val controller = WindowCompat.getInsetsController(window, view)
+            // Light band (Lumina) needs dark status icons; dark/vivid bands need light ones.
+            controller.isAppearanceLightStatusBars = !palette.dark && palette.bandTop == Color(0xFFFFFFFF)
+            controller.isAppearanceLightNavigationBars = !palette.dark
+        }
+    }
+
+    CompositionLocalProvider(LocalOnePalette provides palette) {
+        MaterialTheme(colorScheme = scheme, typography = oneTypography(), content = content)
+    }
 }

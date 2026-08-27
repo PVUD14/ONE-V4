@@ -6,14 +6,13 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
@@ -29,9 +28,8 @@ import pro.ai8ht.one.R
  * on the web (5.5s per revolution).
  */
 @Composable
-fun BrandWordmark(height: Dp, spinEight: Boolean = false, untinted: Boolean = false, modifier: Modifier = Modifier) {
-    val dark = isSystemInDarkTheme()
-    val tint = if (dark || untinted) null else ColorFilter.tint(MaterialTheme.colorScheme.onBackground)
+fun BrandWordmark(height: Dp, spinEight: Boolean = false, tint: Color? = null, modifier: Modifier = Modifier) {
+    val filter = tint?.let { ColorFilter.tint(it) }
     val rotation: Float = if (spinEight) {
         val transition = rememberInfiniteTransition(label = "brand-eight")
         val value by transition.animateFloat(
@@ -49,7 +47,7 @@ fun BrandWordmark(height: Dp, spinEight: Boolean = false, untinted: Boolean = fa
             contentDescription = "AI",
             modifier = Modifier.height(height),
             contentScale = ContentScale.FillHeight,
-            colorFilter = tint,
+            colorFilter = filter,
         )
         Image(
             painter = painterResource(R.drawable.ai8ht_eight),
@@ -61,14 +59,14 @@ fun BrandWordmark(height: Dp, spinEight: Boolean = false, untinted: Boolean = fa
                     cameraDistance = 12f * density
                 },
             contentScale = ContentScale.FillHeight,
-            colorFilter = tint,
+            colorFilter = filter,
         )
         Image(
             painter = painterResource(R.drawable.ai8ht_right),
             contentDescription = "HT",
             modifier = Modifier.height(height),
             contentScale = ContentScale.FillHeight,
-            colorFilter = tint,
+            colorFilter = filter,
         )
     }
 }

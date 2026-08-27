@@ -110,7 +110,7 @@ internal fun JobsScreen() {
             when {
                 opportunities == null -> LoadingSpinner()
                 opportunities!!.isEmpty() -> EmptyState(
-                    androidx.compose.material.icons.Icons.Filled.WorkOutline, Color(0xFFF3EEFF), Color(0xFF6941C6),
+                    androidx.compose.material.icons.Icons.Filled.WorkOutline, pro.ai8ht.one.ui.Tone.Violet,
                     "No open roles right now",
                     "When employers post opportunities for your institution, they appear here with one-tap apply.")
                 else -> LazyColumn(Modifier.fillMaxSize()) {
@@ -164,7 +164,7 @@ internal fun JobsScreen() {
             when {
                 applications == null -> LoadingSpinner()
                 applications!!.isEmpty() -> EmptyState(
-                    androidx.compose.material.icons.Icons.Filled.WorkOutline, Color(0xFFF3EEFF), Color(0xFF6941C6),
+                    androidx.compose.material.icons.Icons.Filled.WorkOutline, pro.ai8ht.one.ui.Tone.Violet,
                     "No applications yet",
                     "Apply to an opportunity and every stage — submitted, shortlisted, offered — is tracked here.")
                 else -> LazyColumn(Modifier.fillMaxSize()) {
@@ -321,11 +321,12 @@ internal fun OverlayScaffold(
     actions: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {},
     content: @Composable () -> Unit,
 ) {
-    Column(Modifier.fillMaxSize().background(Color(0xFF0B0C0F))) {
+    val ovPalette = pro.ai8ht.one.ui.LocalOnePalette.current
+    Column(Modifier.fillMaxSize().background(ovPalette.bandBottom)) {
         BrandBand {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Silver) }
-                Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Silver)
+                IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = ovPalette.bandInk) }
+                Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = ovPalette.bandInk)
                 Spacer(Modifier.weight(1f))
                 actions()
             }
@@ -363,19 +364,19 @@ internal fun MoreMenuScreen(
         Spacer(Modifier.height(14.dp))
         PilotCard {
             Column {
-                MenuRow(Icons.Filled.Person, Color(0xFFEEF4FF), Color(0xFF1F55E5), "Profile",
+                MenuRow(Icons.Filled.Person, pro.ai8ht.one.ui.Tone.Accent, "Profile",
                     "Your details, headline and photo") { onOpen(MoreDest.Profile) }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-                MenuRow(Icons.Filled.Insights, Color(0xFFEAF4EE), Color(0xFF2E6B46), "Career readiness",
+                MenuRow(Icons.Filled.Insights, pro.ai8ht.one.ui.Tone.Green, "Career readiness",
                     "Your advisory band and roadmap") { onOpen(MoreDest.Career) }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-                MenuRow(Icons.Filled.Description, Color(0xFFF3EEFF), Color(0xFF6941C6), "Documents",
+                MenuRow(Icons.Filled.Description, pro.ai8ht.one.ui.Tone.Violet, "Documents",
                     "Résumés, certificates and verification") { onOpen(MoreDest.Documents) }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-                MenuRow(Icons.Filled.Lock, Color(0xFFFDF6E0), Color(0xFF8A6400), "Privacy & data",
+                MenuRow(Icons.Filled.Lock, pro.ai8ht.one.ui.Tone.Amber, "Privacy & data",
                     "Your data copy and consent") { onOpen(MoreDest.Privacy) }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-                MenuRow(Icons.Filled.Settings, Color(0xFFF2F4F7), Color(0xFF667085), "Settings",
+                MenuRow(Icons.Filled.Settings, pro.ai8ht.one.ui.Tone.Gray, "Settings",
                     "App info and sign out") { onOpen(MoreDest.Settings) }
             }
         }
@@ -388,15 +389,14 @@ internal fun MoreMenuScreen(
 @Composable
 private fun MenuRow(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
-    bg: Color,
-    fg: Color,
+    tone: pro.ai8ht.one.ui.Tone,
     title: String,
     subtitle: String,
     onClick: () -> Unit,
 ) {
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically) {
-        IconBubble(icon, bg, fg)
+        IconBubble(icon, tone)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
@@ -510,7 +510,7 @@ internal fun DocumentsPage(onClose: () -> Unit) {
                         documents!!.forEachIndexed { index, doc ->
                             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically) {
-                                IconBubble(Icons.Filled.Description, Color(0xFFF3EEFF), Color(0xFF6941C6))
+                                IconBubble(Icons.Filled.Description, pro.ai8ht.one.ui.Tone.Violet)
                                 Spacer(Modifier.width(12.dp))
                                 Column(Modifier.weight(1f)) {
                                     Text(doc.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
@@ -597,7 +597,7 @@ internal fun CareerPage(learner: LearnerStateDto?, onClose: () -> Unit) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp)) {
             PilotCard {
                 Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    IconBubble(Icons.Filled.Insights, Color(0xFFEAF4EE), Color(0xFF2E6B46), size = 44.dp)
+                    IconBubble(Icons.Filled.Insights, pro.ai8ht.one.ui.Tone.Green, size = 44.dp)
                     Spacer(Modifier.width(12.dp))
                     Column {
                         Text("Readiness band", style = MaterialTheme.typography.bodySmall,
@@ -643,12 +643,60 @@ internal fun CareerPage(learner: LearnerStateDto?, onClose: () -> Unit) {
 }
 
 @Composable
-internal fun SettingsPage(onClose: () -> Unit, onSignOut: () -> Unit) {
+internal fun SettingsPage(currentTheme: String, onThemeChange: (String) -> Unit, onClose: () -> Unit, onSignOut: () -> Unit) {
     OverlayScaffold("Settings", onClose) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp)) {
             PilotCard {
+                Column(Modifier.padding(16.dp)) {
+                    Text("Theme", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(2.dp))
+                    Text("Pick the world ONE lives in on this device.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(12.dp))
+                    pro.ai8ht.one.ui.AllPalettes.chunked(3).forEach { rowPalettes ->
+                        Row(Modifier.fillMaxWidth().padding(bottom = 10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            rowPalettes.forEach { option ->
+                                val selected = option.id == currentTheme
+                                Column(
+                                    Modifier.weight(1f).clickable { onThemeChange(option.id) },
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                ) {
+                                    Box(
+                                        Modifier.fillMaxWidth().height(46.dp)
+                                            .background(option.bandBrush, RoundedCornerShape(12.dp))
+                                            .then(
+                                                if (selected) Modifier.background(
+                                                    Color.Transparent, RoundedCornerShape(12.dp),
+                                                ) else Modifier,
+                                            ),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Box(Modifier.size(16.dp).background(option.accent, CircleShape))
+                                        if (selected) {
+                                            Box(
+                                                Modifier.matchParentSize().background(
+                                                    Color.Transparent, RoundedCornerShape(12.dp),
+                                                ),
+                                            )
+                                            Text("✓", color = option.bandInk, fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.padding(start = 34.dp))
+                                        }
+                                    }
+                                    Spacer(Modifier.height(4.dp))
+                                    Text(option.displayName, style = MaterialTheme.typography.labelSmall,
+                                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            PilotCard {
                 Column(Modifier.padding(18.dp)) {
-                    BrandWordmark(height = 22.dp)
+                    BrandWordmark(height = 22.dp, tint = if (pro.ai8ht.one.ui.LocalOnePalette.current.dark) null else pro.ai8ht.one.ui.LocalOnePalette.current.ink)
                     Spacer(Modifier.height(8.dp))
                     Text("ONE by AI8HT", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                     Text("Version ${BuildConfig.VERSION_NAME} · one.ai8ht.pro",

@@ -25,6 +25,18 @@ function go(path: string): void {
   window.dispatchEvent(new PopStateEvent('popstate'));
 }
 
+function NaRingRailCard({ title, center, legend }: { readonly title: string; readonly center: string; readonly legend: readonly string[] }): React.ReactElement {
+  return <section className="pilot-card">
+    <div className="pilot-card-head"><h2>{title}</h2><span className="pilot-chip slate">NA</span></div>
+    <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+      <MultiRing segments={[]}>NA<div style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--p-muted)' }}>{center}</div></MultiRing>
+      <div className="pilot-legend" style={{ flex: 1 }}>
+        {legend.map((label) => <div key={label}><i style={{ background: '#e5eaf2' }} /> {label} <span className="num">NA</span></div>)}
+      </div>
+    </div>
+  </section>;
+}
+
 function NaListCard({ title, note }: { readonly title: string; readonly note: string }): React.ReactElement {
   return <section className="pilot-card">
     <div className="pilot-card-head"><h2>{title}</h2><span className="pilot-chip slate">NA</span></div>
@@ -112,7 +124,7 @@ export function StudentPracticePage(): React.ReactElement {
 
 export function StudentCompanyPrepPage(): React.ReactElement {
   const [tab, setTab] = useState(0);
-  return <div className="pilot pilot-embed"><div className="pilot-page" style={{ gridTemplateColumns: '1fr' }}>
+  return <div className="pilot pilot-embed"><div className="pilot-page" style={tab === 0 ? undefined : { gridTemplateColumns: '1fr' }}>
     <div className="pilot-content">
       <div className="pilot-page-head">
         <div><h1>Company Preparation</h1><p>Prepare for your dream companies with tailored resources and practice.</p></div>
@@ -129,6 +141,10 @@ export function StudentCompanyPrepPage(): React.ReactElement {
         <NaListCard title="Companies" note="Company prep guides are not live yet — NA. Real openings from real employers are under Opportunities." />
       </> : <NaListCard title={['Overview', 'Companies', 'Interview Prep', 'Aptitude Prep', 'Mock Interviews', 'Saved'][tab] ?? ''} note="This prep content is not live yet — NA." />}
     </div>
+    {tab === 0 ? <aside className="pilot-rail">
+      <NaRingRailCard title="Preparation Progress" center="Overall" legend={['Completed', 'In Progress', 'Not Started', 'Saved']} />
+      <NaListCard title="Upcoming Interviews" note="No interview schedule yet — NA." />
+    </aside> : null}
   </div></div>;
 }
 
@@ -138,7 +154,7 @@ const TOOL_TABS = ['Overview', 'Planning', 'Building', 'Acceleration'] as const;
 
 export function StudentCareerToolsPage(): React.ReactElement {
   const [tab, setTab] = useState(0);
-  return <div className="pilot pilot-embed"><div className="pilot-page" style={{ gridTemplateColumns: '1fr' }}>
+  return <div className="pilot pilot-embed"><div className="pilot-page" style={tab === 0 ? undefined : { gridTemplateColumns: '1fr' }}>
     <div className="pilot-content">
       <div className="pilot-page-head">
         <div><h1>Career Tools</h1><p>Everything you need to plan, build and accelerate your career.</p></div>
@@ -159,6 +175,10 @@ export function StudentCareerToolsPage(): React.ReactElement {
         <p style={{ color: 'var(--p-muted)', marginTop: 12 }}>What is live today: your readiness band and roadmap under My Career, and real skills evidence under Skills.</p>
       </section>
     </div>
+    {tab === 0 ? <aside className="pilot-rail">
+      <NaRingRailCard title="Tools Usage Overview" center="Tools Used" legend={['Resume & Docs', 'Skill Tools', 'Planning', 'Job Search']} />
+      <NaListCard title="Recommended for You" note="Tool recommendations are not live yet — NA." />
+    </aside> : null}
   </div></div>;
 }
 
@@ -167,7 +187,7 @@ export function StudentCareerToolsPage(): React.ReactElement {
 export function StudentScholarshipsPage(): React.ReactElement {
   const [tab, setTab] = useState(0);
   const labels = ['Overview', 'Recommended', 'Merit Based', 'Need Based', 'Deadlines'] as const;
-  return <div className="pilot pilot-embed"><div className="pilot-page" style={{ gridTemplateColumns: '1fr' }}>
+  return <div className="pilot pilot-embed"><div className="pilot-page" style={tab === 0 ? undefined : { gridTemplateColumns: '1fr' }}>
     <div className="pilot-content">
       <div className="pilot-page-head">
         <div><h1>Scholarships</h1><p>Discover and apply for scholarships to support your education journey.</p></div>
@@ -184,6 +204,10 @@ export function StudentScholarshipsPage(): React.ReactElement {
       ) : null}
       <NaListCard title={labels[tab] ?? ''} note="Scholarship listings are not live yet — NA. They arrive when a scholarships content partner or institution feed is connected." />
     </div>
+    {tab === 0 ? <aside className="pilot-rail">
+      <NaRingRailCard title="Scholarship Insights" center="Available" legend={['Merit Based', 'Need Based', 'Corporate', 'Private']} />
+      <NaListCard title="Upcoming Deadlines" note="No scholarship deadlines yet — NA." />
+    </aside> : null}
   </div></div>;
 }
 
@@ -201,7 +225,7 @@ export function StudentResumeBuilderPage(): React.ReactElement {
   }, [token]);
   const resumes = (documents ?? []).filter((doc) => doc.documentType === 'RESUME' && !doc.archivedAt);
 
-  return <div className="pilot pilot-embed"><div className="pilot-page" style={{ gridTemplateColumns: '1fr' }}>
+  return <div className="pilot pilot-embed"><div className="pilot-page" style={tab === 0 || tab === 1 ? undefined : { gridTemplateColumns: '1fr' }}>
     <div className="pilot-content">
       <div className="pilot-page-head">
         <div><h1>Resume Builder</h1><p>Create professional resumes that showcase your skills and land your dream job.</p></div>
@@ -238,6 +262,30 @@ export function StudentResumeBuilderPage(): React.ReactElement {
         </section>
       ) : null}
     </div>
+    {tab === 0 || tab === 1 ? <aside className="pilot-rail">
+      <section className="pilot-card">
+        <div className="pilot-card-head"><h2>Resume Overview</h2><span className="pilot-chip slate">NA</span></div>
+        <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+          <Ring value={0} size={88} stroke={10} tone="blue"><span style={{ fontSize: 14, color: 'var(--p-muted)' }}>NA</span></Ring>
+          <div className="pilot-legend" style={{ flex: 1 }}>
+            {['Content', 'Format', 'Skills', 'Impact'].map((label) => <div key={label}><i style={{ background: '#e5eaf2' }} /> {label} <span className="num">NA/100</span></div>)}
+          </div>
+        </div>
+        <small style={{ display: 'block', marginTop: 10, color: 'var(--p-muted)' }}>Automated resume scoring is not live yet — NA.</small>
+      </section>
+      <section className="pilot-card">
+        <div className="pilot-card-head"><h2>Recent Resumes</h2><span className="pilot-chip blue">{resumes.length} real</span></div>
+        <div className="pilot-list">
+          {resumes.length ? resumes.slice(0, 3).map((doc) => (
+            <div key={doc.id} className="pilot-list-row">
+              <span className="pilot-tile blue" style={{ width: 34, height: 34 }}><FileText size={15} /></span>
+              <div className="grow"><strong style={{ fontSize: 12.5 }}>{doc.title}</strong><small>{doc.verificationState.replaceAll('_', ' ').toLowerCase()}</small></div>
+            </div>
+          )) : <p style={{ color: 'var(--p-muted)', margin: '8px 0' }}>None yet.</p>}
+        </div>
+      </section>
+      <NaListCard title="Resume Tips" note="Curated resume tips are not live yet — NA." />
+    </aside> : null}
   </div></div>;
 }
 
@@ -260,7 +308,7 @@ export function InstitutionInterventionsPage({ institutionId, basePath }: { read
     return () => controller.abort();
   }, [token, institutionId]);
 
-  return <div className="pilot pilot-embed"><div className="pilot-page" style={{ gridTemplateColumns: '1fr' }}>
+  return <div className="pilot pilot-embed"><div className="pilot-page">
     <div className="pilot-content">
       <div className="pilot-page-head">
         <div><h1>Interventions</h1><p>Structured support for students who need attention before the placement season.</p></div>
@@ -284,5 +332,13 @@ export function InstitutionInterventionsPage({ institutionId, basePath }: { read
 
       <NaListCard title="Tracked interventions" note="Structured intervention records (owner, due date, outcome tracking) are not built yet — NA. The live queue above is derived from real assessment data." />
     </div>
+    <aside className="pilot-rail">
+      <NaListCard title="Why Interventions Work" note="Outcome insights arrive once structured intervention records exist — NA." />
+      <section className="pilot-card" style={{ textAlign: 'center' }}>
+        <h2 style={{ textAlign: 'left' }}>Completion Rate</h2>
+        <Ring value={0} size={104} stroke={11} tone="blue"><span style={{ fontSize: 16, color: 'var(--p-muted)' }}>NA</span></Ring>
+        <small style={{ display: 'block', marginTop: 8, color: 'var(--p-muted)' }}>NA — no tracked interventions yet</small>
+      </section>
+    </aside>
   </div></div>;
 }

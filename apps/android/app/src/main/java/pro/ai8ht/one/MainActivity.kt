@@ -104,7 +104,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class Screen(val title: String, val subtitle: String) {
+internal enum class Screen(val title: String, val subtitle: String) {
     Home("Home", "Your day at a glance"),
     Assessments("Assessments", "Assigned tests, windows and your results"),
     Learning("Learning", "Modules, lessons and your progress"),
@@ -112,11 +112,12 @@ private enum class Screen(val title: String, val subtitle: String) {
     More("Profile", "Your account, documents and privacy"),
 }
 
-private class StudentData(
+internal class StudentData(
     val student: StudentDto?,
     val assessments: List<AssessmentDto>,
     val learner: LearnerStateDto?,
     val notifications: NotificationsEnvelope?,
+    val activity: StudentActivityDto? = null,
 )
 
 private fun parseWorkspace(raw: String?): Workspace? {
@@ -303,7 +304,8 @@ private fun MainScaffold(
             val exams = async { guarded { Api.listAssessments(context) } }
             val learner = async { guarded { Api.learnerState(context) } }
             val inbox = async { guarded { Api.listNotifications(context) } }
-            val loaded = StudentData(student.await(), exams.await() ?: emptyList(), learner.await(), inbox.await())
+            val activity = async { guarded { Api.studentActivity(context) } }
+            val loaded = StudentData(student.await(), exams.await() ?: emptyList(), learner.await(), inbox.await(), activity.await())
             if (unauthorized) { onSessionExpired(); return@coroutineScope }
             if (loaded.student == null && loaded.learner == null && loaded.notifications == null) loadError = true
             data = loaded
@@ -445,8 +447,9 @@ private fun MainScaffold(
                     Column(Modifier.fillMaxSize()) {
                         if (current == Screen.Home) Spacer(Modifier.height(2.dp))
                         when (current) {
-                            Screen.Home -> HomeScreen(
+                            Screen.Home -> PilotHomeScreen(
                                 data!!,
+                                activity = data!!.activity,
                                 onOpen = { screen = it },
                                 onInbox = { showInbox = true },
                                 onChat = { showChat = true },
@@ -659,7 +662,7 @@ private fun ProgressRing(progress: Float, center: String, caption: String) {
 }
 
 @Composable
-private fun QuickTile(
+internal fun QuickTile(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     tone: Tone,
     label: String,

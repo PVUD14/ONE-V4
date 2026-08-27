@@ -126,6 +126,9 @@ object Api {
     suspend fun helpArticles(context: Context): List<HelpArticleDto> =
         json.decodeFromString<HelpEnvelope>(request(context, "GET", "/api/v1/help")).articles
 
+    suspend fun studentActivity(context: Context): StudentActivityDto =
+        json.decodeFromString(request(context, "GET", "/api/v1/student/activity"))
+
     suspend fun securityContext(context: Context): SecurityContextDto =
         json.decodeFromString(request(context, "GET", "/api/v1/security/context"))
 
@@ -165,6 +168,11 @@ object Api {
         ).opportunities
 
     /** Streams an assistant answer; onDelta receives each text chunk as it arrives. */
+    suspend fun listEmployerApplicants(context: Context, employerId: String, opportunityId: String): List<EmployerApplicantDto> =
+        json.decodeFromString<EmployerApplicantsEnvelope>(
+            request(context, "GET", "/api/v1/employers/$employerId/opportunities/$opportunityId/applications"),
+        ).applications
+
     suspend fun assistantChat(
         context: Context,
         messages: List<Pair<String, String>>,
@@ -524,4 +532,21 @@ object Api {
     val title: String = "",
     val keywords: List<String> = emptyList(),
     val body: String = "",
+)
+
+@Serializable data class StudentActivityDto(
+    val today: String = "",
+    val currentStreakDays: Int = 0,
+    val activeDaysLast7: Int = 0,
+    val last7: List<ActivityDayDto> = emptyList(),
+    val days: List<ActivityDayDto> = emptyList(),
+)
+@Serializable data class ActivityDayDto(val date: String = "", val count: Int = 0)
+@Serializable data class EmployerApplicantsEnvelope(val applications: List<EmployerApplicantDto> = emptyList())
+@Serializable data class EmployerApplicantDto(
+    val id: String,
+    val state: String = "",
+    val candidateName: String? = null,
+    val interviewCount: Int = 0,
+    val offerState: String? = null,
 )

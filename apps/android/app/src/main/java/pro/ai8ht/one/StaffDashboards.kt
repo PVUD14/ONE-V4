@@ -192,6 +192,7 @@ private class InstitutionData(
     val subjects: Int,
     val underReview: Int,
     val notifications: NotificationsEnvelope?,
+    val attention: List<Pair<NotAttemptedDto, InstitutionExamDto>> = emptyList(),
 )
 
 @Composable
@@ -218,7 +219,13 @@ internal fun InstitutionScaffold(
             val subjects = async { runCatching { Api.listSubjects(context, organizationId).size }.getOrDefault(0) }
             val review = async { runCatching { Api.countQuestions(context, organizationId, "UNDER_REVIEW") }.getOrDefault(0) }
             val inbox = async { runCatching { Api.listNotifications(context) }.getOrNull() }
-            data = InstitutionData(exams.await(), subjects.await(), review.await(), inbox.await())
+            val loadedExams = exams.await()
+            val target = loadedExams.firstOrNull { it.lifecycleState == "PUBLISHED" && it.assignedCount > 0 }
+            val attention = if (target != null) {
+                runCatching { Api.examResults(context, organizationId, target.id).notAttempted.map { it to target } }
+                    .getOrDefault(emptyList())
+            } else emptyList()
+            data = InstitutionData(loadedExams, subjects.await(), review.await(), inbox.await(), attention)
         }
     }
 
@@ -305,6 +312,7 @@ private fun InstitutionHome(data: InstitutionData, onExams: () -> Unit) {
     val attempts = data.exams.sumOf { it.completedAttempts }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp)) {
         Spacer(Modifier.height(12.dp))
+        // Pilot KPI row: real where an engine exists, NA where it does not.
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             StatCell("${data.exams.size}", "Exams", Tone.Accent, Icons.Filled.Assignment, Modifier.weight(1f))
             StatCell("$published", "Published", Tone.Green, Icons.Filled.Assignment, Modifier.weight(1f))
@@ -312,8 +320,63 @@ private fun InstitutionHome(data: InstitutionData, onExams: () -> Unit) {
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             StatCell("${data.underReview}", "To review", Tone.Amber, Icons.Filled.Notifications, Modifier.weight(1f))
-            StatCell("$attempts/$assigned", "Attempts", Tone.Violet, Icons.Filled.School, Modifier.weight(1f))
+            StatCell("${data.attention.size}", "Need intervention", Tone.Gray, Icons.Filled.Notifications, Modifier.weight(1f))
         }
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            StatCell("$attempts/$assigned", "Attempts", Tone.Violet, Icons.Filled.School, Modifier.weight(1f))
+            StatCell("NA", "Students placed", Tone.Gray, Icons.Filled.School, Modifier.weight(1f))
+        }
+
+        // Pilot: Cohort Readiness - NA multi-ring until the aggregate engine exists.
+        SectionTitle("Cohort Readiness")
+        PilotCard {
+            Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                PilotRing(null, "NA", "AVG", size = 84, stroke = 9f)
+                Spacer(Modifier.width(14.dp))
+                Column(Modifier.weight(1f)) {
+                    listOf("Job Ready", "Nearly Ready", "Developing", "Needs Support").forEach { label ->
+                        Row(Modifier.padding(vertical = 2.dp)) {
+                            Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+                            Text("NA", style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+        }
+
+        // Pilot: Placement Pipeline - NA funnel until drives exist.
+        SectionTitle("Placement Pipeline")
+        PilotCard {
+            Column(Modifier.padding(14.dp)) {
+                listOf("Eligible", "Applied", "Shortlisted", "Offers", "Placed").forEach { label ->
+                    FunnelRow(label, null, 1)
+                }
+            }
+        }
+
+        // Pilot: Students Needing Attention - real, from assessment data.
+        SectionTitle("Needing attention")
+        if (data.attention.isEmpty()) {
+            PilotCard { Text("Nobody needs attention right now - every assigned assessment is attempted.",
+                Modifier.padding(14.dp), style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        } else {
+            data.attention.take(5).forEach { (entry, exam) ->
+                PilotCard(Modifier.fillMaxWidth().padding(bottom = 8.dp).clickable { onExams() }) {
+                    Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(entry.studentName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                            Text(if (entry.inProgress) "In progress now: ${exam.title}" else "Has not attempted: ${exam.title}",
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        StatusChip("Review", ChipKind.Waiting)
+                    }
+                }
+            }
+        }
+
         SectionTitle("Recent assessments", trailing = "View all", onTrailing = onExams)
         if (data.exams.isEmpty()) {
             PilotCard {
@@ -454,6 +517,7 @@ internal fun EmployerScaffold(
     val palette = LocalOnePalette.current
     var tab by remember { mutableStateOf(0) }
     var roles by remember { mutableStateOf<List<EmployerOpportunityDto>?>(null) }
+    var applicants by remember { mutableStateOf<List<EmployerApplicantDto>>(emptyList()) }
     var inbox by remember { mutableStateOf<NotificationsEnvelope?>(null) }
     var showInboxOv by remember { mutableStateOf(false) }
     var showChatOv by remember { mutableStateOf(false) }
@@ -464,7 +528,11 @@ internal fun EmployerScaffold(
         coroutineScope {
             val r = async { runCatching { Api.listEmployerOpportunities(context, organizationId) }.getOrDefault(emptyList()) }
             val n = async { runCatching { Api.listNotifications(context) }.getOrNull() }
-            roles = r.await(); inbox = n.await()
+            val loadedRoles = r.await()
+            val loadedApplicants = loadedRoles.filter { it.applicationCount > 0 }.take(4).flatMap { role ->
+                runCatching { Api.listEmployerApplicants(context, organizationId, role.id) }.getOrDefault(emptyList())
+            }
+            roles = loadedRoles; applicants = loadedApplicants; inbox = n.await()
         }
     }
 
@@ -526,7 +594,7 @@ internal fun EmployerScaffold(
                 when {
                     roles == null -> HomeSkeleton()
                     else -> when (tab) {
-                        0 -> EmployerHome(roles!!) { tab = 1 }
+                        0 -> EmployerHome(roles!!, applicants) { tab = 1 }
                         1 -> EmployerRoles(roles!!)
                         else -> StaffMore(onSignOut, onSwitchWorkspace,
                             "Posting roles, publishing and candidate review stay on the web at one.ai8ht.pro.",
@@ -539,21 +607,67 @@ internal fun EmployerScaffold(
 }
 
 @Composable
-private fun EmployerHome(roles: List<EmployerOpportunityDto>, onRoles: () -> Unit) {
+private fun EmployerHome(roles: List<EmployerOpportunityDto>, applicants: List<EmployerApplicantDto>, onRoles: () -> Unit) {
     val published = roles.count { it.lifecycleState == "PUBLISHED" }
     val applications = roles.sumOf { it.applicationCount }
     val open = roles.sumOf { it.openApplicationCount }
+    fun stage(needle: String) = applicants.count { it.state.contains(needle) }
+    val offers = applicants.count { it.offerState != null }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp)) {
         Spacer(Modifier.height(12.dp))
+        // Pilot KPI rows - all real.
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            StatCell("${roles.size}", "Roles", Tone.Violet, Icons.Filled.WorkOutline, Modifier.weight(1f))
-            StatCell("$published", "Published", Tone.Green, Icons.Filled.WorkOutline, Modifier.weight(1f))
+            StatCell("$published", "Open Roles", Tone.Violet, Icons.Filled.WorkOutline, Modifier.weight(1f))
+            StatCell("$applications", "Total Applicants", Tone.Accent, Icons.Filled.School, Modifier.weight(1f))
         }
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            StatCell("$applications", "Applications", Tone.Accent, Icons.Filled.School, Modifier.weight(1f))
-            StatCell("$open", "Open", Tone.Amber, Icons.Filled.Notifications, Modifier.weight(1f))
+            StatCell("$open", "In Pipeline", Tone.Amber, Icons.Filled.Notifications, Modifier.weight(1f))
+            StatCell("$offers", "Offers", Tone.Green, Icons.Filled.WorkOutline, Modifier.weight(1f))
         }
+
+        // Pilot: Hiring Funnel - real stage counts.
+        SectionTitle("Hiring Funnel")
+        PilotCard {
+            Column(Modifier.padding(14.dp)) {
+                val max = applications.coerceAtLeast(1)
+                FunnelRow("Applied", applications, max)
+                FunnelRow("Shortlisted", stage("SHORTLIST"), max)
+                FunnelRow("Interview", stage("INTERVIEW"), max)
+                FunnelRow("Offer", offers, max)
+                FunnelRow("Hired", stage("HIRED"), max)
+            }
+        }
+
+        // Pilot: This Week's Interviews - NA until a calendar engine exists.
+        SectionTitle("This Week's Interviews")
+        PilotCard {
+            Text("NA - an interview calendar is not built yet. Interviews are scheduled from the applicant row on the web.",
+                Modifier.padding(14.dp), style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+
+        // Pilot: Recently Shortlisted - real.
+        SectionTitle("Recently Shortlisted")
+        val shortlisted = applicants.filter { it.state.contains("SHORTLIST") || it.state.contains("INTERVIEW") }
+        if (shortlisted.isEmpty()) {
+            PilotCard { Text("Nobody shortlisted yet.", Modifier.padding(14.dp),
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        } else {
+            shortlisted.take(4).forEach { applicant ->
+                PilotCard(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                    Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(applicant.candidateName ?: "Candidate", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                            Text(prettify(applicant.state), style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        StatusChip(prettify(applicant.state), ChipKind.Accent)
+                    }
+                }
+            }
+        }
+
         SectionTitle("Recent roles", trailing = "View all", onTrailing = onRoles)
         if (roles.isEmpty()) {
             PilotCard {

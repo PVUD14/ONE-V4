@@ -38,6 +38,18 @@ const operationsRoles = ['PLATFORM_SUPER_ADMIN', 'OPERATIONS_ADMIN'];
 export class CareerReadinessController {
   constructor(@Inject(PG_POOL) private readonly pool: Pool) {}
 
+  /** Best-effort activity recording; never allowed to break the main action. */
+  private async recordActivity(userId: string, eventType: string): Promise<void> {
+    try {
+      await this.pool.query(
+        'INSERT INTO learner_activity_events (id, user_id, event_type) VALUES ($1, $2, $3)',
+        [randomUUID(), userId, eventType],
+      );
+    } catch {
+      // Activity is derived telemetry - the completion itself is the record.
+    }
+  }
+
   @Get('/career-readiness/catalog')
   catalog(): Promise<Record<string, unknown>> {
     return getPublishedCareerReadinessCatalog(this.pool);
@@ -55,9 +67,12 @@ export class CareerReadinessController {
     @Req() request: ProtectedHttpRequest,
     @Param('lessonVersionId') lessonVersionId: string,
   ): Promise<Record<string, unknown>> {
+    const learnerId = requireLearnerId(request);
     try {
-      return await completeLesson(this.pool, { subjectUserId: requireLearnerId(request),
+      const completed = await completeLesson(this.pool, { subjectUserId: learnerId,
         lessonVersionId: requireUuid(lessonVersionId), correlationId: requireCorrelationId(request) });
+      await this.recordActivity(learnerId, 'LESSON_COMPLETED');
+      return completed;
     } catch (error) {
       throw mapDomainError(error);
     }
@@ -69,10 +84,13 @@ export class CareerReadinessController {
     @Req() request: ProtectedHttpRequest,
     @Param('assessmentDefinitionId') assessmentDefinitionId: string,
   ): Promise<Record<string, unknown>> {
+    const learnerId = requireLearnerId(request);
     try {
-      return await startAssessmentAttempt(this.pool, { subjectUserId: requireLearnerId(request),
+      const attempt = await startAssessmentAttempt(this.pool, { subjectUserId: learnerId,
         assessmentDefinitionId: requireUuid(assessmentDefinitionId), correlationId: requireCorrelationId(request),
         selectionSeed: randomUUID() });
+      await this.recordActivity(learnerId, 'EXAM_ATTEMPT_STARTED');
+      return attempt;
     } catch (error) {
       throw mapDomainError(error);
     }
@@ -87,9 +105,12 @@ export class CareerReadinessController {
     @Body() body: unknown,
   ): Promise<Record<string, unknown>> {
     if (!idempotencyKey || !idempotencyKeyPattern.test(idempotencyKey)) throw safeBadRequest();
+    const learnerId = requireLearnerId(request);
     try {
-      return await submitAssessmentAttempt(this.pool, { subjectUserId: requireLearnerId(request), attemptId: requireUuid(attemptId),
+      const submitted = await submitAssessmentAttempt(this.pool, { subjectUserId: learnerId, attemptId: requireUuid(attemptId),
         idempotencyKey, selectedOptions: readSelectedOptions(body), correlationId: requireCorrelationId(request) });
+      await this.recordActivity(learnerId, 'EXAM_ATTEMPT_SUBMITTED');
+      return submitted;
     } catch (error) {
       throw mapDomainError(error);
     }

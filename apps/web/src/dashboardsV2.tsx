@@ -3,6 +3,7 @@ import {
   getLearnerCareerReadinessState,
   getProtectedAccessToken,
   getSecurityContext,
+  getStudentActivity,
   getStudentProfile,
   listEmployerApplicants,
   listEmployerOpportunities,
@@ -30,6 +31,7 @@ import {
   type OperationsInvitationDto,
   type OperationsUserAccessDto,
   type OrganizationManagementDto,
+  type StudentActivityDto,
   type StudentExamDto,
   type StudentProfileDto,
   type UserNotificationDto,
@@ -110,6 +112,7 @@ interface StudentDashboardData {
   readonly learner: LearnerCareerReadinessState | null;
   readonly exams: readonly StudentExamDto[] | null;
   readonly notifications: { readonly notifications: readonly UserNotificationDto[]; readonly unreadCount: number } | null;
+  readonly activity: StudentActivityDto | null;
 }
 
 export function StudentDashboardV2({ studentName }: { readonly studentName: string }): React.ReactElement {
@@ -123,7 +126,8 @@ export function StudentDashboardV2({ studentName }: { readonly studentName: stri
       getLearnerCareerReadinessState(token, controller.signal).catch(() => null),
       listStudentExams(token, controller.signal).then((response) => response.assessments).catch(() => null),
       listMyNotifications(token, controller.signal).catch(() => null),
-    ]).then(([profile, learner, exams, notifications]) => setData({ profile, learner, exams, notifications }));
+      getStudentActivity(token, controller.signal).catch(() => null),
+    ]).then(([profile, learner, exams, notifications, activity]) => setData({ profile, learner, exams, notifications, activity }));
     return () => controller.abort();
   }, [token]);
 
@@ -156,6 +160,7 @@ export function StudentDashboardV2({ studentName }: { readonly studentName: stri
               ? <>Your next assessment window closes <b>{new Date(nextDeadline).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</b>. Keep building your evidence.</>
               : 'No assessment window is open right now. Keep building your evidence.'}</p>
             <div className="v2-hero-chips">
+              {(data.activity?.currentStreakDays ?? 0) > 0 ? <V2Chip tone="amber">🔥 {data.activity!.currentStreakDays}-day streak</V2Chip> : null}
               {data.profile?.targetCareer ? <V2Chip tone="blue">Target: {data.profile.targetCareer}</V2Chip> : null}
               {band ? <V2Chip tone="purple">Advisory band: {prettify(band)}</V2Chip> : <V2Chip tone="slate">No advisory band yet</V2Chip>}
             </div>
@@ -248,6 +253,23 @@ export function StudentDashboardV2({ studentName }: { readonly studentName: stri
                 );
               })}
             </div>
+          </section>
+        ) : null}
+        {data.activity ? (
+          <section className="v2-card">
+            <div className="v2-card-head"><h2>Your week</h2>
+              {data.activity.activeDaysLast7 > 0 ? <V2Chip tone="green">{data.activity.activeDaysLast7} active day{data.activity.activeDaysLast7 === 1 ? '' : 's'}</V2Chip> : null}</div>
+            <div className="v2-week">
+              {data.activity.last7.map((entry) => (
+                <div key={entry.date} className="v2-week-day">
+                  <i className={entry.count > 0 ? 'on' : ''} title={`${entry.date}: ${entry.count} action${entry.count === 1 ? '' : 's'}`}>
+                    {entry.count > 0 ? '✓' : ''}
+                  </i>
+                  <small>{new Date(`${entry.date}T00:00:00`).toLocaleDateString(undefined, { weekday: 'narrow' })}</small>
+                </div>
+              ))}
+            </div>
+            <p className="v2-boundary">A day counts when you complete a lesson or work an assessment — real actions only.</p>
           </section>
         ) : null}
         <section className="v2-assist">

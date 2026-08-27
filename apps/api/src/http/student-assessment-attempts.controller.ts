@@ -62,6 +62,18 @@ export class StudentAssessmentAttemptsController {
     @Inject(API_ID_GENERATOR) private readonly ids: ApiIdGenerator,
   ) {}
 
+  /** Best-effort activity recording; never allowed to break the main action. */
+  private async recordActivity(studentUserId: string, eventType: string): Promise<void> {
+    try {
+      await this.db.execute(sql`
+        INSERT INTO learner_activity_events (id, user_id, event_type)
+        VALUES (${this.ids.uuid()}::uuid, ${studentUserId}::uuid, ${eventType})
+      `);
+    } catch {
+      // Activity is derived telemetry - the attempt itself is the record.
+    }
+  }
+
   @Get('/assessments')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async listAssigned(@Req() request: ProtectedHttpRequest): Promise<Record<string, unknown>> {
@@ -189,6 +201,7 @@ export class StudentAssessmentAttemptsController {
       }
     });
 
+    await this.recordActivity(studentUserId, 'EXAM_ATTEMPT_STARTED');
     return this.attemptPayload(attemptId, studentUserId, context.correlationId);
   }
 
@@ -255,6 +268,7 @@ export class StudentAssessmentAttemptsController {
     const attempt = await this.loadOpenAttempt(requireUuid(attemptId, context.correlationId), studentUserId, context.correlationId);
     const late = remainingSeconds(attempt.started_at, attempt.duration_seconds, attempt.ends_at) <= -lateSubmitGraceSeconds;
     const result = await this.finalizeAttempt(attempt, late);
+    await this.recordActivity(studentUserId, 'EXAM_ATTEMPT_SUBMITTED');
     return { submitted: true, autoSubmitted: late, result, correlationId: context.correlationId };
   }
 

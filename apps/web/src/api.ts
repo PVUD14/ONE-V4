@@ -823,6 +823,18 @@ export function listStudentExams(token: string, signal?: AbortSignal): Promise<{
   return requestJson('/api/v1/student/assessments', { token, ...(signal ? { signal } : {}) });
 }
 
+export interface StudentActivityDto {
+  readonly today: string;
+  readonly currentStreakDays: number;
+  readonly activeDaysLast7: number;
+  readonly last7: readonly { readonly date: string; readonly count: number }[];
+  readonly days: readonly { readonly date: string; readonly count: number }[];
+}
+
+export function getStudentActivity(token: string, signal?: AbortSignal): Promise<StudentActivityDto> {
+  return requestJson('/api/v1/student/activity', { token, ...(signal ? { signal } : {}) });
+}
+
 export function startExamAttempt(token: string, definitionId: string): Promise<{ attempt: ExamAttemptDto }> {
   return requestJson(`/api/v1/student/assessments/${encodeURIComponent(definitionId)}/attempts`, { token, method: 'POST' });
 }

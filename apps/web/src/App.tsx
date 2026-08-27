@@ -46,7 +46,7 @@ import { StudentMessagesFlyout, StudentNotificationsBell } from './notifications
 import { AssistantWidget } from './assistantWidget.js';
 import { ConsentGate } from './consentGate.js';
 import { HelpFaqPanel } from './helpFaqPanel.js';
-import { StudentDashboardV2 } from './dashboardsV2.js';
+import { StudentDashboardV2, V2EmptyState, V2Stat } from './dashboardsV2.js';
 
 type RouteKey = 'dashboard' | 'career-path' | 'ai-coach' | 'readiness' | 'skills' | 'assessments' | 'learning' | 'experience' | 'opportunities' | 'applications' | 'interviews' | 'documents' | 'profile' | 'settings' | 'help';
 
@@ -799,11 +799,11 @@ function AuthenticatedStudentRoute({ route, currentStudent }: { readonly route: 
   if (route === 'documents') return <AuthenticatedStudentDocuments />;
   if (route === 'opportunities') return <><StudentOpportunitiesPage /><AuthenticatedStudentSavedOpportunities /></>;
   if (route === 'applications') return <StudentApplicationsPage />;
-  if (route === 'career-path') return <><CareerReadinessApiPanel route="roadmap" /><AuthenticatedStudentUnavailable route={route} /></>;
-  if (route === 'readiness') return <><CareerReadinessApiPanel route="readiness" /><AuthenticatedStudentUnavailable route={route} /></>;
-  if (route === 'skills') return <><CareerReadinessApiPanel route="skills" /><AuthenticatedStudentUnavailable route={route} /></>;
+  if (route === 'career-path') return <CareerReadinessApiPanel route="roadmap" />;
+  if (route === 'readiness') return <CareerReadinessApiPanel route="readiness" />;
+  if (route === 'skills') return <CareerReadinessApiPanel route="skills" />;
   if (route === 'assessments') return <><ExamAttemptPanel /><CareerReadinessApiPanel route="assessments" /></>;
-  if (route === 'learning') return <><CareerReadinessApiPanel route="learning" /><AuthenticatedStudentUnavailable route={route} /></>;
+  if (route === 'learning') return <CareerReadinessApiPanel route="learning" />;
   if (route === 'settings') return <><CareerReadinessApiPanel route="notifications" /><StudentPrivacyPanel /></>;
   if (route === 'help') return <HelpFaqPanel persona="student" />;
   return <AuthenticatedStudentUnavailable route={route} />;
@@ -900,9 +900,17 @@ function AuthenticatedStudentDocuments(): React.ReactElement {
       setStatus('Document metadata save failed.');
     }
   }
+  const verifiedCount = documents.filter((doc) => /verified/i.test(doc.verificationState ?? '')).length;
+  const withFileCount = documents.filter((doc) => doc.file).length;
   return <div className="workspace-grid">
     <section className="card wide-card"><span className="eyebrow">Your documents</span><h2>Documents</h2><p role="status">{status}</p>
       <p>Add a document, then attach the file. Every file is checked for malware before it is stored, so it may take a moment to appear.</p></section>
+    <div className="v2-row v2-cols-4 career-stat-strip wide-card">
+      <V2Stat icon="📄" tone="blue" value={documents.length} label="Documents" />
+      <V2Stat icon="📎" tone="purple" value={withFileCount} label="With files attached" />
+      <V2Stat icon="✅" tone="green" value={verifiedCount} label="Verified" />
+      <V2Stat icon="🛡️" tone="amber" value="Scanned" label="Malware-checked storage" />
+    </div>
     <form className="card student-form" onSubmit={(event) => { void submit(event); }}>
       <h2>Add a document</h2>
       <label className="student-form-field"><span>Title</span><input name="title" required maxLength={160} placeholder="My CV" /></label>
@@ -1038,7 +1046,9 @@ function AuthenticatedStudentSavedOpportunities(): React.ReactElement {
 }
 
 function AuthenticatedStudentUnavailable({ route }: { readonly route: RouteKey }): React.ReactElement {
-  return <section className="card wide-card"><h2>{routeTitles[route].title}</h2><p>This authenticated Student module does not substitute fictional Rahul data. Real persistence for this page is not yet available in this UAT build.</p></section>;
+  return <V2EmptyState icon="🧭" title={`${routeTitles[route].title} is not built yet`}
+    note="This module is on the roadmap but has no live workflow behind it yet — nothing here is hidden or broken."
+    hint="Your Home dashboard shows everything that is live for you today." />;
 }
 
 function currentPath(): string {

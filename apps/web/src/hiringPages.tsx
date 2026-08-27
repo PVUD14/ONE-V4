@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { getAccessToken } from './auth.js';
+import { V2Stat } from './dashboardsV2.js';
 import {
   ApiRequestError,
   addOpportunityAudience,
@@ -122,7 +123,14 @@ export function StudentOpportunitiesPage(): React.ReactElement {
     }
   }
 
+  const closingSoon = opportunities.filter((item) => item.applicationDeadline && Date.parse(item.applicationDeadline) - Date.now() < 7 * 24 * 60 * 60 * 1000).length;
   return <div className="workspace-grid">
+    <div className="v2-row v2-cols-4 career-stat-strip wide-card">
+      <V2Stat icon="💼" tone="blue" value={opportunities.length} label="Open to you" />
+      <V2Stat icon="📨" tone="green" value={opportunities.filter((item) => item.alreadyApplied).length} label="Already applied" />
+      <V2Stat icon="⏳" tone="amber" value={closingSoon} label="Closing within a week" />
+      <V2Stat icon="🤝" tone="purple" value="Consent" label="Profile shared per role only" />
+    </div>
     <section className="card wide-card">
       <h2>Open opportunities</h2>
       <p role="status">{status}</p>
@@ -228,7 +236,14 @@ export function StudentApplicationsPage(): React.ReactElement {
     }
   }
 
+  const openApplications = applications.filter((item) => !item.closedAt);
   return <div className="workspace-grid">
+    <div className="v2-row v2-cols-4 career-stat-strip wide-card">
+      <V2Stat icon="📨" tone="blue" value={applications.length} label="Applications" />
+      <V2Stat icon="🔄" tone="green" value={openApplications.length} label="In progress" />
+      <V2Stat icon="📅" tone="purple" value={applications.filter((item) => /interview/i.test(item.state)).length} label="At interview" />
+      <V2Stat icon="🏁" tone="amber" value={applications.filter((item) => /offer/i.test(item.state)).length} label="At offer" />
+    </div>
     <section className="card wide-card">
       <h2>Your applications</h2>
       {status ? <p role="status">{status}</p> : null}
@@ -374,6 +389,13 @@ export function EmployerOpportunitiesPage({ employerId }: { readonly employerId:
       <p>Create a role, choose who can see it, and publish. Applications appear under Applicants.</p>
     </div></div>
 
+    <div className="v2-row v2-cols-4 career-stat-strip role-wide">
+      <V2Stat icon="💼" tone="blue" value={opportunities.filter((item) => item.lifecycleState === 'PUBLISHED').length} label="Published" />
+      <V2Stat icon="✏️" tone="amber" value={opportunities.filter((item) => item.lifecycleState !== 'PUBLISHED').length} label="Drafts" />
+      <V2Stat icon="📥" tone="green" value={opportunities.reduce((sum, item) => sum + item.applicationCount, 0)} label="Applications" />
+      <V2Stat icon="🔄" tone="purple" value={opportunities.reduce((sum, item) => sum + item.openApplicationCount, 0)} label="Open applications" />
+    </div>
+
     {status ? <section className="role-card role-wide"><p role="status">{status}</p></section> : null}
 
     <section className="role-card role-wide">
@@ -508,6 +530,13 @@ export function EmployerApplicantsPage({ employerId }: { readonly employerId: st
       <h1>Applicants</h1>
       <p>Move candidates through your process. Everything here is a real record, and every change is logged.</p>
     </div></div>
+
+    <div className="v2-row v2-cols-4 career-stat-strip role-wide">
+      <V2Stat icon="👥" tone="blue" value={applicants.length} label="Applicants shown" />
+      <V2Stat icon="⭐" tone="purple" value={applicants.filter((item) => /shortlist/i.test(item.state)).length} label="Shortlisted" />
+      <V2Stat icon="📅" tone="amber" value={applicants.reduce((sum, item) => sum + item.interviewCount, 0)} label="Interviews" />
+      <V2Stat icon="🏁" tone="green" value={applicants.filter((item) => item.offerState).length} label="With offers" />
+    </div>
 
     <section className="role-card role-wide">
       <label className="student-form-field"><span>Opportunity</span>

@@ -11,6 +11,7 @@ import {
   type CareerReadinessCatalog,
   type LearnerCareerReadinessState,
 } from './api.js';
+import { V2EmptyState, V2Stat } from './dashboardsV2.js';
 
 type CareerRoute = 'readiness' | 'skills' | 'assessments' | 'learning' | 'roadmap' | 'notifications';
 
@@ -105,6 +106,7 @@ export function CareerReadinessApiPanel({ route }: { readonly route: CareerRoute
       {route === 'assessments' ? <AssessmentApiView catalog={catalog} learner={learner} token={token} busy={busy} attempt={attempt}
         selectedOptions={selectedOptions} onSelect={(questionId, optionId) => setSelectedOptions((current) => ({ ...current, [questionId]: optionId }))}
         onStart={start} onSubmit={submit} /> : null}
+      {learner && route !== 'notifications' ? <CareerStatStrip learner={learner} catalog={catalog} /> : null}
       {route === 'readiness' ? <ReadinessApiView learner={learner} /> : null}
       {route === 'skills' ? <SkillsApiView learner={learner} /> : null}
       {route === 'roadmap' ? <RoadmapApiView learner={learner} /> : null}
@@ -145,10 +147,25 @@ function AssessmentApiView({ catalog, learner, token, busy, attempt, selectedOpt
   </article>) ?? null}</div>;
 }
 
+function CareerStatStrip({ learner, catalog }: { readonly learner: LearnerCareerReadinessState; readonly catalog: CareerReadinessCatalog | null }): React.ReactElement {
+  const lessons = catalog?.modules.flatMap((module) => module.lessons) ?? [];
+  const completed = learner.progress.filter((item) => item.state === 'COMPLETED').length;
+  const scored = learner.attempts.filter((item) => typeof item.scoreCorrect === 'number');
+  return (
+    <div className="v2-row v2-cols-4 career-stat-strip">
+      <V2Stat icon="📚" tone="purple" value={`${completed} / ${lessons.length || completed}`} label="Lessons completed" />
+      <V2Stat icon="🧾" tone="blue" value={learner.evidence.length} label="Evidence records" />
+      <V2Stat icon="📝" tone="green" value={scored.length} label="Scored attempts" />
+      <V2Stat icon="🎯" tone="amber" value={learner.readiness ? formatBand(learner.readiness.band) : '—'} label="Advisory band" />
+    </div>
+  );
+}
+
 function ReadinessApiView({ learner }: { readonly learner: LearnerCareerReadinessState | null }): React.ReactElement {
   return learner?.readiness ? <div className="career-readiness-result"><span>Current advisory band</span><strong>{formatBand(learner.readiness.band)}</strong>
     <p>Based on {learner.evidence.length} immutable evidence record{learner.evidence.length === 1 ? '' : 's'}. No personal readiness history is shown.</p></div>
-    : <p className="career-api-empty">No advisory band yet. Complete learning and the published assessment to create enough evidence.</p>;
+    : <V2EmptyState icon="📈" title="No advisory band yet"
+      note="Complete learning and the published assessment to create enough evidence. Bands are advisory and never employer-visible." />;
 }
 
 function SkillsApiView({ learner }: { readonly learner: LearnerCareerReadinessState | null }): React.ReactElement {
@@ -157,7 +174,8 @@ function SkillsApiView({ learner }: { readonly learner: LearnerCareerReadinessSt
 }
 
 function RoadmapApiView({ learner }: { readonly learner: LearnerCareerReadinessState | null }): React.ReactElement {
-  if (!learner?.roadmap.length) return <p className="career-api-empty">No API-backed next action yet. Recommendations appear only after versioned evidence is evaluated.</p>;
+  if (!learner?.roadmap.length) return <V2EmptyState icon="🗺️" title="No next action yet"
+    note="Advisory next actions appear here after your versioned evidence is evaluated — complete lessons and assessments to generate them." />;
   return <div className="career-api-grid">{learner.roadmap.map((action) => <article key={action.id}><span>Advisory next action</span>
     <h3>{formatBand(action.actionCode)}</h3><p>Reason: {formatBand(action.reasonCode)}. State: {formatBand(action.state)}.</p>
     {action.dueAt ? <small>Due {new Date(action.dueAt).toLocaleDateString()}</small> : null}</article>)}</div>;

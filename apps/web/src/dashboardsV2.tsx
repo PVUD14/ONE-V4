@@ -67,7 +67,7 @@ function greeting(): string {
 
 // --- Shared primitives -------------------------------------------------------
 
-function V2Ring({ percent, label, value, tone = '#1f55e5' }: {
+export function V2Ring({ percent, label, value, tone = '#1f55e5' }: {
   readonly percent: number; readonly label: string; readonly value: string; readonly tone?: string;
 }): React.ReactElement {
   const clamped = Math.max(0, Math.min(100, percent));
@@ -84,17 +84,17 @@ function V2Ring({ percent, label, value, tone = '#1f55e5' }: {
   );
 }
 
-function V2Stat({ icon, tone, value, label }: {
+export function V2Stat({ icon, tone, value, label }: {
   readonly icon: string; readonly tone: string; readonly value: React.ReactNode; readonly label: string;
 }): React.ReactElement {
   return <div className="v2-card v2-stat"><span className={`v2-tile ${tone}`} aria-hidden="true">{icon}</span><div><b>{value}</b><small>{label}</small></div></div>;
 }
 
-function V2Chip({ tone, children }: { readonly tone: string; readonly children: React.ReactNode }): React.ReactElement {
+export function V2Chip({ tone, children }: { readonly tone: string; readonly children: React.ReactNode }): React.ReactElement {
   return <span className={`v2-chip ${tone}`}>{children}</span>;
 }
 
-function V2Bar({ percent, tone = '' }: { readonly percent: number; readonly tone?: string }): React.ReactElement {
+export function V2Bar({ percent, tone = '' }: { readonly percent: number; readonly tone?: string }): React.ReactElement {
   return <div className={`v2-bar ${tone}`}><i style={{ width: `${Math.max(0, Math.min(100, percent))}%` }} /></div>;
 }
 
@@ -103,6 +103,19 @@ function chipToneForState(state: string): string {
   if (['DRAFT', 'PENDING', 'UNDER_REVIEW', 'IN_PROGRESS'].some((value) => state.includes(value))) return 'amber';
   if (['SHORTLIST', 'INTERVIEW'].some((value) => state.includes(value))) return 'purple';
   return 'blue';
+}
+
+export function V2EmptyState({ icon, title, note, hint }: {
+  readonly icon: string; readonly title: string; readonly note: string; readonly hint?: string;
+}): React.ReactElement {
+  return (
+    <section className="v2-card v2-empty-state">
+      <span className="v2-empty-icon" aria-hidden="true">{icon}</span>
+      <h2>{title}</h2>
+      <p>{note}</p>
+      {hint ? <p className="v2-empty-hint">{hint}</p> : null}
+    </section>
+  );
 }
 
 // --- Student -----------------------------------------------------------------

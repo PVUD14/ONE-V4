@@ -10,6 +10,7 @@ function isMobileDevice(): boolean {
 }
 
 import { useEffect, useRef, useState } from 'react';
+import { V2Stat } from './dashboardsV2.js';
 import {
   getProtectedAccessToken,
   listStudentExams,
@@ -101,6 +102,14 @@ export function ExamAttemptPanel(): React.ReactElement | null {
         <div className="role-card role-wide exam-result-card">
           <h3>Result recorded</h3>
           <p><strong>{result.score}</strong> / {result.maxScore} · {result.percentage}% — {result.correct} correct, {result.wrong} wrong, {result.notAttempted} not attempted.</p>
+        </div>
+      ) : null}
+      {exams?.length ? (
+        <div className="v2-row v2-cols-4 career-stat-strip">
+          <V2Stat icon="📝" tone="blue" value={exams.filter((exam) => exam.openAttemptId || (Date.now() >= Date.parse(exam.startsAt) && Date.now() <= Date.parse(exam.endsAt) && exam.attemptsUsed < exam.attemptsAllowed)).length} label="Open now" />
+          <V2Stat icon="✅" tone="green" value={exams.filter((exam) => exam.latestResult).length} label="With results" />
+          <V2Stat icon="📊" tone="purple" value={exams.some((exam) => exam.latestResult) ? `${Math.max(...exams.filter((exam) => exam.latestResult).map((exam) => exam.latestResult!.percentage))}%` : '—'} label="Best score" />
+          <V2Stat icon="🕒" tone="amber" value={`${exams.reduce((sum, exam) => sum + exam.attemptsUsed, 0)} / ${exams.reduce((sum, exam) => sum + exam.attemptsAllowed, 0)}`} label="Attempts used" />
         </div>
       ) : null}
       {exams?.length ? (

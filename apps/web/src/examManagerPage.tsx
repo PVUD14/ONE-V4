@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { V2Stat } from './dashboardsV2.js';
 import {
   assignInstitutionExam,
   createExamQuestion,
@@ -72,6 +73,12 @@ export function InstitutionExamEnginePage({ institutionId, canApprove = true }: 
       <h1>Assessments</h1>
       <p>Build a governed question bank, assemble blueprint assessments over approved questions, publish, assign rostered students and read results.</p>
     </div></div>
+    <div className="v2-row v2-cols-4 career-stat-strip role-wide">
+      <V2Stat icon="📚" tone="blue" value={subjects.length} label="Subjects" />
+      <V2Stat icon="✅" tone="green" value={questions.filter((question) => question.approvalStatus === 'APPROVED').length} label="Approved questions" />
+      <V2Stat icon="🕒" tone="amber" value={questions.filter((question) => question.approvalStatus === 'UNDER_REVIEW').length} label="Awaiting review" />
+      <V2Stat icon="📝" tone="purple" value={`${exams.filter((exam) => exam.lifecycleState === 'PUBLISHED').length} / ${exams.length}`} label="Published exams" />
+    </div>
     {notice ? <p className="role-api-success" role="status">{notice}</p> : null}
     {error ? <p className="form-error" role="alert">{error}</p> : null}
 

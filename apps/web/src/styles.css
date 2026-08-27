@@ -4823,3 +4823,17 @@ button.secondary {
 
 /* Help accordion aligns with V2 cards. */
 .help-faq-item { box-shadow: var(--soft-shadow); border-radius: 14px; }
+
+/* V2 empty state: honest not-built-yet and restricted notices. */
+.v2-empty-state { text-align: center; padding: 44px 24px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.v2-empty-icon { width: 56px; height: 56px; border-radius: 16px; display: grid; place-items: center; font-size: 26px; background: var(--student-soft); margin-bottom: 6px; }
+.v2-empty-state h2 { margin: 0; }
+.v2-empty-state p { margin: 0; max-width: 520px; color: var(--muted); }
+.v2-empty-state .v2-empty-hint { font-size: 12.5px; border-top: 1px dashed var(--line); padding-top: 10px; margin-top: 8px; }
+.career-stat-strip { margin: 4px 0 14px; }
+.career-stat-strip .v2-card { box-shadow: none; border-color: var(--line); }
+
+/* Ops KPI cards align with the V2 stat language. */
+.role-kpi span { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.role-kpi strong { font-size: 21px; line-height: 1.15; }
+.role-kpi p { color: var(--muted); font-size: 12px; margin: 4px 0 0; }

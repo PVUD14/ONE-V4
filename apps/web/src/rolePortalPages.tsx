@@ -46,7 +46,7 @@ import { EmployerApplicantsPage, EmployerOpportunitiesPage } from './hiringPages
 import { AssistantWidget } from './assistantWidget.js';
 import { HelpFaqPanel } from './helpFaqPanel.js';
 import { ConsentGate } from './consentGate.js';
-import { EmployerDashboardV2, InstitutionDashboardV2, OperationsDashboardV2 } from './dashboardsV2.js';
+import { EmployerDashboardV2, InstitutionDashboardV2, OperationsDashboardV2, V2EmptyState, V2Stat } from './dashboardsV2.js';
 
 interface AuthenticatedWorkspaceSummary {
   readonly role: string;
@@ -480,6 +480,12 @@ function InstitutionStudentsPage({ portal, authenticatedWorkspace }: { readonly 
     setPreview(null);
   }
   return <section className="role-module role-module--dense"><div className="role-page-heading"><div><span className="eyebrow">Authenticated API-backed</span><h1>Students</h1><p>Institution-owned roster and relationship lifecycle. This is not an Operations workflow.</p></div></div>
+    <div className="v2-row v2-cols-4 career-stat-strip role-wide">
+      <V2Stat icon="🎓" tone="blue" value={students.length} label="Students on roster" />
+      <V2Stat icon="✅" tone="green" value={students.filter((student) => (student.relationship?.state ?? student.status) === 'ACTIVE').length} label="Active" />
+      <V2Stat icon="🏛️" tone="purple" value={units.length} label="Academic units" />
+      <V2Stat icon="🔎" tone="amber" value={filteredStudents.length} label="Matching search" />
+    </div>
     {loadError ? <p className="form-error" role="alert">{loadError}</p> : null}{relationshipError ? <p className="form-error" role="alert">{relationshipError}</p> : null}{notice ? <p className="role-api-success" role="status">{notice}</p> : null}
     <form className="role-card role-wide role-management-form" onSubmit={(event) => void addStudent(event)}><h2>Add Student</h2>{studentError ? <p className="form-error" role="alert">{studentError}</p> : null}<label><span>Full name *</span><input value={form.fullName} onChange={(event) => setForm((value) => ({ ...value, fullName: event.target.value }))} required /></label><label><span>Institution ID *</span><input value={form.institutionStudentId} onChange={(event) => setForm((value) => ({ ...value, institutionStudentId: event.target.value }))} required /></label><label><span>Email *</span><input type="email" value={form.email} onChange={(event) => setForm((value) => ({ ...value, email: event.target.value }))} required /></label><UnitSelect label="Department" value={form.departmentUnitId} units={unitsByKind('DEPARTMENT')} onChange={(departmentUnitId) => setForm((value) => ({ ...value, departmentUnitId }))} /><UnitSelect label="Program" value={form.programUnitId} units={unitsByKind('PROGRAM')} onChange={(programUnitId) => setForm((value) => ({ ...value, programUnitId }))} /><UnitSelect label="Batch" value={form.batchUnitId} units={unitsByKind('BATCH')} onChange={(batchUnitId) => setForm((value) => ({ ...value, batchUnitId }))} /><UnitSelect label="Section" value={form.sectionUnitId} units={unitsByKind('SECTION')} onChange={(sectionUnitId) => setForm((value) => ({ ...value, sectionUnitId }))} /><label><span>Academic start date</span><input type="date" value={form.academicStartDate} onChange={(event) => setForm((value) => ({ ...value, academicStartDate: event.target.value }))} /></label><label><span>Expected graduation date</span><input type="date" value={form.expectedGraduationDate} onChange={(event) => setForm((value) => ({ ...value, expectedGraduationDate: event.target.value }))} /></label><button type="submit">Add student</button></form>
     <section className="role-card role-wide"><h2>Import Students</h2>{csvError ? <p className="form-error" role="alert">{csvError}</p> : null}<p>CSV validates academic unit names, stores resolved institution unit IDs, and rejects unknown/cross-institution names.</p><textarea value={csv} onChange={(event) => setCsv(event.target.value)} rows={5} /><div className="role-record-actions"><button type="button" onClick={() => void previewImport()}>Validate CSV</button>{preview ? <button type="button" disabled={preview.rejectedCount > 0} onClick={() => void commitImport()}>Commit {preview.acceptedCount} rows</button> : null}</div>{preview ? <div><p>{preview.acceptedCount} accepted, {preview.warningCount} warnings, {preview.rejectedCount} rejected.</p><table className="role-record-table"><thead><tr><th>Row</th><th>Email</th><th>State</th><th>Resolved units</th><th>Issues</th></tr></thead><tbody>{preview.rows.map((row) => <tr key={row.rowNumber}><td>{row.rowNumber}</td><td>{row.email}</td><td>{row.state}</td><td>{[row.departmentUnitId, row.programUnitId, row.batchUnitId, row.sectionUnitId].filter(Boolean).length} IDs</td><td>{row.issues.join(', ') || 'None'}</td></tr>)}</tbody></table></div> : null}</section>
@@ -521,7 +527,14 @@ function InstitutionAcademicStructurePage({ portal, authenticatedWorkspace }: { 
       setError('Academic unit update failed.');
     }
   }
-  return <section className="role-module role-module--dense"><div className="role-page-heading"><div><span className="eyebrow">Authenticated API-backed</span><h1>Academic Structure</h1><p>Manage institution-scoped departments, programs, batches, sections and campuses. Parent choices are institution-scoped.</p></div></div>{notice ? <p className="role-api-success" role="status">{notice}</p> : null}{error ? <p className="form-error" role="alert">{error}</p> : null}<form className="role-card role-wide role-management-form" onSubmit={(event) => void create(event)}><h2>Add academic unit</h2><label><span>Kind</span><select value={form.kind} onChange={(event) => setForm((value) => ({ ...value, kind: event.target.value }))}><option>DEPARTMENT</option><option>PROGRAM</option><option>BATCH</option><option>SECTION</option><option>CAMPUS</option></select></label><label><span>Name</span><input value={form.name} onChange={(event) => setForm((value) => ({ ...value, name: event.target.value }))} required /></label><UnitSelect label="Parent unit" value={form.parentUnitId} units={units} onChange={(parentUnitId) => setForm((value) => ({ ...value, parentUnitId }))} /><button type="submit">Create unit</button></form><div className="role-record-table-wrap"><table className="role-record-table"><caption className="sr-only">{portal.roleName} academic units</caption><thead><tr><th>Name</th><th>Kind</th><th>Parent</th><th>Action</th></tr></thead><tbody>{units.map((unit) => <tr key={unit.id}><th>{unit.name}</th><td>{unit.kind}</td><td>{units.find((candidate) => candidate.id === unit.parentUnitId)?.name ?? 'Institution'}</td><td><button type="button" className="secondary" onClick={() => void edit(unit)}>Edit unit</button></td></tr>)}</tbody></table></div></section>;
+  return <section className="role-module role-module--dense"><div className="role-page-heading"><div><span className="eyebrow">Authenticated API-backed</span><h1>Academic Structure</h1><p>Manage institution-scoped departments, programs, batches, sections and campuses. Parent choices are institution-scoped.</p></div></div>
+    <div className="v2-row v2-cols-4 career-stat-strip role-wide">
+      <V2Stat icon="🏛️" tone="blue" value={units.filter((unit) => unit.kind === 'DEPARTMENT').length} label="Departments" />
+      <V2Stat icon="🎓" tone="purple" value={units.filter((unit) => unit.kind === 'PROGRAM').length} label="Programs" />
+      <V2Stat icon="📅" tone="green" value={units.filter((unit) => unit.kind === 'BATCH').length} label="Batches" />
+      <V2Stat icon="🧩" tone="amber" value={units.filter((unit) => ['SECTION', 'CAMPUS'].includes(unit.kind)).length} label="Sections and campuses" />
+    </div>
+    {notice ? <p className="role-api-success" role="status">{notice}</p> : null}{error ? <p className="form-error" role="alert">{error}</p> : null}<form className="role-card role-wide role-management-form" onSubmit={(event) => void create(event)}><h2>Add academic unit</h2><label><span>Kind</span><select value={form.kind} onChange={(event) => setForm((value) => ({ ...value, kind: event.target.value }))}><option>DEPARTMENT</option><option>PROGRAM</option><option>BATCH</option><option>SECTION</option><option>CAMPUS</option></select></label><label><span>Name</span><input value={form.name} onChange={(event) => setForm((value) => ({ ...value, name: event.target.value }))} required /></label><UnitSelect label="Parent unit" value={form.parentUnitId} units={units} onChange={(parentUnitId) => setForm((value) => ({ ...value, parentUnitId }))} /><button type="submit">Create unit</button></form><div className="role-record-table-wrap"><table className="role-record-table"><caption className="sr-only">{portal.roleName} academic units</caption><thead><tr><th>Name</th><th>Kind</th><th>Parent</th><th>Action</th></tr></thead><tbody>{units.map((unit) => <tr key={unit.id}><th>{unit.name}</th><td>{unit.kind}</td><td>{units.find((candidate) => candidate.id === unit.parentUnitId)?.name ?? 'Institution'}</td><td><button type="button" className="secondary" onClick={() => void edit(unit)}>Edit unit</button></td></tr>)}</tbody></table></div></section>;
 }
 
 function InstitutionStaffPage({ portal: _portal, authenticatedWorkspace }: { readonly portal: RolePortalConfig; readonly authenticatedWorkspace?: AuthenticatedWorkspaceSummary | undefined }): React.ReactElement {
@@ -552,6 +565,12 @@ function InstitutionStaffPage({ portal: _portal, authenticatedWorkspace }: { rea
     }
   }
   return <section className="role-module role-module--dense"><div className="role-page-heading"><div><span className="eyebrow">Authenticated API-backed</span><h1>Staff</h1><p>Invite institution staff through the verified-recipient invitation lifecycle. This screen does not attach arbitrary global user IDs.</p></div></div>
+    <div className="v2-row v2-cols-4 career-stat-strip role-wide">
+      <V2Stat icon="👥" tone="teal" value={staff?.memberships.length ?? 0} label="Active memberships" />
+      <V2Stat icon="✉️" tone="amber" value={staff?.invitations.filter((invite) => invite.state === 'PENDING').length ?? 0} label="Pending invitations" />
+      <V2Stat icon="📮" tone="blue" value={staff?.invitations.length ?? 0} label="Invitations sent" />
+      <V2Stat icon="🔐" tone="purple" value="Verified" label="Recipient-verified onboarding" />
+    </div>
     {notice ? <p className="role-api-success" role="status">{notice}</p> : null}{error ? <p className="form-error" role="alert">{error}</p> : null}
     <form className="role-card role-wide role-management-form" onSubmit={(event) => void invite(event)}>
       <h2>Invite institution staff</h2>
@@ -591,10 +610,13 @@ function EmployerRecruiterRealityPage({ portal, routeLabel }: { readonly portal:
   // another page's data.
   return <section className="role-module role-module--dense">
     <div className="role-page-heading"><div>
-      <span className="eyebrow">Not available yet</span>
+      <span className="eyebrow">Coming later</span>
       <h1>{routeLabel}</h1>
-      <p>{routeLabel} is not built yet. Opportunities and Applicants are live — use those to post a role and work your pipeline. Interviews and offers are managed from the applicant row.</p>
+      <p>Opportunities and Applicants carry your live pipeline today.</p>
     </div></div>
+    <div className="role-wide"><V2EmptyState icon="🧭" title="Not built yet"
+      note={`${routeLabel} is on the roadmap but has no live workflow behind it yet - nothing here is hidden or broken.`}
+      hint="Interviews and offers are managed from the applicant row on the Applicants page." /></div>
   </section>;
 }
 
@@ -617,7 +639,14 @@ function OperationsUsersAccessPage(): React.ReactElement {
     return () => controller.abort();
   }, [token, query]);
   if (!token) return <RestrictedApiState title="Users & Access" message="Sign in with an Operations identity to inspect users and access." />;
-  return <section className="role-module role-module--dense"><div className="role-page-heading"><div><span className="eyebrow">READ_ONLY governance</span><h1>Users & Access</h1><p>Search users, identity links, memberships and Student relationship counts. No tokens, password data, raw invitation tokens or platform-role mutation are exposed.</p></div></div>{error ? <p className="form-error" role="alert">{error}</p> : null}<section className="role-card role-wide"><label className="role-local-search"><span>Search by email or internal user ID</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="person@example.test or UUID" /></label></section><section className="role-card role-wide"><h2>Users</h2><table className="role-record-table"><thead><tr><th>Email</th><th>User ID</th><th>Identity link</th><th>Memberships</th><th>Student relationships</th></tr></thead><tbody>{users.map((user) => <tr key={user.id}><td>{user.email}</td><td>{user.id}</td><td>{user.identityLinkStatus}</td><td>{user.memberships.map((item) => `${String(item.role)} / ${String(item.state)}`).join(', ') || 'None'}</td><td>{user.studentRelationshipCount}</td></tr>)}</tbody></table></section><section className="role-card role-wide"><h2>Invitation tracking</h2><InvitationInventoryTable invitations={invitations} /></section></section>;
+  return <section className="role-module role-module--dense"><div className="role-page-heading"><div><span className="eyebrow">READ_ONLY governance</span><h1>Users & Access</h1><p>Search users, identity links, memberships and Student relationship counts. No tokens, password data, raw invitation tokens or platform-role mutation are exposed.</p></div></div>
+    <div className="v2-row v2-cols-4 career-stat-strip role-wide">
+      <V2Stat icon="👥" tone="teal" value={users.length} label="Accounts shown" />
+      <V2Stat icon="🎓" tone="blue" value={users.filter((user) => user.studentRelationshipCount > 0).length} label="Student accounts" />
+      <V2Stat icon="🏛️" tone="purple" value={users.filter((user) => user.memberships.length > 0).length} label="With organization roles" />
+      <V2Stat icon="✉️" tone="amber" value={invitations.filter((invitation) => invitation.state === 'PENDING').length} label="Pending invitations" />
+    </div>
+    {error ? <p className="form-error" role="alert">{error}</p> : null}<section className="role-card role-wide"><label className="role-local-search"><span>Search by email or internal user ID</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="person@example.test or UUID" /></label></section><section className="role-card role-wide"><h2>Users</h2><table className="role-record-table"><thead><tr><th>Email</th><th>User ID</th><th>Identity link</th><th>Memberships</th><th>Student relationships</th></tr></thead><tbody>{users.map((user) => <tr key={user.id}><td>{user.email}</td><td>{user.id}</td><td>{user.identityLinkStatus}</td><td>{user.memberships.map((item) => `${String(item.role)} / ${String(item.state)}`).join(', ') || 'None'}</td><td>{user.studentRelationshipCount}</td></tr>)}</tbody></table></section><section className="role-card role-wide"><h2>Invitation tracking</h2><InvitationInventoryTable invitations={invitations} /></section></section>;
 }
 
 function OperationsContentReadOnlyPage(): React.ReactElement {
@@ -629,15 +658,23 @@ function OperationsTechnicalReadOnlyPage({ routeLabel }: { readonly routeLabel: 
 }
 
 function AuthenticatedReadOnlyModule({ title, detail }: { readonly title: string; readonly detail: string }): React.ReactElement {
-  return <section className="role-module"><div className="role-page-heading"><div><span className="eyebrow">READ_ONLY</span><h1>{title}</h1><p>{detail}</p></div></div><section className="role-card role-wide"><h2>No preview mutation</h2><p>This authenticated route deliberately avoids session-local fake success. Use demo routes only for fictional previews.</p></section></section>;
+  return <section className="role-module"><div className="role-page-heading"><div><span className="eyebrow">Read-only</span><h1>{title}</h1><p>{detail}</p></div></div>
+    <div className="role-wide"><V2EmptyState icon="🔎" title="View-only for your role"
+      note="You can see authorized context here, but changes for this module are not switched on yet for your role."
+      hint="Assessments and Help & FAQ are fully live — use the sidebar to reach them." /></div></section>;
 }
 
 function AuthenticatedNotYetAvailable({ title, detail }: { readonly title: string; readonly detail: string }): React.ReactElement {
-  return <section className="role-module"><div className="role-page-heading"><div><span className="eyebrow">NOT_YET_AVAILABLE</span><h1>{title}</h1><p>{detail}</p></div></div><section className="role-empty"><h2>Not yet available</h2><p>No persistent API and database-backed workflow has been approved for this authenticated action in Phase 2A.</p></section></section>;
+  return <section className="role-module"><div className="role-page-heading"><div><span className="eyebrow">Coming later</span><h1>{title}</h1><p>{detail}</p></div></div>
+    <div className="role-wide"><V2EmptyState icon="🧭" title="Not built yet"
+      note="This module is on the roadmap but has no live workflow behind it yet — nothing here is hidden or broken."
+      hint="Your dashboard shows everything that is live for your role today." /></div></section>;
 }
 
 function RestrictedApiState({ title, message }: { readonly title: string; readonly message: string }): React.ReactElement {
-  return <section className="role-module"><div className="role-page-heading"><div><span className="eyebrow">Authenticated API-backed</span><h1>{title}</h1><p>{message}</p></div></div><section className="role-empty"><h2>Restricted</h2><p>No fake mutation or preview role selection is used for this protected workflow.</p></section></section>;
+  return <section className="role-module"><div className="role-page-heading"><div><span className="eyebrow">Authenticated API-backed</span><h1>{title}</h1><p>{message}</p></div></div>
+    <div className="role-wide"><V2EmptyState icon="🔐" title="Sign-in required"
+      note="This protected workflow only renders for an authorized identity — no preview or fake data is substituted." /></div></section>;
 }
 
 function UnitSelect({ label, value, units, onChange }: { readonly label: string; readonly value: string; readonly units: readonly InstitutionUnitDto[]; readonly onChange: (value: string) => void }): React.ReactElement {

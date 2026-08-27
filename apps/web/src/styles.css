@@ -4758,3 +4758,68 @@ button.secondary {
   .v2-cols-2 { grid-template-columns: 1fr; }
   .v2-quick { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* --- V2 rollout across every page (not just dashboards) ---------------------
+   The shared building blocks all module pages render through, restyled to the
+   V2 language so student, institution, employer and operations pages inherit
+   the same look as the dashboards. */
+
+/* Page headers become the V2 hero band. */
+.page-header,
+.role-page-heading {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 18px 20px;
+  background: linear-gradient(120deg, #eef3ff 0%, #f7f9ff 55%, #f2ecff 100%);
+  box-shadow: var(--soft-shadow);
+  margin-bottom: 18px;
+}
+.page-header h1,
+.role-page-heading h1 { font-size: 24px; letter-spacing: -.01em; }
+.page-header p,
+.role-page-heading > div > p { margin: 0; color: var(--muted); }
+
+/* Career readiness panels: from tinted inset boxes to V2 white cards. */
+.career-api-panel {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.career-api-heading h2 { font-size: 17px; color: var(--ink, #101828); }
+.career-api-grid article, .career-readiness-result {
+  border-color: var(--line);
+  border-radius: 14px;
+  box-shadow: var(--soft-shadow);
+}
+.career-api-grid article > span, .career-readiness-result > span {
+  color: var(--muted);
+  font-size: 10.5px;
+  letter-spacing: .08em;
+}
+.career-readiness-result strong { color: var(--student); }
+.career-api-boundary { border-top: 1px dashed var(--line); }
+.career-assessment-form fieldset { border-color: var(--line); border-radius: 12px; }
+
+/* Tables: V2 header typography and row hover, in both shells. */
+.role-record-table thead th {
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: .06em;
+}
+.role-record-table th, .role-record-table td { border-bottom-color: var(--line); }
+.role-record-table tbody tr:hover th, .role-record-table tbody tr:hover td { background: var(--canvas); }
+
+/* Exam rows pick up the V2 list feel. */
+.exam-list-row { box-shadow: var(--soft-shadow); }
+.exam-list-row:hover { background: var(--canvas); }
+
+/* Cards and form labels: consistent V2 hierarchy. */
+.role-card h2, .card h2 { font-size: 15.5px; }
+.role-management-form label > span,
+.student-form-field > span { font-size: 11px; font-weight: 600; letter-spacing: .04em; color: var(--muted); text-transform: uppercase; }
+.role-management-form input, .role-management-form select, .role-management-form textarea { border-color: var(--line); border-radius: 10px; }
+.role-management-form input:focus, .role-management-form select:focus, .role-management-form textarea:focus { outline: 2px solid var(--student-soft); border-color: var(--student); }
+
+/* Help accordion aligns with V2 cards. */
+.help-faq-item { box-shadow: var(--soft-shadow); border-radius: 14px; }

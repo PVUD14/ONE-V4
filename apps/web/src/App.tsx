@@ -1,4 +1,4 @@
-import { Bell, BookOpen, CircleHelp, BriefcaseBusiness, Building2, CalendarDays, ChevronDown, ClipboardCheck, FileText, Gauge, GraduationCap, Home, LayoutDashboard, Menu, MessageSquare, Search, Settings, ShieldCheck, Sparkles, Target, Trophy, UserRound, X, type LucideIcon } from 'lucide-react';
+import { Bell, BookOpen, CircleHelp, BriefcaseBusiness, Building2, CalendarDays, ChevronDown, ClipboardCheck, FileText, Gauge, GraduationCap, Home, LayoutDashboard, MapPinned, Menu, MessageSquare, Search, Settings, ShieldCheck, Sparkles, Target, Trophy, UserRound, Wrench, X, type LucideIcon } from 'lucide-react';
 import { BrandWordmark } from './brand.js';
 import type { FormEvent } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -48,8 +48,9 @@ import { ConsentGate } from './consentGate.js';
 import { HelpFaqPanel } from './helpFaqPanel.js';
 import { V2EmptyState, V2Stat } from './dashboardsV2.js';
 import { StudentDashboardV3 } from './studentDashboardV3.js';
+import { StudentCareerToolsPage, StudentCompanyPrepPage, StudentPracticePage, StudentResumeBuilderPage, StudentScholarshipsPage } from './pilotParityPages.js';
 
-type RouteKey = 'dashboard' | 'career-path' | 'ai-coach' | 'readiness' | 'skills' | 'assessments' | 'learning' | 'experience' | 'opportunities' | 'applications' | 'interviews' | 'documents' | 'profile' | 'settings' | 'help';
+type RouteKey = 'dashboard' | 'career-path' | 'ai-coach' | 'readiness' | 'skills' | 'assessments' | 'learning' | 'experience' | 'opportunities' | 'applications' | 'interviews' | 'documents' | 'profile' | 'settings' | 'help' | 'practice' | 'company-prep' | 'career-tools' | 'scholarships' | 'resume-builder';
 
 interface NavItem {
   readonly label: string;
@@ -63,14 +64,19 @@ const navItems: readonly NavItem[] = [
   { label: 'Home', path: '/student', icon: Home, group: 'Plan', route: 'dashboard' },
   { label: 'My Career', path: '/student/career-path', icon: Target, group: 'Plan', route: 'career-path' },
   { label: 'AI Career Coach', path: '/student/ai-coach', icon: Sparkles, group: 'Plan', route: 'ai-coach' },
+  { label: 'Career Tools', path: '/student/career-tools', icon: MapPinned, group: 'Plan', route: 'career-tools' },
   { label: 'Readiness', path: '/student/readiness', icon: Gauge, group: 'Prepare', route: 'readiness' },
   { label: 'Skills', path: '/student/skills', icon: Sparkles, group: 'Prepare', route: 'skills' },
   { label: 'Assessments', path: '/student/assessments', icon: ClipboardCheck, group: 'Prepare', route: 'assessments' },
   { label: 'Learning', path: '/student/learning', icon: BookOpen, group: 'Prepare', route: 'learning' },
+  { label: 'Practice', path: '/student/practice', icon: Wrench, group: 'Prepare', route: 'practice' },
+  { label: 'Company Prep', path: '/student/company-prep', icon: Building2, group: 'Prepare', route: 'company-prep' },
   { label: 'Experience', path: '/student/experience', icon: Trophy, group: 'Prepare', route: 'experience' },
   { label: 'Opportunities', path: '/student/opportunities', icon: BriefcaseBusiness, group: 'Apply', route: 'opportunities' },
   { label: 'Applications', path: '/student/applications', icon: LayoutDashboard, group: 'Apply', route: 'applications' },
   { label: 'Interviews', path: '/student/interviews', icon: CalendarDays, group: 'Apply', route: 'interviews' },
+  { label: 'Scholarships', path: '/student/scholarships', icon: GraduationCap, group: 'Apply', route: 'scholarships' },
+  { label: 'Resume Builder', path: '/student/resume-builder', icon: FileText, group: 'Account', route: 'resume-builder' },
   { label: 'Documents', path: '/student/documents', icon: FileText, group: 'Account', route: 'documents' },
   { label: 'Profile', path: '/student/profile', icon: UserRound, group: 'Account', route: 'profile' },
   { label: 'Settings', path: '/student/settings', icon: Settings, group: 'Account', route: 'settings' },
@@ -79,6 +85,11 @@ const navItems: readonly NavItem[] = [
 
 const routeTitles: Record<RouteKey, PageMeta> = {
   dashboard: { title: 'Student Dashboard', eyebrow: 'Home', description: 'A guided summary of your career progress and next steps.' },
+  practice: { title: 'Practice', eyebrow: 'Prepare', description: 'Sharpen your skills with coding, problems, projects and real-world challenges.' },
+  'company-prep': { title: 'Company Preparation', eyebrow: 'Prepare', description: 'Prepare for your dream companies with tailored resources and practice.' },
+  'career-tools': { title: 'Career Tools', eyebrow: 'Plan', description: 'Everything you need to plan, build and accelerate your career.' },
+  scholarships: { title: 'Scholarships', eyebrow: 'Apply', description: 'Discover and apply for scholarships to support your education journey.' },
+  'resume-builder': { title: 'Resume Builder', eyebrow: 'Account', description: 'Create professional resumes that showcase your skills and land your dream job.' },
   'career-path': { title: 'My Career Path', eyebrow: 'Target career', description: 'Milestones, skill gaps, learning, and experience needed for your goal.' },
   'ai-coach': { title: 'AI Career Coach', eyebrow: 'Preview guidance', description: 'Explainable, non-authoritative recommendations using demo-only Student data.' },
   readiness: { title: 'Readiness', eyebrow: 'Employability model', description: 'Category scores, blockers, history, interventions, and supporting evidence.' },
@@ -792,6 +803,11 @@ function RouteScreen({ route, authenticated, currentStudent }: { readonly route:
   if (route === 'interviews') return <InterviewsPage />;
   if (route === 'documents') return <DocumentsPage />;
   if (route === 'profile') return <ProfilePage />;
+  if (route === 'practice') return <StudentPracticePage />;
+  if (route === 'company-prep') return <StudentCompanyPrepPage />;
+  if (route === 'career-tools') return <StudentCareerToolsPage />;
+  if (route === 'scholarships') return <StudentScholarshipsPage />;
+  if (route === 'resume-builder') return <StudentResumeBuilderPage />;
   return <SettingsPage />;
 }
 
@@ -808,6 +824,11 @@ function AuthenticatedStudentRoute({ route, currentStudent }: { readonly route: 
   if (route === 'learning') return <CareerReadinessApiPanel route="learning" />;
   if (route === 'settings') return <><CareerReadinessApiPanel route="notifications" /><StudentPrivacyPanel /></>;
   if (route === 'help') return <HelpFaqPanel persona="student" />;
+  if (route === 'practice') return <StudentPracticePage />;
+  if (route === 'company-prep') return <StudentCompanyPrepPage />;
+  if (route === 'career-tools') return <StudentCareerToolsPage />;
+  if (route === 'scholarships') return <StudentScholarshipsPage />;
+  if (route === 'resume-builder') return <StudentResumeBuilderPage />;
   return <AuthenticatedStudentUnavailable route={route} />;
 }
 

@@ -46,7 +46,9 @@ import { EmployerApplicantsPage, EmployerOpportunitiesPage } from './hiringPages
 import { AssistantWidget } from './assistantWidget.js';
 import { HelpFaqPanel } from './helpFaqPanel.js';
 import { ConsentGate } from './consentGate.js';
-import { EmployerDashboardV2, InstitutionDashboardV2, OperationsDashboardV2, V2EmptyState, V2Stat } from './dashboardsV2.js';
+import { OperationsDashboardV2, V2EmptyState, V2Stat } from './dashboardsV2.js';
+import { EmployerDashboardV3, InstitutionDashboardV3 } from './staffDashboardsV3.js';
+import { InstitutionInterventionsPage } from './pilotParityPages.js';
 
 interface AuthenticatedWorkspaceSummary {
   readonly role: string;
@@ -216,9 +218,9 @@ function initialsFor(value: string): string {
 
 function AuthenticatedDashboardChooser({ portal, routeLabel, onNavigate, authenticatedWorkspace }: { readonly portal: RolePortalConfig; readonly routeLabel: string; readonly onNavigate: (path: string) => void; readonly authenticatedWorkspace?: AuthenticatedWorkspaceSummary | undefined }): React.ReactElement {
   if (portal.family === 'Institution' && ['institution-admin', 'placement-officer', 'department-head', 'faculty'].includes(portal.key) && isInstitutionStaffWorkspace(authenticatedWorkspace)) {
-    return <InstitutionDashboardV2 institutionId={authenticatedWorkspace.organizationId} basePath={portal.basePath} />;
+    return <InstitutionDashboardV3 institutionId={authenticatedWorkspace.organizationId} basePath={portal.basePath} />;
   }
-  if (portal.family === 'Employer') return <EmployerDashboardV2 basePath={portal.basePath} />;
+  if (portal.family === 'Employer') return <EmployerDashboardV3 basePath={portal.basePath} />;
   if (portal.key === 'operations-admin') return <OperationsDashboardV2 basePath={portal.basePath} />;
   return <AuthenticatedRoleSurface portal={portal} routeLabel={routeLabel} onNavigate={onNavigate} />;
 }
@@ -273,6 +275,11 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   if (!demoMode && portal.key === 'institution-admin' && route.label === 'Student Detail') return <InstitutionStudentsPage portal={portal} authenticatedWorkspace={authenticatedWorkspace} />;
   if (!demoMode && portal.key === 'institution-admin' && route.label === 'Academic Structure') return <InstitutionAcademicStructurePage portal={portal} authenticatedWorkspace={authenticatedWorkspace} />;
   if (!demoMode && route.label === 'Help & FAQ') return <HelpFaqPanel persona={portal.family === 'Employer' ? 'employer' : 'institution'} />;
+  if (!demoMode && portal.family === 'Institution' && route.label === 'Interventions') {
+    return isInstitutionStaffWorkspace(authenticatedWorkspace)
+      ? <InstitutionInterventionsPage institutionId={authenticatedWorkspace.organizationId} basePath={portal.basePath} />
+      : <InstitutionWorkspaceError title="Interventions" />;
+  }
     if (!demoMode && ['institution-admin', 'placement-officer', 'department-head', 'faculty'].includes(portal.key) && route.label === 'Assessments') return isInstitutionStaffWorkspace(authenticatedWorkspace) ? <InstitutionExamEnginePage institutionId={authenticatedWorkspace.organizationId} canApprove={portal.key !== 'faculty'} /> : <InstitutionWorkspaceError title='Assessments' />;
   if (!demoMode && portal.key === 'institution-admin' && route.label === 'Staff') return <InstitutionStaffPage portal={portal} authenticatedWorkspace={authenticatedWorkspace} />;
   if (!demoMode && portal.key === 'institution-admin' && /career readiness|placement|reports/i.test(route.label)) return <AuthenticatedReadOnlyModule title={route.label} detail="Institution reports and readiness information are read-only in Phase 2A unless a dedicated persistent mutation is available." />;

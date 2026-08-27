@@ -45,6 +45,12 @@ object Session {
         prefs(context).edit().putString("theme", id).apply()
     }
 
+    fun email(context: Context): String? = prefs(context).getString("email", null)?.ifBlank { null }
+
+    fun setEmail(context: Context, value: String) {
+        prefs(context).edit().putString("email", value.trim()).apply()
+    }
+
     fun workspace(context: Context): String? = prefs(context).getString("workspace", null)
 
     fun setWorkspace(context: Context, value: String?) {

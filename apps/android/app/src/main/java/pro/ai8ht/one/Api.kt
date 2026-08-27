@@ -238,6 +238,7 @@ object Api {
                     newDevice: com.amazonaws.mobileconnectors.cognitoidentityprovider.CognitoDevice?,
                 ) {
                     Session.setTokens(context, session.accessToken.jwtToken, session.refreshToken.token)
+                    Session.setEmail(context, email)
                     continuation.resumeWith(Result.success(Unit))
                 }
                 override fun getAuthenticationDetails(

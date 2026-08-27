@@ -170,6 +170,11 @@ fun OneApp(currentTheme: String, onThemeChange: (String) -> Unit) {
             version = consent?.requiredVersion ?: "",
             onGranted = { consent = null; consentChecked = true },
         )
+        Session.email(context)?.startsWith("demo.") == true -> DemoAccountScreen(onSignOut = {
+            Session.clear(context)
+            workspace = null
+            signedIn = false
+        })
         workspace == null && workspaceOptions == null -> BrandSplash()
         workspace == null -> WorkspaceChooserScreen(workspaceOptions!!) { picked ->
             workspace = picked
@@ -228,6 +233,38 @@ private fun BrandSplash() {
         Spacer(Modifier.height(18.dp))
         Text("ONE", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color(0xFFD9DCE1))
         Text("The campus-to-career workspace", style = MaterialTheme.typography.bodySmall, color = Color(0xFF8E939C))
+    }
+}
+
+/** Demo accounts drive the web pilot's fictional showcase only — the app talks
+ *  to the real API, so they would just see empty screens. Say so honestly. */
+@Composable
+private fun DemoAccountScreen(onSignOut: () -> Unit) {
+    val palette = pro.ai8ht.one.ui.LocalOnePalette.current
+    Column(Modifier.fillMaxSize().background(palette.bandBottom)) {
+        BrandBand {
+            Spacer(Modifier.height(20.dp))
+            BrandWordmark(height = 24.dp, tint = palette.wordmarkTint)
+            Spacer(Modifier.height(12.dp))
+            Text("Demo account", style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold, color = palette.bandInk)
+        }
+        BandSheet {
+            Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally) {
+                IconBubble(Icons.Filled.AutoAwesome, Tone.Amber, size = 64.dp)
+                Spacer(Modifier.height(16.dp))
+                Text("This account showcases the web pilot", style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                Spacer(Modifier.height(6.dp))
+                Text("Demo accounts present a guided, fictional walkthrough at one.ai8ht.pro on the web. " +
+                    "The app shows real accounts with real data — sign in with your own account instead.",
+                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center)
+                Spacer(Modifier.height(20.dp))
+                Button(onClick = onSignOut, shape = RoundedCornerShape(10.dp)) { Text("Sign in with another account") }
+            }
+        }
     }
 }
 
@@ -356,7 +393,10 @@ private fun MainScaffold(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(
-                            "Hi, " + (data?.student?.fullName?.split(" ")?.firstOrNull() ?: "Student"),
+                            "Hi, " + (data?.student?.fullName?.split(" ")?.firstOrNull()
+                                ?: Session.email(context)?.substringBefore("@")?.substringBefore(".")
+                                    ?.replaceFirstChar { c -> c.uppercase() }
+                                ?: "there"),
                             style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = palette.bandInk,
                         )
                         val line = listOfNotNull(data?.student?.program, data?.student?.batch).joinToString(" · ")

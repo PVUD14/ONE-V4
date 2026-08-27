@@ -291,7 +291,7 @@ describe('All-role portal registry and preview workflows', () => {
     render(<App />);
     fireEvent.click(await screen.findByRole('button', { name: 'Retry workspace' }));
     await waitFor(() => expect(window.location.pathname).toBe('/institution/admin'));
-    expect(screen.getByRole('heading', { name: 'Institution Administration' })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('Institution scope only')).toBeInTheDocument());
     expect(screen.queryByText(/Rahul Kumar/)).not.toBeInTheDocument();
   });
 

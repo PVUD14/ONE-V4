@@ -46,6 +46,7 @@ import { StudentMessagesFlyout, StudentNotificationsBell } from './notifications
 import { AssistantWidget } from './assistantWidget.js';
 import { ConsentGate } from './consentGate.js';
 import { HelpFaqPanel } from './helpFaqPanel.js';
+import { StudentDashboardV2 } from './dashboardsV2.js';
 
 type RouteKey = 'dashboard' | 'career-path' | 'ai-coach' | 'readiness' | 'skills' | 'assessments' | 'learning' | 'experience' | 'opportunities' | 'applications' | 'interviews' | 'documents' | 'profile' | 'settings' | 'help';
 
@@ -812,26 +813,7 @@ function AuthenticatedStudentDashboard({ currentStudent }: { readonly currentStu
   if (currentStudent.state !== 'resolved') {
     return <section className="card wide-card"><h2>Student profile</h2><p>{currentStudent.state === 'error' ? currentStudent.message : 'Loading protected Student profile...'}</p></section>;
   }
-  const student = currentStudent.student;
-  return <div className="workspace-grid">
-    <section className="card wide-card"><span className="eyebrow">Your profile</span><h2>{student.fullName}</h2><p>Email: {student.verifiedEmail ?? 'Not available'}</p><p>Student ID: {student.institutionStudentId}</p><p>Status: {student.academicStatus}</p></section>
-    <section className="card"><h2>Your course</h2><p>Department: {student.department ?? 'Your college has not added this yet'}</p><p>Program: {student.program ?? 'Your college has not added this yet'}</p><p>Batch: {student.batch ?? 'Your college has not added this yet'}</p><p>Section: {student.section ?? 'Your college has not added this yet'}</p></section>
-    <section className="card"><h2>Target career</h2><AuthenticatedStudentProfileSummary /></section>
-    <section className="card wide-card"><h2>What you can do today</h2><p>Your profile, document details and saved opportunities are all saved to your account and stay with you. Uploading actual files is not switched on yet.</p></section>
-    <section className="card wide-card"><h2>Career readiness</h2><CareerReadinessApiPanel route="readiness" /></section>
-  </div>;
-}
-
-function AuthenticatedStudentProfileSummary(): React.ReactElement {
-  const [profile, setProfile] = useState<StudentProfileDto | null>(null);
-  useEffect(() => {
-    const token = getAccessToken();
-    if (!token) return undefined;
-    const controller = new AbortController();
-    getStudentProfile(token, controller.signal).then(({ profile: next }) => setProfile(next)).catch(() => setProfile(null));
-    return () => controller.abort();
-  }, []);
-  return <p>{profile?.targetCareer ?? 'Target career not set.'}</p>;
+  return <StudentDashboardV2 studentName={currentStudent.student.fullName} />;
 }
 
 function AuthenticatedStudentProfile(): React.ReactElement {

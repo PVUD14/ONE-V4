@@ -46,6 +46,7 @@ import { EmployerApplicantsPage, EmployerOpportunitiesPage } from './hiringPages
 import { AssistantWidget } from './assistantWidget.js';
 import { HelpFaqPanel } from './helpFaqPanel.js';
 import { ConsentGate } from './consentGate.js';
+import { EmployerDashboardV2, InstitutionDashboardV2, OperationsDashboardV2 } from './dashboardsV2.js';
 
 interface AuthenticatedWorkspaceSummary {
   readonly role: string;
@@ -152,7 +153,7 @@ function RolePortalInner({ portal, apiHealth, authStatus, authNotice, showDevelo
         <main id="role-main" className="role-main">
           {demoMode ? <section className="demo-boundary" role="note"><strong>DEMO PREVIEW</strong><span>Fictional data. This route is not authenticated and does not authorize a user.</span></section> : null}
           <PortalModeNotice portal={portal} notice={topbarNotice} demoMode={demoMode} authenticatedWorkspace={authenticatedWorkspace} />
-          {!demoMode && activeRoute?.path === portal.basePath ? <AuthenticatedRoleSurface portal={portal} routeLabel={activeRoute?.label ?? 'Dashboard'} onNavigate={navigate} /> : activeRoute?.path === portal.basePath ? <RoleDashboard portal={portal} onNavigate={navigate} /> : <RoleModulePage portal={portal} route={activeRoute ?? portal.nav[0]!} demoMode={demoMode} authenticatedWorkspace={authenticatedWorkspace} />}
+          {!demoMode && activeRoute?.path === portal.basePath ? <AuthenticatedDashboardChooser portal={portal} routeLabel={activeRoute?.label ?? 'Dashboard'} onNavigate={navigate} authenticatedWorkspace={authenticatedWorkspace} /> : activeRoute?.path === portal.basePath ? <RoleDashboard portal={portal} onNavigate={navigate} /> : <RoleModulePage portal={portal} route={activeRoute ?? portal.nav[0]!} demoMode={demoMode} authenticatedWorkspace={authenticatedWorkspace} />}
         </main>
       </div>
       <AssistantWidget persona={portal.family === 'Employer' ? 'employer' : portal.family === 'Institution' ? 'institution' : 'student'} />
@@ -203,6 +204,15 @@ function PortalModeNotice({ portal, notice, demoMode, authenticatedWorkspace }: 
 function initialsFor(value: string): string {
   const words = value.split(/[@._\-\s]+/).filter(Boolean);
   return words.slice(0, 2).map((word) => word[0]?.toUpperCase() ?? '').join('') || 'U';
+}
+
+function AuthenticatedDashboardChooser({ portal, routeLabel, onNavigate, authenticatedWorkspace }: { readonly portal: RolePortalConfig; readonly routeLabel: string; readonly onNavigate: (path: string) => void; readonly authenticatedWorkspace?: AuthenticatedWorkspaceSummary | undefined }): React.ReactElement {
+  if (portal.family === 'Institution' && ['institution-admin', 'placement-officer', 'department-head', 'faculty'].includes(portal.key) && isInstitutionWorkspace(authenticatedWorkspace)) {
+    return <InstitutionDashboardV2 institutionId={authenticatedWorkspace.organizationId} basePath={portal.basePath} />;
+  }
+  if (portal.family === 'Employer') return <EmployerDashboardV2 basePath={portal.basePath} />;
+  if (portal.key === 'operations-admin') return <OperationsDashboardV2 basePath={portal.basePath} />;
+  return <AuthenticatedRoleSurface portal={portal} routeLabel={routeLabel} onNavigate={onNavigate} />;
 }
 
 function AuthenticatedRoleSurface({ portal, routeLabel, onNavigate }: { readonly portal: RolePortalConfig; readonly routeLabel: string; readonly onNavigate: (path: string) => void }): React.ReactElement {

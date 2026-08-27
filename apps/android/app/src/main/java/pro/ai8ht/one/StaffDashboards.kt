@@ -210,6 +210,7 @@ internal fun InstitutionScaffold(
     var showChatOv by remember { mutableStateOf(false) }
     var showThemeOv by remember { mutableStateOf(false) }
     var resultsFor by remember { mutableStateOf<InstitutionExamDto?>(null) }
+    var showHelpOv by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         coroutineScope {
@@ -221,15 +222,17 @@ internal fun InstitutionScaffold(
         }
     }
 
-    androidx.activity.compose.BackHandler(enabled = showInboxOv || showChatOv || showThemeOv || resultsFor != null) {
+    androidx.activity.compose.BackHandler(enabled = showInboxOv || showChatOv || showThemeOv || showHelpOv || resultsFor != null) {
         when {
             showChatOv -> showChatOv = false
             showThemeOv -> showThemeOv = false
             showInboxOv -> showInboxOv = false
+            showHelpOv -> showHelpOv = false
             else -> resultsFor = null
         }
     }
     when {
+        showHelpOv -> { SlideIn { HelpFaqPage(persona = "institution", onClose = { showHelpOv = false }) }; return }
         showChatOv -> { SlideIn { ChatOverlay(persona = "institution", onClose = { showChatOv = false }) }; return }
         showThemeOv -> { SlideIn { ThemeOverlay(currentTheme, onThemeChange, onClose = { showThemeOv = false }) }; return }
         showInboxOv -> { SlideIn { StaffInboxOverlay(data?.notifications, onClose = { showInboxOv = false }) }; return }
@@ -286,7 +289,8 @@ internal fun InstitutionScaffold(
                         0 -> InstitutionHome(data!!) { tab = 1 }
                         1 -> InstitutionExams(data!!.exams) { resultsFor = it }
                         else -> StaffMore(onSignOut, onSwitchWorkspace,
-                            "Question authoring, exam building, publishing and reopening stay on the web at one.ai8ht.pro.")
+                            "Question authoring, exam building, publishing and reopening stay on the web at one.ai8ht.pro.",
+                            onHelp = { showHelpOv = true })
                     }
                 }
             }
@@ -454,6 +458,7 @@ internal fun EmployerScaffold(
     var showInboxOv by remember { mutableStateOf(false) }
     var showChatOv by remember { mutableStateOf(false) }
     var showThemeOv by remember { mutableStateOf(false) }
+    var showHelpOv by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         coroutineScope {
@@ -463,14 +468,16 @@ internal fun EmployerScaffold(
         }
     }
 
-    androidx.activity.compose.BackHandler(enabled = showInboxOv || showChatOv || showThemeOv) {
+    androidx.activity.compose.BackHandler(enabled = showInboxOv || showChatOv || showThemeOv || showHelpOv) {
         when {
             showChatOv -> showChatOv = false
             showThemeOv -> showThemeOv = false
+            showHelpOv -> showHelpOv = false
             else -> showInboxOv = false
         }
     }
     when {
+        showHelpOv -> { SlideIn { HelpFaqPage(persona = "employer", onClose = { showHelpOv = false }) }; return }
         showChatOv -> { SlideIn { ChatOverlay(persona = "employer", onClose = { showChatOv = false }) }; return }
         showThemeOv -> { SlideIn { ThemeOverlay(currentTheme, onThemeChange, onClose = { showThemeOv = false }) }; return }
         showInboxOv -> { SlideIn { StaffInboxOverlay(inbox, onClose = { showInboxOv = false }) }; return }
@@ -522,7 +529,8 @@ internal fun EmployerScaffold(
                         0 -> EmployerHome(roles!!) { tab = 1 }
                         1 -> EmployerRoles(roles!!)
                         else -> StaffMore(onSignOut, onSwitchWorkspace,
-                            "Posting roles, publishing and candidate review stay on the web at one.ai8ht.pro.")
+                            "Posting roles, publishing and candidate review stay on the web at one.ai8ht.pro.",
+                            onHelp = { showHelpOv = true })
                     }
                 }
             }
@@ -609,7 +617,7 @@ private fun EmployerRoles(roles: List<EmployerOpportunityDto>) {
 // --- Shared staff pages ----------------------------------------------------------
 
 @Composable
-private fun StaffMore(onSignOut: () -> Unit, onSwitchWorkspace: (() -> Unit)?, webNote: String) {
+private fun StaffMore(onSignOut: () -> Unit, onSwitchWorkspace: (() -> Unit)?, webNote: String, onHelp: () -> Unit) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp)) {
         PilotCard {
             Column(Modifier.padding(16.dp)) {
@@ -619,6 +627,8 @@ private fun StaffMore(onSignOut: () -> Unit, onSwitchWorkspace: (() -> Unit)?, w
             }
         }
         Spacer(Modifier.height(12.dp))
+        OutlinedButton(onClick = onHelp) { Text("Help & FAQ") }
+        Spacer(Modifier.height(8.dp))
         if (onSwitchWorkspace != null) {
             OutlinedButton(onClick = onSwitchWorkspace) { Text("Switch workspace") }
             Spacer(Modifier.height(8.dp))
@@ -666,6 +676,7 @@ internal fun OpsScaffold(
     var inbox by remember { mutableStateOf<NotificationsEnvelope?>(null) }
     var showInboxOv by remember { mutableStateOf(false) }
     var showThemeOv by remember { mutableStateOf(false) }
+    var showHelpOv by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         coroutineScope {
@@ -676,10 +687,15 @@ internal fun OpsScaffold(
         }
     }
 
-    androidx.activity.compose.BackHandler(enabled = showInboxOv || showThemeOv) {
-        if (showThemeOv) showThemeOv = false else showInboxOv = false
+    androidx.activity.compose.BackHandler(enabled = showInboxOv || showThemeOv || showHelpOv) {
+        when {
+            showHelpOv -> showHelpOv = false
+            showThemeOv -> showThemeOv = false
+            else -> showInboxOv = false
+        }
     }
     when {
+        showHelpOv -> { SlideIn { HelpFaqPage(persona = "institution", onClose = { showHelpOv = false }) }; return }
         showThemeOv -> { SlideIn { ThemeOverlay(currentTheme, onThemeChange, onClose = { showThemeOv = false }) }; return }
         showInboxOv -> { SlideIn { StaffInboxOverlay(inbox, onClose = { showInboxOv = false }) }; return }
     }
@@ -716,7 +732,8 @@ internal fun OpsScaffold(
                     orgs == null -> HomeSkeleton()
                     tab == 0 -> OpsOverview(orgs!!, invitations)
                     else -> StaffMore(onSignOut, onSwitchWorkspace,
-                        "This workspace is view-only in the app by policy. All changes - onboarding, invitations, configuration - happen on the web at one.ai8ht.pro.")
+                        "This workspace is view-only in the app by policy. All changes - onboarding, invitations, configuration - happen on the web at one.ai8ht.pro.",
+                        onHelp = { showHelpOv = true })
                 }
             }
         }
@@ -771,5 +788,61 @@ private fun OpsOverview(orgs: List<OpsOrganizationDto>, invitations: List<OpsInv
             }
         }
         Spacer(Modifier.height(20.dp))
+    }
+}
+
+// --- Help & FAQ -------------------------------------------------------------------
+
+@Composable
+internal fun HelpFaqPage(persona: String, onClose: () -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var articles by remember { mutableStateOf<List<HelpArticleDto>?>(null) }
+    var failed by remember { mutableStateOf(false) }
+    var expanded by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        runCatching { Api.helpArticles(context) }
+            .onSuccess { articles = it }
+            .onFailure { failed = true }
+    }
+    OverlayScaffold("Help & FAQ", onClose) {
+        when {
+            failed -> CenteredNote("The help guide could not be loaded right now. Try again shortly.")
+            articles == null -> LoadingSpinner()
+            else -> {
+                val visible = articles!!.filter { it.personas.contains("all") || it.personas.contains(persona) }
+                LazyColumn(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
+                    item {
+                        Spacer(Modifier.height(10.dp))
+                        Text(
+                            "Answers for your role — from the same guide that powers the ONE Assistant.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(6.dp))
+                    }
+                    items(visible, key = { it.id }) { article ->
+                        Spacer(Modifier.height(10.dp))
+                        PilotCard(Modifier.fillMaxWidth().clickable {
+                            expanded = if (expanded == article.id) null else article.id
+                        }) {
+                            Column(Modifier.padding(14.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(article.title, Modifier.weight(1f),
+                                        style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                    Text(if (expanded == article.id) "▾" else "▸",
+                                        color = MaterialTheme.colorScheme.primary)
+                                }
+                                if (expanded == article.id) {
+                                    Spacer(Modifier.height(8.dp))
+                                    Text(article.body, style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                    }
+                    item { Spacer(Modifier.height(18.dp)) }
+                }
+            }
+        }
     }
 }

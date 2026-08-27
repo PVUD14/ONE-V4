@@ -44,6 +44,7 @@ import { StatusBadge } from './studentComponents.js';
 import { OperationsCareerReadinessPanel } from './operationsCareerReadinessPanel.js';
 import { EmployerApplicantsPage, EmployerOpportunitiesPage } from './hiringPages.js';
 import { AssistantWidget } from './assistantWidget.js';
+import { HelpFaqPanel } from './helpFaqPanel.js';
 import { ConsentGate } from './consentGate.js';
 
 interface AuthenticatedWorkspaceSummary {
@@ -253,7 +254,8 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   if (!demoMode && portal.key === 'institution-admin' && route.label === 'Students') return <InstitutionStudentsPage portal={portal} authenticatedWorkspace={authenticatedWorkspace} />;
   if (!demoMode && portal.key === 'institution-admin' && route.label === 'Student Detail') return <InstitutionStudentsPage portal={portal} authenticatedWorkspace={authenticatedWorkspace} />;
   if (!demoMode && portal.key === 'institution-admin' && route.label === 'Academic Structure') return <InstitutionAcademicStructurePage portal={portal} authenticatedWorkspace={authenticatedWorkspace} />;
-  if (!demoMode && ['institution-admin', 'placement-officer', 'department-head', 'faculty'].includes(portal.key) && route.label === 'Assessments') return isInstitutionWorkspace(authenticatedWorkspace) ? <InstitutionExamEnginePage institutionId={authenticatedWorkspace.organizationId} canApprove={portal.key !== 'faculty'} /> : <InstitutionWorkspaceError title='Assessments' />;
+  if (!demoMode && route.label === 'Help & FAQ') return <HelpFaqPanel persona={portal.family === 'Employer' ? 'employer' : 'institution'} />;
+    if (!demoMode && ['institution-admin', 'placement-officer', 'department-head', 'faculty'].includes(portal.key) && route.label === 'Assessments') return isInstitutionWorkspace(authenticatedWorkspace) ? <InstitutionExamEnginePage institutionId={authenticatedWorkspace.organizationId} canApprove={portal.key !== 'faculty'} /> : <InstitutionWorkspaceError title='Assessments' />;
   if (!demoMode && portal.key === 'institution-admin' && route.label === 'Staff') return <InstitutionStaffPage portal={portal} authenticatedWorkspace={authenticatedWorkspace} />;
   if (!demoMode && portal.key === 'institution-admin' && /career readiness|placement|reports/i.test(route.label)) return <AuthenticatedReadOnlyModule title={route.label} detail="Institution reports and readiness information are read-only in Phase 2A unless a dedicated persistent mutation is available." />;
   if (!demoMode && portal.key === 'institution-admin' && /settings/i.test(route.label)) return <AuthenticatedNotYetAvailable title={route.label} detail="Institution settings mutation is not yet available in this UAT slice." />;

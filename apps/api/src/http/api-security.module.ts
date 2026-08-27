@@ -24,6 +24,7 @@ import { StudentAssessmentAttemptsController } from './student-assessment-attemp
 import { AssistantController } from './assistant.controller.js';
 import { NotificationsController } from './notifications.controller.js';
 import { ConsentsController } from './consents.controller.js';
+import { HelpController } from './help.controller.js';
 
 @Module({})
 export class Phase1ApiSecurityModule {
@@ -44,7 +45,7 @@ export class Phase1ApiSecurityModule {
 
     return {
       module: Phase1ApiSecurityModule,
-      controllers: [Phase1SecurityController, OperationsInstitutionOnboardingController, StudentOperationalCoreController, StudentHiringController, EmployerHiringController, StudentDocumentsController, StudentPrivacyController, InstitutionAssessmentsController, StudentAssessmentAttemptsController, AssistantController, NotificationsController, ConsentsController],
+      controllers: [Phase1SecurityController, OperationsInstitutionOnboardingController, StudentOperationalCoreController, StudentHiringController, EmployerHiringController, StudentDocumentsController, StudentPrivacyController, InstitutionAssessmentsController, StudentAssessmentAttemptsController, AssistantController, NotificationsController, ConsentsController, HelpController],
       providers,
       exports: [
         API_IDENTITY_VERIFIER,

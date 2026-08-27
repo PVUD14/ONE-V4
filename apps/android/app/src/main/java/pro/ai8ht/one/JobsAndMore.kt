@@ -24,6 +24,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Insights
@@ -311,7 +312,7 @@ internal fun ChatOverlay(persona: String = "student", onClose: () -> Unit) {
 
 internal enum class MoreDest(val title: String) {
     Profile("Profile"), Career("Career readiness"), Documents("Documents"),
-    Privacy("Privacy & data"), Settings("Settings"),
+    Privacy("Privacy & data"), Help("Help & FAQ"), Settings("Settings"),
 }
 
 @Composable
@@ -375,6 +376,9 @@ internal fun MoreMenuScreen(
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline)
                 MenuRow(Icons.Filled.Lock, pro.ai8ht.one.ui.Tone.Amber, "Privacy & data",
                     "Your data copy and consent") { onOpen(MoreDest.Privacy) }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                MenuRow(Icons.AutoMirrored.Filled.HelpOutline, pro.ai8ht.one.ui.Tone.Accent, "Help & FAQ",
+                    "Answers for your role") { onOpen(MoreDest.Help) }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline)
                 MenuRow(Icons.Filled.Settings, pro.ai8ht.one.ui.Tone.Gray, "Settings",
                     "App info and sign out") { onOpen(MoreDest.Settings) }

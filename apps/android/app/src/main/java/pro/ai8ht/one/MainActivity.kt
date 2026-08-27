@@ -336,6 +336,7 @@ private fun MainScaffold(
         moreDest == MoreDest.Documents -> { SlideIn { DocumentsPage(onClose = { moreDest = null }) }; return }
         moreDest == MoreDest.Privacy -> { SlideIn { PrivacyPage(onClose = { moreDest = null }) }; return }
         moreDest == MoreDest.Career -> { SlideIn { CareerPage(data?.learner, onClose = { moreDest = null }) }; return }
+        moreDest == MoreDest.Help -> { SlideIn { HelpFaqPage(persona = "student", onClose = { moreDest = null }) }; return }
         moreDest == MoreDest.Settings -> { SlideIn { SettingsPage(currentTheme = currentTheme, onThemeChange = onThemeChange, onClose = { moreDest = null }, onSignOut = onSignOut, onSwitchWorkspace = onSwitchWorkspace) }; return }
     }
 

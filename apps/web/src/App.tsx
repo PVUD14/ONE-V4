@@ -1,4 +1,4 @@
-import { Bell, BookOpen, BriefcaseBusiness, Building2, CalendarDays, ChevronDown, ClipboardCheck, FileText, Gauge, GraduationCap, Home, LayoutDashboard, Menu, MessageSquare, Search, Settings, ShieldCheck, Sparkles, Target, Trophy, UserRound, X, type LucideIcon } from 'lucide-react';
+import { Bell, BookOpen, CircleHelp, BriefcaseBusiness, Building2, CalendarDays, ChevronDown, ClipboardCheck, FileText, Gauge, GraduationCap, Home, LayoutDashboard, Menu, MessageSquare, Search, Settings, ShieldCheck, Sparkles, Target, Trophy, UserRound, X, type LucideIcon } from 'lucide-react';
 import { BrandWordmark } from './brand.js';
 import type { FormEvent } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -45,8 +45,9 @@ import { ExamAttemptPanel } from './examAttemptPanel.js';
 import { StudentMessagesFlyout, StudentNotificationsBell } from './notificationsBell.js';
 import { AssistantWidget } from './assistantWidget.js';
 import { ConsentGate } from './consentGate.js';
+import { HelpFaqPanel } from './helpFaqPanel.js';
 
-type RouteKey = 'dashboard' | 'career-path' | 'ai-coach' | 'readiness' | 'skills' | 'assessments' | 'learning' | 'experience' | 'opportunities' | 'applications' | 'interviews' | 'documents' | 'profile' | 'settings';
+type RouteKey = 'dashboard' | 'career-path' | 'ai-coach' | 'readiness' | 'skills' | 'assessments' | 'learning' | 'experience' | 'opportunities' | 'applications' | 'interviews' | 'documents' | 'profile' | 'settings' | 'help';
 
 interface NavItem {
   readonly label: string;
@@ -71,6 +72,7 @@ const navItems: readonly NavItem[] = [
   { label: 'Documents', path: '/student/documents', icon: FileText, group: 'Account', route: 'documents' },
   { label: 'Profile', path: '/student/profile', icon: UserRound, group: 'Account', route: 'profile' },
   { label: 'Settings', path: '/student/settings', icon: Settings, group: 'Account', route: 'settings' },
+  { label: 'Help & FAQ', path: '/student/help', icon: CircleHelp, group: 'Account', route: 'help' },
 ];
 
 const routeTitles: Record<RouteKey, PageMeta> = {
@@ -88,6 +90,7 @@ const routeTitles: Record<RouteKey, PageMeta> = {
   documents: { title: 'Documents', eyebrow: 'Controlled files', description: 'Resume, certificates, academic files, portfolio evidence, and access context.' },
   profile: { title: 'Profile', eyebrow: 'Student-owned identity', description: 'Academic profile, career objective, consent, visibility, and evidence status.' },
   settings: { title: 'Settings', eyebrow: 'Account and privacy', description: 'Preferences, notifications, privacy, consent, accessibility, and security overview.' },
+  help: { title: 'Help & FAQ', eyebrow: 'Guidance', description: 'Answers for students, from the same guide that powers the ONE Assistant.' },
 };
 
 const productName = 'ONE';
@@ -779,6 +782,7 @@ function RouteScreen({ route, authenticated, currentStudent }: { readonly route:
   if (route === 'assessments') return <><ExamAttemptPanel /><CareerReadinessApiPanel route="assessments" /><AssessmentsPage /></>;
   if (route === 'learning') return <><CareerReadinessApiPanel route="learning" /><Learning /></>;
   if (route === 'settings') return <><CareerReadinessApiPanel route="notifications" /><SettingsPage /></>;
+  if (route === 'help') return <HelpFaqPanel persona="student" />;
   if (route === 'experience') return <ExperiencePage />;
   if (route === 'opportunities') return <OpportunitiesPage />;
   if (route === 'applications') return <ApplicationsPage />;
@@ -800,6 +804,7 @@ function AuthenticatedStudentRoute({ route, currentStudent }: { readonly route: 
   if (route === 'assessments') return <><ExamAttemptPanel /><CareerReadinessApiPanel route="assessments" /></>;
   if (route === 'learning') return <><CareerReadinessApiPanel route="learning" /><AuthenticatedStudentUnavailable route={route} /></>;
   if (route === 'settings') return <><CareerReadinessApiPanel route="notifications" /><StudentPrivacyPanel /></>;
+  if (route === 'help') return <HelpFaqPanel persona="student" />;
   return <AuthenticatedStudentUnavailable route={route} />;
 }
 

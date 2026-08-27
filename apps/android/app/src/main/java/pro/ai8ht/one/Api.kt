@@ -123,6 +123,9 @@ object Api {
     suspend fun listDocuments(context: Context): List<DocumentDto> =
         json.decodeFromString<DocumentsEnvelope>(request(context, "GET", "/api/v1/students/me/documents")).documents
 
+    suspend fun helpArticles(context: Context): List<HelpArticleDto> =
+        json.decodeFromString<HelpEnvelope>(request(context, "GET", "/api/v1/help")).articles
+
     suspend fun securityContext(context: Context): SecurityContextDto =
         json.decodeFromString(request(context, "GET", "/api/v1/security/context"))
 
@@ -513,3 +516,12 @@ object Api {
 )
 @Serializable data class OpsInvitationsEnvelope(val invitations: List<OpsInvitationDto> = emptyList())
 @Serializable data class OpsInvitationDto(val id: String, val state: String = "", val role: String = "")
+
+@Serializable data class HelpEnvelope(val articles: List<HelpArticleDto> = emptyList())
+@Serializable data class HelpArticleDto(
+    val id: String,
+    val personas: List<String> = emptyList(),
+    val title: String = "",
+    val keywords: List<String> = emptyList(),
+    val body: String = "",
+)

@@ -69,7 +69,7 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
     personas: ['student'],
     title: 'Taking an assessment',
     keywords: ['assessment', 'exam', 'test', 'start', 'attempt', 'timer', 'resume', 'save'],
-    body: 'Open Assessments in your workspace to see what is assigned to you, with each assessment’s window and your attempts used. Start an attempt to get your paper; every attempt runs on its own countdown clock (the assessment’s duration), which is separate from the window in which you may start. Answers save automatically as you go, and if you lose connection you can resume the same attempt with the remaining time. Submit before the clock runs out; when it reaches zero the attempt submits itself.',
+    body: 'Assessments are taken on a laptop or desktop only - phone screens and app switching do not mix with timed, proctored attempts. Open Assessments in your workspace to see what is assigned to you, with each assessment’s window and your attempts used. Start an attempt to get your paper; every attempt runs on its own countdown clock (the assessment’s duration), which is separate from the window in which you may start. Answers save automatically as you go, and if you lose connection you can resume the same attempt with the remaining time. Submit before the clock runs out; when it reaches zero the attempt submits itself.',
   },
   {
     id: 'assessment-rules',
@@ -83,7 +83,7 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
     personas: ['student'],
     title: 'Why can’t I start my assessment?',
     keywords: ['cannot', 'start', 'unable', 'window', 'closed', 'opens', 'soon', 'expired', 'exhausted'],
-    body: 'If an assessment shows Opens soon, its window has not started yet. Window closed means the start window has passed. Completed with no attempts left means you used your allowance. In all three cases only your institution can help: staff can reopen the window, add attempts, or change the per-attempt duration. Ask your placement cell — the assistant cannot change assessment windows.',
+    body: 'If an assessment shows Opens soon, its window has not started yet. Window closed means the start window has passed. Completed with no attempts left means you used your allowance. In all three cases only your institution can help: staff can reopen the window, add attempts, or change the per-attempt duration. Ask your placement cell — the assistant cannot change assessment windows. Also note assessments are laptop-only: on a phone you will see the assignment but the start button is replaced with a laptop-only notice.',
   },
   {
     id: 'learning-lessons',
@@ -140,5 +140,19 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
     title: 'Meeting candidates',
     keywords: ['candidate', 'profile', 'verified', 'qr', 'readiness', 'score', 'screen'],
     body: 'You meet candidates through profiles they have consented to share — current skills, projects and certifications, opened from a link or a QR code the student presents. ONE does not expose internal readiness scores to employers by design: candidates are evaluated on real evidence, and your own assessments, not on an opaque platform ranking.',
+  },
+  {
+    id: 'mobile-app',
+    personas: ['all'],
+    title: 'The ONE mobile app',
+    keywords: ['app', 'mobile', 'android', 'phone', 'theme', 'install', 'sign in'],
+    body: 'The Android app signs in with the same email and password as the web. Students see their dashboard, assessments and results, learning, jobs and notifications; institution and employer staff see live monitoring dashboards; operations accounts see a view-only overview. Exams are never taken in the app - a laptop is required. Pick your look from six themes via the palette icon at the top of any screen. Demo accounts work only in the web pilot, not the app.',
+  },
+  {
+    id: 'help-faq',
+    personas: ['all'],
+    title: 'Where to find help',
+    keywords: ['help', 'faq', 'guide', 'how'],
+    body: 'The Help & FAQ section lists answers for your role, and the ONE Assistant (the sparkle button) answers questions conversationally from the same guide. If neither resolves it, report the issue to your placement cell or the ONE support contact with what you clicked and what happened.',
   },
 ];

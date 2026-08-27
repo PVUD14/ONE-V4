@@ -946,3 +946,17 @@ export function getPrivacyConsentStatus(token: string, signal?: AbortSignal): Pr
 export function grantPrivacyConsent(token: string, version: string): Promise<{ granted: boolean; version: string }> {
   return requestJson('/api/v1/me/consents/privacy-notice', { token, method: 'POST', body: { version } });
 }
+
+// --- Help & FAQ ---------------------------------------------------------------
+
+export interface HelpArticleDto {
+  readonly id: string;
+  readonly personas: readonly string[];
+  readonly title: string;
+  readonly keywords: readonly string[];
+  readonly body: string;
+}
+
+export function getHelpArticles(signal?: AbortSignal): Promise<{ readonly articles: readonly HelpArticleDto[] }> {
+  return requestJson('/api/v1/help', signal ? { signal } : {});
+}

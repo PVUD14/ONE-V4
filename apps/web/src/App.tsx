@@ -701,8 +701,8 @@ function StudentShell({ apiHealth, authNotice, authStatus, currentStudent, demoM
         <main id="main-content" className="student-main">
           {demoMode && showDevelopmentIndicators ? <PreviewBadge apiHealth={apiHealth} /> : null}
           {demoMode ? <StudentPreviewStatus authenticated={false} /> : <AuthenticatedStudentStatus currentStudent={currentStudent} />}
-          {/* The pilot-exact dashboard carries its own greeting header. */}
-          {route === 'dashboard' && authStatus.state === 'authenticated' ? null : <PageHeader meta={routeTitles[route]} />}
+          {/* Pilot-exact pages carry their own pilot page head. */}
+          {['dashboard', 'practice', 'company-prep', 'career-tools', 'scholarships', 'resume-builder'].includes(route) && authStatus.state === 'authenticated' ? null : <PageHeader meta={routeTitles[route]} />}
           <RouteScreen route={route} authenticated={authStatus.state === 'authenticated'} currentStudent={currentStudent} />
         </main>
       </div>

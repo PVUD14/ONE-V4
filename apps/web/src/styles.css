@@ -4865,3 +4865,12 @@ button.secondary {
   .pilot.pilot-embed .pilot-row.cols-3,
   .pilot.pilot-embed .pilot-row.cols-4 { grid-template-columns: 1fr; }
 }
+
+/* Real functional panels embedded inside pilot shells: strip their legacy
+   page chrome so they read as pilot content; functionality is untouched. */
+.pilot-embed .embedded-real { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.pilot-embed .embedded-real .page-header,
+.pilot-embed .embedded-real .role-page-heading { display: none; }
+.pilot-embed .embedded-real .career-api-panel { border: 0; box-shadow: none; background: transparent; padding: 0; margin: 0; }
+.pilot-embed .embedded-real .role-module { display: flex; flex-direction: column; gap: 16px; }
+.pilot-embed .embedded-real .workspace-grid { gap: 16px; }

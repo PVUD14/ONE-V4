@@ -49,6 +49,7 @@ import { HelpFaqPanel } from './helpFaqPanel.js';
 import { V2EmptyState, V2Stat } from './dashboardsV2.js';
 import { StudentDashboardV3 } from './studentDashboardV3.js';
 import { StudentCareerToolsPage, StudentCompanyPrepPage, StudentPracticePage, StudentResumeBuilderPage, StudentScholarshipsPage } from './pilotParityPages.js';
+import { StudentAssessmentsV3, StudentLearningV3, StudentOpportunitiesV3, StudentProfileV3, StudentRoadmapV3 } from './parityWraps.js';
 
 type RouteKey = 'dashboard' | 'career-path' | 'ai-coach' | 'readiness' | 'skills' | 'assessments' | 'learning' | 'experience' | 'opportunities' | 'applications' | 'interviews' | 'documents' | 'profile' | 'settings' | 'help' | 'practice' | 'company-prep' | 'career-tools' | 'scholarships' | 'resume-builder';
 
@@ -702,7 +703,7 @@ function StudentShell({ apiHealth, authNotice, authStatus, currentStudent, demoM
           {demoMode && showDevelopmentIndicators ? <PreviewBadge apiHealth={apiHealth} /> : null}
           {demoMode ? <StudentPreviewStatus authenticated={false} /> : <AuthenticatedStudentStatus currentStudent={currentStudent} />}
           {/* Pilot-exact pages carry their own pilot page head. */}
-          {['dashboard', 'practice', 'company-prep', 'career-tools', 'scholarships', 'resume-builder'].includes(route) && authStatus.state === 'authenticated' ? null : <PageHeader meta={routeTitles[route]} />}
+          {['dashboard', 'practice', 'company-prep', 'career-tools', 'scholarships', 'resume-builder', 'career-path', 'learning', 'assessments', 'opportunities', 'profile'].includes(route) && authStatus.state === 'authenticated' ? null : <PageHeader meta={routeTitles[route]} />}
           <RouteScreen route={route} authenticated={authStatus.state === 'authenticated'} currentStudent={currentStudent} />
         </main>
       </div>
@@ -813,15 +814,15 @@ function RouteScreen({ route, authenticated, currentStudent }: { readonly route:
 
 function AuthenticatedStudentRoute({ route, currentStudent }: { readonly route: RouteKey; readonly currentStudent: CurrentStudentState }): React.ReactElement {
   if (route === 'dashboard') return <AuthenticatedStudentDashboard currentStudent={currentStudent} />;
-  if (route === 'profile') return <AuthenticatedStudentProfile />;
+  if (route === 'profile') return <StudentProfileV3><AuthenticatedStudentProfile /></StudentProfileV3>;
   if (route === 'documents') return <AuthenticatedStudentDocuments />;
-  if (route === 'opportunities') return <><StudentOpportunitiesPage /><AuthenticatedStudentSavedOpportunities /></>;
+  if (route === 'opportunities') return <StudentOpportunitiesV3><StudentOpportunitiesPage /><AuthenticatedStudentSavedOpportunities /></StudentOpportunitiesV3>;
   if (route === 'applications') return <StudentApplicationsPage />;
-  if (route === 'career-path') return <CareerReadinessApiPanel route="roadmap" />;
+  if (route === 'career-path') return <StudentRoadmapV3><CareerReadinessApiPanel route="roadmap" /></StudentRoadmapV3>;
   if (route === 'readiness') return <CareerReadinessApiPanel route="readiness" />;
   if (route === 'skills') return <CareerReadinessApiPanel route="skills" />;
-  if (route === 'assessments') return <><ExamAttemptPanel /><CareerReadinessApiPanel route="assessments" /></>;
-  if (route === 'learning') return <CareerReadinessApiPanel route="learning" />;
+  if (route === 'assessments') return <StudentAssessmentsV3><ExamAttemptPanel /><CareerReadinessApiPanel route="assessments" /></StudentAssessmentsV3>;
+  if (route === 'learning') return <StudentLearningV3><CareerReadinessApiPanel route="learning" /></StudentLearningV3>;
   if (route === 'settings') return <><CareerReadinessApiPanel route="notifications" /><StudentPrivacyPanel /></>;
   if (route === 'help') return <HelpFaqPanel persona="student" />;
   if (route === 'practice') return <StudentPracticePage />;

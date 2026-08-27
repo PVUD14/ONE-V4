@@ -176,6 +176,12 @@ fun OneApp(currentTheme: String, onThemeChange: (String) -> Unit) {
             workspaceOptions = null
             Session.setWorkspace(context, encodeWorkspace(picked))
         }
+        workspace!!.kind == WorkspaceKind.OPS -> OpsScaffold(
+            currentTheme = currentTheme,
+            onThemeChange = onThemeChange,
+            onSignOut = { Session.clear(context); workspace = null; signedIn = false },
+            onSwitchWorkspace = if (multiWorkspace) ({ Session.setWorkspace(context, null); workspace = null }) else null,
+        )
         workspace!!.kind == WorkspaceKind.INSTITUTION -> InstitutionScaffold(
             organizationId = workspace!!.organizationId ?: "",
             currentTheme = currentTheme,
@@ -501,7 +507,7 @@ private fun HomeScreen(
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(exam.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                        Text("Closes ${formatWhen(exam.endsAt)} · ${exam.durationSeconds / 60} min on the clock",
+                        Text("Closes ${formatWhen(exam.endsAt)} · ${exam.durationSeconds / 60} min · laptop only",
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     StatusChip("Open", ChipKind.Accent)
@@ -655,7 +661,18 @@ private fun AssessmentsScreen(items: List<AssessmentDto>) {
         return
     }
     val results = items.mapNotNull { it.latestResult }
+    val bannerPalette = pro.ai8ht.one.ui.LocalOnePalette.current
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
+        if (items.any { it.openAttemptId != null }) {
+            item {
+                Spacer(Modifier.height(10.dp))
+                val (warnBg, warnFg) = bannerPalette.soft(Tone.Amber)
+                Surface(color = warnBg, contentColor = warnFg, shape = RoundedCornerShape(12.dp)) {
+                    Text("You have an attempt in progress. Exams are laptop-only — continue right away at one.ai8ht.pro on a laptop; the timer keeps running.",
+                        Modifier.padding(12.dp), style = MaterialTheme.typography.labelMedium)
+                }
+            }
+        }
         if (results.isNotEmpty()) {
             item {
                 Spacer(Modifier.height(10.dp))
@@ -725,9 +742,16 @@ private fun AssessmentCard(exam: AssessmentDto) {
                     Text("${result.score.toInt()}/${result.maxScore.toInt()}",
                         style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
                 }
+            } else if (exam.openAttemptId != null) {
+                Spacer(Modifier.height(8.dp))
+                val (warnBg, warnFg) = palette.soft(Tone.Amber)
+                Surface(color = warnBg, contentColor = warnFg, shape = RoundedCornerShape(10.dp)) {
+                    Text("Attempt in progress — continue now on your LAPTOP at one.ai8ht.pro. The timer keeps running; exams cannot be taken on mobile.",
+                        Modifier.padding(10.dp), style = MaterialTheme.typography.labelMedium)
+                }
             } else if (ends != null && now.isBefore(ends)) {
                 Spacer(Modifier.height(6.dp))
-                Text("Open until ${formatWhen(exam.endsAt)} · take it on the web at one.ai8ht.pro",
+                Text("Open until ${formatWhen(exam.endsAt)} · exams are taken on a laptop at one.ai8ht.pro",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }

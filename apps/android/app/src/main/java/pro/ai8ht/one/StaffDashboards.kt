@@ -58,7 +58,7 @@ import pro.ai8ht.one.ui.Tone
 
 // --- Workspaces ----------------------------------------------------------------
 
-enum class WorkspaceKind { STUDENT, INSTITUTION, EMPLOYER }
+enum class WorkspaceKind { STUDENT, INSTITUTION, EMPLOYER, OPS }
 
 data class Workspace(val kind: WorkspaceKind, val organizationId: String?, val role: String)
 
@@ -68,6 +68,8 @@ fun classifyWorkspaces(ctx: SecurityContextDto): List<Workspace> {
     for (m in ctx.memberships) {
         val role = m.role.uppercase()
         when {
+            role == "OPERATIONS_ADMIN" || role == "PLATFORM_SUPER_ADMIN" ->
+                out += Workspace(WorkspaceKind.OPS, null, m.role)
             role.startsWith("INSTITUTION") || role in institutionRoles ->
                 out += Workspace(WorkspaceKind.INSTITUTION, m.organizationId, m.role)
             role.startsWith("EMPLOYER") || role == "RECRUITER" ->
@@ -104,11 +106,13 @@ internal fun WorkspaceChooserScreen(options: List<Workspace>, onPick: (Workspace
                                     WorkspaceKind.STUDENT -> Icons.Filled.School
                                     WorkspaceKind.INSTITUTION -> Icons.Filled.Assignment
                                     WorkspaceKind.EMPLOYER -> Icons.Filled.WorkOutline
+                                    WorkspaceKind.OPS -> Icons.Filled.MoreHoriz
                                 },
                                 when (workspace.kind) {
                                     WorkspaceKind.STUDENT -> Tone.Accent
                                     WorkspaceKind.INSTITUTION -> Tone.Green
                                     WorkspaceKind.EMPLOYER -> Tone.Violet
+                                    WorkspaceKind.OPS -> Tone.Amber
                                 },
                             )
                             Spacer(Modifier.width(12.dp))
@@ -118,6 +122,7 @@ internal fun WorkspaceChooserScreen(options: List<Workspace>, onPick: (Workspace
                                         WorkspaceKind.STUDENT -> "Student"
                                         WorkspaceKind.INSTITUTION -> "Institution"
                                         WorkspaceKind.EMPLOYER -> "Employer"
+                                        WorkspaceKind.OPS -> "Operations"
                                     },
                                     style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
                                 )
@@ -641,5 +646,130 @@ private fun StaffInboxOverlay(feed: NotificationsEnvelope?, onClose: () -> Unit)
                 }
             }
         }
+    }
+}
+
+// --- Operations dashboard (view-only by policy) ----------------------------------
+
+@Composable
+internal fun OpsScaffold(
+    currentTheme: String,
+    onThemeChange: (String) -> Unit,
+    onSignOut: () -> Unit,
+    onSwitchWorkspace: (() -> Unit)?,
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val palette = LocalOnePalette.current
+    var tab by remember { mutableStateOf(0) }
+    var orgs by remember { mutableStateOf<List<OpsOrganizationDto>?>(null) }
+    var invitations by remember { mutableStateOf<List<OpsInvitationDto>>(emptyList()) }
+    var inbox by remember { mutableStateOf<NotificationsEnvelope?>(null) }
+    var showInboxOv by remember { mutableStateOf(false) }
+    var showThemeOv by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        coroutineScope {
+            val o = async { runCatching { Api.listOperationsOrganizations(context) }.getOrDefault(emptyList()) }
+            val i = async { runCatching { Api.listOperationsInvitations(context) }.getOrDefault(emptyList()) }
+            val n = async { runCatching { Api.listNotifications(context) }.getOrNull() }
+            orgs = o.await(); invitations = i.await(); inbox = n.await()
+        }
+    }
+
+    androidx.activity.compose.BackHandler(enabled = showInboxOv || showThemeOv) {
+        if (showThemeOv) showThemeOv = false else showInboxOv = false
+    }
+    when {
+        showThemeOv -> { SlideIn { ThemeOverlay(currentTheme, onThemeChange, onClose = { showThemeOv = false }) }; return }
+        showInboxOv -> { SlideIn { StaffInboxOverlay(inbox, onClose = { showInboxOv = false }) }; return }
+    }
+
+    Scaffold(
+        containerColor = palette.bandBottom,
+        contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
+        bottomBar = {
+            NavigationBar(containerColor = palette.navBg, windowInsets = NavigationBarDefaults.windowInsets) {
+                val colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = palette.navSelected, selectedTextColor = palette.navSelected,
+                    indicatorColor = palette.accentSoft,
+                    unselectedIconColor = palette.muted, unselectedTextColor = palette.muted,
+                )
+                NavigationBarItem(selected = tab == 0, onClick = { tab = 0 },
+                    icon = { Icon(Icons.Filled.Home, null) }, label = { Text("Overview") }, colors = colors)
+                NavigationBarItem(selected = tab == 1, onClick = { tab = 1 },
+                    icon = { Icon(Icons.Filled.MoreHoriz, null) }, label = { Text("More") }, colors = colors)
+            }
+        },
+    ) { padding ->
+        Column(Modifier.padding(padding).fillMaxSize()) {
+            BrandBand {
+                StaffBandHeader(
+                    title = if (tab == 0) "Operations" else "More",
+                    subtitle = if (tab == 0) "Platform overview · view-only" else "Workspace and app settings",
+                    unread = inbox?.unreadCount ?: 0,
+                    onTheme = { showThemeOv = true },
+                    onBell = { showInboxOv = true },
+                )
+            }
+            BandSheet {
+                when {
+                    orgs == null -> HomeSkeleton()
+                    tab == 0 -> OpsOverview(orgs!!, invitations)
+                    else -> StaffMore(onSignOut, onSwitchWorkspace,
+                        "This workspace is view-only in the app by policy. All changes - onboarding, invitations, configuration - happen on the web at one.ai8ht.pro.")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OpsOverview(orgs: List<OpsOrganizationDto>, invitations: List<OpsInvitationDto>) {
+    val institutions = orgs.count { it.kind == "INSTITUTION" }
+    val employers = orgs.count { it.kind == "EMPLOYER" }
+    val verified = orgs.count { it.verificationState.uppercase().startsWith("VERIF") }
+    val pendingInvites = invitations.count { it.state.uppercase() == "PENDING" }
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp)) {
+        Spacer(Modifier.height(10.dp))
+        PilotCard(glow = true) {
+            Text("View-only workspace: monitoring only. Changes happen on the web.",
+                Modifier.padding(12.dp), style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            StatCell("$institutions", "Institutions", Tone.Green, Icons.Filled.School, Modifier.weight(1f))
+            StatCell("$employers", "Employers", Tone.Violet, Icons.Filled.WorkOutline, Modifier.weight(1f))
+        }
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            StatCell("$verified", "Verified", Tone.Accent, Icons.Filled.Assignment, Modifier.weight(1f))
+            StatCell("$pendingInvites", "Invites pending", Tone.Amber, Icons.Filled.Notifications, Modifier.weight(1f))
+        }
+        SectionTitle("Organizations")
+        if (orgs.isEmpty()) {
+            PilotCard { Text("No organizations onboarded yet.", Modifier.padding(16.dp),
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        } else {
+            orgs.take(10).forEach { org ->
+                PilotCard(Modifier.fillMaxWidth().padding(bottom = 10.dp)) {
+                    Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                        IconBubble(
+                            if (org.kind == "INSTITUTION") Icons.Filled.School else Icons.Filled.WorkOutline,
+                            if (org.kind == "INSTITUTION") Tone.Green else Tone.Violet, size = 32.dp,
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(org.legalName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                            Text(prettify(org.kind), style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        StatusChip(prettify(org.verificationState),
+                            if (org.verificationState.uppercase().startsWith("VERIF")) ChipKind.Positive else ChipKind.Waiting)
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(20.dp))
     }
 }

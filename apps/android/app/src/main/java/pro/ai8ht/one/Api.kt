@@ -146,6 +146,16 @@ object Api {
             request(context, "GET", "/api/v1/institutions/$institutionId/assessments/$definitionId/results"),
         )
 
+    suspend fun listOperationsOrganizations(context: Context): List<OpsOrganizationDto> =
+        json.decodeFromString<OpsOrganizationsEnvelope>(
+            request(context, "GET", "/api/v1/operations/organizations"),
+        ).organizations
+
+    suspend fun listOperationsInvitations(context: Context): List<OpsInvitationDto> =
+        json.decodeFromString<OpsInvitationsEnvelope>(
+            request(context, "GET", "/api/v1/operations/invitations"),
+        ).invitations
+
     suspend fun listEmployerOpportunities(context: Context, employerId: String): List<EmployerOpportunityDto> =
         json.decodeFromString<EmployerOpportunitiesEnvelope>(
             request(context, "GET", "/api/v1/employers/$employerId/opportunities"),
@@ -491,3 +501,14 @@ object Api {
     val applicationCount: Int = 0,
     val openApplicationCount: Int = 0,
 )
+
+@Serializable data class OpsOrganizationsEnvelope(val organizations: List<OpsOrganizationDto> = emptyList())
+@Serializable data class OpsOrganizationDto(
+    val id: String,
+    val kind: String = "",
+    val legalName: String = "",
+    val verificationState: String = "",
+    val active: Boolean = true,
+)
+@Serializable data class OpsInvitationsEnvelope(val invitations: List<OpsInvitationDto> = emptyList())
+@Serializable data class OpsInvitationDto(val id: String, val state: String = "", val role: String = "")

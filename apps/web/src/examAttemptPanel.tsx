@@ -1,3 +1,14 @@
+/**
+ * Assessments are laptop/desktop-only by policy: phones make timed, proctored
+ * attempts too easy to interrupt. Detected once per load; on mobile the
+ * start/resume actions are replaced with a directive to use a laptop.
+ */
+function isMobileDevice(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const coarse = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches === true;
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || (coarse && window.innerWidth < 900);
+}
+
 import { useEffect, useRef, useState } from 'react';
 import {
   getProtectedAccessToken,
@@ -107,7 +118,11 @@ export function ExamAttemptPanel(): React.ReactElement | null {
                 <div className="exam-list-side">
                   {exam.latestResult ? <span className="exam-chip done">{exam.latestResult.percentage}%</span> : null}
                   <small>{exam.attemptsUsed} / {exam.attemptsAllowed} attempts used</small>
-                  {exam.openAttemptId ? (
+                  {isMobileDevice() && (exam.openAttemptId || (windowOpen && attemptsLeft > 0)) ? (
+                    <span className="exam-chip muted" title="Assessments are taken on a laptop or desktop only.">
+                      {exam.openAttemptId ? 'Attempt in progress — continue on your laptop; the timer keeps running.' : 'Laptop only — open one.ai8ht.pro on a laptop to start.'}
+                    </span>
+                  ) : exam.openAttemptId ? (
                     <button type="button" disabled={busy} onClick={() => void start(exam.id)}>Resume Attempt</button>
                   ) : windowOpen && attemptsLeft > 0 ? (
                     <button type="button" disabled={busy} onClick={() => void start(exam.id)}>Start Attempt</button>

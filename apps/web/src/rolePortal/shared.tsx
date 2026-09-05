@@ -1,0 +1,72 @@
+/**
+ * ONE · Role portal — Shared
+ *
+ * Workspace guards, the honest read-only / not-built / sign-in states, and error
+ * formatting. Depends on nothing in the shell, so the families can import it freely.
+ *
+ * Split out of rolePortalPages.tsx so each stream owns its own surface. The
+ * shell and the route dispatcher remain there and import from here.
+ */
+import { ApiRequestError } from '../api.js';
+import { V2EmptyState } from '../dashboardsV2.js';
+
+export interface AuthenticatedWorkspaceSummary {
+  readonly role: string;
+  readonly organizationId: string | null;
+}
+
+export const institutionWorkspaceRoles = new Set(['INSTITUTION_OWNER', 'INSTITUTION_ADMIN']);
+
+export function isInstitutionWorkspace(workspace: AuthenticatedWorkspaceSummary | undefined): workspace is AuthenticatedWorkspaceSummary & { readonly organizationId: string } {
+  return Boolean(workspace?.organizationId && institutionWorkspaceRoles.has(workspace.role));
+}
+
+// Staff surfaces (dashboard, exam engine) are shared with the wider institution
+// staff roles; admin-only management pages keep the narrower set above.
+export const institutionStaffWorkspaceRoles = new Set(['INSTITUTION_OWNER', 'INSTITUTION_ADMIN', 'PLACEMENT_ADMIN', 'DEPARTMENT_HEAD', 'FACULTY_LECTURER', 'CAREER_COUNSELOR']);
+
+export function isInstitutionStaffWorkspace(workspace: AuthenticatedWorkspaceSummary | undefined): workspace is AuthenticatedWorkspaceSummary & { readonly organizationId: string } {
+  return Boolean(workspace?.organizationId && institutionStaffWorkspaceRoles.has(workspace.role));
+}
+
+export function InstitutionWorkspaceError({ title, unauthorized = false }: { readonly title: string; readonly unauthorized?: boolean }): React.ReactElement {
+  return <section className="role-module role-module--dense"><div className="role-page-heading"><div><span className="eyebrow">Authenticated API-backed</span><h1>{title}</h1><p>{unauthorized ? 'You do not have permission to perform this action.' : 'We could not resolve your institution workspace.'}</p></div></div><p className="form-error" role="alert">{unauthorized ? 'You do not have permission to perform this action.' : 'We could not load your institution workspace. Reference: workspace-context-missing'}</p></section>;
+}
+
+export function AuthenticatedReadOnlyModule({ title, detail }: { readonly title: string; readonly detail: string }): React.ReactElement {
+  return <section className="role-module"><div className="role-page-heading"><div><span className="eyebrow">Read-only</span><h1>{title}</h1><p>{detail}</p></div></div>
+    <div className="role-wide"><V2EmptyState icon="🔎" title="View-only for your role"
+      note="You can see authorized context here, but changes for this module are not switched on yet for your role."
+      hint="Assessments and Help & FAQ are fully live — use the sidebar to reach them." /></div></section>;
+}
+
+export function AuthenticatedNotYetAvailable({ title, detail }: { readonly title: string; readonly detail: string }): React.ReactElement {
+  return <section className="role-module"><div className="role-page-heading"><div><span className="eyebrow">Coming later</span><h1>{title}</h1><p>{detail}</p></div></div>
+    <div className="role-wide"><V2EmptyState icon="🧭" title="Not built yet"
+      note="This module is on the roadmap but has no live workflow behind it yet — nothing here is hidden or broken."
+      hint="Your dashboard shows everything that is live for your role today." /></div></section>;
+}
+
+export function RestrictedApiState({ title, message }: { readonly title: string; readonly message: string }): React.ReactElement {
+  return <section className="role-module"><div className="role-page-heading"><div><span className="eyebrow">Authenticated API-backed</span><h1>{title}</h1><p>{message}</p></div></div>
+    <div className="role-wide"><V2EmptyState icon="🔐" title="Sign-in required"
+      note="This protected workflow only renders for an authorized identity — no preview or fake data is substituted." /></div></section>;
+}
+
+export function formatApiError(error: unknown, fallback: string): string {
+  if (!(error instanceof ApiRequestError)) return fallback;
+  const message = safeErrorMessage(error.code) ?? fallback;
+  return `${message}${error.field ? ` Field: ${error.field}.` : ''} Reference: ${error.correlationId}`;
+}
+
+export function safeErrorMessage(code: string | undefined): string | undefined {
+  switch (code) {
+    case 'STUDENT_EMAIL_ALREADY_EXISTS': return 'This email is already associated with a ONE identity and cannot be attached automatically. Use the approved onboarding/recovery workflow.';
+    case 'INSTITUTION_STUDENT_ID_ALREADY_EXISTS': return 'A Student with this institution ID already exists.';
+    case 'INVALID_ACADEMIC_DATE_WINDOW': return 'Expected graduation date must be on or after academic start date.';
+    case 'INVALID_ACADEMIC_UNIT_SCOPE': return 'Selected academic unit is not valid for this Institution and field.';
+    case 'STAFF_INVITATION_ALREADY_PENDING': return 'Staff invitation already pending.';
+    case 'FORBIDDEN': return 'You do not have permission to perform this action.';
+    default: return undefined;
+  }
+}

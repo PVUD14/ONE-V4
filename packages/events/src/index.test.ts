@@ -174,4 +174,30 @@ describe('integration event envelope', () => {
       payload: { attemptId: randomUUID(), evidenceId: randomUUID(), outcomeBand: 'PROGRESSING', answers: 'raw' },
     })).toThrow(/unexpected payload field answers/);
   });
+
+  it('registers minimum-data seeded content generation lifecycle events', () => {
+    const requestId = randomUUID();
+    const contentId = randomUUID();
+    const actorId = randomUUID();
+    const requested = createIntegrationEventEnvelope({
+      eventId: randomUUID(), eventType: 'content.generation.requested', eventVersion: 1,
+      occurredAt: '2026-08-18T00:00:00.000Z', aggregateId: requestId,
+      actorId, correlationId: 'content-generation-1',
+      payload: { requestId, contentId, seedKey: 'COMPANY_RESEARCH_CHECKLIST' },
+    });
+    expect(requested).toMatchObject({ producer: 'learner-content', aggregateType: 'content_generation_request' });
+
+    expect(() => createIntegrationEventEnvelope({
+      eventId: randomUUID(), eventType: 'content.generation.completed', eventVersion: 1,
+      occurredAt: '2026-08-18T00:00:01.000Z', aggregateId: contentId,
+      actorId, correlationId: requested.correlationId, causationId: requested.eventId,
+      payload: { requestId, contentId, seedKey: 'COMPANY_RESEARCH_CHECKLIST', reviewState: 'DRAFT', source: 'SEEDED' },
+    })).not.toThrow();
+    expect(() => createIntegrationEventEnvelope({
+      eventId: randomUUID(), eventType: 'content.generation.requested', eventVersion: 1,
+      occurredAt: '2026-08-18T00:00:00.000Z', aggregateId: requestId,
+      actorId: randomUUID(), correlationId: 'content-generation-2',
+      payload: { requestId, contentId, seedKey: 'UNREGISTERED_SEED' },
+    })).toThrow(/invalid enum/);
+  });
 });

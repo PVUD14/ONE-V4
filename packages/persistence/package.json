@@ -14,7 +14,8 @@
     "db:seed:careers": "tsx src/seed-careers.ts",
     "test": "vitest run --fileParallelism=false",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "worker:automation": "tsx src/run-automation-worker.ts"
+    "worker:automation": "tsx src/run-automation-worker.ts",
+    "worker:content-generation": "tsx src/run-content-generation-worker.ts"
   },
   "dependencies": {
     "@planthepath/career-readiness": "workspace:*",

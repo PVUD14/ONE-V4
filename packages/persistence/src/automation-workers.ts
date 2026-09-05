@@ -24,6 +24,7 @@ import {
   releaseAutomationClaimForFailure,
   resolveClaimedEmailDelivery,
 } from './automation-runtime.js';
+import { consumeSeededContentGenerationRequested } from './content-generation.js';
 
 export async function publishOutboxOnce(input: {
   readonly db: PersistenceDb; readonly publisher: IntegrationEventPublisher; readonly leaseOwner: string; readonly now: Date;
@@ -47,6 +48,12 @@ export function createNotificationEventConsumer(input: { readonly pool: Pool; re
   return new SqsIntegrationEventConsumer(input.queueUrl, async (event) => {
     if (event.eventType !== 'notification.delivery.requested' || event.eventVersion !== 1) throw new Error('event is outside the notification consumer contract');
     await createAutomationCommandForNotificationEvent(input.pool, event.eventId);
+  });
+}
+
+export function createContentGenerationEventConsumer(input: { readonly db: PersistenceDb; readonly queueUrl: string }): SqsIntegrationEventConsumer {
+  return new SqsIntegrationEventConsumer(input.queueUrl, async (event) => {
+    await consumeSeededContentGenerationRequested(input.db, event);
   });
 }
 

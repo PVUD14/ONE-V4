@@ -30,6 +30,75 @@ export type LearnerContentType = (typeof LEARNER_CONTENT_TYPES)[number];
 export type LearnerContentSource = (typeof LEARNER_CONTENT_SOURCES)[number];
 export type LearnerContentReviewState = (typeof LEARNER_CONTENT_REVIEW_STATES)[number];
 
+export const LEARNER_CONTENT_SEED_KEYS = [
+  'PRACTICE_PROBLEM_SOLVING',
+  'COMPANY_RESEARCH_CHECKLIST',
+  'INTERVIEW_EVIDENCE_PLANNER',
+  'SCHOLARSHIP_APPLICATION_CHECKLIST',
+  'EVIDENCE_FIRST_RESUME_OUTLINE',
+] as const;
+
+export type LearnerContentSeedKey = (typeof LEARNER_CONTENT_SEED_KEYS)[number];
+
+export interface LearnerContentSeed {
+  readonly contentType: LearnerContentType;
+  readonly title: string;
+  readonly summary: string;
+  readonly content: Readonly<Record<string, unknown>>;
+  readonly sortOrder: number;
+  readonly metadata: Readonly<Record<string, unknown>>;
+}
+
+/** Fixed local fixtures used by the non-AI D3 pipeline. */
+export const LEARNER_CONTENT_SEEDS: Readonly<Record<LearnerContentSeedKey, LearnerContentSeed>> = {
+  PRACTICE_PROBLEM_SOLVING: {
+    contentType: 'PRACTICE',
+    title: 'Problem-solving practice guide',
+    summary: 'A repeatable structure for working through practice problems.',
+    content: { steps: ['Restate the problem', 'List known constraints', 'Choose an approach', 'Check the result'] },
+    sortOrder: 10,
+    metadata: { locale: 'en-IN', seedVersion: 'd3-v1' },
+  },
+  COMPANY_RESEARCH_CHECKLIST: {
+    contentType: 'COMPANY_PREP',
+    title: 'Company research checklist',
+    summary: 'A checklist for preparing from verified company and role information.',
+    content: { checklist: ['Read the role description', 'Review the official company site', 'Prepare role-specific questions'] },
+    sortOrder: 20,
+    metadata: { locale: 'en-IN', seedVersion: 'd3-v1' },
+  },
+  INTERVIEW_EVIDENCE_PLANNER: {
+    contentType: 'CAREER_TOOL',
+    title: 'Interview evidence planner',
+    summary: 'A worksheet for selecting evidence before an interview.',
+    content: { sections: ['Situation', 'Action', 'Result', 'Verification'] },
+    sortOrder: 30,
+    metadata: { locale: 'en-IN', seedVersion: 'd3-v1' },
+  },
+  SCHOLARSHIP_APPLICATION_CHECKLIST: {
+    contentType: 'SCHOLARSHIP',
+    title: 'Scholarship application checklist',
+    summary: 'A safety-first checklist for checking eligibility and official deadlines.',
+    content: { checklist: ['Confirm eligibility', 'Verify the official deadline', 'Collect required documents'] },
+    sortOrder: 40,
+    metadata: { locale: 'en-IN', seedVersion: 'd3-v1' },
+  },
+  EVIDENCE_FIRST_RESUME_OUTLINE: {
+    contentType: 'RESUME_BUILDER',
+    title: 'Evidence-first resume outline',
+    summary: 'A resume outline that keeps claims connected to verifiable work.',
+    content: { sections: ['Summary', 'Skills', 'Verified projects', 'Education'] },
+    sortOrder: 50,
+    metadata: { locale: 'en-IN', seedVersion: 'd3-v1' },
+  },
+};
+
+export function learnerContentSeed(seedKey: LearnerContentSeedKey): LearnerContentSeed {
+  const seed = LEARNER_CONTENT_SEEDS[seedKey];
+  if (!seed) throw new LearnerContentRuleError('INVALID_CONTENT', 'Learner content seed is not supported.');
+  return seed;
+}
+
 export interface LearnerContentDraftInput {
   readonly id: string;
   readonly contentType: LearnerContentType;

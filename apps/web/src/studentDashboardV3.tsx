@@ -99,7 +99,7 @@ export function StudentDashboardV3({ studentName }: { readonly studentName: stri
   const daypart = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
   const exams = data.exams ?? [];
   const lessons = data.learner?.catalog?.modules?.flatMap((module) => module.lessons ?? []) ?? [];
-  const completedLessonIds = new Set(data.learner?.progress.filter((item) => item.state === 'COMPLETED').map((item) => item.lessonVersionId) ?? []);
+  const completedLessonIds = new Set(data.learner?.progress?.filter((item) => item.state === 'COMPLETED').map((item) => item.lessonVersionId) ?? []);
   const nextLesson = lessons.find((lesson) => !completedLessonIds.has(lesson.id));
   const lessonPercent = lessons.length ? Math.round((completedLessonIds.size / lessons.length) * 100) : 0;
   const openExams = exams.filter((exam) => exam.openAttemptId !== null || (now >= Date.parse(exam.startsAt) && now <= Date.parse(exam.endsAt) && exam.attemptsUsed < exam.attemptsAllowed));

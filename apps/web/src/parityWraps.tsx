@@ -100,7 +100,7 @@ export function StudentRoadmapV3({ children }: { readonly children: React.ReactN
 export function StudentLearningV3({ children }: { readonly children: React.ReactNode }): React.ReactElement {
   const learner = useLearner();
   const lessons = learner?.catalog?.modules?.flatMap((module) => module.lessons ?? []) ?? [];
-  const completed = learner?.progress.filter((item) => item.state === 'COMPLETED').length ?? 0;
+  const completed = learner?.progress?.filter((item) => item.state === 'COMPLETED').length ?? 0;
   const notStarted = Math.max(0, lessons.length - completed);
   const percent = lessons.length ? Math.round((completed / lessons.length) * 100) : null;
   return <PilotShell title="Learn" subtitle="Courses and lessons that build your readiness evidence." rail={<>

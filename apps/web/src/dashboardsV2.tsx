@@ -149,7 +149,7 @@ export function StudentDashboardV2({ studentName }: { readonly studentName: stri
   const now = Date.now();
   const exams = data.exams ?? [];
   const lessons = data.learner?.catalog?.modules?.flatMap((module) => module.lessons ?? []) ?? [];
-  const completedLessonIds = new Set(data.learner?.progress.filter((item) => item.state === 'COMPLETED').map((item) => item.lessonVersionId) ?? []);
+  const completedLessonIds = new Set(data.learner?.progress?.filter((item) => item.state === 'COMPLETED').map((item) => item.lessonVersionId) ?? []);
   const openExams = exams.filter((exam) => exam.openAttemptId !== null || (now >= Date.parse(exam.startsAt) && now <= Date.parse(exam.endsAt) && exam.attemptsUsed < exam.attemptsAllowed));
   const results = exams.filter((exam) => exam.latestResult !== null);
   const bestScore = results.length ? Math.max(...results.map((exam) => exam.latestResult!.percentage)) : null;

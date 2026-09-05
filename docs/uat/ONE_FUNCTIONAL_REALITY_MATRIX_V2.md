@@ -1,5 +1,12 @@
 # ONE Functional Reality Matrix V2
 
+> **Status: stale — 2026-09-05.** This matrix predates the current release and understates what
+> exists. It records student binary upload, employer hiring mutations and student application
+> workflows as unavailable; all three are implemented and enforced. It also implies a missing
+> readiness scoring engine — see [ADR-020 — Readiness Is a Band, Not a Score](../architecture/ADR-020-readiness-is-a-band-not-a-score.md), which records that the engine exists
+> and that no numeric score will ever be produced. For the current state, read the Role Capability
+> and Build-State report rather than this file.
+
 Phase 2A starts from human-accepted Phase 1 routing/session UAT:
 
 - Student login: PASS

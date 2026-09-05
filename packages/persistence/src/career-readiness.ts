@@ -317,6 +317,14 @@ export async function publishCareerReadinessPilot(
 }
 
 export async function getPublishedCareerReadinessCatalog(pool: Pool): Promise<Record<string, unknown>> {
+  const topics = await pool.query(
+    `SELECT DISTINCT t.id, t.stable_key AS "stableKey", t.name, t.description
+     FROM taxonomy_nodes t
+     JOIN content_revisions cr ON cr.id=t.content_revision_id AND cr.state='PUBLISHED'
+     JOIN release_manifests rm ON rm.id=cr.release_manifest_id AND rm.status='PUBLISHED'
+     WHERE t.kind='TOPIC' AND t.active
+     ORDER BY t.stable_key`,
+  );
   const modules = await pool.query(
     `SELECT m.id, m.stable_key AS "stableKey", m.version, m.title, m.description,
        COALESCE(jsonb_agg(jsonb_build_object(
@@ -335,7 +343,8 @@ export async function getPublishedCareerReadinessCatalog(pool: Pool): Promise<Re
      FROM assessment_definitions a JOIN release_manifests rm ON rm.id=a.release_manifest_id AND rm.status='PUBLISHED'
      JOIN assessment_blueprints b ON b.assessment_definition_id=a.id ORDER BY a.stable_key`,
   );
-  return { pilot: 'Career Readiness Fundamentals', releaseManifestId: PILOT_RELEASE_ID, modules: modules.rows, assessments: assessments.rows };
+  return { pilot: 'Career Readiness Fundamentals', releaseManifestId: PILOT_RELEASE_ID,
+    topics: topics.rows, modules: modules.rows, assessments: assessments.rows };
 }
 
 export async function completeLesson(pool: Pool, input: {

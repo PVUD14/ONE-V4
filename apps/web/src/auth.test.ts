@@ -206,11 +206,11 @@ describe('Cognito Hosted UI browser authentication', () => {
     await waitFor(() => expect(screen.getByText('Quick Actions')).toBeInTheDocument());
     expect(screen.queryByText('Rahul Kumar')).not.toBeInTheDocument();
     expect(screen.queryByText('DEMO PREVIEW')).not.toBeInTheDocument();
-    // Pilot-parity rule (2026-08-27): score widgets render in the same slots as
-    // the pilot but show an explicit NA until a real scoring engine exists -
-    // "/100" may appear, a fabricated numeric score may not.
-    expect(screen.getAllByText('/100').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('NA').length).toBeGreaterThan(0);
+    // The protected readiness engine is banded, so authenticated UI must keep
+    // the visual slot without presenting a fabricated numeric score.
+    expect(screen.getByRole('heading', { name: 'Career Readiness Band' })).toBeInTheDocument();
+    expect(screen.getByText('No advisory band yet')).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain('/100');
     window.history.pushState(null, '', '/student/readiness');
     render(React.createElement(App));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/api/v1/career-readiness/me'), expect.objectContaining({

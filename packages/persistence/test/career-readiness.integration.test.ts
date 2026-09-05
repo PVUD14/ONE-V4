@@ -63,7 +63,9 @@ describe('Career Readiness Fundamentals production path', () => {
 
   it('publishes only governed PlanThePath-owned content and omits answer keys', async () => {
     const catalog = await getPublishedCareerReadinessCatalog(pool);
-    expect(catalog).toMatchObject({ pilot: 'Career Readiness Fundamentals' });
+    expect(catalog).toMatchObject({ pilot: 'Career Readiness Fundamentals', topics: expect.arrayContaining(
+      fixture.topics.map(({ id, stableKey, name, description }) => ({ id, stableKey, name, description })),
+    ) });
     expect(JSON.stringify(catalog)).not.toContain('correctOptionId');
     expect(JSON.stringify(catalog)).not.toContain('answer_hash');
   });

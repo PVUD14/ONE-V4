@@ -70,6 +70,7 @@ export async function getApiHealth(signal?: AbortSignal): Promise<ApiHealth> {
 export interface CareerReadinessCatalog {
   readonly pilot: string;
   readonly releaseManifestId: string;
+  readonly topics: readonly { readonly id: string; readonly stableKey: string; readonly name: string; readonly description: string }[];
   readonly modules: readonly {
     readonly id: string; readonly stableKey: string; readonly version: number; readonly title: string; readonly description: string;
     readonly lessons: readonly { readonly id: string; readonly stableKey: string; readonly version: number; readonly title: string;
@@ -86,7 +87,7 @@ export interface LearnerCareerReadinessState {
   readonly evidence: readonly { readonly id: string; readonly evidenceType: string; readonly topicId: string; readonly demonstrated: number; readonly possible: number }[];
   readonly mastery: readonly { readonly id: string; readonly topicId: string; readonly band: string; readonly evidenceIds: readonly string[] }[];
   readonly readiness: { readonly id: string; readonly band: string; readonly advisory: true; readonly employerVisible: false;
-    readonly explanation: { readonly factors?: readonly unknown[] } } | null;
+    readonly explanation: { readonly factors?: readonly { readonly topicId: string; readonly masteryBand: string; readonly explanation: string }[] } } | null;
   readonly roadmap: readonly { readonly id: string; readonly topicId: string; readonly actionCode: string; readonly reasonCode: string; readonly state: string; readonly dueAt?: string }[];
   readonly notificationPreferences: { readonly emailEnabled: boolean; readonly quietHoursStartMinute: number;
     readonly quietHoursEndMinute: number; readonly dailyCap: number } | null;

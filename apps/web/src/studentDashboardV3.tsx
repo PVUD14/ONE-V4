@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ArrowRight, Award, BookOpen, Building2, CalendarDays, CheckCircle2, ClipboardCheck, Flame, Play, Star, Target, TrendingUp, Trophy } from 'lucide-react';
-import { Ring, Spark, toneColor } from './pilot/pilotComponents.js';
+import { Spark, toneColor } from './pilot/pilotComponents.js';
 import {
   getLearnerCareerReadinessState,
   getProtectedAccessToken,
@@ -41,8 +41,31 @@ function relativeWhen(iso: string): string {
   return days === 1 ? 'Yesterday' : `${days} days ago`;
 }
 
-const CATEGORY_SCORES = ['Aptitude', 'Technical', 'Communication', 'Interview', 'Resume'] as const;
+const READINESS_BANDS = ['NOT_ENOUGH_EVIDENCE', 'DEVELOPING', 'PROGRESSING', 'READY_FOR_NEXT_STEP'] as const;
 const NA_COURSE_TONES = ['blue', 'purple', 'teal', 'green'] as const;
+
+function ReadinessBandRing({ band }: { readonly band: string | null }): React.ReactElement {
+  const size = 76;
+  const stroke = 9;
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const segment = circumference / READINESS_BANDS.length;
+  const gap = 5;
+  const activeIndex = band ? READINESS_BANDS.indexOf(band as (typeof READINESS_BANDS)[number]) : -1;
+  const label = activeIndex >= 0 ? `${prettify(READINESS_BANDS[activeIndex]!)} readiness band` : 'Readiness band unavailable';
+  return <span style={{ position: 'relative', width: size, height: size, display: 'inline-grid', placeItems: 'center', flex: '0 0 auto' }}>
+    <svg width={size} height={size} role="img" aria-label={label}>
+      {READINESS_BANDS.map((candidate, index) => <circle key={candidate}
+        cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={index === activeIndex ? toneColor('blue') : '#dce3ee'}
+        strokeWidth={index === activeIndex ? stroke : stroke - 2} strokeLinecap="round"
+        strokeDasharray={`${segment - gap} ${circumference - segment + gap}`}
+        strokeDashoffset={-index * segment} transform={`rotate(-90 ${size / 2} ${size / 2})`} />)}
+    </svg>
+    <span style={{ position: 'absolute', textAlign: 'center', fontWeight: 700, fontSize: 11, color: activeIndex >= 0 ? 'var(--p-text)' : 'var(--p-muted)' }}>
+      {activeIndex >= 0 ? 'BAND' : 'NA'}
+    </span>
+  </span>;
+}
 
 interface DashboardData {
   readonly profile: StudentProfileDto | null;
@@ -82,6 +105,9 @@ export function StudentDashboardV3({ studentName }: { readonly studentName: stri
   const openExams = exams.filter((exam) => exam.openAttemptId !== null || (now >= Date.parse(exam.startsAt) && now <= Date.parse(exam.endsAt) && exam.attemptsUsed < exam.attemptsAllowed));
   const band = data.learner?.readiness?.band ?? null;
   const modules = data.learner?.catalog?.modules ?? [];
+  const topics = new Map((data.learner?.catalog?.topics ?? []).map((topic) => [topic.id, topic]));
+  const factors = new Map((data.learner?.readiness?.explanation.factors ?? []).map((factor) => [factor.topicId, factor]));
+  const masteryCards = (data.learner?.mastery ?? []).slice(0, 5);
 
   // Today's plan is rule-derived from live account state - the honest v1 of
   // the pilot's daily-plan engine.
@@ -130,24 +156,38 @@ export function StudentDashboardV3({ studentName }: { readonly studentName: stri
 
         <div className="pilot-row v3-score-row">
           <section className="pilot-card">
-            <h2>Career Readiness Score</h2>
+            <h2>Career Readiness Band</h2>
             <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'nowrap' }}>
               <div style={{ minWidth: 0 }}>
-                <span style={{ fontSize: 32, fontWeight: 800, lineHeight: 1 }}>NA<span style={{ fontSize: 14, color: 'var(--p-muted)', fontWeight: 600 }}>/100</span></span>
-                <div style={{ marginTop: 7 }}>{band
+                <div>{band
                   ? <span className="pilot-chip green">{prettify(band)}</span>
                   : <span className="pilot-chip slate">No advisory band yet</span>}</div>
                 <div style={{ marginTop: 11 }}><button type="button" className="pilot-btn soft small" onClick={() => go('/student/readiness')}>View Full Report</button></div>
               </div>
-              <Ring value={0} size={66} stroke={8} tone="blue"><span style={{ fontSize: 14, color: 'var(--p-muted)' }}>NA</span></Ring>
+              <ReadinessBandRing band={band} />
+            </div>
+            <div aria-label="Readiness band legend" style={{ display: 'grid', gap: 5, marginTop: 12 }}>
+              {READINESS_BANDS.map((candidate, index) => <span key={candidate} style={{ display: 'flex', gap: 7, alignItems: 'center', fontSize: 10.5,
+                color: candidate === band ? 'var(--p-text)' : 'var(--p-muted)', fontWeight: candidate === band ? 700 : 500 }}>
+                <i aria-hidden="true" style={{ width: 8, height: 8, borderRadius: '50%', background: candidate === band ? toneColor('blue') : '#dce3ee' }} />
+                {index + 1}. {prettify(candidate)}{candidate === band ? ' (current)' : ''}
+              </span>)}
             </div>
           </section>
-          {CATEGORY_SCORES.map((label) => (
-            <section key={label} className="pilot-card pilot-score-card">
-              <header>{label}</header>
-              <Ring value={0} size={62} stroke={7} tone="blue"><span style={{ fontSize: 11, color: 'var(--p-muted)' }}>NA</span></Ring>
-              <div className="value">NA<span>/100</span></div>
+          {masteryCards.map((mastery) => {
+            const factor = factors.get(mastery.topicId);
+            return <section key={mastery.id} className="pilot-card pilot-score-card">
+              <header>{topics.get(mastery.topicId)?.name ?? 'Readiness topic'}</header>
+              <span className="pilot-chip blue">{prettify(mastery.band)}</span>
+              <small>{mastery.evidenceIds.length} active evidence record{mastery.evidenceIds.length === 1 ? '' : 's'}</small>
+              {factor ? <small>{factor.explanation}</small> : null}
+            </section>
+          })}
+          {Array.from({ length: Math.max(0, 5 - masteryCards.length) }).map((_, index) => (
+            <section key={`mastery-na-${index}`} className="pilot-card pilot-score-card">
+              <header>Readiness factor</header>
               <span className="pilot-chip slate">NA</span>
+              <small>No mastery projection available.</small>
             </section>
           ))}
         </div>

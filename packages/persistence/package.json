@@ -10,6 +10,7 @@
     "db:migrate": "tsx src/migrate.ts",
     "db:register:n8n": "tsx src/register-n8n-workflows.ts",
     "db:seed:career-readiness": "tsx src/seed-career-readiness-pilot.ts",
+    "db:seed:local-users": "tsx src/seed-local-users.ts",
     "db:seed:careers": "tsx src/seed-careers.ts",
     "test": "vitest run --fileParallelism=false",
     "typecheck": "tsc -p tsconfig.json --noEmit",

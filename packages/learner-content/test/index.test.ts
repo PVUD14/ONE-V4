@@ -4,6 +4,7 @@ import {
   LearnerContentRuleError,
   assertLearnerContentDraft,
   assertLearnerContentReviewTransition,
+  learnerContentSeed,
   type LearnerContentDraftInput,
 } from '../src/index.js';
 
@@ -21,6 +22,13 @@ function draft(overrides: Partial<LearnerContentDraftInput> = {}): LearnerConten
 }
 
 describe('learner content contracts', () => {
+  it('provides deterministic non-AI seed content for the generation pipeline', () => {
+    const first = learnerContentSeed('COMPANY_RESEARCH_CHECKLIST');
+    const second = learnerContentSeed('COMPANY_RESEARCH_CHECKLIST');
+    expect(first).toEqual(second);
+    expect(first).toMatchObject({ contentType: 'COMPANY_PREP', metadata: { seedVersion: 'd3-v1' } });
+  });
+
   it('accepts seeded and authored non-assessment drafts without generated provenance', () => {
     expect(() => assertLearnerContentDraft(draft({ source: 'SEEDED' }))).not.toThrow();
     expect(() => assertLearnerContentDraft(draft({ source: 'AUTHORED' }))).not.toThrow();

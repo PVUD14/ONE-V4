@@ -344,6 +344,36 @@ export const eventSchemas = {
     schemaRef: 'registry://automation.command.requested/1',
     payload: { commandId: { kind: 'uuid' }, workflowKey: { kind: 'string', minLength: 3, maxLength: 64, pattern: /^[a-z0-9-]+$/ }, commandType: { kind: 'string', minLength: 3, maxLength: 64, pattern: /^[A-Z0-9_]+$/ } },
   },
+  contentGenerationRequestedV1: {
+    eventType: 'content.generation.requested',
+    eventVersion: 1,
+    producer: 'learner-content',
+    aggregateType: 'content_generation_request',
+    purpose: 'seeded-learner-content-generation',
+    dataClassification: 'internal',
+    schemaRef: 'registry://content.generation.requested/1',
+    payload: {
+      requestId: { kind: 'uuid' },
+      contentId: { kind: 'uuid' },
+      seedKey: { kind: 'enum', values: ['PRACTICE_PROBLEM_SOLVING', 'COMPANY_RESEARCH_CHECKLIST', 'INTERVIEW_EVIDENCE_PLANNER', 'SCHOLARSHIP_APPLICATION_CHECKLIST', 'EVIDENCE_FIRST_RESUME_OUTLINE'] },
+    },
+  },
+  contentGenerationCompletedV1: {
+    eventType: 'content.generation.completed',
+    eventVersion: 1,
+    producer: 'learner-content',
+    aggregateType: 'learner_content',
+    purpose: 'seeded-learner-content-generation-completion',
+    dataClassification: 'internal',
+    schemaRef: 'registry://content.generation.completed/1',
+    payload: {
+      requestId: { kind: 'uuid' },
+      contentId: { kind: 'uuid' },
+      seedKey: { kind: 'enum', values: ['PRACTICE_PROBLEM_SOLVING', 'COMPANY_RESEARCH_CHECKLIST', 'INTERVIEW_EVIDENCE_PLANNER', 'SCHOLARSHIP_APPLICATION_CHECKLIST', 'EVIDENCE_FIRST_RESUME_OUTLINE'] },
+      reviewState: { kind: 'enum', values: ['DRAFT'] },
+      source: { kind: 'enum', values: ['SEEDED'] },
+    },
+  },
 } as const satisfies Record<string, EventSchemaDefinition>;
 
 export function schemaForEvent(eventType: string, eventVersion: number): EventSchemaDefinition {

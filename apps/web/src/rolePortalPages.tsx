@@ -7,8 +7,8 @@
  *
  * Add a role-specific page to its family module, not here.
  */
-import { getProtectedAccessToken, listExamQuestions, listInstitutionExams } from './api.js';
 import type { ApiHealth } from './api.js';
+import { getProtectedAccessToken, listExamQuestions, listInstitutionExams } from './api.js';
 import { AssistantWidget } from './assistantWidget.js';
 import type { AuthStatus } from './auth.js';
 import { AuthControls } from './authControls.js';
@@ -17,16 +17,17 @@ import { ConsentGate } from './consentGate.js';
 import { OperationsDashboardV2 } from './dashboardsV2.js';
 import { InstitutionExamEnginePage } from './examManagerPage.js';
 import { HelpFaqPanel } from './helpFaqPanel.js';
+import { InstitutionReportsPage } from './institutionReportsPage.js';
 import { OperationsCareerReadinessPanel } from './operationsCareerReadinessPanel.js';
 import { StaffPilotWrap } from './parityWraps.js';
 import { InstitutionInterventionsPage } from './pilotParityPages.js';
 import { EmployerRecruiterRealityPage } from './rolePortal/employer.js';
 import { InstitutionAcademicStructurePage, InstitutionStaffPage, InstitutionStudentsPage } from './rolePortal/institution.js';
 import { OperationsContentReadOnlyPage, OperationsOrganizationsPage, OperationsTechnicalReadOnlyPage, OperationsUsersAccessPage } from './rolePortal/operations.js';
-import { AuthenticatedNotYetAvailable, AuthenticatedReadOnlyModule, InstitutionWorkspaceError, isInstitutionStaffWorkspace, isInstitutionWorkspace } from './rolePortal/shared.js';
 import type { AuthenticatedWorkspaceSummary } from './rolePortal/shared.js';
-import { portalFamilyIcons, rolePortals } from './rolePortalConfig.js';
+import { AuthenticatedNotYetAvailable, AuthenticatedReadOnlyModule, institutionWorkspaceRoles, InstitutionWorkspaceError, isInstitutionStaffWorkspace, isInstitutionWorkspace } from './rolePortal/shared.js';
 import type { RoleFixture, RoleNavItem, RolePortalConfig } from './rolePortalConfig.js';
+import { portalFamilyIcons, rolePortals } from './rolePortalConfig.js';
 import { RolePreviewProvider, useRolePreviewState } from './rolePortalPreviewState.js';
 import { EmployerDashboardV3, InstitutionDashboardV3 } from './staffDashboardsV3.js';
 import { StatusBadge } from './studentComponents.js';
@@ -249,6 +250,11 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
         : <InstitutionWorkspaceError title='Assessments' />;
     }
   if (!demoMode && portal.key === 'institution-admin' && route.label === 'Staff') return <InstitutionStaffPage portal={portal} authenticatedWorkspace={authenticatedWorkspace} />;
+  if (!demoMode && portal.key === 'institution-admin' && route.label === 'Reports') {
+    return isInstitutionWorkspace(authenticatedWorkspace)
+      ? <InstitutionReportsPage key={authenticatedWorkspace.organizationId} institutionId={authenticatedWorkspace.organizationId} />
+      : <InstitutionWorkspaceError title="Reports" unauthorized={Boolean(authenticatedWorkspace && !institutionWorkspaceRoles.has(authenticatedWorkspace.role))} />;
+  }
   if (!demoMode && portal.key === 'institution-admin' && /career readiness|placement|reports/i.test(route.label)) return <AuthenticatedReadOnlyModule title={route.label} detail="Institution reports and readiness information are read-only in Phase 2A unless a dedicated persistent mutation is available." />;
   if (!demoMode && portal.key === 'institution-admin' && /settings/i.test(route.label)) return <AuthenticatedNotYetAvailable title={route.label} detail="Institution settings mutation is not yet available in this UAT slice." />;
   if (!demoMode && portal.key === 'recruiter') return <EmployerRecruiterRealityPage portal={portal} routeLabel={route.label} />;

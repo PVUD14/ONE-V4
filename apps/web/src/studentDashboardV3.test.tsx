@@ -65,4 +65,16 @@ describe('StudentDashboardV3 readiness presentation', () => {
     expect(screen.getAllByText('No mastery projection available.')).toHaveLength(5);
     expect(document.body.textContent).not.toContain('/100');
   });
+
+  it('renders safely when career readiness returns a partial learner payload', async () => {
+    apiState.learner = {};
+
+    render(<StudentDashboardV3 studentName="Aanya Rao" />);
+
+    expect(await screen.findByRole('heading', { name: 'Career Readiness Band' })).toBeInTheDocument();
+    expect(screen.getByText('No advisory band yet')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Readiness band unavailable' })).toBeInTheDocument();
+    expect(screen.getAllByText('No mastery projection available.')).toHaveLength(5);
+    expect(document.body.textContent).not.toContain('/100');
+  });
 });

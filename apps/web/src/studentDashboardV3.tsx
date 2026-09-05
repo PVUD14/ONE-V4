@@ -131,7 +131,7 @@ export function StudentDashboardV3({ studentName }: { readonly studentName: stri
 
   const activityRows = (data.notifications?.notifications ?? []).slice(0, 4);
   const streak = data.activity?.currentStreakDays ?? 0;
-  const weekPoints = data.activity?.last7.map((entry) => entry.count) ?? [0, 0, 0, 0, 0, 0, 0];
+  const weekPoints = data.activity?.last7?.map((entry) => entry.count) ?? [0, 0, 0, 0, 0, 0, 0];
   const activeDays = data.activity?.activeDaysLast7 ?? 0;
   const weekDayLetters = (data.activity?.last7 ?? []).map((entry) => new Date(`${entry.date}T00:00:00`).toLocaleDateString(undefined, { weekday: 'narrow' }));
 

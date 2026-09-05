@@ -20,6 +20,7 @@
     "@planthepath/career-readiness": "workspace:*",
     "@planthepath/automation": "workspace:*",
     "@planthepath/events": "workspace:*",
+    "@planthepath/learner-content": "workspace:*",
     "drizzle-orm": "^0.45.2",
     "pg": "^8.16.0"
   },

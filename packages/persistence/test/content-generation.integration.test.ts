@@ -112,18 +112,24 @@ describe('seeded content generation pipeline', () => {
   it('rejects unrelated events without creating content', async () => {
     const eventId = randomUUID();
     const userId = randomUUID();
+    const correlationId = 'content-generation-reject-1';
+    const now = new Date();
+    await pool.query('TRUNCATE outbox_events CASCADE');
     await db.insert(schema.outboxEvents).values({
       id: eventId,
       aggregateType: 'user',
       aggregateId: userId,
       eventType: 'identity.user.provisioned',
       payload: { userId },
-      correlationId: 'content-generation-reject-1',
+      correlationId,
+      availableAt: now,
     });
     const publisher = new InMemoryIntegrationEventPublisher();
-    const now = new Date();
     const [claimed] = await claimOutboxBatch(db, { leaseOwner: 'content-reject', batchSize: 1, leaseDurationMs: 60_000, now });
-    await dispatchClaimedOutboxEvent(db, claimed!, publisher, { leaseOwner: claimed!.leaseOwner, leaseToken: claimed!.leaseToken, now });
+    expect(claimed).toBeDefined();
+    if (!claimed) throw new Error(`expected claim for correlation ${correlationId}`);
+    expect(claimed).toMatchObject({ id: eventId, correlationId });
+    await dispatchClaimedOutboxEvent(db, claimed, publisher, { leaseOwner: claimed.leaseOwner, leaseToken: claimed.leaseToken, now });
 
     await expect(consumeSeededContentGenerationRequested(db, publisher.published[0]!)).rejects.toThrow(/outside/);
     expect(await db.select().from(schema.learnerContentItems)).toHaveLength(0);

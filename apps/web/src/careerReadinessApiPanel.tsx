@@ -121,7 +121,7 @@ function LearningApiView({ catalog, learner, token, busy, onComplete }: {
   readonly busy: boolean; readonly onComplete: (lessonId: string) => void;
 }): React.ReactElement {
   const completed = new Set(learner?.progress?.filter((item) => item.state === 'COMPLETED').map((item) => item.lessonVersionId) ?? []);
-  return <div className="career-api-grid">{catalog?.modules.flatMap((module) => module.lessons).map((lesson) => (
+  return <div className="career-api-grid">{(catalog?.modules ?? []).flatMap((module) => module.lessons).map((lesson) => (
     <article key={lesson.id}><span>{completed.has(lesson.id) ? 'Completed with evidence' : 'Published lesson'}</span><h3>{lesson.title}</h3>
       <p>{lesson.body.summary}</p><small>{lesson.prerequisiteLessonIds.length ? `${lesson.prerequisiteLessonIds.length} prerequisite` : 'No prerequisite'}</small>
       <button type="button" disabled={!token || busy || completed.has(lesson.id)} onClick={() => onComplete(lesson.id)}>{completed.has(lesson.id) ? 'Completed' : 'Complete lesson'}</button>
@@ -141,14 +141,14 @@ function AssessmentApiView({ catalog, learner, token, busy, attempt, selectedOpt
         checked={selectedOptions[question.id] === option.id} onChange={() => onSelect(question.id, option.id)} />{option.text}</label>)}</fieldset>)}
     <button type="submit" disabled={busy || attempt.questions.some((question) => !selectedOptions[question.id])}>Submit assessment once</button>
   </form>;
-  return <div className="career-api-grid">{catalog?.assessments.map((assessment) => <article key={assessment.id}><span>Published assessment</span>
+  return <div className="career-api-grid">{(catalog?.assessments ?? []).map((assessment) => <article key={assessment.id}><span>Published assessment</span>
     <h3>{assessment.title}</h3><p>{assessment.selectionCount} questions · {Math.round(assessment.timeLimitSeconds / 60)} minutes · one attempt</p>
     <button type="button" disabled={!token || busy || Boolean(learner?.attempts?.length)} onClick={() => onStart(assessment.id)}>Start assessment</button>
   </article>) ?? null}</div>;
 }
 
 function CareerStatStrip({ learner, catalog }: { readonly learner: LearnerCareerReadinessState; readonly catalog: CareerReadinessCatalog | null }): React.ReactElement {
-  const lessons = catalog?.modules.flatMap((module) => module.lessons) ?? [];
+  const lessons = (catalog?.modules ?? []).flatMap((module) => module.lessons);
   const completed = learner.progress.filter((item) => item.state === 'COMPLETED').length;
   const scored = learner.attempts.filter((item) => typeof item.scoreCorrect === 'number');
   return (

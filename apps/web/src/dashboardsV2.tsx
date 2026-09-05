@@ -291,7 +291,7 @@ export function StudentDashboardV2({ studentName }: { readonly studentName: stri
           <button type="button" onClick={() => go('/student/help')}>How do I take an assessment?</button>
           <button type="button" onClick={() => go('/student/help')}>Why can&apos;t I start my assessment?</button>
         </section>
-        {data.notifications?.notifications.length ? (
+        {data.notifications?.notifications?.length ? (
           <section className="v2-card">
             <div className="v2-card-head"><h2>Notifications</h2>{data.notifications.unreadCount > 0 ? <V2Chip tone="amber">{data.notifications.unreadCount} new</V2Chip> : null}</div>
             <div className="v2-list">

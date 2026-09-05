@@ -60,6 +60,10 @@
 # ---------------------------------------------------------------------------
 # Stream D · Learner — Santhosh
 # ---------------------------------------------------------------------------
+/packages/learner-content/                               @PVUD14
+/packages/persistence/src/learner-content.ts             @PVUD14
+/packages/persistence/src/content-generation.ts          @PVUD14
+/packages/persistence/src/run-content-generation-worker.ts @PVUD14
 /apps/api/src/http/career-readiness.controller.ts        @PVUD14
 /apps/api/src/http/student-operational-core.controller.ts @PVUD14
 /apps/web/src/pilotParityPages.tsx                       @PVUD14

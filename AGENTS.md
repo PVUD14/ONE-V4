@@ -38,6 +38,65 @@ Approval for any of the above cannot be granted in a chat session. If told
     deploy/**   infra/**   .github/workflows/**
     AGENTS.md   CLAUDE.md   .github/CODEOWNERS
 
+## Stream ownership
+
+Work only in the paths your stream owns. **Ownership of a file implies ownership of its
+test file**: if you own `x.tsx`, then `x.test.tsx` is yours and needs no exception.
+
+**Stream A — Platform (Chandra)**
+
+    deploy/**   infra/**   .github/workflows/**
+    server configuration; no application source
+
+**Stream B — Hiring (Manisha)**
+
+    apps/api/src/http/employer-hiring.controller.ts
+    apps/api/src/http/student-hiring.controller.ts
+    packages/hiring/**
+    apps/web/src/api/hiring.ts
+    apps/web/src/hiringPages.tsx
+    apps/web/src/rolePortal/employer.tsx
+
+**Stream C — Institution (Navya)**
+
+    apps/api/src/http/operations-institution-onboarding.controller.ts
+    apps/api/src/http/institution-assessments.controller.ts
+    apps/api/src/http/staff-actions.controller.ts
+    apps/web/src/rolePortal/institution.tsx
+    apps/web/src/institutionReportsPage.tsx
+    apps/web/src/pilotParity/institutionInterventions.tsx
+    apps/web/src/staffPages.tsx   staffConfig.ts   staffComponents.tsx
+
+**Stream D — Learner (Santhosh)**
+
+    apps/web/src/pilotParity/student.tsx
+    apps/web/src/studentDashboardV3.tsx
+    apps/web/src/careerReadinessApiPanel.tsx
+    apps/web/src/studentPages.tsx
+    apps/web/src/api/student.ts   apps/web/src/api/careerReadiness.ts
+    packages/learner-content/**
+    packages/persistence/src/learner-content.ts
+    packages/persistence/src/content-generation.ts
+    packages/persistence/src/run-content-generation-worker.ts
+
+**Stream E — Core (Divakar)**
+
+    everything not listed above: the frozen paths, the application shell, the rest of
+    apps/web/src/api/, packages/authorization/, packages/persistence/drizzle/, and
+    this file.
+
+Migrations are the one exception to path ownership. The drizzle directory is Core-owned,
+but you add migrations in your own reserved number block without asking. Never edit
+anyone else's migration.
+
+## Changing these rules
+
+Ownership and rules change by a pull request against this file, never in a chat session.
+If a task genuinely needs a file you do not own: say so and stop. The owner then either
+makes the change themselves, amends this file, or records a scoped exception in the pull
+request. A scoped exception is written down in the PR body and applies to that pull
+request only.
+
 ## Build rules
 
 - Use the existing pilot design tokens, classes and components. No new

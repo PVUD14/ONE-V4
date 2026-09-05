@@ -140,6 +140,14 @@ describe('employer applicant pipeline', () => {
   const employerOpportunity = { id: opportunity.id, referenceCode: 'SOC-2026-01', lifecycleState: 'PUBLISHED',
     title: 'SOC Analyst Intern', employmentType: 'INTERNSHIP', workMode: 'ONSITE', locationCity: 'Bengaluru',
     applicationDeadline: null, publishedAt: '2026-08-01T00:00:00.000Z', applicationCount: 2, openApplicationCount: 1 };
+  const employerApplicants = [
+    { id: 'a-interview', state: 'INTERVIEW', consentRevoked: false, candidateName: 'Aanya Interview', candidateEmail: 'aanya@uat.example.test',
+      institutionStudentId: null, submittedAt: '2026-08-10T00:00:00.000Z', closedAt: null, interviewCount: 1, offerState: null, updatedAt: '2026-08-10T00:00:00.000Z' },
+    { id: 'a-offer', state: 'OFFER', consentRevoked: false, candidateName: 'Ojas Offer', candidateEmail: 'ojas@uat.example.test',
+      institutionStudentId: null, submittedAt: '2026-08-11T00:00:00.000Z', closedAt: null, interviewCount: 2, offerState: 'EXTENDED', updatedAt: '2026-08-11T00:00:00.000Z' },
+    { id: 'a-applied', state: 'APPLIED', consentRevoked: false, candidateName: 'Mira Applied', candidateEmail: 'mira@uat.example.test',
+      institutionStudentId: null, submittedAt: '2026-08-12T00:00:00.000Z', closedAt: null, interviewCount: 0, offerState: null, updatedAt: '2026-08-12T00:00:00.000Z' },
+  ];
 
   it('withholds the candidate once they withdraw, while keeping the row', async () => {
     stubFetch({
@@ -172,6 +180,32 @@ describe('employer applicant pipeline', () => {
     // Moving backwards is not offered at all, so the rule cannot be reached by clicking.
     expect(screen.queryByRole('button', { name: 'Screening' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Shortlisted' })).not.toBeInTheDocument();
+  });
+
+  it('pre-applies the canonical interview application-state filter', async () => {
+    stubFetch({
+      [`/api/v1/employers/${employerId}/opportunities`]: { opportunities: [employerOpportunity] },
+      [`/api/v1/employers/${employerId}/opportunities/${opportunity.id}/applications`]: { applications: employerApplicants },
+    });
+    await authenticate();
+    render(<EmployerApplicantsPage employerId={employerId} applicationStateFilter="INTERVIEW" />);
+    expect(await screen.findByText('Aanya Interview')).toBeInTheDocument();
+    expect(screen.getByText((_content, element) => element?.textContent === 'Application state filter: Interview')).toBeInTheDocument();
+    expect(screen.queryByText('Ojas Offer')).not.toBeInTheDocument();
+    expect(screen.queryByText('Mira Applied')).not.toBeInTheDocument();
+  });
+
+  it('pre-applies the canonical offer application-state filter', async () => {
+    stubFetch({
+      [`/api/v1/employers/${employerId}/opportunities`]: { opportunities: [employerOpportunity] },
+      [`/api/v1/employers/${employerId}/opportunities/${opportunity.id}/applications`]: { applications: employerApplicants },
+    });
+    await authenticate();
+    render(<EmployerApplicantsPage employerId={employerId} applicationStateFilter="OFFER" />);
+    expect(await screen.findByText('Ojas Offer')).toBeInTheDocument();
+    expect(screen.getByText((_content, element) => element?.textContent === 'Application state filter: Offer')).toBeInTheDocument();
+    expect(screen.queryByText('Aanya Interview')).not.toBeInTheDocument();
+    expect(screen.queryByText('Mira Applied')).not.toBeInTheDocument();
   });
 });
 

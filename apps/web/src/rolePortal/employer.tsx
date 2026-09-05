@@ -37,6 +37,14 @@ export function EmployerRecruiterRealityPage({ portal, routeLabel }: { readonly 
     return <StaffPilotWrap title="Opportunities" subtitle="Post roles, choose their audience and publish. Applications land under Applicants.">
       <EmployerOpportunitiesPage employerId={employerId} /></StaffPilotWrap>;
   }
+  if (/interview/i.test(routeLabel)) {
+    return <StaffPilotWrap title="Applicants" subtitle="Move real candidates through your process; every change is logged.">
+      <EmployerApplicantsPage employerId={employerId} applicationStateFilter="INTERVIEW" /></StaffPilotWrap>;
+  }
+  if (/offer/i.test(routeLabel)) {
+    return <StaffPilotWrap title="Applicants" subtitle="Move real candidates through your process; every change is logged.">
+      <EmployerApplicantsPage employerId={employerId} applicationStateFilter="OFFER" /></StaffPilotWrap>;
+  }
   if (/applicant|candidate|talent/i.test(routeLabel)) {
     return <StaffPilotWrap title="Applicants" subtitle="Move real candidates through your process; every change is logged.">
       <EmployerApplicantsPage employerId={employerId} /></StaffPilotWrap>;

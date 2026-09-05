@@ -30,6 +30,15 @@ export type LearnerContentType = (typeof LEARNER_CONTENT_TYPES)[number];
 export type LearnerContentSource = (typeof LEARNER_CONTENT_SOURCES)[number];
 export type LearnerContentReviewState = (typeof LEARNER_CONTENT_REVIEW_STATES)[number];
 
+export const LEARNER_CONTENT_REVIEW_QUEUE_STATES = [
+  'DRAFT',
+  'IN_REVIEW',
+  'CHANGES_REQUESTED',
+  'APPROVED',
+] as const satisfies readonly LearnerContentReviewState[];
+
+export type LearnerContentReviewQueueState = (typeof LEARNER_CONTENT_REVIEW_QUEUE_STATES)[number];
+
 export const LEARNER_CONTENT_SEED_KEYS = [
   'PRACTICE_PROBLEM_SOLVING',
   'COMPANY_RESEARCH_CHECKLIST',

@@ -25,7 +25,7 @@ import { EmployerRecruiterRealityPage } from './rolePortal/employer.js';
 import { InstitutionAcademicStructurePage, InstitutionStaffPage, InstitutionStudentsPage } from './rolePortal/institution.js';
 import { OperationsContentReadOnlyPage, OperationsOrganizationsPage, OperationsTechnicalReadOnlyPage, OperationsUsersAccessPage } from './rolePortal/operations.js';
 import type { AuthenticatedWorkspaceSummary } from './rolePortal/shared.js';
-import { AuthenticatedNotYetAvailable, AuthenticatedReadOnlyModule, InstitutionWorkspaceError, isInstitutionStaffWorkspace, isInstitutionWorkspace } from './rolePortal/shared.js';
+import { AuthenticatedNotYetAvailable, AuthenticatedReadOnlyModule, institutionWorkspaceRoles, InstitutionWorkspaceError, isInstitutionStaffWorkspace, isInstitutionWorkspace } from './rolePortal/shared.js';
 import type { RoleFixture, RoleNavItem, RolePortalConfig } from './rolePortalConfig.js';
 import { portalFamilyIcons, rolePortals } from './rolePortalConfig.js';
 import { RolePreviewProvider, useRolePreviewState } from './rolePortalPreviewState.js';

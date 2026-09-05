@@ -883,7 +883,7 @@ function AuthenticatedStudentProfile(): React.ReactElement {
     <form className="card wide-card student-form" onSubmit={(event) => { void submit(event); }}>
       <label className="student-form-field"><span>Target career</span><input name="targetCareer" defaultValue={profile?.targetCareer ?? ''} maxLength={120} /></label>
       <label className="student-form-field"><span>Headline</span><input name="profileHeadline" defaultValue={profile?.profileHeadline ?? ''} maxLength={160} /></label>
-      <label className="student-form-field"><span>Career interests, comma separated</span><input name="careerInterests" defaultValue={profile?.careerInterests.join(', ') ?? ''} /></label>
+      <label className="student-form-field"><span>Career interests, comma separated</span><input name="careerInterests" defaultValue={(profile?.careerInterests ?? []).join(', ')} /></label>
       <label className="student-form-field"><span>Portfolio URL</span><input name="portfolioUrl" defaultValue={profile?.portfolioUrl ?? ''} placeholder="https://..." /></label>
       <label className="student-form-field"><span>Summary</span><textarea name="profileSummary" defaultValue={profile?.profileSummary ?? ''} maxLength={2000} /></label>
       <label className="student-form-field"><span>Visibility</span><select name="visibilityState" defaultValue={profile?.visibilityState ?? 'PRIVATE'}><option>PRIVATE</option><option>INSTITUTION_VISIBLE</option><option>EMPLOYER_DISCOVERY</option></select></label>

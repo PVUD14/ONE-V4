@@ -189,9 +189,9 @@ export function InstitutionStaffPage({ portal: _portal, authenticatedWorkspace }
   }
   return <section className="role-module role-module--dense"><div className="role-page-heading"><div><span className="eyebrow">Authenticated API-backed</span><h1>Staff</h1><p>Invite institution staff through the verified-recipient invitation lifecycle. This screen does not attach arbitrary global user IDs.</p></div></div>
     <div className="v2-row v2-cols-4 career-stat-strip role-wide">
-      <V2Stat icon="👥" tone="teal" value={staff?.memberships.length ?? 0} label="Active memberships" />
-      <V2Stat icon="✉️" tone="amber" value={staff?.invitations.filter((invite) => invite.state === 'PENDING').length ?? 0} label="Pending invitations" />
-      <V2Stat icon="📮" tone="blue" value={staff?.invitations.length ?? 0} label="Invitations sent" />
+      <V2Stat icon="👥" tone="teal" value={staff?.memberships?.length ?? 0} label="Active memberships" />
+      <V2Stat icon="✉️" tone="amber" value={(staff?.invitations ?? []).filter((invite) => invite.state === 'PENDING').length} label="Pending invitations" />
+      <V2Stat icon="📮" tone="blue" value={staff?.invitations?.length ?? 0} label="Invitations sent" />
       <V2Stat icon="🔐" tone="purple" value="Verified" label="Recipient-verified onboarding" />
     </div>
     {notice ? <p className="role-api-success" role="status">{notice}</p> : null}{error ? <p className="form-error" role="alert">{error}</p> : null}
@@ -202,8 +202,8 @@ export function InstitutionStaffPage({ portal: _portal, authenticatedWorkspace }
       <button type="submit">Send staff invitation</button>
     </form>
     <section className="role-card role-wide"><h2>Staff onboarding boundary</h2><ul className="role-check-list"><li>Allowed roles: PLACEMENT_ADMIN, DEPARTMENT_HEAD, FACULTY_LECTURER.</li><li>No platform, employer or self-escalation role is exposed.</li><li>The recipient must authenticate with a verified matching email before membership is created.</li></ul></section>
-    <section className="role-card role-wide"><h2>Staff invitations</h2>{staff?.invitations.length ? <table className="role-record-table"><thead><tr><th>Email</th><th>Role</th><th>State</th><th>Delivery</th><th>Expires</th></tr></thead><tbody>{staff.invitations.map((invite) => <tr key={invite.id}><td>{invite.email}</td><td>{invite.role}</td><td>{invite.state}</td><td>{invite.delivery?.state ?? 'Pending command'}</td><td>{new Date(invite.expiresAt).toLocaleDateString()}</td></tr>)}</tbody></table> : <p>No staff invitations yet.</p>}</section>
-    <section className="role-card role-wide"><h2>Active staff memberships</h2>{staff?.memberships.length ? <table className="role-record-table"><thead><tr><th>Email</th><th>Role</th><th>State</th><th>Actions</th></tr></thead><tbody>{staff.memberships.map((member) => <tr key={member.id}><td>{member.email}</td><td>{member.role}</td><td>{member.state}</td><td><span className="staff-readonly-note">Revoke/resend/end membership: NOT YET AVAILABLE</span></td></tr>)}</tbody></table> : <p>No accepted staff memberships yet.</p>}</section>
+    <section className="role-card role-wide"><h2>Staff invitations</h2>{staff?.invitations?.length ? <table className="role-record-table"><thead><tr><th>Email</th><th>Role</th><th>State</th><th>Delivery</th><th>Expires</th></tr></thead><tbody>{staff.invitations.map((invite) => <tr key={invite.id}><td>{invite.email}</td><td>{invite.role}</td><td>{invite.state}</td><td>{invite.delivery?.state ?? 'Pending command'}</td><td>{new Date(invite.expiresAt).toLocaleDateString()}</td></tr>)}</tbody></table> : <p>No staff invitations yet.</p>}</section>
+    <section className="role-card role-wide"><h2>Active staff memberships</h2>{staff?.memberships?.length ? <table className="role-record-table"><thead><tr><th>Email</th><th>Role</th><th>State</th><th>Actions</th></tr></thead><tbody>{staff.memberships.map((member) => <tr key={member.id}><td>{member.email}</td><td>{member.role}</td><td>{member.state}</td><td><span className="staff-readonly-note">Revoke/resend/end membership: NOT YET AVAILABLE</span></td></tr>)}</tbody></table> : <p>No accepted staff memberships yet.</p>}</section>
   </section>;
 }
 

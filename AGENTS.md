@@ -88,6 +88,14 @@ Every commit message ends with this trailer block:
     Agent-Scope: drafted implementation  # omit if Agent: none
     Reviewed-By: pending
 
+The block must be the LAST paragraph of the message, with NO blank line inside
+it — `Co-Authored-By` and any other trailer go in the same block. Git parses
+only the final paragraph as trailers, so a blank line before any of these lines
+silently turns all of them into ordinary body text and the attribution report
+returns nothing. Verify with:
+
+    git log -1 --format='%(trailers:key=Stream,valueonly)'
+
 Every new file starts with:
 
     /**
@@ -96,16 +104,27 @@ Every new file starts with:
      * Agent-assisted: yes (Codex) · Reviewed: pending
      */
 
-## Flow
+## Flow — fork based
 
-    your stream branch  ->  PR into `integration`  ->  auto-deploys to staging
-    `integration`       ->  PR into `main` (Divakar approves only)
-    `main`              ->  manual production release by Divakar only
+Contributors hold READ access to `PVUD14/ONE-V4` and cannot push to it. Work
+happens in your own fork and arrives as a cross-fork pull request.
+
+    origin    = your fork          you push here
+    upstream  = PVUD14/ONE-V4      you pull from here; you cannot push
+
+    your fork, stream branch  ->  PR into upstream `integration`  ->  staging
+    upstream `integration`    ->  PR into `main` (Divakar approves only)
+    upstream `main`           ->  manual production release by Divakar only
 
 Merging to `main` does not deploy. Nothing reaches one.ai8ht.pro without an
 explicit human approval and a manual release.
 
 ## Local development
+
+    git clone https://github.com/<you>/ONE-V4.git        # your fork
+    cd ONE-V4
+    git remote add upstream https://github.com/PVUD14/ONE-V4.git
+    git fetch upstream && git checkout -b integration upstream/integration
 
     corepack enable && corepack prepare pnpm@10.15.0 --activate
     corepack pnpm install

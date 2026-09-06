@@ -46,3 +46,39 @@ export function canEmployerReadApplicant(scope: EmployerApplicantScope): boolean
   if (scope.consentRevokedAt) return false;
   return true;
 }
+
+// ADR-018: Institution Analyst is not a role. Analytics-and-export is a capability
+// grantable to these two roles and to no others.
+export const institutionAnalyticsCapableRoles = ['INSTITUTION_ADMIN', 'DEPARTMENT_HEAD'] as const;
+
+export type InstitutionAnalyticsCapableRole = (typeof institutionAnalyticsCapableRoles)[number];
+
+export interface InstitutionAnalyticsScope {
+  readonly institutionId: string;
+  readonly requestedInstitutionId: string;
+  readonly role: string;
+  readonly membershipState: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'ENDED';
+  readonly analyticsCapabilityGranted: boolean;
+}
+
+export function canReadInstitutionAnalytics(scope: InstitutionAnalyticsScope): boolean {
+  if (scope.institutionId !== scope.requestedInstitutionId) return false;
+  if (scope.membershipState !== 'ACTIVE') return false;
+  // The grant is necessary but never sufficient: a role outside the capable set is
+  // denied even holding it, so a mis-set flag cannot widen a role's reach.
+  if (!institutionAnalyticsCapableRoles.includes(scope.role as InstitutionAnalyticsCapableRole)) return false;
+  return scope.analyticsCapabilityGranted;
+}
+
+// ADR-024: offer compensation is never institution-visible, per student or in
+// aggregate. Named here so an institution read path, report generator or export
+// imports the exclusion rather than remembering it.
+export const institutionForbiddenDisclosureFields = [
+  'compensation_currency',
+  'compensation_amount',
+  'compensation_period',
+] as const;
+
+export function isInstitutionForbiddenDisclosureField(field: string): boolean {
+  return institutionForbiddenDisclosureFields.includes(field as (typeof institutionForbiddenDisclosureFields)[number]);
+}

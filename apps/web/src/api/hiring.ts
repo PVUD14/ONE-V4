@@ -104,6 +104,56 @@ export interface EmployerApplicantDto {
   readonly updatedAt: string;
 }
 
+export interface EmployerInterviewDto {
+  readonly id: string;
+  readonly applicationId: string;
+  readonly applicationState: string;
+  readonly opportunityId: string;
+  readonly referenceCode: string | null;
+  readonly title: string;
+  readonly consentRevoked: boolean;
+  readonly candidateName: string | null;
+  readonly candidateEmail: string | null;
+  readonly institutionStudentId: string | null;
+  readonly roundNumber: number;
+  readonly mode: string;
+  readonly state: string;
+  readonly scheduledStart: string | null;
+  readonly scheduledEnd: string | null;
+  readonly locationDetail: string | null;
+  readonly joiningLink: string | null;
+  readonly submittedAt: string | null;
+  readonly closedAt: string | null;
+  readonly outcomeCount: number;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+export interface EmployerOfferDto {
+  readonly id: string;
+  readonly applicationId: string;
+  readonly applicationState: string;
+  readonly opportunityId: string;
+  readonly referenceCode: string | null;
+  readonly title: string;
+  readonly consentRevoked: boolean;
+  readonly candidateName: string | null;
+  readonly candidateEmail: string | null;
+  readonly institutionStudentId: string | null;
+  readonly state: string;
+  readonly compensation: CompensationDto;
+  readonly joiningDate: string | null;
+  readonly offerExpiresAt: string | null;
+  readonly conditions: string | null;
+  readonly extendedAt: string | null;
+  readonly respondedAt: string | null;
+  readonly withdrawnAt: string | null;
+  readonly submittedAt: string | null;
+  readonly closedAt: string | null;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
 export function listOpportunities(token: string, q = '', signal?: AbortSignal): Promise<{ readonly opportunities: readonly OpportunitySummaryDto[] }> {
   const query = q.trim() ? `?q=${encodeURIComponent(q.trim())}` : '';
   return requestJson(`/api/v1/opportunities${query}`, { token, ...(signal ? { signal } : {}) });
@@ -151,6 +201,14 @@ export function publishOpportunity(token: string, employerId: string, opportunit
 
 export function listEmployerApplicants(token: string, employerId: string, opportunityId: string, signal?: AbortSignal): Promise<{ readonly applications: readonly EmployerApplicantDto[] }> {
   return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/opportunities/${encodeURIComponent(opportunityId)}/applications`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function listEmployerInterviews(token: string, employerId: string, signal?: AbortSignal): Promise<{ readonly interviews: readonly EmployerInterviewDto[] }> {
+  return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/interviews`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function listEmployerOffers(token: string, employerId: string, signal?: AbortSignal): Promise<{ readonly offers: readonly EmployerOfferDto[] }> {
+  return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/offers`, { token, ...(signal ? { signal } : {}) });
 }
 
 export function transitionApplication(token: string, employerId: string, applicationId: string, toState: string, note?: string): Promise<{ readonly application: { readonly id: string; readonly state: string } }> {

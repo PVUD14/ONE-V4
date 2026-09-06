@@ -197,6 +197,23 @@ describe('hiring lifecycle', () => {
     const outcomes = await pool.query('SELECT recommendation, overall_rating FROM interview_outcomes WHERE interview_id = $1', [interviewId]);
     expect(outcomes.rows).toHaveLength(1);
     expect(outcomes.rows[0].recommendation).toBe('YES');
+
+    const listed = await api().get(`/api/v1/employers/${employerId}/interviews`).set(auth(recruiterToken)).expect(200);
+    expect(listed.body.interviews).toHaveLength(1);
+    expect(listed.body.interviews[0]).toMatchObject({
+      id: interviewId,
+      applicationId,
+      applicationState: 'INTERVIEW',
+      opportunityId,
+      referenceCode: 'SOC-2026-01',
+      title: 'SOC Analyst Intern',
+      consentRevoked: false,
+      candidateEmail: 'aanya@hiring.test',
+      roundNumber: 1,
+      mode: 'VIDEO',
+      state: 'SCHEDULED',
+      outcomeCount: 1,
+    });
   });
 
   it('refuses to mark hired before an offer is accepted', async () => {
@@ -218,6 +235,26 @@ describe('hiring lifecycle', () => {
     const listed = await api().get('/api/v1/students/me/offers').set(auth(studentToken)).expect(200);
     expect(listed.body.offers).toHaveLength(1);
     expect(listed.body.offers[0].compensation.amount).toBe('28000.00');
+
+    const employerOffers = await api().get(`/api/v1/employers/${employerId}/offers`).set(auth(recruiterToken)).expect(200);
+    expect(employerOffers.body.offers).toHaveLength(1);
+    expect(employerOffers.body.offers[0]).toMatchObject({
+      id: offerId,
+      applicationId,
+      applicationState: 'OFFER',
+      opportunityId,
+      referenceCode: 'SOC-2026-01',
+      title: 'SOC Analyst Intern',
+      consentRevoked: false,
+      candidateEmail: 'aanya@hiring.test',
+      state: 'EXTENDED',
+      compensation: { currency: 'INR', amount: '28000.00', period: 'MONTH' },
+    });
+  });
+
+  it('does not let a rival employer list employer interview or offer records', async () => {
+    await api().get(`/api/v1/employers/${employerId}/interviews`).set(auth(rivalRecruiterToken)).expect(403);
+    await api().get(`/api/v1/employers/${employerId}/offers`).set(auth(rivalRecruiterToken)).expect(403);
   });
 
   it('lets the candidate accept, then the employer records the hire', async () => {
@@ -309,6 +346,19 @@ describe('withdrawal', () => {
 
     const applied = await api().post('/api/v1/students/me/applications').set(auth(studentToken)).send({ opportunityId: id, consentGranted: true }).expect(201);
     const withdrawnId = applied.body.application.id;
+    await api().post(`/api/v1/employers/${employerId}/applications/${withdrawnId}/transition`).set(auth(recruiterToken)).send({ toState: 'INTERVIEW' }).expect(201);
+    const interview = await api().post(`/api/v1/employers/${employerId}/applications/${withdrawnId}/interviews`).set(auth(recruiterToken)).send({
+      mode: 'VIDEO',
+      scheduledStart: '2026-09-08T09:00:00.000Z',
+      scheduledEnd: '2026-09-08T10:00:00.000Z',
+    }).expect(201);
+    await api().post(`/api/v1/employers/${employerId}/applications/${withdrawnId}/transition`).set(auth(recruiterToken)).send({ toState: 'OFFER' }).expect(201);
+    const offer = await api().post(`/api/v1/employers/${employerId}/applications/${withdrawnId}/offers`).set(auth(recruiterToken)).send({
+      compensationCurrency: 'INR',
+      compensationAmount: 30000,
+      compensationPeriod: 'MONTH',
+      offerExpiresAt: '2026-10-15T00:00:00.000Z',
+    }).expect(201);
 
     const before = await pool.query('SELECT revoked_at FROM employer_applicant_access_grants WHERE student_user_id = $1 AND opportunity_id = $2', [studentUserId, id]);
     expect(before.rows[0].revoked_at).toBeNull();
@@ -325,6 +375,20 @@ describe('withdrawal', () => {
     expect(withdrawn.consentRevoked).toBe(true);
     expect(withdrawn.candidateEmail).toBeNull();
     expect(withdrawn.candidateName).toBeNull();
+
+    const interviews = await api().get(`/api/v1/employers/${employerId}/interviews`).set(auth(recruiterToken)).expect(200);
+    const withdrawnInterview = interviews.body.interviews.find((item: { id: string }) => item.id === interview.body.interview.id);
+    expect(withdrawnInterview.applicationState).toBe('WITHDRAWN');
+    expect(withdrawnInterview.consentRevoked).toBe(true);
+    expect(withdrawnInterview.candidateEmail).toBeNull();
+    expect(withdrawnInterview.candidateName).toBeNull();
+
+    const offers = await api().get(`/api/v1/employers/${employerId}/offers`).set(auth(recruiterToken)).expect(200);
+    const withdrawnOffer = offers.body.offers.find((item: { id: string }) => item.id === offer.body.offer.id);
+    expect(withdrawnOffer.applicationState).toBe('WITHDRAWN');
+    expect(withdrawnOffer.consentRevoked).toBe(true);
+    expect(withdrawnOffer.candidateEmail).toBeNull();
+    expect(withdrawnOffer.candidateName).toBeNull();
   });
 });
 

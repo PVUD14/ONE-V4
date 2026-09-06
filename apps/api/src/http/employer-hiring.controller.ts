@@ -236,6 +236,32 @@ export class EmployerHiringController {
   // Interviews
   // -------------------------------------------------------------------------
 
+  @Get('/employers/:employerId/interviews')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async listInterviews(@Req() request: ProtectedHttpRequest, @Param('employerId') employerId: string): Promise<Record<string, unknown>> {
+    const context = this.requireEmployer(request, employerId, employerInterviewRoles);
+    const rows = await this.db.execute(sql`
+      SELECT i.id, i.application_id, i.round_number, i.mode, i.state, i.scheduled_start, i.scheduled_end,
+             i.location_detail, i.joining_link, i.created_at, i.updated_at,
+             a.state AS application_state, a.submitted_at, a.closed_at, a.consent_revoked_at,
+             o.id AS opportunity_id, o.reference_code,
+             v.title,
+             u.email AS student_email, isp.full_name, isp.institution_student_id,
+             (SELECT count(*) FROM interview_outcomes io WHERE io.interview_id = i.id) AS outcome_count
+      FROM interviews i
+      JOIN applications a ON a.id = i.application_id AND a.employer_id = i.employer_id
+      JOIN opportunities o ON o.id = a.opportunity_id AND o.employer_id = i.employer_id
+      JOIN opportunity_versions v ON v.id = a.applied_version_id
+      JOIN users u ON u.id = a.student_user_id
+      LEFT JOIN institution_student_profiles isp ON isp.student_user_id = a.student_user_id AND isp.status = 'ACTIVE'
+      WHERE i.employer_id = ${employerId}::uuid
+        AND a.state <> 'DRAFT'
+      ORDER BY i.scheduled_start ASC NULLS LAST, i.updated_at DESC
+      LIMIT 500
+    `) as QueryResult<Record<string, unknown>>;
+    return { interviews: rows.rows.map(mapEmployerInterviewRow), correlationId: context.correlationId };
+  }
+
   @Post('/employers/:employerId/applications/:applicationId/interviews')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async scheduleInterview(@Req() request: ProtectedHttpRequest, @Param('employerId') employerId: string, @Param('applicationId') applicationId: string, @Body() body: unknown): Promise<Record<string, unknown>> {
@@ -330,6 +356,32 @@ export class EmployerHiringController {
   // -------------------------------------------------------------------------
   // Offers
   // -------------------------------------------------------------------------
+
+  @Get('/employers/:employerId/offers')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async listOffers(@Req() request: ProtectedHttpRequest, @Param('employerId') employerId: string): Promise<Record<string, unknown>> {
+    const context = this.requireEmployer(request, employerId, employerManageRoles);
+    const rows = await this.db.execute(sql`
+      SELECT off.id, off.application_id, off.state, off.compensation_currency, off.compensation_amount,
+             off.compensation_period, off.joining_date, off.offer_expires_at, off.conditions,
+             off.extended_at, off.responded_at, off.withdrawn_at, off.created_at, off.updated_at,
+             a.state AS application_state, a.submitted_at, a.closed_at, a.consent_revoked_at,
+             o.id AS opportunity_id, o.reference_code,
+             v.title,
+             u.email AS student_email, isp.full_name, isp.institution_student_id
+      FROM offers off
+      JOIN applications a ON a.id = off.application_id AND a.employer_id = off.employer_id
+      JOIN opportunities o ON o.id = a.opportunity_id AND o.employer_id = off.employer_id
+      JOIN opportunity_versions v ON v.id = a.applied_version_id
+      JOIN users u ON u.id = a.student_user_id
+      LEFT JOIN institution_student_profiles isp ON isp.student_user_id = a.student_user_id AND isp.status = 'ACTIVE'
+      WHERE off.employer_id = ${employerId}::uuid
+        AND a.state <> 'DRAFT'
+      ORDER BY off.updated_at DESC
+      LIMIT 500
+    `) as QueryResult<Record<string, unknown>>;
+    return { offers: rows.rows.map(mapEmployerOfferRow), correlationId: context.correlationId };
+  }
 
   @Post('/employers/:employerId/applications/:applicationId/offers')
   @UseGuards(ProtectedApiAuthenticationGuard)
@@ -551,6 +603,64 @@ function mapApplicantRow(row: Record<string, unknown>): Record<string, unknown> 
     closedAt: row.closed_at ?? null,
     interviewCount: Number(row.interview_count ?? 0),
     offerState: row.offer_state ?? null,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapCandidateFields(row: Record<string, unknown>): Record<string, unknown> {
+  const consentRevoked = row.consent_revoked_at != null;
+  return {
+    consentRevoked,
+    candidateName: consentRevoked ? null : (row.full_name ?? null),
+    candidateEmail: consentRevoked ? null : row.student_email,
+    institutionStudentId: consentRevoked ? null : (row.institution_student_id ?? null),
+  };
+}
+
+function mapEmployerInterviewRow(row: Record<string, unknown>): Record<string, unknown> {
+  return {
+    id: row.id,
+    applicationId: row.application_id,
+    applicationState: row.application_state,
+    opportunityId: row.opportunity_id,
+    referenceCode: row.reference_code ?? null,
+    title: row.title,
+    ...mapCandidateFields(row),
+    roundNumber: Number(row.round_number ?? 0),
+    mode: row.mode,
+    state: row.state,
+    scheduledStart: row.scheduled_start ?? null,
+    scheduledEnd: row.scheduled_end ?? null,
+    locationDetail: row.location_detail ?? null,
+    joiningLink: row.joining_link ?? null,
+    submittedAt: row.submitted_at ?? null,
+    closedAt: row.closed_at ?? null,
+    outcomeCount: Number(row.outcome_count ?? 0),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapEmployerOfferRow(row: Record<string, unknown>): Record<string, unknown> {
+  return {
+    id: row.id,
+    applicationId: row.application_id,
+    applicationState: row.application_state,
+    opportunityId: row.opportunity_id,
+    referenceCode: row.reference_code ?? null,
+    title: row.title,
+    ...mapCandidateFields(row),
+    state: row.state,
+    compensation: { currency: row.compensation_currency ?? null, amount: row.compensation_amount ?? null, period: row.compensation_period ?? null },
+    joiningDate: row.joining_date ?? null,
+    offerExpiresAt: row.offer_expires_at ?? null,
+    conditions: row.conditions ?? null,
+    extendedAt: row.extended_at ?? null,
+    respondedAt: row.responded_at ?? null,
+    withdrawnAt: row.withdrawn_at ?? null,
+    submittedAt: row.submitted_at ?? null,
+    closedAt: row.closed_at ?? null,
+    createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
 }

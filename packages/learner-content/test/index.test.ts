@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import {
   LearnerContentRuleError,
+  LEARNER_CONTENT_REVIEW_QUEUE_STATES,
   assertLearnerContentDraft,
   assertLearnerContentReviewTransition,
   learnerContentSeed,
@@ -49,6 +50,12 @@ describe('learner content contracts', () => {
     expect(() => assertLearnerContentReviewTransition('DRAFT', 'IN_REVIEW')).not.toThrow();
     expect(() => assertLearnerContentReviewTransition('IN_REVIEW', 'APPROVED')).not.toThrow();
     expect(() => assertLearnerContentReviewTransition('APPROVED', 'PUBLISHED')).not.toThrow();
+  });
+
+  it('keeps terminal states out of the human review queue', () => {
+    expect(LEARNER_CONTENT_REVIEW_QUEUE_STATES).toEqual(['DRAFT', 'IN_REVIEW', 'CHANGES_REQUESTED', 'APPROVED']);
+    expect(LEARNER_CONTENT_REVIEW_QUEUE_STATES).not.toContain('PUBLISHED');
+    expect(LEARNER_CONTENT_REVIEW_QUEUE_STATES).not.toContain('ARCHIVED');
   });
 
   it('rejects review shortcuts and reopening archived content', () => {

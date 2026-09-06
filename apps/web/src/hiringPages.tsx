@@ -448,7 +448,9 @@ const PIPELINE_NEXT: Readonly<Record<string, readonly string[]>> = {
   OFFER: ['HIRED', 'REJECTED'],
 };
 
-export function EmployerApplicantsPage({ employerId }: { readonly employerId: string }): React.ReactElement {
+type EmployerApplicantStateFilter = 'INTERVIEW' | 'OFFER';
+
+export function EmployerApplicantsPage({ employerId, applicationStateFilter }: { readonly employerId: string; readonly applicationStateFilter?: EmployerApplicantStateFilter }): React.ReactElement {
   const [opportunities, setOpportunities] = useState<readonly EmployerOpportunityDto[]>([]);
   const [selectedOpportunity, setSelectedOpportunity] = useState<string>('');
   const [applicants, setApplicants] = useState<readonly EmployerApplicantDto[]>([]);
@@ -524,6 +526,8 @@ export function EmployerApplicantsPage({ employerId }: { readonly employerId: st
     }
   }
 
+  const visibleApplicants = applicationStateFilter ? applicants.filter((item) => item.state === applicationStateFilter) : applicants;
+
   return <section className="role-module role-module--dense">
     <div className="role-page-heading"><div>
       <span className="eyebrow">Applicants</span>
@@ -532,10 +536,10 @@ export function EmployerApplicantsPage({ employerId }: { readonly employerId: st
     </div></div>
 
     <div className="v2-row v2-cols-4 career-stat-strip role-wide">
-      <V2Stat icon="👥" tone="blue" value={applicants.length} label="Applicants shown" />
-      <V2Stat icon="⭐" tone="purple" value={applicants.filter((item) => /shortlist/i.test(item.state)).length} label="Shortlisted" />
-      <V2Stat icon="📅" tone="amber" value={applicants.reduce((sum, item) => sum + item.interviewCount, 0)} label="Interviews" />
-      <V2Stat icon="🏁" tone="green" value={applicants.filter((item) => item.offerState).length} label="With offers" />
+      <V2Stat icon="👥" tone="blue" value={visibleApplicants.length} label="Applicants shown" />
+      <V2Stat icon="⭐" tone="purple" value={visibleApplicants.filter((item) => /shortlist/i.test(item.state)).length} label="Shortlisted" />
+      <V2Stat icon="📅" tone="amber" value={visibleApplicants.reduce((sum, item) => sum + item.interviewCount, 0)} label="Interviews" />
+      <V2Stat icon="🏁" tone="green" value={visibleApplicants.filter((item) => item.offerState).length} label="With offers" />
     </div>
 
     <section className="role-card role-wide">
@@ -545,15 +549,16 @@ export function EmployerApplicantsPage({ employerId }: { readonly employerId: st
           {opportunities.map((item) => <option key={item.id} value={item.id}>{item.title ?? item.referenceCode} ({item.applicationCount})</option>)}
         </select>
       </label>
+      {applicationStateFilter ? <p className="hiring-meta">Application state filter: <span className={`hiring-state state-${applicationStateFilter.toLowerCase()}`}>{humanise(applicationStateFilter)}</span></p> : null}
       {status ? <p role="status">{status}</p> : null}
     </section>
 
     <section className="role-card role-wide">
-      {applicants.length === 0
+      {visibleApplicants.length === 0
         ? <p>No applications to show.</p>
         : <div className="role-record-table-wrap"><table className="role-record-table">
           <thead><tr><th>Candidate</th><th>Stage</th><th>Applied</th><th>Interviews</th><th>Offer</th><th>Next step</th></tr></thead>
-          <tbody>{applicants.map((item) => <tr key={item.id}>
+          <tbody>{visibleApplicants.map((item) => <tr key={item.id}>
             <td>{item.consentRevoked
               ? <span className="hiring-meta">Withdrawn — details no longer shared</span>
               : <>{item.candidateName ?? item.candidateEmail}{item.institutionStudentId ? <span className="hiring-meta"> · {item.institutionStudentId}</span> : null}</>}</td>

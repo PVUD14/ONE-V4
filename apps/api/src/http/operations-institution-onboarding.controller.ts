@@ -352,7 +352,7 @@ export class OperationsInstitutionOnboardingController {
   @Get('/institutions/:institutionId/units')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async listUnits(@Req() request: ProtectedHttpRequest, @Param('institutionId') institutionId: string): Promise<Record<string, unknown>> {
-    const context = requireInstitutionAdmin(request, institutionId);
+    const context = requireInstitutionStaff(request, institutionId);
     const id = requireUuid(institutionId, context.correlationId);
     const units = await this.db.execute(sql`SELECT id, institution_id, kind, name, parent_unit_id, created_at, updated_at FROM institution_units WHERE institution_id=${id}::uuid ORDER BY kind, name`) as QueryResult<Record<string, unknown>>;
     return { units: units.rows.map(mapUnitRow), correlationId: context.correlationId };

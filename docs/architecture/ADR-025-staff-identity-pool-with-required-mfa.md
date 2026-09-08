@@ -35,8 +35,8 @@ pre-authentication triggers and adaptive authentication do not change this.
 
 ## Decision
 
-**Staff authenticate against a separate Cognito user pool with MFA set to `REQUIRED` and TOTP as the
-factor. Students and graduates remain in the existing pool with MFA off.**
+**Staff authenticate against a separate Cognito user pool with MFA set to `REQUIRED`. Students and
+graduates remain in the existing pool with MFA off.**
 
 Managed login handles both enrolment and the sign-in challenge for the staff pool, so no MFA
 handshake is implemented or maintained in application code. The ONE sign-in form hands off to
@@ -45,8 +45,28 @@ managed login when it meets a challenge.
 "Staff" means every role that is not Student or Graduate: the platform roles, all institution staff
 roles, and all employer roles.
 
-TOTP rather than SMS. Authenticator apps cost nothing, work without signal, and avoid SNS and Indian
-DLT sender registration for a weaker factor.
+**Both an authenticator app (TOTP) and SMS are offered, and the user chooses.** Managed login
+presents the `SELECT_MFA_TYPE` prompt and the setup flow for whichever they pick, so supporting two
+factors costs nothing in application code.
+
+TOTP alone was the first choice, on the grounds that it is free, works without signal and avoids SMS
+entirely. It was widened during review for a practical reason: staff at partner institutions cannot
+be relied upon to install an authenticator app, and the support cost of that friction is expected to
+exceed the cost of SMS. Offering both removes an adoption barrier at the point where these are
+external users we do not employ.
+
+The costs of admitting SMS are accepted knowingly:
+
+- Indian DLT sender registration and an Amazon SNS configuration are required before SMS MFA works,
+  and the account must be out of the SNS sandbox.
+- SMS carries a per-message cost for the life of the product.
+- SMS is the weakest of the available factors; SIM-swap is its standard bypass. It is offered as an
+  accessibility floor, not as the recommended option, and TOTP should be presented first.
+
+**A user needs both an email address and a phone number on file.** Cognito will not let the same
+channel carry both the MFA code and the password-reset code. With SMS as a user's factor, recovery
+must go by email; with email recovery unavailable, that user cannot reset a password. Both
+attributes are therefore required on the staff pool rather than optional.
 
 ## Why not the alternatives
 
@@ -94,8 +114,11 @@ enforcement is not enforcement.
 
 Sequence, staff pool in UAT before production:
 
-1. Create the staff pool with MFA `REQUIRED`, TOTP only, and an app client matching the existing
-   public SPA client's flows.
+1. Create the staff pool with MFA `REQUIRED`, both TOTP and SMS enabled, `email` and `phone_number`
+   as required attributes, and an app client matching the existing public SPA client's flows. SMS
+   additionally needs an SNS configuration, DLT sender registration and the account out of the SNS
+   sandbox; TOTP works without any of that, so ship TOTP first and add SMS when the registration
+   clears rather than blocking the pool on it.
 2. Widen token verification to accept both issuers. Additive and independently shippable.
 3. Add the staff sign-in route, and make the existing form hand off to managed login on a challenge
    rather than reporting a dead end.

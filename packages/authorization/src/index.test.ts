@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  auditSearchRoles,
   canEmployerReadApplicant,
   canInstitutionReadStudentActivity,
   canReadInstitutionAnalytics,
+  canSearchAuditEvents,
   canonicalInstitutionRelationshipPolicy,
+  type AuditSearchScope,
   institutionAnalyticsCapableRoles,
   institutionForbiddenDisclosureFields,
   institutionRelationshipAuthorizesActivity,
@@ -138,5 +141,29 @@ describe('institution disclosure exclusions', () => {
       'compensation_amount',
       'compensation_period',
     ]);
+  });
+});
+
+describe('audit event search authorization', () => {
+  function scope(overrides: Partial<AuditSearchScope> = {}): AuditSearchScope {
+    return { role: 'SECURITY_ADMIN', membershipState: 'ACTIVE', ...overrides };
+  }
+
+  it('admits exactly the three cross-tenant platform roles', () => {
+    expect([...auditSearchRoles]).toStrictEqual(['PLATFORM_SUPER_ADMIN', 'OPERATIONS_ADMIN', 'SECURITY_ADMIN']);
+  });
+
+  it.each([
+    ['security admin', scope(), true],
+    ['operations admin', scope({ role: 'OPERATIONS_ADMIN' }), true],
+    ['platform super admin', scope({ role: 'PLATFORM_SUPER_ADMIN' }), true],
+    ['institution admin', scope({ role: 'INSTITUTION_ADMIN' }), false],
+    ['department head', scope({ role: 'DEPARTMENT_HEAD' }), false],
+    ['recruiter', scope({ role: 'RECRUITER' }), false],
+    ['suspended security admin', scope({ membershipState: 'SUSPENDED' }), false],
+    ['ended operations admin', scope({ role: 'OPERATIONS_ADMIN', membershipState: 'ENDED' }), false],
+    ['pending platform super admin', scope({ role: 'PLATFORM_SUPER_ADMIN', membershipState: 'PENDING' }), false],
+  ])('%s', (_name, candidateScope, expected) => {
+    expect(canSearchAuditEvents(candidateScope)).toBe(expected);
   });
 });

@@ -117,6 +117,37 @@ export function getCurrentStudent(token: string, signal?: AbortSignal): Promise<
   return requestJson('/api/v1/students/me', { token, ...(signal ? { signal } : {}) });
 }
 
+/** Student-scoped C7 projection; staff identities and review metadata are not returned. */
+export interface StudentStaffActionDto {
+  readonly id: string;
+  readonly actionType: 'INTERVENTION' | 'ASSIGNED_TASK';
+  readonly title: string;
+  readonly note: string | null;
+  readonly state: string;
+  readonly dueAt: string | null;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly version: number;
+  readonly canComplete: boolean;
+  readonly responseNote: string | null;
+  readonly assignerRole: string;
+}
+
+export function listStudentStaffActions(token: string, institutionId: string, signal?: AbortSignal): Promise<{ readonly actions: readonly StudentStaffActionDto[] }> {
+  return requestJson(`/api/v1/students/me/staff-actions?institutionId=${encodeURIComponent(institutionId)}`,
+    { token, ...(signal ? { signal } : {}) });
+}
+
+export function completeStudentStaffAction(token: string, actionId: string,
+  body: { readonly version: number; readonly responseNote: string }, signal?: AbortSignal): Promise<{
+    readonly id: string; readonly state: 'COMPLETED'; readonly version: number;
+    readonly responseNote: string | null; readonly resolvedAt: string;
+  }> {
+  return requestJson(`/api/v1/students/me/staff-actions/${encodeURIComponent(actionId)}/complete`, {
+    token, method: 'POST', body: { version: body.version, responseNote: body.responseNote }, ...(signal ? { signal } : {}),
+  });
+}
+
 export function getStudentProfile(token: string, signal?: AbortSignal): Promise<{ readonly profile: StudentProfileDto }> {
   return requestJson('/api/v1/students/me/profile', { token, ...(signal ? { signal } : {}) });
 }

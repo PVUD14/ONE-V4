@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ArrowRight, Award, BookOpen, Building2, CalendarDays, CheckCircle2, ClipboardCheck, Flame, Play, Star, Target, TrendingUp, Trophy } from 'lucide-react';
 import { Spark, toneColor } from './pilot/pilotComponents.js';
+import { completeStudentStaffAction, getCurrentStudent, listStudentStaffActions, type StudentStaffActionDto } from './api/student.js';
 import {
   getLearnerCareerReadinessState,
   getProtectedAccessToken,
@@ -178,6 +179,106 @@ function StudentReports({ learner, exams, applications }: Pick<DashboardData, 'l
   </section>;
 }
 
+const SUPPORT_ROLES: Readonly<Record<string, string>> = {
+  PLACEMENT_ADMIN: 'Placement Officer', INSTITUTION_ADMIN: 'Institution Administrator',
+  DEPARTMENT_HEAD: 'Department Head', FACULTY_LECTURER: 'Faculty Lecturer', INSTITUTION_OWNER: 'Institution Owner',
+};
+const SUPPORT_STATES: Readonly<Record<string, string>> = {
+  DRAFT: 'Draft', UNDER_REVIEW: 'Under review', CHANGES_REQUESTED: 'Changes requested', APPROVED: 'Approved',
+  OPEN: 'Open', IN_PROGRESS: 'In progress', COMPLETED: 'Completed', REJECTED: 'Rejected', CANCELLED: 'Cancelled', ARCHIVED: 'Archived',
+};
+
+function StudentSupport({ token }: { readonly token: string | null }): React.ReactElement {
+  const [view, setView] = useState<{ institutionId: string; actions: readonly StudentStaffActionDto[]; loading: boolean; unavailable: boolean }>({
+    institutionId: '', actions: [], loading: true, unavailable: false,
+  });
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const [notice, setNotice] = useState('');
+  const [busy, setBusy] = useState(false);
+  const request = useRef<AbortController | null>(null);
+  const completing = useRef(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    request.current = controller;
+    async function load(): Promise<void> {
+      try {
+        if (!token) throw new Error('No student session');
+        // Resolve the institution from the protected profile, not a URL or a staff-selected scope.
+        const { student } = await getCurrentStudent(token, controller.signal);
+        if (!student?.institutionId) throw new Error('No student institution');
+        const { actions } = await listStudentStaffActions(token, student.institutionId, controller.signal);
+        if (!controller.signal.aborted) setView({ institutionId: student.institutionId, actions, loading: false, unavailable: false });
+      } catch {
+        if (!controller.signal.aborted) setView({ institutionId: '', actions: [], loading: false, unavailable: true });
+      }
+    }
+    void load();
+    return () => controller.abort();
+  }, [token]);
+
+  async function complete(action: StudentStaffActionDto): Promise<void> {
+    const signal = request.current?.signal;
+    if (!token || !view.institutionId || !signal || signal.aborted || completing.current || action.canComplete !== true) return;
+    completing.current = true;
+    setBusy(true);
+    setNotice('');
+    let saved = false;
+    try {
+      await completeStudentStaffAction(token, action.id, { version: action.version, responseNote: notes[action.id] ?? '' }, signal);
+      saved = true;
+    } catch {
+      // A failed or stale write never becomes a local success, and upstream error text stays private.
+    }
+    if (signal.aborted) return;
+    try {
+      const { actions } = await listStudentStaffActions(token, view.institutionId, signal);
+      if (signal.aborted) return;
+      setView({ ...view, actions, unavailable: false });
+      setNotice(saved ? 'Completion saved.' : 'Completion could not be confirmed. Review the refreshed item before trying again.');
+      if (saved) setNotes((previous) => ({ ...previous, [action.id]: '' }));
+    } catch {
+      if (signal.aborted) return;
+      setView({ ...view, actions: [], unavailable: true });
+      setNotice(saved ? 'Completion saved. Support could not be refreshed.' : 'Completion could not be confirmed. Please reload the page before trying again.');
+    } finally {
+      completing.current = false;
+      if (!signal.aborted) setBusy(false);
+    }
+  }
+
+  return <section className="pilot-card" aria-labelledby="student-support-title">
+    <div className="pilot-card-head"><h2 id="student-support-title">Support</h2></div>
+    <p>Tasks and interventions your college has assigned to you.</p>
+    {notice ? <p role="status">{notice}</p> : null}
+    {view.loading ? <p role="status">Loading your support…</p> : view.actions.length ? <ul className="pilot-list" aria-label="Assigned support items">
+      {view.actions.map((action) => {
+        const role = Object.hasOwn(SUPPORT_ROLES, action.assignerRole) ? SUPPORT_ROLES[action.assignerRole] : null;
+        const state = Object.hasOwn(SUPPORT_STATES, action.state) ? SUPPORT_STATES[action.state] : 'NA';
+        return <li key={action.id} className="pilot-list-row"><div className="grow">
+          <h3>{action.title || 'NA'}</h3>
+          <p>{action.actionType === 'ASSIGNED_TASK' ? 'Assigned task' : action.actionType === 'INTERVENTION' ? 'Intervention' : 'NA'}</p>
+          <p>{role ? `Assigned by your ${role}` : 'Assigned by your college'}</p>
+          <p>Due: {action.dueAt && Number.isFinite(Date.parse(action.dueAt))
+            ? <time dateTime={action.dueAt}>{new Date(action.dueAt).toLocaleString(undefined, {
+              year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+            })}</time> : 'NA'}</p>
+          <p>State: <span className="pilot-chip slate">{state}</span></p>
+          {action.note ? <p>{action.note}</p> : null}
+          {action.responseNote ? <p>Your response: {action.responseNote}</p> : null}
+          {action.canComplete === true ? <form onSubmit={(event) => { event.preventDefault(); void complete(action); }} aria-label={`Complete ${action.title}`}>
+            <label className="pilot-field"><span>Response note for {action.title} (optional)</span>
+              <textarea maxLength={2000} rows={3} value={notes[action.id] ?? ''} disabled={busy}
+                onChange={(event) => setNotes((previous) => ({ ...previous, [action.id]: event.target.value }))} />
+            </label>
+            <button type="submit" className="pilot-btn primary small" disabled={busy}>{busy ? 'Saving…' : 'Mark complete'}</button>
+          </form> : <p>Read-only — no student action is available for this item.</p>}
+        </div></li>;
+      })}
+    </ul> : <p>{view.unavailable ? 'No support items are available right now.' : 'Nothing has been assigned to you yet.'}</p>}
+  </section>;
+}
+
 export function StudentDashboardV3({ studentName }: { readonly studentName: string }): React.ReactElement {
   const token = getProtectedAccessToken();
   const [data, setData] = useState<DashboardData | null>(null);
@@ -259,6 +360,8 @@ export function StudentDashboardV3({ studentName }: { readonly studentName: stri
           </div>
           <button type="button" className="pilot-btn ghost" onClick={() => go('/student/assessments')}><CalendarDays size={15} /> View Calendar</button>
         </div>
+
+        <StudentSupport key={token} token={token} />
 
         <div className="pilot-row v3-score-row">
           <section className="pilot-card">

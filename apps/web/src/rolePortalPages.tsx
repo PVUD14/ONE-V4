@@ -249,6 +249,26 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
             <InstitutionExamEnginePage institutionId={authenticatedWorkspace.organizationId} canApprove={portal.key !== 'faculty'} /></StaffPilotWrap>
         : <InstitutionWorkspaceError title='Assessments' />;
     }
+  // Placement Officer's real portal. Each screen is routed to a surface this role is
+  // actually authorized for server-side, so a promoted screen shows data rather than a
+  // forbidden error: students (and their search) sit behind institution staff roles,
+  // and the aggregate report admits PLACEMENT_ADMIN. Departments and Batches read the
+  // units endpoint, which is institution-admin only, so they stay on the honest empty
+  // state until that read is widened rather than rendering an error to the officer.
+  if (!demoMode && portal.key === 'placement-officer' && /^students$|^student search$/i.test(route.label)) {
+    return isInstitutionStaffWorkspace(authenticatedWorkspace)
+      ? <StaffPilotWrap title={route.label} subtitle="The roster you are placing: readiness, department and the state of every relationship.">
+          <InstitutionStudentsPage portal={portal} authenticatedWorkspace={authenticatedWorkspace} /></StaffPilotWrap>
+      : <InstitutionWorkspaceError title={route.label} />;
+  }
+  if (!demoMode && portal.key === 'placement-officer' && route.label === 'Readiness') {
+    return isInstitutionWorkspace(authenticatedWorkspace)
+      ? <InstitutionReportsPage key={authenticatedWorkspace.organizationId} institutionId={authenticatedWorkspace.organizationId} />
+      : <InstitutionWorkspaceError title="Readiness" unauthorized={Boolean(authenticatedWorkspace && !institutionWorkspaceRoles.has(authenticatedWorkspace.role))} />;
+  }
+  if (!demoMode && portal.key === 'placement-officer' && /^departments$|^batches$/i.test(route.label)) {
+    return <AuthenticatedNotYetAvailable title={route.label} detail="Academic structure is readable by institution administrators only. This screen turns on for Placement Officers when that read is opened to institution staff; nothing else is required." />;
+  }
   if (!demoMode && portal.key === 'institution-admin' && route.label === 'Staff') return <InstitutionStaffPage portal={portal} authenticatedWorkspace={authenticatedWorkspace} />;
   if (!demoMode && portal.key === 'institution-admin' && route.label === 'Reports') {
     return isInstitutionWorkspace(authenticatedWorkspace)

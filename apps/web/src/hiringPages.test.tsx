@@ -312,6 +312,28 @@ describe('interview and offer management', () => {
     expect(window.prompt).not.toHaveBeenCalled();
   });
 
+  it('requires a conscious acknowledgement when scheduling grants participant access to the candidate', async () => {
+    const participantId = crypto.randomUUID();
+    stubFetch({ [`${base}/opportunities`]: { opportunities: [{ ...opportunity, lifecycleState: 'PUBLISHED', applicationCount: 1 }] },
+      [`${base}/opportunities/${opportunity.id}/applications`]: { applications: [{ ...interview, id: 'application-a', state: 'INTERVIEW', offerState: null, interviewCount: 0 }] },
+      [`${base}/interview-participant-options`]: { participants: [{ userId: participantId, label: 'participant@example.test' }] } });
+    await authenticate(); render(<EmployerApplicantsPage employerId={employerId} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Schedule interview' }));
+    fillSchedule(); fireEvent.change(screen.getByLabelText('Mode'), { target: { value: 'PHONE' } });
+    expect(screen.getByText(/Adding a participant lets that person see the candidate details/)).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'participant@example.test' }));
+    const acknowledgement = screen.getByRole('checkbox', { name: /I understand that the selected participants/ });
+    expect(acknowledgement).not.toBeChecked(); expect(acknowledgement).toBeRequired();
+    const form = screen.getByRole('button', { name: 'Save interview' }).closest('form')!;
+    fireEvent.submit(form);
+    expect(await screen.findByText('Confirm participant access before scheduling.')).toBeInTheDocument();
+    expect(postsTo('/interviews')).toHaveLength(0);
+    fireEvent.click(acknowledgement); fireEvent.submit(form);
+    await waitFor(() => expect(postsTo('/interviews')).toHaveLength(1));
+    expect(JSON.parse(postsTo('/interviews')[0]![1]!.body as string)).toMatchObject({ participantUserIds: [participantId], participantVisibilityAcknowledged: true, mode: 'PHONE', ...expectedWindow() });
+    expect(document.body.textContent).not.toContain(participantId);
+  });
+
   function stubApplicant(state: string): void {
     stubFetch({ [`${base}/opportunities`]: { opportunities: [{ ...opportunity, lifecycleState: 'PUBLISHED', applicationCount: 1 }] },
       [`${base}/opportunities/${opportunity.id}/applications`]: { applications: [{ ...interview, id: 'application-a', state, offerState: null, interviewCount: 0 }] } });
@@ -328,6 +350,13 @@ describe('interview and offer management', () => {
 });
 
 describe('institution consent and reports', () => {
+  it('keeps the interview screen usable with a safe error when the API list is malformed', async () => {
+    stubFetch({ '/api/v1/employers/employer/interviews': {} });
+    await authenticate(); render(<EmployerInterviewsPage employerId="employer" />);
+    expect(await screen.findByText('Records could not be loaded. Please refresh.')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Interviews' })).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain('Invalid hiring list response');
+  });
   it('makes institution sharing optional and records the explicit choice', async () => {
     stubFetch({ '/api/v1/opportunities': { opportunities: [opportunity] }, [`/api/v1/opportunities/${opportunity.id}`]: detail,
       '/api/v1/students/me/applications': { application: { id: 'app', state: 'APPLIED' } } });

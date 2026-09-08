@@ -44,6 +44,38 @@ const interviewModes = ['ONSITE', 'VIDEO', 'PHONE'] as const;
 const recommendations = ['STRONG_YES', 'YES', 'NEUTRAL', 'NO', 'STRONG_NO'] as const;
 const audienceKinds = ['PUBLIC', 'INSTITUTION', 'INSTITUTION_UNIT', 'INVITE_ONLY'] as const;
 
+/** Dependency injection keeps this named, single-interview guard portable. */
+export function createInterviewParticipantGuard(db: Pick<PersistenceDb, 'execute'>) {
+  return async function requireInterviewParticipant(request: ProtectedHttpRequest, employerId: string, interviewId: string) {
+    const context = requireTrustedAuthorization(request);
+    requireUuid(employerId, context.correlationId);
+    requireUuid(interviewId, context.correlationId);
+    const actorId = context.authorization.principal.userId;
+    if (!context.authorization.memberships.some((membership) => membership.state === 'ACTIVE'
+      && membership.organizationId === employerId && membership.scope.organizationId === employerId
+      && membership.scope.employerId === employerId)) throw forbidden(context.correlationId);
+    const rows = await db.execute(sql`
+      SELECT i.id FROM interviews i
+      WHERE i.id = ${interviewId}::uuid AND i.employer_id = ${employerId}::uuid
+        AND ${activeInterviewAssignment(actorId)}
+    `) as QueryResult<{ id: string }>;
+    if (rows.rows.length !== 1) throw forbidden(context.correlationId);
+    return context;
+  };
+}
+
+/** Shared by the guard and data statements so revocation is rechecked on each query. */
+function activeInterviewAssignment(actorId: string) {
+  return sql`i.state IN ('SCHEDULED', 'RESCHEDULED')
+    AND i.scheduled_start IS NOT NULL
+    AND (i.scheduled_end IS NULL OR i.scheduled_end > clock_timestamp())
+    AND EXISTS (SELECT 1 FROM interview_participants p
+      WHERE p.interview_id = i.id AND p.participant_user_id = ${actorId}::uuid AND p.removed_at IS NULL)
+    AND EXISTS (SELECT 1 FROM organization_memberships m JOIN organizations org ON org.id = m.organization_id
+      WHERE m.user_id = ${actorId}::uuid AND m.organization_id = i.employer_id AND org.kind = 'EMPLOYER'
+        AND m.scope_organization_id = i.employer_id AND m.scope_employer_id = i.employer_id AND m.state = 'ACTIVE')`;
+}
+
 /**
  * Employer-facing hiring surface. Every route is scoped to an employer the caller
  * holds an active membership in; the composite foreign keys in 0007 make it
@@ -52,10 +84,11 @@ const audienceKinds = ['PUBLIC', 'INSTITUTION', 'INSTITUTION_UNIT', 'INVITE_ONLY
  */
 @Controller('/api/v1')
 export class EmployerHiringController {
+  private readonly requireInterviewParticipant: ReturnType<typeof createInterviewParticipantGuard>;
   constructor(
     @Inject(API_PERSISTENCE_DB) private readonly db: PersistenceDb,
     @Inject(API_ID_GENERATOR) private readonly ids: ApiIdGenerator,
-  ) {}
+  ) { this.requireInterviewParticipant = createInterviewParticipantGuard(db); }
 
   // -------------------------------------------------------------------------
   // Opportunities
@@ -242,6 +275,101 @@ export class EmployerHiringController {
   // Interviews
   // -------------------------------------------------------------------------
 
+  @Get('/employers/:employerId/my-interviews')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async listMyInterviews(@Req() request: ProtectedHttpRequest, @Param('employerId') employerId: string): Promise<Record<string, unknown>> {
+    const context = requireTrustedAuthorization(request);
+    requireUuid(employerId, context.correlationId);
+    if (!context.authorization.memberships.some((m) => m.state === 'ACTIVE' && m.organizationId === employerId
+      && m.scope.organizationId === employerId && m.scope.employerId === employerId)) throw forbidden(context.correlationId);
+    const rows = await this.readParticipantInterviews(context.authorization.principal.userId, employerId);
+    return { interviews: rows.rows.map(mapParticipantInterview), correlationId: context.correlationId };
+  }
+
+  @Get('/employers/:employerId/my-interviews/:interviewId')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async getMyInterview(@Req() request: ProtectedHttpRequest, @Param('employerId') employerId: string, @Param('interviewId') interviewId: string): Promise<Record<string, unknown>> {
+    const context = await this.requireInterviewParticipant(request, employerId, interviewId);
+    const rows = await this.readParticipantInterviews(context.authorization.principal.userId, employerId, interviewId);
+    if (rows.rows.length !== 1) throw forbidden(context.correlationId);
+    return { interview: mapParticipantInterview(rows.rows[0]!), correlationId: context.correlationId };
+  }
+
+  @Post('/employers/:employerId/my-interviews/:interviewId/outcome')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async submitMyOutcome(@Req() request: ProtectedHttpRequest, @Param('employerId') employerId: string, @Param('interviewId') interviewId: string, @Body() body: unknown): Promise<Record<string, unknown>> {
+    const context = await this.requireInterviewParticipant(request, employerId, interviewId);
+    const actorId = context.authorization.principal.userId;
+    const recommendation = readEnum(body, 'recommendation', recommendations, context.correlationId);
+    const rating = readOptionalRating(body, context.correlationId);
+    const strengths = readOptionalSafeText(body, 'strengths', 2000, context.correlationId);
+    const concerns = readOptionalSafeText(body, 'concerns', 2000, context.correlationId);
+    const notes = readOptionalSafeText(body, 'notes', 4000, context.correlationId);
+    await this.db.transaction(async (tx) => {
+      // Lock the authorization rows: removal, suspension, cancellation and consent
+      // revocation cannot race a scorecard into an already-revoked scope.
+      const locked = await tx.execute(sql`
+        SELECT i.id FROM interviews i
+        JOIN applications a ON a.id = i.application_id AND a.employer_id = i.employer_id
+        JOIN interview_participants p ON p.interview_id = i.id AND p.participant_user_id = ${actorId}::uuid AND p.removed_at IS NULL
+        JOIN organization_memberships m ON m.user_id = ${actorId}::uuid AND m.organization_id = i.employer_id
+          AND m.scope_organization_id = i.employer_id AND m.scope_employer_id = i.employer_id AND m.state = 'ACTIVE'
+        WHERE i.id = ${interviewId}::uuid AND i.employer_id = ${employerId}::uuid
+          AND a.consent_revoked_at IS NULL AND a.closed_at IS NULL AND a.state <> 'DRAFT'
+          AND ${activeInterviewAssignment(actorId)}
+        FOR SHARE OF i, a, p, m
+      `) as QueryResult<{ id: string }>;
+      if (!locked.rows.length) throw forbidden(context.correlationId);
+      const saved = await tx.execute(sql`
+        INSERT INTO interview_outcomes (id, interview_id, submitted_by_user_id, recommendation, overall_rating, strengths, concerns, notes)
+        SELECT ${this.ids.uuid()}::uuid, i.id, ${actorId}::uuid, ${recommendation}, ${rating}, ${strengths}, ${concerns}, ${notes}
+        FROM interviews i WHERE i.id = ${interviewId}::uuid AND i.employer_id = ${employerId}::uuid AND ${activeInterviewAssignment(actorId)}
+        ON CONFLICT (interview_id, submitted_by_user_id) DO UPDATE SET
+          recommendation = EXCLUDED.recommendation, overall_rating = EXCLUDED.overall_rating,
+          strengths = EXCLUDED.strengths, concerns = EXCLUDED.concerns, notes = EXCLUDED.notes, submitted_at = now()
+        RETURNING id
+      `) as QueryResult<{ id: string }>;
+      if (saved.rows.length !== 1) throw forbidden(context.correlationId);
+      await tx.execute(sql`
+        INSERT INTO audit_events (id, actor_user_id, action, resource_type, resource_id, organization_id, outcome, correlation_id)
+        VALUES (${this.ids.uuid()}::uuid, ${actorId}::uuid, 'interview.outcome_recorded', 'interview', ${interviewId}::uuid,
+          ${employerId}::uuid, 'SUCCESS', ${context.correlationId})
+      `);
+    });
+    return { ok: true, correlationId: context.correlationId };
+  }
+
+  @Get('/employers/:employerId/interview-participant-options')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async listParticipantOptions(@Req() request: ProtectedHttpRequest, @Param('employerId') employerId: string): Promise<Record<string, unknown>> {
+    const context = this.requireEmployer(request, employerId, employerManageRoles);
+    const rows = await this.db.execute(sql`
+      SELECT DISTINCT u.id, u.email FROM organization_memberships m JOIN users u ON u.id = m.user_id
+      WHERE m.organization_id = ${employerId}::uuid AND m.scope_organization_id = ${employerId}::uuid
+        AND m.scope_employer_id = ${employerId}::uuid AND m.state = 'ACTIVE' AND u.state = 'ACTIVE'
+      ORDER BY u.email LIMIT 200
+    `) as QueryResult<{ id: string; email: string }>;
+    return { participants: rows.rows.map((row) => ({ userId: row.id, label: row.email })), correlationId: context.correlationId };
+  }
+
+  private async readParticipantInterviews(actorId: string, employerId: string, interviewId?: string) {
+    return this.db.execute(sql`
+      SELECT i.id, i.round_number, i.mode, i.state, i.scheduled_start, i.scheduled_end, i.location_detail, i.joining_link,
+        a.consent_revoked_at, a.closed_at, v.title, v.summary, v.responsibilities,
+        u.email AS student_email, isp.full_name, isp.institution_student_id
+      FROM interviews i
+      JOIN applications a ON a.id = i.application_id AND a.employer_id = i.employer_id
+      JOIN opportunity_versions v ON v.id = a.applied_version_id AND v.opportunity_id = a.opportunity_id
+      JOIN users u ON u.id = a.student_user_id
+      LEFT JOIN LATERAL (SELECT full_name, institution_student_id FROM institution_student_profiles
+        WHERE student_user_id = a.student_user_id AND status = 'ACTIVE' ORDER BY updated_at DESC LIMIT 1) isp ON true
+      WHERE i.employer_id = ${employerId}::uuid AND a.state <> 'DRAFT'
+        ${interviewId ? sql`AND i.id = ${interviewId}::uuid` : sql``}
+        AND ${activeInterviewAssignment(actorId)}
+      ORDER BY i.scheduled_start, i.id LIMIT 200
+    `) as Promise<QueryResult<Record<string, unknown>>>;
+  }
+
   @Get('/employers/:employerId/interviews')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async listInterviews(@Req() request: ProtectedHttpRequest, @Param('employerId') employerId: string): Promise<Record<string, unknown>> {
@@ -285,19 +413,56 @@ export class EmployerHiringController {
     const joiningLink = readOptionalHttpsUrl(body, 'joiningLink', context.correlationId);
     if (mode === 'ONSITE' && !locationDetail) throw badRequest('LOCATION_REQUIRED', context.correlationId);
 
-    const interviewId = this.ids.uuid();
-    const nextRound = await this.db.execute(sql`
-      SELECT coalesce(max(round_number), 0) + 1 AS next FROM interviews WHERE application_id = ${id}::uuid
-    `) as QueryResult<{ next: number }>;
+    const record = body as Record<string, unknown>;
+    const suppliedParticipants = record.participantUserIds ?? [];
+    if (!Array.isArray(suppliedParticipants) || suppliedParticipants.length > 20 || suppliedParticipants.some((id) => typeof id !== 'string' || !uuidPattern.test(id))) {
+      throw badRequest('INVALID_PARTICIPANTS', context.correlationId);
+    }
+    const participantIds = [...new Set(suppliedParticipants as string[])];
+    if (participantIds.length && record.participantVisibilityAcknowledged !== true) throw badRequest('PARTICIPANT_VISIBILITY_REQUIRED', context.correlationId);
+    return this.db.transaction(async (tx) => {
+      const lockedApplication = await tx.execute(sql`
+        SELECT id FROM applications WHERE id = ${id}::uuid AND employer_id = ${employerId}::uuid
+          AND consent_revoked_at IS NULL AND closed_at IS NULL AND state <> 'DRAFT' FOR UPDATE
+      `) as QueryResult<{ id: string }>;
+      if (lockedApplication.rows.length !== 1) throw forbidden(context.correlationId);
+      if (participantIds.length) {
+        const members = await tx.execute(sql`
+          SELECT m.user_id FROM organization_memberships m JOIN users u ON u.id = m.user_id
+          WHERE m.user_id IN (${sql.join(participantIds.map((participantId) => sql`${participantId}::uuid`), sql`, `)}) AND m.organization_id = ${employerId}::uuid
+            AND m.scope_organization_id = ${employerId}::uuid AND m.scope_employer_id = ${employerId}::uuid
+            AND m.state = 'ACTIVE' AND u.state = 'ACTIVE' ORDER BY m.id FOR SHARE OF m, u
+        `) as QueryResult<{ user_id: string }>;
+        if (new Set(members.rows.map((row) => row.user_id)).size !== participantIds.length) throw badRequest('INVALID_PARTICIPANTS', context.correlationId);
+      }
+      const interviewId = this.ids.uuid();
+      const nextRound = await tx.execute(sql`
+        SELECT coalesce(max(round_number), 0) + 1 AS next FROM interviews WHERE application_id = ${id}::uuid
+      `) as QueryResult<{ next: number }>;
 
-    await this.db.execute(sql`
-      INSERT INTO interviews (id, application_id, employer_id, round_number, mode, state, scheduled_start, scheduled_end, location_detail, joining_link, created_by_user_id)
-      VALUES (${interviewId}::uuid, ${id}::uuid, ${employerId}::uuid, ${nextRound.rows[0]?.next ?? 1}, ${mode}, 'SCHEDULED', ${scheduledStart}::timestamptz, ${scheduledEnd}::timestamptz, ${locationDetail}, ${joiningLink}, ${context.authorization.principal.userId}::uuid)
-    `);
-    await this.writeAudit(context.authorization.principal.userId, 'interview.scheduled', 'interview', interviewId, context.correlationId);
-    await this.writeOutbox('interview', interviewId, 'interview.scheduled', { interviewId, applicationId: id }, context.authorization.principal.userId, employerId, context.correlationId);
+      await tx.execute(sql`
+        INSERT INTO interviews (id, application_id, employer_id, round_number, mode, state, scheduled_start, scheduled_end, location_detail, joining_link, created_by_user_id)
+        VALUES (${interviewId}::uuid, ${id}::uuid, ${employerId}::uuid, ${nextRound.rows[0]?.next ?? 1}, ${mode}, 'SCHEDULED', ${scheduledStart}::timestamptz, ${scheduledEnd}::timestamptz, ${locationDetail}, ${joiningLink}, ${context.authorization.principal.userId}::uuid)
+      `);
+      for (const participantId of participantIds) {
+        await tx.execute(sql`
+          INSERT INTO interview_participants (id, interview_id, participant_user_id, participant_role)
+          VALUES (${this.ids.uuid()}::uuid, ${interviewId}::uuid, ${participantId}::uuid, 'INTERVIEWER')
+        `);
+      }
+      if (participantIds.length) {
+        await tx.execute(sql`
+          INSERT INTO audit_events (id, actor_user_id, action, resource_type, resource_id, organization_id, outcome, correlation_id, context)
+          VALUES (${this.ids.uuid()}::uuid, ${context.authorization.principal.userId}::uuid, 'interview.participants_assigned',
+            'interview', ${interviewId}::uuid, ${employerId}::uuid, 'SUCCESS', ${context.correlationId},
+            ${JSON.stringify({ participantUserIds: participantIds, visibilityAcknowledged: true })}::jsonb)
+        `);
+      }
+      await this.writeAudit(context.authorization.principal.userId, 'interview.scheduled', 'interview', interviewId, context.correlationId, tx);
+      await this.writeOutbox('interview', interviewId, 'interview.scheduled', { interviewId, applicationId: id }, context.authorization.principal.userId, employerId, context.correlationId, tx);
 
-    return { interview: { id: interviewId, state: 'SCHEDULED', roundNumber: nextRound.rows[0]?.next ?? 1 }, correlationId: context.correlationId };
+      return { interview: { id: interviewId, state: 'SCHEDULED', roundNumber: nextRound.rows[0]?.next ?? 1 }, correlationId: context.correlationId };
+    });
   }
 
   @Post('/employers/:employerId/interviews/:interviewId/state')
@@ -590,15 +755,15 @@ export class EmployerHiringController {
     `);
   }
 
-  private async writeAudit(actorUserId: string, action: string, resourceType: string, resourceId: string, correlationId: string): Promise<void> {
-    await this.db.execute(sql`
+  private async writeAudit(actorUserId: string, action: string, resourceType: string, resourceId: string, correlationId: string, db: Pick<PersistenceDb, 'execute'> = this.db): Promise<void> {
+    await db.execute(sql`
       INSERT INTO audit_events (id, actor_user_id, action, resource_type, resource_id, outcome, correlation_id)
       VALUES (${this.ids.uuid()}::uuid, ${actorUserId}::uuid, ${action}, ${resourceType}, ${resourceId}::uuid, 'SUCCESS', ${correlationId})
     `);
   }
 
-  private async writeOutbox(aggregateType: string, aggregateId: string, eventType: string, payload: Record<string, unknown>, actorUserId: string, organizationId: string, correlationId: string): Promise<void> {
-    await this.db.execute(sql`
+  private async writeOutbox(aggregateType: string, aggregateId: string, eventType: string, payload: Record<string, unknown>, actorUserId: string, organizationId: string, correlationId: string, db: Pick<PersistenceDb, 'execute'> = this.db): Promise<void> {
+    await db.execute(sql`
       INSERT INTO outbox_events (id, aggregate_type, aggregate_id, event_type, payload, actor_user_id, organization_id, correlation_id)
       VALUES (${this.ids.uuid()}::uuid, ${aggregateType}, ${aggregateId}, ${eventType}, ${JSON.stringify(payload)}::jsonb, ${actorUserId}::uuid, ${organizationId}::uuid, ${correlationId})
     `);
@@ -723,6 +888,19 @@ function mapEmployerInterviewRow(row: Record<string, unknown>): Record<string, u
     outcomeCount: Number(row.outcome_count ?? 0),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+function mapParticipantInterview(row: Record<string, unknown>): Record<string, unknown> {
+  const candidate = mapCandidateFields(row);
+  return {
+    id: row.id, title: row.title, roundNumber: Number(row.round_number), mode: row.mode, state: row.state,
+    scheduledStart: row.scheduled_start, scheduledEnd: row.scheduled_end ?? null,
+    ...candidate,
+    locationDetail: candidate.consentRevoked ? null : row.location_detail ?? null,
+    joiningLink: candidate.consentRevoked ? null : row.joining_link ?? null,
+    summary: row.summary ?? null, responsibilities: row.responsibilities ?? null,
+    canRecordOutcome: !candidate.consentRevoked && row.closed_at == null,
   };
 }
 

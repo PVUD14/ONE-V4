@@ -6,6 +6,7 @@ import {
   withdrawEmployerOffer, revokeInstitutionVisibility, getEmployerHiringAnalytics,
   type EmployerInterviewDto, type EmployerOfferDto, type InterviewScheduleInput,
   type InterviewStateInput, type InterviewOutcomeInput, type OfferInput, type HiringAnalyticsDto,
+  listInterviewParticipantOptions, type InterviewParticipantOptionDto,
 } from './api/hiring.js';
 import {
   ApiRequestError,
@@ -56,6 +57,8 @@ const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   APPLICATION_NOT_AT_OFFER_STAGE: 'Move the candidate to the offer stage first.',
   LOCATION_REQUIRED: 'On-site roles need a location.',
   INVALID_SCHEDULE: 'Choose an end time after the interview starts.',
+  INVALID_PARTICIPANTS: 'Select current members of this employer to join the interview.',
+  PARTICIPANT_VISIBILITY_REQUIRED: 'Confirm that the selected participants may see the candidate for this interview.',
   FORBIDDEN: 'You do not have access to that.',
 };
 
@@ -482,7 +485,7 @@ const PIPELINE_NEXT: Readonly<Record<string, readonly string[]>> = {
 };
 
 // Shared verbatim consent redaction from the Applicants table.
-function CandidateIdentity({ item }: { readonly item: Pick<EmployerApplicantDto, 'consentRevoked' | 'candidateName' | 'candidateEmail' | 'institutionStudentId'> }): React.ReactElement {
+export function CandidateIdentity({ item }: { readonly item: Pick<EmployerApplicantDto, 'consentRevoked' | 'candidateName' | 'candidateEmail' | 'institutionStudentId'> }): React.ReactElement {
   return item.consentRevoked
     ? <span className="hiring-meta">Withdrawn — details no longer shared</span>
     : <>{item.candidateName ?? item.candidateEmail ?? 'NA'}{item.institutionStudentId ? <span className="hiring-meta"> · {item.institutionStudentId}</span> : null}</>;
@@ -511,19 +514,34 @@ function scheduleWindow(form: FormData): { scheduledStart: string; scheduledEnd:
   return { scheduledStart: start.toISOString(), scheduledEnd: new Date(start.getTime() + duration * 60_000).toISOString() };
 }
 
-function InterviewForm({ onSave, onCancel }: { readonly onSave: (input: InterviewScheduleInput) => Promise<void>; readonly onCancel: () => void }): React.ReactElement {
+function InterviewForm({ employerId, onSave, onCancel }: { readonly employerId: string; readonly onSave: (input: InterviewScheduleInput) => Promise<void>; readonly onCancel: () => void }): React.ReactElement {
   const [mode, setMode] = useState<InterviewScheduleInput['mode']>('VIDEO');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [participants, setParticipants] = useState<readonly InterviewParticipantOptionDto[]>([]);
+  const [selectedParticipants, setSelectedParticipants] = useState<readonly string[]>([]);
+  const [participantStatus, setParticipantStatus] = useState('Loading employer members…');
+  const [visibilityAcknowledged, setVisibilityAcknowledged] = useState(false);
+  useEffect(() => {
+    const abort = new AbortController();
+    const token = getAccessToken();
+    if (!token) { setParticipantStatus('Sign in to select participants.'); return; }
+    void listInterviewParticipantOptions(token, employerId, abort.signal).then(({ participants }) => {
+      if (!abort.signal.aborted) { setParticipants(participants ?? []); setParticipantStatus(participants?.length ? '' : 'No eligible employer members to add.'); }
+    }).catch(() => { if (!abort.signal.aborted) setParticipantStatus('Employer members could not be loaded.'); });
+    return () => abort.abort();
+  }, [employerId]);
   async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     if (busy) return;
     const form = new FormData(event.currentTarget);
+    if (selectedParticipants.length && !visibilityAcknowledged) { setError('Confirm participant access before scheduling.'); return; }
     let window: ReturnType<typeof scheduleWindow>;
     try { window = scheduleWindow(form); } catch { setError('Choose a future date and a duration between 1 and 1440 minutes.'); return; }
     setBusy(true); setError('');
     try {
       await onSave({ ...window, mode,
+        ...(selectedParticipants.length ? { participantUserIds: selectedParticipants, participantVisibilityAcknowledged: visibilityAcknowledged } : {}),
         ...(mode === 'VIDEO' ? { joiningLink: String(form.get('joiningLink')) } : {}),
         ...(mode === 'ONSITE' || form.get('locationDetail') ? { locationDetail: String(form.get('locationDetail')) } : {}),
       });
@@ -537,6 +555,19 @@ function InterviewForm({ onSave, onCancel }: { readonly onSave: (input: Intervie
     </select></label>
     {mode === 'VIDEO' ? <label><span>Joining link</span><input name="joiningLink" type="url" pattern="https://[^\s]+" required maxLength={512} /></label>
       : <label><span>{mode === 'ONSITE' ? 'Location' : 'Phone arrangements (optional)'}</span><input key={mode} name="locationDetail" required={mode === 'ONSITE'} maxLength={500} /></label>}
+    <fieldset disabled={busy}><legend>Interview participants</legend>
+      <p>Adding a participant lets that person see the candidate details shared for this interview and record a scorecard. Access ends when the assignment is removed or the interview ends.</p>
+      {participantStatus ? <p role="status">{participantStatus}</p> : null}
+      <p>{selectedParticipants.length} participants selected.</p>
+      {participants.map((participant) => <label key={participant.userId} className="hiring-checkbox">
+        <input type="checkbox" checked={selectedParticipants.includes(participant.userId)} onChange={(event) => {
+          setSelectedParticipants((previous) => event.target.checked ? [...previous, participant.userId] : previous.filter((id) => id !== participant.userId));
+          setVisibilityAcknowledged(false);
+        }} /><span>{participant.label}</span>
+      </label>)}
+      {selectedParticipants.length ? <label className="hiring-checkbox"><input type="checkbox" required checked={visibilityAcknowledged}
+        onChange={(event) => setVisibilityAcknowledged(event.target.checked)} /><span>I understand that the selected participants will be able to see this candidate for this interview.</span></label> : null}
+    </fieldset>
     {error ? <p role="alert">{error}</p> : null}
     <button disabled={busy} type="submit">{busy ? 'Saving…' : 'Save interview'}</button>
     <button disabled={busy} type="button" className="secondary" onClick={onCancel}>Close form</button>
@@ -598,6 +629,7 @@ function useEmployerList<T>(employerId: string, loader: (token: string, id: stri
     try {
       const rows = await loader(token, employerId, signal);
       if (current !== sequence.current || signal?.aborted) return;
+      if (!Array.isArray(rows)) throw new Error('Invalid hiring list response');
       setResult({ employerId, rows }); setStatus('');
     } finally { if (current === sequence.current && !signal?.aborted) setLoading(false); }
   }, [employerId, loader]);
@@ -663,7 +695,7 @@ export function EmployerInterviewsPage({ employerId }: { readonly employerId: st
   </section>;
 }
 
-function InterviewActionForm({ kind, onSave, onCancel }: {
+export function InterviewActionForm({ kind, onSave, onCancel }: {
   readonly kind: 'outcome' | 'reschedule'; readonly onSave: (body: InterviewOutcomeInput | InterviewStateInput) => Promise<void>; readonly onCancel: () => void;
 }): React.ReactElement {
   const [busy, setBusy] = useState(false);
@@ -884,7 +916,7 @@ export function EmployerApplicantsPage({ employerId, applicationStateFilter }: {
       <h2>{action.kind === 'interview' ? 'Schedule interview' : 'Send offer'}</h2>
       <p><CandidateIdentity item={action.applicant} /></p>
       {action.kind === 'interview'
-        ? <InterviewForm onSave={saveInterview} onCancel={() => setAction(null)} />
+        ? <InterviewForm employerId={employerId} onSave={saveInterview} onCancel={() => setAction(null)} />
         : <OfferForm onSave={saveOffer} onCancel={() => setAction(null)} />}
     </section> : null}
   </section>;

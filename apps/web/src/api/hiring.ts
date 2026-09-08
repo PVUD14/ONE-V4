@@ -227,6 +227,48 @@ export interface InterviewScheduleInput {
   readonly scheduledEnd: string;
   readonly locationDetail?: string;
   readonly joiningLink?: string;
+  readonly participantUserIds?: readonly string[];
+  readonly participantVisibilityAcknowledged?: boolean;
+}
+
+export interface InterviewParticipantOptionDto {
+  readonly userId: string;
+  readonly label: string;
+}
+
+export interface ParticipantInterviewDto {
+  readonly id: string;
+  readonly title: string;
+  readonly roundNumber: number;
+  readonly mode: string;
+  readonly state: string;
+  readonly scheduledStart: string;
+  readonly scheduledEnd: string | null;
+  readonly consentRevoked: boolean;
+  readonly candidateName: string | null;
+  readonly candidateEmail: string | null;
+  readonly institutionStudentId: string | null;
+  readonly locationDetail: string | null;
+  readonly joiningLink: string | null;
+  readonly summary: string | null;
+  readonly responsibilities: string | null;
+  readonly canRecordOutcome: boolean;
+}
+
+export function listInterviewParticipantOptions(token: string, employerId: string, signal?: AbortSignal): Promise<{ readonly participants: readonly InterviewParticipantOptionDto[] }> {
+  return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/interview-participant-options`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function listMyInterviews(token: string, employerId: string, signal?: AbortSignal): Promise<{ readonly interviews: readonly ParticipantInterviewDto[] }> {
+  return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/my-interviews`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function getMyInterview(token: string, employerId: string, interviewId: string, signal?: AbortSignal): Promise<{ readonly interview: ParticipantInterviewDto }> {
+  return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/my-interviews/${encodeURIComponent(interviewId)}`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function submitMyInterviewOutcome(token: string, employerId: string, interviewId: string, body: InterviewOutcomeInput): Promise<{ readonly ok: boolean }> {
+  return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/my-interviews/${encodeURIComponent(interviewId)}/outcome`, { token, method: 'POST', body });
 }
 
 export interface OfferInput {

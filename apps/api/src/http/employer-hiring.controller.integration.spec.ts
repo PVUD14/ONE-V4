@@ -72,6 +72,131 @@ async function apply(opportunityId: string, grant = false, actorId = userId): Pr
   return (result.application as { id: string }).id;
 }
 
+async function seedEmployerMember(employerId: string, state = 'ACTIVE'): Promise<string> {
+  const memberId = await seedUser();
+  await pool.query(`INSERT INTO organization_memberships
+    (id, organization_id, user_id, role, state, scope_organization_id, scope_employer_id)
+    VALUES ($1, $2, $3, 'RECRUITER', $4, $2, $2)`, [randomUUID(), employerId, memberId, state]);
+  return memberId;
+}
+
+async function assignedInterview() {
+  const role = await createRole();
+  const applicationId = await apply(role.opportunityId);
+  const memberId = await seedEmployerMember(role.employerId);
+  const input = { mode: 'VIDEO', scheduledStart: '2099-10-01T09:00Z', scheduledEnd: '2099-10-01T10:00Z',
+    joiningLink: 'https://meet.example.test/candidate', locationDetail: 'Candidate phone arrangements',
+    participantUserIds: [memberId], participantVisibilityAcknowledged: true };
+  const scheduled = await employer.scheduleInterview(role.request, role.employerId, applicationId, input);
+  return { ...role, applicationId, memberId, input, participantRequest: trusted(memberId, role.employerId),
+    interviewId: (scheduled.interview as { id: string }).id };
+}
+
+describe('interview access follows assignment', () => {
+  it('lists and reads the assigned interview, but denies another at the same employer', async () => {
+    const f = await assignedInterview();
+    const second = await employer.scheduleInterview(f.request, f.employerId, f.applicationId, { ...f.input, participantUserIds: [] });
+    const otherId = (second.interview as { id: string }).id;
+    expect(await employer.listMyInterviews(f.participantRequest, f.employerId)).toMatchObject({ interviews: [{ id: f.interviewId }] });
+    const brief = await employer.getMyInterview(f.participantRequest, f.employerId, f.interviewId);
+    expect(brief.interview).toMatchObject({ id: f.interviewId, consentRevoked: false, canRecordOutcome: true });
+    expect(JSON.stringify(brief)).not.toContain(otherId);
+    await expect(employer.getMyInterview(f.participantRequest, f.employerId, otherId)).rejects.toMatchObject({ status: 403 });
+    await expect(employer.submitMyOutcome(f.participantRequest, f.employerId, otherId, { recommendation: 'YES' })).rejects.toMatchObject({ status: 403 });
+    const rival = await createRole();
+    await expect(employer.getMyInterview(trusted(f.memberId, rival.employerId), rival.employerId, f.interviewId)).rejects.toMatchObject({ status: 403 });
+  });
+
+  it('denies an active employer member who is not a participant', async () => {
+    const f = await assignedInterview();
+    const nonParticipant = trusted(await seedEmployerMember(f.employerId), f.employerId);
+    expect(await employer.listMyInterviews(nonParticipant, f.employerId)).toMatchObject({ interviews: [] });
+    await expect(employer.getMyInterview(nonParticipant, f.employerId, f.interviewId)).rejects.toMatchObject({ status: 403 });
+    await expect(employer.submitMyOutcome(nonParticipant, f.employerId, f.interviewId, { recommendation: 'YES' })).rejects.toMatchObject({ status: 403 });
+  });
+
+  it('checks membership suspension in the database even with a stale ACTIVE request context', async () => {
+    const f = await assignedInterview();
+    await pool.query("UPDATE organization_memberships SET state = 'SUSPENDED' WHERE user_id = $1", [f.memberId]);
+    expect(await employer.listMyInterviews(f.participantRequest, f.employerId)).toMatchObject({ interviews: [] });
+    await expect(employer.getMyInterview(f.participantRequest, f.employerId, f.interviewId)).rejects.toMatchObject({ status: 403 });
+    await expect(employer.submitMyOutcome(f.participantRequest, f.employerId, f.interviewId, { recommendation: 'YES' })).rejects.toMatchObject({ status: 403 });
+  });
+
+  it('ends access when the participant is removed', async () => {
+    const f = await assignedInterview();
+    await pool.query('UPDATE interview_participants SET removed_at = now() WHERE interview_id = $1', [f.interviewId]);
+    expect(await employer.listMyInterviews(f.participantRequest, f.employerId)).toMatchObject({ interviews: [] });
+    await expect(employer.getMyInterview(f.participantRequest, f.employerId, f.interviewId)).rejects.toMatchObject({ status: 403 });
+  });
+
+  it.each(['COMPLETED', 'CANCELLED', 'NO_SHOW'])('ends read and scorecard access at %s', async (toState) => {
+    const f = await assignedInterview();
+    await employer.updateInterviewState(f.request, f.employerId, f.interviewId, { toState });
+    expect(await employer.listMyInterviews(f.participantRequest, f.employerId)).toMatchObject({ interviews: [] });
+    await expect(employer.getMyInterview(f.participantRequest, f.employerId, f.interviewId)).rejects.toMatchObject({ status: 403 });
+    await expect(employer.submitMyOutcome(f.participantRequest, f.employerId, f.interviewId, { recommendation: 'YES' })).rejects.toMatchObject({ status: 403 });
+  });
+
+  it('expires access at the scheduled end even if completion was not recorded', async () => {
+    const f = await assignedInterview();
+    await pool.query("UPDATE interviews SET scheduled_start = now() - interval '2 hours', scheduled_end = now() - interval '1 hour' WHERE id = $1", [f.interviewId]);
+    expect(await employer.listMyInterviews(f.participantRequest, f.employerId)).toMatchObject({ interviews: [] });
+    await expect(employer.getMyInterview(f.participantRequest, f.employerId, f.interviewId)).rejects.toMatchObject({ status: 403 });
+  });
+
+  it('redacts revoked identity with the same mapping as applicants and prevents further scoring', async () => {
+    const f = await assignedInterview();
+    await student.withdraw(trusted(userId), f.applicationId, {});
+    const brief = (await employer.getMyInterview(f.participantRequest, f.employerId, f.interviewId)).interview;
+    const masked = { consentRevoked: true, candidateName: null, candidateEmail: null, institutionStudentId: null };
+    expect(brief).toMatchObject({ ...masked, canRecordOutcome: false, locationDetail: null, joiningLink: null });
+    expect(await employer.listMyInterviews(f.participantRequest, f.employerId)).toMatchObject({ interviews: [{ id: f.interviewId, ...masked }] });
+    expect(await employer.listApplicants(f.request, f.employerId, f.opportunityId)).toMatchObject({ applications: [masked] });
+    expect(JSON.stringify(brief)).not.toMatch(/@example.test|Candidate phone arrangements|meet.example.test/);
+    await expect(employer.submitMyOutcome(f.participantRequest, f.employerId, f.interviewId, { recommendation: 'YES' })).rejects.toMatchObject({ status: 403 });
+  });
+
+  it('upserts only the authenticated participant scorecard and audits it', async () => {
+    const f = await assignedInterview();
+    await employer.submitMyOutcome(f.participantRequest, f.employerId, f.interviewId, { recommendation: 'YES', notes: 'Clear reasoning.' });
+    await employer.submitMyOutcome(f.participantRequest, f.employerId, f.interviewId, { recommendation: 'STRONG_YES', submittedByUserId: outsiderId });
+    expect((await pool.query('SELECT submitted_by_user_id, recommendation FROM interview_outcomes WHERE interview_id = $1', [f.interviewId])).rows)
+      .toEqual([{ submitted_by_user_id: f.memberId, recommendation: 'STRONG_YES' }]);
+    expect((await pool.query("SELECT count(*)::int AS count FROM audit_events WHERE resource_id = $1 AND action = 'interview.outcome_recorded'", [f.interviewId])).rows[0].count).toBe(2);
+  });
+
+  it('requires visibility acknowledgement, rejects foreign/suspended participants, and creates no partial rows', async () => {
+    const f = await assignedInterview();
+    const before = (await pool.query('SELECT count(*)::int AS count FROM interviews WHERE application_id = $1', [f.applicationId])).rows;
+    await expect(employer.scheduleInterview(f.request, f.employerId, f.applicationId, { ...f.input, participantVisibilityAcknowledged: false })).rejects.toMatchObject({ status: 400 });
+    const rival = await createRole();
+    const foreignId = await seedEmployerMember(rival.employerId);
+    const suspendedId = await seedEmployerMember(f.employerId, 'SUSPENDED');
+    for (const id of [foreignId, suspendedId]) {
+      await expect(employer.scheduleInterview(f.request, f.employerId, f.applicationId, { ...f.input, participantUserIds: [f.memberId, id] })).rejects.toMatchObject({ status: 400 });
+    }
+    expect((await pool.query('SELECT count(*)::int AS count FROM interviews WHERE application_id = $1', [f.applicationId])).rows).toEqual(before);
+    expect(await employer.listParticipantOptions(f.request, f.employerId)).toMatchObject({ participants: [{ userId: f.memberId }] });
+    const audit = await pool.query("SELECT context FROM audit_events WHERE action = 'interview.participants_assigned' AND resource_id = $1", [f.interviewId]);
+    expect(audit.rows).toEqual([{ context: { participantUserIds: [f.memberId], visibilityAcknowledged: true } }]);
+    expect((await pool.query('SELECT role FROM organization_memberships WHERE user_id = $1', [f.memberId])).rows).toEqual([{ role: 'RECRUITER' }]);
+  });
+
+  it('rolls back both scheduling and scorecards when their audit cannot be recorded', async () => {
+    const f = await assignedInterview();
+    const auditId = (await pool.query("SELECT id FROM audit_events WHERE action = 'interview.participants_assigned' AND resource_id = $1", [f.interviewId])).rows[0].id as string;
+    let calls = 0;
+    const failingSchedule = new EmployerHiringController(db, { uuid: () => ++calls === 3 ? auditId : randomUUID() });
+    await expect(failingSchedule.scheduleInterview(f.request, f.employerId, f.applicationId, f.input)).rejects.toThrow();
+    expect((await pool.query('SELECT count(*)::int AS count FROM interviews WHERE application_id = $1', [f.applicationId])).rows[0].count).toBe(1);
+    calls = 0;
+    const failingOutcome = new EmployerHiringController(db, { uuid: () => ++calls === 2 ? auditId : randomUUID() });
+    await expect(failingOutcome.submitMyOutcome(f.participantRequest, f.employerId, f.interviewId, { recommendation: 'YES' })).rejects.toThrow();
+    expect((await pool.query('SELECT count(*)::int AS count FROM interview_outcomes WHERE interview_id = $1', [f.interviewId])).rows[0].count).toBe(0);
+  });
+});
+
 describe('hiring workflow persistence', () => {
   it('replays both migrations without changing existing consent or duplicating signals', async () => {
     const role = await createRole();

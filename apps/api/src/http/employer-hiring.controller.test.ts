@@ -43,6 +43,20 @@ describe('employer report authorization', () => {
     expect(response.analytics).toMatchObject({ applicationCount: 3, meanTimeToOfferDays: null });
   });
 });
+
+describe('participant authentication boundaries', () => {
+  it.each(['listMyInterviews', 'getMyInterview', 'submitMyOutcome', 'listParticipantOptions'] as const)('retains authentication on %s', (method) => {
+    expect(Reflect.getMetadata('__guards__', EmployerHiringController.prototype[method])).toContain(ProtectedApiAuthenticationGuard);
+  });
+  it.each([
+    ['RECRUITER', 'SUSPENDED', employerId],
+    ['RECRUITER', 'ACTIVE', randomUUID()],
+  ])('denies inactive or mismatched membership before reading an interview', async (role, state, scope) => {
+    const { controller, db } = fixture([]);
+    await expect(controller.getMyInterview(request(role, state, scope), employerId, randomUUID())).rejects.toThrow();
+    expect(db.execute).not.toHaveBeenCalled();
+  });
+});
 describe('interview rescheduling', () => {
   it('rejects invalid windows before database writes', async () => {
     const { controller, db } = fixture([]);

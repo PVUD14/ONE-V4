@@ -45,6 +45,14 @@ export function PilotOverlayProvider({ children }: { readonly children: React.Re
   const openModal = useCallback((next: ModalState) => setModal(next), []);
   const closeModal = useCallback(() => setModal(null), []);
 
+  // A pending toast timer outlives the provider without this. In the browser that
+  // is a state update on an unmounted tree; under test it fires after teardown and
+  // reaches for a window that no longer exists.
+  useEffect(() => () => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = null;
+  }, []);
+
   useEffect(() => {
     if (!modal) return;
     const onKey = (event: KeyboardEvent): void => { if (event.key === 'Escape') setModal(null); };
@@ -155,7 +163,12 @@ export function downloadCsv(filename: string, rows: readonly (readonly string[])
   anchor.href = url;
   anchor.download = filename;
   anchor.click();
-  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  // Fire-and-forget by nature: the download has already started and there is no
+  // component to hang the cleanup on. Guarded so a teardown between the click and
+  // the revoke cannot turn a released object URL into an unhandled error.
+  setTimeout(() => {
+    try { URL.revokeObjectURL(url); } catch { /* the document is already gone */ }
+  }, 4000);
 }
 
 function LaunchBody({ context, action }: { readonly context: string; readonly action: string }): React.ReactElement {

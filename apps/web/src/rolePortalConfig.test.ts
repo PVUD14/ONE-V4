@@ -4,6 +4,7 @@
  * Agent-assisted: yes (Claude) · Reviewed: pending
  */
 import { describe, expect, it } from 'vitest';
+import { institutionStaffWorkspaceRoles, institutionWorkspaceRoles } from './rolePortal/shared.js';
 import { rolePortals } from './rolePortalConfig.js';
 
 function navLabels(key: string): readonly string[] {
@@ -35,5 +36,16 @@ describe('placement officer navigation', () => {
     const portal = rolePortals.find((candidate) => candidate.key === 'placement-officer')!;
     const paths = portal.nav.map((item) => item.path);
     expect(new Set(paths).size).toBe(paths.length);
+  });
+});
+
+describe('placement officer workspace predicates', () => {
+  it('is institution staff, not an institution administrator', () => {
+    // Routing a Placement Officer screen through the admin predicate denies the very
+    // role the screen exists for, even where the server would have allowed the read.
+    // Screens for this role use the staff predicate; the admin one stays for
+    // management surfaces.
+    expect(institutionWorkspaceRoles.has('PLACEMENT_ADMIN')).toBe(false);
+    expect(institutionStaffWorkspaceRoles.has('PLACEMENT_ADMIN')).toBe(true);
   });
 });

@@ -88,7 +88,9 @@ Accepted when authorized sources can create/version assessments, students receiv
 
 ## 111. Readiness
 
-Accepted when a score is reproducible from a published versioned model, component explanations are visible, historical snapshots retain their model version, private AI chat content does not affect score, and score recalculation is auditable.
+Accepted when the advisory band is reproducible from a published versioned model, component explanations are visible, historical snapshots retain their model version, private AI chat content does not affect the band, and band recalculation is auditable.
+
+Amended 2026-09-08 per [ADR-020 — Readiness Is a Band, Not a Score](../ADR-020-readiness-is-a-band-not-a-score.md). This criterion previously required a reproducible numeric *score*. The domain deliberately emits a four-value advisory band and never a number, enforced by CHECK constraints so that no numeric judgement can reach an employer, so the criterion as written could never be signed. Reproducibility, explainability, versioned snapshots and auditability are unchanged — only the artefact they apply to.
 
 ## 112. Career Intelligence/Roadmap
 

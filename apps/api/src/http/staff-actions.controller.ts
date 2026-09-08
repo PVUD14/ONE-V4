@@ -58,6 +58,7 @@ interface Action extends Relationship {
   state: string; version: number; created_at: Date; updated_at: Date;
   student_name: string; owner_name: string; profile_updated_at: Date;
 }
+const studentCompletionStates = ['OPEN', 'APPROVED', 'IN_PROGRESS'];
 const reviewStates = ['DRAFT', 'UNDER_REVIEW', 'APPROVED', 'REJECTED', 'ARCHIVED'];
 function nextStates(state: string): string[] {
   // Delegate the governed edges to the question bank's existing state machine.
@@ -83,7 +84,7 @@ function temporal(scope: Pick<Scope, 'institutionId'>, relation: Relationship, a
     effectiveFrom: relation.effective_from, ...(relation.effective_to ? { effectiveTo: relation.effective_to } : {}),
   }, at);
 }
-function currentRelation(scope: Scope, relation: Relationship): boolean {
+function currentRelation(scope: Pick<Scope, 'institutionId'>, relation: Relationship): boolean {
   return ['VERIFIED', 'ACTIVE'].includes(relation.relationship_state) && temporal(scope, relation, new Date());
 }
 function currentAction(scope: Scope, action: Action): boolean {
@@ -354,8 +355,67 @@ export class StaffActionsController {
     });
   }
 
+  /** Student completion is a terminal operation, not access to the staff review state machine. */
+  @Post('/students/me/staff-actions/:actionId/complete')
+  async completeForStudent(@Req() request: ProtectedHttpRequest, @Param('actionId') actionId: string,
+    @Body() body: Record<string, unknown>) {
+    const context = requireTrustedAuthorization(request);
+    const id = uuid(actionId, context.correlationId);
+    const studentUserId = context.authorization.principal.userId;
+    if (!body || Array.isArray(body) || typeof body !== 'object' ||
+      Object.keys(body).some((key) => !['version', 'responseNote'].includes(key)) ||
+      !Number.isSafeInteger(body['version']) || Number(body['version']) < 1) {
+      throw new BadRequestException(inputError('INVALID_INPUT', context.correlationId));
+    }
+    const responseNote = textValue(body['responseNote'], 2000, context.correlationId);
+    return this.db.transaction(async (tx) => {
+      const result = await tx.execute(sql`
+        SELECT a.id, a.institution_id, a.action_type, a.state, a.version, a.outcome_note, a.created_at, a.updated_at,
+          r.id AS relationship_id, r.state AS relationship_state, r.effective_from, r.effective_to
+        FROM staff_actions a
+        JOIN users u ON u.id = a.subject_student_user_id AND u.state = 'ACTIVE'
+        JOIN organizations o ON o.id = a.institution_id AND o.active AND o.kind = 'INSTITUTION'
+        JOIN institution_relationships r ON r.id = a.institution_relationship_id
+          AND r.institution_id = a.institution_id AND r.student_user_id = a.subject_student_user_id
+        WHERE a.id = ${id}::uuid AND a.subject_student_user_id = ${studentUserId}::uuid
+          AND a.visibility = 'SUBJECT_VISIBLE' AND a.action_type IN ('INTERVENTION', 'ASSIGNED_TASK')
+        FOR UPDATE OF a FOR SHARE OF r, u, o
+      `) as Rows<Relationship & {
+        id: string; institution_id: string; action_type: string; state: string; version: number;
+        outcome_note: string | null; created_at: Date; updated_at: Date;
+      }>;
+      const action = result.rows[0];
+      if (!action) throw new ForbiddenException(safeError('FORBIDDEN', context.correlationId));
+      const scope = { institutionId: action.institution_id };
+      const relation = { ...action, effective_from: new Date(action.effective_from),
+        effective_to: action.effective_to ? new Date(action.effective_to) : null };
+      if (!currentRelation(scope, relation) || !temporal(scope, relation, new Date(action.created_at)) ||
+        !temporal(scope, relation, new Date(action.updated_at))) {
+        throw new ForbiddenException(safeError('FORBIDDEN', context.correlationId));
+      }
+      if (body['version'] !== action.version) throw new ConflictException(inputError('STALE_VERSION', context.correlationId));
+      if (!studentCompletionStates.includes(action.state)) throw new ForbiddenException(safeError('FORBIDDEN', context.correlationId));
+      const updated = await tx.execute(sql`
+        UPDATE staff_actions SET state = 'COMPLETED', version = version + 1,
+          outcome_note = COALESCE(${responseNote}, outcome_note),
+          resolved_at = now(), updated_at = now(), updated_by_user_id = ${studentUserId}::uuid
+        WHERE id = ${id}::uuid AND subject_student_user_id = ${studentUserId}::uuid AND version = ${action.version}
+        RETURNING version, resolved_at
+      `) as Rows<{ version: number; resolved_at: Date }>;
+      const completed = updated.rows[0];
+      if (!completed) throw new ConflictException(inputError('STALE_VERSION', context.correlationId));
+      await tx.execute(sql`
+        INSERT INTO audit_events (id, actor_user_id, action, resource_type, resource_id, organization_id, outcome, correlation_id, context)
+        VALUES (${this.ids.uuid()}::uuid, ${studentUserId}::uuid, 'staff_action.student_completed', 'staff_action', ${id},
+          ${action.institution_id}::uuid, 'SUCCESS', ${context.correlationId},
+          ${JSON.stringify({ actionType: action.action_type, fromState: action.state, toState: 'COMPLETED',
+            fromVersion: action.version, version: completed.version, note: responseNote, previousOutcomeNote: action.outcome_note })}::jsonb)
+      `);
+      return { id, state: 'COMPLETED', version: completed.version, responseNote, resolvedAt: completed.resolved_at };
+    });
+  }
 
-  /** Student read only: identity comes from the guard, never a requested student ID. */
+  /** Student identity comes from the guard, never a requested student ID. */
   @Get('/students/me/staff-actions')
   async forStudent(@Req() request: ProtectedHttpRequest, @Query('institutionId') institutionId: string) {
     const context = requireTrustedAuthorization(request);
@@ -363,29 +423,41 @@ export class StaffActionsController {
     const studentUserId = context.authorization.principal.userId;
     return this.db.transaction(async (tx) => {
       const result = await tx.execute(sql`
-        SELECT a.id, a.action_type, a.title, a.note, a.state, a.due_at, a.created_at, a.updated_at,
+        SELECT a.id, a.action_type, a.title, a.note, a.state, a.due_at, a.created_at, a.updated_at, a.version,
+          response.note AS response_note, assigner.role AS assigner_role,
           r.id AS relationship_id, r.state AS relationship_state, r.effective_from, r.effective_to
         FROM staff_actions a
         JOIN users u ON u.id = a.subject_student_user_id AND u.state = 'ACTIVE'
         JOIN organizations o ON o.id = a.institution_id AND o.active AND o.kind = 'INSTITUTION'
         JOIN institution_relationships r ON r.id = a.institution_relationship_id
           AND r.institution_id = a.institution_id AND r.student_user_id = a.subject_student_user_id
+        JOIN organization_memberships assigner ON assigner.id = a.actor_membership_id
+          AND assigner.organization_id = a.institution_id AND assigner.user_id = a.actor_user_id
+        LEFT JOIN LATERAL (
+          SELECT e.context->>'note' AS note FROM audit_events e
+          WHERE e.resource_type = 'staff_action' AND e.resource_id = a.id::text
+            AND e.organization_id = a.institution_id AND e.actor_user_id = ${studentUserId}::uuid
+            AND e.action = 'staff_action.student_completed' AND e.outcome = 'SUCCESS'
+          ORDER BY e.occurred_at DESC, e.id DESC LIMIT 1
+        ) response ON true
         WHERE a.institution_id = ${id}::uuid AND a.subject_student_user_id = ${studentUserId}::uuid
           AND a.visibility = 'SUBJECT_VISIBLE' AND a.action_type IN ('INTERVENTION', 'ASSIGNED_TASK')
         ORDER BY a.created_at DESC, a.id
-        FOR SHARE OF a, r, u, o
+        FOR SHARE OF a, r, u, o, assigner
       `) as Rows<Relationship & {
         id: string; action_type: string; title: string; note: string | null; state: string;
-        due_at: Date | null; created_at: Date; updated_at: Date;
+        due_at: Date | null; created_at: Date; updated_at: Date; version: number; response_note: string | null; assigner_role: string;
       }>;
-      const actions = result.rows.filter((row) => {
-        const relation = { ...row, effective_from: new Date(row.effective_from), effective_to: row.effective_to ? new Date(row.effective_to) : null };
-        return temporal({ institutionId: id }, relation, new Date(row.created_at)) &&
-          temporal({ institutionId: id }, relation, new Date(row.updated_at));
-      });
+      const actions = result.rows.map((row) => ({ ...row, effective_from: new Date(row.effective_from),
+        effective_to: row.effective_to ? new Date(row.effective_to) : null })).filter((row) =>
+        temporal({ institutionId: id }, row, new Date(row.created_at)) &&
+        temporal({ institutionId: id }, row, new Date(row.updated_at)));
       return { actions: actions.map((row) => ({
         id: row.id, actionType: row.action_type, title: row.title, note: row.note, state: row.state,
-        dueAt: row.due_at, createdAt: row.created_at, updatedAt: row.updated_at,
+        dueAt: row.due_at, createdAt: row.created_at, updatedAt: row.updated_at, version: row.version,
+        canComplete: studentCompletionStates.includes(row.state) && currentRelation({ institutionId: id }, row),
+        responseNote: row.response_note,
+        assignerRole: row.assigner_role,
       })) };
     });
   }

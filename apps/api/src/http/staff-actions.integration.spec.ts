@@ -381,7 +381,7 @@ describe('Student-visible staff actions', () => {
     expect(result.status).toBe(200);
     expect(result.body.actions.map((row: { id: string }) => row.id).sort()).toEqual([taskId, interventionId].sort());
     for (const row of result.body.actions) {
-      expect(Object.keys(row).sort()).toEqual(['id', 'actionType', 'title', 'note', 'state', 'dueAt', 'createdAt', 'updatedAt'].sort());
+      expect(Object.keys(row).sort()).toEqual(['id', 'actionType', 'title', 'note', 'state', 'dueAt', 'createdAt', 'updatedAt', 'version', 'canComplete', 'responseNote', 'assignerRole'].sort());
     }
     expect((await api().get(studentPath())).status).toBe(401);
     expect((await api().get(studentPath()).set(auth(admin.id))).body.actions).toEqual([]);
@@ -411,6 +411,217 @@ describe('Student-visible staff actions', () => {
     expect((await api().get(studentPath()).set(auth(student))).body.actions).toEqual([]);
     await pool.query("UPDATE users SET state='SUSPENDED' WHERE id=$1", [student]);
     expect([401,403]).toContain((await api().get(studentPath()).set(auth(student))).status);
+  });
+});
+
+
+describe('C7 student staff-action completion', () => {
+  const readPath = () => '/api/v1/students/me/staff-actions?institutionId=' + institutionId;
+  const completePath = (id: string) => '/api/v1/students/me/staff-actions/' + id + '/complete';
+  async function studentSession(id = studentId) {
+    tokens.add(id);
+    await pool.query('UPDATE users SET external_subject=$1::text WHERE id=$1::uuid', [id]);
+    return id;
+  }
+  async function ready(type = 'ASSIGNED_TASK', state = 'APPROVED', visibility = 'SUBJECT_VISIBLE') {
+    const created = type === 'INTERVENTION' ? await draft() : await createC5(type);
+    expect(created.status).toBe(201);
+    await pool.query("UPDATE staff_actions SET state=$2,visibility=$3,outcome_note='Private staff review',last_reviewed_by_user_id=$4,last_reviewed_at=now() WHERE id=$1",
+      [created.body.id, state, visibility, admin.id]);
+    return created.body.id as string;
+  }
+  const complete = (id: string, actor = studentId, body: Record<string, unknown> = { version: 1, responseNote: 'Finished the assigned work' }) =>
+    api().post(completePath(id)).set(auth(actor)).send(body);
+  const row = async (id: string) => (await pool.query('SELECT * FROM staff_actions WHERE id=$1', [id])).rows[0];
+
+  it.each(['INTERVENTION', 'ASSIGNED_TASK'])('completes the authenticated student own %s and persists only the permitted changes', async (type) => {
+    await studentSession();
+    const id = await ready(type);
+    const before = await row(id);
+    const initial = await api().get(readPath()).set(auth(studentId));
+    expect(initial.status).toBe(200);
+    expect(initial.body.actions[0]).toMatchObject({ id, version: 1, canComplete: true, responseNote: null, assignerRole: 'INSTITUTION_ADMIN' });
+    const result = await complete(id);
+    expect(result.status).toBe(201);
+    expect(result.body).toEqual({ id, state: 'COMPLETED', version: 2, responseNote: 'Finished the assigned work', resolvedAt: expect.any(String) });
+    const after = await row(id);
+    expect(after).toEqual({ ...before, state: 'COMPLETED', version: 2, outcome_note: 'Finished the assigned work',
+      updated_by_user_id: studentId, resolved_at: expect.any(Date), updated_at: expect.any(Date) });
+    const audit = (await pool.query("SELECT * FROM audit_events WHERE resource_id=$1 AND action='staff_action.student_completed'", [id])).rows;
+    expect(audit).toHaveLength(1);
+    expect(audit[0]).toMatchObject({ actor_user_id: studentId, organization_id: institutionId, outcome: 'SUCCESS',
+      context: { actionType: type, fromState: 'APPROVED', toState: 'COMPLETED', fromVersion: 1, version: 2,
+        note: 'Finished the assigned work', previousOutcomeNote: 'Private staff review' } });
+    const read = await api().get(readPath()).set(auth(studentId));
+    expect(read.body.actions[0]).toMatchObject({ id, state: 'COMPLETED', version: 2, canComplete: false, responseNote: 'Finished the assigned work' });
+    for (const forbidden of [admin.id, admin.membershipId, admin.id + '@example.test', 'Private staff review']) {
+      expect(JSON.stringify(read.body)).not.toContain(forbidden);
+    }
+  });
+
+
+  it.each(['PLACEMENT_ADMIN', 'FACULTY_LECTURER'])('returns the acting membership role %s without identifying the assigner', async (role) => {
+    await studentSession();
+    const actor = await staff(role);
+    const created = await createC5('ASSIGNED_TASK', actor.id);
+    expect(created.status).toBe(201);
+    await pool.query("UPDATE staff_actions SET visibility='SUBJECT_VISIBLE',assigned_to_membership_id=$2 WHERE id=$1",
+      [created.body.id, admin.membershipId]);
+    // A second membership for the same actor must not replace the membership that created the action.
+    const otherInstitution = randomUUID();
+    await pool.query("INSERT INTO organizations (id,kind,legal_name) VALUES ($1,'INSTITUTION','Other local institution')", [otherInstitution]);
+    await pool.query("INSERT INTO organization_memberships (id,organization_id,user_id,role,state,scope_organization_id,scope_institution_id) VALUES ($1,$2,$3,'INSTITUTION_OWNER','ACTIVE',$2,$2)",
+      [randomUUID(), otherInstitution, actor.id]);
+    for (const membershipState of ['ACTIVE', 'ENDED']) {
+      await pool.query('UPDATE organization_memberships SET state=$1 WHERE id=$2', [membershipState, actor.membershipId]);
+      const result = await api().get(readPath()).set(auth(studentId)).expect(200);
+      expect(result.body.actions).toHaveLength(1);
+      expect(result.body.actions[0]).toMatchObject({ id: created.body.id, assignerRole: role });
+      expect(result.body.actions[0]).not.toHaveProperty('assignerDisplayName');
+      for (const privateValue of [actor.id, actor.membershipId, actor.id + '@example.test', otherInstitution]) {
+        expect(JSON.stringify(result.body)).not.toContain(privateValue);
+      }
+    }
+  });
+
+  it.each(['OPEN', 'IN_PROGRESS'])('allows the ready state %s without touching review metadata', async (state) => {
+    await studentSession();
+    const id = await ready('ASSIGNED_TASK', state);
+    const before = await row(id);
+    expect((await complete(id)).status).toBe(201);
+    expect(await row(id)).toMatchObject({ last_reviewed_by_user_id: before.last_reviewed_by_user_id, last_reviewed_at: before.last_reviewed_at });
+  });
+
+  it.each(['DRAFT', 'UNDER_REVIEW', 'CHANGES_REQUESTED', 'REJECTED', 'COMPLETED', 'CANCELLED', 'ARCHIVED'])('cannot complete or walk the staff state %s', async (state) => {
+    await studentSession();
+    const id = await ready('ASSIGNED_TASK', state);
+    const before = await row(id);
+    expect((await api().get(readPath()).set(auth(studentId))).body.actions[0].canComplete).toBe(false);
+    expect((await complete(id)).status).toBe(403);
+    expect(await row(id)).toEqual(before);
+    expect((await moveC5('ASSIGNED_TASK', id, 1, 'APPROVED', studentId)).status).toBe(403);
+  });
+
+  it('does not let another student, a staff member, or an anonymous caller complete the item', async () => {
+    await studentSession();
+    const id = await ready();
+    const otherStudentId = randomUUID();
+    await pool.query("INSERT INTO users (id,email,state) VALUES ($1,$2,'ACTIVE')", [otherStudentId, otherStudentId + '@example.test']);
+    await studentSession(otherStudentId);
+    const before = await row(id);
+    expect((await api().post(completePath(id)).send({ version: 1 })).status).toBe(401);
+    expect((await complete(id, otherStudentId)).status).toBe(403);
+    expect((await complete(id, admin.id)).status).toBe(403);
+    expect((await complete(randomUUID())).status).toBe(403);
+    expect(await row(id)).toEqual(before);
+  });
+
+  it.each(['FACULTY_NOTE', 'ACADEMIC_VERIFICATION', 'MEETING'])('denies the excluded type %s even when marked subject-visible', async (type) => {
+    await studentSession();
+    const id = await ready(type);
+    expect((await complete(id)).status).toBe(403);
+    expect((await row(id)).state).toBe('APPROVED');
+  });
+
+  it('denies STAFF_ONLY items and rechecks visibility revocation after the student reads', async () => {
+    await studentSession();
+    const id = await ready();
+    expect((await api().get(readPath()).set(auth(studentId))).body.actions[0].canComplete).toBe(true);
+    await pool.query("UPDATE staff_actions SET visibility='STAFF_ONLY' WHERE id=$1", [id]);
+    expect((await complete(id)).status).toBe(403);
+    expect((await row(id)).state).toBe('APPROVED');
+    expect((await api().get(readPath()).set(auth(studentId))).body.actions).toEqual([]);
+  });
+
+  it.each(['title', 'actionType', 'assignedToMembershipId', 'actorUserId', 'studentUserId', 'institutionId',
+    'dueAt', 'visibility', 'toState', 'state', 'note'])('rejects the protected request field %s rather than silently applying or ignoring it', async (field) => {
+    await studentSession();
+    const id = await ready();
+    const before = await row(id);
+    expect((await complete(id, studentId, { version: 1, responseNote: 'Response', [field]: 'unauthorized change' })).status).toBe(400);
+    expect(await row(id)).toEqual(before);
+  });
+
+  it.each(['ENDED', 'REVOKED', 'TRANSFERRED', 'GRADUATED', 'PENDING'])('denies completion after the pinned relationship becomes %s, even after re-enrollment', async (state) => {
+    await studentSession();
+    const id = await ready();
+    await pool.query("UPDATE staff_actions SET created_at=now()-interval '1 day',updated_at=now()-interval '1 day' WHERE id=$1", [id]);
+    await pool.query("UPDATE institution_relationships SET state=$2,effective_to=now()-interval '1 hour' WHERE id=$1", [relationshipId, state]);
+    await pool.query("INSERT INTO institution_relationships (id,institution_id,student_user_id,state,effective_from) VALUES ($1,$2,$3,'ACTIVE',now())",
+      [randomUUID(), institutionId, studentId]);
+    expect((await complete(id)).status).toBe(403);
+    expect((await row(id)).state).toBe('APPROVED');
+    const read = await api().get(readPath()).set(auth(studentId));
+    if (['TRANSFERRED', 'GRADUATED'].includes(state)) {
+      expect(read.body.actions).toHaveLength(1);
+      expect(read.body.actions[0].canComplete).toBe(false);
+    } else {
+      expect(read.body.actions).toEqual([]);
+    }
+  });
+
+  it('checks current time bounds and the action creation and latest revision against the relationship', async () => {
+    await studentSession();
+    const id = await ready();
+    await pool.query("UPDATE institution_relationships SET effective_to=now()-interval '1 second' WHERE id=$1", [relationshipId]);
+    expect((await complete(id)).status).toBe(403);
+    await pool.query('UPDATE institution_relationships SET effective_to=NULL WHERE id=$1', [relationshipId]);
+    await pool.query("UPDATE staff_actions SET created_at=now()-interval '3 days' WHERE id=$1", [id]);
+    expect((await complete(id)).status).toBe(403);
+    await pool.query("UPDATE staff_actions SET created_at=now(),updated_at=now()+interval '2 days' WHERE id=$1", [id]);
+    await pool.query("UPDATE institution_relationships SET effective_to=now()+interval '1 day' WHERE id=$1", [relationshipId]);
+    expect((await complete(id)).status).toBe(403);
+    expect((await row(id)).version).toBe(1);
+  });
+
+  it('rejects stale versions and serializes concurrent completion attempts without duplicate audit events', async () => {
+    await studentSession();
+    const id = await ready();
+    const stale = await complete(id, studentId, { version: 2 });
+    expect(stale.status).toBe(409);
+    expect(stale.body.error.code).toBe('STALE_VERSION');
+    const results = await Promise.all([complete(id), complete(id)]);
+    expect(results.map((result) => result.status).sort()).toEqual([201, 409]);
+    expect(results.find((result) => result.status === 409)!.body.error.code).toBe('STALE_VERSION');
+    expect((await row(id)).version).toBe(2);
+    expect((await pool.query("SELECT count(*)::integer AS n FROM audit_events WHERE resource_id=$1 AND action='staff_action.student_completed'", [id])).rows[0].n).toBe(1);
+  });
+
+  it('validates versions and response size, and never returns a staff outcome as the student response', async () => {
+    await studentSession();
+    const id = await ready();
+    for (const version of [undefined, null, 0, -1, 1.5, '1', Number.MAX_SAFE_INTEGER + 1]) {
+      expect((await complete(id, studentId, { version })).status).toBe(400);
+    }
+    expect((await complete(id, studentId, { version: 1, responseNote: 'x'.repeat(2001) })).status).toBe(400);
+    expect((await complete(id, studentId, { version: 1, responseNote: 123 })).status).toBe(400);
+    expect((await complete(id, studentId, { version: 1 })).body.responseNote).toBeNull();
+    expect((await row(id)).outcome_note).toBe('Private staff review');
+    const read = await api().get(readPath()).set(auth(studentId));
+    expect(read.body.actions[0].responseNote).toBeNull();
+    expect(JSON.stringify(read.body)).not.toContain('Private staff review');
+  });
+
+  it('rechecks an inactive institution and suspended student before writing', async () => {
+    await studentSession();
+    const id = await ready();
+    await pool.query('UPDATE organizations SET active=false WHERE id=$1', [institutionId]);
+    expect((await complete(id)).status).toBe(403);
+    await pool.query('UPDATE organizations SET active=true WHERE id=$1', [institutionId]);
+    await pool.query("UPDATE users SET state='SUSPENDED' WHERE id=$1", [studentId]);
+    expect([401, 403]).toContain((await complete(id)).status);
+    expect((await row(id)).version).toBe(1);
+  });
+
+  it('rolls back completion and the response when the transactional audit insert fails', async () => {
+    await studentSession();
+    const id = await ready();
+    const before = await row(id);
+    const collisionId = (await pool.query('SELECT id FROM audit_events WHERE resource_id=$1', [id])).rows[0].id;
+    nextIds = [collisionId];
+    expect((await complete(id)).status).toBe(500);
+    expect(await row(id)).toEqual(before);
+    expect((await api().get(readPath()).set(auth(studentId))).body.actions[0].responseNote).toBeNull();
   });
 });
 

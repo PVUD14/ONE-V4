@@ -111,7 +111,10 @@ export const rolePortals: readonly RolePortalConfig[] = [
   {
     key: 'placement-officer', family: 'Institution', roleName: 'Placement Officer', backendRole: 'PLACEMENT_ADMIN / PLACEMENT_OFFICER', enforcementStatus: 'Partially backend enforced', basePath: '/institution/placement-officer', subtitle: 'Institution Portal', organization: 'ABC Engineering College', previewUser: 'Anita Sharma', initials: 'AS', accent: 'emerald', dashboardTitle: 'Placement Dashboard', dashboardSummary: 'Operational placement readiness, interventions, applications and employer engagement.',
     allowedOperations: ['Coordinate interventions', 'Create assessments', 'Recommend opportunities'], readOnlyData: ['Student consent', 'Employer offer terms'], forbiddenOperations: ['Override student identity', 'Issue offers'],
-    nav: nav('/institution/placement-officer', [['Home', ['Dashboard']], ['Placement', ['Assessments', 'Help & FAQ']]]), kpis: [], records: [],
+    // Cohort and Structure are appended after the existing groups so no item that was
+    // already here changes position. The five new entries are the placement screens
+    // that run on institution data the server already authorizes for this role.
+    nav: nav('/institution/placement-officer', [['Home', ['Dashboard']], ['Placement', ['Assessments', 'Help & FAQ']], ['Cohort', ['Students', 'Student Search', 'Readiness']], ['Structure', ['Departments', 'Batches']]]), kpis: [], records: [],
   },
   {
     key: 'faculty', family: 'Institution', roleName: 'Lecturer / Faculty', backendRole: 'FACULTY_LECTURER', enforcementStatus: 'Partially backend enforced', basePath: '/institution/faculty', subtitle: 'Faculty Portal', organization: 'ABC Engineering College', previewUser: 'Dr. Meera Iyer', initials: 'MI', accent: 'blue', dashboardTitle: 'Faculty Dashboard', dashboardSummary: 'Assigned students, academic verification, assessments, tasks and interventions.',

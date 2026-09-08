@@ -25,7 +25,7 @@ import { EmployerRecruiterRealityPage } from './rolePortal/employer.js';
 import { InstitutionAcademicStructurePage, InstitutionStaffActionsPage, InstitutionStaffPage, InstitutionStudentsPage } from './rolePortal/institution.js';
 import { OperationsContentReadOnlyPage, OperationsOrganizationsPage, OperationsTechnicalReadOnlyPage, OperationsUsersAccessPage } from './rolePortal/operations.js';
 import type { AuthenticatedWorkspaceSummary } from './rolePortal/shared.js';
-import { AuthenticatedNotYetAvailable, AuthenticatedReadOnlyModule, institutionWorkspaceRoles, InstitutionWorkspaceError, isInstitutionStaffWorkspace, isInstitutionWorkspace } from './rolePortal/shared.js';
+import { AuthenticatedNotYetAvailable, AuthenticatedReadOnlyModule, institutionStaffWorkspaceRoles, institutionWorkspaceRoles, InstitutionWorkspaceError, isInstitutionStaffWorkspace, isInstitutionWorkspace } from './rolePortal/shared.js';
 import type { RoleFixture, RoleNavItem, RolePortalConfig } from './rolePortalConfig.js';
 import { portalFamilyIcons, rolePortals } from './rolePortalConfig.js';
 import { RolePreviewProvider, useRolePreviewState } from './rolePortalPreviewState.js';
@@ -249,6 +249,33 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
             <InstitutionExamEnginePage institutionId={authenticatedWorkspace.organizationId} canApprove={portal.key !== 'faculty'} /></StaffPilotWrap>
         : <InstitutionWorkspaceError title='Assessments' />;
     }
+  // Placement Officer's real portal. Each screen is routed to a surface this role is
+  // actually authorized for server-side, so a promoted screen shows data rather than a
+  // forbidden error: students (and their search) sit behind institution staff roles,
+  // and the aggregate report admits PLACEMENT_ADMIN. Departments and Batches read the
+  // units endpoint, which is institution-admin only, so they stay on the honest empty
+  // state until that read is widened rather than rendering an error to the officer.
+  if (!demoMode && portal.key === 'placement-officer' && /^students$|^student search$/i.test(route.label)) {
+    return isInstitutionStaffWorkspace(authenticatedWorkspace)
+      ? <StaffPilotWrap title={route.label} subtitle="The roster you are placing: readiness, department and the state of every relationship.">
+          <InstitutionStudentsPage portal={portal} authenticatedWorkspace={authenticatedWorkspace} /></StaffPilotWrap>
+      : <InstitutionWorkspaceError title={route.label} />;
+  }
+  if (!demoMode && portal.key === 'placement-officer' && route.label === 'Readiness') {
+    // Staff, not admin. The aggregate report admits PLACEMENT_ADMIN server-side, and
+    // the narrower institution-admin predicate would deny the very role this branch
+    // exists for.
+    return isInstitutionStaffWorkspace(authenticatedWorkspace)
+      ? <InstitutionReportsPage key={authenticatedWorkspace.organizationId} institutionId={authenticatedWorkspace.organizationId} />
+      : <InstitutionWorkspaceError title="Readiness" unauthorized={Boolean(authenticatedWorkspace && !institutionStaffWorkspaceRoles.has(authenticatedWorkspace.role))} />;
+  }
+  if (!demoMode && portal.key === 'placement-officer' && /^departments$|^batches$/i.test(route.label)) {
+    // The units read is being widened to institution staff, so the data will be
+    // available. The remaining gap is the surface: the academic structure page offers
+    // create and edit against endpoints that stay institution-admin only, and a
+    // control that always fails is worse than an honest empty state.
+    return <AuthenticatedNotYetAvailable title={route.label} detail="Academic structure is available to Placement Officers as a read-only view once one is built; the management view is reserved for institution administrators." />;
+  }
   if (!demoMode && portal.key === 'institution-admin' && route.label === 'Staff') return <InstitutionStaffPage portal={portal} authenticatedWorkspace={authenticatedWorkspace} />;
   if (!demoMode && portal.key === 'institution-admin' && route.label === 'Reports') {
     return isInstitutionWorkspace(authenticatedWorkspace)

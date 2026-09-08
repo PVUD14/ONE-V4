@@ -22,7 +22,7 @@ import { OperationsCareerReadinessPanel } from './operationsCareerReadinessPanel
 import { StaffPilotWrap } from './parityWraps.js';
 import { InstitutionInterventionsPage } from './pilotParityPages.js';
 import { EmployerRecruiterRealityPage } from './rolePortal/employer.js';
-import { InstitutionAcademicStructurePage, InstitutionStaffPage, InstitutionStudentsPage } from './rolePortal/institution.js';
+import { InstitutionAcademicStructurePage, InstitutionStaffActionsPage, InstitutionStaffPage, InstitutionStudentsPage } from './rolePortal/institution.js';
 import { OperationsContentReadOnlyPage, OperationsOrganizationsPage, OperationsTechnicalReadOnlyPage, OperationsUsersAccessPage } from './rolePortal/operations.js';
 import type { AuthenticatedWorkspaceSummary } from './rolePortal/shared.js';
 import { AuthenticatedNotYetAvailable, AuthenticatedReadOnlyModule, institutionWorkspaceRoles, InstitutionWorkspaceError, isInstitutionStaffWorkspace, isInstitutionWorkspace } from './rolePortal/shared.js';
@@ -258,6 +258,9 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   if (!demoMode && portal.key === 'institution-admin' && /career readiness|placement|reports/i.test(route.label)) return <AuthenticatedReadOnlyModule title={route.label} detail="Institution reports and readiness information are read-only in Phase 2A unless a dedicated persistent mutation is available." />;
   if (!demoMode && portal.key === 'institution-admin' && /settings/i.test(route.label)) return <AuthenticatedNotYetAvailable title={route.label} detail="Institution settings mutation is not yet available in this UAT slice." />;
   if (!demoMode && portal.key === 'recruiter') return <EmployerRecruiterRealityPage portal={portal} routeLabel={route.label} />;
+  if (!demoMode && ['faculty', 'department-head'].includes(portal.key) && ['Assigned Tasks', 'Student Detail', 'Academic Verification', 'Meetings', 'Calendar'].includes(route.label)) {
+    return <InstitutionStaffActionsPage routeLabel={route.label} authenticatedWorkspace={authenticatedWorkspace} />;
+  }
   if (!demoMode && ['faculty', 'department-head'].includes(portal.key)) return <AuthenticatedReadOnlyModule title={route.label} detail="This authenticated staff role can view authorized context only in Phase 2A. Assessment, task, resource, workload, intervention, and meeting mutations are disabled until persistent APIs exist." />;
   if (!demoMode) return <AuthenticatedNotYetAvailable title={route.label} detail="This authenticated module has no approved persistent Phase 2A workflow yet." />;
   const categories = [...new Set(portal.records.map((record) => record.category))];

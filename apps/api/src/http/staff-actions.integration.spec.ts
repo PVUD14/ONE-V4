@@ -196,3 +196,218 @@ describe('C4 protected staff-action workflow', () => {
     expect((await pool.query('SELECT count(*)::integer AS n FROM staff_actions')).rows[0].n).toBe(0);
   });
 });
+
+const c5Types = ['ASSIGNED_TASK', 'FACULTY_NOTE', 'ACADEMIC_VERIFICATION', 'MEETING'];
+const typedPath = (type: string, suffix = '') => path() + suffix + '?actionType=' + type;
+function createC5(type: string, actor = admin.id, overrides: Record<string, unknown> = {}) {
+  return api().post(typedPath(type)).set(auth(actor)).send({
+    studentUserId: studentId, title: 'Local ' + type, note: 'Local staff note',
+    ...(type === 'MEETING' ? { scheduledStartAt: '2030-01-01T10:00:00Z', scheduledEndAt: '2030-01-01T11:00:00Z' } : {}),
+    ...overrides,
+  });
+}
+function moveC5(type: string, id: string, version: number, toState: string, actor = admin.id, note: string | null = 'Recorded outcome') {
+  return api().post(typedPath(type, '/' + id + '/transition')).set(auth(actor)).send({ version, toState, note });
+}
+describe('C5 staff-action workflows', () => {
+  it.each(c5Types)('creates and lists only %s records, with trusted identity and staff-only visibility', async (type) => {
+    await draft();
+    const faculty = await staff('FACULTY_LECTURER', institutionId, departmentId);
+    const created = await createC5(type, faculty.id, { actorUserId: admin.id });
+    expect(created.status).toBe(201);
+    const response = await api().get(typedPath(type)).set(auth(faculty.id));
+    expect(response.status).toBe(200);
+    expect(response.body.actions).toHaveLength(1);
+    expect(response.body.actions[0]).toMatchObject({
+      id: created.body.id, actionType: type, visibility: 'STAFF_ONLY', authorName: faculty.id + '@example.test',
+      assignedToMembershipId: faculty.membershipId, studentUserId: studentId, state: 'DRAFT',
+    });
+    expect((await api().get(path()).set(auth(faculty.id))).body.actions).toHaveLength(1);
+    const wrongType = type === 'ASSIGNED_TASK' ? 'FACULTY_NOTE' : 'ASSIGNED_TASK';
+    expect((await moveC5(wrongType, created.body.id, 1, 'UNDER_REVIEW')).status).toBe(403);
+    expect((await transition(created.body.id, 1, 'UNDER_REVIEW')).status).toBe(403);
+    const row = (await pool.query('SELECT actor_user_id,actor_membership_id FROM staff_actions WHERE id=$1', [created.body.id])).rows[0];
+    expect(row).toEqual({ actor_user_id: faculty.id, actor_membership_id: faculty.membershipId });
+  });
+
+  it.each(c5Types)('denies unauthenticated and other-institution access for %s', async (type) => {
+    const otherOrg = randomUUID();
+    await pool.query("INSERT INTO organizations (id,kind,legal_name) VALUES ($1,'INSTITUTION','Other local institution')", [otherOrg]);
+    const other = await staff('INSTITUTION_ADMIN', otherOrg);
+    const created = await createC5(type);
+    expect((await api().get(typedPath(type))).status).toBe(401);
+    expect((await api().get(typedPath(type)).set(auth(other.id))).status).toBe(403);
+    expect((await createC5(type, other.id)).status).toBe(403);
+    expect((await moveC5(type, created.body.id, 1, 'UNDER_REVIEW', other.id)).status).toBe(403);
+  });
+
+  it.each(c5Types)('preserves student and department isolation for %s including updates', async (type) => {
+    const department = randomUUID();
+    await pool.query("INSERT INTO institution_units (id,institution_id,kind,name) VALUES ($1,$2,'DEPARTMENT','Other department')", [department, institutionId]);
+    const other = await staff('FACULTY_LECTURER', institutionId, department);
+    const created = await createC5(type);
+    expect((await createC5(type, other.id)).status).toBe(403);
+    expect((await api().get(typedPath(type)).set(auth(other.id))).body.actions).toEqual([]);
+    expect((await moveC5(type, created.body.id, 1, 'UNDER_REVIEW', other.id)).status).toBe(403);
+    expect((await api().post(typedPath(type, '/' + created.body.id + '/update')).set(auth(other.id)).send({ version: 1, title: 'Changed' })).status).toBe(403);
+    expect((await api().get(typedPath(type)).query({ studentUserId: randomUUID() }).set(auth(admin.id))).body.actions).toEqual([]);
+    expect((await api().get(typedPath(type)).query({ studentUserId: studentId }).set(auth(admin.id))).body.actions).toHaveLength(1);
+  });
+
+  it('updates task drafts with audit, expected version and immutable author/student/type', async () => {
+    const faculty = await staff('FACULTY_LECTURER');
+    const created = await createC5('ASSIGNED_TASK', faculty.id, { assignedToMembershipId: faculty.membershipId });
+    const url = typedPath('ASSIGNED_TASK', '/' + created.body.id + '/update');
+    const updated = await api().post(url).set(auth(faculty.id)).send({ version: 1, title: 'Revised task', note: 'Revised note', dueAt: '2030-02-01T10:00:00Z' });
+    expect(updated.status).toBe(201);
+    expect(updated.body.version).toBe(2);
+    expect((await api().post(url).set(auth(faculty.id)).send({ version: 1, title: 'Stale' })).status).toBe(409);
+    expect((await api().post(url).set(auth(faculty.id)).send({ version: 2, studentUserId: randomUUID() })).status).toBe(400);
+    const list = await api().get(typedPath('ASSIGNED_TASK')).query({ state: 'DRAFT', assigneeMembershipId: faculty.membershipId }).set(auth(admin.id));
+    expect(list.body.actions[0]).toMatchObject({ title: 'Revised task', note: 'Revised note', authorName: faculty.id + '@example.test', version: 2 });
+    expect((await api().get(typedPath('ASSIGNED_TASK')).query({ state: 'APPROVED' }).set(auth(admin.id))).body.actions).toEqual([]);
+    expect((await api().get(typedPath('ASSIGNED_TASK')).query({ assigneeMembershipId: admin.membershipId }).set(auth(admin.id))).body.actions).toEqual([]);
+    const audits = (await pool.query("SELECT context FROM audit_events WHERE resource_id=$1 AND action='staff_action.updated'", [created.body.id])).rows;
+    expect(audits).toHaveLength(1);
+    expect(audits[0].context).toMatchObject({ before: { title: 'Local ASSIGNED_TASK' }, after: { title: 'Revised task' }, version: 2 });
+    expect((await moveC5('ASSIGNED_TASK', created.body.id, 2, 'UNDER_REVIEW', faculty.id)).status).toBe(201);
+    expect((await api().post(url).set(auth(faculty.id)).send({ version: 3, title: 'Edit reviewed content' })).status).toBe(403);
+  });
+
+  it('does not infer delegation, public notes, evidence access or a new action vocabulary', async () => {
+    const other = await staff('FACULTY_LECTURER');
+    expect((await createC5('ASSIGNED_TASK', admin.id, { assignedToMembershipId: other.membershipId })).status).toBe(403);
+    expect((await createC5('FACULTY_NOTE', admin.id, { visibility: 'SUBJECT_VISIBLE' })).status).toBe(403);
+    expect((await createC5('ACADEMIC_VERIFICATION', admin.id, { evidenceDocumentVersionId: randomUUID() })).status).toBe(403);
+    expect((await createC5('UNKNOWN')).status).toBe(400);
+    expect((await createC5('FACULTY_NOTE', admin.id, { note: '' })).status).toBe(400);
+    tokens.add(studentId);
+    await pool.query('UPDATE users SET external_subject=$1::text WHERE id=$1::uuid', [studentId]);
+    expect((await api().get(typedPath('FACULTY_NOTE')).set(auth(studentId))).status).toBe(403);
+  });
+
+  it('reviews generic verification with outcome and existing senior roles, without academic mutations', async () => {
+    const faculty = await staff('FACULTY_LECTURER');
+    const created = await createC5('ACADEMIC_VERIFICATION', faculty.id);
+    const id = created.body.id;
+    expect((await moveC5('ACADEMIC_VERIFICATION', id, 1, 'APPROVED')).status).toBe(403);
+    expect((await moveC5('ACADEMIC_VERIFICATION', id, 1, 'UNDER_REVIEW', faculty.id)).status).toBe(201);
+    expect((await moveC5('ACADEMIC_VERIFICATION', id, 2, 'APPROVED', faculty.id)).status).toBe(403);
+    expect((await moveC5('ACADEMIC_VERIFICATION', id, 2, 'CHANGES_REQUESTED')).status).toBe(403);
+    expect((await moveC5('ACADEMIC_VERIFICATION', id, 2, 'REJECTED')).status).toBe(201);
+    expect((await moveC5('ACADEMIC_VERIFICATION', id, 3, 'DRAFT', faculty.id)).status).toBe(201);
+    expect((await moveC5('ACADEMIC_VERIFICATION', id, 4, 'UNDER_REVIEW', faculty.id)).status).toBe(201);
+    expect((await moveC5('ACADEMIC_VERIFICATION', id, 5, 'APPROVED', admin.id, null)).status).toBe(400);
+    expect((await moveC5('ACADEMIC_VERIFICATION', id, 5, 'APPROVED')).status).toBe(201);
+    const row = (await api().get(typedPath('ACADEMIC_VERIFICATION')).set(auth(admin.id))).body.actions[0];
+    expect(row).toMatchObject({ reviewerName: admin.id + '@example.test', outcomeNote: 'Recorded outcome', state: 'APPROVED' });
+    expect(row.lastReviewedAt).toBeTruthy();
+    expect((await pool.query('SELECT status FROM institution_student_profiles WHERE student_user_id=$1', [studentId])).rows[0].status).toBe('ACTIVE');
+  });
+
+  it.each([
+    { scheduledStartAt: null, scheduledEndAt: null },
+    { scheduledEndAt: null },
+    { scheduledStartAt: 'invalid' },
+    { scheduledEndAt: '2030-01-01T10:00:00Z' },
+    { scheduledEndAt: '2030-01-01T09:00:00Z' },
+    { scheduledStartAt: '2030-01-01T10:00:00' },
+  ])('rejects invalid meeting timestamps %j', async (overrides) => {
+    expect((await createC5('MEETING', admin.id, overrides)).status).toBe(400);
+    expect((await pool.query('SELECT count(*)::integer AS n FROM staff_actions')).rows[0].n).toBe(0);
+  });
+
+  it('scopes studentless meetings to the creator membership and supports past/upcoming, completion and cancellation', async () => {
+    const faculty = await staff('FACULTY_LECTURER', institutionId, departmentId);
+    const future = await createC5('MEETING', faculty.id, { studentUserId: null });
+    expect(future.status).toBe(201);
+    const past = await createC5('MEETING', faculty.id, { studentUserId: null, scheduledStartAt: '2020-01-01T10:00:00Z', scheduledEndAt: '2020-01-01T11:00:00Z' });
+    expect(past.status).toBe(201);
+    expect((await api().get(typedPath('MEETING')).query({ period: 'upcoming' }).set(auth(faculty.id))).body.actions.map((a: { id: string }) => a.id)).toEqual([future.body.id]);
+    expect((await api().get(typedPath('MEETING')).query({ period: 'past' }).set(auth(faculty.id))).body.actions.map((a: { id: string }) => a.id)).toEqual([past.body.id]);
+    expect((await api().get(typedPath('MEETING')).query({ studentUserId: studentId }).set(auth(faculty.id))).body.actions).toEqual([]);
+    const otherDepartment = randomUUID();
+    await pool.query("INSERT INTO institution_units (id,institution_id,kind,name) VALUES ($1,$2,'DEPARTMENT','Other local department')", [otherDepartment, institutionId]);
+    const other = await staff('FACULTY_LECTURER', institutionId, otherDepartment);
+    expect((await api().get(typedPath('MEETING')).set(auth(other.id))).body.actions).toEqual([]);
+    expect((await moveC5('MEETING', future.body.id, 1, 'UNDER_REVIEW', faculty.id)).status).toBe(201);
+    expect((await moveC5('MEETING', future.body.id, 2, 'APPROVED')).status).toBe(201);
+    expect((await moveC5('MEETING', future.body.id, 3, 'IN_PROGRESS', faculty.id)).status).toBe(201);
+    expect((await moveC5('MEETING', future.body.id, 4, 'COMPLETED', faculty.id)).status).toBe(201);
+    expect((await moveC5('MEETING', past.body.id, 1, 'CANCELLED', faculty.id)).status).toBe(201);
+  });
+
+  it.each(c5Types)('blocks post-relationship writes and disclosure for %s', async (type) => {
+    const created = await createC5(type);
+    await pool.query("UPDATE institution_relationships SET state='REVOKED',effective_to=now() WHERE id=$1", [relationshipId]);
+    expect((await api().get(typedPath(type)).set(auth(admin.id))).body.actions).toEqual([]);
+    expect((await moveC5(type, created.body.id, 1, 'UNDER_REVIEW')).status).toBe(403);
+    expect((await createC5(type)).status).toBe(403);
+  });
+});
+
+describe('Student-visible staff actions', () => {
+  const studentPath = (institution = institutionId) => '/api/v1/students/me/staff-actions?institutionId=' + institution;
+  async function signInStudent(id = studentId) {
+    tokens.add(id);
+    await pool.query('UPDATE users SET external_subject=$1::text WHERE id=$1::uuid', [id]);
+    return id;
+  }
+  async function visible(type = 'ASSIGNED_TASK') {
+    const created = type === 'INTERVENTION' ? await draft() : await createC5(type);
+    expect(created.status).toBe(201);
+    await pool.query("UPDATE staff_actions SET visibility='SUBJECT_VISIBLE' WHERE id=$1", [created.body.id]);
+    return created.body.id as string;
+  }
+  it('returns only the authenticated subject and permitted types/visibility, with a limited response', async () => {
+    const student = await signInStudent();
+    const taskId = await visible();
+    const interventionId = await visible('INTERVENTION');
+    await createC5('ASSIGNED_TASK');
+    await visible('FACULTY_NOTE');
+    const otherStudentId = randomUUID();
+    await pool.query("INSERT INTO users (id,email,state) VALUES ($1,$2,'ACTIVE')", [otherStudentId, otherStudentId + '@example.test']);
+    await pool.query(`INSERT INTO institution_student_profiles
+      (id,institution_id,student_user_id,institution_student_id,full_name,status,department_unit_id)
+      VALUES ($1,$2,$3,'LOCAL-OTHER','Other local student','ACTIVE',$4)`, [randomUUID(), institutionId, otherStudentId, departmentId]);
+    const otherRelationship = randomUUID();
+    await pool.query("INSERT INTO institution_relationships (id,institution_id,student_user_id,state,effective_from) VALUES ($1,$2,$3,'ACTIVE',now()-interval '1 day')", [otherRelationship, institutionId, otherStudentId]);
+    const other = await createC5('ASSIGNED_TASK', admin.id, { studentUserId: otherStudentId });
+    expect(other.status).toBe(201);
+    await pool.query("UPDATE staff_actions SET visibility='SUBJECT_VISIBLE' WHERE id=$1", [other.body.id]);
+    const result = await api().get(studentPath()).query({ studentUserId: otherStudentId }).set(auth(student));
+    expect(result.status).toBe(200);
+    expect(result.body.actions.map((row: { id: string }) => row.id).sort()).toEqual([taskId, interventionId].sort());
+    for (const row of result.body.actions) {
+      expect(Object.keys(row).sort()).toEqual(['id', 'actionType', 'title', 'note', 'state', 'dueAt', 'createdAt', 'updatedAt'].sort());
+    }
+    expect((await api().get(studentPath())).status).toBe(401);
+    expect((await api().get(studentPath()).set(auth(admin.id))).body.actions).toEqual([]);
+    expect((await api().get(studentPath(randomUUID())).set(auth(student))).body.actions).toEqual([]);
+  });
+  it.each(['ENDED', 'REVOKED', 'PENDING'])('hides student actions when the pinned relationship is %s', async (state) => {
+    const student = await signInStudent();
+    await visible();
+    await pool.query('UPDATE institution_relationships SET state=$1,effective_to=now() WHERE id=$2', [state, relationshipId]);
+    expect((await api().get(studentPath()).set(auth(student))).body.actions).toEqual([]);
+  });
+  it.each(['TRANSFERRED', 'GRADUATED'])('applies canonical historical time limits for %s', async (state) => {
+    const student = await signInStudent();
+    const id = await visible();
+    await pool.query("UPDATE staff_actions SET created_at=now()-interval '1 day',updated_at=now()-interval '1 day' WHERE id=$1", [id]);
+    await pool.query("UPDATE institution_relationships SET state=$1,effective_to=now()-interval '1 hour' WHERE id=$2", [state, relationshipId]);
+    expect((await api().get(studentPath()).set(auth(student))).body.actions).toHaveLength(1);
+    await pool.query('UPDATE staff_actions SET updated_at=now() WHERE id=$1', [id]);
+    expect((await api().get(studentPath()).set(auth(student))).body.actions).toEqual([]);
+  });
+  it('honors visibility revocation, future activity boundaries and suspended identities', async () => {
+    const student = await signInStudent();
+    const id = await visible();
+    await pool.query("UPDATE staff_actions SET visibility='STAFF_ONLY' WHERE id=$1", [id]);
+    expect((await api().get(studentPath()).set(auth(student))).body.actions).toEqual([]);
+    await pool.query("UPDATE staff_actions SET visibility='SUBJECT_VISIBLE',created_at=now()-interval '3 days',updated_at=now()-interval '3 days' WHERE id=$1", [id]);
+    expect((await api().get(studentPath()).set(auth(student))).body.actions).toEqual([]);
+    await pool.query("UPDATE users SET state='SUSPENDED' WHERE id=$1", [student]);
+    expect([401,403]).toContain((await api().get(studentPath()).set(auth(student))).status);
+  });
+});

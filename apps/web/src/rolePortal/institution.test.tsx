@@ -244,3 +244,109 @@ describe('Placement Officer roster', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
+
+
+describe('External application distinction in the placement roster', () => {
+  const portal = rolePortals.find((item) => item.key === 'placement-officer')!;
+  const profileId = crypto.randomUUID(); const otherProfileId = crypto.randomUUID(); const otherStudentId = crypto.randomUUID();
+  const placement = (org = institutionId) => <InstitutionStudentsPage portal={portal} authenticatedWorkspace={{ organizationId: org, role: 'PLACEMENT_ADMIN' }} />;
+  const native = { id: crypto.randomUUID(), employer: { name: 'Native employer' }, opportunityTitle: 'Native role', state: 'APPLIED',
+    createdAt: '2026-09-01T10:00:00Z', submittedAt: '2026-09-01T10:00:00Z', offer: { exists: false, responseState: null } };
+  const external = { id: crypto.randomUUID(), companyName: 'Declared employer', roleTitle: 'Declared role', stage: 'HIRED',
+    appliedOn: '2026-09-01', sourceKind: 'REFERRAL', source: 'STUDENT_DECLARED', verificationState: 'UNVERIFIED' };
+  function mockRoster(externalRead: (url: string, options: RequestInit) => unknown = () => Promise.resolve(response({ externalApplications: [external] }))) {
+    fetchMock.mockImplementation((url: string, options: RequestInit) => {
+      if (url.includes('/external-applications')) return externalRead(url, options);
+      if (url.endsWith('/applications')) return Promise.resolve(response({ applications: [native] }));
+      if (url.includes('/units')) return Promise.resolve(response({ units: [] }));
+      return Promise.resolve(response({ students: [
+        { id: profileId, studentUserId: studentId, fullName: 'First local student', institutionStudentId: 'EXT-001', status: 'ACTIVE', units: {} },
+        { id: otherProfileId, studentUserId: otherStudentId, fullName: 'Second local student', institutionStudentId: 'EXT-002', status: 'ACTIVE', units: {} },
+      ] }));
+    });
+  }
+  async function openFirst() {
+    fireEvent.click(await screen.findByRole('button', { name: 'View applications for First local student' }));
+  }
+
+  it('uses the student user ID and keeps declared HIRED separate from native counts and labels', async () => {
+    mockRoster(); render(placement());
+    await screen.findByRole('table', { name: 'Placement student roster' });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    await openFirst();
+    const externalRegion = screen.getByRole('region', { name: 'Student-declared external applications (unverified)' });
+    const nativeRegion = screen.getByRole('region', { name: 'Native applications' });
+    await within(externalRegion).findByRole('table');
+    await within(nativeRegion).findByRole('table');
+    expect(within(externalRegion).getByText('HIRED (student-declared)')).toBeInTheDocument();
+    expect(externalRegion).toHaveTextContent('Shared external declarations shown: 1');
+    expect(externalRegion).toHaveTextContent('does not contribute to native or placement metrics');
+    expect(nativeRegion).toHaveTextContent('Shared native applications shown: 1');
+    expect(within(nativeRegion).queryByText('Declared employer')).not.toBeInTheDocument();
+    expect(within(externalRegion).queryByText('Native employer')).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith('/students/' + studentId + '/external-applications'))).toBe(true);
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/students/' + profileId + '/'))).toBe(false);
+    expect(screen.queryByText(studentId)).not.toBeInTheDocument();
+    expect(screen.queryByText(external.id)).not.toBeInTheDocument();
+
+    const nativeBefore = nativeRegion.innerHTML;
+    mockRoster(() => Promise.resolve(response({ externalApplications: [] })));
+    fireEvent.click(within(externalRegion).getByRole('button', { name: 'Refresh external declarations' }));
+    await within(externalRegion).findByText('No external declarations are shared and available in this scope.');
+    expect(externalRegion).toHaveTextContent('Shared external declarations shown: 0');
+    expect(nativeRegion.innerHTML).toBe(nativeBefore);
+    expect(screen.queryByText('Declared employer')).not.toBeInTheDocument();
+  });
+
+  it('shows loading as unavailable until an actual empty result arrives', async () => {
+    let resolve!: (value: unknown) => void;
+    mockRoster(() => new Promise((done) => { resolve = done; }));
+    render(placement()); await openFirst();
+    const region = screen.getByRole('region', { name: 'Student-declared external applications (unverified)' });
+    expect(within(region).getByRole('status')).toHaveTextContent('Loading external declarations');
+    expect(region).toHaveTextContent('Shared external declarations shown: NA');
+    expect(within(region).queryByText(/No external declarations/)).not.toBeInTheDocument();
+    await act(async () => resolve(response({ externalApplications: [] })));
+    expect(region).toHaveTextContent('Shared external declarations shown: 0');
+  });
+
+  it.each([401, 403, 500])('keeps native results separate from a safe external %s error', async (status) => {
+    mockRoster(() => Promise.resolve({ ok: false, status, json: async () => ({ message: 'private upstream error' }) }));
+    render(placement()); await openFirst();
+    const region = screen.getByRole('region', { name: 'Student-declared external applications (unverified)' });
+    expect(await within(region).findByRole('alert')).not.toHaveTextContent('private upstream error');
+    expect(region).toHaveTextContent('Shared external declarations shown: NA');
+    expect(screen.queryByText('private upstream error')).not.toBeInTheDocument();
+    expect(await within(screen.getByRole('region', { name: 'Native applications' })).findByText('Native employer')).toBeInTheDocument();
+  });
+
+  it('aborts old student requests, discards late data and clears details on a workspace switch', async () => {
+    let resolveOld!: (value: unknown) => void;
+    let oldSignal!: AbortSignal;
+    mockRoster((url, options) => {
+      if (url.includes('/students/' + studentId + '/')) {
+        oldSignal = options.signal!;
+        return new Promise((resolve) => { resolveOld = resolve; });
+      }
+      return Promise.resolve(response({ externalApplications: [{ ...external, companyName: 'Second declared employer' }] }));
+    });
+    const view = render(placement()); await openFirst();
+    fireEvent.click(screen.getByRole('button', { name: 'View applications for Second local student' }));
+    await screen.findByText('Second declared employer');
+    expect(oldSignal.aborted).toBe(true);
+    await act(async () => resolveOld(response({ externalApplications: [external] })));
+    expect(screen.queryByText('Declared employer')).not.toBeInTheDocument();
+    view.rerender(placement(crypto.randomUUID()));
+    expect(screen.queryByText('Second declared employer')).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: /Shared applications for/ })).not.toBeInTheDocument();
+  });
+
+  it('does not mislabel a response with unexpected verification provenance', async () => {
+    mockRoster(() => Promise.resolve(response({ externalApplications: [{ ...external, verificationState: 'VERIFIED' }] })));
+    render(placement()); await openFirst();
+    const region = screen.getByRole('region', { name: 'Student-declared external applications (unverified)' });
+    await within(region).findByRole('alert');
+    expect(within(region).queryByText('Declared employer')).not.toBeInTheDocument();
+    expect(region).toHaveTextContent('Shared external declarations shown: NA');
+  });
+});

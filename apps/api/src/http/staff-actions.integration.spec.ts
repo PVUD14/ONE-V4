@@ -731,3 +731,115 @@ describe('C6 institution application visibility', () => {
     await api().get(readPath()).expect(401);
   });
 });
+
+
+describe('External institution application visibility', () => {
+  const readPath = (institution = institutionId, student = studentId) =>
+    '/api/v1/institutions/' + institution + '/students/' + student + '/external-applications';
+  async function declaration(granted = true, subject = studentId, stage = 'APPLIED') {
+    const id = randomUUID();
+    await pool.query("INSERT INTO external_applications (id,student_user_id,company_name,role_title,source_kind,applied_on,stage,institution_visibility_granted_at,application_url) VALUES ($1,$2,'Declared company','Declared role','REFERRAL',current_date,$3,CASE WHEN $4 THEN now() ELSE NULL END,'https://example.test/private-reference')",
+      [id, subject, stage, granted]);
+    return id;
+  }
+  it('returns consented declarations with explicit unverified provenance and an allowlisted SELECT/response', async () => {
+    const id = await declaration();
+    await declaration(false);
+    const officer = await staff('PLACEMENT_ADMIN');
+    executedQueries.length = 0;
+    const result = await api().get(readPath()).set(auth(officer.id)).expect(200);
+    expect(Object.keys(result.body)).toEqual(['externalApplications']);
+    expect(result.body.externalApplications).toHaveLength(1);
+    expect(result.body.externalApplications[0]).toMatchObject({
+      id, companyName: 'Declared company', roleTitle: 'Declared role', sourceKind: 'REFERRAL',
+      stage: 'APPLIED', source: 'STUDENT_DECLARED', verificationState: 'UNVERIFIED',
+    });
+    expect(Object.keys(result.body.externalApplications[0]).sort()).toEqual([
+      'id', 'companyName', 'roleTitle', 'sourceKind', 'appliedOn', 'stage', 'source', 'verificationState', 'createdAt', 'updatedAt',
+    ].sort());
+    const query = executedQueries.find((query) => /FROM external_applications e/i.test(query));
+    expect(query).toBeDefined();
+    expect(query).not.toMatch(/select\s+(?:\w+\.)?\*/i);
+    const identifiers = query!.toLowerCase().match(/[a-z_][a-z_0-9]*/g) ?? [];
+    for (const field of institutionForbiddenDisclosureFields) expect(identifiers).not.toContain(field);
+    expect(identifiers.some(isInstitutionForbiddenDisclosureField)).toBe(false);
+    expect(identifiers).not.toContain('application_url');
+    expect(JSON.stringify(result.body)).not.toContain('private-reference');
+  });
+
+  it('never folds a declared HIRED into the native response, an offer, or a placement outcome', async () => {
+    const nativePath = '/api/v1/institutions/' + institutionId + '/students/' + studentId + '/applications';
+    const before = (await api().get(nativePath).set(auth(admin.id)).expect(200)).body;
+    const hired = await declaration(true, studentId, 'HIRED');
+    const external = (await api().get(readPath()).set(auth(admin.id)).expect(200)).body;
+    expect(external.externalApplications[0]).toMatchObject({ id: hired, stage: 'HIRED', source: 'STUDENT_DECLARED', verificationState: 'UNVERIFIED' });
+    expect((await api().get(nativePath).set(auth(admin.id)).expect(200)).body).toEqual(before);
+    expect(before).toEqual({ applications: [] });
+    expect((await pool.query('SELECT count(*)::int AS count FROM applications')).rows[0].count).toBe(0);
+    expect((await pool.query('SELECT count(*)::int AS count FROM offers')).rows[0].count).toBe(0);
+  });
+
+  it('removes revoked and physically deleted declarations from every subsequent read', async () => {
+    const id = await declaration();
+    expect((await api().get(readPath()).set(auth(admin.id)).expect(200)).body.externalApplications).toHaveLength(1);
+    await pool.query('UPDATE external_applications SET institution_visibility_revoked_at=now(),updated_at=now() WHERE id=$1', [id]);
+    expect((await api().get(readPath()).set(auth(admin.id)).expect(200)).body.externalApplications).toEqual([]);
+    await pool.query('UPDATE external_applications SET institution_visibility_revoked_at=NULL,institution_visibility_granted_at=now(),updated_at=now() WHERE id=$1', [id]);
+    expect((await api().get(readPath()).set(auth(admin.id)).expect(200)).body.externalApplications).toHaveLength(1);
+    await pool.query('DELETE FROM external_applications WHERE id=$1', [id]);
+    expect((await api().get(readPath()).set(auth(admin.id)).expect(200)).body.externalApplications).toEqual([]);
+  });
+
+  it.each(['ENDED', 'REVOKED', 'TRANSFERRED', 'GRADUATED', 'PENDING'])('denies external rows for a %s relationship', async (state) => {
+    await declaration();
+    await pool.query('UPDATE institution_relationships SET state=$1,effective_to=now() WHERE id=$2', [state, relationshipId]);
+    expect((await api().get(readPath()).set(auth(admin.id)).expect(200)).body.externalApplications).toEqual([]);
+  });
+
+  it('checks applied date, creation and the latest revision using canonical activity access', async () => {
+    const id = await declaration();
+    await pool.query("UPDATE external_applications SET applied_on=current_date-3 WHERE id=$1", [id]);
+    expect((await api().get(readPath()).set(auth(admin.id)).expect(200)).body.externalApplications).toEqual([]);
+    await pool.query("UPDATE external_applications SET applied_on=current_date,created_at=now()-interval '3 days' WHERE id=$1", [id]);
+    expect((await api().get(readPath()).set(auth(admin.id)).expect(200)).body.externalApplications).toEqual([]);
+    await pool.query("UPDATE external_applications SET created_at=now(),updated_at=now()+interval '2 hours' WHERE id=$1", [id]);
+    await pool.query("UPDATE institution_relationships SET effective_to=now()+interval '1 hour' WHERE id=$1", [relationshipId]);
+    expect((await api().get(readPath()).set(auth(admin.id)).expect(200)).body.externalApplications).toEqual([]);
+    await pool.query('UPDATE external_applications SET updated_at=now() WHERE id=$1', [id]);
+    expect((await api().get(readPath()).set(auth(admin.id)).expect(200)).body.externalApplications).toHaveLength(1);
+  });
+
+  it('isolates requested students and institutions without accepting a query override', async () => {
+    const id = await declaration();
+    const otherStudent = randomUUID();
+    await pool.query("INSERT INTO users (id,email,state) VALUES ($1,$2,'ACTIVE')", [otherStudent, otherStudent + '@example.test']);
+    await pool.query("INSERT INTO institution_student_profiles (id,institution_id,student_user_id,institution_student_id,full_name,status,department_unit_id) VALUES ($1,$2,$3,'LOCAL-EXT-OTHER','Other local student','ACTIVE',$4)", [randomUUID(), institutionId, otherStudent, departmentId]);
+    await pool.query("INSERT INTO institution_relationships (id,institution_id,student_user_id,state,effective_from) VALUES ($1,$2,$3,'ACTIVE',now()-interval '2 days')", [randomUUID(), institutionId, otherStudent]);
+    const otherId = await declaration(true, otherStudent);
+    expect((await api().get(readPath()).query({ studentUserId: otherStudent }).set(auth(admin.id)).expect(200)).body.externalApplications.map((row: { id: string }) => row.id)).toEqual([id]);
+    expect((await api().get(readPath(institutionId, otherStudent)).set(auth(admin.id)).expect(200)).body.externalApplications.map((row: { id: string }) => row.id)).toEqual([otherId]);
+    const otherInstitution = randomUUID();
+    await pool.query("INSERT INTO organizations (id,kind,legal_name) VALUES ($1,'INSTITUTION','Other institution')", [otherInstitution]);
+    const outsider = await staff('PLACEMENT_ADMIN', otherInstitution);
+    await api().get(readPath()).set(auth(outsider.id)).expect(403);
+    expect((await api().get(readPath(otherInstitution)).set(auth(outsider.id)).expect(200)).body.externalApplications).toEqual([]);
+  });
+
+  it('keeps department/batch scope, active identities and staff authentication', async () => {
+    await declaration();
+    const department = randomUUID(); const batch = randomUUID();
+    await pool.query("INSERT INTO institution_units (id,institution_id,kind,name) VALUES ($1,$2,'DEPARTMENT','Other department'),($3,$2,'BATCH','Other batch')", [department, institutionId, batch]);
+    const faculty = await staff('FACULTY_LECTURER', institutionId, department);
+    expect((await api().get(readPath()).set(auth(faculty.id)).expect(200)).body.externalApplications).toEqual([]);
+    await pool.query('UPDATE organization_memberships SET scope_department_unit_id=NULL,scope_batch_unit_id=$1 WHERE id=$2', [batch, faculty.membershipId]);
+    expect((await api().get(readPath()).set(auth(faculty.id)).expect(200)).body.externalApplications).toEqual([]);
+    await api().get(readPath()).expect(401);
+    tokens.add(studentId);
+    await pool.query('UPDATE users SET external_subject=$1::text WHERE id=$1::uuid', [studentId]);
+    await api().get(readPath()).set(auth(studentId)).expect(403);
+    await pool.query("UPDATE users SET state='SUSPENDED' WHERE id=$1", [studentId]);
+    expect((await api().get(readPath()).set(auth(admin.id)).expect(200)).body.externalApplications).toEqual([]);
+    await pool.query("UPDATE organization_memberships SET state='SUSPENDED' WHERE id=$1", [admin.membershipId]);
+    await api().get(readPath()).set(auth(admin.id)).expect(403);
+  });
+});

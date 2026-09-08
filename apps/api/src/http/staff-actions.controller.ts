@@ -5,6 +5,7 @@
  */
 import { BadRequestException, Body, ConflictException, Controller, ForbiddenException, Get, Inject, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { sql, type SQL } from 'drizzle-orm';
+import { externalApplicationCap } from '@planthepath/hiring/src/external-applications.js';
 import { assertQuestionTransition, type QuestionStatus } from '@planthepath/assessments';
 import { institutionRelationshipAuthorizesActivity, type TemporalInstitutionScope } from '@planthepath/authorization/src/index.js';
 import { hasInstitutionRelationshipAuthorizationForActivity, type PersistenceDb } from '@planthepath/persistence/src/repositories.js';
@@ -521,6 +522,54 @@ export class StaffActionsController {
         });
       }
       return { applications };
+    });
+  }
+
+
+  /** Student declarations remain separate from native applications and verified placement reporting. */
+  @Get('/institutions/:institutionId/students/:studentUserId/external-applications')
+  async studentExternalApplications(@Req() request: ProtectedHttpRequest, @Param('institutionId') institutionId: string,
+    @Param('studentUserId') studentUserId: string) {
+    return this.db.transaction(async (tx) => {
+      const scope = await this.scope(tx, request, institutionId);
+      const studentId = uuid(studentUserId, scope.correlationId);
+      try {
+        await this.subject(tx, scope, studentId);
+      } catch (error) {
+        if (error instanceof ForbiddenException) return { externalApplications: [] };
+        throw error;
+      }
+      const result = await tx.execute(sql`
+        SELECT e.id, e.company_name, e.role_title, e.source_kind, e.applied_on::text AS applied_on,
+          e.stage, e.source, e.verification_state, e.created_at, e.updated_at
+        FROM external_applications e
+        WHERE e.student_user_id = ${studentId}::uuid
+          AND e.institution_visibility_granted_at IS NOT NULL AND e.institution_visibility_revoked_at IS NULL
+        ORDER BY e.applied_on DESC, e.id
+        LIMIT ${externalApplicationCap}
+        FOR SHARE OF e
+      `) as Rows<{
+        id: string; company_name: string; role_title: string; source_kind: string; applied_on: string;
+        stage: string; source: string; verification_state: string; created_at: Date; updated_at: Date;
+      }>;
+      const externalApplications = [];
+      for (const row of result.rows) {
+        // applied_on is a date-only declaration; use its canonical UTC date, as the student contract does.
+        const activityDates = [new Date(row.applied_on + 'T00:00:00.000Z'), new Date(row.created_at), new Date(row.updated_at)];
+        let authorized = true;
+        for (const at of activityDates) {
+          if (!await hasInstitutionRelationshipAuthorizationForActivity(tx, scope.institutionId, studentId, at)) {
+            authorized = false; break;
+          }
+        }
+        if (!authorized) continue;
+        externalApplications.push({
+          id: row.id, companyName: row.company_name, roleTitle: row.role_title, sourceKind: row.source_kind,
+          appliedOn: row.applied_on, stage: row.stage, source: row.source, verificationState: row.verification_state,
+          createdAt: row.created_at, updatedAt: row.updated_at,
+        });
+      }
+      return { externalApplications };
     });
   }
 

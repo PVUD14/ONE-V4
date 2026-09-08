@@ -82,3 +82,27 @@ export const institutionForbiddenDisclosureFields = [
 export function isInstitutionForbiddenDisclosureField(field: string): boolean {
   return institutionForbiddenDisclosureFields.includes(field as (typeof institutionForbiddenDisclosureFields)[number]);
 }
+
+// Acceptance 124 requires audit events to be searchable by authorized roles, and
+// platform control 102 places that search with platform administration. Security
+// Admin exists to hold exactly this and has had no capability until now.
+export const auditSearchRoles = ['PLATFORM_SUPER_ADMIN', 'OPERATIONS_ADMIN', 'SECURITY_ADMIN'] as const;
+
+export type AuditSearchRole = (typeof auditSearchRoles)[number];
+
+export interface AuditSearchScope {
+  readonly role: string;
+  readonly membershipState: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'ENDED';
+}
+
+/**
+ * Audit search is deliberately platform-wide rather than tenant-scoped. An
+ * investigation that stopped at an organization boundary could not follow an actor
+ * across tenants, which is the case the search exists for. Only the three roles that
+ * already carry cross-tenant authority are admitted, and a membership that is not
+ * ACTIVE never qualifies.
+ */
+export function canSearchAuditEvents(scope: AuditSearchScope): boolean {
+  if (scope.membershipState !== 'ACTIVE') return false;
+  return auditSearchRoles.includes(scope.role as AuditSearchRole);
+}

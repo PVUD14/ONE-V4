@@ -7,7 +7,7 @@ import { BadRequestException, Body, ConflictException, Controller, ForbiddenExce
 import { sql, type SQL } from 'drizzle-orm';
 import { assertQuestionTransition, type QuestionStatus } from '@planthepath/assessments';
 import { institutionRelationshipAuthorizesActivity, type TemporalInstitutionScope } from '@planthepath/authorization/src/index.js';
-import type { PersistenceDb } from '@planthepath/persistence/src/repositories.js';
+import { hasInstitutionRelationshipAuthorizationForActivity, type PersistenceDb } from '@planthepath/persistence/src/repositories.js';
 import { API_ID_GENERATOR, API_PERSISTENCE_DB, ProtectedApiAuthenticationGuard, requireTrustedAuthorization, safeError, type ApiIdGenerator, type ProtectedHttpRequest } from './api-security.js';
 
 type Rows<T> = { rows: T[] };
@@ -424,13 +424,15 @@ export class StaffActionsController {
     return this.db.transaction(async (tx) => {
       const result = await tx.execute(sql`
         SELECT a.id, a.action_type, a.title, a.note, a.state, a.due_at, a.created_at, a.updated_at, a.version,
-          response.note AS response_note,
+          response.note AS response_note, assigner.role AS assigner_role,
           r.id AS relationship_id, r.state AS relationship_state, r.effective_from, r.effective_to
         FROM staff_actions a
         JOIN users u ON u.id = a.subject_student_user_id AND u.state = 'ACTIVE'
         JOIN organizations o ON o.id = a.institution_id AND o.active AND o.kind = 'INSTITUTION'
         JOIN institution_relationships r ON r.id = a.institution_relationship_id
           AND r.institution_id = a.institution_id AND r.student_user_id = a.subject_student_user_id
+        JOIN organization_memberships assigner ON assigner.id = a.actor_membership_id
+          AND assigner.organization_id = a.institution_id AND assigner.user_id = a.actor_user_id
         LEFT JOIN LATERAL (
           SELECT e.context->>'note' AS note FROM audit_events e
           WHERE e.resource_type = 'staff_action' AND e.resource_id = a.id::text
@@ -441,10 +443,10 @@ export class StaffActionsController {
         WHERE a.institution_id = ${id}::uuid AND a.subject_student_user_id = ${studentUserId}::uuid
           AND a.visibility = 'SUBJECT_VISIBLE' AND a.action_type IN ('INTERVENTION', 'ASSIGNED_TASK')
         ORDER BY a.created_at DESC, a.id
-        FOR SHARE OF a, r, u, o
+        FOR SHARE OF a, r, u, o, assigner
       `) as Rows<Relationship & {
         id: string; action_type: string; title: string; note: string | null; state: string;
-        due_at: Date | null; created_at: Date; updated_at: Date; version: number; response_note: string | null;
+        due_at: Date | null; created_at: Date; updated_at: Date; version: number; response_note: string | null; assigner_role: string;
       }>;
       const actions = result.rows.map((row) => ({ ...row, effective_from: new Date(row.effective_from),
         effective_to: row.effective_to ? new Date(row.effective_to) : null })).filter((row) =>
@@ -455,9 +457,70 @@ export class StaffActionsController {
         dueAt: row.due_at, createdAt: row.created_at, updatedAt: row.updated_at, version: row.version,
         canComplete: studentCompletionStates.includes(row.state) && currentRelation({ institutionId: id }, row),
         responseNote: row.response_note,
-        // Core has no staff display-name source yet; never substitute an email or internal identifier.
-        assignerDisplayName: null,
+        assignerRole: row.assigner_role,
       })) };
+    });
+  }
+
+
+  /** ADR-019/024: explicit institution consent plus current scope and canonical activity-date access. */
+  @Get('/institutions/:institutionId/students/:studentUserId/applications')
+  async studentApplications(@Req() request: ProtectedHttpRequest, @Param('institutionId') institutionId: string, @Param('studentUserId') studentUserId: string) {
+    return this.db.transaction(async (tx) => {
+      const scope = await this.scope(tx, request, institutionId);
+      const studentId = uuid(studentUserId, scope.correlationId);
+      try {
+        // Reuse current relationship and department/batch checks, holding their read locks.
+        await this.subject(tx, scope, studentId);
+      } catch (error) {
+        if (error instanceof ForbiddenException) return { applications: [] };
+        throw error;
+      }
+      const result = await tx.execute(sql`
+        SELECT a.id, a.employer_id, employer.legal_name AS employer_name,
+          v.title AS opportunity_title, a.state, a.created_at, a.submitted_at, a.updated_at, a.closed_at
+        FROM applications a
+        JOIN organizations employer ON employer.id = a.employer_id AND employer.kind = 'EMPLOYER'
+        JOIN opportunity_versions v ON v.id = a.applied_version_id AND v.opportunity_id = a.opportunity_id
+        WHERE a.student_user_id = ${studentId}::uuid
+          AND a.institution_visibility_granted_at IS NOT NULL
+          AND a.institution_visibility_revoked_at IS NULL
+        ORDER BY a.created_at DESC, a.id
+        LIMIT 100
+        FOR SHARE OF a
+      `) as Rows<{
+        id: string; employer_id: string; employer_name: string; opportunity_title: string; state: string;
+        created_at: Date; submitted_at: Date | null; updated_at: Date; closed_at: Date | null;
+      }>;
+      const applications = [];
+      for (const row of result.rows) {
+        // Creation and every disclosed revision must belong to authorized activity time.
+        const activityDates = [row.created_at, row.submitted_at, row.updated_at, row.closed_at].filter((value) => value !== null);
+        let authorized = true;
+        for (const at of activityDates) {
+          if (!await hasInstitutionRelationshipAuthorizationForActivity(tx, scope.institutionId, studentId, new Date(at))) {
+            authorized = false; break;
+          }
+        }
+        if (!authorized) continue;
+        // Match the existing student offer state's vocabulary, without disclosing its terms.
+        const offers = await tx.execute(sql`
+          SELECT state, created_at, updated_at
+          FROM offers
+          WHERE application_id = ${row.id}::uuid AND employer_id = ${row.employer_id}::uuid
+          ORDER BY created_at DESC, id DESC LIMIT 1 FOR SHARE
+        `) as Rows<{ state: string; created_at: Date; updated_at: Date }>;
+        const offer = offers.rows[0];
+        if (offer && (!await hasInstitutionRelationshipAuthorizationForActivity(tx, scope.institutionId, studentId, new Date(offer.created_at)) ||
+          !await hasInstitutionRelationshipAuthorizationForActivity(tx, scope.institutionId, studentId, new Date(offer.updated_at)))) continue;
+        applications.push({
+          id: row.id, employer: { id: row.employer_id, name: row.employer_name },
+          opportunityTitle: row.opportunity_title, state: row.state,
+          createdAt: row.created_at, submittedAt: row.submitted_at, updatedAt: row.updated_at, closedAt: row.closed_at,
+          offer: { exists: Boolean(offer), responseState: offer?.state ?? null },
+        });
+      }
+      return { applications };
     });
   }
 

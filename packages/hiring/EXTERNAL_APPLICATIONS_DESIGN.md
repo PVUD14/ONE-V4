@@ -6,9 +6,9 @@ Agent-assisted: yes (Codex) · Reviewed: pending
 
 # B8 external applications — design for sign-off
 
-Status: proposed, awaiting Divakar's sign-off. No migration or implementation accompanies this design.
+Status: reviewed and amended, awaiting Divakar's sign-off of this amended design. Implementation remains on hold. No migration or implementation accompanies this design.
 
-Base: `origin/integration` at `21adf00`. At inspection, this base does not contain the delivered B1–B6 commit `9f6ac2dc1521b82dedb49be91e17ca19f006b7dc`. That delivered commit contains both 0017 (native application institution consent) and **0018 (opportunity review signals)**. Do not reuse or modify either migration. Proposal: allocate **0019** to this table after explicit numbering and design sign-off; do not create a migration until then.
+Base: `origin/integration` at `cf39d03`. B1–B7 are integrated, including 0017 (native application institution consent) and 0018 (opportunity review signals). Do not reuse or modify either migration. **0019 is confirmed for B8; the amended table design is not yet approved.** Do not write migration 0019 or implement the student workflow before Divakar signs off this amended design.
 
 ## Proposed table: external_applications
 
@@ -45,11 +45,17 @@ Proposed routes under `/api/v1/students/me/external-applications`:
 - `GET` lists only the authenticated student's records, with bounded pagination.
 - `POST` creates a record from company, role, source kind, date, optional link and stage; optional institution consent defaults false.
 - `PATCH /:id` edits these student-maintained fields using the expected revision. It cannot change owner, provenance, verification state or consent timestamps. Students may correct stage in either direction because these are declarations, not employer-authorized pipeline transitions.
-- `DELETE /:id` permanently deletes only the authenticated student's record, after UI confirmation and a revision check. It does not change native applications. Keep only the minimal audit metadata described below.
+- `DELETE /:id` permanently deletes only the authenticated student's record, after UI confirmation and a revision check. It does not change native applications. The confirmation must explain that deletion cannot be undone and that a record previously shared with an institution will disappear from subsequent reports. Keep only the minimal audit metadata described below.
 - `POST /:id/institution-visibility/grant` records an explicit grant after the reviewed notice. Granting after revocation sets a new grant time and clears the current revocation; the audit preserves each grant/revocation action.
 - `POST /:id/institution-visibility/revoke` revokes this consent independently of stage or edits. Retry preserves the first revocation time. The control remains available on closed/terminal entries.
 
 Every route uses the existing protected authentication boundary. Every database read/write predicates ownership by the authenticated `student_user_id`; mutation ownership and revision checks occur in the modifying statement. Do not trust an ID in a path as authorization. Requests from another user must not reveal whether a record exists. The same person may have employer memberships, but those memberships grant no external-application access; only their student ownership does.
+
+### Per-student storage cap
+
+Proposed hard cap: **500 external application records per student**, across all stages and regardless of institution consent. Terminal, withdrawn and unshared records count toward the same limit. This caps currently held rows, not lifetime submissions; successful permanent deletion frees a slot. Never silently delete or merge records to make room. Edits and consent revocation remain available at the cap.
+
+Enforce the cap server-side in the create transaction: lock the authenticated student's `users` row with `FOR UPDATE`, count that student's current external records, and reject creation when the count is already 500. Every create path must use this same lock before counting and inserting, so concurrent requests cannot both claim the last slot. Reject before inserting either the application or a successful-create audit. Return a stable validation code and a safe message explaining the 500-record limit; no database details. This proposal uses a count cap rather than introducing a separate rate-limit service.
 
 Mutations and their minimal audits commit together. Proposed audit actions: `external_application.created`, `.updated`, `.deleted`, `.institution_visibility_granted`, and `.institution_visibility_revoked`; resource type `external_application`. Record actor, resource ID, correlation ID, outcome and changed field names/revision, but not raw company/role/link values or full request bodies. Do not queue unregistered outbox events. No separate detailed stage-history table is proposed in this slice.
 
@@ -57,7 +63,13 @@ Mutations and their minimal audits commit together. Proposed audit actions: `ext
 
 Apply ADR-019 to each external record. An institution may read a per-student record only when its distinct consent is current **and** the existing relationship/activity-access rule authorizes that institution at read time for `applied_on`. A backdated declaration must not bypass the relationship's effective dates. Reuse the existing access check; do not create a second interpretation of DP-010. Return only company, role, self-reported stage and key dates, together with the required provenance/unverified labels. The optional application link is student-only in this proposal.
 
-The institution read path and reports remain Stream C work. Their DTOs must keep native application counts separate from **student-declared, unverified external application** counts. Never add external rows to an existing verified/native metric under its current label. An explicitly labeled combined total may be considered only if both components remain visible. Anonymous aggregates follow ADR-019/DP-010 relationship scoping and do not themselves require per-record consent.
+The institution read path and reports remain Stream C work. Their DTOs must keep native application counts separate from **student-declared, unverified external application** counts. Never add external rows to an existing verified/native metric under its current label. Anonymous aggregates follow ADR-019/DP-010 relationship scoping and do not themselves require per-record consent.
+
+**Hard metric rule: a student-declared `HIRED` must never enter any placement or conversion metric without independent verification, including an explicitly labelled combined total.** A declaration, its institution visibility consent, or an unverified label is not verification. In this design every external row is fixed to `UNVERIFIED`, so external rows are excluded from placement and conversion metrics entirely, including their numerators, denominators and combined totals. Stage edits to `HIRED` cannot create a verified hire or a placement/conversion event. The student's own timeline and consent-authorized record views may show the declared stage with the unverified label; that display grants no metric eligibility. Any future inclusion requires a separately approved independent-verification workflow and evidence; none is introduced here.
+
+Non-outcome application-activity counts may present native and student-declared counts side by side, clearly distinguished. This is not permission to combine unverified declarations into placement or conversion metrics, and the proposed reporting DTOs expose no combined placement/conversion total.
+
+**Permanent deletion deliberately changes later reports.** A student-owned declaration that an institution previously saw under valid consent disappears from subsequent record views, report reruns, and applicable external-application activity aggregates after deletion. Do not retain a soft-deleted reporting row, substitute an audit-derived record, or carry its contribution forward merely to preserve past figures. Institution report caches/materialized data must remove or invalidate the deleted declaration before serving later reports; this is a Stream C/Core handoff required before institution reporting ships. Previously downloaded reports cannot be recalled, but new reads and reruns must reflect deletion. Minimal deletion audit metadata is not a reportable application. This loss from later reporting is the intended behavior, not a defect to compensate for.
 
 Employer APIs and employer analytics continue to query only native applications. They must never query this table or include its counts. Do not infer a verified offer, response or hire from an external stage declaration.
 
@@ -67,14 +79,16 @@ Core handoff before shipping: include these student-owned rows in the applicable
 
 ## Migration and verification plan after sign-off
 
-Add one new idempotent migration in the agreed unused slot; preserve native application constraints and all existing migrations. Test replay, fixed provenance/verification values, consent ordering and foreign-key ownership.
+Only after amended-design sign-off, add one new idempotent migration in confirmed slot **0019**; preserve native application constraints and all existing migrations. Test replay, fixed provenance/verification values, consent ordering and foreign-key ownership.
 
 Test student create/edit/delete, cross-student denial, invalid owner/provenance injection, stale-edit rejection, URL validation, and privacy-safe error messages. Test independent grant/revocation after every stage, idempotent revocation, and atomic rollback on audit failure. UI tests assert that the unverified label is always visible and counters/DTOs stay separate. Verify employer endpoints and analytics exclude external records. Stream C's institution tests must cover consent plus relationship scope, backdated records, and explicit aggregate distinctions.
+
+Test the cap at 499, 500 and attempted 501 records, including simultaneous creates competing for the final slot, all-stage counting, no cap bypass through consent changes, deletion freeing a slot, and edits/revocation remaining possible at the cap. Assert cap rejection leaves no record or successful-create audit. Reporting tests must prove that changing an external stage to `HIRED` never changes any placement/conversion numerator, denominator or combined total, even when institution consent is granted. After an institution reads a consented declaration, permanently delete it and verify it is absent from later record views, report reruns and external-activity aggregates, including cached report paths; its audit must not restore its reporting contribution.
 
 Use disposable local Postgres with synthetic data. Integration hooks must set an explicit cold-start timeout (at least 60 seconds) and any membership fixtures must match organization kind and scope. Before pushing implementation, run the repository typecheck and full test suite.
 
 ## Requested sign-off
 
-Approve or amend this table, stage vocabulary, deletion/audit behavior, institution disclosure and separate reporting contract. Confirm **0019** rather than the already-used 0018. After that sign-off, Stream B can write the migration and student workflow; Stream C/Core retain the stated read/report/privacy handoffs.
+Approve or amend this table, stage vocabulary, **500-record per-student cap**, permanent deletion/audit behavior, institution disclosure and **hard exclusion of unverified declarations from placement/conversion metrics**. The migration number **0019 is already confirmed** and needs no further numbering decision. Only Divakar's sign-off of this amended design releases the hold on the migration and student workflow; Stream C/Core retain the stated read/report/privacy handoffs.
 
-B7 is separately blocked on the requested ADR-026 being available and Core wiring the existing Interviewer portal into a Stream B surface (or recording a scoped exception). `origin/integration` currently routes only the recruiter portal into `rolePortal/employer.tsx`; the Interviewer portal falls through to a placeholder in Core-owned `rolePortalPages.tsx`. INTERVIEWER must remain disabled as a membership role.
+B7 is merged. B9 labels are confirmed as `My Interviews`, `Candidate Brief`, and `Scorecards`; Core owns navigation wiring and no Stream B code change is needed. INTERVIEWER remains disabled as a membership role. B4 consent wording remains queued for privacy review through the DPDP counsel engagement before shipping.

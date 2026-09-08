@@ -3,7 +3,7 @@
  * Owner: Navya · Created: 2026-09-05
  * Agent-assisted: yes (Codex) · Reviewed: pending
  */
-import { BadRequestException, Body, ConflictException, Controller, ForbiddenException, Get, Inject, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, ConflictException, Controller, ForbiddenException, Get, Inject, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { sql, type SQL } from 'drizzle-orm';
 import { assertQuestionTransition, type QuestionStatus } from '@planthepath/assessments';
 import { institutionRelationshipAuthorizesActivity, type TemporalInstitutionScope } from '@planthepath/authorization/src/index.js';
@@ -11,6 +11,30 @@ import type { PersistenceDb } from '@planthepath/persistence/src/repositories.js
 import { API_ID_GENERATOR, API_PERSISTENCE_DB, ProtectedApiAuthenticationGuard, requireTrustedAuthorization, safeError, type ApiIdGenerator, type ProtectedHttpRequest } from './api-security.js';
 
 type Rows<T> = { rows: T[] };
+const actionTypes = ['INTERVENTION', 'ASSIGNED_TASK', 'FACULTY_NOTE', 'ACADEMIC_VERIFICATION', 'MEETING'] as const;
+type ActionType = typeof actionTypes[number];
+interface Filters { studentUserId?: string; state?: string; assigneeMembershipId?: string; period?: string }
+function actionType(value: unknown, correlationId: string): ActionType {
+  if (value === undefined) return 'INTERVENTION';
+  if (typeof value !== 'string' || !actionTypes.includes(value as ActionType)) throw new BadRequestException(inputError('INVALID_INPUT', correlationId));
+  return value as ActionType;
+}
+function dateValue(value: unknown, correlationId: string): Date | null {
+  const text = textValue(value, 64, correlationId);
+  if (!text) return null;
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})$/.test(text) || !Number.isFinite(Date.parse(text))) {
+    throw new BadRequestException(inputError('INVALID_INPUT', correlationId));
+  }
+  return new Date(text);
+}
+function meetingDates(type: ActionType, start: unknown, end: unknown, correlationId: string) {
+  const scheduledStartAt = dateValue(start, correlationId);
+  const scheduledEndAt = dateValue(end, correlationId);
+  if (type === 'MEETING' ? !scheduledStartAt || !scheduledEndAt || scheduledEndAt <= scheduledStartAt : Boolean(scheduledStartAt || scheduledEndAt)) {
+    throw new BadRequestException(inputError('INVALID_INPUT', correlationId));
+  }
+  return { scheduledStartAt, scheduledEndAt };
+}
 const staffRoles = ['INSTITUTION_OWNER', 'INSTITUTION_ADMIN', 'PLACEMENT_ADMIN', 'DEPARTMENT_HEAD', 'FACULTY_LECTURER'];
 const reviewRoles = staffRoles.filter((role) => role !== 'FACULTY_LECTURER');
 interface Scope {
@@ -25,7 +49,10 @@ interface Student extends Relationship {
   student_user_id: string; full_name: string; department_unit_id: string | null; batch_unit_id: string | null;
 }
 interface Action extends Relationship {
-  id: string; subject_student_user_id: string; institution_relationship_id: string;
+  id: string; subject_student_user_id: string | null; institution_relationship_id: string | null;
+  action_type: ActionType; visibility: string; actor_membership_id: string;
+  scheduled_start_at: Date | null; scheduled_end_at: Date | null;
+  author_name: string; reviewer_name: string | null; last_reviewed_at: Date | null;
   actor_user_id: string; assigned_to_membership_id: string | null;
   title: string; note: string | null; outcome_note: string | null; due_at: Date | null;
   state: string; version: number; created_at: Date; updated_at: Date;
@@ -50,7 +77,7 @@ function allowedStates(scope: Scope, action: Action): string[] {
   if (!canManage(scope, action)) return [];
   return nextStates(action.state).filter((state) => !['APPROVED', 'REJECTED'].includes(state) || reviewRoles.includes(scope.role));
 }
-function temporal(scope: Scope, relation: Relationship, at: Date): boolean {
+function temporal(scope: Pick<Scope, 'institutionId'>, relation: Relationship, at: Date): boolean {
   return institutionRelationshipAuthorizesActivity({
     institutionId: scope.institutionId, relationshipState: relation.relationship_state,
     effectiveFrom: relation.effective_from, ...(relation.effective_to ? { effectiveTo: relation.effective_to } : {}),
@@ -58,6 +85,14 @@ function temporal(scope: Scope, relation: Relationship, at: Date): boolean {
 }
 function currentRelation(scope: Scope, relation: Relationship): boolean {
   return ['VERIFIED', 'ACTIVE'].includes(relation.relationship_state) && temporal(scope, relation, new Date());
+}
+function currentAction(scope: Scope, action: Action): boolean {
+  return action.subject_student_user_id === null
+    ? action.action_type === 'MEETING' && action.institution_relationship_id === null
+    : currentRelation(scope, action);
+}
+function editable(scope: Scope, action: Action): boolean {
+  return action.action_type === 'ASSIGNED_TASK' && action.state === 'DRAFT' && currentAction(scope, action) && canManage(scope, action);
 }
 function unitScope(scope: Scope): SQL {
   return sql`(${scope.scope_department_unit_id}::uuid IS NULL OR p.department_unit_id = ${scope.scope_department_unit_id}::uuid)
@@ -78,8 +113,8 @@ function textValue(value: unknown, limit: number, correlationId: string, require
   return value.trim() || null;
 }
 
-/** C4 exposes interventions only. Other record types and student writes await their own policy review. */
-@Controller('/api/v1/institutions/:institutionId/staff-actions')
+/** C5 reuses C4 scope, lifecycle and audit. Visibility changes, evidence access and wider delegation remain deferred. */
+@Controller('/api/v1')
 @UseGuards(ProtectedApiAuthenticationGuard)
 export class StaffActionsController {
   constructor(
@@ -125,9 +160,9 @@ export class StaffActionsController {
     return student;
   }
 
-  private async rows(tx: PersistenceDb, scope: Scope, id?: string, lock = false): Promise<Action[]> {
+  private async rows(tx: PersistenceDb, scope: Scope, type: ActionType, id?: string, lock = false): Promise<Action[]> {
     const result = await tx.execute(sql`
-      SELECT a.*, p.full_name AS student_name, p.updated_at AS profile_updated_at, owner.email AS owner_name,
+      SELECT a.*, p.full_name AS student_name, p.updated_at AS profile_updated_at, owner.email AS owner_name, author.email AS author_name, reviewer.email AS reviewer_name,
         r.id AS relationship_id, r.state AS relationship_state, r.effective_from, r.effective_to
       FROM staff_actions a
       JOIN institution_relationships r ON r.id = a.institution_relationship_id
@@ -135,23 +170,59 @@ export class StaffActionsController {
       JOIN institution_student_profiles p ON p.institution_id = a.institution_id AND p.student_user_id = a.subject_student_user_id
       JOIN organization_memberships m ON m.id = a.assigned_to_membership_id AND m.organization_id = a.institution_id
       JOIN users owner ON owner.id = m.user_id
-      WHERE a.institution_id = ${scope.institutionId}::uuid AND a.action_type = 'INTERVENTION'
+      JOIN users author ON author.id = a.actor_user_id
+      LEFT JOIN users reviewer ON reviewer.id = a.last_reviewed_by_user_id
+      WHERE a.institution_id = ${scope.institutionId}::uuid AND a.action_type = ${type} AND a.visibility = 'STAFF_ONLY'
         AND (${id ?? null}::uuid IS NULL OR a.id = ${id ?? null}::uuid)
         AND ${unitScope(scope)}
         AND (${scope.scope_department_unit_id}::uuid IS NULL OR a.department_unit_id = ${scope.scope_department_unit_id}::uuid)
         AND (${scope.scope_batch_unit_id}::uuid IS NULL OR a.batch_unit_id = ${scope.scope_batch_unit_id}::uuid)
       ORDER BY a.created_at DESC, a.id ${lock ? sql`FOR UPDATE OF a` : sql`FOR SHARE OF a, r, p`}
     `) as Rows<Action>;
+
+    if (type === 'MEETING') {
+      const meetings = await tx.execute(sql`
+        SELECT a.*, NULL AS student_name, owner.email AS owner_name, author.email AS author_name,
+          reviewer.email AS reviewer_name
+        FROM staff_actions a
+        JOIN organization_memberships m ON m.id = a.assigned_to_membership_id AND m.organization_id = a.institution_id
+        JOIN users owner ON owner.id = m.user_id JOIN users author ON author.id = a.actor_user_id
+        LEFT JOIN users reviewer ON reviewer.id = a.last_reviewed_by_user_id
+        WHERE a.institution_id = ${scope.institutionId}::uuid AND a.action_type = 'MEETING'
+          AND a.subject_student_user_id IS NULL AND a.institution_relationship_id IS NULL AND a.visibility = 'STAFF_ONLY'
+          AND (${id ?? null}::uuid IS NULL OR a.id = ${id ?? null}::uuid)
+          AND (${scope.scope_department_unit_id}::uuid IS NULL OR a.department_unit_id = ${scope.scope_department_unit_id}::uuid)
+          AND (${scope.scope_batch_unit_id}::uuid IS NULL OR a.batch_unit_id = ${scope.scope_batch_unit_id}::uuid)
+        ORDER BY a.created_at DESC, a.id ${lock ? sql`FOR UPDATE OF a` : sql`FOR SHARE OF a`}
+      `) as Rows<Action>;
+      result.rows.push(...meetings.rows);
+      result.rows.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime() || a.id.localeCompare(b.id));
+    }
+
     // Check the latest revision as well as creation: an older row cannot disclose later activity.
-    return result.rows.filter((action) => temporal(scope, action, action.created_at) && temporal(scope, action, action.updated_at)
-      && (!['TRANSFERRED', 'GRADUATED'].includes(action.relationship_state) || Boolean(action.effective_to && action.profile_updated_at < action.effective_to)));
+    return result.rows.filter((action) => (action.subject_student_user_id === null && currentAction(scope, action)) || (temporal(scope, action, action.created_at) && temporal(scope, action, action.updated_at)
+      && (!['TRANSFERRED', 'GRADUATED'].includes(action.relationship_state) || Boolean(action.effective_to && action.profile_updated_at < action.effective_to))));
   }
 
-  @Get()
-  async list(@Req() request: ProtectedHttpRequest, @Param('institutionId') institutionId: string) {
+  @Get('/institutions/:institutionId/staff-actions')
+  async list(@Req() request: ProtectedHttpRequest, @Param('institutionId') institutionId: string, @Query('actionType') typeParam?: string, @Query() filters: Filters = {}) {
     return this.db.transaction(async (tx) => {
       const scope = await this.scope(tx, request, institutionId);
-      const actions = await this.rows(tx, scope);
+      const type = actionType(typeParam, scope.correlationId);
+      const studentFilter = filters.studentUserId === undefined ? null : uuid(filters.studentUserId, scope.correlationId);
+      const assigneeFilter = filters.assigneeMembershipId === undefined ? null : uuid(filters.assigneeMembershipId, scope.correlationId);
+      const states = [...reviewStates, 'OPEN', 'IN_PROGRESS', 'CHANGES_REQUESTED', 'COMPLETED', 'CANCELLED'];
+      if ((filters.state !== undefined && !states.includes(filters.state)) ||
+        (filters.period !== undefined && (type !== 'MEETING' || !['upcoming', 'past'].includes(filters.period)))) {
+        throw new BadRequestException(inputError('INVALID_INPUT', scope.correlationId));
+      }
+      const now = new Date();
+      const actions = (await this.rows(tx, scope, type)).filter((action) =>
+        (!studentFilter || action.subject_student_user_id === studentFilter) &&
+        (!assigneeFilter || action.assigned_to_membership_id === assigneeFilter) &&
+        (filters.state === undefined || action.state === filters.state) &&
+        (filters.period === undefined || Boolean(action.scheduled_end_at &&
+          (filters.period === 'past' ? new Date(action.scheduled_end_at) <= now : new Date(action.scheduled_end_at) > now))));
       const students = await tx.execute(sql`
         SELECT p.student_user_id, p.full_name FROM institution_student_profiles p
         JOIN users u ON u.id = p.student_user_id
@@ -167,54 +238,67 @@ export class StaffActionsController {
           id: action.id, title: action.title, note: action.note, outcomeNote: action.outcome_note,
           studentName: action.student_name, ownerName: action.owner_name, state: action.state, version: action.version,
           dueAt: action.due_at, updatedAt: action.updated_at,
-          allowedTransitions: currentRelation(scope, action) ? allowedStates(scope, action) : [],
+          actionType: action.action_type, visibility: action.visibility, authorName: action.author_name,
+          studentUserId: action.subject_student_user_id, assignedToMembershipId: action.assigned_to_membership_id,
+          scheduledStartAt: action.scheduled_start_at, scheduledEndAt: action.scheduled_end_at,
+          reviewerName: action.reviewer_name, lastReviewedAt: action.last_reviewed_at,
+          canEdit: editable(scope, action),
+          allowedTransitions: currentAction(scope, action) ? allowedStates(scope, action) : [],
         })),
         students: students.rows.map((student) => ({ id: student.student_user_id, name: student.full_name })),
+        // C4 establishes self-assignment only; wider delegation awaits policy review.
+        assignees: [{ id: scope.id, name: 'You' }],
       };
     });
   }
 
-  @Post()
-  async create(@Req() request: ProtectedHttpRequest, @Param('institutionId') institutionId: string, @Body() body: Record<string, unknown>) {
+  @Post('/institutions/:institutionId/staff-actions')
+  async create(@Req() request: ProtectedHttpRequest, @Param('institutionId') institutionId: string, @Body() body: Record<string, unknown>, @Query('actionType') typeParam?: string) {
     return this.db.transaction(async (tx) => {
       const scope = await this.scope(tx, request, institutionId);
-      const studentId = uuid(body['studentUserId'], scope.correlationId);
+      const type = actionType(typeParam, scope.correlationId);
+      if (typeParam !== undefined && ((body['visibility'] !== undefined && body['visibility'] !== 'STAFF_ONLY') ||
+        body['evidenceDocumentVersionId'] != null || body['sourceExamAssignmentId'] != null ||
+        (body['assignedToMembershipId'] !== undefined && body['assignedToMembershipId'] !== scope.id))) {
+        throw new ForbiddenException(safeError('FORBIDDEN', scope.correlationId));
+      }
+      const studentId = type === 'MEETING' && body['studentUserId'] == null ? null : uuid(body['studentUserId'], scope.correlationId);
       const title = textValue(body['title'], 200, scope.correlationId, true);
-      const note = textValue(body['note'], 4000, scope.correlationId);
-      const dueText = textValue(body['dueAt'], 64, scope.correlationId);
-      const dueAt = dueText ? new Date(dueText) : null;
-      if (dueAt && !Number.isFinite(dueAt.getTime())) throw new BadRequestException(inputError('INVALID_INPUT', scope.correlationId));
-      const student = await this.subject(tx, scope, studentId);
+      const note = textValue(body['note'], 4000, scope.correlationId, type === 'FACULTY_NOTE');
+      const dueAt = dateValue(body['dueAt'], scope.correlationId);
+      const dates = meetingDates(type, body['scheduledStartAt'], body['scheduledEndAt'], scope.correlationId);
+      const student = studentId ? await this.subject(tx, scope, studentId) : null;
       const id = this.ids.uuid();
       await tx.execute(sql`
         INSERT INTO staff_actions (id, institution_id, subject_student_user_id, institution_relationship_id,
           actor_user_id, actor_membership_id, assigned_to_membership_id, department_unit_id, batch_unit_id,
-          action_type, title, note, due_at, updated_by_user_id)
-        VALUES (${id}::uuid, ${scope.institutionId}::uuid, ${studentId}::uuid, ${student.relationship_id}::uuid,
-          ${scope.user_id}::uuid, ${scope.id}::uuid, ${scope.id}::uuid, ${student.department_unit_id}::uuid, ${student.batch_unit_id}::uuid,
-          'INTERVENTION', ${title}, ${note}, ${dueAt}, ${scope.user_id}::uuid)
+          action_type, title, note, due_at, scheduled_start_at, scheduled_end_at, updated_by_user_id)
+        VALUES (${id}::uuid, ${scope.institutionId}::uuid, ${studentId}::uuid, ${student?.relationship_id ?? null}::uuid,
+          ${scope.user_id}::uuid, ${scope.id}::uuid, ${scope.id}::uuid, ${student?.department_unit_id ?? scope.scope_department_unit_id}::uuid, ${student?.batch_unit_id ?? scope.scope_batch_unit_id}::uuid,
+          ${type}, ${title}, ${note}, ${dueAt}, ${dates.scheduledStartAt}, ${dates.scheduledEndAt}, ${scope.user_id}::uuid)
       `);
       await this.audit(tx, scope, id, 'staff_action.created', {
-        fromState: null, toState: 'DRAFT', version: 1, title, note, dueAt,
-        subjectStudentUserId: studentId, relationshipId: student.relationship_id, assignedToMembershipId: scope.id,
+        fromState: null, toState: 'DRAFT', version: 1, actionType: type, title, note, dueAt, ...dates,
+        subjectStudentUserId: studentId, relationshipId: student?.relationship_id ?? null, assignedToMembershipId: scope.id,
       });
       return { id, state: 'DRAFT', version: 1 };
     });
   }
 
-  @Post('/:actionId/transition')
-  async transition(@Req() request: ProtectedHttpRequest, @Param('institutionId') institutionId: string, @Param('actionId') actionId: string, @Body() body: Record<string, unknown>) {
+  @Post('/institutions/:institutionId/staff-actions/:actionId/transition')
+  async transition(@Req() request: ProtectedHttpRequest, @Param('institutionId') institutionId: string, @Param('actionId') actionId: string, @Body() body: Record<string, unknown>, @Query('actionType') typeParam?: string) {
     return this.db.transaction(async (tx) => {
       const scope = await this.scope(tx, request, institutionId);
       const id = uuid(actionId, scope.correlationId);
-      const action = (await this.rows(tx, scope, id, true))[0];
+      const type = actionType(typeParam, scope.correlationId);
+      const action = (await this.rows(tx, scope, type, id, true))[0];
       if (!action) throw new ForbiddenException(safeError('FORBIDDEN', scope.correlationId));
-      await this.subject(tx, scope, action.subject_student_user_id, action.institution_relationship_id);
+      if (action.subject_student_user_id) await this.subject(tx, scope, action.subject_student_user_id, action.institution_relationship_id ?? undefined);
       if (!Number.isInteger(body['version']) || Number(body['version']) < 1) throw new BadRequestException(inputError('INVALID_INPUT', scope.correlationId));
       if (body['version'] !== action.version) throw new ConflictException(inputError('STALE_VERSION', scope.correlationId));
       const toState = textValue(body['toState'], 32, scope.correlationId, true)!;
       if (!allowedStates(scope, action).includes(toState)) throw new ForbiddenException(safeError('FORBIDDEN', scope.correlationId));
-      const note = textValue(body['note'], 2000, scope.correlationId, ['REJECTED', 'COMPLETED', 'CANCELLED'].includes(toState));
+      const note = textValue(body['note'], 2000, scope.correlationId, ['REJECTED', 'COMPLETED', 'CANCELLED'].includes(toState) || (type === 'ACADEMIC_VERIFICATION' && toState === 'APPROVED'));
       const reviewing = ['APPROVED', 'REJECTED'].includes(toState);
       const result = await tx.execute(sql`
         UPDATE staff_actions SET state = ${toState}, version = version + 1,
@@ -230,10 +314,79 @@ export class StaffActionsController {
       `) as Rows<{ version: number }>;
       if (result.rows.length !== 1) throw new ConflictException(inputError('STALE_VERSION', scope.correlationId));
       await this.audit(tx, scope, id, 'staff_action.transitioned', {
-        fromState: action.state, toState, fromVersion: action.version, version: result.rows[0]!.version,
+        actionType: type, fromState: action.state, toState, fromVersion: action.version, version: result.rows[0]!.version,
         note, previousOutcomeNote: action.outcome_note,
       });
       return { id, state: toState, version: result.rows[0]!.version };
+    });
+  }
+
+  @Post('/institutions/:institutionId/staff-actions/:actionId/update')
+  async update(@Req() request: ProtectedHttpRequest, @Param('institutionId') institutionId: string,
+    @Query('actionType') typeParam: string, @Param('actionId') actionId: string, @Body() body: Record<string, unknown>) {
+    return this.db.transaction(async (tx) => {
+      const scope = await this.scope(tx, request, institutionId);
+      const type = actionType(typeParam, scope.correlationId);
+      const id = uuid(actionId, scope.correlationId);
+      const action = (await this.rows(tx, scope, type, id, true))[0];
+      if (!action || !editable(scope, action)) throw new ForbiddenException(safeError('FORBIDDEN', scope.correlationId));
+      await this.subject(tx, scope, action.subject_student_user_id!, action.institution_relationship_id ?? undefined);
+      if (!Number.isInteger(body['version']) || Number(body['version']) < 1) throw new BadRequestException(inputError('INVALID_INPUT', scope.correlationId));
+      if (body['version'] !== action.version) throw new ConflictException(inputError('STALE_VERSION', scope.correlationId));
+      if (Object.keys(body).some((key) => !['version', 'title', 'note', 'dueAt'].includes(key))) {
+        throw new BadRequestException(inputError('INVALID_INPUT', scope.correlationId));
+      }
+      const title = body['title'] === undefined ? action.title : textValue(body['title'], 200, scope.correlationId, true);
+      const note = body['note'] === undefined ? action.note : textValue(body['note'], 4000, scope.correlationId);
+      const dueAt = body['dueAt'] === undefined ? action.due_at : dateValue(body['dueAt'], scope.correlationId);
+      const result = await tx.execute(sql`
+        UPDATE staff_actions SET title = ${title}, note = ${note}, due_at = ${dueAt}, version = version + 1,
+          updated_at = now(), updated_by_user_id = ${scope.user_id}::uuid
+        WHERE id = ${id}::uuid AND institution_id = ${scope.institutionId}::uuid AND version = ${action.version}
+        RETURNING version
+      `) as Rows<{ version: number }>;
+      if (result.rows.length !== 1) throw new ConflictException(inputError('STALE_VERSION', scope.correlationId));
+      await this.audit(tx, scope, id, 'staff_action.updated', {
+        actionType: type, fromVersion: action.version, version: result.rows[0]!.version,
+        before: { title: action.title, note: action.note, dueAt: action.due_at }, after: { title, note, dueAt },
+      });
+      return { id, state: action.state, version: result.rows[0]!.version };
+    });
+  }
+
+
+  /** Student read only: identity comes from the guard, never a requested student ID. */
+  @Get('/students/me/staff-actions')
+  async forStudent(@Req() request: ProtectedHttpRequest, @Query('institutionId') institutionId: string) {
+    const context = requireTrustedAuthorization(request);
+    const id = uuid(institutionId, context.correlationId);
+    const studentUserId = context.authorization.principal.userId;
+    return this.db.transaction(async (tx) => {
+      const result = await tx.execute(sql`
+        SELECT a.id, a.action_type, a.title, a.note, a.state, a.due_at, a.created_at, a.updated_at,
+          r.id AS relationship_id, r.state AS relationship_state, r.effective_from, r.effective_to
+        FROM staff_actions a
+        JOIN users u ON u.id = a.subject_student_user_id AND u.state = 'ACTIVE'
+        JOIN organizations o ON o.id = a.institution_id AND o.active AND o.kind = 'INSTITUTION'
+        JOIN institution_relationships r ON r.id = a.institution_relationship_id
+          AND r.institution_id = a.institution_id AND r.student_user_id = a.subject_student_user_id
+        WHERE a.institution_id = ${id}::uuid AND a.subject_student_user_id = ${studentUserId}::uuid
+          AND a.visibility = 'SUBJECT_VISIBLE' AND a.action_type IN ('INTERVENTION', 'ASSIGNED_TASK')
+        ORDER BY a.created_at DESC, a.id
+        FOR SHARE OF a, r, u, o
+      `) as Rows<Relationship & {
+        id: string; action_type: string; title: string; note: string | null; state: string;
+        due_at: Date | null; created_at: Date; updated_at: Date;
+      }>;
+      const actions = result.rows.filter((row) => {
+        const relation = { ...row, effective_from: new Date(row.effective_from), effective_to: row.effective_to ? new Date(row.effective_to) : null };
+        return temporal({ institutionId: id }, relation, new Date(row.created_at)) &&
+          temporal({ institutionId: id }, relation, new Date(row.updated_at));
+      });
+      return { actions: actions.map((row) => ({
+        id: row.id, actionType: row.action_type, title: row.title, note: row.note, state: row.state,
+        dueAt: row.due_at, createdAt: row.created_at, updatedAt: row.updated_at,
+      })) };
     });
   }
 

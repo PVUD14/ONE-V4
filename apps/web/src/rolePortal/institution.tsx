@@ -6,16 +6,17 @@
  * Split out of rolePortalPages.tsx so each stream owns its own surface. The
  * shell and the route dispatcher remain there and import from here.
  */
-import { addInstitutionStudent, commitStudentRosterImport, createInstitutionUnit, endInstitutionStudentRelationship, getProtectedAccessToken, inviteInstitutionStaff, listInstitutionStaff, listInstitutionStudents, listInstitutionUnits, previewStudentRosterImport, updateInstitutionStudent, updateInstitutionUnit } from '../api.js';
+import { ApiRequestError, apiBaseUrl, addInstitutionStudent, commitStudentRosterImport, createInstitutionUnit, endInstitutionStudentRelationship, getProtectedAccessToken, inviteInstitutionStaff, listInstitutionStaff, listInstitutionStudents, listInstitutionUnits, previewStudentRosterImport, updateInstitutionStudent, updateInstitutionUnit } from '../api.js';
 import type { InstitutionStaffDto, InstitutionStudentCreateRequest, InstitutionStudentDto, InstitutionUnitDto, RosterImportPreviewDto } from '../api.js';
 import { V2Stat } from '../dashboardsV2.js';
 import type { RolePortalConfig } from '../rolePortalConfig.js';
-import { InstitutionWorkspaceError, RestrictedApiState, formatApiError, institutionWorkspaceRoles, isInstitutionWorkspace } from './shared.js';
+import { InstitutionWorkspaceError, RestrictedApiState, formatApiError, institutionWorkspaceRoles, isInstitutionStaffWorkspace, isInstitutionWorkspace } from './shared.js';
 import type { AuthenticatedWorkspaceSummary } from './shared.js';
 import { Search } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { NaListCard } from '../pilotParity/naWidgets.js';
+import { useEffect, useRef, useState } from 'react';
 
-export function InstitutionStudentsPage({ portal, authenticatedWorkspace }: { readonly portal: RolePortalConfig; readonly authenticatedWorkspace?: AuthenticatedWorkspaceSummary | undefined }): React.ReactElement {
+function InstitutionAdminStudentsPage({ portal, authenticatedWorkspace }: { readonly portal: RolePortalConfig; readonly authenticatedWorkspace?: AuthenticatedWorkspaceSummary | undefined }): React.ReactElement {
   const token = getProtectedAccessToken();
   const institutionId = authenticatedWorkspace?.organizationId ?? '';
   const [students, setStudents] = useState<readonly InstitutionStudentDto[]>([]);
@@ -117,7 +118,7 @@ export function InstitutionStudentsPage({ portal, authenticatedWorkspace }: { re
   </section>;
 }
 
-export function InstitutionAcademicStructurePage({ portal, authenticatedWorkspace }: { readonly portal: RolePortalConfig; readonly authenticatedWorkspace?: AuthenticatedWorkspaceSummary | undefined }): React.ReactElement {
+export function InstitutionAcademicStructurePage({ portal, authenticatedWorkspace, canManage = true }: { readonly canManage?: boolean; readonly portal: RolePortalConfig; readonly authenticatedWorkspace?: AuthenticatedWorkspaceSummary | undefined }): React.ReactElement {
   const token = getProtectedAccessToken();
   const institutionId = authenticatedWorkspace?.organizationId ?? '';
   const [units, setUnits] = useState<readonly InstitutionUnitDto[]>([]);
@@ -125,9 +126,9 @@ export function InstitutionAcademicStructurePage({ portal, authenticatedWorkspac
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   useEffect(() => { if (token && institutionId) void listInstitutionUnits(token, institutionId).then((result) => setUnits(result.units)).catch(() => setError('Unable to load academic units.')); }, [token, institutionId, notice]);
-  if (!token) return <RestrictedApiState title="Academic Structure" message="Sign in with an Institution Admin identity to manage academic structure." />;
-  if (authenticatedWorkspace && !institutionWorkspaceRoles.has(authenticatedWorkspace.role)) return <InstitutionWorkspaceError title="Academic Structure" unauthorized />;
-  if (!isInstitutionWorkspace(authenticatedWorkspace)) return <InstitutionWorkspaceError title="Academic Structure" />;
+  if (!token) return <RestrictedApiState title="Academic Structure" message={canManage ? "Sign in with an Institution Admin identity to manage academic structure." : "Sign in to your institution staff workspace to view academic structure."} />;
+  if (authenticatedWorkspace && !(canManage ? institutionWorkspaceRoles.has(authenticatedWorkspace.role) : isInstitutionStaffWorkspace(authenticatedWorkspace))) return <InstitutionWorkspaceError title="Academic Structure" unauthorized />;
+  if (canManage ? !isInstitutionWorkspace(authenticatedWorkspace) : !isInstitutionStaffWorkspace(authenticatedWorkspace)) return <InstitutionWorkspaceError title="Academic Structure" />;
   async function create(event: React.FormEvent): Promise<void> {
     event.preventDefault();
     setError('');
@@ -150,14 +151,14 @@ export function InstitutionAcademicStructurePage({ portal, authenticatedWorkspac
       setError('Academic unit update failed.');
     }
   }
-  return <section className="role-module role-module--dense"><div className="role-page-heading"><div><span className="eyebrow">Authenticated API-backed</span><h1>Academic Structure</h1><p>Manage institution-scoped departments, programs, batches, sections and campuses. Parent choices are institution-scoped.</p></div></div>
+  return <section className="role-module role-module--dense"><div className="role-page-heading"><div><span className="eyebrow">Authenticated API-backed</span><h1>Academic Structure</h1><p>{canManage ? "Manage institution-scoped departments, programs, batches, sections and campuses. Parent choices are institution-scoped." : "View institution-scoped departments, programs, batches, sections and campuses."}</p></div></div>
     <div className="v2-row v2-cols-4 career-stat-strip role-wide">
       <V2Stat icon="🏛️" tone="blue" value={units.filter((unit) => unit.kind === 'DEPARTMENT').length} label="Departments" />
       <V2Stat icon="🎓" tone="purple" value={units.filter((unit) => unit.kind === 'PROGRAM').length} label="Programs" />
       <V2Stat icon="📅" tone="green" value={units.filter((unit) => unit.kind === 'BATCH').length} label="Batches" />
       <V2Stat icon="🧩" tone="amber" value={units.filter((unit) => ['SECTION', 'CAMPUS'].includes(unit.kind)).length} label="Sections and campuses" />
     </div>
-    {notice ? <p className="role-api-success" role="status">{notice}</p> : null}{error ? <p className="form-error" role="alert">{error}</p> : null}<form className="role-card role-wide role-management-form" onSubmit={(event) => void create(event)}><h2>Add academic unit</h2><label><span>Kind</span><select value={form.kind} onChange={(event) => setForm((value) => ({ ...value, kind: event.target.value }))}><option>DEPARTMENT</option><option>PROGRAM</option><option>BATCH</option><option>SECTION</option><option>CAMPUS</option></select></label><label><span>Name</span><input value={form.name} onChange={(event) => setForm((value) => ({ ...value, name: event.target.value }))} required /></label><UnitSelect label="Parent unit" value={form.parentUnitId} units={units} onChange={(parentUnitId) => setForm((value) => ({ ...value, parentUnitId }))} /><button type="submit">Create unit</button></form><div className="role-record-table-wrap"><table className="role-record-table"><caption className="sr-only">{portal.roleName} academic units</caption><thead><tr><th>Name</th><th>Kind</th><th>Parent</th><th>Action</th></tr></thead><tbody>{units.map((unit) => <tr key={unit.id}><th>{unit.name}</th><td>{unit.kind}</td><td>{units.find((candidate) => candidate.id === unit.parentUnitId)?.name ?? 'Institution'}</td><td><button type="button" className="secondary" onClick={() => void edit(unit)}>Edit unit</button></td></tr>)}</tbody></table></div></section>;
+    {notice ? <p className="role-api-success" role="status">{notice}</p> : null}{error ? <p className="form-error" role="alert">{error}</p> : null}{canManage ? <form className="role-card role-wide role-management-form" onSubmit={(event) => void create(event)}><h2>Add academic unit</h2><label><span>Kind</span><select value={form.kind} onChange={(event) => setForm((value) => ({ ...value, kind: event.target.value }))}><option>DEPARTMENT</option><option>PROGRAM</option><option>BATCH</option><option>SECTION</option><option>CAMPUS</option></select></label><label><span>Name</span><input value={form.name} onChange={(event) => setForm((value) => ({ ...value, name: event.target.value }))} required /></label><UnitSelect label="Parent unit" value={form.parentUnitId} units={units} onChange={(parentUnitId) => setForm((value) => ({ ...value, parentUnitId }))} /><button type="submit">Create unit</button></form> : null}<div className="role-record-table-wrap"><table className="role-record-table"><caption className="sr-only">{portal.roleName} academic units</caption><thead><tr><th>Name</th><th>Kind</th><th>Parent</th><th>Action</th></tr></thead><tbody>{units.map((unit) => <tr key={unit.id}><th>{unit.name}</th><td>{unit.kind}</td><td>{units.find((candidate) => candidate.id === unit.parentUnitId)?.name ?? 'Institution'}</td><td>{canManage ? <button type="button" className="secondary" onClick={() => void edit(unit)}>Edit unit</button> : "NA"}</td></tr>)}</tbody></table></div></section>;
 }
 
 export function InstitutionStaffPage({ portal: _portal, authenticatedWorkspace }: { readonly portal: RolePortalConfig; readonly authenticatedWorkspace?: AuthenticatedWorkspaceSummary | undefined }): React.ReactElement {
@@ -234,4 +235,244 @@ export function cleanStudentPayload(form: Record<string, string>): InstitutionSt
   if (form.academicStartDate?.trim()) payload.academicStartDate = form.academicStartDate.trim();
   if (form.expectedGraduationDate?.trim()) payload.expectedGraduationDate = form.expectedGraduationDate.trim();
   return payload;
+}
+
+
+interface StaffActionRecord {
+  id: string; actionType: string; title: string; note: string | null; outcomeNote: string | null;
+  studentUserId: string | null; studentName: string | null; assignedToMembershipId: string;
+  ownerName: string; authorName: string; visibility: string; state: string; version: number;
+  dueAt: string | null; scheduledStartAt: string | null; scheduledEndAt: string | null;
+  reviewerName: string | null; lastReviewedAt: string | null; allowedTransitions: string[]; canEdit: boolean;
+}
+interface StaffActionResponse {
+  actions: StaffActionRecord[]; students: { id: string; name: string }[]; assignees: { id: string; name: string }[];
+}
+const workflowTypes: Record<string, { type: string; title: string }> = {
+  'Assigned Tasks': { type: 'ASSIGNED_TASK', title: 'Assigned Tasks' },
+  'Student Detail': { type: 'FACULTY_NOTE', title: 'Faculty Notes' },
+  'Academic Verification': { type: 'ACADEMIC_VERIFICATION', title: 'Academic Verification' },
+  'Meetings': { type: 'MEETING', title: 'Meetings' },
+  'Calendar': { type: 'MEETING', title: 'Meetings' },
+};
+const workflowTransitions: Record<string, string> = {
+  DRAFT: 'Return to draft', UNDER_REVIEW: 'Submit for review', APPROVED: 'Approve',
+  REJECTED: 'Reject', IN_PROGRESS: 'Start', COMPLETED: 'Complete', CANCELLED: 'Cancel', ARCHIVED: 'Archive',
+};
+function workflowError(cause: unknown): string {
+  if (cause instanceof ApiRequestError) {
+    if (cause.status === 401) return 'Your session has expired. Sign in again.';
+    if (cause.status === 403) return 'You do not have permission in this institution or student scope.';
+    if (cause.status === 409) return 'This record has changed. Refresh before trying again.';
+    if (cause.status === 400) return 'Check the title, student, notes and dates.';
+  }
+  return 'Unable to load or save records. Please try again.';
+}
+async function staffWorkflowRequest<T>(path: string, token: string, signal: AbortSignal, body?: unknown): Promise<T> {
+  const correlationId = crypto.randomUUID();
+  const response = await fetch(apiBaseUrl + path, {
+    method: body === undefined ? 'GET' : 'POST', signal,
+    headers: { Accept: 'application/json', Authorization: 'Bearer ' + token, 'X-Correlation-Id': correlationId,
+      ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  });
+  if (!response.ok) throw new ApiRequestError({ status: response.status, correlationId });
+  return response.json() as Promise<T>;
+}
+
+export function InstitutionStaffActionsPage({ routeLabel, authenticatedWorkspace }: {
+  readonly routeLabel: string; readonly authenticatedWorkspace?: AuthenticatedWorkspaceSummary | undefined;
+}): React.ReactElement {
+  const token = getProtectedAccessToken();
+  const workflow = workflowTypes[routeLabel];
+  if (!workflow) return <InstitutionWorkspaceError title={routeLabel} />;
+  if (!token) return <RestrictedApiState title={routeLabel} message="Sign in to your institution staff workspace." />;
+  if (!isInstitutionStaffWorkspace(authenticatedWorkspace)) return <InstitutionWorkspaceError title={routeLabel} unauthorized />;
+  return <StaffActionWorkflow key={authenticatedWorkspace.organizationId + ':' + authenticatedWorkspace.role + ':' + token + ':' + workflow.type}
+    token={token} institutionId={authenticatedWorkspace.organizationId} type={workflow.type} title={workflow.title} routeLabel={routeLabel} />;
+}
+
+function StaffActionWorkflow({ token, institutionId, type, title, routeLabel }: {
+  readonly token: string; readonly institutionId: string; readonly type: string; readonly title: string; readonly routeLabel: string;
+}): React.ReactElement {
+  const [records, setRecords] = useState<StaffActionResponse | null>(null);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [refresh, setRefresh] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<StaffActionRecord | null>(null);
+  const emptyForm = { studentUserId: '', title: '', note: '', dueAt: '', assignedToMembershipId: '', scheduledStartAt: '', scheduledEndAt: '' };
+  const [form, setForm] = useState(emptyForm);
+  const [filters, setFilters] = useState({ studentUserId: '', state: '', assigneeMembershipId: '', period: '' });
+  const [reasons, setReasons] = useState<Record<string, string>>({});
+  const mutation = useRef<AbortController | null>(null);
+  const path = '/api/v1/institutions/' + encodeURIComponent(institutionId) + '/staff-actions';
+  const query = new URLSearchParams([['actionType', type], ...Object.entries(filters).filter(([, value]) => value)]).toString();
+  useEffect(() => () => mutation.current?.abort(), []);
+  useEffect(() => {
+    const controller = new AbortController();
+    setRecords(null); setError('');
+    void staffWorkflowRequest<StaffActionResponse>(path + (query ? '?' + query : ''), token, controller.signal)
+      .then((response) => { if (!controller.signal.aborted) setRecords(response); })
+      .catch((cause: unknown) => { if (!controller.signal.aborted) setError(workflowError(cause)); });
+    return () => controller.abort();
+  }, [path, query, token, refresh]);
+
+  async function save(body: unknown, suffix = ''): Promise<void> {
+    if (mutation.current) return;
+    const controller = new AbortController();
+    mutation.current = controller; setBusy(true); setError(''); setNotice('');
+    try {
+      await staffWorkflowRequest(path + suffix + '?actionType=' + encodeURIComponent(type), token, controller.signal, body);
+      if (controller.signal.aborted) return;
+      setShowForm(false); setEditing(null); setForm(emptyForm); setRecords(null);
+      setNotice(suffix ? 'Record updated.' : 'Staff-only draft saved.');
+      setRefresh((value) => value + 1);
+    } catch (cause) { if (!controller.signal.aborted) setError(workflowError(cause)); }
+    finally { if (!controller.signal.aborted) { mutation.current = null; setBusy(false); } }
+  }
+  function submit(event: React.FormEvent): void {
+    event.preventDefault();
+    const toIso = (value: string) => value ? new Date(value).toISOString() : null;
+    try {
+      if (type === 'MEETING' && (!form.scheduledStartAt || !form.scheduledEndAt || Date.parse(form.scheduledEndAt) <= Date.parse(form.scheduledStartAt))) {
+        setError('Meeting end must be after its start.'); return;
+      }
+      if (editing) {
+        void save({ version: editing.version, title: form.title, note: form.note, dueAt: toIso(form.dueAt) }, '/' + encodeURIComponent(editing.id) + '/update');
+      } else {
+        void save({ studentUserId: form.studentUserId || null, title: form.title, note: form.note, dueAt: toIso(form.dueAt),
+          visibility: 'STAFF_ONLY', ...(form.assignedToMembershipId ? { assignedToMembershipId: form.assignedToMembershipId } : {}),
+          ...(type === 'MEETING' ? { scheduledStartAt: toIso(form.scheduledStartAt), scheduledEndAt: toIso(form.scheduledEndAt) } : {}) });
+      }
+    } catch { setError('Enter a valid date and time.'); }
+  }
+  function localDate(value: string | null): string {
+    if (!value) return '';
+    const date = new Date(value);
+    return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  }
+  const actions = records?.actions ?? [];
+  return <div className="pilot pilot-embed"><div className="pilot-page"><div className="pilot-content"><section className="role-module role-module--dense">
+    <div className="role-page-heading"><div><span className="eyebrow">Institution staff workspace</span><h1>{routeLabel}</h1>
+      <p>{type === 'FACULTY_NOTE' ? 'Student notes are visible to authorized institution staff only.' : type === 'ACADEMIC_VERIFICATION'
+        ? 'Record a review and its outcome. This does not change an authoritative academic record or grant document access.'
+        : type === 'MEETING' ? 'Record meetings within your institution scope, with an optional student subject.' : 'Manage student tasks in your current institution scope.'}</p></div>
+      <button type="button" disabled={!records || busy} onClick={() => { setEditing(null); setForm(emptyForm); setShowForm(true); }}>Create {type === 'FACULTY_NOTE' ? 'note' : type === 'MEETING' ? 'meeting' : type === 'ASSIGNED_TASK' ? 'task' : 'verification'}</button>
+    </div>
+    {error ? <p className="form-error" role="alert">{error}</p> : null}
+    {notice ? <p className="role-api-success" role="status">{notice}</p> : null}
+    <section className="role-card role-wide"><h2>{title}</h2>
+      <div className="role-management-form">
+        <label>Filter student<select value={filters.studentUserId} disabled={busy} onChange={(event) => setFilters({ ...filters, studentUserId: event.target.value })}>
+          <option value="">All students in scope</option>{(records?.students ?? []).map((student) => <option key={student.id} value={student.id}>{student.name}</option>)}</select></label>
+        <label>Filter state<select value={filters.state} disabled={busy} onChange={(event) => setFilters({ ...filters, state: event.target.value })}>
+          <option value="">All states</option>{['DRAFT', 'UNDER_REVIEW', 'APPROVED', 'REJECTED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'ARCHIVED'].map((state) => <option key={state} value={state}>{state.replaceAll('_', ' ')}</option>)}</select></label>
+        <label>Filter responsibility<select value={filters.assigneeMembershipId} disabled={busy} onChange={(event) => setFilters({ ...filters, assigneeMembershipId: event.target.value })}>
+          <option value="">All responsible staff</option>{(records?.assignees ?? []).map((staff) => <option key={staff.id} value={staff.id}>{staff.name}</option>)}</select></label>
+        {type === 'MEETING' ? <label>Meeting period<select value={filters.period} disabled={busy} onChange={(event) => setFilters({ ...filters, period: event.target.value })}><option value="">All meetings</option><option value="upcoming">Upcoming or ongoing</option><option value="past">Past</option></select></label> : null}
+        <button type="button" disabled={busy} onClick={() => setRefresh((value) => value + 1)}>Refresh records</button>
+      </div>
+    </section>
+    {showForm && records ? <form className="role-card role-wide role-management-form" onSubmit={submit}>
+      <h2>{editing ? 'Edit task draft' : 'New ' + title.toLowerCase()}</h2>
+      {!editing ? <label>Student<select required={type !== 'MEETING'} disabled={busy} value={form.studentUserId} onChange={(event) => setForm({ ...form, studentUserId: event.target.value })}>
+        <option value="">{type === 'MEETING' ? 'No student — staff meeting' : 'Select a student'}</option>
+        {records.students.map((student) => <option key={student.id} value={student.id}>{student.name}</option>)}</select></label> : null}
+      <label>Title<input required maxLength={200} disabled={busy} value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></label>
+      <label>Note<textarea required={type === 'FACULTY_NOTE'} maxLength={4000} disabled={busy} value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} /></label>
+      {type === 'ASSIGNED_TASK' ? <label>Due date and time<input type="datetime-local" disabled={busy} value={form.dueAt} onChange={(event) => setForm({ ...form, dueAt: event.target.value })} /></label> : null}
+      {!editing ? <label>Responsible staff<select disabled={busy} value={form.assignedToMembershipId} onChange={(event) => setForm({ ...form, assignedToMembershipId: event.target.value })}>
+        <option value="">You — current staff membership</option>{records.assignees.map((staff) => <option key={staff.id} value={staff.id}>{staff.name}</option>)}</select></label> : null}
+      {type === 'MEETING' ? <>
+        <label>Meeting start<input required type="datetime-local" disabled={busy} value={form.scheduledStartAt} onChange={(event) => setForm({ ...form, scheduledStartAt: event.target.value })} /></label>
+        <label>Meeting end<input required type="datetime-local" disabled={busy} value={form.scheduledEndAt} onChange={(event) => setForm({ ...form, scheduledEndAt: event.target.value })} /></label>
+      </> : null}
+      <p>Visibility: staff only. The creating staff member is responsible for the record.</p>
+      <button type="submit" disabled={busy || (!editing && type !== 'MEETING' && !records.students.length)}>{busy ? 'Saving…' : editing ? 'Save changes' : 'Save draft'}</button>
+      <button type="button" className="secondary" disabled={busy} onClick={() => { setShowForm(false); setEditing(null); }}>Close form</button>
+    </form> : null}
+    {!records ? <p role="status">{error ? 'Records unavailable.' : 'Loading records…'}</p> : !actions.length ? <section className="role-card role-wide"><p>No records match your current scope and filters.</p></section> :
+      actions.map((action) => <article className="role-card role-wide" key={action.id}>
+        <h3>{action.title}</h3><p>{action.studentName ?? 'Staff meeting'} · Responsible: {action.ownerName}</p>
+        <p>Author: {action.authorName} · Staff only · {action.state.replaceAll('_', ' ')}</p>
+        {action.note ? <p>{action.note}</p> : null}
+        {action.dueAt ? <p>Due: {new Date(action.dueAt).toLocaleString()}</p> : null}
+        {action.scheduledStartAt && action.scheduledEndAt ? <p>Meeting: {new Date(action.scheduledStartAt).toLocaleString()} — {new Date(action.scheduledEndAt).toLocaleString()}</p> : null}
+        {action.outcomeNote ? <p>Outcome: {action.outcomeNote}</p> : null}
+        {action.reviewerName && action.lastReviewedAt ? <p>Reviewed by {action.reviewerName} on {new Date(action.lastReviewedAt).toLocaleString()}</p> : null}
+        {action.canEdit ? <button type="button" className="secondary" disabled={busy} onClick={() => {
+          setEditing(action); setShowForm(true); setForm({ ...emptyForm, title: action.title, note: action.note ?? '', dueAt: localDate(action.dueAt) });
+        }}>Edit task</button> : null}
+        {action.allowedTransitions.length ? <>
+          <label>Review or outcome note for {action.title}<textarea maxLength={2000} disabled={busy} value={reasons[action.id] ?? ''} onChange={(event) => setReasons({ ...reasons, [action.id]: event.target.value })} /></label>
+          <div className="role-record-actions">{action.allowedTransitions.map((state) => <button type="button" className="secondary" disabled={busy} key={state} onClick={() => {
+            if ((['REJECTED', 'COMPLETED', 'CANCELLED'].includes(state) || (type === 'ACADEMIC_VERIFICATION' && state === 'APPROVED')) && !reasons[action.id]?.trim()) {
+              setError('Add a review or outcome note before this action.'); return;
+            }
+            void save({ version: action.version, toState: state, note: reasons[action.id] ?? null }, '/' + encodeURIComponent(action.id) + '/transition');
+          }}>{workflowTransitions[state] ?? state.replaceAll('_', ' ')}</button>)}</div>
+        </> : null}
+      </article>)}
+  </section></div><aside className="pilot-rail">
+    <NaListCard title="Recorded outcomes" note={records ? actions.filter((action) => action.state === 'COMPLETED').length + ' of ' + actions.length + ' visible records completed.' : 'NA — records unavailable.'} />
+    {type === 'ACADEMIC_VERIFICATION' ? <NaListCard title="Evidence document" note="NA — institution access to student evidence is not available. A verification record does not grant document access." /> : null}
+  </aside></div></div>;
+}
+
+type InstitutionPageProps = { readonly portal: RolePortalConfig; readonly authenticatedWorkspace?: AuthenticatedWorkspaceSummary | undefined };
+
+export function InstitutionStudentsPage(props: InstitutionPageProps): React.ReactElement {
+  if (props.authenticatedWorkspace?.role === 'PLACEMENT_ADMIN') {
+    const token = getProtectedAccessToken();
+    if (!token) return <RestrictedApiState title="Students" message="Sign in to your institution staff workspace." />;
+    if (!isInstitutionStaffWorkspace(props.authenticatedWorkspace)) return <InstitutionWorkspaceError title="Students" unauthorized />;
+    return <PlacementStudentRoster key={props.authenticatedWorkspace.organizationId + ':' + token}
+      token={token} institutionId={props.authenticatedWorkspace.organizationId} />;
+  }
+  return <InstitutionAdminStudentsPage {...props} />;
+}
+
+function PlacementStudentRoster({ token, institutionId }: { readonly token: string; readonly institutionId: string }): React.ReactElement {
+  const [data, setData] = useState<{ students: readonly InstitutionStudentDto[]; units: readonly InstitutionUnitDto[] } | null>(null);
+  const [error, setError] = useState('');
+  const [refresh, setRefresh] = useState(0);
+  const [filters, setFilters] = useState({ query: '', department: '', batch: '', status: '' });
+  useEffect(() => {
+    const controller = new AbortController();
+    setData(null); setError('');
+    void Promise.all([listInstitutionStudents(token, institutionId, controller.signal), listInstitutionUnits(token, institutionId, controller.signal)])
+      .then(([roster, structure]) => { if (!controller.signal.aborted) setData({ students: roster.students, units: structure.units }); })
+      .catch((cause: unknown) => { if (!controller.signal.aborted) setError(workflowError(cause)); });
+    return () => controller.abort();
+  }, [token, institutionId, refresh]);
+  const unitName = (id: string | null | undefined) => (data?.units ?? []).find((unit) => unit.id === id)?.name ?? 'NA';
+  const students = (data?.students ?? []).filter((student) =>
+    (!filters.department || student.units?.departmentUnitId === filters.department) &&
+    (!filters.batch || student.units?.batchUnitId === filters.batch) &&
+    (!filters.status || (student.relationship?.state ?? student.status) === filters.status) &&
+    [student.fullName, student.institutionStudentId, unitName(student.units?.departmentUnitId), unitName(student.units?.batchUnitId)]
+      .join(' ').toLowerCase().includes(filters.query.trim().toLowerCase()));
+  return <section className="role-module role-module--dense">
+    <div className="role-page-heading"><div><span className="eyebrow">Institution placement</span><h1>Students</h1><p>Search your institution roster. Unavailable placement information is shown as NA.</p></div></div>
+    <section className="role-card role-wide role-management-form">
+      <label>Search students<input type="search" value={filters.query} onChange={(event) => setFilters({ ...filters, query: event.target.value })} /></label>
+      <label>Department<select value={filters.department} onChange={(event) => setFilters({ ...filters, department: event.target.value })}><option value="">All departments</option>
+        {(data?.units ?? []).filter((unit) => unit.kind === 'DEPARTMENT').map((unit) => <option key={unit.id} value={unit.id}>{unit.name}</option>)}</select></label>
+      <label>Batch<select value={filters.batch} onChange={(event) => setFilters({ ...filters, batch: event.target.value })}><option value="">All batches</option>
+        {(data?.units ?? []).filter((unit) => unit.kind === 'BATCH').map((unit) => <option key={unit.id} value={unit.id}>{unit.name}</option>)}</select></label>
+      <label>Status<select value={filters.status} onChange={(event) => setFilters({ ...filters, status: event.target.value })}><option value="">All statuses</option>
+        {[...new Set((data?.students ?? []).map((student) => student.relationship?.state ?? student.status))].sort().map((state) => <option key={state} value={state}>{state.replaceAll('_', ' ')}</option>)}</select></label>
+      <button type="button" onClick={() => setRefresh((value) => value + 1)}>Refresh roster</button>
+    </section>
+    {error ? <p className="form-error" role="alert">{error}</p> : null}
+    {!data ? <p role="status">{error ? 'Roster unavailable.' : 'Loading roster…'}</p> :
+      <div className="role-record-table-wrap"><table className="role-record-table"><caption className="sr-only">Placement student roster</caption>
+        <thead><tr><th>Name</th><th>Roll number</th><th>Department</th><th>Batch</th><th>Status</th><th>Readiness band</th><th>Applications</th><th>Last activity</th></tr></thead>
+        <tbody>{students.length ? students.map((student) => <tr key={student.id}><th>{student.fullName}</th><td>{student.institutionStudentId}</td>
+          <td>{unitName(student.units?.departmentUnitId)}</td><td>{unitName(student.units?.batchUnitId)}</td><td>{(student.relationship?.state ?? student.status).replaceAll('_', ' ')}</td>
+          <td>NA</td><td>NA</td><td>NA</td></tr>) : <tr><td colSpan={8}>No students match your scope and filters.</td></tr>}</tbody>
+      </table></div>}
+  </section>;
 }

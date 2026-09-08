@@ -59,6 +59,8 @@ export interface StudentApplicationDto {
   readonly submittedAt: string | null;
   readonly closedAt: string | null;
   readonly consentRevokedAt: string | null;
+  readonly institutionVisibilityGrantedAt: string | null;
+  readonly institutionVisibilityRevokedAt: string | null;
   readonly updatedAt: string;
   readonly termsAcknowledgementPending: boolean;
 }
@@ -167,8 +169,12 @@ export function listStudentApplications(token: string, signal?: AbortSignal): Pr
   return requestJson('/api/v1/students/me/applications', { token, ...(signal ? { signal } : {}) });
 }
 
-export function applyToOpportunity(token: string, opportunityId: string): Promise<{ readonly application: { readonly id: string; readonly state: string } }> {
-  return requestJson('/api/v1/students/me/applications', { token, method: 'POST', body: { opportunityId, consentGranted: true } });
+export function applyToOpportunity(token: string, opportunityId: string, institutionVisibilityGranted = false): Promise<{ readonly application: { readonly id: string; readonly state: string } }> {
+  return requestJson('/api/v1/students/me/applications', { token, method: 'POST', body: { opportunityId, consentGranted: true, institutionVisibilityGranted } });
+}
+
+export function revokeInstitutionVisibility(token: string, applicationId: string): Promise<{ readonly ok: boolean }> {
+  return requestJson(`/api/v1/students/me/applications/${encodeURIComponent(applicationId)}/institution-visibility/revoke`, { token, method: 'POST' });
 }
 
 export function withdrawApplication(token: string, applicationId: string, reason?: string): Promise<Record<string, unknown>> {
@@ -215,10 +221,109 @@ export function transitionApplication(token: string, employerId: string, applica
   return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/applications/${encodeURIComponent(applicationId)}/transition`, { token, method: 'POST', body: { toState, ...(note ? { note } : {}) } });
 }
 
-export function scheduleInterview(token: string, employerId: string, applicationId: string, body: unknown): Promise<{ readonly interview: { readonly id: string; readonly state: string; readonly roundNumber: number } }> {
+export interface InterviewScheduleInput {
+  readonly mode: 'VIDEO' | 'PHONE' | 'ONSITE';
+  readonly scheduledStart: string;
+  readonly scheduledEnd: string;
+  readonly locationDetail?: string;
+  readonly joiningLink?: string;
+  readonly participantUserIds?: readonly string[];
+  readonly participantVisibilityAcknowledged?: boolean;
+}
+
+export interface InterviewParticipantOptionDto {
+  readonly userId: string;
+  readonly label: string;
+}
+
+export interface ParticipantInterviewDto {
+  readonly id: string;
+  readonly title: string;
+  readonly roundNumber: number;
+  readonly mode: string;
+  readonly state: string;
+  readonly scheduledStart: string;
+  readonly scheduledEnd: string | null;
+  readonly consentRevoked: boolean;
+  readonly candidateName: string | null;
+  readonly candidateEmail: string | null;
+  readonly institutionStudentId: string | null;
+  readonly locationDetail: string | null;
+  readonly joiningLink: string | null;
+  readonly summary: string | null;
+  readonly responsibilities: string | null;
+  readonly canRecordOutcome: boolean;
+}
+
+export function listInterviewParticipantOptions(token: string, employerId: string, signal?: AbortSignal): Promise<{ readonly participants: readonly InterviewParticipantOptionDto[] }> {
+  return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/interview-participant-options`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function listMyInterviews(token: string, employerId: string, signal?: AbortSignal): Promise<{ readonly interviews: readonly ParticipantInterviewDto[] }> {
+  return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/my-interviews`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function getMyInterview(token: string, employerId: string, interviewId: string, signal?: AbortSignal): Promise<{ readonly interview: ParticipantInterviewDto }> {
+  return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/my-interviews/${encodeURIComponent(interviewId)}`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function submitMyInterviewOutcome(token: string, employerId: string, interviewId: string, body: InterviewOutcomeInput): Promise<{ readonly ok: boolean }> {
+  return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/my-interviews/${encodeURIComponent(interviewId)}/outcome`, { token, method: 'POST', body });
+}
+
+export interface OfferInput {
+  readonly compensationCurrency: string;
+  readonly compensationAmount: number;
+  readonly compensationPeriod: 'HOUR' | 'MONTH' | 'YEAR' | 'TOTAL_STIPEND';
+  readonly joiningDate?: string;
+  readonly offerExpiresAt: string;
+  readonly conditions?: string;
+}
+
+export interface InterviewStateInput {
+  readonly toState: 'RESCHEDULED' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW';
+  readonly reason?: string;
+  readonly scheduledStart?: string;
+  readonly scheduledEnd?: string;
+}
+
+export interface InterviewOutcomeInput {
+  readonly recommendation: 'STRONG_YES' | 'YES' | 'NEUTRAL' | 'NO' | 'STRONG_NO';
+  readonly overallRating?: number;
+  readonly strengths?: string;
+  readonly concerns?: string;
+  readonly notes?: string;
+}
+
+export function updateInterviewState(token: string, employerId: string, interviewId: string, body: InterviewStateInput): Promise<{ readonly interview: { readonly id: string; readonly state: string } }> {
+  return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/interviews/${encodeURIComponent(interviewId)}/state`, { token, method: 'POST', body });
+}
+
+export function submitInterviewOutcome(token: string, employerId: string, interviewId: string, body: InterviewOutcomeInput): Promise<{ readonly ok: boolean }> {
+  return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/interviews/${encodeURIComponent(interviewId)}/outcome`, { token, method: 'POST', body });
+}
+
+export function withdrawEmployerOffer(token: string, employerId: string, offerId: string): Promise<{ readonly offer: { readonly id: string; readonly state: string } }> {
+  return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/offers/${encodeURIComponent(offerId)}/withdraw`, { token, method: 'POST' });
+}
+
+export interface HiringAnalyticsDto {
+  readonly applicationCount: number;
+  readonly stages: readonly { readonly stage: string; readonly count: number; readonly reached: number }[];
+  readonly conversions: readonly { readonly from: string; readonly to: string; readonly entrants: number; readonly progressed: number; readonly rate: number | null }[];
+  readonly meanTimeToOfferDays: number | null;
+  readonly timedOfferCount: number;
+  readonly opportunities: readonly { readonly title: string; readonly applicationCount: number; readonly funnel: readonly { readonly stage: string; readonly count: number }[] }[];
+}
+
+export function getEmployerHiringAnalytics(token: string, employerId: string, signal?: AbortSignal): Promise<{ readonly analytics: HiringAnalyticsDto }> {
+  return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/hiring-analytics`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function scheduleInterview(token: string, employerId: string, applicationId: string, body: InterviewScheduleInput): Promise<{ readonly interview: { readonly id: string; readonly state: string; readonly roundNumber: number } }> {
   return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/applications/${encodeURIComponent(applicationId)}/interviews`, { token, method: 'POST', body });
 }
 
-export function extendOffer(token: string, employerId: string, applicationId: string, body: unknown): Promise<{ readonly offer: { readonly id: string; readonly state: string } }> {
+export function extendOffer(token: string, employerId: string, applicationId: string, body: OfferInput): Promise<{ readonly offer: { readonly id: string; readonly state: string } }> {
   return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/applications/${encodeURIComponent(applicationId)}/offers`, { token, method: 'POST', body });
 }

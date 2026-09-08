@@ -5,10 +5,11 @@
  *
  * Verifies the authenticated learner dashboard readiness-band presentation.
  */
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as api from './api.js';
 import { StudentDashboardV3 } from './studentDashboardV3.js';
+import type { StudentStaffActionDto } from './api/student.js';
 
 const apiState = vi.hoisted(() => ({
   token: 'learner-token' as string | null,
@@ -18,6 +19,13 @@ const apiState = vi.hoisted(() => ({
   learnerError: null as string | null,
   examsError: null as string | null,
   applicationsError: null as string | null,
+}));
+const supportApi = vi.hoisted(() => ({ current: vi.fn(), list: vi.fn(), complete: vi.fn() }));
+
+vi.mock('./api/student.js', () => ({
+  getCurrentStudent: supportApi.current,
+  listStudentStaffActions: supportApi.list,
+  completeStudentStaffAction: supportApi.complete,
 }));
 
 vi.mock('./api.js', () => ({
@@ -55,6 +63,9 @@ beforeEach(() => {
   apiState.learnerError = null;
   apiState.examsError = null;
   apiState.applicationsError = null;
+  supportApi.current.mockReset().mockResolvedValue({ student: { institutionId: 'student-institution' } });
+  supportApi.list.mockReset().mockResolvedValue({ actions: [] });
+  supportApi.complete.mockReset();
   apiState.learner = {
     catalog,
     progress: [], attempts: [], evidence: [], roadmap: [], notificationPreferences: null, notifications: [],
@@ -63,6 +74,174 @@ beforeEach(() => {
       explanation: { factors: [{ topicId: 'topic-communication', masteryBand: 'PROGRESSING',
         explanation: '2 active evidence records evaluated by career-readiness-mastery-v1' }] } },
   };
+});
+
+function supportAction(overrides: Partial<StudentStaffActionDto> = {}): StudentStaffActionDto {
+  return {
+    id: 'support-internal-id', actionType: 'ASSIGNED_TASK', title: 'Upload your placement preparation checklist',
+    note: 'Use the checklist supplied by your college.', state: 'OPEN', dueAt: '2030-04-15T09:00:00Z',
+    createdAt: '2030-04-01T09:00:00Z', updatedAt: '2030-04-01T09:00:00Z', version: 3,
+    canComplete: true, responseNote: null, assignerRole: 'PLACEMENT_ADMIN', ...overrides,
+  };
+}
+
+async function supportSection(): Promise<HTMLElement> {
+  const section = await screen.findByRole('region', { name: 'Support' });
+  await waitFor(() => expect(within(section).queryByText('Loading your support…')).not.toBeInTheDocument());
+  return section;
+}
+
+describe('Student support', () => {
+  it('renders the assigned title, kind, role, due date and state from the student-scoped read', async () => {
+    const action = supportAction();
+    supportApi.list.mockResolvedValue({ actions: [action] });
+    render(<StudentDashboardV3 studentName="Aanya Rao" />);
+    const section = await supportSection();
+    expect(supportApi.current).toHaveBeenCalledWith('learner-token', expect.any(AbortSignal));
+    expect(supportApi.list).toHaveBeenCalledWith('learner-token', 'student-institution', expect.any(AbortSignal));
+    expect(within(section).getByRole('heading', { name: action.title })).toBeInTheDocument();
+    expect(within(section).getByText('Assigned task')).toBeInTheDocument();
+    expect(within(section).getByText('Assigned by your Placement Officer')).toBeInTheDocument();
+    expect(section.querySelector('time')).toHaveAttribute('datetime', action.dueAt);
+    expect(within(section).getByText('Open')).toBeInTheDocument();
+    expect(within(section).getByText(action.note!)).toBeInTheDocument();
+    expect(section.textContent).not.toContain(action.id);
+    expect(section.textContent).not.toContain(action.assignerRole);
+    expect(document.body.textContent).not.toContain('/100');
+  });
+
+  it('completes with the current version and response note, then shows persisted state after remount', async () => {
+    let stored = supportAction();
+    supportApi.list.mockImplementation(async () => ({ actions: [stored] }));
+    supportApi.complete.mockImplementation(async (_token, _id, body) => {
+      stored = { ...stored, state: 'COMPLETED', version: body.version + 1, canComplete: false, responseNote: body.responseNote };
+      return { id: stored.id, state: stored.state, version: stored.version, responseNote: stored.responseNote, resolvedAt: '2030-04-02T10:00:00Z' };
+    });
+    const mounted = render(<StudentDashboardV3 studentName="Aanya Rao" />);
+    const section = await supportSection();
+    const note = within(section).getByRole('textbox', { name: /Response note/ });
+    expect(note).toHaveAttribute('maxlength', '2000');
+    fireEvent.change(note, { target: { value: 'The checklist is complete and attached.' } });
+    fireEvent.click(within(section).getByRole('button', { name: 'Mark complete' }));
+    expect(await within(section).findByText('Completion saved.')).toBeInTheDocument();
+    expect(supportApi.complete).toHaveBeenCalledExactlyOnceWith('learner-token', stored.id,
+      { version: 3, responseNote: 'The checklist is complete and attached.' }, expect.any(AbortSignal));
+    expect(supportApi.list).toHaveBeenCalledTimes(2);
+    expect(within(section).getByText('Completed')).toBeInTheDocument();
+    expect(within(section).queryByRole('button')).not.toBeInTheDocument();
+    mounted.unmount();
+    render(<StudentDashboardV3 studentName="Aanya Rao" />);
+    const reloaded = await supportSection();
+    expect(within(reloaded).getByText('Completed')).toBeInTheDocument();
+    expect(within(reloaded).getByText('Your response: The checklist is complete and attached.')).toBeInTheDocument();
+    expect(within(reloaded).queryByRole('textbox')).not.toBeInTheDocument();
+  });
+
+  it.each(['OPEN', 'COMPLETED', 'UNDER_REVIEW', 'ARCHIVED'])('keeps a server-declared read-only %s item free of action controls', async (state) => {
+    supportApi.list.mockResolvedValue({ actions: [supportAction({ actionType: 'INTERVENTION', state, canComplete: false, dueAt: null })] });
+    render(<StudentDashboardV3 studentName="Aanya Rao" />);
+    const section = await supportSection();
+    expect(within(section).getByText('Intervention')).toBeInTheDocument();
+    expect(within(section).getByText('Due: NA')).toBeInTheDocument();
+    expect(within(section).getByText('Read-only — no student action is available for this item.')).toBeInTheDocument();
+    expect(within(section).queryByRole('button')).not.toBeInTheDocument();
+    expect(within(section).queryByRole('textbox')).not.toBeInTheDocument();
+    expect(supportApi.complete).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['INSTITUTION_ADMIN', 'Institution Administrator'], ['FACULTY_LECTURER', 'Faculty Lecturer'],
+    ['DEPARTMENT_HEAD', 'Department Head'], ['INSTITUTION_OWNER', 'Institution Owner'],
+  ])('labels the %s assigner as a role, not a person', async (assignerRole, label) => {
+    supportApi.list.mockResolvedValue({ actions: [supportAction({ assignerRole })] });
+    render(<StudentDashboardV3 studentName="Aanya Rao" />);
+    expect(within(await supportSection()).getByText(`Assigned by your ${label}`)).toBeInTheDocument();
+  });
+
+  it('keeps unknown role/state values and invalid dates out of the rendered text', async () => {
+    supportApi.list.mockResolvedValue({ actions: [supportAction({ assignerRole: 'private-role-id', state: 'private-state-id', dueAt: 'invalid', canComplete: false })] });
+    render(<StudentDashboardV3 studentName="Aanya Rao" />);
+    const section = await supportSection();
+    expect(within(section).getByText('Assigned by your college')).toBeInTheDocument();
+    expect(within(section).getByText('Due: NA')).toBeInTheDocument();
+    expect(section.textContent).not.toMatch(/private-role-id|private-state-id|Invalid Date/);
+  });
+
+  it('plainly says when nothing has been assigned', async () => {
+    render(<StudentDashboardV3 studentName="Aanya Rao" />);
+    const section = await supportSection();
+    expect(within(section).getByText('Nothing has been assigned to you yet.')).toBeInTheDocument();
+    expect(within(section).queryByRole('list')).not.toBeInTheDocument();
+  });
+
+  it.each(['profile', 'list'])('degrades a %s failure to an honest empty state without upstream error text', async (failure) => {
+    (failure === 'profile' ? supportApi.current : supportApi.list).mockRejectedValue(new Error('internal-id database stack trace'));
+    render(<StudentDashboardV3 studentName="Aanya Rao" />);
+    const section = await supportSection();
+    expect(within(section).getByText('No support items are available right now.')).toBeInTheDocument();
+    expect(section.textContent).not.toMatch(/internal-id|stack trace|database/);
+    expect(within(section).queryByRole('button')).not.toBeInTheDocument();
+    if (failure === 'profile') expect(supportApi.list).not.toHaveBeenCalled();
+  });
+
+  it('does not guess an institution when the protected profile is partial', async () => {
+    supportApi.current.mockResolvedValue({ student: {} });
+    render(<StudentDashboardV3 studentName="Aanya Rao" />);
+    expect(within(await supportSection()).getByText('No support items are available right now.')).toBeInTheDocument();
+    expect(supportApi.list).not.toHaveBeenCalled();
+  });
+
+  it('refreshes a failed completion without falsely marking it complete or dumping the error', async () => {
+    supportApi.list.mockResolvedValueOnce({ actions: [supportAction()] }).mockResolvedValue({ actions: [supportAction({ state: 'CANCELLED', version: 4, canComplete: false })] });
+    supportApi.complete.mockRejectedValue(new Error('STALE_VERSION private-id database stack trace'));
+    render(<StudentDashboardV3 studentName="Aanya Rao" />);
+    const section = await supportSection();
+    fireEvent.click(within(section).getByRole('button', { name: 'Mark complete' }));
+    expect(await within(section).findByText('Completion could not be confirmed. Review the refreshed item before trying again.')).toBeInTheDocument();
+    expect(within(section).getByText('Cancelled')).toBeInTheDocument();
+    expect(within(section).queryByRole('button')).not.toBeInTheDocument();
+    expect(section.textContent).not.toMatch(/Completion saved|STALE_VERSION|private-id|stack trace/);
+  });
+
+  it('prevents duplicate submissions while completion is pending', async () => {
+    supportApi.list.mockResolvedValue({ actions: [supportAction()] });
+    let resolve!: (value: unknown) => void;
+    supportApi.complete.mockImplementation(() => new Promise((done) => { resolve = done; }));
+    render(<StudentDashboardV3 studentName="Aanya Rao" />);
+    const section = await supportSection();
+    const form = within(section).getByRole('form');
+    fireEvent.submit(form);
+    fireEvent.submit(form);
+    expect(supportApi.complete).toHaveBeenCalledTimes(1);
+    expect(within(section).getByRole('button', { name: 'Saving…' })).toBeDisabled();
+    await act(async () => resolve({ state: 'COMPLETED' }));
+    expect(await within(section).findByText('Completion saved.')).toBeInTheDocument();
+  });
+
+  it('distinguishes a saved completion from an unavailable refreshed list', async () => {
+    supportApi.list.mockResolvedValueOnce({ actions: [supportAction()] }).mockRejectedValue(new Error('private refresh failure'));
+    supportApi.complete.mockResolvedValue({ state: 'COMPLETED' });
+    render(<StudentDashboardV3 studentName="Aanya Rao" />);
+    const section = await supportSection();
+    fireEvent.click(within(section).getByRole('button', { name: 'Mark complete' }));
+    expect(await within(section).findByText('Completion saved. Support could not be refreshed.')).toBeInTheDocument();
+    expect(within(section).getByText('No support items are available right now.')).toBeInTheDocument();
+    expect(within(section).queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  it('discards the previous session’s support and aborts its pending request', async () => {
+    let resolve!: (value: unknown) => void;
+    supportApi.list.mockImplementationOnce(() => new Promise((done) => { resolve = done; })).mockResolvedValue({ actions: [] });
+    const mounted = render(<StudentDashboardV3 studentName="Aanya Rao" />);
+    await waitFor(() => expect(supportApi.list).toHaveBeenCalledTimes(1));
+    const signal = supportApi.list.mock.calls[0]![2] as AbortSignal;
+    apiState.token = 'next-learner-token';
+    mounted.rerender(<StudentDashboardV3 studentName="Next learner" />);
+    expect(within(await supportSection()).getByText('Nothing has been assigned to you yet.')).toBeInTheDocument();
+    expect(signal.aborted).toBe(true);
+    await act(async () => resolve({ actions: [supportAction()] }));
+    expect(screen.queryByText(supportAction().title)).not.toBeInTheDocument();
+  });
 });
 
 afterEach(() => cleanup());

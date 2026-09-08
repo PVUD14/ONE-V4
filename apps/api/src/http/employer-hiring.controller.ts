@@ -1,5 +1,7 @@
 import { BadRequestException, Body, Controller, ForbiddenException, Get, Inject, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
+import { detectOpportunitySignals, OPPORTUNITY_DETECTOR_VERSION } from '@planthepath/hiring/src/review-signals.js';
+import { summarizeHiringAnalytics, type HiringAggregateRow } from '@planthepath/hiring/src/analytics.js';
 import type { PersistenceDb } from '@planthepath/persistence/src/repositories.js';
 import {
   HiringRuleError,
@@ -80,6 +82,8 @@ export class EmployerHiringController {
     await this.insertVersion(opportunityId, versionId, 1, input, actorId);
     await this.db.execute(sql`UPDATE opportunities SET current_version_id = ${versionId}::uuid, updated_at = now() WHERE id = ${opportunityId}::uuid`);
 
+    await this.recordReviewSignals(opportunityId, employerId, actorId, context.correlationId);
+
     await this.writeAudit(actorId, 'opportunity.created', 'opportunity', opportunityId, context.correlationId);
     return { opportunity: { id: opportunityId, versionId, lifecycleState: 'DRAFT' }, correlationId: context.correlationId };
   }
@@ -135,6 +139,8 @@ export class EmployerHiringController {
     // success while silently going nowhere, so it is refused.
     const audiences = await this.db.execute(sql`SELECT count(*)::int AS count FROM opportunity_audiences WHERE opportunity_id = ${id}::uuid`) as QueryResult<{ count: number }>;
     if ((audiences.rows[0]?.count ?? 0) === 0) throw badRequest('AUDIENCE_REQUIRED', context.correlationId);
+
+    await this.recordReviewSignals(id, employerId, context.authorization.principal.userId, context.correlationId);
 
     await this.db.execute(sql`
       UPDATE opportunities SET lifecycle_state = 'PUBLISHED', published_at = coalesce(published_at, now()), updated_at = now()
@@ -274,6 +280,7 @@ export class EmployerHiringController {
     const mode = readEnum(body, 'mode', interviewModes, context.correlationId);
     const scheduledStart = readRequiredIsoDate(body, 'scheduledStart', context.correlationId);
     const scheduledEnd = readOptionalIsoDate(body, 'scheduledEnd', context.correlationId);
+    if (scheduledEnd && scheduledEnd <= scheduledStart) throw badRequest('INVALID_SCHEDULE', context.correlationId);
     const locationDetail = readOptionalSafeText(body, 'locationDetail', 500, context.correlationId);
     const joiningLink = readOptionalHttpsUrl(body, 'joiningLink', context.correlationId);
     if (mode === 'ONSITE' && !locationDetail) throw badRequest('LOCATION_REQUIRED', context.correlationId);
@@ -301,6 +308,10 @@ export class EmployerHiringController {
     const toState = readEnum(body, 'toState', ['RESCHEDULED', 'COMPLETED', 'CANCELLED', 'NO_SHOW'] as const, context.correlationId);
     const reason = readOptionalSafeText(body, 'reason', 1000, context.correlationId);
 
+    const scheduledStart = toState === 'RESCHEDULED' ? readRequiredIsoDate(body, 'scheduledStart', context.correlationId) : null;
+    const scheduledEnd = toState === 'RESCHEDULED' ? readRequiredIsoDate(body, 'scheduledEnd', context.correlationId) : null;
+    if (scheduledStart && scheduledEnd && scheduledEnd <= scheduledStart) throw badRequest('INVALID_SCHEDULE', context.correlationId);
+
     const rows = await this.db.execute(sql`
       SELECT id, state FROM interviews WHERE id = ${id}::uuid AND employer_id = ${employerId}::uuid
     `) as QueryResult<Record<string, unknown>>;
@@ -314,7 +325,9 @@ export class EmployerHiringController {
     }
 
     await this.db.execute(sql`
-      UPDATE interviews SET state = ${toState}, cancellation_reason = ${toState === 'CANCELLED' ? reason : null}, updated_at = now()
+      UPDATE interviews SET state = ${toState}, cancellation_reason = ${toState === 'CANCELLED' ? reason : null},
+        scheduled_start = coalesce(${scheduledStart}::timestamptz, scheduled_start),
+        scheduled_end = coalesce(${scheduledEnd}::timestamptz, scheduled_end), updated_at = now()
       WHERE id = ${id}::uuid AND employer_id = ${employerId}::uuid
     `);
     await this.writeAudit(context.authorization.principal.userId, `interview.${toState.toLowerCase()}`, 'interview', id, context.correlationId);
@@ -446,6 +459,78 @@ export class EmployerHiringController {
   // -------------------------------------------------------------------------
   // Internals
   // -------------------------------------------------------------------------
+
+  @Get('/employers/:employerId/hiring-analytics')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async hiringAnalytics(@Req() request: ProtectedHttpRequest, @Param('employerId') employerId: string): Promise<Record<string, unknown>> {
+    const context = this.requireEmployer(request, employerId, employerManageRoles);
+    const rows = await this.db.execute(sql`
+      WITH scoped AS (
+        SELECT a.id, a.opportunity_id, a.state,
+          ARRAY(SELECT DISTINCT stage FROM (
+            SELECT h.to_state AS stage FROM application_state_history h WHERE h.application_id = a.id
+            UNION SELECT a.state UNION SELECT 'APPLIED'
+          ) visited ORDER BY stage) AS reached,
+          (SELECT CASE WHEN min(off.extended_at) >= a.submitted_at
+             THEN extract(epoch FROM (min(off.extended_at) - a.submitted_at)) / 86400.0 ELSE NULL END
+           FROM offers off WHERE off.application_id = a.id AND off.employer_id = ${employerId}::uuid
+          ) AS offer_days
+        FROM applications a WHERE a.employer_id = ${employerId}::uuid AND a.state <> 'DRAFT'
+      )
+      SELECT o.id AS opportunity_id, coalesce(v.title, 'NA') AS title, s.state,
+        coalesce(s.reached, ARRAY[]::text[]) AS reached, count(s.id) AS count,
+        sum(s.offer_days) AS offer_days, count(s.offer_days) AS timed_offers
+      FROM opportunities o
+      LEFT JOIN opportunity_versions v ON v.id = o.current_version_id
+      LEFT JOIN scoped s ON s.opportunity_id = o.id
+      WHERE o.employer_id = ${employerId}::uuid
+      GROUP BY o.id, v.title, s.state, s.reached ORDER BY v.title, o.id
+    `) as QueryResult<HiringAggregateRow>;
+    return { analytics: summarizeHiringAnalytics(rows.rows), correlationId: context.correlationId };
+  }
+
+  private async recordReviewSignals(opportunityId: string, employerId: string, actorId: string, correlationId: string): Promise<void> {
+    const rows = await this.db.execute(sql`
+      SELECT v.*,
+        EXISTS (SELECT 1 FROM opportunities other JOIN opportunity_versions ov ON ov.id = other.current_version_id
+          WHERE other.employer_id <> ${employerId}::uuid
+            AND lower(regexp_replace(trim(ov.title), '\\s+', ' ', 'g')) = lower(regexp_replace(trim(v.title), '\\s+', ' ', 'g'))
+            AND length(trim(concat_ws(' ', v.summary, v.responsibilities))) > 0
+            AND lower(regexp_replace(trim(concat_ws(' ', ov.summary, ov.responsibilities)), '\\s+', ' ', 'g')) =
+                lower(regexp_replace(trim(concat_ws(' ', v.summary, v.responsibilities)), '\\s+', ' ', 'g'))
+        ) AS cross_employer_duplicate
+      FROM opportunities o JOIN opportunity_versions v ON v.id = o.current_version_id
+      WHERE o.id = ${opportunityId}::uuid AND o.employer_id = ${employerId}::uuid
+    `) as QueryResult<Record<string, unknown>>;
+    const row = rows.rows[0];
+    if (!row) throw forbidden(correlationId);
+    const signals = detectOpportunitySignals({
+      text: [row.title, row.summary, row.responsibilities, row.joining_conditions].filter(Boolean).join('\n'),
+      crossEmployerDuplicate: row.cross_employer_duplicate === true,
+      currency: row.compensation_currency == null ? null : String(row.compensation_currency),
+      period: row.compensation_period == null ? null : String(row.compensation_period),
+      min: row.compensation_min == null ? null : String(row.compensation_min),
+      max: row.compensation_max == null ? null : String(row.compensation_max),
+    });
+    // Store evidence and its audit atomically; no lifecycle mutation or unregistered outbox event.
+    await this.db.transaction(async (tx) => {
+      for (const signal of signals) {
+        await tx.execute(sql`
+          INSERT INTO opportunity_review_signals (id, opportunity_id, employer_id, opportunity_version_id, signal_code, detector_version)
+          VALUES (${this.ids.uuid()}::uuid, ${opportunityId}::uuid, ${employerId}::uuid, ${String(row.id)}::uuid, ${signal}, ${OPPORTUNITY_DETECTOR_VERSION})
+          ON CONFLICT (opportunity_version_id, signal_code, detector_version) DO UPDATE SET last_detected_at = now()
+        `);
+      }
+      if (signals.length) {
+        await tx.execute(sql`
+          INSERT INTO audit_events (id, actor_user_id, action, resource_type, resource_id, organization_id, outcome, correlation_id, context)
+          VALUES (${this.ids.uuid()}::uuid, ${actorId}::uuid, 'opportunity.review_requested', 'opportunity', ${opportunityId}::uuid,
+            ${employerId}::uuid, 'SUCCESS', ${correlationId},
+            ${JSON.stringify({ versionId: row.id, signals, detectorVersion: OPPORTUNITY_DETECTOR_VERSION })}::jsonb)
+        `);
+      }
+    });
+  }
 
   private requireEmployer(request: ProtectedHttpRequest, employerId: string, roles: readonly string[]): ReturnType<typeof requireTrustedAuthorization> {
     const context = requireTrustedAuthorization(request);

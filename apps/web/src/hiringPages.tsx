@@ -1,6 +1,12 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { getAccessToken } from './auth.js';
 import { V2Stat } from './dashboardsV2.js';
+import {
+  listEmployerInterviews, listEmployerOffers, updateInterviewState, submitInterviewOutcome,
+  withdrawEmployerOffer, revokeInstitutionVisibility, getEmployerHiringAnalytics,
+  type EmployerInterviewDto, type EmployerOfferDto, type InterviewScheduleInput,
+  type InterviewStateInput, type InterviewOutcomeInput, type OfferInput, type HiringAnalyticsDto,
+} from './api/hiring.js';
 import {
   ApiRequestError,
   addOpportunityAudience,
@@ -49,6 +55,7 @@ const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   ACTIVE_OFFER_EXISTS: 'There is already an active offer for this candidate.',
   APPLICATION_NOT_AT_OFFER_STAGE: 'Move the candidate to the offer stage first.',
   LOCATION_REQUIRED: 'On-site roles need a location.',
+  INVALID_SCHEDULE: 'Choose an end time after the interview starts.',
   FORBIDDEN: 'You do not have access to that.',
 };
 
@@ -83,6 +90,7 @@ export function StudentOpportunitiesPage(): React.ReactElement {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('Loading opportunities…');
   const [busy, setBusy] = useState(false);
+  const [institutionVisibilityGranted, setInstitutionVisibilityGranted] = useState(false);
 
   // `message` wins over the computed summary, so a confirmation survives the refresh
   // that follows it instead of being overwritten a moment later.
@@ -102,6 +110,7 @@ export function StudentOpportunitiesPage(): React.ReactElement {
     const token = getAccessToken();
     if (!token) return;
     try {
+      setInstitutionVisibilityGranted(false);
       setSelected(await getOpportunity(token, id));
     } catch (error) {
       setStatus(messageFor(error, 'That opportunity could not be opened.'));
@@ -113,7 +122,7 @@ export function StudentOpportunitiesPage(): React.ReactElement {
     if (!token) return;
     setBusy(true);
     try {
-      await applyToOpportunity(token, id);
+      await applyToOpportunity(token, id, institutionVisibilityGranted);
       await reload(search, 'Application submitted. You can track it under Applications.');
       await openDetail(id);
     } catch (error) {
@@ -182,6 +191,14 @@ export function StudentOpportunitiesPage(): React.ReactElement {
       <h3>Can you apply?</h3>
       <EligibilityNotice eligibility={selected.eligibility} />
 
+      {/* PRIVACY REVIEW REQUIRED BEFORE SHIPPING: draft notice, not approved copy (ADR-019). */}
+      <label className="hiring-checkbox"><input type="checkbox" checked={institutionVisibilityGranted}
+        disabled={busy || selected.opportunity.alreadyApplied === true}
+        onChange={(event) => setInstitutionVisibilityGranted(event.target.checked)} />
+        <span>Also share this application's employer, role, stage, key dates and offer response with my institution while our relationship is active (optional).</span>
+      </label>
+      <p className="hiring-consent-note">This does not share offer compensation, documents or readiness information. You can stop sharing from Applications at any time, without withdrawing your application.</p>
+
       <div className="hiring-actions">
         <button type="button" disabled={busy || selected.opportunity.alreadyApplied === true} onClick={() => { void apply(selected.opportunity.id); }}>
           {selected.opportunity.alreadyApplied ? 'Already applied' : 'Apply and share my profile'}
@@ -213,6 +230,19 @@ function EligibilityNotice({ eligibility }: { readonly eligibility: EligibilityD
 export function StudentApplicationsPage(): React.ReactElement {
   const [applications, setApplications] = useState<readonly StudentApplicationDto[]>([]);
   const [status, setStatus] = useState('Loading your applications…');
+  const [revoking, setRevoking] = useState(false);
+
+  async function revokeVisibility(id: string): Promise<void> {
+    const token = getAccessToken();
+    if (!token || revoking) return;
+    setRevoking(true);
+    try {
+      await revokeInstitutionVisibility(token, id);
+      await reload('Institution sharing stopped. Your application is unchanged.');
+    } catch (error) {
+      setStatus(messageFor(error, 'Institution sharing could not be stopped.'));
+    } finally { setRevoking(false); }
+  }
 
   // `message` wins over the computed summary, so a confirmation survives the refresh
   // that follows it instead of being overwritten a moment later.
@@ -250,13 +280,16 @@ export function StudentApplicationsPage(): React.ReactElement {
       {applications.length === 0
         ? <p>When you apply to an opportunity it will appear here, with the stage it has reached.</p>
         : <div className="data-table-wrap"><table>
-          <thead><tr><th>Role</th><th>Company</th><th>Stage</th><th>Applied</th><th>Action</th></tr></thead>
+          <thead><tr><th>Role</th><th>Company</th><th>Stage</th><th>Applied</th><th>Institution sharing</th><th>Action</th></tr></thead>
           <tbody>{applications.map((item) => <tr key={item.id}>
             <td>{item.title}</td>
             <td>{item.employerName}</td>
             <td><span className={`hiring-state state-${item.state.toLowerCase()}`}>{humanise(item.state)}</span>
               {item.termsAcknowledgementPending ? <span className="hiring-tag warn">Terms changed</span> : null}</td>
             <td>{formatDate(item.submittedAt)}</td>
+            <td>{item.institutionVisibilityGrantedAt && !item.institutionVisibilityRevokedAt
+              ? <button type="button" className="secondary" disabled={revoking} onClick={() => { void revokeVisibility(item.id); }}>Stop institution sharing</button>
+              : <span>{item.institutionVisibilityRevokedAt ? 'Sharing stopped' : 'Not shared'}</span>}</td>
             <td>{item.closedAt
               ? <span className="hiring-meta">Closed</span>
               : <button type="button" className="secondary" onClick={() => { void withdraw(item.id); }}>Withdraw</button>}</td>
@@ -448,6 +481,297 @@ const PIPELINE_NEXT: Readonly<Record<string, readonly string[]>> = {
   OFFER: ['HIRED', 'REJECTED'],
 };
 
+// Shared verbatim consent redaction from the Applicants table.
+function CandidateIdentity({ item }: { readonly item: Pick<EmployerApplicantDto, 'consentRevoked' | 'candidateName' | 'candidateEmail' | 'institutionStudentId'> }): React.ReactElement {
+  return item.consentRevoked
+    ? <span className="hiring-meta">Withdrawn — details no longer shared</span>
+    : <>{item.candidateName ?? item.candidateEmail ?? 'NA'}{item.institutionStudentId ? <span className="hiring-meta"> · {item.institutionStudentId}</span> : null}</>;
+}
+
+function formatDateTime(value: string | null): string {
+  if (!value || !Number.isFinite(Date.parse(value))) return 'NA';
+  return new Date(value).toLocaleString();
+}
+
+function ScheduleFields(): React.ReactElement {
+  return <>
+    <p>Times use your local timezone ({Intl.DateTimeFormat().resolvedOptions().timeZone}).</p>
+    <label><span>Date</span><input name="date" type="date" required /></label>
+    <label><span>Start time</span><input name="startTime" type="time" required /></label>
+    <label><span>Duration (minutes)</span><input name="duration" type="number" required min={1} max={1440} step={1} /></label>
+  </>;
+}
+
+function scheduleWindow(form: FormData): { scheduledStart: string; scheduledEnd: string } {
+  const start = new Date(`${String(form.get('date'))}T${String(form.get('startTime'))}`);
+  const duration = Number(form.get('duration'));
+  if (!Number.isFinite(start.getTime()) || start.getTime() <= Date.now() || !Number.isInteger(duration) || duration < 1 || duration > 1440) {
+    throw new Error('Choose a future date and a duration between 1 and 1440 minutes.');
+  }
+  return { scheduledStart: start.toISOString(), scheduledEnd: new Date(start.getTime() + duration * 60_000).toISOString() };
+}
+
+function InterviewForm({ onSave, onCancel }: { readonly onSave: (input: InterviewScheduleInput) => Promise<void>; readonly onCancel: () => void }): React.ReactElement {
+  const [mode, setMode] = useState<InterviewScheduleInput['mode']>('VIDEO');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    if (busy) return;
+    const form = new FormData(event.currentTarget);
+    let window: ReturnType<typeof scheduleWindow>;
+    try { window = scheduleWindow(form); } catch { setError('Choose a future date and a duration between 1 and 1440 minutes.'); return; }
+    setBusy(true); setError('');
+    try {
+      await onSave({ ...window, mode,
+        ...(mode === 'VIDEO' ? { joiningLink: String(form.get('joiningLink')) } : {}),
+        ...(mode === 'ONSITE' || form.get('locationDetail') ? { locationDetail: String(form.get('locationDetail')) } : {}),
+      });
+    } catch (failure) { setError(messageFor(failure, 'The interview could not be scheduled.')); }
+    finally { setBusy(false); }
+  }
+  return <form className="role-management-form" onSubmit={(event) => { void submit(event); }}>
+    <ScheduleFields />
+    <label><span>Mode</span><select value={mode} onChange={(event) => setMode(event.target.value as InterviewScheduleInput['mode'])}>
+      {['VIDEO', 'PHONE', 'ONSITE'].map((value) => <option key={value} value={value}>{humanise(value)}</option>)}
+    </select></label>
+    {mode === 'VIDEO' ? <label><span>Joining link</span><input name="joiningLink" type="url" pattern="https://[^\s]+" required maxLength={512} /></label>
+      : <label><span>{mode === 'ONSITE' ? 'Location' : 'Phone arrangements (optional)'}</span><input key={mode} name="locationDetail" required={mode === 'ONSITE'} maxLength={500} /></label>}
+    {error ? <p role="alert">{error}</p> : null}
+    <button disabled={busy} type="submit">{busy ? 'Saving…' : 'Save interview'}</button>
+    <button disabled={busy} type="button" className="secondary" onClick={onCancel}>Close form</button>
+  </form>;
+}
+
+function OfferForm({ onSave, onCancel }: { readonly onSave: (input: OfferInput) => Promise<void>; readonly onCancel: () => void }): React.ReactElement {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    if (busy) return;
+    const form = new FormData(event.currentTarget);
+    const expiry = new Date(String(form.get('expiry')));
+    const amount = Number(form.get('amount'));
+    if (!Number.isFinite(expiry.getTime()) || expiry.getTime() <= Date.now() || !Number.isFinite(amount) || amount < 0 || amount > 1_000_000_000) {
+      setError('Enter a valid amount and a future expiry.'); return;
+    }
+    setBusy(true); setError('');
+    try {
+      await onSave({ compensationCurrency: String(form.get('currency')).toUpperCase(), compensationAmount: amount,
+        compensationPeriod: String(form.get('period')) as OfferInput['compensationPeriod'],
+        offerExpiresAt: expiry.toISOString(),
+        ...(form.get('joiningDate') ? { joiningDate: String(form.get('joiningDate')) } : {}),
+        ...(form.get('conditions') ? { conditions: String(form.get('conditions')) } : {}),
+      });
+    } catch (failure) { setError(messageFor(failure, 'The offer could not be sent.')); }
+    finally { setBusy(false); }
+  }
+  return <form className="role-management-form" onSubmit={(event) => { void submit(event); }}>
+    <label><span>Currency</span><input name="currency" required pattern="[A-Za-z]{3}" maxLength={3} /></label>
+    <label><span>Amount</span><input name="amount" type="number" required min={0} max={1_000_000_000} step="0.01" /></label>
+    <label><span>Period</span><select name="period" required defaultValue=""><option value="" disabled>Select period</option>
+      {['HOUR', 'MONTH', 'YEAR', 'TOTAL_STIPEND'].map((value) => <option key={value} value={value}>{humanise(value)}</option>)}
+    </select></label>
+    <label><span>Joining date (optional)</span><input name="joiningDate" type="date" /></label>
+    <label><span>Expiry (local time)</span><input name="expiry" type="datetime-local" required /></label>
+    <label><span>Conditions (optional)</span><textarea name="conditions" maxLength={4000} /></label>
+    {error ? <p role="alert">{error}</p> : null}
+    <button type="submit" disabled={busy}>{busy ? 'Sending…' : 'Send offer'}</button>
+    <button type="button" disabled={busy} className="secondary" onClick={onCancel}>Close form</button>
+  </form>;
+}
+
+const loadInterviews = async (token: string, employerId: string, signal?: AbortSignal) => (await listEmployerInterviews(token, employerId, signal)).interviews;
+const loadOffers = async (token: string, employerId: string, signal?: AbortSignal) => (await listEmployerOffers(token, employerId, signal)).offers;
+
+function useEmployerList<T>(employerId: string, loader: (token: string, id: string, signal?: AbortSignal) => Promise<readonly T[]>) {
+  const [result, setResult] = useState<{ employerId: string; rows: readonly T[] }>({ employerId, rows: [] });
+  const [status, setStatus] = useState('Loading…');
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const sequence = useRef(0);
+  const reload = useCallback(async (signal?: AbortSignal) => {
+    const current = ++sequence.current;
+    const token = getAccessToken();
+    if (!token) { setStatus('You are not signed in.'); setLoading(false); return; }
+    setLoading(true);
+    try {
+      const rows = await loader(token, employerId, signal);
+      if (current !== sequence.current || signal?.aborted) return;
+      setResult({ employerId, rows }); setStatus('');
+    } finally { if (current === sequence.current && !signal?.aborted) setLoading(false); }
+  }, [employerId, loader]);
+  useEffect(() => {
+    const abort = new AbortController();
+    void reload(abort.signal).catch(() => { if (!abort.signal.aborted) setStatus('Records could not be loaded. Please refresh.'); });
+    return () => { abort.abort(); sequence.current++; };
+  }, [reload]);
+  async function act(operation: (token: string) => Promise<unknown>, message: string): Promise<void> {
+    const token = getAccessToken();
+    if (!token || busy) return;
+    setBusy(true);
+    try {
+      await operation(token);
+      try { await reload(); setStatus(message); }
+      catch { setResult({ employerId, rows: [] }); setStatus(`${message} Refresh to update the list.`); }
+    } catch (failure) { setStatus(messageFor(failure, 'That change could not be saved.')); throw failure; }
+    finally { setBusy(false); }
+  }
+  return { rows: result.employerId === employerId ? result.rows : [], status, loading, busy, act };
+}
+
+export function EmployerInterviewsPage({ employerId }: { readonly employerId: string }): React.ReactElement {
+  const { rows, status, loading, busy, act } = useEmployerList(employerId, loadInterviews);
+  const [selected, setSelected] = useState<{ id: string; kind: 'outcome' | 'reschedule' } | null>(null);
+  const interviews = [...rows].sort((a, b) => (a.scheduledStart ? Date.parse(a.scheduledStart) : Infinity) - (b.scheduledStart ? Date.parse(b.scheduledStart) : Infinity));
+  const selectedInterview = rows.find((item) => item.id === selected?.id && !item.consentRevoked && !item.closedAt);
+  async function change(id: string, toState: InterviewStateInput['toState']): Promise<void> {
+    if (toState === 'CANCELLED' && !window.confirm('Cancel this interview?')) return;
+    await act((token) => updateInterviewState(token, employerId, id, { toState }), 'Interview updated.').catch(() => undefined);
+  }
+  return <section className="role-module role-module--dense">
+    <div className="role-page-heading"><div><h1>Interviews</h1><p>Scheduled interviews, in start-time order. Times are shown in your local timezone.</p></div></div>
+    <section className="role-card role-wide">
+      {status ? <p role="status">{status}</p> : null}
+      {!loading && !status && rows.length === 0 ? <p>No interviews are scheduled.</p> : null}
+      {rows.length ? <div className="role-record-table-wrap"><table className="role-record-table">
+        <thead><tr>{['Candidate', 'Opportunity', 'Round', 'Mode', 'Start', 'End', 'State', 'Outcomes', 'Actions'].map((title) => <th key={title}>{title}</th>)}</tr></thead>
+        <tbody>{interviews.map((item) => <tr key={item.id}>
+          <td><CandidateIdentity item={item} /></td><td>{item.title || 'NA'}</td><td>{item.roundNumber}</td><td>{humanise(item.mode)}</td>
+          <td>{formatDateTime(item.scheduledStart)}</td><td>{formatDateTime(item.scheduledEnd)}</td><td>{humanise(item.state)}</td><td>{item.outcomeCount}</td>
+          <td>{!item.consentRevoked && !item.closedAt ? <div className="hiring-actions">
+            {['SCHEDULED', 'RESCHEDULED'].includes(item.state) ? <>
+              <button disabled={busy} onClick={() => setSelected({ id: item.id, kind: 'reschedule' })}>Reschedule</button>
+              <button disabled={busy} onClick={() => { void change(item.id, 'COMPLETED'); }}>Mark completed</button>
+              <button disabled={busy} onClick={() => { void change(item.id, 'NO_SHOW'); }}>Mark no show</button>
+              <button className="secondary" disabled={busy} onClick={() => { void change(item.id, 'CANCELLED'); }}>Cancel interview</button>
+            </> : null}
+            {item.state === 'COMPLETED' ? <button disabled={busy} onClick={() => setSelected({ id: item.id, kind: 'outcome' })}>Record outcome</button> : null}
+          </div> : <span className="hiring-meta">Closed</span>}</td>
+        </tr>)}</tbody>
+      </table></div> : null}
+    </section>
+    {selected && selectedInterview ? <section className="role-card role-wide">
+      <h2>{selected.kind === 'outcome' ? 'Record outcome' : 'Reschedule interview'}</h2><p><CandidateIdentity item={selectedInterview} /></p>
+      <InterviewActionForm key={`${selected.id}-${selected.kind}`} kind={selected.kind} onCancel={() => setSelected(null)} onSave={async (body) => {
+        await act((token) => selected.kind === 'outcome'
+          ? submitInterviewOutcome(token, employerId, selected.id, body as InterviewOutcomeInput)
+          : updateInterviewState(token, employerId, selected.id, body as InterviewStateInput), 'Interview updated.');
+        setSelected(null);
+      }} />
+    </section> : null}
+  </section>;
+}
+
+function InterviewActionForm({ kind, onSave, onCancel }: {
+  readonly kind: 'outcome' | 'reschedule'; readonly onSave: (body: InterviewOutcomeInput | InterviewStateInput) => Promise<void>; readonly onCancel: () => void;
+}): React.ReactElement {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    if (busy) return;
+    const form = new FormData(event.currentTarget);
+    let body: InterviewOutcomeInput | InterviewStateInput;
+    if (kind === 'reschedule') {
+      try { body = { toState: 'RESCHEDULED', ...scheduleWindow(form) }; }
+      catch { setError('Choose a future date and a duration between 1 and 1440 minutes.'); return; }
+    } else {
+      body = { recommendation: String(form.get('recommendation')) as InterviewOutcomeInput['recommendation'],
+        ...(form.get('overallRating') ? { overallRating: Number(form.get('overallRating')) } : {}),
+        strengths: String(form.get('strengths')), concerns: String(form.get('concerns')), notes: String(form.get('notes')) };
+    }
+    setBusy(true); setError('');
+    try { await onSave(body); } catch { setError('The change could not be saved.'); } finally { setBusy(false); }
+  }
+  return <form className="role-management-form" onSubmit={(event) => { void submit(event); }}>
+    {kind === 'reschedule' ? <ScheduleFields /> : <>
+      <p>Submitting again replaces your previous outcome for this interview.</p>
+      <label><span>Recommendation</span><select name="recommendation" required defaultValue=""><option value="" disabled>Select recommendation</option>
+        {['STRONG_YES', 'YES', 'NEUTRAL', 'NO', 'STRONG_NO'].map((value) => <option key={value} value={value}>{humanise(value)}</option>)}
+      </select></label>
+      <label><span>Interview rating (optional, 1–5)</span><input name="overallRating" type="number" min={1} max={5} step={1} /></label>
+      <label><span>Strengths</span><textarea name="strengths" maxLength={2000} /></label>
+      <label><span>Concerns</span><textarea name="concerns" maxLength={2000} /></label>
+      <label><span>Notes</span><textarea name="notes" maxLength={4000} /></label>
+    </>}
+    {error ? <p role="alert">{error}</p> : null}
+    <button disabled={busy} type="submit">Save changes</button><button disabled={busy} type="button" className="secondary" onClick={onCancel}>Close form</button>
+  </form>;
+}
+
+function offerResponse(item: EmployerOfferDto): string {
+  if (item.state === 'ACCEPTED' || item.state === 'DECLINED') return humanise(item.state);
+  if (item.state === 'EXTENDED') return item.offerExpiresAt && Date.parse(item.offerExpiresAt) <= Date.now() ? 'Expired without response' : 'Awaiting response';
+  if (item.state === 'EXPIRED') return 'Expired without response';
+  if (item.state === 'WITHDRAWN') return 'Withdrawn without response';
+  return 'Not requested';
+}
+
+export function EmployerOffersPage({ employerId }: { readonly employerId: string }): React.ReactElement {
+  const { rows, status, loading, busy, act } = useEmployerList(employerId, loadOffers);
+  async function withdraw(id: string): Promise<void> {
+    if (!window.confirm('Withdraw this offer? The candidate will no longer be able to accept it.')) return;
+    await act((token) => withdrawEmployerOffer(token, employerId, id), 'Offer withdrawn.').catch(() => undefined);
+  }
+  return <section className="role-module role-module--dense">
+    <div className="role-page-heading"><div><h1>Offers</h1><p>Offer dates and candidate responses.</p></div></div>
+    <section className="role-card role-wide">
+      {status ? <p role="status">{status}</p> : null}
+      {!loading && !status && rows.length === 0 ? <p>No offers have been sent. Nothing is scheduled.</p> : null}
+      {rows.length ? <div className="role-record-table-wrap"><table className="role-record-table">
+        <thead><tr>{['Candidate', 'Opportunity', 'State', 'Joining date', 'Expiry', 'Response state', 'Actions'].map((title) => <th key={title}>{title}</th>)}</tr></thead>
+        <tbody>{rows.map((item) => <tr key={item.id}>
+          <td><CandidateIdentity item={item} /></td><td>{item.title || 'NA'}</td><td>{humanise(item.state)}</td>
+          <td>{item.joiningDate ? formatDate(item.joiningDate.slice(0, 10) + 'T00:00:00') : 'NA'}</td><td>{formatDateTime(item.offerExpiresAt)}</td><td>{offerResponse(item)}</td>
+          <td>{!item.consentRevoked && !item.closedAt && ['DRAFT', 'EXTENDED'].includes(item.state)
+            ? <button className="secondary" disabled={busy} onClick={() => { void withdraw(item.id); }}>Withdraw offer</button> : 'NA'}</td>
+        </tr>)}</tbody>
+      </table></div> : null}
+    </section>
+  </section>;
+}
+
+export function EmployerHiringAnalyticsPage({ employerId }: { readonly employerId: string }): React.ReactElement {
+  const [result, setResult] = useState<{ employerId: string; analytics: HiringAnalyticsDto } | null>(null);
+  const [status, setStatus] = useState('Loading hiring analytics…');
+  useEffect(() => {
+    const abort = new AbortController();
+    const token = getAccessToken();
+    if (!token) { setStatus('You are not signed in.'); return; }
+    void getEmployerHiringAnalytics(token, employerId, abort.signal).then(({ analytics }) => {
+      if (!abort.signal.aborted) { setResult({ employerId, analytics }); setStatus(''); }
+    }).catch(() => { if (!abort.signal.aborted) setStatus('Hiring analytics could not be loaded.'); });
+    return () => abort.abort();
+  }, [employerId]);
+  const analytics = result?.employerId === employerId ? result.analytics : null;
+  return <section className="role-module role-module--dense">
+    <div className="role-page-heading"><div><h1>Hiring reports</h1><p>All submitted applications for your employer. No candidate identities are included.</p></div></div>
+    {status ? <p role="status">{status}</p> : null}
+    <div className="v2-row v2-cols-4 career-stat-strip role-wide">
+      <V2Stat icon="📨" tone="blue" label="Applications" value={analytics?.applicationCount ?? 'NA'} />
+      <V2Stat icon="⏱" tone="amber" label="Mean days to first offer" value={analytics?.meanTimeToOfferDays == null ? 'NA' : analytics.meanTimeToOfferDays.toFixed(1)} />
+      <V2Stat icon="📄" tone="green" label="Applications with timed offers" value={analytics?.timedOfferCount ?? 'NA'} />
+    </div>
+    <section className="role-card role-wide"><h2>Applications by stage</h2>
+      <div className="role-record-table-wrap"><table className="role-record-table"><thead><tr><th>Stage</th><th>Current applications</th><th>Ever reached</th></tr></thead>
+        <tbody>{(analytics?.stages ?? ['APPLIED', 'SCREENING', 'SHORTLISTED', 'ASSESSMENT', 'INTERVIEW', 'OFFER', 'HIRED', 'REJECTED', 'WITHDRAWN'].map((stage) => ({ stage, count: 'NA', reached: 'NA' }))).map((item) => <tr key={item.stage}><td>{humanise(item.stage)}</td><td>{item.count}</td><td>{item.reached}</td></tr>)}</tbody>
+      </table></div>
+    </section>
+    <section className="role-card role-wide"><h2>Stage conversion</h2><p>Among applications that entered a stage, the share that also reached the next named stage. Skipped stages are not inferred; these are lifetime figures, not a forecast.</p>
+      {analytics ? <div className="role-record-table-wrap"><table className="role-record-table"><thead><tr><th>From</th><th>To</th><th>Entered</th><th>Progressed</th><th>Conversion</th></tr></thead>
+        <tbody>{analytics.conversions.map((item) => <tr key={item.from}><td>{humanise(item.from)}</td><td>{humanise(item.to)}</td><td>{item.entrants}</td><td>{item.progressed}</td><td>{item.rate === null ? 'NA' : `${(item.rate * 100).toFixed(1)}%`}</td></tr>)}</tbody>
+      </table></div> : <p>NA</p>}
+      <p>Time-to-offer runs from application submission to the first extended offer, using records with valid timestamps.</p>
+    </section>
+    <section className="role-card role-wide"><h2>Per-opportunity funnel</h2>
+      {analytics?.opportunities.length ? <div className="role-record-table-wrap"><table className="role-record-table"><thead><tr><th>Opportunity</th><th>Applications</th>{analytics.opportunities[0]?.funnel.map((item) => <th key={item.stage}>{humanise(item.stage)}</th>)}</tr></thead>
+        <tbody>{analytics.opportunities.map((item, index) => <tr key={index}><td>{item.title}</td><td>{item.applicationCount}</td>{item.funnel.map((stage) => <td key={stage.stage}>{stage.count}</td>)}</tr>)}</tbody>
+      </table></div> : <p>{analytics ? 'No opportunities to report yet.' : 'NA'}</p>}
+    </section>
+  </section>;
+}
+
 type EmployerApplicantStateFilter = 'INTERVIEW' | 'OFFER';
 
 export function EmployerApplicantsPage({ employerId, applicationStateFilter }: { readonly employerId: string; readonly applicationStateFilter?: EmployerApplicantStateFilter }): React.ReactElement {
@@ -490,40 +814,22 @@ export function EmployerApplicantsPage({ employerId, applicationStateFilter }: {
     }
   }
 
-  async function schedule(applicationId: string): Promise<void> {
+  const [action, setAction] = useState<{ kind: 'interview' | 'offer'; applicant: EmployerApplicantDto } | null>(null);
+
+  async function saveInterview(input: InterviewScheduleInput): Promise<void> {
     const token = getAccessToken();
-    if (!token) return;
-    const start = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    start.setHours(10, 0, 0, 0);
-    try {
-      await scheduleInterview(token, employerId, applicationId, {
-        mode: 'VIDEO',
-        scheduledStart: start.toISOString(),
-        scheduledEnd: new Date(start.getTime() + 60 * 60 * 1000).toISOString(),
-      });
-      setStatus(`Interview scheduled for ${start.toLocaleString()}.`);
-      await reloadApplicants(selectedOpportunity);
-    } catch (error) {
-      setStatus(messageFor(error, 'The interview could not be scheduled.'));
-    }
+    if (!token || !action) throw new Error('Unavailable');
+    await scheduleInterview(token, employerId, action.applicant.id, input);
+    setAction(null);
+    await reloadApplicants(selectedOpportunity).catch(() => setStatus('Interview saved. Refresh to update the list.'));
   }
 
-  async function offer(applicationId: string): Promise<void> {
+  async function saveOffer(input: OfferInput): Promise<void> {
     const token = getAccessToken();
-    if (!token) return;
-    const amount = Number(window.prompt('Monthly amount in INR?', '25000') ?? '');
-    if (!Number.isFinite(amount) || amount <= 0) return;
-    const expires = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
-    try {
-      await extendOffer(token, employerId, applicationId, {
-        compensationCurrency: 'INR', compensationAmount: amount, compensationPeriod: 'MONTH',
-        offerExpiresAt: expires.toISOString(),
-      });
-      setStatus(`Offer sent. The candidate has until ${expires.toLocaleDateString()} to respond.`);
-      await reloadApplicants(selectedOpportunity);
-    } catch (error) {
-      setStatus(messageFor(error, 'The offer could not be sent.'));
-    }
+    if (!token || !action) throw new Error('Unavailable');
+    await extendOffer(token, employerId, action.applicant.id, input);
+    setAction(null);
+    await reloadApplicants(selectedOpportunity).catch(() => setStatus('Offer sent. Refresh to update the list.'));
   }
 
   const visibleApplicants = applicationStateFilter ? applicants.filter((item) => item.state === applicationStateFilter) : applicants;
@@ -544,7 +850,7 @@ export function EmployerApplicantsPage({ employerId, applicationStateFilter }: {
 
     <section className="role-card role-wide">
       <label className="student-form-field"><span>Opportunity</span>
-        <select value={selectedOpportunity} onChange={(event) => setSelectedOpportunity(event.target.value)}>
+        <select value={selectedOpportunity} onChange={(event) => { setAction(null); setApplicants([]); setSelectedOpportunity(event.target.value); }}>
           <option value="">Select an opportunity</option>
           {opportunities.map((item) => <option key={item.id} value={item.id}>{item.title ?? item.referenceCode} ({item.applicationCount})</option>)}
         </select>
@@ -559,9 +865,7 @@ export function EmployerApplicantsPage({ employerId, applicationStateFilter }: {
         : <div className="role-record-table-wrap"><table className="role-record-table">
           <thead><tr><th>Candidate</th><th>Stage</th><th>Applied</th><th>Interviews</th><th>Offer</th><th>Next step</th></tr></thead>
           <tbody>{visibleApplicants.map((item) => <tr key={item.id}>
-            <td>{item.consentRevoked
-              ? <span className="hiring-meta">Withdrawn — details no longer shared</span>
-              : <>{item.candidateName ?? item.candidateEmail}{item.institutionStudentId ? <span className="hiring-meta"> · {item.institutionStudentId}</span> : null}</>}</td>
+            <td><CandidateIdentity item={item} /></td>
             <td><span className={`hiring-state state-${item.state.toLowerCase()}`}>{humanise(item.state)}</span></td>
             <td>{formatDate(item.submittedAt)}</td>
             <td>{item.interviewCount}</td>
@@ -570,11 +874,18 @@ export function EmployerApplicantsPage({ employerId, applicationStateFilter }: {
               ? <span className="hiring-meta">Closed</span>
               : <div className="hiring-actions">
                 {(PIPELINE_NEXT[item.state] ?? []).map((next) => <button key={next} type="button" className={next === 'REJECTED' ? 'secondary' : undefined} onClick={() => { void move(item.id, next); }}>{humanise(next)}</button>)}
-                {item.state === 'INTERVIEW' ? <button type="button" className="secondary" onClick={() => { void schedule(item.id); }}>Schedule interview</button> : null}
-                {item.state === 'OFFER' && !item.offerState ? <button type="button" onClick={() => { void offer(item.id); }}>Send offer</button> : null}
+                {item.state === 'INTERVIEW' ? <button type="button" className="secondary" onClick={() => setAction({ kind: 'interview', applicant: item })}>Schedule interview</button> : null}
+                {item.state === 'OFFER' && !item.offerState ? <button type="button" onClick={() => setAction({ kind: 'offer', applicant: item })}>Send offer</button> : null}
               </div>}</td>
           </tr>)}</tbody>
         </table></div>}
     </section>
+    {action && !action.applicant.consentRevoked ? <section className="role-card role-wide">
+      <h2>{action.kind === 'interview' ? 'Schedule interview' : 'Send offer'}</h2>
+      <p><CandidateIdentity item={action.applicant} /></p>
+      {action.kind === 'interview'
+        ? <InterviewForm onSave={saveInterview} onCancel={() => setAction(null)} />
+        : <OfferForm onSave={saveOffer} onCancel={() => setAction(null)} />}
+    </section> : null}
   </section>;
 }

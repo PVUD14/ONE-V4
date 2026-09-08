@@ -8,7 +8,7 @@
  */
 import { getProtectedAccessToken, getSecurityContext } from '../api.js';
 import { V2EmptyState } from '../dashboardsV2.js';
-import { EmployerApplicantsPage, EmployerOpportunitiesPage } from '../hiringPages.js';
+import { EmployerApplicantsPage, EmployerOpportunitiesPage, EmployerInterviewsPage, EmployerOffersPage, EmployerHiringAnalyticsPage } from '../hiringPages.js';
 import { StaffPilotWrap } from '../parityWraps.js';
 import type { RolePortalConfig } from '../rolePortalConfig.js';
 import { RestrictedApiState } from './shared.js';
@@ -33,13 +33,16 @@ export function EmployerRecruiterRealityPage({ portal, routeLabel }: { readonly 
   if (!employerMembership) return <section className="role-module role-module--dense"><div className="role-page-heading"><div><h1>{routeLabel}</h1><p role="status">Loading your employer workspace…</p></div></div></section>;
 
   const employerId = employerMembership.organizationId;
+  if (/interview/i.test(routeLabel)) return <StaffPilotWrap title="Interviews" subtitle="Manage scheduled interviews and record outcomes."><EmployerInterviewsPage key={employerId} employerId={employerId} /></StaffPilotWrap>;
+  if (/offer/i.test(routeLabel)) return <StaffPilotWrap title="Offers" subtitle="Track offers and candidate responses."><EmployerOffersPage key={employerId} employerId={employerId} /></StaffPilotWrap>;
+  if (/report|analytic/i.test(routeLabel)) return <StaffPilotWrap title="Reports" subtitle="Your employer's hiring funnel."><EmployerHiringAnalyticsPage key={employerId} employerId={employerId} /></StaffPilotWrap>;
   if (/opportunit/i.test(routeLabel)) {
     return <StaffPilotWrap title="Opportunities" subtitle="Post roles, choose their audience and publish. Applications land under Applicants.">
-      <EmployerOpportunitiesPage employerId={employerId} /></StaffPilotWrap>;
+      <EmployerOpportunitiesPage key={employerId} employerId={employerId} /></StaffPilotWrap>;
   }
   if (/applicant|candidate|talent/i.test(routeLabel)) {
     return <StaffPilotWrap title="Applicants" subtitle="Move real candidates through your process; every change is logged.">
-      <EmployerApplicantsPage employerId={employerId} /></StaffPilotWrap>;
+      <EmployerApplicantsPage key={employerId} employerId={employerId} /></StaffPilotWrap>;
   }
 
   // Routes whose backend does not exist yet keep saying so rather than borrowing

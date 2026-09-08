@@ -15,6 +15,7 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import * as schema from '@planthepath/persistence/src/schema.js';
 import { findIdentityByExternalSubject, loadActiveMembershipsForUser } from '@planthepath/persistence/src/identity-authentication.js';
 import { Phase1ApiSecurityModule } from './api-security.module.js';
+import { institutionForbiddenDisclosureFields, isInstitutionForbiddenDisclosureField } from '@planthepath/authorization/src/index.js';
 import { PG_POOL } from '../persistence.provider.js';
 
 const connectionString = process.env.DATABASE_URL;
@@ -22,7 +23,8 @@ if (!connectionString) throw new Error('DATABASE_URL is required for staff-actio
 const schemaName = 'staff_actions_' + randomUUID().replaceAll('-', '');
 const adminPool = new Pool({ connectionString });
 const pool = new Pool({ connectionString, options: '-c search_path=' + schemaName });
-const db = drizzle(pool, { schema });
+const executedQueries: string[] = [];
+const db = drizzle(pool, { schema, logger: { logQuery(query) { executedQueries.push(query); } } });
 const tokens = new Set<string>();
 let nextIds: string[] = [];
 let app: INestApplication;
@@ -59,7 +61,7 @@ beforeAll(async () => {
 });
 beforeEach(async () => {
   await pool.query('TRUNCATE users CASCADE');
-  tokens.clear(); nextIds = [];
+  tokens.clear(); nextIds = []; executedQueries.length = 0;
   institutionId = randomUUID(); studentId = randomUUID(); relationshipId = randomUUID(); departmentId = randomUUID();
   await pool.query("INSERT INTO organizations (id,kind,legal_name) VALUES ($1,'INSTITUTION','Local institution')", [institutionId]);
   await pool.query("INSERT INTO institution_units (id,institution_id,kind,name) VALUES ($1,$2,'DEPARTMENT','Local department')", [departmentId, institutionId]);
@@ -409,5 +411,112 @@ describe('Student-visible staff actions', () => {
     expect((await api().get(studentPath()).set(auth(student))).body.actions).toEqual([]);
     await pool.query("UPDATE users SET state='SUSPENDED' WHERE id=$1", [student]);
     expect([401,403]).toContain((await api().get(studentPath()).set(auth(student))).status);
+  });
+});
+
+describe('C6 institution application visibility', () => {
+  const readPath = (institution = institutionId, student = studentId) =>
+    '/api/v1/institutions/' + institution + '/students/' + student + '/applications';
+  async function application(granted = true, subject = studentId) {
+    const employer = randomUUID(); const opportunity = randomUUID(); const version = randomUUID(); const id = randomUUID();
+    await pool.query("INSERT INTO organizations (id,kind,legal_name) VALUES ($1,'EMPLOYER','Local test employer')", [employer]);
+    await pool.query("INSERT INTO opportunities (id,employer_id,created_by_user_id,reference_code) VALUES ($1,$2,$3,'LOCAL-C6')", [opportunity, employer, admin.id]);
+    await pool.query("INSERT INTO opportunity_versions (id,opportunity_id,version_number,title,employment_type,work_mode,material_terms_hash,created_by_user_id) VALUES ($1,$2,1,'Local applied role','FULL_TIME','REMOTE',$3,$4)", [version, opportunity, '0'.repeat(64), admin.id]);
+    await pool.query("INSERT INTO applications (id,opportunity_id,employer_id,applied_version_id,student_user_id,state,consent_granted_at,submitted_at,institution_visibility_granted_at) VALUES ($1,$2,$3,$4,$5,'APPLIED',now(),now(),CASE WHEN $6 THEN now() ELSE NULL END)", [id, opportunity, employer, version, subject, granted]);
+    return { id, employer };
+  }
+  async function offer(id: string, employer: string) {
+    // Non-null synthetic terms prove SQL/response exclusions, using the shared column vocabulary.
+    await pool.query("INSERT INTO offers (id,application_id,employer_id,state,created_by_user_id," + institutionForbiddenDisclosureFields.join(',') + ",extended_at,responded_at,offer_expires_at) VALUES ($1,$2,$3,'ACCEPTED',$4,'INR',123456.78,'YEAR',now(),now(),now()+interval '7 days')", [randomUUID(), id, employer, admin.id]);
+  }
+  it('returns only the granted student application and allowed fields, without selecting forbidden columns', async () => {
+    const shared = await application(); await offer(shared.id, shared.employer);
+    await application(false);
+    const officer = await staff('PLACEMENT_ADMIN');
+    executedQueries.length = 0;
+    const result = await api().get(readPath()).set(auth(officer.id)).expect(200);
+    expect(result.body.applications).toHaveLength(1);
+    expect(result.body.applications[0]).toMatchObject({
+      id: shared.id, employer: { id: shared.employer, name: 'Local test employer' },
+      opportunityTitle: 'Local applied role', state: 'APPLIED', offer: { exists: true, responseState: 'ACCEPTED' },
+    });
+    expect(Object.keys(result.body.applications[0]).sort()).toEqual([
+      'id', 'employer', 'opportunityTitle', 'state', 'createdAt', 'submittedAt', 'updatedAt', 'closedAt', 'offer',
+    ].sort());
+    expect(Object.keys(result.body.applications[0].offer).sort()).toEqual(['exists', 'responseState']);
+    expect(Object.keys(result.body.applications[0].employer).sort()).toEqual(['id', 'name']);
+    const selects = executedQueries.filter((query) => /^\s*select\b/i.test(query));
+    expect(selects.some((query) => /FROM applications a/i.test(query))).toBe(true);
+    expect(selects.some((query) => /FROM offers/i.test(query))).toBe(true);
+    for (const query of selects) {
+      const identifiers = query.toLowerCase().match(/[a-z_][a-z_0-9]*/g) ?? [];
+      for (const field of institutionForbiddenDisclosureFields) expect(identifiers).not.toContain(field);
+      expect(identifiers.some(isInstitutionForbiddenDisclosureField)).toBe(false);
+      expect(query).not.toMatch(/select\s+(?:\w+\.)?\*/i);
+    }
+    const keys = JSON.stringify(result.body).match(/"([^"]+)":/g) ?? [];
+    expect(keys.some((key) => isInstitutionForbiddenDisclosureField(key.slice(1, -2).replace(/[A-Z]/g, (letter) => '_' + letter.toLowerCase())))).toBe(false);
+    expect(JSON.stringify(result.body)).not.toContain('123456.78');
+  });
+  it('does not substitute employer consent for absent institution consent', async () => {
+    await application(false);
+    expect((await api().get(readPath()).set(auth(admin.id)).expect(200)).body.applications).toEqual([]);
+  });
+  it('removes a row immediately after institution consent is revoked', async () => {
+    const shared = await application();
+    expect((await api().get(readPath()).set(auth(admin.id)).expect(200)).body.applications).toHaveLength(1);
+    await pool.query('UPDATE applications SET institution_visibility_revoked_at=now(),updated_at=now() WHERE id=$1', [shared.id]);
+    expect((await api().get(readPath()).set(auth(admin.id)).expect(200)).body.applications).toEqual([]);
+  });
+  it.each(['ENDED', 'REVOKED', 'TRANSFERRED', 'GRADUATED', 'PENDING'])('denies current disclosure after the relationship becomes %s', async (state) => {
+    await application();
+    await pool.query('UPDATE institution_relationships SET state=$1,effective_to=now() WHERE id=$2', [state, relationshipId]);
+    expect((await api().get(readPath()).set(auth(admin.id)).expect(200)).body.applications).toEqual([]);
+  });
+  it('uses application dates as well as the currently active relationship', async () => {
+    const shared = await application();
+    await pool.query("UPDATE applications SET created_at=now()-interval '3 days',submitted_at=now()-interval '3 days',updated_at=now()-interval '3 days' WHERE id=$1", [shared.id]);
+    expect((await api().get(readPath()).set(auth(admin.id)).expect(200)).body.applications).toEqual([]);
+    await pool.query('UPDATE applications SET created_at=now(),submitted_at=now(),updated_at=now() WHERE id=$1', [shared.id]);
+    expect((await api().get(readPath()).set(auth(admin.id)).expect(200)).body.applications[0].offer).toEqual({ exists: false, responseState: null });
+  });
+  it('withholds application and offer revisions outside the relationship window', async () => {
+    const shared = await application();
+    await pool.query("UPDATE institution_relationships SET effective_to=now()+interval '1 hour' WHERE id=$1", [relationshipId]);
+    await pool.query("UPDATE applications SET updated_at=now()+interval '2 hours' WHERE id=$1", [shared.id]);
+    expect((await api().get(readPath()).set(auth(admin.id)).expect(200)).body.applications).toEqual([]);
+    await pool.query('UPDATE applications SET updated_at=now() WHERE id=$1', [shared.id]);
+    await offer(shared.id, shared.employer);
+    await pool.query("UPDATE offers SET updated_at=now()+interval '2 hours' WHERE application_id=$1", [shared.id]);
+    expect((await api().get(readPath()).set(auth(admin.id)).expect(200)).body.applications).toEqual([]);
+  });
+  it('isolates institutions and requested students', async () => {
+    const shared = await application();
+    const otherStudent = randomUUID();
+    await pool.query("INSERT INTO users (id,email,state) VALUES ($1,$2,'ACTIVE')", [otherStudent, otherStudent + '@example.test']);
+    await pool.query("INSERT INTO institution_student_profiles (id,institution_id,student_user_id,institution_student_id,full_name,status,department_unit_id) VALUES ($1,$2,$3,'LOCAL-C6-OTHER','Other local student','ACTIVE',$4)", [randomUUID(), institutionId, otherStudent, departmentId]);
+    await pool.query("INSERT INTO institution_relationships (id,institution_id,student_user_id,state,effective_from) VALUES ($1,$2,$3,'ACTIVE',now()-interval '1 day')", [randomUUID(), institutionId, otherStudent]);
+    const otherApplication = await application(true, otherStudent);
+    expect((await api().get(readPath()).query({ studentUserId: otherStudent }).set(auth(admin.id)).expect(200)).body.applications.map((row: { id: string }) => row.id)).toEqual([shared.id]);
+    expect((await api().get(readPath(institutionId, otherStudent)).set(auth(admin.id)).expect(200)).body.applications.map((row: { id: string }) => row.id)).toEqual([otherApplication.id]);
+
+    const otherInstitution = randomUUID();
+    await pool.query("INSERT INTO organizations (id,kind,legal_name) VALUES ($1,'INSTITUTION','Other local institution')", [otherInstitution]);
+    const outsider = await staff('PLACEMENT_ADMIN', otherInstitution);
+    await api().get(readPath()).set(auth(outsider.id)).expect(403);
+    expect((await api().get(readPath(otherInstitution)).set(auth(outsider.id)).expect(200)).body.applications).toEqual([]);
+    expect((await api().get(readPath(institutionId, randomUUID())).set(auth(admin.id)).expect(200)).body.applications).toEqual([]);
+  });
+  it('retains department and batch scope and denies inactive or unauthenticated staff', async () => {
+    await application();
+    const department = randomUUID(); const batch = randomUUID();
+    await pool.query("INSERT INTO institution_units (id,institution_id,kind,name) VALUES ($1,$2,'DEPARTMENT','Other department'),($3,$2,'BATCH','Other batch')", [department, institutionId, batch]);
+    const faculty = await staff('FACULTY_LECTURER', institutionId, department);
+    expect((await api().get(readPath()).set(auth(faculty.id)).expect(200)).body.applications).toEqual([]);
+    await pool.query('UPDATE organization_memberships SET scope_department_unit_id=NULL,scope_batch_unit_id=$1 WHERE id=$2', [batch, faculty.membershipId]);
+    expect((await api().get(readPath()).set(auth(faculty.id)).expect(200)).body.applications).toEqual([]);
+    await pool.query("UPDATE organization_memberships SET state='SUSPENDED' WHERE id=$1", [admin.membershipId]);
+    await api().get(readPath()).set(auth(admin.id)).expect(403);
+    await api().get(readPath()).expect(401);
   });
 });

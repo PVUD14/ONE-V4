@@ -210,4 +210,80 @@ describe('Career Readiness Fundamentals production path', () => {
       },
     });
   });
+
+  it('returns the band over time newest first, agreeing with the current snapshot', async () => {
+    const model = await pool.query<{ id: string }>(
+      `SELECT id FROM readiness_model_versions WHERE active ORDER BY published_at DESC LIMIT 1`,
+    );
+    const modelVersionId = model.rows[0]!.id;
+    const learner = randomUUID();
+    await pool.query(`INSERT INTO users (id, external_subject, email, state) VALUES ($1,$2,$3,'ACTIVE')`,
+      [learner, `band-history:${learner}`, `band-history-${learner}@example.test`]);
+
+    // Inserted out of chronological order, so a pass cannot be explained by insertion
+    // order standing in for the ORDER BY.
+    const points: readonly (readonly [string, string])[] = [
+      ['PROGRESSING', '2026-07-01T00:00:00Z'],
+      ['NOT_ENOUGH_EVIDENCE', '2026-05-01T00:00:00Z'],
+      ['READY_FOR_NEXT_STEP', '2026-08-01T00:00:00Z'],
+      ['DEVELOPING', '2026-06-01T00:00:00Z'],
+    ];
+    for (const [band, generatedAt] of points) {
+      await pool.query(
+        `INSERT INTO readiness_snapshots
+         (id, subject_user_id, model_version_id, evidence_ids, evidence_set_hash, band, explanation, generated_at)
+         VALUES ($1,$2,$3,'{}'::uuid[],$4,$5,'{}'::jsonb,$6)`,
+        [randomUUID(), learner, modelVersionId, createHash('sha256').update(`${learner}:${generatedAt}`).digest('hex'), band, generatedAt],
+      );
+    }
+
+    const state = await getLearnerCareerReadinessState(pool, learner);
+    const history = state.readinessHistory as readonly { band: string; modelVersionId: string; generatedAt: Date; id: string }[];
+
+    expect(history.map((entry) => entry.band)).toStrictEqual([
+      'READY_FOR_NEXT_STEP', 'PROGRESSING', 'DEVELOPING', 'NOT_ENOUGH_EVIDENCE',
+    ]);
+    expect(history.every((entry) => entry.modelVersionId === modelVersionId)).toBe(true);
+    expect(history.every((entry) => entry.generatedAt instanceof Date)).toBe(true);
+
+    // The invariant a client can rely on: the newest history entry is the snapshot
+    // already served as `readiness`, so the two can never disagree.
+    const current = state.readiness as { id: string; band: string };
+    expect(history[0]!.id).toBe(current.id);
+    expect(history[0]!.band).toBe(current.band);
+  });
+
+  it("never returns another learner's snapshots", async () => {
+    const model = await pool.query<{ id: string }>(
+      `SELECT id FROM readiness_model_versions WHERE active ORDER BY published_at DESC LIMIT 1`,
+    );
+    const modelVersionId = model.rows[0]!.id;
+    const mine = randomUUID();
+    const theirs = randomUUID();
+    for (const [id, label] of [[mine, 'mine'], [theirs, 'theirs']] as const) {
+      await pool.query(`INSERT INTO users (id, external_subject, email, state) VALUES ($1,$2,$3,'ACTIVE')`,
+        [id, `isolation-${label}:${id}`, `isolation-${label}-${id}@example.test`]);
+      await pool.query(
+        `INSERT INTO readiness_snapshots
+         (id, subject_user_id, model_version_id, evidence_ids, evidence_set_hash, band, explanation, generated_at)
+         VALUES ($1,$2,$3,'{}'::uuid[],$4,$5,'{}'::jsonb,'2026-06-15T00:00:00Z')`,
+        [randomUUID(), id, modelVersionId, createHash('sha256').update(`isolation:${id}`).digest('hex'),
+          label === 'mine' ? 'DEVELOPING' : 'READY_FOR_NEXT_STEP'],
+      );
+    }
+
+    const state = await getLearnerCareerReadinessState(pool, mine);
+    const history = state.readinessHistory as readonly { band: string }[];
+    expect(history).toHaveLength(1);
+    expect(history[0]!.band).toBe('DEVELOPING');
+  });
+
+  it('reports an empty history rather than failing when a learner has no snapshot', async () => {
+    const learner = randomUUID();
+    await pool.query(`INSERT INTO users (id, external_subject, email, state) VALUES ($1,$2,$3,'ACTIVE')`,
+      [learner, `no-history:${learner}`, `no-history-${learner}@example.test`]);
+    const state = await getLearnerCareerReadinessState(pool, learner);
+    expect(state.readinessHistory).toStrictEqual([]);
+    expect(state.readiness).toBeNull();
+  });
 });

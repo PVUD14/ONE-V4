@@ -21,14 +21,25 @@ export interface CareerReadinessCatalog {
     readonly blueprintId: string; readonly selectionCount: number; readonly timeLimitSeconds: number }[];
 }
 
+export interface ReadinessHistoryEntry {
+  readonly id: string;
+  readonly band: 'NOT_ENOUGH_EVIDENCE' | 'DEVELOPING' | 'PROGRESSING' | 'READY_FOR_NEXT_STEP';
+  readonly modelVersionId: string;
+  readonly generatedAt: string;
+}
+
 export interface LearnerCareerReadinessState {
   readonly catalog: CareerReadinessCatalog;
-  readonly progress: readonly { readonly lessonVersionId: string; readonly state: string; readonly completedAt?: string }[];
-  readonly attempts: readonly { readonly id: string; readonly state: string; readonly scoreCorrect?: number; readonly scorePossible?: number }[];
-  readonly evidence: readonly { readonly id: string; readonly evidenceType: string; readonly topicId: string; readonly demonstrated: number; readonly possible: number }[];
+  readonly progress: readonly { readonly lessonVersionId: string; readonly state: string; readonly startedAt?: string | null; readonly completedAt?: string | null }[];
+  readonly attempts: readonly { readonly id: string; readonly state: string; readonly startedAt?: string; readonly submittedAt?: string | null;
+    readonly scoreCorrect?: number; readonly scorePossible?: number }[];
+  readonly evidence: readonly { readonly id: string; readonly evidenceType: string; readonly topicId: string; readonly occurredAt?: string;
+    readonly demonstrated: number; readonly possible: number }[];
   readonly mastery: readonly { readonly id: string; readonly topicId: string; readonly band: string; readonly evidenceIds: readonly string[] }[];
   readonly readiness: { readonly id: string; readonly band: string; readonly advisory: true; readonly employerVisible: false;
     readonly explanation: { readonly factors?: readonly { readonly topicId: string; readonly masteryBand: string; readonly explanation: string }[] } } | null;
+  /** Newest first, at most 100 snapshots. Optional for unavailable/older responses. */
+  readonly readinessHistory?: readonly ReadinessHistoryEntry[];
   readonly roadmap: readonly { readonly id: string; readonly topicId: string; readonly actionCode: string; readonly reasonCode: string; readonly state: string; readonly dueAt?: string }[];
   readonly notificationPreferences: { readonly emailEnabled: boolean; readonly quietHoursStartMinute: number;
     readonly quietHoursEndMinute: number; readonly dailyCap: number } | null;

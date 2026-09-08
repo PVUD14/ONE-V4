@@ -327,3 +327,48 @@ export function scheduleInterview(token: string, employerId: string, application
 export function extendOffer(token: string, employerId: string, applicationId: string, body: OfferInput): Promise<{ readonly offer: { readonly id: string; readonly state: string } }> {
   return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/applications/${encodeURIComponent(applicationId)}/offers`, { token, method: 'POST', body });
 }
+export interface ExternalApplicationInput {
+  readonly companyName: string;
+  readonly roleTitle: string;
+  readonly sourceKind: 'JOB_BOARD' | 'COMPANY_SITE' | 'REFERRAL';
+  readonly appliedOn: string;
+  readonly applicationUrl?: string | null;
+  readonly stage: 'APPLIED' | 'SCREENING' | 'ASSESSMENT' | 'INTERVIEW' | 'OFFER' | 'HIRED' | 'REJECTED' | 'WITHDRAWN';
+  readonly institutionVisibilityGranted?: boolean;
+}
+export interface ExternalApplicationDto extends Omit<ExternalApplicationInput, 'institutionVisibilityGranted'> {
+  readonly id: string;
+  readonly applicationUrl: string | null;
+  readonly source: 'STUDENT_DECLARED';
+  readonly verificationState: 'UNVERIFIED';
+  readonly revision: number;
+  readonly institutionVisibilityGrantedAt: string | null;
+  readonly institutionVisibilityRevokedAt: string | null;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+export interface ExternalApplicationPageDto {
+  readonly externalApplications: readonly ExternalApplicationDto[];
+  readonly total: number;
+  readonly offset: number;
+  readonly limit: number;
+}
+const externalApplicationsPath = '/api/v1/students/me/external-applications';
+export function listExternalApplications(token: string, offset = 0, signal?: AbortSignal): Promise<ExternalApplicationPageDto> {
+  return requestJson(`${externalApplicationsPath}?offset=${offset}&limit=50`, { token, ...(signal ? { signal } : {}) });
+}
+export function getExternalApplication(token: string, id: string, signal?: AbortSignal): Promise<{ readonly externalApplication: ExternalApplicationDto }> {
+  return requestJson(`${externalApplicationsPath}/${encodeURIComponent(id)}`, { token, ...(signal ? { signal } : {}) });
+}
+export function createExternalApplication(token: string, body: ExternalApplicationInput): Promise<{ readonly externalApplication: ExternalApplicationDto }> {
+  return requestJson(externalApplicationsPath, { token, method: 'POST', body });
+}
+export function updateExternalApplication(token: string, id: string, body: Partial<Omit<ExternalApplicationInput, 'institutionVisibilityGranted'>> & { readonly revision: number }): Promise<{ readonly externalApplication: ExternalApplicationDto }> {
+  return requestJson(`${externalApplicationsPath}/${encodeURIComponent(id)}`, { token, method: 'PATCH', body });
+}
+export function deleteExternalApplication(token: string, id: string, revision: number): Promise<{ readonly ok: boolean }> {
+  return requestJson(`${externalApplicationsPath}/${encodeURIComponent(id)}`, { token, method: 'DELETE', body: { revision } });
+}
+export function changeExternalInstitutionVisibility(token: string, id: string, revision: number, action: 'grant' | 'revoke'): Promise<{ readonly externalApplication: ExternalApplicationDto }> {
+  return requestJson(`${externalApplicationsPath}/${encodeURIComponent(id)}/institution-visibility/${action}`, { token, method: 'POST', body: { revision } });
+}

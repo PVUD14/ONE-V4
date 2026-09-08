@@ -1,4 +1,5 @@
-import { BadRequestException, Body, Controller, ForbiddenException, Get, Inject, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, ConflictException, Controller, Delete, ForbiddenException, Get, Inject, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { externalApplicationCap, externalFields, externalInputRecord, externalRevision, ExternalApplicationInputError, type ExternalApplicationFields } from '@planthepath/hiring/src/external-applications.js';
 import { sql } from 'drizzle-orm';
 import type { PersistenceDb } from '@planthepath/persistence/src/repositories.js';
 import {
@@ -41,6 +42,129 @@ export class StudentHiringController {
     @Inject(API_PERSISTENCE_DB) private readonly db: PersistenceDb,
     @Inject(API_ID_GENERATOR) private readonly ids: ApiIdGenerator,
   ) {}
+
+  @Get('/students/me/external-applications')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async listExternalApplications(@Req() request: ProtectedHttpRequest, @Query('offset') offset?: string, @Query('limit') limit?: string): Promise<Record<string, unknown>> {
+    const context = requireTrustedAuthorization(request);
+    const actor = context.authorization.principal.userId;
+    const pageOffset = readExternalPage(offset, 0, 0, externalApplicationCap, context.correlationId);
+    const pageLimit = readExternalPage(limit, 50, 1, 100, context.correlationId);
+    const result = await this.db.execute(sql`
+      SELECT (SELECT count(*)::int FROM external_applications WHERE student_user_id = ${actor}::uuid) AS total,
+        coalesce((SELECT jsonb_agg(page) FROM (
+          SELECT * FROM external_applications WHERE student_user_id = ${actor}::uuid
+          ORDER BY applied_on DESC, id LIMIT ${pageLimit} OFFSET ${pageOffset}
+        ) page), '[]'::jsonb) AS records
+    `) as QueryResult<{ total: number; records: Record<string, unknown>[] }>;
+    const row = result.rows[0]!;
+    return { externalApplications: row.records.map(mapExternalApplication), total: row.total, offset: pageOffset, limit: pageLimit, correlationId: context.correlationId };
+  }
+
+  @Get('/students/me/external-applications/:id')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async getExternalApplication(@Req() request: ProtectedHttpRequest, @Param('id') id: string): Promise<Record<string, unknown>> {
+    const context = requireTrustedAuthorization(request);
+    requireUuid(id, context.correlationId);
+    const result = await this.db.execute(sql`SELECT * FROM external_applications WHERE id = ${id}::uuid AND student_user_id = ${context.authorization.principal.userId}::uuid`) as QueryResult<Record<string, unknown>>;
+    if (!result.rows[0]) throw forbidden(context.correlationId);
+    return { externalApplication: mapExternalApplication(result.rows[0]), correlationId: context.correlationId };
+  }
+
+  @Post('/students/me/external-applications')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async createExternalApplication(@Req() request: ProtectedHttpRequest, @Body() body: unknown): Promise<Record<string, unknown>> {
+    const context = requireTrustedAuthorization(request);
+    const fields = parseExternal(() => externalFields(body), context.correlationId) as ExternalApplicationFields;
+    const grant = (body as Record<string, unknown>).institutionVisibilityGranted === true;
+    const actor = context.authorization.principal.userId;
+    return this.db.transaction(async (tx) => {
+      // Every create for this student takes this lock before counting, including concurrent requests.
+      const owner = await tx.execute(sql`SELECT id FROM users WHERE id = ${actor}::uuid AND state = 'ACTIVE' FOR UPDATE`) as QueryResult<{ id: string }>;
+      if (!owner.rows[0]) throw forbidden(context.correlationId);
+      const count = await tx.execute(sql`SELECT count(*)::int AS count FROM external_applications WHERE student_user_id = ${actor}::uuid`) as QueryResult<{ count: number }>;
+      if (count.rows[0]!.count >= externalApplicationCap) throw badRequest('EXTERNAL_APPLICATION_LIMIT', context.correlationId);
+      const id = this.ids.uuid();
+      const result = await tx.execute(sql`
+        INSERT INTO external_applications (id, student_user_id, company_name, role_title, source_kind, applied_on, application_url, stage, institution_visibility_granted_at)
+        VALUES (${id}::uuid, ${actor}::uuid, ${fields.companyName}, ${fields.roleTitle}, ${fields.sourceKind}, ${fields.appliedOn}::date,
+          ${fields.applicationUrl}, ${fields.stage}, CASE WHEN ${grant} THEN now() ELSE NULL END)
+        RETURNING *
+      `) as QueryResult<Record<string, unknown>>;
+      await this.auditExternal(tx, context, id, 'created', Object.keys(fields), 1);
+      if (grant) await this.auditExternal(tx, context, id, 'institution_visibility_granted', ['institutionVisibility'], 1);
+      return { externalApplication: mapExternalApplication(result.rows[0]!), correlationId: context.correlationId };
+    });
+  }
+
+  @Patch('/students/me/external-applications/:id')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async updateExternalApplication(@Req() request: ProtectedHttpRequest, @Param('id') id: string, @Body() body: unknown): Promise<Record<string, unknown>> {
+    return this.mutateExternalApplication(request, id, body, 'updated');
+  }
+
+  @Delete('/students/me/external-applications/:id')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async deleteExternalApplication(@Req() request: ProtectedHttpRequest, @Param('id') id: string, @Body() body: unknown): Promise<Record<string, unknown>> {
+    return this.mutateExternalApplication(request, id, body, 'deleted');
+  }
+
+  @Post('/students/me/external-applications/:id/institution-visibility/grant')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async grantExternalVisibility(@Req() request: ProtectedHttpRequest, @Param('id') id: string, @Body() body: unknown): Promise<Record<string, unknown>> {
+    return this.mutateExternalApplication(request, id, body, 'institution_visibility_granted');
+  }
+
+  @Post('/students/me/external-applications/:id/institution-visibility/revoke')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async revokeExternalVisibility(@Req() request: ProtectedHttpRequest, @Param('id') id: string, @Body() body: unknown): Promise<Record<string, unknown>> {
+    return this.mutateExternalApplication(request, id, body, 'institution_visibility_revoked');
+  }
+
+  private async mutateExternalApplication(request: ProtectedHttpRequest, id: string, body: unknown,
+    action: 'updated' | 'deleted' | 'institution_visibility_granted' | 'institution_visibility_revoked'): Promise<Record<string, unknown>> {
+    const context = requireTrustedAuthorization(request);
+    requireUuid(id, context.correlationId);
+    const fields = action === 'updated' ? parseExternal(() => externalFields(body, true), context.correlationId) : {};
+    const record = parseExternal(() => externalInputRecord(body, action === 'updated' ? ['revision', ...Object.keys(fields)] : ['revision']), context.correlationId);
+    const revision = parseExternal(() => externalRevision(record), context.correlationId);
+    const actor = context.authorization.principal.userId;
+    return this.db.transaction(async (tx) => {
+      const locked = await tx.execute(sql`SELECT * FROM external_applications WHERE id = ${id}::uuid AND student_user_id = ${actor}::uuid FOR UPDATE`) as QueryResult<Record<string, unknown>>;
+      const row = locked.rows[0];
+      if (!row) throw forbidden(context.correlationId);
+      // A repeated revoke is safe and preserves the first revocation, even after other edits.
+      // A stale revoke after a new grant is rejected by the revision check below.
+      if (action === 'institution_visibility_revoked' && (row.institution_visibility_granted_at == null || row.institution_visibility_revoked_at != null)) {
+        return { externalApplication: mapExternalApplication(row), correlationId: context.correlationId };
+      }
+      if (Number(row.revision) !== revision) throw new ConflictException(safeHiringError('EXTERNAL_APPLICATION_STALE', context.correlationId));
+      if (action === 'institution_visibility_granted' && row.institution_visibility_granted_at != null && row.institution_visibility_revoked_at == null) {
+        return { externalApplication: mapExternalApplication(row), correlationId: context.correlationId };
+      }
+      if (action === 'deleted') {
+        const deleted = await tx.execute(sql`DELETE FROM external_applications WHERE id = ${id}::uuid AND student_user_id = ${actor}::uuid AND revision = ${revision} RETURNING id`) as QueryResult<{ id: string }>;
+        if (!deleted.rows[0]) throw new ConflictException(safeHiringError('EXTERNAL_APPLICATION_STALE', context.correlationId));
+        await this.auditExternal(tx, context, id, action, [], revision);
+        return { ok: true, correlationId: context.correlationId };
+      }
+      const columns = { companyName: 'company_name', roleTitle: 'role_title', sourceKind: 'source_kind', appliedOn: 'applied_on', applicationUrl: 'application_url', stage: 'stage' } as const;
+      const changes = Object.entries(fields).map(([key, value]) => sql`${sql.identifier(columns[key as keyof typeof columns])} = ${value}`);
+      if (action === 'institution_visibility_granted') changes.push(sql`institution_visibility_granted_at = clock_timestamp(), institution_visibility_revoked_at = NULL`);
+      if (action === 'institution_visibility_revoked') changes.push(sql`institution_visibility_revoked_at = greatest(clock_timestamp(), institution_visibility_granted_at)`);
+      const result = await tx.execute(sql`UPDATE external_applications SET ${sql.join(changes, sql`, `)}, revision = revision + 1, updated_at = clock_timestamp()
+        WHERE id = ${id}::uuid AND student_user_id = ${actor}::uuid AND revision = ${revision} RETURNING *`) as QueryResult<Record<string, unknown>>;
+      if (!result.rows[0]) throw new ConflictException(safeHiringError('EXTERNAL_APPLICATION_STALE', context.correlationId));
+      await this.auditExternal(tx, context, id, action, action === 'updated' ? Object.keys(fields) : ['institutionVisibility'], revision + 1);
+      return { externalApplication: mapExternalApplication(result.rows[0]), correlationId: context.correlationId };
+    });
+  }
+
+  private async auditExternal(db: Pick<PersistenceDb, 'execute'>, context: ReturnType<typeof requireTrustedAuthorization>, id: string, action: string, changedFields: string[], revision: number): Promise<void> {
+    await db.execute(sql`INSERT INTO audit_events (id, actor_user_id, action, resource_type, resource_id, outcome, correlation_id, context)
+      VALUES (${this.ids.uuid()}::uuid, ${context.authorization.principal.userId}::uuid, ${`external_application.${action}`}, 'external_application',
+        ${id}::uuid, 'SUCCESS', ${context.correlationId}, ${JSON.stringify({ changedFields, revision })}::jsonb)`);
+  }
 
   @Get('/opportunities')
   @UseGuards(ProtectedApiAuthenticationGuard)
@@ -487,6 +611,24 @@ function mapOffer(row: Record<string, unknown>): Record<string, unknown> {
     conditions: row.conditions ?? null,
     extendedAt: row.extended_at ?? null,
   };
+}
+
+function mapExternalApplication(row: Record<string, unknown>): Record<string, unknown> {
+  return {
+    id: row.id, companyName: row.company_name, roleTitle: row.role_title, sourceKind: row.source_kind,
+    appliedOn: row.applied_on instanceof Date ? `${row.applied_on.getFullYear()}-${String(row.applied_on.getMonth() + 1).padStart(2, '0')}-${String(row.applied_on.getDate()).padStart(2, '0')}` : row.applied_on,
+    applicationUrl: row.application_url, stage: row.stage, source: row.source, verificationState: row.verification_state,
+    institutionVisibilityGrantedAt: row.institution_visibility_granted_at, institutionVisibilityRevokedAt: row.institution_visibility_revoked_at,
+    revision: Number(row.revision), createdAt: row.created_at, updatedAt: row.updated_at,
+  };
+}
+function parseExternal<T>(read: () => T, correlationId: string): T {
+  try { return read(); } catch (error) { if (error instanceof ExternalApplicationInputError) throw badRequest('INVALID_EXTERNAL_APPLICATION', correlationId); throw error; }
+}
+function readExternalPage(value: string | undefined, fallback: number, min: number, max: number, correlationId: string): number {
+  if (value === undefined) return fallback;
+  if (!/^\d+$/.test(value) || !Number.isSafeInteger(Number(value)) || Number(value) < min || Number(value) > max) throw badRequest('INVALID_EXTERNAL_PAGE', correlationId);
+  return Number(value);
 }
 
 function readDecision(body: unknown, correlationId: string): 'ACCEPT' | 'DECLINE' {

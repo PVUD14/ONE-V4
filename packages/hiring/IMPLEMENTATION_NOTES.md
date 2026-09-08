@@ -80,9 +80,9 @@ B1–B6 have been rebased onto `origin/integration` at `21adf00`, including migr
 `0026_learner_content_reviews.sql`. The rebased work and B7 are on
 `stream/b-manisha/interviewer-assignment`; the previously pushed
 `stream/b-manisha/interviews-offers-api` history is preserved without a force-push.
-This branch includes the existing 0017 and 0018 migrations unchanged. B8 remains
-design-only in draft PR #9: 0019 is reserved, but its table design still needs
-Divakar's approval. No 0019 migration is included.
+The B7 delivery included migrations 0017 and 0018 unchanged. Divakar subsequently
+approved the amended B8 design in PR #9 and migration 0019; the implementation
+and remaining owner handoffs are described below.
 
 The B7 authority is Divakar's restated ADR-026 decision supplied with the task;
 the ADR file is not yet present on integration. No membership role or membership
@@ -134,6 +134,76 @@ outbox event commit together. The assignment audit context is
 `{ participantUserIds: UUID[], visibilityAcknowledged: true }` on the interview
 resource with employer organization scope. The literal `INTERVIEWER` is used
 only as the existing `interview_participants.participant_role` value.
+
+## B8 — approved external application tracking
+
+Implemented from `origin/integration` at `6a9d810`, following Divakar's approval
+of the amended design in PR #9 (`bbb8c0c`). Migration
+`0019_external_applications.sql` adds the separate student-owned table with fixed
+`STUDENT_DECLARED` provenance and `UNVERIFIED` state. It does not change any
+existing migration, native application foreign key, opportunity or employer row.
+
+**No external declaration, including `HIRED`, enters any placement or conversion
+metric, numerator, denominator or combined total without independent
+verification.** This slice provides no verification workflow. Native application
+DTOs, employer reads, offers, interview lists and analytics remain native-only.
+The student's external records and count occupy their own section; every row,
+detail and form visibly says `Student-declared · Unverified`, including terminal
+stages. Dates render as calendar dates without timezone conversion.
+
+Routes under `/api/v1/students/me/external-applications`:
+
+| Method/path | Contract |
+| --- | --- |
+| `GET /` | Owner-only `{ externalApplications, total, offset, limit }`; offset 0–500, default 0; limit 1–100, default 50; ordered by applied date descending, then ID |
+| `GET /:id` | Owner-only `{ externalApplication }`; unknown and other-owner IDs receive the same generic denial |
+| `POST /` | Company, role, source kind, applied date, optional HTTPS link and stage; separate optional `institutionVisibilityGranted`, default false |
+| `PATCH /:id` | Expected `revision` plus one or more declared fields; rejects owner, provenance, verification and consent injection |
+| `DELETE /:id` | JSON `{ revision }`; physically deletes the owned record and atomically audits deletion |
+| `POST /:id/institution-visibility/grant` | JSON `{ revision }`; explicit independent consent; a new grant after revocation replaces grant time and clears current revocation |
+| `POST /:id/institution-visibility/revoke` | JSON `{ revision }`; retry on already-unshared/revoked record is a no-op, preserving the first revocation; stale retries after a new grant are rejected |
+
+Every response includes a correlation ID; these and record IDs are not rendered
+as user-facing labels. The record DTO includes declared fields, provenance,
+verification state, consent timestamps, revision and creation/update times, never
+the owner's user ID. Errors use fixed safe codes/messages. Links are validated
+but never fetched, and remain student-only.
+
+**500 currently held records per student**, across every stage and consent state.
+Create locks the authenticated student's `users` row before counting and inserting
+inside one transaction. All create requests use this lock, including concurrent
+requests for the last slot. Cap failures add no row or successful-create audit.
+Edits and revocations work at the cap; permanent deletion frees a slot. Mutations
+lock the owned row and predicate writes on both owner and expected revision.
+Stale changes return `EXTERNAL_APPLICATION_STALE` (409), cap rejection
+`EXTERNAL_APPLICATION_LIMIT` (400).
+
+Successful mutations and minimal `external_application.*` audits commit together.
+Audits contain actor, resource ID, correlation ID, outcome, changed field names
+and revision, never company/role/link values or full request bodies. No unregistered
+outbox event or reportable stage-history record is introduced.
+
+### Required Stream C and Core handoffs
+
+- **Stream C owns institution reads and reports.** Before exposing per-student
+  external data, enforce separate current record consent and the existing ADR-019 /
+  DP-010 relationship/activity-access rule for `applied_on`, including backdated
+  declarations. Keep company, role, declared stage and key dates explicitly
+  unverified; withhold links. Apply the hard metric exclusion above everywhere.
+- **Permanent deletion intentionally changes later reports.** A declaration
+  previously seen under consent must disappear from later reads, report reruns,
+  cached/materialized results and external-activity aggregates. Do not preserve
+  its contribution through a soft-delete row or its audit. Stream C/Core must
+  invalidate any future report caches; no institution read/cache path is built
+  here. Previously downloaded reports cannot be recalled. The student confirmation
+  explains permanence and disappearance from later reports.
+- **Core owns privacy export and deletion integration.** Include these rows in the
+  student's applicable privacy export/deletion lifecycle before shipping. The
+  direct student DELETE endpoint is implemented here; Core's existing privacy
+  handlers are unchanged and this PR does not claim those handoffs are complete.
+- **Privacy review:** B4 consent wording remains queued for the DPDP counsel
+  engagement. The B8 sharing notice also remains draft wording requiring ADR-019
+  privacy review before shipment; table-design approval is not notice approval.
 
 ## Verification
 

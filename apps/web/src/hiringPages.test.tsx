@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { completeHostedLoginFromLocation } from './auth.js';
-import { EmployerApplicantsPage, EmployerInterviewsPage, EmployerOffersPage, EmployerHiringAnalyticsPage, StudentApplicationsPage, StudentOpportunitiesPage } from './hiringPages.js';
+import { EmployerApplicantsPage, EmployerInterviewsPage, EmployerOffersPage, EmployerHiringAnalyticsPage, StudentApplicationsPage, StudentOpportunitiesPage, StudentExternalApplicationsPanel } from './hiringPages.js';
 
 const opportunity = {
   id: '11111111-1111-4111-8111-111111111111',
@@ -383,6 +383,114 @@ describe('institution consent and reports', () => {
     expect(screen.getByRole('heading', { name: 'Stage conversion' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Per-opportunity funnel' })).toBeInTheDocument();
     expect(screen.getAllByText('NA').length).toBeGreaterThan(5);
+  });
+});
+
+describe('student-declared external application UI', () => {
+  const path = '/api/v1/students/me/external-applications';
+  const external = { id: crypto.randomUUID(), companyName: 'External Test Company', roleTitle: 'External Test Role', sourceKind: 'REFERRAL', appliedOn: '2026-01-01', stage: 'HIRED',
+    applicationUrl: null, source: 'STUDENT_DECLARED', verificationState: 'UNVERIFIED', revision: 4, institutionVisibilityGrantedAt: null, institutionVisibilityRevokedAt: null };
+
+  it('keeps declarations separate from native counters and labels every terminal row and detail', async () => {
+    const rows = ['APPLIED', 'SCREENING', 'ASSESSMENT', 'INTERVIEW', 'OFFER', 'HIRED', 'REJECTED', 'WITHDRAWN'].map((stage, index) => ({ ...external, id: index === 0 ? external.id : crypto.randomUUID(), stage }));
+    stubFetch({ [path]: { externalApplications: rows, total: rows.length }, [`${path}/${external.id}`]: { externalApplication: external },
+      '/api/v1/students/me/applications': { applications: [] }, '/api/v1/students/me/offers': { offers: [] } });
+    await authenticate(); render(<StudentApplicationsPage />);
+    const table = await screen.findByRole('table', { name: 'Student-declared external applications' });
+    await waitFor(() => expect(within(table).getAllByText('Student-declared · Unverified')).toHaveLength(8));
+    const stats = document.querySelector('.career-stat-strip')!;
+    expect(stats.textContent).toMatch(/0.*Applications.*0.*In progress.*0.*At interview.*0.*At offer/);
+    fireEvent.click(within(table).getAllByRole('button', { name: 'View external application' })[0]!);
+    expect(await screen.findByText('Declared stage: Hired · Unverified')).toBeInTheDocument();
+    expect(screen.getAllByText('Student-declared · Unverified')).toHaveLength(9);
+    expect(screen.getByText('Application link: NA')).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain(external.id);
+  });
+
+  it('creates a declaration with optional consent off by default', async () => {
+    stubFetch({ [path]: { externalApplications: [], total: 0 } });
+    await authenticate(); render(<StudentExternalApplicationsPanel />);
+    await screen.findByText('No external applications recorded.');
+    fireEvent.click(screen.getByRole('button', { name: 'Record external application' }));
+    const form = screen.getByRole('button', { name: 'Save external application' }).closest('form')!;
+    expect(within(form).getByText('Student-declared · Unverified')).toBeInTheDocument();
+    expect(within(form).getByRole('checkbox')).not.toBeChecked();
+    fireEvent.change(screen.getByLabelText('Company name'), { target: { value: ' Test Company ' } });
+    fireEvent.change(screen.getByLabelText('Role title'), { target: { value: ' Test Role ' } });
+    fireEvent.change(screen.getByLabelText('Application source'), { target: { value: 'COMPANY_SITE' } });
+    fireEvent.change(screen.getByLabelText('Date applied'), { target: { value: '2026-01-01' } });
+    fireEvent.change(screen.getByLabelText('Declared stage'), { target: { value: 'HIRED' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save external application' }));
+    await waitFor(() => expect(postsTo('/external-applications')).toHaveLength(1));
+    expect(JSON.parse(postsTo('/external-applications')[0]![1]!.body as string)).toEqual({ companyName: 'Test Company', roleTitle: 'Test Role', sourceKind: 'COMPANY_SITE', appliedOn: '2026-01-01', applicationUrl: null, stage: 'HIRED', institutionVisibilityGranted: false });
+    expect(await screen.findByText('External application recorded as student-declared and unverified.')).toBeInTheDocument();
+  });
+
+  it('updates with the expected revision and handles stale writes without exposing upstream details', async () => {
+    stubFetch({ [path]: { externalApplications: [external], total: 1 } }, { [`${path}/${external.id}`]: { status: 409, body: { error: { code: 'EXTERNAL_APPLICATION_STALE', message: 'SQL internal detail' } } } });
+    await authenticate(); render(<StudentExternalApplicationsPanel />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit external application' }));
+    fireEvent.change(screen.getByLabelText('Declared stage'), { target: { value: 'APPLIED' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save external application' }));
+    await waitFor(() => expect(vi.mocked(fetch).mock.calls.some(([, init]) => init?.method === 'PATCH')).toBe(true));
+    const call = vi.mocked(fetch).mock.calls.find(([, init]) => init?.method === 'PATCH')!;
+    expect(JSON.parse(call[1]!.body as string)).toMatchObject({ revision: 4, stage: 'APPLIED' });
+    expect(JSON.parse(call[1]!.body as string)).not.toHaveProperty('institutionVisibilityGranted');
+    expect((await screen.findAllByText('This record changed elsewhere. Refresh and reopen it before trying again.')).length).toBeGreaterThan(0);
+    expect(document.body.textContent).not.toContain('SQL internal detail');
+  });
+
+  it('requires permanent deletion confirmation and sends the revision', async () => {
+    const routes: Record<string, unknown> = { [path]: { externalApplications: [external], total: 1 } };
+    stubFetch(routes); await authenticate(); render(<StudentExternalApplicationsPanel />);
+    vi.stubGlobal('confirm', vi.fn(() => false));
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete permanently' }));
+    expect(fetch).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ method: 'DELETE' }));
+    vi.mocked(window.confirm).mockReturnValue(true);
+    routes[path] = { externalApplications: [], total: 0 };
+    fireEvent.click(screen.getByRole('button', { name: 'Delete permanently' }));
+    expect(await screen.findByText('External application permanently deleted. It will no longer appear in later reports.')).toBeInTheDocument();
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('This cannot be undone. If your institution previously saw it, it will disappear from later reports.'));
+    const call = vi.mocked(fetch).mock.calls.find(([, init]) => init?.method === 'DELETE')!;
+    expect(JSON.parse(call[1]!.body as string)).toEqual({ revision: 4 });
+    expect(await screen.findByText('No external applications recorded.')).toBeInTheDocument();
+    expect(screen.queryByText('External Test Role')).not.toBeInTheDocument();
+  });
+
+  it('keeps sharing revocable at the cap and excludes the private link from the notice', async () => {
+    const shared = { ...external, institutionVisibilityGrantedAt: '2026-01-01T00:00:00Z' };
+    stubFetch({ [path]: { externalApplications: [shared], total: 500 }, [`${path}/${external.id}`]: { externalApplication: shared } });
+    await authenticate(); render(<StudentExternalApplicationsPanel />);
+    fireEvent.click(await screen.findByRole('button', { name: 'View external application' }));
+    expect(screen.getByRole('button', { name: 'Record external application' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Edit external application' })).toBeEnabled();
+    fireEvent.click(await screen.findByRole('button', { name: 'Stop sharing external application' }));
+    await waitFor(() => expect(postsTo('/institution-visibility/revoke')).toHaveLength(1));
+    expect(JSON.parse(postsTo('/institution-visibility/revoke')[0]![1]!.body as string)).toEqual({ revision: 4 });
+  });
+
+  it('pages through external records with bounded requests', async () => {
+    stubFetch({ [path]: { externalApplications: [external], total: 51 } });
+    await authenticate(); render(<StudentExternalApplicationsPanel />);
+    await screen.findByText('Records: 51 of 500');
+    fireEvent.click(screen.getByRole('button', { name: 'Next external applications' }));
+    await waitFor(() => expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).includes('offset=50&limit=50'))).toBe(true));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Previous external applications' })).toBeEnabled());
+    expect(screen.getByRole('button', { name: 'Next external applications' })).toBeDisabled();
+  });
+
+  it('requires separate confirmation before granting institution visibility', async () => {
+    stubFetch({ [path]: { externalApplications: [external], total: 1 }, [`${path}/${external.id}`]: { externalApplication: external } });
+    await authenticate(); render(<StudentExternalApplicationsPanel />);
+    fireEvent.click(await screen.findByRole('button', { name: 'View external application' }));
+    const share = await screen.findByRole('button', { name: 'Share external application with institution' });
+    vi.stubGlobal('confirm', vi.fn(() => false));
+    fireEvent.click(share); expect(postsTo('/institution-visibility/grant')).toHaveLength(0);
+    vi.mocked(window.confirm).mockReturnValue(true);
+    fireEvent.click(share);
+    await waitFor(() => expect(postsTo('/institution-visibility/grant')).toHaveLength(1));
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('The application link stays private.'));
+    expect(JSON.parse(postsTo('/institution-visibility/grant')[0]![1]!.body as string)).toEqual({ revision: 4 });
   });
 });
 

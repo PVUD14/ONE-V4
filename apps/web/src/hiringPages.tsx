@@ -7,6 +7,8 @@ import {
   type EmployerInterviewDto, type EmployerOfferDto, type InterviewScheduleInput,
   type InterviewStateInput, type InterviewOutcomeInput, type OfferInput, type HiringAnalyticsDto,
   listInterviewParticipantOptions, type InterviewParticipantOptionDto,
+  listExternalApplications, getExternalApplication, createExternalApplication, updateExternalApplication,
+  deleteExternalApplication, changeExternalInstitutionVisibility, type ExternalApplicationDto, type ExternalApplicationInput,
 } from './api/hiring.js';
 import {
   ApiRequestError,
@@ -59,6 +61,9 @@ const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   INVALID_SCHEDULE: 'Choose an end time after the interview starts.',
   INVALID_PARTICIPANTS: 'Select current members of this employer to join the interview.',
   PARTICIPANT_VISIBILITY_REQUIRED: 'Confirm that the selected participants may see the candidate for this interview.',
+  EXTERNAL_APPLICATION_LIMIT: 'You can hold up to 500 external applications. Permanently delete a record before adding another.',
+  EXTERNAL_APPLICATION_STALE: 'This record changed elsewhere. Refresh and reopen it before trying again.',
+  INVALID_EXTERNAL_APPLICATION: 'Check the company, role, source, application date and HTTPS link. Future application dates are not allowed.',
   FORBIDDEN: 'You do not have access to that.',
 };
 
@@ -279,6 +284,7 @@ export function StudentApplicationsPage(): React.ReactElement {
     </div>
     <section className="card wide-card">
       <h2>Your applications</h2>
+      <p>Applications submitted through ONE. External declarations are listed separately below.</p>
       {status ? <p role="status">{status}</p> : null}
       {applications.length === 0
         ? <p>When you apply to an opportunity it will appear here, with the stage it has reached.</p>
@@ -300,7 +306,153 @@ export function StudentApplicationsPage(): React.ReactElement {
         </table></div>}
     </section>
     <StudentOffersPanel onChanged={() => { void reload(); }} />
+    <StudentExternalApplicationsPanel />
   </div>;
+}
+
+const externalStages: readonly ExternalApplicationInput['stage'][] = ['APPLIED', 'SCREENING', 'ASSESSMENT', 'INTERVIEW', 'OFFER', 'HIRED', 'REJECTED', 'WITHDRAWN'];
+const externalSources: readonly ExternalApplicationInput['sourceKind'][] = ['JOB_BOARD', 'COMPANY_SITE', 'REFERRAL'];
+const externalLabel = 'Student-declared · Unverified';
+const externalConsentNotice = 'Share this external application’s company, role, stage and dates with my institution. This is optional; I can stop sharing at any time. The application link stays private.';
+
+export function StudentExternalApplicationsPanel(): React.ReactElement {
+  const token = getAccessToken();
+  if (!token) return <section className="card wide-card"><h2>External applications</h2><p>Sign in to record applications made outside ONE.</p><p>Records: NA of 500</p></section>;
+  return <ExternalApplicationsWorkspace key={token} token={token} />;
+}
+
+function ExternalApplicationsWorkspace({ token }: { readonly token: string }): React.ReactElement {
+  const [rows, setRows] = useState<readonly ExternalApplicationDto[]>([]);
+  const [total, setTotal] = useState<number | null>(null);
+  const [offset, setOffset] = useState(0);
+  const [refresh, setRefresh] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState('');
+  const [detail, setDetail] = useState<ExternalApplicationDto | null>(null);
+  const [editor, setEditor] = useState<ExternalApplicationDto | 'new' | null>(null);
+  const detailRequest = useRef<AbortController | null>(null);
+  useEffect(() => () => detailRequest.current?.abort(), []);
+  useEffect(() => {
+    const abort = new AbortController();
+    setLoading(true);
+    void listExternalApplications(token, offset, abort.signal).then((page) => {
+      if (abort.signal.aborted) return;
+      if (!Array.isArray(page.externalApplications) || !Number.isInteger(page.total)) throw new Error('Invalid response');
+      if (offset > 0 && offset >= page.total) { setOffset(Math.floor(Math.max(0, page.total - 1) / 50) * 50); return; }
+      setRows(page.externalApplications); setTotal(page.total);
+    }).catch(() => { if (!abort.signal.aborted) { setRows([]); setTotal(null); setNotice('External applications could not be loaded. Please refresh.'); } })
+      .finally(() => { if (!abort.signal.aborted) setLoading(false); });
+    return () => abort.abort();
+  }, [token, offset, refresh]);
+
+  function closeDetail(): void { detailRequest.current?.abort(); setDetail(null); setEditor(null); }
+  async function openDetail(row: ExternalApplicationDto): Promise<void> {
+    closeDetail();
+    const abort = new AbortController(); detailRequest.current = abort;
+    try {
+      const response = await getExternalApplication(token, row.id, abort.signal);
+      if (!abort.signal.aborted) setDetail(response.externalApplication);
+    } catch (error) { if (!abort.signal.aborted) setNotice(messageFor(error, 'This external application could not be opened. Refresh to check whether it still exists.')); }
+  }
+  async function mutate(operation: () => Promise<unknown>, success: string): Promise<void> {
+    if (busy) return;
+    setBusy(true); setNotice('');
+    try {
+      await operation(); closeDetail(); setRows([]); setTotal(null); setLoading(true);
+      setNotice(success); setRefresh((value) => value + 1);
+    } catch (error) { setNotice(messageFor(error, 'The external application could not be changed.')); throw error; }
+    finally { setBusy(false); }
+  }
+  async function remove(row: ExternalApplicationDto): Promise<void> {
+    if (!window.confirm('Permanently delete this external application? This cannot be undone. If your institution previously saw it, it will disappear from later reports.')) return;
+    await mutate(() => deleteExternalApplication(token, row.id, row.revision), 'External application permanently deleted. It will no longer appear in later reports.').catch(() => undefined);
+  }
+  async function changeSharing(row: ExternalApplicationDto, action: 'grant' | 'revoke'): Promise<void> {
+    if (action === 'grant' && !window.confirm(externalConsentNotice)) return;
+    await mutate(() => changeExternalInstitutionVisibility(token, row.id, row.revision, action), action === 'grant' ? 'Institution sharing enabled for this declaration.' : 'Institution sharing stopped. Your declaration is unchanged.').catch(() => undefined);
+  }
+  function sharing(row: ExternalApplicationDto): string {
+    return row.institutionVisibilityGrantedAt && !row.institutionVisibilityRevokedAt ? 'Shared with institution' : row.institutionVisibilityRevokedAt ? 'Sharing stopped' : 'Not shared';
+  }
+  return <section className="card wide-card">
+    <h2>External applications</h2>
+    <p>Record applications you made outside ONE. These declarations are unverified and do not count toward placement or conversion metrics.</p>
+    <p>Records: {total ?? 'NA'} of 500</p>
+    <div className="hiring-actions">
+      <button type="button" disabled={busy || total === 500} onClick={() => { closeDetail(); setEditor('new'); }}>Record external application</button>
+      <button type="button" className="secondary" disabled={busy || loading} onClick={() => { closeDetail(); setRefresh((value) => value + 1); }}>Refresh external applications</button>
+    </div>
+    {total === 500 ? <p>You have reached the 500-record limit. Editing and stopping institution sharing remain available.</p> : null}
+    {notice ? <p role="status">{notice}</p> : null}
+    {loading ? <p role="status">Loading external applications…</p> : null}
+    {!loading && total === 0 ? <p>No external applications recorded.</p> : null}
+    <div className="data-table-wrap"><table aria-label="Student-declared external applications">
+      <thead><tr><th>Role</th><th>Company</th><th>Source</th><th>Declared stage</th><th>Date applied</th><th>Institution sharing</th><th>Actions</th></tr></thead>
+      <tbody>{rows.map((row) => <tr key={row.id}>
+        <td>{row.roleTitle || 'NA'}<div className="hiring-meta">{externalLabel}</div></td><td>{row.companyName || 'NA'}</td><td>{humanise(row.sourceKind)}</td>
+        <td>{humanise(row.stage)}<span className="hiring-meta"> · Unverified</span></td><td>{row.appliedOn || 'NA'}</td><td>{sharing(row)}</td>
+        <td><div className="hiring-actions">
+          <button type="button" disabled={busy} onClick={() => { void openDetail(row); }}>View external application</button>
+          <button type="button" disabled={busy} onClick={() => { closeDetail(); setEditor(row); }}>Edit external application</button>
+          <button type="button" disabled={busy} className="secondary" onClick={() => { void remove(row); }}>Delete permanently</button>
+        </div></td>
+      </tr>)}</tbody>
+    </table></div>
+    <div className="hiring-actions">
+      <button type="button" disabled={loading || busy || offset === 0} onClick={() => { closeDetail(); setRows([]); setOffset((value) => Math.max(0, value - 50)); }}>Previous external applications</button>
+      <button type="button" disabled={loading || busy || total == null || offset + 50 >= total} onClick={() => { closeDetail(); setRows([]); setOffset((value) => value + 50); }}>Next external applications</button>
+    </div>
+    {detail ? <section className="role-card">
+      <h3>{detail.roleTitle || 'NA'}</h3><p>{externalLabel}</p><p>Company: {detail.companyName || 'NA'}</p>
+      <p>Source: {humanise(detail.sourceKind)}</p><p>Declared stage: {humanise(detail.stage)} · Unverified</p><p>Date applied: {detail.appliedOn || 'NA'}</p>
+      <p>Application link: {detail.applicationUrl && /^https:\/\//i.test(detail.applicationUrl) ? <a href={detail.applicationUrl} target="_blank" rel="noopener noreferrer">Open application link</a> : 'NA'}</p>
+      <p>Institution sharing: {sharing(detail)}</p>
+      <p>{externalConsentNotice}</p>
+      <button type="button" disabled={busy} onClick={() => { void changeSharing(detail, detail.institutionVisibilityGrantedAt && !detail.institutionVisibilityRevokedAt ? 'revoke' : 'grant'); }}>
+        {detail.institutionVisibilityGrantedAt && !detail.institutionVisibilityRevokedAt ? 'Stop sharing external application' : 'Share external application with institution'}
+      </button>
+      <button type="button" className="secondary" disabled={busy} onClick={closeDetail}>Close external details</button>
+    </section> : null}
+    {editor ? <ExternalApplicationForm key={editor === 'new' ? 'new' : `${editor.id}-${editor.revision}`} initial={editor === 'new' ? undefined : editor} busy={busy} onCancel={closeDetail}
+      onSave={async (input) => { await mutate(() => editor === 'new' ? createExternalApplication(token, input)
+        : updateExternalApplication(token, editor.id, { companyName: input.companyName, roleTitle: input.roleTitle, sourceKind: input.sourceKind,
+          appliedOn: input.appliedOn, applicationUrl: input.applicationUrl ?? null, stage: input.stage, revision: editor.revision }),
+      editor === 'new' ? 'External application recorded as student-declared and unverified.' : 'External application updated.'); }} /> : null}
+  </section>;
+}
+
+function ExternalApplicationForm({ initial, busy, onSave, onCancel }: {
+  readonly initial: ExternalApplicationDto | undefined; readonly busy: boolean;
+  readonly onSave: (input: ExternalApplicationInput) => Promise<void>; readonly onCancel: () => void;
+}): React.ReactElement {
+  const [error, setError] = useState('');
+  async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault(); if (busy) return;
+    const form = new FormData(event.currentTarget);
+    const appliedOn = String(form.get('appliedOn'));
+    if (appliedOn > new Date().toISOString().slice(0, 10)) { setError('Choose the date you applied; future dates are not allowed.'); return; }
+    setError('');
+    try { await onSave({ companyName: String(form.get('companyName')).trim(), roleTitle: String(form.get('roleTitle')).trim(),
+      sourceKind: String(form.get('sourceKind')) as ExternalApplicationInput['sourceKind'], appliedOn,
+      applicationUrl: String(form.get('applicationUrl')) || null, stage: String(form.get('stage')) as ExternalApplicationInput['stage'],
+      ...(!initial ? { institutionVisibilityGranted: form.get('institutionVisibilityGranted') === 'on' } : {}) });
+    } catch (failure) { setError(messageFor(failure, 'The external application could not be saved.')); }
+  }
+  return <form className="role-management-form" onSubmit={(event) => { void submit(event); }}>
+    <h3 className="wide-card">{initial ? 'Edit external application' : 'Record external application'}</h3><p className="wide-card">{externalLabel}</p>
+    <fieldset className="role-management-form wide-card" disabled={busy}><legend>Application you made outside ONE</legend>
+      <label><span>Company name</span><input name="companyName" required maxLength={200} defaultValue={initial?.companyName ?? ''} /></label>
+      <label><span>Role title</span><input name="roleTitle" required maxLength={200} defaultValue={initial?.roleTitle ?? ''} /></label>
+      <label><span>Application source</span><select name="sourceKind" required defaultValue={initial?.sourceKind ?? ''}><option value="" disabled>Select source</option>{externalSources.map((source) => <option key={source} value={source}>{humanise(source)}</option>)}</select></label>
+      <label><span>Date applied</span><input name="appliedOn" type="date" required max={new Date().toISOString().slice(0, 10)} defaultValue={initial?.appliedOn ?? ''} /></label>
+      <label><span>Application link (optional)</span><input name="applicationUrl" type="url" pattern="https://[^\s]+" maxLength={2048} defaultValue={initial?.applicationUrl ?? ''} /></label>
+      <label><span>Declared stage</span><select name="stage" required defaultValue={initial?.stage ?? 'APPLIED'}>{externalStages.map((stage) => <option key={stage} value={stage}>{humanise(stage)} · Unverified</option>)}</select></label>
+      {!initial ? <label className="hiring-checkbox"><input name="institutionVisibilityGranted" type="checkbox" defaultChecked={false} /><span>{externalConsentNotice}</span></label> : <p>Editing does not change institution sharing. Use the separate sharing control in the record details.</p>}
+    </fieldset>
+    {error ? <p role="alert">{error}</p> : null}
+    <button type="submit" disabled={busy}>Save external application</button><button type="button" className="secondary" disabled={busy} onClick={onCancel}>Cancel external edit</button>
+  </form>;
 }
 
 export function StudentOffersPanel({ onChanged }: { readonly onChanged?: () => void }): React.ReactElement {

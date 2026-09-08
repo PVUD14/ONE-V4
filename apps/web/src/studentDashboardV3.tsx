@@ -7,9 +7,11 @@ import {
   getStudentActivity,
   getStudentProfile,
   listMyNotifications,
+  listStudentApplications,
   listStudentExams,
   type LearnerCareerReadinessState,
   type StudentActivityDto,
+  type StudentApplicationDto,
   type StudentExamDto,
   type StudentProfileDto,
   type UserNotificationDto,
@@ -73,6 +75,107 @@ interface DashboardData {
   readonly exams: readonly StudentExamDto[] | null;
   readonly notifications: { readonly notifications: readonly UserNotificationDto[]; readonly unreadCount: number } | null;
   readonly activity: StudentActivityDto | null;
+  readonly applications: readonly StudentApplicationDto[] | null;
+}
+
+function ReportDate({ value }: { readonly value: string | null | undefined }): React.ReactElement {
+  if (!value || !Number.isFinite(Date.parse(value))) return <>NA</>;
+  return <time dateTime={value}>{new Date(value).toLocaleString(undefined, {
+    year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+  })}</time>;
+}
+
+function reportState(value: string | undefined, allowed: readonly string[]): string {
+  return value && allowed.includes(value) ? prettify(value) : 'NA';
+}
+
+function StudentReports({ learner, exams, applications }: Pick<DashboardData, 'learner' | 'exams' | 'applications'>): React.ReactElement {
+  const history = learner?.readinessHistory ?? [];
+  const lessonTitles = new Map((learner?.catalog?.modules ?? []).flatMap((module) =>
+    (module.lessons ?? []).map((lesson) => [lesson.id, lesson.title] as const)));
+  const topicNames = new Map((learner?.catalog?.topics ?? []).map((topic) => [topic.id, topic.name]));
+
+  return <section aria-labelledby="student-reports-title">
+    <div className="pilot-page-head"><div>
+      <h2 id="student-reports-title">Your Reports</h2>
+      <p>Your recorded learning, assessment and application activity. Readiness is advisory and is never shared with employers.</p>
+    </div></div>
+    <section className="pilot-card" aria-labelledby="report-readiness-title">
+      <h3 id="report-readiness-title">Readiness over time</h3>
+      <p>Latest available snapshots, newest first (up to 100). Each step is a band, not a score.</p>
+      <p>Not Enough Evidence · Developing · Progressing · Ready For Next Step</p>
+      {history.length ? <ol className="pilot-list" aria-label="Readiness band history, newest first">
+        {history.map((point, index) => {
+          const previous = history[index + 1];
+          const modelChanged = previous && point.modelVersionId && previous.modelVersionId
+            && point.modelVersionId !== previous.modelVersionId;
+          return <li key={point.id} className="pilot-list-row">
+            <div className="grow">
+              <strong><ReportDate value={point.generatedAt} /></strong>
+              <span className="pilot-chip blue">{reportState(point.band, READINESS_BANDS)}</span>
+              {modelChanged ? <p>Model version changed since the previous snapshot. Bands across this change are not comparable.</p> : null}
+              {!point.modelVersionId || (previous && !previous.modelVersionId)
+                ? <p>Model version unavailable; comparison unavailable.</p> : null}
+            </div>
+          </li>;
+        })}
+      </ol> : <p>NA — no readiness history available.</p>}
+    </section>
+    <div className="pilot-row cols-2">
+      <section className="pilot-card" aria-labelledby="report-learning-title">
+        <h3 id="report-learning-title">Learning progress</h3>
+        {learner?.progress?.length ? <ul className="pilot-list" aria-label="Recorded lesson progress">
+          {learner.progress.map((item) => <li key={item.lessonVersionId} className="pilot-list-row"><div className="grow">
+            <strong>{lessonTitles.get(item.lessonVersionId) ?? 'NA'}</strong>
+            <span className="pilot-chip slate">{reportState(item.state, ['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED'])}</span>
+            <p>Started: <ReportDate value={item.startedAt} /> · Completed: <ReportDate value={item.completedAt} /></p>
+          </div></li>)}
+        </ul> : <p>NA — no recorded lesson progress available.</p>}
+      </section>
+      <section className="pilot-card" aria-labelledby="report-evidence-title">
+        <h3 id="report-evidence-title">Learning evidence</h3>
+        {learner?.evidence?.length ? <ul className="pilot-list" aria-label="Recorded learning evidence">
+          {learner.evidence.map((item) => <li key={item.id} className="pilot-list-row"><div className="grow">
+            <strong>{topicNames.get(item.topicId) ?? 'NA'}</strong>
+            <p>Recorded: <ReportDate value={item.occurredAt} /></p>
+          </div></li>)}
+        </ul> : <p>NA — no learning evidence available.</p>}
+      </section>
+    </div>
+    <section className="pilot-card" aria-labelledby="report-assessments-title">
+      <h3 id="report-assessments-title">Assessment activity</h3>
+      <h4>Career-readiness attempts</h4>
+      {learner?.attempts?.length ? <ul className="pilot-list" aria-label="Career-readiness assessment attempts">
+        {learner.attempts.map((item) => <li key={item.id} className="pilot-list-row"><div className="grow">
+          <strong>{reportState(item.state, ['IN_PROGRESS', 'SUBMITTED', 'EXPIRED', 'VOIDED'])}</strong>
+          <p>Started: <ReportDate value={item.startedAt} /> · Submitted: <ReportDate value={item.submittedAt} /></p>
+        </div></li>)}
+      </ul> : <p>NA — no career-readiness attempts available.</p>}
+      <h4>Assigned assessments</h4>
+      <p>Available assignments ordered by start date (up to 100). Attempts used excludes any attempt still in progress.</p>
+      {exams?.length ? <ul className="pilot-list" aria-label="Assigned assessment activity">
+        {exams.map((exam) => <li key={exam.id} className="pilot-list-row"><div className="grow">
+          <strong>{exam.title || 'NA'}</strong>
+          <p>Attempts used: {exam.attemptsUsed ?? 'NA'} · Allowed: {exam.attemptsAllowed ?? 'NA'}</p>
+          <span className="pilot-chip slate">{exam.openAttemptId ? 'In progress'
+            : exam.latestResult ? 'Published result available' : 'No published result available'}</span>
+        </div></li>)}
+      </ul> : <p>NA — no assigned assessment activity available.</p>}
+    </section>
+    <section className="pilot-card" aria-labelledby="report-applications-title">
+      <h3 id="report-applications-title">Application activity</h3>
+      <p>Your latest available applications (up to 200), most recently updated first. This is not a lifetime total.</p>
+      {applications?.length ? <ul className="pilot-list" aria-label="Your application activity">
+        {applications.map((item) => <li key={item.id} className="pilot-list-row"><div className="grow">
+          <strong>{item.title || 'NA'}</strong>
+          <p>{item.employerName || 'NA'}</p>
+          <span className="pilot-chip slate">{reportState(item.state,
+            ['DRAFT', 'APPLIED', 'SCREENING', 'SHORTLISTED', 'ASSESSMENT', 'INTERVIEW', 'OFFER', 'HIRED', 'REJECTED', 'WITHDRAWN'])}</span>
+          <p>Submitted: <ReportDate value={item.submittedAt} /> · Updated: <ReportDate value={item.updatedAt} /></p>
+        </div></li>)}
+      </ul> : <p>NA — no application activity available.</p>}
+    </section>
+  </section>;
 }
 
 export function StudentDashboardV3({ studentName }: { readonly studentName: string }): React.ReactElement {
@@ -87,7 +190,10 @@ export function StudentDashboardV3({ studentName }: { readonly studentName: stri
       listStudentExams(token, controller.signal).then((response) => response.assessments).catch(() => null),
       listMyNotifications(token, controller.signal).catch(() => null),
       getStudentActivity(token, controller.signal).catch(() => null),
-    ]).then(([profile, learner, exams, notifications, activity]) => setData({ profile, learner, exams, notifications, activity }));
+      listStudentApplications(token, controller.signal).then((response) => response.applications).catch(() => null),
+    ]).then(([profile, learner, exams, notifications, activity, applications]) => {
+      if (!controller.signal.aborted) setData({ profile, learner, exams, notifications, activity, applications });
+    });
     return () => controller.abort();
   }, [token]);
 
@@ -106,7 +212,7 @@ export function StudentDashboardV3({ studentName }: { readonly studentName: stri
   const band = data.learner?.readiness?.band ?? null;
   const modules = data.learner?.catalog?.modules ?? [];
   const topics = new Map((data.learner?.catalog?.topics ?? []).map((topic) => [topic.id, topic]));
-  const factors = new Map((data.learner?.readiness?.explanation.factors ?? []).map((factor) => [factor.topicId, factor]));
+  const factors = new Map((data.learner?.readiness?.explanation?.factors ?? []).map((factor) => [factor.topicId, factor]));
   const masteryCards = (data.learner?.mastery ?? []).slice(0, 5);
 
   // Today's plan is rule-derived from live account state - the honest v1 of
@@ -162,7 +268,7 @@ export function StudentDashboardV3({ studentName }: { readonly studentName: stri
                 <div>{band
                   ? <span className="pilot-chip green">{prettify(band)}</span>
                   : <span className="pilot-chip slate">No advisory band yet</span>}</div>
-                <div style={{ marginTop: 11 }}><button type="button" className="pilot-btn soft small" onClick={() => go('/student/readiness')}>View Full Report</button></div>
+                <div style={{ marginTop: 11 }}><a className="pilot-btn soft small" href="#student-reports-title">View Full Report</a></div>
               </div>
               <ReadinessBandRing band={band} />
             </div>
@@ -305,6 +411,7 @@ export function StudentDashboardV3({ studentName }: { readonly studentName: stri
             </div>
           </section>
         </div>
+        <StudentReports learner={data.learner} exams={data.exams} applications={data.applications} />
       </div>
 
       <aside className="pilot-rail">

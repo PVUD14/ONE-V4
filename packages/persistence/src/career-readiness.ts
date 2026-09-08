@@ -596,7 +596,7 @@ export async function submitAssessmentAttempt(pool: Pool, input: {
 }
 
 export async function getLearnerCareerReadinessState(pool: Pool, subjectUserId: string): Promise<Record<string, unknown>> {
-  const [catalog, progress, attempts, evidence, projections, readiness, roadmap, notificationPreferences, notifications] = await Promise.all([
+  const [catalog, progress, attempts, evidence, projections, readiness, readinessHistory, roadmap, notificationPreferences, notifications] = await Promise.all([
     getPublishedCareerReadinessCatalog(pool),
     pool.query(`SELECT lesson_version_id AS "lessonVersionId", state, started_at AS "startedAt", completed_at AS "completedAt"
       FROM learner_progress WHERE subject_user_id=$1 ORDER BY updated_at`, [subjectUserId]),
@@ -608,6 +608,14 @@ export async function getLearnerCareerReadinessState(pool: Pool, subjectUserId: 
       FROM mastery_projections WHERE subject_user_id=$1 ORDER BY topic_id, generated_at DESC`, [subjectUserId]),
     pool.query(`SELECT id, band, advisory, employer_visible AS "employerVisible", explanation, generated_at AS "generatedAt"
       FROM readiness_snapshots WHERE subject_user_id=$1 ORDER BY generated_at DESC LIMIT 1`, [subjectUserId]),
+    // The band over time, newest first, so history[0] is always the same snapshot as
+    // `readiness`. Bands and their model version only: a snapshot's band is comparable
+    // with an earlier one only if the model version matches, and ADR-020 forbids any
+    // numeric readiness value, so there is nothing here to plot as a score.
+    // Tie-broken on id so the order is deterministic when two snapshots share a
+    // timestamp, and bounded so a long-lived learner cannot make this unbounded.
+    pool.query(`SELECT id, band, model_version_id AS "modelVersionId", generated_at AS "generatedAt"
+      FROM readiness_snapshots WHERE subject_user_id=$1 ORDER BY generated_at DESC, id DESC LIMIT 100`, [subjectUserId]),
     pool.query(`SELECT id, topic_id AS "topicId", action_code AS "actionCode", reason_code AS "reasonCode", state, due_at AS "dueAt"
       FROM roadmap_actions WHERE subject_user_id=$1 AND state NOT IN ('SUPERSEDED','DISMISSED') ORDER BY created_at DESC`, [subjectUserId]),
     pool.query(`SELECT email_enabled AS "emailEnabled", quiet_hours_start_minute AS "quietHoursStartMinute",
@@ -617,7 +625,7 @@ export async function getLearnerCareerReadinessState(pool: Pool, subjectUserId: 
       JOIN notification_templates t ON t.id=n.template_id WHERE n.subject_user_id=$1 ORDER BY n.created_at DESC LIMIT 25`, [subjectUserId]),
   ]);
   return { catalog, progress: progress.rows, attempts: attempts.rows, evidence: evidence.rows,
-    mastery: projections.rows, readiness: readiness.rows[0] ?? null, roadmap: roadmap.rows,
+    mastery: projections.rows, readiness: readiness.rows[0] ?? null, readinessHistory: readinessHistory.rows, roadmap: roadmap.rows,
     notificationPreferences: notificationPreferences.rows[0] ?? null, notifications: notifications.rows };
 }
 

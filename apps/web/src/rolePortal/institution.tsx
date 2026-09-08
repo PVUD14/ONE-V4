@@ -118,7 +118,7 @@ function InstitutionAdminStudentsPage({ portal, authenticatedWorkspace }: { read
   </section>;
 }
 
-export function InstitutionAcademicStructurePage({ portal, authenticatedWorkspace }: { readonly portal: RolePortalConfig; readonly authenticatedWorkspace?: AuthenticatedWorkspaceSummary | undefined }): React.ReactElement {
+export function InstitutionAcademicStructurePage({ portal, authenticatedWorkspace, canManage = true }: { readonly canManage?: boolean; readonly portal: RolePortalConfig; readonly authenticatedWorkspace?: AuthenticatedWorkspaceSummary | undefined }): React.ReactElement {
   const token = getProtectedAccessToken();
   const institutionId = authenticatedWorkspace?.organizationId ?? '';
   const [units, setUnits] = useState<readonly InstitutionUnitDto[]>([]);
@@ -126,9 +126,9 @@ export function InstitutionAcademicStructurePage({ portal, authenticatedWorkspac
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   useEffect(() => { if (token && institutionId) void listInstitutionUnits(token, institutionId).then((result) => setUnits(result.units)).catch(() => setError('Unable to load academic units.')); }, [token, institutionId, notice]);
-  if (!token) return <RestrictedApiState title="Academic Structure" message="Sign in with an Institution Admin identity to manage academic structure." />;
-  if (authenticatedWorkspace && !institutionWorkspaceRoles.has(authenticatedWorkspace.role)) return <InstitutionWorkspaceError title="Academic Structure" unauthorized />;
-  if (!isInstitutionWorkspace(authenticatedWorkspace)) return <InstitutionWorkspaceError title="Academic Structure" />;
+  if (!token) return <RestrictedApiState title="Academic Structure" message={canManage ? "Sign in with an Institution Admin identity to manage academic structure." : "Sign in to your institution staff workspace to view academic structure."} />;
+  if (authenticatedWorkspace && !(canManage ? institutionWorkspaceRoles.has(authenticatedWorkspace.role) : isInstitutionStaffWorkspace(authenticatedWorkspace))) return <InstitutionWorkspaceError title="Academic Structure" unauthorized />;
+  if (canManage ? !isInstitutionWorkspace(authenticatedWorkspace) : !isInstitutionStaffWorkspace(authenticatedWorkspace)) return <InstitutionWorkspaceError title="Academic Structure" />;
   async function create(event: React.FormEvent): Promise<void> {
     event.preventDefault();
     setError('');
@@ -151,14 +151,14 @@ export function InstitutionAcademicStructurePage({ portal, authenticatedWorkspac
       setError('Academic unit update failed.');
     }
   }
-  return <section className="role-module role-module--dense"><div className="role-page-heading"><div><span className="eyebrow">Authenticated API-backed</span><h1>Academic Structure</h1><p>Manage institution-scoped departments, programs, batches, sections and campuses. Parent choices are institution-scoped.</p></div></div>
+  return <section className="role-module role-module--dense"><div className="role-page-heading"><div><span className="eyebrow">Authenticated API-backed</span><h1>Academic Structure</h1><p>{canManage ? "Manage institution-scoped departments, programs, batches, sections and campuses. Parent choices are institution-scoped." : "View institution-scoped departments, programs, batches, sections and campuses."}</p></div></div>
     <div className="v2-row v2-cols-4 career-stat-strip role-wide">
       <V2Stat icon="🏛️" tone="blue" value={units.filter((unit) => unit.kind === 'DEPARTMENT').length} label="Departments" />
       <V2Stat icon="🎓" tone="purple" value={units.filter((unit) => unit.kind === 'PROGRAM').length} label="Programs" />
       <V2Stat icon="📅" tone="green" value={units.filter((unit) => unit.kind === 'BATCH').length} label="Batches" />
       <V2Stat icon="🧩" tone="amber" value={units.filter((unit) => ['SECTION', 'CAMPUS'].includes(unit.kind)).length} label="Sections and campuses" />
     </div>
-    {notice ? <p className="role-api-success" role="status">{notice}</p> : null}{error ? <p className="form-error" role="alert">{error}</p> : null}<form className="role-card role-wide role-management-form" onSubmit={(event) => void create(event)}><h2>Add academic unit</h2><label><span>Kind</span><select value={form.kind} onChange={(event) => setForm((value) => ({ ...value, kind: event.target.value }))}><option>DEPARTMENT</option><option>PROGRAM</option><option>BATCH</option><option>SECTION</option><option>CAMPUS</option></select></label><label><span>Name</span><input value={form.name} onChange={(event) => setForm((value) => ({ ...value, name: event.target.value }))} required /></label><UnitSelect label="Parent unit" value={form.parentUnitId} units={units} onChange={(parentUnitId) => setForm((value) => ({ ...value, parentUnitId }))} /><button type="submit">Create unit</button></form><div className="role-record-table-wrap"><table className="role-record-table"><caption className="sr-only">{portal.roleName} academic units</caption><thead><tr><th>Name</th><th>Kind</th><th>Parent</th><th>Action</th></tr></thead><tbody>{units.map((unit) => <tr key={unit.id}><th>{unit.name}</th><td>{unit.kind}</td><td>{units.find((candidate) => candidate.id === unit.parentUnitId)?.name ?? 'Institution'}</td><td><button type="button" className="secondary" onClick={() => void edit(unit)}>Edit unit</button></td></tr>)}</tbody></table></div></section>;
+    {notice ? <p className="role-api-success" role="status">{notice}</p> : null}{error ? <p className="form-error" role="alert">{error}</p> : null}{canManage ? <form className="role-card role-wide role-management-form" onSubmit={(event) => void create(event)}><h2>Add academic unit</h2><label><span>Kind</span><select value={form.kind} onChange={(event) => setForm((value) => ({ ...value, kind: event.target.value }))}><option>DEPARTMENT</option><option>PROGRAM</option><option>BATCH</option><option>SECTION</option><option>CAMPUS</option></select></label><label><span>Name</span><input value={form.name} onChange={(event) => setForm((value) => ({ ...value, name: event.target.value }))} required /></label><UnitSelect label="Parent unit" value={form.parentUnitId} units={units} onChange={(parentUnitId) => setForm((value) => ({ ...value, parentUnitId }))} /><button type="submit">Create unit</button></form> : null}<div className="role-record-table-wrap"><table className="role-record-table"><caption className="sr-only">{portal.roleName} academic units</caption><thead><tr><th>Name</th><th>Kind</th><th>Parent</th><th>Action</th></tr></thead><tbody>{units.map((unit) => <tr key={unit.id}><th>{unit.name}</th><td>{unit.kind}</td><td>{units.find((candidate) => candidate.id === unit.parentUnitId)?.name ?? 'Institution'}</td><td>{canManage ? <button type="button" className="secondary" onClick={() => void edit(unit)}>Edit unit</button> : "NA"}</td></tr>)}</tbody></table></div></section>;
 }
 
 export function InstitutionStaffPage({ portal: _portal, authenticatedWorkspace }: { readonly portal: RolePortalConfig; readonly authenticatedWorkspace?: AuthenticatedWorkspaceSummary | undefined }): React.ReactElement {

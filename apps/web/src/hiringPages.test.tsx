@@ -1,7 +1,7 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { completeHostedLoginFromLocation } from './auth.js';
-import { EmployerApplicantsPage, StudentApplicationsPage, StudentOpportunitiesPage } from './hiringPages.js';
+import { EmployerApplicantsPage, EmployerInterviewsPage, EmployerOffersPage, EmployerHiringAnalyticsPage, StudentApplicationsPage, StudentOpportunitiesPage } from './hiringPages.js';
 
 const opportunity = {
   id: '11111111-1111-4111-8111-111111111111',
@@ -210,6 +210,185 @@ describe('employer applicant pipeline', () => {
 });
 
 type ErrorStub = Readonly<Record<string, { readonly status: number; readonly body: unknown }>>;
+
+describe('interview and offer management', () => {
+  const employerId = '44444444-4444-4444-8444-444444444444';
+  const base = `/api/v1/employers/${employerId}`;
+  const interview = { id: 'interview-a', applicationId: 'application-a', applicationState: 'INTERVIEW', opportunityId: opportunity.id,
+    title: opportunity.title, consentRevoked: false, candidateName: 'Test Candidate', candidateEmail: 'candidate@example.test', institutionStudentId: null,
+    roundNumber: 2, mode: 'VIDEO', state: 'SCHEDULED', scheduledStart: '2099-10-01T09:30:00Z', scheduledEnd: '2099-10-01T10:15:00Z',
+    closedAt: null, outcomeCount: 0 };
+  const offer = { ...interview, id: 'offer-a', state: 'EXTENDED', joiningDate: null, offerExpiresAt: '2099-10-01T09:30:00Z', respondedAt: null,
+    compensation: { currency: 'INR', amount: '99999', period: 'MONTH' } };
+
+  it('uses scheduled order and redacts all candidate fields even if revoked data is populated', async () => {
+    stubFetch({ [`${base}/interviews`]: { interviews: [interview, { ...interview, id: 'interview-b', scheduledStart: '2099-09-01T09:00:00Z', consentRevoked: true, candidateName: 'Hidden Name', candidateEmail: 'hidden@example.test', institutionStudentId: 'HIDDEN-STUDENT' }] } });
+    await authenticate(); render(<EmployerInterviewsPage employerId={employerId} />);
+    await screen.findByText('Test Candidate');
+    const rows = screen.getAllByRole('row');
+    expect(within(rows[1]!).getByText('Withdrawn — details no longer shared')).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/Hidden Name|hidden@example.test|HIDDEN-STUDENT/);
+    expect(within(rows[1]!).queryByRole('button')).not.toBeInTheDocument();
+    expect(within(rows[2]!).getByText('2')).toBeInTheDocument();
+  });
+
+  it('requires confirmation before cancelling, then posts the typed state body', async () => {
+    stubFetch({ [`${base}/interviews`]: { interviews: [interview] }, [`${base}/interviews/${interview.id}/state`]: { interview: { id: interview.id, state: 'CANCELLED' } } });
+    const confirm = vi.fn().mockReturnValue(false); vi.stubGlobal('confirm', confirm);
+    await authenticate(); render(<EmployerInterviewsPage employerId={employerId} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel interview' }));
+    expect(postsTo('/state')).toHaveLength(0);
+    confirm.mockReturnValue(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel interview' }));
+    await waitFor(() => expect(postsTo('/state')).toHaveLength(1));
+    expect(JSON.parse(postsTo('/state')[0]![1]!.body as string)).toEqual({ toState: 'CANCELLED' });
+  });
+
+  it('records an outcome and reschedules with actual times', async () => {
+    stubFetch({ [`${base}/interviews`]: { interviews: [{ ...interview, state: 'COMPLETED' }] }, [`${base}/interviews/${interview.id}/outcome`]: { ok: true } });
+    await authenticate(); const view = render(<EmployerInterviewsPage employerId={employerId} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Record outcome' }));
+    fireEvent.change(screen.getByLabelText('Recommendation'), { target: { value: 'YES' } });
+    fireEvent.change(screen.getByLabelText('Notes'), { target: { value: 'Strong technical explanation.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(postsTo('/outcome')).toHaveLength(1));
+    expect(JSON.parse(postsTo('/outcome')[0]![1]!.body as string)).toMatchObject({ recommendation: 'YES', notes: 'Strong technical explanation.' });
+    view.unmount();
+    stubFetch({ [`${base}/interviews`]: { interviews: [interview] } });
+    render(<EmployerInterviewsPage employerId={employerId} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Reschedule' }));
+    fillSchedule();
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(postsTo('/state')).toHaveLength(1));
+    expect(JSON.parse(postsTo('/state')[0]![1]!.body as string)).toEqual({ toState: 'RESCHEDULED', ...expectedWindow() });
+  });
+
+  it('confirms offer withdrawal, preserves missing slots and withholds revoked identity', async () => {
+    stubFetch({ [`${base}/offers`]: { offers: [offer, { ...offer, id: 'offer-b', consentRevoked: true, candidateName: 'Secret Candidate' }] } });
+    const confirm = vi.fn().mockReturnValue(false); vi.stubGlobal('confirm', confirm);
+    await authenticate(); render(<EmployerOffersPage employerId={employerId} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Withdraw offer' }));
+    expect(postsTo('/withdraw')).toHaveLength(0);
+    expect(document.body.textContent).not.toMatch(/Secret Candidate|99999/);
+    expect(screen.getAllByText('NA').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Awaiting response')).toHaveLength(2);
+    confirm.mockReturnValue(true); fireEvent.click(screen.getByRole('button', { name: 'Withdraw offer' }));
+    await waitFor(() => expect(postsTo('/withdraw')).toHaveLength(1));
+  });
+
+  it('renders honest empty states and safe failures', async () => {
+    stubFetch({ [`${base}/interviews`]: { interviews: [] } });
+    await authenticate(); const view = render(<EmployerInterviewsPage employerId={employerId} />);
+    expect(await screen.findByText('No interviews are scheduled.')).toBeInTheDocument(); view.unmount();
+    stubFetch({}, { [`${base}/offers`]: { status: 500, body: { error: { code: 'UPSTREAM', message: 'sensitive stack trace' } } } });
+    render(<EmployerOffersPage employerId={employerId} />);
+    expect(await screen.findByText('Records could not be loaded. Please refresh.')).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain('sensitive');
+    expect(screen.queryByText('No offers have been sent. Nothing is scheduled.')).not.toBeInTheDocument();
+  });
+
+  it('sends the selected interview mode, location, date and duration', async () => {
+    stubApplicant('INTERVIEW'); await authenticate(); render(<EmployerApplicantsPage employerId={employerId} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Schedule interview' }));
+    fillSchedule(); fireEvent.change(screen.getByLabelText('Mode'), { target: { value: 'ONSITE' } });
+    fireEvent.change(screen.getByLabelText('Location'), { target: { value: 'Office reception' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save interview' }));
+    await waitFor(() => expect(postsTo('/interviews')).toHaveLength(1));
+    expect(JSON.parse(postsTo('/interviews')[0]![1]!.body as string)).toEqual({ mode: 'ONSITE', locationDetail: 'Office reception', ...expectedWindow() });
+  });
+
+  it('collects offer terms through a form without prompts', async () => {
+    stubApplicant('OFFER'); vi.stubGlobal('prompt', vi.fn()); await authenticate(); render(<EmployerApplicantsPage employerId={employerId} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Send offer' }));
+    fireEvent.change(screen.getByLabelText('Currency'), { target: { value: 'USD' } });
+    fireEvent.change(screen.getByLabelText('Amount'), { target: { value: '1200.50' } });
+    fireEvent.change(screen.getByLabelText('Period'), { target: { value: 'MONTH' } });
+    fireEvent.change(screen.getByLabelText('Joining date (optional)'), { target: { value: '2099-11-01' } });
+    fireEvent.change(screen.getByLabelText('Expiry (local time)'), { target: { value: '2099-10-01T12:00' } });
+    fireEvent.change(screen.getByLabelText('Conditions (optional)'), { target: { value: 'Subject to document verification.' } });
+    fireEvent.click(screen.getAllByRole('button', { name: 'Send offer' }).at(-1)!);
+    await waitFor(() => expect(postsTo('/offers')).toHaveLength(1));
+    expect(JSON.parse(postsTo('/offers')[0]![1]!.body as string)).toEqual({ compensationCurrency: 'USD', compensationAmount: 1200.5, compensationPeriod: 'MONTH', joiningDate: '2099-11-01', offerExpiresAt: new Date('2099-10-01T12:00').toISOString(), conditions: 'Subject to document verification.' });
+    expect(window.prompt).not.toHaveBeenCalled();
+  });
+
+  it('requires a conscious acknowledgement when scheduling grants participant access to the candidate', async () => {
+    const participantId = crypto.randomUUID();
+    stubFetch({ [`${base}/opportunities`]: { opportunities: [{ ...opportunity, lifecycleState: 'PUBLISHED', applicationCount: 1 }] },
+      [`${base}/opportunities/${opportunity.id}/applications`]: { applications: [{ ...interview, id: 'application-a', state: 'INTERVIEW', offerState: null, interviewCount: 0 }] },
+      [`${base}/interview-participant-options`]: { participants: [{ userId: participantId, label: 'participant@example.test' }] } });
+    await authenticate(); render(<EmployerApplicantsPage employerId={employerId} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Schedule interview' }));
+    fillSchedule(); fireEvent.change(screen.getByLabelText('Mode'), { target: { value: 'PHONE' } });
+    expect(screen.getByText(/Adding a participant lets that person see the candidate details/)).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'participant@example.test' }));
+    const acknowledgement = screen.getByRole('checkbox', { name: /I understand that the selected participants/ });
+    expect(acknowledgement).not.toBeChecked(); expect(acknowledgement).toBeRequired();
+    const form = screen.getByRole('button', { name: 'Save interview' }).closest('form')!;
+    fireEvent.submit(form);
+    expect(await screen.findByText('Confirm participant access before scheduling.')).toBeInTheDocument();
+    expect(postsTo('/interviews')).toHaveLength(0);
+    fireEvent.click(acknowledgement); fireEvent.submit(form);
+    await waitFor(() => expect(postsTo('/interviews')).toHaveLength(1));
+    expect(JSON.parse(postsTo('/interviews')[0]![1]!.body as string)).toMatchObject({ participantUserIds: [participantId], participantVisibilityAcknowledged: true, mode: 'PHONE', ...expectedWindow() });
+    expect(document.body.textContent).not.toContain(participantId);
+  });
+
+  function stubApplicant(state: string): void {
+    stubFetch({ [`${base}/opportunities`]: { opportunities: [{ ...opportunity, lifecycleState: 'PUBLISHED', applicationCount: 1 }] },
+      [`${base}/opportunities/${opportunity.id}/applications`]: { applications: [{ ...interview, id: 'application-a', state, offerState: null, interviewCount: 0 }] } });
+  }
+  function fillSchedule(): void {
+    fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2099-09-15' } });
+    fireEvent.change(screen.getByLabelText('Start time'), { target: { value: '14:20' } });
+    fireEvent.change(screen.getByLabelText('Duration (minutes)'), { target: { value: '45' } });
+  }
+  function expectedWindow() {
+    const start = new Date('2099-09-15T14:20');
+    return { scheduledStart: start.toISOString(), scheduledEnd: new Date(start.getTime() + 45 * 60_000).toISOString() };
+  }
+});
+
+describe('institution consent and reports', () => {
+  it('keeps the interview screen usable with a safe error when the API list is malformed', async () => {
+    stubFetch({ '/api/v1/employers/employer/interviews': {} });
+    await authenticate(); render(<EmployerInterviewsPage employerId="employer" />);
+    expect(await screen.findByText('Records could not be loaded. Please refresh.')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Interviews' })).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain('Invalid hiring list response');
+  });
+  it('makes institution sharing optional and records the explicit choice', async () => {
+    stubFetch({ '/api/v1/opportunities': { opportunities: [opportunity] }, [`/api/v1/opportunities/${opportunity.id}`]: detail,
+      '/api/v1/students/me/applications': { application: { id: 'app', state: 'APPLIED' } } });
+    await authenticate(); render(<StudentOpportunitiesPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'View details' }));
+    const consent = await screen.findByRole('checkbox'); expect(consent).not.toBeChecked();
+    fireEvent.click(consent); fireEvent.click(screen.getByRole('button', { name: 'Apply and share my profile' }));
+    await waitFor(() => expect(postsTo('/applications')).toHaveLength(1));
+    expect(JSON.parse(postsTo('/applications')[0]![1]!.body as string)).toMatchObject({ consentGranted: true, institutionVisibilityGranted: true });
+  });
+  it('lets students stop institution sharing on a closed application without withdrawing it', async () => {
+    stubFetch({ '/api/v1/students/me/applications': { applications: [{ id: 'app', title: 'Role', employerName: 'Employer', state: 'HIRED', closedAt: '2026-09-01', institutionVisibilityGrantedAt: '2026-08-01', institutionVisibilityRevokedAt: null }] }, '/api/v1/students/me/offers': { offers: [] } });
+    await authenticate(); render(<StudentApplicationsPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Stop institution sharing' }));
+    await waitFor(() => expect(postsTo('/institution-visibility/revoke')).toHaveLength(1));
+    expect(postsTo('/withdraw')).toHaveLength(0);
+    expect(await screen.findByText('Institution sharing stopped. Your application is unchanged.')).toBeInTheDocument();
+  });
+  it('keeps analytics widgets present with NA when data cannot be loaded', async () => {
+    stubFetch({}, { '/api/v1/employers/employer/hiring-analytics': { status: 500, body: {} } });
+    await authenticate(); render(<EmployerHiringAnalyticsPage employerId="employer" />);
+    await screen.findByText('Hiring analytics could not be loaded.');
+    expect(screen.getByRole('heading', { name: 'Applications by stage' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Stage conversion' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Per-opportunity funnel' })).toBeInTheDocument();
+    expect(screen.getAllByText('NA').length).toBeGreaterThan(5);
+  });
+});
+
+function postsTo(suffix: string): [string, RequestInit | undefined][] {
+  return vi.mocked(fetch).mock.calls.filter(([url, init]) => String(url).endsWith(suffix) && init?.method === 'POST') as [string, RequestInit | undefined][];
+}
 
 function stubFetch(routes: Readonly<Record<string, unknown>>, errors: ErrorStub = {}): void {
   vi.stubGlobal('fetch', vi.fn(async (url: string) => {

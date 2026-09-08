@@ -136,6 +136,7 @@ export class StudentHiringController {
     const context = requireTrustedAuthorization(request);
     const rows = await this.db.execute(sql`
       SELECT a.id, a.state, a.submitted_at, a.closed_at, a.consent_revoked_at, a.updated_at,
+             a.institution_visibility_granted_at, a.institution_visibility_revoked_at,
              o.id AS opportunity_id, org.legal_name AS employer_name,
              v.title, v.employment_type, v.work_mode, v.location_city,
              (SELECT count(*) FROM opportunity_term_change_acknowledgements t
@@ -180,41 +181,72 @@ export class StudentHiringController {
       throw ruleFailure(error, context.correlationId);
     }
 
-    const applicationId = this.ids.uuid();
-    const employerId = String(opportunity.employer_id);
-    const versionId = String(opportunity.current_version_id);
+    return this.db.transaction(async (tx) => {
+      const applicationId = this.ids.uuid();
+      const employerId = String(opportunity.employer_id);
+      const versionId = String(opportunity.current_version_id);
 
-    // The partial unique index on open applications is the real guard against a
-    // double submission racing this insert; ON CONFLICT keeps it a clean 200.
-    const inserted = await this.db.execute(sql`
-      INSERT INTO applications (id, opportunity_id, employer_id, applied_version_id, student_user_id, state, consent_granted_at, submitted_at)
-      VALUES (${applicationId}::uuid, ${input.opportunityId}::uuid, ${employerId}::uuid, ${versionId}::uuid, ${studentUserId}::uuid, 'APPLIED', now(), now())
-      ON CONFLICT DO NOTHING
-      RETURNING id
-    `) as QueryResult<{ id: string }>;
-    if (inserted.rows.length !== 1) {
-      throw badRequest('ALREADY_APPLIED', context.correlationId);
-    }
+      // The partial unique index on open applications is the real guard against a
+      // double submission racing this insert; ON CONFLICT keeps it a clean 200.
+      const inserted = await tx.execute(sql`
+        INSERT INTO applications (id, opportunity_id, employer_id, applied_version_id, student_user_id, state, consent_granted_at, submitted_at, institution_visibility_granted_at)
+        VALUES (${applicationId}::uuid, ${input.opportunityId}::uuid, ${employerId}::uuid, ${versionId}::uuid, ${studentUserId}::uuid, 'APPLIED', now(), now(), CASE WHEN ${input.institutionVisibilityGranted} THEN now() ELSE NULL END)
+        ON CONFLICT DO NOTHING
+        RETURNING id
+      `) as QueryResult<{ id: string }>;
+      if (inserted.rows.length !== 1) {
+        throw badRequest('ALREADY_APPLIED', context.correlationId);
+      }
 
-    await this.db.execute(sql`
-      INSERT INTO application_state_history (id, application_id, from_state, to_state, changed_by_user_id, actor_role)
-      VALUES (${this.ids.uuid()}::uuid, ${applicationId}::uuid, 'DRAFT', 'APPLIED', ${studentUserId}::uuid, 'STUDENT')
-    `);
-    // Consent to be seen by this employer for this opportunity, and nothing wider.
-    // The unique index is partial (WHERE revoked_at IS NULL), so the conflict target
-    // must repeat that predicate. DO NOTHING rather than DO UPDATE: a previously
-    // revoked grant stays revoked as an audit record, and re-applying writes a new row.
-    await this.db.execute(sql`
-      INSERT INTO employer_applicant_access_grants (id, employer_id, student_user_id, opportunity_id, granted_at)
-      VALUES (${this.ids.uuid()}::uuid, ${employerId}::uuid, ${studentUserId}::uuid, ${input.opportunityId}::uuid, now())
-      ON CONFLICT (employer_id, student_user_id, opportunity_id) WHERE revoked_at IS NULL DO NOTHING
-    `);
-    await this.writeAudit(studentUserId, 'application.submitted', 'application', applicationId, context.correlationId);
-    await this.writeOutbox('application', applicationId, 'application.submitted', {
-      applicationId, opportunityId: input.opportunityId, employerId,
-    }, studentUserId, employerId, context.correlationId);
+      await tx.execute(sql`
+        INSERT INTO application_state_history (id, application_id, from_state, to_state, changed_by_user_id, actor_role)
+        VALUES (${this.ids.uuid()}::uuid, ${applicationId}::uuid, 'DRAFT', 'APPLIED', ${studentUserId}::uuid, 'STUDENT')
+      `);
+      // Consent to be seen by this employer for this opportunity, and nothing wider.
+      // The unique index is partial (WHERE revoked_at IS NULL), so the conflict target
+      // must repeat that predicate. DO NOTHING rather than DO UPDATE: a previously
+      // revoked grant stays revoked as an audit record, and re-applying writes a new row.
+      await tx.execute(sql`
+        INSERT INTO employer_applicant_access_grants (id, employer_id, student_user_id, opportunity_id, granted_at)
+        VALUES (${this.ids.uuid()}::uuid, ${employerId}::uuid, ${studentUserId}::uuid, ${input.opportunityId}::uuid, now())
+        ON CONFLICT (employer_id, student_user_id, opportunity_id) WHERE revoked_at IS NULL DO NOTHING
+      `);
+      await this.writeAudit(studentUserId, 'application.submitted', 'application', applicationId, context.correlationId, tx);
+      if (input.institutionVisibilityGranted) {
+        await this.writeAudit(studentUserId, 'application.institution_visibility_granted', 'application', applicationId, context.correlationId, tx);
+      }
+      await this.writeOutbox('application', applicationId, 'application.submitted', {
+        applicationId, opportunityId: input.opportunityId, employerId,
+      }, studentUserId, employerId, context.correlationId, tx);
 
-    return { application: { id: applicationId, state: 'APPLIED' }, correlationId: context.correlationId };
+      return { application: { id: applicationId, state: 'APPLIED' }, correlationId: context.correlationId };
+    });
+  }
+
+  @Post('/students/me/applications/:applicationId/institution-visibility/revoke')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async revokeInstitutionVisibility(@Req() request: ProtectedHttpRequest, @Param('applicationId') applicationId: string): Promise<Record<string, unknown>> {
+    const context = requireTrustedAuthorization(request);
+    const studentUserId = context.authorization.principal.userId;
+    const id = requireUuid(applicationId, context.correlationId);
+    // A single atomic update preserves the first revocation timestamp on retries.
+    // Closed applications are included: visibility is independent of hiring state.
+    await this.db.transaction(async (tx) => {
+      const rows = await tx.execute(sql`
+        UPDATE applications SET
+          institution_visibility_revoked_at = CASE WHEN institution_visibility_granted_at IS NOT NULL
+            THEN coalesce(institution_visibility_revoked_at, greatest(now(), institution_visibility_granted_at)) ELSE NULL END,
+          updated_at = now()
+        WHERE id = ${id}::uuid AND student_user_id = ${studentUserId}::uuid
+        RETURNING id
+      `) as QueryResult<{ id: string }>;
+      if (rows.rows.length !== 1) throw forbidden(context.correlationId);
+      await tx.execute(sql`
+        INSERT INTO audit_events (id, actor_user_id, action, resource_type, resource_id, outcome, correlation_id)
+        VALUES (${this.ids.uuid()}::uuid, ${studentUserId}::uuid, 'application.institution_visibility_revoked', 'application', ${id}::uuid, 'SUCCESS', ${context.correlationId})
+      `);
+    });
+    return { ok: true, correlationId: context.correlationId };
   }
 
   @Post('/students/me/applications/:applicationId/withdraw')
@@ -352,15 +384,15 @@ export class StudentHiringController {
     };
   }
 
-  private async writeAudit(actorUserId: string, action: string, resourceType: string, resourceId: string, correlationId: string): Promise<void> {
-    await this.db.execute(sql`
+  private async writeAudit(actorUserId: string, action: string, resourceType: string, resourceId: string, correlationId: string, db: Pick<PersistenceDb, 'execute'> = this.db): Promise<void> {
+    await db.execute(sql`
       INSERT INTO audit_events (id, actor_user_id, action, resource_type, resource_id, outcome, correlation_id)
       VALUES (${this.ids.uuid()}::uuid, ${actorUserId}::uuid, ${action}, ${resourceType}, ${resourceId}::uuid, 'SUCCESS', ${correlationId})
     `);
   }
 
-  private async writeOutbox(aggregateType: string, aggregateId: string, eventType: string, payload: Record<string, unknown>, actorUserId: string, organizationId: string, correlationId: string): Promise<void> {
-    await this.db.execute(sql`
+  private async writeOutbox(aggregateType: string, aggregateId: string, eventType: string, payload: Record<string, unknown>, actorUserId: string, organizationId: string, correlationId: string, db: Pick<PersistenceDb, 'execute'> = this.db): Promise<void> {
+    await db.execute(sql`
       INSERT INTO outbox_events (id, aggregate_type, aggregate_id, event_type, payload, actor_user_id, organization_id, correlation_id)
       VALUES (${this.ids.uuid()}::uuid, ${aggregateType}, ${aggregateId}, ${eventType}, ${JSON.stringify(payload)}::jsonb, ${actorUserId}::uuid, ${organizationId}::uuid, ${correlationId})
     `);
@@ -425,6 +457,8 @@ function mapApplication(row: Record<string, unknown>): Record<string, unknown> {
     submittedAt: row.submitted_at ?? null,
     closedAt: row.closed_at ?? null,
     consentRevokedAt: row.consent_revoked_at ?? null,
+    institutionVisibilityGrantedAt: row.institution_visibility_granted_at ?? null,
+    institutionVisibilityRevokedAt: row.institution_visibility_revoked_at ?? null,
     updatedAt: row.updated_at,
     termsAcknowledgementPending: Number(row.pending_terms ?? 0) > 0,
   };
@@ -462,12 +496,15 @@ function readDecision(body: unknown, correlationId: string): 'ACCEPT' | 'DECLINE
   return value;
 }
 
-function readApplyInput(body: unknown, correlationId: string): { opportunityId: string; consentGranted: boolean } {
+function readApplyInput(body: unknown, correlationId: string): { opportunityId: string; consentGranted: boolean; institutionVisibilityGranted: boolean } {
   if (typeof body !== 'object' || body === null) throw badRequest('INVALID_BODY', correlationId);
   const record = body as Record<string, unknown>;
   const opportunityId = typeof record.opportunityId === 'string' ? record.opportunityId : '';
   if (!uuidPattern.test(opportunityId)) throw badRequest('INVALID_OPPORTUNITY_ID', correlationId);
-  return { opportunityId, consentGranted: record.consentGranted === true };
+  if (record.institutionVisibilityGranted !== undefined && typeof record.institutionVisibilityGranted !== 'boolean') {
+    throw badRequest('INVALID_INSTITUTION_VISIBILITY_CONSENT', correlationId);
+  }
+  return { opportunityId, consentGranted: record.consentGranted === true, institutionVisibilityGranted: record.institutionVisibilityGranted === true };
 }
 
 function readOptionalText(body: unknown, field: string, max: number, correlationId: string): string | null {

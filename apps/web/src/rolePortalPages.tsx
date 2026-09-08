@@ -270,11 +270,14 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
       : <InstitutionWorkspaceError title="Readiness" unauthorized={Boolean(authenticatedWorkspace && !institutionStaffWorkspaceRoles.has(authenticatedWorkspace.role))} />;
   }
   if (!demoMode && portal.key === 'placement-officer' && /^departments$|^batches$/i.test(route.label)) {
-    // The units read is being widened to institution staff, so the data will be
-    // available. The remaining gap is the surface: the academic structure page offers
-    // create and edit against endpoints that stay institution-admin only, and a
-    // control that always fails is worse than an honest empty state.
-    return <AuthenticatedNotYetAvailable title={route.label} detail="Academic structure is available to Placement Officers as a read-only view once one is built; the management view is reserved for institution administrators." />;
+    // Read-only deliberately. The units read now admits institution staff, but unit
+    // create and update stay institution-admin, so a Placement Officer given the
+    // management view would get controls that always fail. canManage={false} keeps the
+    // table and drops exactly those controls.
+    return isInstitutionStaffWorkspace(authenticatedWorkspace)
+      ? <StaffPilotWrap title={route.label} subtitle="The departments and batches you are placing into, as your institution has structured them.">
+          <InstitutionAcademicStructurePage portal={portal} authenticatedWorkspace={authenticatedWorkspace} canManage={false} /></StaffPilotWrap>
+      : <InstitutionWorkspaceError title={route.label} unauthorized={Boolean(authenticatedWorkspace && !institutionStaffWorkspaceRoles.has(authenticatedWorkspace.role))} />;
   }
   if (!demoMode && portal.key === 'institution-admin' && route.label === 'Staff') return <InstitutionStaffPage portal={portal} authenticatedWorkspace={authenticatedWorkspace} />;
   if (!demoMode && portal.key === 'institution-admin' && route.label === 'Reports') {

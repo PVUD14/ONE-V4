@@ -435,7 +435,9 @@ export function InstitutionStudentsPage(props: InstitutionPageProps): React.Reac
 }
 
 function PlacementStudentRoster({ token, institutionId }: { readonly token: string; readonly institutionId: string }): React.ReactElement {
-  const [data, setData] = useState<{ students: readonly InstitutionStudentDto[]; units: readonly InstitutionUnitDto[] } | null>(null);
+  // The roster response includes studentUserId separately from its profile id.
+  const [data, setData] = useState<{ students: readonly (InstitutionStudentDto & { readonly studentUserId?: string })[]; units: readonly InstitutionUnitDto[] } | null>(null);
+  const [selectedStudentId, setSelectedStudentId] = useState('');
   const [error, setError] = useState('');
   const [refresh, setRefresh] = useState(0);
   const [filters, setFilters] = useState({ query: '', department: '', batch: '', status: '' });
@@ -454,6 +456,7 @@ function PlacementStudentRoster({ token, institutionId }: { readonly token: stri
     (!filters.status || (student.relationship?.state ?? student.status) === filters.status) &&
     [student.fullName, student.institutionStudentId, unitName(student.units?.departmentUnitId), unitName(student.units?.batchUnitId)]
       .join(' ').toLowerCase().includes(filters.query.trim().toLowerCase()));
+  const selectedStudent = students.find((student) => student.id === selectedStudentId);
   return <section className="role-module role-module--dense">
     <div className="role-page-heading"><div><span className="eyebrow">Institution placement</span><h1>Students</h1><p>Search your institution roster. Unavailable placement information is shown as NA.</p></div></div>
     <section className="role-card role-wide role-management-form">
@@ -464,7 +467,7 @@ function PlacementStudentRoster({ token, institutionId }: { readonly token: stri
         {(data?.units ?? []).filter((unit) => unit.kind === 'BATCH').map((unit) => <option key={unit.id} value={unit.id}>{unit.name}</option>)}</select></label>
       <label>Status<select value={filters.status} onChange={(event) => setFilters({ ...filters, status: event.target.value })}><option value="">All statuses</option>
         {[...new Set((data?.students ?? []).map((student) => student.relationship?.state ?? student.status))].sort().map((state) => <option key={state} value={state}>{state.replaceAll('_', ' ')}</option>)}</select></label>
-      <button type="button" onClick={() => setRefresh((value) => value + 1)}>Refresh roster</button>
+      <button type="button" onClick={() => { setSelectedStudentId(''); setRefresh((value) => value + 1); }}>Refresh roster</button>
     </section>
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {!data ? <p role="status">{error ? 'Roster unavailable.' : 'Loading roster…'}</p> :
@@ -472,7 +475,68 @@ function PlacementStudentRoster({ token, institutionId }: { readonly token: stri
         <thead><tr><th>Name</th><th>Roll number</th><th>Department</th><th>Batch</th><th>Status</th><th>Readiness band</th><th>Applications</th><th>Last activity</th></tr></thead>
         <tbody>{students.length ? students.map((student) => <tr key={student.id}><th>{student.fullName}</th><td>{student.institutionStudentId}</td>
           <td>{unitName(student.units?.departmentUnitId)}</td><td>{unitName(student.units?.batchUnitId)}</td><td>{(student.relationship?.state ?? student.status).replaceAll('_', ' ')}</td>
-          <td>NA</td><td>NA</td><td>NA</td></tr>) : <tr><td colSpan={8}>No students match your scope and filters.</td></tr>}</tbody>
+          <td>NA</td><td>{student.studentUserId ? <button type="button" className="secondary" aria-label={'View applications for ' + student.fullName} onClick={() => setSelectedStudentId(student.id)}>View applications</button> : 'NA'}</td><td>NA</td></tr>) : <tr><td colSpan={8}>No students match your scope and filters.</td></tr>}</tbody>
       </table></div>}
+    {selectedStudent?.studentUserId ? <section className="role-card role-wide" aria-label={'Shared applications for ' + selectedStudent.fullName}>
+      <h2>Shared applications for {selectedStudent.fullName}</h2>
+      <p>Only records currently available with institution consent are shown. These counts are not cohort totals.</p>
+      <button type="button" className="secondary" onClick={() => setSelectedStudentId('')}>Close applications</button>
+      {[false, true].map((external) => <StudentApplicationRecords key={selectedStudent.studentUserId + ':' + external}
+        token={token} institutionId={institutionId} studentUserId={selectedStudent.studentUserId!} external={external} />)}
+    </section> : null}
+  </section>;
+}
+
+interface NativeInstitutionApplication {
+  id: string; employer: { name: string }; opportunityTitle: string; state: string; submittedAt: string | null;
+  createdAt: string; offer: { exists: boolean; responseState: string | null };
+}
+interface ExternalInstitutionApplication {
+  id: string; companyName: string; roleTitle: string; stage: string; appliedOn: string;
+  source: 'STUDENT_DECLARED'; verificationState: 'UNVERIFIED'; sourceKind: string;
+}
+function StudentApplicationRecords({ token, institutionId, studentUserId, external }: {
+  readonly token: string; readonly institutionId: string; readonly studentUserId: string; readonly external: boolean;
+}): React.ReactElement {
+  const [rows, setRows] = useState<readonly { id: string; company: string; title: string; stage: string; date: string | null; detail: string }[] | null>(null);
+  const [error, setError] = useState('');
+  const [refresh, setRefresh] = useState(0);
+  const title = external ? 'Student-declared external applications (unverified)' : 'Native applications';
+  useEffect(() => {
+    const controller = new AbortController();
+    setRows(null); setError('');
+    const path = '/api/v1/institutions/' + encodeURIComponent(institutionId) + '/students/' + encodeURIComponent(studentUserId) +
+      (external ? '/external-applications' : '/applications');
+    void staffWorkflowRequest<{ applications?: NativeInstitutionApplication[]; externalApplications?: ExternalInstitutionApplication[] }>(path, token, controller.signal)
+      .then((result) => {
+        if (controller.signal.aborted) return;
+        if (external) {
+          if (!Array.isArray(result.externalApplications) || result.externalApplications.some((row) => row.source !== 'STUDENT_DECLARED' || row.verificationState !== 'UNVERIFIED')) {
+            throw new Error('Invalid external declaration response');
+          }
+          setRows(result.externalApplications.map((row) => ({ id: row.id, company: row.companyName, title: row.roleTitle,
+            stage: row.stage.replaceAll('_', ' ') + ' (student-declared)', date: row.appliedOn, detail: row.sourceKind.replaceAll('_', ' ') })));
+        } else {
+          if (!Array.isArray(result.applications)) throw new Error('Invalid native application response');
+          setRows(result.applications.map((row) => ({ id: row.id, company: row.employer.name, title: row.opportunityTitle,
+            stage: row.state.replaceAll('_', ' '), date: row.submittedAt ?? row.createdAt,
+            detail: row.offer.exists ? row.offer.responseState?.replaceAll('_', ' ') ?? 'NA' : 'No offer' })));
+        }
+      })
+      .catch((cause: unknown) => { if (!controller.signal.aborted) setError(workflowError(cause)); });
+    return () => controller.abort();
+  }, [token, institutionId, studentUserId, external, refresh]);
+  return <section className="role-card role-wide" aria-label={title}>
+    <h3>{title}</h3>
+    {external ? <p>These are unverified student declarations. A declared HIRED is not a verified placement and does not contribute to native or placement metrics.</p> : null}
+    <p>{external ? 'Shared external declarations shown' : 'Shared native applications shown'}: <strong>{rows === null ? 'NA' : rows.length}</strong></p>
+    <button type="button" className="secondary" onClick={() => setRefresh((value) => value + 1)}>Refresh {external ? 'external declarations' : 'native applications'}</button>
+    {error ? <p className="form-error" role="alert">{error}</p> : rows === null ? <p role="status">Loading {external ? 'external declarations' : 'native applications'}…</p> :
+      rows.length === 0 ? <p>No {external ? 'external declarations' : 'native applications'} are shared and available in this scope.</p> :
+        <div className="role-record-table-wrap"><table className="role-record-table"><caption>{title}</caption>
+          <thead><tr><th>Company</th><th>Role</th><th>Stage</th><th>Applied</th><th>{external ? 'Declared source' : 'Offer response'}</th></tr></thead>
+          <tbody>{rows.map((row) => <tr key={row.id}><th>{row.company}</th><td>{row.title}</td><td>{row.stage}</td>
+            <td>{row.date?.slice(0, 10) ?? 'NA'}</td><td>{row.detail}</td></tr>)}</tbody>
+        </table></div>}
   </section>;
 }

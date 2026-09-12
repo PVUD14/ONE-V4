@@ -420,8 +420,99 @@ export async function completeLesson(pool: Pool, input: {
     await insertOutbox(client, { aggregateType: 'learner_progress', aggregateId: progressId, eventType: 'learning.lesson.completed',
       actorUserId: input.subjectUserId, correlationId: input.correlationId,
       payload: { progressId, lessonVersionId: input.lessonVersionId, evidenceId } });
-    return { progressId, evidenceId, idempotentReplay: false };
+    // Completing a lesson is evidence, so it moves the band in the same transaction
+    // that records it. Writing the evidence and leaving the band stale until the
+    // learner happened to sit an assessment was the previous behaviour, and it made
+    // the readiness figure quietly older than the record it claimed to summarise.
+    const recomputed = await recomputeReadiness(client, { subjectUserId: input.subjectUserId, correlationId: input.correlationId });
+    return {
+      progressId, evidenceId, idempotentReplay: false,
+      readiness: { band: recomputed.band, advisory: true, employerVisible: false, snapshotId: recomputed.snapshotId },
+    };
   });
+}
+
+/**
+ * Reproject mastery, resnapshot readiness and re-recommend the roadmap from the
+ * learner's current evidence.
+ *
+ * Extracted so lesson completion and assessment submission share one definition.
+ * Previously only submission recomputed, which meant completing a lesson wrote
+ * evidence that changed nothing a learner could see until they happened to sit an
+ * assessment -- the evidence was real and the band was stale.
+ *
+ * Every write supersedes rather than overwrites, and the snapshot is stamped with the
+ * currently active model version, so history stays reconstructable under the model it
+ * was computed by (ADR-020).
+ */
+async function recomputeReadiness(
+  client: DbClient,
+  input: { readonly subjectUserId: string; readonly correlationId: string },
+): Promise<{ readonly snapshotId: string; readonly band: string; readonly roadmapActionIds: readonly string[] }> {
+  const allEvidence = await loadEvidence(client, input.subjectUserId);
+  const projections = projectTopicMastery(allEvidence);
+  const projectionIds = new Map<string, string>();
+  for (const projection of projections) {
+    const prior = await client.query<{ id: string }>(
+      'SELECT id FROM mastery_projections WHERE subject_user_id=$1 AND topic_id=$2 ORDER BY generated_at DESC LIMIT 1',
+      [input.subjectUserId, projection.topicId],
+    );
+    const projectionId = randomUUID();
+    projectionIds.set(projection.topicId, projectionId);
+    await client.query(
+      `INSERT INTO mastery_projections
+       (id, subject_user_id, topic_id, algorithm_version, evidence_ids, evidence_set_hash, band, supersedes_projection_id)
+       VALUES ($1,$2,$3,$4,$5::uuid[],$6,$7,$8)`,
+      [projectionId, input.subjectUserId, projection.topicId, projection.algorithmVersion, [...projection.evidenceIds],
+        sha256Hex([...projection.evidenceIds].sort().join(':')), projection.band, prior.rows[0]?.id ?? null],
+    );
+  }
+  const readiness = calculateAdvisoryReadiness(projections);
+  const priorSnapshot = await client.query<{ id: string }>(
+    'SELECT id FROM readiness_snapshots WHERE subject_user_id=$1 ORDER BY generated_at DESC LIMIT 1', [input.subjectUserId],
+  );
+  const snapshotId = randomUUID();
+  const modelVersionId = await activeReadinessModelId(client);
+  await client.query(
+    `INSERT INTO readiness_snapshots
+     (id, subject_user_id, model_version_id, evidence_ids, evidence_set_hash, band, advisory, employer_visible, explanation, supersedes_snapshot_id)
+     VALUES ($1,$2,$3,$4::uuid[],$5,$6,true,false,$7::jsonb,$8)`,
+    [snapshotId, input.subjectUserId, modelVersionId, [...readiness.evidenceIds],
+      sha256Hex([...readiness.evidenceIds].sort().join(':')), readiness.band, JSON.stringify({ factors: readiness.factors }), priorSnapshot.rows[0]?.id ?? null],
+  );
+  for (const factor of readiness.factors) {
+    const projectionId = projectionIds.get(factor.topicId);
+    if (!projectionId) continue;
+    await client.query(
+      `INSERT INTO readiness_factors (id, snapshot_id, topic_id, mastery_projection_id, reason_code, explanation)
+       VALUES ($1,$2,$3,$4,$5,$6)`,
+      [randomUUID(), snapshotId, factor.topicId, projectionId, `MASTERY_${factor.masteryBand}`, factor.explanation],
+    );
+  }
+  // Outstanding recommendations are superseded rather than duplicated: a recomputation
+  // replaces the advice, it does not pile another copy of it on the learner.
+  await client.query(
+    "UPDATE roadmap_actions SET state='SUPERSEDED' WHERE subject_user_id=$1 AND state='RECOMMENDED'",
+    [input.subjectUserId],
+  );
+  const roadmapActionIds: string[] = [];
+  for (const action of recommendRoadmapActions(projections)) {
+    const actionId = randomUUID();
+    roadmapActionIds.push(actionId);
+    await client.query(
+      `INSERT INTO roadmap_actions
+       (id, subject_user_id, policy_version_id, topic_id, action_code, reason_code, evidence_ids, state, due_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7::uuid[],'RECOMMENDED',now()+interval '7 days')`,
+      [actionId, input.subjectUserId, ROADMAP_POLICY_ID, action.topicId, action.actionCode, action.reasonCode, [...action.evidenceIds]],
+    );
+    await insertOutbox(client, { aggregateType: 'roadmap_action', aggregateId: actionId, eventType: 'roadmap.action.created',
+      actorUserId: input.subjectUserId, correlationId: input.correlationId,
+      payload: { roadmapActionId: actionId, policyVersionId: ROADMAP_POLICY_ID, actionCode: action.actionCode } });
+  }
+  await insertOutbox(client, { aggregateType: 'readiness_snapshot', aggregateId: snapshotId,
+    eventType: 'readiness.snapshot.created', actorUserId: input.subjectUserId, correlationId: input.correlationId,
+    payload: { readinessSnapshotId: snapshotId, modelVersionId, band: readiness.band } });
+  return { snapshotId, band: readiness.band, roadmapActionIds };
 }
 
 export async function startAssessmentAttempt(pool: Pool, input: {
@@ -545,72 +636,16 @@ export async function submitAssessmentAttempt(pool: Pool, input: {
     );
     await client.query("UPDATE assessment_assignments SET state='COMPLETED' WHERE id=(SELECT assignment_id FROM assessment_attempts WHERE id=$1)", [input.attemptId]);
 
-    const allEvidence = await loadEvidence(client, input.subjectUserId);
-    const projections = projectTopicMastery(allEvidence);
-    const projectionIds = new Map<string, string>();
-    for (const projection of projections) {
-      const prior = await client.query<{ id: string }>(
-        'SELECT id FROM mastery_projections WHERE subject_user_id=$1 AND topic_id=$2 ORDER BY generated_at DESC LIMIT 1',
-        [input.subjectUserId, projection.topicId],
-      );
-      const projectionId = randomUUID();
-      projectionIds.set(projection.topicId, projectionId);
-      await client.query(
-        `INSERT INTO mastery_projections
-         (id, subject_user_id, topic_id, algorithm_version, evidence_ids, evidence_set_hash, band, supersedes_projection_id)
-         VALUES ($1,$2,$3,$4,$5::uuid[],$6,$7,$8)`,
-        [projectionId, input.subjectUserId, projection.topicId, projection.algorithmVersion, [...projection.evidenceIds],
-          sha256Hex([...projection.evidenceIds].sort().join(':')), projection.band, prior.rows[0]?.id ?? null],
-      );
-    }
-    const readiness = calculateAdvisoryReadiness(projections);
-    const priorSnapshot = await client.query<{ id: string }>(
-      'SELECT id FROM readiness_snapshots WHERE subject_user_id=$1 ORDER BY generated_at DESC LIMIT 1', [input.subjectUserId],
-    );
-    const snapshotId = randomUUID();
-    const modelVersionId = await activeReadinessModelId(client);
-    await client.query(
-      `INSERT INTO readiness_snapshots
-       (id, subject_user_id, model_version_id, evidence_ids, evidence_set_hash, band, advisory, employer_visible, explanation, supersedes_snapshot_id)
-       VALUES ($1,$2,$3,$4::uuid[],$5,$6,true,false,$7::jsonb,$8)`,
-      [snapshotId, input.subjectUserId, modelVersionId, [...readiness.evidenceIds],
-        sha256Hex([...readiness.evidenceIds].sort().join(':')), readiness.band, JSON.stringify({ factors: readiness.factors }), priorSnapshot.rows[0]?.id ?? null],
-    );
-    for (const factor of readiness.factors) {
-      const projectionId = projectionIds.get(factor.topicId);
-      if (!projectionId) continue;
-      await client.query(
-        `INSERT INTO readiness_factors (id, snapshot_id, topic_id, mastery_projection_id, reason_code, explanation)
-         VALUES ($1,$2,$3,$4,$5,$6)`,
-        [randomUUID(), snapshotId, factor.topicId, projectionId, `MASTERY_${factor.masteryBand}`, factor.explanation],
-      );
-    }
-    const roadmapActions = recommendRoadmapActions(projections);
-    const roadmapActionIds: string[] = [];
-    for (const action of roadmapActions) {
-      const actionId = randomUUID();
-      roadmapActionIds.push(actionId);
-      await client.query(
-        `INSERT INTO roadmap_actions
-         (id, subject_user_id, policy_version_id, topic_id, action_code, reason_code, evidence_ids, state, due_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7::uuid[],'RECOMMENDED',now()+interval '7 days')`,
-        [actionId, input.subjectUserId, ROADMAP_POLICY_ID, action.topicId, action.actionCode, action.reasonCode, [...action.evidenceIds]],
-      );
-      await insertOutbox(client, { aggregateType: 'roadmap_action', aggregateId: actionId, eventType: 'roadmap.action.created',
-        actorUserId: input.subjectUserId, correlationId: input.correlationId,
-        payload: { roadmapActionId: actionId, policyVersionId: ROADMAP_POLICY_ID, actionCode: action.actionCode } });
-    }
+    const recomputed = await recomputeReadiness(client, { subjectUserId: input.subjectUserId, correlationId: input.correlationId });
+
     const ratio = scoreCorrect / Math.max(1, items.rows.length);
     const outcomeBand = ratio >= 0.8 ? 'DEMONSTRATED' : ratio >= 0.6 ? 'PROGRESSING' : 'DEVELOPING';
     await insertOutbox(client, { aggregateType: 'assessment_attempt', aggregateId: input.attemptId,
       eventType: 'assessment.attempt.submitted', actorUserId: input.subjectUserId, correlationId: input.correlationId,
       payload: { attemptId: input.attemptId, evidenceId: evidenceIds[0], outcomeBand } });
-    await insertOutbox(client, { aggregateType: 'readiness_snapshot', aggregateId: snapshotId,
-      eventType: 'readiness.snapshot.created', actorUserId: input.subjectUserId, correlationId: input.correlationId,
-      payload: { readinessSnapshotId: snapshotId, modelVersionId, band: readiness.band } });
     return { attemptId: input.attemptId, scoreCorrect, scorePossible: items.rows.length, outcomeBand,
-      readiness: { band: readiness.band, advisory: true, employerVisible: false, snapshotId },
-      evidenceIds, roadmapActionIds, idempotentReplay: false };
+      readiness: { band: recomputed.band, advisory: true, employerVisible: false, snapshotId: recomputed.snapshotId },
+      evidenceIds, roadmapActionIds: [...recomputed.roadmapActionIds], idempotentReplay: false };
   });
 }
 

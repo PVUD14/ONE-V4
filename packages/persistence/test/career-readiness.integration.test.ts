@@ -125,6 +125,62 @@ describe('Career Readiness Fundamentals production path', () => {
     expect(events.rows[0]?.count).toBe(3);
   });
 
+  it('recomputes readiness when a lesson is completed, not only when an assessment is submitted', async () => {
+    // A learner who has done nothing yet, so the first completion is the only cause of
+    // any snapshot that appears.
+    const learner = randomUUID();
+    await pool.query(
+      `INSERT INTO users (id, external_subject, email, state) VALUES ($1,$2,$3,'ACTIVE')`,
+      [learner, `sub-${learner}`, `${learner}@example.test`],
+    );
+    const before = await pool.query<{ count: number }>(
+      'SELECT count(*)::int AS count FROM readiness_snapshots WHERE subject_user_id=$1', [learner],
+    );
+    expect(before.rows[0]?.count).toBe(0);
+
+    const result = await completeLesson(pool, {
+      subjectUserId: learner, lessonVersionId: fixture.lessons[0]!.id, correlationId: 'lesson-recompute-check',
+    }) as Record<string, unknown>;
+    // The completion now reports the band it produced, rather than writing evidence and
+    // leaving the figure older than the record it summarises.
+    expect(result.readiness).toBeTruthy();
+
+    const snapshot = await pool.query<{ advisory: boolean; employer_visible: boolean; model_version_id: string }>(
+      'SELECT advisory, employer_visible, model_version_id FROM readiness_snapshots WHERE subject_user_id=$1 ORDER BY generated_at DESC LIMIT 1',
+      [learner],
+    );
+    expect(snapshot.rows).toHaveLength(1);
+    // Advisory and never employer-visible, whichever path produced it.
+    expect(snapshot.rows[0]?.advisory).toBe(true);
+    expect(snapshot.rows[0]?.employer_visible).toBe(false);
+
+    // Stamped with the active model version, so a band is only ever comparable with one
+    // computed under the same model (ADR-020).
+    const active = await pool.query<{ id: string }>(
+      "SELECT id FROM readiness_model_versions WHERE stable_key='career-readiness-fundamentals' AND active ORDER BY version DESC LIMIT 1",
+    );
+    expect(snapshot.rows[0]?.model_version_id).toBe(active.rows[0]?.id);
+  });
+
+  it('leaves an already-completed lesson alone rather than resnapshotting on replay', async () => {
+    const learner = randomUUID();
+    await pool.query(
+      `INSERT INTO users (id, external_subject, email, state) VALUES ($1,$2,$3,'ACTIVE')`,
+      [learner, `sub-${learner}`, `${learner}@example.test`],
+    );
+    await completeLesson(pool, { subjectUserId: learner, lessonVersionId: fixture.lessons[0]!.id, correlationId: 'replay-first' });
+    const afterFirst = await pool.query<{ count: number }>(
+      'SELECT count(*)::int AS count FROM readiness_snapshots WHERE subject_user_id=$1', [learner],
+    );
+    const replay = await completeLesson(pool, { subjectUserId: learner, lessonVersionId: fixture.lessons[0]!.id, correlationId: 'replay-second' });
+    expect(replay.idempotentReplay).toBe(true);
+    const afterReplay = await pool.query<{ count: number }>(
+      'SELECT count(*)::int AS count FROM readiness_snapshots WHERE subject_user_id=$1', [learner],
+    );
+    // A replay is not new evidence, so it is not a new band.
+    expect(afterReplay.rows[0]?.count).toBe(afterFirst.rows[0]?.count);
+  });
+
   it('freezes question selection, submits once, and derives transparent advisory state', async () => {
     await pool.query(
       `INSERT INTO notification_preferences (user_id, quiet_hours_start_minute, quiet_hours_end_minute)

@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Inject, NotFoundException, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Inject, Logger, NotFoundException, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import type { PersistenceDb } from '@planthepath/persistence/src/repositories.js';
 import {
@@ -23,6 +23,7 @@ import {
   type ApiIdGenerator,
   type ProtectedHttpRequest,
 } from './api-security.js';
+import { recordExamResultEvidence } from '@planthepath/persistence/src/exam-evidence-bridge.js';
 import { recordNotification } from './notify.js';
 
 type QueryResult<T> = { rows: T[] };
@@ -57,6 +58,8 @@ interface AttemptRow {
  */
 @Controller('/api/v1/student')
 export class StudentAssessmentAttemptsController {
+  private readonly logger = new Logger('StudentAssessmentAttempts');
+
   constructor(
     @Inject(API_PERSISTENCE_DB) private readonly db: PersistenceDb,
     @Inject(API_ID_GENERATOR) private readonly ids: ApiIdGenerator,
@@ -400,6 +403,21 @@ export class StudentAssessmentAttemptsController {
           (${resultId}::uuid, ${attempt.id}::uuid, ${summary.score}, ${summary.maxScore}, ${summary.percentage},
            ${summary.correct}, ${summary.wrong}, ${summary.notAttempted}, ${timeTaken}, ${published})
       `);
+      // A published result is the institution's word about the student, so it becomes
+      // readiness evidence in the same transaction that records it -- never one without
+      // the other. An unmapped subject writes nothing and says so rather than guessing
+      // a topic, and re-publishing does not double-count.
+      if (published) {
+        const bridged = await recordExamResultEvidence(tx, { attemptId: attempt.id });
+        if (bridged.unmappedSubject) {
+          // Visible, not filled. Until the institution maps this subject onto readiness
+          // topics, its exams move no bands, and that should be findable in the log
+          // rather than discovered as "the feature is broken".
+          this.logger.warn(JSON.stringify({
+            event: 'exam.evidence.subject_unmapped', attemptId: attempt.id, definitionId: attempt.definition_id,
+          }));
+        }
+      }
     });
 
     if (published) {

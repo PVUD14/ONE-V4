@@ -74,31 +74,53 @@ internal fun PilotHomeScreen(
 
         // Career Readiness Score - the pilot's lead card. NA until the scoring
         // engine exists; the advisory band is real.
+        // A band, never a number.
+        //
+        // This card read "Career Readiness Score  NA/100" beside a ring labelled SCORE,
+        // which is the pilot picture drawn before the domain was modelled. ADR-020
+        // settled it the other way: readiness is a four-value advisory band, the
+        // database refuses to store it as anything else, and a /100 presents a score
+        // that merely happens to be missing. The band below is real data.
         PilotCard(glow = true) {
             Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("Career Readiness Score", style = MaterialTheme.typography.labelMedium,
+                    Text("Career readiness", style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.height(4.dp))
-                    Row(verticalAlignment = Alignment.Bottom) {
-                        Text("NA", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                        Text("/100", style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
                     Spacer(Modifier.height(6.dp))
-                    StatusChip(band?.let { prettify(it) } ?: "No advisory band yet", if (band != null) ChipKind.Positive else ChipKind.Muted)
+                    Text(
+                        band?.let { prettify(it) } ?: "Not enough evidence yet",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        if (band == null) {
+                            "Complete a lesson or an assessment and this starts to move."
+                        } else {
+                            "Advisory guidance for you and your college. Employers never see it."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                     Spacer(Modifier.height(8.dp))
-                    TextButton(onClick = { onSection(MoreDest.Career) }) { Text("View Full Report") }
+                    TextButton(onClick = { onSection(MoreDest.Career) }) { Text("What this means") }
                 }
-                PilotRing(null, "NA", "SCORE", size = 84, stroke = 9f)
             }
         }
 
-        // The five pilot category scores - NA rings until the engine exists.
-        SectionTitle("Category scores")
-        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            listOf("Aptitude", "Technical", "Communication", "Interview", "Resume").forEach { label ->
-                ScoreCategoryCard(label, Modifier.width(132.dp))
+        // Per-topic mastery, from projections the server was already returning.
+        val masteryByTopic = data.learner?.mastery.orEmpty()
+        val topicNames = data.learner?.catalog?.topics.orEmpty().associate { it.id to it.name }
+        if (masteryByTopic.isNotEmpty()) {
+            SectionTitle("Where you stand")
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                masteryByTopic.forEach { entry ->
+                    TopicBandCard(
+                        label = topicNames[entry.topicId] ?: "Topic",
+                        band = entry.band,
+                        modifier = Modifier.width(132.dp),
+                    )
+                }
             }
         }
 

@@ -375,8 +375,16 @@ object Api {
     val progress: List<ProgressDto> = emptyList(),
     val readiness: ReadinessDto? = null,
     val roadmap: List<RoadmapDto> = emptyList(),
+    // The server has always returned these; the app never read them, and drew five
+    // hardcoded NA rings over the top of real per-topic bands.
+    val mastery: List<MasteryDto> = emptyList(),
 )
-@Serializable data class CatalogDto(val modules: List<ModuleDto> = emptyList())
+@Serializable data class MasteryDto(val topicId: String = "", val band: String = "")
+@Serializable data class TopicDto(val id: String, val name: String = "")
+@Serializable data class CatalogDto(
+    val modules: List<ModuleDto> = emptyList(),
+    val topics: List<TopicDto> = emptyList(),
+)
 @Serializable data class ModuleDto(
     val id: String,
     val title: String = "",

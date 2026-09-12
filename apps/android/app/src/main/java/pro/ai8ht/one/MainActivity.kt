@@ -360,6 +360,7 @@ private fun MainScaffold(
     LaunchedEffect(sessionEnded) {
         if (sessionEnded) {
             studentVm.clearOnSignOut()
+            studentVm.acknowledgeSessionEnded()
             onSessionExpired()
         }
     }

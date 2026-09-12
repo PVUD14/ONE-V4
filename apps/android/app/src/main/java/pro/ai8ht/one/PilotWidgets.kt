@@ -59,18 +59,36 @@ fun PilotRing(percent: Float?, center: String, caption: String, size: Int = 96, 
     }
 }
 
-/** Small pilot score card: label, ring, value/100, band chip. NA when no engine. */
+/**
+ * One topic's mastery band.
+ *
+ * Replaces a card that drew a ring, "NA/100" and an "NA" chip for five hardcoded
+ * category names. Those numbers never existed: mastery is a band, and the server was
+ * already returning a real one per topic while this drew placeholders over the top.
+ */
 @Composable
-fun ScoreCategoryCard(label: String, modifier: Modifier = Modifier) {
+fun TopicBandCard(label: String, band: String, modifier: Modifier = Modifier) {
     PilotCard(modifier) {
         Column(Modifier.padding(12.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold, maxLines = 1)
-            Spacer(Modifier.height(8.dp))
-            PilotRing(null, "NA", "", size = 64, stroke = 7f)
-            Spacer(Modifier.height(6.dp))
-            Text("NA/100", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(4.dp))
-            StatusChip("NA", ChipKind.Muted)
+            Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold, maxLines = 2)
+            Spacer(Modifier.height(10.dp))
+            StatusChip(
+                prettify(band),
+                when (band) {
+                    "DEMONSTRATED" -> ChipKind.Positive
+                    "PROGRESSING" -> ChipKind.Accent
+                    "DEVELOPING" -> ChipKind.Waiting
+                    else -> ChipKind.Muted
+                },
+            )
+            if (band == "NOT_ENOUGH_EVIDENCE") {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "Nothing measured yet",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }

@@ -63,7 +63,23 @@ class StudentViewModel(application: Application) : AndroidViewModel(application)
         refresh()
     }
 
+    /**
+     * Clear the ended-session flag once the shell has acted on it.
+     *
+     * Without this the flag stays true for the life of the ViewModel, which outlives
+     * the sign-out — so the next successful sign-in composes the shell, the effect
+     * watching this flag fires again on a value that never changed back, and the user
+     * is signed straight out again. It looks exactly like a silently rejected password.
+     */
+    fun acknowledgeSessionEnded() {
+        _sessionEnded.value = false
+    }
+
     fun refresh() {
+        // A refresh is a fresh verdict on the session; carrying the previous one forward
+        // would sign out a user who has just signed back in.
+        _sessionEnded.value = false
+        started = true
         val context = getApplication<Application>()
         viewModelScope.launch {
             repository.load(

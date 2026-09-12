@@ -141,10 +141,20 @@ function AssessmentApiView({ catalog, learner, token, busy, attempt, selectedOpt
         checked={selectedOptions[question.id] === option.id} onChange={() => onSelect(question.id, option.id)} />{option.text}</label>)}</fieldset>)}
     <button type="submit" disabled={busy || attempt.questions.some((question) => !selectedOptions[question.id])}>Submit assessment once</button>
   </form>;
-  return <div className="career-api-grid">{(catalog?.assessments ?? []).map((assessment) => <article key={assessment.id}><span>Published assessment</span>
-    <h3>{assessment.title}</h3><p>{assessment.selectionCount} questions · {Math.round(assessment.timeLimitSeconds / 60)} minutes · one attempt</p>
-    <button type="button" disabled={!token || busy || Boolean(learner?.attempts?.length)} onClick={() => onStart(assessment.id)}>Start assessment</button>
-  </article>) ?? null}</div>;
+  // The server allows one attempt per assessment. This previously disabled every
+  // assessment as soon as the learner had attempted any one of them, which is a
+  // stricter rule than the server's and made readiness effectively impossible to
+  // exercise or regression-test. Now each card reflects only its own assessment.
+  const attemptedAssessments = new Set((learner?.attempts ?? [])
+    .map((attempt) => attempt.assessmentDefinitionId).filter((id): id is string => Boolean(id)));
+  return <div className="career-api-grid">{(catalog?.assessments ?? []).map((assessment) => {
+    const alreadyAttempted = attemptedAssessments.has(assessment.id);
+    return <article key={assessment.id}><span>Published assessment</span>
+      <h3>{assessment.title}</h3><p>{assessment.selectionCount} questions · {Math.round(assessment.timeLimitSeconds / 60)} minutes · one attempt</p>
+      <button type="button" disabled={!token || busy || alreadyAttempted} onClick={() => onStart(assessment.id)}>
+        {alreadyAttempted ? 'Already attempted' : 'Start assessment'}</button>
+    </article>;
+  }) ?? null}</div>;
 }
 
 function CareerStatStrip({ learner, catalog }: { readonly learner: LearnerCareerReadinessState; readonly catalog: CareerReadinessCatalog | null }): React.ReactElement {

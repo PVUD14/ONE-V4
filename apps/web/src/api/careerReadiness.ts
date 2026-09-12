@@ -32,7 +32,7 @@ export interface LearnerCareerReadinessState {
   readonly catalog: CareerReadinessCatalog;
   readonly progress: readonly { readonly lessonVersionId: string; readonly state: string; readonly startedAt?: string | null; readonly completedAt?: string | null }[];
   readonly attempts: readonly { readonly id: string; readonly state: string; readonly startedAt?: string; readonly submittedAt?: string | null;
-    readonly scoreCorrect?: number; readonly scorePossible?: number }[];
+    readonly scoreCorrect?: number; readonly scorePossible?: number; readonly assessmentDefinitionId?: string }[];
   readonly evidence: readonly { readonly id: string; readonly evidenceType: string; readonly topicId: string; readonly occurredAt?: string;
     readonly demonstrated: number; readonly possible: number }[];
   readonly mastery: readonly { readonly id: string; readonly topicId: string; readonly band: string; readonly evidenceIds: readonly string[] }[];

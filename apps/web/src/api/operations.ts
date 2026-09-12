@@ -150,3 +150,41 @@ export function listFeatureFlags(token: string, signal?: AbortSignal): Promise<{
 export function setFeatureFlagState(token: string, key: string, enabled: boolean, reasonCode: string): Promise<{ readonly flags: readonly FeatureFlagDto[] }> {
   return requestJson(`/api/v1/operations/feature-flags/${encodeURIComponent(key)}/state`, { token, method: 'POST', body: { enabled, reasonCode } });
 }
+
+export interface TrustCaseDto {
+  readonly id: string;
+  readonly caseType: string;
+  readonly subjectKind: string;
+  readonly state: string;
+  readonly severity: string;
+  readonly organizationId: string | null;
+  readonly organizationName: string | null;
+  readonly reportedByUserId: string | null;
+  readonly openedAt: string;
+  readonly closedAt: string | null;
+  readonly evidenceCount: number;
+  readonly liveActions: number;
+}
+
+export interface ReviewSignalDto {
+  readonly id: string;
+  readonly opportunityVersionId: string;
+  readonly signalCode: string;
+  readonly detectorVersion: string;
+  readonly firstDetectedAt: string;
+}
+
+export function listTrustCases(token: string, includeClosed = false, signal?: AbortSignal): Promise<{
+  readonly cases: readonly TrustCaseDto[]; readonly pendingSignals: readonly ReviewSignalDto[];
+}> {
+  return requestJson(`/api/v1/operations/trust-safety/cases?includeClosed=${includeClosed}`, { token, ...(signal ? { signal } : {}) });
+}
+
+/** Opening a case is not a penalty: enforcement is a separate act on a decided case. */
+export function openTrustCaseFromSignal(token: string, body: unknown): Promise<{ readonly id: string; readonly cases: readonly TrustCaseDto[] }> {
+  return requestJson('/api/v1/operations/trust-safety/cases', { token, method: 'POST', body });
+}
+
+export function transitionTrustCase(token: string, caseId: string, toState: string, reasonCode: string): Promise<Record<string, unknown>> {
+  return requestJson(`/api/v1/operations/trust-safety/cases/${encodeURIComponent(caseId)}/transition`, { token, method: 'POST', body: { toState, reasonCode } });
+}

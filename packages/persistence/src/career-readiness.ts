@@ -53,6 +53,24 @@ const PILOT_SOURCE_PATH = 'data/career-readiness/pilot-v1.json';
 const PILOT_RELEASE_ID = '25000000-0000-4000-8000-000000000001';
 const PILOT_SOURCE_RECORD_ID = '25000000-0000-4000-8000-000000000002';
 const READINESS_MODEL_ID = '26000000-0000-4000-8000-000000000001';
+
+/**
+ * The model version a new snapshot is stamped with.
+ *
+ * Resolved from the active row rather than a constant, so publishing a new version
+ * (migration 0030 publishes version 2) changes what future snapshots claim without a
+ * code change. Historical snapshots keep the version they were computed under --
+ * ADR-020 forbids silently recalculating history, and the id on each row is what makes
+ * an old band comparable only with its own generation.
+ */
+async function activeReadinessModelId(client: DbClient): Promise<string> {
+  const result = await client.query<{ id: string }>(
+    `SELECT id FROM readiness_model_versions
+     WHERE stable_key='career-readiness-fundamentals' AND active
+     ORDER BY version DESC LIMIT 1`,
+  );
+  return result.rows[0]?.id ?? READINESS_MODEL_ID;
+}
 const ROADMAP_POLICY_ID = '26000000-0000-4000-8000-000000000002';
 const NOTIFICATION_TEMPLATE_ID = '26000000-0000-4000-8000-000000000003';
 
@@ -550,11 +568,12 @@ export async function submitAssessmentAttempt(pool: Pool, input: {
       'SELECT id FROM readiness_snapshots WHERE subject_user_id=$1 ORDER BY generated_at DESC LIMIT 1', [input.subjectUserId],
     );
     const snapshotId = randomUUID();
+    const modelVersionId = await activeReadinessModelId(client);
     await client.query(
       `INSERT INTO readiness_snapshots
        (id, subject_user_id, model_version_id, evidence_ids, evidence_set_hash, band, advisory, employer_visible, explanation, supersedes_snapshot_id)
        VALUES ($1,$2,$3,$4::uuid[],$5,$6,true,false,$7::jsonb,$8)`,
-      [snapshotId, input.subjectUserId, READINESS_MODEL_ID, [...readiness.evidenceIds],
+      [snapshotId, input.subjectUserId, modelVersionId, [...readiness.evidenceIds],
         sha256Hex([...readiness.evidenceIds].sort().join(':')), readiness.band, JSON.stringify({ factors: readiness.factors }), priorSnapshot.rows[0]?.id ?? null],
     );
     for (const factor of readiness.factors) {
@@ -588,7 +607,7 @@ export async function submitAssessmentAttempt(pool: Pool, input: {
       payload: { attemptId: input.attemptId, evidenceId: evidenceIds[0], outcomeBand } });
     await insertOutbox(client, { aggregateType: 'readiness_snapshot', aggregateId: snapshotId,
       eventType: 'readiness.snapshot.created', actorUserId: input.subjectUserId, correlationId: input.correlationId,
-      payload: { readinessSnapshotId: snapshotId, modelVersionId: READINESS_MODEL_ID, band: readiness.band } });
+      payload: { readinessSnapshotId: snapshotId, modelVersionId, band: readiness.band } });
     return { attemptId: input.attemptId, scoreCorrect, scorePossible: items.rows.length, outcomeBand,
       readiness: { band: readiness.band, advisory: true, employerVisible: false, snapshotId },
       evidenceIds, roadmapActionIds, idempotentReplay: false };
@@ -600,8 +619,14 @@ export async function getLearnerCareerReadinessState(pool: Pool, subjectUserId: 
     getPublishedCareerReadinessCatalog(pool),
     pool.query(`SELECT lesson_version_id AS "lessonVersionId", state, started_at AS "startedAt", completed_at AS "completedAt"
       FROM learner_progress WHERE subject_user_id=$1 ORDER BY updated_at`, [subjectUserId]),
-    pool.query(`SELECT id, state, started_at AS "startedAt", expires_at AS "expiresAt", submitted_at AS "submittedAt",
-      score_correct AS "scoreCorrect", score_possible AS "scorePossible" FROM assessment_attempts WHERE subject_user_id=$1 ORDER BY started_at DESC`, [subjectUserId]),
+    // assessmentDefinitionId is carried so a client can tell which assessments this
+    // learner has already attempted. The server limit is one attempt per blueprint, and
+    // without this the UI could only approximate that by blocking everything.
+    pool.query(`SELECT a.id, a.state, a.started_at AS "startedAt", a.expires_at AS "expiresAt", a.submitted_at AS "submittedAt",
+      a.score_correct AS "scoreCorrect", a.score_possible AS "scorePossible",
+      b.assessment_definition_id AS "assessmentDefinitionId"
+      FROM assessment_attempts a JOIN assessment_blueprints b ON b.id = a.blueprint_id
+      WHERE a.subject_user_id=$1 ORDER BY a.started_at DESC`, [subjectUserId]),
     pool.query(`SELECT id, evidence_type AS "evidenceType", topic_id AS "topicId", demonstrated, possible,
       content_version AS "contentVersion", occurred_at AS "occurredAt" FROM evidence_records WHERE subject_user_id=$1 ORDER BY occurred_at`, [subjectUserId]),
     pool.query(`SELECT DISTINCT ON (topic_id) id, topic_id AS "topicId", band, evidence_ids AS "evidenceIds", algorithm_version AS "algorithmVersion", generated_at AS "generatedAt"

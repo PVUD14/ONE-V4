@@ -666,6 +666,11 @@ export class OperationsInstitutionOnboardingController {
       `);
       await writeAudit(tx, { id: this.ids.uuid(), actorUserId: input.actorUserId, action: 'identity.invitation.created', resourceType: 'invitation', resourceId: invitationId, organizationId: input.organizationId, correlationId: input.correlationId });
       await writeOutbox(tx, { id: this.ids.uuid(), aggregateType: 'invitation', aggregateId: invitationId, eventType: 'identity.invitation.created', payload: { invitationId }, actorUserId: input.actorUserId, organizationId: input.organizationId, correlationId: input.correlationId });
+      // The command above is what the automation worker delivers, and the worker is
+      // driven by this event -- not by identity.invitation.created, which announces
+      // that an invitation exists and has no delivery consumer. Without this line the
+      // worker runs, drains the outbox and delivers no invitation at all.
+      await writeOutbox(tx, { id: this.ids.uuid(), aggregateType: 'notification_command', aggregateId: notificationCommandId, eventType: 'notification.delivery.requested', payload: { commandId: notificationCommandId, templateId: input.templateId, channel: 'EMAIL' }, actorUserId: input.actorUserId, organizationId: input.organizationId, correlationId: input.correlationId });
     });
     if (this.invitationMailSink) {
       const delivered = await this.invitationMailSink.send({ toEmail: input.email, subject, textBody, invitationId, correlationId: input.correlationId });

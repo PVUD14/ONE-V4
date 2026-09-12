@@ -89,7 +89,9 @@ export class CareerReadinessController {
       const attempt = await startAssessmentAttempt(this.pool, { subjectUserId: learnerId,
         assessmentDefinitionId: requireUuid(assessmentDefinitionId), correlationId: requireCorrelationId(request),
         selectionSeed: randomUUID() });
-      await this.recordActivity(learnerId, 'EXAM_ATTEMPT_STARTED');
+      // Reopening an attempt already in progress is not a new start. Recording one would
+      // let closing and reopening the app inflate a learner's activity streak.
+      if (attempt.resumed !== true) await this.recordActivity(learnerId, 'EXAM_ATTEMPT_STARTED');
       return attempt;
     } catch (error) {
       throw mapDomainError(error);
@@ -202,8 +204,21 @@ function isIsoDate(value: string): boolean {
 
 function mapDomainError(error: unknown): BadRequestException | ConflictException {
   const message = error instanceof Error ? error.message : '';
-  if (/already submitted|attempt limit|idempotency/i.test(message)) {
-    return new ConflictException({ error: { code: 'CONFLICT', message: 'Request conflicts with current state' } });
+  // "Request conflicts with current state" is API wording, and it reached the screen.
+  // A learner who cannot start the check needs to know which of these it is: they have
+  // used their attempts, or the one they had has run out of time. Neither sentence
+  // exposes anything internal, and both tell them what is actually true.
+  if (/attempt limit/i.test(message)) {
+    return new ConflictException({ error: { code: 'ATTEMPT_LIMIT_REACHED', message:
+      'You have used all your attempts at this check. Your results so far still count towards your band.' } });
+  }
+  if (/has expired/i.test(message)) {
+    return new ConflictException({ error: { code: 'ATTEMPT_EXPIRED', message:
+      'Time ran out on that attempt, so it could not be submitted.' } });
+  }
+  if (/already submitted|idempotency/i.test(message)) {
+    return new ConflictException({ error: { code: 'ALREADY_SUBMITTED', message:
+      'That attempt has already been submitted.' } });
   }
   // Prerequisite refusals name the missing lessons (their titles are the
   // learner's own published curriculum, safe to echo).

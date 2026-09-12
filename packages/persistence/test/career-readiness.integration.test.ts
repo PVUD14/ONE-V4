@@ -205,6 +205,62 @@ describe('Career Readiness Fundamentals production path', () => {
     expect(JSON.stringify(state)).not.toContain('selected_option_id');
   });
 
+  it('resumes an attempt still inside its window instead of refusing a new one', async () => {
+    const learnerId = randomUUID();
+    await pool.query(`INSERT INTO users (id, external_subject, email, state) VALUES ($1,$2,$3,'ACTIVE')`,
+      [learnerId, `resume-test:${learnerId}`, `resume-${learnerId}@example.test`]);
+    const first = await startAssessmentAttempt(pool, { subjectUserId: learnerId,
+      assessmentDefinitionId: fixture.assessment.id, correlationId: 'resume-start-1', selectionSeed: 'resume-seed-one-0000000000' });
+    const again = await startAssessmentAttempt(pool, { subjectUserId: learnerId,
+      assessmentDefinitionId: fixture.assessment.id, correlationId: 'resume-start-2', selectionSeed: 'resume-seed-two-0000000000' });
+
+    // The same attempt, the same questions, the same deadline. A different seed must not
+    // reshuffle a paper the learner has already seen.
+    expect(again.attemptId).toBe(first.attemptId);
+    expect(again.resumed).toBe(true);
+    expect(again.expiresAt).toBe(first.expiresAt);
+    expect((again.questions as { id: string }[]).map((q) => q.id))
+      .toEqual((first.questions as { id: string }[]).map((q) => q.id));
+    expect(JSON.stringify(again)).not.toContain('correctOptionId');
+  });
+
+  it('honours the definition attempt limit and counts an abandoned attempt against it', async () => {
+    const learnerId = randomUUID();
+    await pool.query(`INSERT INTO users (id, external_subject, email, state) VALUES ($1,$2,$3,'ACTIVE')`,
+      [learnerId, `limit-test:${learnerId}`, `limit-${learnerId}@example.test`]);
+    const limit = await pool.query<{ attempt_limit: number }>(
+      'SELECT attempt_limit FROM assessment_definitions WHERE id=$1', [fixture.assessment.id]);
+    // The point of the fix: the column decides, and it is no longer one.
+    expect(limit.rows[0]?.attempt_limit).toBe(3);
+
+    const answerFor = (started: Record<string, unknown>) => Object.fromEntries(
+      (started.questions as { id: string }[]).map((q) => [q.id, fixture.assessment.questions.find((f) => f.id === q.id)!.correctOptionId]),
+    );
+    for (const round of [1, 2]) {
+      const started = await startAssessmentAttempt(pool, { subjectUserId: learnerId,
+        assessmentDefinitionId: fixture.assessment.id, correlationId: `limit-start-${round}`, selectionSeed: `limit-seed-${round}-0000000000` });
+      await submitAssessmentAttempt(pool, { subjectUserId: learnerId, attemptId: started.attemptId as string,
+        idempotencyKey: `limit-submit-${round}`, selectedOptions: answerFor(started), correlationId: `limit-submit-${round}` });
+    }
+
+    // Start a third and abandon it. An expired attempt is retired rather than left to
+    // block the learner forever, but it still consumes an attempt: the questions were
+    // seen, so abandoning must not be a free re-draw from the bank.
+    const abandoned = await startAssessmentAttempt(pool, { subjectUserId: learnerId,
+      assessmentDefinitionId: fixture.assessment.id, correlationId: 'limit-start-3', selectionSeed: 'limit-seed-3-0000000000' });
+    // Both ends move: assessment_attempt_window_ck insists expires_at > started_at.
+    await pool.query(
+      `UPDATE assessment_attempts SET started_at=now() - interval '2 hours', expires_at=now() - interval '1 hour' WHERE id=$1`,
+      [abandoned.attemptId]);
+
+    await expect(startAssessmentAttempt(pool, { subjectUserId: learnerId,
+      assessmentDefinitionId: fixture.assessment.id, correlationId: 'limit-start-4', selectionSeed: 'limit-seed-4-0000000000' }))
+      .rejects.toThrow('attempt limit reached');
+    const states = await pool.query<{ state: string }>(
+      'SELECT state FROM assessment_attempts WHERE id=$1', [abandoned.attemptId]);
+    expect(states.rows[0]?.state).toBe('EXPIRED');
+  });
+
   it('suppresses institution aggregates below the privacy threshold', async () => {
     const institutionId = randomUUID();
     await pool.query(`INSERT INTO organizations (id, kind, legal_name, verification_state) VALUES ($1,'INSTITUTION','Aggregate Test','VERIFIED')`, [institutionId]);

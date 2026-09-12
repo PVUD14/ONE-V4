@@ -52,6 +52,18 @@ const PILOT_TRANSFORM_VERSION = 'career-readiness-pilot-v1';
 const PILOT_SOURCE_PATH = 'data/career-readiness/pilot-v1.json';
 const PILOT_RELEASE_ID = '25000000-0000-4000-8000-000000000001';
 const PILOT_SOURCE_RECORD_ID = '25000000-0000-4000-8000-000000000002';
+/**
+ * How many times a learner may take the readiness check.
+ *
+ * It published as 1, which made readiness a one-shot measurement — you took it once and
+ * your band could never move again from that source. ADR-020 describes a band that
+ * develops as evidence accumulates, so one is the wrong number.
+ *
+ * It is not unlimited either. The pilot bank holds six questions and each attempt draws
+ * four, so free retakes would let a learner work through the bank and build evidence out
+ * of repetition rather than learning. Three leaves room to improve without that.
+ */
+const READINESS_CHECK_ATTEMPT_LIMIT = 3;
 const READINESS_MODEL_ID = '26000000-0000-4000-8000-000000000001';
 
 /**
@@ -284,9 +296,10 @@ export async function publishCareerReadinessPilot(
     await client.query(
       `INSERT INTO assessment_definitions
        (id, stable_key, version, title, content_revision_id, release_manifest_id, attempt_limit, time_limit_seconds, published_at)
-       VALUES ($1,$2,1,$3,$4,$5,1,$6,now())`,
+       VALUES ($1,$2,1,$3,$4,$5,$7,$6,now())`,
       [fixture.assessment.id, fixture.assessment.stableKey, fixture.assessment.title,
-        revisionByEntityId.get(fixture.assessment.blueprintId), PILOT_RELEASE_ID, fixture.assessment.timeLimitSeconds],
+        revisionByEntityId.get(fixture.assessment.blueprintId), PILOT_RELEASE_ID, fixture.assessment.timeLimitSeconds,
+        READINESS_CHECK_ATTEMPT_LIMIT],
     );
     await client.query(
       `INSERT INTO assessment_blueprints (id, assessment_definition_id, version, selection_count, algorithm_version, constraints)
@@ -518,20 +531,94 @@ async function recomputeReadiness(
 export async function startAssessmentAttempt(pool: Pool, input: {
   readonly subjectUserId: string; readonly assessmentDefinitionId: string; readonly correlationId: string; readonly selectionSeed: string;
 }): Promise<Record<string, unknown>> {
+  const definition = await pool.query<{
+    blueprint_id: string; selection_count: number; time_limit_seconds: number; attempt_limit: number;
+  }>(
+    `SELECT b.id AS blueprint_id, b.selection_count, a.time_limit_seconds, a.attempt_limit
+     FROM assessment_definitions a JOIN release_manifests rm ON rm.id=a.release_manifest_id AND rm.status='PUBLISHED'
+     JOIN assessment_blueprints b ON b.assessment_definition_id=a.id WHERE a.id=$1`, [input.assessmentDefinitionId],
+  );
+  if (!definition.rows[0]) throw new Error('published assessment was not found');
+  const blueprintId = definition.rows[0].blueprint_id;
+
+  // Close out any attempt whose window has passed, and commit that before doing anything
+  // else.
+  //
+  // `submitAssessmentAttempt` refuses an expired attempt, so one left IN_PROGRESS can
+  // never be finished — and while it sat there it also blocked every new attempt, so a
+  // learner who opened the check and put their phone down was locked out of the feature
+  // permanently with nothing in the product able to release them. EXPIRED has been in the
+  // state CHECK since 0004 and nothing ever wrote it.
+  //
+  // This deliberately runs outside the transaction below. Inside it, a learner who is out
+  // of attempts would take the "limit reached" throw, the transaction would roll back, and
+  // the retirement would be undone — leaving a row that still claims to be in progress and
+  // a screen that still says so.
+  await pool.query(
+    `UPDATE assessment_attempts SET state='EXPIRED'
+     WHERE subject_user_id=$1 AND blueprint_id=$2 AND state='IN_PROGRESS' AND expires_at <= now()`,
+    [input.subjectUserId, blueprintId],
+  );
+
+  const published = definition.rows[0];
+
   return transaction(pool, async (client) => {
-    const assessment = await client.query<{
-      blueprint_id: string; selection_count: number; time_limit_seconds: number;
-    }>(
-      `SELECT b.id AS blueprint_id, b.selection_count, a.time_limit_seconds
-       FROM assessment_definitions a JOIN release_manifests rm ON rm.id=a.release_manifest_id AND rm.status='PUBLISHED'
-       JOIN assessment_blueprints b ON b.assessment_definition_id=a.id WHERE a.id=$1`, [input.assessmentDefinitionId],
+    // Serialise this learner's starts on this blueprint.
+    //
+    // Counting attempts and then inserting one is read-modify-write, and at READ
+    // COMMITTED two requests can both count the same number and both insert — which is
+    // how a double-tapped Start button, or a retry over a flaky connection, gets past a
+    // limit. The lock is held to the end of the transaction and is scoped to this
+    // learner and blueprint, so it never blocks anybody else.
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))',
+      [input.subjectUserId, blueprintId]);
+
+    // An attempt still inside its window is resumed, not refused. The clock keeps
+    // running, which is the point of a timed assessment; what changes is that leaving
+    // the app is no longer fatal.
+    const open = await client.query<{ id: string; assignment_id: string; started_at: Date; expires_at: Date }>(
+      `SELECT id, assignment_id, started_at, expires_at FROM assessment_attempts
+       WHERE subject_user_id=$1 AND blueprint_id=$2 AND state='IN_PROGRESS'
+       ORDER BY started_at DESC LIMIT 1`,
+      [input.subjectUserId, blueprintId],
     );
-    if (!assessment.rows[0]) throw new Error('published assessment was not found');
-    const prior = await client.query(
-      `SELECT id FROM assessment_attempts WHERE subject_user_id=$1 AND state IN ('IN_PROGRESS','SUBMITTED')
-       AND blueprint_id=$2 LIMIT 1`, [input.subjectUserId, assessment.rows[0].blueprint_id],
+    if (open.rows[0]) {
+      const resumed = open.rows[0];
+      const items = await client.query<{
+        id: string; topic_id: string; prompt: string; options: ProtectedQuestionVersion['options']; version: number;
+      }>(
+        `SELECT q.id, q.topic_id, q.prompt, q.options, q.version
+         FROM assessment_attempt_items i JOIN question_versions q ON q.id=i.question_version_id
+         WHERE i.attempt_id=$1 ORDER BY i.position`, [resumed.id],
+      );
+      return {
+        attemptId: resumed.id, assignmentId: resumed.assignment_id,
+        startedAt: resumed.started_at.toISOString(), expiresAt: resumed.expires_at.toISOString(),
+        notificationCommandId: null, resumed: true,
+        questions: items.rows.map((question) => ({
+          id: question.id, topicId: question.topic_id, prompt: question.prompt,
+          options: question.options, publishedRevision: question.version,
+        })),
+      };
+    }
+
+    // What the definition actually says, rather than "one, ever".
+    //
+    // `attempt_limit` has been on assessment_definitions since 0004 and was read by
+    // nothing; the rule enforced here instead was that any prior attempt blocks a new
+    // one. That made readiness a one-shot measurement, which contradicts ADR-020 —
+    // a band is meant to move as evidence accumulates — and made the feature untestable.
+    //
+    // An expired attempt counts as consumed. The learner saw the questions, so letting
+    // it be free would make "start and abandon" a way to enumerate the item bank.
+    const consumed = await client.query<{ used: string }>(
+      `SELECT count(*) AS used FROM assessment_attempts
+       WHERE subject_user_id=$1 AND blueprint_id=$2 AND state IN ('SUBMITTED','EXPIRED')`,
+      [input.subjectUserId, blueprintId],
     );
-    if (prior.rows[0]) throw new Error('assessment attempt limit reached');
+    if (Number(consumed.rows[0]?.used ?? 0) >= published.attempt_limit) {
+      throw new Error('assessment attempt limit reached');
+    }
     const questionRows = await client.query<{
       id: string; topic_id: string; prompt: string; options: ProtectedQuestionVersion['options']; version: number; correct_option_id: string;
     }>(
@@ -543,11 +630,11 @@ export async function startAssessmentAttempt(pool: Pool, input: {
       id: question.id, topicId: question.topic_id, prompt: question.prompt, options: question.options,
       correctOptionId: question.correct_option_id, publishedRevision: question.version,
     }));
-    const selected = selectQuestionsDeterministically(protectedQuestions, assessment.rows[0].selection_count, input.selectionSeed);
+    const selected = selectQuestionsDeterministically(protectedQuestions, published.selection_count, input.selectionSeed);
     const assignmentId = randomUUID();
     const attemptId = randomUUID();
     const startedAt = new Date();
-    const expiresAt = new Date(startedAt.getTime() + assessment.rows[0].time_limit_seconds * 1_000);
+    const expiresAt = new Date(startedAt.getTime() + published.time_limit_seconds * 1_000);
     await client.query(
       `INSERT INTO assessment_assignments
        (id, assessment_definition_id, subject_user_id, assigned_by_user_id, available_at, due_at, state)
@@ -558,7 +645,7 @@ export async function startAssessmentAttempt(pool: Pool, input: {
       `INSERT INTO assessment_attempts
        (id, assignment_id, subject_user_id, blueprint_id, selection_seed, state, started_at, expires_at, correlation_id)
        VALUES ($1,$2,$3,$4,$5,'IN_PROGRESS',$6,$7,$8)`,
-      [attemptId, assignmentId, input.subjectUserId, assessment.rows[0].blueprint_id, input.selectionSeed, startedAt, expiresAt, input.correlationId],
+      [attemptId, assignmentId, input.subjectUserId, blueprintId, input.selectionSeed, startedAt, expiresAt, input.correlationId],
     );
     for (const [position, question] of selected.entries()) {
       await client.query(
@@ -568,7 +655,7 @@ export async function startAssessmentAttempt(pool: Pool, input: {
     }
     await insertOutbox(client, { aggregateType: 'assessment_attempt', aggregateId: attemptId,
       eventType: 'assessment.attempt.started', actorUserId: input.subjectUserId, correlationId: input.correlationId,
-      payload: { attemptId, assignmentId, blueprintId: assessment.rows[0].blueprint_id } });
+      payload: { attemptId, assignmentId, blueprintId: blueprintId } });
     const notificationCommandId = await maybeCreateAssessmentDueNotification(client, input.subjectUserId, assignmentId, input.correlationId);
     return { attemptId, assignmentId, startedAt: startedAt.toISOString(), expiresAt: expiresAt.toISOString(),
       notificationCommandId, questions: selected.map(({ correctOptionId: _answer, ...question }) => question) };

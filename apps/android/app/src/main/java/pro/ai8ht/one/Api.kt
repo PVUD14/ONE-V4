@@ -19,7 +19,7 @@ import java.util.UUID
  */
 object Api {
     private val http = OkHttpClient()
-    private val json = Json { ignoreUnknownKeys = true }
+    internal val json = Json { ignoreUnknownKeys = true }
     private val jsonMedia = "application/json; charset=utf-8".toMediaType()
 
     fun baseUrl(context: Context): String =
@@ -28,7 +28,17 @@ object Api {
     class ApiException(val status: Int, val code: String?, val detail: String? = null) :
         Exception(detail ?: "API request failed ($status${code?.let { ", $it" } ?: ""})")
 
-    private suspend fun request(context: Context, method: String, path: String, body: String? = null): String =
+    /**
+     * @param idempotencyKey sent as Idempotency-Key where the route requires one. A retry
+     *   over a dropped mobile connection must not be able to count as a second submission.
+     */
+    internal suspend fun request(
+        context: Context,
+        method: String,
+        path: String,
+        body: String? = null,
+        idempotencyKey: String? = null,
+    ): String =
         withContext(Dispatchers.IO) {
             val token = Session.token(context) ?: throw ApiException(401, "NO_TOKEN")
             val builder = Request.Builder()
@@ -36,10 +46,12 @@ object Api {
                 .header("Accept", "application/json")
                 .header("X-Correlation-Id", "and-" + UUID.randomUUID())
                 .header("X-Client", "one-android/" + BuildConfig.VERSION_NAME)
+            if (idempotencyKey != null) builder.header("Idempotency-Key", idempotencyKey)
             when (method) {
                 "GET" -> builder.get()
                 "POST" -> builder.post((body ?: "{}").toRequestBody(jsonMedia))
                 "PATCH" -> builder.patch((body ?: "{}").toRequestBody(jsonMedia))
+                "DELETE" -> builder.delete()
             }
             fun run(tokenValue: String): Pair<Int, String> {
                 val request = builder.header("Authorization", "Bearer " + tokenValue).build()
@@ -98,11 +110,6 @@ object Api {
 
     suspend fun listOpportunities(context: Context): List<OpportunityDto> =
         json.decodeFromString<OpportunitiesEnvelope>(request(context, "GET", "/api/v1/opportunities")).opportunities
-
-    suspend fun applyToOpportunity(context: Context, opportunityId: String) {
-        request(context, "POST", "/api/v1/students/me/applications",
-            "{\"opportunityId\":\"$opportunityId\",\"consentGranted\":true}")
-    }
 
     suspend fun listApplications(context: Context): List<ApplicationDto> =
         json.decodeFromString<ApplicationsEnvelope>(request(context, "GET", "/api/v1/students/me/applications")).applications

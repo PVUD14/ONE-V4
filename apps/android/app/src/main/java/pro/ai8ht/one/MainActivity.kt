@@ -27,6 +27,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.AutoAwesome
@@ -288,6 +289,16 @@ private fun MainScaffold(
     var showChat by remember { mutableStateOf(false) }
     var showEditProfile by remember { mutableStateOf(false) }
     var moreDest by remember { mutableStateOf<MoreDest?>(null) }
+    var readinessOpen by remember { mutableStateOf(false) }
+    // The student's institution is on the security context, not the student record: a
+    // student can have several relationships over time, and the active one is what
+    // scopes anything their college assigned them.
+    var studentInstitutionId by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        studentInstitutionId = runCatching { Api.securityContext(context) }.getOrNull()
+            ?.studentRelationships?.firstOrNull { it.state == "ACTIVE" || it.state == "VERIFIED" }
+            ?.institutionId
+    }
     var showTheme by remember { mutableStateOf(false) }
     var avatarVersion by remember { mutableIntStateOf(0) }
     var refreshing by remember { mutableStateOf(false) }
@@ -338,6 +349,26 @@ private fun MainScaffold(
         moreDest == MoreDest.Documents -> { SlideIn { DocumentsPage(onClose = { moreDest = null }) }; return }
         moreDest == MoreDest.Privacy -> { SlideIn { PrivacyPage(onClose = { moreDest = null }) }; return }
         moreDest == MoreDest.Career -> { SlideIn { CareerPage(data?.learner, onClose = { moreDest = null }) }; return }
+        readinessOpen -> {
+            SlideIn {
+                ReadinessAssessmentPage(
+                    onClose = { readinessOpen = false },
+                    onSubmitted = { reloadKey += 1 },
+                )
+            }
+            return
+        }
+        moreDest == MoreDest.Target -> { SlideIn { CareerTargetPage(onClose = { moreDest = null }) }; return }
+        moreDest == MoreDest.Academics -> { SlideIn { AcademicRecordsPage(onClose = { moreDest = null }) }; return }
+        moreDest == MoreDest.Support -> {
+            SlideIn {
+                SupportTasksPage(
+                    institutionId = studentInstitutionId,
+                    onClose = { moreDest = null },
+                )
+            }
+            return
+        }
         moreDest == MoreDest.Help -> { SlideIn { HelpFaqPage(persona = "student", onClose = { moreDest = null }) }; return }
         moreDest == MoreDest.Settings -> { SlideIn { SettingsPage(currentTheme = currentTheme, onThemeChange = onThemeChange, onClose = { moreDest = null }, onSignOut = onSignOut, onSwitchWorkspace = onSwitchWorkspace) }; return }
     }
@@ -455,7 +486,10 @@ private fun MainScaffold(
                                 onChat = { showChat = true },
                                 onSection = { moreDest = it },
                             )
-                            Screen.Assessments -> AssessmentsScreen(data!!.assessments)
+                            Screen.Assessments -> AssessmentsScreen(
+                                data!!.assessments,
+                                onOpenReadiness = { readinessOpen = true },
+                            )
                             Screen.Learning -> LearningScreen(data!!.learner, onChanged = { reloadKey += 1 })
                             Screen.Jobs -> JobsScreen()
                             Screen.More -> MoreMenuScreen(data!!.student, avatarVersion, onOpen = { moreDest = it }, onSignOut = onSignOut)
@@ -697,16 +731,23 @@ internal fun QuickTile(
 // --- Assessments --------------------------------------------------------------
 
 @Composable
-private fun AssessmentsScreen(items: List<AssessmentDto>) {
+private fun AssessmentsScreen(items: List<AssessmentDto>, onOpenReadiness: () -> Unit) {
+    val bannerPalette = pro.ai8ht.one.ui.LocalOnePalette.current
     if (items.isEmpty()) {
-        EmptyState(Icons.Filled.Assignment, Tone.Accent,
-            "No assessments yet",
-            "Your placement cell assigns tests to you. They appear here with their windows, timers and results.")
+        // Not an empty screen any more: institution exams may be absent while a
+        // readiness check is still available, and those are two different things.
+        Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
+            Spacer(Modifier.height(12.dp))
+            ReadinessEntryCard(onOpenReadiness)
+            EmptyState(Icons.Filled.Assignment, Tone.Accent,
+                "No exams assigned yet",
+                "Your placement cell assigns tests to you. They appear here with their windows, timers and results.")
+        }
         return
     }
     val results = items.mapNotNull { it.latestResult }
-    val bannerPalette = pro.ai8ht.one.ui.LocalOnePalette.current
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
+        item { Spacer(Modifier.height(12.dp)); ReadinessEntryCard(onOpenReadiness) }
         if (items.any { it.openAttemptId != null }) {
             item {
                 Spacer(Modifier.height(10.dp))
@@ -1110,5 +1151,32 @@ private fun ConsentScreen(version: String, onGranted: () -> Unit) {
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(10.dp),
         ) { Text(if (busy) "Recording…" else "I have read the notice and I consent") }
+    }
+}
+
+/**
+ * Entry point to the readiness check.
+ *
+ * Kept visually distinct from institution exams because they are not the same thing:
+ * exams are assigned, timed and laptop-only; this is a short self-service check that
+ * moves the advisory band.
+ */
+@Composable
+private fun ReadinessEntryCard(onOpen: () -> Unit) {
+    PilotCard {
+        Row(
+            Modifier.fillMaxWidth().clickable { onOpen() }.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconBubble(Icons.Filled.Assignment, Tone.Green)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Readiness check", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text("A few questions, right here on your phone",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+        }
     }
 }

@@ -78,13 +78,48 @@ internal fun JobsScreen() {
     var applications by remember { mutableStateOf<List<ApplicationDto>?>(null) }
     var notice by remember { mutableStateOf<String?>(null) }
     var reload by remember { mutableIntStateOf(0) }
+    var openOpportunityId by remember { mutableStateOf<String?>(null) }
+    var jobsOverlay by remember { mutableStateOf<JobsOverlay?>(null) }
 
     LaunchedEffect(reload) {
         opportunities = runCatching { Api.listOpportunities(context) }.getOrNull()
         applications = runCatching { Api.listApplications(context) }.getOrNull()
     }
 
+    // Full-screen overlays sit above the tab content and return to it on close.
+    openOpportunityId?.let { id ->
+        SlideIn {
+            OpportunityDetailPage(
+                opportunityId = id,
+                onClose = { openOpportunityId = null },
+                onApplied = { notice = "Application submitted."; reload += 1 },
+            )
+        }
+        return
+    }
+    when (jobsOverlay) {
+        JobsOverlay.Offers -> { SlideIn { OffersPage(onClose = { jobsOverlay = null }) }; return }
+        JobsOverlay.Saved -> {
+            SlideIn {
+                SavedOpportunitiesPage(
+                    onClose = { jobsOverlay = null },
+                    onOpen = { jobsOverlay = null; openOpportunityId = it },
+                )
+            }
+            return
+        }
+        JobsOverlay.External -> { SlideIn { ExternalApplicationsPage(onClose = { jobsOverlay = null }) }; return }
+        null -> Unit
+    }
+
     Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
+        Spacer(Modifier.height(4.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            JobsQuickLink("Offers", Modifier.weight(1f)) { jobsOverlay = JobsOverlay.Offers }
+            JobsQuickLink("Saved", Modifier.weight(1f)) { jobsOverlay = JobsOverlay.Saved }
+            JobsQuickLink("Applied elsewhere", Modifier.weight(1.4f)) { jobsOverlay = JobsOverlay.External }
+        }
+        Spacer(Modifier.height(10.dp))
         val segmentColors = SegmentedButtonDefaults.colors(
             activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
             activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -113,12 +148,12 @@ internal fun JobsScreen() {
                 opportunities!!.isEmpty() -> EmptyState(
                     androidx.compose.material.icons.Icons.Filled.WorkOutline, pro.ai8ht.one.ui.Tone.Violet,
                     "No open roles right now",
-                    "When employers post opportunities for your institution, they appear here with one-tap apply.")
+                    "When employers post opportunities for your institution, they appear here.")
                 else -> LazyColumn(Modifier.fillMaxSize()) {
                     items(opportunities!!, key = { it.id }) { opp ->
                         Spacer(Modifier.height(12.dp))
                         PilotCard {
-                            Column(Modifier.padding(16.dp)) {
+                            Column(Modifier.clickable { openOpportunityId = opp.id }.padding(16.dp)) {
                                 Row(verticalAlignment = Alignment.Top) {
                                     Column(Modifier.weight(1f)) {
                                         Text(opp.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
@@ -143,17 +178,10 @@ internal fun JobsScreen() {
                                 }
                                 if (!opp.alreadyApplied) {
                                     Spacer(Modifier.height(10.dp))
-                                    Button(
-                                        onClick = {
-                                            notice = null
-                                            scope.launch {
-                                                runCatching { Api.applyToOpportunity(context, opp.id) }
-                                                    .onSuccess { notice = "Application submitted for ${opp.title}."; reload += 1 }
-                                                    .onFailure { notice = (it as? Api.ApiException)?.detail ?: "Could not apply just now. Try again." }
-                                            }
-                                        },
-                                        shape = RoundedCornerShape(10.dp),
-                                    ) { Text("Apply") }
+                                    // Opens the role rather than applying. Applying carries a
+                                    // consent decision, and a list row is no place to make one.
+                                    Text("View role and apply", style = MaterialTheme.typography.labelLarge,
+                                        color = MaterialTheme.colorScheme.primary)
                                 }
                             }
                         }
@@ -189,6 +217,30 @@ internal fun JobsScreen() {
                                     Spacer(Modifier.height(6.dp))
                                     Text("Submitted ${formatWhen(it)}", style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                // Terminal states are not withdrawable, and offering to
+                                // withdraw something already settled would be a dead button.
+                                if (app.state !in setOf("WITHDRAWN", "REJECTED", "ACCEPTED", "DECLINED")) {
+                                    Spacer(Modifier.height(8.dp))
+                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        TextButton(onClick = {
+                                            scope.launch {
+                                                runCatching { Api.withdrawApplication(context, app.id) }
+                                                    .onSuccess { notice = "Application withdrawn."; reload += 1 }
+                                                    .onFailure { notice = (it as? Api.ApiException)?.detail ?: "Could not withdraw that." }
+                                            }
+                                        }) { Text("Withdraw") }
+                                        // Revoking institution visibility is separate from
+                                        // withdrawing: a student may want their college to
+                                        // stop seeing an application they are still pursuing.
+                                        TextButton(onClick = {
+                                            scope.launch {
+                                                runCatching { Api.revokeInstitutionVisibility(context, app.id) }
+                                                    .onSuccess { notice = "Your institution can no longer see this application." }
+                                                    .onFailure { notice = (it as? Api.ApiException)?.detail ?: "Could not update that." }
+                                            }
+                                        }) { Text("Hide from college") }
+                                    }
                                 }
                             }
                         }
@@ -311,7 +363,8 @@ internal fun ChatOverlay(persona: String = "student", onClose: () -> Unit) {
 // --- More: named sections ------------------------------------------------------
 
 internal enum class MoreDest(val title: String) {
-    Profile("Profile"), Career("Career readiness"), Documents("Documents"),
+    Profile("Profile"), Career("Career readiness"), Target("Career target"),
+    Academics("Academic record"), Support("Support"), Documents("Documents"),
     Privacy("Privacy & data"), Help("Help & FAQ"), Settings("Settings"),
 }
 
@@ -370,6 +423,12 @@ internal fun MoreMenuScreen(
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline)
                 MenuRow(Icons.Filled.Insights, pro.ai8ht.one.ui.Tone.Green, "Career readiness",
                     "Your advisory band and roadmap") { onOpen(MoreDest.Career) }
+                MenuRow(Icons.Filled.Insights, pro.ai8ht.one.ui.Tone.Accent, "Career target",
+                    "What you are aiming at, and what is still missing") { onOpen(MoreDest.Target) }
+                MenuRow(Icons.Filled.Description, pro.ai8ht.one.ui.Tone.Green, "Academic record",
+                    "Your results, and what employers can actually see") { onOpen(MoreDest.Academics) }
+                MenuRow(Icons.Filled.Person, pro.ai8ht.one.ui.Tone.Violet, "Support",
+                    "Tasks your institution has assigned you") { onOpen(MoreDest.Support) }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline)
                 MenuRow(Icons.Filled.Description, pro.ai8ht.one.ui.Tone.Violet, "Documents",
                     "Résumés, certificates and verification") { onOpen(MoreDest.Documents) }
@@ -580,6 +639,26 @@ internal fun PrivacyPage(onClose: () -> Unit) {
                     ) { Text("Request data copy") }
                 }
             }
+            Spacer(Modifier.height(12.dp))
+            DeletionCard(
+                requests = requests,
+                onRequest = {
+                    notice = null
+                    scope.launch {
+                        runCatching { Api.requestDeletion(context) }
+                            .onSuccess { notice = "Deletion requested. You have 30 days to change your mind."; reload += 1 }
+                            .onFailure { notice = (it as? Api.ApiException)?.detail ?: "Could not request deletion just now." }
+                    }
+                },
+                onCancel = { requestId ->
+                    notice = null
+                    scope.launch {
+                        runCatching { Api.cancelPrivacyRequest(context, requestId) }
+                            .onSuccess { notice = "Deletion cancelled. Nothing was erased."; reload += 1 }
+                            .onFailure { notice = (it as? Api.ApiException)?.detail ?: "Could not cancel that request." }
+                    }
+                },
+            )
             Spacer(Modifier.height(12.dp))
             PilotCard {
                 Column(Modifier.padding(16.dp)) {

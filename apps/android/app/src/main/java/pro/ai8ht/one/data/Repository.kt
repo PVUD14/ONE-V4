@@ -25,6 +25,15 @@ class Repository(private val context: Context, private val store: Store) {
 
         /** Nothing cached and the fetch failed. The only state worth an error screen. */
         data class Failed(val message: String) : State<Nothing>
+
+        /**
+         * The session is no longer valid and could not be refreshed.
+         *
+         * Distinct from [Failed] on purpose: "you are offline" and "you are signed out"
+         * need opposite responses, and conflating them strands a user on a retry screen
+         * that can never succeed.
+         */
+        data object Unauthenticated : State<Nothing>
     }
 
     /**
@@ -63,9 +72,17 @@ class Repository(private val context: Context, private val store: Store) {
                     .onFailure { emit(failure(cached, "We could not read that just now.")) }
             }
             .onFailure { cause ->
-                val message = (cause as? Api.ApiException)?.detail ?: "You appear to be offline."
-                // Only a failure when there was nothing to show. With cached content the
-                // screen keeps what it had and is told it is stale.
+                val failure = cause as? Api.ApiException
+                // A 401 here means the token expired and the silent refresh also failed.
+                // It is reported even when there is cached content, because the cache
+                // belongs to a session that has ended.
+                if (failure?.status == 401) {
+                    emit(State.Unauthenticated)
+                    return@onFailure
+                }
+                val message = failure?.detail ?: "You appear to be offline."
+                // Otherwise only a failure when there was nothing to show. With cached
+                // content the screen keeps what it had and is told it is stale.
                 if (cached == null) emit(State.Failed(message))
             }
     }

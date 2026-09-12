@@ -50,6 +50,10 @@ class StudentViewModel(application: Application) : AndroidViewModel(application)
     private val _activity = MutableStateFlow<Repository.State<StudentActivityDto>>(Repository.State.Loading)
     val activity: StateFlow<Repository.State<StudentActivityDto>> = _activity.asStateFlow()
 
+    /** Set when any load reports the session has ended, so the shell can sign out. */
+    private val _sessionEnded = MutableStateFlow(false)
+    val sessionEnded: StateFlow<Boolean> = _sessionEnded.asStateFlow()
+
     private var started = false
 
     /** Idempotent: calling this on every composition is intended and cheap. */
@@ -66,7 +70,7 @@ class StudentViewModel(application: Application) : AndroidViewModel(application)
                 key = "/api/v1/students/me",
                 decode = { Api.json.decodeFromString<StudentEnvelope>(it).student },
                 fetch = { Api.request(context, "GET", "/api/v1/students/me") },
-                emit = { _student.value = it },
+                emit = { if (it is Repository.State.Unauthenticated) _sessionEnded.value = true else _student.value = it },
             )
         }
         viewModelScope.launch {
@@ -74,7 +78,7 @@ class StudentViewModel(application: Application) : AndroidViewModel(application)
                 key = "/api/v1/student/assessments",
                 decode = { Api.json.decodeFromString<AssessmentsEnvelope>(it).assessments },
                 fetch = { Api.request(context, "GET", "/api/v1/student/assessments") },
-                emit = { _assessments.value = it },
+                emit = { if (it is Repository.State.Unauthenticated) _sessionEnded.value = true else _assessments.value = it },
             )
         }
         viewModelScope.launch {
@@ -82,7 +86,7 @@ class StudentViewModel(application: Application) : AndroidViewModel(application)
                 key = "/api/v1/career-readiness/me",
                 decode = { Api.json.decodeFromString<LearnerStateDto>(it) },
                 fetch = { Api.request(context, "GET", "/api/v1/career-readiness/me") },
-                emit = { _learner.value = it },
+                emit = { if (it is Repository.State.Unauthenticated) _sessionEnded.value = true else _learner.value = it },
             )
         }
         viewModelScope.launch {
@@ -90,7 +94,7 @@ class StudentViewModel(application: Application) : AndroidViewModel(application)
                 key = "/api/v1/opportunities",
                 decode = { Api.json.decodeFromString<OpportunitiesEnvelope>(it).opportunities },
                 fetch = { Api.request(context, "GET", "/api/v1/opportunities") },
-                emit = { _opportunities.value = it },
+                emit = { if (it is Repository.State.Unauthenticated) _sessionEnded.value = true else _opportunities.value = it },
             )
         }
         viewModelScope.launch {
@@ -98,7 +102,7 @@ class StudentViewModel(application: Application) : AndroidViewModel(application)
                 key = "/api/v1/me/notifications",
                 decode = { Api.json.decodeFromString<NotificationsEnvelope>(it) },
                 fetch = { Api.request(context, "GET", "/api/v1/me/notifications") },
-                emit = { _notifications.value = it },
+                emit = { if (it is Repository.State.Unauthenticated) _sessionEnded.value = true else _notifications.value = it },
             )
         }
         viewModelScope.launch {
@@ -106,7 +110,7 @@ class StudentViewModel(application: Application) : AndroidViewModel(application)
                 key = "/api/v1/student/activity",
                 decode = { Api.json.decodeFromString<StudentActivityDto>(it) },
                 fetch = { Api.request(context, "GET", "/api/v1/student/activity") },
-                emit = { _activity.value = it },
+                emit = { if (it is Repository.State.Unauthenticated) _sessionEnded.value = true else _activity.value = it },
             )
         }
     }

@@ -353,6 +353,16 @@ private fun MainScaffold(
     val learnerState by studentVm.learner.collectAsState()
     val notificationsState by studentVm.notifications.collectAsState()
     val activityState by studentVm.activity.collectAsState()
+    val sessionEnded by studentVm.sessionEnded.collectAsState()
+
+    // An expired session returns to sign-in rather than sitting on a retry screen that
+    // can never succeed. The cache goes with it: it belongs to the session that ended.
+    LaunchedEffect(sessionEnded) {
+        if (sessionEnded) {
+            studentVm.clearOnSignOut()
+            onSessionExpired()
+        }
+    }
 
     LaunchedEffect(studentState, assessmentsState, learnerState, notificationsState, activityState) {
         data = StudentData(

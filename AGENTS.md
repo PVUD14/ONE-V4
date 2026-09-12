@@ -67,10 +67,16 @@ needs an AWS account is out of reach until he provides access.
 
 ## AI
 
-Inference runs on ONE's own GPU pod (RunPod), per ADR-029. The hold on model-dependent
-code is lifted: build it.
+**Held.** Inference will run on AWS through managed inference, once Divakar provides AWS
+access (ADR-030, superseding ADR-029). The RunPod GPU pod was abandoned on cost. Until
+that access exists, do not integrate a provider, write model-dependent code, or stand up
+a serving stack — and do not propose self-hosting again without the measured cost case
+ADR-010 asks for.
 
-These rules survive whatever the model is or where it runs:
+The hold does not cover `packages/ai-orchestration`, which is provider-agnostic and
+built. When access arrives the remaining work is one adapter.
+
+These rules survive whatever the model is and wherever it runs:
 
 - No portal and no request handler calls an inference endpoint. Everything goes through
   ONE AI Orchestration.

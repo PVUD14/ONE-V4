@@ -43,7 +43,7 @@ import java.util.UUID
  *
  * The submission key is generated once when the attempt starts, not at the moment of
  * submitting. A retry over a dropped connection then carries the same key and cannot be
- * counted as a second attempt against a one-attempt-per-assessment limit.
+ * counted as a second submission against the definition's attempt limit.
  */
 @Composable
 internal fun ReadinessAssessmentPage(onClose: () -> Unit, onSubmitted: () -> Unit) {
@@ -124,6 +124,10 @@ internal fun ReadinessAssessmentPage(onClose: () -> Unit, onSubmitted: () -> Uni
                                                     submissionKey = "and-" + UUID.randomUUID()
                                                     answers.clear()
                                                     attempt = it
+                                                    if (it.resumed) {
+                                                        notice = "Picking up the attempt you already had open. " +
+                                                            "Its time has been running since you started it."
+                                                    }
                                                 }
                                                 .onFailure {
                                                     notice = (it as? Api.ApiException)?.detail

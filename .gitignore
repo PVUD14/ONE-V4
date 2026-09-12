@@ -25,3 +25,6 @@ Thumbs.db
 *.pfx
 id_rsa
 id_ed25519
+
+# Local emulator screen recordings — large binaries, not source
+.recordings/

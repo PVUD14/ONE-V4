@@ -466,6 +466,10 @@ internal fun quoted(value: String): String {
     val attemptId: String,
     val expiresAt: String = "",
     val questions: List<ReadinessQuestionDto> = emptyList(),
+    // True when the server handed back an attempt that was already open rather than
+    // starting a fresh one. The clock has been running since it was first started, so
+    // the student is told instead of quietly being given less time than they expect.
+    val resumed: Boolean = false,
 )
 
 @Serializable data class ReadinessQuestionDto(

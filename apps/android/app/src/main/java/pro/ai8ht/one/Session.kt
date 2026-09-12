@@ -35,8 +35,28 @@ object Session {
             .apply()
     }
 
+    /**
+     * Sign out: drop everything that belongs to the session, keep what belongs to the device.
+     *
+     * This used to call `clear()`, which also threw away the chosen theme and the API
+     * override. Neither is a credential. A user who picks a look and signs out gets it
+     * silently reset, and a tester pointed at a non-default host is silently returned to
+     * the default one, which is the kind of surprise that wastes an afternoon.
+     *
+     * Named keys rather than an exclusion list, so a new session key has to be added here
+     * deliberately — forgetting to remove a token is a worse failure than forgetting to
+     * preserve a preference.
+     */
     fun clear(context: Context) {
-        prefs(context).edit().clear().apply()
+        prefs(context).edit()
+            .remove("access_token")
+            .remove("refresh_token")
+            .remove("email")
+            .remove("workspace")
+            .remove("pkce_verifier")
+            .remove("oauth_verifier")
+            .remove("oauth_state")
+            .apply()
     }
 
     fun theme(context: Context): String = prefs(context).getString("theme", "nexus") ?: "nexus"

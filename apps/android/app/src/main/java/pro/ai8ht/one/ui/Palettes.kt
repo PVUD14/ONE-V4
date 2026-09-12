@@ -116,7 +116,11 @@ val SunsetEmber = OnePalette(
 val OceanGradient = OnePalette(
     id = "ocean", displayName = "Ocean Gradient", dark = false,
     bandTop = Color(0xFF1F55E5), bandBottom = Color(0xFF38BDF8),
-    bandInk = Color(0xFFFFFFFF), bandMuted = Color(0xCCFFFFFF), wordmarkTint = null,
+    // The wordmark is tinted white here rather than left as the silver artwork.
+    // Untinted, the silver sits on a saturated blue at roughly the same luminance and the
+    // mark all but disappears — on the one surface where the brand should be clearest.
+    // Everything else on this band is already white, so the mark joins it.
+    bandInk = Color(0xFFFFFFFF), bandMuted = Color(0xCCFFFFFF), wordmarkTint = Color(0xFFFFFFFF),
     sheet = Color(0xFFF2F7FF), card = Color(0xFFFFFFFF), cardBorder = null,
     ink = Color(0xFF0F172A), muted = Color(0xFF64748B), outline = Color(0xFFE3ECFB),
     accent = Color(0xFF1F55E5), accentDeep = Color(0xFF38BDF8), onAccent = Color.White,

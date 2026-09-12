@@ -23,7 +23,7 @@ import { StaffPilotWrap } from './parityWraps.js';
 import { InstitutionInterventionsPage } from './pilotParityPages.js';
 import { EmployerRecruiterRealityPage } from './rolePortal/employer.js';
 import { InstitutionAcademicStructurePage, InstitutionStaffActionsPage, InstitutionStaffPage, InstitutionStudentsPage } from './rolePortal/institution.js';
-import { OperationsContentReadOnlyPage, OperationsOrganizationsPage, OperationsTechnicalReadOnlyPage, OperationsUsersAccessPage } from './rolePortal/operations.js';
+import { OperationsAuditLogPage, OperationsContentReadOnlyPage, OperationsOrganizationsPage, OperationsTechnicalReadOnlyPage, OperationsUsersAccessPage } from './rolePortal/operations.js';
 import type { AuthenticatedWorkspaceSummary } from './rolePortal/shared.js';
 import { AuthenticatedNotYetAvailable, AuthenticatedReadOnlyModule, institutionStaffWorkspaceRoles, institutionWorkspaceRoles, InstitutionWorkspaceError, isInstitutionStaffWorkspace, isInstitutionWorkspace } from './rolePortal/shared.js';
 import type { RoleFixture, RoleNavItem, RolePortalConfig } from './rolePortalConfig.js';
@@ -229,7 +229,11 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   if (!demoMode && portal.key === 'operations-admin' && route.label === 'Users') return <OperationsUsersAccessPage />;
   if (!demoMode && portal.key === 'operations-admin' && route.label === 'User Detail') return <OperationsUsersAccessPage />;
   if (!demoMode && portal.key === 'operations-admin' && route.label === 'Content Management') return <OperationsContentReadOnlyPage />;
-  if (!demoMode && portal.key === 'operations-admin' && /system health|audit logs|security|ai operations/i.test(route.label)) return <OperationsTechnicalReadOnlyPage routeLabel={route.label} />;
+  // Audit Logs leaves the shared technical panel: the audit-event search endpoint is
+  // complete and role-gated, and pointing this item at the generic status page was the
+  // only reason it looked unbuilt.
+  if (!demoMode && portal.key === 'operations-admin' && /audit logs/i.test(route.label)) return <OperationsAuditLogPage />;
+  if (!demoMode && portal.key === 'operations-admin' && /system health|security|ai operations/i.test(route.label)) return <OperationsTechnicalReadOnlyPage routeLabel={route.label} />;
   if (!demoMode && portal.key === 'operations-admin' && /verification/i.test(route.label)) return <OperationsOrganizationsPage portal={portal} />;
   if (!demoMode && portal.key === 'operations-admin' && /trust and safety|subscriptions|billing|analytics|feature flags|support|settings/i.test(route.label)) return <AuthenticatedNotYetAvailable title={route.label} detail="This Operations module is not yet backed by a Phase 2A persistent workflow." />;
   if (!demoMode && portal.key === 'institution-admin' && ['Students', 'Student Detail'].includes(route.label)) {

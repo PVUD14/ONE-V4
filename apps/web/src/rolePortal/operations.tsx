@@ -7,13 +7,13 @@
  * Split out of rolePortalPages.tsx so each stream owns its own surface. The
  * shell and the route dispatcher remain there and import from here.
  */
-import { createOperationsOrganization, getOperationsOrganizationOnboardingStatus, getProtectedAccessToken, inviteInitialOrganizationAdmin, listOperationsInvitations, listOperationsOrganizations, listOperationsUsersAccess, transitionOrganizationVerification, updateOperationsOrganization } from '../api.js';
-import type { OperationsInvitationDto, OperationsUserAccessDto, OrganizationManagementDto } from '../api.js';
+import { createOperationsOrganization, getOperationsOrganizationOnboardingStatus, getProtectedAccessToken, inviteInitialOrganizationAdmin, listOperationsInvitations, listOperationsOrganizations, listOperationsUsersAccess, searchAuditEvents, transitionOrganizationVerification, updateOperationsOrganization } from '../api.js';
+import type { AuditEventDto, AuditSearchFilters, OperationsInvitationDto, OperationsUserAccessDto, OrganizationManagementDto } from '../api.js';
 import { V2Stat } from '../dashboardsV2.js';
 import { OperationsCareerReadinessPanel } from '../operationsCareerReadinessPanel.js';
 import type { RolePortalConfig } from '../rolePortalConfig.js';
 import { StatusBadge } from '../studentComponents.js';
-import { RestrictedApiState } from './shared.js';
+import { formatApiError, RestrictedApiState } from './shared.js';
 import { Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -137,6 +137,84 @@ export function OperationsContentReadOnlyPage(): React.ReactElement {
 
 export function OperationsTechnicalReadOnlyPage({ routeLabel }: { readonly routeLabel: string }): React.ReactElement {
   return <section className="role-module role-module--dense"><div className="role-page-heading"><div><span className="eyebrow">READ_ONLY technical operations</span><h1>{routeLabel}</h1><p>Safe operational status only: API health is visible in the shell, and outbox/workflow/automation status is loaded through the existing Operations status endpoint. Secrets and n8n credentials are never displayed.</p></div></div><OperationsCareerReadinessPanel /><section className="role-card role-wide"><h2>Mutation boundary</h2><p>n8n remains inactive unless explicitly enabled outside this UI. Kill-switch, workflow activation and credential operations are not exposed as Phase 2A buttons.</p></section></section>;
+}
+
+/**
+ * Audit and security event search.
+ *
+ * The endpoint behind this has existed and been unreachable: complete, role-gated,
+ * keyset-paginated, and with no caller in the web app at all. Nothing new is
+ * authorized here — `canSearchAuditEvents` already restricts it to the platform
+ * roles, and a denial renders as a denial rather than an empty table, so an
+ * unauthorized operator is not told "no events" when the truth is "not for you".
+ */
+export function OperationsAuditLogPage(): React.ReactElement {
+  const token = getProtectedAccessToken();
+  const [draft, setDraft] = useState<AuditSearchFilters>({ action: '', outcome: '', correlationId: '', from: '', to: '' });
+  const [applied, setApplied] = useState<AuditSearchFilters>({});
+  const [events, setEvents] = useState<readonly AuditEventDto[]>([]);
+  const [cursors, setCursors] = useState<readonly string[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const cursor = cursors[cursors.length - 1];
+
+  useEffect(() => {
+    if (!token) return;
+    const controller = new AbortController();
+    setLoading(true);
+    searchAuditEvents(token, { ...applied, ...(cursor ? { cursor } : {}) }, controller.signal)
+      .then((result) => { setEvents(result.events); setNextCursor(result.nextCursor); setError(''); })
+      .catch((cause) => { if (!controller.signal.aborted) setError(formatApiError(cause, 'Unable to search audit events.')); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
+  }, [token, applied, cursor]);
+
+  if (!token) return <RestrictedApiState title="Audit Logs" message="Sign in with an authorized platform identity to search audit and security events." />;
+
+  const apply = (event: React.FormEvent): void => {
+    event.preventDefault();
+    setCursors([]);
+    setApplied({ ...draft });
+  };
+
+  return <section className="role-module role-module--dense">
+    <div className="role-page-heading"><div><span className="eyebrow">READ_ONLY security operations</span><h1>Audit Logs</h1>
+      <p>Search the immutable audit and security record. There is no write path here — audit rows are never edited, so this search cannot become a way to change the evidence it exists to prove.</p></div></div>
+    <div className="v2-row v2-cols-4 career-stat-strip role-wide">
+      <V2Stat icon="📜" tone="teal" value={events.length} label="Events on this page" />
+      <V2Stat icon="✅" tone="blue" value={events.filter((event) => event.outcome === 'SUCCESS').length} label="Succeeded" />
+      <V2Stat icon="⛔" tone="amber" value={events.filter((event) => event.outcome === 'DENIED').length} label="Denied" />
+      <V2Stat icon="🏛️" tone="purple" value={new Set(events.map((event) => event.organizationId).filter(Boolean)).size} label="Organizations" />
+    </div>
+    <section className="role-card role-wide"><form className="role-management-form" onSubmit={apply}>
+      <label><span>Action prefix</span><input value={draft.action ?? ''} onChange={(event) => setDraft({ ...draft, action: event.target.value })} placeholder="institution.roster_import" /></label>
+      <label><span>Outcome</span><select value={draft.outcome ?? ''} onChange={(event) => setDraft({ ...draft, outcome: event.target.value })}><option value="">Any</option><option value="SUCCESS">SUCCESS</option><option value="DENIED">DENIED</option></select></label>
+      <label><span>Correlation ID</span><input value={draft.correlationId ?? ''} onChange={(event) => setDraft({ ...draft, correlationId: event.target.value })} placeholder="Exact match" /></label>
+      <label><span>From</span><input type="date" value={draft.from ?? ''} onChange={(event) => setDraft({ ...draft, from: event.target.value })} /></label>
+      <label><span>To</span><input type="date" value={draft.to ?? ''} onChange={(event) => setDraft({ ...draft, to: event.target.value })} /></label>
+      <button type="submit" className="pilot-btn">Search</button>
+    </form></section>
+    {error ? <p className="form-error" role="alert">{error}</p> : null}
+    <section className="role-card role-wide"><h2>Events</h2>
+      {loading && !events.length ? <p>Searching…</p> : null}
+      {!loading && !events.length && !error ? <p>No audit events match these filters.</p> : null}
+      {events.length ? <div className="role-record-table-wrap"><table className="role-record-table">
+        <thead><tr><th>Occurred</th><th>Action</th><th>Outcome</th><th>Resource</th><th>Actor</th><th>Correlation</th></tr></thead>
+        <tbody>{events.map((event) => <tr key={event.id}>
+          <td>{new Date(event.occurredAt).toLocaleString()}</td>
+          <td>{event.action}</td>
+          <td><StatusBadge label={event.outcome} tone={event.outcome === 'DENIED' ? 'danger' : 'success'} /></td>
+          <td>{event.resourceType} / {event.resourceId}</td>
+          <td>{event.actorUserId}</td>
+          <td>{event.correlationId}</td>
+        </tr>)}</tbody></table></div> : null}
+      <div className="role-actions">
+        <button type="button" className="pilot-btn" disabled={!cursors.length || loading} onClick={() => setCursors(cursors.slice(0, -1))}>Previous</button>
+        <button type="button" className="pilot-btn" disabled={!nextCursor || loading} onClick={() => { if (nextCursor) setCursors([...cursors, nextCursor]); }}>Next</button>
+      </div>
+    </section>
+  </section>;
 }
 
 export function InvitationInventoryTable({ invitations }: { readonly invitations: readonly OperationsInvitationDto[] }): React.ReactElement {

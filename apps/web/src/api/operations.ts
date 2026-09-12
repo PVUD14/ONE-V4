@@ -85,3 +85,47 @@ export function inviteInitialOrganizationAdmin(token: string, organizationId: st
 export function getOperationsOrganizationOnboardingStatus(token: string, organizationId: string): Promise<{ readonly status: Record<string, unknown> }> {
   return requestJson(`/api/v1/operations/organizations/${encodeURIComponent(organizationId)}/onboarding-status`, { token });
 }
+
+export interface AuditEventDto {
+  readonly id: string;
+  readonly actorUserId: string;
+  readonly action: string;
+  readonly resourceType: string;
+  readonly resourceId: string;
+  readonly organizationId: string | null;
+  readonly outcome: 'SUCCESS' | 'DENIED';
+  readonly correlationId: string;
+  readonly occurredAt: string;
+  readonly context: Record<string, unknown>;
+}
+
+export interface AuditSearchFilters {
+  readonly action?: string;
+  readonly outcome?: string;
+  readonly correlationId?: string;
+  readonly actorUserId?: string;
+  readonly organizationId?: string;
+  readonly from?: string;
+  readonly to?: string;
+  readonly limit?: number;
+  readonly cursor?: string;
+}
+
+/**
+ * Keyset-paginated audit and security event search. The server bounds the page size
+ * and rejects an unparseable cursor, so the caller passes `nextCursor` back verbatim
+ * rather than constructing a position of its own.
+ */
+export function searchAuditEvents(
+  token: string,
+  filters: AuditSearchFilters = {},
+  signal?: AbortSignal,
+): Promise<{ readonly events: readonly AuditEventDto[]; readonly nextCursor: string | null; readonly correlationId: string }> {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    const text = typeof value === 'number' ? String(value) : value?.trim();
+    if (text) query.set(key, text);
+  }
+  const suffix = query.toString() ? `?${query.toString()}` : '';
+  return requestJson(`/api/v1/operations/audit-events${suffix}`, { token, ...(signal ? { signal } : {}) });
+}

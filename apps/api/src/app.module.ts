@@ -8,6 +8,8 @@ import { createClamAvScanner } from './storage/clamav.js';
 import { createLocalDiskStorage, type FileStorage } from './storage/file-storage.js';
 import { createEncryptedStorage, parseFileEncryptionKey } from './storage/encrypted-storage.js';
 import { CareerReadinessController } from './http/career-readiness.controller.js';
+import { CareerTargetsController } from './http/career-targets.controller.js';
+import { AcademicRecordsController } from './http/academic-records.controller.js';
 import { AutomationCallbackController } from './http/automation-callback.controller.js';
 
 const runtimeConfig = loadRuntimeConfig();
@@ -38,7 +40,7 @@ const configuredScanner = runtimeConfig.documents.clamavSocketPath
       ...(configuredScanner ? { fileScanner: configuredScanner } : {}),
     }),
   ],
-  controllers: [HealthController, CareerReadinessController, AutomationCallbackController],
+  controllers: [HealthController, CareerReadinessController, CareerTargetsController, AcademicRecordsController, AutomationCallbackController],
   providers: [
     { provide: RUNTIME_CONFIG, useValue: runtimeConfig },
     { provide: PG_POOL, useValue: databaseRuntime.pool },

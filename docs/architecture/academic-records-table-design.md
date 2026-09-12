@@ -1,7 +1,7 @@
 # Academic Records — Table Design for Circulation
 
-**Status:** Circulated for comment — not yet implemented
-**Date:** 2026-09-08
+**Status:** Frozen — open questions resolved 2026-09-12; migration not yet written
+**Date:** 2026-09-08 · **Frozen:** 2026-09-12
 **Author:** Divakar · Agent-assisted: yes (Claude) · Reviewed: pending
 **Rule:** Circulated before any migration is written, per the migrations rule in `CLAUDE.md`
 
@@ -122,20 +122,74 @@ If no verified term exists, the fact is unknown and the engine fails closed, exa
 This means the employer-facing behaviour improves the moment institutions start verifying, with no
 change to the hiring code.
 
-## Open questions for the owners
+## Resolutions — the five open questions, answered
 
-1. **Who owns the write paths?** The institution import and verification surfaces are Stream C;
-   student declaration is Stream D or Core; the schema is Core. The migration number must come from
-   whichever stream writes it, so this needs assigning before anyone starts.
-2. **Does a verified record survive the relationship ending?** A graduate's degree should remain
-   verified after they leave. That is a different rule from activity visibility (DP-010), and it
-   should be stated explicitly rather than inherited by accident.
-3. **Can a second institution verify a record it did not issue?** Proposed answer: no — only the
-   issuing institution, or nobody where `institution_id` is null.
-4. **Is `backlog_count` per term or cumulative?** Institutions differ. Proposal: per term, with the
-   cumulative figure derived, never stored.
-5. **Do we accept prior education at non-customer institutions as unverifiable?** Proposal: yes,
-   stored and clearly marked self-reported forever, because refusing it loses the student's history.
+Frozen 2026-09-12. The proposals above are adopted as written except where noted.
+
+### 1. Who owns the write paths
+
+- **Schema and the canonical read API: Core.** The migration is written by Core from the
+  **cross-stream block (`0070`)**, not from a feature stream's block, because three streams write to
+  these tables and none of them owns the shape.
+- **Institution bulk import and verify/reject: Stream C**, in its own controllers, reusing the roster
+  CSV preview-and-commit pattern rather than inventing a second import shape.
+- **Student declaration: the endpoint is Core, the screens are Stream D.** Stream D owns no API
+  controller, so shipping the endpoint from Core avoids a scoped ownership exception for what is
+  otherwise routine work.
+- **Eligibility resolution: Stream B**, inside `packages/hiring`.
+
+### 2. A verified record survives the relationship ending
+
+**Yes. Verification is permanent; visibility is not.**
+
+Once an institution has verified a term it issued, that verification stands after the student
+graduates, transfers or the relationship is otherwise ended. A degree does not become unverified
+because the graduate stopped being a current student — that is the whole point of an institution
+standing behind the record.
+
+This is deliberately *not* the same rule as DP-010. DP-010 governs what an institution may **read**
+about a student's ongoing activity, and it remains strictly relationship- and time-scoped: a former
+institution still sees nothing generated after its relationship ended, including new terms at a new
+institution. What survives is the **fact of the earlier verification**, carried with the student.
+
+Concretely: `verification_state`, `verified_by_user_id` and `verified_at` are never cleared by a
+relationship transition, and no relationship transition may downgrade a `VERIFIED` term. A former
+institution cannot verify, re-verify or reject anything after its relationship ends.
+
+*This one interacts with DP-010 and should be confirmed explicitly at review rather than nodded
+through.*
+
+### 3. Only the issuing institution may verify
+
+**Adopted as proposed.** Verification is available to the institution named in `institution_id`, and
+to nobody where `institution_id` is null. A second institution cannot verify a record it did not
+issue, however convenient that would be for a transfer student.
+
+### 4. `backlog_count` is per term
+
+**Adopted as proposed.** Stored per term; the cumulative figure is derived at read time and never
+persisted. This follows the same provenance rule as the result value: what is stored is what the
+institution issued for that period, and anything computed across periods is our arithmetic, not
+their record.
+
+`MAX_BACKLOGS` therefore evaluates against the derived cumulative figure over verified terms — and
+returns unknown, not zero, where no verified term exists.
+
+### 5. Prior education elsewhere is accepted and marked self-reported forever
+
+**Adopted as proposed.** A qualification with a null `institution_id` is stored with
+`institution_name_declared`, stays `SELF_REPORTED` permanently, and is displayed to the student as
+their own record. It never satisfies an employer's eligibility rule and is never presented as
+verified. Refusing to store it would lose the student's history to protect a distinction the
+`verification_state` column already makes.
+
+### Invariant that must ship with the migration
+
+Store the value as issued together with the scale it was issued on; **never persist a converted
+number**; normalise only at comparison time; and where a scale cannot be normalised, the answer is
+unknown rather than a guess. This is to be enforced by a test in the same pull request as the
+migration, because it is the rule most likely to be traded away the first time an employer filter
+wants a comparable figure.
 
 ## Not in scope here
 

@@ -3,9 +3,15 @@ import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import * as schema from './schema.js';
 import { N8nAutomationAdapter } from '@planthepath/automation/src/index.js';
-import { createEventBridgePublisher, createNotificationEventConsumer, dispatchAutomationOnce, publishOutboxOnce } from './automation-workers.js';
+import { createEventBridgePublisher, createLocalIntegrationEventPublisher, createNotificationEventConsumer, dispatchAutomationOnce, publishOutboxOnce } from './automation-workers.js';
 
-type WorkerMode = 'outbox-publisher' | 'notification-consumer' | 'automation-dispatcher';
+/**
+ * `local-dispatcher` is the mode ADR-028 deploys: it drains the outbox in-process and
+ * invokes the workflow service, with no broker between the two. The three
+ * broker-shaped modes below it are kept and still work — they are the escape hatch
+ * for the day the worker has to run somewhere other than beside the database.
+ */
+type WorkerMode = 'local-dispatcher' | 'outbox-publisher' | 'notification-consumer' | 'automation-dispatcher';
 
 async function main(): Promise<void> {
   const mode = requireMode(process.env.AUTOMATION_WORKER_MODE);
@@ -15,7 +21,23 @@ async function main(): Promise<void> {
   process.once('SIGTERM', () => { stopping = true; });
   process.once('SIGINT', () => { stopping = true; });
   try {
-    if (mode === 'outbox-publisher') {
+    if (mode === 'local-dispatcher') {
+      const db = drizzle(pool, { schema });
+      const local = createLocalIntegrationEventPublisher({ pool, db });
+      const adapter = new N8nAutomationAdapter(requireValue('PTP_N8N_BASE_URL'));
+      const invocationSigningSecret = Buffer.from(requireValue('PTP_N8N_INVOCATION_SECRET'), 'utf8');
+      const callbackSigningSecret = Buffer.from(requireValue('AUTOMATION_SIGNING_SECRET'), 'utf8');
+      while (!stopping) {
+        const now = new Date();
+        const drained = await publishOutboxOnce({ db, publisher: local.publisher, leaseOwner, now });
+        const dispatched = await dispatchAutomationOnce({ pool, adapter, invocationSigningSecret,
+          callbackSigningSecret, leaseOwner, now });
+        log(mode, { outbox: drained, routing: local.counts(), automation: dispatched });
+        // Idle backoff only. A tick that did work loops straight into the next one, so
+        // a backlog drains at full speed rather than one batch per second.
+        if (!drained.claimed && !dispatched.claimed) await delay(1_000);
+      }
+    } else if (mode === 'outbox-publisher') {
       const db = drizzle(pool, { schema });
       const publisher = createEventBridgePublisher(requireValue('PTP_EVENT_BUS_NAME'));
       while (!stopping) {
@@ -40,7 +62,7 @@ async function main(): Promise<void> {
 }
 
 function requireMode(value: string | undefined): WorkerMode {
-  if (value === 'outbox-publisher' || value === 'notification-consumer' || value === 'automation-dispatcher') return value;
+  if (value === 'local-dispatcher' || value === 'outbox-publisher' || value === 'notification-consumer' || value === 'automation-dispatcher') return value;
   throw new Error('AUTOMATION_WORKER_MODE must select a supported worker');
 }
 

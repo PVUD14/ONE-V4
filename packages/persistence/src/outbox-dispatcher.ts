@@ -413,6 +413,102 @@ export async function replayOutboxEvent(
   });
 }
 
+/**
+ * Retire an accumulated backlog of undispatched events before a dispatcher starts.
+ *
+ * The outbox has been written to for months by live code paths with nothing claiming
+ * from it. The first worker to start would otherwise drain all of it at once: months
+ * of invitations and reminders arriving together, to real people, on day one. ADR-028
+ * names this as a prerequisite of deploying the worker rather than a follow-up.
+ *
+ * Rows are moved to the same terminal state an expiry produces, with their own failure
+ * class so a superseded backlog is never mistaken for a delivery that failed. Nothing
+ * is deleted — the outbox stays the durable record of what the product intended — and
+ * any row here can still be replayed individually if it turns out to matter.
+ *
+ * One audit row is written for the operation, carrying the count and the cutoff. The
+ * individual rows are recoverable from the outbox itself, so an audit row per event
+ * would be volume without information.
+ */
+export async function supersedeOutboxBacklog(
+  db: PersistenceDb,
+  input: {
+    readonly olderThan: Date;
+    readonly actorUserId: string;
+    readonly reasonCode: string;
+    readonly auditId: string;
+    readonly correlationId: string;
+    readonly limit: number;
+    readonly now: Date;
+  },
+): Promise<number> {
+  requireUuid(input.actorUserId, 'actorUserId');
+  requireUuid(input.auditId, 'auditId');
+  validateReasonCode(input.reasonCode);
+  if (!Number.isInteger(input.limit) || input.limit < 1 || input.limit > 100_000) {
+    throw new RangeError('limit must be an integer from 1 to 100000');
+  }
+  return db.transaction(async (tx) => {
+    const superseded = await tx.execute(sql`
+      WITH stale AS (
+        SELECT id
+        FROM outbox_events
+        WHERE delivery_state = 'PENDING'
+          AND occurred_at < ${input.olderThan}
+        ORDER BY occurred_at ASC, id ASC
+        LIMIT ${input.limit}
+        FOR UPDATE SKIP LOCKED
+      )
+      UPDATE outbox_events o
+      SET delivery_state = 'FAILED',
+          lease_owner = NULL,
+          lease_token = NULL,
+          lease_expires_at = NULL,
+          last_failure_class = 'SUPERSEDED_BACKLOG',
+          last_failure_message = NULL,
+          updated_at = now()
+      FROM stale
+      WHERE o.id = stale.id
+      RETURNING o.id
+    `) as QueryResult<{ id: string }>;
+
+    await tx.execute(sql`
+      INSERT INTO audit_events (id, actor_user_id, action, resource_type, resource_id, organization_id, outcome, correlation_id, context)
+      VALUES (
+        ${input.auditId}::uuid,
+        ${input.actorUserId}::uuid,
+        'outbox.backlog.superseded',
+        'outbox_event',
+        'backlog',
+        NULL,
+        'SUCCESS',
+        ${input.correlationId},
+        ${JSON.stringify({ reasonCode: input.reasonCode, olderThan: input.olderThan.toISOString(), superseded: superseded.rows.length })}::jsonb
+      )
+    `);
+    return superseded.rows.length;
+  });
+}
+
+/** The dead-letter view: what failed, why, and how recently. */
+export async function listFailedOutboxEvents(
+  db: PersistenceDb,
+  input: { readonly limit: number },
+): Promise<readonly Record<string, unknown>[]> {
+  if (!Number.isInteger(input.limit) || input.limit < 1 || input.limit > 500) {
+    throw new RangeError('limit must be an integer from 1 to 500');
+  }
+  const result = await db.execute(sql`
+    SELECT id, event_type, aggregate_type, aggregate_id, organization_id, correlation_id,
+           attempts, last_failure_class, occurred_at, updated_at, expires_at
+    FROM outbox_events
+    WHERE delivery_state = 'FAILED'
+    ORDER BY updated_at DESC, id DESC
+    LIMIT ${input.limit}
+  `) as QueryResult<Record<string, unknown>>;
+  return result.rows;
+}
+
 export async function handleEventIdempotently<T>(
   db: PersistenceDb,
   input: {

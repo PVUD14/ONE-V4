@@ -23,7 +23,8 @@
     "@planthepath/events": "workspace:*",
     "@planthepath/learner-content": "workspace:*",
     "drizzle-orm": "^0.45.2",
-    "pg": "^8.16.0"
+    "pg": "^8.16.0",
+    "@planthepath/ai-orchestration": "workspace:*"
   },
   "devDependencies": {
     "@types/pg": "^8.15.0",

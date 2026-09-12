@@ -329,19 +329,32 @@ private fun InstitutionHome(data: InstitutionData, onExams: () -> Unit) {
             StatCell("NA", "Students placed", Tone.Gray, Icons.Filled.School, Modifier.weight(1f))
         }
 
-        // Pilot: Cohort Readiness - NA multi-ring until the aggregate engine exists.
-        SectionTitle("Cohort Readiness")
+        // Cohort readiness: how many students sit in each band, not an average.
+        //
+        // This drew an "AVG" ring and four categories — Job Ready, Nearly Ready,
+        // Developing, Needs Support — which had two problems. An average readiness is a
+        // numeric readiness value, which ADR-020 forbids and the database refuses to
+        // store; and those four names are not the bands the product uses, so an
+        // institution would learn a vocabulary that appears nowhere else. The bands
+        // below are the real ones. A count of students per band is not a readiness
+        // value, so this is the shape the widget can legitimately take once there is a
+        // cohort aggregate behind it — there is no such endpoint yet, so each reads NA.
+        SectionTitle("Cohort readiness")
         PilotCard {
-            Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                PilotRing(null, "NA", "AVG", size = 84, stroke = 9f)
-                Spacer(Modifier.width(14.dp))
-                Column(Modifier.weight(1f)) {
-                    listOf("Job Ready", "Nearly Ready", "Developing", "Needs Support").forEach { label ->
-                        Row(Modifier.padding(vertical = 2.dp)) {
-                            Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
-                            Text("NA", style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
+            Column(Modifier.padding(14.dp)) {
+                Text(
+                    "Advisory bands, shared with you and the student. Employers never see them.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(10.dp))
+                listOf(
+                    "Ready for next step", "Progressing", "Developing", "Not enough evidence",
+                ).forEach { label ->
+                    Row(Modifier.padding(vertical = 3.dp)) {
+                        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+                        Text("NA", style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
@@ -540,6 +553,27 @@ internal fun EmployerScaffold(
         }
     }
 
+    // Back closes the topmost overlay rather than quitting.
+    //
+    // This has to be declared before the early returns below, not after them. Each
+    // overlay returns out of the composable, so a BackHandler placed underneath them is
+    // never composed while an overlay is open — which is exactly when it is needed. The
+    // result was that system back from Offers, My interviews, Hiring analytics or an
+    // applicant closed the whole app.
+    androidx.activity.compose.BackHandler(
+        enabled = showInboxOv || showChatOv || showThemeOv || showHelpOv ||
+            openApplicant != null || employerOverlay != null,
+    ) {
+        when {
+            showChatOv -> showChatOv = false
+            showThemeOv -> showThemeOv = false
+            showHelpOv -> showHelpOv = false
+            showInboxOv -> showInboxOv = false
+            openApplicant != null -> openApplicant = null
+            else -> employerOverlay = null
+        }
+    }
+
     openApplicant?.let { applicant ->
         SlideIn {
             ApplicantActionsPage(
@@ -569,14 +603,6 @@ internal fun EmployerScaffold(
         null -> Unit
     }
 
-    androidx.activity.compose.BackHandler(enabled = showInboxOv || showChatOv || showThemeOv || showHelpOv) {
-        when {
-            showChatOv -> showChatOv = false
-            showThemeOv -> showThemeOv = false
-            showHelpOv -> showHelpOv = false
-            else -> showInboxOv = false
-        }
-    }
     when {
         showHelpOv -> { SlideIn { HelpFaqPage(persona = "employer", onClose = { showHelpOv = false }) }; return }
         showChatOv -> { SlideIn { ChatOverlay(persona = "employer", onClose = { showChatOv = false }) }; return }

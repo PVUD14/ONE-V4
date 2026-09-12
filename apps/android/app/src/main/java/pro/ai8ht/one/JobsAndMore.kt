@@ -86,6 +86,15 @@ internal fun JobsScreen() {
         applications = runCatching { Api.listApplications(context) }.getOrNull()
     }
 
+    // Back closes the overlay above the tab, rather than quitting the app.
+    //
+    // The shell's own BackHandler knows about the More destinations but not about these,
+    // and an overlay below would never be composed while one is open — so without this
+    // a student reading a job and pressing back lost the app.
+    androidx.activity.compose.BackHandler(enabled = openOpportunityId != null || jobsOverlay != null) {
+        if (openOpportunityId != null) openOpportunityId = null else jobsOverlay = null
+    }
+
     // Full-screen overlays sit above the tab content and return to it on close.
     openOpportunityId?.let { id ->
         SlideIn {

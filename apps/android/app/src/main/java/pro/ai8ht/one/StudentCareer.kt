@@ -53,14 +53,17 @@ import pro.ai8ht.one.ui.Tone
 internal fun CareerTargetPage(onClose: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
-    var targets by remember { mutableStateOf<List<CareerTargetDto>?>(null) }
+    var targets by remember { mutableStateOf<Load<List<CareerTargetDto>>>(Load.Loading) }
     var catalog by remember { mutableStateOf<List<CareerRoleDto>>(emptyList()) }
     var choosing by remember { mutableStateOf(false) }
     var reload by remember { mutableIntStateOf(0) }
     var notice by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(reload) {
-        targets = runCatching { Api.careerTargets(context) }.getOrNull() ?: emptyList()
+        targets = loadOf { Api.careerTargets(context) }
+        // The catalogue failing is not on its own worth a failure screen: the page can
+        // still show a target that loaded. Its absence only becomes visible when the
+        // student tries to choose, and the empty picker says so there.
         catalog = runCatching { Api.careerRoleCatalog(context) }.getOrNull() ?: emptyList()
     }
 
@@ -68,7 +71,7 @@ internal fun CareerTargetPage(onClose: () -> Unit) {
         title = "Career target",
         onClose = onClose,
         actions = {
-            if (!targets.isNullOrEmpty()) {
+            if ((targets as? Load.Ready)?.value?.isNotEmpty() == true) {
                 TextButton(onClick = { choosing = !choosing }) { Text(if (choosing) "Cancel" else "Change") }
             }
         },
@@ -81,9 +84,11 @@ internal fun CareerTargetPage(onClose: () -> Unit) {
                         color = MaterialTheme.colorScheme.onPrimaryContainer)
                 }
             }
+            val loaded = targets
             when {
-                targets == null -> LoadingSpinner()
-                targets!!.isEmpty() || choosing -> CareerRolePicker(catalog) { roleId ->
+                loaded is Load.Loading -> LoadingSpinner()
+                loaded is Load.Failed -> FailedState(loaded.message) { reload += 1 }
+                (loaded as Load.Ready).value.isEmpty() || choosing -> CareerRolePicker(catalog) { roleId ->
                     scope.launch {
                         runCatching { Api.setCareerTarget(context, roleId) }
                             .onSuccess { choosing = false; reload += 1 }
@@ -91,7 +96,7 @@ internal fun CareerTargetPage(onClose: () -> Unit) {
                     }
                 }
                 else -> LazyColumn(Modifier.fillMaxSize()) {
-                    items(targets!!, key = { it.id }) { target ->
+                    items(loaded.value, key = { it.id }) { target ->
                         Spacer(Modifier.height(12.dp))
                         PilotCard {
                             Column(Modifier.padding(16.dp)) {
@@ -273,7 +278,7 @@ internal fun SupportTasksPage(institutionId: String?, onClose: () -> Unit) {
 internal fun AcademicRecordsPage(onClose: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
-    var records by remember { mutableStateOf<AcademicRecordsDto?>(null) }
+    var records by remember { mutableStateOf<Load<AcademicRecordsDto>>(Load.Loading) }
     var reload by remember { mutableIntStateOf(0) }
     var notice by remember { mutableStateOf<String?>(null) }
     var addingTermFor by remember { mutableStateOf<String?>(null) }
@@ -282,7 +287,7 @@ internal fun AcademicRecordsPage(onClose: () -> Unit) {
     var termResult by remember { mutableStateOf("") }
     var termBacklogs by remember { mutableStateOf("") }
 
-    LaunchedEffect(reload) { records = runCatching { Api.academicRecords(context) }.getOrNull() }
+    LaunchedEffect(reload) { records = loadOf { Api.academicRecords(context) } }
 
     OverlayScaffold(title = "Academic record", onClose = onClose) {
         Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
@@ -293,10 +298,12 @@ internal fun AcademicRecordsPage(onClose: () -> Unit) {
                         color = MaterialTheme.colorScheme.onPrimaryContainer)
                 }
             }
-            val data = records
+            val state = records
+            val data = (state as? Load.Ready)?.value
             when {
-                data == null -> LoadingSpinner()
-                data.qualifications.isEmpty() -> EmptyState(
+                state is Load.Loading -> LoadingSpinner()
+                state is Load.Failed -> FailedState(state.message) { reload += 1 }
+                data == null || data.qualifications.isEmpty() -> EmptyState(
                     Icons.Filled.School, Tone.Violet, "No academic record yet",
                     "Add your programme and results on the web app, then ask your institution to verify them. " +
                         "Employers who ask for a minimum CGPA can only see verified results.",

@@ -383,12 +383,15 @@ private fun MainScaffold(
     }
 
     // System back closes the topmost overlay instead of quitting the app.
-    androidx.activity.compose.BackHandler(enabled = showChat || showEditProfile || showInbox || showTheme || moreDest != null) {
+    androidx.activity.compose.BackHandler(
+        enabled = showChat || showEditProfile || showInbox || showTheme || readinessOpen || moreDest != null,
+    ) {
         when {
             showChat -> showChat = false
             showEditProfile -> showEditProfile = false
             showInbox -> showInbox = false
             showTheme -> showTheme = false
+            readinessOpen -> readinessOpen = false
             else -> moreDest = null
         }
     }

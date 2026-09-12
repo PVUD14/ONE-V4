@@ -398,16 +398,25 @@ describe('notifications backbone (mobile foundation)', () => {
 });
 
 describe('DPDP consent capture', () => {
-  it('is dormant until a notice version is configured', async () => {
-    delete process.env.CONSENT_PRIVACY_NOTICE_VERSION;
+  // The source of truth is the consent registry (migration 0028) rather than an
+  // environment variable, so "publish a notice" is a row and "retire it" is a column.
+  const publish = (version: string): Promise<unknown> => pool.query(
+    `INSERT INTO consent_definitions (consent_key, version, title, enforcement)
+     VALUES ('privacy-notice', $1, 'Privacy notice', 'BLOCKING')`, [version],
+  );
+  const retire = (version: string): Promise<unknown> => pool.query(
+    "UPDATE consent_definitions SET retired_at = now() WHERE consent_key='privacy-notice' AND version=$1", [version],
+  );
+
+  it('is dormant until a notice version is published', async () => {
     const status = await api().get('/api/v1/me/consents/privacy-notice').set(auth(studentToken));
     expect(status.status).toBe(200);
     expect(status.body.required).toBe(false);
     expect(status.body.requiredVersion).toBeNull();
   });
 
-  it('requires, records and clears consent for the configured version only', async () => {
-    process.env.CONSENT_PRIVACY_NOTICE_VERSION = '2026-09-v1';
+  it('requires, records and clears consent for the published version only', async () => {
+    await publish('2026-09-v1');
     try {
       const before = await api().get('/api/v1/me/consents/privacy-notice').set(auth(studentToken));
       expect(before.body.required).toBe(true);
@@ -427,12 +436,21 @@ describe('DPDP consent capture', () => {
       expect(after.body.required).toBe(false);
       expect(after.body.grantedVersion).toBe('2026-09-v1');
 
-      // A new notice version re-arms the gate: consent is per version.
-      process.env.CONSENT_PRIVACY_NOTICE_VERSION = '2026-12-v2';
+      // Withdrawal re-arms the gate and is recorded against the version held.
+      const withdrawn = await api().post('/api/v1/me/consents/privacy-notice/withdraw').set(auth(studentToken)).send({});
+      expect(withdrawn.status).toBe(201);
+      expect(withdrawn.body.blocksProductUse).toBe(true);
+      const afterWithdrawal = await api().get('/api/v1/me/consents/privacy-notice').set(auth(studentToken));
+      expect(afterWithdrawal.body.required).toBe(true);
+
+      // A new notice version re-arms the gate too: consent is per version.
+      await retire('2026-09-v1');
+      await publish('2026-12-v2');
       const rearmed = await api().get('/api/v1/me/consents/privacy-notice').set(auth(studentToken));
       expect(rearmed.body.required).toBe(true);
+      expect(rearmed.body.requiredVersion).toBe('2026-12-v2');
     } finally {
-      delete process.env.CONSENT_PRIVACY_NOTICE_VERSION;
+      await pool.query("UPDATE consent_definitions SET retired_at = now() WHERE consent_key='privacy-notice' AND retired_at IS NULL");
     }
   });
 });

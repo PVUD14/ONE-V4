@@ -17,6 +17,7 @@ import { Pool, type PoolClient } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { sql } from 'drizzle-orm';
 import * as schema from '../src/schema.js';
+import type { PersistenceDb } from '../src/repositories.js';
 import { linkExamSubjectToTopic, recordExamResultEvidence } from '../src/exam-evidence-bridge.js';
 
 const connectionString = process.env.DATABASE_URL;
@@ -26,7 +27,7 @@ const migrationDir = new URL('../drizzle/', import.meta.url);
 
 let client: PoolClient;
 /** drizzle over the same client, so the bridge runs inside this test's transaction. */
-let db: ReturnType<typeof drizzle>;
+let db: PersistenceDb;
 let institutionId: string;
 let studentId: string;
 let staffId: string;
@@ -44,7 +45,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   client = await pool.connect();
   await client.query('BEGIN');
-  db = drizzle(client as never, { schema });
+  db = drizzle(client as never, { schema }) as unknown as PersistenceDb;
   institutionId = randomUUID();
   studentId = randomUUID();
   staffId = randomUUID();

@@ -93,3 +93,34 @@ object Session {
         return Base64.encodeToString(buffer, Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP)
     }
 }
+
+/**
+ * Transient PKCE state.
+ *
+ * Stored rather than held in memory because the app can be killed while the user is in
+ * the browser — a slow MFA step on a low-memory phone is exactly when that happens —
+ * and the returning authorization code is useless without the verifier that started it.
+ * Both are cleared the moment the exchange is attempted, successfully or not.
+ */
+internal fun Session.setOauthVerifier(context: Context, verifier: String) {
+    context.getSharedPreferences("one-session", Context.MODE_PRIVATE)
+        .edit().putString("oauth_verifier", verifier).apply()
+}
+
+internal fun Session.oauthVerifier(context: Context): String? =
+    context.getSharedPreferences("one-session", Context.MODE_PRIVATE)
+        .getString("oauth_verifier", null)?.ifBlank { null }
+
+internal fun Session.setOauthState(context: Context, state: String) {
+    context.getSharedPreferences("one-session", Context.MODE_PRIVATE)
+        .edit().putString("oauth_state", state).apply()
+}
+
+internal fun Session.oauthState(context: Context): String? =
+    context.getSharedPreferences("one-session", Context.MODE_PRIVATE)
+        .getString("oauth_state", null)?.ifBlank { null }
+
+internal fun Session.clearOauthTransient(context: Context) {
+    context.getSharedPreferences("one-session", Context.MODE_PRIVATE)
+        .edit().remove("oauth_verifier").remove("oauth_state").apply()
+}

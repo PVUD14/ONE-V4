@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.WorkOutline
 import androidx.compose.material3.Badge
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
@@ -523,8 +524,11 @@ internal fun EmployerScaffold(
     var showChatOv by remember { mutableStateOf(false) }
     var showThemeOv by remember { mutableStateOf(false) }
     var showHelpOv by remember { mutableStateOf(false) }
+    var employerOverlay by remember { mutableStateOf<EmployerOverlay?>(null) }
+    var openApplicant by remember { mutableStateOf<EmployerApplicantDto?>(null) }
+    var employerReload by remember { mutableStateOf(0) }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(employerReload) {
         coroutineScope {
             val r = async { runCatching { Api.listEmployerOpportunities(context, organizationId) }.getOrDefault(emptyList()) }
             val n = async { runCatching { Api.listNotifications(context) }.getOrNull() }
@@ -534,6 +538,35 @@ internal fun EmployerScaffold(
             }
             roles = loadedRoles; applicants = loadedApplicants; inbox = n.await()
         }
+    }
+
+    openApplicant?.let { applicant ->
+        SlideIn {
+            ApplicantActionsPage(
+                employerId = organizationId,
+                applicantName = applicant.candidateName ?: "Candidate",
+                applicationId = applicant.id,
+                currentState = applicant.state,
+                onClose = { openApplicant = null },
+                onChanged = { employerReload += 1 },
+            )
+        }
+        return
+    }
+    when (employerOverlay) {
+        EmployerOverlay.MyInterviews -> {
+            SlideIn { MyInterviewsPage(organizationId, onClose = { employerOverlay = null }) }
+            return
+        }
+        EmployerOverlay.Offers -> {
+            SlideIn { EmployerOffersPage(organizationId, onClose = { employerOverlay = null }) }
+            return
+        }
+        EmployerOverlay.Analytics -> {
+            SlideIn { HiringAnalyticsPage(organizationId, onClose = { employerOverlay = null }) }
+            return
+        }
+        null -> Unit
     }
 
     androidx.activity.compose.BackHandler(enabled = showInboxOv || showChatOv || showThemeOv || showHelpOv) {
@@ -594,7 +627,13 @@ internal fun EmployerScaffold(
                 when {
                     roles == null -> HomeSkeleton()
                     else -> when (tab) {
-                        0 -> EmployerHome(roles!!, applicants) { tab = 1 }
+                        0 -> EmployerHome(
+                            roles = roles!!,
+                            applicants = applicants,
+                            onRoles = { tab = 1 },
+                            onOpenOverlay = { employerOverlay = it },
+                            onOpenApplicant = { openApplicant = it },
+                        )
                         1 -> EmployerRoles(roles!!)
                         else -> StaffMore(onSignOut, onSwitchWorkspace,
                             "Posting roles, publishing and candidate review stay on the web at one.ai8ht.pro.",
@@ -607,7 +646,13 @@ internal fun EmployerScaffold(
 }
 
 @Composable
-private fun EmployerHome(roles: List<EmployerOpportunityDto>, applicants: List<EmployerApplicantDto>, onRoles: () -> Unit) {
+private fun EmployerHome(
+    roles: List<EmployerOpportunityDto>,
+    applicants: List<EmployerApplicantDto>,
+    onRoles: () -> Unit,
+    onOpenOverlay: (EmployerOverlay) -> Unit,
+    onOpenApplicant: (EmployerApplicantDto) -> Unit,
+) {
     val published = roles.count { it.lifecycleState == "PUBLISHED" }
     val applications = roles.sumOf { it.applicationCount }
     val open = roles.sumOf { it.openApplicationCount }
@@ -642,9 +687,17 @@ private fun EmployerHome(roles: List<EmployerOpportunityDto>, applicants: List<E
         // Pilot: This Week's Interviews - NA until a calendar engine exists.
         SectionTitle("This Week's Interviews")
         PilotCard {
-            Text("NA - an interview calendar is not built yet. Interviews are scheduled from the applicant row on the web.",
-                Modifier.padding(14.dp), style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Column(Modifier.padding(14.dp)) {
+                Text("Interviews you are on the panel for, with their scorecards.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = { onOpenOverlay(EmployerOverlay.MyInterviews) }) { Text("My interviews") }
+                    TextButton(onClick = { onOpenOverlay(EmployerOverlay.Offers) }) { Text("Offers") }
+                    TextButton(onClick = { onOpenOverlay(EmployerOverlay.Analytics) }) { Text("Hiring") }
+                }
+            }
         }
 
         // Pilot: Recently Shortlisted - real.
@@ -656,7 +709,10 @@ private fun EmployerHome(roles: List<EmployerOpportunityDto>, applicants: List<E
         } else {
             shortlisted.take(4).forEach { applicant ->
                 PilotCard(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
-                    Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        Modifier.clickable { onOpenApplicant(applicant) }.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
                         Column(Modifier.weight(1f)) {
                             Text(applicant.candidateName ?: "Candidate", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                             Text(prettify(applicant.state), style = MaterialTheme.typography.bodySmall,

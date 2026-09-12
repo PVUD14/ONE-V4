@@ -65,6 +65,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -82,6 +83,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import pro.ai8ht.one.data.valueOrNull
 import pro.ai8ht.one.ui.BrandWordmark
 import pro.ai8ht.one.ui.OneBlue
 import pro.ai8ht.one.ui.OneBlueDeep
@@ -90,18 +92,43 @@ import pro.ai8ht.one.ui.Tone
 import java.time.Instant
 
 class MainActivity : ComponentActivity() {
+    /**
+     * Set when the OAuth redirect brings us back, and read once by the sign-in screen.
+     *
+     * The activity is `singleTask`, so a redirect while the app is already running
+     * arrives at [onNewIntent] rather than a fresh instance — both paths funnel here.
+     */
+    private val pendingRedirect = androidx.compose.runtime.mutableStateOf<android.net.Uri?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        captureRedirect(intent)
         setContent {
             val context = androidx.compose.ui.platform.LocalContext.current
             var themeId by remember { mutableStateOf(Session.theme(context)) }
             OneTheme(themeId) {
-                OneApp(currentTheme = themeId, onThemeChange = { id ->
-                    themeId = id
-                    Session.setTheme(context, id)
-                })
+                OneApp(
+                    currentTheme = themeId,
+                    onThemeChange = { id ->
+                        themeId = id
+                        Session.setTheme(context, id)
+                    },
+                    oauthRedirect = pendingRedirect.value,
+                    onRedirectHandled = { pendingRedirect.value = null },
+                )
             }
         }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        captureRedirect(intent)
+    }
+
+    private fun captureRedirect(intent: android.content.Intent?) {
+        val data = intent?.data ?: return
+        if (data.scheme == "one.ai8ht.pro" && data.host == "signin") pendingRedirect.value = data
     }
 }
 
@@ -132,7 +159,12 @@ private fun parseWorkspace(raw: String?): Workspace? {
 private fun encodeWorkspace(ws: Workspace): String = "${ws.kind.name}|${ws.organizationId ?: ""}|${ws.role}"
 
 @Composable
-fun OneApp(currentTheme: String, onThemeChange: (String) -> Unit) {
+fun OneApp(
+    currentTheme: String,
+    onThemeChange: (String) -> Unit,
+    oauthRedirect: android.net.Uri? = null,
+    onRedirectHandled: () -> Unit = {},
+) {
     val context = LocalContext.current
     var signedIn by remember { mutableStateOf(Session.token(context) != null) }
     var sessionExpired by remember { mutableStateOf(false) }
@@ -166,7 +198,12 @@ fun OneApp(currentTheme: String, onThemeChange: (String) -> Unit) {
     }
 
     when {
-        !signedIn -> SignInScreen(expired = sessionExpired, onSignedIn = { sessionExpired = false; signedIn = true; consentChecked = false })
+        !signedIn -> SignInScreen(
+            expired = sessionExpired,
+            oauthRedirect = oauthRedirect,
+            onRedirectHandled = onRedirectHandled,
+            onSignedIn = { sessionExpired = false; signedIn = true; consentChecked = false },
+        )
         !consentChecked -> BrandSplash()
         consent?.required == true -> ConsentScreen(
             version = consent?.requiredVersion ?: "",
@@ -303,25 +340,35 @@ private fun MainScaffold(
     var avatarVersion by remember { mutableIntStateOf(0) }
     var refreshing by remember { mutableStateOf(false) }
 
-    LaunchedEffect(reloadKey) {
-        loadError = false
-        var unauthorized = false
-        suspend fun <T> guarded(block: suspend () -> T): T? = try { block() } catch (error: Api.ApiException) {
-            if (error.status == 401) unauthorized = true
-            null
-        } catch (error: Exception) { null }
-        coroutineScope {
-            val student = async { guarded { Api.studentMe(context) } }
-            val exams = async { guarded { Api.listAssessments(context) } }
-            val learner = async { guarded { Api.learnerState(context) } }
-            val inbox = async { guarded { Api.listNotifications(context) } }
-            val activity = async { guarded { Api.studentActivity(context) } }
-            val loaded = StudentData(student.await(), exams.await() ?: emptyList(), learner.await(), inbox.await(), activity.await())
-            if (unauthorized) { onSessionExpired(); return@coroutineScope }
-            if (loaded.student == null && loaded.learner == null && loaded.notifications == null) loadError = true
-            data = loaded
-        }
-        refreshing = false
+    // Data now comes from a ViewModel over a cache-then-network repository, so a tab
+    // switch or a rotation no longer throws everything away and re-fetches it. What the
+    // screens below consume is unchanged; only where it comes from has moved.
+    val studentVm: pro.ai8ht.one.data.StudentViewModel =
+        androidx.lifecycle.viewmodel.compose.viewModel()
+    LaunchedEffect(Unit) { studentVm.start() }
+    LaunchedEffect(reloadKey) { if (reloadKey > 0) studentVm.refresh() }
+
+    val studentState by studentVm.student.collectAsState()
+    val assessmentsState by studentVm.assessments.collectAsState()
+    val learnerState by studentVm.learner.collectAsState()
+    val notificationsState by studentVm.notifications.collectAsState()
+    val activityState by studentVm.activity.collectAsState()
+
+    LaunchedEffect(studentState, assessmentsState, learnerState, notificationsState, activityState) {
+        data = StudentData(
+            student = studentState.valueOrNull(),
+            assessments = assessmentsState.valueOrNull() ?: emptyList(),
+            learner = learnerState.valueOrNull(),
+            notifications = notificationsState.valueOrNull(),
+            activity = activityState.valueOrNull(),
+        )
+        // Only an error when nothing at all resolved, cache included. A stale screen is
+        // a working screen.
+        loadError = studentState is pro.ai8ht.one.data.Repository.State.Failed &&
+            learnerState is pro.ai8ht.one.data.Repository.State.Failed &&
+            notificationsState is pro.ai8ht.one.data.Repository.State.Failed
+        if (data?.student != null || data?.learner != null) refreshing = false
+        if (loadError) refreshing = false
     }
 
     // System back closes the topmost overlay instead of quitting the app.
@@ -1001,7 +1048,21 @@ private fun InboxOverlay(feed: NotificationsEnvelope?, onClose: () -> Unit, onAl
 // --- Sign in / consent ---------------------------------------------------------
 
 @Composable
-private fun SignInScreen(expired: Boolean = false, onSignedIn: () -> Unit) {
+private fun SignInScreen(
+    expired: Boolean = false,
+    oauthRedirect: android.net.Uri? = null,
+    onRedirectHandled: () -> Unit = {},
+    onSignedIn: () -> Unit,
+) {
+    val redirectContext = LocalContext.current
+    var redirectError by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(oauthRedirect) {
+        val uri = oauthRedirect ?: return@LaunchedEffect
+        runCatching { OAuth.complete(redirectContext, uri) }
+            .onSuccess { if (it) onSignedIn() }
+            .onFailure { redirectError = it.message ?: "Sign-in did not complete." }
+        onRedirectHandled()
+    }
     val context = LocalContext.current
     val signPalette = pro.ai8ht.one.ui.LocalOnePalette.current
     val scope = rememberCoroutineScope()
@@ -1056,9 +1117,31 @@ private fun SignInScreen(expired: Boolean = false, onSignedIn: () -> Unit) {
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                         keyboardType = androidx.compose.ui.text.input.KeyboardType.Password),
                     shape = RoundedCornerShape(10.dp), colors = fieldColors)
-                error?.let {
+                (error ?: redirectError)?.let {
                     Spacer(Modifier.height(8.dp))
                     Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
+                // Hosted sign-in, shown only once an operator has registered the mobile
+                // app client. It is the only path that can complete an MFA challenge, so
+                // it is offered first and password sign-in becomes the fallback.
+                if (OAuth.isConfigured()) {
+                    Spacer(Modifier.height(14.dp))
+                    Button(
+                        onClick = {
+                            error = null
+                            runCatching { OAuth.begin(context) }
+                                .onFailure { error = it.message ?: "Could not start sign-in." }
+                        },
+                        enabled = !busy,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                    ) { Text("Sign in securely") }
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Opens your browser so two-factor sign-in works.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
                 Spacer(Modifier.height(14.dp))
                 Button(

@@ -129,3 +129,24 @@ export function searchAuditEvents(
   const suffix = query.toString() ? `?${query.toString()}` : '';
   return requestJson(`/api/v1/operations/audit-events${suffix}`, { token, ...(signal ? { signal } : {}) });
 }
+
+export interface FeatureFlagDto {
+  readonly key: string;
+  readonly description: string;
+  readonly enabled: boolean;
+  readonly cap: { readonly kind: string; readonly value: number; readonly window: string } | null;
+  readonly overrides: number;
+  readonly lastChangedAt: string | null;
+}
+
+export function listFeatureFlags(token: string, signal?: AbortSignal): Promise<{ readonly flags: readonly FeatureFlagDto[] }> {
+  return requestJson('/api/v1/operations/feature-flags', { token, ...(signal ? { signal } : {}) });
+}
+
+/**
+ * A reason code is required by the server, not optional here: flipping a flag that
+ * gates a safety behaviour is a high-risk action and the record of why is the point.
+ */
+export function setFeatureFlagState(token: string, key: string, enabled: boolean, reasonCode: string): Promise<{ readonly flags: readonly FeatureFlagDto[] }> {
+  return requestJson(`/api/v1/operations/feature-flags/${encodeURIComponent(key)}/state`, { token, method: 'POST', body: { enabled, reasonCode } });
+}

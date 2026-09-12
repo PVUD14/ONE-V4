@@ -10,6 +10,7 @@ import { createEncryptedStorage, parseFileEncryptionKey } from './storage/encryp
 import { CareerReadinessController } from './http/career-readiness.controller.js';
 import { CareerTargetsController } from './http/career-targets.controller.js';
 import { AcademicRecordsController } from './http/academic-records.controller.js';
+import { PlatformControlsController } from './http/platform-controls.controller.js';
 import { AutomationCallbackController } from './http/automation-callback.controller.js';
 
 const runtimeConfig = loadRuntimeConfig();
@@ -40,7 +41,7 @@ const configuredScanner = runtimeConfig.documents.clamavSocketPath
       ...(configuredScanner ? { fileScanner: configuredScanner } : {}),
     }),
   ],
-  controllers: [HealthController, CareerReadinessController, CareerTargetsController, AcademicRecordsController, AutomationCallbackController],
+  controllers: [HealthController, CareerReadinessController, CareerTargetsController, AcademicRecordsController, PlatformControlsController, AutomationCallbackController],
   providers: [
     { provide: RUNTIME_CONFIG, useValue: runtimeConfig },
     { provide: PG_POOL, useValue: databaseRuntime.pool },

@@ -7,8 +7,8 @@
  * Split out of rolePortalPages.tsx so each stream owns its own surface. The
  * shell and the route dispatcher remain there and import from here.
  */
-import { createOperationsOrganization, getOperationsOrganizationOnboardingStatus, getProtectedAccessToken, inviteInitialOrganizationAdmin, listOperationsInvitations, listOperationsOrganizations, listOperationsUsersAccess, searchAuditEvents, transitionOrganizationVerification, updateOperationsOrganization } from '../api.js';
-import type { AuditEventDto, AuditSearchFilters, OperationsInvitationDto, OperationsUserAccessDto, OrganizationManagementDto } from '../api.js';
+import { createOperationsOrganization, getOperationsOrganizationOnboardingStatus, getProtectedAccessToken, inviteInitialOrganizationAdmin, listFeatureFlags, listOperationsInvitations, listOperationsOrganizations, listOperationsUsersAccess, searchAuditEvents, setFeatureFlagState, transitionOrganizationVerification, updateOperationsOrganization } from '../api.js';
+import type { AuditEventDto, AuditSearchFilters, FeatureFlagDto, OperationsInvitationDto, OperationsUserAccessDto, OrganizationManagementDto } from '../api.js';
 import { V2Stat } from '../dashboardsV2.js';
 import { OperationsCareerReadinessPanel } from '../operationsCareerReadinessPanel.js';
 import type { RolePortalConfig } from '../rolePortalConfig.js';
@@ -213,6 +213,75 @@ export function OperationsAuditLogPage(): React.ReactElement {
         <button type="button" className="pilot-btn" disabled={!cursors.length || loading} onClick={() => setCursors(cursors.slice(0, -1))}>Previous</button>
         <button type="button" className="pilot-btn" disabled={!nextCursor || loading} onClick={() => { if (nextCursor) setCursors([...cursors, nextCursor]); }}>Next</button>
       </div>
+    </section>
+  </section>;
+}
+
+/**
+ * Feature flags.
+ *
+ * A flag is a rollout and kill-switch control, never an entitlement — ADR-022 is
+ * explicit that capability gating built before billing must not assume a billing
+ * source of truth. The screen says so, because the first person to reach for a flag
+ * to answer a commercial question will do it here.
+ */
+export function OperationsFeatureFlagsPage(): React.ReactElement {
+  const token = getProtectedAccessToken();
+  const [flags, setFlags] = useState<readonly FeatureFlagDto[]>([]);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState('');
+  const [reason, setReason] = useState('OPERATIONS_ROLLOUT');
+
+  useEffect(() => {
+    if (!token) return;
+    const controller = new AbortController();
+    listFeatureFlags(token, controller.signal)
+      .then((result) => { setFlags(result.flags); setError(''); })
+      .catch((cause) => { if (!controller.signal.aborted) setError(formatApiError(cause, 'Unable to load feature flags.')); });
+    return () => controller.abort();
+  }, [token]);
+
+  if (!token) return <RestrictedApiState title="Feature Flags" message="Sign in with an authorized platform identity to manage feature flags." />;
+
+  const toggle = async (flag: FeatureFlagDto): Promise<void> => {
+    setBusy(flag.key);
+    try {
+      const result = await setFeatureFlagState(token, flag.key, !flag.enabled, reason);
+      setFlags(result.flags);
+      setError('');
+    } catch (cause) {
+      setError(formatApiError(cause, 'The flag could not be changed.'));
+    } finally {
+      setBusy('');
+    }
+  };
+
+  return <section className="role-module role-module--dense">
+    <div className="role-page-heading"><div><span className="eyebrow">Platform operations</span><h1>Feature Flags</h1>
+      <p>Rollout and kill-switch control. A flag is never an entitlement — what a customer has paid for is a billing question, and billing does not exist yet (ADR-022). Access stays gated on role and membership.</p></div></div>
+    <div className="v2-row v2-cols-4 career-stat-strip role-wide">
+      <V2Stat icon="🚩" tone="teal" value={flags.length} label="Flags defined" />
+      <V2Stat icon="✅" tone="blue" value={flags.filter((flag) => flag.enabled).length} label="Enabled globally" />
+      <V2Stat icon="🎯" tone="purple" value={flags.reduce((total, flag) => total + flag.overrides, 0)} label="Live overrides" />
+      <V2Stat icon="💸" tone="amber" value={flags.filter((flag) => flag.cap).length} label="With a cap" />
+    </div>
+    {error ? <p className="form-error" role="alert">{error}</p> : null}
+    <section className="role-card role-wide"><label className="role-local-search"><span>Reason code recorded with every change</span>
+      <input value={reason} onChange={(event) => setReason(event.target.value.toUpperCase())} placeholder="OPERATIONS_ROLLOUT" /></label></section>
+    <section className="role-card role-wide"><h2>Flags</h2>
+      {!flags.length && !error ? <p>No feature flags are defined yet.</p> : null}
+      {flags.length ? <div className="role-record-table-wrap"><table className="role-record-table">
+        <thead><tr><th>Key</th><th>Description</th><th>State</th><th>Cap</th><th>Overrides</th><th>Last changed</th><th>Action</th></tr></thead>
+        <tbody>{flags.map((flag) => <tr key={flag.key}>
+          <td>{flag.key}</td>
+          <td>{flag.description}</td>
+          <td><StatusBadge label={flag.enabled ? 'ENABLED' : 'OFF'} tone={flag.enabled ? 'success' : 'neutral'} /></td>
+          <td>{flag.cap ? `${flag.cap.value} ${flag.cap.kind} / ${flag.cap.window}` : 'None'}</td>
+          <td>{flag.overrides}</td>
+          <td>{flag.lastChangedAt ? new Date(flag.lastChangedAt).toLocaleString() : 'Never'}</td>
+          <td><button type="button" className="pilot-btn" disabled={busy === flag.key || !/^[A-Z0-9_:-]{3,64}$/.test(reason)} onClick={() => void toggle(flag)}>
+            {busy === flag.key ? 'Saving…' : flag.enabled ? 'Disable' : 'Enable'}</button></td>
+        </tr>)}</tbody></table></div> : null}
     </section>
   </section>;
 }

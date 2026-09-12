@@ -72,6 +72,7 @@ describe('Cognito Hosted UI browser authentication', () => {
     vi.stubEnv('VITE_COGNITO_USER_POOL_ID', 'ap-south-1_uatpool');
     vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
       if (url.endsWith('/health')) return { ok: true };
+      if (url.endsWith('/api/v1/me/consents/privacy-notice')) return { ok: true, json: async () => ({ requiredVersion: null, grantedVersion: null, required: false }) };
       if (url.endsWith('/api/v1/security/context')) {
         expect((init?.headers as Record<string, string>).Authorization).toMatch(/^Bearer /);
         return { ok: true, json: async () => ({ userId: 'student-user', memberships: [], studentRelationships: [{ institutionId: 'institution-1', state: 'ACTIVE', effectiveFrom: '2026-08-21T00:00:00.000Z' }] }) };
@@ -134,6 +135,7 @@ describe('Cognito Hosted UI browser authentication', () => {
     vi.stubEnv('VITE_COGNITO_USER_POOL_ID', 'ap-south-1_uatpool');
     vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
       if (url.endsWith('/health')) return { ok: true };
+      if (url.endsWith('/api/v1/me/consents/privacy-notice')) return { ok: true, json: async () => ({ requiredVersion: null, grantedVersion: null, required: false }) };
       if (url.endsWith('/api/v1/security/context')) return { ok: true, json: async () => ({ userId: 'student-user', memberships: [], studentRelationships: [{ institutionId: 'institution-1', state: 'ACTIVE', effectiveFrom: '2026-08-21T00:00:00.000Z' }] }) };
       if (url.endsWith('/api/v1/students/me')) return { ok: true, json: async () => ({ student: { userId: 'student-user', verifiedEmail: 'student.aanya@uat.example.test', fullName: 'Aanya Rao', institutionStudentId: 'UAT-S-001', institutionId: 'institution-1', academicStatus: 'ACTIVE' } }) };
       if (url.endsWith('/api/v1/students/me/profile') && (!init?.method || init.method === 'GET')) return { ok: true, json: async () => ({ profile: { userId: 'student-user', verifiedEmail: 'student.aanya@uat.example.test', targetCareer: null, careerInterests: [], profileHeadline: null, profileSummary: null, portfolioUrl: null, visibilityState: 'PRIVATE', employerDiscoveryEnabled: false, updatedAt: null } }) };
@@ -178,6 +180,7 @@ describe('Cognito Hosted UI browser authentication', () => {
         return { ok: true, json: async () => ({ access_token: 'uat-access-token', id_token: jwtWithEmail('aanya.student01@example.test') }) };
       }
       if (url.endsWith('/health')) return { ok: true };
+      if (url.endsWith('/api/v1/me/consents/privacy-notice')) return { ok: true, json: async () => ({ requiredVersion: null, grantedVersion: null, required: false }) };
       if (url.endsWith('/api/v1/security/context')) {
         expect((init?.headers as Record<string, string>).Authorization).toBe('Bearer uat-access-token');
         return { ok: true, json: async () => ({ userId: 'student-user-1', memberships: [], studentRelationships: [{ institutionId: 'institution-1', state: 'ACTIVE', effectiveFrom: '2026-08-21T00:00:00.000Z' }] }) };
@@ -255,6 +258,7 @@ describe('Cognito Hosted UI browser authentication', () => {
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
       if (url === 'https://uat-auth.example.test/oauth2/token') return { ok: true, json: async () => ({ access_token: 'institution-token', id_token: jwtWithEmail('institution.admin@uat.example.test') }) };
       if (url.endsWith('/health')) return { ok: true };
+      if (url.endsWith('/api/v1/me/consents/privacy-notice')) return { ok: true, json: async () => ({ requiredVersion: null, grantedVersion: null, required: false }) };
       if (url.endsWith('/api/v1/security/context')) return { ok: true, json: async () => ({
         userId: 'institution-user',
         memberships: [{ organizationId: 'institution-1', role: 'INSTITUTION_ADMIN', scope: {} }],
@@ -285,6 +289,7 @@ describe('Cognito Hosted UI browser authentication', () => {
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
       if (url === 'https://uat-auth.example.test/oauth2/token') return { ok: true, json: async () => ({ access_token: 'placement-token', id_token: jwtWithEmail('placement.admin@uat.example.test') }) };
       if (url.endsWith('/health')) return { ok: true };
+      if (url.endsWith('/api/v1/me/consents/privacy-notice')) return { ok: true, json: async () => ({ requiredVersion: null, grantedVersion: null, required: false }) };
       if (url.endsWith('/api/v1/security/context')) return { ok: true, json: async () => ({
         userId: 'placement-user',
         memberships: [{ organizationId: 'institution-1', role: 'PLACEMENT_ADMIN', scope: {} }],
@@ -308,6 +313,7 @@ describe('Cognito Hosted UI browser authentication', () => {
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
       if (url === 'https://uat-auth.example.test/oauth2/token') return { ok: true, json: async () => ({ access_token: 'recruiter-token', id_token: jwtWithEmail('recruiter@uat.example.test') }) };
       if (url.endsWith('/health')) return { ok: true };
+      if (url.endsWith('/api/v1/me/consents/privacy-notice')) return { ok: true, json: async () => ({ requiredVersion: null, grantedVersion: null, required: false }) };
       if (url.endsWith('/api/v1/security/context')) return { ok: true, json: async () => ({
         userId: 'recruiter-user',
         memberships: [{ organizationId: 'employer-1', role: 'RECRUITER', scope: {} }],
@@ -339,6 +345,7 @@ describe('Cognito Hosted UI browser authentication', () => {
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
       if (url === 'https://uat-auth.example.test/oauth2/token') return { ok: true, json: async () => ({ access_token: 'operations-token', id_token: jwtWithEmail('operations.admin@uat.example.test') }) };
       if (url.endsWith('/health')) return { ok: true };
+      if (url.endsWith('/api/v1/me/consents/privacy-notice')) return { ok: true, json: async () => ({ requiredVersion: null, grantedVersion: null, required: false }) };
       if (url.endsWith('/api/v1/security/context')) return { ok: true, json: async () => ({
         userId: 'operations-user',
         memberships: [{ organizationId: 'operations-org', role: 'OPERATIONS_ADMIN', scope: {} }],
@@ -364,6 +371,7 @@ describe('Cognito Hosted UI browser authentication', () => {
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
       if (url === 'https://uat-auth.example.test/oauth2/token') return { ok: true, json: async () => ({ access_token: 'rejected-token', id_token: jwtWithEmail('unmapped@uat.example.test') }) };
       if (url.endsWith('/health')) return { ok: true };
+      if (url.endsWith('/api/v1/me/consents/privacy-notice')) return { ok: true, json: async () => ({ requiredVersion: null, grantedVersion: null, required: false }) };
       if (url.endsWith('/api/v1/security/context')) return {
         ok: false,
         status: 403,
@@ -391,6 +399,7 @@ describe('Cognito Hosted UI browser authentication', () => {
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
       if (url === 'https://uat-auth.example.test/oauth2/token') return { ok: true, json: async () => ({ access_token: 'student-token', id_token: jwtWithEmail('student.aanya@uat.example.test') }) };
       if (url.endsWith('/health')) return { ok: true };
+      if (url.endsWith('/api/v1/me/consents/privacy-notice')) return { ok: true, json: async () => ({ requiredVersion: null, grantedVersion: null, required: false }) };
       if (url.endsWith('/api/v1/security/context')) return { ok: true, json: async () => ({
         userId: 'student-user',
         memberships: [],

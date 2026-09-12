@@ -62,6 +62,7 @@ function configureRecruiterFetch(): void {
   fetchMock.mockImplementation(async (url: string) => {
     if (url === 'https://uat-auth.example.test/oauth2/token') return { ok: true, json: async () => ({ access_token: 'recruiter-token', id_token: jwtWithEmail('recruiter@example.test') }) };
     if (url.endsWith('/health')) return { ok: true };
+    if (url.endsWith('/api/v1/me/consents/privacy-notice')) return { ok: true, json: async () => ({ requiredVersion: null, grantedVersion: null, required: false }) };
     if (url.endsWith('/api/v1/security/context')) return { ok: true, json: async () => recruiterSecurityContext() };
     if (url.endsWith(`/api/v1/employers/${recruiterEmployerId}/opportunities`)) return { ok: true, json: async () => ({ opportunities: [recruiterOpportunity] }) };
     if (url.endsWith(`/api/v1/employers/${recruiterEmployerId}/opportunities/${recruiterOpportunityId}/applications`)) return { ok: true, json: async () => ({ applications: recruiterApplicants }) };
@@ -308,6 +309,7 @@ describe('All-role portal registry and preview workflows', () => {
     fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
       if (url === 'https://uat-auth.example.test/oauth2/token') return { ok: true, json: async () => ({ access_token: 'institution-token', id_token: jwtWithEmail('institution.admin@example.test') }) };
       if (url.endsWith('/health')) return { ok: true };
+      if (url.endsWith('/api/v1/me/consents/privacy-notice')) return { ok: true, json: async () => ({ requiredVersion: null, grantedVersion: null, required: false }) };
       if (url.endsWith('/api/v1/security/context')) {
         contextCalls += 1;
         expect((init?.headers as Record<string, string>).Authorization).toBe('Bearer institution-token');
@@ -344,6 +346,7 @@ describe('All-role portal registry and preview workflows', () => {
     fetchMock.mockImplementation(async (url: string) => {
       if (url === 'https://uat-auth.example.test/oauth2/token') return { ok: true, json: async () => ({ access_token: 'institution-token', id_token: jwtWithEmail('institution.admin@uat.example.test') }) };
       if (url.endsWith('/health')) return { ok: true };
+      if (url.endsWith('/api/v1/me/consents/privacy-notice')) return { ok: true, json: async () => ({ requiredVersion: null, grantedVersion: null, required: false }) };
       if (url.endsWith('/api/v1/security/context')) throw new DOMException('Request was aborted by effect cleanup.', 'AbortError');
       return { ok: false };
     });
@@ -360,6 +363,7 @@ describe('All-role portal registry and preview workflows', () => {
     fetchMock.mockImplementation(async (url: string) => {
       if (url === 'https://uat-auth.example.test/oauth2/token') return { ok: true, json: async () => ({ access_token: 'institution-token', id_token: jwtWithEmail('institution.admin@uat.example.test') }) };
       if (url.endsWith('/health')) return { ok: true };
+      if (url.endsWith('/api/v1/me/consents/privacy-notice')) return { ok: true, json: async () => ({ requiredVersion: null, grantedVersion: null, required: false }) };
       if (url.endsWith('/api/v1/security/context')) return { ok: false, status: 500, headers: { get: () => 'ctx-500' }, json: async () => ({ message: { correlationId: 'ctx-500' } }) };
       return { ok: false };
     });
@@ -374,6 +378,7 @@ describe('All-role portal registry and preview workflows', () => {
     fetchMock.mockImplementation(async (url: string) => {
       if (url === 'https://uat-auth.example.test/oauth2/token') return { ok: true, json: async () => ({ access_token: 'institution-token', id_token: jwtWithEmail('institution.admin@uat.example.test') }) };
       if (url.endsWith('/health')) return { ok: true };
+      if (url.endsWith('/api/v1/me/consents/privacy-notice')) return { ok: true, json: async () => ({ requiredVersion: null, grantedVersion: null, required: false }) };
       if (url.endsWith('/api/v1/security/context')) {
         contextCalls += 1;
         if (contextCalls === 1) throw new TypeError('temporary network failure');

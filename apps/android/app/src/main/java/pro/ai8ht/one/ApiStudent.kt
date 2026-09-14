@@ -158,6 +158,35 @@ import kotlinx.serialization.Serializable
     val percentOfEvaluated: Int? = null,
 )
 
+// --- Public profile and photo -------------------------------------------------
+
+@Serializable data class ShareSectionsDto(
+    val showPhoto: Boolean = false,
+    val showHeadline: Boolean = true,
+    val showCity: Boolean = true,
+    val showInstitution: Boolean = true,
+    val showEducation: Boolean = true,
+    val showSelfReported: Boolean = true,
+    val showAssessments: Boolean = false,
+    val showLearning: Boolean = true,
+    val showCertificates: Boolean = true,
+    val showSkills: Boolean = true,
+    val showPortfolio: Boolean = true,
+)
+
+@Serializable data class ShareLinkDto(
+    val id: String = "",
+    val coverKey: String = "MIDNIGHT",
+    val sections: ShareSectionsDto = ShareSectionsDto(),
+    val expiresAt: String = "",
+    val lastViewedAt: String? = null,
+    val expired: Boolean = false,
+    /** Returned once, when the link is created. Never available again. */
+    val token: String? = null,
+)
+
+@Serializable data class ShareLinkEnvelope(val link: ShareLinkDto? = null, val hasPhoto: Boolean = false)
+
 // --- Learner content ----------------------------------------------------------
 
 @Serializable data class LearnerContentEnvelope(val items: List<LearnerContentItemDto> = emptyList())
@@ -410,6 +439,42 @@ suspend fun Api.transitionRoadmapAction(context: Context, actionId: String, toSt
  * anything, so listing it would only produce a request nobody can answer.
  */
 /** Published learner content. Empty until somebody publishes something, which is honest. */
+suspend fun Api.readShareLink(context: Context): ShareLinkEnvelope =
+    json.decodeFromString(request(context, "GET", "/api/v1/students/me/public-profile"))
+
+suspend fun Api.publishShareLink(context: Context): ShareLinkDto =
+    json.decodeFromString<ShareLinkEnvelope>(
+        request(context, "POST", "/api/v1/students/me/public-profile", "{}")).link
+        ?: throw Api.ApiException(500, "NO_LINK")
+
+suspend fun Api.updateShareSections(context: Context, key: String, value: Boolean): ShareLinkDto =
+    json.decodeFromString<ShareLinkEnvelope>(
+        request(
+            context, "POST", "/api/v1/students/me/public-profile/settings",
+            "{\"sections\":{\"" + key + "\":" + value + "}}",
+        ),
+    ).link ?: throw Api.ApiException(500, "NO_LINK")
+
+suspend fun Api.extendShareLink(context: Context, days: Int): ShareLinkDto =
+    json.decodeFromString<ShareLinkEnvelope>(
+        request(context, "POST", "/api/v1/students/me/public-profile/settings", "{\"days\":" + days + "}"),
+    ).link ?: throw Api.ApiException(500, "NO_LINK")
+
+suspend fun Api.revokeShareLink(context: Context) {
+    request(context, "DELETE", "/api/v1/students/me/public-profile")
+}
+
+/**
+ * Uploads the photo to the platform rather than the device, so the web app and a
+ * reinstalled phone see the same face. Replaces the local-only file this app used to keep.
+ */
+suspend fun Api.uploadProfilePhoto(context: Context, contentType: String, base64: String) {
+    request(
+        context, "POST", "/api/v1/students/me/profile-photo",
+        buildJson("contentType" to quoted(contentType), "data" to quoted(base64)),
+    )
+}
+
 suspend fun Api.listLearnerContent(context: Context, contentType: String): List<LearnerContentItemDto> =
     json.decodeFromString<LearnerContentEnvelope>(
         request(context, "GET", "/api/v1/learner-content?contentType=" + contentType)).items

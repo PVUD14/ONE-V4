@@ -355,7 +355,7 @@
       </span>
       <div class="docmeta">
         Proven capability record<br>
-        ONE &middot; 13 September 2026
+        ONE &middot; 14 September 2026
       </div>
     </div>
     <h1>What ONE Already Does</h1>
@@ -363,9 +363,9 @@
   </header>
 
   <div class="counts">
-    <div class="count"><b>159</b><span>Live API routes</span></div>
-    <div class="count"><b>30</b><span>Database migrations</span></div>
-    <div class="count"><b>67</b><span>Test suites</span></div>
+    <div class="count"><b>182</b><span>Live API routes</span></div>
+    <div class="count"><b>33</b><span>Database migrations</span></div>
+    <div class="count"><b>77</b><span>Test suites</span></div>
     <div class="count"><b>11</b><span>Role portals</span></div>
     <div class="count"><b>9</b><span>Question formats</span></div>
     <div class="count"><b>3</b><span>Clients: web, phone, API</span></div>
@@ -467,6 +467,39 @@
 
       <div class="guarantee">
         <div class="promise">
+          <h3>A published profile link leaks nothing if the database does</h3>
+          <p>A student can publish a page anyone with the link can open, and switch it off for everybody at once. An unknown, expired and revoked link are indistinguishable to whoever holds one.</p>
+        </div>
+        <dl class="mechanism">
+          <dt>Enforced by</dt>
+          <dd>Only a <code>sha256</code> digest of the token is stored &mdash; the raw link is shown once, to its owner, and cannot be recovered. The page resolver does not join <code>readiness_snapshots</code>, <code>applications</code> or the document files at all, so there is nothing to filter out.</dd>
+        </dl>
+      </div>
+
+      <div class="guarantee">
+        <div class="promise">
+          <h3>A screening result never becomes readiness evidence</h3>
+          <p>An employer can build a question bank and send a test to applicants. What they measure stays theirs: it does not feed the band, and they never see the band either.</p>
+        </div>
+        <dl class="mechanism">
+          <dt>Enforced by</dt>
+          <dd>The employer assessment tables do not reference <code>evidence_records</code>, <code>mastery_projections</code> or <code>readiness_snapshots</code>. A test counts rows in all three before and after a submission and asserts they are unchanged.</dd>
+        </dl>
+      </div>
+
+      <div class="guarantee">
+        <div class="promise">
+          <h3>An employer can tell a candidate why, without exposing their own notes</h3>
+          <p>What a recruiter recorded for their team stays private. Releasing feedback is a second, deliberate act from a shared vocabulary, and it can be corrected but never retracted.</p>
+        </div>
+        <dl class="mechanism">
+          <dt>Enforced by</dt>
+          <dd>Separate tables from <code>applications.rejection_reason_code</code>, which is untouched. A correction supersedes rather than overwrites, and a partial unique index allows exactly one live release.</dd>
+        </dl>
+      </div>
+
+      <div class="guarantee">
+        <div class="promise">
           <h3>Nothing is ever deleted to hide a correction</h3>
           <p>Corrections append; they do not erase. A replanned roadmap supersedes the old one rather than overwriting it, and application stage changes are kept as history.</p>
         </div>
@@ -499,6 +532,10 @@
           <li>Browse and save opportunities, apply, withdraw, and respond to offers</li>
           <li>Log applications made <b>outside</b> ONE, and grant or revoke institution visibility on each</li>
           <li>Complete tasks assigned by staff</li>
+          <li>See <b>why an employer rejected them</b>, where that employer chose to say</li>
+          <li>Sit screening tests employers send them, on a laptop or a phone</li>
+          <li>See one calendar of interviews, exam windows, tasks and deadlines, and export it</li>
+          <li><b>Publish a profile behind a revocable link</b>, choosing what it shows, and switch it off for everyone at once</li>
           <li>Grant and withdraw consent, <b>export everything</b>, and request deletion</li>
         </ul>
       </div>
@@ -516,6 +553,7 @@
           <li>Assemble exams by blueprint from approved questions only, publish, assign and read results</li>
           <li>Assign tasks and interventions to students and track them to completion</li>
           <li>Read readiness reporting for their own cohorts, aggregate and suppressed below five</li>
+          <li>Work a queue of <b>verification requests from former students</b>, told whether each person is current, former, or not on their roster</li>
           <li>See student applications they have been granted visibility of</li>
         </ul>
       </div>
@@ -532,6 +570,8 @@
           <li><b>An interviewer sees only their own assigned interview</b>, not the wider pipeline</li>
           <li>Record structured scorecards and interview outcomes</li>
           <li>Draft, issue and withdraw offers &mdash; compensation never visible to the institution</li>
+          <li><b>Build a question bank and send a screening test</b> to applicants, with a second person approving each question</li>
+          <li>Release structured feedback to a rejected candidate, choosing what is said</li>
           <li>Read hiring analytics on their own funnel</li>
         </ul>
       </div>
@@ -548,6 +588,7 @@
           <li>Open, progress and act on trust-and-safety cases</li>
           <li>Read the platform audit log</li>
           <li>Place and release legal holds so an automatic deletion cannot erase evidence under investigation</li>
+          <li><b>Write, review and publish learner content</b>, with approval and publication requiring two different people</li>
           <li>See failed outbound events and replay or supersede them</li>
         </ul>
       </div>
@@ -641,11 +682,17 @@
       <div class="apx"><span class="claim">Backups, monitoring and recovery procedures</span><span class="where">docs/ops/runbook-*.md &middot; deploy/scripts/backup-and-verify.sh</span></div>
     </div>
 
-    <p class="note"><b>How these numbers were produced.</b> The counts in the header are measured from the repository, not estimated: routes counted from the HTTP controllers, migrations and test suites from the file tree. The capability statements were each checked against the code that implements them while this document was written, and the test suite was run: <b>537 tests pass</b> across the web application and ten domain packages (hiring, identity, authorization, privacy, career readiness, assessments, events, learner content, AI orchestration, automation). Two limits, stated rather than buried: the 13 database-backed integration suites need a live database and were not exercised for this document, and two web sign-in tests are timing-sensitive and can flake when suites run in parallel &mdash; both passed on a clean run. <b>Where something is only partly built, it is absent from these pages rather than softened</b> &mdash; the companion briefing carries it instead.</p>
+    <p class="note"><b>How these numbers were produced.</b> The counts in the header are measured from the repository, not estimated: routes counted from the HTTP controllers, migrations and test suites from the file tree. The capability statements were each checked against the code that implements them while this document was written, and the whole test suite was run against a real database: <b>every suite passes</b> &mdash; the web
+       application, the API including its database-backed integration tests, the persistence package, and ten domain
+       packages. The flaky sign-in tests noted in the previous edition were diagnosed and fixed; they were slow, not
+       broken. One limit remains, stated rather than buried: an <b>independent penetration test has still not been
+       done</b>, so every security claim above is our own assessment of our own work.
+       <b>Where something is only partly built, it is absent from these pages rather than softened</b> &mdash; the
+       companion briefing carries it instead.</p>
   </section>
 
   <footer>
-    <span>ONE &mdash; proven capability record &middot; 13 September 2026</span>
+    <span>ONE &mdash; proven capability record &middot; 14 September 2026</span>
     <span>&copy; AI8HT. All rights reserved.</span>
   </footer>
 

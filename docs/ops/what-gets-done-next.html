@@ -333,42 +333,42 @@
       </span>
       <div class="docmeta">
         Delivery plan<br>
-        ONE &middot; 13 September 2026
+        ONE &middot; 14 September 2026
       </div>
     </div>
     <h1>What Gets Done Next</h1>
-    <p class="thesis">The findings, sorted by <strong>who can finish them</strong> rather than how big they are. Six can be built and shipped without anyone else; one is authorised and crosses a line that needed permission; two can only be carried partway, and the stopping point is named; four are not mine at all.</p>
+    <p class="thesis"><strong>Second edition, after the work.</strong> Everything in the first six sections has shipped &mdash; candidate feedback, the calendar, alumni verification, employer screening, content authoring, the housekeeping, and the public profile that needed permission. What remains is one item held by your own decision, two that can only go partway until cloud access exists, and four that were never mine.</p>
   </header>
 
   <div class="counts">
-    <div class="count"><b>6</b><span>I can finish</span></div>
-    <div class="count"><b>1</b><span>Authorised</span></div>
+    <div class="count"><b>7</b><span>Delivered</span></div>
     <div class="count"><b>1</b><span>Held by decision</span></div>
     <div class="count"><b>2</b><span>Partway only</span></div>
     <div class="count"><b>4</b><span>Not mine</span></div>
+    <div class="count"><b>0</b><span>Still to start</span></div>
   </div>
 
   <section>
     <div class="sec-head"><span class="sec-num">01</span><h2>How this is sorted, and what was decided</h2></div>
     <p class="lede">A plan is only useful if the boundary between &ldquo;this will be done&rdquo; and &ldquo;this needs someone else&rdquo; is drawn honestly. Everything below carries one of four marks, and nothing is marked more optimistically than it deserves.</p>
     <p>
-      <span class="chip c-go">Can finish</span> built, tested, on both web and phone, with the design documents the repository rules require &mdash;
+      <span class="chip c-go">Delivered</span> built, tested, on both web and phone, with the design documents the repository rules require &mdash;
       <span class="chip c-gated">Gated</span> buildable, but it crosses a line that is not mine to cross &mdash;
       <span class="chip c-partial">Partway</span> real progress is possible and the stopping point is stated &mdash;
       <span class="chip c-ext">Not mine</span> needs access, money or people.
     </p>
-    <p class="note"><b>Decisions taken 13 September 2026.</b> Work runs straight down A1 to A5 in order without stopping between items. <b>The public profile is authorised</b> &mdash; it adds the first unauthenticated route in the system, and gets an ADR recording the decision and what was rejected. <b>Billing stays closed</b>, so ADR-022 stands unchanged until its own trigger fires: a paying customer with a date, or a decision to sell to students directly.</p>
+    <p class="note"><b>What happened.</b> A1 to A5 and the housekeeping ran straight through, then B1. The public profile shipped with ADR-031 recording that ONE now has one unauthenticated route &mdash; which belongs in a security review rather than being discovered in one. Photos were added to the first version at your request, which meant retiring the phone&rsquo;s device-only photo so the two clients stop disagreeing. <b>Billing stays closed</b>: ADR-022 stands until a paying customer with a date, or a decision to sell to students directly.</p>
   </section>
 
   <section>
-    <div class="sec-head"><span class="sec-num">02</span><h2>The work I can finish</h2></div>
+    <div class="sec-head"><span class="sec-num">02</span><h2>The work that is finished</h2></div>
 
     <div class="items">
 
       <div class="item">
         <div class="ref">A1</div>
         <div class="item-body">
-          <h3>Feedback reaches the rejected candidate <span class="chip c-go">Can finish</span></h3>
+          <h3>Feedback reaches the rejected candidate <span class="chip c-go">Delivered</span></h3>
           <p>The highest value on the list, and cheaper than it looked: <code>applications.rejection_reason_code</code> already exists and is <em>already written</em> every time an employer rejects someone, alongside a full state history. Nobody has ever shown it to the student.</p>
           <p>What is missing is a controlled vocabulary instead of free text, a release decision so the employer chooses what the candidate sees, a student-facing route, and the link from a released reason to the roadmap &mdash; so a rejection stops being a dead end and becomes the most useful signal in the system.</p>
           <dl class="facts">
@@ -382,7 +382,7 @@
       <div class="item">
         <div class="ref">A2</div>
         <div class="item-body">
-          <h3>Calendar, and a feed that leaves the building <span class="chip c-go">Can finish</span></h3>
+          <h3>Calendar, and a feed that leaves the building <span class="chip c-go">Delivered</span></h3>
           <p>Nothing new to store. Interview times, exam windows, staff-action due dates and roadmap deadlines are all already recorded &mdash; nobody has built the page that gathers them per person. One aggregation route, a view per role, and an ICS feed so it appears in Outlook and Google Calendar, where people actually look.</p>
           <dl class="facts">
             <div><dt>Migration</dt><dd>None in-app; one small token table only if the feed should stay live</dd></div>
@@ -395,7 +395,7 @@
       <div class="item">
         <div class="ref">A4</div>
         <div class="item-body">
-          <h3>Alumni ask their old college to verify <span class="chip c-go">Can finish</span></h3>
+          <h3>Alumni ask their old college to verify <span class="chip c-go">Delivered</span></h3>
           <p>The verification engine already accepts people who are no longer enrolled &mdash; the queue is scoped by <em>which institution issued the qualification</em> and never asks whether the person is still a student. This builds the request path and the college&rsquo;s queue for requests from people who are not on their roster.</p>
           <p>This is the college-facing half, and it is useful on its own. It does not include self-registration, which is held in section 04.</p>
           <dl class="facts">
@@ -409,7 +409,7 @@
       <div class="item">
         <div class="ref">A3</div>
         <div class="item-body">
-          <h3>Employers can send a screening test <span class="chip c-go">Can finish</span></h3>
+          <h3>Employers can send a screening test <span class="chip c-go">Delivered</span></h3>
           <p>Table stakes for a hiring product, and an extension rather than a build from nothing: the question bank, review states, blueprint assembly, per-student frozen papers and submit-once scoring all exist on the institution side. Employers get their own scoped bank under the same rules &mdash; including the wall that keeps one organisation&rsquo;s questions permanently its own.</p>
           <dl class="facts">
             <div><dt>Migration</dt><dd><code>0036</code></dd></div>
@@ -422,7 +422,7 @@
       <div class="item">
         <div class="ref">A5</div>
         <div class="item-body">
-          <h3>Somewhere to write the content <span class="chip c-go">Can finish</span></h3>
+          <h3>Somewhere to write the content <span class="chip c-go">Delivered</span></h3>
           <p>The <code>learner_content</code> table and its draft &rarr; review &rarr; publish workflow exist, and <em>no route reads or writes them</em>. That single absence is why Practice, Company Prep, Career Tools, Scholarships and Resume Builder are empty shells.</p>
           <p>This builds the serving route and the authoring screen, so a person can write, review and publish into those five pages. It does not fill them &mdash; stock and subject reviewers are in section 05.</p>
           <dl class="facts">
@@ -435,7 +435,7 @@
       <div class="item">
         <div class="ref">A6</div>
         <div class="item-body">
-          <h3>Housekeeping, folded in along the way <span class="chip c-go">Can finish</span></h3>
+          <h3>Housekeeping, folded in along the way <span class="chip c-go">Delivered</span></h3>
           <p>Two web sign-in tests are timing-sensitive and fail when suites run in parallel, passing cleanly on their own &mdash; a flake worth removing rather than tolerating. And the V2 functional reality matrix still carries a stale banner pointing at a report that exists only as a PDF; it should be retired properly rather than left to mislead a future reader.</p>
         </div>
       </div>
@@ -444,12 +444,12 @@
   </section>
 
   <section>
-    <div class="sec-head"><span class="sec-num">03</span><h2>Authorised, because it crosses a line</h2></div>
+    <div class="sec-head"><span class="sec-num">03</span><h2>The one that needed permission, and the one still held</h2></div>
     <div class="items">
       <div class="item">
         <div class="ref">B1</div>
         <div class="item-body">
-          <h3>A profile the student can take outside ONE <span class="chip c-gated">Authorised</span></h3>
+          <h3>A profile the student can take outside ONE <span class="chip c-go">Delivered</span></h3>
           <p>Today there is <strong>not one unauthenticated route in the entire system</strong>. That is a real security property, and a shareable profile link ends it &mdash; which is why it needed a decision rather than a judgement call. It is now authorised.</p>
           <p>Scoped deliberately: the link is revocable and expiring, it shows only what the student chose to share, verified and self-reported items are visibly distinguished, and <strong>the readiness band is excluded</strong>. An ADR records the decision and what was rejected, as the repository requires.</p>
           <dl class="facts">
@@ -529,20 +529,19 @@
   </section>
 
   <section>
-    <div class="sec-head"><span class="sec-num">06</span><h2>Order of work, and the rules it follows</h2></div>
+    <div class="sec-head"><span class="sec-num">06</span><h2>What happens after this</h2></div>
     <ol class="seq">
-      <li><p><b>A1 &mdash; candidate feedback.</b> Most value per unit of work; the foundation is already in the ground.</p></li>
-      <li><p><b>A2 &mdash; calendar and feed.</b> Nearly free, and immediately visible to every single user.</p></li>
-      <li><p><b>A4 &mdash; alumni verification.</b> Makes the alumni story real on the college side without waiting on cloud access.</p></li>
-      <li><p><b>A3 &mdash; employer assessments.</b> The largest remaining employer-side gap.</p></li>
-      <li><p><b>A5 &mdash; content authoring.</b> Unblocks five dead pages so they are ready the moment content exists.</p></li>
-      <li><p><b>B1 &mdash; public profile.</b> Authorised, and preceded by its ADR.</p></li>
+      <li><p><b>Write the content.</b> The desk exists and two people must sign off before a student sees anything. What it needs now is somebody who knows a field, writing into it. Nothing else on this list unlocks as much.</p></li>
+      <li><p><b>Finish the front door.</b> Retroactive verification shipped; self-signup is the missing half, and it is what lets a person with no institution use any of this. ONE&rsquo;s side is straightforward; registration waits on cloud access.</p></li>
+      <li><p><b>Get cloud access.</b> It is the single blocker on staff two-factor, every AI feature, and the half of speaking practice that listens. Three separate items, one obstacle.</p></li>
+      <li><p><b>Commission a penetration test</b> before real student data arrives at scale &mdash; with more surface to look at now that one unauthenticated route exists.</p></li>
+      <li><p><b>Reopen billing when there is a paying customer with a date.</b> That is the trigger ADR-022 names, and nothing about it has changed.</p></li>
     </ol>
-    <p class="note"><b>Standing rules this plan obeys.</b> Every item ships to the Android app in the same piece of work, and any item with genuinely no phone counterpart will be named as such rather than quietly skipped. A table carrying real consequences gets its design written into <b>docs/architecture/</b> before its migration. Migrations are only ever added, never edited &mdash; <code>0016</code>, <code>0035</code>&ndash;<code>0039</code> and <code>0071</code>+ are the free numbers. Nothing invented ever reaches a screen a real user can see: a missing source renders <code>NA</code> or <code>0</code> rather than a plausible figure. And readiness stays a band, never a number, and never reaches an employer.</p>
+    <p class="note"><b>Standing rules this work obeyed.</b> Every item ships to the Android app in the same piece of work, and any item with genuinely no phone counterpart will be named as such rather than quietly skipped. A table carrying real consequences gets its design written into <b>docs/architecture/</b> before its migration. Migrations were only added, never edited &mdash; <code>0035</code>, <code>0036</code> and <code>0071</code> were used; <code>0016</code> and <code>0037</code>&ndash;<code>0039</code> remain free. Nothing invented ever reaches a screen a real user can see: a missing source renders <code>NA</code> or <code>0</code> rather than a plausible figure. And readiness stays a band, never a number, and never reaches an employer.</p>
   </section>
 
   <footer>
-    <span>ONE &mdash; delivery plan &middot; 13 September 2026</span>
+    <span>ONE &mdash; delivery plan &middot; 14 September 2026 (second edition)</span>
     <span>&copy; AI8HT. All rights reserved.</span>
   </footer>
 

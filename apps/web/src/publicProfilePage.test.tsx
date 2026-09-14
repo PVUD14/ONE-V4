@@ -54,7 +54,7 @@ function stubProfile(payload: unknown, ok = true): void {
 
 describe('the public profile a stranger sees', () => {
   it('renders without any access token at all', async () => {
-    const fetchMock = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ profile }) }));
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => ({ ok: true, status: 200, json: async () => ({ profile }) }));
     vi.stubGlobal('fetch', fetchMock);
     render(<PublicProfilePage token="tok-123" />);
     expect(await screen.findByRole('heading', { name: 'Rahul Kumar', level: 1 })).toBeInTheDocument();

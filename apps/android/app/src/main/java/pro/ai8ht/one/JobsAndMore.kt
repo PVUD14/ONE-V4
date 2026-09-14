@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.WorkOutline
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -398,7 +399,7 @@ internal fun ChatOverlay(persona: String = "student", onClose: () -> Unit) {
 // --- More: named sections ------------------------------------------------------
 
 internal enum class MoreDest(val title: String) {
-    Profile("Profile"), Calendar("Calendar"), Screening("Screening tests"), Resources("Resources"), Career("Career readiness"), Target("Career target"),
+    Profile("Profile"), Calendar("Calendar"), Screening("Screening tests"), Resources("Resources"), Share("Public profile"), Career("Career readiness"), Target("Career target"),
     Academics("Academic record"), Support("Support"), Documents("Documents"),
     Privacy("Privacy & data"), Help("Help & FAQ"), Settings("Settings"),
 }
@@ -462,6 +463,8 @@ internal fun MoreMenuScreen(
                     "Tests employers have sent you") { onOpen(MoreDest.Screening) }
                 MenuRow(Icons.Filled.MenuBook, pro.ai8ht.one.ui.Tone.Green, "Resources",
                     "Practice, company prep, scholarships and more") { onOpen(MoreDest.Resources) }
+                MenuRow(Icons.Filled.Share, pro.ai8ht.one.ui.Tone.Violet, "Public profile",
+                    "A link you control, showing your verified record") { onOpen(MoreDest.Share) }
                 MenuRow(Icons.Filled.Insights, pro.ai8ht.one.ui.Tone.Green, "Career readiness",
                     "Your advisory band and roadmap") { onOpen(MoreDest.Career) }
                 MenuRow(Icons.Filled.Insights, pro.ai8ht.one.ui.Tone.Accent, "Career target",
@@ -522,14 +525,34 @@ internal fun ProfilePage(
     var profile by remember { mutableStateOf<ProfileDto?>(null) }
     LaunchedEffect(Unit) { profile = runCatching { Api.getProfile(context) }.getOrNull() }
 
+    val scope = rememberCoroutineScope()
+    var photoNotice by remember { mutableStateOf<String?>(null) }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) {
-            runCatching {
-                context.contentResolver.openInputStream(uri)?.use { input ->
-                    ProfilePhoto.save(context, input.readBytes())
+            scope.launch {
+                val bytes = runCatching {
+                    context.contentResolver.openInputStream(uri)?.use { input -> input.readBytes() }
+                }.getOrNull()
+                val type = context.contentResolver.getType(uri) ?: "image/jpeg"
+                when {
+                    bytes == null -> photoNotice = "That photo could not be read."
+                    type !in setOf("image/jpeg", "image/png") -> photoNotice = "Choose a JPEG or PNG."
+                    bytes.size > 5 * 1024 * 1024 -> photoNotice = "That photo is larger than 5 MB."
+                    else -> runCatching {
+                        val encoded = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+                        Api.uploadProfilePhoto(context, type, encoded)
+                        // Cached locally only so the screen updates without a round trip;
+                        // the server copy is the one that counts.
+                        ProfilePhoto.save(context, bytes)
+                    }.onSuccess {
+                        photoNotice = "Photo saved. It appears on the web too."
+                        onPhotoPicked()
+                    }.onFailure {
+                        photoNotice = (it as? Api.ApiException)?.detail
+                            ?: "That photo could not be saved. It is scanned before it is stored, so try again shortly."
+                    }
                 }
             }
-            onPhotoPicked()
         }
     }
 
@@ -542,6 +565,11 @@ internal fun ProfilePage(
                     TextButton(onClick = {
                         picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                     }) { Text("Change photo") }
+                    photoNotice?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                    }
                     Text(student?.fullName ?: "Student", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     Text(student?.verifiedEmail ?: "", style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)

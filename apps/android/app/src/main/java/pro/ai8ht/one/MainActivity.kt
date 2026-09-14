@@ -412,6 +412,7 @@ private fun MainScaffold(
         moreDest == MoreDest.Calendar -> { SlideIn { CalendarPage(onClose = { moreDest = null }) }; return }
         moreDest == MoreDest.Screening -> { SlideIn { ScreeningPage(onClose = { moreDest = null }) }; return }
         moreDest == MoreDest.Resources -> { SlideIn { ResourcesPage(onClose = { moreDest = null }) }; return }
+        moreDest == MoreDest.Share -> { SlideIn { ShareProfilePage(onClose = { moreDest = null }) }; return }
         moreDest == MoreDest.Career -> { SlideIn { CareerPage(data?.learner, onClose = { moreDest = null }) }; return }
         readinessOpen -> {
             SlideIn {

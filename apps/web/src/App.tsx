@@ -48,6 +48,7 @@ import { ConsentGate } from './consentGate.js';
 import { HelpFaqPanel } from './helpFaqPanel.js';
 import { CalendarPage } from './calendarPage.js';
 import { PublicProfilePage } from './publicProfilePage.js';
+import { ShareProfilePanel } from './shareProfilePanel.js';
 import { ScreeningAssessmentsPage } from './screeningAssessmentsPage.js';
 import { V2EmptyState, V2Stat } from './dashboardsV2.js';
 import { StudentDashboardV3 } from './studentDashboardV3.js';
@@ -828,7 +829,7 @@ function RouteScreen({ route, authenticated, currentStudent }: { readonly route:
 
 function AuthenticatedStudentRoute({ route, currentStudent }: { readonly route: RouteKey; readonly currentStudent: CurrentStudentState }): React.ReactElement {
   if (route === 'dashboard') return <AuthenticatedStudentDashboard currentStudent={currentStudent} />;
-  if (route === 'profile') return <StudentProfileV3><AuthenticatedStudentProfile /></StudentProfileV3>;
+  if (route === 'profile') return <StudentProfileV3><AuthenticatedStudentProfile /><ShareProfilePanel /></StudentProfileV3>;
   if (route === 'documents') return <AuthenticatedStudentDocuments />;
   if (route === 'opportunities') return <StudentOpportunitiesV3><StudentOpportunitiesPage /><AuthenticatedStudentSavedOpportunities /></StudentOpportunitiesV3>;
   if (route === 'applications') return <StudentApplicationsPage />;

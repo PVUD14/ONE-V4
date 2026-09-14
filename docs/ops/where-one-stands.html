@@ -624,7 +624,7 @@
       </span>
       <div class="docmeta">
         Build state &amp; commercial briefing<br>
-        ONE &middot; 13 September 2026
+        ONE &middot; 14 September 2026
       </div>
     </div>
     <h1>Where ONE Stands</h1>
@@ -632,9 +632,9 @@
   </header>
 
   <div class="counts">
-    <div class="count"><b>159</b><span>Live API routes</span></div>
-    <div class="count"><b>30</b><span>Database migrations</span></div>
-    <div class="count"><b>67</b><span>Test suites</span></div>
+    <div class="count"><b>182</b><span>Live API routes</span></div>
+    <div class="count"><b>33</b><span>Database migrations</span></div>
+    <div class="count"><b>77</b><span>Test suites</span></div>
     <div class="count"><b>11</b><span>Role portals</span></div>
     <div class="count"><b>9</b><span>Question formats</span></div>
     <div class="count"><b>0</b><span>Ways to take payment</span></div>
@@ -681,7 +681,7 @@
         <span class="chip b-dem">Demonstrated</span>
       </div>
       <div class="row">
-        <div><h3>Hiring pipeline</h3><p>Post, target, apply, shortlist, schedule, score, offer, accept &mdash; the whole chain is real. Interviewers see only their assigned interview. No employer-built assessments; no calendar integration.</p></div>
+        <div><h3>Hiring pipeline</h3><p>Post, target, apply, shortlist, screen, schedule, score, offer, accept. Employers build their own screening tests; rejected candidates hear why. Still no connection to the applicant-tracking systems large companies already run.</p></div>
         <span class="chip b-pro">Progressing</span>
       </div>
       <div class="row">
@@ -689,7 +689,7 @@
         <span class="chip b-pro">Progressing</span>
       </div>
       <div class="row">
-        <div><h3>Security posture</h3><p>Server-side authorization on every request, cross-tenant access impossible by database structure rather than by permission check, backups encrypted to a key the server does not hold. Staff two-factor decided but not switched on. No independent penetration test.</p></div>
+        <div><h3>Security posture</h3><p>Server-side authorization on every request, cross-tenant access impossible by database structure rather than by permission check, backups encrypted to a key the server does not hold. One unauthenticated route now exists, deliberately and narrowly, for the public profile (ADR-031). Staff two-factor decided but not switched on. No independent penetration test.</p></div>
         <span class="chip b-pro">Progressing</span>
       </div>
       <div class="row">
@@ -697,11 +697,19 @@
         <span class="chip b-pro">Progressing</span>
       </div>
       <div class="row">
+        <div><h3>Public profile</h3><p>A student can publish a page anyone with the link can open, choose what it shows, and switch it off for everyone at once. Only a fingerprint of the link is stored, so the database holds no working URLs.</p></div>
+        <span class="chip b-dem">Demonstrated</span>
+      </div>
+      <div class="row">
+        <div><h3>Calendar</h3><p>Interviews, exam windows, assigned tasks and roadmap deadlines gathered into one view per person, with an export for Outlook and Google Calendar. A live subscribable feed is still a download.</p></div>
+        <span class="chip b-pro">Progressing</span>
+      </div>
+      <div class="row">
         <div><h3>Staff role depth</h3><p>Counsellors, analysts and department heads can read their data; several of their actions are not yet wired. The pages say so plainly rather than showing dead buttons.</p></div>
         <span class="chip b-dev">Developing</span>
       </div>
       <div class="row">
-        <div><h3>Learning content</h3><p>The factory is built &mdash; taxonomy, versioning, prerequisites, draft&rarr;review&rarr;publish. The stock is not: a thin technology-oriented seed and no authoring screen.</p></div>
+        <div><h3>Learning content</h3><p>The factory and the authoring desk are both built now &mdash; taxonomy, versioning, draft&rarr;review&rarr;publish, and screens to write and approve. The stock is not: a thin technology-oriented seed and nobody yet writing into it.</p></div>
         <span class="chip b-non">Not enough evidence</span>
       </div>
       <div class="row">
@@ -719,7 +727,7 @@
 
   <section>
     <div class="sec-head"><span class="sec-num">03</span><h2>What is missing, in the order I would fix it</h2></div>
-    <p>Ranked by what unblocks the most value soonest, not by size. Several are far cheaper than they look, because the engine behind them already exists and only the door is missing.</p>
+    <p>Ranked by what unblocks the most value soonest, not by size. Four items that stood here on 13 September have since shipped &mdash; candidate feedback, the calendar, employer screening assessments and the public profile &mdash; and two more have shrunk to the half that was genuinely missing. What is left is mostly not software.</p>
 
     <div class="gaps">
 
@@ -727,7 +735,7 @@
         <div class="rank">01</div>
         <div class="gap-body">
           <h3>Nobody can pay us</h3>
-          <p>This is the only major area with zero implementation, and it hides because it has no screens &mdash; everything else unbuilt shows as an empty page; this shows as nothing. Manual invoicing works for five pilot colleges and fails at the fiftieth, and fails completely for a student who wants to pay directly.</p>
+          <p>Still the only major area with zero implementation, and it still hides because it has no screens. Manual invoicing works for a handful of pilot colleges and fails at the fiftieth, and fails completely for a student who wants to pay directly.</p>
           <dl class="standing">
             <div><dt>Already there</dt><dd>Role and membership gating, which billing can build on without displacing a placeholder.</dd></div>
             <div><dt>Missing</dt><dd>Plans, subscriptions, entitlements, payment provider, invoices, tax handling.</dd></div>
@@ -738,12 +746,12 @@
       <div class="gap">
         <div class="rank">02</div>
         <div class="gap-body">
-          <h3>No front door for anyone who is not currently at a college</h3>
-          <p>There is no self-signup anywhere. The only way in is an invitation. A person who graduated before ONE existed has no path to an account &mdash; which excludes the most motivated users and the ones most likely to pay personally, and caps our relationship with any person at roughly four years.</p>
-          <p>The encouraging discovery: <strong>the verification machinery already accepts them.</strong> A qualification names its issuing institution, and the verification queue is scoped by that alone &mdash; it never asks whether the person is still enrolled. A 2019 graduate pointing at their old college would land in that college&rsquo;s queue and be verifiable with today&rsquo;s code.</p>
+          <h3>No front door for anyone not already at a college</h3>
+          <p>Half of this is now fixed. A graduate <em>can</em> ask their old college to confirm a record, and the college has a queue that distinguishes a current student from a former one from somebody it holds no record of at all.</p>
+          <p>What remains is the door itself: there is still <strong>no self-signup</strong>, so a person whose institution never joined has no way to create an account. Building ONE's side of that is straightforward; the registration step is identity configuration and waits on cloud access.</p>
           <dl class="standing">
-            <div><dt>Already there</dt><dd>Retroactive verification, permanent once granted, issuer-only. Self-reported records cannot be falsely verified.</dd></div>
-            <div><dt>Missing</dt><dd>Self-signup, an alumni-request screen for colleges, notifications.</dd></div>
+            <div><dt>Shipped since</dt><dd>Institution directory, retroactive verification requests, the college-facing queue.</dd></div>
+            <div><dt>Missing</dt><dd>Self-registration, and an independent-learner account for people with no institution.</dd></div>
           </dl>
         </div>
       </div>
@@ -752,11 +760,11 @@
         <div class="rank">03</div>
         <div class="gap-body">
           <h3>No content library beyond a thin technology seed</h3>
-          <p>The existential one. A platform that promises employability for every field currently serves roughly one. The recommendation is to generate with a model and publish only after a named subject expert approves &mdash; the provenance and review machinery was built for exactly this and has been waiting.</p>
-          <p>A model solves <em>authoring</em>. It does not solve <em>authority</em>. The reviewer is the product. And depth in three fields beats shallowness across thirty &mdash; a student can tell the difference within ten minutes, at which point the credibility is spent rather than built.</p>
+          <p>The existential one, and the one least changed. There is now a desk to write, review and publish from &mdash; with approval and publication requiring two different people &mdash; so the obstacle is no longer software.</p>
+          <p>It is stock and reviewers. A model can draft; it cannot carry authority. Depth in three fields beats shallowness across thirty, because a student can tell the difference within ten minutes.</p>
           <dl class="standing">
-            <div><dt>Already there</dt><dd>Taxonomy, versioning, prerequisites, draft&rarr;review&rarr;publish, provenance columns for model and prompt version.</dd></div>
-            <div><dt>Missing</dt><dd>Stock, an authoring screen, and a named reviewer per field.</dd></div>
+            <div><dt>Shipped since</dt><dd>The authoring and review screens, and the routes that serve published content to the five student pages.</dd></div>
+            <div><dt>Missing</dt><dd>Written material, and a named subject expert per field to approve it.</dd></div>
           </dl>
         </div>
       </div>
@@ -764,50 +772,31 @@
       <div class="gap">
         <div class="rank">04</div>
         <div class="gap-body">
-          <h3>No feedback reaches a rejected candidate</h3>
-          <p>Arguably the highest-value unbuilt feature in the product. Today a student applies, is rejected, and hears nothing &mdash; then repeats the same mistake across forty applications. Employers already fill in structured scorecards; the feature is one scorecard with two visibilities, the employer choosing what is released.</p>
-          <p>ONE can then do what nothing else can, because it holds both the evidence and the outcome: connect that feedback to the roadmap, and over time say with measured numbers which demonstrated topics actually predict being hired.</p>
+          <h3>No interview or speaking practice</h3>
+          <p>Nothing yet observes a student answering a question. A student never trained on speaking is disadvantaged by default, so this is not optional &mdash; and it has to come from model observation, because a coach in every practice session does not scale past one campus.</p>
+          <p>Three commitments already settled: the <strong>microphone is checked first and is a gate, not a penalty</strong> &mdash; poor audio yields &ldquo;we could not assess this,&rdquo; never a low band; the output is a band with categories, never a number; and the target is <em>being understood</em>, not sounding foreign. Practice stays private from employers, permanently.</p>
+          <dl class="standing">
+            <div><dt>Buildable now</dt><dd>The session record, the privacy constraints, and the microphone gate &mdash; none of which need a model.</dd></div>
+            <div><dt>Waiting on</dt><dd>Cloud access, for the part that listens.</dd></div>
+          </dl>
         </div>
       </div>
 
       <div class="gap">
         <div class="rank">05</div>
         <div class="gap-body">
-          <h3>No interview or speaking practice</h3>
-          <p>Nothing observes a student answering a question. A student never trained on speaking is disadvantaged by default, so this is not optional &mdash; and it has to come from model observation, because a coach in every practice session does not scale past one campus.</p>
-          <p>Three design commitments: the <strong>microphone is checked first and is a gate, not a penalty</strong> &mdash; poor audio yields &ldquo;we could not assess this,&rdquo; never a low band; the output is a band with categories, never a number; and the target is <em>being understood</em>, not sounding foreign. Practice is private from employers, permanently.</p>
+          <h3>Staff two-factor is decided but not on, and nobody external has attacked this</h3>
+          <p>The decision is recorded and the application already handles the prompt; it needs a separate staff sign-in pool, which needs cloud access. Until then the strongest control on a placement officer&rsquo;s account is a password &mdash; today&rsquo;s weakest link.</p>
+          <p>And every security claim in the companion document is <em>our own assessment of our own work</em>. Before real student data arrives at scale, somebody outside should be paid to attack it &mdash; with more to look at now that one unauthenticated route exists.</p>
         </div>
       </div>
 
       <div class="gap">
         <div class="rank">06</div>
         <div class="gap-body">
-          <h3>No portable, verified profile</h3>
-          <p>Every door into ONE requires a sign-in. A student can export everything they own, but there is no shareable link a verified record can live behind. The one asset we have spent all this effort making trustworthy is locked inside the building. Needs revocable, scoped, expiring sharing &mdash; with the readiness band excluded.</p>
-        </div>
-      </div>
-
-      <div class="gap">
-        <div class="rank">07</div>
-        <div class="gap-body">
-          <h3>Staff two-factor is decided but not on</h3>
-          <p>The decision is recorded and the application already handles the prompt; it needs a separate staff sign-in pool, which needs cloud access. Until then the strongest control on a placement officer&rsquo;s account is a password &mdash; today&rsquo;s weakest link. Independent penetration testing should follow before real data arrives at scale.</p>
-        </div>
-      </div>
-
-      <div class="gap">
-        <div class="rank">08</div>
-        <div class="gap-body">
-          <h3>No employer-side assessments</h3>
-          <p>&ldquo;Send a screening test to 200 applicants&rdquo; is table stakes for a hiring product, and an employer cannot do it. The entire engine exists on the institution side; this is an extension, not a build from nothing.</p>
-        </div>
-      </div>
-
-      <div class="gap">
-        <div class="rank">09</div>
-        <div class="gap-body">
-          <h3>No calendar</h3>
-          <p>Interview times, exam windows, task due dates and roadmap deadlines are all already recorded. Nobody has built the page that gathers them per person. Unusually cheap for how visible it is &mdash; and it should push into Google Calendar and Outlook, where people actually look.</p>
+          <h3>Nothing connects to the systems large employers already run</h3>
+          <p>An employer can now post, screen, interview, score and offer entirely inside ONE, which is enough for a mid-size company. A large one already has an applicant-tracking system, and will ask what this replaces rather than what it adds.</p>
+          <p>The calendar has the same shape of gap: it exports, but does not yet subscribe, so an interview added today does not appear in somebody&rsquo;s Outlook tomorrow without a re-import.</p>
         </div>
       </div>
 
@@ -866,18 +855,18 @@
   <section>
     <div class="sec-head"><span class="sec-num">06</span><h2>The sequence I would follow</h2></div>
     <ol class="seq">
-      <li><p><b>Finish the pilot and measure the outcome.</b> Do not build billing yet. Every later conversation depends on one sentence: this college&rsquo;s placement rate moved by this much.</p></li>
-      <li><p><b>Open the front door.</b> Self-signup plus the alumni verification request &mdash; the cheapest large win on the list, because the engine behind it already works.</p></li>
+      <li><p><b>Finish the pilot and measure the outcome.</b> Still first, and still the thing every later conversation depends on: this college&rsquo;s placement rate moved by this much.</p></li>
+      <li><p><b>Open the front door properly.</b> Retroactive verification shipped; self-signup is the half still missing, and it is what lets somebody with no institution use any of this.</p></li>
       <li><p><b>Build billing the moment there is a paying customer with a date.</b> That is the trigger already written into the decision to defer it.</p></li>
       <li><p><b>Switch on staff two-factor and commission a penetration test</b> before real student data arrives at scale.</p></li>
-      <li><p><b>Pick one field and make its content genuinely excellent.</b> Use it to win colleges in that field; let it pay for the next field.</p></li>
-      <li><p><b>Then employers.</b> Close the feedback loop to rejected candidates first &mdash; it is what makes the platform worth returning to.</p></li>
+      <li><p><b>Pick one field and make its content genuinely excellent.</b> The desk to write it now exists; what it needs is a person who knows the field.</p></li>
+      <li><p><b>Then speaking practice</b>, once cloud access makes the part that listens possible.</p></li>
     </ol>
-    <p class="note"><b>The one-line summary.</b> The product is close to sellable. The ability to get paid is not built at all. The hard parts &mdash; governance, provenance, verification, tenant isolation, the refusal to fake a score &mdash; are done, and they are the parts that are expensive to retrofit. What remains is stock, a door, and a till.</p>
+    <p class="note"><b>The one-line summary, a day later and still true.</b> The product is close to sellable, and the ability to get paid is still not built at all. What changed is that four of the nine gaps closed in a day &mdash; because the engines behind them already existed and only the doors were missing. What is left is mostly <b>not software</b>: written material, a subject expert, an external security test, a payment decision, and cloud access. Stock, a door, and a till.</p>
   </section>
 
   <footer>
-    <span>ONE &mdash; internal briefing &middot; assessed 13 September 2026</span>
+    <span>ONE &mdash; internal briefing &middot; assessed 14 September 2026</span>
     <span>&copy; AI8HT. All rights reserved.</span>
   </footer>
 

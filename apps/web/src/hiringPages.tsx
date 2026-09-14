@@ -20,14 +20,19 @@ import {
   listEmployerApplicants,
   listEmployerOpportunities,
   listOpportunities,
+  listCandidateFeedbackReasons,
   listStudentApplications,
   listStudentOffers,
   publishOpportunity,
+  readApplicationFeedback,
+  releaseCandidateFeedback,
   respondToOffer,
   scheduleInterview,
   transitionApplication,
   withdrawApplication,
+  type CandidateFeedbackReasonDto,
   type EligibilityDto,
+  type StudentApplicationFeedbackDto,
   type EmployerApplicantDto,
   type EmployerOpportunityDto,
   type OpportunityDetailDto,
@@ -239,6 +244,8 @@ export function StudentApplicationsPage(): React.ReactElement {
   const [applications, setApplications] = useState<readonly StudentApplicationDto[]>([]);
   const [status, setStatus] = useState('Loading your applications…');
   const [revoking, setRevoking] = useState(false);
+  // null = closed, 'loading', 'none' = the employer withdrew it between list and read.
+  const [feedback, setFeedback] = useState<StudentApplicationFeedbackDto | 'loading' | 'none' | null>(null);
 
   async function revokeVisibility(id: string): Promise<void> {
     const token = getAccessToken();
@@ -274,6 +281,21 @@ export function StudentApplicationsPage(): React.ReactElement {
     }
   }
 
+  async function openFeedback(id: string): Promise<void> {
+    const token = getAccessToken();
+    if (!token) return;
+    setFeedback('loading');
+    try {
+      const response = await readApplicationFeedback(token, id);
+      // A released row can be superseded between the list and this read, so an absent
+      // one is a normal outcome rather than an error.
+      setFeedback(response.feedback ?? 'none');
+    } catch (error) {
+      setStatus(messageFor(error, 'That feedback could not be loaded.'));
+      setFeedback(null);
+    }
+  }
+
   const openApplications = applications.filter((item) => !item.closedAt);
   return <div className="workspace-grid">
     <div className="v2-row v2-cols-4 career-stat-strip wide-card">
@@ -289,13 +311,16 @@ export function StudentApplicationsPage(): React.ReactElement {
       {applications.length === 0
         ? <p>When you apply to an opportunity it will appear here, with the stage it has reached.</p>
         : <div className="data-table-wrap"><table>
-          <thead><tr><th>Role</th><th>Company</th><th>Stage</th><th>Applied</th><th>Institution sharing</th><th>Action</th></tr></thead>
+          <thead><tr><th>Role</th><th>Company</th><th>Stage</th><th>Applied</th><th>Feedback</th><th>Institution sharing</th><th>Action</th></tr></thead>
           <tbody>{applications.map((item) => <tr key={item.id}>
             <td>{item.title}</td>
             <td>{item.employerName}</td>
             <td><span className={`hiring-state state-${item.state.toLowerCase()}`}>{humanise(item.state)}</span>
               {item.termsAcknowledgementPending ? <span className="hiring-tag warn">Terms changed</span> : null}</td>
             <td>{formatDate(item.submittedAt)}</td>
+            <td>{item.feedbackReleased
+              ? <button type="button" className="secondary" onClick={() => { void openFeedback(item.id); }}>See why</button>
+              : <span className="hiring-meta">{item.state === 'REJECTED' ? 'None shared' : '—'}</span>}</td>
             <td>{item.institutionVisibilityGrantedAt && !item.institutionVisibilityRevokedAt
               ? <button type="button" className="secondary" disabled={revoking} onClick={() => { void revokeVisibility(item.id); }}>Stop institution sharing</button>
               : <span>{item.institutionVisibilityRevokedAt ? 'Sharing stopped' : 'Not shared'}</span>}</td>
@@ -305,9 +330,45 @@ export function StudentApplicationsPage(): React.ReactElement {
           </tr>)}</tbody>
         </table></div>}
     </section>
+    {feedback ? <StudentFeedbackCard feedback={feedback} onClose={() => setFeedback(null)} /> : null}
     <StudentOffersPanel onChanged={() => { void reload(); }} />
     <StudentExternalApplicationsPanel />
   </div>;
+}
+
+/**
+ * What an employer chose to say to this candidate, and what they can do about it.
+ *
+ * A reason with no mapped topic shows the reason alone. Nothing here invents a next
+ * step, and nothing here shows a readiness band.
+ */
+export function StudentFeedbackCard({ feedback, onClose }: {
+  readonly feedback: StudentApplicationFeedbackDto | 'loading' | 'none';
+  readonly onClose: () => void;
+}): React.ReactElement {
+  if (feedback === 'loading') return <section className="card wide-card"><h2>Feedback</h2><p role="status">Loading…</p></section>;
+  if (feedback === 'none') {
+    return <section className="card wide-card">
+      <h2>Feedback</h2>
+      <p role="status">This feedback is no longer available.</p>
+      <button type="button" className="secondary" onClick={onClose}>Close</button>
+    </section>;
+  }
+  return <section className="card wide-card">
+    <h2>Why this application did not go further</h2>
+    <p>{feedback.employerName} shared this on {formatDate(feedback.releasedAt)} about your application for {feedback.title}.</p>
+    <ul className="check-stack">
+      {feedback.reasons.map((reason) => <li key={reason.code}>
+        <strong>{reason.studentLabel}</strong>
+        {reason.topics.length
+          ? <span className="hiring-meta"> Worth working on: {reason.topics.map((topic) => topic.name).join(', ')}</span>
+          : null}
+      </li>)}
+    </ul>
+    {feedback.note ? <p><em>&ldquo;{feedback.note}&rdquo;</em></p> : null}
+    <p className="hiring-meta">Only you can see this. It is not shown to your institution or to other employers, and it does not affect your readiness.</p>
+    <button type="button" className="secondary" onClick={onClose}>Close</button>
+  </section>;
 }
 
 const externalStages: readonly ExternalApplicationInput['stage'][] = ['APPLIED', 'SCREENING', 'ASSESSMENT', 'INTERVIEW', 'OFFER', 'HIRED', 'REJECTED', 'WITHDRAWN'];
@@ -998,7 +1059,18 @@ export function EmployerApplicantsPage({ employerId, applicationStateFilter }: {
     }
   }
 
-  const [action, setAction] = useState<{ kind: 'interview' | 'offer'; applicant: EmployerApplicantDto } | null>(null);
+  const [action, setAction] = useState<{ kind: 'interview' | 'offer' | 'feedback'; applicant: EmployerApplicantDto } | null>(null);
+
+  async function saveFeedback(reasonCodes: readonly string[], note: string): Promise<void> {
+    const token = getAccessToken();
+    if (!token || !action) throw new Error('Unavailable');
+    await releaseCandidateFeedback(token, employerId, action.applicant.id, reasonCodes, note || undefined);
+    setAction(null);
+    // Reload first: reloadApplicants recomputes the status line, so a confirmation set
+    // before it would be wiped a moment later.
+    await reloadApplicants(selectedOpportunity).catch(() => undefined);
+    setStatus('Feedback shared with the candidate.');
+  }
 
   async function saveInterview(input: InterviewScheduleInput): Promise<void> {
     const token = getAccessToken();
@@ -1055,7 +1127,12 @@ export function EmployerApplicantsPage({ employerId, applicationStateFilter }: {
             <td>{item.interviewCount}</td>
             <td>{item.offerState ? humanise(item.offerState) : '—'}</td>
             <td>{item.closedAt || item.consentRevoked
-              ? <span className="hiring-meta">Closed</span>
+              ? <div className="hiring-actions">
+                <span className="hiring-meta">Closed</span>
+                {item.state === 'REJECTED' && !item.consentRevoked
+                  ? <button type="button" className="secondary" onClick={() => setAction({ kind: 'feedback', applicant: item })}>Share feedback</button>
+                  : null}
+              </div>
               : <div className="hiring-actions">
                 {(PIPELINE_NEXT[item.state] ?? []).map((next) => <button key={next} type="button" className={next === 'REJECTED' ? 'secondary' : undefined} onClick={() => { void move(item.id, next); }}>{humanise(next)}</button>)}
                 {item.state === 'INTERVIEW' ? <button type="button" className="secondary" onClick={() => setAction({ kind: 'interview', applicant: item })}>Schedule interview</button> : null}
@@ -1065,11 +1142,83 @@ export function EmployerApplicantsPage({ employerId, applicationStateFilter }: {
         </table></div>}
     </section>
     {action && !action.applicant.consentRevoked ? <section className="role-card role-wide">
-      <h2>{action.kind === 'interview' ? 'Schedule interview' : 'Send offer'}</h2>
+      <h2>{action.kind === 'interview' ? 'Schedule interview' : action.kind === 'offer' ? 'Send offer' : 'Share feedback with this candidate'}</h2>
       <p><CandidateIdentity item={action.applicant} /></p>
       {action.kind === 'interview'
         ? <InterviewForm employerId={employerId} onSave={saveInterview} onCancel={() => setAction(null)} />
-        : <OfferForm onSave={saveOffer} onCancel={() => setAction(null)} />}
+        : action.kind === 'offer'
+          ? <OfferForm onSave={saveOffer} onCancel={() => setAction(null)} />
+          : <FeedbackForm employerId={employerId} onSave={saveFeedback} onCancel={() => setAction(null)} />}
     </section> : null}
   </section>;
+}
+
+/**
+ * Choosing what a rejected candidate gets told.
+ *
+ * Deliberately separate from the rejection itself: the reason an employer recorded for
+ * their own team stays private, and this is a second, considered act. Nothing is shared
+ * unless someone picks a reason and presses the button.
+ */
+export function FeedbackForm({ employerId, onSave, onCancel }: {
+  readonly employerId: string;
+  readonly onSave: (reasonCodes: readonly string[], note: string) => Promise<void>;
+  readonly onCancel: () => void;
+}): React.ReactElement {
+  const [reasons, setReasons] = useState<readonly CandidateFeedbackReasonDto[]>([]);
+  const [selected, setSelected] = useState<readonly string[]>([]);
+  const [note, setNote] = useState('');
+  const [status, setStatus] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const token = getAccessToken();
+    if (!token) return;
+    void listCandidateFeedbackReasons(token, employerId)
+      .then((response) => setReasons(response.reasons))
+      .catch(() => setStatus('The feedback options could not be loaded.'));
+  }, [employerId]);
+
+  function toggle(code: string): void {
+    setSelected((current) => current.includes(code)
+      ? current.filter((item) => item !== code)
+      : current.length >= 4 ? current : [...current, code]);
+  }
+
+  async function submit(event: React.FormEvent): Promise<void> {
+    event.preventDefault();
+    if (!selected.length) return setStatus('Choose at least one reason.');
+    setSaving(true);
+    try {
+      await onSave(selected, note.trim());
+    } catch (error) {
+      setStatus(messageFor(error, 'That feedback could not be shared.'));
+    } finally { setSaving(false); }
+  }
+
+  return <form onSubmit={(event) => { void submit(event); }} className="student-form">
+    <p>Pick up to four reasons. The candidate sees exactly these words, your optional note, and nothing else — your internal notes stay private.</p>
+    {reasons.length === 0 ? <p role="status">{status || 'Loading options…'}</p> : null}
+    <ul className="check-stack">
+      {reasons.map((reason) => <li key={reason.code}>
+        <label>
+          <input
+            type="checkbox"
+            checked={selected.includes(reason.code)}
+            disabled={!selected.includes(reason.code) && selected.length >= 4}
+            onChange={() => toggle(reason.code)}
+          />
+          {' '}{reason.studentLabel}
+        </label>
+      </li>)}
+    </ul>
+    <label className="student-form-field"><span>Note to the candidate (optional)</span>
+      <textarea value={note} maxLength={1000} onChange={(event) => setNote(event.target.value)} />
+    </label>
+    {status && reasons.length ? <p role="status">{status}</p> : null}
+    <div className="hiring-actions">
+      <button type="submit" disabled={saving || !selected.length}>Share with candidate</button>
+      <button type="button" className="secondary" onClick={onCancel}>Cancel</button>
+    </div>
+  </form>;
 }

@@ -538,3 +538,69 @@ internal fun JobsQuickLink(label: String, modifier: Modifier = Modifier, onClick
         )
     }
 }
+
+/**
+ * What an employer chose to say to a candidate they rejected, and what to do about it.
+ *
+ * Reached only from an application the employer actually released feedback on. A reason
+ * with no mapped topic shows the reason alone -- nothing here invents a next step, and
+ * nothing here shows a readiness band.
+ */
+@Composable
+internal fun FeedbackPage(feedback: ApplicationFeedbackDto, onClose: () -> Unit) {
+    OverlayScaffold(title = "Why this didn't go further", onClose = onClose) {
+        Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
+            Spacer(Modifier.height(10.dp))
+            PilotCard {
+                Column(Modifier.padding(16.dp)) {
+                    Text(feedback.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        feedback.employerName + (feedback.releasedAt?.let { " · shared ${formatWhen(it)}" } ?: ""),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            LazyColumn(Modifier.fillMaxSize()) {
+                items(feedback.reasons, key = { it.code }) { reason ->
+                    Spacer(Modifier.height(12.dp))
+                    PilotCard {
+                        Column(Modifier.padding(16.dp)) {
+                            Text(reason.studentLabel, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                            if (reason.topics.isNotEmpty()) {
+                                Spacer(Modifier.height(8.dp))
+                                Text(
+                                    "Worth working on: " + reason.topics.joinToString(", ") { it.name },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                }
+                feedback.note?.takeIf { it.isNotBlank() }?.let { note ->
+                    item {
+                        Spacer(Modifier.height(12.dp))
+                        PilotCard {
+                            Column(Modifier.padding(16.dp)) {
+                                Text("From the employer", style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Spacer(Modifier.height(6.dp))
+                                Text(note, style = MaterialTheme.typography.bodyMedium)
+                            }
+                        }
+                    }
+                }
+                item {
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        "Only you can see this. It is not shown to your institution or to other employers, and it does not affect your readiness.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(24.dp))
+                }
+            }
+        }
+    }
+}

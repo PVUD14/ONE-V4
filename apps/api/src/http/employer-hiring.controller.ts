@@ -272,6 +272,77 @@ export class EmployerHiringController {
   }
 
   // -------------------------------------------------------------------------
+  // Candidate feedback
+  //
+  // Releasing feedback is a separate act from rejecting. applications.rejection_reason_code
+  // and application_state_history.note were written for the employer's own team and stay
+  // private; nothing here reads them. Design in
+  // docs/architecture/candidate-feedback-release-table-design.md.
+  // -------------------------------------------------------------------------
+
+  @Get('/employers/:employerId/candidate-feedback-reasons')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async feedbackReasons(@Req() request: ProtectedHttpRequest, @Param('employerId') employerId: string): Promise<Record<string, unknown>> {
+    const context = this.requireEmployer(request, employerId, employerManageRoles);
+    const rows = await this.db.execute(sql`
+      SELECT code, student_label, category FROM candidate_feedback_reasons
+      WHERE active ORDER BY sort_order, code
+    `) as QueryResult<Record<string, unknown>>;
+    return {
+      reasons: rows.rows.map((row) => ({ code: row.code, studentLabel: row.student_label, category: row.category })),
+      correlationId: context.correlationId,
+    };
+  }
+
+  @Post('/employers/:employerId/applications/:applicationId/feedback')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async releaseFeedback(@Req() request: ProtectedHttpRequest, @Param('employerId') employerId: string, @Param('applicationId') applicationId: string, @Body() body: unknown): Promise<Record<string, unknown>> {
+    const context = this.requireEmployer(request, employerId, employerManageRoles);
+    const id = requireUuid(applicationId, context.correlationId);
+    const reasonCodes = readFeedbackReasonCodes(body, context.correlationId);
+    const note = readOptionalSafeText(body, 'note', 1000, context.correlationId);
+    const actorId = context.authorization.principal.userId;
+
+    const application = await this.requireOwnedApplication(employerId, id, context.correlationId);
+    // Feedback on a live application would become a back channel for negotiating, and
+    // feedback after HIRED is a different conversation entirely.
+    if (String(application.state) !== 'REJECTED') throw badRequest('FEEDBACK_REQUIRES_REJECTED_APPLICATION', context.correlationId);
+
+    const known = await this.db.execute(sql`
+      SELECT code FROM candidate_feedback_reasons
+      WHERE active AND code IN (${sql.join(reasonCodes.map((code) => sql`${code}`), sql`, `)})
+    `) as QueryResult<{ code: string }>;
+    if (known.rows.length !== reasonCodes.length) throw badRequest('UNKNOWN_FEEDBACK_REASON', context.correlationId);
+
+    const releaseId = this.ids.uuid();
+    await this.db.transaction(async (tx) => {
+      // A correction supersedes rather than overwrites: once a person has been told why
+      // they were rejected, un-telling them is not a state this product represents.
+      await tx.execute(sql`
+        UPDATE application_feedback_releases SET superseded_at = now()
+        WHERE application_id = ${id}::uuid AND superseded_at IS NULL
+      `);
+      await tx.execute(sql`
+        INSERT INTO application_feedback_releases (id, application_id, employer_id, released_by_user_id, note)
+        VALUES (${releaseId}::uuid, ${id}::uuid, ${employerId}::uuid, ${actorId}::uuid, ${note})
+      `);
+      for (const code of reasonCodes) {
+        await tx.execute(sql`
+          INSERT INTO application_feedback_release_reasons (release_id, reason_code)
+          VALUES (${releaseId}::uuid, ${code})
+        `);
+      }
+      await this.writeAudit(actorId, 'application.feedback.released', 'application', id, context.correlationId, tx);
+      // The payload carries no reason code and no note: the outbox is a transport that
+      // crosses service boundaries, and what an employer said about a named person
+      // does not belong in it.
+      await this.writeOutbox('application', id, 'application.feedback.released', { applicationId: id, releaseId }, actorId, employerId, context.correlationId, tx);
+    });
+
+    return { feedback: { id: releaseId, applicationId: id, reasonCodes, note }, correlationId: context.correlationId };
+  }
+
+  // -------------------------------------------------------------------------
   // Interviews
   // -------------------------------------------------------------------------
 
@@ -933,6 +1004,23 @@ function readEnum<T extends readonly string[]>(body: unknown, field: string, all
   const value = (body as Record<string, unknown>)[field];
   if (typeof value !== 'string' || !allowed.includes(value)) throw badRequest(`INVALID_${field.toUpperCase()}`, correlationId);
   return value;
+}
+
+/**
+ * Reason codes on a feedback release. Capped at four because feedback a candidate can
+ * act on is specific; eleven boxes ticked is a shrug with extra steps. The codes are
+ * matched against the catalogue by the caller, so this only shapes the input.
+ */
+function readFeedbackReasonCodes(body: unknown, correlationId: string): readonly string[] {
+  if (typeof body !== 'object' || body === null) throw badRequest('INVALID_BODY', correlationId);
+  const value = (body as Record<string, unknown>).reasonCodes;
+  if (!Array.isArray(value) || value.length < 1 || value.length > 4) throw badRequest('INVALID_REASONCODES', correlationId);
+  const codes = [...new Set(value)];
+  if (codes.length !== value.length) throw badRequest('INVALID_REASONCODES', correlationId);
+  for (const code of codes) {
+    if (typeof code !== 'string' || !/^[A-Z][A-Z0-9_]{2,63}$/.test(code)) throw badRequest('INVALID_REASONCODES', correlationId);
+  }
+  return codes as readonly string[];
 }
 
 function readRequiredSafeText(body: unknown, field: string, max: number, correlationId: string): string {

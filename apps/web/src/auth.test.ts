@@ -12,6 +12,13 @@ function jwtWithEmailAndExpiry(email: string): string {
   return `header.${payload}.signature`;
 }
 
+// Every test here calls vi.resetModules() and then re-imports the whole App module tree,
+// so each one pays a full transform-and-evaluate before it asserts anything. That is
+// inherent to testing sign-in against the real app, and under a parallel suite run it sat
+// close enough to the 5s default to fail intermittently. The assertions are unchanged;
+// only the time allowed for the import is.
+vi.setConfig({ testTimeout: 30000 });
+
 beforeEach(() => {
   cleanup();
   window.sessionStorage.clear();
@@ -88,7 +95,7 @@ describe('Cognito Hosted UI browser authentication', () => {
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'student.aanya@uat.example.test' } });
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'Correct-Horse-1' } });
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
-    await waitFor(() => expect(window.location.pathname).toBe('/student'));
+    await waitFor(() => expect(window.location.pathname).toBe('/student'), { timeout: 15000 });
     expect(captured).toMatchObject({ username: 'student.aanya@uat.example.test', password: 'Correct-Horse-1', flow: 'USER_SRP_AUTH' });
     expect(JSON.stringify(window.sessionStorage)).not.toContain('Correct-Horse-1');
     expect(window.localStorage.length).toBe(0);
@@ -152,7 +159,7 @@ describe('Cognito Hosted UI browser authentication', () => {
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'student.aanya@uat.example.test' } });
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'Correct-Horse-1' } });
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
-    await waitFor(() => expect(window.location.pathname).toBe('/student'));
+    await waitFor(() => expect(window.location.pathname).toBe('/student'), { timeout: 15000 });
     window.history.pushState(null, '', '/student/profile');
     window.dispatchEvent(new PopStateEvent('popstate'));
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Your career profile' })).toBeInTheDocument());
@@ -201,7 +208,7 @@ describe('Cognito Hosted UI browser authentication', () => {
     render(React.createElement(App));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument());
     expect(screen.getByText('aanya.student01@example.test')).toBeInTheDocument();
-    await waitFor(() => expect(window.location.pathname).toBe('/student'));
+    await waitFor(() => expect(window.location.pathname).toBe('/student'), { timeout: 15000 });
     await waitFor(() => expect(screen.getByRole('button', { name: 'Student profile menu' })).toHaveTextContent('Aanya Rao'));
     // UAT #18: the resolved workspace shows no auth/debug banner; identity
     // lives in the top bar only.

@@ -17,6 +17,10 @@ import { ConsentGate } from './consentGate.js';
 import { OperationsDashboardV2 } from './dashboardsV2.js';
 import { InstitutionExamEnginePage } from './examManagerPage.js';
 import { HelpFaqPanel } from './helpFaqPanel.js';
+import { CalendarPage } from './calendarPage.js';
+import { AcademicVerificationPage } from './academicVerificationPage.js';
+import { EmployerAssessmentsPage } from './employerAssessmentsPage.js';
+import { LearnerContentStudio } from './learnerContentStudio.js';
 import { InstitutionReportsPage } from './institutionReportsPage.js';
 import { OperationsCareerReadinessPanel } from './operationsCareerReadinessPanel.js';
 import { StaffPilotWrap } from './parityWraps.js';
@@ -229,7 +233,11 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   if (!demoMode && portal.key === 'operations-admin' && route.label === 'Organization Detail') return <OperationsOrganizationsPage portal={portal} />;
   if (!demoMode && portal.key === 'operations-admin' && route.label === 'Users') return <OperationsUsersAccessPage />;
   if (!demoMode && portal.key === 'operations-admin' && route.label === 'User Detail') return <OperationsUsersAccessPage />;
-  if (!demoMode && portal.key === 'operations-admin' && route.label === 'Content Management') return <OperationsContentReadOnlyPage />;
+  // The studio goes above the existing read-only career-readiness panel rather than
+  // replacing it: that panel reports on a different content pipeline and still works.
+  if (!demoMode && portal.key === 'operations-admin' && route.label === 'Content Management') {
+    return <><LearnerContentStudio /><OperationsContentReadOnlyPage /></>;
+  }
   // Audit Logs leaves the shared technical panel: the audit-event search endpoint is
   // complete and role-gated, and pointing this item at the generic status page was the
   // only reason it looked unbuilt.
@@ -294,10 +302,26 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   }
   if (!demoMode && portal.key === 'institution-admin' && /career readiness|placement|reports/i.test(route.label)) return <AuthenticatedReadOnlyModule title={route.label} detail="Institution reports and readiness information are read-only in Phase 2A unless a dedicated persistent mutation is available." />;
   if (!demoMode && portal.key === 'institution-admin' && /settings/i.test(route.label)) return <AuthenticatedNotYetAvailable title={route.label} detail="Institution settings mutation is not yet available in this UAT slice." />;
+  // organizationId is nullable on the workspace summary, so the page only mounts once
+  // there is an employer to scope it to.
+  if (!demoMode && portal.family === 'Employer' && route.label === 'Assessments' && authenticatedWorkspace?.organizationId) {
+    return <EmployerAssessmentsPage employerId={authenticatedWorkspace.organizationId} />;
+  }
   if (!demoMode && portal.key === 'recruiter') return <EmployerRecruiterRealityPage portal={portal} routeLabel={route.label} />;
   if (!demoMode && ['faculty', 'department-head'].includes(portal.key) && ['Assigned Tasks', 'Student Detail', 'Academic Verification', 'Meetings', 'Calendar'].includes(route.label)) {
-    return <InstitutionStaffActionsPage routeLabel={route.label} authenticatedWorkspace={authenticatedWorkspace} />;
+    // Calendar and Academic Verification each gain a real page above the staff-action
+    // list they already had, rather than replacing it: those lists are where the work is
+    // actually recorded, and they stay.
+    const staffActions = <InstitutionStaffActionsPage routeLabel={route.label} authenticatedWorkspace={authenticatedWorkspace} />;
+    if (route.label === 'Calendar') return <><CalendarPage />{staffActions}</>;
+    if (route.label === 'Academic Verification' && isInstitutionWorkspace(authenticatedWorkspace)) {
+      return <><AcademicVerificationPage institutionId={authenticatedWorkspace.organizationId} />{staffActions}</>;
+    }
+    return staffActions;
   }
+  // Every other authenticated role with a Calendar in its navigation had nothing behind
+  // it at all, so the merged feed is purely additive there.
+  if (!demoMode && route.label === 'Calendar') return <CalendarPage />;
   if (!demoMode && ['faculty', 'department-head'].includes(portal.key)) return <AuthenticatedReadOnlyModule title={route.label} detail="This authenticated staff role can view authorized context only in Phase 2A. Assessment, task, resource, workload, intervention, and meeting mutations are disabled until persistent APIs exist." />;
   if (!demoMode) return <AuthenticatedNotYetAvailable title={route.label} detail="This authenticated module has no approved persistent Phase 2A workflow yet." />;
   const categories = [...new Set(portal.records.map((record) => record.category))];

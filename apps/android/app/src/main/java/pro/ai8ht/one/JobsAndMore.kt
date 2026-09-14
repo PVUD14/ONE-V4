@@ -26,9 +26,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Assignment
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.WorkOutline
@@ -80,6 +83,7 @@ internal fun JobsScreen() {
     var reload by remember { mutableIntStateOf(0) }
     var openOpportunityId by remember { mutableStateOf<String?>(null) }
     var jobsOverlay by remember { mutableStateOf<JobsOverlay?>(null) }
+    var feedback by remember { mutableStateOf<ApplicationFeedbackDto?>(null) }
 
     LaunchedEffect(reload) {
         opportunities = runCatching { Api.listOpportunities(context) }.getOrNull()
@@ -93,6 +97,12 @@ internal fun JobsScreen() {
     // a student reading a job and pressing back lost the app.
     androidx.activity.compose.BackHandler(enabled = openOpportunityId != null || jobsOverlay != null) {
         if (openOpportunityId != null) openOpportunityId = null else jobsOverlay = null
+    }
+    androidx.activity.compose.BackHandler(enabled = feedback != null) { feedback = null }
+
+    feedback?.let { released ->
+        SlideIn { FeedbackPage(released, onClose = { feedback = null }) }
+        return
     }
 
     // Full-screen overlays sit above the tab content and return to it on close.
@@ -226,6 +236,22 @@ internal fun JobsScreen() {
                                     Spacer(Modifier.height(6.dp))
                                     Text("Submitted ${formatWhen(it)}", style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                // Only shown when the employer deliberately released
+                                // something. Silence stays silent rather than offering a
+                                // button that opens an empty page.
+                                if (app.feedbackReleased) {
+                                    Spacer(Modifier.height(8.dp))
+                                    TextButton(onClick = {
+                                        scope.launch {
+                                            runCatching { Api.applicationFeedback(context, app.id) }
+                                                .onSuccess { result ->
+                                                    if (result != null) feedback = result
+                                                    else notice = "That feedback is no longer available."
+                                                }
+                                                .onFailure { notice = (it as? Api.ApiException)?.detail ?: "Could not load that feedback." }
+                                        }
+                                    }) { Text("See why") }
                                 }
                                 // Terminal states are not withdrawable, and offering to
                                 // withdraw something already settled would be a dead button.
@@ -372,7 +398,7 @@ internal fun ChatOverlay(persona: String = "student", onClose: () -> Unit) {
 // --- More: named sections ------------------------------------------------------
 
 internal enum class MoreDest(val title: String) {
-    Profile("Profile"), Career("Career readiness"), Target("Career target"),
+    Profile("Profile"), Calendar("Calendar"), Screening("Screening tests"), Resources("Resources"), Career("Career readiness"), Target("Career target"),
     Academics("Academic record"), Support("Support"), Documents("Documents"),
     Privacy("Privacy & data"), Help("Help & FAQ"), Settings("Settings"),
 }
@@ -430,6 +456,12 @@ internal fun MoreMenuScreen(
                 MenuRow(Icons.Filled.Person, pro.ai8ht.one.ui.Tone.Accent, "Profile",
                     "Your details, headline and photo") { onOpen(MoreDest.Profile) }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                MenuRow(Icons.Filled.DateRange, pro.ai8ht.one.ui.Tone.Violet, "Calendar",
+                    "Interviews, exam windows and deadlines") { onOpen(MoreDest.Calendar) }
+                MenuRow(Icons.Filled.Assignment, pro.ai8ht.one.ui.Tone.Accent, "Screening tests",
+                    "Tests employers have sent you") { onOpen(MoreDest.Screening) }
+                MenuRow(Icons.Filled.MenuBook, pro.ai8ht.one.ui.Tone.Green, "Resources",
+                    "Practice, company prep, scholarships and more") { onOpen(MoreDest.Resources) }
                 MenuRow(Icons.Filled.Insights, pro.ai8ht.one.ui.Tone.Green, "Career readiness",
                     "Your advisory band and roadmap") { onOpen(MoreDest.Career) }
                 MenuRow(Icons.Filled.Insights, pro.ai8ht.one.ui.Tone.Accent, "Career target",

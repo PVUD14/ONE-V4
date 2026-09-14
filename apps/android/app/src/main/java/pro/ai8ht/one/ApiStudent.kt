@@ -158,6 +158,73 @@ import kotlinx.serialization.Serializable
     val percentOfEvaluated: Int? = null,
 )
 
+// --- Learner content ----------------------------------------------------------
+
+@Serializable data class LearnerContentEnvelope(val items: List<LearnerContentItemDto> = emptyList())
+
+@Serializable data class LearnerContentItemDto(
+    val id: String = "",
+    val contentType: String = "",
+    val title: String = "",
+    val summary: String? = null,
+    val publishedAt: String? = null,
+)
+
+// --- Employer screening tests -------------------------------------------------
+
+@Serializable data class ScreeningInvitationsEnvelope(val invitations: List<ScreeningInvitationDto> = emptyList())
+
+@Serializable data class ScreeningInvitationDto(
+    val id: String = "",
+    val state: String = "",
+    val opensAt: String = "",
+    val closesAt: String = "",
+    val title: String = "",
+    val durationSeconds: Int = 0,
+    val employerName: String = "",
+    val roleTitle: String = "",
+    val attemptId: String? = null,
+    val attemptState: String? = null,
+    val percentage: Double? = null,
+)
+
+@Serializable data class ScreeningAttemptEnvelope(val attempt: ScreeningAttemptDto)
+
+@Serializable data class ScreeningAttemptDto(
+    val id: String = "",
+    val questions: List<ScreeningQuestionDto> = emptyList(),
+)
+
+@Serializable data class ScreeningQuestionDto(
+    val questionId: String = "",
+    val displayOrder: Int = 0,
+    val questionText: String = "",
+    val questionType: String = "",
+    val marks: Double = 0.0,
+    /** In this candidate's own key order. Nothing here says which is correct. */
+    val options: List<ScreeningOptionDto> = emptyList(),
+    val selectedOptionKeys: List<String> = emptyList(),
+)
+
+@Serializable data class ScreeningOptionDto(val key: String = "", val text: String = "")
+
+@Serializable data class ScreeningResultEnvelope(val result: ScreeningResultDto)
+
+@Serializable data class ScreeningResultDto(
+    val score: Double = 0.0,
+    val maxScore: Double = 0.0,
+    val percentage: Double = 0.0,
+)
+
+@Serializable data class InstitutionDirectoryEnvelope(val institutions: List<DirectoryInstitutionDto> = emptyList())
+
+@Serializable data class DirectoryInstitutionDto(
+    val id: String = "",
+    val name: String = "",
+    val city: String? = null,
+    val stateOrProvince: String? = null,
+)
+
 @Serializable data class AcademicRecordsDto(
     val qualifications: List<QualificationDto> = emptyList(),
     val eligibilityFacts: EligibilityFactsDto? = null,
@@ -335,6 +402,42 @@ suspend fun Api.transitionRoadmapAction(context: Context, actionId: String, toSt
         buildJson("toState" to quoted(toState)),
     )
 }
+
+/**
+ * Institutions a student can name as the issuer of a qualification.
+ *
+ * Verified institutions only -- an unverified organization cannot meaningfully confirm
+ * anything, so listing it would only produce a request nobody can answer.
+ */
+/** Published learner content. Empty until somebody publishes something, which is honest. */
+suspend fun Api.listLearnerContent(context: Context, contentType: String): List<LearnerContentItemDto> =
+    json.decodeFromString<LearnerContentEnvelope>(
+        request(context, "GET", "/api/v1/learner-content?contentType=" + contentType)).items
+
+suspend fun Api.listScreeningInvitations(context: Context): List<ScreeningInvitationDto> =
+    json.decodeFromString<ScreeningInvitationsEnvelope>(
+        request(context, "GET", "/api/v1/students/me/screening-assessments")).invitations
+
+suspend fun Api.startScreeningAttempt(context: Context, invitationId: String): ScreeningAttemptDto =
+    json.decodeFromString<ScreeningAttemptEnvelope>(
+        request(context, "POST", "/api/v1/students/me/screening-assessments/$invitationId/start")).attempt
+
+suspend fun Api.saveScreeningAnswer(context: Context, attemptId: String, questionId: String, keys: List<String>) {
+    val encoded = keys.joinToString(",") { quoted(it) }
+    request(
+        context, "POST", "/api/v1/students/me/screening-attempts/$attemptId/answers",
+        buildJson("questionId" to quoted(questionId), "selectedOptionKeys" to "[$encoded]"),
+    )
+}
+
+suspend fun Api.submitScreeningAttempt(context: Context, attemptId: String): ScreeningResultDto =
+    json.decodeFromString<ScreeningResultEnvelope>(
+        request(context, "POST", "/api/v1/students/me/screening-attempts/$attemptId/submit")).result
+
+suspend fun Api.searchInstitutions(context: Context, query: String): List<DirectoryInstitutionDto> =
+    json.decodeFromString<InstitutionDirectoryEnvelope>(
+        request(context, "GET", "/api/v1/institutions/directory?q=" + java.net.URLEncoder.encode(query, "UTF-8"))
+    ).institutions
 
 suspend fun Api.academicRecords(context: Context): AcademicRecordsDto =
     json.decodeFromString(request(context, "GET", "/api/v1/students/me/academic-records"))

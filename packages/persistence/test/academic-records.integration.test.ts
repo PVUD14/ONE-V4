@@ -18,6 +18,12 @@ import {
   asCgpa10,
   getAcademicEligibilityFacts,
   normaliseResult,
+  declareQualification,
+  listAcademicRecords,
+  listVerificationQueue,
+  searchInstitutions,
+  submitTermForVerification,
+  AcademicRecordError,
 } from '../src/academic-records.js';
 
 const connectionString = process.env.DATABASE_URL;
@@ -217,5 +223,120 @@ describe('eligibility facts', () => {
     const facts = await getAcademicEligibilityFacts(client, studentId);
     expect(facts.hasVerifiedRecord).toBe(false);
     expect(facts.cgpa10).toBeNull();
+  });
+});
+
+/**
+ * A record earned at an institution can be confirmed by that institution after the person
+ * has left it. Nothing in the verification path asks about enrolment, and these tests
+ * exist so that nobody adds such a check believing it was an oversight.
+ */
+describe('alumni verification requests', () => {
+  async function verifiedInstitution(name = 'Verified test college'): Promise<string> {
+    const id = randomUUID();
+    await client.query(
+      "INSERT INTO organizations (id, kind, legal_name, verification_state) VALUES ($1, 'INSTITUTION', $2, 'VERIFIED')",
+      [id, name],
+    );
+    return id;
+  }
+
+  it('reads a student record back with the issuing institution name', async () => {
+    // This is the test whose absence let `o.name` survive: the column was renamed to
+    // legal_name in 0001, so every call to this function raised at runtime.
+    await insertQualification();
+    const records = await listAcademicRecords(client as never, studentId);
+    const qualifications = records.qualifications as { institutionName: string }[];
+    expect(qualifications[0]?.institutionName).toBe('E local test institution');
+  });
+
+  it('keeps a request from someone who never enrolled, and labels it honestly', async () => {
+    const issuer = await verifiedInstitution();
+    const qualification = randomUUID();
+    await client.query(
+      `INSERT INTO student_qualifications (id, student_user_id, institution_id, qualification_type, programme_name, started_on, completed_on)
+       VALUES ($1,$2,$3,'BTECH','Computer Science and Engineering','2015-08-01','2019-06-30')`,
+      [qualification, studentId, issuer],
+    );
+    const term = await insertTerm(qualification, { sequence: 8, label: 'Semester 8', resultValue: 8.4, resultScale: 'CGPA_10' });
+    await submitTermForVerification(client as never, { studentUserId: studentId, termId: term });
+
+    const queue = await listVerificationQueue(client as never, issuer);
+    expect(queue).toHaveLength(1);
+    const entry = queue[0] as Record<string, unknown>;
+    // The institution holds no record of this person, which is precisely the case that
+    // needs a human to check an archive.
+    expect(entry.relationship).toBe('NONE');
+    // And no name, because ONE has never been told one. A null is the truth here.
+    expect(entry.studentName).toBeNull();
+    expect(entry.studentEmail).toBe(studentId + '@example.test');
+    expect(String(entry.claimedCompletedOn)).toContain('2019');
+  });
+
+  it('labels a graduated student as former rather than current', async () => {
+    const issuer = await verifiedInstitution('Graduation test college');
+    await client.query(
+      `INSERT INTO institution_relationships (id, institution_id, student_user_id, state, effective_from, effective_to)
+       VALUES ($1,$2,$3,'GRADUATED', now() - interval '6 years', now() - interval '2 years')`,
+      [randomUUID(), issuer, studentId],
+    );
+    const qualification = randomUUID();
+    await client.query(
+      `INSERT INTO student_qualifications (id, student_user_id, institution_id, qualification_type, programme_name)
+       VALUES ($1,$2,$3,'BTECH','Computer Science and Engineering')`,
+      [qualification, studentId, issuer],
+    );
+    const term = await insertTerm(qualification, { sequence: 8, label: 'Semester 8', resultValue: 8.4, resultScale: 'CGPA_10' });
+    await submitTermForVerification(client as never, { studentUserId: studentId, termId: term });
+
+    const queue = await listVerificationQueue(client as never, issuer);
+    expect((queue[0] as Record<string, unknown>).relationship).toBe('FORMER');
+  });
+
+  it('refuses a qualification issued by something that is not a verified institution', async () => {
+    const employer = randomUUID();
+    await client.query("INSERT INTO organizations (id, kind, legal_name, verification_state) VALUES ($1, 'EMPLOYER', 'Not a college', 'VERIFIED')", [employer]);
+    // An employer can never reach an institution verification queue, so a qualification
+    // pointed at one would wait forever while looking to the student like neglect.
+    await expect(declareQualification(client as never, {
+      studentUserId: studentId, institutionId: employer,
+      qualificationType: 'BTECH', programmeName: 'Computer Science and Engineering',
+    })).rejects.toBeInstanceOf(AcademicRecordError);
+
+    const unverified = randomUUID();
+    await client.query("INSERT INTO organizations (id, kind, legal_name) VALUES ($1, 'INSTITUTION', 'Pending college')", [unverified]);
+    await expect(declareQualification(client as never, {
+      studentUserId: studentId, institutionId: unverified,
+      qualificationType: 'BTECH', programmeName: 'Computer Science and Engineering',
+    })).rejects.toBeInstanceOf(AcademicRecordError);
+  });
+
+  it('still accepts a college that is not on ONE, and leaves it permanently self-reported', async () => {
+    const created = await declareQualification(client as never, {
+      studentUserId: studentId, institutionNameDeclared: 'A college that never joined',
+      qualificationType: 'BTECH', programmeName: 'Computer Science and Engineering',
+    });
+    const row = await client.query('SELECT institution_id, verification_state FROM student_qualifications WHERE id=$1', [created.id]);
+    expect(row.rows[0].institution_id).toBeNull();
+    expect(row.rows[0].verification_state).toBe('SELF_REPORTED');
+  });
+
+  it('finds an institution by name, and lists only the ones that could actually verify', async () => {
+    await verifiedInstitution('Aurora Institute of Technology');
+    const unverified = randomUUID();
+    await client.query("INSERT INTO organizations (id, kind, legal_name) VALUES ($1, 'INSTITUTION', 'Aurora Pending College')", [unverified]);
+    const closed = randomUUID();
+    await client.query("INSERT INTO organizations (id, kind, legal_name, verification_state, active) VALUES ($1, 'INSTITUTION', 'Aurora Closed College', 'VERIFIED', false)", [closed]);
+    const employer = randomUUID();
+    await client.query("INSERT INTO organizations (id, kind, legal_name, verification_state) VALUES ($1, 'EMPLOYER', 'Aurora Mobility', 'VERIFIED')", [employer]);
+
+    const found = await searchInstitutions(client as never, 'Aurora');
+    expect(found.map((row) => row.name)).toEqual(['Aurora Institute of Technology']);
+  });
+
+  it('refuses to enumerate the directory from a single character', async () => {
+    await verifiedInstitution('Aurora Institute of Technology');
+    expect(await searchInstitutions(client as never, 'A')).toEqual([]);
+    expect(await searchInstitutions(client as never, '  ')).toEqual([]);
   });
 });

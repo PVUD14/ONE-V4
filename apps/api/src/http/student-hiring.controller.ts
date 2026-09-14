@@ -264,7 +264,9 @@ export class StudentHiringController {
              o.id AS opportunity_id, org.legal_name AS employer_name,
              v.title, v.employment_type, v.work_mode, v.location_city,
              (SELECT count(*) FROM opportunity_term_change_acknowledgements t
-               WHERE t.application_id = a.id AND t.acknowledged_at IS NULL AND t.declined_at IS NULL) AS pending_terms
+               WHERE t.application_id = a.id AND t.acknowledged_at IS NULL AND t.declined_at IS NULL) AS pending_terms,
+             EXISTS (SELECT 1 FROM application_feedback_releases f
+               WHERE f.application_id = a.id AND f.superseded_at IS NULL) AS feedback_released
       FROM applications a
       JOIN opportunities o ON o.id = a.opportunity_id
       JOIN opportunity_versions v ON v.id = a.applied_version_id
@@ -345,6 +347,61 @@ export class StudentHiringController {
 
       return { application: { id: applicationId, state: 'APPLIED' }, correlationId: context.correlationId };
     });
+  }
+
+  /**
+   * Feedback an employer chose to release on a rejected application, with the topics that
+   * address each reason where a mapping exists.
+   *
+   * Scoped to the signed-in student's own application, and reads only the release tables —
+   * never applications.rejection_reason_code or application_state_history.note, which the
+   * employer wrote for their own team. A reason with no mapped topic yields an empty list
+   * rather than a suggestion nobody made.
+   */
+  @Get('/students/me/applications/:applicationId/feedback')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async applicationFeedback(@Req() request: ProtectedHttpRequest, @Param('applicationId') applicationId: string): Promise<Record<string, unknown>> {
+    const context = requireTrustedAuthorization(request);
+    const id = requireUuid(applicationId, context.correlationId);
+    const rows = await this.db.execute(sql`
+      SELECT f.id, f.note, f.released_at, org.legal_name AS employer_name, v.title,
+             r.reason_code, cr.student_label, cr.category,
+             COALESCE((
+               SELECT json_agg(json_build_object('topicId', tn.id, 'name', tn.name) ORDER BY tn.name)
+               FROM candidate_feedback_reason_topics rt
+               JOIN taxonomy_nodes tn ON tn.id = rt.topic_id AND tn.active
+               WHERE rt.reason_code = r.reason_code
+             ), '[]'::json) AS topics
+      FROM application_feedback_releases f
+      JOIN applications a ON a.id = f.application_id
+      JOIN opportunity_versions v ON v.id = a.applied_version_id
+      JOIN organizations org ON org.id = a.employer_id
+      JOIN application_feedback_release_reasons r ON r.release_id = f.id
+      JOIN candidate_feedback_reasons cr ON cr.code = r.reason_code
+      WHERE f.application_id = ${id}::uuid
+        AND f.superseded_at IS NULL
+        AND a.student_user_id = ${context.authorization.principal.userId}::uuid
+      ORDER BY cr.sort_order, cr.code
+    `) as QueryResult<Record<string, unknown>>;
+
+    const [first] = rows.rows;
+    if (!first) return { feedback: null, correlationId: context.correlationId };
+    return {
+      feedback: {
+        id: first.id,
+        employerName: first.employer_name,
+        title: first.title,
+        releasedAt: first.released_at,
+        note: first.note ?? null,
+        reasons: rows.rows.map((row) => ({
+          code: row.reason_code,
+          studentLabel: row.student_label,
+          category: row.category,
+          topics: Array.isArray(row.topics) ? row.topics : [],
+        })),
+      },
+      correlationId: context.correlationId,
+    };
   }
 
   @Post('/students/me/applications/:applicationId/institution-visibility/revoke')
@@ -585,6 +642,7 @@ function mapApplication(row: Record<string, unknown>): Record<string, unknown> {
     institutionVisibilityRevokedAt: row.institution_visibility_revoked_at ?? null,
     updatedAt: row.updated_at,
     termsAcknowledgementPending: Number(row.pending_terms ?? 0) > 0,
+    feedbackReleased: row.feedback_released === true,
   };
 }
 

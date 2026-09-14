@@ -9,6 +9,7 @@ import type { StudentDocumentDto } from '../api.js';
 import { MultiRing, Ring } from '../pilot/pilotComponents.js';
 import { PilotTabs } from '../pilot/pilotOverlay.js';
 import { NaCourseTiles, NaListCard, NaRingRailCard, go } from './naWidgets.js';
+import { PublishedContentCard } from './publishedContent.js';
 import { Award, Building2, ClipboardCheck, Code2, FileText, Flame, LineChart, Target, Trophy, Wrench } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -47,6 +48,7 @@ export function StudentPracticePage(): React.ReactElement {
         </section>
         <NaCourseTiles title="Continue Practicing" labels={['NA', 'NA', 'NA', 'NA', 'NA']} />
         <NaCourseTiles title="Recommended for You" labels={['NA', 'NA', 'NA', 'NA', 'NA']} />
+        <PublishedContentCard contentType="PRACTICE" title="Practice resources" />
         <NaListCard title="Practice by Skill" note="A practice problem bank is not live yet — NA. Your institution's live assessments are under Assessments." />
       </> : null}
     </div>
@@ -88,6 +90,7 @@ export function StudentCompanyPrepPage(): React.ReactElement {
             <div className="pilot-stat"><span className="pilot-tile amber"><Target size={17} /></span><div><b>NA</b><small>Mock Interviews</small></div></div>
           </div>
         </section>
+        <PublishedContentCard contentType="COMPANY_PREP" title="Company preparation" />
         <NaListCard title="Companies" note="Company prep guides are not live yet — NA. Real openings from real employers are under Opportunities." />
       </> : <NaListCard title={['Overview', 'Companies', 'Interview Prep', 'Aptitude Prep', 'Mock Interviews', 'Saved'][tab] ?? ''} note="This prep content is not live yet — NA." />}
     </div>
@@ -127,7 +130,8 @@ export function StudentCareerToolsPage(): React.ReactElement {
     </div>
     {tab === 0 ? <aside className="pilot-rail">
       <NaRingRailCard title="Tools Usage Overview" center="Tools Used" legend={['Resume & Docs', 'Skill Tools', 'Planning', 'Job Search']} />
-      <NaListCard title="Recommended for You" note="Tool recommendations are not live yet — NA." />
+      <PublishedContentCard contentType="CAREER_TOOL" title="Career tools" />
+        <NaListCard title="Recommended for You" note="Tool recommendations are not live yet — NA." />
     </aside> : null}
   </div></div>;
 }
@@ -156,7 +160,8 @@ export function StudentScholarshipsPage(): React.ReactElement {
     </div>
     {tab === 0 ? <aside className="pilot-rail">
       <NaRingRailCard title="Scholarship Insights" center="Available" legend={['Merit Based', 'Need Based', 'Corporate', 'Private']} />
-      <NaListCard title="Upcoming Deadlines" note="No scholarship deadlines yet — NA." />
+      <PublishedContentCard contentType="SCHOLARSHIP" title="Scholarships" />
+        <NaListCard title="Upcoming Deadlines" note="No scholarship deadlines yet — NA." />
     </aside> : null}
   </div></div>;
 }
@@ -197,7 +202,10 @@ export function StudentResumeBuilderPage(): React.ReactElement {
           </div>
         </section>
       ) : null}
-      {tab === 1 ? <NaListCard title="Templates" note="Guided resume templates are not live yet — NA." /> : null}
+      {tab === 1 ? <>
+        <PublishedContentCard contentType="RESUME_BUILDER" title="Resume guidance" />
+        <NaListCard title="Templates" note="Guided resume templates are not live yet — NA." />
+      </> : null}
       {tab === 2 ? <NaListCard title="Examples" note="Role-specific resume examples are not live yet — NA." /> : null}
       {tab === 3 ? (
         <section className="pilot-card" style={{ maxWidth: 640 }}>

@@ -63,6 +63,26 @@ export interface StudentApplicationDto {
   readonly institutionVisibilityRevokedAt: string | null;
   readonly updatedAt: string;
   readonly termsAcknowledgementPending: boolean;
+  /** True when the employer chose to tell this candidate why. Fetch the detail separately. */
+  readonly feedbackReleased: boolean;
+}
+
+export interface CandidateFeedbackReasonDto {
+  readonly code: string;
+  readonly studentLabel: string;
+  readonly category: string;
+}
+
+export interface StudentApplicationFeedbackDto {
+  readonly id: string;
+  readonly employerName: string;
+  readonly title: string;
+  readonly releasedAt: string;
+  readonly note: string | null;
+  readonly reasons: readonly (CandidateFeedbackReasonDto & {
+    /** Empty when nothing a student studies addresses this reason. Never filled with a guess. */
+    readonly topics: readonly { readonly topicId: string; readonly name: string }[];
+  })[];
 }
 
 export interface StudentOfferDto {
@@ -215,6 +235,18 @@ export function listEmployerInterviews(token: string, employerId: string, signal
 
 export function listEmployerOffers(token: string, employerId: string, signal?: AbortSignal): Promise<{ readonly offers: readonly EmployerOfferDto[] }> {
   return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/offers`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function readApplicationFeedback(token: string, applicationId: string, signal?: AbortSignal): Promise<{ readonly feedback: StudentApplicationFeedbackDto | null }> {
+  return requestJson(`/api/v1/students/me/applications/${encodeURIComponent(applicationId)}/feedback`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function listCandidateFeedbackReasons(token: string, employerId: string, signal?: AbortSignal): Promise<{ readonly reasons: readonly CandidateFeedbackReasonDto[] }> {
+  return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/candidate-feedback-reasons`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function releaseCandidateFeedback(token: string, employerId: string, applicationId: string, reasonCodes: readonly string[], note?: string): Promise<{ readonly feedback: { readonly id: string } }> {
+  return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/applications/${encodeURIComponent(applicationId)}/feedback`, { token, method: 'POST', body: { reasonCodes, ...(note ? { note } : {}) } });
 }
 
 export function transitionApplication(token: string, employerId: string, applicationId: string, toState: string, note?: string): Promise<{ readonly application: { readonly id: string; readonly state: string } }> {

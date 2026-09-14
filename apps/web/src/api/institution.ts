@@ -118,3 +118,36 @@ export function commitStudentRosterImport(token: string, institutionId: string, 
 }
 
 // --- Hiring: opportunities, applications, interviews, offers -----------------
+
+// --- Academic verification ----------------------------------------------------
+
+export interface VerificationQueueEntryDto {
+  readonly termId: string;
+  readonly label: string;
+  readonly sequence: number;
+  readonly resultValue: string | null;
+  readonly resultScale: string | null;
+  readonly resultLetter: string | null;
+  readonly backlogCount: number | null;
+  readonly source: string;
+  readonly qualificationId: string;
+  readonly programmeName: string;
+  readonly qualificationType: string;
+  readonly claimedStartedOn: string | null;
+  readonly claimedCompletedOn: string | null;
+  readonly studentUserId: string;
+  readonly studentEmail: string;
+  /** Null when this institution has no roster record of the person — ONE holds no name of its own. */
+  readonly studentName: string | null;
+  readonly institutionStudentId: string | null;
+  /** CURRENT and FORMER can be checked on the roster; NONE needs the archive. */
+  readonly relationship: 'CURRENT' | 'FORMER' | 'NONE';
+}
+
+export function listVerificationQueue(token: string, institutionId: string, signal?: AbortSignal): Promise<{ readonly queue: readonly VerificationQueueEntryDto[] }> {
+  return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/academic-verification-queue`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function decideVerification(token: string, institutionId: string, termId: string, decision: 'VERIFIED' | 'REJECTED'): Promise<{ readonly queue: readonly VerificationQueueEntryDto[] }> {
+  return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/academic-verification/${encodeURIComponent(termId)}/decide`, { token, method: 'POST', body: { decision } });
+}

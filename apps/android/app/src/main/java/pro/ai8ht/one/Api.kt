@@ -114,6 +114,14 @@ object Api {
     suspend fun listApplications(context: Context): List<ApplicationDto> =
         json.decodeFromString<ApplicationsEnvelope>(request(context, "GET", "/api/v1/students/me/applications")).applications
 
+    /** Null when the employer shared nothing, or withdrew it between the list and this read. */
+    suspend fun applicationFeedback(context: Context, applicationId: String): ApplicationFeedbackDto? =
+        json.decodeFromString<ApplicationFeedbackEnvelope>(
+            request(context, "GET", "/api/v1/students/me/applications/$applicationId/feedback")).feedback
+
+    suspend fun listCalendar(context: Context): List<CalendarEntryDto> =
+        json.decodeFromString<CalendarEnvelope>(request(context, "GET", "/api/v1/me/calendar")).entries
+
     suspend fun getProfile(context: Context): ProfileDto =
         json.decodeFromString<ProfileEnvelope>(request(context, "GET", "/api/v1/students/me/profile")).profile
 
@@ -431,6 +439,47 @@ object Api {
     val workMode: String = "",
     val locationCity: String? = null,
     val submittedAt: String? = null,
+    /** True when the employer chose to tell this candidate why. The detail is a separate read. */
+    val feedbackReleased: Boolean = false,
+)
+
+// --- Candidate feedback -------------------------------------------------------
+
+@Serializable data class ApplicationFeedbackEnvelope(val feedback: ApplicationFeedbackDto? = null)
+
+@Serializable data class ApplicationFeedbackDto(
+    val id: String = "",
+    val employerName: String = "",
+    val title: String = "",
+    val releasedAt: String? = null,
+    val note: String? = null,
+    val reasons: List<FeedbackReasonDto> = emptyList(),
+)
+
+@Serializable data class FeedbackReasonDto(
+    val code: String = "",
+    val studentLabel: String = "",
+    val category: String = "",
+    /** Empty when nothing a student studies addresses this reason. Never filled with a guess. */
+    val topics: List<FeedbackTopicDto> = emptyList(),
+)
+
+@Serializable data class FeedbackTopicDto(val topicId: String = "", val name: String = "")
+
+// --- Calendar -----------------------------------------------------------------
+
+@Serializable data class CalendarEnvelope(val entries: List<CalendarEntryDto> = emptyList())
+
+@Serializable data class CalendarEntryDto(
+    val id: String = "",
+    val kind: String = "",
+    val title: String = "",
+    val detail: String? = null,
+    val startsAt: String = "",
+    val endsAt: String? = null,
+    val location: String? = null,
+    val joinUrl: String? = null,
+    val audience: String = "",
 )
 
 // --- Profile ------------------------------------------------------------------

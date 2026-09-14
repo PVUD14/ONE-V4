@@ -106,7 +106,7 @@ export async function getAcademicEligibilityFacts(
 export async function listAcademicRecords(pool: Pool, studentUserId: string): Promise<Record<string, unknown>> {
   const qualifications = await pool.query(
     `SELECT q.id, q.institution_id AS "institutionId", q.institution_name_declared AS "institutionNameDeclared",
-            o.name AS "institutionName", q.qualification_type AS "qualificationType", q.programme_name AS "programmeName",
+            o.legal_name AS "institutionName", q.qualification_type AS "qualificationType", q.programme_name AS "programmeName",
             q.started_on AS "startedOn", q.completed_on AS "completedOn", q.awarded,
             q.verification_state AS "verificationState", q.verified_at AS "verifiedAt"
      FROM student_qualifications q
@@ -149,6 +149,18 @@ export async function declareQualification(
   pool: Pool,
   input: QualificationInput & { readonly studentUserId: string },
 ): Promise<{ readonly id: string }> {
+  // The foreign key guarantees the organization exists and nothing more. Without this
+  // check a qualification could name an employer, which no institution staff member can
+  // ever reach -- leaving the student waiting on a queue nobody can see.
+  if (input.institutionId) {
+    const issuer = await pool.query<{ id: string }>(
+      `SELECT id FROM organizations
+       WHERE id=$1 AND kind='INSTITUTION' AND active AND verification_state='VERIFIED'`,
+      [input.institutionId],
+    );
+    if (!issuer.rows[0]) throw new AcademicRecordError('ACADEMIC_ISSUER_NOT_AN_INSTITUTION');
+  }
+
   const id = randomUUID();
   try {
     await pool.query(
@@ -247,19 +259,75 @@ export async function decideTermVerification(
   if (!result.rowCount) throw new AcademicRecordError('ACADEMIC_TERM_NOT_REVIEWABLE');
 }
 
-/** The verification queue an institution works from. */
+/**
+ * The verification queue an institution works from.
+ *
+ * Scoped by which institution *issued* the qualification, and by nothing else. It does
+ * not ask whether the person is still enrolled, and that is deliberate: an alumnus asking
+ * their old college to confirm a result they earned in 2019 is exactly as legitimate as a
+ * current student submitting this semester. Do not add an enrolment filter here.
+ *
+ * `relationship` tells staff which case they are looking at. CURRENT and FORMER can be
+ * checked against the roster; NONE means the institution holds no record of this person
+ * at all, so the answer is in an archive rather than on a screen.
+ *
+ * `studentName` comes from this institution's own roster and is therefore null for a
+ * NONE request -- ONE holds no platform-level name for a person, only the one each
+ * institution recorded. A null is the truth, and callers must show the email rather than
+ * inventing a name to fill the column.
+ */
 export async function listVerificationQueue(pool: Pool, institutionId: string): Promise<readonly Record<string, unknown>[]> {
   const result = await pool.query(
     `SELECT t.id AS "termId", t.label, t.sequence, t.result_value AS "resultValue", t.result_scale AS "resultScale",
             t.result_letter AS "resultLetter", t.backlog_count AS "backlogCount", t.source,
             t.evidence_document_version_id AS "evidenceDocumentVersionId",
             q.id AS "qualificationId", q.programme_name AS "programmeName", q.qualification_type AS "qualificationType",
-            q.student_user_id AS "studentUserId", u.email AS "studentEmail"
+            q.started_on AS "claimedStartedOn", q.completed_on AS "claimedCompletedOn",
+            q.student_user_id AS "studentUserId", u.email AS "studentEmail",
+            isp.full_name AS "studentName", isp.institution_student_id AS "institutionStudentId",
+            COALESCE((
+              SELECT CASE
+                       WHEN bool_or(r.state IN ('VERIFIED','ACTIVE')) THEN 'CURRENT'
+                       WHEN bool_or(r.state IN ('GRADUATED','TRANSFERRED','ENDED')) THEN 'FORMER'
+                       ELSE 'NONE'
+                     END
+              FROM institution_relationships r
+              WHERE r.institution_id = q.institution_id AND r.student_user_id = q.student_user_id
+            ), 'NONE') AS "relationship"
      FROM student_academic_terms t
      JOIN student_qualifications q ON q.id = t.qualification_id
      JOIN users u ON u.id = q.student_user_id
+     LEFT JOIN institution_student_profiles isp
+       ON isp.student_user_id = q.student_user_id AND isp.institution_id = q.institution_id
      WHERE q.institution_id=$1 AND t.verification_state='PENDING_VERIFICATION'
      ORDER BY t.created_at`, [institutionId],
+  );
+  return result.rows;
+}
+
+/**
+ * Institutions a student can name as the issuer of a qualification.
+ *
+ * Identity only -- enough to recognise your own college in a list, and nothing an
+ * institution did not ask to publish. Verified and active only: an unverified
+ * organization cannot meaningfully confirm anything.
+ */
+export async function searchInstitutions(
+  pool: Pool,
+  query: string,
+  limit = 20,
+): Promise<readonly Record<string, unknown>[]> {
+  const term = query.trim();
+  if (term.length < 2) return [];
+  const result = await pool.query(
+    `SELECT o.id, o.legal_name AS "name", pr.city, pr.state_or_province AS "stateOrProvince"
+     FROM organizations o
+     LEFT JOIN organization_profiles pr ON pr.organization_id = o.id
+     WHERE o.kind='INSTITUTION' AND o.active AND o.verification_state='VERIFIED'
+       AND o.legal_name ILIKE '%' || $1 || '%'
+     ORDER BY o.legal_name
+     LIMIT $2`,
+    [term, Math.min(Math.max(limit, 1), 50)],
   );
   return result.rows;
 }

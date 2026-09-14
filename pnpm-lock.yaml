@@ -34,6 +34,9 @@ importers:
       '@planthepath/identity':
         specifier: workspace:*
         version: link:../../packages/identity
+      '@planthepath/learner-content':
+        specifier: workspace:*
+        version: link:../../packages/learner-content
       '@planthepath/persistence':
         specifier: workspace:*
         version: link:../../packages/persistence

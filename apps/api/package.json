@@ -19,6 +19,7 @@
     "@planthepath/automation": "workspace:*",
     "@planthepath/hiring": "workspace:*",
     "@planthepath/identity": "workspace:*",
+    "@planthepath/learner-content": "workspace:*",
     "@planthepath/persistence": "workspace:*",
     "@planthepath/privacy": "workspace:*",
     "drizzle-orm": "^0.45.2",

@@ -264,3 +264,81 @@ describe('hiring workflow persistence', () => {
     await expect(employer.hiringAnalytics(role.request, rival.employerId)).rejects.toThrow();
   });
 });
+
+describe('candidate feedback release', () => {
+  it('refuses feedback on a live application and accepts it once rejected', async () => {
+    const role = await createRole();
+    const id = await apply(role.opportunityId);
+    // A live candidate must not be handed a rejection reason: it would turn the feedback
+    // channel into a back channel for negotiating an outcome that has not happened.
+    await expect(employer.releaseFeedback(role.request, role.employerId, id, { reasonCodes: ['CORE_SKILL_GAP'] })).rejects.toThrow();
+    await employer.transitionApplication(role.request, role.employerId, id, { toState: 'REJECTED' });
+    const released = await employer.releaseFeedback(role.request, role.employerId, id, { reasonCodes: ['CORE_SKILL_GAP'], note: 'Keep going.' });
+    expect((released.feedback as { id: string }).id).toBeTruthy();
+  });
+
+  it('shows the release to its own student, and to nobody else', async () => {
+    const role = await createRole();
+    const id = await apply(role.opportunityId, false, outsiderId);
+    await employer.transitionApplication(role.request, role.employerId, id, { toState: 'REJECTED' });
+    await employer.releaseFeedback(role.request, role.employerId, id, { reasonCodes: ['STRONGER_APPLICANTS'] });
+
+    const mine = await student.applicationFeedback(trusted(outsiderId), id);
+    const feedback = mine.feedback as { reasons: { code: string; studentLabel: string; topics: unknown[] }[] };
+    expect(feedback.reasons[0]?.code).toBe('STRONGER_APPLICANTS');
+    expect(feedback.reasons[0]?.studentLabel).toMatch(/closer match/);
+    // Nothing a student studies addresses losing to a stronger applicant, so the reason
+    // maps to no topic and the student is offered none rather than an invented one.
+    expect(feedback.reasons[0]?.topics).toEqual([]);
+
+    // Another student reading the same application id gets nothing at all.
+    expect((await student.applicationFeedback(trusted(userId), id)).feedback).toBeNull();
+  });
+
+  it('supersedes a correction instead of leaving two live releases', async () => {
+    const role = await createRole();
+    const id = await apply(role.opportunityId);
+    await employer.transitionApplication(role.request, role.employerId, id, { toState: 'REJECTED' });
+    await employer.releaseFeedback(role.request, role.employerId, id, { reasonCodes: ['CORE_SKILL_GAP'] });
+    await employer.releaseFeedback(role.request, role.employerId, id, { reasonCodes: ['EXPERIENCE_LEVEL'] });
+
+    const rows = await pool.query('SELECT superseded_at FROM application_feedback_releases WHERE application_id = $1', [id]);
+    // Both rows survive -- a correction is honest, a disappearance is not.
+    expect(rows.rows).toHaveLength(2);
+    expect(rows.rows.filter((row) => row.superseded_at === null)).toHaveLength(1);
+
+    const current = (await student.applicationFeedback(trusted(userId), id)).feedback as { reasons: { code: string }[] };
+    expect(current.reasons.map((reason) => reason.code)).toEqual(['EXPERIENCE_LEVEL']);
+  });
+
+  it('never surfaces what the employer wrote for their own team', async () => {
+    const role = await createRole();
+    const id = await apply(role.opportunityId);
+    await employer.transitionApplication(role.request, role.employerId, id, {
+      toState: 'REJECTED', reasonCode: 'INTERNAL_WEAK_COMMS', note: 'Rambled badly; would not put in front of a client.',
+    });
+    await employer.releaseFeedback(role.request, role.employerId, id, { reasonCodes: ['COMMUNICATION'] });
+
+    const shown = JSON.stringify((await student.applicationFeedback(trusted(userId), id)).feedback);
+    expect(shown).not.toMatch(/INTERNAL_WEAK_COMMS|Rambled|client/);
+    // The private column is untouched by the release, and still holds what it always did.
+    const stored = await pool.query('SELECT rejection_reason_code FROM applications WHERE id = $1', [id]);
+    expect(stored.rows[0].rejection_reason_code).toBe('INTERNAL_WEAK_COMMS');
+  });
+
+  it('refuses a code that is not in the catalogue, writing nothing', async () => {
+    const role = await createRole();
+    const id = await apply(role.opportunityId);
+    await employer.transitionApplication(role.request, role.employerId, id, { toState: 'REJECTED' });
+    await expect(employer.releaseFeedback(role.request, role.employerId, id, { reasonCodes: ['MADE_UP_REASON'] })).rejects.toThrow();
+    expect((await pool.query('SELECT count(*)::int AS count FROM application_feedback_releases WHERE application_id = $1', [id])).rows[0].count).toBe(0);
+  });
+
+  it('denies a rival employer releasing feedback on an application that is not theirs', async () => {
+    const role = await createRole();
+    const other = await createRole();
+    const id = await apply(role.opportunityId);
+    await employer.transitionApplication(role.request, role.employerId, id, { toState: 'REJECTED' });
+    await expect(employer.releaseFeedback(other.request, other.employerId, id, { reasonCodes: ['CORE_SKILL_GAP'] })).rejects.toThrow();
+  });
+});

@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.TrackChanges
 import androidx.compose.material.icons.filled.TaskAlt
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -298,6 +299,10 @@ internal fun AcademicRecordsPage(onClose: () -> Unit) {
                         color = MaterialTheme.colorScheme.onPrimaryContainer)
                 }
             }
+            AddQualificationCard(
+                onAdded = { notice = "Programme added. Add your results, then send them for confirmation."; reload += 1 },
+                onFailed = { notice = it },
+            )
             val state = records
             val data = (state as? Load.Ready)?.value
             when {
@@ -305,8 +310,8 @@ internal fun AcademicRecordsPage(onClose: () -> Unit) {
                 state is Load.Failed -> FailedState(state.message) { reload += 1 }
                 data == null || data.qualifications.isEmpty() -> EmptyState(
                     Icons.Filled.School, Tone.Violet, "No academic record yet",
-                    "Add your programme and results on the web app, then ask your institution to verify them. " +
-                        "Employers who ask for a minimum CGPA can only see verified results.",
+                    "Add the programme you studied, then ask the institution that issued it to confirm your results. " +
+                        "Employers who ask for a minimum CGPA can only see confirmed results.",
                 )
                 else -> LazyColumn(Modifier.fillMaxSize()) {
                     data.eligibilityFacts?.let { facts ->
@@ -522,5 +527,138 @@ internal fun DeletionCard(
             },
             dismissButton = { TextButton(onClick = { confirming = false }) { Text("Cancel") } },
         )
+    }
+}
+
+/**
+ * Declaring a programme, and naming who issued it.
+ *
+ * The institution search is the whole point. Without it `institutionId` can only be set by
+ * already knowing a UUID, which is why nobody who left an institution has ever been able
+ * to ask it to confirm anything.
+ *
+ * A college that is not on ONE can still be named, and is recorded as a plain string that
+ * can never become verified. That is the honest outcome — there is nobody to ask — and the
+ * copy says so rather than letting the student expect a confirmation that cannot come.
+ */
+@Composable
+internal fun AddQualificationCard(onAdded: () -> Unit, onFailed: (String) -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+    var open by remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
+    var results by remember { mutableStateOf<List<DirectoryInstitutionDto>>(emptyList()) }
+    var chosen by remember { mutableStateOf<DirectoryInstitutionDto?>(null) }
+    var notOnOne by remember { mutableStateOf(false) }
+    var programme by remember { mutableStateOf("") }
+    var qualificationType by remember { mutableStateOf("BTECH") }
+    var saving by remember { mutableStateOf(false) }
+
+    // Two characters is the server's own floor; searching on one would just enumerate.
+    LaunchedEffect(query) {
+        results = if (query.trim().length < 2 || chosen != null) emptyList()
+        else runCatching { Api.searchInstitutions(context, query.trim()) }.getOrDefault(emptyList())
+    }
+
+    Spacer(Modifier.height(12.dp))
+    PilotCard {
+        Column(Modifier.padding(16.dp)) {
+            if (!open) {
+                Text("Add a programme", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Text(
+                    "Studied somewhere before? Add it here and ask that institution to confirm your results.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(10.dp))
+                Button(onClick = { open = true }) { Text("Add a programme") }
+                return@Column
+            }
+
+            Text("Who issued it?", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(8.dp))
+            if (chosen != null) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(chosen!!.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                        val place = listOfNotNull(chosen!!.city, chosen!!.stateOrProvince).joinToString(", ")
+                        if (place.isNotBlank()) {
+                            Text(place, style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    TextButton(onClick = { chosen = null; query = "" }) { Text("Change") }
+                }
+            } else {
+                OutlinedTextField(
+                    value = query, onValueChange = { query = it; notOnOne = false },
+                    label = { Text(if (notOnOne) "Institution name" else "Search for your institution") },
+                    singleLine = true, modifier = Modifier.fillMaxWidth(),
+                )
+                if (!notOnOne) {
+                    results.take(6).forEach { institution ->
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            institution.name,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { chosen = institution }
+                                .padding(vertical = 6.dp),
+                        )
+                    }
+                    if (query.trim().length >= 2 && results.isEmpty()) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            "No match on ONE. You can still add it, but results from an institution that is not on ONE stay self-reported — there is nobody to confirm them.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        TextButton(onClick = { notOnOne = true }) { Text("Add it anyway") }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(10.dp))
+            OutlinedTextField(
+                value = programme, onValueChange = { programme = it },
+                label = { Text("Programme, e.g. Computer Science and Engineering") },
+                singleLine = true, modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = qualificationType, onValueChange = { qualificationType = it.uppercase() },
+                label = { Text("Qualification, e.g. BTECH") },
+                singleLine = true, modifier = Modifier.fillMaxWidth(),
+            )
+
+            Spacer(Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    enabled = !saving && programme.isNotBlank() && (chosen != null || (notOnOne && query.isNotBlank())),
+                    onClick = {
+                        saving = true
+                        scope.launch {
+                            runCatching {
+                                Api.declareQualification(
+                                    context,
+                                    institutionId = chosen?.id,
+                                    institutionNameDeclared = if (chosen == null) query.trim() else null,
+                                    qualificationType = qualificationType.trim(),
+                                    programmeName = programme.trim(),
+                                )
+                            }.onSuccess {
+                                open = false; query = ""; chosen = null; notOnOne = false; programme = ""
+                                onAdded()
+                            }.onFailure {
+                                onFailed((it as? Api.ApiException)?.detail ?: "That programme could not be added.")
+                            }
+                            saving = false
+                        }
+                    },
+                ) { Text("Add") }
+                OutlinedButton(onClick = { open = false }) { Text("Cancel") }
+            }
+        }
     }
 }

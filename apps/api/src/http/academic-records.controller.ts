@@ -29,6 +29,7 @@ import {
   NotFoundException,
   Param,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -40,6 +41,7 @@ import {
   decideTermVerification,
   listAcademicRecords,
   listVerificationQueue,
+  searchInstitutions,
   submitTermForVerification,
   type ResultScale,
 } from '@planthepath/persistence/src/academic-records.js';
@@ -105,6 +107,20 @@ export class AcademicRecordsController {
       throw mapAcademicError(error);
     }
     return listAcademicRecords(this.pool, studentUserId);
+  }
+
+  /**
+   * Institutions a student can name as the issuer of a qualification.
+   *
+   * Without this there is no way to set `institutionId` except by already knowing a UUID,
+   * which is why nobody who has left an institution has ever been able to ask it to verify
+   * anything. Identity only: name and place, nothing an institution did not publish.
+   */
+  @Get('/institutions/directory')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async directory(@Req() request: ProtectedHttpRequest, @Query('q') query?: string): Promise<Record<string, unknown>> {
+    requireLearnerId(request);
+    return { institutions: await searchInstitutions(this.pool, typeof query === 'string' ? query : '') };
   }
 
   @Get('/institutions/:institutionId/academic-verification-queue')

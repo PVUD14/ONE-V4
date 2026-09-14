@@ -498,6 +498,121 @@ function postsTo(suffix: string): [string, RequestInit | undefined][] {
   return vi.mocked(fetch).mock.calls.filter(([url, init]) => String(url).endsWith(suffix) && init?.method === 'POST') as [string, RequestInit | undefined][];
 }
 
+describe('candidate feedback', () => {
+  const rejected = {
+    id: '55555555-5555-4555-8555-555555555555',
+    state: 'REJECTED', opportunityId: opportunity.id, employerName: 'Aster Mobility',
+    title: 'SOC Analyst Intern', employmentType: 'INTERNSHIP', workMode: 'ONSITE', locationCity: 'Bengaluru',
+    submittedAt: '2026-08-10T00:00:00.000Z', closedAt: '2026-08-20T00:00:00.000Z', consentRevokedAt: null,
+    updatedAt: '2026-08-20T00:00:00.000Z', termsAcknowledgementPending: false, feedbackReleased: true,
+  };
+  const feedbackPath = `/api/v1/students/me/applications/${rejected.id}/feedback`;
+
+  it('shows what the employer said and what to work on', async () => {
+    stubFetch({
+      '/api/v1/students/me/applications': { applications: [rejected] },
+      '/api/v1/students/me/offers': { offers: [] },
+      [feedbackPath]: { feedback: {
+        id: 'f-1', employerName: 'Aster Mobility', title: 'SOC Analyst Intern',
+        releasedAt: '2026-08-21T00:00:00.000Z', note: 'Strong attitude — keep going.',
+        reasons: [{ code: 'CORE_SKILL_GAP', studentLabel: 'A core skill for this role was not yet demonstrated',
+          category: 'SKILL_GAP', topics: [{ topicId: 't-1', name: 'SIEM fundamentals' }] }],
+      } },
+    });
+    await authenticate();
+    render(<StudentApplicationsPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'See why' }));
+    expect(await screen.findByText('A core skill for this role was not yet demonstrated')).toBeInTheDocument();
+    expect(screen.getByText(/Worth working on: SIEM fundamentals/)).toBeInTheDocument();
+    expect(screen.getByText(/Strong attitude/)).toBeInTheDocument();
+  });
+
+  it('tells the student the feedback is theirs alone and does not move their readiness', async () => {
+    stubFetch({
+      '/api/v1/students/me/applications': { applications: [rejected] },
+      '/api/v1/students/me/offers': { offers: [] },
+      [feedbackPath]: { feedback: { id: 'f-1', employerName: 'Aster Mobility', title: 'SOC Analyst Intern',
+        releasedAt: '2026-08-21T00:00:00.000Z', note: null,
+        reasons: [{ code: 'STRONGER_APPLICANTS', studentLabel: 'Other applicants were a closer match for this role', category: 'COMPETITION', topics: [] }] } },
+    });
+    await authenticate();
+    render(<StudentApplicationsPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'See why' }));
+    expect(await screen.findByText(/not shown to your institution or to other employers/)).toBeInTheDocument();
+    expect(screen.getByText(/does not affect your readiness/)).toBeInTheDocument();
+  });
+
+  it('offers no next step for a reason nothing the student studies would fix', async () => {
+    stubFetch({
+      '/api/v1/students/me/applications': { applications: [rejected] },
+      '/api/v1/students/me/offers': { offers: [] },
+      [feedbackPath]: { feedback: { id: 'f-1', employerName: 'Aster Mobility', title: 'SOC Analyst Intern',
+        releasedAt: '2026-08-21T00:00:00.000Z', note: null,
+        reasons: [{ code: 'STRONGER_APPLICANTS', studentLabel: 'Other applicants were a closer match for this role', category: 'COMPETITION', topics: [] }] } },
+    });
+    await authenticate();
+    render(<StudentApplicationsPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'See why' }));
+    expect(await screen.findByText('Other applicants were a closer match for this role')).toBeInTheDocument();
+    expect(screen.queryByText(/Worth working on/)).not.toBeInTheDocument();
+  });
+
+  it('keeps silence silent when the employer released nothing', async () => {
+    stubFetch({
+      '/api/v1/students/me/applications': { applications: [{ ...rejected, feedbackReleased: false }] },
+      '/api/v1/students/me/offers': { offers: [] },
+    });
+    await authenticate();
+    render(<StudentApplicationsPage />);
+    expect(await screen.findByText('None shared')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'See why' })).not.toBeInTheDocument();
+  });
+
+  it('says so plainly when the employer replaced the feedback mid-read', async () => {
+    stubFetch({
+      '/api/v1/students/me/applications': { applications: [rejected] },
+      '/api/v1/students/me/offers': { offers: [] },
+      [feedbackPath]: { feedback: null },
+    });
+    await authenticate();
+    render(<StudentApplicationsPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'See why' }));
+    expect(await screen.findByText('This feedback is no longer available.')).toBeInTheDocument();
+  });
+
+  it('lets an employer share feedback only once the candidate has been rejected', async () => {
+    const employerId = '44444444-4444-4444-8444-444444444444';
+    const base = `/api/v1/employers/${employerId}`;
+    stubFetch({
+      [`${base}/opportunities`]: { opportunities: [{ id: opportunity.id, referenceCode: 'SOC-2026-01', lifecycleState: 'PUBLISHED',
+        title: 'SOC Analyst Intern', employmentType: 'INTERNSHIP', workMode: 'ONSITE', locationCity: 'Bengaluru',
+        applicationDeadline: null, publishedAt: '2026-08-01T00:00:00.000Z', applicationCount: 2, openApplicationCount: 1 }] },
+      [`${base}/opportunities/${opportunity.id}/applications`]: { applications: [
+        { id: 'a-rejected', state: 'REJECTED', consentRevoked: false, candidateName: 'Rhea Rejected', candidateEmail: 'rhea@uat.example.test',
+          institutionStudentId: null, submittedAt: '2026-08-10T00:00:00.000Z', closedAt: '2026-08-20T00:00:00.000Z', interviewCount: 1, offerState: null, updatedAt: '2026-08-20T00:00:00.000Z' },
+        { id: 'a-applied', state: 'APPLIED', consentRevoked: false, candidateName: 'Mira Applied', candidateEmail: 'mira@uat.example.test',
+          institutionStudentId: null, submittedAt: '2026-08-12T00:00:00.000Z', closedAt: null, interviewCount: 0, offerState: null, updatedAt: '2026-08-12T00:00:00.000Z' },
+      ] },
+      [`${base}/candidate-feedback-reasons`]: { reasons: [
+        { code: 'CORE_SKILL_GAP', studentLabel: 'A core skill for this role was not yet demonstrated', category: 'SKILL_GAP' },
+        { code: 'STRONGER_APPLICANTS', studentLabel: 'Other applicants were a closer match for this role', category: 'COMPETITION' },
+      ] },
+      [`${base}/applications/a-rejected/feedback`]: { feedback: { id: 'f-1' } },
+    });
+    await authenticate();
+    render(<EmployerApplicantsPage employerId={employerId} />);
+    // One button, on the rejected row only: a live candidate must not be sent a rejection reason.
+    const share = await screen.findAllByRole('button', { name: 'Share feedback' });
+    expect(share).toHaveLength(1);
+
+    fireEvent.click(share[0]!);
+    expect(await screen.findByText(/your internal notes stay private/)).toBeInTheDocument();
+    fireEvent.click(await screen.findByLabelText(/A core skill for this role/));
+    fireEvent.click(screen.getByRole('button', { name: 'Share with candidate' }));
+    await waitFor(() => expect(screen.getByText('Feedback shared with the candidate.')).toBeInTheDocument());
+  });
+});
+
 function stubFetch(routes: Readonly<Record<string, unknown>>, errors: ErrorStub = {}): void {
   vi.stubGlobal('fetch', vi.fn(async (url: string) => {
     if (url.endsWith('/oauth2/token')) return { ok: true, json: async () => ({ access_token: 'test-access-token' }) };

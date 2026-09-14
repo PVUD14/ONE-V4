@@ -126,3 +126,127 @@ export function submitExamAttempt(token: string, attemptId: string): Promise<{ s
 }
 
 // --- ONE Assistant -----------------------------------------------------------
+
+// --- Employer screening assessments -------------------------------------------
+
+export interface EmployerQuestionDto {
+  readonly id: string;
+  readonly questionText: string;
+  readonly questionType: string;
+  readonly difficulty: string;
+  readonly marks: number;
+  readonly approvalStatus: string;
+  readonly version: number;
+  readonly optionCount: number;
+}
+
+export interface EmployerAssessmentDto {
+  readonly id: string;
+  readonly title: string;
+  readonly durationSeconds: number;
+  readonly totalMarks: number;
+  readonly lifecycleState: string;
+  readonly opportunityId: string | null;
+  readonly publishedAt: string | null;
+  readonly itemCount: number;
+  readonly invitedCount: number;
+  readonly submittedCount: number;
+}
+
+export interface EmployerAssessmentResultDto {
+  readonly invitationId: string;
+  readonly applicationId: string;
+  readonly state: string;
+  readonly candidateName: string | null;
+  readonly candidateEmail: string;
+  readonly closesAt: string;
+  readonly score: number | null;
+  readonly maxScore: number | null;
+  readonly percentage: number | null;
+  readonly submittedAt: string | null;
+}
+
+export interface ScreeningInvitationDto {
+  readonly id: string;
+  readonly state: string;
+  readonly opensAt: string;
+  readonly closesAt: string;
+  readonly title: string;
+  readonly durationSeconds: number;
+  readonly employerName: string;
+  readonly roleTitle: string;
+  readonly attemptId: string | null;
+  readonly attemptState: string | null;
+  readonly percentage: number | null;
+}
+
+export interface ScreeningAttemptDto {
+  readonly id: string;
+  readonly questions: readonly {
+    readonly questionId: string;
+    readonly displayOrder: number;
+    readonly questionText: string;
+    readonly questionType: string;
+    readonly marks: number;
+    /** Presented in the candidate's own key order. No indication of which is correct. */
+    readonly options: readonly { readonly key: string; readonly text: string }[];
+    readonly selectedOptionKeys: readonly string[];
+  }[];
+}
+
+const employerBase = (employerId: string): string => `/api/v1/employers/${encodeURIComponent(employerId)}`;
+
+export function listEmployerQuestions(token: string, employerId: string, signal?: AbortSignal): Promise<{ readonly questions: readonly EmployerQuestionDto[] }> {
+  return requestJson(`${employerBase(employerId)}/assessment-questions`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function createEmployerQuestion(token: string, employerId: string, body: {
+  readonly questionText: string; readonly questionType: string; readonly marks: number;
+  readonly difficulty?: string;
+  readonly options: readonly { readonly key: string; readonly text: string; readonly isCorrect: boolean }[];
+}): Promise<{ readonly question: { readonly id: string } }> {
+  return requestJson(`${employerBase(employerId)}/assessment-questions`, { token, method: 'POST', body });
+}
+
+export function transitionEmployerQuestion(token: string, employerId: string, questionId: string, toState: string): Promise<{ readonly question: { readonly id: string; readonly approvalStatus: string } }> {
+  return requestJson(`${employerBase(employerId)}/assessment-questions/${encodeURIComponent(questionId)}/transition`, { token, method: 'POST', body: { toState } });
+}
+
+export function listEmployerAssessments(token: string, employerId: string, signal?: AbortSignal): Promise<{ readonly assessments: readonly EmployerAssessmentDto[] }> {
+  return requestJson(`${employerBase(employerId)}/assessments`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function createEmployerAssessment(token: string, employerId: string, body: {
+  readonly title: string; readonly durationSeconds: number;
+  readonly opportunityId: string | null; readonly questionIds: readonly string[];
+}): Promise<{ readonly assessment: { readonly id: string } }> {
+  return requestJson(`${employerBase(employerId)}/assessments`, { token, method: 'POST', body });
+}
+
+export function publishEmployerAssessment(token: string, employerId: string, assessmentId: string): Promise<{ readonly assessment: { readonly id: string } }> {
+  return requestJson(`${employerBase(employerId)}/assessments/${encodeURIComponent(assessmentId)}/publish`, { token, method: 'POST' });
+}
+
+export function inviteToEmployerAssessment(token: string, employerId: string, assessmentId: string, applicationIds: readonly string[], closesAt: string): Promise<{ readonly invited: number }> {
+  return requestJson(`${employerBase(employerId)}/assessments/${encodeURIComponent(assessmentId)}/invitations`, { token, method: 'POST', body: { applicationIds, closesAt } });
+}
+
+export function listEmployerAssessmentResults(token: string, employerId: string, assessmentId: string, signal?: AbortSignal): Promise<{ readonly results: readonly EmployerAssessmentResultDto[] }> {
+  return requestJson(`${employerBase(employerId)}/assessments/${encodeURIComponent(assessmentId)}/results`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function listScreeningInvitations(token: string, signal?: AbortSignal): Promise<{ readonly invitations: readonly ScreeningInvitationDto[] }> {
+  return requestJson('/api/v1/students/me/screening-assessments', { token, ...(signal ? { signal } : {}) });
+}
+
+export function startScreeningAttempt(token: string, invitationId: string): Promise<{ readonly attempt: ScreeningAttemptDto }> {
+  return requestJson(`/api/v1/students/me/screening-assessments/${encodeURIComponent(invitationId)}/start`, { token, method: 'POST' });
+}
+
+export function saveScreeningAnswer(token: string, attemptId: string, questionId: string, selectedOptionKeys: readonly string[]): Promise<{ readonly saved: boolean }> {
+  return requestJson(`/api/v1/students/me/screening-attempts/${encodeURIComponent(attemptId)}/answers`, { token, method: 'POST', body: { questionId, selectedOptionKeys } });
+}
+
+export function submitScreeningAttempt(token: string, attemptId: string): Promise<{ readonly result: { readonly score: number; readonly maxScore: number; readonly percentage: number } }> {
+  return requestJson(`/api/v1/students/me/screening-attempts/${encodeURIComponent(attemptId)}/submit`, { token, method: 'POST' });
+}

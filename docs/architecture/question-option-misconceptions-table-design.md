@@ -67,8 +67,8 @@ publication, forcing a second review of a question that was already approved.
 
 ### Why the tag has its own revision
 
-A tag is a separate claim from the question: an approved question can be tagged later, a tag can be
-withdrawn (`ARCHIVED`) without re-versioning the question, and — B.8 — an agent-drafted tag on a
+A tag is a separate claim from the question: an approved question can be tagged later, a tag could be
+withdrawn without re-versioning the question (once archiving is possible — see the open point in the shared design), and — B.8 — an agent-drafted tag on a
 human-authored question must still go through review on its own. *Rejected: putting tags only inside the
 question revision's body.* Retagging a published question would then need a new question version, and the
 tag would have no provenance of its own.

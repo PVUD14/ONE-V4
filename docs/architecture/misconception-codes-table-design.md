@@ -82,7 +82,8 @@ Two independent state columns would disagree. So:
   `CHANGES_REQUESTED` (a reviewer never approves something that then changes under them; published
   content never changes); identity and provenance columns (`id`, `code`, `version`, `source`,
   `generator_version`, `prompt_version`, `generated_at`, `content_revision_id`, `created_by_user_id`,
-  `created_at`) never change.
+  `created_at`, and for a tag `question_revision_id`, `option_id`, `misconception_code_id`) never change —
+  a different tag is a new row.
 - **Delete** is rejected. Abandoned drafts stay as history, like `content_revisions`.
 
 ### Publication
@@ -138,9 +139,11 @@ would not join to the taxonomy the rest of the engine uses.
 ### Versions and published history
 
 More than one version of a code may be published at once: a tag points at a **specific** version, so a
-question tagged against v1 keeps meaning v1 until someone tags it against v2. Retiring a version is
-`PUBLISHED → ARCHIVED` on its revision; the resolver stops returning a tag whose code version is no longer
-`PUBLISHED`.
+question tagged against v1 keeps meaning v1 until someone tags it against v2. The resolver returns a tag
+only while both the tag and its code version are `PUBLISHED`, so archiving either would withdraw it.
+**But archiving is not possible today:** the 0004 trigger `protect_published_content_revision` rejects
+every update of a published revision, including `PUBLISHED → ARCHIVED`, and this goal does not relax it.
+Withdrawing a published code or tag therefore needs its own decision (see open points).
 
 ## Recording a misconception on an attempt and in learner skill state
 
@@ -188,3 +191,7 @@ or evidence; it only informs what to teach next (ENG-08).
    OPS-09 editor will grant `CONTENT_REVIEW` / `CONTENT_PUBLISH`. Recommended: a subject expert per track
    for misconception codes and tags (they are claims about how students think in that subject), and
    Divakar for teaching strategies. Nothing is published until then.
+2. **Withdrawing published content.** The 0004 trigger makes a published revision immutable, archive
+   included, so a wrong published misconception or tag cannot be retired. Recommended: a later migration
+   lets `protect_published_content_revision` allow exactly `PUBLISHED → ARCHIVED` (state, nothing else),
+   for every content type at once, as its own reviewed change — not an engine-only exception.

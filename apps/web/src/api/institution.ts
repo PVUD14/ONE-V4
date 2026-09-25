@@ -88,7 +88,19 @@ export function listInstitutionStaff(token: string, institutionId: string, signa
   return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/staff-role-assignments`, { token, ...(signal ? { signal } : {}) });
 }
 
-export function listInstitutionStudents(token: string, institutionId: string, signal?: AbortSignal): Promise<{ readonly students: readonly InstitutionStudentDto[] }> {
+/** Whose students a roster response covers. UNITS names the units the reader is scoped to. */
+export interface InstitutionStudentScopeDto {
+  readonly kind: 'INSTITUTION' | 'UNITS' | 'NONE';
+  readonly units: readonly { readonly id: string; readonly kind: string; readonly name: string }[];
+}
+
+/** "Department of Mechanical Engineering · Batch 2027" for a scoped reader; null when the whole institution is shown. */
+export function institutionStudentScopeLabel(scope: InstitutionStudentScopeDto | undefined): string | null {
+  if (!scope || scope.kind !== 'UNITS' || scope.units.length === 0) return null;
+  return scope.units.map((unit) => unit.name).join(' · ');
+}
+
+export function listInstitutionStudents(token: string, institutionId: string, signal?: AbortSignal): Promise<{ readonly students: readonly InstitutionStudentDto[]; readonly scope?: InstitutionStudentScopeDto }> {
   return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/students`, { token, ...(signal ? { signal } : {}) });
 }
 

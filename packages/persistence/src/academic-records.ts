@@ -15,6 +15,8 @@
  */
 import { randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
+import type { InstitutionStudentScope } from '@planthepath/authorization/src/index.js';
+import { institutionStudentScopeClause } from './institution-scope.js';
 
 export class AcademicRecordError extends Error {
   constructor(readonly code: string) {
@@ -276,7 +278,18 @@ export async function decideTermVerification(
  * institution recorded. A null is the truth, and callers must show the email rather than
  * inventing a name to fill the column.
  */
-export async function listVerificationQueue(pool: Pool, institutionId: string): Promise<readonly Record<string, unknown>[]> {
+/**
+ * Pending terms for the institution. A scoped reader (INST-02) sees only students whose
+ * roster profile falls inside their units; a claim from someone with no roster profile
+ * (a past student asking retroactively) has no unit and stays with institution-wide staff.
+ */
+export async function listVerificationQueue(
+  pool: Pool,
+  institutionId: string,
+  scope: InstitutionStudentScope = { kind: 'INSTITUTION' },
+): Promise<readonly Record<string, unknown>[]> {
+  const values: unknown[] = [institutionId];
+  const inScope = scope.kind === 'INSTITUTION' ? 'TRUE' : institutionStudentScopeClause(scope, 'isp', values);
   const result = await pool.query(
     `SELECT t.id AS "termId", t.label, t.sequence, t.result_value AS "resultValue", t.result_scale AS "resultScale",
             t.result_letter AS "resultLetter", t.backlog_count AS "backlogCount", t.source,
@@ -300,7 +313,8 @@ export async function listVerificationQueue(pool: Pool, institutionId: string): 
      LEFT JOIN institution_student_profiles isp
        ON isp.student_user_id = q.student_user_id AND isp.institution_id = q.institution_id
      WHERE q.institution_id=$1 AND t.verification_state='PENDING_VERIFICATION'
-     ORDER BY t.created_at`, [institutionId],
+       AND ${inScope}
+     ORDER BY t.created_at`, values,
   );
   return result.rows;
 }

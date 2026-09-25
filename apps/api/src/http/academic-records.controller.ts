@@ -47,6 +47,7 @@ import {
 } from '@planthepath/persistence/src/academic-records.js';
 import { PG_POOL } from '../persistence.provider.js';
 import { ProtectedApiAuthenticationGuard, type ProtectedHttpRequest } from './api-security.js';
+import { institutionStudentScopeFor } from './institution-student-scope.js';
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -128,7 +129,8 @@ export class AcademicRecordsController {
   async queue(@Req() request: ProtectedHttpRequest, @Param('institutionId') institutionId: string): Promise<Record<string, unknown>> {
     const id = requireUuid(institutionId);
     requireInstitutionStaff(request, id);
-    return { queue: await listVerificationQueue(this.pool, id) };
+    const scope = await institutionStudentScopeFor(this.pool, request, id, verificationRoles);
+    return { queue: await listVerificationQueue(this.pool, id, scope) };
   }
 
   @Post('/institutions/:institutionId/academic-verification/:termId/decide')
@@ -142,12 +144,17 @@ export class AcademicRecordsController {
     const id = requireUuid(institutionId);
     const reviewerUserId = requireInstitutionStaff(request, id);
     const decision = readDecision(body);
+    const term = requireUuid(termId);
+    // A reviewer may only decide a term they can see in their own queue (INST-02 scope).
+    const scope = await institutionStudentScopeFor(this.pool, request, id, verificationRoles);
+    if (scope.kind !== 'INSTITUTION'
+      && !(await listVerificationQueue(this.pool, id, scope)).some((item) => item['termId'] === term)) throw safeForbidden();
     try {
-      await decideTermVerification(this.pool, { institutionId: id, reviewerUserId, termId: requireUuid(termId), decision });
+      await decideTermVerification(this.pool, { institutionId: id, reviewerUserId, termId: term, decision });
     } catch (error) {
       throw mapAcademicError(error);
     }
-    return { queue: await listVerificationQueue(this.pool, id) };
+    return { queue: await listVerificationQueue(this.pool, id, scope) };
   }
 }
 

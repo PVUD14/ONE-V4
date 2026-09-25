@@ -243,6 +243,18 @@ describe('Placement Officer roster', () => {
     expect(screen.getByText('Sign in to your institution staff workspace.')).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it('names the units a scoped reader is limited to, and says nothing extra for the whole institution', async () => {
+    fetchMock.mockImplementation((url: string) => Promise.resolve(response(url.includes('/units') ? { units: [] } : {
+      students: [], scope: { kind: 'UNITS', units: [{ id: department, kind: 'DEPARTMENT', name: 'Mechanical Engineering' }] },
+    })));
+    const view = render(placement());
+    expect(await screen.findByText('Showing students in Mechanical Engineering.')).toBeInTheDocument();
+    view.unmount();
+    rosterResponse(); render(placement());
+    await screen.findByRole('table', { name: 'Placement student roster' });
+    expect(screen.queryByText(/^Showing students in/)).not.toBeInTheDocument();
+  });
 });
 
 

@@ -242,6 +242,9 @@ importers:
       '@planthepath/ai-orchestration':
         specifier: workspace:*
         version: link:../ai-orchestration
+      '@planthepath/authorization':
+        specifier: workspace:*
+        version: link:../authorization
       '@planthepath/automation':
         specifier: workspace:*
         version: link:../automation

@@ -24,6 +24,8 @@ import {
   type ProtectedHttpRequest,
 } from './api-security.js';
 import { recordNotification } from './notify.js';
+import { institutionStudentScopeSql } from '@planthepath/persistence/src/institution-scope.js';
+import { institutionStudentScopeFor } from './institution-student-scope.js';
 
 type QueryResult<T> = { rows: T[] };
 
@@ -539,6 +541,8 @@ export class InstitutionAssessmentsController {
   ): Promise<Record<string, unknown>> {
     const context = this.requireInstitutionStaff(request, institutionId, assessmentStaffRoles);
     const id = requireUuid(definitionId, context.correlationId);
+    // INST-02: results, the not-attempted list and the assigned count cover the reader's students only.
+    const scope = await institutionStudentScopeFor(this.db, request, institutionId, assessmentStaffRoles);
     const rows = await this.db.execute(sql`
       SELECT r.score, r.max_score, r.percentage, r.correct_count, r.wrong_count, r.not_attempted_count,
              r.time_taken_seconds, r.created_at, t.attempt_number, t.status, t.auto_submitted, t.screen_shift_count,
@@ -547,6 +551,7 @@ export class InstitutionAssessmentsController {
       JOIN exam_attempts t ON t.id = r.attempt_id
       JOIN institution_student_profiles p ON p.student_user_id = t.student_user_id AND p.institution_id = t.institution_id
       WHERE t.definition_id = ${id}::uuid AND t.institution_id = ${institutionId}::uuid
+        AND ${institutionStudentScopeSql(scope, 'p')}
       ORDER BY r.percentage DESC, r.created_at
       LIMIT 500
     `) as QueryResult<Record<string, unknown>>;
@@ -568,6 +573,7 @@ export class InstitutionAssessmentsController {
       FROM exam_assignments a
       JOIN institution_student_profiles p ON p.student_user_id = a.student_user_id AND p.institution_id = a.institution_id
       WHERE a.definition_id = ${id}::uuid AND a.institution_id = ${institutionId}::uuid
+        AND ${institutionStudentScopeSql(scope, 'p')}
         AND NOT EXISTS (SELECT 1 FROM exam_attempts t
                          WHERE t.definition_id = ${id}::uuid AND t.student_user_id = a.student_user_id AND t.status <> 'IN_PROGRESS')
       ORDER BY p.full_name
@@ -578,8 +584,10 @@ export class InstitutionAssessmentsController {
     }));
 
     const assignedCount = await this.db.execute(sql`
-      SELECT count(*) AS n FROM exam_assignments
-      WHERE definition_id = ${id}::uuid AND institution_id = ${institutionId}::uuid
+      SELECT count(*) AS n FROM exam_assignments a
+      LEFT JOIN institution_student_profiles p ON p.student_user_id = a.student_user_id AND p.institution_id = a.institution_id
+      WHERE a.definition_id = ${id}::uuid AND a.institution_id = ${institutionId}::uuid
+        AND ${institutionStudentScopeSql(scope, 'p')}
     `) as QueryResult<{ n: string }>;
 
     return {

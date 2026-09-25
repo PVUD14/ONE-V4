@@ -28,6 +28,7 @@ import {
 } from '@planthepath/persistence/src/career-readiness.js';
 import { PG_POOL } from '../persistence.provider.js';
 import { ProtectedApiAuthenticationGuard, type ProtectedHttpRequest } from './api-security.js';
+import { resolveInstitutionStudentScope } from '@planthepath/persistence/src/institution-scope.js';
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const idempotencyKeyPattern = /^[A-Za-z0-9._:-]{8,128}$/;
@@ -154,8 +155,11 @@ export class CareerReadinessController {
     const membership = request.planThePath?.authorization?.selectedMembership;
     if (!membership || membership.organizationId !== id || !institutionReportRoles.includes(membership.role)) throw safeForbidden();
     if (!isIsoDate(periodStart) || !isIsoDate(periodEnd) || periodEnd < periodStart) throw safeBadRequest();
+    const studentScope = await resolveInstitutionStudentScope(this.pool, id, [{
+      role: membership.role, departmentUnitId: membership.scope.departmentId ?? null, batchUnitId: membership.scope.batchId ?? null,
+    }]);
     try {
-      return await generateInstitutionAggregateReport(this.pool, { institutionId: id, periodStart, periodEnd });
+      return await generateInstitutionAggregateReport(this.pool, { institutionId: id, periodStart, periodEnd, studentScope });
     } catch {
       throw safeBadRequest();
     }

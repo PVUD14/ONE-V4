@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
+import type { InstitutionStudentScope } from '@planthepath/authorization/src/index.js';
+import { institutionStudentScopeClause } from './institution-scope.js';
 import {
   calculateAdvisoryReadiness,
   deterministicPackageIdentity,
@@ -861,9 +863,16 @@ export async function getCareerReadinessOperationalStatus(pool: Pool): Promise<R
 
 export async function generateInstitutionAggregateReport(pool: Pool, input: {
   readonly institutionId: string; readonly periodStart: string; readonly periodEnd: string; readonly minimumCohortSize?: number;
+  /** INST-02: a department head's report covers their department only. Defaults to the whole institution. */
+  readonly studentScope?: InstitutionStudentScope;
 }): Promise<Record<string, unknown>> {
   const minimumCohortSize = input.minimumCohortSize ?? 5;
   if (!Number.isInteger(minimumCohortSize) || minimumCohortSize < 5) throw new Error('minimum cohort size must be at least 5');
+  const studentScope = input.studentScope ?? { kind: 'INSTITUTION' as const };
+  const values: unknown[] = [input.institutionId, input.periodStart, input.periodEnd];
+  const scopeFilter = studentScope.kind === 'INSTITUTION' ? '' : `
+         JOIN institution_student_profiles isp ON isp.institution_id=ir.institution_id AND isp.student_user_id=rs.subject_user_id
+           AND ${institutionStudentScopeClause(studentScope, 'isp', values)}`;
   return transaction(pool, async (client) => {
     const result = await client.query<{ cohort_size: number; band: string; count: number }>(
       `WITH latest AS (
@@ -876,17 +885,19 @@ export async function generateInstitutionAggregateReport(pool: Pool, input: {
              OR (ir.state IN ('TRANSFERRED','GRADUATED') AND ir.effective_to IS NOT NULL)
            )
            AND ir.effective_from <= rs.generated_at
-           AND (ir.effective_to IS NULL OR ir.effective_to > rs.generated_at)
+           AND (ir.effective_to IS NULL OR ir.effective_to > rs.generated_at)${scopeFilter}
          WHERE rs.generated_at >= $2::date AND rs.generated_at < ($3::date + interval '1 day')
          ORDER BY rs.subject_user_id, rs.generated_at DESC
        )
        SELECT count(*) OVER ()::int AS cohort_size, band, count(*)::int AS count FROM latest GROUP BY band`,
-      [input.institutionId, input.periodStart, input.periodEnd],
+      values,
     );
     const cohortSize = result.rows.reduce((sum, row) => sum + row.count, 0);
+    // Record whose students the report counts, so a department's report is never read as the college's.
+    const scope = studentScope.kind === 'INSTITUTION' ? 'INSTITUTION' : 'UNITS';
     const aggregate = cohortSize < minimumCohortSize
-      ? { suppressed: true, minimumCohortSize, cohortSize: 0, bands: [] }
-      : { suppressed: false, minimumCohortSize, cohortSize, bands: result.rows.map(({ band, count }) => ({ band, count })) };
+      ? { suppressed: true, minimumCohortSize, cohortSize: 0, bands: [], scope }
+      : { suppressed: false, minimumCohortSize, cohortSize, bands: result.rows.map(({ band, count }) => ({ band, count })), scope };
     const reportId = randomUUID();
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1_000);
     await client.query(

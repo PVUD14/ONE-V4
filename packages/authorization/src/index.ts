@@ -106,3 +106,5 @@ export function canSearchAuditEvents(scope: AuditSearchScope): boolean {
   if (scope.membershipState !== 'ACTIVE') return false;
   return auditSearchRoles.includes(scope.role as AuditSearchRole);
 }
+
+export * from './institution-scope.js';

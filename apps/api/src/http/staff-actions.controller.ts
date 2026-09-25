@@ -7,7 +7,8 @@ import { BadRequestException, Body, ConflictException, Controller, ForbiddenExce
 import { sql, type SQL } from 'drizzle-orm';
 import { externalApplicationCap } from '@planthepath/hiring/src/external-applications.js';
 import { assertQuestionTransition, type QuestionStatus } from '@planthepath/assessments';
-import { institutionRelationshipAuthorizesActivity, type TemporalInstitutionScope } from '@planthepath/authorization/src/index.js';
+import { institutionRelationshipAuthorizesActivity, type InstitutionStudentScope, type TemporalInstitutionScope } from '@planthepath/authorization/src/index.js';
+import { institutionStudentScopeSql, resolveInstitutionStudentScope } from '@planthepath/persistence/src/institution-scope.js';
 import { hasInstitutionRelationshipAuthorizationForActivity, type PersistenceDb } from '@planthepath/persistence/src/repositories.js';
 import { API_ID_GENERATOR, API_PERSISTENCE_DB, ProtectedApiAuthenticationGuard, requireTrustedAuthorization, safeError, type ApiIdGenerator, type ProtectedHttpRequest } from './api-security.js';
 
@@ -41,6 +42,8 @@ const reviewRoles = staffRoles.filter((role) => role !== 'FACULTY_LECTURER');
 interface Scope {
   id: string; user_id: string; role: string; institutionId: string; correlationId: string;
   scope_department_unit_id: string | null; scope_batch_unit_id: string | null;
+  /** Which students this membership may see: the one institution-wide definition (INST-02). */
+  students: InstitutionStudentScope;
 }
 interface Relationship extends Record<string, unknown> {
   relationship_id: string; relationship_state: TemporalInstitutionScope['relationshipState'];
@@ -97,8 +100,7 @@ function editable(scope: Scope, action: Action): boolean {
   return action.action_type === 'ASSIGNED_TASK' && action.state === 'DRAFT' && currentAction(scope, action) && canManage(scope, action);
 }
 function unitScope(scope: Scope): SQL {
-  return sql`(${scope.scope_department_unit_id}::uuid IS NULL OR p.department_unit_id = ${scope.scope_department_unit_id}::uuid)
-    AND (${scope.scope_batch_unit_id}::uuid IS NULL OR p.batch_unit_id = ${scope.scope_batch_unit_id}::uuid)`;
+  return institutionStudentScopeSql(scope.students, 'p');
 }
 function inputError(code: string, correlationId: string) { return { error: { code, correlationId, message: 'Request could not be completed.' } }; }
 function uuid(value: unknown, correlationId: string): string {
@@ -138,10 +140,13 @@ export class StaffActionsController {
         AND m.scope_institution_id = ${id}::uuid AND m.state = 'ACTIVE'
         AND u.state = 'ACTIVE' AND o.active AND o.kind = 'INSTITUTION'
       FOR SHARE OF m, u, o
-    `) as Rows<Omit<Scope, 'institutionId' | 'correlationId'>>;
+    `) as Rows<Omit<Scope, 'institutionId' | 'correlationId' | 'students'>>;
     const membership = result.rows[0];
     if (!membership || !staffRoles.includes(membership.role)) throw new ForbiddenException(safeError('FORBIDDEN', context.correlationId));
-    return { ...membership, institutionId: id, correlationId: context.correlationId };
+    const students = await resolveInstitutionStudentScope(tx, id, [{
+      role: membership.role, departmentUnitId: membership.scope_department_unit_id, batchUnitId: membership.scope_batch_unit_id,
+    }]);
+    return { ...membership, students, institutionId: id, correlationId: context.correlationId };
   }
 
   private async subject(tx: PersistenceDb, scope: Scope, studentId: string, relationshipId?: string): Promise<Student> {

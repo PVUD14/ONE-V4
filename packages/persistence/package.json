@@ -18,6 +18,7 @@
     "worker:content-generation": "tsx src/run-content-generation-worker.ts"
   },
   "dependencies": {
+    "@planthepath/authorization": "workspace:*",
     "@planthepath/career-readiness": "workspace:*",
     "@planthepath/automation": "workspace:*",
     "@planthepath/events": "workspace:*",

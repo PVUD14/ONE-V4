@@ -6,7 +6,7 @@
  * Split out of rolePortalPages.tsx so each stream owns its own surface. The
  * shell and the route dispatcher remain there and import from here.
  */
-import { ApiRequestError, apiBaseUrl, addInstitutionStudent, commitStudentRosterImport, createInstitutionUnit, endInstitutionStudentRelationship, getProtectedAccessToken, inviteInstitutionStaff, listInstitutionStaff, listInstitutionStudents, listInstitutionUnits, previewStudentRosterImport, updateInstitutionStudent, updateInstitutionUnit } from '../api.js';
+import { ApiRequestError, apiBaseUrl, addInstitutionStudent, commitStudentRosterImport, createInstitutionUnit, endInstitutionStudentRelationship, getProtectedAccessToken, inviteInstitutionStaff, listInstitutionStaff, listInstitutionStudents, listInstitutionUnits, institutionStudentScopeLabel, previewStudentRosterImport, updateInstitutionStudent, updateInstitutionUnit } from '../api.js';
 import type { InstitutionStaffDto, InstitutionStudentCreateRequest, InstitutionStudentDto, InstitutionUnitDto, RosterImportPreviewDto } from '../api.js';
 import { V2Stat } from '../dashboardsV2.js';
 import type { RolePortalConfig } from '../rolePortalConfig.js';
@@ -28,6 +28,7 @@ function InstitutionAdminStudentsPage({ portal, authenticatedWorkspace }: { read
   const [csvError, setCsvError] = useState('');
   const [relationshipError, setRelationshipError] = useState('');
   const [query, setQuery] = useState('');
+  const [scopeLabel, setScopeLabel] = useState<string | null>(null);
   const [form, setForm] = useState({ fullName: '', institutionStudentId: '', email: '', departmentUnitId: '', programUnitId: '', batchUnitId: '', sectionUnitId: '', academicStartDate: '', expectedGraduationDate: '' });
   const [csv, setCsv] = useState('institution_student_id,full_name,email,department,program,batch,section\n');
   useEffect(() => {
@@ -38,6 +39,7 @@ function InstitutionAdminStudentsPage({ portal, authenticatedWorkspace }: { read
       listInstitutionUnits(token, institutionId, controller.signal),
     ]).then(([studentResult, unitResult]) => {
       setStudents(studentResult.students);
+      setScopeLabel(institutionStudentScopeLabel(studentResult.scope));
       setUnits(unitResult.units);
     }).catch((error: unknown) => setLoadError(formatApiError(error, 'Unable to load institution students.')));
     return () => controller.abort();
@@ -103,7 +105,7 @@ function InstitutionAdminStudentsPage({ portal, authenticatedWorkspace }: { read
     setNotice('Roster import committed.');
     setPreview(null);
   }
-  return <section className="role-module role-module--dense"><div className="role-page-heading"><div><span className="eyebrow">Authenticated API-backed</span><h1>Students</h1><p>Institution-owned roster and relationship lifecycle. This is not an Operations workflow.</p></div></div>
+  return <section className="role-module role-module--dense"><div className="role-page-heading"><div><span className="eyebrow">Authenticated API-backed</span><h1>Students</h1><p>Institution-owned roster and relationship lifecycle. This is not an Operations workflow.</p>{scopeLabel && <p>Showing students in {scopeLabel}.</p>}</div></div>
     <div className="v2-row v2-cols-4 career-stat-strip role-wide">
       <V2Stat icon="🎓" tone="blue" value={students.length} label="Students on roster" />
       <V2Stat icon="✅" tone="green" value={students.filter((student) => (student.relationship?.state ?? student.status) === 'ACTIVE').length} label="Active" />
@@ -436,7 +438,7 @@ export function InstitutionStudentsPage(props: InstitutionPageProps): React.Reac
 
 function PlacementStudentRoster({ token, institutionId }: { readonly token: string; readonly institutionId: string }): React.ReactElement {
   // The roster response includes studentUserId separately from its profile id.
-  const [data, setData] = useState<{ students: readonly (InstitutionStudentDto & { readonly studentUserId?: string })[]; units: readonly InstitutionUnitDto[] } | null>(null);
+  const [data, setData] = useState<{ students: readonly (InstitutionStudentDto & { readonly studentUserId?: string })[]; units: readonly InstitutionUnitDto[]; scopeLabel?: string | null } | null>(null);
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [error, setError] = useState('');
   const [refresh, setRefresh] = useState(0);
@@ -445,7 +447,7 @@ function PlacementStudentRoster({ token, institutionId }: { readonly token: stri
     const controller = new AbortController();
     setData(null); setError('');
     void Promise.all([listInstitutionStudents(token, institutionId, controller.signal), listInstitutionUnits(token, institutionId, controller.signal)])
-      .then(([roster, structure]) => { if (!controller.signal.aborted) setData({ students: roster.students, units: structure.units }); })
+      .then(([roster, structure]) => { if (!controller.signal.aborted) setData({ students: roster.students, units: structure.units, scopeLabel: institutionStudentScopeLabel(roster.scope) }); })
       .catch((cause: unknown) => { if (!controller.signal.aborted) setError(workflowError(cause)); });
     return () => controller.abort();
   }, [token, institutionId, refresh]);
@@ -458,7 +460,7 @@ function PlacementStudentRoster({ token, institutionId }: { readonly token: stri
       .join(' ').toLowerCase().includes(filters.query.trim().toLowerCase()));
   const selectedStudent = students.find((student) => student.id === selectedStudentId);
   return <section className="role-module role-module--dense">
-    <div className="role-page-heading"><div><span className="eyebrow">Institution placement</span><h1>Students</h1><p>Search your institution roster. Unavailable placement information is shown as NA.</p></div></div>
+    <div className="role-page-heading"><div><span className="eyebrow">Institution placement</span><h1>Students</h1><p>Search your institution roster. Unavailable placement information is shown as NA.</p>{data?.scopeLabel && <p>Showing students in {data.scopeLabel}.</p>}</div></div>
     <section className="role-card role-wide role-management-form">
       <label>Search students<input type="search" value={filters.query} onChange={(event) => setFilters({ ...filters, query: event.target.value })} /></label>
       <label>Department<select value={filters.department} onChange={(event) => setFilters({ ...filters, department: event.target.value })}><option value="">All departments</option>

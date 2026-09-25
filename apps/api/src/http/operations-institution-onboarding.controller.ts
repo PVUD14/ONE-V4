@@ -3,6 +3,8 @@ import { BadRequestException, Body, ConflictException, Controller, ForbiddenExce
 import { sql } from 'drizzle-orm';
 import { digestInvitationToken, generateInvitationToken } from '@planthepath/identity/src/invitation-token.js';
 import { validateOutboxWriteInput, type PersistenceDb } from '@planthepath/persistence/src/repositories.js';
+import { institutionStudentScopeSql } from '@planthepath/persistence/src/institution-scope.js';
+import { describeInstitutionStudentScope, institutionStudentScopeFor } from './institution-student-scope.js';
 import {
   API_ID_GENERATOR,
   API_PERSISTENCE_DB,
@@ -415,6 +417,7 @@ export class OperationsInstitutionOnboardingController {
   async listStudents(@Req() request: ProtectedHttpRequest, @Param('institutionId') institutionId: string, @Query('q') q?: string): Promise<Record<string, unknown>> {
     const context = requireInstitutionStaff(request, institutionId);
     const id = requireUuid(institutionId, context.correlationId);
+    const scope = await institutionStudentScopeFor(this.db, request, id, institutionStaffRoles);
     const rows = await this.db.execute(sql`
       SELECT sp.*, u.email, ir.id AS relationship_id, ir.state AS relationship_state, ir.effective_from, ir.effective_to
       FROM institution_student_profiles sp
@@ -427,11 +430,16 @@ export class OperationsInstitutionOnboardingController {
         LIMIT 1
       ) ir ON true
       WHERE sp.institution_id=${id}::uuid
+        AND ${institutionStudentScopeSql(scope, 'sp')}
         AND (${q ?? null}::text IS NULL OR lower(sp.full_name) LIKE '%' || lower(${q ?? null}) || '%' OR lower(sp.institution_student_id) LIKE '%' || lower(${q ?? null}) || '%' OR lower(u.email) LIKE '%' || lower(${q ?? null}) || '%')
       ORDER BY sp.updated_at DESC, sp.full_name
       LIMIT 500
     `) as QueryResult<Record<string, unknown>>;
-    return { students: rows.rows.map(mapStudentRow), correlationId: context.correlationId };
+    return {
+      students: rows.rows.map(mapStudentRow),
+      scope: await describeInstitutionStudentScope(this.db, request, id, institutionStaffRoles, scope),
+      correlationId: context.correlationId,
+    };
   }
 
   @Post('/institutions/:institutionId/students')
@@ -485,6 +493,7 @@ export class OperationsInstitutionOnboardingController {
     const context = requireInstitutionStaff(request, institutionId);
     const id = requireUuid(institutionId, context.correlationId);
     const profileId = requireUuid(studentProfileId, context.correlationId);
+    const scope = await institutionStudentScopeFor(this.db, request, id, institutionStaffRoles);
     const rows = await this.db.execute(sql`
       SELECT sp.*, u.email, ir.id AS relationship_id, ir.state AS relationship_state, ir.effective_from, ir.effective_to
       FROM institution_student_profiles sp
@@ -495,6 +504,7 @@ export class OperationsInstitutionOnboardingController {
         ORDER BY effective_from DESC LIMIT 1
       ) ir ON true
       WHERE sp.institution_id=${id}::uuid AND sp.id=${profileId}::uuid
+        AND ${institutionStudentScopeSql(scope, 'sp')}
     `) as QueryResult<Record<string, unknown>>;
     const [row] = rows.rows;
     if (!row) throw forbidden(context.correlationId);

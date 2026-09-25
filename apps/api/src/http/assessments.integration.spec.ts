@@ -224,6 +224,24 @@ describe('assessment engine end to end', () => {
     expect(newAttempt.status).toBe(400);
   });
 
+  it('records exactly one attempt-log row per graded question, with the exam institution (ENG-03)', async () => {
+    const rows = await pool.query<{ item_id: string; correct: boolean; answered: boolean; score: string; institution_id: string; skill_id: string | null; context: string; session_id: string }>(
+      `SELECT item_id, correct, answered, score, institution_id, skill_id, context, session_id
+       FROM learning_attempt_events WHERE source_attempt_type = 'exam_attempt' AND source_attempt_id = $1`, [attemptId],
+    );
+    expect(rows.rows).toHaveLength(3);
+    expect(new Set(rows.rows.map((row) => row.item_id)).size).toBe(3);
+    expect(rows.rows.filter((row) => row.correct)).toHaveLength(2);
+    for (const row of rows.rows) {
+      expect(row).toMatchObject({ answered: true, institution_id: institutionId, skill_id: null, context: 'ASSESSMENT' });
+      expect(Number(row.score)).toBe(row.correct ? 1 : 0);
+    }
+    const sessions = await pool.query<{ id: string; mode: string; institution_id: string }>(
+      "SELECT id, mode, institution_id FROM learning_sessions WHERE source_type = 'exam_attempt' AND source_id = $1", [attemptId],
+    );
+    expect(sessions.rows).toEqual([{ id: rows.rows[0]!.session_id, mode: 'ASSESSMENT', institution_id: institutionId }]);
+  });
+
   it('reports results to institution staff with integrity signals', async () => {
     const results = await api().get(`/api/v1/institutions/${institutionId}/assessments/${examId}/results`).set(auth(staffToken));
     expect(results.status).toBe(200);
@@ -347,6 +365,22 @@ describe('stale attempts and duration changes', () => {
     const autoSubmitted = (results.body.results as { attemptNumber: number; autoSubmitted: boolean }[])
       .find((row) => row.attemptNumber === 2);
     expect(autoSubmitted?.autoSubmitted).toBe(true);
+
+    // Every finalised attempt -- submitted, auto-submitted or expired -- has exactly one
+    // attempt-log row per question on its paper; blanks are recorded as unanswered (ENG-03).
+    const coverage = await pool.query<{ attempt_id: string; paper: number; logged: number; blank_but_correct: number }>(
+      `SELECT t.id AS attempt_id,
+              (SELECT count(*)::int FROM exam_attempt_questions q WHERE q.attempt_id = t.id) AS paper,
+              (SELECT count(*)::int FROM learning_attempt_events e WHERE e.source_attempt_type = 'exam_attempt' AND e.source_attempt_id = t.id) AS logged,
+              (SELECT count(*)::int FROM learning_attempt_events e WHERE e.source_attempt_id = t.id AND NOT e.answered AND e.correct) AS blank_but_correct
+       FROM exam_attempts t JOIN exam_results r ON r.attempt_id = t.id
+       WHERE t.definition_id = $1`, [examId],
+    );
+    expect(coverage.rows.length).toBeGreaterThanOrEqual(2);
+    for (const row of coverage.rows) {
+      expect(row.logged).toBe(row.paper);
+      expect(row.blank_but_correct).toBe(0);
+    }
   });
 });
 

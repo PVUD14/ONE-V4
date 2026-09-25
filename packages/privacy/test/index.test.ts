@@ -126,7 +126,7 @@ describe('deletion policy', () => {
   });
 
   it('erases what is only about the person', () => {
-    for (const category of ['STUDENT_PROFILE', 'DOCUMENTS', 'NOTIFICATIONS'] as const) {
+    for (const category of ['STUDENT_PROFILE', 'DOCUMENTS', 'NOTIFICATIONS', 'LEARNING_ACTIVITY'] as const) {
       expect(deletionPolicyFor(category).disposition).toBe('ERASED');
     }
   });

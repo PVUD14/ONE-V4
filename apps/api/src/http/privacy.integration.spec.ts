@@ -77,7 +77,29 @@ beforeAll(async () => {
   await pool.query(`INSERT INTO student_profiles (user_id, target_career) VALUES ($1, 'SOC Analyst')`, [subjectId]);
   await pool.query(`INSERT INTO student_document_metadata (id, student_user_id, title, document_type) VALUES ($1, $2, 'My CV', 'RESUME')`, [randomUUID(), subjectId]);
   await seedApplication();
+  // Engine behavioural data (ENG-03) for the subject and for someone else, so erasure can
+  // be shown to remove exactly the subject's rows.
+  await seedLearningActivity(subjectId);
+  await seedLearningActivity(opsId);
 });
+
+/** One session, one attempt and one activity event, as the assessment paths write them. */
+async function seedLearningActivity(userId: string): Promise<void> {
+  const sessionId = randomUUID();
+  await pool.query(
+    `INSERT INTO learning_sessions (id, subject_user_id, mode, source_type, source_id, started_at, ended_at)
+     VALUES ($1,$2,'ASSESSMENT','exam_attempt',$3, now() - interval '10 minutes', now())`,
+    [sessionId, userId, randomUUID()],
+  );
+  await pool.query(
+    `INSERT INTO learning_attempt_events
+       (id, subject_user_id, session_id, item_source, item_id, item_version, context, answered, correct, score,
+        content_version, source_attempt_type, source_attempt_id, occurred_at)
+     VALUES ($1,$2,$3,'INSTITUTION_EXAM_QUESTION',$4,1,'ASSESSMENT',true,true,1,'institution-exam-v1','exam_attempt',$5,now())`,
+    [randomUUID(), userId, sessionId, randomUUID(), randomUUID()],
+  );
+  await pool.query(`INSERT INTO learner_activity_events (id, user_id, event_type) VALUES ($1,$2,'EXAM_ATTEMPT_SUBMITTED')`, [randomUUID(), userId]);
+}
 
 async function seedApplication(): Promise<void> {
   const opportunityId = randomUUID();
@@ -175,6 +197,30 @@ describe('deletion request', () => {
   });
 });
 
+describe('learning activity is append-only outside deletion', () => {
+  it('refuses to update or delete an attempt or session outside the deletion transaction', async () => {
+    await expect(pool.query('UPDATE learning_attempt_events SET correct = false WHERE subject_user_id = $1', [subjectId]))
+      .rejects.toThrow(/append-only/);
+    await expect(pool.query('DELETE FROM learning_attempt_events WHERE subject_user_id = $1', [subjectId]))
+      .rejects.toThrow(/append-only/);
+    await expect(pool.query('DELETE FROM learning_sessions WHERE subject_user_id = $1', [subjectId]))
+      .rejects.toThrow(/append-only/);
+    // The erase setting names one person; it does not open the table for anyone else.
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query("SELECT set_config('one.privacy_erase_subject', $1, true)", [opsId]);
+      await expect(client.query('DELETE FROM learning_attempt_events WHERE subject_user_id = $1', [subjectId]))
+        .rejects.toThrow(/append-only/);
+    } finally {
+      await client.query('ROLLBACK');
+      client.release();
+    }
+    const kept = await pool.query('SELECT count(*)::int AS count FROM learning_attempt_events WHERE subject_user_id = $1', [subjectId]);
+    expect(kept.rows[0].count).toBe(1);
+  });
+});
+
 describe('deletion execution', () => {
   let dueId: string;
 
@@ -214,6 +260,17 @@ describe('deletion execution', () => {
     expect((await pool.query('SELECT 1 FROM student_profiles WHERE user_id = $1', [subjectId])).rows).toHaveLength(0);
     expect((await pool.query('SELECT 1 FROM student_document_metadata WHERE student_user_id = $1', [subjectId])).rows).toHaveLength(0);
 
+    // Engine behavioural data is erased (ENG-03) -- the subject's only; the other
+    // person's attempt log is untouched.
+    const learning = async (table: string, column: string, userId: string): Promise<number> =>
+      (await pool.query(`SELECT count(*)::int AS count FROM ${table} WHERE ${column} = $1`, [userId])).rows[0].count;
+    expect(await learning('learning_attempt_events', 'subject_user_id', subjectId)).toBe(0);
+    expect(await learning('learning_sessions', 'subject_user_id', subjectId)).toBe(0);
+    expect(await learning('learner_activity_events', 'user_id', subjectId)).toBe(0);
+    expect(await learning('learning_attempt_events', 'subject_user_id', opsId)).toBe(1);
+    expect(await learning('learning_sessions', 'subject_user_id', opsId)).toBe(1);
+    expect(await learning('learner_activity_events', 'user_id', opsId)).toBe(1);
+
     // What the employer lawfully holds survives, detached from the person.
     const applications = await pool.query('SELECT state FROM applications WHERE student_user_id = $1', [subjectId]);
     expect(applications.rows).toHaveLength(1);
@@ -222,11 +279,14 @@ describe('deletion execution', () => {
 
   it('records what it erased, anonymised and retained', async () => {
     const records = await pool.query(
-      `SELECT category, disposition, basis FROM privacy_deletion_records
+      `SELECT category, disposition, basis, record_count FROM privacy_deletion_records
        WHERE request_id = $1 ORDER BY category`, [dueId],
     );
     expect(records.rows).toHaveLength(10);
     const byCategory = Object.fromEntries(records.rows.map((r) => [r.category, r]));
+    expect(byCategory.LEARNING_ACTIVITY.disposition).toBe('ERASED');
+    // One attempt, one session and one activity event were erased.
+    expect(byCategory.LEARNING_ACTIVITY.record_count).toBe(3);
     expect(byCategory.AUDIT.disposition).toBe('RETAINED');
     expect(byCategory.AUDIT.basis).toBeTruthy();
     expect(byCategory.APPLICATIONS.disposition).toBe('ANONYMISED');

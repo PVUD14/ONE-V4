@@ -52,7 +52,38 @@ export function exportExpiresAt(readyAt: Date, availabilityDays = EXPORT_AVAILAB
   return expires;
 }
 
-const TERMINAL_STATES: readonly PrivacyRequestState[] = ['COMPLETED', 'REJECTED', 'CANCELLED', 'FAILED'];
+/**
+ * The statutory period within which ONE must answer each request type, in days.
+ *
+ * Not defined yet, so every value is null and every statutory due date is "NA" on the
+ * operations console (OPS-06). The privacy notice draft leaves the response period as a
+ * TODO for legal review, and neither the DPDP Act text nor rules are encoded anywhere in
+ * the codebase. Guessing a number here would print a legal deadline nobody approved.
+ * When the period is decided, set it here: the console computes due dates from the real
+ * `requested_at` of each request and needs no other change.
+ *
+ * This is not the deletion grace period above: that is when an erasure is scheduled to
+ * run, a product safeguard, not the deadline for responding to the request.
+ */
+export const STATUTORY_RESPONSE_PERIOD_DAYS: Readonly<Record<PrivacyRequestType, number | null>> = {
+  EXPORT: null,
+  DELETION: null,
+};
+
+/** When a request must be answered by statute, or null when no period is defined. */
+export function statutoryResponseDueAt(
+  requestType: PrivacyRequestType,
+  requestedAt: Date,
+  periods: Readonly<Record<PrivacyRequestType, number | null>> = STATUTORY_RESPONSE_PERIOD_DAYS,
+): Date | null {
+  const days = periods[requestType];
+  if (days === null) return null;
+  const due = new Date(requestedAt.getTime());
+  due.setUTCDate(due.getUTCDate() + days);
+  return due;
+}
+
+const TERMINAL_STATES: readonly PrivacyRequestState[] =['COMPLETED', 'REJECTED', 'CANCELLED', 'FAILED'];
 
 export function isTerminalPrivacyState(state: PrivacyRequestState): boolean {
   return TERMINAL_STATES.includes(state);

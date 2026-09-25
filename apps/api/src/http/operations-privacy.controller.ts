@@ -14,6 +14,12 @@
  * Holds are placed and released, never deleted, and both acts are audited. The reason
  * code is bounded by the schema to the five lawful bases, so "why is this person's
  * erasure suspended" always has an answer.
+ *
+ * OPS-06 gives it a screen (Security → Privacy and consent): the queue is paginated and
+ * minimised (masked subject, no typed reason), each request's detail and state history
+ * is readable and its read audited as `operations.privacy_request.viewed`, holds show
+ * the release request in flight, and consent coverage reports per live definition with
+ * counts under 5 suppressed. Reads are in packages/persistence/src/privacy-operations.ts.
  */
 import {
   BadRequestException,
@@ -25,6 +31,7 @@ import {
   NotFoundException,
   Param,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -40,6 +47,29 @@ import {
 } from './api-security.js';
 import { callerHasInternalCapability, dbCapabilityGrantLoader } from './internal-capability-guard.js';
 import { OperationApprovalError, consumeOperationApproval } from '@planthepath/persistence/src/operation-approvals.js';
+import {
+  decodePrivacyRequestCursor,
+  encodePrivacyRequestCursor,
+  listActiveRetentionHolds,
+  listPrivacyRequests,
+  loadPrivacyRequestDetail,
+  privacyRequestTypes,
+  privacyRequestViews,
+  readConsentCoverage,
+  recordPrivacyRequestViewed,
+  retentionHoldSubjectState,
+  summarisePrivacyQueue,
+  type PrivacyOperationsRequestType,
+  type PrivacyRequestRow,
+  type PrivacyRequestView,
+} from '@planthepath/persistence/src/privacy-operations.js';
+import {
+  aggregateSuppressionThreshold,
+  approvalRequestReasons,
+  isPrivacyHoldPlaceReason,
+  privacyHoldPlaceReasons,
+} from '@planthepath/authorization/src/index.js';
+import { DELETION_GRACE_PERIOD_DAYS, STATUTORY_RESPONSE_PERIOD_DAYS, statutoryResponseDueAt } from '@planthepath/privacy';
 import { approvalHttpError, approvalPayloads, readApprovalId } from './operation-approval-gate.js';
 
 type QueryResult<T> = { rows: T[] };
@@ -47,47 +77,106 @@ type QueryResult<T> = { rows: T[] };
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const reasonCodePattern = /^[A-Z0-9_:-]{3,64}$/;
 
-/** The five lawful bases the schema already bounds this to. */
-const holdReasons = ['LEGAL_OBLIGATION', 'SAFETY_INVESTIGATION', 'EMPLOYER_ACCOUNTABILITY_CASE', 'DISPUTE', 'REGULATORY_REQUEST'];
+const requestQueryKeys = new Set(['view', 'type', 'cursor', 'limit']);
+const placeHoldKeys = new Set(['subjectUserId', 'reasonCode', 'detail']);
+
+/** The request as the console shows it: the statutory due date is NA until a period is defined. */
+function withDueDates(request: PrivacyRequestRow): Record<string, unknown> {
+  const due = statutoryResponseDueAt(request.requestType, new Date(request.requestedAt));
+  return { ...request, statutoryDueAt: due ? due.toISOString() : null };
+}
 
 @Controller('/api/v1/operations/privacy')
 export class OperationsPrivacyController {
   constructor(@Inject(API_PERSISTENCE_DB) private readonly db: PersistenceDb) {}
 
   /**
-   * The request queue. Bounded and ordered by due date, so what is about to be erased
-   * is what an operator sees first.
+   * The request queue, newest first, keyset paginated on (requested_at, id): default 50,
+   * at most 200. Subjects are masked, the typed reason is never returned, and the counts
+   * above the queue are computed in SQL, not from the page.
    */
   @Get('/requests')
   @UseGuards(ProtectedApiAuthenticationGuard)
-  async requests(@Req() request: ProtectedHttpRequest): Promise<Record<string, unknown>> {
+  async requests(@Req() request: ProtectedHttpRequest, @Query() query: Record<string, unknown>): Promise<Record<string, unknown>> {
     const context = await requirePrivacyOperator(request, this.db, 'PRIVACY_REQUESTS');
-    const rows = await this.db.execute(sql`
-      SELECT r.id, r.subject_user_id, r.request_type, r.state, r.requested_at, r.due_at,
-             r.completed_at, r.cancelled_at,
-             (SELECT count(*)::int FROM data_retention_holds h
-               WHERE h.subject_user_id = r.subject_user_id AND h.released_at IS NULL) AS active_holds
-      FROM privacy_requests r
-      ORDER BY r.due_at ASC NULLS LAST, r.requested_at DESC
-      LIMIT 200
-    `) as QueryResult<Record<string, unknown>>;
-    return { requests: rows.rows, correlationId: context.correlationId };
+    const correlationId = context.correlationId;
+    for (const key of Object.keys(query)) if (!requestQueryKeys.has(key)) throw badRequest('PRIVACY_FILTER_UNKNOWN', correlationId);
+    const view = query.view === undefined || query.view === '' ? 'OPEN' : query.view;
+    if (typeof view !== 'string' || !(privacyRequestViews as readonly string[]).includes(view)) throw badRequest('PRIVACY_VIEW_INVALID', correlationId);
+    const type = query.type === undefined || query.type === '' ? undefined : query.type;
+    if (type !== undefined && (typeof type !== 'string' || !(privacyRequestTypes as readonly string[]).includes(type))) {
+      throw badRequest('PRIVACY_TYPE_INVALID', correlationId);
+    }
+    const limit = query.limit === undefined || query.limit === '' ? 50 : Number(query.limit);
+    if (!Number.isInteger(limit) || limit < 1 || limit > 200) throw badRequest('PRIVACY_LIMIT_INVALID', correlationId);
+    let cursor: ReturnType<typeof decodePrivacyRequestCursor> = null;
+    if (query.cursor !== undefined && query.cursor !== '') {
+      cursor = typeof query.cursor === 'string' && query.cursor.length <= 256 ? decodePrivacyRequestCursor(query.cursor) : null;
+      if (!cursor) throw badRequest('PRIVACY_CURSOR_INVALID', correlationId);
+    }
+    const page = await listPrivacyRequests(this.db, {
+      view: view as PrivacyRequestView,
+      limit,
+      ...(type ? { requestType: type as PrivacyOperationsRequestType } : {}),
+      ...(cursor ? { cursor } : {}),
+    });
+    const summary = await summarisePrivacyQueue(this.db);
+    return {
+      requests: page.requests.map(withDueDates),
+      nextCursor: page.nextCursor ? encodePrivacyRequestCursor(page.nextCursor) : null,
+      summary,
+      policy: {
+        deletionGracePeriodDays: DELETION_GRACE_PERIOD_DAYS,
+        statutoryResponsePeriodDays: STATUTORY_RESPONSE_PERIOD_DAYS,
+      },
+      correlationId,
+    };
   }
 
+  /**
+   * One request: its state history, what a completed deletion did per category, and the
+   * holds on its subject. Reading it is audited (§5.2) before the answer is returned, so
+   * a read that cannot be recorded is not served.
+   */
+  @Get('/requests/:requestId')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async requestDetail(@Req() request: ProtectedHttpRequest, @Param('requestId') requestId: string): Promise<Record<string, unknown>> {
+    const context = await requirePrivacyOperator(request, this.db, 'PRIVACY_REQUESTS');
+    if (!uuidPattern.test(requestId)) throw badRequest('PRIVACY_REQUEST_INVALID', context.correlationId);
+    const detail = await loadPrivacyRequestDetail(this.db, requestId.toLowerCase());
+    if (!detail) throw new NotFoundException({ error: { code: 'PRIVACY_REQUEST_NOT_FOUND', correlationId: context.correlationId } });
+    await recordPrivacyRequestViewed(this.db, { actorUserId: context.authorization.principal.userId, requestId: detail.id, correlationId: context.correlationId });
+    return { request: withDueDates(detail), correlationId: context.correlationId };
+  }
+
+  /**
+   * Active legal holds, with the subject masked and any release request in flight, plus
+   * the reason codes for placing one and for asking to release one.
+   */
   @Get('/holds')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async holds(@Req() request: ProtectedHttpRequest): Promise<Record<string, unknown>> {
     const context = await requirePrivacyOperator(request, this.db, 'PRIVACY_REQUESTS');
-    const rows = await this.db.execute(sql`
-      SELECT h.id, h.subject_user_id, u.email AS subject_email, h.reason_code, h.detail,
-             h.placed_by_user_id, h.placed_at
-      FROM data_retention_holds h
-      JOIN users u ON u.id = h.subject_user_id
-      WHERE h.released_at IS NULL
-      ORDER BY h.placed_at DESC
-      LIMIT 200
-    `) as QueryResult<Record<string, unknown>>;
-    return { holds: rows.rows, correlationId: context.correlationId };
+    const result = await listActiveRetentionHolds(this.db);
+    return {
+      holds: result.holds,
+      capped: result.capped,
+      reasons: { place: privacyHoldPlaceReasons, release: approvalRequestReasons.PRIVACY_HOLD_RELEASE },
+      correlationId: context.correlationId,
+    };
+  }
+
+  /**
+   * Consent coverage: every definition and version in the registry, and per consent key
+   * where people stand against its live version. Counts of fewer than 5 people arrive
+   * suppressed, with no value. There is no per-person consent view.
+   */
+  @Get('/consents')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async consents(@Req() request: ProtectedHttpRequest): Promise<Record<string, unknown>> {
+    const context = await requirePrivacyOperator(request, this.db, 'PRIVACY_REQUESTS');
+    const coverage = await readConsentCoverage(this.db);
+    return { ...coverage, suppressionThreshold: aggregateSuppressionThreshold, correlationId: context.correlationId };
   }
 
   @Post('/holds')
@@ -95,14 +184,20 @@ export class OperationsPrivacyController {
   async placeHold(@Req() request: ProtectedHttpRequest, @Body() body: unknown): Promise<Record<string, unknown>> {
     const context = await requirePrivacyOperator(request, this.db, 'PRIVACY_HOLDS');
     const raw = readObject(body, context.correlationId);
+    for (const key of Object.keys(raw)) if (!placeHoldKeys.has(key)) throw badRequest('PRIVACY_FIELD_UNKNOWN', context.correlationId);
     if (typeof raw.subjectUserId !== 'string' || !uuidPattern.test(raw.subjectUserId)) {
       throw badRequest('PRIVACY_SUBJECT_INVALID', context.correlationId);
     }
-    if (typeof raw.reasonCode !== 'string' || !holdReasons.includes(raw.reasonCode)) {
+    if (!isPrivacyHoldPlaceReason(raw.reasonCode)) {
       throw badRequest('PRIVACY_HOLD_REASON_INVALID', context.correlationId);
     }
-    const detail = raw.detail === undefined || raw.detail === null ? null : String(raw.detail);
+    if (raw.detail !== undefined && raw.detail !== null && typeof raw.detail !== 'string') throw badRequest('PRIVACY_HOLD_DETAIL_INVALID', context.correlationId);
+    const detail = typeof raw.detail === 'string' && raw.detail.trim() ? raw.detail.trim() : null;
     if (detail !== null && detail.length > 2000) throw badRequest('PRIVACY_HOLD_DETAIL_TOO_LONG', context.correlationId);
+    // An unknown person is a 404, not a foreign-key error; an erased one has nothing left to hold.
+    const subjectState = await retentionHoldSubjectState(this.db, raw.subjectUserId);
+    if (subjectState === 'NOT_FOUND') throw new NotFoundException({ error: { code: 'PRIVACY_SUBJECT_NOT_FOUND', correlationId: context.correlationId } });
+    if (subjectState === 'ERASED') throw badRequest('PRIVACY_SUBJECT_ERASED', context.correlationId);
 
     const id = randomUUID();
     await this.db.transaction(async (tx) => {

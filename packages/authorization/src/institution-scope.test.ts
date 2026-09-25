@@ -4,6 +4,9 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  canAddressInstitutionAudience,
+  institutionAnnouncementScope,
+  institutionAnnouncementSender,
   institutionScopeAnchors,
   institutionStudentScope,
   institutionUnitDescendants,
@@ -151,5 +154,64 @@ describe('unit containment for scoped writes', () => {
     expect(isUnitWithin('dept-a', 'dept-a', units)).toBe(true);
     expect(isUnitWithin('batch-b1', 'dept-a', units)).toBe(false);
     expect(isUnitWithin('dept-a', 'batch-a1', units)).toBe(false);
+  });
+});
+
+describe('announcement senders (INST-06, decision 10.2 #8)', () => {
+  it('lets owners, admins and unscoped placement admins address the whole institution', () => {
+    for (const role of ['INSTITUTION_OWNER', 'INSTITUTION_ADMIN', 'PLACEMENT_ADMIN']) {
+      const scope = institutionAnnouncementScope([{ role }], units);
+      expect(canAddressInstitutionAudience(scope, null)).toBe(true);
+      expect(canAddressInstitutionAudience(scope, 'batch-b1')).toBe(true);
+    }
+  });
+
+  it('narrows a scoped placement admin to their department', () => {
+    const scope = institutionAnnouncementScope([{ role: 'PLACEMENT_ADMIN', departmentUnitId: 'dept-a' }], units);
+    expect(canAddressInstitutionAudience(scope, null)).toBe(false);
+    expect(canAddressInstitutionAudience(scope, 'batch-a1')).toBe(true);
+    expect(canAddressInstitutionAudience(scope, 'dept-b')).toBe(false);
+  });
+
+  it('limits a department head to their department and gives an unscoped head nobody', () => {
+    const scope = institutionAnnouncementScope([{ role: 'DEPARTMENT_HEAD', departmentUnitId: 'dept-a' }], units);
+    expect(canAddressInstitutionAudience(scope, 'dept-a')).toBe(true);
+    expect(canAddressInstitutionAudience(scope, 'section-a1-1')).toBe(true);
+    expect(canAddressInstitutionAudience(scope, 'campus')).toBe(false);
+    expect(canAddressInstitutionAudience(scope, 'batch-b1')).toBe(false);
+    expect(institutionAnnouncementScope([{ role: 'DEPARTMENT_HEAD' }], units)).toEqual({ kind: 'NONE' });
+  });
+
+  it('limits faculty to their assigned units, and gives faculty without assignments nobody', () => {
+    const scope = institutionAnnouncementScope([{ role: 'FACULTY_LECTURER', teachingUnitIds: ['batch-a1'] }], units);
+    expect(canAddressInstitutionAudience(scope, 'batch-a1')).toBe(true);
+    expect(canAddressInstitutionAudience(scope, 'section-a1-1')).toBe(true);
+    expect(canAddressInstitutionAudience(scope, 'batch-a2')).toBe(false);
+    expect(canAddressInstitutionAudience(scope, 'dept-a')).toBe(false);
+    expect(canAddressInstitutionAudience(scope, null)).toBe(false);
+    // The read fallback (department/batch, or institution-wide when unscoped) never applies to sending.
+    expect(institutionAnnouncementScope([{ role: 'FACULTY_LECTURER' }], units)).toEqual({ kind: 'NONE' });
+    expect(institutionAnnouncementScope([{ role: 'FACULTY_LECTURER', departmentUnitId: 'dept-a' }], units)).toEqual({ kind: 'NONE' });
+  });
+
+  it('requires every anchor of a clause to cover the audience', () => {
+    const scope = institutionAnnouncementScope([{ role: 'PLACEMENT_ADMIN', departmentUnitId: 'dept-a', batchUnitId: 'batch-a1' }], units);
+    expect(canAddressInstitutionAudience(scope, 'section-a1-1')).toBe(true);
+    expect(canAddressInstitutionAudience(scope, 'dept-a')).toBe(false);
+    expect(canAddressInstitutionAudience(scope, 'batch-a2')).toBe(false);
+  });
+
+  it('never lets other roles send', () => {
+    expect(institutionAnnouncementScope([{ role: 'CAREER_COUNSELOR' }, { role: 'STUDENT' }], units)).toEqual({ kind: 'NONE' });
+  });
+
+  it('picks the most senior membership that admits the audience', () => {
+    const memberships = [
+      { role: 'FACULTY_LECTURER', membershipId: 'faculty', teachingUnitIds: ['section-a1-1'] },
+      { role: 'DEPARTMENT_HEAD', membershipId: 'head', departmentUnitId: 'dept-a' },
+    ];
+    expect(institutionAnnouncementSender(memberships, units, 'section-a1-1')?.membership.membershipId).toBe('head');
+    expect(institutionAnnouncementSender(memberships, units, 'batch-b1')).toBeNull();
+    expect(institutionAnnouncementSender([memberships[0]!], units, 'section-a1-1')?.membership.membershipId).toBe('faculty');
   });
 });

@@ -488,3 +488,108 @@ invitations (Api.kt:191,196), and nothing in this goal changes them.
   slow.
 
 **Next goal:** OPS-05.
+
+## OPS-06 — Privacy and consent console (under Security) — 2026-09-26
+**Result:** Complete. Security is now the privacy and consent console. It has the DPDP request queue with each request's state
+history (the read is audited), legal holds (place a hold; ask to release one through the OPS-02 approval flow), and consent
+coverage for each consent key, with small groups suppressed. The governance status Security showed before is kept beneath it.
+**Branch / PR:** feat/ops-privacy-console → feat/plan-phases-0-to-2. Commits in order: acceptance tests (be880a6), implementation
+(509beeb), then this report. Pushed to onev4. No PR was opened because `gh` is not installed.
+**Files created:**
+- packages/authorization/src/privacy-console.ts (+ .test.ts): the hold reasons and `suppressSmallCount` (threshold 5).
+- packages/persistence/src/privacy-operations.ts: the queue, detail, holds and coverage reads, and the `*.viewed` audit.
+- apps/api/src/http/operations-privacy.integration.spec.ts
+- apps/web/src/api/privacyOperations.ts
+- apps/web/src/rolePortal/privacyConsole.tsx (+ .test.tsx)
+
+**Files modified:**
+- apps/api/src/http/operations-privacy.controller.ts:
+  - GET /requests is rebuilt: keyset paging, filters, a SQL summary, and policy.
+  - New routes GET /requests/:id and GET /consents.
+  - GET /holds now masks the subject, includes the release in flight, and lists the reasons.
+  - POST /holds rejects unknown fields, returns 404 for an unknown subject, and refuses an erased subject.
+- packages/privacy/src/index.ts (+ test): `STATUTORY_RESPONSE_PERIOD_DAYS` (all null) and `statutoryResponseDueAt`.
+- packages/authorization/src/index.ts and apps/web/src/api.ts: exports only.
+- apps/web/src/rolePortalPages.tsx: one line, for the operations `Security` label only. AI Operations keeps the read-only page.
+
+**Migrations added:** none. Every table read already exists (0009, 0014, 0028, 0038), so 0048 was not used.
+**Design docs / ADRs:** none needed. No new table, and the reasoning is in the module headers.
+**Defect fixed on the way:** GET /operations/privacy/requests selected `r.due_at`, a column that exists on no migration, so the
+endpoint could only return 500. The OPS-01 matrix did not catch it because it asserts only "not 401/403". The new spec also
+asserts "not 500" for every console route.
+
+**Validation (fresh `one_ops06`, only DATABASE_URL exported):**
+- `corepack pnpm db:migrate` run twice: pass.
+- `corepack pnpm typecheck`: pass.
+- `corepack pnpm -r --no-bail --workspace-concurrency=1 test`: 1 676 passed, 1 failed.
+  - The failure was web `src/auth.test.ts` › "signs out through Cognito logout…". The ConsentGate was still showing "Checking
+    privacy consent" when the test looked for the Sign out button: the checking-state timing race the brief notes.
+  - Neither that file nor anything it imports is touched by this branch.
+  - That file was then run on its own 6 more times and passed every time. The whole web package was rerun and passed: 508/508.
+- Per-package counts:
+  - api: 637, including 30 new
+  - web: 508, including 13 new
+  - persistence: 199
+  - authorization: 149, including 12 new
+  - privacy: 22, including 2 new
+  - others: 161
+- `corepack pnpm build`: pass.
+- Starting state: INST-05's recorded green run on 980d1a7.
+
+**Acceptance criteria:**
+- Every privacy request is visible with its state and history ✔.
+  - The queue has views Open, Closed, All or any single state, plus a type filter. Paging is keyset: default 50, maximum 200, and
+    no request repeats across pages.
+  - Detail shows the full `privacy_request_events` history, who acted (the person, ONE or operations; never an id), what a
+    deletion did per category, and the holds on the person.
+  - Reading a request writes `operations.privacy_request.viewed` with the actor and correlation ID. An unknown id is a 404 and
+    writes no audit row.
+- Hold release requires an approval ✔.
+  - "Request release…" opens `RequestApprovalDialog` for `PRIVACY_HOLD_RELEASE` with a reason code from the fixed list.
+  - A release already in flight shows as awaiting approval or approved, with the next step, instead of offering the button again.
+  - The endpoint still returns 403 `APPROVAL_REQUIRED` without an approval, and the requester cannot approve their own request.
+    The full request → approve → execute flow is tested.
+- Consent counts under 5 show <5 ✔.
+  - They are suppressed on the server: the value is dropped, zero included.
+  - The three cells (consented to the live version, withdrawn, on an older version) split the people who have any record for the
+    key. No total is given, so no suppressed cell can be worked out by subtraction.
+- Engine purposes (`adaptive-learning`, `ai-tutoring`, `model-improvement`, unpublished under HG-6) show "Not published", never
+  0 or 0% ✔. A key whose only versions are retired or not yet effective shows "No version in force" with NA counts.
+- Statutory deadline ✔: NA everywhere. No DPDP response period is defined in code, and the privacy notice draft still says
+  "[TODO days]". It is computed from the real `requested_at` once a period is set in packages/privacy. The deletion schedule
+  shown is the real `deletion_scheduled_for` (the 30-day grace period).
+- Breach runbook and incident register ✔: the runbook path is given, and the incident register says plainly that it is not built
+  yet (OPS-16).
+- Do-nots respected: there is no per-user consent editing or browsing, and consent-gate behaviour is unchanged.
+- §6.6 minimums ✔:
+  - Authorization unit tests: granted, denied, inactive.
+  - API: 401, 403 (institution admin, suspended membership), 200 for all three roles, input 400s including unknown fields,
+    pagination bounds, and the audit row with its reason code.
+  - No full email and no typed deletion reason appears in any response.
+  - Web tests: real data, NA, empty, loading, error with reference, forbidden, sign-in, reason-required dialogs, and navigation
+    labels unchanged.
+
+**Decisions for Divakar (recommendations adopted):**
+- **Suppression includes 0:** 0 is shown as <5, following the literal §5.5 and acceptance text ("under 5 show <5").
+- **Coverage population:** people are placed by their latest record for the key. Erased (anonymised) people are excluded.
+  Counts are given only for a LIVE definition (`retired_at IS NULL AND effective_from <= now()`).
+- **No coverage percentage:** a percentage needs a denominator (who is expected to consent), and nothing in code defines one.
+- **Placing a hold** is done from a request's detail (the person is known there). Holding someone who has no request needs the
+  account lookup to link to it (see Limitations).
+- **Open question, not decided:** the DPDP statutory response periods for access and erasure requests. They need a legal answer
+  (HG-6 territory). Until then the console shows NA.
+
+**Limitations / not done:**
+- No operator actions on the requests themselves (reject, retry a failed export); the goal did not ask for them.
+- A hold can be placed only from a request's detail. There is no hold action on Users / User Detail.
+- The queue sorts on `requested_at` with no global index. That is fine at pilot size; add an index if the table grows.
+- The coverage query scans `user_consents` for live keys once per page load.
+
+**Android:** no change. §4.3 keeps operator screens web-only. The app's only operations calls are GET organizations and GET
+invitations (Api.kt:200,205). It has no Security or privacy-operations screen, and nothing in this goal changes those calls.
+**Risks / follow-ups:**
+- The GET /requests and GET /holds response shapes changed; no other caller existed. The old holds list's full `subject_email` is
+  replaced by a masked subject; `detail` is kept.
+- The `auth.test.ts` timing flake should be hardened separately.
+
+**Next goal:** OPS-07.

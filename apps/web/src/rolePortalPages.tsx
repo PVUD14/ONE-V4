@@ -30,6 +30,7 @@ import { EmployerOrganisationGate } from './rolePortal/employerOrganisationState
 import { InstitutionAcademicStructurePage, InstitutionStaffActionsPage, InstitutionStaffPage, InstitutionStudentsPage } from './rolePortal/institution.js';
 import { OperationsAuditLogPage, OperationsContentReadOnlyPage, OperationsFeatureFlagsPage, OperationsOrganizationsPage, OperationsTechnicalReadOnlyPage, OperationsUsersAccessPage } from './rolePortal/operations.js';
 import { OperationsTrustSafetyPage } from './rolePortal/trustSafety.js';
+import { OperationsStaffCapabilitiesPage } from './rolePortal/staffCapabilities.js';
 import type { AuthenticatedWorkspaceSummary } from './rolePortal/shared.js';
 import { AuthenticatedNotYetAvailable, AuthenticatedReadOnlyModule, institutionStaffWorkspaceRoles, institutionWorkspaceRoles, InstitutionWorkspaceError, isInstitutionStaffWorkspace, isInstitutionWorkspace } from './rolePortal/shared.js';
 import type { RoleFixture, RoleNavItem, RolePortalConfig } from './rolePortalConfig.js';
@@ -247,6 +248,9 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   if (!demoMode && portal.key === 'operations-admin' && /verification/i.test(route.label)) return <OperationsOrganizationsPage portal={portal} />;
   if (!demoMode && portal.key === 'operations-admin' && /feature flags/i.test(route.label)) return <OperationsFeatureFlagsPage />;
   if (!demoMode && portal.key === 'operations-admin' && /trust and safety/i.test(route.label)) return <OperationsTrustSafetyPage />;
+  // OPS-01: Settings holds internal staff and capabilities. Only this label's branch
+  // changes; the others keep the not-yet-available state below.
+  if (!demoMode && portal.key === 'operations-admin' && route.label === 'Settings') return <OperationsStaffCapabilitiesPage />;
   if (!demoMode && portal.key === 'operations-admin' && /subscriptions|billing|analytics|support|settings/i.test(route.label)) return <AuthenticatedNotYetAvailable title={route.label} detail="This Operations module is not yet backed by a Phase 2A persistent workflow." />;
   if (!demoMode && portal.key === 'institution-admin' && ['Students', 'Student Detail'].includes(route.label)) {
     return <StaffPilotWrap title="Students" subtitle="Roster, readiness and the lifecycle of every student relationship.">

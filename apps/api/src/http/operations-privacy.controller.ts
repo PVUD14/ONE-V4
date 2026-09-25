@@ -30,7 +30,6 @@ import {
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { sql } from 'drizzle-orm';
-import { canSearchAuditEvents } from '@planthepath/authorization/src/index.js';
 import type { PersistenceDb } from '@planthepath/persistence/src/repositories.js';
 import {
   API_PERSISTENCE_DB,
@@ -39,6 +38,7 @@ import {
   safeError,
   type ProtectedHttpRequest,
 } from './api-security.js';
+import { callerHasInternalCapability, dbCapabilityGrantLoader } from './internal-capability-guard.js';
 
 type QueryResult<T> = { rows: T[] };
 
@@ -59,7 +59,7 @@ export class OperationsPrivacyController {
   @Get('/requests')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async requests(@Req() request: ProtectedHttpRequest): Promise<Record<string, unknown>> {
-    const context = requirePrivacyOperator(request);
+    const context = await requirePrivacyOperator(request, this.db, 'PRIVACY_REQUESTS');
     const rows = await this.db.execute(sql`
       SELECT r.id, r.subject_user_id, r.request_type, r.state, r.requested_at, r.due_at,
              r.completed_at, r.cancelled_at,
@@ -75,7 +75,7 @@ export class OperationsPrivacyController {
   @Get('/holds')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async holds(@Req() request: ProtectedHttpRequest): Promise<Record<string, unknown>> {
-    const context = requirePrivacyOperator(request);
+    const context = await requirePrivacyOperator(request, this.db, 'PRIVACY_REQUESTS');
     const rows = await this.db.execute(sql`
       SELECT h.id, h.subject_user_id, u.email AS subject_email, h.reason_code, h.detail,
              h.placed_by_user_id, h.placed_at
@@ -91,7 +91,7 @@ export class OperationsPrivacyController {
   @Post('/holds')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async placeHold(@Req() request: ProtectedHttpRequest, @Body() body: unknown): Promise<Record<string, unknown>> {
-    const context = requirePrivacyOperator(request);
+    const context = await requirePrivacyOperator(request, this.db, 'PRIVACY_HOLDS');
     const raw = readObject(body, context.correlationId);
     if (typeof raw.subjectUserId !== 'string' || !uuidPattern.test(raw.subjectUserId)) {
       throw badRequest('PRIVACY_SUBJECT_INVALID', context.correlationId);
@@ -129,7 +129,7 @@ export class OperationsPrivacyController {
     @Param('holdId') holdId: string,
     @Body() body: unknown,
   ): Promise<Record<string, unknown>> {
-    const context = requirePrivacyOperator(request);
+    const context = await requirePrivacyOperator(request, this.db, 'PRIVACY_HOLDS');
     if (!uuidPattern.test(holdId)) throw badRequest('PRIVACY_HOLD_INVALID', context.correlationId);
     const raw = readObject(body, context.correlationId);
     if (typeof raw.reasonCode !== 'string' || !reasonCodePattern.test(raw.reasonCode)) {
@@ -158,15 +158,18 @@ export class OperationsPrivacyController {
 }
 
 /**
- * The same platform roles that may search the audit record. A retention hold suspends
- * a data-subject right, so it is not an ordinary support action.
+ * PRIVACY_REQUESTS to read the queues, PRIVACY_HOLDS to place or release a hold
+ * (OPS-01). Both are baseline for the three platform roles — the set that could search
+ * the audit record before. A retention hold suspends a data-subject right, so it is not
+ * an ordinary support action.
  */
-function requirePrivacyOperator(request: ProtectedHttpRequest): ReturnType<typeof requireTrustedAuthorization> {
+async function requirePrivacyOperator(
+  request: ProtectedHttpRequest,
+  db: PersistenceDb,
+  capability: 'PRIVACY_REQUESTS' | 'PRIVACY_HOLDS',
+): Promise<ReturnType<typeof requireTrustedAuthorization>> {
   const context = requireTrustedAuthorization(request);
-  const permitted = context.authorization.memberships.some((membership) => canSearchAuditEvents({
-    role: membership.role,
-    membershipState: membership.state as 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'ENDED',
-  }));
+  const permitted = await callerHasInternalCapability(context.authorization, dbCapabilityGrantLoader(db), capability);
   if (!permitted) throw new ForbiddenException(safeError('FORBIDDEN', context.correlationId));
   return context;
 }

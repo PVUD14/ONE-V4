@@ -24,7 +24,6 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import type { Pool } from 'pg';
-import { canSearchAuditEvents } from '@planthepath/authorization/src/index.js';
 import {
   TrustSafetyError,
   applyTrustCaseAction,
@@ -37,6 +36,7 @@ import {
 } from '@planthepath/persistence/src/trust-safety.js';
 import { PG_POOL } from '../persistence.provider.js';
 import { ProtectedApiAuthenticationGuard, type ProtectedHttpRequest } from './api-security.js';
+import { callerHasInternalCapability, poolCapabilityGrantLoader } from './internal-capability-guard.js';
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const reasonCodePattern = /^[A-Z0-9_:-]{3,64}$/;
@@ -53,7 +53,7 @@ export class TrustSafetyController {
   @Get('/cases')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async cases(@Req() request: ProtectedHttpRequest, @Query('includeClosed') includeClosed?: string): Promise<Record<string, unknown>> {
-    requireTrustOperator(request);
+    await requireTrustOperator(request, this.pool, 'TRUST_SAFETY_INVESTIGATE');
     return {
       cases: await listTrustCases(this.pool, { includeClosed: includeClosed === 'true' }),
       // The detector queue sits alongside the case queue, because a signal is the most
@@ -65,7 +65,7 @@ export class TrustSafetyController {
   @Get('/cases/:caseId')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async detail(@Req() request: ProtectedHttpRequest, @Param('caseId') caseId: string): Promise<Record<string, unknown>> {
-    requireTrustOperator(request);
+    await requireTrustOperator(request, this.pool, 'TRUST_SAFETY_INVESTIGATE');
     const found = await getTrustCase(this.pool, requireUuid(caseId));
     if (!found) throw new NotFoundException({ error: { code: 'TRUST_CASE_NOT_FOUND' } });
     return { case: found };
@@ -74,7 +74,7 @@ export class TrustSafetyController {
   @Post('/cases')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async open(@Req() request: ProtectedHttpRequest, @Body() body: unknown): Promise<Record<string, unknown>> {
-    const actorUserId = requireTrustOperator(request);
+    const actorUserId = await requireTrustOperator(request, this.pool, 'TRUST_SAFETY_INVESTIGATE');
     const raw = readObject(body);
     if (typeof raw.caseType !== 'string' || !caseTypes.includes(raw.caseType)) throw badRequest('TRUST_CASE_TYPE_INVALID');
     const subjectKind = raw.subjectKind;
@@ -113,7 +113,7 @@ export class TrustSafetyController {
     @Param('caseId') caseId: string,
     @Body() body: unknown,
   ): Promise<Record<string, unknown>> {
-    const actorUserId = requireTrustOperator(request);
+    const actorUserId = await requireTrustOperator(request, this.pool, 'TRUST_SAFETY_INVESTIGATE');
     const raw = readObject(body);
     if (typeof raw.toState !== 'string' || !states.includes(raw.toState)) throw badRequest('TRUST_CASE_STATE_INVALID');
     if (typeof raw.reasonCode !== 'string' || !reasonCodePattern.test(raw.reasonCode)) throw badRequest('REASON_CODE_REQUIRED');
@@ -139,7 +139,7 @@ export class TrustSafetyController {
     @Param('caseId') caseId: string,
     @Body() body: unknown,
   ): Promise<Record<string, unknown>> {
-    const actorUserId = requireTrustOperator(request);
+    const actorUserId = await requireTrustOperator(request, this.pool, 'TRUST_SAFETY_ENFORCE');
     const raw = readObject(body);
     if (typeof raw.action !== 'string' || !actions.includes(raw.action)) throw badRequest('TRUST_ACTION_INVALID');
     const effectiveTo = typeof raw.effectiveTo === 'string' && !Number.isNaN(Date.parse(raw.effectiveTo)) ? raw.effectiveTo : null;
@@ -158,13 +158,19 @@ export class TrustSafetyController {
   }
 }
 
-function requireTrustOperator(request: ProtectedHttpRequest): string {
+/**
+ * TRUST_SAFETY_INVESTIGATE for the queue and case workflow, TRUST_SAFETY_ENFORCE for
+ * enforcement actions (OPS-01). Both are baseline for the three platform roles — the
+ * set that could search the audit record before.
+ */
+async function requireTrustOperator(
+  request: ProtectedHttpRequest,
+  pool: Pool,
+  capability: 'TRUST_SAFETY_INVESTIGATE' | 'TRUST_SAFETY_ENFORCE',
+): Promise<string> {
   const authorization = request.planThePath?.authorization;
   const userId = authorization?.principal.userId;
-  const permitted = (authorization?.memberships ?? []).some((membership) => canSearchAuditEvents({
-    role: membership.role,
-    membershipState: membership.state as 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'ENDED',
-  }));
+  const permitted = await callerHasInternalCapability(authorization, poolCapabilityGrantLoader(pool), capability);
   if (!userId || !permitted) throw new ForbiddenException({ error: { code: 'FORBIDDEN', message: 'Access denied' } });
   return userId;
 }

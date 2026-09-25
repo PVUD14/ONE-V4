@@ -28,7 +28,6 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import type { Pool } from 'pg';
-import { canSearchAuditEvents } from '@planthepath/authorization/src/index.js';
 import {
   PlatformControlError,
   grantMembershipCapability,
@@ -39,6 +38,7 @@ import {
 } from '@planthepath/persistence/src/platform-controls.js';
 import { PG_POOL } from '../persistence.provider.js';
 import { ProtectedApiAuthenticationGuard, type ProtectedHttpRequest } from './api-security.js';
+import { callerHasInternalCapability, poolCapabilityGrantLoader } from './internal-capability-guard.js';
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const reasonCodePattern = /^[A-Z0-9_:-]{3,64}$/;
@@ -54,7 +54,7 @@ export class PlatformControlsController {
   @Get('/operations/feature-flags')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async flags(@Req() request: ProtectedHttpRequest): Promise<Record<string, unknown>> {
-    requirePlatformOperator(request);
+    await requireFlagOperator(request, this.pool);
     return { flags: await listFeatureFlags(this.pool) };
   }
 
@@ -65,7 +65,7 @@ export class PlatformControlsController {
     @Param('key') key: string,
     @Body() body: unknown,
   ): Promise<Record<string, unknown>> {
-    const actorUserId = requirePlatformOperator(request);
+    const actorUserId = await requireFlagOperator(request, this.pool);
     if (!flagKeyPattern.test(key)) throw badRequest('FEATURE_FLAG_KEY_INVALID');
     const raw = readObject(body);
     if (typeof raw.enabled !== 'boolean') throw badRequest('FEATURE_FLAG_STATE_INVALID');
@@ -144,13 +144,15 @@ export class PlatformControlsController {
   }
 }
 
-function requirePlatformOperator(request: ProtectedHttpRequest): string {
+/**
+ * OPS_FLAGS_MANAGE (OPS-01). Baseline for all three platform roles: flags were guarded by
+ * the audit-search role family, which includes Security, and ADR-032 preserves that
+ * (divergence D1 from the plan's table, to be tightened by its own ADR).
+ */
+async function requireFlagOperator(request: ProtectedHttpRequest, pool: Pool): Promise<string> {
   const authorization = request.planThePath?.authorization;
   const userId = authorization?.principal.userId;
-  const permitted = (authorization?.memberships ?? []).some((membership) => canSearchAuditEvents({
-    role: membership.role,
-    membershipState: membership.state as 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'ENDED',
-  }));
+  const permitted = await callerHasInternalCapability(authorization, poolCapabilityGrantLoader(pool), 'OPS_FLAGS_MANAGE');
   if (!userId || !permitted) throw forbidden();
   return userId;
 }

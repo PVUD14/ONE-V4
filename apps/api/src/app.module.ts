@@ -12,6 +12,7 @@ import { CareerTargetsController } from './http/career-targets.controller.js';
 import { AcademicRecordsController } from './http/academic-records.controller.js';
 import { PlatformControlsController } from './http/platform-controls.controller.js';
 import { TrustSafetyController } from './http/trust-safety.controller.js';
+import { OperationsStaffController } from './http/operations-staff.controller.js';
 import { AutomationCallbackController } from './http/automation-callback.controller.js';
 import { LearnerContentController } from './http/learner-content.controller.js';
 import { PublicProfileController } from './http/public-profile.controller.js';
@@ -45,7 +46,7 @@ const configuredScanner = runtimeConfig.documents.clamavSocketPath
       ...(configuredScanner ? { fileScanner: configuredScanner } : {}),
     }),
   ],
-  controllers: [HealthController, CareerReadinessController, CareerTargetsController, AcademicRecordsController, PlatformControlsController, TrustSafetyController, AutomationCallbackController, LearnerContentController, PublicProfileController],
+  controllers: [HealthController, CareerReadinessController, CareerTargetsController, AcademicRecordsController, PlatformControlsController, TrustSafetyController, OperationsStaffController, AutomationCallbackController, LearnerContentController, PublicProfileController],
   providers: [
     { provide: RUNTIME_CONFIG, useValue: runtimeConfig },
     // The public-profile controller lives here because it needs the pool, and it needs the

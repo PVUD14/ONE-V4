@@ -5,7 +5,6 @@
  */
 import { BadRequestException, Controller, ForbiddenException, Get, Inject, Query, Req, UseGuards } from '@nestjs/common';
 import { sql, type SQL } from 'drizzle-orm';
-import { canSearchAuditEvents } from '@planthepath/authorization/src/index.js';
 import type { PersistenceDb } from '@planthepath/persistence/src/repositories.js';
 import {
   API_PERSISTENCE_DB,
@@ -14,6 +13,7 @@ import {
   safeError,
   type ProtectedHttpRequest,
 } from './api-security.js';
+import { callerHasInternalCapability, dbCapabilityGrantLoader } from './internal-capability-guard.js';
 
 type QueryResult<T> = { rows: T[] };
 
@@ -41,10 +41,8 @@ export class OperationsAuditController {
   @UseGuards(ProtectedApiAuthenticationGuard)
   async search(@Req() request: ProtectedHttpRequest, @Query() query: Record<string, unknown>): Promise<Record<string, unknown>> {
     const context = requireTrustedAuthorization(request);
-    const permitted = context.authorization.memberships.some((membership) => canSearchAuditEvents({
-      role: membership.role,
-      membershipState: membership.state as 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'ENDED',
-    }));
+    // OPS-01: SECURITY_AUDIT_SEARCH, baseline for all three platform roles as before.
+    const permitted = await callerHasInternalCapability(context.authorization, dbCapabilityGrantLoader(this.db), 'SECURITY_AUDIT_SEARCH');
     if (!permitted) throw new ForbiddenException(safeError('FORBIDDEN', context.correlationId));
 
     const filters = readFilters(query, context.correlationId);

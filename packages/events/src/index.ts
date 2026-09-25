@@ -299,6 +299,28 @@ export const eventSchemas = {
     schemaRef: 'registry://organization_membership.suspended/1',
     payload: { membershipId: { kind: 'uuid' } },
   },
+  // OPS-01 (ADR-032): internal capability grants and revocations. No consumer yet; the
+  // outbox row is the durable announcement an access review (OPS-15) can follow.
+  organizationMembershipCapabilityGrantedV1: {
+    eventType: 'organization_membership.capability_granted',
+    eventVersion: 1,
+    producer: 'identity-organization',
+    aggregateType: 'organization_membership',
+    purpose: 'internal-capability-administration',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://organization_membership.capability_granted/1',
+    payload: { membershipId: { kind: 'uuid' }, capability: { kind: 'string', minLength: 3, maxLength: 64, pattern: /^[A-Z_]+$/ } },
+  },
+  organizationMembershipCapabilityRevokedV1: {
+    eventType: 'organization_membership.capability_revoked',
+    eventVersion: 1,
+    producer: 'identity-organization',
+    aggregateType: 'organization_membership',
+    purpose: 'internal-capability-administration',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://organization_membership.capability_revoked/1',
+    payload: { membershipId: { kind: 'uuid' }, capability: { kind: 'string', minLength: 3, maxLength: 64, pattern: /^[A-Z_]+$/ } },
+  },
   learningLessonCompletedV1: {
     eventType: 'learning.lesson.completed',
     eventVersion: 1,

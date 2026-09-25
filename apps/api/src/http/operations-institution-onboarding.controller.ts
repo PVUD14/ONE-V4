@@ -15,6 +15,7 @@ import {
   type ApiIdGenerator,
   type ProtectedHttpRequest,
 } from './api-security.js';
+import { callerHasInternalCapability, dbCapabilityGrantLoader } from './internal-capability-guard.js';
 
 type QueryResult<T> = { rows: T[] };
 type OrganizationKind = 'INSTITUTION' | 'EMPLOYER';
@@ -33,7 +34,6 @@ export { createConfiguredInvitationMailSink, LoopbackSmtpInvitationMailSink, typ
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const emailPattern = /^[^@ \t\r\n]+@[^@ \t\r\n]+\.[^@ \t\r\n]+$/;
 const countryPattern = /^[A-Z]{2}$/;
-const platformMutationRoles: readonly string[] = ['PLATFORM_SUPER_ADMIN', 'OPERATIONS_ADMIN'];
 const institutionAdminRoles: readonly string[] = ['INSTITUTION_OWNER', 'INSTITUTION_ADMIN'];
 const institutionStaffRoles: readonly string[] = ['INSTITUTION_OWNER', 'INSTITUTION_ADMIN', 'PLACEMENT_ADMIN', 'DEPARTMENT_HEAD', 'FACULTY_LECTURER'];
 const institutionAssignableRoles = ['PLACEMENT_ADMIN', 'DEPARTMENT_HEAD', 'FACULTY_LECTURER'] as const;
@@ -51,7 +51,7 @@ export class OperationsInstitutionOnboardingController {
   @Get('/operations/organizations')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async listOrganizations(@Req() request: ProtectedHttpRequest, @Query('q') q?: string, @Query('kind') kind?: string, @Query('verification') verification?: string): Promise<Record<string, unknown>> {
-    const context = requireOperations(request);
+    const context = await requireOperations(request, this.db, 'OPS_ORG_MANAGE');
     const rows = await this.db.execute(sql`
       SELECT o.id, o.kind, o.legal_name, o.verification_state, o.active, o.created_at, o.updated_at,
              p.display_name, p.website_url, p.country_code, p.state_or_province, p.city, p.postal_code,
@@ -80,7 +80,7 @@ export class OperationsInstitutionOnboardingController {
   @Post('/operations/organizations')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async createOrganization(@Req() request: ProtectedHttpRequest, @Body() body: unknown): Promise<Record<string, unknown>> {
-    const context = requireOperations(request);
+    const context = await requireOperations(request, this.db, 'OPS_ORG_MANAGE');
     const input = readOrganizationInput(body, true, context.correlationId);
     const organizationId = this.ids.uuid();
     await this.db.transaction(async (tx) => {
@@ -116,8 +116,17 @@ export class OperationsInstitutionOnboardingController {
   @Get('/operations/organizations/:targetOrganizationId')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async getOrganizationById(@Req() request: ProtectedHttpRequest, @Param('targetOrganizationId') organizationId: string): Promise<Record<string, unknown>> {
-    const context = requireOperations(request);
-    const id = requireUuid(organizationId, context.correlationId);
+    const context = await requireOperations(request, this.db, 'OPS_ORG_MANAGE');
+    return this.loadOrganization(requireUuid(organizationId, context.correlationId), context.correlationId);
+  }
+
+  /**
+   * The organisation read shared by the GET route and the writes that answer with the
+   * updated record. Split from the route so a caller holding only OPS_VERIFY is not
+   * refused the answer to a transition it was allowed to make.
+   */
+  private async loadOrganization(id: string, correlationId: string): Promise<Record<string, unknown>> {
+    const context = { correlationId };
     const result = await this.db.execute(sql`
       SELECT o.id, o.kind, o.legal_name, o.verification_state, o.active, o.created_at, o.updated_at,
              p.display_name, p.website_url, p.country_code, p.state_or_province, p.city, p.postal_code,
@@ -141,7 +150,7 @@ export class OperationsInstitutionOnboardingController {
   @Patch('/operations/organizations/:targetOrganizationId')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async updateOrganization(@Req() request: ProtectedHttpRequest, @Param('targetOrganizationId') organizationId: string, @Body() body: unknown): Promise<Record<string, unknown>> {
-    const context = requireOperations(request);
+    const context = await requireOperations(request, this.db, 'OPS_ORG_MANAGE');
     const id = requireUuid(organizationId, context.correlationId);
     const input = readOrganizationInput(body, false, context.correlationId);
     await this.db.transaction(async (tx) => {
@@ -180,7 +189,7 @@ export class OperationsInstitutionOnboardingController {
   @Post('/operations/organizations/:targetOrganizationId/verification')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async transitionVerification(@Req() request: ProtectedHttpRequest, @Param('targetOrganizationId') organizationId: string, @Body() body: unknown): Promise<Record<string, unknown>> {
-    const context = requireOperations(request);
+    const context = await requireOperations(request, this.db, 'OPS_VERIFY');
     const id = requireUuid(organizationId, context.correlationId);
     const toState = readEnum(readString(body, 'toState', context.correlationId), ['UNDER_REVIEW', 'VERIFIED', 'REJECTED', 'SUSPENDED'], context.correlationId);
     const reasonCode = readOptionalString(body, 'reasonCode') ?? 'OPERATIONS_REVIEW';
@@ -198,7 +207,7 @@ export class OperationsInstitutionOnboardingController {
       await writeOutbox(tx, { id: this.ids.uuid(), aggregateType: 'organization', aggregateId: id, eventType: 'organization.verification_transitioned', payload: { organizationId: id, toState }, actorUserId: context.authorization.principal.userId, organizationId: id, correlationId: context.correlationId });
       if (toState === 'SUSPENDED') await this.pauseEmployerJobs(tx, id, reasonCode, context.authorization.principal.userId, context.correlationId);
     });
-    return this.getOrganizationById(request, id);
+    return this.loadOrganization(id, context.correlationId);
   }
 
   /**
@@ -222,7 +231,7 @@ export class OperationsInstitutionOnboardingController {
   @Post('/operations/organizations/:targetOrganizationId/initial-admin-invitations')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async inviteInitialAdmin(@Req() request: ProtectedHttpRequest, @Param('targetOrganizationId') organizationId: string, @Body() body: unknown): Promise<Record<string, unknown>> {
-    const context = requireOperations(request);
+    const context = await requireOperations(request, this.db, 'OPS_ORG_MANAGE');
     const id = requireUuid(organizationId, context.correlationId);
     const email = normalizeEmail(readString(body, 'email', context.correlationId), context.correlationId);
     const org = await this.db.execute(sql`SELECT kind FROM organizations WHERE id = ${id}::uuid AND kind IN ('INSTITUTION','EMPLOYER')`) as QueryResult<{ kind: OrganizationKind }>;
@@ -249,7 +258,7 @@ export class OperationsInstitutionOnboardingController {
   @Get('/operations/users-access')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async listUsersAccess(@Req() request: ProtectedHttpRequest, @Query('q') q?: string): Promise<Record<string, unknown>> {
-    const context = requireOperations(request);
+    const context = await requireOperations(request, this.db, 'OPS_ORG_MANAGE');
     const search = q?.trim() || null;
     const rows = await this.db.execute(sql`
       SELECT u.id, u.email, u.external_subject IS NOT NULL AS identity_linked, u.state, u.created_at, u.updated_at,
@@ -289,7 +298,7 @@ export class OperationsInstitutionOnboardingController {
   @Get('/operations/invitations')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async listInvitationInventory(@Req() request: ProtectedHttpRequest, @Query('q') q?: string): Promise<Record<string, unknown>> {
-    const context = requireOperations(request);
+    const context = await requireOperations(request, this.db, 'OPS_ORG_MANAGE');
     const search = q?.trim() || null;
     const rows = await this.db.execute(sql`
       SELECT i.id, i.email, i.organization_id, o.legal_name AS organization_legal_name, o.kind AS organization_kind,
@@ -319,7 +328,7 @@ export class OperationsInstitutionOnboardingController {
   @Get('/operations/organizations/:targetOrganizationId/onboarding-status')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async onboardingStatus(@Req() request: ProtectedHttpRequest, @Param('targetOrganizationId') organizationId: string): Promise<Record<string, unknown>> {
-    const context = requireOperations(request);
+    const context = await requireOperations(request, this.db, 'OPS_ORG_MANAGE');
     const id = requireUuid(organizationId, context.correlationId);
     const result = await this.db.execute(sql`
       SELECT o.verification_state,
@@ -803,9 +812,18 @@ export class OperationsInstitutionOnboardingController {
   }
 }
 
-function requireOperations(request: ProtectedHttpRequest): ReturnType<typeof requireTrustedAuthorization> {
+/**
+ * OPS_ORG_MANAGE for organisations, users and invitations; OPS_VERIFY for verification
+ * transitions (OPS-01). Both are baseline for PLATFORM_SUPER_ADMIN and OPERATIONS_ADMIN
+ * only — the two roles this controller admitted before — so SECURITY_ADMIN stays out.
+ */
+async function requireOperations(
+  request: ProtectedHttpRequest,
+  db: PersistenceDb,
+  capability: 'OPS_ORG_MANAGE' | 'OPS_VERIFY',
+): Promise<ReturnType<typeof requireTrustedAuthorization>> {
   const context = requireTrustedAuthorization(request);
-  if (!context.authorization.memberships.some((membership) => membership.state === 'ACTIVE' && platformMutationRoles.includes(membership.role))) throw forbidden(context.correlationId);
+  if (!await callerHasInternalCapability(context.authorization, dbCapabilityGrantLoader(db), capability)) throw forbidden(context.correlationId);
   return context;
 }
 

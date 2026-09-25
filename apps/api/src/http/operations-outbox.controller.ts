@@ -29,7 +29,6 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { canSearchAuditEvents } from '@planthepath/authorization/src/index.js';
 import { listFailedOutboxEvents, replayOutboxEvent, supersedeOutboxBacklog } from '@planthepath/persistence/src/outbox-dispatcher.js';
 import type { PersistenceDb } from '@planthepath/persistence/src/repositories.js';
 import {
@@ -39,6 +38,7 @@ import {
   safeError,
   type ProtectedHttpRequest,
 } from './api-security.js';
+import { callerHasInternalCapability, dbCapabilityGrantLoader } from './internal-capability-guard.js';
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const reasonCodePattern = /^[A-Z0-9_:-]{3,64}$/;
@@ -50,7 +50,7 @@ export class OperationsOutboxController {
   @Get('/outbox/failed')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async failed(@Req() request: ProtectedHttpRequest, @Query('limit') limit?: string): Promise<Record<string, unknown>> {
-    const context = requirePlatformOperator(request);
+    const context = await requireJobsOperator(request, this.db);
     const parsed = limit === undefined || limit === '' ? 50 : Number(limit);
     if (!Number.isInteger(parsed) || parsed < 1 || parsed > 500) {
       throw badRequest('OUTBOX_LIMIT_INVALID', context.correlationId);
@@ -65,7 +65,7 @@ export class OperationsOutboxController {
     @Param('eventId') eventId: string,
     @Body() body: unknown,
   ): Promise<Record<string, unknown>> {
-    const context = requirePlatformOperator(request);
+    const context = await requireJobsOperator(request, this.db);
     if (!uuidPattern.test(eventId)) throw badRequest('OUTBOX_EVENT_INVALID', context.correlationId);
     const { reasonCode, ticketReference } = readReason(body, context.correlationId);
 
@@ -94,7 +94,7 @@ export class OperationsOutboxController {
   @Post('/outbox/backlog/supersede')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async supersedeBacklog(@Req() request: ProtectedHttpRequest, @Body() body: unknown): Promise<Record<string, unknown>> {
-    const context = requirePlatformOperator(request);
+    const context = await requireJobsOperator(request, this.db);
     const { reasonCode } = readReason(body, context.correlationId);
     const raw = (body ?? {}) as Record<string, unknown>;
     if (typeof raw.olderThan !== 'string' || Number.isNaN(Date.parse(raw.olderThan))) {
@@ -119,16 +119,14 @@ export class OperationsOutboxController {
 }
 
 /**
- * The same platform roles that may search the audit record. Replaying an event causes
- * a real-world effect and superseding a backlog suppresses many, so neither belongs to
- * an ordinary support role.
+ * OPS_JOBS_REPLAY (OPS-01): baseline for the three platform roles, exactly the set that
+ * could search the audit record before. Replaying an event causes a real-world effect
+ * and superseding a backlog suppresses many, so neither belongs to an ordinary support
+ * role.
  */
-function requirePlatformOperator(request: ProtectedHttpRequest): ReturnType<typeof requireTrustedAuthorization> {
+async function requireJobsOperator(request: ProtectedHttpRequest, db: PersistenceDb): Promise<ReturnType<typeof requireTrustedAuthorization>> {
   const context = requireTrustedAuthorization(request);
-  const permitted = context.authorization.memberships.some((membership) => canSearchAuditEvents({
-    role: membership.role,
-    membershipState: membership.state as 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'ENDED',
-  }));
+  const permitted = await callerHasInternalCapability(context.authorization, dbCapabilityGrantLoader(db), 'OPS_JOBS_REPLAY');
   if (!permitted) throw new ForbiddenException(safeError('FORBIDDEN', context.correlationId));
   return context;
 }

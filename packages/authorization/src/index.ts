@@ -108,3 +108,4 @@ export function canSearchAuditEvents(scope: AuditSearchScope): boolean {
 }
 
 export * from './institution-scope.js';
+export * from './internal-capabilities.js';

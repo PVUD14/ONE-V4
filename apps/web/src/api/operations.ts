@@ -188,3 +188,57 @@ export function openTrustCaseFromSignal(token: string, body: unknown): Promise<{
 export function transitionTrustCase(token: string, caseId: string, toState: string, reasonCode: string): Promise<Record<string, unknown>> {
   return requestJson(`/api/v1/operations/trust-safety/cases/${encodeURIComponent(caseId)}/transition`, { token, method: 'POST', body: { toState, reasonCode } });
 }
+
+// --- Staff and capabilities (OPS-01, ADR-032) -------------------------------
+
+export interface StaffCapabilityGrantDto {
+  readonly capability: string;
+  readonly grantedAt: string;
+  readonly reasonCode: string;
+  readonly highRisk: boolean;
+}
+
+export interface StaffMemberDto {
+  readonly membershipId: string;
+  readonly email: string;
+  readonly role: string;
+  readonly state: string;
+  readonly isSelf: boolean;
+  readonly baseline: readonly string[];
+  readonly grants: readonly StaffCapabilityGrantDto[];
+  readonly effective: readonly string[];
+}
+
+export interface StaffCapabilityCatalogueEntryDto {
+  readonly capability: string;
+  readonly highRisk: boolean;
+  readonly grantableHere: boolean;
+}
+
+export interface StaffDirectoryDto {
+  readonly staff: readonly StaffMemberDto[];
+  readonly nextCursor: string | null;
+  readonly capabilities: readonly StaffCapabilityCatalogueEntryDto[];
+  readonly grantReasons: readonly string[];
+  readonly revokeReasons: readonly string[];
+  /** Until dual control exists (OPS-02) only a Platform Super Admin may grant a high-risk capability. */
+  readonly actorMayGrantHighRisk: boolean;
+  readonly correlationId: string;
+}
+
+export function listOperationsStaff(token: string, cursor?: string | null, signal?: AbortSignal): Promise<StaffDirectoryDto> {
+  const suffix = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
+  return requestJson(`/api/v1/operations/staff${suffix}`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function grantStaffCapability(
+  token: string, membershipId: string, body: { readonly capability: string; readonly reasonCode: string; readonly note?: string },
+): Promise<{ readonly member: StaffMemberDto; readonly correlationId: string }> {
+  return requestJson(`/api/v1/operations/staff/${encodeURIComponent(membershipId)}/capabilities`, { token, method: 'POST', body });
+}
+
+export function revokeStaffCapability(
+  token: string, membershipId: string, capability: string, body: { readonly reasonCode: string; readonly note?: string },
+): Promise<{ readonly member: StaffMemberDto; readonly correlationId: string }> {
+  return requestJson(`/api/v1/operations/staff/${encodeURIComponent(membershipId)}/capabilities/${encodeURIComponent(capability)}/revoke`, { token, method: 'POST', body });
+}

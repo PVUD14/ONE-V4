@@ -22,3 +22,4 @@ export * from './api/assistant.js';
 export * from './api/platform.js';
 export * from './api/systemHealth.js';
 export * from './api/privacyOperations.js';
+export * from './api/operationsOverview.js';

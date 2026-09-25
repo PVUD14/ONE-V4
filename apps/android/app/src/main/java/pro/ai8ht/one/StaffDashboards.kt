@@ -1147,8 +1147,9 @@ internal fun OpsScaffold(
     val context = androidx.compose.ui.platform.LocalContext.current
     val palette = LocalOnePalette.current
     var tab by remember { mutableStateOf(0) }
-    var orgs by remember { mutableStateOf<List<OpsOrganizationDto>?>(null) }
-    var invitations by remember { mutableStateOf<List<OpsInvitationDto>>(emptyList()) }
+    // OPS-03: one server-side summary replaces the two full-list fetches (each capped at 200).
+    var overview by remember { mutableStateOf<OpsOverviewDto?>(null) }
+    var overviewFailed by remember { mutableStateOf(false) }
     var inbox by remember { mutableStateOf<NotificationsEnvelope?>(null) }
     var showInboxOv by remember { mutableStateOf(false) }
     var showThemeOv by remember { mutableStateOf(false) }
@@ -1156,10 +1157,10 @@ internal fun OpsScaffold(
 
     LaunchedEffect(Unit) {
         coroutineScope {
-            val o = async { runCatching { Api.listOperationsOrganizations(context) }.getOrDefault(emptyList()) }
-            val i = async { runCatching { Api.listOperationsInvitations(context) }.getOrDefault(emptyList()) }
+            val o = async { runCatching { Api.operationsOverview(context) } }
             val n = async { runCatching { Api.listNotifications(context) }.getOrNull() }
-            orgs = o.await(); invitations = i.await(); inbox = n.await()
+            val result = o.await()
+            overview = result.getOrNull(); overviewFailed = result.isFailure; inbox = n.await()
         }
     }
 
@@ -1205,8 +1206,9 @@ internal fun OpsScaffold(
             }
             BandSheet {
                 when {
-                    orgs == null -> HomeSkeleton()
-                    tab == 0 -> OpsOverview(orgs!!, invitations)
+                    tab == 0 && overviewFailed -> CenteredNote("The operations overview could not be loaded. No numbers are shown until the server's counts load. Try again shortly.")
+                    tab == 0 && overview == null -> HomeSkeleton()
+                    tab == 0 -> OpsOverview(overview!!)
                     else -> StaffMore(onSignOut, onSwitchWorkspace,
                         "This workspace is view-only in the app by policy. All changes - onboarding, invitations, configuration - happen on the web at one.ai8ht.pro.",
                         onHelp = { showHelpOv = true })
@@ -1216,12 +1218,45 @@ internal fun OpsScaffold(
     }
 }
 
+private const val OPS_NA = "NA"
+
+/** A bounded server count as text: NA when the section is not available, "+" when capped. */
+private fun opsCount(count: OpsCountDto?): String =
+    count?.let { if (it.capped) "%,d+".format(it.value) else "%,d".format(it.value) } ?: OPS_NA
+
+private fun opsSum(first: OpsCountDto?, second: OpsCountDto?): OpsCountDto? =
+    if (first == null || second == null) null else OpsCountDto(first.value + second.value, first.capped || second.capped)
+
+private data class OpsQueueRow(val title: String, val count: OpsCountDto?, val detail: String?, val screen: String)
+
+/** The same ten queues as the web Overview, in the same order. */
+private fun opsQueues(overview: OpsOverviewDto): List<OpsQueueRow> = listOf(
+    OpsQueueRow("Organizations awaiting verification", overview.verification?.awaitingDecision,
+        overview.verification?.let { "${opsCount(it.underReview)} under review" }, "Verification"),
+    OpsQueueRow("Employer access requests", overview.employerAccessRequests?.pending,
+        overview.employerAccessRequests?.let { "Waiting for a decision" }, "Organizations"),
+    OpsQueueRow("Invitations pending over 72 hours", overview.invitations?.staff?.pendingOver72Hours,
+        overview.invitations?.let { "${opsCount(it.staff.expiredUnaccepted)} expired without being accepted" }, "Users"),
+    OpsQueueRow("Student invitations not delivered", overview.invitations?.student?.notDelivered,
+        overview.invitations?.let { "Of ${opsCount(it.student.pending)} pending · ${opsCount(it.student.pendingOver72Hours)} over 72 hours" }, "Users"),
+    OpsQueueRow("Open trust and safety cases", overview.trustSafety?.open,
+        overview.trustSafety?.let { "Critical ${opsCount(it.bySeverity["CRITICAL"])} · high ${opsCount(it.bySeverity["HIGH"])} · unassigned ${opsCount(it.unassigned)}" }, "Trust and Safety"),
+    OpsQueueRow("Failed background events", overview.jobs?.failedEvents,
+        overview.jobs?.let { "${opsCount(it.openAlerts)} open health alerts" }, "System Health"),
+    OpsQueueRow("Open privacy requests", overview.privacyRequests?.open,
+        overview.privacyRequests?.let { "${opsCount(it.deletionsDueWithin7Days)} deletions scheduled within 7 days · ${opsCount(it.failed)} failed" }, "Security"),
+    OpsQueueRow("Active legal holds", overview.privacyHolds?.active,
+        overview.privacyHolds?.let { "Releasing a hold needs a second person's approval" }, "Security"),
+    OpsQueueRow("Approvals awaiting a decision", overview.approvals?.pending,
+        overview.approvals?.let { "${opsCount(it.awaitingExecution)} approved, awaiting execution" }, "Settings"),
+    OpsQueueRow("Open support cases", overview.support?.open,
+        overview.support?.let { "${opsCount(it.overdue)} past their SLA · ${opsCount(it.unassigned)} unassigned" }, "Support"),
+)
+
 @Composable
-private fun OpsOverview(orgs: List<OpsOrganizationDto>, invitations: List<OpsInvitationDto>) {
-    val institutions = orgs.count { it.kind == "INSTITUTION" }
-    val employers = orgs.count { it.kind == "EMPLOYER" }
-    val verified = orgs.count { it.verificationState.uppercase().startsWith("VERIF") }
-    val pendingInvites = invitations.count { it.state.uppercase() == "PENDING" }
+private fun OpsOverview(overview: OpsOverviewDto) {
+    val orgs = overview.organizations
+    val verified = orgs?.let { opsSum(it.institutions.byVerification["VERIFIED"], it.employers.byVerification["VERIFIED"]) }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp)) {
         Spacer(Modifier.height(10.dp))
         PilotCard(glow = true) {
@@ -1231,20 +1266,44 @@ private fun OpsOverview(orgs: List<OpsOrganizationDto>, invitations: List<OpsInv
         }
         Spacer(Modifier.height(12.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            StatCell("$institutions", "Institutions", Tone.Green, Icons.Filled.School, Modifier.weight(1f))
-            StatCell("$employers", "Employers", Tone.Violet, Icons.Filled.WorkOutline, Modifier.weight(1f))
+            StatCell(opsCount(orgs?.institutions?.total), "Institutions", Tone.Green, Icons.Filled.School, Modifier.weight(1f))
+            StatCell(opsCount(orgs?.employers?.total), "Employers", Tone.Violet, Icons.Filled.WorkOutline, Modifier.weight(1f))
         }
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            StatCell("$verified", "Verified", Tone.Accent, Icons.Filled.Assignment, Modifier.weight(1f))
-            StatCell("$pendingInvites", "Invites pending", Tone.Amber, Icons.Filled.Notifications, Modifier.weight(1f))
+            StatCell(opsCount(verified), "Verified", Tone.Accent, Icons.Filled.Assignment, Modifier.weight(1f))
+            StatCell(opsCount(overview.invitations?.staff?.pending), "Invites pending", Tone.Amber, Icons.Filled.Notifications, Modifier.weight(1f))
+        }
+        SectionTitle("Operator queues")
+        opsQueues(overview).forEach { queue ->
+            PilotCard(Modifier.fillMaxWidth().padding(bottom = 10.dp)) {
+                Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(queue.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                        Text(queue.detail?.let { "$it · worked in ${queue.screen} on the web" } ?: "NA - not available with your access.",
+                            style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    val count = queue.count
+                    StatusChip(opsCount(count), when {
+                        count == null -> ChipKind.Muted
+                        count.value > 0 -> ChipKind.Waiting
+                        else -> ChipKind.Positive
+                    })
+                }
+            }
         }
         SectionTitle("Organizations")
-        if (orgs.isEmpty()) {
-            PilotCard { Text("No organizations onboarded yet.", Modifier.padding(16.dp),
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-        } else {
-            orgs.take(10).forEach { org ->
+        when {
+            orgs == null -> PilotCard {
+                Text("NA - organization management is not part of your access.", Modifier.padding(16.dp),
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            orgs.recent.isEmpty() -> PilotCard {
+                Text("No organizations onboarded yet.", Modifier.padding(16.dp),
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            else -> orgs.recent.forEach { org ->
                 PilotCard(Modifier.fillMaxWidth().padding(bottom = 10.dp)) {
                     Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                         IconBubble(
@@ -1253,7 +1312,7 @@ private fun OpsOverview(orgs: List<OpsOrganizationDto>, invitations: List<OpsInv
                         )
                         Spacer(Modifier.width(10.dp))
                         Column(Modifier.weight(1f)) {
-                            Text(org.legalName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                            Text(org.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                             Text(prettify(org.kind), style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }

@@ -201,15 +201,16 @@ object Api {
             request(context, "GET", "/api/v1/institutions/$institutionId/assessments/$definitionId/results"),
         )
 
-    suspend fun listOperationsOrganizations(context: Context): List<OpsOrganizationDto> =
-        json.decodeFromString<OpsOrganizationsEnvelope>(
-            request(context, "GET", "/api/v1/operations/organizations"),
-        ).organizations
-
-    suspend fun listOperationsInvitations(context: Context): List<OpsInvitationDto> =
-        json.decodeFromString<OpsInvitationsEnvelope>(
-            request(context, "GET", "/api/v1/operations/invitations"),
-        ).invitations
+    /**
+     * The Operations Overview (OPS-03): one server-side summary whose counts are computed
+     * in bounded SQL. It replaces fetching the organisation and invitation lists (each
+     * capped at 200 rows) and counting them on the phone. A section the caller's
+     * capabilities do not cover arrives as null and is shown as NA.
+     */
+    suspend fun operationsOverview(context: Context): OpsOverviewDto =
+        json.decodeFromString<OpsOverviewEnvelope>(
+            request(context, "GET", "/api/v1/operations/overview"),
+        ).overview
 
     suspend fun listEmployerOpportunities(context: Context, employerId: String): List<EmployerOpportunityDto> =
         json.decodeFromString<EmployerOpportunitiesEnvelope>(
@@ -690,16 +691,76 @@ internal fun NotificationDto.announcementSource(): String {
     val openApplicationCount: Int = 0,
 )
 
-@Serializable data class OpsOrganizationsEnvelope(val organizations: List<OpsOrganizationDto> = emptyList())
-@Serializable data class OpsOrganizationDto(
+// Operations Overview (OPS-03). Every count is bounded on the server: `capped` means the
+// real number is larger than `value`. A null section is one the caller cannot access.
+@Serializable data class OpsCountDto(val value: Int = 0, val capped: Boolean = false)
+@Serializable data class OpsKindCountsDto(
+    val total: OpsCountDto = OpsCountDto(),
+    val byVerification: Map<String, OpsCountDto> = emptyMap(),
+)
+@Serializable data class OpsRecentOrganizationDto(
     val id: String,
     val kind: String = "",
-    val legalName: String = "",
+    val name: String = "",
     val verificationState: String = "",
     val active: Boolean = true,
 )
-@Serializable data class OpsInvitationsEnvelope(val invitations: List<OpsInvitationDto> = emptyList())
-@Serializable data class OpsInvitationDto(val id: String, val state: String = "", val role: String = "")
+@Serializable data class OpsOrganizationsSectionDto(
+    val total: OpsCountDto = OpsCountDto(),
+    val active: OpsCountDto = OpsCountDto(),
+    val institutions: OpsKindCountsDto = OpsKindCountsDto(),
+    val employers: OpsKindCountsDto = OpsKindCountsDto(),
+    val recent: List<OpsRecentOrganizationDto> = emptyList(),
+)
+@Serializable data class OpsVerificationSectionDto(val awaitingDecision: OpsCountDto = OpsCountDto(), val underReview: OpsCountDto = OpsCountDto())
+@Serializable data class OpsAccessRequestsSectionDto(val pending: OpsCountDto = OpsCountDto())
+@Serializable data class OpsStaffInvitationsDto(
+    val total: OpsCountDto = OpsCountDto(),
+    val accepted: OpsCountDto = OpsCountDto(),
+    val pending: OpsCountDto = OpsCountDto(),
+    val pendingOver72Hours: OpsCountDto = OpsCountDto(),
+    val expiredUnaccepted: OpsCountDto = OpsCountDto(),
+)
+@Serializable data class OpsStudentInvitationsDto(
+    val pending: OpsCountDto = OpsCountDto(),
+    val pendingOver72Hours: OpsCountDto = OpsCountDto(),
+    val notDelivered: OpsCountDto = OpsCountDto(),
+)
+@Serializable data class OpsInvitationsSectionDto(
+    val staff: OpsStaffInvitationsDto = OpsStaffInvitationsDto(),
+    val student: OpsStudentInvitationsDto = OpsStudentInvitationsDto(),
+)
+@Serializable data class OpsTrustSectionDto(
+    val open: OpsCountDto = OpsCountDto(),
+    val unassigned: OpsCountDto = OpsCountDto(),
+    val bySeverity: Map<String, OpsCountDto> = emptyMap(),
+)
+@Serializable data class OpsJobsSectionDto(val failedEvents: OpsCountDto = OpsCountDto(), val openAlerts: OpsCountDto = OpsCountDto())
+@Serializable data class OpsPrivacyRequestsSectionDto(
+    val open: OpsCountDto = OpsCountDto(),
+    val deletionsDueWithin7Days: OpsCountDto = OpsCountDto(),
+    val failed: OpsCountDto = OpsCountDto(),
+)
+@Serializable data class OpsPrivacyHoldsSectionDto(val active: OpsCountDto = OpsCountDto())
+@Serializable data class OpsApprovalsSectionDto(val pending: OpsCountDto = OpsCountDto(), val awaitingExecution: OpsCountDto = OpsCountDto())
+@Serializable data class OpsSupportSectionDto(
+    val open: OpsCountDto = OpsCountDto(),
+    val overdue: OpsCountDto = OpsCountDto(),
+    val unassigned: OpsCountDto = OpsCountDto(),
+)
+@Serializable data class OpsOverviewDto(
+    val organizations: OpsOrganizationsSectionDto? = null,
+    val verification: OpsVerificationSectionDto? = null,
+    val employerAccessRequests: OpsAccessRequestsSectionDto? = null,
+    val invitations: OpsInvitationsSectionDto? = null,
+    val trustSafety: OpsTrustSectionDto? = null,
+    val jobs: OpsJobsSectionDto? = null,
+    val privacyRequests: OpsPrivacyRequestsSectionDto? = null,
+    val privacyHolds: OpsPrivacyHoldsSectionDto? = null,
+    val approvals: OpsApprovalsSectionDto? = null,
+    val support: OpsSupportSectionDto? = null,
+)
+@Serializable data class OpsOverviewEnvelope(val overview: OpsOverviewDto)
 
 @Serializable data class HelpEnvelope(val articles: List<HelpArticleDto> = emptyList())
 @Serializable data class HelpArticleDto(

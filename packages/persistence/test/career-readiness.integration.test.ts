@@ -162,6 +162,17 @@ describe('Career Readiness Fundamentals production path', () => {
     expect(snapshot.rows[0]?.model_version_id).toBe(active.rows[0]?.id);
   });
 
+  it('leaves a first import on readiness model version 2, the state a migration run produces', async () => {
+    // beforeAll truncates users, which cascades to model versions, and then imports: the
+    // same order as an environment migrated before its first import. 0030 could not
+    // publish version 2 then, because version 1 did not exist yet.
+    const versions = await pool.query<{ version: number; active: boolean }>(
+      `SELECT version, active FROM readiness_model_versions
+       WHERE stable_key='career-readiness-fundamentals' ORDER BY version`,
+    );
+    expect(versions.rows).toEqual([{ version: 1, active: false }, { version: 2, active: true }]);
+  });
+
   it('leaves an already-completed lesson alone rather than resnapshotting on replay', async () => {
     const learner = randomUUID();
     await pool.query(

@@ -181,6 +181,19 @@ describe('exam result to readiness evidence', () => {
 
 describe('readiness model version', () => {
   it('publishes version 2 as the active model and retires version 1', async () => {
+    // 0030 builds version 2 from version 1, which the career-readiness import writes at
+    // runtime. Other suites truncate users (cascading to model versions), so whether a
+    // version 1 row existed here used to depend on which files ran first. Establish the
+    // precondition 0030 relies on -- the import's own row -- and replay 0030 in this
+    // test's transaction, so the assertion is about the migration, not the file order.
+    await client.query(
+      `INSERT INTO readiness_model_versions (id, stable_key, version, policy, published_by_user_id, published_at, active)
+       VALUES ('26000000-0000-4000-8000-000000000001', 'career-readiness-fundamentals', 1, $1::jsonb, $2, now(), true)
+       ON CONFLICT (id) DO NOTHING`,
+      [JSON.stringify({ algorithm: 'career-readiness-mastery-v1', advisory: true, employerVisible: false }), staffId],
+    );
+    await client.query(await readFile(new URL('0030_exam_topic_bridge.sql', migrationDir), 'utf8'));
+
     const versions = await db.execute(sql`
       SELECT version, active FROM readiness_model_versions
       WHERE stable_key = 'career-readiness-fundamentals' ORDER BY version

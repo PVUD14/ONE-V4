@@ -83,6 +83,38 @@ async function activeReadinessModelId(client: DbClient): Promise<string> {
   );
   return result.rows[0]?.id ?? READINESS_MODEL_ID;
 }
+
+/**
+ * Publish readiness model version 2 on top of a freshly imported version 1.
+ *
+ * Migration 0030 publishes version 2 by copying version 1, but version 1 is written at
+ * import time, below. An environment migrated before its first import therefore came out
+ * of the import on version 1 and stayed there until the next migration run, stamping
+ * every snapshot in between with the retired model. This repeats 0030's statements in the
+ * import's own transaction, so an import leaves the state a migration run would. Both are
+ * idempotent (fixed id, ON CONFLICT DO NOTHING). Nothing historical is recalculated
+ * (ADR-020); a first import has no history.
+ */
+async function publishReadinessModelVersion2(client: DbClient): Promise<void> {
+  await client.query(
+    `INSERT INTO readiness_model_versions (id, stable_key, version, policy, published_by_user_id, published_at, active)
+     SELECT '26000000-0000-4000-8000-000000000002', 'career-readiness-fundamentals', 2,
+            jsonb_build_object(
+              'algorithm', 'career-readiness-mastery-v1',
+              'advisory', true,
+              'employerVisible', false,
+              'inputs', jsonb_build_array('LESSON_COMPLETION', 'ASSESSMENT_OUTCOME', 'INSTITUTION_EXAM_OUTCOME'),
+              'supersedes', 1),
+            m.published_by_user_id, now(), true
+     FROM readiness_model_versions m
+     WHERE m.stable_key = 'career-readiness-fundamentals' AND m.version = 1
+     ON CONFLICT (id) DO NOTHING`,
+  );
+  await client.query(
+    `UPDATE readiness_model_versions SET active = false
+     WHERE stable_key = 'career-readiness-fundamentals' AND version = 1`,
+  );
+}
 const ROADMAP_POLICY_ID = '26000000-0000-4000-8000-000000000002';
 const NOTIFICATION_TEMPLATE_ID = '26000000-0000-4000-8000-000000000003';
 
@@ -331,6 +363,7 @@ export async function publishCareerReadinessPilot(
        VALUES ($1,'career-readiness-fundamentals',1,$2::jsonb,$3,now(),true)`,
       [READINESS_MODEL_ID, JSON.stringify({ algorithm: 'career-readiness-mastery-v1', advisory: true, employerVisible: false }), actors.publisherUserId],
     );
+    await publishReadinessModelVersion2(client);
     await client.query(
       `INSERT INTO roadmap_policy_versions (id, stable_key, version, policy, published_by_user_id, published_at, active)
        VALUES ($1,'career-readiness-roadmap',1,$2::jsonb,$3,now(),true)`,

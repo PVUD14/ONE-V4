@@ -132,3 +132,35 @@ describe('D-1: employer owners and admins resolve the employer workspace', () =>
     expect(screen.queryByText('Fixture Draft Role')).not.toBeInTheDocument();
   });
 });
+
+describe('EMP-01: employer workspace behaviour for each role', () => {
+  it('opens one employer workspace for an owner who is also a recruiter of the same employer', async () => {
+    signInWith('owner.recruiter@uat.example.test', [employerMembership('RECRUITER'), employerMembership('EMPLOYER_OWNER')]);
+    const { App } = await import('./App.js');
+    render(React.createElement(App));
+    await waitFor(() => expect(window.location.pathname).toBe('/employer/recruiter'));
+    expect(screen.queryByRole('heading', { name: 'Choose your ONE workspace' })).not.toBeInTheDocument();
+  });
+
+  async function openTeamAs(role: string): Promise<void> {
+    signInWith('team.viewer@uat.example.test', [employerMembership(role)]);
+    const { App } = await import('./App.js');
+    render(React.createElement(App));
+    await waitFor(() => expect(window.location.pathname).toBe('/employer/recruiter'));
+    cleanup();
+    window.history.pushState(null, '', '/employer/recruiter/team');
+    render(React.createElement(App));
+  }
+
+  it('tells a recruiter that Team is managed by the owner or admin', async () => {
+    await openTeamAs('RECRUITER');
+    expect(await screen.findByText('Managed by your owner or admin')).toBeInTheDocument();
+    expect(screen.queryByText('Not built yet')).not.toBeInTheDocument();
+  });
+
+  it.each(['EMPLOYER_OWNER', 'EMPLOYER_ADMIN'])('shows Team to an %s as the honest not-built state', async (role) => {
+    await openTeamAs(role);
+    expect(await screen.findByText('Not built yet')).toBeInTheDocument();
+    expect(screen.queryByText('Managed by your owner or admin')).not.toBeInTheDocument();
+  });
+});

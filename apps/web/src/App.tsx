@@ -521,6 +521,15 @@ function WorkspaceChooser({ authStatus, authNotice, workspaceResolution, onSignI
 function resolveAuthorizedWorkspaces(context: SecurityContextDto): readonly AuthorizedWorkspace[] {
   const workspaces: AuthorizedWorkspace[] = [];
   const pushUnique = (workspace: AuthorizedWorkspace): void => {
+    if (workspace.family === 'Employer') {
+      // One employer entry per organisation, as on Android: a person who is both owner and
+      // recruiter of the same employer opens one portal, labelled with the broader role.
+      const existing = workspaces.findIndex((item) => item.family === 'Employer' && item.organizationId === workspace.organizationId);
+      if (existing >= 0) {
+        if (employerRoleRank(workspace.role) < employerRoleRank(workspaces[existing]!.role)) workspaces[existing] = workspace;
+        return;
+      }
+    }
     if (!workspaces.some((item) => item.path === workspace.path && item.role === workspace.role && item.organizationId === workspace.organizationId)) workspaces.push(workspace);
   };
   if ((context.studentRelationships?.length ?? 0) > 0) {
@@ -556,12 +565,22 @@ function workspaceError(reason: WorkspaceResolutionFailureReason, correlationId?
   };
 }
 
+const employerRoleOrder = ['EMPLOYER_OWNER', 'EMPLOYER_ADMIN', 'RECRUITER'] as const;
+function employerRoleRank(role: string): number {
+  const rank = employerRoleOrder.indexOf(role as typeof employerRoleOrder[number]);
+  return rank < 0 ? employerRoleOrder.length : rank;
+}
+
 function workspaceForMembership(membership: SecurityContextDto['memberships'][number]): AuthorizedWorkspace | null {
   const organizationId = membership.organizationId;
   if (membership.role === 'INSTITUTION_OWNER' || membership.role === 'INSTITUTION_ADMIN') return { ...portalChoices[1], role: membership.role, organizationId };
   if (membership.role === 'PLACEMENT_ADMIN') return { ...portalChoices[1], path: '/institution/placement-officer', label: 'Placement Admin', detail: 'Placement operations for the authorized institution.', role: membership.role, organizationId };
   if (membership.role === 'FACULTY_LECTURER') return { ...portalChoices[1], path: '/institution/faculty', label: 'Faculty', detail: 'Faculty workspace for assigned academic support.', role: membership.role, organizationId };
   if (membership.role === 'DEPARTMENT_HEAD') return { ...portalChoices[1], path: '/institution/department-head', label: 'Department Head', detail: 'Department workspace for authorized academic oversight.', role: membership.role, organizationId };
+  // Owners and admins run the same employer portal as recruiters; the server decides what each
+  // role may do, and owner/admin-only screens check the role for display only (EMP-01).
+  if (membership.role === 'EMPLOYER_OWNER') return { ...portalChoices[2], label: 'Employer Owner', detail: 'Employer workspace: hiring, team and company settings.', role: membership.role, organizationId };
+  if (membership.role === 'EMPLOYER_ADMIN') return { ...portalChoices[2], label: 'Employer Admin', detail: 'Employer workspace: hiring, recruiters and reports.', role: membership.role, organizationId };
   if (membership.role === 'RECRUITER') return { ...portalChoices[2], role: membership.role, organizationId };
   if (membership.role === 'OPERATIONS_ADMIN') return { ...portalChoices[3], role: membership.role, organizationId };
   if (membership.role === 'PLATFORM_SUPER_ADMIN') return { ...portalChoices[3], label: 'Platform Super Admin', detail: 'Platform operations workspace; distinct super-admin UI is not yet implemented.', role: membership.role, organizationId };

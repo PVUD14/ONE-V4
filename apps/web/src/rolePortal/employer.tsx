@@ -16,6 +16,12 @@ import { RestrictedApiState } from './shared.js';
 import { useEffect, useState } from 'react';
 
 const participantRouteLabels = ['My Interviews', 'Candidate Brief', 'Scorecards'];
+const ownerAdminOnlyLabels = ['Team', 'Settings'];
+
+/** Display-only: whether an employer role manages the organisation (team, settings). */
+export function employerManagesOrganisation(role: string): boolean {
+  return role === 'EMPLOYER_OWNER' || role === 'EMPLOYER_ADMIN';
+}
 
 export function EmployerRecruiterRealityPage({ portal, routeLabel }: { readonly portal: RolePortalConfig; readonly routeLabel: string }): React.ReactElement {
   if (participantRouteLabels.includes(routeLabel)) return <EmployerInterviewerRealityPage routeLabel={routeLabel} />;
@@ -51,6 +57,22 @@ function EmployerManagementRealityPage({ portal, routeLabel }: { readonly portal
   if (/applicant|candidate|talent/i.test(routeLabel)) {
     return <StaffPilotWrap title="Applicants" subtitle="Move real candidates through your process; every change is logged.">
       <EmployerApplicantsPage key={employerId} employerId={employerId} /></StaffPilotWrap>;
+  }
+
+  // Team and Settings belong to the employer's owner and admins (Appendix 2 §5.1). The role
+  // check here only decides what to display; the server remains the authority when these
+  // screens gain actions (EMP-02, EMP-16).
+  if (ownerAdminOnlyLabels.includes(routeLabel) && !employerManagesOrganisation(employerMembership.role)) {
+    return <section className="role-module role-module--dense">
+      <div className="role-page-heading"><div>
+        <span className="eyebrow">Owner and admin only</span>
+        <h1>{routeLabel}</h1>
+        <p>{routeLabel} is managed by your employer's owner or admin.</p>
+      </div></div>
+      <div className="role-wide"><V2EmptyState icon="🔒" title="Managed by your owner or admin"
+        note={`Recruiters do not change ${routeLabel.toLowerCase()}. Ask your employer's owner or admin if something here needs to change.`}
+        hint="Opportunities, Applicants, Interviews and Offers are all yours to run." /></div>
+    </section>;
   }
 
   // Routes whose backend does not exist yet keep saying so rather than borrowing

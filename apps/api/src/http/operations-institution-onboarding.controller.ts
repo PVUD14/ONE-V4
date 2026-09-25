@@ -22,7 +22,7 @@ type VerificationState = 'PENDING' | 'UNDER_REVIEW' | 'VERIFIED' | 'REJECTED' | 
 type InstitutionType = 'UNIVERSITY' | 'ENGINEERING_COLLEGE' | 'ARTS_SCIENCE_COLLEGE' | 'BUSINESS_SCHOOL' | 'POLYTECHNIC' | 'OTHER';
 type UnitKind = 'DEPARTMENT' | 'PROGRAM' | 'BATCH' | 'SECTION' | 'CAMPUS';
 type RelationshipEndState = 'TRANSFERRED' | 'GRADUATED' | 'ENDED' | 'REVOKED';
-type InvitationRole = 'INSTITUTION_ADMIN' | 'EMPLOYER_ADMIN' | 'PLACEMENT_ADMIN' | 'DEPARTMENT_HEAD' | 'FACULTY_LECTURER';
+type InvitationRole = 'INSTITUTION_ADMIN' | 'EMPLOYER_OWNER' | 'EMPLOYER_ADMIN' | 'PLACEMENT_ADMIN' | 'DEPARTMENT_HEAD' | 'FACULTY_LECTURER';
 
 export const API_INVITATION_MAIL_SINK = Symbol('API_INVITATION_MAIL_SINK');
 
@@ -209,7 +209,9 @@ export class OperationsInstitutionOnboardingController {
     const org = await this.db.execute(sql`SELECT kind FROM organizations WHERE id = ${id}::uuid AND kind IN ('INSTITUTION','EMPLOYER')`) as QueryResult<{ kind: OrganizationKind }>;
     const [row] = org.rows;
     if (!row) throw forbidden(context.correlationId);
-    const role = row.kind === 'INSTITUTION' ? 'INSTITUTION_ADMIN' : 'EMPLOYER_ADMIN';
+    // An employer's first user is its owner (decision 10.2 #1), because only an owner can add
+    // admins; invitations already issued as EMPLOYER_ADMIN keep their role.
+    const role = row.kind === 'INSTITUTION' ? 'INSTITUTION_ADMIN' : 'EMPLOYER_OWNER';
     const invitation = await this.createScopedInvitation({
       actorUserId: context.authorization.principal.userId,
       organizationId: id,
@@ -659,7 +661,7 @@ export class OperationsInstitutionOnboardingController {
     const invitationId = this.ids.uuid();
     const notificationCommandId = this.ids.uuid();
     const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1_000);
-    const subject = input.role === 'EMPLOYER_ADMIN' ? 'ONE employer administrator invitation' : 'ONE institution administrator invitation';
+    const subject = input.role === 'EMPLOYER_OWNER' || input.role === 'EMPLOYER_ADMIN' ? 'ONE employer administrator invitation' : 'ONE institution administrator invitation';
     const invitationUrl = buildInvitationUrl(token);
     const textBody = [
       'You have been invited to administer a ONE organization.',

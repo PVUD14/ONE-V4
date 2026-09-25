@@ -33,6 +33,7 @@ import { ExamTopicMappingController } from './exam-topic-mapping.controller.js';
 import { OperationsAuditController } from './operations-audit.controller.js';
 import { CalendarController } from './calendar.controller.js';
 import { EmployerAssessmentsController } from './employer-assessments.controller.js';
+import { EmployerTeamController } from './employer-team.controller.js';
 
 @Module({})
 export class Phase1ApiSecurityModule {
@@ -53,7 +54,7 @@ export class Phase1ApiSecurityModule {
 
     return {
       module: Phase1ApiSecurityModule,
-      controllers: [StaffActionsController, Phase1SecurityController, OperationsInstitutionOnboardingController, StudentOperationalCoreController, StudentHiringController, EmployerHiringController, StudentDocumentsController, StudentPrivacyController, InstitutionAssessmentsController, StudentAssessmentAttemptsController, AssistantController, NotificationsController, ConsentsController, HelpController, StudentActivityController, OperationsAuditController, OperationsOutboxController, OperationsPrivacyController, ExamTopicMappingController, CalendarController, EmployerAssessmentsController],
+      controllers: [StaffActionsController, Phase1SecurityController, OperationsInstitutionOnboardingController, StudentOperationalCoreController, StudentHiringController, EmployerHiringController, StudentDocumentsController, StudentPrivacyController, InstitutionAssessmentsController, StudentAssessmentAttemptsController, AssistantController, NotificationsController, ConsentsController, HelpController, StudentActivityController, OperationsAuditController, OperationsOutboxController, OperationsPrivacyController, ExamTopicMappingController, CalendarController, EmployerAssessmentsController, EmployerTeamController],
       providers,
       exports: [
         API_IDENTITY_VERIFIER,

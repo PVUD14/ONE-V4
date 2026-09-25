@@ -11,6 +11,7 @@ import { V2EmptyState } from '../dashboardsV2.js';
 import { EmployerApplicantsPage, EmployerOpportunitiesPage, EmployerInterviewsPage, EmployerOffersPage, EmployerHiringAnalyticsPage, CandidateIdentity, InterviewActionForm } from '../hiringPages.js';
 import { getMyInterview, listMyInterviews, submitMyInterviewOutcome, type ParticipantInterviewDto, type InterviewOutcomeInput } from '../api/hiring.js';
 import { StaffPilotWrap } from '../parityWraps.js';
+import { EmployerTeamPage } from './employerTeam.js';
 import type { RolePortalConfig } from '../rolePortalConfig.js';
 import { RestrictedApiState } from './shared.js';
 import { useEffect, useState } from 'react';
@@ -74,6 +75,9 @@ function EmployerManagementRealityPage({ portal, routeLabel }: { readonly portal
         hint="Opportunities, Applicants, Interviews and Offers are all yours to run." /></div>
     </section>;
   }
+
+  // EMP-02: Team is live for owners and admins; recruiters were answered above.
+  if (routeLabel === 'Team') return <EmployerTeamPage key={employerId} employerId={employerId} />;
 
   // Routes whose backend does not exist yet keep saying so rather than borrowing
   // another page's data.

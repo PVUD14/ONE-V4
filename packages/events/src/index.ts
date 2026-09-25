@@ -108,6 +108,18 @@ export const eventSchemas = {
     schemaRef: 'registry://identity.invitation.created/1',
     payload: { invitationId: { kind: 'uuid' } },
   },
+  // EMP-02: an employer owner or admin withdrew a pending team invitation. No consumer yet;
+  // the outbox row is the durable record next to the audit event.
+  identityInvitationRevokedV1: {
+    eventType: 'identity.invitation.revoked',
+    eventVersion: 1,
+    producer: 'identity-organization',
+    aggregateType: 'invitation',
+    purpose: 'identity-invitation-revocation',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://identity.invitation.revoked/1',
+    payload: { invitationId: { kind: 'uuid' } },
+  },
   // INST-01: one per rostered student; the outbox worker sends the invitation email.
   studentInvitationRequestedV1: {
     eventType: 'institution.student.invitation.requested',
@@ -288,6 +300,18 @@ export const eventSchemas = {
     dataClassification: 'confidential',
     schemaRef: 'registry://institution.roster_import.committed/1',
     payload: { importId: { kind: 'uuid' } },
+  },
+  // EMP-02: an employer owner or admin ended a team member's membership. Access ends on the
+  // member's next request because memberships are read per request; this announces it.
+  organizationMembershipEndedV1: {
+    eventType: 'organization_membership.ended',
+    eventVersion: 1,
+    producer: 'identity-organization',
+    aggregateType: 'organization_membership',
+    purpose: 'organization-membership-end',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://organization_membership.ended/1',
+    payload: { membershipId: { kind: 'uuid' }, role: { kind: 'enum', values: organizationRoles } },
   },
   organizationMembershipSuspendedV1: {
     eventType: 'organization_membership.suspended',

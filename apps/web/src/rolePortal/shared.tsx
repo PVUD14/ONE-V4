@@ -66,6 +66,13 @@ export function safeErrorMessage(code: string | undefined): string | undefined {
     case 'INVALID_ACADEMIC_DATE_WINDOW': return 'Expected graduation date must be on or after academic start date.';
     case 'INVALID_ACADEMIC_UNIT_SCOPE': return 'Selected academic unit is not valid for this Institution and field.';
     case 'STAFF_INVITATION_ALREADY_PENDING': return 'Staff invitation already pending.';
+    case 'TEAM_MEMBER_ALREADY_EXISTS': return 'This person is already on your team. To change their role, end their membership and invite them again.';
+    case 'TEAM_INVITATION_ALREADY_PENDING': return 'An invitation to this address is already pending. Resend it instead.';
+    case 'TEAM_INVITATION_NOT_PENDING': return 'This invitation is no longer pending. Refresh to see its current state.';
+    case 'TEAM_MEMBER_NOT_ACTIVE': return 'This membership has already ended.';
+    case 'TEAM_LAST_OWNER': return 'Your last owner cannot be removed. Add another owner through ONE operations first.';
+    case 'TEAM_EMAIL_INVALID': return 'Enter a valid email address.';
+    case 'EMPLOYER_ORGANISATION_INACTIVE': return 'Your employer account is suspended or was not approved, so your team cannot be changed.';
     case 'FORBIDDEN': return 'You do not have permission to perform this action.';
     default: return undefined;
   }

@@ -417,3 +417,63 @@ export function deleteExternalApplication(token: string, id: string, revision: n
 export function changeExternalInstitutionVisibility(token: string, id: string, revision: number, action: 'grant' | 'revoke'): Promise<{ readonly externalApplication: ExternalApplicationDto }> {
   return requestJson(`${externalApplicationsPath}/${encodeURIComponent(id)}/institution-visibility/${action}`, { token, method: 'POST', body: { revision } });
 }
+
+// --- Employer team (EMP-02) --------------------------------------------------
+// Owners and admins manage the team; the server decides who may invite, revoke, resend or
+// end whom. Interviewers join as recruiters (decision 10.2 #2).
+
+export type EmployerTeamRole = 'EMPLOYER_OWNER' | 'EMPLOYER_ADMIN' | 'RECRUITER';
+
+export interface EmployerTeamMemberDto {
+  readonly membershipId: string;
+  readonly email: string;
+  readonly role: EmployerTeamRole;
+  readonly state: string;
+  readonly since: string | null;
+  readonly isSelf: boolean;
+  readonly canEnd: boolean;
+}
+
+export interface EmployerTeamInvitationDto {
+  readonly id: string;
+  readonly email: string;
+  readonly role: EmployerTeamRole;
+  readonly state: 'PENDING' | 'EXPIRED';
+  readonly createdAt: string | null;
+  readonly expiresAt: string | null;
+  readonly delivery: { readonly state: string; readonly sendCount: number; readonly lastSentAt: string | null };
+  readonly canRevoke: boolean;
+  readonly canResend: boolean;
+}
+
+export interface EmployerTeamDto {
+  readonly actorRole: EmployerTeamRole;
+  readonly invitableRoles: readonly EmployerTeamRole[];
+  readonly deliveryConfigured: boolean;
+  readonly members: readonly EmployerTeamMemberDto[];
+  readonly nextCursor: string | null;
+  readonly invitations: readonly EmployerTeamInvitationDto[];
+  readonly invitationsTruncated: boolean;
+  readonly reasonCodes: { readonly revoke: readonly string[]; readonly resend: readonly string[]; readonly end: readonly string[] };
+}
+
+export function getEmployerTeam(token: string, employerId: string, cursor?: string, signal?: AbortSignal): Promise<{ readonly team: EmployerTeamDto }> {
+  const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
+  return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/team${query}`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function inviteEmployerTeamMember(token: string, employerId: string, email: string, role: EmployerTeamRole): Promise<{ readonly invitation: { readonly id: string; readonly delivery: { readonly state: string } } }> {
+  return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/team-invitations`, { token, method: 'POST', body: { email, role } });
+}
+
+export function revokeEmployerTeamInvitation(token: string, employerId: string, invitationId: string, reasonCode: string): Promise<{ readonly invitation: { readonly id: string; readonly state: string } }> {
+  return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/team-invitations/${encodeURIComponent(invitationId)}/revoke`, { token, method: 'POST', body: { reasonCode } });
+}
+
+export function resendEmployerTeamInvitation(token: string, employerId: string, invitationId: string, reasonCode: string): Promise<{ readonly invitation: { readonly id: string; readonly delivery: { readonly state: string } } }> {
+  return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/team-invitations/${encodeURIComponent(invitationId)}/resend`, { token, method: 'POST', body: { reasonCode } });
+}
+
+export function endEmployerTeamMembership(token: string, employerId: string, membershipId: string, reasonCode: string): Promise<{ readonly member: { readonly membershipId: string; readonly state: string } }> {
+  return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/team/${encodeURIComponent(membershipId)}/end`, { token, method: 'POST', body: { reasonCode } });
+}

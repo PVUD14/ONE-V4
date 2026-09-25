@@ -173,7 +173,7 @@ private fun StaffBandHeader(title: String, subtitle: String, unread: Int, onThem
 }
 
 @Composable
-private fun StatCell(value: String, label: String, tone: Tone, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier = Modifier) {
+internal fun StatCell(value: String, label: String, tone: Tone, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier = Modifier) {
     PilotCard(modifier) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             IconBubble(icon, tone, size = 32.dp)
@@ -626,6 +626,10 @@ internal fun EmployerScaffold(
             SlideIn { HiringAnalyticsPage(organizationId, onClose = { employerOverlay = null }) }
             return
         }
+        EmployerOverlay.Team -> {
+            SlideIn { EmployerTeamPage(organizationId, onClose = { employerOverlay = null }) }
+            return
+        }
         null -> Unit
     }
 
@@ -784,6 +788,15 @@ private fun EmployerHome(
                     }
                 }
             }
+        }
+
+        // EMP-02: the team, read-only; changes are made on the web. The server decides who
+        // may see it, so a recruiter opening it is told Team is managed by the owner or admin.
+        SectionTitle("Team", trailing = "View", onTrailing = { onOpenOverlay(EmployerOverlay.Team) })
+        PilotCard(Modifier.fillMaxWidth()) {
+            Text("Who is on your hiring team, in which role, and which invitations are still open.",
+                Modifier.clickable { onOpenOverlay(EmployerOverlay.Team) }.padding(14.dp),
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
 
         SectionTitle("Recent roles", trailing = "View all", onTrailing = onRoles)

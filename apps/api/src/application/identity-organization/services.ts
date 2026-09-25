@@ -695,7 +695,11 @@ export class IdentityOrganizationService {
   }
 }
 
-function canAssignRole(actorRole: OrganizationRole, targetRole: OrganizationRole): boolean {
+/**
+ * Which roles an actor may grant. Exported so the employer team routes (EMP-02) enforce the
+ * same rule as this service rather than a second copy that could drift.
+ */
+export function canAssignRole(actorRole: OrganizationRole, targetRole: OrganizationRole): boolean {
   switch (actorRole) {
     case 'INSTITUTION_OWNER':
       return ['INSTITUTION_ADMIN', 'PLACEMENT_ADMIN', 'DEPARTMENT_HEAD', 'FACULTY_LECTURER'].includes(targetRole);

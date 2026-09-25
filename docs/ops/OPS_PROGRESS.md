@@ -155,3 +155,113 @@ OPS_ORG_MANAGE to SECURITY_ADMIN's baseline failed 10 tests.
 - The audit-search cursor uses millisecond precision. Staff paging uses microseconds after the same bug showed
   up in its test, and the audit cursor may deserve the same fix.
 **Next goal:** OPS-02.
+
+## OPS-02 — Reason codes and dual control for high-risk actions — 2026-09-25
+**Result:** Complete. Every high-risk action that exists today now needs a second person's approval. The approval is bound to the
+exact payload, expires after 24 hours, is used once inside the action's own transaction, and only the requester can execute it.
+The solo-operator safeguard is in place, and Settings has an Approvals queue.
+**Branch / PR:** feat/ops-dual-control → feat/plan-phases-0-to-2. The branch was rebased onto the base after EMP-02. Commits, in
+order: design, acceptance tests, implementation, this report. Pushed to onev4. No PR was opened because `gh` is not installed, so
+the merge is left to review.
+**Files created:**
+- docs/architecture/high-risk-approvals-table-design.md
+- packages/persistence/drizzle/0038_operation_approvals.sql
+- packages/authorization/src/high-risk-actions.ts (+ .test.ts)
+- packages/persistence/src/operation-approvals.ts
+- apps/api/src/http/operation-approval-gate.ts
+- apps/api/src/http/operations-approvals.controller.ts
+- apps/api/src/http/operations-approvals.integration.spec.ts
+- apps/web/src/rolePortal/approvals.tsx (+ .test.tsx)
+
+**Files modified:**
+- packages/authorization/src/{index,internal-capabilities}.ts: a high-risk grant now returns APPROVAL_REQUIRED instead of
+  HIGH_RISK_GRANT_REQUIRES_SUPER_ADMIN.
+- packages/events/src/index.ts: 3 new events.
+- packages/persistence/src/platform-controls.ts: a flag guard hook, `highRiskDirection` in the flag list, and an approval hook on grants.
+- apps/api/src/http/{operations-institution-onboarding (verification route only), operations-outbox, operations-privacy,
+  operations-staff, platform-controls}.controller.ts.
+- apps/api/src/http/api-security.module.ts: registration only.
+- apps/web/src/api/operations.ts and apps/web/src/rolePortal/{operations,staffCapabilities,shared}.tsx.
+- apps/web/src/rolePortalPages.tsx: the operations `Settings` branch only.
+- Tests updated: operations-capabilities.integration.spec.ts, employer-organisation-state.integration.spec.ts,
+  internal-capabilities.test.ts, staffCapabilities.test.tsx (see Risks).
+
+**Migrations added:** 0038_operation_approvals.sql. It contains:
+- the `operation_approvals` table and its shape CHECKs;
+- a guard trigger: the request cannot change, state only moves forward, expiry uses the database clock, the approver and solo
+  rules are enforced, rows cannot be deleted, and request timestamps are stamped by the database;
+- the functions `operation_approval_is_approver` and `operation_approval_approver_count`;
+- the column `feature_flags.high_risk_direction`.
+
+The migration is idempotent: `db:migrate` ran twice on a freshly created `one_ops02` with no errors.
+**Design docs / ADRs:** high-risk-approvals-table-design.md records the chosen design and the rejected alternatives for both the
+table and the safeguard. No ADR was needed; this builds on ADR-032.
+**Validation (only DATABASE_URL exported; after rebasing onto the EMP-02 base e238fd2; freshly recreated `one_ops02`):**
+- `db:migrate` run twice: pass.
+- `corepack pnpm typecheck`: pass.
+- `corepack pnpm -r --no-bail --workspace-concurrency=1 test`: pass, **1 376 passed, 0 failed**.
+  - web 422 (9 new in approvals.test)
+  - api 478 (17 new in operations-approvals.integration.spec)
+  - persistence 187
+  - authorization 107 (14 new)
+  - others 182
+- `corepack pnpm build`: pass (web chunk-size warning only).
+
+A run before the rebase had a single timeout on the App.test demo-mode nav walk (22.4 s against a 20 s limit, under load). That test
+does not touch this change, and it passed in this run. Starting state: OPS-01's recorded green run on 300c6f2.
+**Acceptance criteria:**
+- Each high-risk action without a valid approval returns 403 with a clear code ✔. Suspension, a high-risk flag change, backlog
+  supersede, hold release and a high-risk grant all return `APPROVAL_REQUIRED`, including for the super admin, and nothing changes.
+  Other refusals are `APPROVAL_NOT_APPROVED`, `APPROVAL_EXPIRED`, `APPROVAL_PAYLOAD_MISMATCH` and `APPROVAL_NOT_REQUESTER`.
+- The requester cannot approve their own request except through a valid SOLO approval ✔ (`APPROVAL_SELF_DECISION_REFUSED`). The
+  trigger refuses it as well.
+- Expired and payload-changed approvals are rejected ✔. This covers expiry at decision and at execution, a different reason, a
+  different target, a wider limit, and reuse after execution.
+- The solo path works only with exactly one approver and after 15 minutes ✔. Under 15 minutes returns `APPROVAL_SOLO_COOLING_OFF`;
+  with one approver the approval succeeds and is marked SOLO; once a second approver is granted, self-approval is refused.
+- Every request, decision and execution is audited ✔ as `operations.approval.{requested,approved,rejected,executed}`, with requester,
+  approver, mode and reason. The action's own audit row carries the approval, and outbox events are written.
+- §6.6 minimums ✔: 401/403/200, input 400s, pagination bounds, and no personal data beyond minimised fields (the hold subject never
+  appears in the queue). Web tests cover real data, empty, loading, error with reference, forbidden, confirm dialogs that require a
+  reason code, and unchanged navigation labels.
+- OPS-01's temporary "super admin only" rule for high-risk grants now goes through dual control ✔.
+
+**Decisions for Divakar (recommendations adopted):**
+- **Solo safeguard:** a 15-minute cooling-off, a SOLO marker, and automatic switch-off. The approver count comes from live
+  memberships, not from a setting.
+- **SOLO email notice:** it uses the existing pipeline (notification_commands → the allow-listed `security-notification` workflow,
+  ADR-021) only when that workflow is registered active and outside its kill switch. None is today (HG-7), so the notice is recorded
+  as **NOT_DELIVERED** on the approval and in audit, and the screen says so. Nothing is queued to fail and nothing claims delivery.
+  The QUEUED path is tested with a registered workflow.
+- **No break-glass bypass:** the solo path is the only single-person route until the incident register (OPS-16) exists.
+- **Approval rules:**
+  - One 24-hour window from the request covers both decision and execution.
+  - The executor must be the requester.
+  - An approver may not approve a capability grant to themselves.
+  - A request is refused `APPROVAL_NOT_REQUIRED` when the change is not actually high-risk.
+- **High-risk flags** are marked by `high_risk_direction`: ENABLE for AI features, DISABLE for safety controls and kill switches. It is
+  set by migration only, with no API. No flag exists yet.
+- **Reason codes** are defined in code for each action, with fixed approve and reject decision lists.
+
+**Limitations / not done:**
+- These §5.4 rows have no endpoint yet: flag cap raise (no cap API), requirement-set publish (OPS-08) and bulk personal-data exports.
+  Each gets a key by a new migration that widens the CHECK.
+- Backlog supersede and hold release have no web control because System Health and Security are read-only today. Their requests go
+  through the API and are executed from the Approvals queue.
+- The Approvals stat "Requests in this view" counts only the loaded page (up to 50). It is labelled that way and is not a server-side
+  queue count; that is OPS-03's job.
+
+**Android:** no change. §4.3 keeps operator screens web-only. The app's only operations calls are GET organizations and GET
+invitations (Api.kt:181,186), so no gated write is reachable from the phone.
+**Risks / follow-ups:**
+- Four pre-existing tests had to change because their contract changed on purpose. No assertion was weakened; each is at least as
+  strict as before:
+  - The OPS-01 matrix row for backlog supersede now expects `APPROVAL_REQUIRED` for admitted roles, instead of "any non-403".
+  - The OPS-01 delegated-grant test now proves that nobody, the super admin included, can grant a high-risk capability without
+    approval.
+  - The EMP-03 suspension helper now runs request → approve → execute, with the listed reason `POLICY_VIOLATION` instead of
+    `REPRO_D3`.
+  - The unit test for high-risk grants changed in the same way.
+- A shared or production database gains high-risk flags only when a migration marks them.
+
+**Next goal:** OPS-03.

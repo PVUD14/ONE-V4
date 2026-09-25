@@ -549,14 +549,17 @@ export class OperationsInstitutionOnboardingController {
     const id = requireUuid(institutionId, context.correlationId);
     const profileId = requireUuid(studentProfileId, context.correlationId);
     const state = readEnum(readString(body, 'state', context.correlationId), ['TRANSFERRED', 'GRADUATED', 'ENDED', 'REVOKED'], context.correlationId);
-    const effectiveTo = readOptionalDateTime(body, 'effectiveTo', context.correlationId) ?? new Date().toISOString();
+    // With no explicit end, the database stamps it: the relationship's start was stamped by the
+    // database too, and this process's clock can trail it by a few ms, which would put the end
+    // before the start and fail institution_relationship_window_ck.
+    const effectiveTo = readOptionalDateTime(body, 'effectiveTo', context.correlationId) ?? null;
     await this.db.transaction(async (tx) => {
       const profile = await tx.execute(sql`SELECT student_user_id FROM institution_student_profiles WHERE id=${profileId}::uuid AND institution_id=${id}::uuid FOR UPDATE`) as QueryResult<{ student_user_id: string }>;
       const studentUserId = profile.rows[0]?.student_user_id;
       if (!studentUserId) throw new Error('student profile not found');
       const rel = await tx.execute(sql`
         UPDATE institution_relationships
-        SET state=${state}::relationship_state, effective_to=${effectiveTo}, updated_at=now()
+        SET state=${state}::relationship_state, effective_to=COALESCE(${effectiveTo}::timestamptz, now()), updated_at=now()
         WHERE id = (
           SELECT id FROM institution_relationships
           WHERE institution_id=${id}::uuid AND student_user_id=${studentUserId}::uuid AND effective_to IS NULL

@@ -80,7 +80,7 @@ describe('D-1: employer owners and admins resolve the employer workspace', () =>
     render(React.createElement(App));
     await waitFor(() => expect(window.location.pathname).toBe('/employer/recruiter'));
     expect(screen.queryByText('No active ONE workspace is available for this identity.')).not.toBeInTheDocument();
-    expect(screen.getAllByText(role).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText(role)).length).toBeGreaterThan(0);
   });
 
   it('opens an employer deep link for an EMPLOYER_ADMIN', async () => {
@@ -116,7 +116,7 @@ describe('D-1: employer owners and admins resolve the employer workspace', () =>
     const { App } = await import('./App.js');
     render(React.createElement(App));
     await waitFor(() => expect(window.location.pathname).toBe('/employer/recruiter'));
-    expect(screen.getAllByText('RECRUITER').length).toBeGreaterThan(0);
+    expect((await screen.findAllByText('RECRUITER')).length).toBeGreaterThan(0);
   });
 
   it('keeps an institution-only identity out of the employer workspace', async () => {

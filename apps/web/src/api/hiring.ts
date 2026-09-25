@@ -209,6 +209,19 @@ export function respondToOffer(token: string, offerId: string, decision: 'ACCEPT
   return requestJson(`/api/v1/students/me/offers/${encodeURIComponent(offerId)}/respond`, { token, method: 'POST', body: { decision, ...(reason ? { reason } : {}) } });
 }
 
+/** An employer organisation's own verification state and what it allows (EMP-03). */
+export interface EmployerOrganisationStatusDto {
+  readonly verificationState: 'PENDING' | 'UNDER_REVIEW' | 'VERIFIED' | 'REJECTED' | 'SUSPENDED';
+  readonly active: boolean;
+  readonly canDraft: boolean;
+  readonly canPublish: boolean;
+  readonly canReachCandidates: boolean;
+}
+
+export function getEmployerOrganisationStatus(token: string, employerId: string, signal?: AbortSignal): Promise<{ readonly organisation: EmployerOrganisationStatusDto }> {
+  return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/organisation-status`, { token, ...(signal ? { signal } : {}) });
+}
+
 export function listEmployerOpportunities(token: string, employerId: string, signal?: AbortSignal): Promise<{ readonly opportunities: readonly EmployerOpportunityDto[] }> {
   return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/opportunities`, { token, ...(signal ? { signal } : {}) });
 }

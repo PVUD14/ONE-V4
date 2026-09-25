@@ -175,3 +175,25 @@ describe('employer applicant access authentication guard', () => {
     }
   });
 });
+
+describe('employer applicant access follows the organisation state (EMP-03)', () => {
+  it.each([
+    ['SUSPENDED', false],
+    ['REJECTED', true],
+    ['PENDING', true],
+    ['UNDER_REVIEW', true],
+  ] as const)('refuses a live grant while the employer is %s', async (verificationState, active) => {
+    const recruiterId = await seedUser(`recruiter-${verificationState.toLowerCase()}@example.test`);
+    const studentId = await seedUser(`student-${verificationState.toLowerCase()}@example.test`);
+    const employerId = await seedEmployer(`Employer ${verificationState}`);
+    const opportunityId = randomUUID();
+    await seedEmployerMembership({ userId: recruiterId, employerId });
+    await seedEmployerGrant({ employerId, studentUserId: studentId, opportunityId });
+    const input = { actorUserId: recruiterId, employerId, opportunityId, studentUserId: studentId, now: new Date('2026-08-16T00:00:00Z') };
+    await expect(assertEmployerApplicantAccessForAuthenticatedPrincipal(db, input)).resolves.toBeUndefined();
+
+    await pool.query('UPDATE organizations SET verification_state = $2::verification_state, active = $3 WHERE id = $1', [employerId, verificationState, active]);
+    await expect(assertEmployerApplicantAccessForAuthenticatedPrincipal(db, input)).rejects.toThrow('employer applicant access not found');
+    await expect(assertEmployerApplicantAccessForAuthenticatedPrincipal(db, { ...input, lockForMutation: true })).rejects.toThrow('employer applicant access not found');
+  });
+});

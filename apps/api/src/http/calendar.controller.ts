@@ -186,6 +186,10 @@ export class CalendarController {
         AND p.participant_user_id = ${userId}::uuid AND p.removed_at IS NULL
       JOIN applications a ON a.id = i.application_id
       JOIN opportunity_versions v ON v.id = a.applied_version_id
+      -- EMP-03: an interviewer of a suspended, rejected or unverified employer no longer
+      -- sees that employer's interview slots.
+      JOIN organizations employer_org ON employer_org.id = i.employer_id
+        AND employer_org.verification_state = 'VERIFIED' AND employer_org.active
       WHERE i.employer_id IN (${sql.join(employerIds.map((id) => sql`${id}::uuid`), sql`, `)})
         AND i.state IN ('SCHEDULED','RESCHEDULED')
         AND i.scheduled_start BETWEEN ${range.from.toISOString()} AND ${range.to.toISOString()}

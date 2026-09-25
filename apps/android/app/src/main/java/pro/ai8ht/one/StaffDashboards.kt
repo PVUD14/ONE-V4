@@ -561,11 +561,16 @@ internal fun EmployerScaffold(
     var employerOverlay by remember { mutableStateOf<EmployerOverlay?>(null) }
     var openApplicant by remember { mutableStateOf<EmployerApplicantDto?>(null) }
     var employerReload by remember { mutableStateOf(0) }
+    // EMP-03: null when the status could not be read; the app then behaves as before and
+    // the server still refuses what it must.
+    var orgStatus by remember { mutableStateOf<EmployerOrganisationStatusDto?>(null) }
 
     LaunchedEffect(employerReload) {
         coroutineScope {
+            val s = async { runCatching { Api.employerOrganisationStatus(context, organizationId) }.getOrNull() }
             val r = async { runCatching { Api.listEmployerOpportunities(context, organizationId) }.getOrDefault(emptyList()) }
             val n = async { runCatching { Api.listNotifications(context) }.getOrNull() }
+            orgStatus = s.await()
             val loadedRoles = r.await()
             val loadedApplicants = loadedRoles.filter { it.applicationCount > 0 }.take(4).flatMap { role ->
                 runCatching { Api.listEmployerApplicants(context, organizationId, role.id) }.getOrDefault(emptyList())
@@ -671,17 +676,27 @@ internal fun EmployerScaffold(
                 )
             }
             BandSheet {
+                val awaitingVerification = orgStatus?.let { it.canDraft && !it.canReachCandidates } == true
                 when {
+                    // Suspended or rejected: Home and Roles show the plain status; More (help,
+                    // switch workspace, sign out) stays reachable.
+                    orgStatus?.canDraft == false && tab != 2 -> EmployerOrganisationStatusPanel(orgStatus!!)
                     roles == null -> HomeSkeleton()
                     else -> when (tab) {
-                        0 -> EmployerHome(
-                            roles = roles!!,
-                            applicants = applicants,
-                            onRoles = { tab = 1 },
-                            onOpenOverlay = { employerOverlay = it },
-                            onOpenApplicant = { openApplicant = it },
-                        )
-                        1 -> EmployerRoles(roles!!)
+                        0 -> Column(Modifier.fillMaxSize()) {
+                            if (awaitingVerification) EmployerVerificationNotice()
+                            EmployerHome(
+                                roles = roles!!,
+                                applicants = applicants,
+                                onRoles = { tab = 1 },
+                                onOpenOverlay = { employerOverlay = it },
+                                onOpenApplicant = { openApplicant = it },
+                            )
+                        }
+                        1 -> Column(Modifier.fillMaxSize()) {
+                            if (awaitingVerification) EmployerVerificationNotice()
+                            EmployerRoles(roles!!)
+                        }
                         else -> StaffMore(onSignOut, onSwitchWorkspace,
                             "Posting roles, publishing and candidate review stay on the web at one.ai8ht.pro.",
                             onHelp = { showHelpOv = true })

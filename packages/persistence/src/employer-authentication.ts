@@ -29,6 +29,13 @@ export async function assertEmployerApplicantAccessForAuthenticatedPrincipal(
      AND membership.scope_organization_id = grant_record.employer_id
      AND membership.scope_employer_id = grant_record.employer_id
      AND membership.role IN ('EMPLOYER_OWNER', 'EMPLOYER_ADMIN', 'RECRUITER')
+    -- EMP-03: a grant is only usable while the employer is verified and active. A
+    -- REJECTED organisation keeps active = true, so the state is checked as well.
+    JOIN organizations employer_org
+      ON employer_org.id = grant_record.employer_id
+     AND employer_org.kind = 'EMPLOYER'
+     AND employer_org.verification_state = 'VERIFIED'
+     AND employer_org.active
     WHERE grant_record.employer_id = ${input.employerId}::uuid
       AND grant_record.opportunity_id = ${input.opportunityId}::uuid
       AND grant_record.student_user_id = ${input.studentUserId}::uuid

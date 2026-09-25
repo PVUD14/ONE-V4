@@ -43,6 +43,7 @@ import {
   type ApiIdGenerator,
   type ProtectedHttpRequest,
 } from './api-security.js';
+import { requireActiveEmployer, type EmployerAction } from './employer-organisation-state.js';
 
 type QueryResult<T> = { rows: T[] };
 
@@ -74,7 +75,7 @@ export class EmployerAssessmentsController {
   @Get('/employers/:employerId/assessment-questions')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async listQuestions(@Req() request: ProtectedHttpRequest, @Param('employerId') employerId: string): Promise<Record<string, unknown>> {
-    const context = this.requireEmployer(request, employerId);
+    const context = await this.requireEmployer(request, employerId, 'jobs.draft');
     const rows = await this.db.execute(sql`
       SELECT q.id, q.question_text, q.question_type, q.difficulty, q.marks, q.approval_status, q.version,
              (SELECT count(*)::int FROM employer_assessment_question_options o WHERE o.question_id = q.id) AS option_count
@@ -97,7 +98,7 @@ export class EmployerAssessmentsController {
   @Post('/employers/:employerId/assessment-questions')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async createQuestion(@Req() request: ProtectedHttpRequest, @Param('employerId') employerId: string, @Body() body: unknown): Promise<Record<string, unknown>> {
-    const context = this.requireEmployer(request, employerId);
+    const context = await this.requireEmployer(request, employerId, 'jobs.draft');
     const input = readQuestionInput(body, context.correlationId);
     try {
       validateObjectiveQuestion({ questionText: input.questionText, questionType: input.questionType, options: input.options });
@@ -133,7 +134,7 @@ export class EmployerAssessmentsController {
   @Post('/employers/:employerId/assessment-questions/:questionId/transition')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async transitionQuestion(@Req() request: ProtectedHttpRequest, @Param('employerId') employerId: string, @Param('questionId') questionId: string, @Body() body: unknown): Promise<Record<string, unknown>> {
-    const context = this.requireEmployer(request, employerId);
+    const context = await this.requireEmployer(request, employerId, 'jobs.draft');
     const id = requireUuid(questionId, context.correlationId);
     const toState = readEnum(body, 'toState', ['UNDER_REVIEW', 'APPROVED', 'REJECTED', 'ARCHIVED'] as const, context.correlationId);
     const rows = await this.db.execute(sql`
@@ -172,7 +173,7 @@ export class EmployerAssessmentsController {
   @Get('/employers/:employerId/assessments')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async listAssessments(@Req() request: ProtectedHttpRequest, @Param('employerId') employerId: string): Promise<Record<string, unknown>> {
-    const context = this.requireEmployer(request, employerId);
+    const context = await this.requireEmployer(request, employerId, 'jobs.draft');
     const rows = await this.db.execute(sql`
       SELECT a.id, a.title, a.duration_seconds, a.total_marks, a.lifecycle_state, a.opportunity_id, a.published_at,
              (SELECT count(*)::int FROM employer_assessment_items i WHERE i.assessment_id = a.id) AS item_count,
@@ -197,7 +198,7 @@ export class EmployerAssessmentsController {
   @Post('/employers/:employerId/assessments')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async createAssessment(@Req() request: ProtectedHttpRequest, @Param('employerId') employerId: string, @Body() body: unknown): Promise<Record<string, unknown>> {
-    const context = this.requireEmployer(request, employerId);
+    const context = await this.requireEmployer(request, employerId, 'jobs.draft');
     const input = readAssessmentInput(body, context.correlationId);
 
     // Only approved questions, and only this employer's. The composite foreign key would
@@ -235,7 +236,7 @@ export class EmployerAssessmentsController {
   @Post('/employers/:employerId/assessments/:assessmentId/publish')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async publishAssessment(@Req() request: ProtectedHttpRequest, @Param('employerId') employerId: string, @Param('assessmentId') assessmentId: string): Promise<Record<string, unknown>> {
-    const context = this.requireEmployer(request, employerId);
+    const context = await this.requireEmployer(request, employerId, 'jobs.publish');
     const id = requireUuid(assessmentId, context.correlationId);
     const rows = await this.db.execute(sql`
       SELECT a.lifecycle_state, (SELECT count(*)::int FROM employer_assessment_items i WHERE i.assessment_id = a.id) AS item_count
@@ -261,7 +262,7 @@ export class EmployerAssessmentsController {
   @Post('/employers/:employerId/assessments/:assessmentId/invitations')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async invite(@Req() request: ProtectedHttpRequest, @Param('employerId') employerId: string, @Param('assessmentId') assessmentId: string, @Body() body: unknown): Promise<Record<string, unknown>> {
-    const context = this.requireEmployer(request, employerId);
+    const context = await this.requireEmployer(request, employerId, 'candidates');
     const id = requireUuid(assessmentId, context.correlationId);
     const input = readInvitationInput(body, context.correlationId);
 
@@ -310,7 +311,7 @@ export class EmployerAssessmentsController {
   @Get('/employers/:employerId/assessments/:assessmentId/results')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async results(@Req() request: ProtectedHttpRequest, @Param('employerId') employerId: string, @Param('assessmentId') assessmentId: string): Promise<Record<string, unknown>> {
-    const context = this.requireEmployer(request, employerId);
+    const context = await this.requireEmployer(request, employerId, 'candidates');
     const id = requireUuid(assessmentId, context.correlationId);
     const rows = await this.db.execute(sql`
       SELECT v.id AS invitation_id, v.state, v.application_id, v.closes_at,
@@ -594,18 +595,12 @@ export class EmployerAssessmentsController {
     return attempt;
   }
 
-  private requireEmployer(request: ProtectedHttpRequest, employerId: string): ReturnType<typeof requireTrustedAuthorization> {
-    const context = requireTrustedAuthorization(request);
-    const id = requireUuid(employerId, context.correlationId);
-    const permitted = context.authorization.memberships.some((membership) => (
-      membership.organizationId === id
-      && membership.scope.organizationId === id
-      && membership.scope.employerId === id
-      && membership.state === 'ACTIVE'
-      && (assessmentRoles as readonly string[]).includes(membership.role)
-    ));
-    if (!permitted) throw forbidden(context.correlationId);
-    return context;
+  /**
+   * Appendix 2 §5.1: an unverified employer may build its bank and draft tests; publishing
+   * and anything that touches candidates needs a verified, active organisation.
+   */
+  private requireEmployer(request: ProtectedHttpRequest, employerId: string, action: EmployerAction): Promise<ReturnType<typeof requireTrustedAuthorization>> {
+    return requireActiveEmployer(this.db, request, employerId, action, assessmentRoles);
   }
 }
 

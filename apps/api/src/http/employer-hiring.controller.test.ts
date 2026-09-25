@@ -19,9 +19,20 @@ function request(role = 'RECRUITER', state = 'ACTIVE', scopeId = employerId): Pr
     principal: { userId: actorId }, memberships: [{ organizationId: employerId, state, role, scope: { organizationId: employerId, employerId: scopeId } }],
   } } } as unknown as ProtectedHttpRequest;
 }
+/**
+ * The employer in these tests is verified and active (EMP-03). The organisation-state read
+ * that every employer route now makes is answered here and kept out of `queries`, so the
+ * assertions below still see exactly the statements each route issues for its own work.
+ */
+const verifiedEmployerState = { verification_state: 'VERIFIED', active: true };
 function fixture(resultRows: Record<string, unknown>[][]) {
   const queries: { sql: string; params: unknown[] }[] = [];
-  const execute = vi.fn(async (query: SQL) => { queries.push(new PgDialect().sqlToQuery(query)); return { rows: resultRows.shift() ?? [] }; });
+  const execute = vi.fn(async (query: SQL) => {
+    const compiled = new PgDialect().sqlToQuery(query);
+    if (/SELECT verification_state, active FROM organizations/.test(compiled.sql)) return { rows: [verifiedEmployerState] };
+    queries.push(compiled);
+    return { rows: resultRows.shift() ?? [] };
+  });
   const db = { execute, transaction: vi.fn(async (fn: (tx: unknown) => Promise<void>) => fn({ execute })) };
   return { controller: new EmployerHiringController(db as unknown as PersistenceDb, { uuid: randomUUID }), queries, db };
 }
@@ -91,7 +102,7 @@ describe('opportunity review recording', () => {
   });
   it('checks and records signals before publish without using them as an automatic rejection', async () => {
     const id = randomUUID();
-    const { controller, queries } = fixture([[{ id, lifecycle_state: 'DRAFT' }], [{ count: 1 }], [{ id: randomUUID(), title: 'Role', compensation_min: null }]]);
+    const { controller, queries } = fixture([[{ id, lifecycle_state: 'DRAFT' }], [{ count: 1 }], [{ id: randomUUID(), title: 'Role', compensation_min: null }], [], [], [{ id }]]); // signal insert, its audit, then the guarded UPDATE ... RETURNING id
     const result = await controller.publishOpportunity(request(), employerId, id);
     const signalIndex = queries.findIndex((query) => query.sql.includes('INSERT INTO opportunity_review_signals'));
     const publishIndex = queries.findIndex((query) => query.sql.includes("lifecycle_state = 'PUBLISHED'"));

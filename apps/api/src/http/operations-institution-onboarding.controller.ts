@@ -196,8 +196,27 @@ export class OperationsInstitutionOnboardingController {
       `);
       await writeAudit(tx, { id: this.ids.uuid(), actorUserId: context.authorization.principal.userId, action: 'organization.verification_transitioned', resourceType: 'organization', resourceId: id, organizationId: id, correlationId: context.correlationId, context: { toState, reasonCode } });
       await writeOutbox(tx, { id: this.ids.uuid(), aggregateType: 'organization', aggregateId: id, eventType: 'organization.verification_transitioned', payload: { organizationId: id, toState }, actorUserId: context.authorization.principal.userId, organizationId: id, correlationId: context.correlationId });
+      if (toState === 'SUSPENDED') await this.pauseEmployerJobs(tx, id, reasonCode, context.authorization.principal.userId, context.correlationId);
     });
     return this.getOrganizationById(request, id);
+  }
+
+  /**
+   * Decision 10.2 #3: suspension moves every published job of the organisation to PAUSED
+   * in the same transaction as the verification change, with an audit row and an outbox
+   * event per job. Reinstatement does not republish: the jobs stay paused until the
+   * employer publishes them again, so nothing reappears to students unreviewed.
+   */
+  private async pauseEmployerJobs(tx: PersistenceDb, organizationId: string, reasonCode: string, actorUserId: string, correlationId: string): Promise<void> {
+    const paused = await tx.execute(sql`
+      UPDATE opportunities SET lifecycle_state = 'PAUSED', updated_at = now()
+      WHERE employer_id = ${organizationId}::uuid AND lifecycle_state = 'PUBLISHED'
+      RETURNING id
+    `) as QueryResult<{ id: string }>;
+    for (const { id: opportunityId } of paused.rows) {
+      await writeAudit(tx, { id: this.ids.uuid(), actorUserId, action: 'opportunity.paused', resourceType: 'opportunity', resourceId: opportunityId, organizationId, correlationId, context: { reasonCode, cause: 'ORGANIZATION_SUSPENDED' } });
+      await writeOutbox(tx, { id: this.ids.uuid(), aggregateType: 'opportunity', aggregateId: opportunityId, eventType: 'opportunity.paused', payload: { opportunityId, employerId: organizationId, cause: 'ORGANIZATION_SUSPENDED' }, actorUserId, organizationId, correlationId });
+    }
   }
 
   @Post('/operations/organizations/:targetOrganizationId/initial-admin-invitations')

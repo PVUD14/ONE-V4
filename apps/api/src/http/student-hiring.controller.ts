@@ -22,6 +22,7 @@ import {
   type ApiIdGenerator,
   type ProtectedHttpRequest,
 } from './api-security.js';
+import { employerInGoodStandingSql } from './employer-organisation-state.js';
 
 type QueryResult<T> = { rows: T[] };
 
@@ -188,6 +189,7 @@ export class StudentHiringController {
       WHERE o.lifecycle_state = 'PUBLISHED'
         AND (v.application_deadline IS NULL OR v.application_deadline > now())
         AND ${visibleToStudent(studentUserId)}
+        AND ${employerInGoodStanding}
         AND (${search}::text IS NULL OR v.title ILIKE ${search} OR org.legal_name ILIKE ${search})
       ORDER BY o.published_at DESC NULLS LAST
       LIMIT 100
@@ -217,6 +219,7 @@ export class StudentHiringController {
       WHERE o.id = ${id}::uuid
         AND o.lifecycle_state = 'PUBLISHED'
         AND ${visibleToStudent(studentUserId)}
+        AND ${employerInGoodStanding}
     `) as QueryResult<Record<string, unknown>>;
     const [row] = rows.rows;
     if (!row) throw forbidden(context.correlationId);
@@ -291,6 +294,7 @@ export class StudentHiringController {
       JOIN opportunity_versions v ON v.id = o.current_version_id
       WHERE o.id = ${input.opportunityId}::uuid
         AND ${visibleToStudent(studentUserId)}
+        AND ${employerInGoodStanding}
     `) as QueryResult<Record<string, unknown>>;
     const [opportunity] = opportunityRows.rows;
     if (!opportunity) throw forbidden(context.correlationId);
@@ -585,6 +589,13 @@ export class StudentHiringController {
  * relationship; INSTITUTION_UNIT requires the student to sit in that unit. INVITE_ONLY
  * is intentionally absent, so an invite-only posting never appears in discovery.
  */
+/**
+ * Students see, open and apply to jobs only from employers that are verified and active
+ * (EMP-03): a suspended, rejected or unverified employer does not reach students, even
+ * if one of its jobs is still marked published.
+ */
+const employerInGoodStanding = employerInGoodStandingSql(sql`o.employer_id`);
+
 function visibleToStudent(studentUserId: string) {
   return sql`EXISTS (
     SELECT 1 FROM opportunity_audiences oa

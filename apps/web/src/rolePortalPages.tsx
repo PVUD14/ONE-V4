@@ -26,6 +26,7 @@ import { OperationsCareerReadinessPanel } from './operationsCareerReadinessPanel
 import { StaffPilotWrap } from './parityWraps.js';
 import { InstitutionInterventionsPage } from './pilotParityPages.js';
 import { EmployerRecruiterRealityPage } from './rolePortal/employer.js';
+import { EmployerOrganisationGate } from './rolePortal/employerOrganisationState.js';
 import { InstitutionAcademicStructurePage, InstitutionStaffActionsPage, InstitutionStaffPage, InstitutionStudentsPage } from './rolePortal/institution.js';
 import { OperationsAuditLogPage, OperationsContentReadOnlyPage, OperationsFeatureFlagsPage, OperationsOrganizationsPage, OperationsTechnicalReadOnlyPage, OperationsUsersAccessPage } from './rolePortal/operations.js';
 import { OperationsTrustSafetyPage } from './rolePortal/trustSafety.js';
@@ -186,7 +187,7 @@ function AuthenticatedDashboardChooser({ portal, routeLabel, onNavigate, authent
   if (portal.family === 'Institution' && ['institution-admin', 'placement-officer', 'department-head', 'faculty'].includes(portal.key) && isInstitutionStaffWorkspace(authenticatedWorkspace)) {
     return <InstitutionDashboardV3 institutionId={authenticatedWorkspace.organizationId} basePath={portal.basePath} />;
   }
-  if (portal.family === 'Employer') return <EmployerDashboardV3 basePath={portal.basePath} />;
+  if (portal.family === 'Employer') return <EmployerOrganisationGate employerId={authenticatedWorkspace?.organizationId} routeLabel={routeLabel}><EmployerDashboardV3 basePath={portal.basePath} /></EmployerOrganisationGate>;
   if (portal.key === 'operations-admin') return <OperationsDashboardV2 basePath={portal.basePath} />;
   return <AuthenticatedRoleSurface portal={portal} routeLabel={routeLabel} onNavigate={onNavigate} />;
 }
@@ -305,9 +306,9 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   // organizationId is nullable on the workspace summary, so the page only mounts once
   // there is an employer to scope it to.
   if (!demoMode && portal.family === 'Employer' && route.label === 'Assessments' && authenticatedWorkspace?.organizationId) {
-    return <EmployerAssessmentsPage employerId={authenticatedWorkspace.organizationId} />;
+    return <EmployerOrganisationGate employerId={authenticatedWorkspace.organizationId} routeLabel={route.label}><EmployerAssessmentsPage employerId={authenticatedWorkspace.organizationId} /></EmployerOrganisationGate>;
   }
-  if (!demoMode && portal.key === 'recruiter') return <EmployerRecruiterRealityPage portal={portal} routeLabel={route.label} />;
+  if (!demoMode && portal.key === 'recruiter') return <EmployerOrganisationGate employerId={authenticatedWorkspace?.organizationId} routeLabel={route.label}><EmployerRecruiterRealityPage portal={portal} routeLabel={route.label} /></EmployerOrganisationGate>;
   if (!demoMode && ['faculty', 'department-head'].includes(portal.key) && ['Assigned Tasks', 'Student Detail', 'Academic Verification', 'Meetings', 'Calendar'].includes(route.label)) {
     // Calendar and Academic Verification each gain a real page above the staff-action
     // list they already had, rather than replacing it: those lists are where the work is

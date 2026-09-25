@@ -152,6 +152,20 @@ export const eventSchemas = {
       toState: { kind: 'enum', values: ['PENDING', 'UNDER_REVIEW', 'VERIFIED', 'REJECTED', 'SUSPENDED'] },
     },
   },
+  opportunityPausedV1: {
+    eventType: 'opportunity.paused',
+    eventVersion: 1,
+    producer: 'identity-organization',
+    aggregateType: 'opportunity',
+    purpose: 'opportunity-paused-by-organization-state',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://opportunity.paused/1',
+    payload: {
+      opportunityId: { kind: 'uuid' },
+      employerId: { kind: 'uuid' },
+      cause: { kind: 'enum', values: ['ORGANIZATION_SUSPENDED'] },
+    },
+  },
   organizationRoleAssignedV1: {
     eventType: 'organization.role.assigned',
     eventVersion: 1,

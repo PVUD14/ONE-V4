@@ -179,3 +179,145 @@ describe('D-3: a suspended organisation cannot act as an employer', () => {
     expect(await lifecycle(opportunityId)).toBe('DRAFT');
   });
 });
+
+const refusedStates = [['SUSPENDED', false], ['REJECTED', true]] as const;
+const unverifiedStates = [['PENDING', true], ['UNDER_REVIEW', true]] as const;
+
+/**
+ * Every employer route, with the §5.1 action group it belongs to. The ids are
+ * placeholders: the organisation-state check runs before any resource lookup.
+ */
+function employerRoutes(employerId: string) {
+  const base = '/api/v1/employers/' + employerId;
+  const any = randomUUID();
+  return [
+    { group: 'draft', method: 'post', path: base + '/opportunities', body: { referenceCode: 'R-' + any.slice(0, 8), title: 'Role', summary: 'Build things.', employmentType: 'FULL_TIME', workMode: 'REMOTE', compensationDisclosed: false } },
+    { group: 'draft', method: 'get', path: base + '/opportunities' },
+    { group: 'draft', method: 'post', path: base + '/opportunities/' + any + '/audiences', body: { audienceKind: 'PUBLIC' } },
+    { group: 'draft', method: 'get', path: base + '/assessment-questions' },
+    { group: 'draft', method: 'get', path: base + '/assessments' },
+    { group: 'publish', method: 'post', path: base + '/opportunities/' + any + '/publish' },
+    { group: 'publish', method: 'post', path: base + '/assessments/' + any + '/publish' },
+    { group: 'candidates', method: 'get', path: base + '/opportunities/' + any + '/applications' },
+    { group: 'candidates', method: 'post', path: base + '/applications/' + any + '/transition', body: { toState: 'SHORTLISTED' } },
+    { group: 'candidates', method: 'get', path: base + '/candidate-feedback-reasons' },
+    { group: 'candidates', method: 'post', path: base + '/applications/' + any + '/feedback', body: {} },
+    { group: 'candidates', method: 'get', path: base + '/interviews' },
+    { group: 'candidates', method: 'get', path: base + '/interview-participant-options' },
+    { group: 'candidates', method: 'post', path: base + '/applications/' + any + '/interviews', body: {} },
+    { group: 'candidates', method: 'post', path: base + '/interviews/' + any + '/state', body: { toState: 'CANCELLED' } },
+    { group: 'candidates', method: 'post', path: base + '/interviews/' + any + '/outcome', body: {} },
+    { group: 'candidates', method: 'get', path: base + '/my-interviews' },
+    { group: 'candidates', method: 'get', path: base + '/my-interviews/' + any },
+    { group: 'candidates', method: 'post', path: base + '/my-interviews/' + any + '/outcome', body: { recommendation: 'YES' } },
+    { group: 'candidates', method: 'get', path: base + '/offers' },
+    { group: 'candidates', method: 'post', path: base + '/applications/' + any + '/offers', body: {} },
+    { group: 'candidates', method: 'post', path: base + '/offers/' + any + '/withdraw' },
+    { group: 'candidates', method: 'get', path: base + '/hiring-analytics' },
+    { group: 'candidates', method: 'post', path: base + '/assessments/' + any + '/invitations', body: {} },
+    { group: 'candidates', method: 'get', path: base + '/assessments/' + any + '/results' },
+  ] as const;
+}
+type EmployerRoute = ReturnType<typeof employerRoutes>[number];
+async function call(route: EmployerRoute, userId: string) {
+  const pending = route.method === 'get' ? api().get(route.path) : api().post(route.path).send('body' in route ? route.body : {});
+  return pending.set(auth(userId));
+}
+const ids = (response: { body: { opportunities: { id: string }[] } }) => response.body.opportunities.map((item) => item.id);
+
+describe('EMP-03: organisation state x action group', () => {
+  it.each(refusedStates)('refuses every employer route to a %s organisation, and says why', async (verification, active) => {
+    const { employerId, recruiterId } = await employerWithRecruiter(verification, active);
+    for (const route of employerRoutes(employerId)) {
+      const response = await call(route, recruiterId);
+      expect({ route: route.path, status: response.status, code: response.body?.error?.code })
+        .toEqual({ route: route.path, status: 403, code: 'EMPLOYER_ORGANISATION_INACTIVE' });
+    }
+  });
+
+  it.each(unverifiedStates)('lets a %s organisation draft but not publish or reach candidates', async (verification, active) => {
+    const { employerId, recruiterId } = await employerWithRecruiter(verification, active);
+    for (const route of employerRoutes(employerId)) {
+      const response = await call(route, recruiterId);
+      if (route.group === 'draft') {
+        expect({ route: route.path, code: response.body?.error?.code ?? null }).not.toMatchObject({ code: expect.stringMatching(/^EMPLOYER_ORGANISATION_/) });
+      } else {
+        expect({ route: route.path, status: response.status, code: response.body?.error?.code })
+          .toEqual({ route: route.path, status: 403, code: 'EMPLOYER_ORGANISATION_UNVERIFIED' });
+      }
+    }
+    const created = await api().post(opportunitiesPath(employerId)).set(auth(recruiterId))
+      .send({ referenceCode: 'DRAFT-' + randomUUID().slice(0, 8), title: 'Draft role', summary: 'Drafted before verification.', employmentType: 'FULL_TIME', workMode: 'REMOTE', compensationDisclosed: false })
+      .expect(201);
+    const draftId = created.body.opportunity.id as string;
+    await api().post(opportunitiesPath(employerId) + '/' + draftId + '/audiences').set(auth(recruiterId)).send({ audienceKind: 'PUBLIC' }).expect(201);
+    expect(ids(await api().get(opportunitiesPath(employerId)).set(auth(recruiterId)).expect(200))).toContain(draftId);
+    await api().post(opportunitiesPath(employerId) + '/' + draftId + '/publish').set(auth(recruiterId)).expect(403);
+    expect(await lifecycle(draftId)).toBe('DRAFT');
+  });
+
+  it('lets every member read their own organisation status in every state', async () => {
+    for (const [verification, active] of [...refusedStates, ...unverifiedStates, ['VERIFIED', true] as const]) {
+      const { employerId, recruiterId } = await employerWithRecruiter(verification, active);
+      const response = await api().get('/api/v1/employers/' + employerId + '/organisation-status').set(auth(recruiterId)).expect(200);
+      const verified = verification === 'VERIFIED';
+      expect(response.body.organisation).toEqual({
+        verificationState: verification, active,
+        canDraft: verified || verification === 'PENDING' || verification === 'UNDER_REVIEW',
+        canPublish: verified, canReachCandidates: verified,
+      });
+    }
+    const { employerId } = await employerWithRecruiter();
+    await api().get('/api/v1/employers/' + employerId + '/organisation-status').set(auth(await user())).expect(403);
+    await api().get('/api/v1/employers/' + employerId + '/organisation-status').expect(401);
+  });
+});
+
+describe('EMP-03: suspension pauses published jobs (decision 10.2 #3)', () => {
+  it('pauses on suspension, hides the job and its applicants, and keeps it paused on reinstatement', async () => {
+    const { employerId, recruiterId } = await employerWithRecruiter();
+    const opportunityId = await draftWithAudience(employerId, recruiterId);
+    const untouchedDraftId = await draftWithAudience(employerId, recruiterId);
+    await api().post(opportunitiesPath(employerId) + '/' + opportunityId + '/publish').set(auth(recruiterId)).expect(201);
+    const applied = await api().post('/api/v1/students/me/applications').set(auth(studentUserId)).send({ opportunityId, consentGranted: true }).expect(201);
+    const applicants = await api().get(opportunitiesPath(employerId) + '/' + opportunityId + '/applications').set(auth(recruiterId)).expect(200);
+    expect(applicants.body.applications).toHaveLength(1);
+
+    await suspendThroughOperations(employerId);
+    expect(await lifecycle(opportunityId)).toBe('PAUSED');
+    expect(await lifecycle(untouchedDraftId)).toBe('DRAFT');
+    const audit = await pool.query("SELECT context FROM audit_events WHERE action='opportunity.paused' AND resource_id=$1", [opportunityId]);
+    expect(audit.rows).toEqual([{ context: { reasonCode: 'REPRO_D3', cause: 'ORGANIZATION_SUSPENDED' } }]);
+    const outbox = await pool.query("SELECT payload FROM outbox_events WHERE event_type='opportunity.paused' AND aggregate_id=$1", [opportunityId]);
+    expect(outbox.rows).toEqual([{ payload: { opportunityId, employerId, cause: 'ORGANIZATION_SUSPENDED' } }]);
+
+    await api().get(opportunitiesPath(employerId) + '/' + opportunityId + '/applications').set(auth(recruiterId)).expect(403);
+    await api().post('/api/v1/employers/' + employerId + '/applications/' + applied.body.application.id + '/transition')
+      .set(auth(recruiterId)).send({ toState: 'SHORTLISTED' }).expect(403);
+    expect(ids(await api().get('/api/v1/opportunities').set(auth(studentUserId)).expect(200))).not.toContain(opportunityId);
+    await api().post('/api/v1/students/me/applications').set(auth(await user())).send({ opportunityId, consentGranted: true }).expect(403);
+
+    await api().post('/api/v1/operations/organizations/' + employerId + '/verification')
+      .set(auth(opsUserId)).send({ toState: 'VERIFIED', reasonCode: 'REINSTATED' }).expect(201);
+    expect((await pool.query('SELECT verification_state, active FROM organizations WHERE id=$1', [employerId])).rows[0])
+      .toEqual({ verification_state: 'VERIFIED', active: true });
+    expect(await lifecycle(opportunityId)).toBe('PAUSED');
+    expect(ids(await api().get('/api/v1/opportunities').set(auth(studentUserId)).expect(200))).not.toContain(opportunityId);
+
+    await api().post(opportunitiesPath(employerId) + '/' + opportunityId + '/publish').set(auth(recruiterId)).expect(201);
+    expect(ids(await api().get('/api/v1/opportunities').set(auth(studentUserId)).expect(200))).toContain(opportunityId);
+  });
+
+  it('hides and refuses a published job whose employer is rejected, unverified or inactive, even without a pause', async () => {
+    for (const [verification, active] of [['REJECTED', true], ['PENDING', true], ['VERIFIED', false]] as const) {
+      const { employerId, recruiterId } = await employerWithRecruiter();
+      const opportunityId = await draftWithAudience(employerId, recruiterId);
+      await api().post(opportunitiesPath(employerId) + '/' + opportunityId + '/publish').set(auth(recruiterId)).expect(201);
+      // Set directly: operations cannot reach these combinations from VERIFIED, but the data can hold them.
+      await pool.query('UPDATE organizations SET verification_state=$2::verification_state, active=$3 WHERE id=$1', [employerId, verification, active]);
+      expect(ids(await api().get('/api/v1/opportunities').set(auth(studentUserId)).expect(200))).not.toContain(opportunityId);
+      await api().get('/api/v1/opportunities/' + opportunityId).set(auth(studentUserId)).expect(403);
+      await api().post('/api/v1/students/me/applications').set(auth(await user())).send({ opportunityId, consentGranted: true }).expect(403);
+    }
+  });
+});

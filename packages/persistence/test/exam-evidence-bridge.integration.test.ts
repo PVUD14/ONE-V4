@@ -122,6 +122,43 @@ describe('exam result to readiness evidence', () => {
     expect(evidence.rows[0]?.possible).toBe(10);
   });
 
+  it('stamps exam evidence unaided, at the stage the student\'s attempts on the topic support (ENG-04)', async () => {
+    if (!topicId) return;
+    await seedAttempt({ correct: 7, wrong: 2, notAttempted: 1 }, true);
+    await map();
+    // Unaided successes on the topic on two earlier days. Exam attempt rows carry no skill
+    // (ENG-03), so the exam itself adds nothing to the stage; these rows are what it reads.
+    for (const daysAgo of [3, 2]) {
+      const sessionId = randomUUID();
+      await client.query(`INSERT INTO learning_sessions (id, subject_user_id, mode, started_at)
+        VALUES ($1,$2,'PRACTICE', now() - make_interval(days => $3))`, [sessionId, studentId, daysAgo]);
+      await client.query(
+        `INSERT INTO learning_attempt_events (id, subject_user_id, session_id, item_source, item_id, item_version, skill_id,
+           context, answered, correct, score, content_version, source_attempt_type, source_attempt_id, occurred_at)
+         VALUES ($1,$2,$3,'CAREER_READINESS_QUESTION',$4,1,$5,'PRACTICE',true,true,1,'practice-test','assessment_attempt',$6,
+                 now() - make_interval(days => $7))`,
+        [randomUUID(), studentId, sessionId, randomUUID(), topicId, randomUUID(), daysAgo],
+      );
+    }
+
+    await recordExamResultEvidence(db, { attemptId });
+    const evidence = await client.query<{ assisted: boolean; stage_at_capture: string }>(
+      'SELECT assisted, stage_at_capture FROM evidence_records WHERE source_aggregate_id=$1', [attemptId],
+    );
+    expect(evidence.rows).toEqual([{ assisted: false, stage_at_capture: 'DEMONSTRATED' }]);
+  });
+
+  it('stamps exam evidence ESTIMATED when the student has no attempts on the topic', async () => {
+    if (!topicId) return;
+    await seedAttempt({ correct: 7, wrong: 2, notAttempted: 1 }, true);
+    await map();
+    await recordExamResultEvidence(db, { attemptId });
+    const evidence = await client.query<{ assisted: boolean; stage_at_capture: string }>(
+      'SELECT assisted, stage_at_capture FROM evidence_records WHERE source_aggregate_id=$1', [attemptId],
+    );
+    expect(evidence.rows).toEqual([{ assisted: false, stage_at_capture: 'ESTIMATED' }]);
+  });
+
   it('stays silent on an unmapped subject rather than guessing a topic', async () => {
     await seedAttempt({ correct: 9, wrong: 1, notAttempted: 0 }, true);
     const outcome = await recordExamResultEvidence(db, { attemptId });

@@ -175,6 +175,20 @@ describe('integration event envelope', () => {
     })).toThrow(/unexpected payload field answers/);
   });
 
+  it('accepts NOT_ENOUGH_EVIDENCE as a submitted check outcome, so one attempt never has to claim a band (C3)', () => {
+    const event = createIntegrationEventEnvelope({
+      eventId: randomUUID(), eventType: 'assessment.attempt.submitted', eventVersion: 1,
+      occurredAt: '2026-08-18T00:00:00.000Z', aggregateId: randomUUID(), correlationId: 'career-readiness-event-3',
+      payload: { attemptId: randomUUID(), evidenceId: randomUUID(), outcomeBand: 'NOT_ENOUGH_EVIDENCE' },
+    });
+    expect(event.payload).toMatchObject({ outcomeBand: 'NOT_ENOUGH_EVIDENCE' });
+    expect(() => createIntegrationEventEnvelope({
+      eventId: randomUUID(), eventType: 'assessment.attempt.submitted', eventVersion: 1,
+      occurredAt: '2026-08-18T00:00:00.000Z', aggregateId: randomUUID(), correlationId: 'career-readiness-event-4',
+      payload: { attemptId: randomUUID(), evidenceId: randomUUID(), outcomeBand: 'READY' },
+    })).toThrow();
+  });
+
   it('registers minimum-data seeded content generation lifecycle events', () => {
     const requestId = randomUUID();
     const contentId = randomUUID();

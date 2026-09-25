@@ -50,6 +50,11 @@ function signInWith(email: string, memberships: readonly Membership[]): void {
     if (url.endsWith('/api/v1/me/consents/privacy-notice')) return { ok: true, json: async () => ({ requiredVersion: null, grantedVersion: null, required: false }) };
     if (url.endsWith('/api/v1/security/context')) return { ok: true, json: async () => ({ userId: 'employer-user', memberships, studentRelationships: [] }) };
     if (url.endsWith(`/api/v1/employers/${employerId}/opportunities`)) return { ok: true, json: async () => ({ opportunities: [opportunity] }) };
+    if (url.endsWith(`/api/v1/employers/${employerId}/team`)) return { ok: true, json: async () => ({ team: {
+      actorRole: memberships.find((item) => item.organizationId === employerId)?.role, invitableRoles: ['RECRUITER'], deliveryConfigured: false,
+      members: [{ membershipId: 'member-1', email: 'team.viewer@uat.example.test', role: 'EMPLOYER_OWNER', state: 'ACTIVE', since: null, isSelf: true, canEnd: false }],
+      nextCursor: null, invitations: [], invitationsTruncated: false, reasonCodes: { revoke: [], resend: [], end: [] },
+    } }) };
     return { ok: false };
   }));
 }
@@ -158,9 +163,11 @@ describe('EMP-01: employer workspace behaviour for each role', () => {
     expect(screen.queryByText('Not built yet')).not.toBeInTheDocument();
   });
 
-  it.each(['EMPLOYER_OWNER', 'EMPLOYER_ADMIN'])('shows Team to an %s as the honest not-built state', async (role) => {
+  // EMP-01 showed owners and admins the honest not-built state here; EMP-02 built Team.
+  it.each(['EMPLOYER_OWNER', 'EMPLOYER_ADMIN'])('shows Team to an %s as the live team screen', async (role) => {
     await openTeamAs(role);
-    expect(await screen.findByText('Not built yet')).toBeInTheDocument();
+    expect(await screen.findByText('team.viewer@uat.example.test (you)')).toBeInTheDocument();
+    expect(screen.queryByText('Not built yet')).not.toBeInTheDocument();
     expect(screen.queryByText('Managed by your owner or admin')).not.toBeInTheDocument();
   });
 });

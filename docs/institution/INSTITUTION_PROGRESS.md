@@ -38,3 +38,21 @@ email; `GET …/staff-actions` lists only the B student.
 **Risks / follow-ups:** reproduction specs become the first commit of INST-01 / INST-02 together with
 their fixes, never earlier.
 **Next goal:** INST-02 (blocked this run by the A.4 stop).
+
+## INST-02 — One scope helper, enforced on every institution read — 2026-09-25
+**Result:** Complete — every student-level institution read now filters by the reader's unit scope through one definition; administrators' results are unchanged.
+**Branch / PR:** fix/inst-scope-enforcement → feat/plan-phases-0-to-2 (no PR: `gh` is not installed; merged under the program's merge policy after full validation).
+**Files created:** packages/authorization/src/institution-scope.ts (+ .test.ts); packages/persistence/src/institution-scope.ts; apps/api/src/http/institution-student-scope.ts; apps/api/src/http/institution-student-scope.integration.spec.ts.
+**Files modified:** operations-institution-onboarding.controller.ts (student list, detail; list returns `scope`); staff-actions.controller.ts (local predicate replaced — covers applications and external applications through `subject()`); academic-records.controller.ts and persistence/academic-records.ts (queue scoped; a decision on an out-of-scope term is refused); career-readiness.controller.ts and persistence/career-readiness.ts (report scoped; aggregate records `scope`); institution-assessments.controller.ts (results, not-attempted list, assigned count); web api/institution.ts and rolePortal/institution.tsx (roster subtitle); persistence/package.json and pnpm-lock.yaml (authorization dependency).
+**Migrations added:** none.
+**Design docs / ADRs:** none required (no new table); the rule and its reasoning are in the header of packages/authorization/src/institution-scope.ts.
+**Validation:** fresh local database, only DATABASE_URL exported — typecheck pass · test pass, 1 139 passed / 0 failed (api 367 incl. 14 new, web 367 incl. 1 new, authorization 60 incl. 11 new, persistence 163, others) · build pass.
+**Acceptance criteria:**
+- Every endpoint listed has cross-scope denial tests (department A vs B; faculty outside scope) ✔ — roster list and detail, applications, external applications, verification queue and decide, readiness report, assessment results, staff actions.
+- Admin results unchanged ✔ — tested on list, detail, applications, queue, report and results.
+- Staff-action tests pass unchanged after the predicate move ✔ (existing staff-actions spec untouched and green).
+- Screens show the scope in the subtitle ✔ — "Showing students in <units>." on both roster pages.
+**Decisions for Divakar:** (1) Section 5.1 / decision 10.2 #2 adopted. (2) A placement admin, department head or faculty membership with **no** unit scope stays institution-wide (the staff-action rule the plan cites for faculty); failing closed would empty every current department-head workspace because invitations cannot set a scope yet. Recommended next: let admins set department/batch when inviting or assigning staff (INST-03), then consider failing closed. (3) With several staff memberships in one institution, the scope is their union. (4) An owner/admin membership that somehow carries a unit scope is institution-wide (Section 5.1); previously staff actions would have narrowed it — no product flow creates one.
+**Limitations / not done:** scoped staff invitations (no UI or API sets a membership's unit scope yet); assessment *assignment* (a write) is not yet scoped; verification-queue items from students without a roster profile are visible only to institution-wide staff.
+**Risks / follow-ups:** Android has no roster screen; its assessment-results read is scoped server-side (no client change needed).
+**Next goal:** INST-01 (student invitation and activation).

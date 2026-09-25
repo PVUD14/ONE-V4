@@ -11,6 +11,15 @@ export interface RuntimeConfig {
   readonly cognito: {
     readonly userPoolId?: string;
     readonly clientId?: string;
+    /**
+     * ADR-025's staff pool (MFA required). Absent by default: while it is absent, token
+     * verification and membership handling are exactly as before. When present, internal
+     * platform roles count only for tokens the staff pool issued (runtime-auth.ts).
+     */
+    readonly staffPool?: {
+      readonly userPoolId: string;
+      readonly clientId: string;
+    };
   };
   readonly automation: {
     readonly signingSecret?: string;
@@ -42,6 +51,7 @@ export function loadRuntimeConfig(env: NodeJS.ProcessEnv = process.env): Runtime
   if (nodeEnv === 'production' && (!userPoolId || !clientId)) {
     throw new Error('COGNITO_USER_POOL_ID and COGNITO_CLIENT_ID are required in production');
   }
+  const staffPool = parseStaffPool(env, userPoolId, clientId);
   if (automationSigningSecret && Buffer.byteLength(automationSigningSecret, 'utf8') < 32) {
     throw new Error('AUTOMATION_SIGNING_SECRET must contain at least 32 bytes');
   }
@@ -81,6 +91,7 @@ export function loadRuntimeConfig(env: NodeJS.ProcessEnv = process.env): Runtime
     cognito: {
       ...(userPoolId ? { userPoolId } : {}),
       ...(clientId ? { clientId } : {}),
+      ...(staffPool ? { staffPool } : {}),
     },
     automation: {
       ...(automationSigningSecret ? { signingSecret: automationSigningSecret } : {}),
@@ -93,6 +104,39 @@ export function loadRuntimeConfig(env: NodeJS.ProcessEnv = process.env): Runtime
       ...(fileEncryptionKey ? { fileEncryptionKey } : {}),
     },
   };
+}
+
+const cognitoUserPoolIdPattern = /^[a-z]{2}(?:-[a-z]+)+-\d+_[A-Za-z0-9]+$/;
+
+/**
+ * Both staff-pool settings or neither. Half a staff pool would leave the API believing
+ * MFA is enforced for staff when it is not, so a partial configuration is refused at
+ * startup rather than ignored. Messages name the setting, never its value.
+ */
+function parseStaffPool(
+  env: NodeJS.ProcessEnv,
+  userPoolId: string | undefined,
+  clientId: string | undefined,
+): { readonly userPoolId: string; readonly clientId: string } | undefined {
+  const staffUserPoolId = optionalNonEmpty(env.COGNITO_STAFF_USER_POOL_ID);
+  const staffClientId = optionalNonEmpty(env.COGNITO_STAFF_CLIENT_ID);
+  if (!staffUserPoolId && !staffClientId) return undefined;
+  if (!staffUserPoolId || !staffClientId) {
+    throw new Error('COGNITO_STAFF_USER_POOL_ID and COGNITO_STAFF_CLIENT_ID must be set together');
+  }
+  if (!userPoolId || !clientId) {
+    throw new Error('COGNITO_STAFF_USER_POOL_ID requires COGNITO_USER_POOL_ID and COGNITO_CLIENT_ID');
+  }
+  if (!cognitoUserPoolIdPattern.test(staffUserPoolId)) {
+    throw new Error('COGNITO_STAFF_USER_POOL_ID must be a Cognito user pool id (region_suffix)');
+  }
+  if (staffUserPoolId === userPoolId) {
+    throw new Error('COGNITO_STAFF_USER_POOL_ID must name a different pool from COGNITO_USER_POOL_ID');
+  }
+  if (staffClientId === clientId) {
+    throw new Error('COGNITO_STAFF_CLIENT_ID must differ from COGNITO_CLIENT_ID');
+  }
+  return { userPoolId: staffUserPoolId, clientId: staffClientId };
 }
 
 function parseNodeEnv(value: string | undefined): NodeEnv {

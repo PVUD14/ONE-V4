@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { Phase1ApiSecurityModule } from './http/api-security.module.js';
 import { loadRuntimeConfig } from './config.js';
 import { createDatabaseRuntime, PG_POOL, PostgresRuntimeLifecycle, RUNTIME_CONFIG } from './persistence.provider.js';
-import { createRuntimeIdentityVerifier } from './runtime-auth.js';
+import { createRuntimeIdentityVerifier, createRuntimeStaffPoolPolicy } from './runtime-auth.js';
 import { HealthController } from './health.controller.js';
 import { createClamAvScanner } from './storage/clamav.js';
 import { createLocalDiskStorage, type FileStorage } from './storage/file-storage.js';
@@ -20,6 +20,7 @@ import { API_FILE_SCANNER, API_FILE_STORAGE } from './http/api-security.js';
 
 const runtimeConfig = loadRuntimeConfig();
 const databaseRuntime = createDatabaseRuntime(runtimeConfig.databaseUrl);
+const staffPoolPolicy = createRuntimeStaffPoolPolicy(runtimeConfig);
 
 /** Disk storage, wrapped in at-rest encryption whenever FILE_ENCRYPTION_KEY is set. */
 function configuredFileStorage(documents: typeof runtimeConfig.documents): FileStorage {
@@ -40,6 +41,8 @@ const configuredScanner = runtimeConfig.documents.clamavSocketPath
       verifier: createRuntimeIdentityVerifier(runtimeConfig),
       identityStore: databaseRuntime.identityStore,
       db: databaseRuntime.db,
+      // ADR-025: only when COGNITO_STAFF_* are set; absent, memberships are unchanged.
+      ...(staffPoolPolicy ? { staffPoolPolicy } : {}),
       // Both or neither: config already refuses a storage root without a scanner, so
       // documents are either fully configured or reported unavailable.
       ...(runtimeConfig.documents.storageRoot ? { fileStorage: configuredFileStorage(runtimeConfig.documents) } : {}),

@@ -22,6 +22,7 @@ import {
   type IdentityTokenVerifier,
   type VerifiedIdentityToken,
 } from '@planthepath/identity/src/cognito.js';
+import type { StaffPoolPolicy } from '@planthepath/identity/src/staff-pool.js';
 import {
   digestInvitationToken,
   requireVerifiedRecipientEmail,
@@ -45,6 +46,10 @@ export const API_ID_GENERATOR = Symbol('API_ID_GENERATOR');
 // rather than degrading to an unscanned or unstored file path.
 export const API_FILE_STORAGE = Symbol('API_FILE_STORAGE');
 export const API_FILE_SCANNER = Symbol('API_FILE_SCANNER');
+// Optional: ADR-025's staff-pool policy. Absent (no staff pool configured) means
+// memberships are used exactly as loaded; present, staff-only roles count only for a
+// token the staff pool issued.
+export const API_STAFF_POOL_POLICY = Symbol('API_STAFF_POOL_POLICY');
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const correlationIdPattern = /^[A-Za-z0-9._:-]{8,128}$/;
@@ -89,6 +94,7 @@ export interface ApiSecurityDependencies {
   readonly db: PersistenceDb;
   readonly ids?: ApiIdGenerator;
   readonly invitationMailSink?: unknown;
+  readonly staffPoolPolicy?: StaffPoolPolicy;
 }
 
 @Injectable()
@@ -107,11 +113,12 @@ export class ProtectedApiAuthenticationGuard implements CanActivate {
   constructor(
     @Inject(API_IDENTITY_VERIFIER) private readonly verifier: IdentityTokenVerifier,
     @Inject(API_INTERNAL_IDENTITY_STORE) private readonly identityStore: InternalIdentityStore,
+    @Optional() @Inject(API_STAFF_POOL_POLICY) private readonly staffPoolPolicy?: StaffPoolPolicy,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<ProtectedHttpRequest>();
-    request.planThePath = await authenticateProtectedRequest(request, this.verifier, this.identityStore);
+    request.planThePath = await authenticateProtectedRequest(request, this.verifier, this.identityStore, this.staffPoolPolicy);
     return true;
   }
 }
@@ -134,13 +141,14 @@ export async function authenticateProtectedRequest(
   request: ProtectedHttpRequest,
   verifier: IdentityTokenVerifier,
   identityStore: InternalIdentityStore,
+  staffPoolPolicy?: StaffPoolPolicy,
 ): Promise<TrustedApiRequestContext> {
   const correlationId = resolveCorrelationId(request.headers['x-correlation-id']);
   const rawToken = extractAuthorizedBearerToken(request.headers.authorization, correlationId);
   const requestedOrganizationId = extractCandidateOrganizationId(request, correlationId);
 
   try {
-    const authorization = await resolveAuthorizationContext(rawToken, verifier, identityStore);
+    const authorization = await resolveAuthorizationContext(rawToken, verifier, identityStore, staffPoolPolicy ? { staffPool: staffPoolPolicy } : {});
     const selectedMembership = requestedOrganizationId
       ? selectCurrentMembership(authorization.memberships, requestedOrganizationId)
       : undefined;

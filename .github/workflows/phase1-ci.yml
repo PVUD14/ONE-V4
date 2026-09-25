@@ -52,6 +52,8 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+      - name: Production preflight cases (synthetic app.env only)
+        run: bash deploy/scripts/test-preflight-production.sh
       - run: pnpm db:migrate
       - name: Validate additive upgrade from Phase B migrations
         shell: bash

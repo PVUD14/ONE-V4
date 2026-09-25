@@ -144,7 +144,9 @@ describe('deletion policy', () => {
   it('covers every declared category exactly once', () => {
     const categories = DELETION_POLICY.map((entry) => entry.category);
     expect(new Set(categories).size).toBe(categories.length);
-    expect(categories).toHaveLength(10);
+    // OPS-05 added SUPPORT_CASES and ENG-03 LEARNING_ACTIVITY: both must be declared.
+    expect(categories).toHaveLength(11);
+    expect(categories).toEqual(expect.arrayContaining(['SUPPORT_CASES', 'LEARNING_ACTIVITY']));
   });
 
   it('produces a deterministic, non-routable replacement identity', () => {

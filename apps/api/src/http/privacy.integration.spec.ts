@@ -282,8 +282,9 @@ describe('deletion execution', () => {
       `SELECT category, disposition, basis, record_count FROM privacy_deletion_records
        WHERE request_id = $1 ORDER BY category`, [dueId],
     );
-    expect(records.rows).toHaveLength(10);
+    expect(records.rows).toHaveLength(11);
     const byCategory = Object.fromEntries(records.rows.map((r) => [r.category, r]));
+    expect(byCategory.SUPPORT_CASES.disposition).toBe('ANONYMISED');
     expect(byCategory.LEARNING_ACTIVITY.disposition).toBe('ERASED');
     // One attempt, one session and one activity event were erased.
     expect(byCategory.LEARNING_ACTIVITY.record_count).toBe(3);

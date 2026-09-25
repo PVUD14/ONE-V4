@@ -441,3 +441,64 @@ export function getStaffProfile(token: string, institutionId: string, signal?: A
 export function updateStaffNotificationPreferences(token: string, institutionId: string, body: Partial<NotificationPreferencesDto>): Promise<{ readonly staffProfile: StaffProfileDto }> {
   return requestJson(`${institutionPath(institutionId)}/staff-profile/notification-preferences`, { token, method: 'POST', body });
 }
+
+// --- Cohort announcements (INST-06) ---------------------------------------------
+
+export type AnnouncementChannel = 'IN_APP' | 'EMAIL';
+
+export interface AnnouncementAudienceDto {
+  /** null addresses the whole institution. */
+  readonly unitId: string | null;
+  readonly kind: string;
+  readonly name: string | null;
+}
+
+export interface InstitutionAnnouncementDto {
+  readonly id: string;
+  readonly title: string;
+  readonly body: string;
+  readonly audience: AnnouncementAudienceDto;
+  readonly channels: readonly AnnouncementChannel[];
+  readonly state: 'SCHEDULED' | 'SENT' | 'CANCELLED';
+  readonly senderRole: string;
+  readonly sentByMe: boolean;
+  readonly scheduledFor: string;
+  readonly sentAt: string | null;
+  readonly cancelledAt: string | null;
+  readonly cancelReasonCode: string | null;
+  readonly createdAt: string;
+  readonly delivery: {
+    readonly recipients: number;
+    readonly email: { readonly sent: number; readonly notConfigured: number; readonly failed: number; readonly bounced: number; readonly skipped: number; readonly pending: number };
+  } | null;
+}
+
+export interface InstitutionAnnouncementListDto {
+  readonly announcements: readonly InstitutionAnnouncementDto[];
+  readonly nextCursor: string | null;
+  readonly audiences: readonly AnnouncementAudienceDto[];
+  readonly canSend: boolean;
+  readonly emailConfigured: boolean;
+  readonly dailyLimit: number;
+}
+
+export interface InstitutionAnnouncementCreateRequest {
+  readonly title: string;
+  readonly body: string;
+  readonly audienceUnitId: string | null;
+  readonly channels: readonly AnnouncementChannel[];
+  readonly scheduledFor?: string;
+}
+
+export function listInstitutionAnnouncements(token: string, institutionId: string, cursor?: string | null, signal?: AbortSignal): Promise<InstitutionAnnouncementListDto> {
+  const query = cursor ? `?limit=50&cursor=${encodeURIComponent(cursor)}` : '?limit=50';
+  return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/announcements${query}`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function createInstitutionAnnouncement(token: string, institutionId: string, body: InstitutionAnnouncementCreateRequest): Promise<{ readonly announcement: InstitutionAnnouncementDto }> {
+  return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/announcements`, { token, method: 'POST', body });
+}
+
+export function cancelInstitutionAnnouncement(token: string, institutionId: string, announcementId: string, reasonCode: string): Promise<{ readonly announcement: InstitutionAnnouncementDto }> {
+  return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/announcements/${encodeURIComponent(announcementId)}/cancel`, { token, method: 'POST', body: { reasonCode } });
+}

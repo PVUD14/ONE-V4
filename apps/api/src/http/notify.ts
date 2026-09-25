@@ -3,7 +3,7 @@ import { sql } from 'drizzle-orm';
 import type { PersistenceDb } from '@planthepath/persistence/src/repositories.js';
 import type { ApiIdGenerator } from './api-security.js';
 
-export type NotificationKind = 'EXAM_ASSIGNED' | 'EXAM_REOPENED' | 'RESULT_PUBLISHED' | 'SYSTEM';
+export type NotificationKind = 'EXAM_ASSIGNED' | 'EXAM_REOPENED' | 'RESULT_PUBLISHED' | 'SYSTEM' | 'ANNOUNCEMENT';
 
 const logger = new Logger('notify');
 

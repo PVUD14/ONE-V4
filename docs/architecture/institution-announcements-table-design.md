@@ -21,7 +21,7 @@ table design rather than a free-form notification write.
 | --- | --- |
 | `INSTITUTION_OWNER`, `INSTITUTION_ADMIN` | The whole institution, or any unit in it |
 | `PLACEMENT_ADMIN` (TPO) | The whole institution, or any unit in it — narrowed to the membership's department or batch if it carries one |
-| `DEPARTMENT_HEAD` | Their department, or any unit below it |
+| `DEPARTMENT_HEAD` | Their department, or any unit below it — a head with no department on their membership addresses nobody |
 | `FACULTY_LECTURER` | The sections and batches of their **active teaching assignments**, or any unit below them |
 
 The sender's scope is computed by the single INST-02 helper
@@ -31,7 +31,8 @@ membership in a college that has not yet recorded any assignment falls back to i
 batch — and an unscoped one to the whole institution — so existing workspaces do not empty. For
 sending, that fallback would let a lecturer message the entire college. The helper therefore gets a
 second entry point, `institutionAnnouncementScope`, which feeds faculty memberships to the same
-`institutionStudentScope` with `teachingUnitIds` defaulted to an empty list. A lecturer with no
+`institutionStudentScope` with `teachingUnitIds` defaulted to an empty list (and drops department-head
+memberships that carry no department, which reads treat as institution-wide). A lecturer with no
 active assignment can address nobody and is told so plainly.
 
 An audience is either the institution (`audience_unit_id` NULL, which requires an institution-wide

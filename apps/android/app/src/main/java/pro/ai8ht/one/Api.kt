@@ -176,6 +176,12 @@ object Api {
      * assignments, scoped by the server exactly as the web page is. A 403 means the caller
      * holds no faculty role in this institution.
      */
+    /** INST-06: the caller's announcements (403 when the caller cannot send any). */
+    suspend fun institutionAnnouncements(context: Context, institutionId: String): AnnouncementsEnvelope =
+        json.decodeFromString(
+            request(context, "GET", "/api/v1/institutions/$institutionId/announcements?limit=20"),
+        )
+
     suspend fun myStudents(context: Context, institutionId: String): MyStudentsEnvelope =
         json.decodeFromString(
             request(context, "GET", "/api/v1/institutions/$institutionId/my-students?limit=50"),
@@ -426,6 +432,40 @@ object Api {
     val body: String,
     val createdAt: String,
     val readAt: String? = null,
+    /** INST-06: an ANNOUNCEMENT carries institutionName, from and audience. */
+    val data: Map<String, String> = emptyMap(),
+)
+
+/** "From your faculty · Section X, Local College" — only what the server sent. */
+internal fun NotificationDto.announcementSource(): String {
+    val institution = data["institutionName"]
+    val audience = data["audience"]
+    val where = listOfNotNull(audience, institution?.takeIf { it != audience }).joinToString(", ")
+    return listOfNotNull(data["from"]?.let { "From $it" }, where.ifBlank { null }).joinToString(" · ").ifBlank { "From your college" }
+}
+
+// --- Cohort announcements (INST-06) ---------------------------------------------
+
+@Serializable data class AnnouncementAudienceDto(val unitId: String? = null, val kind: String = "", val name: String? = null)
+@Serializable data class AnnouncementEmailDto(
+    val sent: Int = 0, val notConfigured: Int = 0, val failed: Int = 0, val bounced: Int = 0, val skipped: Int = 0, val pending: Int = 0,
+)
+@Serializable data class AnnouncementDeliveryDto(val recipients: Int = 0, val email: AnnouncementEmailDto = AnnouncementEmailDto())
+@Serializable data class InstitutionAnnouncementDto(
+    val id: String,
+    val title: String,
+    val body: String,
+    val audience: AnnouncementAudienceDto = AnnouncementAudienceDto(),
+    val channels: List<String> = emptyList(),
+    val state: String,
+    val scheduledFor: String? = null,
+    val sentAt: String? = null,
+    val delivery: AnnouncementDeliveryDto? = null,
+)
+@Serializable data class AnnouncementsEnvelope(
+    val announcements: List<InstitutionAnnouncementDto> = emptyList(),
+    val canSend: Boolean = false,
+    val emailConfigured: Boolean = false,
 )
 
 @Serializable data class ConsentStatusDto(

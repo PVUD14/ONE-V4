@@ -6,6 +6,17 @@ interface DerivedNotification {
   readonly id: string;
   readonly text: string;
   readonly actionable: boolean;
+  /** INST-06: a college announcement, shown in its own list with who it is from. */
+  readonly announcement?: { readonly title: string; readonly body: string; readonly from: string };
+}
+
+/** "From your faculty · Section X, Local College" — only what the server sent; nothing invented. */
+function announcementSource(data: Record<string, string> | undefined): string {
+  const from = data?.['from'];
+  const audience = data?.['audience'];
+  const institution = data?.['institutionName'];
+  const parts = [from ? `From ${from}` : '', [audience, audience !== institution ? institution : ''].filter(Boolean).join(', ')].filter(Boolean);
+  return parts.join(' · ') || 'From your college';
 }
 
 /**
@@ -40,7 +51,10 @@ export function StudentNotificationsBell(): React.ReactElement {
       if (feed.status === 'fulfilled') {
         setUnread(feed.value.unreadCount);
         for (const note of feed.value.notifications.slice(0, 20)) {
-          merged.push({ id: note.id, text: `${note.title} — ${note.body}`, actionable: note.readAt === null });
+          merged.push({
+            id: note.id, text: `${note.title} — ${note.body}`, actionable: note.readAt === null,
+            ...(note.kind === 'ANNOUNCEMENT' ? { announcement: { title: note.title, body: note.body, from: announcementSource(note.data) } } : {}),
+          });
         }
       } else {
         setUnread(0);
@@ -67,6 +81,8 @@ export function StudentNotificationsBell(): React.ReactElement {
   }, [open]);
 
   const liveActionable = items.filter((item) => item.id.endsWith('-open')).length;
+  const announcements = items.filter((item) => item.announcement);
+  const others = items.filter((item) => !item.announcement);
   const badgeCount = unread + liveActionable;
 
   return (
@@ -79,11 +95,22 @@ export function StudentNotificationsBell(): React.ReactElement {
       {open ? (
         <div className="notify-flyout" role="dialog" aria-label="Notifications">
           <strong>Notifications</strong>
-          {items.length ? (
+          {announcements.length ? (
+            <>
+              <strong>Announcements</strong>
+              <ul aria-label="Announcements">
+                {announcements.map((item) => <li key={item.id} className={item.actionable ? 'actionable' : ''}>
+                  {item.announcement!.title} — {item.announcement!.body}<br /><small>{item.announcement!.from}</small>
+                </li>)}
+              </ul>
+            </>
+          ) : null}
+          {others.length ? (
             <ul>
-              {items.map((item) => <li key={item.id} className={item.actionable ? 'actionable' : ''}>{item.text}</li>)}
+              {others.map((item) => <li key={item.id} className={item.actionable ? 'actionable' : ''}>{item.text}</li>)}
             </ul>
-          ) : (
+          ) : null}
+          {items.length ? null : (
             <p>You&apos;re all caught up — nothing needs your attention.</p>
           )}
         </div>

@@ -127,3 +127,63 @@ export function isStudentInInstitutionScope(scope: InstitutionStudentScope, stud
     .filter((id): id is string => Boolean(id));
   return scope.clauses.some((anchors) => anchors.every((covered) => studentUnits.some((unit) => covered.includes(unit))));
 }
+
+/**
+ * Announcement senders (INST-06, decision 10.2 #8): owners, admins and placement admins
+ * institution-wide (a placement admin narrowed by their membership's unit scope, as for
+ * reads); department heads their department; faculty their sections.
+ */
+export const institutionAnnouncementSenderRoles = ['INSTITUTION_OWNER', 'INSTITUTION_ADMIN', 'PLACEMENT_ADMIN', 'DEPARTMENT_HEAD', 'FACULTY_LECTURER'] as const;
+
+/**
+ * Who a membership may send an announcement to. The same definition as reads, with two
+ * deliberate differences, because the read fallbacks would widen a sender to the whole
+ * college: a faculty member sends only through active teaching assignments (none recorded
+ * means nobody), and a department head needs a department on their membership.
+ */
+export function institutionAnnouncementScope(
+  memberships: readonly InstitutionStaffScopeMembership[],
+  units: readonly InstitutionUnitNode[],
+): InstitutionStudentScope {
+  const senders = memberships
+    .filter((membership) => (institutionAnnouncementSenderRoles as readonly string[]).includes(membership.role))
+    .filter((membership) => membership.role !== 'DEPARTMENT_HEAD' || Boolean(membership.departmentUnitId))
+    .map((membership) => membership.role === 'FACULTY_LECTURER'
+      ? { ...membership, teachingUnitIds: membership.teachingUnitIds ?? [] }
+      : membership);
+  return institutionStudentScope(senders, units);
+}
+
+/**
+ * True when `scope` may address the audience: the whole institution (`null`) needs an
+ * institution-wide scope; a unit needs some clause whose every anchor covers it — the rule
+ * a student row is tested against, applied to the unit itself.
+ */
+export function canAddressInstitutionAudience(scope: InstitutionStudentScope, audienceUnitId: string | null): boolean {
+  if (scope.kind === 'INSTITUTION') return true;
+  if (scope.kind === 'NONE' || audienceUnitId === null) return false;
+  return scope.clauses.some((anchors) => anchors.every((covered) => covered.includes(audienceUnitId)));
+}
+
+/**
+ * The membership that admits an announcement to `audienceUnitId`, most senior role first,
+ * with that membership's own sending scope — recipients are resolved inside it. Null when
+ * none of the caller's memberships may address the audience.
+ */
+export function institutionAnnouncementSender<M extends InstitutionStaffScopeMembership>(
+  memberships: readonly M[],
+  units: readonly InstitutionUnitNode[],
+  audienceUnitId: string | null,
+): { readonly membership: M; readonly scope: InstitutionStudentScope } | null {
+  const ordered = [...memberships].sort((left, right) => senderRank(left.role) - senderRank(right.role));
+  for (const membership of ordered) {
+    const scope = institutionAnnouncementScope([membership], units);
+    if (canAddressInstitutionAudience(scope, audienceUnitId)) return { membership, scope };
+  }
+  return null;
+}
+
+function senderRank(role: string): number {
+  const rank = (institutionAnnouncementSenderRoles as readonly string[]).indexOf(role);
+  return rank === -1 ? Number.MAX_SAFE_INTEGER : rank;
+}

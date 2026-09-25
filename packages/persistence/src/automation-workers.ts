@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { deliverStudentInvitation, STUDENT_INVITATION_REQUESTED } from './student-invitations.js';
+import { ANNOUNCEMENT_DISPATCH_REQUESTED, dispatchInstitutionAnnouncement } from './institution-announcements.js';
 import type { InvitationMailSink } from './invitation-mail.js';
 import type { Pool } from 'pg';
 import type { IntegrationEventEnvelope } from '@planthepath/events/src/index.js';
@@ -80,6 +81,10 @@ export function createLocalIntegrationEventPublisher(input: { readonly pool: Poo
     // INST-01: with no sink configured the invitation is recorded NOT_CONFIGURED, not dropped.
     [STUDENT_INVITATION_REQUESTED]: async (event) => {
       await deliverStudentInvitation(input.db, event, input.invitationMailSink ? { mailSink: input.invitationMailSink } : {});
+    },
+    // INST-06: sends a due announcement once; with no sink its email is recorded NOT_CONFIGURED.
+    [ANNOUNCEMENT_DISPATCH_REQUESTED]: async (event) => {
+      await dispatchInstitutionAnnouncement(input.db, event, input.invitationMailSink ? { mailSink: input.invitationMailSink } : {});
     },
   };
   return {

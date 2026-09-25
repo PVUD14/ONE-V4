@@ -10,7 +10,7 @@ import { requestJson } from './http.js';
 
 export interface UserNotificationDto {
   readonly id: string;
-  readonly kind: 'EXAM_ASSIGNED' | 'EXAM_REOPENED' | 'RESULT_PUBLISHED' | 'SYSTEM';
+  readonly kind: 'EXAM_ASSIGNED' | 'EXAM_REOPENED' | 'RESULT_PUBLISHED' | 'SYSTEM' | 'ANNOUNCEMENT';
   readonly title: string;
   readonly body: string;
   readonly data: Record<string, string>;

@@ -28,6 +28,7 @@ import { EmployerRecruiterRealityPage } from './rolePortal/employer.js';
 import { EmployerOrganisationGate } from './rolePortal/employerOrganisationState.js';
 import { InstitutionAcademicStructurePage, InstitutionStaffActionsPage, InstitutionStaffPage, InstitutionStudentsPage } from './rolePortal/institution.js';
 import { FacultyMyStudentsPage, InstitutionFacultyAndStaffPage } from './rolePortal/institutionTeaching.js';
+import { FacultyMessagesPage } from './rolePortal/institutionAnnouncements.js';
 import { AcademicVerificationSection, FacultyAcademicVerification } from './rolePortal/institutionAcademicVerification.js';
 import { OperationsAuditLogPage, OperationsContentReadOnlyPage, OperationsFeatureFlagsPage, OperationsOrganizationsPage, OperationsInvitationTrackingPanel, OperationsTechnicalReadOnlyPage } from './rolePortal/operations.js';
 import { OperationsAccountLookupPage, OperationsSupportDeskPage } from './rolePortal/support.js';
@@ -342,6 +343,8 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   // INST-03: only these two labels' branches change; navigation is untouched.
   if (!demoMode && portal.key === 'faculty' && route.label === 'My Students') return <FacultyMyStudentsPage authenticatedWorkspace={authenticatedWorkspace} />;
   if (!demoMode && portal.key === 'department-head' && route.label === 'Faculty and Staff') return <InstitutionFacultyAndStaffPage authenticatedWorkspace={authenticatedWorkspace} />;
+  // INST-06: faculty Messages — announcements to assigned sections and the lecturer's inbox. Only this label's branch changes.
+  if (!demoMode && portal.key === 'faculty' && route.label === 'Messages') return <FacultyMessagesPage authenticatedWorkspace={authenticatedWorkspace} />;
   if (!demoMode && ['faculty', 'department-head'].includes(portal.key) && ['Assigned Tasks', 'Student Detail', 'Academic Verification', 'Meetings', 'Calendar'].includes(route.label)) {
     // Calendar and Academic Verification each gain a real page above the staff-action
     // list they already had, rather than replacing it: those lists are where the work is

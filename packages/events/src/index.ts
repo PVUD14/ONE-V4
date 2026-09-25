@@ -140,6 +140,17 @@ export const eventSchemas = {
     schemaRef: 'registry://institution.student.invitation.requested/1',
     payload: { invitationId: { kind: 'uuid' } },
   },
+  // INST-06: one per announcement, available at its scheduled time; the worker sends it once.
+  institutionAnnouncementDispatchRequestedV1: {
+    eventType: 'institution.announcement.dispatch.requested',
+    eventVersion: 1,
+    producer: 'identity-organization',
+    aggregateType: 'institution_announcement',
+    purpose: 'institution-announcement-dispatch',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://institution.announcement.dispatch.requested/1',
+    payload: { announcementId: { kind: 'uuid' } },
+  },
   organizationCreatedV1: {
     eventType: 'organization.created',
     eventVersion: 1,

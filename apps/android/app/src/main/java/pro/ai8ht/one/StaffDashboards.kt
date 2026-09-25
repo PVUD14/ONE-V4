@@ -202,7 +202,15 @@ private class InstitutionData(
     val verification: VerificationSummaryDto? = null,
     /** Current and upcoming academic calendar entries (INST-05); null when it could not be read (NA). */
     val academicTerms: List<CalendarTermDto>? = null,
+    /** Cohort announcements (INST-06); NotSender when the server says this caller cannot send (403). */
+    val announcements: AnnouncementsState = AnnouncementsState.NotSender,
 )
+
+private sealed interface AnnouncementsState {
+    data object NotSender : AnnouncementsState
+    data object Unavailable : AnnouncementsState
+    data class Loaded(val envelope: AnnouncementsEnvelope) : AnnouncementsState
+}
 
 /**
  * The Android institution workspace merges every institution role of one college into a
@@ -257,6 +265,12 @@ internal fun InstitutionScaffold(
             val calendar = async {
                 runCatching { Api.academicTerms(context, organizationId, java.time.LocalDate.now().toString()) }.getOrNull()
             }
+            val announcements = async {
+                runCatching { Api.institutionAnnouncements(context, organizationId) }.fold(
+                    onSuccess = { AnnouncementsState.Loaded(it) },
+                    onFailure = { if (it is Api.ApiException && it.status == 403) AnnouncementsState.NotSender else AnnouncementsState.Unavailable },
+                )
+            }
             val loadedExams = exams.await()
             val target = loadedExams.firstOrNull { it.lifecycleState == "PUBLISHED" && it.assignedCount > 0 }
             val attention = if (target != null) {
@@ -264,7 +278,7 @@ internal fun InstitutionScaffold(
                     .getOrDefault(emptyList())
             } else emptyList()
             data = InstitutionData(loadedExams, subjects.await(), review.await(), inbox.await(), attention, activation.await(),
-                myStudents.await(), verification.await(), calendar.await())
+                myStudents.await(), verification.await(), calendar.await(), announcements.await())
         }
     }
 
@@ -410,6 +424,9 @@ private fun InstitutionHome(data: InstitutionData, onVerify: () -> Unit, onExams
         // Academic calendar (INST-05): the college's current and upcoming terms, examination
         // periods and breaks, as its admins set them on the web Settings screen.
         AcademicCalendarSection(data.academicTerms)
+        // Cohort announcements (INST-06): what this staff member sent and how it was delivered.
+        // Composing stays on the web (faculty: Messages), where the audience picker lives.
+        if (data.announcements !is AnnouncementsState.NotSender) AnnouncementsSection(data.announcements)
 
         // Student activation (INST-01): who has accepted their invitation. Same summary as the
         // web Dashboard; resending invitations stays on the web Students page.
@@ -525,6 +542,53 @@ private fun AcademicCalendarSection(terms: List<CalendarTermDto>?) {
                         }
                         if (term.current) StatusChip("Now", ChipKind.Positive)
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AnnouncementsSection(state: AnnouncementsState) {
+    val loaded = (state as? AnnouncementsState.Loaded)?.envelope
+    SectionTitle("Announcements")
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        StatCell(loaded?.announcements?.count { it.state == "SENT" }?.toString() ?: "NA", "Sent", Tone.Accent, Icons.Filled.Notifications, Modifier.weight(1f))
+        StatCell(loaded?.announcements?.count { it.state == "SCHEDULED" }?.toString() ?: "NA", "Scheduled", Tone.Violet, Icons.Filled.Notifications, Modifier.weight(1f))
+    }
+    Spacer(Modifier.height(10.dp))
+    when {
+        loaded == null -> PilotCard {
+            Text("Your announcements could not be loaded right now. Open Messages on the web.",
+                Modifier.padding(14.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        !loaded.canSend && loaded.announcements.isEmpty() -> PilotCard {
+            Text("You have nobody to send announcements to yet. Faculty send to the sections and batches they are assigned to teach.",
+                Modifier.padding(14.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        loaded.announcements.isEmpty() -> PilotCard {
+            Text("No announcements yet. Compose one under Messages on the web.",
+                Modifier.padding(14.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        else -> loaded.announcements.take(4).forEach { announcement ->
+            PilotCard(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                Column(Modifier.padding(12.dp)) {
+                    Text(announcement.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                    val audience = if (announcement.audience.unitId == null) "Whole institution" else announcement.audience.name ?: "NA"
+                    val status = when (announcement.state) {
+                        "SENT" -> "Sent to ${announcement.delivery?.recipients ?: 0} student(s)"
+                        "SCHEDULED" -> "Scheduled"
+                        else -> "Cancelled"
+                    }
+                    val email = announcement.delivery?.email
+                    val emailNote = when {
+                        !announcement.channels.contains("EMAIL") -> ""
+                        email != null && email.notConfigured > 0 -> " · email not sent: no sender is set up yet"
+                        email != null -> " · ${email.sent} email(s) sent"
+                        else -> ""
+                    }
+                    Text("$audience · $status$emailNote", style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }

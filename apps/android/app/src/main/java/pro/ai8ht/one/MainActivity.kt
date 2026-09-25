@@ -1055,10 +1055,35 @@ private fun InboxOverlay(feed: NotificationsEnvelope?, onClose: () -> Unit, onAl
             feed == null || feed.notifications.isEmpty() ->
                 EmptyState(Icons.Filled.Notifications, Tone.Amber,
                     "All caught up",
-                    "Nothing needs your attention. Assignments, reopenings and results land here the moment they happen.")
+                    "Nothing needs your attention. College announcements, assignments, reopenings and results land here the moment they happen.")
             else -> LazyColumn(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
+                // INST-06: college announcements get their own list, with who they are from.
+                val announcements = feed.notifications.filter { it.kind == "ANNOUNCEMENT" }
+                val others = feed.notifications.filter { it.kind != "ANNOUNCEMENT" }
                 item { Spacer(Modifier.height(10.dp)) }
-                items(feed.notifications, key = { it.id }) { note ->
+                if (announcements.isNotEmpty()) {
+                    item { Text("Announcements", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(vertical = 6.dp)) }
+                    items(announcements, key = { it.id }) { note ->
+                        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+                            Box(Modifier.width(3.dp).fillMaxHeight()
+                                .background(if (note.readAt == null) MaterialTheme.colorScheme.primary else Color.Transparent))
+                            Column(Modifier.padding(start = 13.dp, end = 16.dp, top = 10.dp, bottom = 10.dp)) {
+                                Text(note.title, style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = if (note.readAt == null) FontWeight.Bold else FontWeight.Normal)
+                                Spacer(Modifier.height(2.dp))
+                                Text(note.body, style = MaterialTheme.typography.bodySmall)
+                                Spacer(Modifier.height(2.dp))
+                                Text(note.announcementSource(), style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                    }
+                    if (others.isNotEmpty()) item { Text("Other notifications", style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 14.dp, bottom = 6.dp)) }
+                }
+                items(others, key = { it.id }) { note ->
                     Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
                         Box(Modifier.width(3.dp).fillMaxHeight()
                             .background(if (note.readAt == null) MaterialTheme.colorScheme.primary else Color.Transparent))

@@ -265,3 +265,116 @@ invitations (Api.kt:181,186), so no gated write is reachable from the phone.
 - A shared or production database gains high-risk flags only when a migration marks them.
 
 **Next goal:** OPS-03.
+
+## OPS-05 — Support desk (minimal) and account lookup — 2026-09-25
+**Result:** Complete. Support is now a case desk, and Users / User Detail is a masked, audited account lookup. A privacy
+deletion detaches the person from their support cases and redacts each case's summary and notes.
+
+**Branch / PR:** feat/ops-support-desk → feat/plan-phases-0-to-2. The commits are, in order: design (ed663f0), acceptance
+tests (b4cc580), implementation (a7e7b32), and this report. The branch is pushed to onev4. No PR was opened because `gh` is
+not installed, so the merge is left to review.
+
+**Files created:**
+- docs/architecture/support-cases-table-design.md
+- packages/persistence/drizzle/0043_support_cases.sql
+- packages/authorization/src/support-desk.ts (+ .test.ts)
+- packages/persistence/src/support-cases.ts
+- apps/api/src/http/operations-support.controller.ts (+ operations-support.integration.spec.ts)
+- apps/web/src/api/support.ts
+- apps/web/src/rolePortal/support.tsx (+ .test.tsx)
+
+**Files modified:**
+- packages/authorization/src/index.ts: export only.
+- packages/events/src/index.ts: 3 events, `support_case.opened`, `.state_changed` and `.assigned`, carrying identifiers and
+  enums only.
+- packages/privacy/src/index.ts: a new deletion category `SUPPORT_CASES`, disposition ANONYMISED, with a stated basis.
+- apps/api/src/http/privacy-deletion.ts: the erase step detaches support cases before the identity is anonymised. The brief
+  named packages/persistence/src/privacy-deletion.ts, but the flow lives in the API package and `run-privacy-worker.ts` runs it.
+- apps/api/src/http/api-security.module.ts: registration only.
+- apps/web/src/api.ts: barrel export only.
+- apps/web/src/rolePortal/operations.tsx: the unmasked users table is gone. Invitation tracking stays, as its own panel.
+- apps/web/src/rolePortalPages.tsx: only the `Users`, `User Detail` and `Support` branches.
+- Tests updated: the privacy unit test and privacy.integration.spec. Adding a category moves the category count from 9 to 10,
+  and each test gains one expectation for the new category. No assertion was loosened.
+
+**Migrations added:** 0043_support_cases.sql. It creates:
+- the tables `support_cases` and `support_case_events`;
+- a guard trigger on cases. It stamps the SLA target and timestamps from the database clock and makes the opening record
+  immutable. It allows only the listed transitions, and the only changes it allows to the subject and summary are a
+  detachment and a redaction. Nothing can be deleted.
+- a guard trigger on history, which is append-only except for redacting a note;
+- a widened `privacy_deletion_category_ck`, with the one new value `SUPPORT_CASES`;
+- the index `audit_resource_time_idx`, for the account timeline.
+
+The migration was run twice on a freshly created `one_ops05` with no errors.
+
+**Design docs / ADRs:** support-cases-table-design.md covers the chosen design, state machine, SLA table, deletion and
+retention, and the rejected options. No ADR was needed; this builds on ADR-032.
+
+**Validation (fresh `one_ops05`, only DATABASE_URL exported):**
+- `db:migrate` ×2: pass.
+- typecheck: pass.
+- `pnpm -r --no-bail --workspace-concurrency=1 test`: **1 424 passed, 0 failed**, broken down as:
+  - web: 435, including 13 new
+  - api: 496, including 18 new
+  - authorization: 124, including 17 new
+  - persistence: 187
+  - others: 182
+- build: pass, with the web chunk-size warning only.
+
+Starting state: OPS-02's recorded green run on the same head, 8a780af, had 1 376 passing. In this session, migrate,
+typecheck and the package tests up to persistence were re-run on that head and passed. The base api/web run was stopped after
+40 minutes of disk contention from parallel agents, so no result is claimed for it.
+
+**Acceptance criteria:**
+- ✔ A case can be logged from a phone call in under a minute, with category, severity and summary. It takes one dialog and
+  one request. The dialog defaults to PHONE, MEDIUM and CUSTOMER_CONTACT, so the operator picks a category and types one line.
+- ✔ Transitions follow the state machine. An invalid transition returns 400 `SUPPORT_CASE_TRANSITION_NOT_ALLOWED`, and a
+  reason that does not fit the transition returns `REASON_CODE_INVALID`. The trigger refuses the same transitions from any
+  other writer.
+- ✔ Account lookup masks contacts, and the reveal is audited.
+  - The email shows as `a***@domain`.
+  - The phone slot shows NA, because ONE stores no phone number.
+  - A reveal needs a reason code, and `operations.support_account.contact_revealed` is written in the same transaction.
+  - Searching and viewing are audited as `…searched` and `…viewed`. The search text is not stored in audit.
+  - Reading a case writes `operations.support_case.viewed`.
+- ✔ After a privacy deletion the case no longer links to the user.
+  - The subject is set to NULL and `subject_detached_at` is set.
+  - The summary is replaced, and the notes are redacted.
+  - `privacy_deletion_records` gets a SUPPORT_CASES row.
+  - Re-linking the case to the user is refused by the trigger.
+- ✔ The §6.6 minimums:
+  - 401 without a token.
+  - 403 for an institution admin on every route, and for SECURITY_ADMIN on the case desk.
+  - 400 on invalid input and on unknown fields.
+  - Pagination defaults to 50 and allows at most 200. It is keyset paging, and no case repeats across pages.
+  - Audit rows carry the reason code, and outbox rows are written.
+  - The full email address and the audit context never appear in any response.
+  - Web tests cover real data, NA, loading, empty, an error with its reference, forbidden, reason-required dialogs, and
+    unchanged navigation labels.
+- ✔ No operations screen shows academic content, documents or AI conversations.
+
+**Decisions for Divakar (recommendations adopted):**
+- D3 from OPS-01: the new lookup uses SUPPORT_ACCOUNT_LOOKUP. The old `GET /operations/users-access` endpoint is unchanged and
+  still needs OPS_ORG_MANAGE, but no screen calls it any more. Retiring it is a later cleanup.
+- On deletion, support cases are anonymised, not erased. This is recorded as a new deletion category.
+- SLA targets are in calendar hours: URGENT 4, HIGH 24, MEDIUM 72, LOW 120. Severity is fixed when the case is opened.
+- Reason codes are defined in code for opening a case, for each target state, and for notes, assignment and reveal.
+- A case can only be assigned to someone who holds SUPPORT_CASES through an ACTIVE platform membership.
+- Cases store no contact details.
+- Account search needs at least 3 characters, a full address, or an id. It cannot list every account.
+
+**Limitations / not done:**
+- No attachments, email ingestion or impersonation, as the goal specifies.
+- A case does not link to the account view; operators search for the account instead.
+- The Overview support tile is left to OPS-03.
+
+**Android:** no change. §4.3 keeps operator screens web-only. The app's only operations calls are GET organizations and GET
+invitations (Api.kt:181,186), and both are unchanged.
+
+**Risks / follow-ups:**
+- `audit_resource_time_idx` is built without CONCURRENTLY. On a large `audit_events` table that briefly locks it.
+- The privacy worker still does not run in a single transaction; that is unchanged. The detach step is idempotent, so a
+  retry is safe.
+
+**Next goal:** OPS-06.

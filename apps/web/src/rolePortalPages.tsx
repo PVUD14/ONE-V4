@@ -31,6 +31,7 @@ import { FacultyMyStudentsPage, InstitutionFacultyAndStaffPage } from './rolePor
 import { AcademicVerificationSection, FacultyAcademicVerification } from './rolePortal/institutionAcademicVerification.js';
 import { OperationsAuditLogPage, OperationsContentReadOnlyPage, OperationsFeatureFlagsPage, OperationsOrganizationsPage, OperationsInvitationTrackingPanel, OperationsTechnicalReadOnlyPage } from './rolePortal/operations.js';
 import { OperationsAccountLookupPage, OperationsSupportDeskPage } from './rolePortal/support.js';
+import { FacultyAcademicCalendar, InstitutionSettingsPage, StaffProfilePage, StaffSettingsPage } from './rolePortal/institutionSettings.js';
 import { OperationsTrustSafetyPage } from './rolePortal/trustSafety.js';
 import { OperationsStaffCapabilitiesPage } from './rolePortal/staffCapabilities.js';
 import { OperationsApprovalsPanel } from './rolePortal/approvals.js';
@@ -330,7 +331,8 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
       : <InstitutionWorkspaceError title="Reports" unauthorized={Boolean(authenticatedWorkspace && !institutionWorkspaceRoles.has(authenticatedWorkspace.role))} />;
   }
   if (!demoMode && portal.key === 'institution-admin' && /career readiness|placement|reports/i.test(route.label)) return <AuthenticatedReadOnlyModule title={route.label} detail="Institution reports and readiness information are read-only in Phase 2A unless a dedicated persistent mutation is available." />;
-  if (!demoMode && portal.key === 'institution-admin' && /settings/i.test(route.label)) return <AuthenticatedNotYetAvailable title={route.label} detail="Institution settings mutation is not yet available in this UAT slice." />;
+  // INST-05: the admin's Settings label now opens the college settings; navigation is unchanged.
+  if (!demoMode && portal.key === 'institution-admin' && route.label === 'Settings') return <InstitutionSettingsPage authenticatedWorkspace={authenticatedWorkspace} />;
   // organizationId is nullable on the workspace summary, so the page only mounts once
   // there is an employer to scope it to.
   if (!demoMode && portal.family === 'Employer' && route.label === 'Assessments' && authenticatedWorkspace?.organizationId) {
@@ -345,7 +347,8 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
     // list they already had, rather than replacing it: those lists are where the work is
     // actually recorded, and they stay.
     const staffActions = <InstitutionStaffActionsPage routeLabel={route.label} authenticatedWorkspace={authenticatedWorkspace} />;
-    if (route.label === 'Calendar') return <><CalendarPage />{staffActions}</>;
+    // INST-05: the faculty Calendar shows the academic calendar alongside the meetings.
+    if (route.label === 'Calendar') return <>{portal.key === 'faculty' ? <FacultyAcademicCalendar authenticatedWorkspace={authenticatedWorkspace} /> : null}<CalendarPage />{staffActions}</>;
     // INST-04: staff roles, not the owner/admin-only check that left this unreachable for
     // the faculty it was built for. The queue first, the staff-action list as a second tab.
     if (route.label === 'Academic Verification' && isInstitutionStaffWorkspace(authenticatedWorkspace)) {
@@ -353,6 +356,12 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
     }
     return staffActions;
   }
+  // INST-05: only these labels' branches change — faculty Profile and Settings (their own
+  // profile and notification preferences), department head Settings (the same, plus the
+  // college settings read-only). The placement officer has no Settings item and gets none.
+  if (!demoMode && portal.key === 'faculty' && route.label === 'Profile') return <StaffProfilePage authenticatedWorkspace={authenticatedWorkspace} />;
+  if (!demoMode && portal.key === 'faculty' && route.label === 'Settings') return <StaffSettingsPage authenticatedWorkspace={authenticatedWorkspace} />;
+  if (!demoMode && portal.key === 'department-head' && route.label === 'Settings') return <InstitutionSettingsPage authenticatedWorkspace={authenticatedWorkspace} personal />;
   // Every other authenticated role with a Calendar in its navigation had nothing behind
   // it at all, so the merged feed is purely additive there.
   if (!demoMode && route.label === 'Calendar') return <CalendarPage />;

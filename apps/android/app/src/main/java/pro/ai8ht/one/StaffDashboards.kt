@@ -200,6 +200,8 @@ private class InstitutionData(
     val myStudents: MyStudentsState = MyStudentsState.NotFaculty,
     /** Academic verification backlog (INST-04), server-counted over the reader's scope; null reads NA. */
     val verification: VerificationSummaryDto? = null,
+    /** Current and upcoming academic calendar entries (INST-05); null when it could not be read (NA). */
+    val academicTerms: List<CalendarTermDto>? = null,
 )
 
 /**
@@ -252,6 +254,9 @@ internal fun InstitutionScaffold(
                 )
             }
             val verification = async { runCatching { Api.verificationSummary(context, organizationId) }.getOrNull() }
+            val calendar = async {
+                runCatching { Api.academicTerms(context, organizationId, java.time.LocalDate.now().toString()) }.getOrNull()
+            }
             val loadedExams = exams.await()
             val target = loadedExams.firstOrNull { it.lifecycleState == "PUBLISHED" && it.assignedCount > 0 }
             val attention = if (target != null) {
@@ -259,7 +264,7 @@ internal fun InstitutionScaffold(
                     .getOrDefault(emptyList())
             } else emptyList()
             data = InstitutionData(loadedExams, subjects.await(), review.await(), inbox.await(), attention, activation.await(),
-                myStudents.await(), verification.await())
+                myStudents.await(), verification.await(), calendar.await())
         }
     }
 
@@ -402,6 +407,10 @@ private fun InstitutionHome(data: InstitutionData, onVerify: () -> Unit, onExams
         // assignments, as the server scopes them. Assigning stays on the web Staff screen.
         if (data.myStudents !is MyStudentsState.NotFaculty) MyStudentsSection(data.myStudents)
 
+        // Academic calendar (INST-05): the college's current and upcoming terms, examination
+        // periods and breaks, as its admins set them on the web Settings screen.
+        AcademicCalendarSection(data.academicTerms)
+
         // Student activation (INST-01): who has accepted their invitation. Same summary as the
         // web Dashboard; resending invitations stays on the web Students page.
         SectionTitle("Student activation")
@@ -492,6 +501,33 @@ private fun InstitutionHome(data: InstitutionData, onVerify: () -> Unit, onExams
             }
         }
         Spacer(Modifier.height(20.dp))
+    }
+}
+
+private val academicTermKindLabels = mapOf("TERM" to "Term", "EXAMINATIONS" to "Examinations", "BREAK" to "Break")
+
+@Composable
+private fun AcademicCalendarSection(terms: List<CalendarTermDto>?) {
+    SectionTitle("Academic calendar")
+    PilotCard {
+        Column(Modifier.padding(14.dp)) {
+            when {
+                terms == null -> Text("The academic calendar could not be loaded right now (NA).",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                terms.isEmpty() -> Text("No academic calendar has been set up yet. Your institution admin adds terms under Settings on the web.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                else -> terms.take(5).forEach { term ->
+                    Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(term.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                            Text("${academicTermKindLabels[term.kind] ?: "NA"} · ${term.startsOn} to ${term.endsOn} · ${term.unit?.name ?: "Whole college"}",
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        if (term.current) StatusChip("Now", ChipKind.Positive)
+                    }
+                }
+            }
+        }
     }
 }
 

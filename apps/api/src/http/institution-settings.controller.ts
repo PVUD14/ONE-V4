@@ -442,7 +442,7 @@ export class InstitutionSettingsController {
   }
 }
 
-interface PreferenceRow { email_enabled: boolean; quiet_hours_start_minute: number; quiet_hours_end_minute: number; daily_cap: number }
+interface PreferenceRow extends Record<string, unknown> { email_enabled: boolean; quiet_hours_start_minute: number; quiet_hours_end_minute: number; daily_cap: number }
 
 function mapPreferences(row: PreferenceRow): Record<string, unknown> {
   return { emailEnabled: row.email_enabled, quietHoursStartMinute: row.quiet_hours_start_minute, quietHoursEndMinute: row.quiet_hours_end_minute, dailyCap: row.daily_cap };

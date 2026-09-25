@@ -181,6 +181,15 @@ object Api {
             request(context, "GET", "/api/v1/institutions/$institutionId/my-students?limit=50"),
         )
 
+    /**
+     * The college's academic calendar (INST-05): current and upcoming terms, examination
+     * periods and breaks, read by every institution staff role. Editing stays on the web.
+     */
+    suspend fun academicTerms(context: Context, institutionId: String, from: String): List<CalendarTermDto> =
+        json.decodeFromString<CalendarTermsEnvelope>(
+            request(context, "GET", "/api/v1/institutions/$institutionId/academic-terms?from=$from&limit=20"),
+        ).terms
+
     suspend fun examResults(context: Context, institutionId: String, definitionId: String): ExamResultsDto =
         json.decodeFromString(
             request(context, "GET", "/api/v1/institutions/$institutionId/assessments/$definitionId/results"),
@@ -347,6 +356,19 @@ object Api {
 @Serializable data class RosterActivationEnvelope(val activationSummary: Map<String, Int>? = null)
 @Serializable data class ErrorBody(val code: String? = null, val message: String? = null)
 
+/** The college academic calendar (INST-05). */
+@Serializable data class CalendarTermsEnvelope(val terms: List<CalendarTermDto> = emptyList())
+@Serializable data class CalendarTermDto(
+    val id: String = "",
+    val name: String = "",
+    /** TERM, EXAMINATIONS or BREAK. */
+    val kind: String = "TERM",
+    val startsOn: String = "",
+    val endsOn: String = "",
+    val unit: CalendarTermUnitDto? = null,
+    val current: Boolean = false,
+)
+@Serializable data class CalendarTermUnitDto(val id: String = "", val kind: String = "", val name: String = "")
 @Serializable data class MyStudentsEnvelope(
     /** ASSIGNMENTS: scope comes from teaching assignments; MEMBERSHIP: the college has not started assigning. */
     val mode: String = "MEMBERSHIP",

@@ -330,3 +330,114 @@ export function listMyStudents(token: string, institutionId: string, cursor?: st
 export function setInstitutionStaffScope(token: string, institutionId: string, membershipId: string, body: StaffUnitScopeDto & { readonly reasonCode: string }): Promise<Record<string, unknown>> {
   return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/staff-memberships/${encodeURIComponent(membershipId)}/scope`, { token, method: 'POST', body });
 }
+
+// --- College settings, grading scales, academic calendar, staff profile (INST-05) ---
+
+export type InstitutionResultScale = 'CGPA_10' | 'GPA_4' | 'PERCENTAGE' | 'LETTER' | 'PASS_FAIL';
+
+export const institutionResultScaleLabels: Readonly<Record<InstitutionResultScale, string>> = {
+  CGPA_10: 'CGPA out of 10', GPA_4: 'GPA out of 4', PERCENTAGE: 'Percentage', LETTER: 'Letter grades', PASS_FAIL: 'Pass / fail',
+};
+
+export interface ProgrammeGradingScaleDto {
+  readonly programUnitId: string;
+  readonly scale: InstitutionResultScale;
+  /** Null: the college has not given one, or the scale has none. Shown as NA. */
+  readonly passThreshold: number | null;
+  readonly updatedAt: string;
+}
+
+export interface InstitutionSettingsDto {
+  /** Verified by AI8HT operations; read-only from the college side. */
+  readonly profile: {
+    readonly legalName: string; readonly verificationState: string; readonly profileSetUp: boolean;
+    readonly displayName: string | null; readonly websiteUrl: string | null; readonly countryCode: string | null;
+    readonly stateOrProvince: string | null; readonly city: string | null; readonly postalCode: string | null;
+    readonly addressLine1: string | null; readonly addressLine2: string | null; readonly primaryContactEmail: string | null;
+    readonly institutionType: string | null;
+  };
+  readonly college: { readonly about: string | null; readonly placementContactEmail: string | null; readonly updatedAt: string | null };
+  /** Every programme; gradingScale null means NA — no scale is ever guessed. */
+  readonly programmes: readonly { readonly programUnitId: string; readonly programName: string; readonly parentName: string | null; readonly gradingScale: ProgrammeGradingScaleDto | null }[];
+  readonly canEdit: boolean;
+  readonly options: { readonly scales: readonly InstitutionResultScale[]; readonly numericScaleMaximum: Readonly<Partial<Record<InstitutionResultScale, number>>> };
+}
+
+export type AcademicTermKind = 'TERM' | 'EXAMINATIONS' | 'BREAK';
+
+export const academicTermKindLabels: Readonly<Record<AcademicTermKind, string>> = { TERM: 'Term', EXAMINATIONS: 'Examinations', BREAK: 'Break' };
+
+export interface AcademicTermDto {
+  readonly id: string; readonly name: string; readonly kind: AcademicTermKind; readonly startsOn: string; readonly endsOn: string;
+  readonly unit: { readonly id: string; readonly kind: string; readonly name: string } | null;
+  readonly current: boolean; readonly archived: boolean; readonly archiveReasonCode: string | null; readonly updatedAt: string;
+}
+
+export interface AcademicTermListDto {
+  readonly terms: readonly AcademicTermDto[];
+  readonly nextCursor: string | null;
+  readonly canEdit: boolean;
+  readonly options: { readonly kinds: readonly AcademicTermKind[]; readonly units: readonly { readonly id: string; readonly kind: string; readonly name: string }[] };
+}
+
+export interface AcademicTermInput {
+  readonly name?: string; readonly kind?: AcademicTermKind; readonly startsOn?: string; readonly endsOn?: string; readonly unitId?: string | null;
+}
+
+export interface NotificationPreferencesDto {
+  readonly emailEnabled: boolean; readonly quietHoursStartMinute: number; readonly quietHoursEndMinute: number; readonly dailyCap: number;
+}
+
+export interface StaffProfileDto {
+  readonly email: string;
+  readonly institutionName: string;
+  readonly roles: readonly { readonly role: string; readonly department: string | null; readonly batch: string | null }[];
+  readonly teachingAssignments: readonly { readonly unit: string; readonly subject: string | null; readonly academicTerm: string }[];
+  /** Null until the person saves; the defaults below then apply. */
+  readonly notificationPreferences: NotificationPreferencesDto | null;
+  readonly notificationDefaults: NotificationPreferencesDto;
+  /** False while ONE sends institution staff no reminder emails. */
+  readonly staffRemindersLive: boolean;
+}
+
+const institutionPath = (institutionId: string) => `/api/v1/institutions/${encodeURIComponent(institutionId)}`;
+
+export function getInstitutionSettings(token: string, institutionId: string, signal?: AbortSignal): Promise<{ readonly settings: InstitutionSettingsDto }> {
+  return requestJson(`${institutionPath(institutionId)}/settings`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function updateInstitutionSettings(token: string, institutionId: string, body: { readonly about?: string | null; readonly placementContactEmail?: string | null }): Promise<{ readonly settings: InstitutionSettingsDto }> {
+  return requestJson(`${institutionPath(institutionId)}/settings`, { token, method: 'POST', body });
+}
+
+export function setProgrammeGradingScale(token: string, institutionId: string, body: { readonly programUnitId: string; readonly scale: InstitutionResultScale; readonly passThreshold?: number | null }): Promise<{ readonly gradingScale: ProgrammeGradingScaleDto }> {
+  return requestJson(`${institutionPath(institutionId)}/grading-scales`, { token, method: 'POST', body });
+}
+
+export function removeProgrammeGradingScale(token: string, institutionId: string, programUnitId: string, reasonCode: string): Promise<{ readonly gradingScale: null }> {
+  return requestJson(`${institutionPath(institutionId)}/grading-scales/${encodeURIComponent(programUnitId)}/remove`, { token, method: 'POST', body: { reasonCode } });
+}
+
+export function listAcademicTerms(token: string, institutionId: string, signal?: AbortSignal): Promise<AcademicTermListDto> {
+  return requestJson(`${institutionPath(institutionId)}/academic-terms?limit=200`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function createAcademicTerm(token: string, institutionId: string, body: AcademicTermInput): Promise<{ readonly term: AcademicTermDto }> {
+  return requestJson(`${institutionPath(institutionId)}/academic-terms`, { token, method: 'POST', body });
+}
+
+export function updateAcademicTerm(token: string, institutionId: string, termId: string, body: AcademicTermInput): Promise<{ readonly term: AcademicTermDto }> {
+  return requestJson(`${institutionPath(institutionId)}/academic-terms/${encodeURIComponent(termId)}`, { token, method: 'PATCH', body });
+}
+
+export function archiveAcademicTerm(token: string, institutionId: string, termId: string, reasonCode: string): Promise<{ readonly term: AcademicTermDto }> {
+  return requestJson(`${institutionPath(institutionId)}/academic-terms/${encodeURIComponent(termId)}/archive`, { token, method: 'POST', body: { reasonCode } });
+}
+
+export function getStaffProfile(token: string, institutionId: string, signal?: AbortSignal): Promise<{ readonly staffProfile: StaffProfileDto }> {
+  return requestJson(`${institutionPath(institutionId)}/staff-profile`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function updateStaffNotificationPreferences(token: string, institutionId: string, body: Partial<NotificationPreferencesDto>): Promise<{ readonly staffProfile: StaffProfileDto }> {
+  return requestJson(`${institutionPath(institutionId)}/staff-profile/notification-preferences`, { token, method: 'POST', body });
+}

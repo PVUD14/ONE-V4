@@ -84,6 +84,11 @@ browser's, not the API's), and `AUTOMATION_SIGNING_SECRET` (≥32 bytes;
 building, and pass `ALLOW_PRODUCTION_MIGRATIONS=true` to the migrate step per-run —
 that guard exists so production migrations are a conscious act, never ambient.
 
+The staff pool (ADR-025) is optional: `COGNITO_STAFF_USER_POOL_ID` and
+`COGNITO_STAFF_CLIENT_ID` are set together or not at all. Unset, the preflight warns;
+with `--require-staff-pool` it fails. Setting them up and turning them on is
+`docs/ops/runbook-staff-pool.md`.
+
 ## Database backup with restore verification
 
 A dump that has never been restored is not a backup; it is a file that might be one.

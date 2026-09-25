@@ -592,4 +592,102 @@ invitations (Api.kt:200,205). It has no Security or privacy-operations screen, a
   replaced by a masked subject; `detail` is kept.
 - The `auth.test.ts` timing flake should be hardened separately.
 
+## OPS-03 — Real Overview with server-side queue counts — 2026-09-26
+**Result:** Complete. The operations Overview now renders from one bounded server-side summary covering every operator queue. It fetches no full lists, and a section the caller cannot access shows NA in its slot. No widget is dropped.
+
+**Branch / PR:** feat/ops-overview → feat/plan-phases-0-to-2. Commits in order: acceptance tests (9d8ae5c), implementation (4300e6e), this report. The branch is pushed to onev4. No PR was opened because `gh` is not installed.
+
+**Files created:**
+- packages/authorization/src/operations-overview.ts (+ .test.ts): the gate, the section → capability table and `suppressPeopleCount`.
+- packages/persistence/src/operations-overview.ts: `readOperationsOverview`. Each section is one statement of capped counts, and only the sections the caller may see are queried.
+- apps/api/src/http/operations-overview.controller.ts (+ operations-overview.integration.spec.ts): `GET /api/v1/operations/overview`.
+- apps/web/src/api/operationsOverview.ts: the client.
+- apps/web/src/operationsOverview.test.tsx
+
+**Files modified:**
+- apps/web/src/dashboardsV2.tsx: `OperationsDashboardV2` only. Nothing was needed in rolePortalPages.tsx because the Overview branch already renders this component.
+- apps/web/src/api.ts: a re-export.
+- apps/api/src/http/api-security.module.ts: registration only.
+- packages/authorization/src/index.ts: an export.
+- apps/android/…/Api.kt and StaffDashboards.kt (see Android).
+
+**Migrations added:** none. Every table read already exists on the base.
+**Design docs / ADRs:** none needed. No new table; this builds on ADR-032.
+
+**Validation (fresh `one_ops03`, only DATABASE_URL exported):**
+- `db:migrate` run twice: pass.
+- `corepack pnpm typecheck`: pass.
+- `corepack pnpm -r --no-bail --workspace-concurrency=1 test`: pass, **1 671 passed, 0 failed**.
+  - api 618 (9 new)
+  - web 503 (8 new)
+  - persistence 221
+  - authorization 147 (10 new)
+  - others 182
+- `corepack pnpm build`: pass (web chunk-size warning only).
+- Android: `./gradlew --no-daemon -q :app:compileDebugKotlin` passes.
+
+**What the summary counts, and who sees it.** Each section needs the capability its own screen checks. Without it the section is `null`, is not queried, and renders NA.
+
+| Section | Capability | Counts | Tile links to |
+|---|---|---|---|
+| organizations | OPS_ORG_MANAGE | total, active, by kind × verification state, 5 most recent | Organizations |
+| verification | OPS_VERIFY | awaiting a decision (PENDING + UNDER_REVIEW), under review | Verification |
+| employerAccessRequests | OPS_ORG_MANAGE | pending, oldest pending date | Organizations |
+| invitations | OPS_ORG_MANAGE | staff: total / accepted / pending / pending over 72 h / expired unaccepted; student: pending, over 72 h, not delivered, by delivery state; 3 expiring soonest, 4 most recent | Users |
+| accounts | ANALYTICS_VIEW | all accounts, student accounts, accounts with organisation roles (suppressed under 5) | Users |
+| trustSafety | TRUST_SAFETY_INVESTIGATE | open, unassigned, by severity | Trust and Safety |
+| jobs | OPS_JOBS_REPLAY | failed outbox events, open health alerts | System Health |
+| privacyRequests | PRIVACY_REQUESTS | open (exports, deletions), deletions scheduled within 7 days, failed | Security |
+| privacyHolds | PRIVACY_HOLDS | active holds | Security |
+| approvals | APPROVE_HIGH_RISK | pending (unexpired), approved awaiting execution | Settings |
+| support | SUPPORT_CASES | open, past SLA, unassigned | Support |
+
+What each role sees:
+- The super admin sees every section.
+- OPERATIONS_ADMIN sees every section except approvals, because an approver sees the whole approvals queue and anyone else sees only their own requests there.
+- SECURITY_ADMIN sees trust, jobs and the two privacy sections.
+
+**Acceptance criteria:**
+- One request renders the Overview, and no full-list fetches remain ✔. The web test asserts exactly one fetch, to `/operations/overview`, and none to `/operations/organizations`, `/invitations` or `/users-access`. On Android the two list calls are gone too.
+- A count for a module the caller cannot access shows NA ✔.
+  - API: the security admin gets `null` for the seven sections outside its baseline. A granted SUPPORT_CASES adds `support`, and revoking it removes it again.
+  - Web: every stat, the ring, the queue rows, and the Organizations, Invitations, Accounts and Needs-attention widgets show NA, and every heading stays on the page.
+- Tile links open the matching screens ✔. The web test clicks each of the 10 queue tiles and checks the path against the Operations nav config.
+- §5.7 bounded SQL ✔. Every count reads at most 10 001 rows (`LIMIT cap+1` subqueries) and reports `capped`, which the screens show as "10,000+". This is tested with cap = 1.
+- §5.6 no dropped widget ✔. The previous Overview hid the ring and the Accounts card when data was missing. Both now always render, with NA or 0.
+- §6.6 minimums ✔:
+  - Authorization unit tests: granted, denied, inactive membership, institution role with stray grants.
+  - API: 401; 403 for an institution admin and a suspended operator; 200 for all three roles; 400 on any query parameter, checked only after authorization; bounded counts; no personal data. The last is asserted by searching the response for seeded email and subject markers.
+  - Web: real data, NA, loading, error with reference, forbidden, navigation labels unchanged.
+  - Regression: every pre-existing test passes unchanged. No existing test was edited.
+  - There is no write, so no reason code or audit row is needed.
+
+**Decisions for Divakar (recommendations adopted):**
+- **Gate.** The endpoint opens for anyone holding any internal capability except CONTENT_REVIEW_EXTERNAL, which is the faculty reviewer's, not an operator's. Today that means exactly the three ACTIVE platform roles.
+- **Suppression per tile (§5.5).**
+  - The Accounts counts are counts of people, so they are suppressed below 5, zero included. The value never leaves the server.
+  - Every queue count is a count of work items: requests, cases, invitations, events, approvals. These are not suppressed, because the same operator can already open each item on the linked screen, and showing "<5 failed deliveries" would hide work without protecting anyone. OPS-06 made the same call for privacy queue counts.
+- **Accounts use ANALYTICS_VIEW.** Platform-wide counts of people are aggregate analytics. This is the same role set as the OPS_ORG_MANAGE list they used to come from.
+- **No personal data in the summary.** Recent and expiring invitations are described by role and organisation, not by recipient; recipients stay on the Users screen. The previous Overview printed recipient emails. Because the summary carries no personal data, the read is not audited as a `*.viewed` event.
+- **Privacy "due within 7 days"** means deletions whose erasure is scheduled within 7 days, the only deadline ONE records. No statutory response period is defined in code, and OPS-06 also left it NA, so none is invented.
+- **Invitation counts** cover live invitations (not past `expires_at`). Expired, never-accepted invitations are counted separately. The acceptance ring is staff invitations accepted out of all staff invitations.
+
+**Limitations / not done:**
+- OPS-06 (the privacy console) was not on the base when this finished. The privacy counts are real because they read 0009's tables, but the Security tile opens the existing read-only Security page until OPS-06 merges.
+- OPS-06 adds its own `suppressSmallCount` helper, and this goal adds `suppressPeopleCount`. They have different names and do not conflict, but both implement the same rule. After both merge, one should be kept.
+- Seeding an overdue support case in the API test is not possible, because the 0043 trigger stamps the SLA from the database clock. The overdue count is asserted as 0, and its SQL matches `summariseSupportCases`.
+- With no token the Overview stays on its loading state, which is unchanged from before. The authenticated chooser never renders it without one.
+
+**Android:** changed, for parity. The app's operations overview counted the same two lists, each capped at 200, and turned any failure into 0.
+- It now makes one call to `/operations/overview` and computes the four stat cells from the summary: Institutions, Employers, Verified, Invites pending.
+- It lists the same ten operator queues read-only. The app stays view-only per §4.3, so there is no action, and each row names the web screen where the queue is worked.
+- Recent organisations come from the summary.
+- A section the caller cannot access shows NA, and a failed load says so instead of showing zeros.
+- `listOperationsOrganizations` and `listOperationsInvitations` and their DTOs are removed; nothing else used them.
+- `compileDebugKotlin` passes.
+
+**Risks / follow-ups:**
+- `organizations` has no index on `verification_state`. The table is small, and every count is capped regardless.
+- If a later module adds a queue, it needs a section, a capability entry in the authorization table, and a tile.
+
 **Next goal:** OPS-07.

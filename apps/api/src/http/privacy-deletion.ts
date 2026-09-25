@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import type { PersistenceDb } from '@planthepath/persistence/src/repositories.js';
 import { DELETION_POLICY, anonymisedIdentity, isDeletionDue, type DeletionCategory, type PrivacyRequestState } from '@planthepath/privacy';
+import { detachSupportCasesForDeletedUser } from '@planthepath/persistence/src/support-cases.js';
 import type { FileStorage } from '../storage/file-storage.js';
 
 type QueryResult<T> = { rows: T[] };
@@ -147,6 +148,10 @@ async function erase(deps: DeletionExecutionDeps, subjectUserId: string): Promis
     UPDATE institution_student_profiles SET full_name = ${replacement.displayName}, updated_at = now()
     WHERE student_user_id = ${subjectUserId}::uuid
   `);
+
+  // Support cases (OPS-05) keep the service record and lose the person: the subject
+  // link, the typed summary and every note on those cases.
+  counts.SUPPORT_CASES = await detachSupportCasesForDeletedUser(db, subjectUserId);
 
   // Identity last: once this lands the person is gone, and every earlier step has
   // already been recorded.

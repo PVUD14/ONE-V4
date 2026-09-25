@@ -417,6 +417,48 @@ export const eventSchemas = {
     schemaRef: 'registry://operation_approval.executed/1',
     payload: { approvalId: { kind: 'uuid' }, actionKey: { kind: 'enum', values: operationApprovalActionKeys } },
   },
+  // OPS-05: the support desk. No consumer yet; the outbox row is the durable
+  // announcement a later notification or the Overview (OPS-03) can follow. Identifiers
+  // and enums only: a case summary or note never leaves the support tables.
+  supportCaseOpenedV1: {
+    eventType: 'support_case.opened',
+    eventVersion: 1,
+    producer: 'operations-support',
+    aggregateType: 'support_case',
+    purpose: 'support-desk',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://support_case.opened/1',
+    payload: {
+      caseId: { kind: 'uuid' },
+      category: { kind: 'enum', values: ['ACCOUNT_ACCESS', 'INVITATION', 'ONBOARDING', 'DATA_CORRECTION', 'PRIVACY_REQUEST', 'TECHNICAL_FAULT', 'HOW_TO', 'COMPLAINT', 'OTHER'] },
+      severity: { kind: 'enum', values: ['LOW', 'MEDIUM', 'HIGH', 'URGENT'] },
+      channel: { kind: 'enum', values: ['EMAIL', 'PHONE', 'WHATSAPP', 'IN_APP'] },
+    },
+  },
+  supportCaseStateChangedV1: {
+    eventType: 'support_case.state_changed',
+    eventVersion: 1,
+    producer: 'operations-support',
+    aggregateType: 'support_case',
+    purpose: 'support-desk',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://support_case.state_changed/1',
+    payload: {
+      caseId: { kind: 'uuid' },
+      fromState: { kind: 'enum', values: ['OPEN', 'IN_PROGRESS', 'WAITING_ON_CUSTOMER', 'RESOLVED', 'CLOSED'] },
+      toState: { kind: 'enum', values: ['OPEN', 'IN_PROGRESS', 'WAITING_ON_CUSTOMER', 'RESOLVED', 'CLOSED'] },
+    },
+  },
+  supportCaseAssignedV1: {
+    eventType: 'support_case.assigned',
+    eventVersion: 1,
+    producer: 'operations-support',
+    aggregateType: 'support_case',
+    purpose: 'support-desk',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://support_case.assigned/1',
+    payload: { caseId: { kind: 'uuid' }, assigneeUserId: { kind: 'uuid', required: false } },
+  },
   learningLessonCompletedV1: {
     eventType: 'learning.lesson.completed',
     eventVersion: 1,

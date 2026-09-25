@@ -29,7 +29,8 @@ import { EmployerOrganisationGate } from './rolePortal/employerOrganisationState
 import { InstitutionAcademicStructurePage, InstitutionStaffActionsPage, InstitutionStaffPage, InstitutionStudentsPage } from './rolePortal/institution.js';
 import { FacultyMyStudentsPage, InstitutionFacultyAndStaffPage } from './rolePortal/institutionTeaching.js';
 import { AcademicVerificationSection, FacultyAcademicVerification } from './rolePortal/institutionAcademicVerification.js';
-import { OperationsAuditLogPage, OperationsContentReadOnlyPage, OperationsFeatureFlagsPage, OperationsOrganizationsPage, OperationsTechnicalReadOnlyPage, OperationsUsersAccessPage } from './rolePortal/operations.js';
+import { OperationsAuditLogPage, OperationsContentReadOnlyPage, OperationsFeatureFlagsPage, OperationsOrganizationsPage, OperationsInvitationTrackingPanel, OperationsTechnicalReadOnlyPage } from './rolePortal/operations.js';
+import { OperationsAccountLookupPage, OperationsSupportDeskPage } from './rolePortal/support.js';
 import { OperationsTrustSafetyPage } from './rolePortal/trustSafety.js';
 import { OperationsStaffCapabilitiesPage } from './rolePortal/staffCapabilities.js';
 import { OperationsApprovalsPanel } from './rolePortal/approvals.js';
@@ -235,8 +236,10 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   const dense = isDenseManagementRoute(portal, route);
   if (!demoMode && portal.key === 'operations-admin' && route.label === 'Organizations') return <OperationsOrganizationsPage portal={portal} />;
   if (!demoMode && portal.key === 'operations-admin' && route.label === 'Organization Detail') return <OperationsOrganizationsPage portal={portal} />;
-  if (!demoMode && portal.key === 'operations-admin' && route.label === 'Users') return <OperationsUsersAccessPage />;
-  if (!demoMode && portal.key === 'operations-admin' && route.label === 'User Detail') return <OperationsUsersAccessPage />;
+  // OPS-05: Users and User Detail are the minimised account lookup (masked contacts,
+  // audited reads) with invitation tracking kept beneath it (Appendix 1 §4.2).
+  if (!demoMode && portal.key === 'operations-admin' && route.label === 'Users') return <><OperationsAccountLookupPage /><OperationsInvitationTrackingPanel /></>;
+  if (!demoMode && portal.key === 'operations-admin' && route.label === 'User Detail') return <><OperationsAccountLookupPage /><OperationsInvitationTrackingPanel /></>;
   // The studio goes above the existing read-only career-readiness panel rather than
   // replacing it: that panel reports on a different content pipeline and still works.
   if (!demoMode && portal.key === 'operations-admin' && route.label === 'Content Management') {
@@ -254,6 +257,9 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   // queue above it (Appendix 1 §4.2). Only this label's branch changes; the others keep
   // the not-yet-available state below.
   if (!demoMode && portal.key === 'operations-admin' && route.label === 'Settings') return <><OperationsApprovalsPanel /><OperationsStaffCapabilitiesPage /></>;
+  // OPS-05: Support is the case desk. Only this label's branch changes; Subscriptions,
+  // Billing and Analytics keep the not-yet-available state below.
+  if (!demoMode && portal.key === 'operations-admin' && route.label === 'Support') return <OperationsSupportDeskPage />;
   if (!demoMode && portal.key === 'operations-admin' && /subscriptions|billing|analytics|support|settings/i.test(route.label)) return <AuthenticatedNotYetAvailable title={route.label} detail="This Operations module is not yet backed by a Phase 2A persistent workflow." />;
   if (!demoMode && portal.key === 'institution-admin' && ['Students', 'Student Detail'].includes(route.label)) {
     // INST-04: the admin reaches academic verification here, under Students (plan §4.2);

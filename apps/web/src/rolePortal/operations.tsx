@@ -7,9 +7,9 @@
  * Split out of rolePortalPages.tsx so each stream owns its own surface. The
  * shell and the route dispatcher remain there and import from here.
  */
-import { createOperationsOrganization, getOperationsOrganizationOnboardingStatus, getProtectedAccessToken, inviteInitialOrganizationAdmin, listFeatureFlags, listOperationsInvitations, listOperationsOrganizations, listOperationsUsersAccess, searchAuditEvents, setFeatureFlagState, transitionOrganizationVerification, updateOperationsOrganization } from '../api.js';
+import { ApiRequestError, createOperationsOrganization, getOperationsOrganizationOnboardingStatus, getProtectedAccessToken, inviteInitialOrganizationAdmin, listFeatureFlags, listOperationsInvitations, listOperationsOrganizations, searchAuditEvents, setFeatureFlagState, transitionOrganizationVerification, updateOperationsOrganization } from '../api.js';
 import { EmployerAccessRequestsSection } from './operationsEmployerAccessRequests.js';
-import type { AuditEventDto, AuditSearchFilters, FeatureFlagDto, OperationsInvitationDto, OperationsUserAccessDto, OrganizationManagementDto } from '../api.js';
+import type { AuditEventDto, AuditSearchFilters, FeatureFlagDto, OperationsInvitationDto, OrganizationManagementDto } from '../api.js';
 import { V2Stat } from '../dashboardsV2.js';
 import { OperationsCareerReadinessPanel } from '../operationsCareerReadinessPanel.js';
 import type { RolePortalConfig } from '../rolePortalConfig.js';
@@ -111,33 +111,40 @@ export function OperationsOrganizationsPage({ portal }: { readonly portal: RoleP
   </section>;
 }
 
-export function OperationsUsersAccessPage(): React.ReactElement {
+/**
+ * Invitation tracking, kept on the Users screen under the OPS-05 account lookup.
+ *
+ * The unmasked user list that used to sit here is replaced by the account lookup
+ * (support.tsx), which masks contacts and audits every read (Appendix 1 §5.5). Chasing
+ * stuck organisation invitations is an onboarding job (OPS_ORG_MANAGE) and stays.
+ */
+export function OperationsInvitationTrackingPanel(): React.ReactElement | null {
   const token = getProtectedAccessToken();
   const [query, setQuery] = useState('');
-  const [users, setUsers] = useState<readonly OperationsUserAccessDto[]>([]);
   const [invitations, setInvitations] = useState<readonly OperationsInvitationDto[]>([]);
   const [error, setError] = useState('');
+  const [forbiddenReference, setForbiddenReference] = useState('');
   useEffect(() => {
     if (!token) return;
     const controller = new AbortController();
-    Promise.all([
-      listOperationsUsersAccess(token, query, controller.signal),
-      listOperationsInvitations(token, query, controller.signal),
-    ]).then(([userResult, invitationResult]) => {
-      setUsers(userResult.users);
-      setInvitations(invitationResult.invitations);
-    }).catch(() => setError('Unable to load Operations governance data.'));
+    listOperationsInvitations(token, query, controller.signal)
+      .then((result) => { setInvitations(result.invitations); setError(''); })
+      .catch((cause) => {
+        if (controller.signal.aborted) return;
+        if (cause instanceof ApiRequestError && cause.status === 403) setForbiddenReference(cause.correlationId);
+        else setError('Unable to load invitation tracking.');
+      });
     return () => controller.abort();
   }, [token, query]);
-  if (!token) return <RestrictedApiState title="Users & Access" message="Sign in with an Operations identity to inspect users and access." />;
-  return <section className="role-module role-module--dense"><div className="role-page-heading"><div><span className="eyebrow">READ_ONLY governance</span><h1>Users & Access</h1><p>Search users, identity links, memberships and Student relationship counts. No tokens, password data, raw invitation tokens or platform-role mutation are exposed.</p></div></div>
-    <div className="v2-row v2-cols-4 career-stat-strip role-wide">
-      <V2Stat icon="👥" tone="teal" value={users.length} label="Accounts shown" />
-      <V2Stat icon="🎓" tone="blue" value={users.filter((user) => user.studentRelationshipCount > 0).length} label="Student accounts" />
-      <V2Stat icon="🏛️" tone="purple" value={users.filter((user) => user.memberships.length > 0).length} label="With organization roles" />
+  if (!token) return null;
+  if (forbiddenReference) return <section className="role-card role-wide"><h2>Invitation tracking</h2><p>Invitation tracking is for staff who manage organisations. Reference: {forbiddenReference}</p></section>;
+  return <section className="role-card role-wide"><h2>Invitation tracking</h2>
+    <div className="v2-row v2-cols-4 career-stat-strip">
       <V2Stat icon="✉️" tone="amber" value={invitations.filter((invitation) => invitation.state === 'PENDING').length} label="Pending invitations" />
     </div>
-    {error ? <p className="form-error" role="alert">{error}</p> : null}<section className="role-card role-wide"><label className="role-local-search"><span>Search by email or internal user ID</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="person@example.test or UUID" /></label></section><section className="role-card role-wide"><h2>Users</h2><table className="role-record-table"><thead><tr><th>Email</th><th>User ID</th><th>Identity link</th><th>Memberships</th><th>Student relationships</th></tr></thead><tbody>{users.map((user) => <tr key={user.id}><td>{user.email}</td><td>{user.id}</td><td>{user.identityLinkStatus}</td><td>{user.memberships.map((item) => `${String(item.role)} / ${String(item.state)}`).join(', ') || 'None'}</td><td>{user.studentRelationshipCount}</td></tr>)}</tbody></table></section><section className="role-card role-wide"><h2>Invitation tracking</h2><InvitationInventoryTable invitations={invitations} /></section></section>;
+    {error ? <p className="form-error" role="alert">{error}</p> : null}
+    <label className="role-local-search"><span>Search invitations by email or organisation</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="person@example.test or organisation" /></label>
+    <InvitationInventoryTable invitations={invitations} /></section>;
 }
 
 export function OperationsContentReadOnlyPage(): React.ReactElement {

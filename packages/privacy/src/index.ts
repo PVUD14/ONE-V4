@@ -142,7 +142,7 @@ export function assertExportDownloadable(input: {
 
 export type DeletionCategory =
   | 'IDENTITY' | 'STUDENT_PROFILE' | 'INSTITUTION_ROSTER' | 'DOCUMENTS'
-  | 'APPLICATIONS' | 'OFFERS' | 'ASSESSMENT_EVIDENCE' | 'NOTIFICATIONS' | 'AUDIT';
+  | 'APPLICATIONS' | 'OFFERS' | 'ASSESSMENT_EVIDENCE' | 'NOTIFICATIONS' | 'AUDIT' | 'SUPPORT_CASES';
 
 export type DeletionDisposition = 'ERASED' | 'ANONYMISED' | 'RETAINED';
 
@@ -169,6 +169,9 @@ export const DELETION_POLICY: readonly DeletionPolicyEntry[] = [
   { category: 'APPLICATIONS', disposition: 'ANONYMISED', basis: 'Employers retain a record of applications and hiring decisions they lawfully made.' },
   { category: 'OFFERS', disposition: 'ANONYMISED', basis: 'Employers retain a record of offers they issued.' },
   { category: 'ASSESSMENT_EVIDENCE', disposition: 'ANONYMISED', basis: 'Aggregate assessment integrity depends on evidence remaining, detached from the person.' },
+  // OPS-05: the operator's service record survives with the person removed from it — the
+  // subject link, the typed summary and every note (docs/architecture/support-cases-table-design.md).
+  { category: 'SUPPORT_CASES', disposition: 'ANONYMISED', basis: 'Support records are kept as a history of the service given, with the person, the summary and the notes removed.' },
   { category: 'AUDIT', disposition: 'RETAINED', basis: 'Security and access audit records are retained under the approved retention schedule.' },
 ];
 

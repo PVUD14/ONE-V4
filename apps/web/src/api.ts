@@ -14,6 +14,7 @@ export * from './api/careerReadiness.js';
 export * from './api/student.js';
 export * from './api/privacy.js';
 export * from './api/operations.js';
+export * from './api/support.js';
 export * from './api/institution.js';
 export * from './api/hiring.js';
 export * from './api/assessments.js';

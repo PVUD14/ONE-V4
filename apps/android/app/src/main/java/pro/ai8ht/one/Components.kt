@@ -42,6 +42,8 @@ import androidx.compose.ui.unit.dp
 import pro.ai8ht.one.ui.LocalOnePalette
 import pro.ai8ht.one.ui.Tone
 import java.time.Instant
+import java.time.LocalDateTime
+import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
@@ -130,9 +132,33 @@ internal fun SectionTitle(text: String, trailing: String? = null, onTrailing: ((
 internal fun prettify(code: String): String =
     code.lowercase().replace('_', ' ').replaceFirstChar { it.uppercase() }
 
-internal fun formatWhen(iso: String): String = runCatching {
-    DateTimeFormatter.ofPattern("d MMM, h:mm a").withZone(ZoneId.systemDefault()).format(Instant.parse(iso))
-}.getOrDefault(iso)
+private val whenFormat = DateTimeFormatter.ofPattern("d MMM yyyy, h:mm a")
+
+/**
+ * Render a server timestamp for a person.
+ *
+ * `Instant.parse` only accepts the strict ISO instant form, and not every route hands
+ * that back: the institution assessment list returns the column as Postgres prints it,
+ * `2026-08-25 13:13:05.569371+00`, with a space instead of the `T` and a two-digit
+ * offset. That threw, the old fallback returned the input unchanged, and a placement
+ * officer read a raw database timestamp with microseconds on it.
+ *
+ * The shapes are normalised here rather than in one caller, because any route can send
+ * either and a screen should never be the thing that decides whether a date is legible.
+ */
+internal fun formatWhen(iso: String): String {
+    if (iso.isBlank()) return iso
+    val normalised = iso.trim()
+        .replaceFirst(' ', 'T')
+        // "+00" and "+0530" are valid Postgres output and invalid ISO offsets.
+        .replace(Regex("([+-])(\\d{2})$"), "$1$2:00")
+        .replace(Regex("([+-])(\\d{2})(\\d{2})$"), "$1$2:$3")
+    return runCatching { whenFormat.withZone(ZoneId.systemDefault()).format(Instant.parse(normalised)) }
+        .recoverCatching { whenFormat.format(OffsetDateTime.parse(normalised).atZoneSameInstant(ZoneId.systemDefault())) }
+        // No offset at all: read it as local time rather than inventing a zone.
+        .recoverCatching { whenFormat.format(LocalDateTime.parse(normalised).atZone(ZoneId.systemDefault())) }
+        .getOrDefault(iso)
+}
 
 @Composable
 internal fun LoadingSpinner() {

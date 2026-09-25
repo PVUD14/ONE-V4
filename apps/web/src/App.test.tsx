@@ -30,6 +30,54 @@ function institutionSecurityContext(): { readonly userId: string; readonly membe
   return { userId: 'admin-user', memberships: [{ organizationId: 'institution-1', role: 'INSTITUTION_ADMIN', scope: { organizationId: 'institution-1', institutionId: 'institution-1' } }] };
 }
 
+const recruiterEmployerId = 'employer-1';
+const recruiterOpportunityId = 'opportunity-1';
+const recruiterOpportunity = {
+  id: recruiterOpportunityId,
+  referenceCode: 'SOC-2026-01',
+  lifecycleState: 'PUBLISHED',
+  title: 'SOC Analyst Intern',
+  employmentType: 'INTERNSHIP',
+  workMode: 'ONSITE',
+  locationCity: 'Bengaluru',
+  applicationDeadline: null,
+  publishedAt: '2026-08-01T00:00:00.000Z',
+  applicationCount: 3,
+  openApplicationCount: 3,
+};
+const recruiterApplicants = [
+  { id: 'route-interview', state: 'INTERVIEW', consentRevoked: false, candidateName: 'Aanya Interview', candidateEmail: 'aanya@uat.example.test',
+    institutionStudentId: null, submittedAt: '2026-08-10T00:00:00.000Z', closedAt: null, interviewCount: 1, offerState: null, updatedAt: '2026-08-10T00:00:00.000Z' },
+  { id: 'route-offer', state: 'OFFER', consentRevoked: false, candidateName: 'Ojas Offer', candidateEmail: 'ojas@uat.example.test',
+    institutionStudentId: null, submittedAt: '2026-08-11T00:00:00.000Z', closedAt: null, interviewCount: 1, offerState: 'EXTENDED', updatedAt: '2026-08-11T00:00:00.000Z' },
+  { id: 'route-applied', state: 'APPLIED', consentRevoked: false, candidateName: 'Mira Applied', candidateEmail: 'mira@uat.example.test',
+    institutionStudentId: null, submittedAt: '2026-08-12T00:00:00.000Z', closedAt: null, interviewCount: 0, offerState: null, updatedAt: '2026-08-12T00:00:00.000Z' },
+];
+
+function recruiterSecurityContext(): { readonly userId: string; readonly memberships: readonly { readonly organizationId: string; readonly role: string; readonly scope: { readonly organizationId: string; readonly employerId: string } }[] } {
+  return { userId: 'recruiter-user', memberships: [{ organizationId: recruiterEmployerId, role: 'RECRUITER', scope: { organizationId: recruiterEmployerId, employerId: recruiterEmployerId } }] };
+}
+
+function configureRecruiterFetch(): void {
+  fetchMock.mockImplementation(async (url: string) => {
+    if (url === 'https://uat-auth.example.test/oauth2/token') return { ok: true, json: async () => ({ access_token: 'recruiter-token', id_token: jwtWithEmail('recruiter@example.test') }) };
+    if (url.endsWith('/health')) return { ok: true };
+    if (url.endsWith('/api/v1/me/consents/privacy-notice')) return { ok: true, json: async () => ({ requiredVersion: null, grantedVersion: null, required: false }) };
+    if (url.endsWith('/api/v1/security/context')) return { ok: true, json: async () => recruiterSecurityContext() };
+    if (url.endsWith(`/api/v1/employers/${recruiterEmployerId}/opportunities`)) return { ok: true, json: async () => ({ opportunities: [recruiterOpportunity] }) };
+    if (url.endsWith(`/api/v1/employers/${recruiterEmployerId}/opportunities/${recruiterOpportunityId}/applications`)) return { ok: true, json: async () => ({ applications: recruiterApplicants }) };
+    return { ok: true, json: async () => ({}) };
+  });
+}
+
+async function signInRecruiter(): Promise<void> {
+  configureHostedCallback('recruiter@example.test');
+  configureRecruiterFetch();
+  render(<App />);
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument());
+  cleanup();
+}
+
 beforeEach(() => {
   window.history.pushState(null, '', '/demo/student');
   fetchMock.mockReset();
@@ -192,6 +240,52 @@ describe('All-role portal registry and preview workflows', () => {
     expect(screen.queryByText(/Student Readiness/i)).not.toBeInTheDocument();
   });
 
+  it('routes recruiter Interviews and Offers to filtered Applicants while Talent Pool stays unfiltered', async () => {
+    const recruiter = activeRolePortals.find((item) => item.key === 'recruiter')!;
+    expect(recruiter.nav.filter((item) => item.group === 'Hiring').map((item) => [item.label, item.path])).toEqual([
+      ['Opportunities', '/employer/recruiter/opportunities'],
+      ['Opportunity Detail', '/employer/recruiter/opportunity-detail'],
+      ['Applicants', '/employer/recruiter/applicants'],
+      ['Candidate Detail', '/employer/recruiter/candidate-detail'],
+      ['Assessments', '/employer/recruiter/assessments'],
+      ['Interviews', '/employer/recruiter/interviews'],
+      ['Talent Pool', '/employer/recruiter/talent-pool'],
+      ['Offers', '/employer/recruiter/offers'],
+    ]);
+
+    await signInRecruiter();
+
+    cleanup();
+    window.history.pushState(null, '', '/employer/recruiter/interviews');
+    render(<App />);
+    expect(await screen.findByText('Aanya Interview')).toBeInTheDocument();
+    expect(screen.getByText((_content, element) => element?.textContent === 'Application state filter: Interview')).toBeInTheDocument();
+    expect(screen.queryByText('Ojas Offer')).not.toBeInTheDocument();
+    expect(screen.queryByText('Mira Applied')).not.toBeInTheDocument();
+    expect(screen.queryByText('Not built yet')).not.toBeInTheDocument();
+    expect(within(screen.getByLabelText('Recruiter navigation')).getByRole('button', { name: 'Interviews' })).toHaveAttribute('aria-current', 'page');
+
+    cleanup();
+    window.history.pushState(null, '', '/employer/recruiter/offers');
+    render(<App />);
+    expect(await screen.findByText('Ojas Offer')).toBeInTheDocument();
+    expect(screen.getByText((_content, element) => element?.textContent === 'Application state filter: Offer')).toBeInTheDocument();
+    expect(screen.queryByText('Aanya Interview')).not.toBeInTheDocument();
+    expect(screen.queryByText('Mira Applied')).not.toBeInTheDocument();
+    expect(screen.queryByText('Not built yet')).not.toBeInTheDocument();
+    expect(within(screen.getByLabelText('Recruiter navigation')).getByRole('button', { name: 'Offers' })).toHaveAttribute('aria-current', 'page');
+
+    cleanup();
+    window.history.pushState(null, '', '/employer/recruiter/talent-pool');
+    render(<App />);
+    expect(await screen.findByText('Aanya Interview')).toBeInTheDocument();
+    expect(screen.getByText('Ojas Offer')).toBeInTheDocument();
+    expect(screen.getByText('Mira Applied')).toBeInTheDocument();
+    expect(screen.queryByText((_content, element) => element?.textContent?.startsWith('Application state filter:') ?? false)).not.toBeInTheDocument();
+    expect(screen.queryByText('Not built yet')).not.toBeInTheDocument();
+    expect(within(screen.getByLabelText('Recruiter navigation')).getByRole('button', { name: 'Talent Pool' })).toHaveAttribute('aria-current', 'page');
+  });
+
   it('renders invitation acceptance as a protected verified-recipient workflow without accepting from preview state', () => {
     fetchMock.mockResolvedValue({ ok: true });
     window.history.pushState(null, '', '/invitations/accept?token=raw-invite-token');
@@ -215,6 +309,7 @@ describe('All-role portal registry and preview workflows', () => {
     fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
       if (url === 'https://uat-auth.example.test/oauth2/token') return { ok: true, json: async () => ({ access_token: 'institution-token', id_token: jwtWithEmail('institution.admin@example.test') }) };
       if (url.endsWith('/health')) return { ok: true };
+      if (url.endsWith('/api/v1/me/consents/privacy-notice')) return { ok: true, json: async () => ({ requiredVersion: null, grantedVersion: null, required: false }) };
       if (url.endsWith('/api/v1/security/context')) {
         contextCalls += 1;
         expect((init?.headers as Record<string, string>).Authorization).toBe('Bearer institution-token');
@@ -251,6 +346,7 @@ describe('All-role portal registry and preview workflows', () => {
     fetchMock.mockImplementation(async (url: string) => {
       if (url === 'https://uat-auth.example.test/oauth2/token') return { ok: true, json: async () => ({ access_token: 'institution-token', id_token: jwtWithEmail('institution.admin@uat.example.test') }) };
       if (url.endsWith('/health')) return { ok: true };
+      if (url.endsWith('/api/v1/me/consents/privacy-notice')) return { ok: true, json: async () => ({ requiredVersion: null, grantedVersion: null, required: false }) };
       if (url.endsWith('/api/v1/security/context')) throw new DOMException('Request was aborted by effect cleanup.', 'AbortError');
       return { ok: false };
     });
@@ -267,6 +363,7 @@ describe('All-role portal registry and preview workflows', () => {
     fetchMock.mockImplementation(async (url: string) => {
       if (url === 'https://uat-auth.example.test/oauth2/token') return { ok: true, json: async () => ({ access_token: 'institution-token', id_token: jwtWithEmail('institution.admin@uat.example.test') }) };
       if (url.endsWith('/health')) return { ok: true };
+      if (url.endsWith('/api/v1/me/consents/privacy-notice')) return { ok: true, json: async () => ({ requiredVersion: null, grantedVersion: null, required: false }) };
       if (url.endsWith('/api/v1/security/context')) return { ok: false, status: 500, headers: { get: () => 'ctx-500' }, json: async () => ({ message: { correlationId: 'ctx-500' } }) };
       return { ok: false };
     });
@@ -281,6 +378,7 @@ describe('All-role portal registry and preview workflows', () => {
     fetchMock.mockImplementation(async (url: string) => {
       if (url === 'https://uat-auth.example.test/oauth2/token') return { ok: true, json: async () => ({ access_token: 'institution-token', id_token: jwtWithEmail('institution.admin@uat.example.test') }) };
       if (url.endsWith('/health')) return { ok: true };
+      if (url.endsWith('/api/v1/me/consents/privacy-notice')) return { ok: true, json: async () => ({ requiredVersion: null, grantedVersion: null, required: false }) };
       if (url.endsWith('/api/v1/security/context')) {
         contextCalls += 1;
         if (contextCalls === 1) throw new TypeError('temporary network failure');

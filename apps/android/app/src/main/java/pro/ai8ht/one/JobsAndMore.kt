@@ -26,11 +26,15 @@ import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Assignment
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.WorkOutline
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -78,13 +82,64 @@ internal fun JobsScreen() {
     var applications by remember { mutableStateOf<List<ApplicationDto>?>(null) }
     var notice by remember { mutableStateOf<String?>(null) }
     var reload by remember { mutableIntStateOf(0) }
+    var openOpportunityId by remember { mutableStateOf<String?>(null) }
+    var jobsOverlay by remember { mutableStateOf<JobsOverlay?>(null) }
+    var feedback by remember { mutableStateOf<ApplicationFeedbackDto?>(null) }
 
     LaunchedEffect(reload) {
         opportunities = runCatching { Api.listOpportunities(context) }.getOrNull()
         applications = runCatching { Api.listApplications(context) }.getOrNull()
     }
 
+    // Back closes the overlay above the tab, rather than quitting the app.
+    //
+    // The shell's own BackHandler knows about the More destinations but not about these,
+    // and an overlay below would never be composed while one is open — so without this
+    // a student reading a job and pressing back lost the app.
+    androidx.activity.compose.BackHandler(enabled = openOpportunityId != null || jobsOverlay != null) {
+        if (openOpportunityId != null) openOpportunityId = null else jobsOverlay = null
+    }
+    androidx.activity.compose.BackHandler(enabled = feedback != null) { feedback = null }
+
+    feedback?.let { released ->
+        SlideIn { FeedbackPage(released, onClose = { feedback = null }) }
+        return
+    }
+
+    // Full-screen overlays sit above the tab content and return to it on close.
+    openOpportunityId?.let { id ->
+        SlideIn {
+            OpportunityDetailPage(
+                opportunityId = id,
+                onClose = { openOpportunityId = null },
+                onApplied = { notice = "Application submitted."; reload += 1 },
+            )
+        }
+        return
+    }
+    when (jobsOverlay) {
+        JobsOverlay.Offers -> { SlideIn { OffersPage(onClose = { jobsOverlay = null }) }; return }
+        JobsOverlay.Saved -> {
+            SlideIn {
+                SavedOpportunitiesPage(
+                    onClose = { jobsOverlay = null },
+                    onOpen = { jobsOverlay = null; openOpportunityId = it },
+                )
+            }
+            return
+        }
+        JobsOverlay.External -> { SlideIn { ExternalApplicationsPage(onClose = { jobsOverlay = null }) }; return }
+        null -> Unit
+    }
+
     Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
+        Spacer(Modifier.height(4.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            JobsQuickLink("Offers", Modifier.weight(1f)) { jobsOverlay = JobsOverlay.Offers }
+            JobsQuickLink("Saved", Modifier.weight(1f)) { jobsOverlay = JobsOverlay.Saved }
+            JobsQuickLink("Applied elsewhere", Modifier.weight(1.4f)) { jobsOverlay = JobsOverlay.External }
+        }
+        Spacer(Modifier.height(10.dp))
         val segmentColors = SegmentedButtonDefaults.colors(
             activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
             activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -113,12 +168,12 @@ internal fun JobsScreen() {
                 opportunities!!.isEmpty() -> EmptyState(
                     androidx.compose.material.icons.Icons.Filled.WorkOutline, pro.ai8ht.one.ui.Tone.Violet,
                     "No open roles right now",
-                    "When employers post opportunities for your institution, they appear here with one-tap apply.")
+                    "When employers post opportunities for your institution, they appear here.")
                 else -> LazyColumn(Modifier.fillMaxSize()) {
                     items(opportunities!!, key = { it.id }) { opp ->
                         Spacer(Modifier.height(12.dp))
                         PilotCard {
-                            Column(Modifier.padding(16.dp)) {
+                            Column(Modifier.clickable { openOpportunityId = opp.id }.padding(16.dp)) {
                                 Row(verticalAlignment = Alignment.Top) {
                                     Column(Modifier.weight(1f)) {
                                         Text(opp.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
@@ -143,17 +198,10 @@ internal fun JobsScreen() {
                                 }
                                 if (!opp.alreadyApplied) {
                                     Spacer(Modifier.height(10.dp))
-                                    Button(
-                                        onClick = {
-                                            notice = null
-                                            scope.launch {
-                                                runCatching { Api.applyToOpportunity(context, opp.id) }
-                                                    .onSuccess { notice = "Application submitted for ${opp.title}."; reload += 1 }
-                                                    .onFailure { notice = (it as? Api.ApiException)?.detail ?: "Could not apply just now. Try again." }
-                                            }
-                                        },
-                                        shape = RoundedCornerShape(10.dp),
-                                    ) { Text("Apply") }
+                                    // Opens the role rather than applying. Applying carries a
+                                    // consent decision, and a list row is no place to make one.
+                                    Text("View role and apply", style = MaterialTheme.typography.labelLarge,
+                                        color = MaterialTheme.colorScheme.primary)
                                 }
                             }
                         }
@@ -189,6 +237,46 @@ internal fun JobsScreen() {
                                     Spacer(Modifier.height(6.dp))
                                     Text("Submitted ${formatWhen(it)}", style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                // Only shown when the employer deliberately released
+                                // something. Silence stays silent rather than offering a
+                                // button that opens an empty page.
+                                if (app.feedbackReleased) {
+                                    Spacer(Modifier.height(8.dp))
+                                    TextButton(onClick = {
+                                        scope.launch {
+                                            runCatching { Api.applicationFeedback(context, app.id) }
+                                                .onSuccess { result ->
+                                                    if (result != null) feedback = result
+                                                    else notice = "That feedback is no longer available."
+                                                }
+                                                .onFailure { notice = (it as? Api.ApiException)?.detail ?: "Could not load that feedback." }
+                                        }
+                                    }) { Text("See why") }
+                                }
+                                // Terminal states are not withdrawable, and offering to
+                                // withdraw something already settled would be a dead button.
+                                if (app.state !in setOf("WITHDRAWN", "REJECTED", "ACCEPTED", "DECLINED")) {
+                                    Spacer(Modifier.height(8.dp))
+                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        TextButton(onClick = {
+                                            scope.launch {
+                                                runCatching { Api.withdrawApplication(context, app.id) }
+                                                    .onSuccess { notice = "Application withdrawn."; reload += 1 }
+                                                    .onFailure { notice = (it as? Api.ApiException)?.detail ?: "Could not withdraw that." }
+                                            }
+                                        }) { Text("Withdraw") }
+                                        // Revoking institution visibility is separate from
+                                        // withdrawing: a student may want their college to
+                                        // stop seeing an application they are still pursuing.
+                                        TextButton(onClick = {
+                                            scope.launch {
+                                                runCatching { Api.revokeInstitutionVisibility(context, app.id) }
+                                                    .onSuccess { notice = "Your institution can no longer see this application." }
+                                                    .onFailure { notice = (it as? Api.ApiException)?.detail ?: "Could not update that." }
+                                            }
+                                        }) { Text("Hide from college") }
+                                    }
                                 }
                             }
                         }
@@ -311,7 +399,8 @@ internal fun ChatOverlay(persona: String = "student", onClose: () -> Unit) {
 // --- More: named sections ------------------------------------------------------
 
 internal enum class MoreDest(val title: String) {
-    Profile("Profile"), Career("Career readiness"), Documents("Documents"),
+    Profile("Profile"), Calendar("Calendar"), Screening("Screening tests"), Resources("Resources"), Share("Public profile"), Career("Career readiness"), Target("Career target"),
+    Academics("Academic record"), Support("Support"), Documents("Documents"),
     Privacy("Privacy & data"), Help("Help & FAQ"), Settings("Settings"),
 }
 
@@ -368,8 +457,22 @@ internal fun MoreMenuScreen(
                 MenuRow(Icons.Filled.Person, pro.ai8ht.one.ui.Tone.Accent, "Profile",
                     "Your details, headline and photo") { onOpen(MoreDest.Profile) }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                MenuRow(Icons.Filled.DateRange, pro.ai8ht.one.ui.Tone.Violet, "Calendar",
+                    "Interviews, exam windows and deadlines") { onOpen(MoreDest.Calendar) }
+                MenuRow(Icons.Filled.Assignment, pro.ai8ht.one.ui.Tone.Accent, "Screening tests",
+                    "Tests employers have sent you") { onOpen(MoreDest.Screening) }
+                MenuRow(Icons.Filled.MenuBook, pro.ai8ht.one.ui.Tone.Green, "Resources",
+                    "Practice, company prep, scholarships and more") { onOpen(MoreDest.Resources) }
+                MenuRow(Icons.Filled.Share, pro.ai8ht.one.ui.Tone.Violet, "Public profile",
+                    "A link you control, showing your verified record") { onOpen(MoreDest.Share) }
                 MenuRow(Icons.Filled.Insights, pro.ai8ht.one.ui.Tone.Green, "Career readiness",
                     "Your advisory band and roadmap") { onOpen(MoreDest.Career) }
+                MenuRow(Icons.Filled.Insights, pro.ai8ht.one.ui.Tone.Accent, "Career target",
+                    "What you are aiming at, and what is still missing") { onOpen(MoreDest.Target) }
+                MenuRow(Icons.Filled.Description, pro.ai8ht.one.ui.Tone.Green, "Academic record",
+                    "Your results, and what employers can actually see") { onOpen(MoreDest.Academics) }
+                MenuRow(Icons.Filled.Person, pro.ai8ht.one.ui.Tone.Violet, "Support",
+                    "Tasks your institution has assigned you") { onOpen(MoreDest.Support) }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline)
                 MenuRow(Icons.Filled.Description, pro.ai8ht.one.ui.Tone.Violet, "Documents",
                     "Résumés, certificates and verification") { onOpen(MoreDest.Documents) }
@@ -422,14 +525,34 @@ internal fun ProfilePage(
     var profile by remember { mutableStateOf<ProfileDto?>(null) }
     LaunchedEffect(Unit) { profile = runCatching { Api.getProfile(context) }.getOrNull() }
 
+    val scope = rememberCoroutineScope()
+    var photoNotice by remember { mutableStateOf<String?>(null) }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) {
-            runCatching {
-                context.contentResolver.openInputStream(uri)?.use { input ->
-                    ProfilePhoto.save(context, input.readBytes())
+            scope.launch {
+                val bytes = runCatching {
+                    context.contentResolver.openInputStream(uri)?.use { input -> input.readBytes() }
+                }.getOrNull()
+                val type = context.contentResolver.getType(uri) ?: "image/jpeg"
+                when {
+                    bytes == null -> photoNotice = "That photo could not be read."
+                    type !in setOf("image/jpeg", "image/png") -> photoNotice = "Choose a JPEG or PNG."
+                    bytes.size > 5 * 1024 * 1024 -> photoNotice = "That photo is larger than 5 MB."
+                    else -> runCatching {
+                        val encoded = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+                        Api.uploadProfilePhoto(context, type, encoded)
+                        // Cached locally only so the screen updates without a round trip;
+                        // the server copy is the one that counts.
+                        ProfilePhoto.save(context, bytes)
+                    }.onSuccess {
+                        photoNotice = "Photo saved. It appears on the web too."
+                        onPhotoPicked()
+                    }.onFailure {
+                        photoNotice = (it as? Api.ApiException)?.detail
+                            ?: "That photo could not be saved. It is scanned before it is stored, so try again shortly."
+                    }
                 }
             }
-            onPhotoPicked()
         }
     }
 
@@ -442,6 +565,11 @@ internal fun ProfilePage(
                     TextButton(onClick = {
                         picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                     }) { Text("Change photo") }
+                    photoNotice?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                    }
                     Text(student?.fullName ?: "Student", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     Text(student?.verifiedEmail ?: "", style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -580,6 +708,26 @@ internal fun PrivacyPage(onClose: () -> Unit) {
                     ) { Text("Request data copy") }
                 }
             }
+            Spacer(Modifier.height(12.dp))
+            DeletionCard(
+                requests = requests,
+                onRequest = {
+                    notice = null
+                    scope.launch {
+                        runCatching { Api.requestDeletion(context) }
+                            .onSuccess { notice = "Deletion requested. You have 30 days to change your mind."; reload += 1 }
+                            .onFailure { notice = (it as? Api.ApiException)?.detail ?: "Could not request deletion just now." }
+                    }
+                },
+                onCancel = { requestId ->
+                    notice = null
+                    scope.launch {
+                        runCatching { Api.cancelPrivacyRequest(context, requestId) }
+                            .onSuccess { notice = "Deletion cancelled. Nothing was erased."; reload += 1 }
+                            .onFailure { notice = (it as? Api.ApiException)?.detail ?: "Could not cancel that request." }
+                    }
+                },
+            )
             Spacer(Modifier.height(12.dp))
             PilotCard {
                 Column(Modifier.padding(16.dp)) {

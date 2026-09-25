@@ -120,8 +120,8 @@ function LearningApiView({ catalog, learner, token, busy, onComplete }: {
   readonly catalog: CareerReadinessCatalog | null; readonly learner: LearnerCareerReadinessState | null; readonly token: string | null;
   readonly busy: boolean; readonly onComplete: (lessonId: string) => void;
 }): React.ReactElement {
-  const completed = new Set(learner?.progress.filter((item) => item.state === 'COMPLETED').map((item) => item.lessonVersionId) ?? []);
-  return <div className="career-api-grid">{catalog?.modules.flatMap((module) => module.lessons).map((lesson) => (
+  const completed = new Set(learner?.progress?.filter((item) => item.state === 'COMPLETED').map((item) => item.lessonVersionId) ?? []);
+  return <div className="career-api-grid">{(catalog?.modules ?? []).flatMap((module) => module.lessons).map((lesson) => (
     <article key={lesson.id}><span>{completed.has(lesson.id) ? 'Completed with evidence' : 'Published lesson'}</span><h3>{lesson.title}</h3>
       <p>{lesson.body.summary}</p><small>{lesson.prerequisiteLessonIds.length ? `${lesson.prerequisiteLessonIds.length} prerequisite` : 'No prerequisite'}</small>
       <button type="button" disabled={!token || busy || completed.has(lesson.id)} onClick={() => onComplete(lesson.id)}>{completed.has(lesson.id) ? 'Completed' : 'Complete lesson'}</button>
@@ -141,14 +141,24 @@ function AssessmentApiView({ catalog, learner, token, busy, attempt, selectedOpt
         checked={selectedOptions[question.id] === option.id} onChange={() => onSelect(question.id, option.id)} />{option.text}</label>)}</fieldset>)}
     <button type="submit" disabled={busy || attempt.questions.some((question) => !selectedOptions[question.id])}>Submit assessment once</button>
   </form>;
-  return <div className="career-api-grid">{catalog?.assessments.map((assessment) => <article key={assessment.id}><span>Published assessment</span>
-    <h3>{assessment.title}</h3><p>{assessment.selectionCount} questions · {Math.round(assessment.timeLimitSeconds / 60)} minutes · one attempt</p>
-    <button type="button" disabled={!token || busy || Boolean(learner?.attempts.length)} onClick={() => onStart(assessment.id)}>Start assessment</button>
-  </article>) ?? null}</div>;
+  // The server allows one attempt per assessment. This previously disabled every
+  // assessment as soon as the learner had attempted any one of them, which is a
+  // stricter rule than the server's and made readiness effectively impossible to
+  // exercise or regression-test. Now each card reflects only its own assessment.
+  const attemptedAssessments = new Set((learner?.attempts ?? [])
+    .map((attempt) => attempt.assessmentDefinitionId).filter((id): id is string => Boolean(id)));
+  return <div className="career-api-grid">{(catalog?.assessments ?? []).map((assessment) => {
+    const alreadyAttempted = attemptedAssessments.has(assessment.id);
+    return <article key={assessment.id}><span>Published assessment</span>
+      <h3>{assessment.title}</h3><p>{assessment.selectionCount} questions · {Math.round(assessment.timeLimitSeconds / 60)} minutes · one attempt</p>
+      <button type="button" disabled={!token || busy || alreadyAttempted} onClick={() => onStart(assessment.id)}>
+        {alreadyAttempted ? 'Already attempted' : 'Start assessment'}</button>
+    </article>;
+  }) ?? null}</div>;
 }
 
 function CareerStatStrip({ learner, catalog }: { readonly learner: LearnerCareerReadinessState; readonly catalog: CareerReadinessCatalog | null }): React.ReactElement {
-  const lessons = catalog?.modules.flatMap((module) => module.lessons) ?? [];
+  const lessons = (catalog?.modules ?? []).flatMap((module) => module.lessons);
   const completed = learner.progress.filter((item) => item.state === 'COMPLETED').length;
   const scored = learner.attempts.filter((item) => typeof item.scoreCorrect === 'number');
   return (
@@ -169,12 +179,12 @@ function ReadinessApiView({ learner }: { readonly learner: LearnerCareerReadines
 }
 
 function SkillsApiView({ learner }: { readonly learner: LearnerCareerReadinessState | null }): React.ReactElement {
-  return <div className="career-api-grid">{learner?.mastery.map((mastery) => <article key={mastery.id}><span>Evidence-derived mastery</span>
+  return <div className="career-api-grid">{learner?.mastery?.map((mastery) => <article key={mastery.id}><span>Evidence-derived mastery</span>
     <h3>{formatBand(mastery.band)}</h3><p>{mastery.evidenceIds.length} active evidence record{mastery.evidenceIds.length === 1 ? '' : 's'}.</p></article>) ?? null}</div>;
 }
 
 function RoadmapApiView({ learner }: { readonly learner: LearnerCareerReadinessState | null }): React.ReactElement {
-  if (!learner?.roadmap.length) return <V2EmptyState icon="🗺️" title="No next action yet"
+  if (!learner?.roadmap?.length) return <V2EmptyState icon="🗺️" title="No next action yet"
     note="Advisory next actions appear here after your versioned evidence is evaluated — complete lessons and assessments to generate them." />;
   return <div className="career-api-grid">{learner.roadmap.map((action) => <article key={action.id}><span>Advisory next action</span>
     <h3>{formatBand(action.actionCode)}</h3><p>Reason: {formatBand(action.reasonCode)}. State: {formatBand(action.state)}.</p>
@@ -184,7 +194,7 @@ function RoadmapApiView({ learner }: { readonly learner: LearnerCareerReadinessS
 function NotificationsApiView({ learner }: { readonly learner: LearnerCareerReadinessState | null }): React.ReactElement {
   const preference = learner?.notificationPreferences;
   return <><p className="career-api-status">Email is {preference?.emailEnabled ? 'enabled' : 'not enabled'}; daily cap {preference?.dailyCap ?? 0}. Destinations stay server-side.</p>
-    <div className="career-api-grid">{learner?.notifications.map((notification) => <article key={notification.id}><span>Native email command</span>
+    <div className="career-api-grid">{learner?.notifications?.map((notification) => <article key={notification.id}><span>Native email command</span>
       <h3>{formatBand(notification.templateKey)}</h3><p>{notification.legalPurpose}</p><small>{formatBand(notification.state)}</small></article>) ?? null}</div></>;
 }
 

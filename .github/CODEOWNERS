@@ -1,0 +1,81 @@
+# ONE — code ownership
+#
+# Every path maps to the stream owner accountable for it. GitHub requests their
+# review automatically, and with branch protection enabled on `main` and
+# `integration` their approval becomes required.
+#
+# ACTION REQUIRED: the placeholder handles below must be replaced with real
+# GitHub usernames before the rules they encode take effect. GitHub silently
+# ignores a CODEOWNERS line naming a user who cannot be resolved, so a wrong
+# handle fails open. Divakar's entries are live already.
+#
+#   Chandra   -> @chandra-github-handle      (Stream A · Platform)
+#   Manisha   -> @manisha-github-handle      (Stream B · Hiring)
+#   Navya     -> @navya-github-handle        (Stream C · Institution)
+#   Santhosh  -> @santhosh-github-handle     (Stream D · Learner)
+#   Divakar   -> @PVUD14                     (Stream E · Core)
+
+# ---------------------------------------------------------------------------
+# Default: anything not claimed below needs the core owner.
+# ---------------------------------------------------------------------------
+*                                       @PVUD14
+
+# ---------------------------------------------------------------------------
+# FROZEN — design system, brand and the rules themselves.
+# These are deliberately owned by one person. Do not widen this list.
+# ---------------------------------------------------------------------------
+/apps/web/src/styles.css                @PVUD14
+/apps/web/src/pilot/pilot.css           @PVUD14
+/apps/web/src/brand.tsx                 @PVUD14
+/apps/web/src/pilot/pilotComponents.tsx @PVUD14
+/apps/web/public/assets/                @PVUD14
+/AGENTS.md                              @PVUD14
+/CLAUDE.md                              @PVUD14
+/.github/CODEOWNERS                     @PVUD14
+
+# ---------------------------------------------------------------------------
+# Stream A · Platform — Chandra
+# ---------------------------------------------------------------------------
+/deploy/                                @PVUD14
+/infra/                                 @PVUD14
+/.github/workflows/                     @PVUD14
+
+# ---------------------------------------------------------------------------
+# Stream B · Hiring — Manisha
+# ---------------------------------------------------------------------------
+/apps/api/src/http/employer-hiring.controller.ts   @PVUD14
+/apps/api/src/http/student-hiring.controller.ts    @PVUD14
+/packages/hiring/                                  @PVUD14
+/apps/web/src/hiringPages.tsx                      @PVUD14
+
+# ---------------------------------------------------------------------------
+# Stream C · Institution — Navya
+# ---------------------------------------------------------------------------
+/apps/api/src/http/operations-institution-onboarding.controller.ts  @PVUD14
+/apps/api/src/http/institution-assessments.controller.ts            @PVUD14
+/apps/web/src/staffPages.tsx                                        @PVUD14
+/apps/web/src/staffConfig.ts                                        @PVUD14
+/apps/web/src/staffComponents.tsx                                   @PVUD14
+
+# ---------------------------------------------------------------------------
+# Stream D · Learner — Santhosh
+# ---------------------------------------------------------------------------
+/packages/learner-content/                               @PVUD14
+/packages/persistence/src/learner-content.ts             @PVUD14
+/packages/persistence/src/content-generation.ts          @PVUD14
+/packages/persistence/src/run-content-generation-worker.ts @PVUD14
+/apps/api/src/http/career-readiness.controller.ts        @PVUD14
+/apps/api/src/http/student-operational-core.controller.ts @PVUD14
+/apps/web/src/pilotParityPages.tsx                       @PVUD14
+/apps/web/src/studentDashboardV3.tsx                     @PVUD14
+/apps/web/src/careerReadinessApiPanel.tsx                @PVUD14
+/apps/web/src/studentPages.tsx                           @PVUD14
+
+# ---------------------------------------------------------------------------
+# Stream E · Core — Divakar
+# ---------------------------------------------------------------------------
+/apps/api/src/assistant/                @PVUD14
+/apps/web/src/App.tsx                   @PVUD14
+/apps/web/src/api.ts                    @PVUD14
+/packages/authorization/                @PVUD14
+/packages/persistence/drizzle/          @PVUD14

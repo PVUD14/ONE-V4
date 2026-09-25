@@ -20,12 +20,19 @@ import { EmployerHiringController } from './employer-hiring.controller.js';
 import { StudentDocumentsController } from './student-documents.controller.js';
 import { StudentPrivacyController } from './student-privacy.controller.js';
 import { InstitutionAssessmentsController } from './institution-assessments.controller.js';
+import { StaffActionsController } from './staff-actions.controller.js';
 import { StudentAssessmentAttemptsController } from './student-assessment-attempts.controller.js';
 import { AssistantController } from './assistant.controller.js';
 import { NotificationsController } from './notifications.controller.js';
 import { ConsentsController } from './consents.controller.js';
 import { HelpController } from './help.controller.js';
 import { StudentActivityController } from './student-activity.controller.js';
+import { OperationsOutboxController } from './operations-outbox.controller.js';
+import { OperationsPrivacyController } from './operations-privacy.controller.js';
+import { ExamTopicMappingController } from './exam-topic-mapping.controller.js';
+import { OperationsAuditController } from './operations-audit.controller.js';
+import { CalendarController } from './calendar.controller.js';
+import { EmployerAssessmentsController } from './employer-assessments.controller.js';
 
 @Module({})
 export class Phase1ApiSecurityModule {
@@ -46,7 +53,7 @@ export class Phase1ApiSecurityModule {
 
     return {
       module: Phase1ApiSecurityModule,
-      controllers: [Phase1SecurityController, OperationsInstitutionOnboardingController, StudentOperationalCoreController, StudentHiringController, EmployerHiringController, StudentDocumentsController, StudentPrivacyController, InstitutionAssessmentsController, StudentAssessmentAttemptsController, AssistantController, NotificationsController, ConsentsController, HelpController, StudentActivityController],
+      controllers: [StaffActionsController, Phase1SecurityController, OperationsInstitutionOnboardingController, StudentOperationalCoreController, StudentHiringController, EmployerHiringController, StudentDocumentsController, StudentPrivacyController, InstitutionAssessmentsController, StudentAssessmentAttemptsController, AssistantController, NotificationsController, ConsentsController, HelpController, StudentActivityController, OperationsAuditController, OperationsOutboxController, OperationsPrivacyController, ExamTopicMappingController, CalendarController, EmployerAssessmentsController],
       providers,
       exports: [
         API_IDENTITY_VERIFIER,

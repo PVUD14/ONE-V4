@@ -7,7 +7,7 @@
     "dev": "tsx watch src/main.ts",
     "start": "node dist/main.js",
     "start:prod": "node dist/main.js",
-    "test": "vitest run",
+    "test": "vitest run --fileParallelism=false",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "worker:privacy": "tsx src/run-privacy-worker.ts"
   },
@@ -19,6 +19,7 @@
     "@planthepath/automation": "workspace:*",
     "@planthepath/hiring": "workspace:*",
     "@planthepath/identity": "workspace:*",
+    "@planthepath/learner-content": "workspace:*",
     "@planthepath/persistence": "workspace:*",
     "@planthepath/privacy": "workspace:*",
     "drizzle-orm": "^0.45.2",

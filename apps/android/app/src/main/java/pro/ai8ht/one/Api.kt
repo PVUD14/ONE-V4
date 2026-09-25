@@ -19,7 +19,7 @@ import java.util.UUID
  */
 object Api {
     private val http = OkHttpClient()
-    private val json = Json { ignoreUnknownKeys = true }
+    internal val json = Json { ignoreUnknownKeys = true }
     private val jsonMedia = "application/json; charset=utf-8".toMediaType()
 
     fun baseUrl(context: Context): String =
@@ -28,7 +28,17 @@ object Api {
     class ApiException(val status: Int, val code: String?, val detail: String? = null) :
         Exception(detail ?: "API request failed ($status${code?.let { ", $it" } ?: ""})")
 
-    private suspend fun request(context: Context, method: String, path: String, body: String? = null): String =
+    /**
+     * @param idempotencyKey sent as Idempotency-Key where the route requires one. A retry
+     *   over a dropped mobile connection must not be able to count as a second submission.
+     */
+    internal suspend fun request(
+        context: Context,
+        method: String,
+        path: String,
+        body: String? = null,
+        idempotencyKey: String? = null,
+    ): String =
         withContext(Dispatchers.IO) {
             val token = Session.token(context) ?: throw ApiException(401, "NO_TOKEN")
             val builder = Request.Builder()
@@ -36,10 +46,12 @@ object Api {
                 .header("Accept", "application/json")
                 .header("X-Correlation-Id", "and-" + UUID.randomUUID())
                 .header("X-Client", "one-android/" + BuildConfig.VERSION_NAME)
+            if (idempotencyKey != null) builder.header("Idempotency-Key", idempotencyKey)
             when (method) {
                 "GET" -> builder.get()
                 "POST" -> builder.post((body ?: "{}").toRequestBody(jsonMedia))
                 "PATCH" -> builder.patch((body ?: "{}").toRequestBody(jsonMedia))
+                "DELETE" -> builder.delete()
             }
             fun run(tokenValue: String): Pair<Int, String> {
                 val request = builder.header("Authorization", "Bearer " + tokenValue).build()
@@ -99,13 +111,16 @@ object Api {
     suspend fun listOpportunities(context: Context): List<OpportunityDto> =
         json.decodeFromString<OpportunitiesEnvelope>(request(context, "GET", "/api/v1/opportunities")).opportunities
 
-    suspend fun applyToOpportunity(context: Context, opportunityId: String) {
-        request(context, "POST", "/api/v1/students/me/applications",
-            "{\"opportunityId\":\"$opportunityId\",\"consentGranted\":true}")
-    }
-
     suspend fun listApplications(context: Context): List<ApplicationDto> =
         json.decodeFromString<ApplicationsEnvelope>(request(context, "GET", "/api/v1/students/me/applications")).applications
+
+    /** Null when the employer shared nothing, or withdrew it between the list and this read. */
+    suspend fun applicationFeedback(context: Context, applicationId: String): ApplicationFeedbackDto? =
+        json.decodeFromString<ApplicationFeedbackEnvelope>(
+            request(context, "GET", "/api/v1/students/me/applications/$applicationId/feedback")).feedback
+
+    suspend fun listCalendar(context: Context): List<CalendarEntryDto> =
+        json.decodeFromString<CalendarEnvelope>(request(context, "GET", "/api/v1/me/calendar")).entries
 
     suspend fun getProfile(context: Context): ProfileDto =
         json.decodeFromString<ProfileEnvelope>(request(context, "GET", "/api/v1/students/me/profile")).profile
@@ -125,6 +140,9 @@ object Api {
 
     suspend fun helpArticles(context: Context): List<HelpArticleDto> =
         json.decodeFromString<HelpEnvelope>(request(context, "GET", "/api/v1/help")).articles
+
+    suspend fun studentActivity(context: Context): StudentActivityDto =
+        json.decodeFromString(request(context, "GET", "/api/v1/student/activity"))
 
     suspend fun securityContext(context: Context): SecurityContextDto =
         json.decodeFromString(request(context, "GET", "/api/v1/security/context"))
@@ -165,6 +183,11 @@ object Api {
         ).opportunities
 
     /** Streams an assistant answer; onDelta receives each text chunk as it arrives. */
+    suspend fun listEmployerApplicants(context: Context, employerId: String, opportunityId: String): List<EmployerApplicantDto> =
+        json.decodeFromString<EmployerApplicantsEnvelope>(
+            request(context, "GET", "/api/v1/employers/$employerId/opportunities/$opportunityId/applications"),
+        ).applications
+
     suspend fun assistantChat(
         context: Context,
         messages: List<Pair<String, String>>,
@@ -360,8 +383,16 @@ object Api {
     val progress: List<ProgressDto> = emptyList(),
     val readiness: ReadinessDto? = null,
     val roadmap: List<RoadmapDto> = emptyList(),
+    // The server has always returned these; the app never read them, and drew five
+    // hardcoded NA rings over the top of real per-topic bands.
+    val mastery: List<MasteryDto> = emptyList(),
 )
-@Serializable data class CatalogDto(val modules: List<ModuleDto> = emptyList())
+@Serializable data class MasteryDto(val topicId: String = "", val band: String = "")
+@Serializable data class TopicDto(val id: String, val name: String = "")
+@Serializable data class CatalogDto(
+    val modules: List<ModuleDto> = emptyList(),
+    val topics: List<TopicDto> = emptyList(),
+)
 @Serializable data class ModuleDto(
     val id: String,
     val title: String = "",
@@ -408,6 +439,47 @@ object Api {
     val workMode: String = "",
     val locationCity: String? = null,
     val submittedAt: String? = null,
+    /** True when the employer chose to tell this candidate why. The detail is a separate read. */
+    val feedbackReleased: Boolean = false,
+)
+
+// --- Candidate feedback -------------------------------------------------------
+
+@Serializable data class ApplicationFeedbackEnvelope(val feedback: ApplicationFeedbackDto? = null)
+
+@Serializable data class ApplicationFeedbackDto(
+    val id: String = "",
+    val employerName: String = "",
+    val title: String = "",
+    val releasedAt: String? = null,
+    val note: String? = null,
+    val reasons: List<FeedbackReasonDto> = emptyList(),
+)
+
+@Serializable data class FeedbackReasonDto(
+    val code: String = "",
+    val studentLabel: String = "",
+    val category: String = "",
+    /** Empty when nothing a student studies addresses this reason. Never filled with a guess. */
+    val topics: List<FeedbackTopicDto> = emptyList(),
+)
+
+@Serializable data class FeedbackTopicDto(val topicId: String = "", val name: String = "")
+
+// --- Calendar -----------------------------------------------------------------
+
+@Serializable data class CalendarEnvelope(val entries: List<CalendarEntryDto> = emptyList())
+
+@Serializable data class CalendarEntryDto(
+    val id: String = "",
+    val kind: String = "",
+    val title: String = "",
+    val detail: String? = null,
+    val startsAt: String = "",
+    val endsAt: String? = null,
+    val location: String? = null,
+    val joinUrl: String? = null,
+    val audience: String = "",
 )
 
 // --- Profile ------------------------------------------------------------------
@@ -524,4 +596,21 @@ object Api {
     val title: String = "",
     val keywords: List<String> = emptyList(),
     val body: String = "",
+)
+
+@Serializable data class StudentActivityDto(
+    val today: String = "",
+    val currentStreakDays: Int = 0,
+    val activeDaysLast7: Int = 0,
+    val last7: List<ActivityDayDto> = emptyList(),
+    val days: List<ActivityDayDto> = emptyList(),
+)
+@Serializable data class ActivityDayDto(val date: String = "", val count: Int = 0)
+@Serializable data class EmployerApplicantsEnvelope(val applications: List<EmployerApplicantDto> = emptyList())
+@Serializable data class EmployerApplicantDto(
+    val id: String,
+    val state: String = "",
+    val candidateName: String? = null,
+    val interviewCount: Int = 0,
+    val offerState: String? = null,
 )

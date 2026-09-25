@@ -8,7 +8,14 @@ import { createClamAvScanner } from './storage/clamav.js';
 import { createLocalDiskStorage, type FileStorage } from './storage/file-storage.js';
 import { createEncryptedStorage, parseFileEncryptionKey } from './storage/encrypted-storage.js';
 import { CareerReadinessController } from './http/career-readiness.controller.js';
+import { CareerTargetsController } from './http/career-targets.controller.js';
+import { AcademicRecordsController } from './http/academic-records.controller.js';
+import { PlatformControlsController } from './http/platform-controls.controller.js';
+import { TrustSafetyController } from './http/trust-safety.controller.js';
 import { AutomationCallbackController } from './http/automation-callback.controller.js';
+import { LearnerContentController } from './http/learner-content.controller.js';
+import { PublicProfileController } from './http/public-profile.controller.js';
+import { API_FILE_SCANNER, API_FILE_STORAGE } from './http/api-security.js';
 
 const runtimeConfig = loadRuntimeConfig();
 const databaseRuntime = createDatabaseRuntime(runtimeConfig.databaseUrl);
@@ -38,9 +45,14 @@ const configuredScanner = runtimeConfig.documents.clamavSocketPath
       ...(configuredScanner ? { fileScanner: configuredScanner } : {}),
     }),
   ],
-  controllers: [HealthController, CareerReadinessController, AutomationCallbackController],
+  controllers: [HealthController, CareerReadinessController, CareerTargetsController, AcademicRecordsController, PlatformControlsController, TrustSafetyController, AutomationCallbackController, LearnerContentController, PublicProfileController],
   providers: [
     { provide: RUNTIME_CONFIG, useValue: runtimeConfig },
+    // The public-profile controller lives here because it needs the pool, and it needs the
+    // same document store and scanner the api-security module is given.
+    ...(runtimeConfig.documents.storageRoot
+      ? [{ provide: API_FILE_STORAGE, useValue: configuredFileStorage(runtimeConfig.documents) }] : []),
+    ...(configuredScanner ? [{ provide: API_FILE_SCANNER, useValue: configuredScanner }] : []),
     { provide: PG_POOL, useValue: databaseRuntime.pool },
     PostgresRuntimeLifecycle,
   ],

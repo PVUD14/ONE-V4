@@ -52,7 +52,69 @@ const PILOT_TRANSFORM_VERSION = 'career-readiness-pilot-v1';
 const PILOT_SOURCE_PATH = 'data/career-readiness/pilot-v1.json';
 const PILOT_RELEASE_ID = '25000000-0000-4000-8000-000000000001';
 const PILOT_SOURCE_RECORD_ID = '25000000-0000-4000-8000-000000000002';
+/**
+ * How many times a learner may take the readiness check.
+ *
+ * It published as 1, which made readiness a one-shot measurement — you took it once and
+ * your band could never move again from that source. ADR-020 describes a band that
+ * develops as evidence accumulates, so one is the wrong number.
+ *
+ * It is not unlimited either. The pilot bank holds six questions and each attempt draws
+ * four, so free retakes would let a learner work through the bank and build evidence out
+ * of repetition rather than learning. Three leaves room to improve without that.
+ */
+const READINESS_CHECK_ATTEMPT_LIMIT = 3;
 const READINESS_MODEL_ID = '26000000-0000-4000-8000-000000000001';
+
+/**
+ * The model version a new snapshot is stamped with.
+ *
+ * Resolved from the active row rather than a constant, so publishing a new version
+ * (migration 0030 publishes version 2) changes what future snapshots claim without a
+ * code change. Historical snapshots keep the version they were computed under --
+ * ADR-020 forbids silently recalculating history, and the id on each row is what makes
+ * an old band comparable only with its own generation.
+ */
+async function activeReadinessModelId(client: DbClient): Promise<string> {
+  const result = await client.query<{ id: string }>(
+    `SELECT id FROM readiness_model_versions
+     WHERE stable_key='career-readiness-fundamentals' AND active
+     ORDER BY version DESC LIMIT 1`,
+  );
+  return result.rows[0]?.id ?? READINESS_MODEL_ID;
+}
+
+/**
+ * Publish readiness model version 2 on top of a freshly imported version 1.
+ *
+ * Migration 0030 publishes version 2 by copying version 1, but version 1 is written at
+ * import time, below. An environment migrated before its first import therefore came out
+ * of the import on version 1 and stayed there until the next migration run, stamping
+ * every snapshot in between with the retired model. This repeats 0030's statements in the
+ * import's own transaction, so an import leaves the state a migration run would. Both are
+ * idempotent (fixed id, ON CONFLICT DO NOTHING). Nothing historical is recalculated
+ * (ADR-020); a first import has no history.
+ */
+async function publishReadinessModelVersion2(client: DbClient): Promise<void> {
+  await client.query(
+    `INSERT INTO readiness_model_versions (id, stable_key, version, policy, published_by_user_id, published_at, active)
+     SELECT '26000000-0000-4000-8000-000000000002', 'career-readiness-fundamentals', 2,
+            jsonb_build_object(
+              'algorithm', 'career-readiness-mastery-v1',
+              'advisory', true,
+              'employerVisible', false,
+              'inputs', jsonb_build_array('LESSON_COMPLETION', 'ASSESSMENT_OUTCOME', 'INSTITUTION_EXAM_OUTCOME'),
+              'supersedes', 1),
+            m.published_by_user_id, now(), true
+     FROM readiness_model_versions m
+     WHERE m.stable_key = 'career-readiness-fundamentals' AND m.version = 1
+     ON CONFLICT (id) DO NOTHING`,
+  );
+  await client.query(
+    `UPDATE readiness_model_versions SET active = false
+     WHERE stable_key = 'career-readiness-fundamentals' AND version = 1`,
+  );
+}
 const ROADMAP_POLICY_ID = '26000000-0000-4000-8000-000000000002';
 const NOTIFICATION_TEMPLATE_ID = '26000000-0000-4000-8000-000000000003';
 
@@ -266,9 +328,10 @@ export async function publishCareerReadinessPilot(
     await client.query(
       `INSERT INTO assessment_definitions
        (id, stable_key, version, title, content_revision_id, release_manifest_id, attempt_limit, time_limit_seconds, published_at)
-       VALUES ($1,$2,1,$3,$4,$5,1,$6,now())`,
+       VALUES ($1,$2,1,$3,$4,$5,$7,$6,now())`,
       [fixture.assessment.id, fixture.assessment.stableKey, fixture.assessment.title,
-        revisionByEntityId.get(fixture.assessment.blueprintId), PILOT_RELEASE_ID, fixture.assessment.timeLimitSeconds],
+        revisionByEntityId.get(fixture.assessment.blueprintId), PILOT_RELEASE_ID, fixture.assessment.timeLimitSeconds,
+        READINESS_CHECK_ATTEMPT_LIMIT],
     );
     await client.query(
       `INSERT INTO assessment_blueprints (id, assessment_definition_id, version, selection_count, algorithm_version, constraints)
@@ -300,6 +363,7 @@ export async function publishCareerReadinessPilot(
        VALUES ($1,'career-readiness-fundamentals',1,$2::jsonb,$3,now(),true)`,
       [READINESS_MODEL_ID, JSON.stringify({ algorithm: 'career-readiness-mastery-v1', advisory: true, employerVisible: false }), actors.publisherUserId],
     );
+    await publishReadinessModelVersion2(client);
     await client.query(
       `INSERT INTO roadmap_policy_versions (id, stable_key, version, policy, published_by_user_id, published_at, active)
        VALUES ($1,'career-readiness-roadmap',1,$2::jsonb,$3,now(),true)`,
@@ -317,6 +381,14 @@ export async function publishCareerReadinessPilot(
 }
 
 export async function getPublishedCareerReadinessCatalog(pool: Pool): Promise<Record<string, unknown>> {
+  const topics = await pool.query(
+    `SELECT DISTINCT t.id, t.stable_key AS "stableKey", t.name, t.description
+     FROM taxonomy_nodes t
+     JOIN content_revisions cr ON cr.id=t.content_revision_id AND cr.state='PUBLISHED'
+     JOIN release_manifests rm ON rm.id=cr.release_manifest_id AND rm.status='PUBLISHED'
+     WHERE t.kind='TOPIC' AND t.active
+     ORDER BY t.stable_key`,
+  );
   const modules = await pool.query(
     `SELECT m.id, m.stable_key AS "stableKey", m.version, m.title, m.description,
        COALESCE(jsonb_agg(jsonb_build_object(
@@ -335,7 +407,8 @@ export async function getPublishedCareerReadinessCatalog(pool: Pool): Promise<Re
      FROM assessment_definitions a JOIN release_manifests rm ON rm.id=a.release_manifest_id AND rm.status='PUBLISHED'
      JOIN assessment_blueprints b ON b.assessment_definition_id=a.id ORDER BY a.stable_key`,
   );
-  return { pilot: 'Career Readiness Fundamentals', releaseManifestId: PILOT_RELEASE_ID, modules: modules.rows, assessments: assessments.rows };
+  return { pilot: 'Career Readiness Fundamentals', releaseManifestId: PILOT_RELEASE_ID,
+    topics: topics.rows, modules: modules.rows, assessments: assessments.rows };
 }
 
 export async function completeLesson(pool: Pool, input: {
@@ -393,27 +466,192 @@ export async function completeLesson(pool: Pool, input: {
     await insertOutbox(client, { aggregateType: 'learner_progress', aggregateId: progressId, eventType: 'learning.lesson.completed',
       actorUserId: input.subjectUserId, correlationId: input.correlationId,
       payload: { progressId, lessonVersionId: input.lessonVersionId, evidenceId } });
-    return { progressId, evidenceId, idempotentReplay: false };
+    // Completing a lesson is evidence, so it moves the band in the same transaction
+    // that records it. Writing the evidence and leaving the band stale until the
+    // learner happened to sit an assessment was the previous behaviour, and it made
+    // the readiness figure quietly older than the record it claimed to summarise.
+    const recomputed = await recomputeReadiness(client, { subjectUserId: input.subjectUserId, correlationId: input.correlationId });
+    return {
+      progressId, evidenceId, idempotentReplay: false,
+      readiness: { band: recomputed.band, advisory: true, employerVisible: false, snapshotId: recomputed.snapshotId },
+    };
   });
+}
+
+/**
+ * Reproject mastery, resnapshot readiness and re-recommend the roadmap from the
+ * learner's current evidence.
+ *
+ * Extracted so lesson completion and assessment submission share one definition.
+ * Previously only submission recomputed, which meant completing a lesson wrote
+ * evidence that changed nothing a learner could see until they happened to sit an
+ * assessment -- the evidence was real and the band was stale.
+ *
+ * Every write supersedes rather than overwrites, and the snapshot is stamped with the
+ * currently active model version, so history stays reconstructable under the model it
+ * was computed by (ADR-020).
+ */
+async function recomputeReadiness(
+  client: DbClient,
+  input: { readonly subjectUserId: string; readonly correlationId: string },
+): Promise<{ readonly snapshotId: string; readonly band: string; readonly roadmapActionIds: readonly string[] }> {
+  const allEvidence = await loadEvidence(client, input.subjectUserId);
+  const projections = projectTopicMastery(allEvidence);
+  const projectionIds = new Map<string, string>();
+  for (const projection of projections) {
+    const prior = await client.query<{ id: string }>(
+      'SELECT id FROM mastery_projections WHERE subject_user_id=$1 AND topic_id=$2 ORDER BY generated_at DESC LIMIT 1',
+      [input.subjectUserId, projection.topicId],
+    );
+    const projectionId = randomUUID();
+    projectionIds.set(projection.topicId, projectionId);
+    await client.query(
+      `INSERT INTO mastery_projections
+       (id, subject_user_id, topic_id, algorithm_version, evidence_ids, evidence_set_hash, band, supersedes_projection_id)
+       VALUES ($1,$2,$3,$4,$5::uuid[],$6,$7,$8)`,
+      [projectionId, input.subjectUserId, projection.topicId, projection.algorithmVersion, [...projection.evidenceIds],
+        sha256Hex([...projection.evidenceIds].sort().join(':')), projection.band, prior.rows[0]?.id ?? null],
+    );
+  }
+  const readiness = calculateAdvisoryReadiness(projections);
+  const priorSnapshot = await client.query<{ id: string }>(
+    'SELECT id FROM readiness_snapshots WHERE subject_user_id=$1 ORDER BY generated_at DESC LIMIT 1', [input.subjectUserId],
+  );
+  const snapshotId = randomUUID();
+  const modelVersionId = await activeReadinessModelId(client);
+  await client.query(
+    `INSERT INTO readiness_snapshots
+     (id, subject_user_id, model_version_id, evidence_ids, evidence_set_hash, band, advisory, employer_visible, explanation, supersedes_snapshot_id)
+     VALUES ($1,$2,$3,$4::uuid[],$5,$6,true,false,$7::jsonb,$8)`,
+    [snapshotId, input.subjectUserId, modelVersionId, [...readiness.evidenceIds],
+      sha256Hex([...readiness.evidenceIds].sort().join(':')), readiness.band, JSON.stringify({ factors: readiness.factors }), priorSnapshot.rows[0]?.id ?? null],
+  );
+  for (const factor of readiness.factors) {
+    const projectionId = projectionIds.get(factor.topicId);
+    if (!projectionId) continue;
+    await client.query(
+      `INSERT INTO readiness_factors (id, snapshot_id, topic_id, mastery_projection_id, reason_code, explanation)
+       VALUES ($1,$2,$3,$4,$5,$6)`,
+      [randomUUID(), snapshotId, factor.topicId, projectionId, `MASTERY_${factor.masteryBand}`, factor.explanation],
+    );
+  }
+  // Outstanding recommendations are superseded rather than duplicated: a recomputation
+  // replaces the advice, it does not pile another copy of it on the learner.
+  await client.query(
+    "UPDATE roadmap_actions SET state='SUPERSEDED' WHERE subject_user_id=$1 AND state='RECOMMENDED'",
+    [input.subjectUserId],
+  );
+  const roadmapActionIds: string[] = [];
+  for (const action of recommendRoadmapActions(projections)) {
+    const actionId = randomUUID();
+    roadmapActionIds.push(actionId);
+    await client.query(
+      `INSERT INTO roadmap_actions
+       (id, subject_user_id, policy_version_id, topic_id, action_code, reason_code, evidence_ids, state, due_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7::uuid[],'RECOMMENDED',now()+interval '7 days')`,
+      [actionId, input.subjectUserId, ROADMAP_POLICY_ID, action.topicId, action.actionCode, action.reasonCode, [...action.evidenceIds]],
+    );
+    await insertOutbox(client, { aggregateType: 'roadmap_action', aggregateId: actionId, eventType: 'roadmap.action.created',
+      actorUserId: input.subjectUserId, correlationId: input.correlationId,
+      payload: { roadmapActionId: actionId, policyVersionId: ROADMAP_POLICY_ID, actionCode: action.actionCode } });
+  }
+  await insertOutbox(client, { aggregateType: 'readiness_snapshot', aggregateId: snapshotId,
+    eventType: 'readiness.snapshot.created', actorUserId: input.subjectUserId, correlationId: input.correlationId,
+    payload: { readinessSnapshotId: snapshotId, modelVersionId, band: readiness.band } });
+  return { snapshotId, band: readiness.band, roadmapActionIds };
 }
 
 export async function startAssessmentAttempt(pool: Pool, input: {
   readonly subjectUserId: string; readonly assessmentDefinitionId: string; readonly correlationId: string; readonly selectionSeed: string;
 }): Promise<Record<string, unknown>> {
+  const definition = await pool.query<{
+    blueprint_id: string; selection_count: number; time_limit_seconds: number; attempt_limit: number;
+  }>(
+    `SELECT b.id AS blueprint_id, b.selection_count, a.time_limit_seconds, a.attempt_limit
+     FROM assessment_definitions a JOIN release_manifests rm ON rm.id=a.release_manifest_id AND rm.status='PUBLISHED'
+     JOIN assessment_blueprints b ON b.assessment_definition_id=a.id WHERE a.id=$1`, [input.assessmentDefinitionId],
+  );
+  if (!definition.rows[0]) throw new Error('published assessment was not found');
+  const blueprintId = definition.rows[0].blueprint_id;
+
+  // Close out any attempt whose window has passed, and commit that before doing anything
+  // else.
+  //
+  // `submitAssessmentAttempt` refuses an expired attempt, so one left IN_PROGRESS can
+  // never be finished — and while it sat there it also blocked every new attempt, so a
+  // learner who opened the check and put their phone down was locked out of the feature
+  // permanently with nothing in the product able to release them. EXPIRED has been in the
+  // state CHECK since 0004 and nothing ever wrote it.
+  //
+  // This deliberately runs outside the transaction below. Inside it, a learner who is out
+  // of attempts would take the "limit reached" throw, the transaction would roll back, and
+  // the retirement would be undone — leaving a row that still claims to be in progress and
+  // a screen that still says so.
+  await pool.query(
+    `UPDATE assessment_attempts SET state='EXPIRED'
+     WHERE subject_user_id=$1 AND blueprint_id=$2 AND state='IN_PROGRESS' AND expires_at <= now()`,
+    [input.subjectUserId, blueprintId],
+  );
+
+  const published = definition.rows[0];
+
   return transaction(pool, async (client) => {
-    const assessment = await client.query<{
-      blueprint_id: string; selection_count: number; time_limit_seconds: number;
-    }>(
-      `SELECT b.id AS blueprint_id, b.selection_count, a.time_limit_seconds
-       FROM assessment_definitions a JOIN release_manifests rm ON rm.id=a.release_manifest_id AND rm.status='PUBLISHED'
-       JOIN assessment_blueprints b ON b.assessment_definition_id=a.id WHERE a.id=$1`, [input.assessmentDefinitionId],
+    // Serialise this learner's starts on this blueprint.
+    //
+    // Counting attempts and then inserting one is read-modify-write, and at READ
+    // COMMITTED two requests can both count the same number and both insert — which is
+    // how a double-tapped Start button, or a retry over a flaky connection, gets past a
+    // limit. The lock is held to the end of the transaction and is scoped to this
+    // learner and blueprint, so it never blocks anybody else.
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))',
+      [input.subjectUserId, blueprintId]);
+
+    // An attempt still inside its window is resumed, not refused. The clock keeps
+    // running, which is the point of a timed assessment; what changes is that leaving
+    // the app is no longer fatal.
+    const open = await client.query<{ id: string; assignment_id: string; started_at: Date; expires_at: Date }>(
+      `SELECT id, assignment_id, started_at, expires_at FROM assessment_attempts
+       WHERE subject_user_id=$1 AND blueprint_id=$2 AND state='IN_PROGRESS'
+       ORDER BY started_at DESC LIMIT 1`,
+      [input.subjectUserId, blueprintId],
     );
-    if (!assessment.rows[0]) throw new Error('published assessment was not found');
-    const prior = await client.query(
-      `SELECT id FROM assessment_attempts WHERE subject_user_id=$1 AND state IN ('IN_PROGRESS','SUBMITTED')
-       AND blueprint_id=$2 LIMIT 1`, [input.subjectUserId, assessment.rows[0].blueprint_id],
+    if (open.rows[0]) {
+      const resumed = open.rows[0];
+      const items = await client.query<{
+        id: string; topic_id: string; prompt: string; options: ProtectedQuestionVersion['options']; version: number;
+      }>(
+        `SELECT q.id, q.topic_id, q.prompt, q.options, q.version
+         FROM assessment_attempt_items i JOIN question_versions q ON q.id=i.question_version_id
+         WHERE i.attempt_id=$1 ORDER BY i.position`, [resumed.id],
+      );
+      return {
+        attemptId: resumed.id, assignmentId: resumed.assignment_id,
+        startedAt: resumed.started_at.toISOString(), expiresAt: resumed.expires_at.toISOString(),
+        notificationCommandId: null, resumed: true,
+        questions: items.rows.map((question) => ({
+          id: question.id, topicId: question.topic_id, prompt: question.prompt,
+          options: question.options, publishedRevision: question.version,
+        })),
+      };
+    }
+
+    // What the definition actually says, rather than "one, ever".
+    //
+    // `attempt_limit` has been on assessment_definitions since 0004 and was read by
+    // nothing; the rule enforced here instead was that any prior attempt blocks a new
+    // one. That made readiness a one-shot measurement, which contradicts ADR-020 —
+    // a band is meant to move as evidence accumulates — and made the feature untestable.
+    //
+    // An expired attempt counts as consumed. The learner saw the questions, so letting
+    // it be free would make "start and abandon" a way to enumerate the item bank.
+    const consumed = await client.query<{ used: string }>(
+      `SELECT count(*) AS used FROM assessment_attempts
+       WHERE subject_user_id=$1 AND blueprint_id=$2 AND state IN ('SUBMITTED','EXPIRED')`,
+      [input.subjectUserId, blueprintId],
     );
-    if (prior.rows[0]) throw new Error('assessment attempt limit reached');
+    if (Number(consumed.rows[0]?.used ?? 0) >= published.attempt_limit) {
+      throw new Error('assessment attempt limit reached');
+    }
     const questionRows = await client.query<{
       id: string; topic_id: string; prompt: string; options: ProtectedQuestionVersion['options']; version: number; correct_option_id: string;
     }>(
@@ -425,11 +663,11 @@ export async function startAssessmentAttempt(pool: Pool, input: {
       id: question.id, topicId: question.topic_id, prompt: question.prompt, options: question.options,
       correctOptionId: question.correct_option_id, publishedRevision: question.version,
     }));
-    const selected = selectQuestionsDeterministically(protectedQuestions, assessment.rows[0].selection_count, input.selectionSeed);
+    const selected = selectQuestionsDeterministically(protectedQuestions, published.selection_count, input.selectionSeed);
     const assignmentId = randomUUID();
     const attemptId = randomUUID();
     const startedAt = new Date();
-    const expiresAt = new Date(startedAt.getTime() + assessment.rows[0].time_limit_seconds * 1_000);
+    const expiresAt = new Date(startedAt.getTime() + published.time_limit_seconds * 1_000);
     await client.query(
       `INSERT INTO assessment_assignments
        (id, assessment_definition_id, subject_user_id, assigned_by_user_id, available_at, due_at, state)
@@ -440,7 +678,7 @@ export async function startAssessmentAttempt(pool: Pool, input: {
       `INSERT INTO assessment_attempts
        (id, assignment_id, subject_user_id, blueprint_id, selection_seed, state, started_at, expires_at, correlation_id)
        VALUES ($1,$2,$3,$4,$5,'IN_PROGRESS',$6,$7,$8)`,
-      [attemptId, assignmentId, input.subjectUserId, assessment.rows[0].blueprint_id, input.selectionSeed, startedAt, expiresAt, input.correlationId],
+      [attemptId, assignmentId, input.subjectUserId, blueprintId, input.selectionSeed, startedAt, expiresAt, input.correlationId],
     );
     for (const [position, question] of selected.entries()) {
       await client.query(
@@ -450,7 +688,7 @@ export async function startAssessmentAttempt(pool: Pool, input: {
     }
     await insertOutbox(client, { aggregateType: 'assessment_attempt', aggregateId: attemptId,
       eventType: 'assessment.attempt.started', actorUserId: input.subjectUserId, correlationId: input.correlationId,
-      payload: { attemptId, assignmentId, blueprintId: assessment.rows[0].blueprint_id } });
+      payload: { attemptId, assignmentId, blueprintId: blueprintId } });
     const notificationCommandId = await maybeCreateAssessmentDueNotification(client, input.subjectUserId, assignmentId, input.correlationId);
     return { attemptId, assignmentId, startedAt: startedAt.toISOString(), expiresAt: expiresAt.toISOString(),
       notificationCommandId, questions: selected.map(({ correctOptionId: _answer, ...question }) => question) };
@@ -518,87 +756,46 @@ export async function submitAssessmentAttempt(pool: Pool, input: {
     );
     await client.query("UPDATE assessment_assignments SET state='COMPLETED' WHERE id=(SELECT assignment_id FROM assessment_attempts WHERE id=$1)", [input.attemptId]);
 
-    const allEvidence = await loadEvidence(client, input.subjectUserId);
-    const projections = projectTopicMastery(allEvidence);
-    const projectionIds = new Map<string, string>();
-    for (const projection of projections) {
-      const prior = await client.query<{ id: string }>(
-        'SELECT id FROM mastery_projections WHERE subject_user_id=$1 AND topic_id=$2 ORDER BY generated_at DESC LIMIT 1',
-        [input.subjectUserId, projection.topicId],
-      );
-      const projectionId = randomUUID();
-      projectionIds.set(projection.topicId, projectionId);
-      await client.query(
-        `INSERT INTO mastery_projections
-         (id, subject_user_id, topic_id, algorithm_version, evidence_ids, evidence_set_hash, band, supersedes_projection_id)
-         VALUES ($1,$2,$3,$4,$5::uuid[],$6,$7,$8)`,
-        [projectionId, input.subjectUserId, projection.topicId, projection.algorithmVersion, [...projection.evidenceIds],
-          sha256Hex([...projection.evidenceIds].sort().join(':')), projection.band, prior.rows[0]?.id ?? null],
-      );
-    }
-    const readiness = calculateAdvisoryReadiness(projections);
-    const priorSnapshot = await client.query<{ id: string }>(
-      'SELECT id FROM readiness_snapshots WHERE subject_user_id=$1 ORDER BY generated_at DESC LIMIT 1', [input.subjectUserId],
-    );
-    const snapshotId = randomUUID();
-    await client.query(
-      `INSERT INTO readiness_snapshots
-       (id, subject_user_id, model_version_id, evidence_ids, evidence_set_hash, band, advisory, employer_visible, explanation, supersedes_snapshot_id)
-       VALUES ($1,$2,$3,$4::uuid[],$5,$6,true,false,$7::jsonb,$8)`,
-      [snapshotId, input.subjectUserId, READINESS_MODEL_ID, [...readiness.evidenceIds],
-        sha256Hex([...readiness.evidenceIds].sort().join(':')), readiness.band, JSON.stringify({ factors: readiness.factors }), priorSnapshot.rows[0]?.id ?? null],
-    );
-    for (const factor of readiness.factors) {
-      const projectionId = projectionIds.get(factor.topicId);
-      if (!projectionId) continue;
-      await client.query(
-        `INSERT INTO readiness_factors (id, snapshot_id, topic_id, mastery_projection_id, reason_code, explanation)
-         VALUES ($1,$2,$3,$4,$5,$6)`,
-        [randomUUID(), snapshotId, factor.topicId, projectionId, `MASTERY_${factor.masteryBand}`, factor.explanation],
-      );
-    }
-    const roadmapActions = recommendRoadmapActions(projections);
-    const roadmapActionIds: string[] = [];
-    for (const action of roadmapActions) {
-      const actionId = randomUUID();
-      roadmapActionIds.push(actionId);
-      await client.query(
-        `INSERT INTO roadmap_actions
-         (id, subject_user_id, policy_version_id, topic_id, action_code, reason_code, evidence_ids, state, due_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7::uuid[],'RECOMMENDED',now()+interval '7 days')`,
-        [actionId, input.subjectUserId, ROADMAP_POLICY_ID, action.topicId, action.actionCode, action.reasonCode, [...action.evidenceIds]],
-      );
-      await insertOutbox(client, { aggregateType: 'roadmap_action', aggregateId: actionId, eventType: 'roadmap.action.created',
-        actorUserId: input.subjectUserId, correlationId: input.correlationId,
-        payload: { roadmapActionId: actionId, policyVersionId: ROADMAP_POLICY_ID, actionCode: action.actionCode } });
-    }
+    const recomputed = await recomputeReadiness(client, { subjectUserId: input.subjectUserId, correlationId: input.correlationId });
+
     const ratio = scoreCorrect / Math.max(1, items.rows.length);
     const outcomeBand = ratio >= 0.8 ? 'DEMONSTRATED' : ratio >= 0.6 ? 'PROGRESSING' : 'DEVELOPING';
     await insertOutbox(client, { aggregateType: 'assessment_attempt', aggregateId: input.attemptId,
       eventType: 'assessment.attempt.submitted', actorUserId: input.subjectUserId, correlationId: input.correlationId,
       payload: { attemptId: input.attemptId, evidenceId: evidenceIds[0], outcomeBand } });
-    await insertOutbox(client, { aggregateType: 'readiness_snapshot', aggregateId: snapshotId,
-      eventType: 'readiness.snapshot.created', actorUserId: input.subjectUserId, correlationId: input.correlationId,
-      payload: { readinessSnapshotId: snapshotId, modelVersionId: READINESS_MODEL_ID, band: readiness.band } });
     return { attemptId: input.attemptId, scoreCorrect, scorePossible: items.rows.length, outcomeBand,
-      readiness: { band: readiness.band, advisory: true, employerVisible: false, snapshotId },
-      evidenceIds, roadmapActionIds, idempotentReplay: false };
+      readiness: { band: recomputed.band, advisory: true, employerVisible: false, snapshotId: recomputed.snapshotId },
+      evidenceIds, roadmapActionIds: [...recomputed.roadmapActionIds], idempotentReplay: false };
   });
 }
 
 export async function getLearnerCareerReadinessState(pool: Pool, subjectUserId: string): Promise<Record<string, unknown>> {
-  const [catalog, progress, attempts, evidence, projections, readiness, roadmap, notificationPreferences, notifications] = await Promise.all([
+  const [catalog, progress, attempts, evidence, projections, readiness, readinessHistory, roadmap, notificationPreferences, notifications] = await Promise.all([
     getPublishedCareerReadinessCatalog(pool),
     pool.query(`SELECT lesson_version_id AS "lessonVersionId", state, started_at AS "startedAt", completed_at AS "completedAt"
       FROM learner_progress WHERE subject_user_id=$1 ORDER BY updated_at`, [subjectUserId]),
-    pool.query(`SELECT id, state, started_at AS "startedAt", expires_at AS "expiresAt", submitted_at AS "submittedAt",
-      score_correct AS "scoreCorrect", score_possible AS "scorePossible" FROM assessment_attempts WHERE subject_user_id=$1 ORDER BY started_at DESC`, [subjectUserId]),
+    // assessmentDefinitionId is carried so a client can tell which assessments this
+    // learner has already attempted. The server limit is one attempt per blueprint, and
+    // without this the UI could only approximate that by blocking everything.
+    pool.query(`SELECT a.id, a.state, a.started_at AS "startedAt", a.expires_at AS "expiresAt", a.submitted_at AS "submittedAt",
+      a.score_correct AS "scoreCorrect", a.score_possible AS "scorePossible",
+      b.assessment_definition_id AS "assessmentDefinitionId"
+      FROM assessment_attempts a JOIN assessment_blueprints b ON b.id = a.blueprint_id
+      WHERE a.subject_user_id=$1 ORDER BY a.started_at DESC`, [subjectUserId]),
     pool.query(`SELECT id, evidence_type AS "evidenceType", topic_id AS "topicId", demonstrated, possible,
       content_version AS "contentVersion", occurred_at AS "occurredAt" FROM evidence_records WHERE subject_user_id=$1 ORDER BY occurred_at`, [subjectUserId]),
     pool.query(`SELECT DISTINCT ON (topic_id) id, topic_id AS "topicId", band, evidence_ids AS "evidenceIds", algorithm_version AS "algorithmVersion", generated_at AS "generatedAt"
       FROM mastery_projections WHERE subject_user_id=$1 ORDER BY topic_id, generated_at DESC`, [subjectUserId]),
     pool.query(`SELECT id, band, advisory, employer_visible AS "employerVisible", explanation, generated_at AS "generatedAt"
       FROM readiness_snapshots WHERE subject_user_id=$1 ORDER BY generated_at DESC LIMIT 1`, [subjectUserId]),
+    // The band over time, newest first, so history[0] is always the same snapshot as
+    // `readiness`. Bands and their model version only: a snapshot's band is comparable
+    // with an earlier one only if the model version matches, and ADR-020 forbids any
+    // numeric readiness value, so there is nothing here to plot as a score.
+    // Tie-broken on id so the order is deterministic when two snapshots share a
+    // timestamp, and bounded so a long-lived learner cannot make this unbounded.
+    pool.query(`SELECT id, band, model_version_id AS "modelVersionId", generated_at AS "generatedAt"
+      FROM readiness_snapshots WHERE subject_user_id=$1 ORDER BY generated_at DESC, id DESC LIMIT 100`, [subjectUserId]),
     pool.query(`SELECT id, topic_id AS "topicId", action_code AS "actionCode", reason_code AS "reasonCode", state, due_at AS "dueAt"
       FROM roadmap_actions WHERE subject_user_id=$1 AND state NOT IN ('SUPERSEDED','DISMISSED') ORDER BY created_at DESC`, [subjectUserId]),
     pool.query(`SELECT email_enabled AS "emailEnabled", quiet_hours_start_minute AS "quietHoursStartMinute",
@@ -608,7 +805,7 @@ export async function getLearnerCareerReadinessState(pool: Pool, subjectUserId: 
       JOIN notification_templates t ON t.id=n.template_id WHERE n.subject_user_id=$1 ORDER BY n.created_at DESC LIMIT 25`, [subjectUserId]),
   ]);
   return { catalog, progress: progress.rows, attempts: attempts.rows, evidence: evidence.rows,
-    mastery: projections.rows, readiness: readiness.rows[0] ?? null, roadmap: roadmap.rows,
+    mastery: projections.rows, readiness: readiness.rows[0] ?? null, readinessHistory: readinessHistory.rows, roadmap: roadmap.rows,
     notificationPreferences: notificationPreferences.rows[0] ?? null, notifications: notifications.rows };
 }
 

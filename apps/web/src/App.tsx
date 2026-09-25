@@ -46,12 +46,16 @@ import { StudentMessagesFlyout, StudentNotificationsBell } from './notifications
 import { AssistantWidget } from './assistantWidget.js';
 import { ConsentGate } from './consentGate.js';
 import { HelpFaqPanel } from './helpFaqPanel.js';
+import { CalendarPage } from './calendarPage.js';
+import { PublicProfilePage } from './publicProfilePage.js';
+import { ShareProfilePanel } from './shareProfilePanel.js';
+import { ScreeningAssessmentsPage } from './screeningAssessmentsPage.js';
 import { V2EmptyState, V2Stat } from './dashboardsV2.js';
 import { StudentDashboardV3 } from './studentDashboardV3.js';
 import { StudentCareerToolsPage, StudentCompanyPrepPage, StudentPracticePage, StudentResumeBuilderPage, StudentScholarshipsPage } from './pilotParityPages.js';
 import { StudentAssessmentsV3, StudentLearningV3, StudentOpportunitiesV3, StudentProfileV3, StudentRoadmapV3 } from './parityWraps.js';
 
-type RouteKey = 'dashboard' | 'career-path' | 'ai-coach' | 'readiness' | 'skills' | 'assessments' | 'learning' | 'experience' | 'opportunities' | 'applications' | 'interviews' | 'documents' | 'profile' | 'settings' | 'help' | 'practice' | 'company-prep' | 'career-tools' | 'scholarships' | 'resume-builder';
+type RouteKey = 'dashboard' | 'career-path' | 'ai-coach' | 'readiness' | 'skills' | 'assessments' | 'learning' | 'experience' | 'opportunities' | 'applications' | 'interviews' | 'documents' | 'profile' | 'settings' | 'help' | 'practice' | 'company-prep' | 'career-tools' | 'scholarships' | 'resume-builder' | 'calendar';
 
 interface NavItem {
   readonly label: string;
@@ -76,6 +80,7 @@ const navItems: readonly NavItem[] = [
   { label: 'Opportunities', path: '/student/opportunities', icon: BriefcaseBusiness, group: 'Apply', route: 'opportunities' },
   { label: 'Applications', path: '/student/applications', icon: LayoutDashboard, group: 'Apply', route: 'applications' },
   { label: 'Interviews', path: '/student/interviews', icon: CalendarDays, group: 'Apply', route: 'interviews' },
+  { label: 'Calendar', path: '/student/calendar', icon: CalendarDays, group: 'Apply', route: 'calendar' },
   { label: 'Scholarships', path: '/student/scholarships', icon: GraduationCap, group: 'Apply', route: 'scholarships' },
   { label: 'Resume Builder', path: '/student/resume-builder', icon: FileText, group: 'Account', route: 'resume-builder' },
   { label: 'Documents', path: '/student/documents', icon: FileText, group: 'Account', route: 'documents' },
@@ -91,6 +96,7 @@ const routeTitles: Record<RouteKey, PageMeta> = {
   'career-tools': { title: 'Career Tools', eyebrow: 'Plan', description: 'Everything you need to plan, build and accelerate your career.' },
   scholarships: { title: 'Scholarships', eyebrow: 'Apply', description: 'Discover and apply for scholarships to support your education journey.' },
   'resume-builder': { title: 'Resume Builder', eyebrow: 'Account', description: 'Create professional resumes that showcase your skills and land your dream job.' },
+  calendar: { title: 'Calendar', eyebrow: 'Apply', description: 'Interviews, exam windows, assigned tasks and deadlines already recorded across ONE.' },
   'career-path': { title: 'My Career Path', eyebrow: 'Target career', description: 'Milestones, skill gaps, learning, and experience needed for your goal.' },
   'ai-coach': { title: 'AI Career Coach', eyebrow: 'Preview guidance', description: 'Explainable, non-authoritative recommendations using demo-only Student data.' },
   readiness: { title: 'Readiness', eyebrow: 'Employability model', description: 'Category scores, blockers, history, interventions, and supporting evidence.' },
@@ -303,6 +309,14 @@ export function App(): React.ReactElement {
   if (import.meta.env.DEV && path.startsWith('/pilot-preview')) {
     const previewPersona = path.endsWith('/institution') ? 'demo.institution' : path.endsWith('/employer') ? 'demo.employer' : 'demo.student';
     return <PilotApp email={`${previewPersona}@dev.local`} onSignOut={handleSignOut} />;
+  }
+
+  // The one route that renders without a session. It must be checked before anything that
+  // looks at authStatus, or a signed-out visitor would be sent to the login screen instead
+  // of the page they were given a link to.
+  if (path.startsWith('/p/')) {
+    const shareToken = path.slice(3);
+    if (shareToken) return <PublicProfilePage token={shareToken} />;
   }
 
   if (path === '/' || path === '/login') {
@@ -809,19 +823,20 @@ function RouteScreen({ route, authenticated, currentStudent }: { readonly route:
   if (route === 'career-tools') return <StudentCareerToolsPage />;
   if (route === 'scholarships') return <StudentScholarshipsPage />;
   if (route === 'resume-builder') return <StudentResumeBuilderPage />;
+  if (route === 'calendar') return <CalendarPage />;
   return <SettingsPage />;
 }
 
 function AuthenticatedStudentRoute({ route, currentStudent }: { readonly route: RouteKey; readonly currentStudent: CurrentStudentState }): React.ReactElement {
   if (route === 'dashboard') return <AuthenticatedStudentDashboard currentStudent={currentStudent} />;
-  if (route === 'profile') return <StudentProfileV3><AuthenticatedStudentProfile /></StudentProfileV3>;
+  if (route === 'profile') return <StudentProfileV3><AuthenticatedStudentProfile /><ShareProfilePanel /></StudentProfileV3>;
   if (route === 'documents') return <AuthenticatedStudentDocuments />;
   if (route === 'opportunities') return <StudentOpportunitiesV3><StudentOpportunitiesPage /><AuthenticatedStudentSavedOpportunities /></StudentOpportunitiesV3>;
   if (route === 'applications') return <StudentApplicationsPage />;
   if (route === 'career-path') return <StudentRoadmapV3><CareerReadinessApiPanel route="roadmap" /></StudentRoadmapV3>;
   if (route === 'readiness') return <CareerReadinessApiPanel route="readiness" />;
   if (route === 'skills') return <CareerReadinessApiPanel route="skills" />;
-  if (route === 'assessments') return <StudentAssessmentsV3><ExamAttemptPanel /><CareerReadinessApiPanel route="assessments" /></StudentAssessmentsV3>;
+  if (route === 'assessments') return <StudentAssessmentsV3><ExamAttemptPanel /><ScreeningAssessmentsPage /><CareerReadinessApiPanel route="assessments" /></StudentAssessmentsV3>;
   if (route === 'learning') return <StudentLearningV3><CareerReadinessApiPanel route="learning" /></StudentLearningV3>;
   if (route === 'settings') return <><CareerReadinessApiPanel route="notifications" /><StudentPrivacyPanel /></>;
   if (route === 'help') return <HelpFaqPanel persona="student" />;
@@ -883,7 +898,7 @@ function AuthenticatedStudentProfile(): React.ReactElement {
     <form className="card wide-card student-form" onSubmit={(event) => { void submit(event); }}>
       <label className="student-form-field"><span>Target career</span><input name="targetCareer" defaultValue={profile?.targetCareer ?? ''} maxLength={120} /></label>
       <label className="student-form-field"><span>Headline</span><input name="profileHeadline" defaultValue={profile?.profileHeadline ?? ''} maxLength={160} /></label>
-      <label className="student-form-field"><span>Career interests, comma separated</span><input name="careerInterests" defaultValue={profile?.careerInterests.join(', ') ?? ''} /></label>
+      <label className="student-form-field"><span>Career interests, comma separated</span><input name="careerInterests" defaultValue={(profile?.careerInterests ?? []).join(', ')} /></label>
       <label className="student-form-field"><span>Portfolio URL</span><input name="portfolioUrl" defaultValue={profile?.portfolioUrl ?? ''} placeholder="https://..." /></label>
       <label className="student-form-field"><span>Summary</span><textarea name="profileSummary" defaultValue={profile?.profileSummary ?? ''} maxLength={2000} /></label>
       <label className="student-form-field"><span>Visibility</span><select name="visibilityState" defaultValue={profile?.visibilityState ?? 'PRIVATE'}><option>PRIVATE</option><option>INSTITUTION_VISIBLE</option><option>EMPLOYER_DISCOVERY</option></select></label>

@@ -10,17 +10,21 @@
     "db:migrate": "tsx src/migrate.ts",
     "db:register:n8n": "tsx src/register-n8n-workflows.ts",
     "db:seed:career-readiness": "tsx src/seed-career-readiness-pilot.ts",
+    "db:seed:local-users": "tsx src/seed-local-users.ts",
     "db:seed:careers": "tsx src/seed-careers.ts",
     "test": "vitest run --fileParallelism=false",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "worker:automation": "tsx src/run-automation-worker.ts"
+    "worker:automation": "tsx src/run-automation-worker.ts",
+    "worker:content-generation": "tsx src/run-content-generation-worker.ts"
   },
   "dependencies": {
     "@planthepath/career-readiness": "workspace:*",
     "@planthepath/automation": "workspace:*",
     "@planthepath/events": "workspace:*",
+    "@planthepath/learner-content": "workspace:*",
     "drizzle-orm": "^0.45.2",
-    "pg": "^8.16.0"
+    "pg": "^8.16.0",
+    "@planthepath/ai-orchestration": "workspace:*"
   },
   "devDependencies": {
     "@types/pg": "^8.15.0",

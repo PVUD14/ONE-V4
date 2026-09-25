@@ -27,6 +27,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.AutoAwesome
@@ -64,6 +65,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -81,6 +83,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import pro.ai8ht.one.data.valueOrNull
 import pro.ai8ht.one.ui.BrandWordmark
 import pro.ai8ht.one.ui.OneBlue
 import pro.ai8ht.one.ui.OneBlueDeep
@@ -89,22 +92,47 @@ import pro.ai8ht.one.ui.Tone
 import java.time.Instant
 
 class MainActivity : ComponentActivity() {
+    /**
+     * Set when the OAuth redirect brings us back, and read once by the sign-in screen.
+     *
+     * The activity is `singleTask`, so a redirect while the app is already running
+     * arrives at [onNewIntent] rather than a fresh instance — both paths funnel here.
+     */
+    private val pendingRedirect = androidx.compose.runtime.mutableStateOf<android.net.Uri?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        captureRedirect(intent)
         setContent {
             val context = androidx.compose.ui.platform.LocalContext.current
             var themeId by remember { mutableStateOf(Session.theme(context)) }
             OneTheme(themeId) {
-                OneApp(currentTheme = themeId, onThemeChange = { id ->
-                    themeId = id
-                    Session.setTheme(context, id)
-                })
+                OneApp(
+                    currentTheme = themeId,
+                    onThemeChange = { id ->
+                        themeId = id
+                        Session.setTheme(context, id)
+                    },
+                    oauthRedirect = pendingRedirect.value,
+                    onRedirectHandled = { pendingRedirect.value = null },
+                )
             }
         }
     }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        captureRedirect(intent)
+    }
+
+    private fun captureRedirect(intent: android.content.Intent?) {
+        val data = intent?.data ?: return
+        if (data.scheme == "one.ai8ht.pro" && data.host == "signin") pendingRedirect.value = data
+    }
 }
 
-private enum class Screen(val title: String, val subtitle: String) {
+internal enum class Screen(val title: String, val subtitle: String) {
     Home("Home", "Your day at a glance"),
     Assessments("Assessments", "Assigned tests, windows and your results"),
     Learning("Learning", "Modules, lessons and your progress"),
@@ -112,11 +140,12 @@ private enum class Screen(val title: String, val subtitle: String) {
     More("Profile", "Your account, documents and privacy"),
 }
 
-private class StudentData(
+internal class StudentData(
     val student: StudentDto?,
     val assessments: List<AssessmentDto>,
     val learner: LearnerStateDto?,
     val notifications: NotificationsEnvelope?,
+    val activity: StudentActivityDto? = null,
 )
 
 private fun parseWorkspace(raw: String?): Workspace? {
@@ -130,7 +159,12 @@ private fun parseWorkspace(raw: String?): Workspace? {
 private fun encodeWorkspace(ws: Workspace): String = "${ws.kind.name}|${ws.organizationId ?: ""}|${ws.role}"
 
 @Composable
-fun OneApp(currentTheme: String, onThemeChange: (String) -> Unit) {
+fun OneApp(
+    currentTheme: String,
+    onThemeChange: (String) -> Unit,
+    oauthRedirect: android.net.Uri? = null,
+    onRedirectHandled: () -> Unit = {},
+) {
     val context = LocalContext.current
     var signedIn by remember { mutableStateOf(Session.token(context) != null) }
     var sessionExpired by remember { mutableStateOf(false) }
@@ -164,7 +198,12 @@ fun OneApp(currentTheme: String, onThemeChange: (String) -> Unit) {
     }
 
     when {
-        !signedIn -> SignInScreen(expired = sessionExpired, onSignedIn = { sessionExpired = false; signedIn = true; consentChecked = false })
+        !signedIn -> SignInScreen(
+            expired = sessionExpired,
+            oauthRedirect = oauthRedirect,
+            onRedirectHandled = onRedirectHandled,
+            onSignedIn = { sessionExpired = false; signedIn = true; consentChecked = false },
+        )
         !consentChecked -> BrandSplash()
         consent?.required == true -> ConsentScreen(
             version = consent?.requiredVersion ?: "",
@@ -287,37 +326,72 @@ private fun MainScaffold(
     var showChat by remember { mutableStateOf(false) }
     var showEditProfile by remember { mutableStateOf(false) }
     var moreDest by remember { mutableStateOf<MoreDest?>(null) }
+    var readinessOpen by remember { mutableStateOf(false) }
+    // The student's institution is on the security context, not the student record: a
+    // student can have several relationships over time, and the active one is what
+    // scopes anything their college assigned them.
+    var studentInstitutionId by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        studentInstitutionId = runCatching { Api.securityContext(context) }.getOrNull()
+            ?.studentRelationships?.firstOrNull { it.state == "ACTIVE" || it.state == "VERIFIED" }
+            ?.institutionId
+    }
     var showTheme by remember { mutableStateOf(false) }
     var avatarVersion by remember { mutableIntStateOf(0) }
     var refreshing by remember { mutableStateOf(false) }
 
-    LaunchedEffect(reloadKey) {
-        loadError = false
-        var unauthorized = false
-        suspend fun <T> guarded(block: suspend () -> T): T? = try { block() } catch (error: Api.ApiException) {
-            if (error.status == 401) unauthorized = true
-            null
-        } catch (error: Exception) { null }
-        coroutineScope {
-            val student = async { guarded { Api.studentMe(context) } }
-            val exams = async { guarded { Api.listAssessments(context) } }
-            val learner = async { guarded { Api.learnerState(context) } }
-            val inbox = async { guarded { Api.listNotifications(context) } }
-            val loaded = StudentData(student.await(), exams.await() ?: emptyList(), learner.await(), inbox.await())
-            if (unauthorized) { onSessionExpired(); return@coroutineScope }
-            if (loaded.student == null && loaded.learner == null && loaded.notifications == null) loadError = true
-            data = loaded
+    // Data now comes from a ViewModel over a cache-then-network repository, so a tab
+    // switch or a rotation no longer throws everything away and re-fetches it. What the
+    // screens below consume is unchanged; only where it comes from has moved.
+    val studentVm: pro.ai8ht.one.data.StudentViewModel =
+        androidx.lifecycle.viewmodel.compose.viewModel()
+    LaunchedEffect(Unit) { studentVm.start() }
+    LaunchedEffect(reloadKey) { if (reloadKey > 0) studentVm.refresh() }
+
+    val studentState by studentVm.student.collectAsState()
+    val assessmentsState by studentVm.assessments.collectAsState()
+    val learnerState by studentVm.learner.collectAsState()
+    val notificationsState by studentVm.notifications.collectAsState()
+    val activityState by studentVm.activity.collectAsState()
+    val sessionEnded by studentVm.sessionEnded.collectAsState()
+
+    // An expired session returns to sign-in rather than sitting on a retry screen that
+    // can never succeed. The cache goes with it: it belongs to the session that ended.
+    LaunchedEffect(sessionEnded) {
+        if (sessionEnded) {
+            studentVm.clearOnSignOut()
+            studentVm.acknowledgeSessionEnded()
+            onSessionExpired()
         }
-        refreshing = false
+    }
+
+    LaunchedEffect(studentState, assessmentsState, learnerState, notificationsState, activityState) {
+        data = StudentData(
+            student = studentState.valueOrNull(),
+            assessments = assessmentsState.valueOrNull() ?: emptyList(),
+            learner = learnerState.valueOrNull(),
+            notifications = notificationsState.valueOrNull(),
+            activity = activityState.valueOrNull(),
+        )
+        // Only an error when nothing at all resolved, cache included. A stale screen is
+        // a working screen.
+        loadError = studentState is pro.ai8ht.one.data.Repository.State.Failed &&
+            learnerState is pro.ai8ht.one.data.Repository.State.Failed &&
+            notificationsState is pro.ai8ht.one.data.Repository.State.Failed
+        if (data?.student != null || data?.learner != null) refreshing = false
+        if (loadError) refreshing = false
     }
 
     // System back closes the topmost overlay instead of quitting the app.
-    androidx.activity.compose.BackHandler(enabled = showChat || showEditProfile || showInbox || showTheme || moreDest != null) {
+    androidx.activity.compose.BackHandler(
+        enabled = showChat || showEditProfile || showInbox || showTheme || readinessOpen || moreDest != null,
+    ) {
         when {
             showChat -> showChat = false
             showEditProfile -> showEditProfile = false
             showInbox -> showInbox = false
             showTheme -> showTheme = false
+            readinessOpen -> readinessOpen = false
             else -> moreDest = null
         }
     }
@@ -335,7 +409,31 @@ private fun MainScaffold(
         }
         moreDest == MoreDest.Documents -> { SlideIn { DocumentsPage(onClose = { moreDest = null }) }; return }
         moreDest == MoreDest.Privacy -> { SlideIn { PrivacyPage(onClose = { moreDest = null }) }; return }
+        moreDest == MoreDest.Calendar -> { SlideIn { CalendarPage(onClose = { moreDest = null }) }; return }
+        moreDest == MoreDest.Screening -> { SlideIn { ScreeningPage(onClose = { moreDest = null }) }; return }
+        moreDest == MoreDest.Resources -> { SlideIn { ResourcesPage(onClose = { moreDest = null }) }; return }
+        moreDest == MoreDest.Share -> { SlideIn { ShareProfilePage(onClose = { moreDest = null }) }; return }
         moreDest == MoreDest.Career -> { SlideIn { CareerPage(data?.learner, onClose = { moreDest = null }) }; return }
+        readinessOpen -> {
+            SlideIn {
+                ReadinessAssessmentPage(
+                    onClose = { readinessOpen = false },
+                    onSubmitted = { reloadKey += 1 },
+                )
+            }
+            return
+        }
+        moreDest == MoreDest.Target -> { SlideIn { CareerTargetPage(onClose = { moreDest = null }) }; return }
+        moreDest == MoreDest.Academics -> { SlideIn { AcademicRecordsPage(onClose = { moreDest = null }) }; return }
+        moreDest == MoreDest.Support -> {
+            SlideIn {
+                SupportTasksPage(
+                    institutionId = studentInstitutionId,
+                    onClose = { moreDest = null },
+                )
+            }
+            return
+        }
         moreDest == MoreDest.Help -> { SlideIn { HelpFaqPage(persona = "student", onClose = { moreDest = null }) }; return }
         moreDest == MoreDest.Settings -> { SlideIn { SettingsPage(currentTheme = currentTheme, onThemeChange = onThemeChange, onClose = { moreDest = null }, onSignOut = onSignOut, onSwitchWorkspace = onSwitchWorkspace) }; return }
     }
@@ -445,14 +543,18 @@ private fun MainScaffold(
                     Column(Modifier.fillMaxSize()) {
                         if (current == Screen.Home) Spacer(Modifier.height(2.dp))
                         when (current) {
-                            Screen.Home -> HomeScreen(
+                            Screen.Home -> PilotHomeScreen(
                                 data!!,
+                                activity = data!!.activity,
                                 onOpen = { screen = it },
                                 onInbox = { showInbox = true },
                                 onChat = { showChat = true },
                                 onSection = { moreDest = it },
                             )
-                            Screen.Assessments -> AssessmentsScreen(data!!.assessments)
+                            Screen.Assessments -> AssessmentsScreen(
+                                data!!.assessments,
+                                onOpenReadiness = { readinessOpen = true },
+                            )
                             Screen.Learning -> LearningScreen(data!!.learner, onChanged = { reloadKey += 1 })
                             Screen.Jobs -> JobsScreen()
                             Screen.More -> MoreMenuScreen(data!!.student, avatarVersion, onOpen = { moreDest = it }, onSignOut = onSignOut)
@@ -659,7 +761,7 @@ private fun ProgressRing(progress: Float, center: String, caption: String) {
 }
 
 @Composable
-private fun QuickTile(
+internal fun QuickTile(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     tone: Tone,
     label: String,
@@ -694,16 +796,23 @@ private fun QuickTile(
 // --- Assessments --------------------------------------------------------------
 
 @Composable
-private fun AssessmentsScreen(items: List<AssessmentDto>) {
+private fun AssessmentsScreen(items: List<AssessmentDto>, onOpenReadiness: () -> Unit) {
+    val bannerPalette = pro.ai8ht.one.ui.LocalOnePalette.current
     if (items.isEmpty()) {
-        EmptyState(Icons.Filled.Assignment, Tone.Accent,
-            "No assessments yet",
-            "Your placement cell assigns tests to you. They appear here with their windows, timers and results.")
+        // Not an empty screen any more: institution exams may be absent while a
+        // readiness check is still available, and those are two different things.
+        Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
+            Spacer(Modifier.height(12.dp))
+            ReadinessEntryCard(onOpenReadiness)
+            EmptyState(Icons.Filled.Assignment, Tone.Accent,
+                "No exams assigned yet",
+                "Your placement cell assigns tests to you. They appear here with their windows, timers and results.")
+        }
         return
     }
     val results = items.mapNotNull { it.latestResult }
-    val bannerPalette = pro.ai8ht.one.ui.LocalOnePalette.current
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
+        item { Spacer(Modifier.height(12.dp)); ReadinessEntryCard(onOpenReadiness) }
         if (items.any { it.openAttemptId != null }) {
             item {
                 Spacer(Modifier.height(10.dp))
@@ -957,7 +1066,21 @@ private fun InboxOverlay(feed: NotificationsEnvelope?, onClose: () -> Unit, onAl
 // --- Sign in / consent ---------------------------------------------------------
 
 @Composable
-private fun SignInScreen(expired: Boolean = false, onSignedIn: () -> Unit) {
+private fun SignInScreen(
+    expired: Boolean = false,
+    oauthRedirect: android.net.Uri? = null,
+    onRedirectHandled: () -> Unit = {},
+    onSignedIn: () -> Unit,
+) {
+    val redirectContext = LocalContext.current
+    var redirectError by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(oauthRedirect) {
+        val uri = oauthRedirect ?: return@LaunchedEffect
+        runCatching { OAuth.complete(redirectContext, uri) }
+            .onSuccess { if (it) onSignedIn() }
+            .onFailure { redirectError = it.message ?: "Sign-in did not complete." }
+        onRedirectHandled()
+    }
     val context = LocalContext.current
     val signPalette = pro.ai8ht.one.ui.LocalOnePalette.current
     val scope = rememberCoroutineScope()
@@ -1012,9 +1135,31 @@ private fun SignInScreen(expired: Boolean = false, onSignedIn: () -> Unit) {
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                         keyboardType = androidx.compose.ui.text.input.KeyboardType.Password),
                     shape = RoundedCornerShape(10.dp), colors = fieldColors)
-                error?.let {
+                (error ?: redirectError)?.let {
                     Spacer(Modifier.height(8.dp))
                     Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
+                // Hosted sign-in, shown only once an operator has registered the mobile
+                // app client. It is the only path that can complete an MFA challenge, so
+                // it is offered first and password sign-in becomes the fallback.
+                if (OAuth.isConfigured()) {
+                    Spacer(Modifier.height(14.dp))
+                    Button(
+                        onClick = {
+                            error = null
+                            runCatching { OAuth.begin(context) }
+                                .onFailure { error = it.message ?: "Could not start sign-in." }
+                        },
+                        enabled = !busy,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                    ) { Text("Sign in securely") }
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Opens your browser so two-factor sign-in works.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
                 Spacer(Modifier.height(14.dp))
                 Button(
@@ -1107,5 +1252,32 @@ private fun ConsentScreen(version: String, onGranted: () -> Unit) {
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(10.dp),
         ) { Text(if (busy) "Recording…" else "I have read the notice and I consent") }
+    }
+}
+
+/**
+ * Entry point to the readiness check.
+ *
+ * Kept visually distinct from institution exams because they are not the same thing:
+ * exams are assigned, timed and laptop-only; this is a short self-service check that
+ * moves the advisory band.
+ */
+@Composable
+private fun ReadinessEntryCard(onOpen: () -> Unit) {
+    PilotCard {
+        Row(
+            Modifier.fillMaxWidth().clickable { onOpen() }.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconBubble(Icons.Filled.Assignment, Tone.Green)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Readiness check", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text("A few questions, right here on your phone",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+        }
     }
 }

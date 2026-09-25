@@ -34,6 +34,9 @@ importers:
       '@planthepath/identity':
         specifier: workspace:*
         version: link:../../packages/identity
+      '@planthepath/learner-content':
+        specifier: workspace:*
+        version: link:../../packages/learner-content
       '@planthepath/persistence':
         specifier: workspace:*
         version: link:../../packages/persistence
@@ -120,6 +123,18 @@ importers:
       vite:
         specifier: ^7.1.2
         version: 7.3.6(@types/node@22.20.1)(tsx@4.23.12)
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@22.20.1)(jsdom@26.1.0)(tsx@4.23.12)
+
+  packages/ai-orchestration:
+    devDependencies:
+      '@types/node':
+        specifier: ^22.13.0
+        version: 22.20.1
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.3
       vitest:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@22.20.1)(jsdom@26.1.0)(tsx@4.23.12)
@@ -213,8 +228,20 @@ importers:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@22.20.1)(jsdom@26.1.0)(tsx@4.23.12)
 
+  packages/learner-content:
+    devDependencies:
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@22.20.1)(jsdom@26.1.0)(tsx@4.23.12)
+
   packages/persistence:
     dependencies:
+      '@planthepath/ai-orchestration':
+        specifier: workspace:*
+        version: link:../ai-orchestration
       '@planthepath/automation':
         specifier: workspace:*
         version: link:../automation
@@ -224,6 +251,9 @@ importers:
       '@planthepath/events':
         specifier: workspace:*
         version: link:../events
+      '@planthepath/learner-content':
+        specifier: workspace:*
+        version: link:../learner-content
       drizzle-orm:
         specifier: ^0.45.2
         version: 0.45.2(@types/pg@8.23.1)(pg@8.23.0)

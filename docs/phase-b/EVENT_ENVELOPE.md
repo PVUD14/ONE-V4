@@ -22,6 +22,8 @@ It is intentionally small and explicit. It is not a generic event framework.
 | `employer.grant.revoked` | 1 | `identity-organization` | `employer_applicant_grant` | Employer applicant grant revocation |
 | `document.reference.recorded` | 1 | `identity-organization` | `document_reference` | Opaque document-reference event shape |
 | `assessment.answer_sheet.recorded` | 1 | `identity-organization` | `answer_sheet` | Opaque answer-sheet event shape |
+| `content.generation.requested` | 1 | `learner-content` | `content_generation_request` | Queue deterministic seeded content creation |
+| `content.generation.completed` | 1 | `learner-content` | `learner_content` | Record seeded draft creation completion |
 
 The serialized integration type may be represented by downstream tooling as `identity.invitation.accepted.v1`, but persistence stores `event_type` and `event_version` separately.
 

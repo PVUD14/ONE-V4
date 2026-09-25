@@ -1,0 +1,38 @@
+# Line endings are LF everywhere, in the repository and in the working tree.
+#
+# Without this the working tree depends on each developer's core.autocrlf, and two
+# things in this repository break when it differs:
+#
+#   * automation/n8n manifests record a SHA-256 of workflow.json. That hash was
+#     computed over LF content, so a CRLF checkout fails `pnpm automation:validate`
+#     with a mismatch that looks like a corrupted workflow and is really a setting.
+#   * shell scripts fail on the server with `$'\r': command not found`, and
+#     `set -euo pipefail` silently does not apply — which let a release script get
+#     halfway through a production deploy before dying.
+#
+# Both cost real time before the cause was found. Normalising here makes the
+# checkout identical on every machine regardless of local git configuration.
+
+* text=auto eol=lf
+
+# Content whose bytes are hashed or executed remotely: never rewrite these.
+automation/n8n/**/*.json  text eol=lf
+*.sh                      text eol=lf
+*.service                 text eol=lf
+*.timer                   text eol=lf
+*.sql                     text eol=lf
+
+# Binary: leave completely alone.
+*.png     binary
+*.jpg     binary
+*.jpeg    binary
+*.gif     binary
+*.ico     binary
+*.pdf     binary
+*.ttf     binary
+*.woff    binary
+*.woff2   binary
+*.tar     binary
+*.jar     binary
+*.keystore binary
+*.p12     binary

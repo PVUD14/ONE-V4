@@ -1,5 +1,27 @@
 # ONE Functional Reality Matrix V2
 
+> **Status: retired — 2026-09-14. Do not use this file to judge what exists.**
+>
+> It was already stale on 2026-09-05, and the banner added then pointed readers at a
+> "Role Capability and Build-State report" that exists only as a generated PDF nobody
+> regenerates — so the redirection was itself a dead end, which is worse than no
+> redirection at all.
+>
+> What this matrix gets wrong has only grown. It records student file upload, employer
+> hiring mutations and student application workflows as unavailable; all three are built
+> and enforced. It implies a missing readiness scoring engine; the engine exists and
+> deliberately produces a band rather than a number
+> ([ADR-020](../architecture/ADR-020-readiness-is-a-band-not-a-score.md)). Since it was
+> written, candidate feedback, a merged calendar, alumni verification, employer screening
+> assessments, learner-content authoring and the public profile have all shipped, and none
+> of them appear below.
+>
+> **For the current state, read the source.** `docs/architecture/ADR-*.md` records the
+> decisions and what each rejected; the `*-table-design.md` files record why the
+> consequential tables are shaped as they are. A status document that drifts is worse than
+> none, because it is believed. The table below is kept only as a record of what was true
+> in Phase 2A.
+
 Phase 2A starts from human-accepted Phase 1 routing/session UAT:
 
 - Student login: PASS

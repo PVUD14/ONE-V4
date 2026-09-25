@@ -1,5 +1,11 @@
 # ONE Role Availability V1
 
+> **Status: partly superseded — 2026-09-05.** The role-availability gaps recorded below are
+> resolved by [ADR-018 — Role Model Consolidation](../architecture/ADR-018-role-model-consolidation.md):
+> Interviewer is to be enabled scoped to three screens, Hiring Manager folds into Recruiter,
+> Career Counselor folds into institution staff, and Institution Analyst is dropped as a role in
+> favour of an analytics capability. Read the ADR before planning work against the table below.
+
 No credentials are stored in this document. Passwords are in the operator-local file outside Git: `E:\8-PTPN-UAT-TEMP\identity\ONE_UAT_CREDENTIALS.local.txt`.
 
 ## UAT Cognito

@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.WorkOutline
 import androidx.compose.material3.Badge
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
@@ -192,6 +193,7 @@ private class InstitutionData(
     val subjects: Int,
     val underReview: Int,
     val notifications: NotificationsEnvelope?,
+    val attention: List<Pair<NotAttemptedDto, InstitutionExamDto>> = emptyList(),
 )
 
 @Composable
@@ -218,7 +220,13 @@ internal fun InstitutionScaffold(
             val subjects = async { runCatching { Api.listSubjects(context, organizationId).size }.getOrDefault(0) }
             val review = async { runCatching { Api.countQuestions(context, organizationId, "UNDER_REVIEW") }.getOrDefault(0) }
             val inbox = async { runCatching { Api.listNotifications(context) }.getOrNull() }
-            data = InstitutionData(exams.await(), subjects.await(), review.await(), inbox.await())
+            val loadedExams = exams.await()
+            val target = loadedExams.firstOrNull { it.lifecycleState == "PUBLISHED" && it.assignedCount > 0 }
+            val attention = if (target != null) {
+                runCatching { Api.examResults(context, organizationId, target.id).notAttempted.map { it to target } }
+                    .getOrDefault(emptyList())
+            } else emptyList()
+            data = InstitutionData(loadedExams, subjects.await(), review.await(), inbox.await(), attention)
         }
     }
 
@@ -305,6 +313,7 @@ private fun InstitutionHome(data: InstitutionData, onExams: () -> Unit) {
     val attempts = data.exams.sumOf { it.completedAttempts }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp)) {
         Spacer(Modifier.height(12.dp))
+        // Pilot KPI row: real where an engine exists, NA where it does not.
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             StatCell("${data.exams.size}", "Exams", Tone.Accent, Icons.Filled.Assignment, Modifier.weight(1f))
             StatCell("$published", "Published", Tone.Green, Icons.Filled.Assignment, Modifier.weight(1f))
@@ -312,8 +321,76 @@ private fun InstitutionHome(data: InstitutionData, onExams: () -> Unit) {
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             StatCell("${data.underReview}", "To review", Tone.Amber, Icons.Filled.Notifications, Modifier.weight(1f))
-            StatCell("$attempts/$assigned", "Attempts", Tone.Violet, Icons.Filled.School, Modifier.weight(1f))
+            StatCell("${data.attention.size}", "Need intervention", Tone.Gray, Icons.Filled.Notifications, Modifier.weight(1f))
         }
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            StatCell("$attempts/$assigned", "Attempts", Tone.Violet, Icons.Filled.School, Modifier.weight(1f))
+            StatCell("NA", "Students placed", Tone.Gray, Icons.Filled.School, Modifier.weight(1f))
+        }
+
+        // Cohort readiness: how many students sit in each band, not an average.
+        //
+        // This drew an "AVG" ring and four categories — Job Ready, Nearly Ready,
+        // Developing, Needs Support — which had two problems. An average readiness is a
+        // numeric readiness value, which ADR-020 forbids and the database refuses to
+        // store; and those four names are not the bands the product uses, so an
+        // institution would learn a vocabulary that appears nowhere else. The bands
+        // below are the real ones. A count of students per band is not a readiness
+        // value, so this is the shape the widget can legitimately take once there is a
+        // cohort aggregate behind it — there is no such endpoint yet, so each reads NA.
+        SectionTitle("Cohort readiness")
+        PilotCard {
+            Column(Modifier.padding(14.dp)) {
+                Text(
+                    "Advisory bands, shared with you and the student. Employers never see them.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(10.dp))
+                listOf(
+                    "Ready for next step", "Progressing", "Developing", "Not enough evidence",
+                ).forEach { label ->
+                    Row(Modifier.padding(vertical = 3.dp)) {
+                        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+                        Text("NA", style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+
+        // Pilot: Placement Pipeline - NA funnel until drives exist.
+        SectionTitle("Placement Pipeline")
+        PilotCard {
+            Column(Modifier.padding(14.dp)) {
+                listOf("Eligible", "Applied", "Shortlisted", "Offers", "Placed").forEach { label ->
+                    FunnelRow(label, null, 1)
+                }
+            }
+        }
+
+        // Pilot: Students Needing Attention - real, from assessment data.
+        SectionTitle("Needing attention")
+        if (data.attention.isEmpty()) {
+            PilotCard { Text("Nobody needs attention right now - every assigned assessment is attempted.",
+                Modifier.padding(14.dp), style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        } else {
+            data.attention.take(5).forEach { (entry, exam) ->
+                PilotCard(Modifier.fillMaxWidth().padding(bottom = 8.dp).clickable { onExams() }) {
+                    Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(entry.studentName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                            Text(if (entry.inProgress) "In progress now: ${exam.title}" else "Has not attempted: ${exam.title}",
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        StatusChip("Review", ChipKind.Waiting)
+                    }
+                }
+            }
+        }
+
         SectionTitle("Recent assessments", trailing = "View all", onTrailing = onExams)
         if (data.exams.isEmpty()) {
             PilotCard {
@@ -454,28 +531,78 @@ internal fun EmployerScaffold(
     val palette = LocalOnePalette.current
     var tab by remember { mutableStateOf(0) }
     var roles by remember { mutableStateOf<List<EmployerOpportunityDto>?>(null) }
+    var applicants by remember { mutableStateOf<List<EmployerApplicantDto>>(emptyList()) }
     var inbox by remember { mutableStateOf<NotificationsEnvelope?>(null) }
     var showInboxOv by remember { mutableStateOf(false) }
     var showChatOv by remember { mutableStateOf(false) }
     var showThemeOv by remember { mutableStateOf(false) }
     var showHelpOv by remember { mutableStateOf(false) }
+    var employerOverlay by remember { mutableStateOf<EmployerOverlay?>(null) }
+    var openApplicant by remember { mutableStateOf<EmployerApplicantDto?>(null) }
+    var employerReload by remember { mutableStateOf(0) }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(employerReload) {
         coroutineScope {
             val r = async { runCatching { Api.listEmployerOpportunities(context, organizationId) }.getOrDefault(emptyList()) }
             val n = async { runCatching { Api.listNotifications(context) }.getOrNull() }
-            roles = r.await(); inbox = n.await()
+            val loadedRoles = r.await()
+            val loadedApplicants = loadedRoles.filter { it.applicationCount > 0 }.take(4).flatMap { role ->
+                runCatching { Api.listEmployerApplicants(context, organizationId, role.id) }.getOrDefault(emptyList())
+            }
+            roles = loadedRoles; applicants = loadedApplicants; inbox = n.await()
         }
     }
 
-    androidx.activity.compose.BackHandler(enabled = showInboxOv || showChatOv || showThemeOv || showHelpOv) {
+    // Back closes the topmost overlay rather than quitting.
+    //
+    // This has to be declared before the early returns below, not after them. Each
+    // overlay returns out of the composable, so a BackHandler placed underneath them is
+    // never composed while an overlay is open — which is exactly when it is needed. The
+    // result was that system back from Offers, My interviews, Hiring analytics or an
+    // applicant closed the whole app.
+    androidx.activity.compose.BackHandler(
+        enabled = showInboxOv || showChatOv || showThemeOv || showHelpOv ||
+            openApplicant != null || employerOverlay != null,
+    ) {
         when {
             showChatOv -> showChatOv = false
             showThemeOv -> showThemeOv = false
             showHelpOv -> showHelpOv = false
-            else -> showInboxOv = false
+            showInboxOv -> showInboxOv = false
+            openApplicant != null -> openApplicant = null
+            else -> employerOverlay = null
         }
     }
+
+    openApplicant?.let { applicant ->
+        SlideIn {
+            ApplicantActionsPage(
+                employerId = organizationId,
+                applicantName = applicant.candidateName ?: "Candidate",
+                applicationId = applicant.id,
+                currentState = applicant.state,
+                onClose = { openApplicant = null },
+                onChanged = { employerReload += 1 },
+            )
+        }
+        return
+    }
+    when (employerOverlay) {
+        EmployerOverlay.MyInterviews -> {
+            SlideIn { MyInterviewsPage(organizationId, onClose = { employerOverlay = null }) }
+            return
+        }
+        EmployerOverlay.Offers -> {
+            SlideIn { EmployerOffersPage(organizationId, onClose = { employerOverlay = null }) }
+            return
+        }
+        EmployerOverlay.Analytics -> {
+            SlideIn { HiringAnalyticsPage(organizationId, onClose = { employerOverlay = null }) }
+            return
+        }
+        null -> Unit
+    }
+
     when {
         showHelpOv -> { SlideIn { HelpFaqPage(persona = "employer", onClose = { showHelpOv = false }) }; return }
         showChatOv -> { SlideIn { ChatOverlay(persona = "employer", onClose = { showChatOv = false }) }; return }
@@ -526,7 +653,13 @@ internal fun EmployerScaffold(
                 when {
                     roles == null -> HomeSkeleton()
                     else -> when (tab) {
-                        0 -> EmployerHome(roles!!) { tab = 1 }
+                        0 -> EmployerHome(
+                            roles = roles!!,
+                            applicants = applicants,
+                            onRoles = { tab = 1 },
+                            onOpenOverlay = { employerOverlay = it },
+                            onOpenApplicant = { openApplicant = it },
+                        )
                         1 -> EmployerRoles(roles!!)
                         else -> StaffMore(onSignOut, onSwitchWorkspace,
                             "Posting roles, publishing and candidate review stay on the web at one.ai8ht.pro.",
@@ -539,21 +672,84 @@ internal fun EmployerScaffold(
 }
 
 @Composable
-private fun EmployerHome(roles: List<EmployerOpportunityDto>, onRoles: () -> Unit) {
+private fun EmployerHome(
+    roles: List<EmployerOpportunityDto>,
+    applicants: List<EmployerApplicantDto>,
+    onRoles: () -> Unit,
+    onOpenOverlay: (EmployerOverlay) -> Unit,
+    onOpenApplicant: (EmployerApplicantDto) -> Unit,
+) {
     val published = roles.count { it.lifecycleState == "PUBLISHED" }
     val applications = roles.sumOf { it.applicationCount }
     val open = roles.sumOf { it.openApplicationCount }
+    fun stage(needle: String) = applicants.count { it.state.contains(needle) }
+    val offers = applicants.count { it.offerState != null }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp)) {
         Spacer(Modifier.height(12.dp))
+        // Pilot KPI rows - all real.
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            StatCell("${roles.size}", "Roles", Tone.Violet, Icons.Filled.WorkOutline, Modifier.weight(1f))
-            StatCell("$published", "Published", Tone.Green, Icons.Filled.WorkOutline, Modifier.weight(1f))
+            StatCell("$published", "Open Roles", Tone.Violet, Icons.Filled.WorkOutline, Modifier.weight(1f))
+            StatCell("$applications", "Total Applicants", Tone.Accent, Icons.Filled.School, Modifier.weight(1f))
         }
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            StatCell("$applications", "Applications", Tone.Accent, Icons.Filled.School, Modifier.weight(1f))
-            StatCell("$open", "Open", Tone.Amber, Icons.Filled.Notifications, Modifier.weight(1f))
+            StatCell("$open", "In Pipeline", Tone.Amber, Icons.Filled.Notifications, Modifier.weight(1f))
+            StatCell("$offers", "Offers", Tone.Green, Icons.Filled.WorkOutline, Modifier.weight(1f))
         }
+
+        // Pilot: Hiring Funnel - real stage counts.
+        SectionTitle("Hiring Funnel")
+        PilotCard {
+            Column(Modifier.padding(14.dp)) {
+                val max = applications.coerceAtLeast(1)
+                FunnelRow("Applied", applications, max)
+                FunnelRow("Shortlisted", stage("SHORTLIST"), max)
+                FunnelRow("Interview", stage("INTERVIEW"), max)
+                FunnelRow("Offer", offers, max)
+                FunnelRow("Hired", stage("HIRED"), max)
+            }
+        }
+
+        // Pilot: This Week's Interviews - NA until a calendar engine exists.
+        SectionTitle("This Week's Interviews")
+        PilotCard {
+            Column(Modifier.padding(14.dp)) {
+                Text("Interviews you are on the panel for, with their scorecards.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = { onOpenOverlay(EmployerOverlay.MyInterviews) }) { Text("My interviews") }
+                    TextButton(onClick = { onOpenOverlay(EmployerOverlay.Offers) }) { Text("Offers") }
+                    TextButton(onClick = { onOpenOverlay(EmployerOverlay.Analytics) }) { Text("Hiring") }
+                }
+            }
+        }
+
+        // Pilot: Recently Shortlisted - real.
+        SectionTitle("Recently Shortlisted")
+        val shortlisted = applicants.filter { it.state.contains("SHORTLIST") || it.state.contains("INTERVIEW") }
+        if (shortlisted.isEmpty()) {
+            PilotCard { Text("Nobody shortlisted yet.", Modifier.padding(14.dp),
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        } else {
+            shortlisted.take(4).forEach { applicant ->
+                PilotCard(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                    Row(
+                        Modifier.clickable { onOpenApplicant(applicant) }.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(applicant.candidateName ?: "Candidate", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                            Text(prettify(applicant.state), style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        StatusChip(prettify(applicant.state), ChipKind.Accent)
+                    }
+                }
+            }
+        }
+
         SectionTitle("Recent roles", trailing = "View all", onTrailing = onRoles)
         if (roles.isEmpty()) {
             PilotCard {

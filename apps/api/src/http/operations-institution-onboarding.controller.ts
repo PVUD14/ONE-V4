@@ -352,7 +352,7 @@ export class OperationsInstitutionOnboardingController {
   @Get('/institutions/:institutionId/units')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async listUnits(@Req() request: ProtectedHttpRequest, @Param('institutionId') institutionId: string): Promise<Record<string, unknown>> {
-    const context = requireInstitutionAdmin(request, institutionId);
+    const context = requireInstitutionStaff(request, institutionId);
     const id = requireUuid(institutionId, context.correlationId);
     const units = await this.db.execute(sql`SELECT id, institution_id, kind, name, parent_unit_id, created_at, updated_at FROM institution_units WHERE institution_id=${id}::uuid ORDER BY kind, name`) as QueryResult<Record<string, unknown>>;
     return { units: units.rows.map(mapUnitRow), correlationId: context.correlationId };
@@ -666,6 +666,11 @@ export class OperationsInstitutionOnboardingController {
       `);
       await writeAudit(tx, { id: this.ids.uuid(), actorUserId: input.actorUserId, action: 'identity.invitation.created', resourceType: 'invitation', resourceId: invitationId, organizationId: input.organizationId, correlationId: input.correlationId });
       await writeOutbox(tx, { id: this.ids.uuid(), aggregateType: 'invitation', aggregateId: invitationId, eventType: 'identity.invitation.created', payload: { invitationId }, actorUserId: input.actorUserId, organizationId: input.organizationId, correlationId: input.correlationId });
+      // The command above is what the automation worker delivers, and the worker is
+      // driven by this event -- not by identity.invitation.created, which announces
+      // that an invitation exists and has no delivery consumer. Without this line the
+      // worker runs, drains the outbox and delivers no invitation at all.
+      await writeOutbox(tx, { id: this.ids.uuid(), aggregateType: 'notification_command', aggregateId: notificationCommandId, eventType: 'notification.delivery.requested', payload: { commandId: notificationCommandId, templateId: input.templateId, channel: 'EMAIL' }, actorUserId: input.actorUserId, organizationId: input.organizationId, correlationId: input.correlationId });
     });
     if (this.invitationMailSink) {
       const delivered = await this.invitationMailSink.send({ toEmail: input.email, subject, textBody, invitationId, correlationId: input.correlationId });

@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { Pool } from 'pg';
+import type { IntegrationEventEnvelope } from '@planthepath/events/src/index.js';
 import type { PersistenceDb } from './repositories.js';
 import { claimOutboxBatch, dispatchClaimedOutboxEvent, markExpiredOutboxEvents, type IntegrationEventPublisher } from './outbox-dispatcher.js';
 import {
@@ -24,6 +25,7 @@ import {
   releaseAutomationClaimForFailure,
   resolveClaimedEmailDelivery,
 } from './automation-runtime.js';
+import { consumeSeededContentGenerationRequested } from './content-generation.js';
 
 export async function publishOutboxOnce(input: {
   readonly db: PersistenceDb; readonly publisher: IntegrationEventPublisher; readonly leaseOwner: string; readonly now: Date;
@@ -43,10 +45,60 @@ export async function publishOutboxOnce(input: {
   return { claimed: claimed.length, published, retryScheduled, terminal };
 }
 
+/**
+ * The transport ADR-028 chose: the outbox table itself.
+ *
+ * A claimed outbox event is handed straight to the consumer that would otherwise have
+ * received it from SQS, in the same process. `event_consumer_receipts` still provides
+ * idempotency, and the outbox's own claim-with-lease, retry, backoff and terminal
+ * state still provide at-least-once delivery — which is the guarantee the broker was
+ * there to supply, minus the network.
+ *
+ * An event type with no local consumer is acknowledged rather than retried. That is
+ * the faithful equivalent of publishing to a bus nobody subscribes to: the outbox row
+ * remains the durable record either way, and failing them instead would drive every
+ * unconsumed event type to FAILED and bury the ones that genuinely broke. The counter
+ * is returned so "nothing is listening to this" stays visible in the worker log
+ * rather than becoming silence.
+ */
+export function createLocalIntegrationEventPublisher(input: { readonly pool: Pool; readonly db: PersistenceDb }): {
+  readonly publisher: IntegrationEventPublisher;
+  readonly counts: () => { readonly handled: number; readonly unrouted: number };
+} {
+  let handled = 0;
+  let unrouted = 0;
+  const handlers: Readonly<Record<string, (event: IntegrationEventEnvelope) => Promise<void>>> = {
+    'notification.delivery.requested': async (event) => {
+      if (event.eventVersion !== 1) throw new Error('event is outside the notification consumer contract');
+      await createAutomationCommandForNotificationEvent(input.pool, event.eventId);
+    },
+    'content.generation.requested': async (event) => {
+      await consumeSeededContentGenerationRequested(input.db, event);
+    },
+  };
+  return {
+    publisher: {
+      async publish(event: IntegrationEventEnvelope): Promise<void> {
+        const handler = handlers[event.eventType];
+        if (!handler) { unrouted += 1; return; }
+        await handler(event);
+        handled += 1;
+      },
+    },
+    counts: () => ({ handled, unrouted }),
+  };
+}
+
 export function createNotificationEventConsumer(input: { readonly pool: Pool; readonly queueUrl: string }): SqsIntegrationEventConsumer {
   return new SqsIntegrationEventConsumer(input.queueUrl, async (event) => {
     if (event.eventType !== 'notification.delivery.requested' || event.eventVersion !== 1) throw new Error('event is outside the notification consumer contract');
     await createAutomationCommandForNotificationEvent(input.pool, event.eventId);
+  });
+}
+
+export function createContentGenerationEventConsumer(input: { readonly db: PersistenceDb; readonly queueUrl: string }): SqsIntegrationEventConsumer {
+  return new SqsIntegrationEventConsumer(input.queueUrl, async (event) => {
+    await consumeSeededContentGenerationRequested(input.db, event);
   });
 }
 

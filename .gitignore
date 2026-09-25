@@ -16,3 +16,15 @@ yarn-error.log*
 Thumbs.db
 .idea/
 .vscode/
+
+# Private keys and certificates. Never commit these — the production SSH key
+# lives in this directory on at least one machine.
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_ed25519
+
+# Local emulator screen recordings — large binaries, not source
+.recordings/

@@ -378,3 +378,113 @@ invitations (Api.kt:181,186), and both are unchanged.
   retry is safe.
 
 **Next goal:** OPS-06.
+
+## OPS-04 — Background jobs console (System Health) — 2026-09-25
+**Result:** Complete. System Health is now the background jobs console. Operators can see outbox health, the worker's state,
+consumer activity, automation workflows and commands, and breach alerts. They can inspect and replay a failed event, and ask for a
+backlog supersede through the OPS-02 approval flow. They need neither the API nor a database client.
+**Branch / PR:** feat/ops-jobs-console → feat/plan-phases-0-to-2. Commits in order: design, acceptance tests, implementation, this
+report. Pushed to onev4. No PR was opened because `gh` is not installed.
+
+**Files created:**
+- docs/architecture/jobs-health-alerts-table-design.md
+- packages/persistence/drizzle/0045_jobs_health_alerts.sql
+- packages/persistence/src/jobs-health.ts and packages/persistence/src/run-jobs-alert-check.ts
+- packages/authorization/src/jobs-console.ts (+ .test.ts)
+- apps/api/src/http/operations-jobs.controller.ts (+ operations-jobs.integration.spec.ts)
+- apps/web/src/api/systemHealth.ts
+- apps/web/src/rolePortal/systemHealth.tsx (+ .test.tsx)
+- packages/persistence/test/jobs-health.integration.test.ts
+- deploy/systemd/planthepath-jobs-alerts.{service,timer}
+
+**Files modified:**
+- apps/web/src/rolePortalPages.tsx: one new line for the `System Health` label only. Security and AI Operations keep the read-only page.
+- apps/web/src/api.ts: a re-export.
+- apps/api/src/http/operations-outbox.controller.ts: `requireJobsOperator` is now exported, and replay reasons must come from the list.
+- apps/api/src/http/api-security.module.ts: registration only.
+- packages/authorization/src/index.ts: an export.
+- packages/persistence/src/content-generation.ts: the consumer-name constant is now exported.
+- packages/persistence/package.json: the `jobs:alert-check` script.
+- .env.example: three optional `JOBS_ALERT_*` variables.
+- deploy/systemd/README.md
+
+**Migrations added:** 0045_jobs_health_alerts.sql. It adds the `jobs_health_alerts` table: one row per breach, a partial unique index
+allowing at most one open alert per condition, and a guard trigger. The trigger makes the fields immutable, allows only OPEN → CLEARED
+stamped by the database clock, and refuses deletes. The migration also adds five partial or covering indexes so the summary reads stay
+bounded. It is idempotent: `db:migrate` ran twice on a fresh `one_ops04`, and the persistence test replays it in its own schema.
+**Design docs / ADRs:** jobs-health-alerts-table-design.md, which also records the rejected options: an audit row under an invented
+system user, a time-bucket dedupe, and state kept in the worker. No ADR was needed.
+
+**Validation (fresh `one_ops04`, only DATABASE_URL exported):**
+- `corepack pnpm db:migrate` run twice: pass.
+- `corepack pnpm typecheck`: pass.
+- `corepack pnpm -r --no-bail --workspace-concurrency=1 test`: pass, **1 504 passed, 0 failed**.
+  - web 455 (10 new)
+  - api 548 (15 new)
+  - persistence 199 (12 new)
+  - authorization 120 (5 new)
+  - others 182
+- `corepack pnpm build`: pass (web chunk-size warning only).
+- `jobs:alert-check` was run against the local database. It logged one JSON line and exited 0.
+
+**Acceptance criteria:**
+- An operator can find, inspect and replay a failed event without the API or a database client ✔.
+  - Finding: a keyset list (default 50, max 200) filtered by event type and by age.
+  - Inspecting: the event's type, attempts, failure class with a fixed plain explanation, the reference, consumer receipts and the
+    automation command.
+  - Replaying: a confirm dialog that requires a listed reason code. The replay is audited as `outbox.event.replayed` with the reason.
+  - Never shown: the payload, the stored failure message, recipients or lease owners. The API tests assert this.
+- Supersede requires an approval ✔. The screen counts what a cutoff would retire, then files `OUTBOX_BACKLOG_SUPERSEDE` through
+  `RequestApprovalDialog`. The action is carried out from Settings → Approvals. Without an approval the endpoint still returns 403
+  `APPROVAL_REQUIRED`; the full flow is tested.
+- A threshold breach produces one alert, not one per event ✔. More failures and repeated runs during one breach leave one row. The
+  alert clears when the condition recovers, and a new breach raises a new alert.
+- Consumer health ✔: last activity, last success and failed receipts for each known consumer. Content-generation worker activity is
+  that consumer's receipts. Missing values show NA.
+- Automation workflow registry state and command counts by state ✔.
+- Worker liveness, derived from data only ✔: Draining, Stalled, or "No work waiting", which says plainly that liveness cannot be judged
+  when nothing is due. Also shown: live claims, claims left by a stopped worker, and the last delivery (NA when none).
+- §6.6 minimums ✔:
+  - Authorization unit tests: granted, denied, and inactive membership.
+  - API: 401, 403 (institution admin, suspended membership), 200 for all three roles, input 400s, pagination bounds, audit row with the
+    reason code, and no data beyond the minimised fields.
+  - Web: real data, NA, empty, loading, error with reference, forbidden, confirm dialogs that require a reason code, and navigation
+    labels unchanged.
+  - Regression: every pre-existing test passes unchanged.
+- The Career Readiness governance panel that System Health showed before is kept under the console ✔.
+
+**Decisions for Divakar (recommendations adopted):**
+- **Alert recipients** are all active platform staff, the same rule as the OPS-02 solo notice. ONE has no "operations mailbox"
+  entity, and `notification_commands` needs a `users` row.
+- **Alert delivery** goes only through the existing `ops-failure` workflow (no new channel), and only when that workflow is active and
+  outside its kill switch **and** an approved `ops-failure` notification template exists. Otherwise the alert is recorded as
+  NOT_DELIVERED and the screen says it was not emailed. The evaluator does not create the template itself: `approved_by_user_id` must be
+  a real person, and a timer has none. Publishing the template belongs with communication templates (OPS-16) or a seed run by Divakar.
+  The QUEUED path is tested.
+- **Defaults:** 10 failed events, or 30 minutes for a due event. Consumer silence is off until an interval is configured. All three
+  are changed in `app.env` without a release. A value that cannot be used is ignored, and the screen says so.
+- **The evaluator** is a five-minute one-shot systemd timer, not an always-on service and not part of the worker. A stopped worker still
+  shows up as a stalled queue.
+- **Replay reason codes** come from a fixed list: TRANSIENT_FAILURE_RESOLVED, CONFIGURATION_FIXED, RECEIVER_RESTORED,
+  INCIDENT_RECOVERY, CUSTOMER_REQUEST. The existing replay endpoint now enforces it (`OUTBOX_REASON_INVALID`). This tightens it; no
+  existing test changed.
+- **Failed-list ordering:** keyset on (occurred_at, id) per §5.7, with a microsecond-precision cursor.
+
+**Limitations / not done:**
+- Nothing here reaches production until Divakar installs the timer units and releases.
+- The first alert check on a host with an unsuperseded pre-dispatcher backlog will correctly raise PENDING_EVENTS_STALLED. The README
+  says so.
+- Consumers are the two known in code (student invitations, seeded content generation). A new consumer must be added to
+  `knownJobConsumers` to appear.
+- Workflow activation and the kill switch stay outside the screen, as before.
+- The old `GET /operations/outbox/failed` endpoint is left unchanged and unused by the web.
+
+**Android:** no change. §4.3 keeps operator screens web-only. The app's only operations calls are GET organizations and GET
+invitations (Api.kt:191,196), and nothing in this goal changes them.
+**Risks / follow-ups:**
+- The 0045 indexes are built without CONCURRENTLY, because the migrator runs each file as one query. They are partial and the pilot
+  outbox is small, but on a large production outbox the build would briefly block writes.
+- The staff-actions API spec took about 16 minutes on the shared local Postgres under load from parallel agents. It passed, but it is
+  slow.
+
+**Next goal:** OPS-05.

@@ -156,7 +156,7 @@ export class CareerReadinessController {
     if (!membership || membership.organizationId !== id || !institutionReportRoles.includes(membership.role)) throw safeForbidden();
     if (!isIsoDate(periodStart) || !isIsoDate(periodEnd) || periodEnd < periodStart) throw safeBadRequest();
     const studentScope = await resolveInstitutionStudentScope(this.pool, id, [{
-      role: membership.role, departmentUnitId: membership.scope.departmentId ?? null, batchUnitId: membership.scope.batchId ?? null,
+      role: membership.role, membershipId: membership.id, departmentUnitId: membership.scope.departmentId ?? null, batchUnitId: membership.scope.batchId ?? null,
     }]);
     try {
       return await generateInstitutionAggregateReport(this.pool, { institutionId: id, periodStart, periodEnd, studentScope });

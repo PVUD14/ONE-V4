@@ -171,6 +171,16 @@ object Api {
             request(context, "GET", "/api/v1/institutions/$institutionId/students"),
         ).activationSummary
 
+    /**
+     * Faculty "My Students" (INST-03): the students of the lecturer's active teaching
+     * assignments, scoped by the server exactly as the web page is. A 403 means the caller
+     * holds no faculty role in this institution.
+     */
+    suspend fun myStudents(context: Context, institutionId: String): MyStudentsEnvelope =
+        json.decodeFromString(
+            request(context, "GET", "/api/v1/institutions/$institutionId/my-students?limit=50"),
+        )
+
     suspend fun examResults(context: Context, institutionId: String, definitionId: String): ExamResultsDto =
         json.decodeFromString(
             request(context, "GET", "/api/v1/institutions/$institutionId/assessments/$definitionId/results"),
@@ -336,6 +346,35 @@ object Api {
 /** Only the summary is read; the roster rows themselves stay on the web Students page. */
 @Serializable data class RosterActivationEnvelope(val activationSummary: Map<String, Int>? = null)
 @Serializable data class ErrorBody(val code: String? = null, val message: String? = null)
+
+@Serializable data class MyStudentsEnvelope(
+    /** ASSIGNMENTS: scope comes from teaching assignments; MEMBERSHIP: the college has not started assigning. */
+    val mode: String = "MEMBERSHIP",
+    val assignments: List<TeachingAssignmentDto> = emptyList(),
+    val students: List<MyStudentDto> = emptyList(),
+    val nextCursor: String? = null,
+)
+@Serializable data class TeachingAssignmentDto(
+    val id: String = "",
+    val unit: TeachingUnitDto = TeachingUnitDto(),
+    val subject: TeachingSubjectDto? = null,
+    val subjectCode: String? = null,
+    val academicTerm: String = "",
+)
+@Serializable data class TeachingUnitDto(val id: String = "", val kind: String = "", val name: String = "")
+@Serializable data class TeachingSubjectDto(val id: String = "", val name: String = "", val code: String? = null)
+@Serializable data class MyStudentDto(
+    val profileId: String = "",
+    val fullName: String = "",
+    val institutionStudentId: String = "",
+    val units: MyStudentUnitsDto = MyStudentUnitsDto(),
+    val activation: MyStudentActivationDto? = null,
+    val openTasks: Int = 0,
+    val recentAssessments: MyStudentAssessmentsDto = MyStudentAssessmentsDto(),
+)
+@Serializable data class MyStudentUnitsDto(val section: String? = null, val batch: String? = null)
+@Serializable data class MyStudentActivationDto(val state: String = "")
+@Serializable data class MyStudentAssessmentsDto(val submitted: Int = 0, val latestTitle: String? = null)
 
 @Serializable data class AssessmentsEnvelope(val assessments: List<AssessmentDto> = emptyList())
 @Serializable data class AssessmentDto(

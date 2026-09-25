@@ -10,9 +10,14 @@
  * faculty member sees the units their membership is scoped to, including every unit
  * below them (a department's programmes, batches and sections). A membership with no
  * unit scope stays institution-wide: that is how staff actions have always treated it,
- * and no invitation sets a scope yet, so failing closed would empty every existing
- * department-head workspace. Faculty narrow further to teaching assignments once those
- * exist.
+ * and failing closed would empty every existing department-head workspace.
+ *
+ * Faculty (INST-03): once an institution records teaching assignments, a faculty
+ * membership carries `teachingUnitIds` — the sections and batches of its active
+ * assignments — and its scope is exactly those units and everything below them. An
+ * empty list is no students; the membership's own department and batch no longer widen
+ * it. Until the institution records its first assignment the field is absent and faculty
+ * keep the membership scope above. See docs/architecture/faculty-teaching-assignments-table-design.md.
  */
 
 export const institutionWideStaffRoles = ['INSTITUTION_OWNER', 'INSTITUTION_ADMIN'] as const;
@@ -27,6 +32,13 @@ export interface InstitutionStaffScopeMembership {
   readonly role: string;
   readonly departmentUnitId?: string | null;
   readonly batchUnitId?: string | null;
+  /** The membership row, so persistence can look up its teaching assignments. */
+  readonly membershipId?: string | null;
+  /**
+   * FACULTY_LECTURER only: the units of the membership's active teaching assignments.
+   * Absent (undefined or null) while the institution has none recorded at all.
+   */
+  readonly teachingUnitIds?: readonly string[] | null;
 }
 
 /**
@@ -77,11 +89,35 @@ export function institutionStudentScope(
   for (const membership of memberships) {
     if ((institutionWideStaffRoles as readonly string[]).includes(membership.role)) return { kind: 'INSTITUTION' };
     if (!(institutionUnitScopedStaffRoles as readonly string[]).includes(membership.role)) continue;
-    const anchors = [membership.departmentUnitId, membership.batchUnitId].filter((id): id is string => Boolean(id));
+    if (teachesByAssignment(membership)) {
+      // One clause per assigned unit: a student in any of them is visible.
+      for (const unit of new Set(membership.teachingUnitIds)) clauses.push([institutionUnitDescendants(unit, units)]);
+      continue;
+    }
+    const anchors = institutionScopeAnchors(membership);
     if (anchors.length === 0) return { kind: 'INSTITUTION' };
     clauses.push(anchors.map((anchor) => institutionUnitDescendants(anchor, units)));
   }
   return clauses.length === 0 ? { kind: 'NONE' } : { kind: 'UNITS', clauses };
+}
+
+function teachesByAssignment(membership: InstitutionStaffScopeMembership): membership is InstitutionStaffScopeMembership & { readonly teachingUnitIds: readonly string[] } {
+  return membership.role === 'FACULTY_LECTURER' && Array.isArray(membership.teachingUnitIds);
+}
+
+/**
+ * The units a membership's scope is anchored on, for naming it on a screen: a faculty
+ * member's assigned units once assignments are in use, otherwise the membership's
+ * department and batch. Empty for an unscoped membership.
+ */
+export function institutionScopeAnchors(membership: InstitutionStaffScopeMembership): readonly string[] {
+  if (teachesByAssignment(membership)) return [...new Set(membership.teachingUnitIds)];
+  return [membership.departmentUnitId, membership.batchUnitId].filter((id): id is string => Boolean(id));
+}
+
+/** True when `unitId` is `anchorId` or below it — the rule for department-scoped writes. */
+export function isUnitWithin(unitId: string, anchorId: string, units: readonly InstitutionUnitNode[]): boolean {
+  return institutionUnitDescendants(anchorId, units).includes(unitId);
 }
 
 export function isStudentInInstitutionScope(scope: InstitutionStudentScope, student: InstitutionStudentUnits): boolean {

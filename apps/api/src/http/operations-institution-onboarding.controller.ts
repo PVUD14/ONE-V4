@@ -6,6 +6,7 @@ import { institutionStudentScopeSql } from '@planthepath/persistence/src/institu
 import { buildInvitationUrl, type InvitationMailSink } from '@planthepath/persistence/src/invitation-mail.js';
 import { createStudentInvitation, loadStudentActivations, resendStudentInvitations, revokePendingStudentInvitations, summariseActivations } from '@planthepath/persistence/src/student-invitations.js';
 import { describeInstitutionStudentScope, institutionStudentScopeFor } from './institution-student-scope.js';
+import { readStaffUnitScope, validateStaffUnitScope } from './institution-staff-scope.js';
 import {
   API_ID_GENERATOR,
   API_PERSISTENCE_DB,
@@ -375,6 +376,7 @@ export class OperationsInstitutionOnboardingController {
     const id = requireUuid(institutionId, context.correlationId);
     const invitations = await this.db.execute(sql`
       SELECT i.id, i.email, i.role, i.state, i.created_at, i.expires_at, i.accepted_at, i.revoked_at,
+             i.scope_department_unit_id, i.scope_batch_unit_id,
              nc.id AS notification_command_id, nc.state AS notification_state,
              nda.provider_kind, nda.provider_reference, nda.outcome AS delivery_outcome
       FROM invitations i
@@ -391,7 +393,7 @@ export class OperationsInstitutionOnboardingController {
       LIMIT 200
     `) as QueryResult<Record<string, unknown>>;
     const memberships = await this.db.execute(sql`
-      SELECT m.id, m.user_id, u.email, m.role, m.state, m.created_at, m.updated_at
+      SELECT m.id, m.user_id, u.email, m.role, m.state, m.created_at, m.updated_at, m.scope_department_unit_id, m.scope_batch_unit_id
       FROM organization_memberships m
       JOIN users u ON u.id = m.user_id
       WHERE m.organization_id = ${id}::uuid
@@ -654,6 +656,9 @@ export class OperationsInstitutionOnboardingController {
     const actorEmail = actor.rows[0]?.email ? normalizeEmail(actor.rows[0].email, context.correlationId) : null;
     if (!actorEmail || email === actorEmail) throw forbidden(context.correlationId);
     const role = readEnum(readString(body, 'role', context.correlationId), institutionAssignableRoles, context.correlationId);
+    // INST-03: an admin may scope the invitation to a department and/or batch; acceptance copies it onto the membership.
+    const unitScope = readStaffUnitScope(body, context.correlationId);
+    await validateStaffUnitScope(this.db, id, role, unitScope, context.correlationId);
     const pendingInvitation = await this.db.execute(sql`
       SELECT id, state, role, expires_at
       FROM invitations
@@ -682,6 +687,8 @@ export class OperationsInstitutionOnboardingController {
       role,
       scopeInstitutionId: id,
       scopeEmployerId: null,
+      scopeDepartmentUnitId: unitScope.departmentUnitId,
+      scopeBatchUnitId: unitScope.batchUnitId,
       templateId: staffInvitationTemplateId,
       legalPurpose: 'transactional institution staff invitation',
       dedupePrefix: 'institution-staff',
@@ -697,6 +704,8 @@ export class OperationsInstitutionOnboardingController {
     readonly role: InvitationRole;
     readonly scopeInstitutionId: string | null;
     readonly scopeEmployerId: string | null;
+    readonly scopeDepartmentUnitId?: string | null;
+    readonly scopeBatchUnitId?: string | null;
     readonly templateId: string;
     readonly legalPurpose: string;
     readonly dedupePrefix: string;
@@ -717,9 +726,10 @@ export class OperationsInstitutionOnboardingController {
     ].join('\n\n');
     await this.db.transaction(async (tx) => {
       await tx.execute(sql`
-        INSERT INTO invitations (id, email, token_hash, invited_by_user_id, organization_id, role, scope_organization_id, scope_institution_id, scope_employer_id, expires_at)
+        INSERT INTO invitations (id, email, token_hash, invited_by_user_id, organization_id, role, scope_organization_id, scope_institution_id, scope_employer_id,
+                                 scope_department_unit_id, scope_batch_unit_id, expires_at)
         VALUES (${invitationId}::uuid, ${input.email}, ${tokenHash}, ${input.actorUserId}::uuid, ${input.organizationId}::uuid, ${input.role}, ${input.organizationId}::uuid,
-                ${input.scopeInstitutionId}::uuid, ${input.scopeEmployerId}::uuid, ${expiresAt})
+                ${input.scopeInstitutionId}::uuid, ${input.scopeEmployerId}::uuid, ${input.scopeDepartmentUnitId ?? null}::uuid, ${input.scopeBatchUnitId ?? null}::uuid, ${expiresAt})
       `);
       await ensureInvitationNotificationTemplate(tx, input.templateId, input.actorUserId, subject);
       await tx.execute(sql`
@@ -1335,6 +1345,7 @@ function mapStaffInvitationRow(row: Record<string, unknown>): Record<string, unk
     expiresAt: row.expires_at,
     acceptedAt: row.accepted_at,
     revokedAt: row.revoked_at,
+    scope: { departmentUnitId: row.scope_department_unit_id ?? null, batchUnitId: row.scope_batch_unit_id ?? null },
     delivery: row.notification_command_id ? {
       commandId: row.notification_command_id,
       state: row.notification_state,
@@ -1354,5 +1365,6 @@ function mapStaffMembershipRow(row: Record<string, unknown>): Record<string, unk
     state: row.state,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    scope: { departmentUnitId: row.scope_department_unit_id ?? null, batchUnitId: row.scope_batch_unit_id ?? null },
   };
 }

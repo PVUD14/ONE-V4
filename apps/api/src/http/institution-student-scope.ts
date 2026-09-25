@@ -9,8 +9,8 @@
  */
 import { sql } from 'drizzle-orm';
 import type { Pool } from 'pg';
-import type { InstitutionStaffScopeMembership, InstitutionStudentScope } from '@planthepath/authorization/src/index.js';
-import { resolveInstitutionStudentScope } from '@planthepath/persistence/src/institution-scope.js';
+import { institutionScopeAnchors, type InstitutionStaffScopeMembership, type InstitutionStudentScope } from '@planthepath/authorization/src/index.js';
+import { resolveInstitutionStudentScope, withTeachingAssignments } from '@planthepath/persistence/src/institution-scope.js';
 import type { PersistenceDb } from '@planthepath/persistence/src/repositories.js';
 import type { ProtectedHttpRequest } from './api-security.js';
 
@@ -32,6 +32,7 @@ export function institutionStaffScopeMemberships(
       && roles.includes(membership.role))
     .map((membership) => ({
       role: membership.role,
+      membershipId: membership.id,
       departmentUnitId: membership.scope.departmentId ?? null,
       batchUnitId: membership.scope.batchId ?? null,
     }));
@@ -55,9 +56,9 @@ export async function describeInstitutionStudentScope(
   scope: InstitutionStudentScope,
 ): Promise<InstitutionStudentScopeView> {
   if (scope.kind !== 'UNITS') return { kind: scope.kind, units: [] };
-  const anchors = [...new Set(institutionStaffScopeMemberships(request, institutionId, roles)
-    .flatMap((membership) => [membership.departmentUnitId, membership.batchUnitId])
-    .filter((id): id is string => Boolean(id)))];
+  // A faculty member's scope is named by their assigned units once assignments are in use (INST-03).
+  const memberships = await withTeachingAssignments(db, institutionId, institutionStaffScopeMemberships(request, institutionId, roles));
+  const anchors = [...new Set(memberships.flatMap((membership) => institutionScopeAnchors(membership)))];
   const rows = await db.execute(sql`
     SELECT id, kind::text AS kind, name FROM institution_units
     WHERE institution_id = ${institutionId}::uuid AND id = ANY(${`{${anchors.join(',')}}`}::uuid[])

@@ -12,14 +12,22 @@ export interface InstitutionUnitDto {
   readonly id: string; readonly institutionId: string; readonly kind: string; readonly name: string; readonly parentUnitId?: string | null;
 }
 
+/** A staff member's department/batch scope (INST-03). Both null: the whole institution. */
+export interface StaffUnitScopeDto {
+  readonly departmentUnitId: string | null;
+  readonly batchUnitId: string | null;
+}
+
 export interface InstitutionStaffDto {
   readonly invitations: readonly {
     readonly id: string; readonly email: string; readonly role: string; readonly state: string;
+    readonly scope?: StaffUnitScopeDto;
     readonly createdAt: string; readonly expiresAt: string; readonly acceptedAt?: string | null; readonly revokedAt?: string | null;
     readonly delivery?: { readonly commandId: string; readonly state: string; readonly providerKind?: string | null; readonly providerReference?: string | null; readonly outcome?: string | null } | null;
   }[];
   readonly memberships: readonly {
     readonly id: string; readonly userId: string; readonly email: string; readonly role: string; readonly state: string; readonly createdAt: string; readonly updatedAt: string;
+    readonly scope?: StaffUnitScopeDto;
   }[];
   readonly unavailableActions: readonly string[];
 }
@@ -95,6 +103,8 @@ export interface InstitutionUnitUpdateRequest {
 export interface InstitutionStaffInvitationRequest {
   readonly email: string;
   readonly role: string;
+  readonly departmentUnitId?: string;
+  readonly batchUnitId?: string;
 }
 
 export interface RosterImportPreviewDto {
@@ -146,8 +156,12 @@ export function endInstitutionStudentRelationship(token: string, institutionId: 
   return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/students/${encodeURIComponent(studentProfileId)}/relationship`, { token, method: 'POST', body: { state, ...(effectiveTo ? { effectiveTo } : {}) } });
 }
 
-export function inviteInstitutionStaff(token: string, institutionId: string, email: string, role: string): Promise<Record<string, unknown>> {
-  const body: InstitutionStaffInvitationRequest = { email, role };
+export function inviteInstitutionStaff(token: string, institutionId: string, email: string, role: string, scope: Partial<StaffUnitScopeDto> = {}): Promise<Record<string, unknown>> {
+  const body: InstitutionStaffInvitationRequest = {
+    email, role,
+    ...(scope.departmentUnitId ? { departmentUnitId: scope.departmentUnitId } : {}),
+    ...(scope.batchUnitId ? { batchUnitId: scope.batchUnitId } : {}),
+  };
   return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/staff-role-assignments`, { token, method: 'POST', body });
 }
 
@@ -192,4 +206,83 @@ export function listVerificationQueue(token: string, institutionId: string, sign
 
 export function decideVerification(token: string, institutionId: string, termId: string, decision: 'VERIFIED' | 'REJECTED'): Promise<{ readonly queue: readonly VerificationQueueEntryDto[] }> {
   return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/academic-verification/${encodeURIComponent(termId)}/decide`, { token, method: 'POST', body: { decision } });
+}
+
+// --- Teaching assignments and My Students (INST-03) ---------------------------
+
+export interface TeachingAssignmentDto {
+  readonly id: string;
+  readonly facultyMembershipId: string;
+  readonly facultyEmail: string;
+  readonly unit: { readonly id: string; readonly kind: string; readonly name: string };
+  readonly subject: { readonly id: string; readonly name: string; readonly code: string | null } | null;
+  readonly subjectCode: string | null;
+  readonly academicTerm: string;
+  readonly startsOn: string;
+  readonly endsOn: string | null;
+  readonly state: 'ACTIVE' | 'ENDED';
+  /** ACTIVE and inside its start/end dates today, so it currently grants access. */
+  readonly active: boolean;
+  readonly reasonCode: string;
+}
+
+export interface TeachingAssignmentListDto {
+  readonly assignments: readonly TeachingAssignmentDto[];
+  readonly nextCursor: string | null;
+  readonly canAssign: boolean;
+  readonly faculty: readonly { readonly membershipId: string; readonly email: string }[];
+  readonly units: readonly { readonly id: string; readonly kind: string; readonly name: string; readonly parentUnitId?: string | null }[];
+  readonly subjects: readonly { readonly id: string; readonly name: string; readonly code: string | null }[];
+}
+
+export interface TeachingAssignmentCreateRequest {
+  readonly facultyMembershipId: string;
+  readonly unitId: string;
+  readonly subjectId?: string;
+  readonly subjectCode?: string;
+  readonly academicTerm: string;
+  readonly startsOn?: string;
+  readonly endsOn?: string;
+  readonly reasonCode: string;
+}
+
+export interface MyStudentDto {
+  readonly profileId: string;
+  readonly studentUserId: string;
+  readonly fullName: string;
+  readonly institutionStudentId: string;
+  readonly units: { readonly section: string | null; readonly batch: string | null };
+  readonly activation: InstitutionStudentActivationDto | null;
+  readonly openTasks: number;
+  readonly recentAssessments: { readonly submitted: number; readonly latestTitle: string | null; readonly latestSubmittedAt: string | null };
+}
+
+export interface MyStudentsDto {
+  /** ASSIGNMENTS: scope comes from teaching assignments. MEMBERSHIP: the institution has not started assigning yet. */
+  readonly mode: 'ASSIGNMENTS' | 'MEMBERSHIP';
+  readonly assignments: readonly TeachingAssignmentDto[];
+  readonly students: readonly MyStudentDto[];
+  readonly nextCursor: string | null;
+  readonly scope?: InstitutionStudentScopeDto;
+}
+
+export function listTeachingAssignments(token: string, institutionId: string, signal?: AbortSignal): Promise<TeachingAssignmentListDto> {
+  return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/teaching-assignments?limit=200`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function createTeachingAssignment(token: string, institutionId: string, body: TeachingAssignmentCreateRequest): Promise<{ readonly assignment: TeachingAssignmentDto }> {
+  return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/teaching-assignments`, { token, method: 'POST', body });
+}
+
+export function endTeachingAssignment(token: string, institutionId: string, assignmentId: string, reasonCode: string): Promise<{ readonly assignment: TeachingAssignmentDto }> {
+  return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/teaching-assignments/${encodeURIComponent(assignmentId)}/end`, { token, method: 'POST', body: { reasonCode } });
+}
+
+export function listMyStudents(token: string, institutionId: string, cursor?: string | null, signal?: AbortSignal): Promise<MyStudentsDto> {
+  const query = cursor ? `?limit=200&cursor=${encodeURIComponent(cursor)}` : '?limit=200';
+  return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/my-students${query}`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function setInstitutionStaffScope(token: string, institutionId: string, membershipId: string, body: StaffUnitScopeDto & { readonly reasonCode: string }): Promise<Record<string, unknown>> {
+  return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/staff-memberships/${encodeURIComponent(membershipId)}/scope`, { token, method: 'POST', body });
 }

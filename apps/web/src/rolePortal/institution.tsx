@@ -6,14 +6,15 @@
  * Split out of rolePortalPages.tsx so each stream owns its own surface. The
  * shell and the route dispatcher remain there and import from here.
  */
-import { ApiRequestError, apiBaseUrl, addInstitutionStudent, commitStudentRosterImport, createInstitutionUnit, endInstitutionStudentRelationship, getProtectedAccessToken, inviteInstitutionStaff, listInstitutionStaff, listInstitutionStudents, listInstitutionUnits, institutionStudentScopeLabel, previewStudentRosterImport, resendStudentInvitations, studentActivationLabels, studentInvitationDeliveryNote, updateInstitutionStudent, updateInstitutionUnit } from '../api.js';
-import type { InstitutionStaffDto, InstitutionStudentCreateRequest, InstitutionStudentDto, InstitutionUnitDto, RosterImportPreviewDto } from '../api.js';
+import { ApiRequestError, apiBaseUrl, addInstitutionStudent, commitStudentRosterImport, createInstitutionUnit, endInstitutionStudentRelationship, getProtectedAccessToken, inviteInstitutionStaff, listInstitutionStaff, setInstitutionStaffScope, listInstitutionStudents, listInstitutionUnits, institutionStudentScopeLabel, previewStudentRosterImport, resendStudentInvitations, studentActivationLabels, studentInvitationDeliveryNote, updateInstitutionStudent, updateInstitutionUnit } from '../api.js';
+import type { InstitutionStaffDto, InstitutionStudentCreateRequest, InstitutionStudentDto, InstitutionUnitDto, RosterImportPreviewDto, StaffUnitScopeDto } from '../api.js';
 import { V2Stat } from '../dashboardsV2.js';
 import type { RolePortalConfig } from '../rolePortalConfig.js';
 import { InstitutionWorkspaceError, RestrictedApiState, formatApiError, institutionWorkspaceRoles, isInstitutionStaffWorkspace, isInstitutionWorkspace } from './shared.js';
 import type { AuthenticatedWorkspaceSummary } from './shared.js';
 import { Search } from 'lucide-react';
 import { NaListCard } from '../pilotParity/naWidgets.js';
+import { TeachingAssignmentsPanel } from './institutionTeaching.js';
 import { useEffect, useRef, useState } from 'react';
 
 /** Why an invitation is being sent again; recorded with the resend (INST-01). */
@@ -187,13 +188,17 @@ export function InstitutionStaffPage({ portal: _portal, authenticatedWorkspace }
   const token = getProtectedAccessToken();
   const institutionId = authenticatedWorkspace?.organizationId ?? '';
   const [staff, setStaff] = useState<InstitutionStaffDto | null>(null);
-  const [form, setForm] = useState({ email: '', role: 'FACULTY_LECTURER' });
+  const [units, setUnits] = useState<readonly InstitutionUnitDto[]>([]);
+  const [form, setForm] = useState({ email: '', role: 'FACULTY_LECTURER', departmentUnitId: '', batchUnitId: '' });
+  const [scopeEdits, setScopeEdits] = useState<Record<string, StaffUnitScopeDto>>({});
+  const [scopeReason, setScopeReason] = useState<string>(staffScopeReasons[0][0]);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   useEffect(() => {
     if (!token || !institutionId) return;
     const controller = new AbortController();
     listInstitutionStaff(token, institutionId, controller.signal).then((result) => setStaff(result.staff)).catch((error: unknown) => setError(formatApiError(error, 'Unable to load staff assignments.')));
+    listInstitutionUnits(token, institutionId, controller.signal).then((result) => setUnits(result.units)).catch(() => setUnits([]));
     return () => controller.abort();
   }, [token, institutionId, notice]);
   if (!token) return <RestrictedApiState title="Staff" message="Sign in with an Institution Admin identity to invite institution staff." />;
@@ -203,12 +208,32 @@ export function InstitutionStaffPage({ portal: _portal, authenticatedWorkspace }
     event.preventDefault();
     setError('');
     try {
-      await inviteInstitutionStaff(token!, institutionId, form.email, form.role);
+      await inviteInstitutionStaff(token!, institutionId, form.email, form.role, {
+        departmentUnitId: form.departmentUnitId || null,
+        batchUnitId: form.role === 'DEPARTMENT_HEAD' ? null : form.batchUnitId || null,
+      });
       setNotice('Staff invitation created. Membership is created only after the verified recipient accepts.');
-      setForm({ email: '', role: 'FACULTY_LECTURER' });
+      setForm({ email: '', role: 'FACULTY_LECTURER', departmentUnitId: '', batchUnitId: '' });
     } catch (error) {
       setError(formatApiError(error, 'Staff invitation failed.'));
     }
+  }
+  const unitName = (id: string | null | undefined): string | null => (id ? units.find((unit) => unit.id === id)?.name ?? 'NA' : null);
+  const scopeLabel = (scope: StaffUnitScopeDto | undefined): string => [unitName(scope?.departmentUnitId), unitName(scope?.batchUnitId)].filter(Boolean).join(' · ') || 'Whole institution';
+  const departmentChoices = (role: string): readonly InstitutionUnitDto[] => units.filter((unit) => unit.kind === 'DEPARTMENT' || (role === 'PLACEMENT_ADMIN' && unit.kind === 'CAMPUS'));
+  const batchChoices = units.filter((unit) => unit.kind === 'BATCH');
+  async function saveScope(membershipId: string, current: StaffUnitScopeDto | undefined): Promise<void> {
+    const edit = scopeEdits[membershipId] ?? { departmentUnitId: current?.departmentUnitId ?? null, batchUnitId: current?.batchUnitId ?? null };
+    setError('');
+    try {
+      await setInstitutionStaffScope(token!, institutionId, membershipId, { departmentUnitId: edit.departmentUnitId, batchUnitId: edit.batchUnitId, reasonCode: scopeReason });
+      setNotice('Staff scope saved. It applies from their next page load.');
+    } catch (error) {
+      setError(formatApiError(error, 'Saving the staff scope failed.'));
+    }
+  }
+  function editScope(membershipId: string, current: StaffUnitScopeDto | undefined, change: Partial<StaffUnitScopeDto>): void {
+    setScopeEdits((edits) => ({ ...edits, [membershipId]: { departmentUnitId: current?.departmentUnitId ?? null, batchUnitId: current?.batchUnitId ?? null, ...edits[membershipId], ...change } }));
   }
   return <section className="role-module role-module--dense"><div className="role-page-heading"><div><span className="eyebrow">Authenticated API-backed</span><h1>Staff</h1><p>Invite institution staff through the verified-recipient invitation lifecycle. This screen does not attach arbitrary global user IDs.</p></div></div>
     <div className="v2-row v2-cols-4 career-stat-strip role-wide">
@@ -222,13 +247,33 @@ export function InstitutionStaffPage({ portal: _portal, authenticatedWorkspace }
       <h2>Invite institution staff</h2>
       <label><span>Recipient email *</span><input type="email" value={form.email} onChange={(event) => setForm((value) => ({ ...value, email: event.target.value }))} required /></label>
       <label><span>Institution role *</span><select value={form.role} onChange={(event) => setForm((value) => ({ ...value, role: event.target.value }))}><option value="FACULTY_LECTURER">Faculty Lecturer</option><option value="DEPARTMENT_HEAD">Department Head</option><option value="PLACEMENT_ADMIN">Placement Admin</option></select></label>
+      <label><span>Department scope</span><select value={form.departmentUnitId} onChange={(event) => setForm((value) => ({ ...value, departmentUnitId: event.target.value }))}><option value="">None (whole institution)</option>{departmentChoices(form.role).map((unit) => <option key={unit.id} value={unit.id}>{unit.name}</option>)}</select></label>
+      {form.role !== 'DEPARTMENT_HEAD' ? <label><span>Batch scope</span><select value={form.batchUnitId} onChange={(event) => setForm((value) => ({ ...value, batchUnitId: event.target.value }))}><option value="">None</option>{batchChoices.map((unit) => <option key={unit.id} value={unit.id}>{unit.name}</option>)}</select></label> : null}
       <button type="submit">Send staff invitation</button>
     </form>
-    <section className="role-card role-wide"><h2>Staff onboarding boundary</h2><ul className="role-check-list"><li>Allowed roles: PLACEMENT_ADMIN, DEPARTMENT_HEAD, FACULTY_LECTURER.</li><li>No platform, employer or self-escalation role is exposed.</li><li>The recipient must authenticate with a verified matching email before membership is created.</li></ul></section>
-    <section className="role-card role-wide"><h2>Staff invitations</h2>{staff?.invitations?.length ? <table className="role-record-table"><thead><tr><th>Email</th><th>Role</th><th>State</th><th>Delivery</th><th>Expires</th></tr></thead><tbody>{staff.invitations.map((invite) => <tr key={invite.id}><td>{invite.email}</td><td>{invite.role}</td><td>{invite.state}</td><td>{invite.delivery?.state ?? 'Pending command'}</td><td>{new Date(invite.expiresAt).toLocaleDateString()}</td></tr>)}</tbody></table> : <p>No staff invitations yet.</p>}</section>
-    <section className="role-card role-wide"><h2>Active staff memberships</h2>{staff?.memberships?.length ? <table className="role-record-table"><thead><tr><th>Email</th><th>Role</th><th>State</th><th>Actions</th></tr></thead><tbody>{staff.memberships.map((member) => <tr key={member.id}><td>{member.email}</td><td>{member.role}</td><td>{member.state}</td><td><span className="staff-readonly-note">Revoke/resend/end membership: NOT YET AVAILABLE</span></td></tr>)}</tbody></table> : <p>No accepted staff memberships yet.</p>}</section>
+    <section className="role-card role-wide"><h2>Staff onboarding boundary</h2><ul className="role-check-list"><li>Allowed roles: PLACEMENT_ADMIN, DEPARTMENT_HEAD, FACULTY_LECTURER.</li><li>No platform, employer or self-escalation role is exposed.</li><li>The recipient must authenticate with a verified matching email before membership is created.</li><li>A department or batch scope limits which students the staff member sees. Without one, a placement admin or department head sees the whole institution; a lecturer sees the students of their teaching assignments once your college records any.</li></ul></section>
+    <section className="role-card role-wide"><h2>Staff invitations</h2>{staff?.invitations?.length ? <table className="role-record-table"><thead><tr><th>Email</th><th>Role</th><th>State</th><th>Delivery</th><th>Expires</th></tr></thead><tbody>{staff.invitations.map((invite) => <tr key={invite.id}><td>{invite.email}</td><td>{invite.role}{invite.scope && (invite.scope.departmentUnitId || invite.scope.batchUnitId) ? <span>{scopeLabel(invite.scope)}</span> : null}</td><td>{invite.state}</td><td>{invite.delivery?.state ?? 'Pending command'}</td><td>{new Date(invite.expiresAt).toLocaleDateString()}</td></tr>)}</tbody></table> : <p>No staff invitations yet.</p>}</section>
+    <section className="role-card role-wide role-management-form"><h2>Active staff memberships</h2>
+      <label><span>Reason for scope change</span><select value={scopeReason} onChange={(event) => setScopeReason(event.target.value)}>{staffScopeReasons.map(([code, label]) => <option key={code} value={code}>{label}</option>)}</select></label>
+      {staff?.memberships?.length ? <table className="role-record-table"><thead><tr><th>Email</th><th>Role</th><th>State</th><th>Scope</th><th>Actions</th></tr></thead><tbody>{staff.memberships.map((member) => {
+        const edit = scopeEdits[member.id] ?? { departmentUnitId: member.scope?.departmentUnitId ?? null, batchUnitId: member.scope?.batchUnitId ?? null };
+        return <tr key={member.id}><td>{member.email}</td><td>{member.role}</td><td>{member.state}</td><td>{scopeLabel(member.scope)}</td><td><div className="role-record-actions">
+          <select aria-label={`Department for ${member.email}`} value={edit.departmentUnitId ?? ''} onChange={(event) => editScope(member.id, member.scope, { departmentUnitId: event.target.value || null })}><option value="">None</option>{departmentChoices(member.role).map((unit) => <option key={unit.id} value={unit.id}>{unit.name}</option>)}</select>
+          {member.role !== 'DEPARTMENT_HEAD' ? <select aria-label={`Batch for ${member.email}`} value={edit.batchUnitId ?? ''} onChange={(event) => editScope(member.id, member.scope, { batchUnitId: event.target.value || null })}><option value="">None</option>{batchChoices.map((unit) => <option key={unit.id} value={unit.id}>{unit.name}</option>)}</select> : null}
+          <button type="button" className="secondary" onClick={() => void saveScope(member.id, member.scope)}>Save scope</button>
+          <span className="staff-readonly-note">Revoke/resend/end membership: NOT YET AVAILABLE</span></div></td></tr>;
+      })}</tbody></table> : <p>No accepted staff memberships yet.</p>}</section>
+    <TeachingAssignmentsPanel key={institutionId + ':' + token} token={token} institutionId={institutionId} />
   </section>;
 }
+
+/** Why a staff member's unit scope is changed; recorded with the change (INST-03). */
+const staffScopeReasons = [
+  ['SCOPE_REVIEW', 'Access review'],
+  ['ROLE_CHANGE', 'Role or responsibility changed'],
+  ['DEPARTMENT_MOVE', 'Moved to another department'],
+  ['CORRECTION', 'Correcting an earlier scope'],
+] as const;
 
 export function UnitSelect({ label, value, units, onChange }: { readonly label: string; readonly value: string; readonly units: readonly InstitutionUnitDto[]; readonly onChange: (value: string) => void }): React.ReactElement {
   return <label><span>{label}</span><select value={value} onChange={(event) => onChange(event.target.value)}><option value="">None</option>{units.map((unit) => <option key={unit.id} value={unit.id}>{unit.kind}: {unit.name}</option>)}</select></label>;

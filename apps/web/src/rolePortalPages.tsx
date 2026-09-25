@@ -28,6 +28,7 @@ import { InstitutionInterventionsPage } from './pilotParityPages.js';
 import { EmployerRecruiterRealityPage } from './rolePortal/employer.js';
 import { EmployerOrganisationGate } from './rolePortal/employerOrganisationState.js';
 import { InstitutionAcademicStructurePage, InstitutionStaffActionsPage, InstitutionStaffPage, InstitutionStudentsPage } from './rolePortal/institution.js';
+import { FacultyMyStudentsPage, InstitutionFacultyAndStaffPage } from './rolePortal/institutionTeaching.js';
 import { OperationsAuditLogPage, OperationsContentReadOnlyPage, OperationsFeatureFlagsPage, OperationsOrganizationsPage, OperationsTechnicalReadOnlyPage, OperationsUsersAccessPage } from './rolePortal/operations.js';
 import { OperationsTrustSafetyPage } from './rolePortal/trustSafety.js';
 import { OperationsStaffCapabilitiesPage } from './rolePortal/staffCapabilities.js';
@@ -315,6 +316,9 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
     return <EmployerOrganisationGate employerId={authenticatedWorkspace.organizationId} routeLabel={route.label}><EmployerAssessmentsPage employerId={authenticatedWorkspace.organizationId} /></EmployerOrganisationGate>;
   }
   if (!demoMode && portal.key === 'recruiter') return <EmployerOrganisationGate employerId={authenticatedWorkspace?.organizationId} routeLabel={route.label}><EmployerRecruiterRealityPage portal={portal} routeLabel={route.label} /></EmployerOrganisationGate>;
+  // INST-03: only these two labels' branches change; navigation is untouched.
+  if (!demoMode && portal.key === 'faculty' && route.label === 'My Students') return <FacultyMyStudentsPage authenticatedWorkspace={authenticatedWorkspace} />;
+  if (!demoMode && portal.key === 'department-head' && route.label === 'Faculty and Staff') return <InstitutionFacultyAndStaffPage authenticatedWorkspace={authenticatedWorkspace} />;
   if (!demoMode && ['faculty', 'department-head'].includes(portal.key) && ['Assigned Tasks', 'Student Detail', 'Academic Verification', 'Meetings', 'Calendar'].includes(route.label)) {
     // Calendar and Academic Verification each gain a real page above the staff-action
     // list they already had, rather than replacing it: those lists are where the work is

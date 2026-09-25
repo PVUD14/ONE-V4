@@ -144,7 +144,7 @@ export class StaffActionsController {
     const membership = result.rows[0];
     if (!membership || !staffRoles.includes(membership.role)) throw new ForbiddenException(safeError('FORBIDDEN', context.correlationId));
     const students = await resolveInstitutionStudentScope(tx, id, [{
-      role: membership.role, departmentUnitId: membership.scope_department_unit_id, batchUnitId: membership.scope_batch_unit_id,
+      role: membership.role, membershipId: membership.id, departmentUnitId: membership.scope_department_unit_id, batchUnitId: membership.scope_batch_unit_id,
     }]);
     return { ...membership, students, institutionId: id, correlationId: context.correlationId };
   }

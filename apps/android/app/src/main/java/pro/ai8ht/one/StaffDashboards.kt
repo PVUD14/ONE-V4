@@ -196,6 +196,24 @@ private class InstitutionData(
     val attention: List<Pair<NotAttemptedDto, InstitutionExamDto>> = emptyList(),
     /** Student invitation activation counts; null when the roster could not be read (shown as NA). */
     val activation: Map<String, Int>? = null,
+    /** Faculty "My Students" (INST-03). */
+    val myStudents: MyStudentsState = MyStudentsState.NotFaculty,
+)
+
+/**
+ * The Android institution workspace merges every institution role of one college into a
+ * single workspace, so the phone asks the server rather than guessing from the role: a 403
+ * means no faculty role here and the section is left out; any other failure shows NA.
+ */
+private sealed interface MyStudentsState {
+    data object NotFaculty : MyStudentsState
+    data object Unavailable : MyStudentsState
+    data class Loaded(val envelope: MyStudentsEnvelope) : MyStudentsState
+}
+
+private val activationLabels = mapOf(
+    "ACTIVATED" to "Activated", "INVITED" to "Invited", "EXPIRED" to "Expired",
+    "BOUNCED" to "Bounced", "NOT_INVITED" to "Not invited",
 )
 
 @Composable
@@ -223,13 +241,19 @@ internal fun InstitutionScaffold(
             val review = async { runCatching { Api.countQuestions(context, organizationId, "UNDER_REVIEW") }.getOrDefault(0) }
             val inbox = async { runCatching { Api.listNotifications(context) }.getOrNull() }
             val activation = async { runCatching { Api.institutionActivationSummary(context, organizationId) }.getOrNull() }
+            val myStudents = async {
+                runCatching { Api.myStudents(context, organizationId) }.fold(
+                    onSuccess = { MyStudentsState.Loaded(it) },
+                    onFailure = { if (it is Api.ApiException && it.status == 403) MyStudentsState.NotFaculty else MyStudentsState.Unavailable },
+                )
+            }
             val loadedExams = exams.await()
             val target = loadedExams.firstOrNull { it.lifecycleState == "PUBLISHED" && it.assignedCount > 0 }
             val attention = if (target != null) {
                 runCatching { Api.examResults(context, organizationId, target.id).notAttempted.map { it to target } }
                     .getOrDefault(emptyList())
             } else emptyList()
-            data = InstitutionData(loadedExams, subjects.await(), review.await(), inbox.await(), attention, activation.await())
+            data = InstitutionData(loadedExams, subjects.await(), review.await(), inbox.await(), attention, activation.await(), myStudents.await())
         }
     }
 
@@ -363,6 +387,10 @@ private fun InstitutionHome(data: InstitutionData, onExams: () -> Unit) {
             }
         }
 
+        // Faculty "My Students" (INST-03): the students of this lecturer's active teaching
+        // assignments, as the server scopes them. Assigning stays on the web Staff screen.
+        if (data.myStudents !is MyStudentsState.NotFaculty) MyStudentsSection(data.myStudents)
+
         // Student activation (INST-01): who has accepted their invitation. Same summary as the
         // web Dashboard; resending invitations stays on the web Students page.
         SectionTitle("Student activation")
@@ -435,6 +463,67 @@ private fun InstitutionHome(data: InstitutionData, onExams: () -> Unit) {
             }
         }
         Spacer(Modifier.height(20.dp))
+    }
+}
+
+@Composable
+private fun MyStudentsSection(state: MyStudentsState) {
+    val loaded = (state as? MyStudentsState.Loaded)?.envelope
+    SectionTitle("My students")
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        StatCell(loaded?.students?.size?.toString() ?: "NA", "Students", Tone.Accent, Icons.Filled.School, Modifier.weight(1f))
+        StatCell(loaded?.assignments?.size?.toString() ?: "NA", "Teaching", Tone.Violet, Icons.Filled.Assignment, Modifier.weight(1f))
+    }
+    Spacer(Modifier.height(10.dp))
+    when {
+        loaded == null -> PilotCard {
+            Text("Your students could not be loaded right now. Pull down later or open My Students on the web.",
+                Modifier.padding(14.dp), style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        loaded.mode == "ASSIGNMENTS" && loaded.assignments.isEmpty() -> PilotCard {
+            Text("You have no active teaching assignment yet. Ask your institution admin or department head to assign you to a section or batch.",
+                Modifier.padding(14.dp), style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        else -> {
+            if (loaded.mode == "MEMBERSHIP") {
+                Text("Your college has not started recording teaching assignments, so this follows the department and batch on your staff account.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(8.dp))
+            }
+            loaded.assignments.take(4).forEach { assignment ->
+                val subject = assignment.subject?.name ?: assignment.subjectCode ?: "NA"
+                Text("$subject · ${assignment.unit.name} · ${assignment.academicTerm}",
+                    style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Spacer(Modifier.height(6.dp))
+            if (loaded.students.isEmpty()) {
+                PilotCard { Text("No students are enrolled in your assigned sections yet.", Modifier.padding(14.dp),
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            }
+            loaded.students.take(8).forEach { student ->
+                PilotCard(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                    Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(student.fullName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                            val units = listOfNotNull(student.units.section, student.units.batch).joinToString(" · ").ifBlank { "NA" }
+                            val recent = if (student.recentAssessments.submitted > 0)
+                                "${student.recentAssessments.submitted} assessment(s) in 30 days" else "No assessment in 30 days"
+                            Text("$units · $recent · ${student.openTasks} open task(s)",
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        val activation = student.activation?.state
+                        StatusChip(activationLabels[activation] ?: "NA",
+                            if (activation == "ACTIVATED") ChipKind.Positive else ChipKind.Waiting)
+                    }
+                }
+            }
+            if (loaded.students.size > 8 || loaded.nextCursor != null) {
+                Text("The full list is on My Students on the web.", style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
     }
 }
 

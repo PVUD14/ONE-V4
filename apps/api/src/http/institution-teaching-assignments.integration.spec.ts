@@ -265,19 +265,22 @@ describe('creating and ending teaching assignments', () => {
     expect((await pool.query('SELECT count(*)::int AS n FROM faculty_teaching_assignments')).rows[0].n).toBe(0);
   });
 
+  // Values are built lazily: the units are created per test in beforeEach.
   it.each([
-    ['an unknown field', { extra: true }],
-    ['a department instead of a section or batch', { unitId: departmentA }],
-    ['a section of another institution', { unitId: otherInstitutionSection }],
-    ['a membership that is not faculty', { facultyMembershipId: 'HEAD' }],
-    ['no subject', { subjectId: undefined }],
-    ['a malformed reason code', { reasonCode: 'no' }],
-    ['a missing term', { academicTerm: '' }],
-    ['an end before the start', { startsOn: '2026-10-10', endsOn: '2026-10-01' }],
-    ['a formula in the subject code', { subjectId: undefined, subjectCode: '=HYPERLINK()' }],
-  ])('rejects %s', async (_label, overrides) => {
-    const body = assignment(overrides.facultyMembershipId === 'HEAD' ? { ...overrides, facultyMembershipId: headA.membershipId } : overrides);
-    await api().post(base() + '/teaching-assignments').set(auth(admin.id)).send(body).expect(400);
+    ['an unknown field', () => ({ extra: true })],
+    ['a department instead of a section or batch', () => ({ unitId: departmentA })],
+    ['a section of another institution', () => ({ unitId: otherInstitutionSection })],
+    ['a membership that is not faculty', () => ({ facultyMembershipId: headA.membershipId })],
+    ['no subject', () => ({ subjectId: undefined })],
+    ['a malformed reason code', () => ({ reasonCode: 'no' })],
+    ['a missing term', () => ({ academicTerm: '' })],
+    ['an end before the start', () => ({ startsOn: '2026-10-10', endsOn: '2026-10-01' })],
+    ['a formula in the subject code', () => ({ subjectId: undefined, subjectCode: '=HYPERLINK()' })],
+  ] as const)('rejects %s', async (_label, overrides) => {
+    const body = assignment(overrides());
+    const refused = await api().post(base() + '/teaching-assignments').set(auth(admin.id)).send(body).expect(400);
+    expect(JSON.stringify(refused.body)).not.toContain(institutionId);
+    expect((await pool.query('SELECT count(*)::int AS n FROM faculty_teaching_assignments')).rows[0].n).toBe(0);
   });
 
   it('accepts a subject code where the college has no subject record', async () => {
@@ -332,12 +335,12 @@ describe('staff unit scope', () => {
   });
 
   it.each([
-    ['a unit of another institution', { departmentUnitId: otherInstitutionSection }],
-    ['a batch in the department slot', { departmentUnitId: batchA1 }],
-    ['a batch outside the department', { departmentUnitId: departmentA, batchUnitId: batchB1 }],
-  ])('refuses an invitation scoped to %s', async (_label, scope) => {
+    ['a unit of another institution', () => ({ departmentUnitId: otherInstitutionSection })],
+    ['a batch in the department slot', () => ({ departmentUnitId: batchA1 })],
+    ['a batch outside the department', () => ({ departmentUnitId: departmentA, batchUnitId: batchB1 })],
+  ] as const)('refuses an invitation scoped to %s', async (_label, scope) => {
     await api().post(base() + '/staff-role-assignments').set(auth(admin.id))
-      .send({ email: 'scoped@example.test', role: 'FACULTY_LECTURER', ...scope }).expect(400);
+      .send({ email: 'scoped@example.test', role: 'FACULTY_LECTURER', ...scope() }).expect(400);
     expect((await pool.query("SELECT count(*)::int AS n FROM invitations WHERE email='scoped@example.test'")).rows[0].n).toBe(0);
   });
 

@@ -495,4 +495,4 @@ internal fun HiringAnalyticsPage(employerId: String, onClose: () -> Unit) {
 }
 
 /** Employer sub-pages reachable from the dashboard. */
-internal enum class EmployerOverlay { MyInterviews, Offers, Analytics, Team }
+internal enum class EmployerOverlay { MyInterviews, Offers, Analytics, Team, CompanyProfile }

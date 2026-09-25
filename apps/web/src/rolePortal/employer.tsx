@@ -12,6 +12,7 @@ import { EmployerApplicantsPage, EmployerOpportunitiesPage, EmployerInterviewsPa
 import { getMyInterview, listMyInterviews, submitMyInterviewOutcome, type ParticipantInterviewDto, type InterviewOutcomeInput } from '../api/hiring.js';
 import { StaffPilotWrap } from '../parityWraps.js';
 import { EmployerTeamPage } from './employerTeam.js';
+import { EmployerCompanyProfilePage } from './employerCompanyProfile.js';
 import type { RolePortalConfig } from '../rolePortalConfig.js';
 import { RestrictedApiState } from './shared.js';
 import { useEffect, useState } from 'react';
@@ -78,6 +79,10 @@ function EmployerManagementRealityPage({ portal, routeLabel }: { readonly portal
 
   // EMP-02: Team is live for owners and admins; recruiters were answered above.
   if (routeLabel === 'Team') return <EmployerTeamPage key={employerId} employerId={employerId} />;
+
+  // EMP-04: Company Profile is live for every employer role; the server decides who may edit
+  // (owners and admins) and who only reads (recruiters).
+  if (routeLabel === 'Company Profile') return <EmployerCompanyProfilePage key={employerId} employerId={employerId} />;
 
   // Routes whose backend does not exist yet keep saying so rather than borrowing
   // another page's data.

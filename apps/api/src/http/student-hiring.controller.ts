@@ -176,7 +176,7 @@ export class StudentHiringController {
 
     const rows = await this.db.execute(sql`
       SELECT o.id, o.reference_code, o.published_at,
-             org.legal_name AS employer_name,
+             org.legal_name AS employer_name, ${companyProfileColumns},
              v.id AS version_id, v.title, v.summary, v.employment_type, v.work_mode,
              v.location_city, v.compensation_disclosed, v.compensation_currency,
              v.compensation_min, v.compensation_max, v.compensation_period,
@@ -186,6 +186,7 @@ export class StudentHiringController {
       FROM opportunities o
       JOIN opportunity_versions v ON v.id = o.current_version_id
       JOIN organizations org ON org.id = o.employer_id
+      LEFT JOIN organization_profiles company ON company.organization_id = o.employer_id
       WHERE o.lifecycle_state = 'PUBLISHED'
         AND (v.application_deadline IS NULL OR v.application_deadline > now())
         AND ${visibleToStudent(studentUserId)}
@@ -207,7 +208,7 @@ export class StudentHiringController {
 
     const rows = await this.db.execute(sql`
       SELECT o.id, o.reference_code, o.lifecycle_state, o.published_at,
-             org.legal_name AS employer_name,
+             org.legal_name AS employer_name, ${companyProfileColumns},
              v.id AS version_id, v.title, v.summary, v.responsibilities, v.employment_type,
              v.work_mode, v.location_city, v.location_region, v.location_country,
              v.positions_available, v.duration_months, v.compensation_disclosed,
@@ -216,6 +217,7 @@ export class StudentHiringController {
       FROM opportunities o
       JOIN opportunity_versions v ON v.id = o.current_version_id
       JOIN organizations org ON org.id = o.employer_id
+      LEFT JOIN organization_profiles company ON company.organization_id = o.employer_id
       WHERE o.id = ${id}::uuid
         AND o.lifecycle_state = 'PUBLISHED'
         AND ${visibleToStudent(studentUserId)}
@@ -633,6 +635,32 @@ function mapOpportunitySummary(row: Record<string, unknown>): Record<string, unk
       ? { currency: row.compensation_currency, min: row.compensation_min, max: row.compensation_max, period: row.compensation_period }
       : null,
     alreadyApplied: row.already_applied == null ? undefined : Number(row.already_applied) > 0,
+    company: mapCompany(row),
+  };
+}
+
+/**
+ * The company profile students see on every job (EMP-04). Only verified, active employers'
+ * jobs reach students (EMP-03), so this is always a verified company's profile. Fields nobody
+ * has filled are null — never invented. The Operations contact email is not included.
+ */
+const companyProfileColumns = sql`company.display_name AS company_display_name, company.website_url AS company_website_url,
+  company.city AS company_city, company.state_or_province AS company_state_or_province, company.country_code AS company_country_code,
+  company.about_text AS company_about, company.industry AS company_industry, company.company_size_band AS company_size_band,
+  company.careers_page_url AS company_careers_page_url`;
+
+function mapCompany(row: Record<string, unknown>): Record<string, unknown> {
+  const value = (key: string): string | null => (typeof row[key] === 'string' && row[key] !== '' ? row[key] as string : null);
+  return {
+    displayName: value('company_display_name'),
+    industry: value('company_industry'),
+    companySizeBand: value('company_size_band'),
+    about: value('company_about'),
+    websiteUrl: value('company_website_url'),
+    careersPageUrl: value('company_careers_page_url'),
+    city: value('company_city'),
+    stateOrProvince: value('company_state_or_province'),
+    countryCode: value('company_country_code'),
   };
 }
 

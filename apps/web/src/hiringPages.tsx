@@ -9,6 +9,7 @@ import {
   listInterviewParticipantOptions, type InterviewParticipantOptionDto,
   listExternalApplications, getExternalApplication, createExternalApplication, updateExternalApplication,
   deleteExternalApplication, changeExternalInstitutionVisibility, type ExternalApplicationDto, type ExternalApplicationInput,
+  companyIndustryLabels, companySizeLabel, type OpportunityCompanyDto,
 } from './api/hiring.js';
 import {
   ApiRequestError,
@@ -172,7 +173,7 @@ export function StudentOpportunitiesPage(): React.ReactElement {
           {opportunities.map((item) => <li key={item.id} className="hiring-list-item">
             <div>
               <h3>{item.title}</h3>
-              <p className="hiring-meta">{item.employerName} · {humanise(item.employmentType)} · {humanise(item.workMode)}{item.locationCity ? ` · ${item.locationCity}` : ''}</p>
+              <p className="hiring-meta">{item.company?.displayName ?? item.employerName}{item.company?.industry ? ` (${companyIndustryLabels[item.company.industry] ?? humanise(item.company.industry)})` : ''} · {humanise(item.employmentType)} · {humanise(item.workMode)}{item.locationCity ? ` · ${item.locationCity}` : ''}</p>
               <p className="hiring-meta">
                 {item.compensation ? formatMoney(item.compensation.currency, item.compensation.min, item.compensation.period) : 'Compensation not disclosed'}
                 {item.applicationDeadline ? ` · closes ${formatDate(item.applicationDeadline)}` : ''}
@@ -192,6 +193,8 @@ export function StudentOpportunitiesPage(): React.ReactElement {
       <p className="hiring-meta">{selected.opportunity.employerName} · {humanise(selected.opportunity.employmentType)} · {humanise(selected.opportunity.workMode)}</p>
       {selected.opportunity.summary ? <p>{selected.opportunity.summary}</p> : null}
       {selected.opportunity.responsibilities ? <p>{selected.opportunity.responsibilities}</p> : null}
+
+      <CompanyProfileCard company={selected.opportunity.company} employerName={selected.opportunity.employerName} />
 
       <h3>What they are looking for</h3>
       {selected.opportunity.skills.length
@@ -221,6 +224,26 @@ export function StudentOpportunitiesPage(): React.ReactElement {
       <p className="hiring-consent-note">Applying shares your profile with {selected.opportunity.employerName} for this role only. You can withdraw at any time, which ends their access.</p>
     </section> : null}
   </div>;
+}
+
+/**
+ * The hiring company, as its verified profile describes it (EMP-04). Only verified employers'
+ * jobs reach students, so this is always a verified company. Unfilled fields say so rather
+ * than being guessed.
+ */
+function CompanyProfileCard({ company, employerName }: { readonly company: OpportunityCompanyDto | undefined; readonly employerName: string }): React.ReactElement {
+  const place = company ? [company.city, company.stateOrProvince, company.countryCode].filter(Boolean).join(', ') : '';
+  const industry = company?.industry ? companyIndustryLabels[company.industry] ?? humanise(company.industry) : null;
+  return <section aria-label="About the company">
+    <h3>About {company?.displayName ?? employerName}</h3>
+    <p className="hiring-meta">Registered as {employerName}{industry ? ` · ${industry}` : ''}{company?.companySizeBand ? ` · ${companySizeLabel(company.companySizeBand)}` : ''}{place ? ` · ${place}` : ''}</p>
+    <p>{company?.about ?? 'The company has not added a description yet.'}</p>
+    {company?.websiteUrl || company?.careersPageUrl ? <p className="hiring-meta">
+      {company.websiteUrl ? <a href={company.websiteUrl} target="_blank" rel="noopener noreferrer">Company website</a> : null}
+      {company.websiteUrl && company.careersPageUrl ? ' · ' : null}
+      {company.careersPageUrl ? <a href={company.careersPageUrl} target="_blank" rel="noopener noreferrer">Careers page</a> : null}
+    </p> : null}
+  </section>;
 }
 
 function EligibilityNotice({ eligibility }: { readonly eligibility: EligibilityDto }): React.ReactElement {

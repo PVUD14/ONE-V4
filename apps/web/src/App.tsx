@@ -48,6 +48,7 @@ import { ConsentGate } from './consentGate.js';
 import { HelpFaqPanel } from './helpFaqPanel.js';
 import { CalendarPage } from './calendarPage.js';
 import { PublicProfilePage } from './publicProfilePage.js';
+import { PublicEmployerAccessPage } from './publicEmployerAccessPage.js';
 import { ShareProfilePanel } from './shareProfilePanel.js';
 import { ScreeningAssessmentsPage } from './screeningAssessmentsPage.js';
 import { V2EmptyState, V2Stat } from './dashboardsV2.js';
@@ -288,7 +289,7 @@ export function App(): React.ReactElement {
   const activeWorkspace = workspaceResolution.state === 'resolved' ? workspaceForPath(path, workspaceResolution.choices) : null;
 
   useEffect(() => {
-    if (path === '/' || path === '/login' || path === '/demo' || effectivePath.startsWith('/institution/placement-officer') || rolePortal) return;
+    if (path === '/' || path === '/login' || path === '/demo' || path === '/employer-access' || effectivePath.startsWith('/institution/placement-officer') || rolePortal) return;
     const title = route === 'dashboard' ? 'Student Dashboard' : routeTitles[route].title;
     document.title = route === 'dashboard' ? `${title} | ${productName}` : `${title} - Student | ${productName}`;
   }, [effectivePath, path, rolePortal, route]);
@@ -317,6 +318,15 @@ export function App(): React.ReactElement {
   if (path.startsWith('/p/')) {
     const shareToken = path.slice(3);
     if (shareToken) return <PublicProfilePage token={shareToken} />;
+  }
+
+  // EMP-04: the public employer access request. Like /p/, it renders without a session and
+  // creates nothing but a pending request for operations to review.
+  if (path === '/employer-access') {
+    return <PublicEmployerAccessPage onNavigate={(nextPath) => {
+      window.history.pushState(null, '', nextPath);
+      setPath(currentPath());
+    }} />;
   }
 
   if (path === '/' || path === '/login') {
@@ -480,6 +490,7 @@ function LoginEntry({ authStatus, authNotice, workspaceResolution, onSignIn, onH
       <p className="auth-footnote">{productTagline}</p>
       {!signInUnavailable ? <button type="button" className="secondary" onClick={onHostedSignIn}>Use hosted sign-in fallback</button> : null}
       {enableDemoPortal ? <button type="button" className="secondary" onClick={() => onNavigate('/demo')}>Open demo previews</button> : null}
+      <p className="auth-footnote">Hiring graduates? <a href="/employer-access" onClick={(event) => { event.preventDefault(); onNavigate('/employer-access'); }}>Request employer access</a></p>
     </section>
   </main>;
 }

@@ -73,6 +73,13 @@ export function safeErrorMessage(code: string | undefined): string | undefined {
     case 'TEAM_LAST_OWNER': return 'Your last owner cannot be removed. Add another owner through ONE operations first.';
     case 'TEAM_EMAIL_INVALID': return 'Enter a valid email address.';
     case 'EMPLOYER_ORGANISATION_INACTIVE': return 'Your employer account is suspended or was not approved, so your team cannot be changed.';
+    case 'COMPANY_PROFILE_FIELD_OPERATIONS_CONTROLLED': return 'Your legal name, display name, website, address and contact email are managed by AI8HT operations. Contact operations to change them.';
+    case 'COMPANY_PROFILE_CAREERS_URL_OFF_DOMAIN': return 'The careers page must be on your company website, or a subdomain of it.';
+    case 'COMPANY_PROFILE_PAYMENT_DEMAND': return 'The description asks students to pay. ONE does not allow asking candidates for fees or deposits.';
+    case 'COMPANY_PROFILE_NOT_SET_UP': return 'AI8HT operations has not finished setting up your company record yet. Contact operations.';
+    case 'COMPANY_PROFILE_INVALID': return 'Check the fields: the description is up to 2000 characters and web addresses start with https://.';
+    case 'EMPLOYER_ACCESS_REQUEST_NOT_PENDING': return 'This request has already been decided. Refresh to see its current state.';
+    case 'EMPLOYER_ACCESS_REQUEST_ORGANIZATION_INVALID': return 'Choose the employer organisation you created for this request.';
     case 'FORBIDDEN': return 'You do not have permission to perform this action.';
     // OPS-02: dual control for high-risk actions.
     case 'APPROVAL_REQUIRED': return 'This is a high-risk action: it needs an approval from a second person first.';

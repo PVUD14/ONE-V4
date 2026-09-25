@@ -30,6 +30,21 @@ export interface OpportunitySummaryDto {
   readonly publishedAt: string | null;
   readonly compensation: CompensationDto | null;
   readonly alreadyApplied?: boolean;
+  /** EMP-04: the hiring company's profile. Absent from older API responses. */
+  readonly company?: OpportunityCompanyDto;
+}
+
+/** What a student sees about the company behind a job (EMP-04). Unfilled fields are null. */
+export interface OpportunityCompanyDto {
+  readonly displayName: string | null;
+  readonly industry: string | null;
+  readonly companySizeBand: string | null;
+  readonly about: string | null;
+  readonly websiteUrl: string | null;
+  readonly careersPageUrl: string | null;
+  readonly city: string | null;
+  readonly stateOrProvince: string | null;
+  readonly countryCode: string | null;
 }
 
 export interface OpportunityDetailDto extends OpportunitySummaryDto {
@@ -476,4 +491,64 @@ export function resendEmployerTeamInvitation(token: string, employerId: string, 
 
 export function endEmployerTeamMembership(token: string, employerId: string, membershipId: string, reasonCode: string): Promise<{ readonly member: { readonly membershipId: string; readonly state: string } }> {
   return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/team/${encodeURIComponent(membershipId)}/end`, { token, method: 'POST', body: { reasonCode } });
+}
+
+// --- Company profile (EMP-04) --------------------------------------------------
+
+/** The employer's own view of its company profile. The server decides canEdit. */
+export interface EmployerCompanyProfileDto {
+  readonly legalName: string;
+  readonly verificationState: string;
+  readonly profileSetUp: boolean;
+  readonly displayName: string | null;
+  readonly websiteUrl: string | null;
+  readonly countryCode: string | null;
+  readonly stateOrProvince: string | null;
+  readonly city: string | null;
+  readonly postalCode: string | null;
+  readonly primaryContactEmail: string | null;
+  readonly about: string | null;
+  readonly industry: string | null;
+  readonly companySizeBand: string | null;
+  readonly careersPageUrl: string | null;
+  readonly updatedAt: string | null;
+  readonly canEdit: boolean;
+  readonly options: { readonly industries: readonly string[]; readonly sizeBands: readonly string[] };
+}
+
+export interface EmployerCompanyProfileChanges {
+  readonly about?: string | null;
+  readonly industry?: string | null;
+  readonly companySizeBand?: string | null;
+  readonly careersPageUrl?: string | null;
+}
+
+export function getEmployerCompanyProfile(token: string, employerId: string, signal?: AbortSignal): Promise<{ readonly companyProfile: EmployerCompanyProfileDto }> {
+  return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/company-profile`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function updateEmployerCompanyProfile(token: string, employerId: string, changes: EmployerCompanyProfileChanges): Promise<{ readonly companyProfile: EmployerCompanyProfileDto }> {
+  return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/company-profile`, { token, method: 'POST', body: changes });
+}
+
+/** Human labels for the fixed industry list and size bands. */
+export const companyIndustryLabels: Readonly<Record<string, string>> = {
+  SOFTWARE_AND_IT_SERVICES: 'Software and IT services',
+  FINANCIAL_SERVICES: 'Financial services',
+  MANUFACTURING: 'Manufacturing',
+  ENGINEERING_AND_CONSTRUCTION: 'Engineering and construction',
+  HEALTHCARE_AND_LIFE_SCIENCES: 'Healthcare and life sciences',
+  CONSULTING_AND_PROFESSIONAL_SERVICES: 'Consulting and professional services',
+  RETAIL_AND_CONSUMER: 'Retail and consumer',
+  EDUCATION: 'Education',
+  MEDIA_AND_COMMUNICATIONS: 'Media and communications',
+  ENERGY_AND_UTILITIES: 'Energy and utilities',
+  LOGISTICS_AND_TRANSPORT: 'Logistics and transport',
+  GOVERNMENT_AND_PUBLIC_SECTOR: 'Government and public sector',
+  NON_PROFIT: 'Non-profit',
+  OTHER: 'Other',
+};
+
+export function companySizeLabel(band: string | null | undefined): string | null {
+  return band ? `${band} employees` : null;
 }

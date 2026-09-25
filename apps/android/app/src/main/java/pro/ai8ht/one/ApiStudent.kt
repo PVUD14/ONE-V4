@@ -32,6 +32,21 @@ import kotlinx.serialization.Serializable
     val eligibility: EligibilityDto? = null,
     val skills: List<String> = emptyList(),
     val selectionStages: List<String> = emptyList(),
+    /** EMP-04: the hiring company's verified profile. Absent from older API responses. */
+    val company: OpportunityCompanyDto? = null,
+)
+
+/** What a student sees about the company behind a job (EMP-04). Unfilled fields are null. */
+@Serializable data class OpportunityCompanyDto(
+    val displayName: String? = null,
+    val industry: String? = null,
+    val companySizeBand: String? = null,
+    val about: String? = null,
+    val websiteUrl: String? = null,
+    val careersPageUrl: String? = null,
+    val city: String? = null,
+    val stateOrProvince: String? = null,
+    val countryCode: String? = null,
 )
 
 /**

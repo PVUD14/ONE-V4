@@ -719,6 +719,10 @@ internal fun EmployerScaffold(
             SlideIn { EmployerTeamPage(organizationId, onClose = { employerOverlay = null }) }
             return
         }
+        EmployerOverlay.CompanyProfile -> {
+            SlideIn { EmployerCompanyProfilePage(organizationId, onClose = { employerOverlay = null }) }
+            return
+        }
         null -> Unit
     }
 
@@ -885,6 +889,15 @@ private fun EmployerHome(
         PilotCard(Modifier.fillMaxWidth()) {
             Text("Who is on your hiring team, in which role, and which invitations are still open.",
                 Modifier.clickable { onOpenOverlay(EmployerOverlay.Team) }.padding(14.dp),
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+
+        // EMP-04: the company profile students see on every job, read-only; the owner or admin
+        // edits it on the web.
+        SectionTitle("Company profile", trailing = "View", onTrailing = { onOpenOverlay(EmployerOverlay.CompanyProfile) })
+        PilotCard(Modifier.fillMaxWidth()) {
+            Text("What students see about your company on every job, and the details AI8HT operations verified.",
+                Modifier.clickable { onOpenOverlay(EmployerOverlay.CompanyProfile) }.padding(14.dp),
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
 

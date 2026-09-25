@@ -105,6 +105,18 @@ describe('All-role portal registry and preview workflows', () => {
     }
   });
 
+  it('opens the public employer access request from sign-in, without a session (EMP-04)', () => {
+    fetchMock.mockResolvedValue({ ok: true });
+    window.history.pushState(null, '', '/login');
+    render(<App />);
+    fireEvent.click(screen.getByRole('link', { name: 'Request employer access' }));
+    expect(window.location.pathname).toBe('/employer-access');
+    expect(screen.getByRole('heading', { name: 'Request employer access' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'AI8HT' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Work email')).toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/employer-access-requests'))).toBe(false);
+  });
+
   it('does not persist login password input while Cognito is unavailable', () => {
     fetchMock.mockResolvedValue({ ok: true });
     window.history.pushState(null, '', '/');

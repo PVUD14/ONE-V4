@@ -209,6 +209,45 @@ describe('employer applicant pipeline', () => {
   });
 });
 
+describe('EMP-04 the company behind every job', () => {
+  const company = {
+    displayName: 'Aster', industry: 'SOFTWARE_AND_IT_SERVICES', companySizeBand: '201-1000',
+    about: 'We build fleet-telematics software.', websiteUrl: 'https://www.aster.example', careersPageUrl: 'https://careers.aster.example',
+    city: 'Bengaluru', stateOrProvince: 'Karnataka', countryCode: 'IN',
+  };
+
+  it('shows the verified company profile on the job, list and detail', async () => {
+    stubFetch({
+      '/api/v1/opportunities': { opportunities: [{ ...opportunity, company }] },
+      [`/api/v1/opportunities/${opportunity.id}`]: { ...detail, opportunity: { ...detail.opportunity, company } },
+    });
+    await authenticate();
+    render(<StudentOpportunitiesPage />);
+    expect(await screen.findByText(/Aster \(Software and IT services\)/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'View details' }));
+    const card = await screen.findByRole('region', { name: 'About the company' });
+    expect(within(card).getByRole('heading', { name: 'About Aster' })).toBeInTheDocument();
+    expect(within(card).getByText(/Registered as Aster Mobility · Software and IT services · 201-1000 employees · Bengaluru, Karnataka, IN/)).toBeInTheDocument();
+    expect(within(card).getByText('We build fleet-telematics software.')).toBeInTheDocument();
+    expect(within(card).getByRole('link', { name: 'Careers page' })).toHaveAttribute('href', 'https://careers.aster.example');
+  });
+
+  it('says a description is missing instead of inventing one', async () => {
+    const empty = { displayName: null, industry: null, companySizeBand: null, about: null, websiteUrl: null, careersPageUrl: null, city: null, stateOrProvince: null, countryCode: null };
+    stubFetch({
+      '/api/v1/opportunities': { opportunities: [{ ...opportunity, company: empty }] },
+      [`/api/v1/opportunities/${opportunity.id}`]: { ...detail, opportunity: { ...detail.opportunity, company: empty } },
+    });
+    await authenticate();
+    render(<StudentOpportunitiesPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'View details' }));
+    const card = await screen.findByRole('region', { name: 'About the company' });
+    expect(within(card).getByRole('heading', { name: 'About Aster Mobility' })).toBeInTheDocument();
+    expect(within(card).getByText('The company has not added a description yet.')).toBeInTheDocument();
+    expect(within(card).queryByRole('link')).not.toBeInTheDocument();
+  });
+});
+
 type ErrorStub = Readonly<Record<string, { readonly status: number; readonly body: unknown }>>;
 
 describe('interview and offer management', () => {

@@ -344,3 +344,55 @@ export function releasePrivacyHold(
 ): Promise<{ readonly released: boolean; readonly correlationId: string }> {
   return requestJson(`/api/v1/operations/privacy/holds/${encodeURIComponent(holdId)}/release`, { token, method: 'POST', body });
 }
+
+// --- Employer access requests (EMP-04) -----------------------------------------
+
+export interface EmployerAccessRequestInput {
+  readonly requesterName: string;
+  readonly companyName: string;
+  readonly workEmail: string;
+  readonly websiteUrl: string;
+}
+
+/** Public: no token. The answer is the same whatever exists on ONE. */
+export function submitEmployerAccessRequest(input: EmployerAccessRequestInput): Promise<{ readonly received: true }> {
+  return requestJson('/api/v1/employer-access-requests', { method: 'POST', body: input });
+}
+
+export interface EmployerAccessRequestDto {
+  readonly id: string;
+  readonly requesterName: string;
+  readonly companyName: string;
+  readonly workEmail: string;
+  readonly emailDomain: string;
+  readonly websiteUrl: string;
+  readonly emailMatchesWebsite: boolean;
+  readonly freeMail: boolean;
+  readonly emailConfirmed: boolean;
+  readonly state: 'PENDING' | 'ONBOARDED' | 'DECLINED' | 'SPAM';
+  readonly organizationId: string | null;
+  readonly decisionReasonCode: string | null;
+  readonly decidedAt: string | null;
+  readonly submissionCount: number;
+  readonly createdAt: string;
+  readonly lastSubmittedAt: string;
+  readonly possibleMatches: readonly { readonly organizationId: string; readonly legalName: string; readonly verificationState: string }[];
+}
+
+export interface EmployerAccessRequestQueueDto {
+  readonly requests: readonly EmployerAccessRequestDto[];
+  readonly nextCursor: string | null;
+  readonly reasonCodes: Readonly<Record<'ONBOARDED' | 'DECLINED' | 'SPAM', readonly string[]>>;
+}
+
+export function listEmployerAccessRequests(token: string, filters: { readonly state?: string; readonly cursor?: string } = {}, signal?: AbortSignal): Promise<EmployerAccessRequestQueueDto> {
+  const query = new URLSearchParams();
+  if (filters.state) query.set('state', filters.state);
+  if (filters.cursor) query.set('cursor', filters.cursor);
+  const suffix = query.toString() ? `?${query.toString()}` : '';
+  return requestJson(`/api/v1/operations/employer-access-requests${suffix}`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function decideEmployerAccessRequest(token: string, requestId: string, decision: { readonly decision: 'ONBOARDED' | 'DECLINED' | 'SPAM'; readonly reasonCode: string; readonly organizationId?: string }): Promise<{ readonly request: { readonly id: string; readonly state: string } }> {
+  return requestJson(`/api/v1/operations/employer-access-requests/${encodeURIComponent(requestId)}/decision`, { token, method: 'POST', body: decision });
+}

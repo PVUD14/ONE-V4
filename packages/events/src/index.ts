@@ -173,6 +173,31 @@ export const eventSchemas = {
       toState: { kind: 'enum', values: ['PENDING', 'UNDER_REVIEW', 'VERIFIED', 'REJECTED', 'SUSPENDED'] },
     },
   },
+  // EMP-04: an employer owner or admin changed the student-facing company profile (about,
+  // industry, size band, careers page).
+  organizationCompanyProfileUpdatedV1: {
+    eventType: 'organization.company_profile.updated',
+    eventVersion: 1,
+    producer: 'identity-organization',
+    aggregateType: 'organization',
+    purpose: 'employer-company-profile-maintenance',
+    dataClassification: 'internal',
+    schemaRef: 'registry://organization.company_profile.updated/1',
+    payload: { organizationId: { kind: 'uuid' } },
+  },
+  // EMP-04: someone asked, through the public form, for their company to join ONE as an
+  // employer. Anonymous, so there is no actor; the payload carries only the request id —
+  // never the name or email — and Operations reads the rest from the queue.
+  employerAccessRequestSubmittedV1: {
+    eventType: 'employer_access_request.submitted',
+    eventVersion: 1,
+    producer: 'identity-organization',
+    aggregateType: 'employer_access_request',
+    purpose: 'employer-access-request-intake',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://employer_access_request.submitted/1',
+    payload: { requestId: { kind: 'uuid' } },
+  },
   opportunityPausedV1: {
     eventType: 'opportunity.paused',
     eventVersion: 1,

@@ -117,6 +117,13 @@ internal fun OpportunityDetailPage(
                     }
                 }
 
+                // EMP-04: the company behind the job, as its verified profile describes it.
+                // Nothing is guessed: a company without a description says so.
+                item {
+                    Spacer(Modifier.height(12.dp))
+                    SectionCard("About ${record.company?.displayName ?: record.employerName}", companySummary(record.company, record.employerName))
+                }
+
                 record.summary?.takeIf { it.isNotBlank() }?.let { summary ->
                     item { Spacer(Modifier.height(12.dp)); SectionCard("About this role", summary) }
                 }
@@ -244,6 +251,22 @@ private fun EligibilityCard(eligibility: EligibilityDto) {
             }
         }
     }
+}
+
+/** The company block of a job, as plain lines: registered name and facts, description, links. */
+internal fun companySummary(company: OpportunityCompanyDto?, employerName: String): String {
+    val facts = listOfNotNull(
+        "Registered as $employerName",
+        company?.industry?.let { companyIndustryLabel(it) },
+        company?.companySizeBand?.let { "$it employees" },
+        listOfNotNull(company?.city, company?.stateOrProvince, company?.countryCode).joinToString(", ").takeIf { it.isNotBlank() },
+    ).joinToString("  ·  ")
+    val links = listOfNotNull(company?.websiteUrl?.let { "Website: $it" }, company?.careersPageUrl?.let { "Careers: $it" })
+    return listOfNotNull(
+        facts,
+        company?.about?.takeIf { it.isNotBlank() } ?: "The company has not added a description yet.",
+        links.joinToString("\n").takeIf { it.isNotBlank() },
+    ).joinToString("\n\n")
 }
 
 @Composable

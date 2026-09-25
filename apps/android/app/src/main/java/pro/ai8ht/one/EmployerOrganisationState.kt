@@ -30,12 +30,14 @@ import pro.ai8ht.one.ui.Tone
 
 @Serializable data class EmployerOrganisationStatusEnvelope(val organisation: EmployerOrganisationStatusDto)
 
+// No defaults on purpose: a response missing a field fails to decode and is treated as
+// "status unknown" (the app behaves as before), never read as a refusal.
 @Serializable data class EmployerOrganisationStatusDto(
-    val verificationState: String = "",
-    val active: Boolean = false,
-    val canDraft: Boolean = false,
-    val canPublish: Boolean = false,
-    val canReachCandidates: Boolean = false,
+    val verificationState: String,
+    val active: Boolean,
+    val canDraft: Boolean,
+    val canPublish: Boolean,
+    val canReachCandidates: Boolean,
 )
 
 suspend fun Api.employerOrganisationStatus(context: Context, employerId: String): EmployerOrganisationStatusDto =

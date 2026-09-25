@@ -35,7 +35,8 @@ export function EmployerOrganisationGate({ employerId, routeLabel, children }: {
     const controller = new AbortController();
     setGate({ state: 'loading' });
     getEmployerOrganisationStatus(token, employerId, controller.signal)
-      .then((response) => setGate({ state: 'known', organisation: response.organisation }))
+      // Anything other than a well-formed status is treated as unknown, never as a verdict.
+      .then((response) => setGate(isOrganisationStatus(response?.organisation) ? { state: 'known', organisation: response.organisation } : { state: 'unknown' }))
       .catch(() => { if (!controller.signal.aborted) setGate({ state: 'unknown' }); });
     return () => controller.abort();
   }, [token, employerId]);
@@ -64,6 +65,12 @@ export function EmployerOrganisationGate({ employerId, routeLabel, children }: {
     return <>{notice}{children}</>;
   }
   return <>{children}</>;
+}
+
+function isOrganisationStatus(value: unknown): value is EmployerOrganisationStatusDto {
+  if (typeof value !== 'object' || value === null) return false;
+  const record = value as Record<string, unknown>;
+  return typeof record.verificationState === 'string' && typeof record.canDraft === 'boolean' && typeof record.canReachCandidates === 'boolean';
 }
 
 /** The plain status page for a suspended, rejected or inactive employer. */

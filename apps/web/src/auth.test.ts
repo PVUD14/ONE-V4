@@ -420,8 +420,10 @@ describe('Cognito Hosted UI browser authentication', () => {
     Object.defineProperty(window, 'location', { configurable: true, value: { ...window.location, assign, origin: 'http://127.0.0.1:5173', pathname: '/student', search: '' } });
     const { App } = await import('./App.js');
     render(React.createElement(App));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    // After the callback the app navigates and the consent gate remounts, re-checking consent
+    // (it never shows the workspace before it knows). The button can therefore vanish between
+    // being found and being clicked, so find-and-click is retried as one step.
+    await waitFor(() => fireEvent.click(screen.getByRole('button', { name: 'Sign out' })), { timeout: 10_000 });
     expect(assign).toHaveBeenCalledWith('https://uat-auth.example.test/logout?client_id=uat-client&logout_uri=http%3A%2F%2F127.0.0.1%3A5173%2Flogin');
     const { getAccessToken } = await import('./auth.js');
     expect(getAccessToken()).toBeNull();

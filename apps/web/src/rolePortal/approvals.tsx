@@ -17,6 +17,7 @@ import {
   getProtectedAccessToken,
   grantStaffCapability,
   listOperationApprovals,
+  publishCareerRequirementSet,
   releasePrivacyHold,
   requestOperationApproval,
   setFeatureFlagState,
@@ -47,6 +48,8 @@ export function describeApproval(approval: OperationApprovalDto): string {
     case 'OUTBOX_BACKLOG_SUPERSEDE': return `Supersede pending events older than ${summary.olderThan ? new Date(summary.olderThan).toLocaleString() : 'NA'} (up to ${summary.limit ?? 'NA'})`;
     case 'PRIVACY_HOLD_RELEASE': return `Release a legal hold (${summary.holdReason ?? 'NA'})`;
     case 'CAPABILITY_GRANT_HIGH_RISK': return `Grant ${summary.capability ?? 'NA'} to ${summary.memberEmail ?? 'NA'}`;
+    case 'CAREER_REQUIREMENT_SET_PUBLISH':
+      return `Publish requirement set v${summary.careerSetVersion ?? 'NA'} for ${summary.careerRoleCatalogueCode ? `${summary.careerRoleCatalogueCode} ` : ''}${summary.careerRoleTitle ?? 'NA'} as ${summary.releaseLabel === 'VERIFIED' ? 'Verified' : 'Not yet verified'}`;
   }
 }
 
@@ -71,6 +74,8 @@ async function executeApproval(token: string, approval: OperationApprovalDto): P
       await grantStaffCapability(token, String(payload.membershipId), {
         capability: String(payload.capability), reasonCode, ...(typeof payload.note === 'string' ? { note: payload.note } : {}), approvalId,
       }); return;
+    case 'CAREER_REQUIREMENT_SET_PUBLISH':
+      await publishCareerRequirementSet(token, String(payload.setId), { releaseLabel: String(payload.releaseLabel), reasonCode, approvalId }); return;
   }
 }
 
@@ -104,7 +109,7 @@ export function OperationsApprovalsPanel(): React.ReactElement | null {
   if (!token) return null;
 
   const heading = <div className="role-page-heading"><div><span className="eyebrow">Settings</span><h1>Approvals</h1>
-    <p>High-risk actions — suspending an organisation, high-risk feature flags, superseding the event backlog, releasing a legal hold and granting high-risk capabilities — need a second person&apos;s approval. An approval is bound to the exact action, expires after 24 hours and is used once, by the person who asked.</p></div></div>;
+    <p>High-risk actions — suspending an organisation, high-risk feature flags, superseding the event backlog, releasing a legal hold, granting high-risk capabilities and publishing a career requirement set — need a second person&apos;s approval. An approval is bound to the exact action, expires after 24 hours and is used once, by the person who asked.</p></div></div>;
 
   if (forbiddenReference) {
     return <section className="role-module role-module--dense">{heading}

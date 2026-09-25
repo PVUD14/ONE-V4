@@ -112,7 +112,7 @@ Existing targets are never cleared by the flag.
 | `id` | uuid PK |
 | `career_role_id` | uuid NOT NULL → `career_roles(id)` |
 | `synonym` | text NOT NULL, 2–120 chars, not starting with `= + @ -` (the 0011 title rule, against formula injection in exports) |
-| `normalized` | text NOT NULL — lower-case, single-spaced; CHECK that it equals `lower(regexp_replace(btrim(synonym), '\s+', ' ', 'g'))` |
+| `normalized` | text NOT NULL — lower-case, trimmed, single-spaced (`normalizeCareerSynonym`); the CHECK holds it lower-case and trimmed. Search compares against it. |
 | `reason_code` | text NOT NULL, `^[A-Z0-9_:-]{3,64}$` |
 | `created_by_user_id` | uuid NULL → `users(id)` (NULL only for a seed) |
 | `created_at` | timestamptz NOT NULL DEFAULT now() |
@@ -217,7 +217,8 @@ fails in 0038, because `ADD CONSTRAINT … CHECK` validates existing rows. Editi
   0038's five keys, or the extension columns for any later key. A NULL `action_key` satisfies 0038's CHECK on every
   replay, so 0038 never fails again.
 - The extension vocabulary (`CAREER_REQUIREMENT_SET_PUBLISH` → `career_requirement_set`) lives in the function
-  `operation_approval_extended_vocabulary()`, called by a BEFORE INSERT OR UPDATE trigger. A later goal adds a key
+  `operation_approval_extended_target_type(action)`, called by the BEFORE INSERT OR UPDATE trigger
+  `operation_approval_extension_guard`. A later goal adds a key
   with `CREATE OR REPLACE FUNCTION` in its own migration. Replays converge on the newest definition because later
   files run later, and the function never re-validates existing rows.
 - The same trigger makes `action_key`, `target_type` and both extension columns immutable with `IS DISTINCT FROM`.

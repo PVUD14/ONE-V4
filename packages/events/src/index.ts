@@ -84,7 +84,12 @@ const operationApprovalActionKeys = [
   'OUTBOX_BACKLOG_SUPERSEDE',
   'PRIVACY_HOLD_RELEASE',
   'CAPABILITY_GRANT_HIGH_RISK',
+  // OPS-08: stored in operation_approvals.extended_action_key (0051), not 0038's CHECK.
+  'CAREER_REQUIREMENT_SET_PUBLISH',
 ] as const;
+
+// OPS-08: requirement-set lifecycle states (0051).
+const careerRequirementSetStates = ['DRAFT', 'IN_REVIEW', 'REVIEWED', 'PUBLISHED', 'SUPERSEDED', 'WITHDRAWN'] as const;
 
 export const eventSchemas = {
   identityInvitationAcceptedV1: {
@@ -469,6 +474,37 @@ export const eventSchemas = {
     dataClassification: 'confidential',
     schemaRef: 'registry://support_case.assigned/1',
     payload: { caseId: { kind: 'uuid' }, assigneeUserId: { kind: 'uuid', required: false } },
+  },
+  // OPS-08: career requirement sets. No consumer yet; a later worker can recompute the
+  // gaps of students targeting the role after a publish. Identifiers and enums only.
+  careerRequirementSetStateChangedV1: {
+    eventType: 'career_requirement_set.state_changed',
+    eventVersion: 1,
+    producer: 'operations-catalogue',
+    aggregateType: 'career_requirement_set',
+    purpose: 'career-catalogue-administration',
+    dataClassification: 'internal',
+    schemaRef: 'registry://career_requirement_set.state_changed/1',
+    payload: {
+      setId: { kind: 'uuid' },
+      careerRoleId: { kind: 'uuid' },
+      fromState: { kind: 'enum', values: careerRequirementSetStates },
+      toState: { kind: 'enum', values: careerRequirementSetStates },
+    },
+  },
+  careerRequirementSetPublishedV1: {
+    eventType: 'career_requirement_set.published',
+    eventVersion: 1,
+    producer: 'operations-catalogue',
+    aggregateType: 'career_requirement_set',
+    purpose: 'career-catalogue-administration',
+    dataClassification: 'internal',
+    schemaRef: 'registry://career_requirement_set.published/1',
+    payload: {
+      setId: { kind: 'uuid' },
+      careerRoleId: { kind: 'uuid' },
+      releaseLabel: { kind: 'enum', values: ['SELECTABLE', 'VERIFIED'] },
+    },
   },
   learningLessonCompletedV1: {
     eventType: 'learning.lesson.completed',

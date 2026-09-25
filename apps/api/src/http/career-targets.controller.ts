@@ -33,6 +33,7 @@ import {
   CareerTargetError,
   clearStudentCareerTarget,
   getStudentCareerTargetState,
+  isCareerCatalogueOpenForLearner,
   listCareerRoles,
   recomputeAllCareerGaps,
   setStudentCareerTarget,
@@ -60,11 +61,17 @@ const roadmapTransitions: Readonly<Record<string, readonly string[]>> = {
 export class CareerTargetsController {
   constructor(@Inject(PG_POOL) private readonly pool: Pool) {}
 
-  /** The career catalogue. Public reference content, so no membership is required. */
+  /**
+   * The career catalogue. Public reference content, so no membership is required. The
+   * full job-role catalogue is offered only where `career-catalogue.selectable-roles` is on
+   * for the caller (OPS-08); otherwise the starter roles, exactly as before.
+   */
   @Get('/career-targets/catalog')
   @UseGuards(ProtectedApiAuthenticationGuard)
-  async catalog(): Promise<Record<string, unknown>> {
-    return { careerRoles: await listCareerRoles(this.pool) };
+  async catalog(@Req() request: ProtectedHttpRequest): Promise<Record<string, unknown>> {
+    const userId = request.planThePath?.authorization?.principal.userId;
+    const catalogueOpen = userId ? await isCareerCatalogueOpenForLearner(this.pool, userId) : false;
+    return { careerRoles: await listCareerRoles(this.pool, { catalogueOpen }) };
   }
 
   @Get('/students/me/career-targets')
@@ -79,7 +86,8 @@ export class CareerTargetsController {
     const learnerId = requireLearnerId(request);
     const { careerRoleId, priority } = readTargetBody(body);
     try {
-      const created = await setStudentCareerTarget(this.pool, { subjectUserId: learnerId, careerRoleId, priority });
+      const catalogueOpen = await isCareerCatalogueOpenForLearner(this.pool, learnerId);
+      const created = await setStudentCareerTarget(this.pool, { subjectUserId: learnerId, careerRoleId, priority, catalogueOpen });
       return { ...created, ...(await getStudentCareerTargetState(this.pool, learnerId)) };
     } catch (error) {
       throw mapTargetError(error);

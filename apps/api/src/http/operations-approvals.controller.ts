@@ -26,6 +26,7 @@ import {
 import { sql } from 'drizzle-orm';
 import {
   approvalDecisionReasons,
+  careerReleaseLabels,
   approvalRequestReasons,
   decideApproval,
   hasInternalCapability,
@@ -41,6 +42,7 @@ import {
   type HighRiskActionKey,
   type InternalCapabilityContext,
 } from '@planthepath/authorization/src/index.js';
+import { loadRequirementSetForPublish } from '@planthepath/persistence/src/career-catalogue.js';
 import {
   countHighRiskApprovers,
   createOperationApproval,
@@ -244,6 +246,17 @@ export class OperationsApprovalsController {
         if (refusal) throw new HttpException(domainError(refusal, correlationId), refusal === 'CAPABILITY_SELF_CHANGE_REFUSED' || refusal === 'FORBIDDEN' ? 403 : refusal === 'CAPABILITY_ALREADY_HELD' ? 409 : 400);
         return { targetId: membershipId, canonical: approvalPayloads.CAPABILITY_GRANT_HIGH_RISK({ membershipId, capability, reasonCode, note }) };
       }
+      case 'CAREER_REQUIREMENT_SET_PUBLISH': {
+        const setId = requireUuidField(payload.setId, correlationId);
+        if (typeof payload.releaseLabel !== 'string' || !(careerReleaseLabels as readonly string[]).includes(payload.releaseLabel)) {
+          throw badRequest('CAREER_RELEASE_LABEL_INVALID', correlationId);
+        }
+        const set = await loadRequirementSetForPublish(this.db, setId);
+        if (!set) throw new OperationApprovalError('APPROVAL_TARGET_NOT_FOUND');
+        // Only a set someone other than its author has reviewed can be put to an approver.
+        if (set.state !== 'REVIEWED') throw badRequest('APPROVAL_TARGET_STATE_INVALID', correlationId);
+        return { targetId: setId, canonical: approvalPayloads.CAREER_REQUIREMENT_SET_PUBLISH({ setId, releaseLabel: payload.releaseLabel, reasonCode }) };
+      }
     }
   }
 }
@@ -255,6 +268,7 @@ const payloadFields: Readonly<Record<HighRiskActionKey, readonly string[]>> = {
   OUTBOX_BACKLOG_SUPERSEDE: ['olderThan', 'limit', 'reasonCode'],
   PRIVACY_HOLD_RELEASE: ['holdId', 'reasonCode'],
   CAPABILITY_GRANT_HIGH_RISK: ['membershipId', 'capability', 'reasonCode', 'note'],
+  CAREER_REQUIREMENT_SET_PUBLISH: ['setId', 'releaseLabel', 'reasonCode'],
 };
 
 /**
@@ -285,6 +299,10 @@ function toApprovalDto(row: OperationApprovalRow, actor: Actor, approverCount: n
       holdReason: row.holdReason,
       olderThan: row.actionKey === 'OUTBOX_BACKLOG_SUPERSEDE' ? payload.olderThan ?? null : null,
       limit: row.actionKey === 'OUTBOX_BACKLOG_SUPERSEDE' ? payload.limit ?? null : null,
+      careerRoleTitle: row.careerRoleTitle,
+      careerRoleCatalogueCode: row.careerRoleCatalogueCode,
+      careerSetVersion: row.careerSetVersion,
+      releaseLabel: row.actionKey === 'CAREER_REQUIREMENT_SET_PUBLISH' ? payload.releaseLabel ?? null : null,
     },
     reasonCode: row.reasonCode,
     note: row.note,

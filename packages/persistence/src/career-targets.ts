@@ -26,6 +26,8 @@ import {
   type CareerRequirement,
   type EvidenceInput,
 } from '@planthepath/career-readiness/src/index.js';
+import { careerCatalogueStudentFlagKey } from '@planthepath/authorization/src/index.js';
+import { resolveFeatureFlag } from './platform-controls.js';
 
 export class CareerTargetError extends Error {
   constructor(readonly code: string) {
@@ -43,16 +45,44 @@ interface CareerRoleRow {
   readonly family: string;
   readonly summary: string | null;
   readonly requirementCount: number;
+  /** OPS-08: SELECTABLE or VERIFIED while the full catalogue is open to the learner; otherwise null. */
+  readonly releaseLabel: 'SELECTABLE' | 'VERIFIED' | null;
+  /** OPS-08: the catalogue code (S01…) while the full catalogue is open to the learner; otherwise null. */
+  readonly catalogueCode: string | null;
 }
 
-/** The catalogue a learner chooses from. Inactive roles are never offered. */
-export async function listCareerRoles(pool: Pool): Promise<readonly CareerRoleRow[]> {
+/**
+ * The catalogue a learner chooses from. Inactive roles are never offered. Until the
+ * `career-catalogue.selectable-roles` flag is on for the learner (OPS-08), only the starter
+ * roles are offered, exactly as before the catalogue existed, and no catalogue field is
+ * disclosed; when it is on, every catalogued role is offered with its honest release label.
+ */
+export async function listCareerRoles(pool: Pool, options: { readonly catalogueOpen?: boolean } = {}): Promise<readonly CareerRoleRow[]> {
+  const open = options.catalogueOpen === true;
   const result = await pool.query<CareerRoleRow>(
     `SELECT r.id, r.code, r.title, r.family, r.summary,
-            (SELECT count(*)::int FROM career_role_requirements q WHERE q.career_role_id = r.id) AS "requirementCount"
-     FROM career_roles r WHERE r.active ORDER BY r.family, r.title`,
+            (SELECT count(*)::int FROM career_role_requirements q WHERE q.career_role_id = r.id) AS "requirementCount",
+            CASE WHEN $1 THEN r.release_label END AS "releaseLabel",
+            CASE WHEN $1 THEN r.catalogue_code END AS "catalogueCode"
+     FROM career_roles r WHERE r.active AND ($1 OR r.origin = 'STARTER') ORDER BY r.family, r.title`,
+    [open],
   );
   return result.rows;
+}
+
+/**
+ * Whether the full catalogue is open to this learner: the flag resolved for them and for
+ * the institution they are actively rostered at (user override, then organisation, then
+ * global; an absent flag is off).
+ */
+export async function isCareerCatalogueOpenForLearner(pool: Pool, subjectUserId: string): Promise<boolean> {
+  const institution = await pool.query<{ institutionId: string }>(
+    `SELECT institution_id AS "institutionId" FROM institution_student_profiles
+     WHERE student_user_id=$1 AND status='ACTIVE' ORDER BY updated_at DESC LIMIT 1`, [subjectUserId],
+  );
+  return resolveFeatureFlag(pool, {
+    key: careerCatalogueStudentFlagKey, userId: subjectUserId, organizationId: institution.rows[0]?.institutionId ?? null,
+  });
 }
 
 async function loadRequirements(client: Queryable, careerRoleId: string): Promise<readonly CareerRequirement[]> {
@@ -128,12 +158,18 @@ export async function recomputeCareerGap(
  */
 export async function setStudentCareerTarget(
   pool: Pool,
-  input: { readonly subjectUserId: string; readonly careerRoleId: string; readonly priority: 'PRIMARY' | 'SECONDARY' },
+  input: {
+    readonly subjectUserId: string; readonly careerRoleId: string; readonly priority: 'PRIMARY' | 'SECONDARY';
+    /** OPS-08: a catalogue-only role may be targeted only while the catalogue is open to this learner. */
+    readonly catalogueOpen?: boolean;
+  },
 ): Promise<{ readonly targetId: string }> {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const role = await client.query<{ id: string }>('SELECT id FROM career_roles WHERE id=$1 AND active', [input.careerRoleId]);
+    const role = await client.query<{ id: string }>(
+      "SELECT id FROM career_roles WHERE id=$1 AND active AND ($2 OR origin = 'STARTER')", [input.careerRoleId, input.catalogueOpen === true],
+    );
     if (!role.rows[0]) throw new CareerTargetError('CAREER_ROLE_NOT_FOUND');
 
     if (input.priority === 'PRIMARY') {

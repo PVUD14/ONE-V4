@@ -1,0 +1,1750 @@
+{
+  "catalogue": "ONE job-role catalogue",
+  "version": "catalogue-v1",
+  "source": "docs/ops/inputs/job-role-catalogue.md (Appendix 4, revision 11)",
+  "note": "Generated from the source file by packages/persistence/src/generate-career-catalogue.ts; do not edit by hand. plannedRelease is the plan, not a label: every role seeds as SELECTABLE. Core skill areas are drafts. Goals are recorded but not stored until the engine plan's goal model exists.",
+  "starterMappings": {
+    "SOC_ANALYST": "C01",
+    "SOFTWARE_ENGINEER": "S01",
+    "DATA_ANALYST": "D01",
+    "BUSINESS_ANALYST": "S21",
+    "CUSTOMER_SUCCESS": "B11"
+  },
+  "roles": [
+    {
+      "code": "S01",
+      "title": "Associate Software Engineer / Programmer Analyst Trainee (IT services mass hiring)",
+      "family": {
+        "code": "A",
+        "label": "Software, IT and product"
+      },
+      "typicalBranches": [
+        "All branches"
+      ],
+      "coreSkillAreas": "One programming language, basic data structures, SQL, OOP, aptitude, communication",
+      "mainEvidence": "Executed code, objective tests",
+      "plannedRelease": "V2"
+    },
+    {
+      "code": "S02",
+      "title": "Software Developer (backend)",
+      "family": {
+        "code": "A",
+        "label": "Software, IT and product"
+      },
+      "typicalBranches": [
+        "CSE",
+        "IT",
+        "ECE",
+        "EEE"
+      ],
+      "coreSkillAreas": "Backend language, data structures and algorithms, databases, APIs, Git, testing basics",
+      "mainEvidence": "Executed code, small project",
+      "plannedRelease": "V2"
+    },
+    {
+      "code": "S03",
+      "title": "Frontend Developer",
+      "family": {
+        "code": "A",
+        "label": "Software, IT and product"
+      },
+      "typicalBranches": [
+        "CSE",
+        "IT",
+        "any"
+      ],
+      "coreSkillAreas": "HTML, CSS, JavaScript, one framework, accessibility basics, API use",
+      "mainEvidence": "Executed code, project",
+      "plannedRelease": "V3"
+    },
+    {
+      "code": "S04",
+      "title": "Full-Stack Developer",
+      "family": {
+        "code": "A",
+        "label": "Software, IT and product"
+      },
+      "typicalBranches": [
+        "CSE",
+        "IT"
+      ],
+      "coreSkillAreas": "Frontend, backend, database, deployment basics",
+      "mainEvidence": "Project",
+      "plannedRelease": "V3"
+    },
+    {
+      "code": "S05",
+      "title": "Mobile App Developer",
+      "family": {
+        "code": "A",
+        "label": "Software, IT and product"
+      },
+      "typicalBranches": [
+        "CSE",
+        "IT",
+        "ECE"
+      ],
+      "coreSkillAreas": "Kotlin or Swift or a cross-platform toolkit, UI, APIs, app lifecycle",
+      "mainEvidence": "Project",
+      "plannedRelease": "V3"
+    },
+    {
+      "code": "S06",
+      "title": "Software Test Engineer (manual QA)",
+      "family": {
+        "code": "A",
+        "label": "Software, IT and product"
+      },
+      "typicalBranches": [
+        "All branches"
+      ],
+      "coreSkillAreas": "Testing life cycle, test cases, defect life cycle, SQL basics",
+      "mainEvidence": "Scenario tests, written test cases",
+      "plannedRelease": "V2"
+    },
+    {
+      "code": "S07",
+      "title": "Test Automation Engineer (SDET)",
+      "family": {
+        "code": "A",
+        "label": "Software, IT and product"
+      },
+      "typicalBranches": [
+        "CSE",
+        "IT",
+        "ECE"
+      ],
+      "coreSkillAreas": "Programming, browser automation, API testing, CI basics",
+      "mainEvidence": "Executed code",
+      "plannedRelease": "V3"
+    },
+    {
+      "code": "S08",
+      "title": "DevOps Engineer (junior)",
+      "family": {
+        "code": "A",
+        "label": "Software, IT and product"
+      },
+      "typicalBranches": [
+        "CSE",
+        "IT"
+      ],
+      "coreSkillAreas": "Linux, Git, CI/CD, containers, scripting, cloud basics",
+      "mainEvidence": "Labs",
+      "plannedRelease": "V3"
+    },
+    {
+      "code": "S09",
+      "title": "Cloud Support / Associate Cloud Engineer",
+      "family": {
+        "code": "A",
+        "label": "Software, IT and product"
+      },
+      "typicalBranches": [
+        "CSE",
+        "IT",
+        "ECE",
+        "EEE"
+      ],
+      "coreSkillAreas": "Cloud fundamentals, networking, Linux, identity basics, troubleshooting",
+      "mainEvidence": "Labs, objective tests",
+      "plannedRelease": "V3"
+    },
+    {
+      "code": "S10",
+      "title": "Site Reliability Engineer (junior)",
+      "family": {
+        "code": "A",
+        "label": "Software, IT and product"
+      },
+      "typicalBranches": [
+        "CSE",
+        "IT"
+      ],
+      "coreSkillAreas": "Linux, monitoring, scripting, networking, incident handling",
+      "mainEvidence": "Labs",
+      "plannedRelease": null
+    },
+    {
+      "code": "S11",
+      "title": "System Administrator (Linux / Windows)",
+      "family": {
+        "code": "A",
+        "label": "Software, IT and product"
+      },
+      "typicalBranches": [
+        "CSE",
+        "IT",
+        "ECE",
+        "EEE"
+      ],
+      "coreSkillAreas": "OS administration, users and permissions, backup, scripting, directory basics",
+      "mainEvidence": "Labs",
+      "plannedRelease": "V3"
+    },
+    {
+      "code": "S12",
+      "title": "Network / NOC Engineer",
+      "family": {
+        "code": "A",
+        "label": "Software, IT and product"
+      },
+      "typicalBranches": [
+        "ECE",
+        "CSE",
+        "IT",
+        "EEE"
+      ],
+      "coreSkillAreas": "TCP/IP, subnetting, routing and switching, firewalls, monitoring",
+      "mainEvidence": "Objective tests, configuration simulation",
+      "plannedRelease": "V3"
+    },
+    {
+      "code": "S13",
+      "title": "Technical Support / IT Helpdesk Engineer",
+      "family": {
+        "code": "A",
+        "label": "Software, IT and product"
+      },
+      "typicalBranches": [
+        "All branches"
+      ],
+      "coreSkillAreas": "OS and hardware troubleshooting, networking basics, ticketing, customer communication",
+      "mainEvidence": "Scenarios; spoken tasks later",
+      "plannedRelease": "V2"
+    },
+    {
+      "code": "S14",
+      "title": "Database Administrator / SQL Developer",
+      "family": {
+        "code": "A",
+        "label": "Software, IT and product"
+      },
+      "typicalBranches": [
+        "CSE",
+        "IT"
+      ],
+      "coreSkillAreas": "SQL, schema design, indexing, backup and recovery, performance",
+      "mainEvidence": "Executed SQL",
+      "plannedRelease": "V3"
+    },
+    {
+      "code": "S15",
+      "title": "ERP / SAP Consultant (trainee)",
+      "family": {
+        "code": "A",
+        "label": "Software, IT and product"
+      },
+      "typicalBranches": [
+        "All branches"
+      ],
+      "coreSkillAreas": "Business processes (finance, supply chain, HR), ERP navigation, configuration basics",
+      "mainEvidence": "Scenarios",
+      "plannedRelease": null
+    },
+    {
+      "code": "S16",
+      "title": "CRM / Salesforce Developer",
+      "family": {
+        "code": "A",
+        "label": "Software, IT and product"
+      },
+      "typicalBranches": [
+        "CSE",
+        "IT"
+      ],
+      "coreSkillAreas": "Platform basics, data model, automation, integration",
+      "mainEvidence": "Executed code",
+      "plannedRelease": null
+    },
+    {
+      "code": "S17",
+      "title": "Mainframe Developer",
+      "family": {
+        "code": "A",
+        "label": "Software, IT and product"
+      },
+      "typicalBranches": [
+        "CSE",
+        "IT",
+        "any"
+      ],
+      "coreSkillAreas": "COBOL, JCL, DB2, batch processing",
+      "mainEvidence": "Executed code",
+      "plannedRelease": null
+    },
+    {
+      "code": "S18",
+      "title": "Game Developer",
+      "family": {
+        "code": "A",
+        "label": "Software, IT and product"
+      },
+      "typicalBranches": [
+        "CSE",
+        "IT"
+      ],
+      "coreSkillAreas": "Game engine, C# or C++, maths for games",
+      "mainEvidence": "Project",
+      "plannedRelease": null
+    },
+    {
+      "code": "S19",
+      "title": "UI / UX Designer",
+      "family": {
+        "code": "A",
+        "label": "Software, IT and product"
+      },
+      "typicalBranches": [
+        "Any"
+      ],
+      "coreSkillAreas": "User research, wireframes, visual design, prototyping, usability testing",
+      "mainEvidence": "Portfolio artifact",
+      "plannedRelease": null
+    },
+    {
+      "code": "S20",
+      "title": "Technical Writer",
+      "family": {
+        "code": "A",
+        "label": "Software, IT and product"
+      },
+      "typicalBranches": [
+        "Any"
+      ],
+      "coreSkillAreas": "Technical writing, documentation tools, API documentation basics",
+      "mainEvidence": "Writing rubric",
+      "plannedRelease": "V3"
+    },
+    {
+      "code": "S21",
+      "title": "IT Business Analyst",
+      "family": {
+        "code": "A",
+        "label": "Software, IT and product"
+      },
+      "typicalBranches": [
+        "CSE",
+        "IT",
+        "any"
+      ],
+      "coreSkillAreas": "Requirements, process modelling, SQL basics, documentation, stakeholder communication",
+      "mainEvidence": "Writing, scenarios",
+      "plannedRelease": "V3"
+    },
+    {
+      "code": "S22",
+      "title": "Associate Product Manager / Product Analyst",
+      "family": {
+        "code": "A",
+        "label": "Software, IT and product"
+      },
+      "typicalBranches": [
+        "Any"
+      ],
+      "coreSkillAreas": "Product thinking, analytics, user research, prioritisation",
+      "mainEvidence": "Case, writing",
+      "plannedRelease": null
+    },
+    {
+      "code": "S23",
+      "title": "IT Project Coordinator / Scrum Associate",
+      "family": {
+        "code": "A",
+        "label": "Software, IT and product"
+      },
+      "typicalBranches": [
+        "Any"
+      ],
+      "coreSkillAreas": "Agile and Scrum, planning tools, reporting, communication",
+      "mainEvidence": "Scenarios",
+      "plannedRelease": null
+    },
+    {
+      "code": "S24",
+      "title": "Blockchain Developer",
+      "family": {
+        "code": "A",
+        "label": "Software, IT and product"
+      },
+      "typicalBranches": [
+        "CSE",
+        "IT"
+      ],
+      "coreSkillAreas": "Cryptography basics, smart contracts",
+      "mainEvidence": "Executed code",
+      "plannedRelease": null
+    },
+    {
+      "code": "S25",
+      "title": "AR / VR Developer",
+      "family": {
+        "code": "A",
+        "label": "Software, IT and product"
+      },
+      "typicalBranches": [
+        "CSE",
+        "IT"
+      ],
+      "coreSkillAreas": "3D engines, graphics basics, interaction design",
+      "mainEvidence": "Project",
+      "plannedRelease": null
+    },
+    {
+      "code": "D01",
+      "title": "Data Analyst",
+      "family": {
+        "code": "B",
+        "label": "Data, AI and cybersecurity"
+      },
+      "typicalBranches": [
+        "All branches"
+      ],
+      "coreSkillAreas": "Spreadsheets, SQL, statistics basics, dashboards, turning business questions into analysis",
+      "mainEvidence": "Executed SQL, notebook task",
+      "plannedRelease": "V2"
+    },
+    {
+      "code": "D02",
+      "title": "BI Developer / Reporting Analyst",
+      "family": {
+        "code": "B",
+        "label": "Data, AI and cybersecurity"
+      },
+      "typicalBranches": [
+        "Any"
+      ],
+      "coreSkillAreas": "SQL, data modelling, dashboards, ETL basics",
+      "mainEvidence": "Executed SQL, dashboard artifact",
+      "plannedRelease": "V3"
+    },
+    {
+      "code": "D03",
+      "title": "MIS Executive",
+      "family": {
+        "code": "B",
+        "label": "Data, AI and cybersecurity"
+      },
+      "typicalBranches": [
+        "Any"
+      ],
+      "coreSkillAreas": "Advanced spreadsheets, reporting, data hygiene",
+      "mainEvidence": "Practical spreadsheet task",
+      "plannedRelease": null
+    },
+    {
+      "code": "D04",
+      "title": "Data Engineer (junior)",
+      "family": {
+        "code": "B",
+        "label": "Data, AI and cybersecurity"
+      },
+      "typicalBranches": [
+        "CSE",
+        "IT"
+      ],
+      "coreSkillAreas": "SQL, Python, data pipelines, cloud data services, data modelling",
+      "mainEvidence": "Executed code",
+      "plannedRelease": "V3"
+    },
+    {
+      "code": "D05",
+      "title": "Data Scientist (entry)",
+      "family": {
+        "code": "B",
+        "label": "Data, AI and cybersecurity"
+      },
+      "typicalBranches": [
+        "CSE",
+        "IT",
+        "ECE",
+        "maths-strong branches"
+      ],
+      "coreSkillAreas": "Statistics, Python, machine-learning basics, experiments, communicating results",
+      "mainEvidence": "Notebook",
+      "plannedRelease": "V3"
+    },
+    {
+      "code": "D06",
+      "title": "Machine Learning Engineer (junior)",
+      "family": {
+        "code": "B",
+        "label": "Data, AI and cybersecurity"
+      },
+      "typicalBranches": [
+        "CSE",
+        "IT",
+        "ECE"
+      ],
+      "coreSkillAreas": "ML algorithms, Python, evaluation, deployment basics",
+      "mainEvidence": "Executed code, notebook",
+      "plannedRelease": "V3"
+    },
+    {
+      "code": "D07",
+      "title": "GenAI / LLM Application Developer",
+      "family": {
+        "code": "B",
+        "label": "Data, AI and cybersecurity"
+      },
+      "typicalBranches": [
+        "CSE",
+        "IT"
+      ],
+      "coreSkillAreas": "Python, model APIs, prompting, retrieval, evaluation, safety",
+      "mainEvidence": "Executed code, project",
+      "plannedRelease": null
+    },
+    {
+      "code": "D08",
+      "title": "AI Data Specialist / Annotation Analyst",
+      "family": {
+        "code": "B",
+        "label": "Data, AI and cybersecurity"
+      },
+      "typicalBranches": [
+        "Any"
+      ],
+      "coreSkillAreas": "Domain knowledge, annotation guidelines, quality checks, writing",
+      "mainEvidence": "Rubric-graded tasks",
+      "plannedRelease": null
+    },
+    {
+      "code": "D09",
+      "title": "Computer Vision Engineer (junior)",
+      "family": {
+        "code": "B",
+        "label": "Data, AI and cybersecurity"
+      },
+      "typicalBranches": [
+        "CSE",
+        "ECE"
+      ],
+      "coreSkillAreas": "Image processing, deep-learning basics",
+      "mainEvidence": "Notebook",
+      "plannedRelease": null
+    },
+    {
+      "code": "C01",
+      "title": "SOC Analyst L1",
+      "family": {
+        "code": "B",
+        "label": "Data, AI and cybersecurity"
+      },
+      "typicalBranches": [
+        "CSE",
+        "IT",
+        "ECE"
+      ],
+      "coreSkillAreas": "Networking, Linux and Windows logs, SIEM alert triage, incident response, MITRE ATT&CK, reporting",
+      "mainEvidence": "Scenarios and objective tests now; labs in V3",
+      "plannedRelease": "V1"
+    },
+    {
+      "code": "C02",
+      "title": "Vulnerability Assessment Analyst (VAPT associate)",
+      "family": {
+        "code": "B",
+        "label": "Data, AI and cybersecurity"
+      },
+      "typicalBranches": [
+        "CSE",
+        "IT",
+        "ECE"
+      ],
+      "coreSkillAreas": "Networking, web basics, scanning tools, CVSS, reporting",
+      "mainEvidence": "Labs, report rubric",
+      "plannedRelease": "V2"
+    },
+    {
+      "code": "C03",
+      "title": "Penetration Tester (junior)",
+      "family": {
+        "code": "B",
+        "label": "Data, AI and cybersecurity"
+      },
+      "typicalBranches": [
+        "CSE",
+        "IT"
+      ],
+      "coreSkillAreas": "Web and application security, networking, Linux, exploitation in labs, reporting",
+      "mainEvidence": "Labs, capture-the-flag",
+      "plannedRelease": "V3"
+    },
+    {
+      "code": "C04",
+      "title": "GRC / IT Audit Analyst",
+      "family": {
+        "code": "B",
+        "label": "Data, AI and cybersecurity"
+      },
+      "typicalBranches": [
+        "Any"
+      ],
+      "coreSkillAreas": "ISO 27001 basics, risk assessment, controls, policies, audit evidence",
+      "mainEvidence": "Scenarios, writing",
+      "plannedRelease": "V3"
+    },
+    {
+      "code": "C05",
+      "title": "Application Security Analyst",
+      "family": {
+        "code": "B",
+        "label": "Data, AI and cybersecurity"
+      },
+      "typicalBranches": [
+        "CSE",
+        "IT"
+      ],
+      "coreSkillAreas": "OWASP Top 10, secure code review, SAST and DAST basics",
+      "mainEvidence": "Code-review task",
+      "plannedRelease": "V3"
+    },
+    {
+      "code": "C06",
+      "title": "Cloud Security Associate",
+      "family": {
+        "code": "B",
+        "label": "Data, AI and cybersecurity"
+      },
+      "typicalBranches": [
+        "CSE",
+        "IT"
+      ],
+      "coreSkillAreas": "Cloud identity, network security groups, logging, misconfiguration review",
+      "mainEvidence": "Labs",
+      "plannedRelease": null
+    },
+    {
+      "code": "C07",
+      "title": "IAM Analyst",
+      "family": {
+        "code": "B",
+        "label": "Data, AI and cybersecurity"
+      },
+      "typicalBranches": [
+        "CSE",
+        "IT",
+        "any"
+      ],
+      "coreSkillAreas": "Identity life cycle, access reviews, directory services, SSO and MFA",
+      "mainEvidence": "Scenarios",
+      "plannedRelease": null
+    },
+    {
+      "code": "C08",
+      "title": "Digital Forensics Analyst (junior)",
+      "family": {
+        "code": "B",
+        "label": "Data, AI and cybersecurity"
+      },
+      "typicalBranches": [
+        "CSE",
+        "IT",
+        "ECE"
+      ],
+      "coreSkillAreas": "File systems, evidence handling, forensic tools, reporting",
+      "mainEvidence": "Labs",
+      "plannedRelease": null
+    },
+    {
+      "code": "C09",
+      "title": "OT / ICS Security Associate",
+      "family": {
+        "code": "B",
+        "label": "Data, AI and cybersecurity"
+      },
+      "typicalBranches": [
+        "EEE",
+        "ECE",
+        "Instrumentation"
+      ],
+      "coreSkillAreas": "Industrial protocols, OT networks, safety-first security",
+      "mainEvidence": "Scenarios",
+      "plannedRelease": null
+    },
+    {
+      "code": "E01",
+      "title": "Embedded Software Engineer",
+      "family": {
+        "code": "C",
+        "label": "Electronics, electrical and instrumentation"
+      },
+      "typicalBranches": [
+        "ECE",
+        "EEE",
+        "CSE"
+      ],
+      "coreSkillAreas": "C programming, microcontrollers, RTOS basics, UART / SPI / I2C, debugging",
+      "mainEvidence": "Executed code, simulated hardware",
+      "plannedRelease": "V2"
+    },
+    {
+      "code": "E02",
+      "title": "Embedded Hardware / PCB Design Engineer",
+      "family": {
+        "code": "C",
+        "label": "Electronics, electrical and instrumentation"
+      },
+      "typicalBranches": [
+        "ECE",
+        "EEE"
+      ],
+      "coreSkillAreas": "Circuit design, PCB tools, component selection, signal-integrity basics",
+      "mainEvidence": "Design artifact",
+      "plannedRelease": null
+    },
+    {
+      "code": "E03",
+      "title": "VLSI Design Engineer (RTL)",
+      "family": {
+        "code": "C",
+        "label": "Electronics, electrical and instrumentation"
+      },
+      "typicalBranches": [
+        "ECE",
+        "EEE"
+      ],
+      "coreSkillAreas": "Digital design, Verilog or VHDL, timing basics, synthesis",
+      "mainEvidence": "HDL simulation",
+      "plannedRelease": "V3"
+    },
+    {
+      "code": "E04",
+      "title": "VLSI Verification Engineer",
+      "family": {
+        "code": "C",
+        "label": "Electronics, electrical and instrumentation"
+      },
+      "typicalBranches": [
+        "ECE",
+        "EEE"
+      ],
+      "coreSkillAreas": "SystemVerilog, UVM basics, test planning",
+      "mainEvidence": "HDL simulation",
+      "plannedRelease": "V3"
+    },
+    {
+      "code": "E05",
+      "title": "Physical Design Engineer",
+      "family": {
+        "code": "C",
+        "label": "Electronics, electrical and instrumentation"
+      },
+      "typicalBranches": [
+        "ECE"
+      ],
+      "coreSkillAreas": "Floorplanning, placement and routing, static timing basics",
+      "mainEvidence": "Objective tests, tool task",
+      "plannedRelease": null
+    },
+    {
+      "code": "E06",
+      "title": "Analog / Mixed-Signal Design Engineer (junior)",
+      "family": {
+        "code": "C",
+        "label": "Electronics, electrical and instrumentation"
+      },
+      "typicalBranches": [
+        "ECE",
+        "EEE"
+      ],
+      "coreSkillAreas": "Analog circuits, SPICE simulation",
+      "mainEvidence": "Simulation task",
+      "plannedRelease": null
+    },
+    {
+      "code": "E07",
+      "title": "Telecom / RF Engineer",
+      "family": {
+        "code": "C",
+        "label": "Electronics, electrical and instrumentation"
+      },
+      "typicalBranches": [
+        "ECE"
+      ],
+      "coreSkillAreas": "Communication systems, RF basics, 4G / 5G concepts, drive testing",
+      "mainEvidence": "Objective tests, scenarios",
+      "plannedRelease": null
+    },
+    {
+      "code": "E08",
+      "title": "IoT Engineer",
+      "family": {
+        "code": "C",
+        "label": "Electronics, electrical and instrumentation"
+      },
+      "typicalBranches": [
+        "ECE",
+        "EEE",
+        "CSE"
+      ],
+      "coreSkillAreas": "Sensors, microcontrollers, connectivity, cloud IoT basics",
+      "mainEvidence": "Project",
+      "plannedRelease": "V3"
+    },
+    {
+      "code": "E09",
+      "title": "Electronics Test and Validation Engineer",
+      "family": {
+        "code": "C",
+        "label": "Electronics, electrical and instrumentation"
+      },
+      "typicalBranches": [
+        "ECE",
+        "EEE"
+      ],
+      "coreSkillAreas": "Test equipment, test plans, measurement, documentation",
+      "mainEvidence": "Scenarios; lab later",
+      "plannedRelease": null
+    },
+    {
+      "code": "E10",
+      "title": "Field Service Engineer (electronics / medical equipment)",
+      "family": {
+        "code": "C",
+        "label": "Electronics, electrical and instrumentation"
+      },
+      "typicalBranches": [
+        "ECE",
+        "EEE",
+        "Instrumentation"
+      ],
+      "coreSkillAreas": "Troubleshooting, equipment knowledge, safety, customer communication",
+      "mainEvidence": "Scenarios; spoken tasks later",
+      "plannedRelease": null
+    },
+    {
+      "code": "E11",
+      "title": "Instrumentation and Control Engineer",
+      "family": {
+        "code": "C",
+        "label": "Electronics, electrical and instrumentation"
+      },
+      "typicalBranches": [
+        "Instrumentation",
+        "EEE",
+        "ECE"
+      ],
+      "coreSkillAreas": "Sensors and transducers, control loops, calibration, reading P&IDs",
+      "mainEvidence": "Numerical problems, objective tests",
+      "plannedRelease": "V3"
+    },
+    {
+      "code": "E12",
+      "title": "Automation Engineer (PLC / SCADA)",
+      "family": {
+        "code": "C",
+        "label": "Electronics, electrical and instrumentation"
+      },
+      "typicalBranches": [
+        "EEE",
+        "Instrumentation",
+        "ECE",
+        "Mechanical"
+      ],
+      "coreSkillAreas": "Ladder-logic PLC programming, SCADA / HMI, drives, industrial networks",
+      "mainEvidence": "PLC simulation",
+      "plannedRelease": "V3"
+    },
+    {
+      "code": "E13",
+      "title": "Robotics Engineer (junior)",
+      "family": {
+        "code": "C",
+        "label": "Electronics, electrical and instrumentation"
+      },
+      "typicalBranches": [
+        "Mechanical",
+        "ECE",
+        "EEE"
+      ],
+      "coreSkillAreas": "Kinematics, control, ROS basics, sensors",
+      "mainEvidence": "Project",
+      "plannedRelease": null
+    },
+    {
+      "code": "L01",
+      "title": "Graduate Engineer Trainee — Electrical (power, utilities, PSUs)",
+      "family": {
+        "code": "C",
+        "label": "Electronics, electrical and instrumentation"
+      },
+      "typicalBranches": [
+        "EEE"
+      ],
+      "coreSkillAreas": "Circuits, machines, power systems, protection, electrical safety",
+      "mainEvidence": "Numerical and objective tests",
+      "plannedRelease": "V2"
+    },
+    {
+      "code": "L02",
+      "title": "Electrical Design Engineer (buildings / MEP)",
+      "family": {
+        "code": "C",
+        "label": "Electronics, electrical and instrumentation"
+      },
+      "typicalBranches": [
+        "EEE"
+      ],
+      "coreSkillAreas": "Load calculation, cable sizing, lighting design, electrical drawings, IS codes",
+      "mainEvidence": "Numerical problems, drawing task",
+      "plannedRelease": "V3"
+    },
+    {
+      "code": "L03",
+      "title": "Power Systems / Protection Engineer",
+      "family": {
+        "code": "C",
+        "label": "Electronics, electrical and instrumentation"
+      },
+      "typicalBranches": [
+        "EEE"
+      ],
+      "coreSkillAreas": "Power flow, protection relays, switchgear, fault analysis",
+      "mainEvidence": "Numerical problems",
+      "plannedRelease": null
+    },
+    {
+      "code": "L04",
+      "title": "Electrical Maintenance Engineer (plant)",
+      "family": {
+        "code": "C",
+        "label": "Electronics, electrical and instrumentation"
+      },
+      "typicalBranches": [
+        "EEE"
+      ],
+      "coreSkillAreas": "Motors, transformers, preventive maintenance, safety, troubleshooting",
+      "mainEvidence": "Scenarios",
+      "plannedRelease": "V3"
+    },
+    {
+      "code": "L05",
+      "title": "Renewable Energy Engineer (solar / wind)",
+      "family": {
+        "code": "C",
+        "label": "Electronics, electrical and instrumentation"
+      },
+      "typicalBranches": [
+        "EEE",
+        "Mechanical"
+      ],
+      "coreSkillAreas": "PV system design, inverters, energy yield, grid connection",
+      "mainEvidence": "Numerical problems, design task",
+      "plannedRelease": "V3"
+    },
+    {
+      "code": "L06",
+      "title": "EV Powertrain / Battery Systems Engineer",
+      "family": {
+        "code": "C",
+        "label": "Electronics, electrical and instrumentation"
+      },
+      "typicalBranches": [
+        "EEE",
+        "Mechanical",
+        "ECE"
+      ],
+      "coreSkillAreas": "Batteries and BMS, motors and drives, power electronics",
+      "mainEvidence": "Numerical problems, simulation",
+      "plannedRelease": null
+    },
+    {
+      "code": "L07",
+      "title": "Electrical Site / Project Engineer",
+      "family": {
+        "code": "C",
+        "label": "Electronics, electrical and instrumentation"
+      },
+      "typicalBranches": [
+        "EEE"
+      ],
+      "coreSkillAreas": "Installation, testing and commissioning, bill of quantities, safety",
+      "mainEvidence": "Scenarios",
+      "plannedRelease": null
+    },
+    {
+      "code": "M01",
+      "title": "Graduate Engineer Trainee — Mechanical",
+      "family": {
+        "code": "D",
+        "label": "Mechanical, manufacturing, chemical and process"
+      },
+      "typicalBranches": [
+        "Mechanical",
+        "Production",
+        "Automobile"
+      ],
+      "coreSkillAreas": "Thermodynamics, strength of materials, manufacturing processes, machine design, safety",
+      "mainEvidence": "Numerical and objective tests",
+      "plannedRelease": "V2"
+    },
+    {
+      "code": "M02",
+      "title": "Design Engineer (CAD)",
+      "family": {
+        "code": "D",
+        "label": "Mechanical, manufacturing, chemical and process"
+      },
+      "typicalBranches": [
+        "Mechanical",
+        "Automobile",
+        "Aeronautical"
+      ],
+      "coreSkillAreas": "Engineering drawing and GD&T, 3D CAD modelling, design basics, materials",
+      "mainEvidence": "Drawing or model artifact",
+      "plannedRelease": "V2"
+    },
+    {
+      "code": "M03",
+      "title": "CAE / Simulation Analyst (FEA / CFD)",
+      "family": {
+        "code": "D",
+        "label": "Mechanical, manufacturing, chemical and process"
+      },
+      "typicalBranches": [
+        "Mechanical",
+        "Aeronautical"
+      ],
+      "coreSkillAreas": "FEA and CFD fundamentals, meshing, interpreting results",
+      "mainEvidence": "Simulation task",
+      "plannedRelease": "V3"
+    },
+    {
+      "code": "M04",
+      "title": "Production / Manufacturing Engineer",
+      "family": {
+        "code": "D",
+        "label": "Mechanical, manufacturing, chemical and process"
+      },
+      "typicalBranches": [
+        "Mechanical",
+        "Production"
+      ],
+      "coreSkillAreas": "Manufacturing processes, line balancing, lean basics, shop-floor problem solving",
+      "mainEvidence": "Scenarios, numerical problems",
+      "plannedRelease": "V3"
+    },
+    {
+      "code": "M05",
+      "title": "Quality Engineer (QA / QC)",
+      "family": {
+        "code": "D",
+        "label": "Mechanical, manufacturing, chemical and process"
+      },
+      "typicalBranches": [
+        "Mechanical",
+        "Production",
+        "any"
+      ],
+      "coreSkillAreas": "Metrology, SPC, 7 QC tools, ISO 9001 basics, root-cause analysis",
+      "mainEvidence": "Numerical problems, scenarios",
+      "plannedRelease": "V3"
+    },
+    {
+      "code": "M06",
+      "title": "Maintenance Engineer (mechanical)",
+      "family": {
+        "code": "D",
+        "label": "Mechanical, manufacturing, chemical and process"
+      },
+      "typicalBranches": [
+        "Mechanical"
+      ],
+      "coreSkillAreas": "Machine elements, preventive and predictive maintenance, hydraulics and pneumatics, safety",
+      "mainEvidence": "Scenarios",
+      "plannedRelease": null
+    },
+    {
+      "code": "M07",
+      "title": "Industrial / Process Improvement Engineer",
+      "family": {
+        "code": "D",
+        "label": "Mechanical, manufacturing, chemical and process"
+      },
+      "typicalBranches": [
+        "Mechanical",
+        "Production"
+      ],
+      "coreSkillAreas": "Work study, lean, Six Sigma basics, data analysis",
+      "mainEvidence": "Case",
+      "plannedRelease": null
+    },
+    {
+      "code": "M08",
+      "title": "HVAC Design Engineer (MEP)",
+      "family": {
+        "code": "D",
+        "label": "Mechanical, manufacturing, chemical and process"
+      },
+      "typicalBranches": [
+        "Mechanical"
+      ],
+      "coreSkillAreas": "Heat-load calculation, duct design, psychrometry, codes",
+      "mainEvidence": "Numerical problems, design task",
+      "plannedRelease": "V3"
+    },
+    {
+      "code": "M09",
+      "title": "Automotive Engineer (service / design)",
+      "family": {
+        "code": "D",
+        "label": "Mechanical, manufacturing, chemical and process"
+      },
+      "typicalBranches": [
+        "Automobile",
+        "Mechanical"
+      ],
+      "coreSkillAreas": "Vehicle systems, diagnostics, powertrain basics",
+      "mainEvidence": "Objective tests, scenarios",
+      "plannedRelease": null
+    },
+    {
+      "code": "M10",
+      "title": "CNC Programmer / Tool Design Engineer",
+      "family": {
+        "code": "D",
+        "label": "Mechanical, manufacturing, chemical and process"
+      },
+      "typicalBranches": [
+        "Mechanical",
+        "Production"
+      ],
+      "coreSkillAreas": "CNC G-code, CAM, tooling, tolerances",
+      "mainEvidence": "G-code simulation",
+      "plannedRelease": null
+    },
+    {
+      "code": "M11",
+      "title": "Aircraft Maintenance / MRO Engineer (trainee)",
+      "family": {
+        "code": "D",
+        "label": "Mechanical, manufacturing, chemical and process"
+      },
+      "typicalBranches": [
+        "Aeronautical",
+        "Mechanical"
+      ],
+      "coreSkillAreas": "Aircraft systems, regulation basics, maintenance documentation",
+      "mainEvidence": "Objective tests",
+      "plannedRelease": null
+    },
+    {
+      "code": "M12",
+      "title": "Piping Design Engineer",
+      "family": {
+        "code": "D",
+        "label": "Mechanical, manufacturing, chemical and process"
+      },
+      "typicalBranches": [
+        "Mechanical",
+        "Chemical"
+      ],
+      "coreSkillAreas": "Piping codes, isometrics, stress basics, P&IDs",
+      "mainEvidence": "Drawing task",
+      "plannedRelease": null
+    },
+    {
+      "code": "M13",
+      "title": "Sourcing / Supply Chain Engineer",
+      "family": {
+        "code": "D",
+        "label": "Mechanical, manufacturing, chemical and process"
+      },
+      "typicalBranches": [
+        "Mechanical",
+        "Production",
+        "any"
+      ],
+      "coreSkillAreas": "Procurement, vendor development, costing, ERP basics",
+      "mainEvidence": "Case",
+      "plannedRelease": null
+    },
+    {
+      "code": "M14",
+      "title": "Production Planning and Control (PPC) Engineer",
+      "family": {
+        "code": "D",
+        "label": "Mechanical, manufacturing, chemical and process"
+      },
+      "typicalBranches": [
+        "Mechanical",
+        "Production"
+      ],
+      "coreSkillAreas": "MRP, scheduling, inventory, capacity planning",
+      "mainEvidence": "Numerical problems, case",
+      "plannedRelease": null
+    },
+    {
+      "code": "P01",
+      "title": "Process Engineer (chemical)",
+      "family": {
+        "code": "D",
+        "label": "Mechanical, manufacturing, chemical and process"
+      },
+      "typicalBranches": [
+        "Chemical"
+      ],
+      "coreSkillAreas": "Mass and energy balances, unit operations, process flow diagrams, process simulation basics",
+      "mainEvidence": "Numerical problems, simulation",
+      "plannedRelease": "V3"
+    },
+    {
+      "code": "P02",
+      "title": "Production / Plant Operations Engineer (chemical, pharma, FMCG)",
+      "family": {
+        "code": "D",
+        "label": "Mechanical, manufacturing, chemical and process"
+      },
+      "typicalBranches": [
+        "Chemical",
+        "Mechanical"
+      ],
+      "coreSkillAreas": "Plant operations, SOPs, safety, troubleshooting",
+      "mainEvidence": "Scenarios",
+      "plannedRelease": null
+    },
+    {
+      "code": "P03",
+      "title": "QA / QC Analyst (pharma / chemical)",
+      "family": {
+        "code": "D",
+        "label": "Mechanical, manufacturing, chemical and process"
+      },
+      "typicalBranches": [
+        "Chemical",
+        "Biotech",
+        "Pharmacy"
+      ],
+      "coreSkillAreas": "Analytical methods, GMP and GLP, documentation",
+      "mainEvidence": "Objective tests, scenarios",
+      "plannedRelease": null
+    },
+    {
+      "code": "P04",
+      "title": "Process Safety / HSE Engineer",
+      "family": {
+        "code": "D",
+        "label": "Mechanical, manufacturing, chemical and process"
+      },
+      "typicalBranches": [
+        "Chemical",
+        "Mechanical",
+        "any"
+      ],
+      "coreSkillAreas": "HAZOP basics, risk assessment, safety regulations, incident investigation",
+      "mainEvidence": "Scenarios",
+      "plannedRelease": "V3"
+    },
+    {
+      "code": "P05",
+      "title": "Bioprocess / Biotech Associate",
+      "family": {
+        "code": "D",
+        "label": "Mechanical, manufacturing, chemical and process"
+      },
+      "typicalBranches": [
+        "Biotech",
+        "Chemical"
+      ],
+      "coreSkillAreas": "Fermentation, downstream processing, lab practice, GMP",
+      "mainEvidence": "Objective tests",
+      "plannedRelease": null
+    },
+    {
+      "code": "P06",
+      "title": "Environmental Engineer (treatment plants)",
+      "family": {
+        "code": "D",
+        "label": "Mechanical, manufacturing, chemical and process"
+      },
+      "typicalBranches": [
+        "Chemical",
+        "Civil",
+        "Environmental"
+      ],
+      "coreSkillAreas": "Water and wastewater treatment, air-pollution control, regulations",
+      "mainEvidence": "Numerical problems",
+      "plannedRelease": null
+    },
+    {
+      "code": "V01",
+      "title": "Site Engineer / Graduate Engineer Trainee — Civil",
+      "family": {
+        "code": "E",
+        "label": "Civil and construction"
+      },
+      "typicalBranches": [
+        "Civil"
+      ],
+      "coreSkillAreas": "Construction materials, site execution, surveying basics, reading drawings, safety",
+      "mainEvidence": "Scenarios, numerical problems",
+      "plannedRelease": "V2"
+    },
+    {
+      "code": "V02",
+      "title": "Structural Design Engineer",
+      "family": {
+        "code": "E",
+        "label": "Civil and construction"
+      },
+      "typicalBranches": [
+        "Civil"
+      ],
+      "coreSkillAreas": "Structural analysis, RCC and steel design, IS codes, analysis software",
+      "mainEvidence": "Numerical problems, design task",
+      "plannedRelease": "V3"
+    },
+    {
+      "code": "V03",
+      "title": "Quantity Surveyor / Estimation and Billing Engineer",
+      "family": {
+        "code": "E",
+        "label": "Civil and construction"
+      },
+      "typicalBranches": [
+        "Civil"
+      ],
+      "coreSkillAreas": "Quantity take-off, rate analysis, bill of quantities, billing, contract basics",
+      "mainEvidence": "Numerical problems, spreadsheet task",
+      "plannedRelease": "V3"
+    },
+    {
+      "code": "V04",
+      "title": "Planning Engineer",
+      "family": {
+        "code": "E",
+        "label": "Civil and construction"
+      },
+      "typicalBranches": [
+        "Civil",
+        "Mechanical"
+      ],
+      "coreSkillAreas": "CPM / PERT scheduling, planning tools, progress tracking",
+      "mainEvidence": "Numerical problems, schedule artifact",
+      "plannedRelease": null
+    },
+    {
+      "code": "V05",
+      "title": "BIM Modeller / Engineer",
+      "family": {
+        "code": "E",
+        "label": "Civil and construction"
+      },
+      "typicalBranches": [
+        "Civil",
+        "Architecture"
+      ],
+      "coreSkillAreas": "BIM concepts, modelling tools, clash coordination, drawings",
+      "mainEvidence": "Model artifact",
+      "plannedRelease": null
+    },
+    {
+      "code": "V06",
+      "title": "Highway / Transportation Engineer",
+      "family": {
+        "code": "E",
+        "label": "Civil and construction"
+      },
+      "typicalBranches": [
+        "Civil"
+      ],
+      "coreSkillAreas": "Pavement design, traffic engineering, IRC codes",
+      "mainEvidence": "Numerical problems",
+      "plannedRelease": null
+    },
+    {
+      "code": "V07",
+      "title": "Geotechnical Engineer (junior)",
+      "family": {
+        "code": "E",
+        "label": "Civil and construction"
+      },
+      "typicalBranches": [
+        "Civil"
+      ],
+      "coreSkillAreas": "Soil mechanics, foundations, soil testing",
+      "mainEvidence": "Numerical problems",
+      "plannedRelease": null
+    },
+    {
+      "code": "V08",
+      "title": "Water Resources / Public Health Engineer",
+      "family": {
+        "code": "E",
+        "label": "Civil and construction"
+      },
+      "typicalBranches": [
+        "Civil"
+      ],
+      "coreSkillAreas": "Hydraulics, hydrology, water supply and sanitation",
+      "mainEvidence": "Numerical problems",
+      "plannedRelease": null
+    },
+    {
+      "code": "V09",
+      "title": "Quality Control Engineer — Civil",
+      "family": {
+        "code": "E",
+        "label": "Civil and construction"
+      },
+      "typicalBranches": [
+        "Civil"
+      ],
+      "coreSkillAreas": "Material testing, QA / QC plans, IS standards",
+      "mainEvidence": "Scenarios, numerical problems",
+      "plannedRelease": null
+    },
+    {
+      "code": "V10",
+      "title": "Surveyor / GIS Analyst",
+      "family": {
+        "code": "E",
+        "label": "Civil and construction"
+      },
+      "typicalBranches": [
+        "Civil",
+        "Geo-informatics"
+      ],
+      "coreSkillAreas": "Surveying instruments, GIS, remote-sensing basics",
+      "mainEvidence": "Practical GIS task",
+      "plannedRelease": null
+    },
+    {
+      "code": "V11",
+      "title": "MEP Coordinator",
+      "family": {
+        "code": "E",
+        "label": "Civil and construction"
+      },
+      "typicalBranches": [
+        "Civil",
+        "Mechanical",
+        "EEE"
+      ],
+      "coreSkillAreas": "MEP drawings, clash detection, site coordination",
+      "mainEvidence": "Scenarios",
+      "plannedRelease": null
+    },
+    {
+      "code": "B01",
+      "title": "Management Trainee (general)",
+      "family": {
+        "code": "F",
+        "label": "Business, finance, sales and operations"
+      },
+      "typicalBranches": [
+        "All branches"
+      ],
+      "coreSkillAreas": "Business fundamentals, communication, problem solving, spreadsheets",
+      "mainEvidence": "Case; group discussion and interview later",
+      "plannedRelease": "V3"
+    },
+    {
+      "code": "B02",
+      "title": "Business / Operations Analyst",
+      "family": {
+        "code": "F",
+        "label": "Business, finance, sales and operations"
+      },
+      "typicalBranches": [
+        "All branches"
+      ],
+      "coreSkillAreas": "Spreadsheets, SQL basics, process mapping, reporting, communication",
+      "mainEvidence": "Case, spreadsheet task",
+      "plannedRelease": "V2"
+    },
+    {
+      "code": "B03",
+      "title": "Associate Consultant (technology / management)",
+      "family": {
+        "code": "F",
+        "label": "Business, finance, sales and operations"
+      },
+      "typicalBranches": [
+        "All branches"
+      ],
+      "coreSkillAreas": "Structured problem solving, case analysis, presentations, domain basics",
+      "mainEvidence": "Case, writing",
+      "plannedRelease": "V3"
+    },
+    {
+      "code": "B04",
+      "title": "Financial Analyst",
+      "family": {
+        "code": "F",
+        "label": "Business, finance, sales and operations"
+      },
+      "typicalBranches": [
+        "All branches"
+      ],
+      "coreSkillAreas": "Accounting basics, financial statements, spreadsheet modelling, valuation basics",
+      "mainEvidence": "Spreadsheet task",
+      "plannedRelease": null
+    },
+    {
+      "code": "B05",
+      "title": "Bank Probationary Officer / Bank Officer",
+      "family": {
+        "code": "F",
+        "label": "Business, finance, sales and operations"
+      },
+      "typicalBranches": [
+        "All branches"
+      ],
+      "coreSkillAreas": "Quantitative aptitude, reasoning, English, banking and financial awareness",
+      "mainEvidence": "Timed objective tests",
+      "plannedRelease": "V2"
+    },
+    {
+      "code": "B06",
+      "title": "Risk and Compliance Analyst (BFSI)",
+      "family": {
+        "code": "F",
+        "label": "Business, finance, sales and operations"
+      },
+      "typicalBranches": [
+        "All branches"
+      ],
+      "coreSkillAreas": "Risk basics, KYC / AML, regulations, analytics",
+      "mainEvidence": "Scenarios",
+      "plannedRelease": null
+    },
+    {
+      "code": "B07",
+      "title": "Equity Research / Investment Analyst (entry)",
+      "family": {
+        "code": "F",
+        "label": "Business, finance, sales and operations"
+      },
+      "typicalBranches": [
+        "All branches"
+      ],
+      "coreSkillAreas": "Financial analysis, valuation, report writing",
+      "mainEvidence": "Writing, spreadsheet task",
+      "plannedRelease": null
+    },
+    {
+      "code": "B08",
+      "title": "Pre-sales / Solutions Engineer",
+      "family": {
+        "code": "F",
+        "label": "Business, finance, sales and operations"
+      },
+      "typicalBranches": [
+        "CSE",
+        "IT",
+        "ECE",
+        "any"
+      ],
+      "coreSkillAreas": "Product knowledge, solution design basics, presentation, requirements gathering",
+      "mainEvidence": "Case; presentation later",
+      "plannedRelease": "V3"
+    },
+    {
+      "code": "B09",
+      "title": "Technical Sales / Business Development Executive",
+      "family": {
+        "code": "F",
+        "label": "Business, finance, sales and operations"
+      },
+      "typicalBranches": [
+        "All branches"
+      ],
+      "coreSkillAreas": "Product knowledge, communication, negotiation, CRM",
+      "mainEvidence": "Role-play later",
+      "plannedRelease": "V3"
+    },
+    {
+      "code": "B10",
+      "title": "Digital Marketing Executive",
+      "family": {
+        "code": "F",
+        "label": "Business, finance, sales and operations"
+      },
+      "typicalBranches": [
+        "All branches"
+      ],
+      "coreSkillAreas": "SEO and SEM, social media, analytics, content",
+      "mainEvidence": "Campaign artifact, analytics task",
+      "plannedRelease": null
+    },
+    {
+      "code": "B11",
+      "title": "Customer Success Associate",
+      "family": {
+        "code": "F",
+        "label": "Business, finance, sales and operations"
+      },
+      "typicalBranches": [
+        "All branches"
+      ],
+      "coreSkillAreas": "Product knowledge, communication, problem solving, CRM",
+      "mainEvidence": "Scenarios",
+      "plannedRelease": null
+    },
+    {
+      "code": "B12",
+      "title": "HR Associate / Talent Acquisition",
+      "family": {
+        "code": "F",
+        "label": "Business, finance, sales and operations"
+      },
+      "typicalBranches": [
+        "All branches"
+      ],
+      "coreSkillAreas": "Recruitment process, HR basics, communication, spreadsheets",
+      "mainEvidence": "Scenarios",
+      "plannedRelease": null
+    },
+    {
+      "code": "B13",
+      "title": "Supply Chain / Logistics Analyst",
+      "family": {
+        "code": "F",
+        "label": "Business, finance, sales and operations"
+      },
+      "typicalBranches": [
+        "All branches"
+      ],
+      "coreSkillAreas": "Logistics, inventory, forecasting basics, spreadsheets and SQL",
+      "mainEvidence": "Case, spreadsheet task",
+      "plannedRelease": null
+    },
+    {
+      "code": "B14",
+      "title": "Procurement Analyst",
+      "family": {
+        "code": "F",
+        "label": "Business, finance, sales and operations"
+      },
+      "typicalBranches": [
+        "All branches"
+      ],
+      "coreSkillAreas": "Sourcing, negotiation basics, vendor management, ERP",
+      "mainEvidence": "Case",
+      "plannedRelease": null
+    }
+  ],
+  "goals": [
+    {
+      "code": "G01",
+      "title": "GATE (PSU jobs or M.Tech admission)",
+      "goalType": "Exam",
+      "linksToRoles": "L01, M01, V01, E-series, P01",
+      "mainEvidence": "Timed objective and numerical tests",
+      "release": "V3 verified",
+      "stored": false
+    },
+    {
+      "code": "G02",
+      "title": "Engineering Services / state PSC engineering exams",
+      "goalType": "Exam",
+      "linksToRoles": "L01, M01, V01",
+      "mainEvidence": "Timed objective tests",
+      "release": "Selectable",
+      "stored": false
+    },
+    {
+      "code": "G03",
+      "title": "Bank and other government recruitment exams",
+      "goalType": "Exam",
+      "linksToRoles": "B05",
+      "mainEvidence": "Timed aptitude tests (reuses the V1 aptitude block)",
+      "release": "V2 verified",
+      "stored": false
+    },
+    {
+      "code": "G04",
+      "title": "MBA entrance (CAT and similar)",
+      "goalType": "Exam",
+      "linksToRoles": "B01, B03",
+      "mainEvidence": "Timed aptitude and verbal tests",
+      "release": "Selectable",
+      "stored": false
+    },
+    {
+      "code": "G05",
+      "title": "Study abroad (GRE, IELTS / TOEFL)",
+      "goalType": "Exam",
+      "linksToRoles": "Any",
+      "mainEvidence": "Timed tests; speaking in V3",
+      "release": "Selectable",
+      "stored": false
+    },
+    {
+      "code": "G06",
+      "title": "IT services recruitment tests",
+      "goalType": "Company preparation",
+      "linksToRoles": "S01, S06, S13",
+      "mainEvidence": "Timed aptitude and coding tests",
+      "release": "V2 verified",
+      "stored": false
+    },
+    {
+      "code": "G07",
+      "title": "Product-company coding interviews",
+      "goalType": "Company preparation",
+      "linksToRoles": "S02, S03, S04, D04",
+      "mainEvidence": "Executed code; interview practice later",
+      "release": "V3 verified",
+      "stored": false
+    },
+    {
+      "code": "G08",
+      "title": "Employer-defined drive preparation",
+      "goalType": "Company preparation",
+      "linksToRoles": "Any role the employer names",
+      "mainEvidence": "Employer's own career target",
+      "release": "V2",
+      "stored": false
+    },
+    {
+      "code": "G09",
+      "title": "Industry certifications (cloud, networking, security, ISO 27001)",
+      "goalType": "Certification",
+      "linksToRoles": "S09, S12, C-series",
+      "mainEvidence": "Objective tests, labs",
+      "release": "V3",
+      "stored": false
+    },
+    {
+      "code": "G10",
+      "title": "Communication and interview skills",
+      "goalType": "Topic",
+      "linksToRoles": "All roles",
+      "mainEvidence": "Writing rubric now; spoken interviews in V3",
+      "release": "V2 (writing), V3 (speech)",
+      "stored": false
+    },
+    {
+      "code": "G11",
+      "title": "Any single topic (\"teach me Docker\", \"improve my Excel\")",
+      "goalType": "Topic",
+      "linksToRoles": "Counts toward every role that requires it",
+      "mainEvidence": "Depends on the skill",
+      "release": "V1 for verified topics; Explore mode in V3",
+      "stored": false
+    },
+    {
+      "code": "G12",
+      "title": "Entrepreneurship / start my own venture",
+      "goalType": "Explore",
+      "linksToRoles": "B-series skills",
+      "mainEvidence": "Case, project",
+      "release": "Selectable",
+      "stored": false
+    },
+    {
+      "code": "G13",
+      "title": "\"Not sure yet\"",
+      "goalType": "Career discovery",
+      "linksToRoles": "Suggests 3–5 roles from branch, interests and placement results",
+      "mainEvidence": "Short interest and strengths survey",
+      "release": "V1",
+      "stored": false
+    }
+  ]
+}

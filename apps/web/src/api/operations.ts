@@ -254,7 +254,8 @@ export function revokeStaffCapability(
 
 // --- Approvals for high-risk actions (OPS-02) -------------------------------
 
-export type HighRiskActionKey = 'ORGANIZATION_SUSPEND' | 'FEATURE_FLAG_HIGH_RISK_CHANGE' | 'OUTBOX_BACKLOG_SUPERSEDE' | 'PRIVACY_HOLD_RELEASE' | 'CAPABILITY_GRANT_HIGH_RISK';
+export type HighRiskActionKey = 'ORGANIZATION_SUSPEND' | 'FEATURE_FLAG_HIGH_RISK_CHANGE' | 'OUTBOX_BACKLOG_SUPERSEDE' | 'PRIVACY_HOLD_RELEASE' | 'CAPABILITY_GRANT_HIGH_RISK'
+  | 'CAREER_REQUIREMENT_SET_PUBLISH';
 
 export interface ApprovalDecisionReasonsDto {
   readonly APPROVE: readonly string[];
@@ -280,6 +281,9 @@ export interface OperationApprovalDto {
     readonly organizationName: string | null; readonly flagKey: string | null; readonly enabled: boolean | null;
     readonly capability: string | null; readonly memberEmail: string | null; readonly holdReason: string | null;
     readonly olderThan: string | null; readonly limit: number | null;
+    /** OPS-08: a requirement-set publish names its role, version and the label it sets. */
+    readonly careerRoleTitle?: string | null; readonly careerRoleCatalogueCode?: string | null;
+    readonly careerSetVersion?: number | null; readonly releaseLabel?: string | null;
   };
   readonly reasonCode: string;
   readonly note: string | null;

@@ -27,6 +27,10 @@ export const approvalPayloads = {
     ({ holdId: input.holdId.toLowerCase(), reasonCode: input.reasonCode }),
   CAPABILITY_GRANT_HIGH_RISK: (input: { readonly membershipId: string; readonly capability: string; readonly reasonCode: string; readonly note?: string | undefined }) =>
     ({ membershipId: input.membershipId.toLowerCase(), capability: input.capability, reasonCode: input.reasonCode, ...(input.note ? { note: input.note } : {}) }),
+  // OPS-08: the set's items are frozen once submitted (0051 trigger), so the set id binds
+  // the exact content; the label the role will carry after publishing is part of the payload.
+  CAREER_REQUIREMENT_SET_PUBLISH: (input: { readonly setId: string; readonly releaseLabel: string; readonly reasonCode: string }) =>
+    ({ setId: input.setId.toLowerCase(), releaseLabel: input.releaseLabel, reasonCode: input.reasonCode }),
 } satisfies Record<HighRiskActionKey, (input: never) => Record<string, unknown> & { reasonCode: string }>;
 
 function domainError(code: string, correlationId: string): { readonly error: { readonly code: string; readonly message: string; readonly correlationId: string } } {

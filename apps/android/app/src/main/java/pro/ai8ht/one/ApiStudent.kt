@@ -130,6 +130,10 @@ import kotlinx.serialization.Serializable
     val family: String = "",
     val summary: String? = null,
     val requirementCount: Int = 0,
+    // OPS-08: set only while the full job-role catalogue is open to this student (the
+    // career-catalogue.selectable-roles flag); null otherwise, when only starter roles are offered.
+    val releaseLabel: String? = null,
+    val catalogueCode: String? = null,
 )
 
 @Serializable data class CareerTargetsEnvelope(val targets: List<CareerTargetDto> = emptyList())

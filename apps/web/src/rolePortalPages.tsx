@@ -20,6 +20,7 @@ import { HelpFaqPanel } from './helpFaqPanel.js';
 import { CalendarPage } from './calendarPage.js';
 import { EmployerAssessmentsPage } from './employerAssessmentsPage.js';
 import { LearnerContentStudio } from './learnerContentStudio.js';
+import { OperationsCareerCataloguePage } from './rolePortal/careerCatalogue.js';
 import { InstitutionReportsPage } from './institutionReportsPage.js';
 import { OperationsCareerReadinessPanel } from './operationsCareerReadinessPanel.js';
 import { StaffPilotWrap } from './parityWraps.js';
@@ -246,8 +247,9 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   if (!demoMode && portal.key === 'operations-admin' && route.label === 'User Detail') return <><OperationsAccountLookupPage /><OperationsInvitationTrackingPanel /></>;
   // The studio goes above the existing read-only career-readiness panel rather than
   // replacing it: that panel reports on a different content pipeline and still works.
+  // OPS-08: the job-role catalogue sits above both; only this label's branch changes.
   if (!demoMode && portal.key === 'operations-admin' && route.label === 'Content Management') {
-    return <><LearnerContentStudio /><OperationsContentReadOnlyPage /></>;
+    return <><OperationsCareerCataloguePage /><LearnerContentStudio /><OperationsContentReadOnlyPage /></>;
   }
   // Audit Logs leaves the shared technical panel: the audit-event search endpoint is
   // complete and role-gated, and pointing this item at the generic status page was the

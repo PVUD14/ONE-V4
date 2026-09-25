@@ -13,6 +13,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { sql, type SQL } from 'drizzle-orm';
 import {
   highRiskActions,
+  isLegacyHighRiskActionKey,
   refuseApprovalExecution,
   type ApprovalDecision,
   type ApprovalRefusal,
@@ -113,10 +114,16 @@ export async function createOperationApproval(
   const payloadHash = approvalPayloadHash(input.actionKey, input.payload);
   await db.transaction(async (tx) => {
     // requested_at and expires_at are set by the 0038 trigger from the database clock.
+    // A key 0038's CHECK does not list goes in the extension columns (0051), so a replay
+    // of 0038 never meets a row its CHECK rejects.
+    const legacy = isLegacyHighRiskActionKey(input.actionKey);
+    const targetType = highRiskActions[input.actionKey].targetType;
     await tx.execute(sql`
       INSERT INTO operation_approvals
-        (id, action_key, target_type, target_id, payload, payload_hash, requested_by_user_id, reason_code, note, correlation_id, expires_at)
-      VALUES (${id}::uuid, ${input.actionKey}, ${highRiskActions[input.actionKey].targetType}, ${input.targetId},
+        (id, action_key, target_type, extended_action_key, extended_target_type, target_id, payload, payload_hash,
+         requested_by_user_id, reason_code, note, correlation_id, expires_at)
+      VALUES (${id}::uuid, ${legacy ? input.actionKey : null}, ${legacy ? targetType : null},
+              ${legacy ? null : input.actionKey}, ${legacy ? null : targetType}, ${input.targetId},
               ${JSON.stringify(canonical(input.payload))}::jsonb, ${payloadHash}, ${input.requestedByUserId}::uuid,
               ${input.payload.reasonCode}, ${input.note ?? null}, ${input.correlationId}, now() + interval '24 hours')
     `);
@@ -169,6 +176,10 @@ export interface OperationApprovalRow {
   readonly memberEmail: string | null;
   readonly memberUserId: string | null;
   readonly holdReason: string | null;
+  /** For a requirement-set publish: the role and set version, for the summary. */
+  readonly careerRoleTitle: string | null;
+  readonly careerRoleCatalogueCode: string | null;
+  readonly careerSetVersion: number | null;
 }
 
 interface ApprovalDbRow {
@@ -178,12 +189,14 @@ interface ApprovalDbRow {
   decided_by_user_id: string | null; decider_email: string | null; decided_at: Date | null; decision_reason_code: string | null;
   solo: boolean; solo_notice_state: string | null; executed_at: Date | null;
   organization_name: string | null; member_email: string | null; member_user_id: string | null; hold_reason: string | null;
+  career_role_title: string | null; career_role_catalogue_code: string | null; career_set_version: number | null;
 }
 
 // Microsecond text timestamps for the keyset cursor: a millisecond cursor would repeat
 // rows requested in the same millisecond.
 const approvalSelect = sql`
-  SELECT a.id, a.action_key, a.target_type, a.target_id, a.payload, a.reason_code, a.note, a.state,
+  SELECT a.id, COALESCE(a.action_key, a.extended_action_key) AS action_key,
+         COALESCE(a.target_type, a.extended_target_type) AS target_type, a.target_id, a.payload, a.reason_code, a.note, a.state,
          a.requested_by_user_id, ru.email AS requester_email,
          to_char(a.requested_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS requested_at,
          to_char(a.expires_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS expires_at,
@@ -192,14 +205,17 @@ const approvalSelect = sql`
          now() >= a.expires_at AS expired,
          a.decided_by_user_id, du.email AS decider_email, a.decided_at, a.decision_reason_code,
          a.solo, a.solo_notice_state, a.executed_at,
-         o.legal_name AS organization_name, mu.email AS member_email, mu.id AS member_user_id, h.reason_code AS hold_reason
+         o.legal_name AS organization_name, mu.email AS member_email, mu.id AS member_user_id, h.reason_code AS hold_reason,
+         cr.title AS career_role_title, cr.catalogue_code AS career_role_catalogue_code, crs.version AS career_set_version
   FROM operation_approvals a
   JOIN users ru ON ru.id = a.requested_by_user_id
   LEFT JOIN users du ON du.id = a.decided_by_user_id
   LEFT JOIN organizations o ON a.target_type = 'organization' AND o.id::text = a.target_id
   LEFT JOIN organization_memberships mm ON a.target_type = 'organization_membership' AND mm.id::text = a.target_id
   LEFT JOIN users mu ON mu.id = mm.user_id
-  LEFT JOIN data_retention_holds h ON a.target_type = 'data_retention_hold' AND h.id::text = a.target_id`;
+  LEFT JOIN data_retention_holds h ON a.target_type = 'data_retention_hold' AND h.id::text = a.target_id
+  LEFT JOIN career_requirement_sets crs ON a.extended_target_type = 'career_requirement_set' AND crs.id::text = a.target_id
+  LEFT JOIN career_roles cr ON cr.id = crs.career_role_id`;
 
 function mapApproval(row: ApprovalDbRow): OperationApprovalRow {
   const live = row.state === 'PENDING' || row.state === 'APPROVED';
@@ -231,6 +247,9 @@ function mapApproval(row: ApprovalDbRow): OperationApprovalRow {
     memberEmail: row.member_email,
     memberUserId: row.member_user_id,
     holdReason: row.hold_reason,
+    careerRoleTitle: row.career_role_title,
+    careerRoleCatalogueCode: row.career_role_catalogue_code,
+    careerSetVersion: row.career_set_version === null ? null : Number(row.career_set_version),
   };
 }
 
@@ -438,7 +457,8 @@ export async function consumeOperationApproval(runner: SqlRunner, input: {
     state: string; action_key: string; payload_hash: string; requested_by_user_id: string; decided_by_user_id: string | null;
     solo: boolean; expired: boolean;
   }>(runner, sql`
-    SELECT state, action_key, payload_hash, requested_by_user_id, decided_by_user_id, solo, now() >= expires_at AS expired
+    SELECT state, COALESCE(action_key, extended_action_key) AS action_key, payload_hash, requested_by_user_id,
+           decided_by_user_id, solo, now() >= expires_at AS expired
     FROM operation_approvals WHERE id = ${input.approvalId}::uuid FOR UPDATE
   `);
   const row = locked[0];

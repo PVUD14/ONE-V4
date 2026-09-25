@@ -8,9 +8,22 @@
  *
  * Design: docs/architecture/high-risk-approvals-table-design.md
  */
+import { careerPublishReasons } from './career-catalogue.js';
 import { hasInternalCapability, internalCapabilityGrantReasons, type InternalCapability, type InternalCapabilityContext } from './internal-capabilities.js';
 
 export const highRiskActionKeys = [
+  'ORGANIZATION_SUSPEND',
+  'FEATURE_FLAG_HIGH_RISK_CHANGE',
+  'OUTBOX_BACKLOG_SUPERSEDE',
+  'PRIVACY_HOLD_RELEASE',
+  'CAPABILITY_GRANT_HIGH_RISK',
+  // OPS-08. Stored in operation_approvals.extended_action_key (0051): 0038 re-adds its
+  // five-key CHECK on every replay, so a sixth key cannot live in action_key.
+  'CAREER_REQUIREMENT_SET_PUBLISH',
+] as const;
+
+/** The keys 0038's CHECK allows in `action_key`; any other key is an extended key (0051). */
+export const legacyHighRiskActionKeys = [
   'ORGANIZATION_SUSPEND',
   'FEATURE_FLAG_HIGH_RISK_CHANGE',
   'OUTBOX_BACKLOG_SUPERSEDE',
@@ -23,7 +36,7 @@ export type HighRiskActionKey = (typeof highRiskActionKeys)[number];
 export interface HighRiskActionDefinition {
   /** Needed both to request the action and to execute it. */
   readonly capability: InternalCapability;
-  readonly targetType: 'organization' | 'feature_flag' | 'outbox_backlog' | 'data_retention_hold' | 'organization_membership';
+  readonly targetType: 'organization' | 'feature_flag' | 'outbox_backlog' | 'data_retention_hold' | 'organization_membership' | 'career_requirement_set';
   readonly label: string;
 }
 
@@ -33,7 +46,12 @@ export const highRiskActions: Readonly<Record<HighRiskActionKey, HighRiskActionD
   OUTBOX_BACKLOG_SUPERSEDE: { capability: 'OPS_JOBS_REPLAY', targetType: 'outbox_backlog', label: 'Supersede the background event backlog' },
   PRIVACY_HOLD_RELEASE: { capability: 'PRIVACY_HOLDS', targetType: 'data_retention_hold', label: 'Release a legal hold' },
   CAPABILITY_GRANT_HIGH_RISK: { capability: 'CAPABILITY_ADMIN', targetType: 'organization_membership', label: 'Grant a high-risk capability' },
+  CAREER_REQUIREMENT_SET_PUBLISH: { capability: 'CONTENT_PUBLISH', targetType: 'career_requirement_set', label: 'Publish a career-role requirement set' },
 };
+
+export function isLegacyHighRiskActionKey(key: HighRiskActionKey): boolean {
+  return (legacyHighRiskActionKeys as readonly string[]).includes(key);
+}
 
 export function isHighRiskActionKey(value: unknown): value is HighRiskActionKey {
   return typeof value === 'string' && (highRiskActionKeys as readonly string[]).includes(value);
@@ -49,6 +67,7 @@ export const approvalRequestReasons: Readonly<Record<HighRiskActionKey, readonly
   OUTBOX_BACKLOG_SUPERSEDE: ['PRE_DISPATCHER_BACKLOG', 'INCIDENT_CLEANUP'],
   PRIVACY_HOLD_RELEASE: ['OBLIGATION_ENDED', 'CASE_CLOSED', 'ENTERED_IN_ERROR'],
   CAPABILITY_GRANT_HIGH_RISK: internalCapabilityGrantReasons,
+  CAREER_REQUIREMENT_SET_PUBLISH: careerPublishReasons,
 };
 
 /** Hours from request to expiry; one window covers deciding and executing. */

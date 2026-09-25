@@ -163,18 +163,47 @@ private fun CareerRolePicker(catalog: List<CareerRoleDto>, onPick: (String) -> U
         )
         return
     }
+    // The full job-role catalogue (OPS-08) is over a hundred roles; a search keeps it usable.
+    // The starter list is short and shows no search, exactly as before.
+    var query by remember { mutableStateOf("") }
+    val searchable = catalog.size > 12
+    val needle = query.trim().lowercase()
+    val shown = if (!searchable || needle.isEmpty()) catalog else catalog.filter { role ->
+        role.title.lowercase().contains(needle) || role.family.lowercase().contains(needle) ||
+            (role.catalogueCode?.lowercase()?.contains(needle) ?: false)
+    }
     LazyColumn(Modifier.fillMaxSize()) {
         item {
             Spacer(Modifier.height(12.dp))
             Text("Pick the career you are aiming at. Everything else is measured against it.",
                 style = MaterialTheme.typography.bodyMedium)
+            if (searchable) {
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    query, { query = it }, label = { Text("Search roles") }, singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                if (shown.isEmpty()) {
+                    Spacer(Modifier.height(10.dp))
+                    Text("No role matches \"${query.trim()}\".", style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
         }
-        items(catalog, key = { it.id }) { role ->
+        items(shown, key = { it.id }) { role ->
             Spacer(Modifier.height(10.dp))
             PilotCard {
                 Column(Modifier.fillMaxWidth().clickable { onPick(role.id) }.padding(16.dp)) {
-                    Text(role.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    Text(role.family, style = MaterialTheme.typography.bodySmall,
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(role.title, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        // An honest label: a role with no full track yet says so (Appendix 4).
+                        when (role.releaseLabel) {
+                            "VERIFIED" -> StatusChip("Verified", ChipKind.Positive)
+                            "SELECTABLE" -> StatusChip("Not yet verified", ChipKind.Muted)
+                            else -> Unit
+                        }
+                    }
+                    Text(listOfNotNull(role.catalogueCode, role.family).joinToString(" · "), style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                     role.summary?.takeIf { it.isNotBlank() }?.let {
                         Spacer(Modifier.height(6.dp))

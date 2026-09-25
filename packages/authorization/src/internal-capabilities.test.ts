@@ -156,12 +156,16 @@ describe('grant and revoke refusals', () => {
     expect(refuseInternalCapabilityGrant(input({ capability: 'CONTENT_REVIEW_EXTERNAL' }))).toBe('CAPABILITY_NOT_GRANTABLE_HERE');
   });
 
-  it.each(highRiskInternalCapabilities)('restricts a %s grant to a super admin until dual control exists', (capability) => {
+  // OPS-02 replaced OPS-01's interim rule (only a super admin could grant these) with dual
+  // control: every high-risk grant needs an approval, and the super admin is not exempt.
+  it.each(highRiskInternalCapabilities)('requires an approval for a %s grant, from a delegate and a super admin alike', (capability) => {
     const delegate = { userId: 'actor', memberships: [{ role: 'OPERATIONS_ADMIN', state: 'ACTIVE', grants: ['CAPABILITY_ADMIN'] }] };
     const fresh = { ...target, role: 'OPERATIONS_ADMIN' };
-    const expected = effectiveInternalCapabilities('OPERATIONS_ADMIN').includes(capability) ? 'CAPABILITY_ALREADY_HELD' : 'HIGH_RISK_GRANT_REQUIRES_SUPER_ADMIN';
-    expect(refuseInternalCapabilityGrant({ actor: delegate, target: fresh, capability })).toBe(expected);
-    if (expected === 'HIGH_RISK_GRANT_REQUIRES_SUPER_ADMIN') expect(refuseInternalCapabilityGrant({ actor: superAdmin, target: fresh, capability })).toBeNull();
+    const held = effectiveInternalCapabilities('OPERATIONS_ADMIN').includes(capability);
+    for (const actor of [delegate, superAdmin]) {
+      expect(refuseInternalCapabilityGrant({ actor, target: fresh, capability })).toBe(held ? 'CAPABILITY_ALREADY_HELD' : 'APPROVAL_REQUIRED');
+      expect(refuseInternalCapabilityGrant({ actor, target: fresh, capability, withApproval: true })).toBe(held ? 'CAPABILITY_ALREADY_HELD' : null);
+    }
   });
 
   it('lets a delegated CAPABILITY_ADMIN grant an ordinary capability', () => {

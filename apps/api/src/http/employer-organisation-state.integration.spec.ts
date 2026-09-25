@@ -35,6 +35,7 @@ const db = drizzle(pool, { schema });
 const tokens = new Set<string>();
 let app: INestApplication;
 let opsUserId: string;
+let approverUserId: string;
 let studentUserId: string;
 
 beforeAll(async () => {
@@ -65,6 +66,9 @@ beforeAll(async () => {
   const platformId = await organization('PLATFORM', 'VERIFIED');
   opsUserId = await user();
   await membership(opsUserId, platformId, 'OPERATIONS_ADMIN');
+  // OPS-02: suspension is dual-controlled, so a second person approves it.
+  approverUserId = await user();
+  await membership(approverUserId, platformId, 'PLATFORM_SUPER_ADMIN');
   studentUserId = await user();
 }, 60_000);
 afterAll(async () => {
@@ -115,9 +119,15 @@ async function draftWithAudience(employerId: string, createdBy: string): Promise
 async function lifecycle(opportunityId: string): Promise<string> {
   return (await pool.query('SELECT lifecycle_state FROM opportunities WHERE id=$1', [opportunityId])).rows[0].lifecycle_state as string;
 }
+// Suspension goes through dual control since OPS-02: operations requests it, a second
+// person approves it, and operations performs it with the approval.
 async function suspendThroughOperations(employerId: string): Promise<void> {
+  const requested = await api().post('/api/v1/operations/approvals').set(auth(opsUserId))
+    .send({ actionKey: 'ORGANIZATION_SUSPEND', payload: { organizationId: employerId, reasonCode: 'POLICY_VIOLATION' } }).expect(201);
+  await api().post('/api/v1/operations/approvals/' + requested.body.approval.id + '/decision').set(auth(approverUserId))
+    .send({ decision: 'APPROVE', reasonCode: 'VERIFIED_NEED' }).expect(201);
   await api().post('/api/v1/operations/organizations/' + employerId + '/verification')
-    .set(auth(opsUserId)).send({ toState: 'SUSPENDED', reasonCode: 'REPRO_D3' }).expect(201);
+    .set(auth(opsUserId)).send({ toState: 'SUSPENDED', reasonCode: 'POLICY_VIOLATION', approvalId: requested.body.approval.id }).expect(201);
   expect((await pool.query('SELECT verification_state, active FROM organizations WHERE id=$1', [employerId])).rows[0])
     .toEqual({ verification_state: 'SUSPENDED', active: false });
 }
@@ -287,7 +297,7 @@ describe('EMP-03: suspension pauses published jobs (decision 10.2 #3)', () => {
     expect(await lifecycle(opportunityId)).toBe('PAUSED');
     expect(await lifecycle(untouchedDraftId)).toBe('DRAFT');
     const audit = await pool.query("SELECT context FROM audit_events WHERE action='opportunity.paused' AND resource_id=$1", [opportunityId]);
-    expect(audit.rows).toEqual([{ context: { reasonCode: 'REPRO_D3', cause: 'ORGANIZATION_SUSPENDED' } }]);
+    expect(audit.rows).toEqual([{ context: { reasonCode: 'POLICY_VIOLATION', cause: 'ORGANIZATION_SUSPENDED' } }]);
     const outbox = await pool.query("SELECT payload FROM outbox_events WHERE event_type='opportunity.paused' AND aggregate_id=$1", [opportunityId]);
     expect(outbox.rows).toEqual([{ payload: { opportunityId, employerId, cause: 'ORGANIZATION_SUSPENDED' } }]);
 

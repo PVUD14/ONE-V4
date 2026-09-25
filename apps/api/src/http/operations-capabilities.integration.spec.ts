@@ -112,7 +112,9 @@ const api = () => request(app.getHttpServer());
 const auth = (userId: string) => ({ Authorization: 'Bearer ' + userId, 'X-Correlation-Id': 'ops-caps-' + randomUUID() });
 
 type Call = (actor: Member) => Promise<request.Response>;
-interface Route { readonly name: string; readonly admits: readonly string[]; readonly call: Call }
+// approvalGated: since OPS-02 an admitted role without an approval gets 403
+// APPROVAL_REQUIRED — past the capability check, and distinct from FORBIDDEN.
+interface Route { readonly name: string; readonly admits: readonly string[]; readonly call: Call; readonly approvalGated?: boolean }
 
 // Written out from the role lists each controller carried before OPS-01:
 // organisations/verification/users/invitations admitted super and operations admins;
@@ -136,7 +138,7 @@ const routes: readonly Route[] = [
   { name: 'GET audit events (SECURITY_AUDIT_SEARCH)', admits: auditFamilyRoles, call: (a) => api().get('/api/v1/operations/audit-events').set(auth(a.userId)) },
   { name: 'GET failed outbox (OPS_JOBS_REPLAY)', admits: auditFamilyRoles, call: (a) => api().get('/api/v1/operations/outbox/failed').set(auth(a.userId)) },
   { name: 'POST outbox replay (OPS_JOBS_REPLAY)', admits: auditFamilyRoles, call: (a) => api().post('/api/v1/operations/outbox/' + randomUUID() + '/replay').set(auth(a.userId)).send({ reasonCode: 'OPS_TEST' }) },
-  { name: 'POST backlog supersede (OPS_JOBS_REPLAY)', admits: auditFamilyRoles, call: (a) => api().post('/api/v1/operations/outbox/backlog/supersede').set(auth(a.userId)).send({ reasonCode: 'OPS_TEST', olderThan: '2000-01-01T00:00:00.000Z' }) },
+  { name: 'POST backlog supersede (OPS_JOBS_REPLAY)', admits: auditFamilyRoles, approvalGated: true, call: (a) => api().post('/api/v1/operations/outbox/backlog/supersede').set(auth(a.userId)).send({ reasonCode: 'OPS_TEST', olderThan: '2000-01-01T00:00:00.000Z' }) },
   { name: 'GET privacy requests (PRIVACY_REQUESTS)', admits: auditFamilyRoles, call: (a) => api().get('/api/v1/operations/privacy/requests').set(auth(a.userId)) },
   { name: 'GET privacy holds (PRIVACY_REQUESTS)', admits: auditFamilyRoles, call: (a) => api().get('/api/v1/operations/privacy/holds').set(auth(a.userId)) },
   { name: 'POST privacy hold (PRIVACY_HOLDS)', admits: auditFamilyRoles, call: (a) => api().post('/api/v1/operations/privacy/holds').set(auth(a.userId)).send({ subjectUserId: a.userId, reasonCode: 'DISPUTE' }) },
@@ -153,7 +155,10 @@ describe('retrofitted operations endpoints keep exactly their previous platform 
     for (const role of platformRoles) {
       const actor = await member(role);
       const response = await route.call(actor);
-      if (route.admits.includes(role)) expect([401, 403], `${role} should be admitted`).not.toContain(response.status);
+      if (route.admits.includes(role) && route.approvalGated) {
+        expect(response.status, `${role} should be admitted and then asked for an approval`).toBe(403);
+        expect(response.body.error.code).toBe('APPROVAL_REQUIRED');
+      } else if (route.admits.includes(role)) expect([401, 403], `${role} should be admitted`).not.toContain(response.status);
       else expect(response.status, `${role} should be denied`).toBe(403);
     }
     const institutionAdmin = await member('INSTITUTION_ADMIN');
@@ -204,7 +209,7 @@ describe('GET /operations/staff', () => {
     expect(row.baseline).toContain('OPS_FLAGS_MANAGE');
     expect(row.baseline).not.toContain('OPS_ORG_MANAGE');
     expect(response.body.grantReasons).toEqual(['NEW_RESPONSIBILITY', 'TEMPORARY_COVER', 'ACCESS_REVIEW_OUTCOME', 'CORRECTION']);
-    expect(response.body.actorMayGrantHighRisk).toBe(true);
+    expect(response.body.highRiskGrantsNeedApproval).toBe(true);
     expect(JSON.stringify(response.body)).not.toContain('user_id');
   });
 
@@ -265,19 +270,31 @@ describe('POST /operations/staff/:membershipId/capabilities', () => {
     expect((await pool.query('SELECT 1 FROM membership_capabilities WHERE membership_id=$1', [admin.membershipId])).rowCount).toBe(0);
   });
 
-  it('lets a delegated CAPABILITY_ADMIN grant ordinary capabilities but not high-risk ones', async () => {
+  // OPS-02 replaced OPS-01's interim "super admin only" rule for high-risk grants with dual
+  // control: nobody, the super admin included, grants one without a second person's approval.
+  it('lets a delegated CAPABILITY_ADMIN grant ordinary capabilities, and nobody grant a high-risk one without an approval', async () => {
     const admin = await member('PLATFORM_SUPER_ADMIN');
+    const approver = await member('PLATFORM_SUPER_ADMIN');
     const operations = await member('OPERATIONS_ADMIN');
     const security = await member('SECURITY_ADMIN');
-    expect((await grant(admin, operations.membershipId, { capability: 'CAPABILITY_ADMIN', reasonCode: 'NEW_RESPONSIBILITY' })).status).toBe(201);
+    const delegated = await grant(admin, operations.membershipId, { capability: 'CAPABILITY_ADMIN', reasonCode: 'NEW_RESPONSIBILITY' });
+    expect(delegated.status).toBe(403);
+    expect(delegated.body.error.code).toBe('APPROVAL_REQUIRED');
+    const request = await api().post('/api/v1/operations/approvals').set(auth(admin.userId))
+      .send({ actionKey: 'CAPABILITY_GRANT_HIGH_RISK', payload: { membershipId: operations.membershipId, capability: 'CAPABILITY_ADMIN', reasonCode: 'NEW_RESPONSIBILITY' } });
+    expect(request.status).toBe(201);
+    await api().post('/api/v1/operations/approvals/' + request.body.approval.id + '/decision').set(auth(approver.userId))
+      .send({ decision: 'APPROVE', reasonCode: 'VERIFIED_NEED' }).expect(201);
+    expect((await grant(admin, operations.membershipId, { capability: 'CAPABILITY_ADMIN', reasonCode: 'NEW_RESPONSIBILITY', approvalId: request.body.approval.id })).status).toBe(201);
     const list = await api().get('/api/v1/operations/staff').set(auth(operations.userId));
     expect(list.status).toBe(200);
-    expect(list.body.actorMayGrantHighRisk).toBe(false);
     expect((await grant(operations, security.membershipId, { capability: 'SUPPORT_CASES', reasonCode: 'TEMPORARY_COVER' })).status).toBe(201);
-    const highRisk = await grant(operations, security.membershipId, { capability: 'APPROVE_HIGH_RISK', reasonCode: 'NEW_RESPONSIBILITY' });
-    expect(highRisk.status).toBe(403);
-    expect(highRisk.body.error.code).toBe('HIGH_RISK_GRANT_REQUIRES_SUPER_ADMIN');
-    expect((await grant(admin, security.membershipId, { capability: 'APPROVE_HIGH_RISK', reasonCode: 'NEW_RESPONSIBILITY' })).status).toBe(201);
+    for (const actor of [operations, admin]) {
+      const highRisk = await grant(actor, security.membershipId, { capability: 'APPROVE_HIGH_RISK', reasonCode: 'NEW_RESPONSIBILITY' });
+      expect(highRisk.status).toBe(403);
+      expect(highRisk.body.error.code).toBe('APPROVAL_REQUIRED');
+    }
+    expect((await pool.query("SELECT 1 FROM membership_capabilities WHERE membership_id=$1 AND capability='APPROVE_HIGH_RISK'", [security.membershipId])).rowCount).toBe(0);
   });
 
   it('validates input explicitly before touching the database', async () => {

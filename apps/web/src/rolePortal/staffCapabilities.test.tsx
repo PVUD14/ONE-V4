@@ -32,7 +32,7 @@ const directory = (over: Record<string, unknown> = {}) => ({
   ],
   grantReasons: ['NEW_RESPONSIBILITY', 'TEMPORARY_COVER'],
   revokeReasons: ['RESPONSIBILITY_ENDED', 'LEAVER'],
-  actorMayGrantHighRisk: true,
+  highRiskGrantsNeedApproval: true,
   correlationId: 'corr-staff-list',
   ...over,
 });
@@ -96,17 +96,26 @@ describe('Staff and capabilities', () => {
     expect(JSON.parse(String(init.body))).toEqual({ capability: 'SUPPORT_CASES', reasonCode: 'TEMPORARY_COVER' });
   });
 
-  it('says when a capability is high-risk and blocks the grant for a non-super-admin', async () => {
-    fetchMock.mockImplementation(() => ok(directory({ actorMayGrantHighRisk: false })));
+  // OPS-02 replaced OPS-01's "super admin only" block with dual control: a high-risk grant
+  // files an approval request instead of granting, for every operator.
+  it('files an approval request for a high-risk capability instead of granting it', async () => {
     render(<OperationsStaffCapabilitiesPage />);
     const row = (await screen.findByText('security.lead@example.test')).closest('tr')!;
     fireEvent.change(within(row).getByLabelText('Capability for security.lead@example.test'), { target: { value: 'PRIVACY_HOLDS' } });
     fireEvent.click(within(row).getByRole('button', { name: 'Grant…' }));
     const dialog = screen.getByRole('dialog', { name: 'Grant PRIVACY_HOLDS' });
-    expect(within(dialog).getByText(/High-risk capability/)).toBeInTheDocument();
-    expect(within(dialog).getByRole('alert')).toHaveTextContent('Only a Platform Super Admin can grant a high-risk capability.');
+    expect(within(dialog).getByText(/approval required from a second person/)).toBeInTheDocument();
+    const submit = within(dialog).getByRole('button', { name: 'Request approval' });
+    expect(submit).toBeDisabled();
     fireEvent.change(within(dialog).getByLabelText(/Reason code/), { target: { value: 'NEW_RESPONSIBILITY' } });
-    expect(within(dialog).getByRole('button', { name: 'Confirm grant' })).toBeDisabled();
+    fireEvent.click(submit);
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Approval requested: Grant PRIVACY_HOLDS.'));
+    const [url, init] = posts()[0]!;
+    expect(String(url)).toContain('/api/v1/operations/approvals');
+    expect(JSON.parse(String(init.body))).toEqual({
+      actionKey: 'CAPABILITY_GRANT_HIGH_RISK', payload: { membershipId: securityMembership, capability: 'PRIVACY_HOLDS', reasonCode: 'NEW_RESPONSIBILITY' },
+    });
+    expect(posts().some(([postUrl]) => String(postUrl).includes('/capabilities'))).toBe(false);
   });
 
   it('revokes a grant with a revoke reason code', async () => {

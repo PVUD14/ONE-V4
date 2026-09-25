@@ -80,3 +80,78 @@ migration numbers in AGENTS.md are stale.
 not on the onev4 backup. PR #9's external-applications design doc is the only branch work missing from
 the base.
 **Next goal:** EMP-00 (step 4).
+
+## OPS-01 — Internal capability model — 2026-09-25
+**Result:** Complete — the retrofitted operations endpoints now check named capabilities through pure functions in `packages/authorization`. Behaviour for the three platform roles is unchanged, and Settings shows staff and lets an operator grant or revoke capabilities with a reason code.
+**Branch / PR:** feat/ops-capabilities → feat/plan-phases-0-to-2 (pushed to onev4; no PR opened — `gh` not installed; merge left to review).
+**Files created:** docs/architecture/ADR-032-internal-operator-capabilities.md;
+docs/architecture/internal-capabilities-table-design.md; packages/authorization/src/internal-capabilities.ts
+(+ .test.ts); packages/persistence/drizzle/0039_internal_capabilities.sql;
+packages/persistence/test/internal-capabilities.integration.test.ts; apps/api/src/http/internal-capability-guard.ts;
+apps/api/src/http/operations-staff.controller.ts; apps/api/src/http/operations-capabilities.integration.spec.ts;
+apps/web/src/rolePortal/staffCapabilities.tsx (+ .test.tsx).
+**Files modified:** packages/authorization/src/index.ts (export); packages/events/src/index.ts (2 events);
+packages/persistence/src/platform-controls.ts (grant/revoke/list/role change; ROLE_CHANGED reason);
+apps/api/src/http/{operations-institution-onboarding, operations-audit, operations-outbox, operations-privacy,
+platform-controls, trust-safety}.controller.ts; apps/api/src/app.module.ts; apps/web/src/api/operations.ts;
+apps/web/src/rolePortalPages.tsx (the operations `Settings` branch only).
+**Migrations added:** 0039_internal_capabilities.sql. It redefines the capability CHECK under 0031's own name,
+adds `revoked_reason_code`, and adds a grant trigger and a role-change trigger. It is idempotent: migrated
+twice on a fresh database with no errors.
+**Design docs / ADRs:** ADR-032; internal-capabilities-table-design.md (vocabulary of 25, baselines, divergences D1–D6).
+**Validation (fresh local DB `one_ops01`, only DATABASE_URL exported):** `db:migrate` ×2 pass · typecheck
+pass · `pnpm -r --no-bail --workspace-concurrency=1 test` pass — 1 255 passed / 0 failed (api 419 incl. 39 new,
+web 383 incl. 11 new, persistence 178 incl. 15 new, authorization 93 incl. 33 new, others 182) · build pass
+(web chunk-size warning only). Starting state = INST-01's recorded run on the same head (1 157 passed); the
+non-api packages re-ran green before any change. A mutation check confirmed the matrix catches drift: adding
+OPS_ORG_MANAGE to SECURITY_ADMIN's baseline failed 10 tests.
+**Acceptance criteria:**
+- Every pre-existing integration test for operations endpoints passes unchanged ✔ (operations-audit,
+  operations-institution-onboarding and api-security specs are untouched and green).
+- Each retrofitted endpoint admits a role with the baseline capability and denies an ACTIVE institution admin ✔.
+  There are 24 routes, each checked against all three platform roles, an institution admin and no token. The
+  expected roles are written out by hand from the old role lists.
+- Granting SUPPORT_CASES to a platform membership succeeds and is audited (actor, reason code, correlation ID,
+  outbox event) ✔. Granting it to an institution membership is refused by the API, and a direct insert fails at
+  the database trigger ✔.
+- Self-grant is rejected ✔, by both the API (403 CAPABILITY_SELF_CHANGE_REFUSED) and the trigger.
+- Changing a membership's role revokes its internal capabilities ✔. `changeMembershipRole` revokes them with
+  reason ROLE_CHANGED in the same transaction, and a raw role update is refused while an internal grant is live.
+- §6.6 minimums ✔: 401, 403, 200, 400 on invalid input, pagination bounds, the audit row carries the reason
+  code, and the staff response has exactly 8 fields. Web tests cover real data, loading, NA, empty, error with
+  correlation ID, forbidden, the confirm dialog requiring a reason, and navigation labels.
+**Decisions for Divakar:**
+- Baselines follow what the code allows today where it differs from §6.2. Tighten later, each by its own ADR:
+  - D1: SECURITY_ADMIN keeps OPS_FLAGS_MANAGE.
+  - D2: the super admin holds CATALOGUE_MANAGE, CONTENT_EDIT/REVIEW/PUBLISH and AI_OPS_CONFIGURE as break-glass
+    rather than as baseline.
+  - D3: users and invitations lookup stays on OPS_ORG_MANAGE, not SUPPORT_ACCOUNT_LOOKUP.
+  - D4: each module's reads share its write capability.
+  - D5: TRUST_SAFETY_ENFORCE and PRIVACY_HOLDS are baseline for OPS and SEC.
+  - D6: no dual control yet.
+- Capabilities that have no endpoint yet take their baseline from §6.2.
+- Until OPS-02, only an ACTIVE PLATFORM_SUPER_ADMIN may grant a high-risk capability. Revoking needs only
+  CAPABILITY_ADMIN.
+- Nobody may change capabilities on their own membership, in either direction.
+- The staff screen never grants CONTENT_REVIEW_EXTERNAL; OPS-10 builds that path.
+- Reason codes: grant NEW_RESPONSIBILITY / TEMPORARY_COVER / ACCESS_REVIEW_OUTCOME / CORRECTION; revoke
+  RESPONSIBILITY_ENDED / ACCESS_REVIEW_OUTCOME / LEAVER / SECURITY_INCIDENT / CORRECTION.
+**Limitations / not done:**
+- learner-content and career-readiness operations controllers keep their role lists (outside the goal's list).
+  learner-content still names non-existent roles.
+- `apps/api/src/application/identity-organization/services.ts` (in-memory service, not an HTTP path) keeps its
+  role lists.
+- There is no HTTP endpoint for a role change, so `changeMembershipRole` is persistence-only.
+- `break_glass: true` auditing is ready (`resolveInternalCapability` returns BREAK_GLASS), but no existing
+  endpoint reaches break-glass, so nothing writes it yet.
+- The role-change trigger covers internal capabilities only; INSTITUTION_ANALYTICS behaviour from 0031 is
+  deliberately unchanged.
+- Android: no change. The app's only operations calls are the read-only GET organizations and GET
+  invitations. Both still admit exactly PLATFORM_SUPER_ADMIN and OPERATIONS_ADMIN, and §4.3 keeps operator
+  screens web-only.
+**Risks / follow-ups:**
+- OPS-02 should route high-risk grants through approvals and tighten D1/D6.
+- OPS-05 decides whether account lookup moves to SUPPORT_ACCOUNT_LOOKUP (D3).
+- The audit-search cursor uses millisecond precision. Staff paging uses microseconds after the same bug showed
+  up in its test, and the audit cursor may deserve the same fix.
+**Next goal:** OPS-02.

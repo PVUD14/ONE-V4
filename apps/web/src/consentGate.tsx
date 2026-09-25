@@ -23,10 +23,9 @@ type GateState =
  * renders the workspace because there is genuinely nothing to consent to, the second
  * blocks.
  *
- * The brief `checking` phase still renders children, so there is a short window before
- * the first answer arrives. Closing that too means a blocking loading state on every
- * authenticated page load and touches tests across several streams; it is worth doing
- * and is deliberately not done here.
+ * The `checking` phase is closed too (ENG-01): until the first answer arrives the gate
+ * shows a short "checking" card instead of the workspace, so there is no window in which
+ * the workspace renders before consent is known.
  */
 export function ConsentGate({ children }: { readonly children: React.ReactNode }): React.ReactElement {
   const token = getProtectedAccessToken();
@@ -59,6 +58,17 @@ export function ConsentGate({ children }: { readonly children: React.ReactNode }
           <button type="button" className="consent-accept" disabled={state.retrying} onClick={() => { setState({ phase: 'unavailable', retrying: true }); setAttempt((value) => value + 1); }}>
             {state.retrying ? 'Checking…' : 'Try again'}
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (state.phase === 'checking') {
+    return (
+      <div className="consent-gate" role="status" aria-label="Checking privacy consent">
+        <div className="consent-card">
+          <span className="consent-icon"><ShieldCheck size={26} /></span>
+          <p className="consent-sub">Checking your privacy consent…</p>
         </div>
       </div>
     );

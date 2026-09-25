@@ -170,14 +170,27 @@ fun OneApp(
     var sessionExpired by remember { mutableStateOf(false) }
     var consent by remember { mutableStateOf<ConsentStatusDto?>(null) }
     var consentChecked by remember { mutableStateOf(false) }
+    // Fails closed (ENG-01): a check that could not be answered is not consent.
+    var consentUnavailable by remember { mutableStateOf(false) }
+    var consentAttempt by remember { mutableStateOf(0) }
     var workspace by remember { mutableStateOf(parseWorkspace(Session.workspace(context))) }
     var workspaceOptions by remember { mutableStateOf<List<Workspace>?>(null) }
     var multiWorkspace by remember { mutableStateOf(false) }
 
-    LaunchedEffect(signedIn) {
+    LaunchedEffect(signedIn, consentAttempt) {
         if (signedIn) {
-            consent = runCatching { Api.consentStatus(context) }.getOrNull()
-            consentChecked = true
+            runCatching { Api.consentStatus(context) }
+                .onSuccess { consent = it; consentUnavailable = false; consentChecked = true }
+                .onFailure { failure ->
+                    if (failure is Api.ApiException && failure.status == 401) {
+                        Session.clear(context)
+                        workspace = null
+                        sessionExpired = true
+                        signedIn = false
+                    } else {
+                        consentUnavailable = true
+                    }
+                }
         }
     }
 
@@ -204,6 +217,7 @@ fun OneApp(
             onRedirectHandled = onRedirectHandled,
             onSignedIn = { sessionExpired = false; signedIn = true; consentChecked = false },
         )
+        consentUnavailable -> ConsentUnavailableScreen(onRetry = { consentUnavailable = false; consentAttempt += 1 })
         !consentChecked -> BrandSplash()
         consent?.required == true -> ConsentScreen(
             version = consent?.requiredVersion ?: "",
@@ -1207,6 +1221,21 @@ private fun SignInScreen(
         }
         }
         }
+    }
+}
+
+@Composable
+private fun ConsentUnavailableScreen(onRetry: () -> Unit) {
+    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(20.dp).verticalScroll(rememberScrollState())) {
+        Spacer(Modifier.height(24.dp))
+        BrandWordmark(height = 22.dp)
+        Spacer(Modifier.height(20.dp))
+        Text("We could not confirm your privacy consent", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(6.dp))
+        Text("ONE will not open your workspace until it can confirm your consent is on record. This is usually a temporary connection problem.",
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(16.dp))
+        Button(onClick = onRetry, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp)) { Text("Try again") }
     }
 }
 

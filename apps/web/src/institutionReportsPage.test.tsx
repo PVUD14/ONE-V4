@@ -67,6 +67,8 @@ describe('Institution Reports — C1', () => {
   it.each(['INSTITUTION_ADMIN', 'INSTITUTION_OWNER'])('wires the Reports route for %s to the selected institution and renders returned data', async (role) => {
     fetchMock.mockResolvedValue({ ok: true, json: async () => report });
     renderRoute({ role, organizationId: institutionId });
+    // The consent gate answers before the workspace renders (ENG-01).
+    await screen.findByLabelText('Start date');
     expect(fetchMock).not.toHaveBeenCalled();
     choosePeriod();
     generate();
@@ -131,9 +133,9 @@ describe('Institution Reports — C1', () => {
     { role: 'INSTITUTION_ADMIN', organizationId: null },
     { role: 'FACULTY_LECTURER', organizationId: institutionId },
     { role: 'OPERATIONS_ADMIN', organizationId: institutionId },
-  ])('does not mount reports with invalid workspace $role / $organizationId', (workspace) => {
+  ])('does not mount reports with invalid workspace $role / $organizationId', async (workspace) => {
     renderRoute(workspace);
-    expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Generate report' })).not.toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
   });

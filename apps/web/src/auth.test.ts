@@ -331,14 +331,14 @@ describe('Cognito Hosted UI browser authentication', () => {
     const { App } = await import('./App.js');
     render(React.createElement(App));
     await waitFor(() => expect(window.location.pathname).toBe('/employer/recruiter'));
-    expect(screen.getAllByText('recruiter@uat.example.test').length).toBeGreaterThan(0);
+    expect((await screen.findAllByText('recruiter@uat.example.test')).length).toBeGreaterThan(0);
     expect(screen.queryByText('Rohan Shah')).not.toBeInTheDocument();
     expect(screen.queryByText(/role selection here does not authenticate/i)).not.toBeInTheDocument();
 
     cleanup();
     window.history.pushState(null, '', '/demo/employer/recruiter');
     render(React.createElement(App));
-    expect(screen.getByText('Rohan Shah')).toBeInTheDocument();
+    expect(await screen.findByText('Rohan Shah')).toBeInTheDocument();
     expect(screen.getAllByText('DEMO PREVIEW').length).toBeGreaterThan(0);
   });
 
@@ -363,7 +363,7 @@ describe('Cognito Hosted UI browser authentication', () => {
     const { App } = await import('./App.js');
     render(React.createElement(App));
     await waitFor(() => expect(window.location.pathname).toBe('/operations/admin'));
-    expect(screen.getByText('OPERATIONS_ADMIN')).toBeInTheDocument();
+    expect(await screen.findByText('OPERATIONS_ADMIN')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Student Dashboard' })).not.toBeInTheDocument();
     expect(screen.queryByText('Rahul Kumar')).not.toBeInTheDocument();
   });

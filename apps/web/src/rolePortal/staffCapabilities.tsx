@@ -5,7 +5,8 @@
  * the role's baseline plus explicit grants — and lets a CAPABILITY_ADMIN holder grant
  * or revoke a capability. Every change goes through a confirm step that requires a
  * reason code from the server's fixed list, because the grant record exists to answer
- * "who could do what, and why" later.
+ * "who could do what, and why" later. A high-risk grant files an approval request
+ * instead (OPS-02) and is carried out from the Approvals queue once approved.
  *
  * The server decides everything: this screen only hides buttons it knows will be
  * refused (your own membership, capabilities already held) and says why.
@@ -16,6 +17,7 @@ import type { StaffDirectoryDto, StaffMemberDto } from '../api.js';
 import { V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { StatusBadge } from '../studentComponents.js';
 import { formatApiError, RestrictedApiState } from './shared.js';
+import { RequestApprovalDialog } from './approvals.js';
 
 type PendingChange =
   | { readonly kind: 'grant'; readonly member: StaffMemberDto; readonly capability: string }
@@ -124,13 +126,20 @@ export function OperationsStaffCapabilitiesPage(): React.ReactElement {
           </tr>;
         })}</tbody></table></div> : null}
     </section>
-    {pending && directory ? <ConfirmCapabilityChange token={token} change={pending} directory={directory}
-      highRisk={highRisk.has(pending.capability)} onCancel={() => setPending(null)} onDone={completed} /> : null}
+    {pending && directory && pending.kind === 'grant' && highRisk.has(pending.capability)
+      // OPS-02: a high-risk grant files an approval request; it is granted from the Approvals queue once approved.
+      ? <RequestApprovalDialog token={token} actionKey="CAPABILITY_GRANT_HIGH_RISK"
+        payload={{ membershipId: pending.member.membershipId, capability: pending.capability }}
+        title={`Grant ${pending.capability}`} reasons={directory.grantReasons}
+        details={[['Staff member', pending.member.email], ['Role', pending.member.role], ['Capability', `${pending.capability} (high-risk)`]]}
+        onCancel={() => setPending(null)} onFiled={(message) => { setPending(null); setNotice(message); }} />
+      : pending && directory ? <ConfirmCapabilityChange token={token} change={pending} directory={directory}
+        onCancel={() => setPending(null)} onDone={completed} /> : null}
   </section>;
 }
 
-function ConfirmCapabilityChange({ token, change, directory, highRisk, onCancel, onDone }: {
-  readonly token: string; readonly change: PendingChange; readonly directory: StaffDirectoryDto; readonly highRisk: boolean;
+function ConfirmCapabilityChange({ token, change, directory, onCancel, onDone }: {
+  readonly token: string; readonly change: PendingChange; readonly directory: StaffDirectoryDto;
   readonly onCancel: () => void; readonly onDone: (message: string) => void;
 }): React.ReactElement {
   const [reasonCode, setReasonCode] = useState('');
@@ -142,7 +151,6 @@ function ConfirmCapabilityChange({ token, change, directory, highRisk, onCancel,
 
   const grant = change.kind === 'grant';
   const reasons = grant ? directory.grantReasons : directory.revokeReasons;
-  const blockedHighRisk = grant && highRisk && !directory.actorMayGrantHighRisk;
 
   const submit = async (event: React.FormEvent): Promise<void> => {
     event.preventDefault();
@@ -165,11 +173,8 @@ function ConfirmCapabilityChange({ token, change, directory, highRisk, onCancel,
       <dl>
         <div><dt>Staff member</dt><dd>{change.member.email}</dd></div>
         <div><dt>Role</dt><dd>{change.member.role}</dd></div>
-        <div><dt>Approval</dt><dd>{highRisk && grant
-          ? 'High-risk capability. Until dual control exists, only a Platform Super Admin may grant it; no second approval is collected yet.'
-          : 'No second approval is required.'}</dd></div>
+        <div><dt>Approval</dt><dd>No second approval is required.</dd></div>
       </dl>
-      {blockedHighRisk ? <p className="form-error" role="alert">Only a Platform Super Admin can grant a high-risk capability.</p> : null}
       <form onSubmit={(event) => void submit(event)} noValidate>
         <label><span>Reason code <em>required</em></span>
           <select ref={firstFieldRef} value={reasonCode} onChange={(event) => setReasonCode(event.target.value)} required>
@@ -181,7 +186,7 @@ function ConfirmCapabilityChange({ token, change, directory, highRisk, onCancel,
         {error ? <p className="form-error" role="alert">{error}</p> : null}
         <div className="role-modal-actions">
           <button type="button" className="secondary" onClick={onCancel}>Cancel</button>
-          <button type="submit" disabled={busy || !reasonCode || blockedHighRisk}>{busy ? 'Saving…' : grant ? 'Confirm grant' : 'Confirm revoke'}</button>
+          <button type="submit" disabled={busy || !reasonCode}>{busy ? 'Saving…' : grant ? 'Confirm grant' : 'Confirm revoke'}</button>
         </div>
       </form>
     </section>

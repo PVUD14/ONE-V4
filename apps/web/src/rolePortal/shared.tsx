@@ -74,6 +74,16 @@ export function safeErrorMessage(code: string | undefined): string | undefined {
     case 'TEAM_EMAIL_INVALID': return 'Enter a valid email address.';
     case 'EMPLOYER_ORGANISATION_INACTIVE': return 'Your employer account is suspended or was not approved, so your team cannot be changed.';
     case 'FORBIDDEN': return 'You do not have permission to perform this action.';
+    // OPS-02: dual control for high-risk actions.
+    case 'APPROVAL_REQUIRED': return 'This is a high-risk action: it needs an approval from a second person first.';
+    case 'APPROVAL_NOT_APPROVED': return 'This request has not been approved, or its approval was already used.';
+    case 'APPROVAL_EXPIRED': return 'This approval has expired. File a new request.';
+    case 'APPROVAL_PAYLOAD_MISMATCH': return 'The action no longer matches what was approved. File a new request.';
+    case 'APPROVAL_NOT_REQUESTER': return 'Only the person who asked for this action can carry it out.';
+    case 'APPROVAL_SELF_DECISION_REFUSED': return 'You cannot decide your own request while another approver exists.';
+    case 'APPROVAL_SOLO_COOLING_OFF': return 'As the only approver you can approve your own request 15 minutes after filing it.';
+    case 'APPROVAL_SUBJECT_CONFLICT': return 'You cannot approve a grant of capability to yourself.';
+    case 'APPROVAL_NOT_PENDING': return 'This request has already been decided.';
     default: return undefined;
   }
 }

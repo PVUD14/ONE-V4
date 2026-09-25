@@ -12,7 +12,8 @@
  *
  * Both mutations are high-risk operations under platform control 103: they require a
  * reason code, they are audited by the persistence functions themselves, and they are
- * restricted to the same platform roles that may search the audit record.
+ * restricted to the same platform roles that may search the audit record. Superseding
+ * the backlog also needs a second person's approval (OPS-02).
  */
 import {
   BadRequestException,
@@ -39,6 +40,8 @@ import {
   type ProtectedHttpRequest,
 } from './api-security.js';
 import { callerHasInternalCapability, dbCapabilityGrantLoader } from './internal-capability-guard.js';
+import { consumeOperationApproval } from '@planthepath/persistence/src/operation-approvals.js';
+import { approvalHttpError, approvalPayloads, approvalRequired, readApprovalId } from './operation-approval-gate.js';
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const reasonCodePattern = /^[A-Z0-9_:-]{3,64}$/;
@@ -105,16 +108,28 @@ export class OperationsOutboxController {
       throw badRequest('OUTBOX_LIMIT_INVALID', context.correlationId);
     }
 
-    const superseded = await supersedeOutboxBacklog(this.db, {
-      olderThan: new Date(raw.olderThan),
-      actorUserId: context.authorization.principal.userId,
-      reasonCode,
-      auditId: randomUUID(),
-      correlationId: context.correlationId,
-      limit,
-      now: new Date(),
-    });
-    return { superseded, correlationId: context.correlationId };
+    // OPS-02: always dual-controlled. The approval is bound to this cutoff, limit and
+    // reason, and consumed in the same transaction as the supersede (a nested
+    // transaction there is a savepoint, so both commit or neither does).
+    const approvalId = readApprovalId(body, context.correlationId);
+    if (!approvalId) throw approvalRequired(context.correlationId);
+    const olderThan = new Date(raw.olderThan);
+    const actorUserId = context.authorization.principal.userId;
+    try {
+      const superseded = await this.db.transaction(async (tx) => {
+        await consumeOperationApproval(tx, {
+          approvalId, actionKey: 'OUTBOX_BACKLOG_SUPERSEDE',
+          payload: approvalPayloads.OUTBOX_BACKLOG_SUPERSEDE({ olderThan, limit, reasonCode }),
+          executorUserId: actorUserId, correlationId: context.correlationId,
+        });
+        return supersedeOutboxBacklog(tx, {
+          olderThan, actorUserId, reasonCode, auditId: randomUUID(), correlationId: context.correlationId, limit, now: new Date(),
+        });
+      });
+      return { superseded, correlationId: context.correlationId };
+    } catch (error) {
+      throw approvalHttpError(error, context.correlationId) ?? error;
+    }
   }
 }
 

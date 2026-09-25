@@ -16,6 +16,9 @@ import {
   type ProtectedHttpRequest,
 } from './api-security.js';
 import { callerHasInternalCapability, dbCapabilityGrantLoader } from './internal-capability-guard.js';
+import { isHighRiskVerificationTransition } from '@planthepath/authorization/src/index.js';
+import { consumeOperationApproval } from '@planthepath/persistence/src/operation-approvals.js';
+import { approvalHttpError, approvalNotRequired, approvalPayloads, approvalRequired, readApprovalId } from './operation-approval-gate.js';
 
 type QueryResult<T> = { rows: T[] };
 type OrganizationKind = 'INSTITUTION' | 'EMPLOYER';
@@ -194,19 +197,31 @@ export class OperationsInstitutionOnboardingController {
     const toState = readEnum(readString(body, 'toState', context.correlationId), ['UNDER_REVIEW', 'VERIFIED', 'REJECTED', 'SUSPENDED'], context.correlationId);
     const reasonCode = readOptionalString(body, 'reasonCode') ?? 'OPERATIONS_REVIEW';
     if (!/^[A-Z0-9_:-]{3,64}$/.test(reasonCode)) throw forbidden(context.correlationId);
-    await this.db.transaction(async (tx) => {
+    // OPS-02: suspension (the only way out of VERIFIED) is dual-controlled. The approval is
+    // consumed inside this transaction, bound to exactly this organisation and reason.
+    const approvalId = readApprovalId(body, context.correlationId);
+    const highRisk = isHighRiskVerificationTransition(toState);
+    if (highRisk && !approvalId) throw approvalRequired(context.correlationId);
+    if (!highRisk && approvalId) throw approvalNotRequired(context.correlationId);
+    try { await this.db.transaction(async (tx) => {
       const current = await tx.execute(sql`SELECT verification_state FROM organizations WHERE id = ${id}::uuid AND kind IN ('INSTITUTION','EMPLOYER') FOR UPDATE`) as QueryResult<{ verification_state: VerificationState }>;
       const [row] = current.rows;
       if (!row || !isAllowedVerificationTransition(row.verification_state, toState)) throw new Error('invalid verification transition');
+      const approval = approvalId ? await consumeOperationApproval(tx, {
+        approvalId, actionKey: 'ORGANIZATION_SUSPEND', payload: approvalPayloads.ORGANIZATION_SUSPEND({ organizationId: id, reasonCode }),
+        executorUserId: context.authorization.principal.userId, correlationId: context.correlationId,
+      }) : null;
       await tx.execute(sql`UPDATE organizations SET verification_state = ${toState}::verification_state, active = ${toState !== 'SUSPENDED'}, updated_at = now() WHERE id = ${id}::uuid`);
       await tx.execute(sql`
         INSERT INTO organization_verification_events (id, organization_id, from_state, to_state, reason_code, actor_user_id, correlation_id)
         VALUES (${this.ids.uuid()}::uuid, ${id}::uuid, ${row.verification_state}::verification_state, ${toState}::verification_state, ${reasonCode}, ${context.authorization.principal.userId}::uuid, ${context.correlationId})
       `);
-      await writeAudit(tx, { id: this.ids.uuid(), actorUserId: context.authorization.principal.userId, action: 'organization.verification_transitioned', resourceType: 'organization', resourceId: id, organizationId: id, correlationId: context.correlationId, context: { toState, reasonCode } });
+      await writeAudit(tx, { id: this.ids.uuid(), actorUserId: context.authorization.principal.userId, action: 'organization.verification_transitioned', resourceType: 'organization', resourceId: id, organizationId: id, correlationId: context.correlationId, context: { toState, reasonCode, ...(approval ? { approval } : {}) } });
       await writeOutbox(tx, { id: this.ids.uuid(), aggregateType: 'organization', aggregateId: id, eventType: 'organization.verification_transitioned', payload: { organizationId: id, toState }, actorUserId: context.authorization.principal.userId, organizationId: id, correlationId: context.correlationId });
       if (toState === 'SUSPENDED') await this.pauseEmployerJobs(tx, id, reasonCode, context.authorization.principal.userId, context.correlationId);
-    });
+    }); } catch (error) {
+      throw approvalHttpError(error, context.correlationId) ?? error;
+    }
     return this.loadOrganization(id, context.correlationId);
   }
 

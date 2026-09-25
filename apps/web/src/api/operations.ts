@@ -74,8 +74,15 @@ export function updateOperationsOrganization(token: string, organizationId: stri
   return requestJson(`/api/v1/operations/organizations/${encodeURIComponent(organizationId)}`, { token, method: 'PATCH', body });
 }
 
-export function transitionOrganizationVerification(token: string, organizationId: string, toState: string): Promise<{ readonly organization: OrganizationManagementDto }> {
-  return requestJson(`/api/v1/operations/organizations/${encodeURIComponent(organizationId)}/verification`, { token, method: 'POST', body: { toState, reasonCode: 'OPERATIONS_UAT' } });
+/**
+ * Suspension is dual-controlled (OPS-02): it is performed with the reason code and
+ * approvalId of an approved request, never with the default reason.
+ */
+export function transitionOrganizationVerification(
+  token: string, organizationId: string, toState: string, approval?: { readonly reasonCode: string; readonly approvalId: string },
+): Promise<{ readonly organization: OrganizationManagementDto }> {
+  const body = approval ? { toState, reasonCode: approval.reasonCode, approvalId: approval.approvalId } : { toState, reasonCode: 'OPERATIONS_UAT' };
+  return requestJson(`/api/v1/operations/organizations/${encodeURIComponent(organizationId)}/verification`, { token, method: 'POST', body });
 }
 
 export function inviteInitialOrganizationAdmin(token: string, organizationId: string, email: string): Promise<Record<string, unknown>> {
@@ -137,6 +144,8 @@ export interface FeatureFlagDto {
   readonly cap: { readonly kind: string; readonly value: number; readonly window: string } | null;
   readonly overrides: number;
   readonly lastChangedAt: string | null;
+  /** OPS-02: the change that needs a second person's approval, or null. */
+  readonly highRiskDirection?: 'ENABLE' | 'DISABLE' | null;
 }
 
 export function listFeatureFlags(token: string, signal?: AbortSignal): Promise<{ readonly flags: readonly FeatureFlagDto[] }> {
@@ -147,8 +156,8 @@ export function listFeatureFlags(token: string, signal?: AbortSignal): Promise<{
  * A reason code is required by the server, not optional here: flipping a flag that
  * gates a safety behaviour is a high-risk action and the record of why is the point.
  */
-export function setFeatureFlagState(token: string, key: string, enabled: boolean, reasonCode: string): Promise<{ readonly flags: readonly FeatureFlagDto[] }> {
-  return requestJson(`/api/v1/operations/feature-flags/${encodeURIComponent(key)}/state`, { token, method: 'POST', body: { enabled, reasonCode } });
+export function setFeatureFlagState(token: string, key: string, enabled: boolean, reasonCode: string, approvalId?: string): Promise<{ readonly flags: readonly FeatureFlagDto[] }> {
+  return requestJson(`/api/v1/operations/feature-flags/${encodeURIComponent(key)}/state`, { token, method: 'POST', body: { enabled, reasonCode, ...(approvalId ? { approvalId } : {}) } });
 }
 
 export interface TrustCaseDto {
@@ -221,8 +230,8 @@ export interface StaffDirectoryDto {
   readonly capabilities: readonly StaffCapabilityCatalogueEntryDto[];
   readonly grantReasons: readonly string[];
   readonly revokeReasons: readonly string[];
-  /** Until dual control exists (OPS-02) only a Platform Super Admin may grant a high-risk capability. */
-  readonly actorMayGrantHighRisk: boolean;
+  /** OPS-02: every high-risk grant goes through an approval, whoever asks. */
+  readonly highRiskGrantsNeedApproval: boolean;
   readonly correlationId: string;
 }
 
@@ -232,7 +241,7 @@ export function listOperationsStaff(token: string, cursor?: string | null, signa
 }
 
 export function grantStaffCapability(
-  token: string, membershipId: string, body: { readonly capability: string; readonly reasonCode: string; readonly note?: string },
+  token: string, membershipId: string, body: { readonly capability: string; readonly reasonCode: string; readonly note?: string; readonly approvalId?: string },
 ): Promise<{ readonly member: StaffMemberDto; readonly correlationId: string }> {
   return requestJson(`/api/v1/operations/staff/${encodeURIComponent(membershipId)}/capabilities`, { token, method: 'POST', body });
 }
@@ -241,4 +250,97 @@ export function revokeStaffCapability(
   token: string, membershipId: string, capability: string, body: { readonly reasonCode: string; readonly note?: string },
 ): Promise<{ readonly member: StaffMemberDto; readonly correlationId: string }> {
   return requestJson(`/api/v1/operations/staff/${encodeURIComponent(membershipId)}/capabilities/${encodeURIComponent(capability)}/revoke`, { token, method: 'POST', body });
+}
+
+// --- Approvals for high-risk actions (OPS-02) -------------------------------
+
+export type HighRiskActionKey = 'ORGANIZATION_SUSPEND' | 'FEATURE_FLAG_HIGH_RISK_CHANGE' | 'OUTBOX_BACKLOG_SUPERSEDE' | 'PRIVACY_HOLD_RELEASE' | 'CAPABILITY_GRANT_HIGH_RISK';
+
+export interface ApprovalDecisionReasonsDto {
+  readonly APPROVE: readonly string[];
+  readonly REJECT: readonly string[];
+}
+
+export interface ApprovalPolicyDto {
+  readonly actions: readonly { readonly actionKey: HighRiskActionKey; readonly label: string; readonly reasons: readonly string[] }[];
+  readonly decisionReasons: ApprovalDecisionReasonsDto;
+  readonly approverCount: number;
+  readonly soloSafeguardActive: boolean;
+  readonly correlationId: string;
+}
+
+export interface OperationApprovalDto {
+  readonly id: string;
+  readonly actionKey: HighRiskActionKey;
+  readonly actionLabel: string;
+  readonly state: 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXECUTED' | 'EXPIRED';
+  /** Identifiers the Execute button needs; never displayed. */
+  readonly payload: Record<string, unknown>;
+  readonly summary: {
+    readonly organizationName: string | null; readonly flagKey: string | null; readonly enabled: boolean | null;
+    readonly capability: string | null; readonly memberEmail: string | null; readonly holdReason: string | null;
+    readonly olderThan: string | null; readonly limit: number | null;
+  };
+  readonly reasonCode: string;
+  readonly note: string | null;
+  readonly requestedBy: { readonly email: string; readonly isSelf: boolean };
+  readonly requestedAt: string;
+  readonly expiresAt: string;
+  readonly coolingOffEndsAt: string;
+  readonly decidedBy: { readonly email: string; readonly isSelf: boolean } | null;
+  readonly decidedAt: string | null;
+  readonly decisionReasonCode: string | null;
+  readonly mode: 'DUAL' | 'SOLO' | null;
+  readonly soloNotice: 'QUEUED' | 'NOT_DELIVERED' | null;
+  readonly executedAt: string | null;
+  readonly canApprove: boolean;
+  readonly canReject: boolean;
+  readonly approveRefusal: string | null;
+  readonly canExecute: boolean;
+}
+
+export interface OperationApprovalQueueDto {
+  readonly approvals: readonly OperationApprovalDto[];
+  readonly nextCursor: string | null;
+  readonly decisionReasons: ApprovalDecisionReasonsDto;
+  readonly approverCount: number;
+  readonly soloSafeguardActive: boolean;
+  readonly viewerIsApprover: boolean;
+  readonly correlationId: string;
+}
+
+export function getApprovalPolicy(token: string, signal?: AbortSignal): Promise<ApprovalPolicyDto> {
+  return requestJson('/api/v1/operations/approvals/policy', { token, ...(signal ? { signal } : {}) });
+}
+
+export function listOperationApprovals(token: string, state?: string, cursor?: string | null, signal?: AbortSignal): Promise<OperationApprovalQueueDto> {
+  const query = new URLSearchParams();
+  if (state) query.set('state', state);
+  if (cursor) query.set('cursor', cursor);
+  const suffix = query.toString() ? `?${query.toString()}` : '';
+  return requestJson(`/api/v1/operations/approvals${suffix}`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function requestOperationApproval(
+  token: string, body: { readonly actionKey: HighRiskActionKey; readonly payload: Record<string, unknown>; readonly note?: string },
+): Promise<{ readonly approval: OperationApprovalDto; readonly correlationId: string }> {
+  return requestJson('/api/v1/operations/approvals', { token, method: 'POST', body });
+}
+
+export function decideOperationApproval(
+  token: string, approvalId: string, body: { readonly decision: 'APPROVE' | 'REJECT'; readonly reasonCode: string; readonly note?: string },
+): Promise<{ readonly approval: OperationApprovalDto; readonly correlationId: string }> {
+  return requestJson(`/api/v1/operations/approvals/${encodeURIComponent(approvalId)}/decision`, { token, method: 'POST', body });
+}
+
+export function supersedeOutboxBacklog(
+  token: string, body: { readonly olderThan: string; readonly limit: number; readonly reasonCode: string; readonly approvalId: string },
+): Promise<{ readonly superseded: number; readonly correlationId: string }> {
+  return requestJson('/api/v1/operations/outbox/backlog/supersede', { token, method: 'POST', body });
+}
+
+export function releasePrivacyHold(
+  token: string, holdId: string, body: { readonly reasonCode: string; readonly approvalId: string },
+): Promise<{ readonly released: boolean; readonly correlationId: string }> {
+  return requestJson(`/api/v1/operations/privacy/holds/${encodeURIComponent(holdId)}/release`, { token, method: 'POST', body });
 }

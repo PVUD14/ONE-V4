@@ -42,7 +42,7 @@ export const internalCapabilities = [
 
 export type InternalCapability = (typeof internalCapabilities)[number];
 
-/** Section 5.4: granting any of these is a high-risk action (dual control arrives with OPS-02). */
+/** Section 5.4: granting any of these is a high-risk action and needs an approval (OPS-02). */
 export const highRiskInternalCapabilities = [
   'APPROVE_HIGH_RISK',
   'CAPABILITY_ADMIN',
@@ -225,6 +225,11 @@ export interface InternalCapabilityChangeInput {
     readonly grants: readonly string[];
   };
   readonly capability: InternalCapability;
+  /**
+   * OPS-02: whether an approval accompanies the grant. It is verified and consumed in the
+   * grant's transaction; this only decides whether one is needed.
+   */
+  readonly withApproval?: boolean;
 }
 
 export type InternalCapabilityChangeRefusal =
@@ -234,12 +239,8 @@ export type InternalCapabilityChangeRefusal =
   | 'CAPABILITY_ROLE_NOT_ELIGIBLE'
   | 'MEMBERSHIP_NOT_ACTIVE'
   | 'CAPABILITY_ALREADY_HELD'
-  | 'HIGH_RISK_GRANT_REQUIRES_SUPER_ADMIN'
+  | 'APPROVAL_REQUIRED'
   | 'CAPABILITY_NOT_GRANTED';
-
-function isActiveSuperAdmin(context: InternalCapabilityContext): boolean {
-  return context.memberships.some((membership) => membership.state === 'ACTIVE' && membership.role === 'PLATFORM_SUPER_ADMIN');
-}
 
 /**
  * Whether a staff grant through the Operations Settings screen may proceed. Returns the
@@ -254,9 +255,10 @@ export function refuseInternalCapabilityGrant(input: InternalCapabilityChangeInp
   if (input.target.organizationKind !== 'PLATFORM' || !isPlatformInternalRole(input.target.role)) return 'CAPABILITY_ROLE_NOT_ELIGIBLE';
   if (input.target.state !== 'ACTIVE') return 'MEMBERSHIP_NOT_ACTIVE';
   if (effectiveInternalCapabilities(input.target.role, input.target.grants).includes(input.capability)) return 'CAPABILITY_ALREADY_HELD';
-  // Until OPS-02's approvals exist, a second person cannot be required; the interim
-  // safeguard is that only the break-glass role may hand out high-risk authority.
-  if (isHighRiskInternalCapability(input.capability) && !isActiveSuperAdmin(input.actor)) return 'HIGH_RISK_GRANT_REQUIRES_SUPER_ADMIN';
+  // OPS-02: a high-risk grant needs a second person's approval, for everyone —
+  // PLATFORM_SUPER_ADMIN included. This replaces OPS-01's interim rule that only a super
+  // admin could grant one.
+  if (isHighRiskInternalCapability(input.capability) && !input.withApproval) return 'APPROVAL_REQUIRED';
   return null;
 }
 

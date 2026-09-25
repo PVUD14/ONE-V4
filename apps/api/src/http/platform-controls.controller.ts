@@ -39,6 +39,10 @@ import {
 import { PG_POOL } from '../persistence.provider.js';
 import { ProtectedApiAuthenticationGuard, type ProtectedHttpRequest } from './api-security.js';
 import { callerHasInternalCapability, poolCapabilityGrantLoader } from './internal-capability-guard.js';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { isHighRiskFlagChange } from '@planthepath/authorization/src/index.js';
+import { OperationApprovalError, consumeOperationApproval } from '@planthepath/persistence/src/operation-approvals.js';
+import { approvalHttpError, approvalPayloads, readApprovalId } from './operation-approval-gate.js';
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const reasonCodePattern = /^[A-Z0-9_:-]{3,64}$/;
@@ -70,13 +74,30 @@ export class PlatformControlsController {
     const raw = readObject(body);
     if (typeof raw.enabled !== 'boolean') throw badRequest('FEATURE_FLAG_STATE_INVALID');
     const reasonCode = readReasonCode(raw.reasonCode);
+    const correlationId = request.planThePath?.correlationId ?? 'unknown';
+    const approvalId = readApprovalId(raw, correlationId);
+    const enabled = raw.enabled;
     try {
       await setFeatureFlagEnabled(this.pool, {
-        key, enabled: raw.enabled, actorUserId, reasonCode,
-        correlationId: request.planThePath?.correlationId ?? 'unknown',
+        key, enabled, actorUserId, reasonCode, correlationId,
+        // OPS-02: a flag marked high-risk needs an approval for its risky direction,
+        // consumed in the same transaction as the change.
+        guard: async (client, flag) => {
+          const highRisk = isHighRiskFlagChange(flag.highRiskDirection, enabled);
+          if (!highRisk) {
+            if (approvalId) throw new OperationApprovalError('APPROVAL_NOT_REQUIRED');
+            return;
+          }
+          if (!approvalId) throw new OperationApprovalError('APPROVAL_REQUIRED');
+          await consumeOperationApproval(drizzle(client), {
+            approvalId, actionKey: 'FEATURE_FLAG_HIGH_RISK_CHANGE',
+            payload: approvalPayloads.FEATURE_FLAG_HIGH_RISK_CHANGE({ key, enabled, reasonCode }),
+            executorUserId: actorUserId, correlationId,
+          });
+        },
       });
     } catch (error) {
-      throw mapControlError(error);
+      throw approvalHttpError(error, correlationId) ?? mapControlError(error);
     }
     return { flags: await listFeatureFlags(this.pool) };
   }

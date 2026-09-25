@@ -35,15 +35,17 @@ export interface FeatureFlagState {
   readonly cap: { readonly kind: string; readonly value: number; readonly window: string } | null;
   readonly overrides: number;
   readonly lastChangedAt: string | null;
+  /** OPS-02: ENABLE or DISABLE when that change needs a second person's approval. */
+  readonly highRiskDirection: 'ENABLE' | 'DISABLE' | null;
 }
 
 export async function listFeatureFlags(pool: Pool): Promise<readonly FeatureFlagState[]> {
   const result = await pool.query<{
     key: string; description: string; enabled: boolean;
     cap_kind: string | null; cap_value: string | null; cap_window: string | null;
-    overrides: number; last_changed_at: Date | null;
+    overrides: number; last_changed_at: Date | null; high_risk_direction: 'ENABLE' | 'DISABLE' | null;
   }>(
-    `SELECT f.key, f.description, f.enabled, f.cap_kind, f.cap_value, f.cap_window,
+    `SELECT f.key, f.description, f.enabled, f.cap_kind, f.cap_value, f.cap_window, f.high_risk_direction,
             (SELECT count(*)::int FROM feature_flag_overrides o WHERE o.flag_key = f.key AND o.revoked_at IS NULL) AS overrides,
             (SELECT max(e.occurred_at) FROM feature_flag_events e WHERE e.flag_key = f.key) AS last_changed_at
      FROM feature_flags f ORDER BY f.key`,
@@ -57,6 +59,7 @@ export async function listFeatureFlags(pool: Pool): Promise<readonly FeatureFlag
       : null,
     overrides: row.overrides,
     lastChangedAt: row.last_changed_at ? row.last_changed_at.toISOString() : null,
+    highRiskDirection: row.high_risk_direction,
   }));
 }
 
@@ -92,15 +95,22 @@ export async function setFeatureFlagEnabled(
   input: {
     readonly key: string; readonly enabled: boolean; readonly actorUserId: string;
     readonly reasonCode: string; readonly correlationId: string;
+    /**
+     * OPS-02: runs inside the transaction with the locked flag, before the change. The
+     * caller decides whether the change is high-risk and consumes its approval here, so
+     * the approval and the change commit or roll back together.
+     */
+    readonly guard?: (client: PoolClient, flag: { readonly enabled: boolean; readonly highRiskDirection: string | null }) => Promise<void>;
   },
 ): Promise<void> {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const current = await client.query<{ enabled: boolean }>(
-      'SELECT enabled FROM feature_flags WHERE key=$1 FOR UPDATE', [input.key],
+    const current = await client.query<{ enabled: boolean; high_risk_direction: string | null }>(
+      'SELECT enabled, high_risk_direction FROM feature_flags WHERE key=$1 FOR UPDATE', [input.key],
     );
     if (!current.rows[0]) throw new PlatformControlError('FEATURE_FLAG_NOT_FOUND');
+    if (input.guard) await input.guard(client, { enabled: current.rows[0].enabled, highRiskDirection: current.rows[0].high_risk_direction });
     await client.query('UPDATE feature_flags SET enabled=$2, updated_at=now() WHERE key=$1', [input.key, input.enabled]);
     await client.query(
       `INSERT INTO feature_flag_events (id, flag_key, actor_user_id, change_kind, from_value, to_value, reason_code, correlation_id)
@@ -359,12 +369,14 @@ export interface InternalCapabilityChangeInput {
   readonly correlationId: string;
   /** The authorization rule, evaluated against the locked target inside the transaction. */
   readonly decide: (target: CapabilityChangeTarget) => InternalCapabilityChangeRefusal | null;
+  /** OPS-02: consumes a high-risk grant's approval in the grant's own transaction. */
+  readonly consumeApproval?: (client: PoolClient) => Promise<Record<string, unknown>>;
 }
 
 async function inCapabilityTransaction<T>(
   pool: Pool,
   input: InternalCapabilityChangeInput,
-  work: (client: PoolClient, target: PlatformStaffMember) => Promise<T>,
+  work: (client: PoolClient, target: PlatformStaffMember, approval?: Record<string, unknown>) => Promise<T>,
 ): Promise<T> {
   const client = await pool.connect();
   try {
@@ -376,7 +388,8 @@ async function inCapabilityTransaction<T>(
       grants: target.grants.map((grant) => grant.capability),
     });
     if (refusal) throw new PlatformControlError(refusal);
-    const outcome = await work(client, target);
+    const approval = input.consumeApproval ? await input.consumeApproval(client) : undefined;
+    const outcome = await work(client, target, approval);
     await client.query('COMMIT');
     return outcome;
   } catch (error) {
@@ -389,7 +402,9 @@ async function inCapabilityTransaction<T>(
 
 async function writeCapabilityAuditAndOutbox(
   client: PoolClient,
-  input: InternalCapabilityChangeInput & { readonly target: PlatformStaffMember; readonly kind: 'granted' | 'revoked' },
+  input: InternalCapabilityChangeInput & {
+    readonly target: PlatformStaffMember; readonly kind: 'granted' | 'revoked'; readonly approval?: Record<string, unknown> | undefined;
+  },
 ): Promise<void> {
   const audit = {
     id: randomUUID(),
@@ -405,6 +420,7 @@ async function writeCapabilityAuditAndOutbox(
       targetUserId: input.target.userId,
       targetRole: input.target.role,
       ...(input.note ? { note: input.note } : {}),
+      ...(input.approval ? { approval: input.approval } : {}),
     },
   };
   validateAuditWriteInput(audit);
@@ -438,7 +454,7 @@ async function writeCapabilityAuditAndOutbox(
  * self-grant; a refusal there maps to the same codes the pure rules use.
  */
 export async function grantInternalCapability(pool: Pool, input: InternalCapabilityChangeInput): Promise<PlatformStaffMember> {
-  return inCapabilityTransaction(pool, input, async (client, target) => {
+  return inCapabilityTransaction(pool, input, async (client, target, approval) => {
     await client.query('SAVEPOINT capability_insert');
     try {
       await client.query(
@@ -454,7 +470,7 @@ export async function grantInternalCapability(pool: Pool, input: InternalCapabil
       if (/membership_capability_live_uq/.test(message)) throw new PlatformControlError('CAPABILITY_ALREADY_HELD');
       throw new PlatformControlError('CAPABILITY_GRANT_REJECTED');
     }
-    await writeCapabilityAuditAndOutbox(client, { ...input, target, kind: 'granted' });
+    await writeCapabilityAuditAndOutbox(client, { ...input, target, kind: 'granted', approval });
     return (await loadStaffMember(client, input.membershipId, false))!;
   });
 }

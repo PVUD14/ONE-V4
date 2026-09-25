@@ -39,6 +39,8 @@ import {
   type ProtectedHttpRequest,
 } from './api-security.js';
 import { callerHasInternalCapability, dbCapabilityGrantLoader } from './internal-capability-guard.js';
+import { OperationApprovalError, consumeOperationApproval } from '@planthepath/persistence/src/operation-approvals.js';
+import { approvalHttpError, approvalPayloads, readApprovalId } from './operation-approval-gate.js';
 
 type QueryResult<T> = { rows: T[] };
 
@@ -136,22 +138,38 @@ export class OperationsPrivacyController {
       throw badRequest('PRIVACY_RELEASE_REASON_REQUIRED', context.correlationId);
     }
 
-    const released = await this.db.transaction(async (tx) => {
-      const result = await tx.execute(sql`
-        UPDATE data_retention_holds
-        SET released_by_user_id = ${context.authorization.principal.userId}::uuid, released_at = now()
-        WHERE id = ${holdId}::uuid AND released_at IS NULL
-        RETURNING id
-      `) as QueryResult<{ id: string }>;
-      if (!result.rows[0]) return false;
-      await tx.execute(sql`
-        INSERT INTO audit_events (id, actor_user_id, action, resource_type, resource_id, organization_id, outcome, correlation_id, context)
-        VALUES (${randomUUID()}::uuid, ${context.authorization.principal.userId}::uuid, 'privacy.retention_hold.released',
-                'data_retention_hold', ${holdId}, NULL, 'SUCCESS', ${context.correlationId},
-                ${JSON.stringify({ reasonCode: raw.reasonCode })}::jsonb)
-      `);
-      return true;
-    });
+    const reasonCode = raw.reasonCode;
+    // OPS-02: releasing a hold is dual-controlled. An unknown or already released hold is
+    // still a 404 first; a live one needs an approval bound to it and to this reason.
+    const approvalId = readApprovalId(raw, context.correlationId);
+    let released: boolean;
+    try {
+      released = await this.db.transaction(async (tx) => {
+        const live = await tx.execute(sql`
+          SELECT id FROM data_retention_holds WHERE id = ${holdId}::uuid AND released_at IS NULL FOR UPDATE
+        `) as QueryResult<{ id: string }>;
+        if (!live.rows[0]) return false;
+        if (!approvalId) throw new OperationApprovalError('APPROVAL_REQUIRED');
+        const approval = await consumeOperationApproval(tx, {
+          approvalId, actionKey: 'PRIVACY_HOLD_RELEASE', payload: approvalPayloads.PRIVACY_HOLD_RELEASE({ holdId, reasonCode }),
+          executorUserId: context.authorization.principal.userId, correlationId: context.correlationId,
+        });
+        await tx.execute(sql`
+          UPDATE data_retention_holds
+          SET released_by_user_id = ${context.authorization.principal.userId}::uuid, released_at = now()
+          WHERE id = ${holdId}::uuid AND released_at IS NULL
+        `);
+        await tx.execute(sql`
+          INSERT INTO audit_events (id, actor_user_id, action, resource_type, resource_id, organization_id, outcome, correlation_id, context)
+          VALUES (${randomUUID()}::uuid, ${context.authorization.principal.userId}::uuid, 'privacy.retention_hold.released',
+                  'data_retention_hold', ${holdId}, NULL, 'SUCCESS', ${context.correlationId},
+                  ${JSON.stringify({ reasonCode, approval })}::jsonb)
+        `);
+        return true;
+      });
+    } catch (error) {
+      throw approvalHttpError(error, context.correlationId) ?? error;
+    }
     if (!released) throw new NotFoundException({ error: { code: 'PRIVACY_HOLD_NOT_FOUND', correlationId: context.correlationId } });
     return { released: true, correlationId: context.correlationId };
   }

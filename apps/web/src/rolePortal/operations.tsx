@@ -14,6 +14,7 @@ import { OperationsCareerReadinessPanel } from '../operationsCareerReadinessPane
 import type { RolePortalConfig } from '../rolePortalConfig.js';
 import { StatusBadge } from '../studentComponents.js';
 import { formatApiError, RestrictedApiState } from './shared.js';
+import { RequestApprovalDialog } from './approvals.js';
 import { Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -24,6 +25,8 @@ export function OperationsOrganizationsPage({ portal }: { readonly portal: RoleP
   const [error, setError] = useState('');
   const [filters, setFilters] = useState({ q: '', kind: '', verification: '' });
   const [form, setForm] = useState({ kind: 'INSTITUTION', legalName: '', displayName: '', countryCode: 'IN', city: '', adminEmail: '' });
+  // OPS-02: suspension is dual-controlled; the button files an approval request.
+  const [suspending, setSuspending] = useState<OrganizationManagementDto | null>(null);
   const load = useMemo(() => async (signal?: AbortSignal) => {
     if (!token) return;
     const result = await listOperationsOrganizations(token, filters, signal);
@@ -97,8 +100,12 @@ export function OperationsOrganizationsPage({ portal }: { readonly portal: RoleP
     <section className="role-card role-wide"><h2>Search and filters</h2><div className="role-management-form"><label><span>Search</span><input value={filters.q} onChange={(event) => setFilters((value) => ({ ...value, q: event.target.value }))} placeholder="Legal/display name" /></label><label><span>Type</span><select value={filters.kind} onChange={(event) => setFilters((value) => ({ ...value, kind: event.target.value }))}><option value="">All</option><option>INSTITUTION</option><option>EMPLOYER</option></select></label><label><span>Verification</span><select value={filters.verification} onChange={(event) => setFilters((value) => ({ ...value, verification: event.target.value }))}><option value="">All</option><option>PENDING</option><option>UNDER_REVIEW</option><option>VERIFIED</option><option>REJECTED</option><option>SUSPENDED</option></select></label></div></section>
     <form className="role-card role-wide role-management-form" onSubmit={(event) => void create(event)}><h2>Add Organization</h2><label><span>Type *</span><select value={form.kind} onChange={(event) => setForm((value) => ({ ...value, kind: event.target.value }))}><option value="INSTITUTION">Institution</option><option value="EMPLOYER">Employer</option></select></label><label><span>Legal Name *</span><input value={form.legalName} onChange={(event) => setForm((value) => ({ ...value, legalName: event.target.value }))} required /></label><label><span>Display Name</span><input value={form.displayName} onChange={(event) => setForm((value) => ({ ...value, displayName: event.target.value }))} /></label><label><span>Country *</span><input value={form.countryCode} onChange={(event) => setForm((value) => ({ ...value, countryCode: event.target.value.toUpperCase() }))} maxLength={2} required /></label><label><span>City</span><input value={form.city} onChange={(event) => setForm((value) => ({ ...value, city: event.target.value }))} /></label><label><span>Primary Admin Email</span><input type="email" value={form.adminEmail} onChange={(event) => setForm((value) => ({ ...value, adminEmail: event.target.value }))} /></label><button type="submit">Create organization</button></form>
     {notice ? <p className="role-api-success" role="status">{notice}</p> : null}{error ? <p className="form-error" role="alert">{error}</p> : null}
-    <div className="role-record-table-wrap"><table className="role-record-table"><caption className="sr-only">{portal.roleName} real organizations</caption><thead><tr><th>Organization</th><th>Kind</th><th>Location</th><th>Contact</th><th>Verification</th><th>Initial Admin</th><th>Updated</th><th>Actions</th></tr></thead><tbody>{organizations.map((org) => <tr key={org.id} className="role-record-row"><th scope="row"><strong>{org.profile.displayName || org.legalName}</strong><span>{org.legalName}</span><small>{org.profile.websiteUrl ?? 'No website'}</small></th><td>{org.kind}</td><td>{[org.profile.city, org.profile.stateOrProvince, org.profile.countryCode, org.profile.postalCode].filter(Boolean).join(', ') || 'Not set'}</td><td>{org.profile.primaryContactEmail ?? 'Not set'}</td><td><StatusBadge label={org.verificationState} tone="info" /></td><td>{org.initialAdminInvitation?.email ?? 'Not invited'}</td><td>{new Date(org.updatedAt).toLocaleDateString()}</td><td><div className="role-record-actions"><button type="button" className="secondary" onClick={() => void edit(org)}>Edit details</button><button type="button" className="secondary" onClick={() => void onboarding(org.id)}>Onboarding</button>{org.verificationState === 'PENDING' ? <button type="button" onClick={() => void transition(org.id, 'UNDER_REVIEW')}>Begin review</button> : null}{org.verificationState === 'UNDER_REVIEW' ? <><button type="button" onClick={() => void transition(org.id, 'VERIFIED')}>Verify</button><button type="button" className="secondary" onClick={() => void transition(org.id, 'REJECTED')}>Reject</button></> : null}{org.verificationState === 'VERIFIED' ? <button type="button" className="secondary" onClick={() => void transition(org.id, 'SUSPENDED')}>Suspend</button> : null}<button type="button" className="secondary" onClick={() => void invite(org.id)}>Invite admin</button></div></td></tr>)}</tbody></table></div>
+    <div className="role-record-table-wrap"><table className="role-record-table"><caption className="sr-only">{portal.roleName} real organizations</caption><thead><tr><th>Organization</th><th>Kind</th><th>Location</th><th>Contact</th><th>Verification</th><th>Initial Admin</th><th>Updated</th><th>Actions</th></tr></thead><tbody>{organizations.map((org) => <tr key={org.id} className="role-record-row"><th scope="row"><strong>{org.profile.displayName || org.legalName}</strong><span>{org.legalName}</span><small>{org.profile.websiteUrl ?? 'No website'}</small></th><td>{org.kind}</td><td>{[org.profile.city, org.profile.stateOrProvince, org.profile.countryCode, org.profile.postalCode].filter(Boolean).join(', ') || 'Not set'}</td><td>{org.profile.primaryContactEmail ?? 'Not set'}</td><td><StatusBadge label={org.verificationState} tone="info" /></td><td>{org.initialAdminInvitation?.email ?? 'Not invited'}</td><td>{new Date(org.updatedAt).toLocaleDateString()}</td><td><div className="role-record-actions"><button type="button" className="secondary" onClick={() => void edit(org)}>Edit details</button><button type="button" className="secondary" onClick={() => void onboarding(org.id)}>Onboarding</button>{org.verificationState === 'PENDING' ? <button type="button" onClick={() => void transition(org.id, 'UNDER_REVIEW')}>Begin review</button> : null}{org.verificationState === 'UNDER_REVIEW' ? <><button type="button" onClick={() => void transition(org.id, 'VERIFIED')}>Verify</button><button type="button" className="secondary" onClick={() => void transition(org.id, 'REJECTED')}>Reject</button></> : null}{org.verificationState === 'VERIFIED' ? <button type="button" className="secondary" onClick={() => setSuspending(org)}>Suspend…</button> : null}<button type="button" className="secondary" onClick={() => void invite(org.id)}>Invite admin</button></div></td></tr>)}</tbody></table></div>
     <section className="role-card role-wide"><h2>Operations boundary</h2><p>Student add/import/transfer controls are intentionally absent from Operations. Those workflows belong to Institution Administration.</p></section>
+    {suspending ? <RequestApprovalDialog token={token} actionKey="ORGANIZATION_SUSPEND" payload={{ organizationId: suspending.id }}
+      title={`Suspend ${suspending.profile.displayName || suspending.legalName}`}
+      details={[['Organization', suspending.legalName], ['Kind', suspending.kind], ['Effect', 'Deactivates the organisation and pauses its published jobs.']]}
+      onCancel={() => setSuspending(null)} onFiled={(message) => { setSuspending(null); setNotice(message); }} /> : null}
   </section>;
 }
 
@@ -231,6 +238,8 @@ export function OperationsFeatureFlagsPage(): React.ReactElement {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
   const [reason, setReason] = useState('OPERATIONS_ROLLOUT');
+  const [requesting, setRequesting] = useState<FeatureFlagDto | null>(null);
+  const [notice, setNotice] = useState('');
 
   useEffect(() => {
     if (!token) return;
@@ -244,6 +253,8 @@ export function OperationsFeatureFlagsPage(): React.ReactElement {
   if (!token) return <RestrictedApiState title="Feature Flags" message="Sign in with an authorized platform identity to manage feature flags." />;
 
   const toggle = async (flag: FeatureFlagDto): Promise<void> => {
+    // OPS-02: the risky direction of a high-risk flag files an approval request instead.
+    if (isHighRiskChange(flag)) { setRequesting(flag); return; }
     setBusy(flag.key);
     try {
       const result = await setFeatureFlagState(token, flag.key, !flag.enabled, reason);
@@ -266,6 +277,7 @@ export function OperationsFeatureFlagsPage(): React.ReactElement {
       <V2Stat icon="💸" tone="amber" value={flags.filter((flag) => flag.cap).length} label="With a cap" />
     </div>
     {error ? <p className="form-error" role="alert">{error}</p> : null}
+    {notice ? <p role="status">{notice}</p> : null}
     <section className="role-card role-wide"><label className="role-local-search"><span>Reason code recorded with every change</span>
       <input value={reason} onChange={(event) => setReason(event.target.value.toUpperCase())} placeholder="OPERATIONS_ROLLOUT" /></label></section>
     <section className="role-card role-wide"><h2>Flags</h2>
@@ -275,15 +287,25 @@ export function OperationsFeatureFlagsPage(): React.ReactElement {
         <tbody>{flags.map((flag) => <tr key={flag.key}>
           <td>{flag.key}</td>
           <td>{flag.description}</td>
-          <td><StatusBadge label={flag.enabled ? 'ENABLED' : 'OFF'} tone={flag.enabled ? 'success' : 'neutral'} /></td>
+          <td><StatusBadge label={flag.enabled ? 'ENABLED' : 'OFF'} tone={flag.enabled ? 'success' : 'neutral'} />
+            {flag.highRiskDirection ? <><br /><StatusBadge label={`High-risk to ${flag.highRiskDirection === 'ENABLE' ? 'enable' : 'disable'}`} tone="warning" /></> : null}</td>
           <td>{flag.cap ? `${flag.cap.value} ${flag.cap.kind} / ${flag.cap.window}` : 'None'}</td>
           <td>{flag.overrides}</td>
           <td>{flag.lastChangedAt ? new Date(flag.lastChangedAt).toLocaleString() : 'Never'}</td>
-          <td><button type="button" className="pilot-btn" disabled={busy === flag.key || !/^[A-Z0-9_:-]{3,64}$/.test(reason)} onClick={() => void toggle(flag)}>
-            {busy === flag.key ? 'Saving…' : flag.enabled ? 'Disable' : 'Enable'}</button></td>
+          <td><button type="button" className="pilot-btn" disabled={busy === flag.key || (!isHighRiskChange(flag) && !/^[A-Z0-9_:-]{3,64}$/.test(reason))} onClick={() => void toggle(flag)}>
+            {busy === flag.key ? 'Saving…' : `${flag.enabled ? 'Disable' : 'Enable'}${isHighRiskChange(flag) ? '…' : ''}`}</button></td>
         </tr>)}</tbody></table></div> : null}
     </section>
+    {requesting ? <RequestApprovalDialog token={token} actionKey="FEATURE_FLAG_HIGH_RISK_CHANGE" payload={{ key: requesting.key, enabled: !requesting.enabled }}
+      title={`${requesting.enabled ? 'Disable' : 'Enable'} flag ${requesting.key}`}
+      details={[['Flag', requesting.key], ['Change', requesting.enabled ? 'Switch off' : 'Switch on'], ['Description', requesting.description]]}
+      onCancel={() => setRequesting(null)} onFiled={(message) => { setRequesting(null); setNotice(message); }} /> : null}
   </section>;
+}
+
+/** OPS-02: whether toggling this flag goes in its marked high-risk direction. */
+function isHighRiskChange(flag: FeatureFlagDto): boolean {
+  return (flag.highRiskDirection === 'ENABLE' && !flag.enabled) || (flag.highRiskDirection === 'DISABLE' && flag.enabled);
 }
 
 export function InvitationInventoryTable({ invitations }: { readonly invitations: readonly OperationsInvitationDto[] }): React.ReactElement {

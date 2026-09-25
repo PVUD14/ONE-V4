@@ -4,7 +4,7 @@
  * Lists the ONE platform organisation's memberships with what each can do, and lets a
  * CAPABILITY_ADMIN holder grant or revoke internal capabilities. Every change carries
  * a reason code from a fixed list and is audited with an outbox event in the same
- * transaction; the grant rules are decided by the pure functions in
+ * transaction; a high-risk grant also needs an approval (OPS-02); the grant rules are decided by the pure functions in
  * packages/authorization and repeated by the database trigger from 0039, so a second
  * writer cannot skip them.
  */
@@ -49,6 +49,9 @@ import {
 import { PG_POOL } from '../persistence.provider.js';
 import { ProtectedApiAuthenticationGuard, requireTrustedAuthorization, safeError, type ProtectedHttpRequest } from './api-security.js';
 import { loadCallerCapabilityContext, poolCapabilityGrantLoader } from './internal-capability-guard.js';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { consumeOperationApproval } from '@planthepath/persistence/src/operation-approvals.js';
+import { approvalHttpError, approvalNotRequired, approvalPayloads, readApprovalId } from './operation-approval-gate.js';
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const defaultLimit = 50;
@@ -79,7 +82,8 @@ export class OperationsStaffController {
       })),
       grantReasons: internalCapabilityGrantReasons,
       revokeReasons: internalCapabilityRevokeReasons,
-      actorMayGrantHighRisk: actor.memberships.some((membership) => membership.state === 'ACTIVE' && membership.role === 'PLATFORM_SUPER_ADMIN'),
+      // OPS-02: every high-risk grant goes through an approval, whoever asks.
+      highRiskGrantsNeedApproval: true,
       correlationId,
     };
   }
@@ -89,18 +93,30 @@ export class OperationsStaffController {
   async grant(@Req() request: ProtectedHttpRequest, @Param('membershipId') membershipId: string, @Body() body: unknown): Promise<Record<string, unknown>> {
     const { correlationId, actor } = await this.requireCapabilityAdmin(request);
     const id = requireUuid(membershipId, correlationId);
-    const raw = readObject(body, ['capability', 'reasonCode', 'note'], correlationId);
+    const raw = readObject(body, ['capability', 'reasonCode', 'note', 'approvalId'], correlationId);
     const capability = readCapability(raw.capability, correlationId);
     const reasonCode = readReason(raw.reasonCode, internalCapabilityGrantReasons, correlationId);
     const note = readNote(raw.note, correlationId);
+    // OPS-02: a high-risk capability needs a second person's approval, bound to this
+    // membership, capability, reason and note, and consumed in the grant's transaction.
+    const approvalId = readApprovalId(raw, correlationId);
+    const highRisk = isHighRiskInternalCapability(capability);
+    if (!highRisk && approvalId) throw approvalNotRequired(correlationId);
     try {
       const member = await grantInternalCapability(this.pool, {
         membershipId: id, capability, actorUserId: actor.userId, reasonCode, ...(note ? { note } : {}), correlationId,
-        decide: (target) => refuseInternalCapabilityGrant({ actor, target, capability }),
+        decide: (target) => refuseInternalCapabilityGrant({ actor, target, capability, withApproval: Boolean(approvalId) }),
+        ...(highRisk && approvalId ? {
+          consumeApproval: async (client) => ({ ...await consumeOperationApproval(drizzle(client), {
+            approvalId, actionKey: 'CAPABILITY_GRANT_HIGH_RISK',
+            payload: approvalPayloads.CAPABILITY_GRANT_HIGH_RISK({ membershipId: id, capability, reasonCode, note }),
+            executorUserId: actor.userId, correlationId,
+          }) }),
+        } : {}),
       });
       return { member: toStaffDto(member, actor.userId), correlationId };
     } catch (error) {
-      throw mapError(error, correlationId);
+      throw approvalHttpError(error, correlationId) ?? mapError(error, correlationId);
     }
   }
 
@@ -172,7 +188,7 @@ function badRequest(code: string, correlationId: string): BadRequestException {
 const refusalStatus: Readonly<Record<InternalCapabilityChangeRefusal, number>> = {
   FORBIDDEN: 403,
   CAPABILITY_SELF_CHANGE_REFUSED: 403,
-  HIGH_RISK_GRANT_REQUIRES_SUPER_ADMIN: 403,
+  APPROVAL_REQUIRED: 403,
   CAPABILITY_NOT_GRANTABLE_HERE: 400,
   CAPABILITY_ROLE_NOT_ELIGIBLE: 400,
   MEMBERSHIP_NOT_ACTIVE: 400,

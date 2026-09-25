@@ -29,6 +29,7 @@ import { HelpController } from './help.controller.js';
 import { StudentActivityController } from './student-activity.controller.js';
 import { OperationsOutboxController } from './operations-outbox.controller.js';
 import { OperationsPrivacyController } from './operations-privacy.controller.js';
+import { OperationsApprovalsController } from './operations-approvals.controller.js';
 import { ExamTopicMappingController } from './exam-topic-mapping.controller.js';
 import { OperationsAuditController } from './operations-audit.controller.js';
 import { CalendarController } from './calendar.controller.js';
@@ -54,7 +55,7 @@ export class Phase1ApiSecurityModule {
 
     return {
       module: Phase1ApiSecurityModule,
-      controllers: [StaffActionsController, Phase1SecurityController, OperationsInstitutionOnboardingController, StudentOperationalCoreController, StudentHiringController, EmployerHiringController, StudentDocumentsController, StudentPrivacyController, InstitutionAssessmentsController, StudentAssessmentAttemptsController, AssistantController, NotificationsController, ConsentsController, HelpController, StudentActivityController, OperationsAuditController, OperationsOutboxController, OperationsPrivacyController, ExamTopicMappingController, CalendarController, EmployerAssessmentsController, EmployerTeamController],
+      controllers: [StaffActionsController, Phase1SecurityController, OperationsInstitutionOnboardingController, StudentOperationalCoreController, StudentHiringController, EmployerHiringController, StudentDocumentsController, StudentPrivacyController, InstitutionAssessmentsController, StudentAssessmentAttemptsController, AssistantController, NotificationsController, ConsentsController, HelpController, StudentActivityController, OperationsAuditController, OperationsOutboxController, OperationsPrivacyController, OperationsApprovalsController, ExamTopicMappingController, CalendarController, EmployerAssessmentsController, EmployerTeamController],
       providers,
       exports: [
         API_IDENTITY_VERIFIER,

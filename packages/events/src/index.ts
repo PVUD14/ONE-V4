@@ -77,6 +77,15 @@ const organizationRoles = [
   'RECRUITER',
 ] as const;
 
+// OPS-02: kept in step with highRiskActionKeys in packages/authorization and the 0038 CHECK.
+const operationApprovalActionKeys = [
+  'ORGANIZATION_SUSPEND',
+  'FEATURE_FLAG_HIGH_RISK_CHANGE',
+  'OUTBOX_BACKLOG_SUPERSEDE',
+  'PRIVACY_HOLD_RELEASE',
+  'CAPABILITY_GRANT_HIGH_RISK',
+] as const;
+
 export const eventSchemas = {
   identityInvitationAcceptedV1: {
     eventType: 'identity.invitation.accepted',
@@ -344,6 +353,44 @@ export const eventSchemas = {
     dataClassification: 'confidential',
     schemaRef: 'registry://organization_membership.capability_revoked/1',
     payload: { membershipId: { kind: 'uuid' }, capability: { kind: 'string', minLength: 3, maxLength: 64, pattern: /^[A-Z_]+$/ } },
+  },
+  // OPS-02: dual control for high-risk operator actions. No consumer yet; like the
+  // capability events above, the outbox row is the durable announcement an access review
+  // (OPS-15) can follow. Identifiers and enums only.
+  operationApprovalRequestedV1: {
+    eventType: 'operation_approval.requested',
+    eventVersion: 1,
+    producer: 'identity-organization',
+    aggregateType: 'operation_approval',
+    purpose: 'high-risk-action-dual-control',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://operation_approval.requested/1',
+    payload: { approvalId: { kind: 'uuid' }, actionKey: { kind: 'enum', values: operationApprovalActionKeys } },
+  },
+  operationApprovalDecidedV1: {
+    eventType: 'operation_approval.decided',
+    eventVersion: 1,
+    producer: 'identity-organization',
+    aggregateType: 'operation_approval',
+    purpose: 'high-risk-action-dual-control',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://operation_approval.decided/1',
+    payload: {
+      approvalId: { kind: 'uuid' },
+      actionKey: { kind: 'enum', values: operationApprovalActionKeys },
+      decision: { kind: 'enum', values: ['APPROVED', 'REJECTED'] },
+      mode: { kind: 'enum', values: ['DUAL', 'SOLO'] },
+    },
+  },
+  operationApprovalExecutedV1: {
+    eventType: 'operation_approval.executed',
+    eventVersion: 1,
+    producer: 'identity-organization',
+    aggregateType: 'operation_approval',
+    purpose: 'high-risk-action-dual-control',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://operation_approval.executed/1',
+    payload: { approvalId: { kind: 'uuid' }, actionKey: { kind: 'enum', values: operationApprovalActionKeys } },
   },
   learningLessonCompletedV1: {
     eventType: 'learning.lesson.completed',

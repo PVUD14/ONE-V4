@@ -167,8 +167,9 @@ configured". Nothing claims an email went out.
 ## Queue and screen
 
 `GET /operations/approvals?state=PENDING|APPROVED|REJECTED|EXECUTED|EXPIRED` (keyset on
-`(requested_at, id)`, default 50, max 200) is readable by anyone who holds `APPROVE_HIGH_RISK` or who
-filed requests (they see their own). The screen lives under **Settings** (Appendix 1 §4.2), above Staff
+`(requested_at, id)`, default 50, max 200) is readable by anyone who holds `APPROVE_HIGH_RISK` (the whole
+queue) or the capability of any high-risk action (only their own requests). `GET /operations/approvals/policy`
+gives the confirm dialogs each action's reason codes and whether the solo safeguard is active. The screen lives under **Settings** (Appendix 1 §4.2), above Staff
 and capabilities; no navigation item changes. It shows the action, a payload summary with names
 resolved server-side (organisation legal name, flag key, capability and staff email, hold reason — never
 the hold subject), requester, reason, expiry, and decision buttons that collect a decision reason code.

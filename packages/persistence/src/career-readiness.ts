@@ -17,7 +17,8 @@ import {
   type ProtectedQuestionVersion,
 } from '@planthepath/career-readiness/src/index.js';
 import { createIntegrationEventEnvelope } from '@planthepath/events/src/index.js';
-import { recordGradedAttemptSession } from './learning-attempts.js';
+import { attemptOutcomeBand, isAssistedAttempt } from '@planthepath/learning-model/src/index.js';
+import { recordGradedAttemptSession, skillStageAtCapture } from './learning-attempts.js';
 
 type QueryResult<T> = { rows: T[]; rowCount: number | null };
 type DbClient = Pick<PoolClient, 'query'>;
@@ -452,6 +453,9 @@ export async function completeLesson(pool: Pool, input: {
     }
     const progressId = randomUUID();
     const evidenceId = randomUUID();
+    // A lesson is not an attempt: the evidence records the stage the student's attempts on the
+    // topic already support, and adds nothing to it (ENG-04).
+    const stageAtCapture = await skillStageAtCapture(client, input.subjectUserId, lesson.rows[0].topic_id);
     await client.query(
       `INSERT INTO learner_progress
        (id, subject_user_id, lesson_version_id, state, started_at, completed_at, last_correlation_id)
@@ -461,10 +465,10 @@ export async function completeLesson(pool: Pool, input: {
     await client.query(
       `INSERT INTO evidence_records
        (id, subject_user_id, evidence_type, topic_id, demonstrated, possible, source_aggregate_type, source_aggregate_id,
-        content_version, provenance, occurred_at)
-       VALUES ($1,$2,'LESSON_COMPLETION',$3,1,1,'learner_progress',$4,$5,$6::jsonb,now())`,
+        content_version, provenance, occurred_at, assisted, stage_at_capture)
+       VALUES ($1,$2,'LESSON_COMPLETION',$3,1,1,'learner_progress',$4,$5,$6::jsonb,now(),false,$7)`,
       [evidenceId, input.subjectUserId, lesson.rows[0].topic_id, progressId, `lesson-v${lesson.rows[0].version}`,
-        JSON.stringify({ lessonVersionId: input.lessonVersionId, releaseManifestId: PILOT_RELEASE_ID })],
+        JSON.stringify({ lessonVersionId: input.lessonVersionId, releaseManifestId: PILOT_RELEASE_ID }), stageAtCapture],
     );
     await insertOutbox(client, { aggregateType: 'learner_progress', aggregateId: progressId, eventType: 'learning.lesson.completed',
       actorUserId: input.subjectUserId, correlationId: input.correlationId,
@@ -766,19 +770,6 @@ export async function submitAssessmentAttempt(pool: Pool, input: {
          VALUES ($1,$2,$3,now(),$4)`, [randomUUID(), item.item_id, selected, isCorrect],
       );
     }
-    const evidenceIds: string[] = [];
-    for (const [topicId, score] of topicScores) {
-      const evidenceId = randomUUID();
-      evidenceIds.push(evidenceId);
-      await client.query(
-        `INSERT INTO evidence_records
-         (id, subject_user_id, evidence_type, topic_id, demonstrated, possible, source_aggregate_type, source_aggregate_id,
-          content_version, provenance, occurred_at)
-         VALUES ($1,$2,'ASSESSMENT_OUTCOME',$3,$4,$5,'assessment_attempt',$6,'assessment-v1',$7::jsonb,now())`,
-        [evidenceId, input.subjectUserId, topicId, score.demonstrated, score.possible, input.attemptId,
-          JSON.stringify({ attemptId: input.attemptId, itemCount: score.possible, releaseManifestId: PILOT_RELEASE_ID })],
-      );
-    }
     await client.query(
       `UPDATE assessment_attempts SET state='SUBMITTED', submitted_at=now(), submission_idempotency_key=$2,
        score_correct=$3, score_possible=$4 WHERE id=$1`,
@@ -786,17 +777,44 @@ export async function submitAssessmentAttempt(pool: Pool, input: {
     );
     await client.query("UPDATE assessment_assignments SET state='COMPLETED' WHERE id=(SELECT assignment_id FROM assessment_attempts WHERE id=$1)", [input.attemptId]);
     // The attempt log (ENG-03): one row per graded response, in this transaction, so the log
-    // can never claim an attempt that rolled back or miss one that committed.
+    // can never claim an attempt that rolled back or miss one that committed. Written before the
+    // evidence (ENG-04) so each evidence row's stage at capture includes this submission.
     await recordGradedAttemptSession(client, {
       subjectUserId: input.subjectUserId, mode: 'ASSESSMENT', context: 'ASSESSMENT',
       sourceAttemptType: 'assessment_attempt', sourceAttemptId: input.attemptId,
       startedAt: attempt.started_at, contentVersion: 'assessment-v1', responses: gradedResponses,
     });
 
+    const evidenceIds: string[] = [];
+    for (const [topicId, score] of topicScores) {
+      const evidenceId = randomUUID();
+      evidenceIds.push(evidenceId);
+      // Assisted if any response behind the row was (none can be today: the check has no hints).
+      const assisted = gradedResponses.some((response) => response.skillId === topicId
+        && isAssistedAttempt({ highestHintLevel: response.highestHintLevel ?? 0, tutorReplied: response.tutorReplied === true }));
+      const stageAtCapture = await skillStageAtCapture(client, input.subjectUserId, topicId);
+      await client.query(
+        `INSERT INTO evidence_records
+         (id, subject_user_id, evidence_type, topic_id, demonstrated, possible, source_aggregate_type, source_aggregate_id,
+          content_version, provenance, occurred_at, assisted, stage_at_capture)
+         VALUES ($1,$2,'ASSESSMENT_OUTCOME',$3,$4,$5,'assessment_attempt',$6,'assessment-v1',$7::jsonb,now(),$8,$9)`,
+        [evidenceId, input.subjectUserId, topicId, score.demonstrated, score.possible, input.attemptId,
+          JSON.stringify({ attemptId: input.attemptId, itemCount: score.possible, releaseManifestId: PILOT_RELEASE_ID }),
+          assisted, stageAtCapture],
+      );
+    }
+
     const recomputed = await recomputeReadiness(client, { subjectUserId: input.subjectUserId, correlationId: input.correlationId });
 
-    const ratio = scoreCorrect / Math.max(1, items.rows.length);
-    const outcomeBand = ratio >= 0.8 ? 'DEMONSTRATED' : ratio >= 0.6 ? 'PROGRESSING' : 'DEVELOPING';
+    // C3 (ENG-04): one attempt, or checks on a single day, never claim a band. The label is
+    // NOT_ENOUGH_EVIDENCE until this student's submitted checks span two calendar days, and the
+    // unchanged ratio band after that. Nothing reads it to decide readiness.
+    const submittedChecks = await client.query<{ submitted_at: Date }>(
+      "SELECT submitted_at FROM assessment_attempts WHERE subject_user_id=$1 AND state='SUBMITTED' AND submitted_at IS NOT NULL",
+      [input.subjectUserId],
+    );
+    const outcomeBand = attemptOutcomeBand({ correct: scoreCorrect, possible: Math.max(1, items.rows.length),
+      submittedAttemptTimes: submittedChecks.rows.map((row) => new Date(row.submitted_at)) });
     await insertOutbox(client, { aggregateType: 'assessment_attempt', aggregateId: input.attemptId,
       eventType: 'assessment.attempt.submitted', actorUserId: input.subjectUserId, correlationId: input.correlationId,
       payload: { attemptId: input.attemptId, evidenceId: evidenceIds[0], outcomeBand } });

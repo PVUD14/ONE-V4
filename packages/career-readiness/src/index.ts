@@ -246,9 +246,23 @@ export function projectTopicMastery(evidence: readonly EvidenceInput[]): readonl
   });
 }
 
+/**
+ * The readiness model this code implements, as the database names it (readiness_model_versions).
+ *
+ * Version 2 (migration 0030) is active: it admits institution exam evidence and still runs
+ * career-readiness-mastery-v1. The literal here said v1 until ENG-04 reconciled it (ADR-034 §2);
+ * snapshots were always stamped with the database's active version, so no stored row was wrong.
+ * A database test asserts the active row matches this, so the two cannot drift silently.
+ */
+export const CAREER_READINESS_MODEL = {
+  stableKey: 'career-readiness-fundamentals',
+  version: 2,
+  masteryAlgorithm: 'career-readiness-mastery-v1',
+} as const;
+
 export type ReadinessBand = 'NOT_ENOUGH_EVIDENCE' | 'DEVELOPING' | 'PROGRESSING' | 'READY_FOR_NEXT_STEP';
 export interface ReadinessResult {
-  readonly modelVersion: 'career-readiness-fundamentals-v1';
+  readonly modelVersion: 'career-readiness-fundamentals-v2';
   readonly band: ReadinessBand;
   readonly evidenceIds: readonly string[];
   readonly factors: readonly { readonly topicId: string; readonly masteryBand: MasteryProjection['band']; readonly explanation: string }[];
@@ -264,7 +278,7 @@ export function calculateAdvisoryReadiness(projections: readonly MasteryProjecti
   const band: ReadinessBand = evidenceIds.length < 4 || projections.length < 2 || insufficient > 0 ? 'NOT_ENOUGH_EVIDENCE'
     : demonstrated === projections.length ? 'READY_FOR_NEXT_STEP'
       : demonstrated + progressing === projections.length ? 'PROGRESSING' : 'DEVELOPING';
-  return { modelVersion: 'career-readiness-fundamentals-v1', band, evidenceIds,
+  return { modelVersion: 'career-readiness-fundamentals-v2', band, evidenceIds,
     factors: projections.map((projection) => ({ topicId: projection.topicId, masteryBand: projection.band,
       explanation: `${projection.evidenceIds.length} active evidence record(s) evaluated by ${projection.algorithmVersion}` })),
     advisory: true, employerVisible: false };

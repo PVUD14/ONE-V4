@@ -26,6 +26,7 @@
     "@planthepath/automation": "workspace:*",
     "@planthepath/events": "workspace:*",
     "@planthepath/learner-content": "workspace:*",
+    "@planthepath/learning-model": "workspace:*",
     "drizzle-orm": "^0.45.2",
     "pg": "^8.16.0",
     "@planthepath/ai-orchestration": "workspace:*"

@@ -17,7 +17,7 @@ import { randomUUID } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import type { PersistenceDb } from './repositories.js';
 import { refreshReadinessAfterEvidence } from './career-readiness.js';
-import { drizzleAsPgClient } from './learning-attempts.js';
+import { drizzleAsPgClient, skillStageAtCapture } from './learning-attempts.js';
 
 type QueryResult<T> = { rows: T[] };
 
@@ -97,13 +97,17 @@ export async function recordExamResultEvidence(
     // Provenance names the mapping that produced this row, so a band can always be
     // traced back to the paper and the weighting behind it.
     const provenance = JSON.stringify({ source: 'INSTITUTION_EXAM', examSubjectId: row.subject_id, weight });
+    // Exams have no hints, so the evidence is unaided. Its stage at capture is what the
+    // student's attempts on the topic support; exam attempt rows carry no skill (ENG-03), so the
+    // exam itself does not raise it until ENG-05 resolves subjects to topics (ENG-04).
+    const stageAtCapture = await skillStageAtCapture(drizzleAsPgClient(db), row.student_user_id, link.topic_id);
     await db.execute(sql`
       INSERT INTO evidence_records
         (id, subject_user_id, evidence_type, topic_id, demonstrated, possible,
-         source_aggregate_type, source_aggregate_id, content_version, provenance, occurred_at)
+         source_aggregate_type, source_aggregate_id, content_version, provenance, occurred_at, assisted, stage_at_capture)
       VALUES (${randomUUID()}::uuid, ${row.student_user_id}::uuid, 'ASSESSMENT_OUTCOME', ${link.topic_id}::uuid,
               ${demonstrated}, ${possible}, 'exam_attempt', ${input.attemptId}::uuid, 'institution-exam-v1',
-              ${provenance}::jsonb, now())
+              ${provenance}::jsonb, now(), false, ${stageAtCapture})
     `);
     topicIds.push(link.topic_id);
   }

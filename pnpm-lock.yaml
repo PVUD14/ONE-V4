@@ -272,6 +272,9 @@ importers:
       '@planthepath/learner-content':
         specifier: workspace:*
         version: link:../learner-content
+      '@planthepath/learning-model':
+        specifier: workspace:*
+        version: link:../learning-model
       drizzle-orm:
         specifier: ^0.45.2
         version: 0.45.2(@types/pg@8.23.1)(pg@8.23.0)

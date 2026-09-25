@@ -18,6 +18,14 @@
 import { randomUUID } from 'node:crypto';
 import { sql, type SQL } from 'drizzle-orm';
 import type { PoolClient } from 'pg';
+import {
+  ASSISTED_HINT_LEVEL,
+  MAX_HINT_LEVEL,
+  isAssistedAttempt,
+  summariseSkillEvidence,
+  type AttemptContext,
+  type EvidenceStage,
+} from '@planthepath/learning-model/src/index.js';
 import type { PersistenceDb } from './repositories.js';
 
 export type PgClient = Pick<PoolClient, 'query'>;
@@ -29,9 +37,8 @@ export type LearningSessionMode = (typeof learningSessionModes)[number];
 export type LearningItemSource = 'CAREER_READINESS_QUESTION' | 'INSTITUTION_EXAM_QUESTION';
 export type LearningSourceAttemptType = 'assessment_attempt' | 'exam_attempt';
 
-/** The hint level from which a success is assisted (C5; ENG-04 moves the rule into learning-model). */
-export const ASSISTED_HINT_LEVEL = 3;
-export const MAX_HINT_LEVEL = 4;
+/** The assisted rule lives in learning-model (ENG-04); re-exported so existing imports keep working. */
+export { ASSISTED_HINT_LEVEL, MAX_HINT_LEVEL };
 
 export interface GradedResponseInput {
   readonly itemSource: LearningItemSource;
@@ -99,7 +106,7 @@ export function normaliseLearningAttempt(input: GradedResponseInput): Normalised
     score,
     responseTimeMs: time === null ? null : Math.round(time),
     highestHintLevel: hint,
-    assisted: hint >= ASSISTED_HINT_LEVEL || Boolean(input.tutorReplied),
+    assisted: isAssistedAttempt({ highestHintLevel: hint, tutorReplied: input.tutorReplied === true }),
   };
 }
 
@@ -160,6 +167,27 @@ export async function recordGradedAttemptSession(
     written += inserted.rowCount ?? 0;
   }
   return { sessionId, written };
+}
+
+/**
+ * The stage (learning-model-v1) a student's skill has reached from the attempt log, read inside
+ * the caller's transaction so it includes attempts that transaction has just written. Evidence
+ * writers stamp it on evidence_records.stage_at_capture at insert (ENG-04). Attempts without a
+ * known skill — institution exam rows, whose subject→topic mapping ENG-05 resolves — do not
+ * count here, which can only understate the stage.
+ */
+export async function skillStageAtCapture(client: PgClient, subjectUserId: string, skillId: string): Promise<EvidenceStage> {
+  const result = await client.query<{
+    id: string; item_id: string; context: AttemptContext; correct: boolean; highest_hint_level: number; assisted: boolean; occurred_at: Date;
+  }>(
+    `SELECT id, item_id, context, correct, highest_hint_level, assisted, occurred_at
+     FROM learning_attempt_events WHERE subject_user_id=$1 AND skill_id=$2`,
+    [subjectUserId, skillId],
+  );
+  return summariseSkillEvidence(result.rows.map((row) => ({
+    id: row.id, itemId: row.item_id, context: row.context, correct: row.correct,
+    highestHintLevel: row.highest_hint_level, assisted: row.assisted, occurredAt: new Date(row.occurred_at).toISOString(),
+  }))).stage;
 }
 
 /** The institution a student currently belongs to — the same rule `currentContext` uses. */

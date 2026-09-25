@@ -498,7 +498,13 @@ export const eventSchemas = {
     purpose: 'assessment-scoring-and-projection',
     dataClassification: 'confidential',
     schemaRef: 'registry://assessment.attempt.submitted/1',
-    payload: { attemptId: { kind: 'uuid' }, evidenceId: { kind: 'uuid' }, outcomeBand: { kind: 'enum', values: ['DEVELOPING', 'PROGRESSING', 'DEMONSTRATED'] } },
+    payload: {
+      attemptId: { kind: 'uuid' },
+      evidenceId: { kind: 'uuid' },
+      // NOT_ENOUGH_EVIDENCE added by ENG-04 (C3): a first check, or any check on the same day
+      // as the only other ones, no longer claims a band from one day's work. No value was removed.
+      outcomeBand: { kind: 'enum', values: ['NOT_ENOUGH_EVIDENCE', 'DEVELOPING', 'PROGRESSING', 'DEMONSTRATED'] },
+    },
   },
   readinessSnapshotCreatedV1: {
     eventType: 'readiness.snapshot.created',

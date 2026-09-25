@@ -161,9 +161,14 @@ describe('C3 in the readiness-check outcome', () => {
 
   it('gives the ratio band once the checks span two calendar days', async () => {
     const learner = await newLearner();
-    const first = await sitCheck(learner, 1, true);
-    await pool.query(`UPDATE assessment_attempts SET started_at=started_at - interval '2 days', expires_at=expires_at - interval '2 days',
-      submitted_at=submitted_at - interval '2 days' WHERE id=$1`, [first.attemptId]);
+    // A check submitted two days ago. Submitted attempts are immutable, so it is written as
+    // submitted in the past while still in progress, before the trigger would protect it.
+    const earlier = await startAssessmentAttempt(pool, { subjectUserId: learner, assessmentDefinitionId: fixture.assessment.id,
+      correlationId: 'stages-earlier', selectionSeed: `stages-earlier-${learner}` });
+    await pool.query(`UPDATE assessment_attempts SET state='SUBMITTED', started_at=now() - interval '2 days 10 minutes',
+      expires_at=now() - interval '2 days' + interval '20 minutes', submitted_at=now() - interval '2 days',
+      submission_idempotency_key=$2, score_correct=4, score_possible=4 WHERE id=$1`,
+      [earlier.attemptId, `stages-earlier-${learner.slice(0, 8)}`]);
     const second = await sitCheck(learner, 2, true);
     expect(second.outcomeBand).toBe('DEMONSTRATED');
   });

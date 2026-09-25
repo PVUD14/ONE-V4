@@ -30,6 +30,7 @@ describe('normaliseLearningAttempt', () => {
     expect(normaliseLearningAttempt(base)).toEqual({
       itemSource: 'CAREER_READINESS_QUESTION', itemId: base.itemId, itemVersion: 1, skillId: base.skillId,
       answered: true, correct: true, score: 1, responseTimeMs: null, highestHintLevel: 0, assisted: false,
+      selectedOptionId: null, misconceptionCodeIds: [],
     });
   });
 
@@ -63,6 +64,33 @@ describe('normaliseLearningAttempt', () => {
     expect(() => normaliseLearningAttempt({ ...base, responseTimeMs: -1 })).toThrow(LearningAttemptError);
     expect(() => normaliseLearningAttempt({ ...base, marksPossible: 0 })).toThrow(LearningAttemptError);
     expect(() => normaliseLearningAttempt({ ...base, marksAwarded: Number.NaN })).toThrow(LearningAttemptError);
+  });
+});
+
+describe('normaliseLearningAttempt misconception link (ENG-07, recorded by ENG-05)', () => {
+  const codeA = '33333333-3333-4333-8333-333333333333';
+  const codeB = '44444444-4444-4444-8444-444444444444';
+
+  it('records the chosen option and the codes a wrong answer signalled, sorted and without duplicates', () => {
+    const row = normaliseLearningAttempt({ ...base, correct: false, marksAwarded: 0, selectedOptionId: 'c',
+      misconceptionCodeIds: [codeB, codeA, codeB] });
+    expect(row).toMatchObject({ correct: false, selectedOptionId: 'c', misconceptionCodeIds: [codeA, codeB] });
+  });
+
+  it('records a correct answer with its option and no codes', () => {
+    expect(normaliseLearningAttempt({ ...base, selectedOptionId: 'b' })).toMatchObject({ selectedOptionId: 'b', misconceptionCodeIds: [] });
+  });
+
+  it('refuses codes on a correct answer or a blank, a bad option id, or a code that is not a UUID', () => {
+    expect(() => normaliseLearningAttempt({ ...base, misconceptionCodeIds: [codeA] })).toThrow(LearningAttemptError);
+    expect(() => normaliseLearningAttempt({ ...base, answered: false, correct: false, misconceptionCodeIds: [codeA] })).toThrow(LearningAttemptError);
+    expect(() => normaliseLearningAttempt({ ...base, answered: false, correct: false, selectedOptionId: 'a' })).toThrow(LearningAttemptError);
+    expect(() => normaliseLearningAttempt({ ...base, selectedOptionId: '' })).toThrow(LearningAttemptError);
+    expect(() => normaliseLearningAttempt({ ...base, selectedOptionId: 'x'.repeat(65) })).toThrow(LearningAttemptError);
+    expect(() => normaliseLearningAttempt({ ...base, correct: false, misconceptionCodeIds: ['not-a-uuid'] })).toThrow(LearningAttemptError);
+    expect(() => normaliseLearningAttempt({ ...base, correct: false,
+      misconceptionCodeIds: Array.from({ length: 17 }, (_, index) => `33333333-3333-4333-8333-${String(index).padStart(12, '0')}`) }))
+      .toThrow(LearningAttemptError);
   });
 });
 

@@ -215,3 +215,28 @@ describe('integration event envelope', () => {
     })).toThrow(/invalid enum/);
   });
 });
+
+describe('learner skill state projection request (ENG-05)', () => {
+  it('is registered with only the subject and a reason, so the outbox carries no learning data', () => {
+    const subjectUserId = randomUUID();
+    const event = createIntegrationEventEnvelope({
+      eventId: randomUUID(), eventType: 'learning.skill_state.projection_requested', eventVersion: 1,
+      occurredAt: '2026-09-26T00:00:00.000Z', aggregateId: subjectUserId, correlationId: 'skill-state-event-1',
+      payload: { subjectUserId, reason: 'ATTEMPTS_RECORDED' },
+    });
+    expect(event).toMatchObject({ aggregateType: 'user', purpose: 'adaptive-learning-projection', dataClassification: 'confidential' });
+    expect(eventSchemas.learningSkillStateProjectionRequestedV1.payload).toEqual({
+      subjectUserId: { kind: 'uuid' }, reason: { kind: 'enum', values: ['ATTEMPTS_RECORDED', 'CONSENT_GRANTED'] },
+    });
+    expect(() => createIntegrationEventEnvelope({
+      eventId: randomUUID(), eventType: 'learning.skill_state.projection_requested', eventVersion: 1,
+      occurredAt: '2026-09-26T00:00:00.000Z', aggregateId: subjectUserId, correlationId: 'skill-state-event-2',
+      payload: { subjectUserId, reason: 'ATTEMPTS_RECORDED', correct: true },
+    })).toThrow(EventValidationError);
+    expect(() => createIntegrationEventEnvelope({
+      eventId: randomUUID(), eventType: 'learning.skill_state.projection_requested', eventVersion: 1,
+      occurredAt: '2026-09-26T00:00:00.000Z', aggregateId: subjectUserId, correlationId: 'skill-state-event-3',
+      payload: { subjectUserId, reason: 'MANUAL_EDIT' },
+    })).toThrow(EventValidationError);
+  });
+});

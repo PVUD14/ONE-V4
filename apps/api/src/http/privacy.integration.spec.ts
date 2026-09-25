@@ -81,7 +81,42 @@ beforeAll(async () => {
   // be shown to remove exactly the subject's rows.
   await seedLearningActivity(subjectId);
   await seedLearningActivity(opsId);
+  // A learner skill state row (ENG-05) for each, written as the projector writes it.
+  const topicId = await seedTopic(opsId);
+  await seedSkillState(subjectId, topicId);
+  await seedSkillState(opsId, topicId);
 });
+
+async function seedTopic(authorId: string): Promise<string> {
+  const topicId = randomUUID();
+  const revisionId = randomUUID();
+  await pool.query(
+    `INSERT INTO content_revisions (id, entity_type, entity_id, revision, author_user_id, state, content_hash, body)
+     VALUES ($1,'TOPIC',$2,1,$3,'DRAFT',$4,'{}')`, [revisionId, topicId, authorId, 'e'.repeat(64)],
+  );
+  await pool.query(
+    `INSERT INTO taxonomy_nodes (id, kind, stable_key, version, name, description, content_revision_id)
+     VALUES ($1,'TOPIC',$2,1,'Synthetic topic','Synthetic topic for the privacy test',$3)`, [topicId, `privacy-topic-${topicId}`, revisionId],
+  );
+  return topicId;
+}
+
+/** Only the projector may write learner_skill_state; the test takes its role for one row. */
+async function seedSkillState(userId: string, topicId: string): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query("SELECT set_config('one.learner_skill_state_writer', 'learner-skill-state-projector', true)");
+    await client.query(
+      `INSERT INTO learner_skill_state (subject_user_id, skill_id, attempt_count, attempt_day_count, unaided_success_count,
+         unaided_success_day_count, assisted_success_count, last_attempt_at, evidence_stage, evidence_band, algorithm_version)
+       VALUES ($1,$2,1,1,1,1,0,now(),'RETAINED','NOT_ENOUGH_EVIDENCE','learner-skill-state-v1')`, [userId, topicId],
+    );
+    await client.query('COMMIT');
+  } finally {
+    client.release();
+  }
+}
 
 /** One session, one attempt and one activity event, as the assessment paths write them. */
 async function seedLearningActivity(userId: string): Promise<void> {
@@ -219,6 +254,23 @@ describe('learning activity is append-only outside deletion', () => {
     const kept = await pool.query('SELECT count(*)::int AS count FROM learning_attempt_events WHERE subject_user_id = $1', [subjectId]);
     expect(kept.rows[0].count).toBe(1);
   });
+
+  it('refuses to delete the skill state projection outside the projector or the deletion transaction for that person', async () => {
+    await expect(pool.query('DELETE FROM learner_skill_state WHERE subject_user_id = $1', [subjectId]))
+      .rejects.toThrow(/only the projector writes it/);
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query("SELECT set_config('one.privacy_erase_subject', $1, true)", [opsId]);
+      await expect(client.query('DELETE FROM learner_skill_state WHERE subject_user_id = $1', [subjectId]))
+        .rejects.toThrow(/only the projector writes it/);
+    } finally {
+      await client.query('ROLLBACK');
+      client.release();
+    }
+    const kept = await pool.query('SELECT count(*)::int AS count FROM learner_skill_state WHERE subject_user_id = $1', [subjectId]);
+    expect(kept.rows[0].count).toBe(1);
+  });
 });
 
 describe('deletion execution', () => {
@@ -270,6 +322,9 @@ describe('deletion execution', () => {
     expect(await learning('learning_attempt_events', 'subject_user_id', opsId)).toBe(1);
     expect(await learning('learning_sessions', 'subject_user_id', opsId)).toBe(1);
     expect(await learning('learner_activity_events', 'user_id', opsId)).toBe(1);
+    // The skill state projection (ENG-05) is rebuilt from no facts, which erases it.
+    expect(await learning('learner_skill_state', 'subject_user_id', subjectId)).toBe(0);
+    expect(await learning('learner_skill_state', 'subject_user_id', opsId)).toBe(1);
 
     // What the employer lawfully holds survives, detached from the person.
     const applications = await pool.query('SELECT state FROM applications WHERE student_user_id = $1', [subjectId]);
@@ -286,8 +341,8 @@ describe('deletion execution', () => {
     const byCategory = Object.fromEntries(records.rows.map((r) => [r.category, r]));
     expect(byCategory.SUPPORT_CASES.disposition).toBe('ANONYMISED');
     expect(byCategory.LEARNING_ACTIVITY.disposition).toBe('ERASED');
-    // One attempt, one session and one activity event were erased.
-    expect(byCategory.LEARNING_ACTIVITY.record_count).toBe(3);
+    // One attempt, one session, one activity event and one skill state row were erased.
+    expect(byCategory.LEARNING_ACTIVITY.record_count).toBe(4);
     expect(byCategory.AUDIT.disposition).toBe('RETAINED');
     expect(byCategory.AUDIT.basis).toBeTruthy();
     expect(byCategory.APPLICATIONS.disposition).toBe('ANONYMISED');

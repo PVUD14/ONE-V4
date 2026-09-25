@@ -487,4 +487,54 @@ describe('DPDP consent capture', () => {
       await pool.query("UPDATE consent_definitions SET retired_at = now() WHERE consent_key='privacy-notice' AND retired_at IS NULL");
     }
   });
+
+  // ENG-05: adaptive-learning gates the skill state projection. A grant asks the worker to project
+  // the student's history; a withdrawal removes the projection in the request that records it.
+  it('asks for a projection on an adaptive-learning grant and deletes it on withdrawal', async () => {
+    await pool.query(`INSERT INTO consent_definitions (consent_key, version, title, enforcement, withdrawable)
+      VALUES ('adaptive-learning', 'eng05-api-test', 'Synthetic adaptive learning purpose', 'OPTIONAL', true)`);
+    try {
+      const granted = await api().post('/api/v1/me/consents/adaptive-learning/grant').set(auth(studentToken))
+        .send({ version: 'eng05-api-test' });
+      expect(granted.status).toBe(201);
+      const requests = await pool.query(
+        `SELECT payload FROM outbox_events WHERE event_type = 'learning.skill_state.projection_requested' AND aggregate_id = $1`,
+        [studentUserId],
+      );
+      expect(requests.rows.map((row) => row.payload)).toContainEqual({ subjectUserId: studentUserId, reason: 'CONSENT_GRANTED' });
+
+      // A projection row, written as the projector writes it.
+      const topicId = randomUUID();
+      const revisionId = randomUUID();
+      await pool.query(
+        `INSERT INTO content_revisions (id, entity_type, entity_id, revision, author_user_id, state, content_hash, body)
+         VALUES ($1,'TOPIC',$2,1,$3,'DRAFT',$4,'{}')`, [revisionId, topicId, studentUserId, 'f'.repeat(64)],
+      );
+      await pool.query(
+        `INSERT INTO taxonomy_nodes (id, kind, stable_key, version, name, description, content_revision_id)
+         VALUES ($1,'TOPIC',$2,1,'Synthetic topic','Synthetic topic for the consent test',$3)`, [topicId, `consent-topic-${topicId}`, revisionId],
+      );
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query("SELECT set_config('one.learner_skill_state_writer', 'learner-skill-state-projector', true)");
+        await client.query(
+          `INSERT INTO learner_skill_state (subject_user_id, skill_id, attempt_count, attempt_day_count, unaided_success_count,
+             unaided_success_day_count, assisted_success_count, last_attempt_at, evidence_stage, evidence_band, algorithm_version)
+           VALUES ($1,$2,1,1,1,1,0,now(),'RETAINED','NOT_ENOUGH_EVIDENCE','learner-skill-state-v1')`, [studentUserId, topicId],
+        );
+        await client.query('COMMIT');
+      } finally {
+        client.release();
+      }
+
+      const withdrawn = await api().post('/api/v1/me/consents/adaptive-learning/withdraw').set(auth(studentToken)).send({});
+      expect(withdrawn.status).toBe(201);
+      expect(withdrawn.body.withdrawn).toBe(true);
+      const left = await pool.query('SELECT count(*)::int AS count FROM learner_skill_state WHERE subject_user_id = $1', [studentUserId]);
+      expect(left.rows[0].count).toBe(0);
+    } finally {
+      await pool.query("UPDATE consent_definitions SET retired_at = now() WHERE consent_key='adaptive-learning' AND retired_at IS NULL");
+    }
+  });
 });

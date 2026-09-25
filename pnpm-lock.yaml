@@ -254,6 +254,9 @@ importers:
       '@planthepath/events':
         specifier: workspace:*
         version: link:../events
+      '@planthepath/identity':
+        specifier: workspace:*
+        version: link:../identity
       '@planthepath/learner-content':
         specifier: workspace:*
         version: link:../learner-content

@@ -20,6 +20,7 @@
   "dependencies": {
     "@planthepath/authorization": "workspace:*",
     "@planthepath/career-readiness": "workspace:*",
+    "@planthepath/identity": "workspace:*",
     "@planthepath/automation": "workspace:*",
     "@planthepath/events": "workspace:*",
     "@planthepath/learner-content": "workspace:*",

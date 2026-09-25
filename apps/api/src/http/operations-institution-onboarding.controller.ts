@@ -1,9 +1,10 @@
-import { createConnection } from 'node:net';
 import { BadRequestException, Body, ConflictException, Controller, ForbiddenException, Get, Inject, Optional, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { digestInvitationToken, generateInvitationToken } from '@planthepath/identity/src/invitation-token.js';
 import { validateOutboxWriteInput, type PersistenceDb } from '@planthepath/persistence/src/repositories.js';
 import { institutionStudentScopeSql } from '@planthepath/persistence/src/institution-scope.js';
+import { buildInvitationUrl, type InvitationMailSink } from '@planthepath/persistence/src/invitation-mail.js';
+import { createStudentInvitation, loadStudentActivations, resendStudentInvitations, revokePendingStudentInvitations, summariseActivations } from '@planthepath/persistence/src/student-invitations.js';
 import { describeInstitutionStudentScope, institutionStudentScopeFor } from './institution-student-scope.js';
 import {
   API_ID_GENERATOR,
@@ -25,47 +26,9 @@ type InvitationRole = 'INSTITUTION_ADMIN' | 'EMPLOYER_ADMIN' | 'PLACEMENT_ADMIN'
 
 export const API_INVITATION_MAIL_SINK = Symbol('API_INVITATION_MAIL_SINK');
 
-export interface InvitationMailSink {
-  send(input: {
-    readonly toEmail: string;
-    readonly subject: string;
-    readonly textBody: string;
-    readonly invitationId: string;
-    readonly correlationId: string;
-  }): Promise<{ readonly providerReference?: string }>;
-}
-
-export class LoopbackSmtpInvitationMailSink implements InvitationMailSink {
-  constructor(readonly host = process.env.PTP_LOCAL_MAILPIT_HOST ?? '127.0.0.1', readonly port = Number(process.env.PTP_LOCAL_MAILPIT_SMTP_PORT ?? '1025')) {
-    if (!['127.0.0.1', 'localhost'].includes(host) || !Number.isInteger(port) || port < 1 || port > 65_535) {
-      throw new Error('local invitation mail sink must be loopback-bound');
-    }
-  }
-
-  async send(input: { readonly toEmail: string; readonly subject: string; readonly textBody: string; readonly invitationId: string; readonly correlationId: string }): Promise<{ readonly providerReference?: string }> {
-    const transcript = await smtpSend({
-      host: this.host,
-      port: this.port,
-      from: 'no-reply@one.local',
-      to: input.toEmail,
-      message: [
-        `From: ONE <no-reply@one.local>`,
-        `To: ${input.toEmail}`,
-        `Subject: ${sanitizeHeader(input.subject)}`,
-        `X-ONE-Correlation-Id: ${sanitizeHeader(input.correlationId)}`,
-        'Content-Type: text/plain; charset=utf-8',
-        '',
-        input.textBody,
-      ].join('\r\n'),
-    });
-    return { providerReference: `mailpit:${input.invitationId}:${transcript}`.slice(0, 256) };
-  }
-}
-
-export function createConfiguredInvitationMailSink(): InvitationMailSink | undefined {
-  if (process.env.PTP_LOCAL_INVITATION_MAILPIT_ENABLED !== 'true') return undefined;
-  return new LoopbackSmtpInvitationMailSink();
-}
+// Delivery moved to packages/persistence so the outbox worker can send student invitations;
+// re-exported so existing API callers keep their imports.
+export { createConfiguredInvitationMailSink, LoopbackSmtpInvitationMailSink, type InvitationMailSink } from '@planthepath/persistence/src/invitation-mail.js';
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const emailPattern = /^[^@ \t\r\n]+@[^@ \t\r\n]+\.[^@ \t\r\n]+$/;
@@ -435,8 +398,12 @@ export class OperationsInstitutionOnboardingController {
       ORDER BY sp.updated_at DESC, sp.full_name
       LIMIT 500
     `) as QueryResult<Record<string, unknown>>;
+    const activations = await loadStudentActivations(this.db, id, rows.rows.map((row) => String(row.student_user_id)));
+    const students = rows.rows.map((row) => ({ ...mapStudentRow(row), activation: activations.get(String(row.student_user_id)) ?? null }));
     return {
-      students: rows.rows.map(mapStudentRow),
+      students,
+      // Server-computed over the same rows, so the Dashboard's counts cannot disagree with this list.
+      activationSummary: summariseActivations([...activations.values()]),
       scope: await describeInstitutionStudentScope(this.db, request, id, institutionStaffRoles, scope),
       correlationId: context.correlationId,
     };
@@ -467,8 +434,11 @@ export class OperationsInstitutionOnboardingController {
       await writeAudit(tx, { id: this.ids.uuid(), actorUserId: context.authorization.principal.userId, action: 'institution.student_profile.created', resourceType: 'institution_student_profile', resourceId: profileId, organizationId: id, correlationId: context.correlationId });
       await writeOutbox(tx, { id: this.ids.uuid(), aggregateType: 'institution_student_profile', aggregateId: profileId, eventType: 'institution.student_profile.created', payload: { profileId }, actorUserId: context.authorization.principal.userId, organizationId: id, correlationId: context.correlationId });
       await writeOutbox(tx, { id: this.ids.uuid(), aggregateType: 'institution_relationship', aggregateId: relationshipId, eventType: 'institution.relationship.created', payload: { relationshipId }, actorUserId: context.authorization.principal.userId, organizationId: id, correlationId: context.correlationId });
+      // INST-01: the student is invited in the same transaction; the email is sent off the request path.
+      await createStudentInvitation(tx, { invitationId: this.ids.uuid(), institutionId: id, studentUserId: userId, email: input.email,
+        invitedByUserId: context.authorization.principal.userId, outboxEventId: this.ids.uuid(), auditId: this.ids.uuid(), correlationId: context.correlationId });
     });
-    return { student: { id: profileId, institutionId: id, institutionStudentId: input.institutionStudentId, fullName: input.fullName, relationshipId }, correlationId: context.correlationId };
+    return { student: { id: profileId, institutionId: id, institutionStudentId: input.institutionStudentId, fullName: input.fullName, relationshipId, activation: 'INVITED' }, correlationId: context.correlationId };
   }
 
   @Patch('/institutions/:institutionId/units/:unitId')
@@ -576,10 +546,47 @@ export class OperationsInstitutionOnboardingController {
       const relationshipId = rel.rows[0]?.id;
       if (!relationshipId) throw new Error('current relationship not found');
       await tx.execute(sql`UPDATE institution_student_profiles SET status=${state}::roster_student_status, updated_at=now() WHERE id=${profileId}::uuid`);
+      // A student whose relationship ended must not be able to activate into it afterwards.
+      await revokePendingStudentInvitations(tx, { institutionId: id, studentUserId, reasonCode: `RELATIONSHIP_${state}` });
       await writeAudit(tx, { id: this.ids.uuid(), actorUserId: context.authorization.principal.userId, action: 'institution.relationship.ended', resourceType: 'institution_relationship', resourceId: relationshipId, organizationId: id, correlationId: context.correlationId, context: { state } });
       await writeOutbox(tx, { id: this.ids.uuid(), aggregateType: 'institution_relationship', aggregateId: relationshipId, eventType: 'institution.relationship.ended', payload: { relationshipId, state }, actorUserId: context.authorization.principal.userId, organizationId: id, correlationId: context.correlationId });
     });
     return this.getStudent(request, id, profileId);
+  }
+
+  /**
+   * Resend student invitations (INST-01): one student, several, or every student still waiting
+   * (INVITED, EXPIRED, BOUNCED or never invited). Requires a reason code; activated students and
+   * students without a current relationship are skipped, never re-invited.
+   */
+  @Post('/institutions/:institutionId/student-invitations/resend')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async resendStudentInvitations(@Req() request: ProtectedHttpRequest, @Param('institutionId') institutionId: string, @Body() body: unknown): Promise<Record<string, unknown>> {
+    const context = requireInstitutionAdmin(request, institutionId);
+    const id = requireUuid(institutionId, context.correlationId);
+    const input = requireObject(body, 'request');
+    const reasonCode = typeof input.reasonCode === 'string' ? input.reasonCode : '';
+    if (!/^[A-Z0-9_:-]{3,64}$/.test(reasonCode)) throw badRequest('INVALID_REASON_CODE', context.correlationId, 'reasonCode');
+    const all = input.all === true;
+    const rawIds = input.studentUserIds;
+    if (all === Array.isArray(rawIds)) throw badRequest('INVALID_RESEND_TARGET', context.correlationId, 'studentUserIds');
+    let studentUserIds: string[];
+    if (all) {
+      const waiting = await this.db.execute(sql`
+        SELECT p.student_user_id FROM institution_student_profiles p JOIN users u ON u.id = p.student_user_id
+        WHERE p.institution_id = ${id}::uuid AND u.state = 'INVITED' LIMIT 2000
+      `) as QueryResult<{ student_user_id: string }>;
+      studentUserIds = waiting.rows.map((row) => row.student_user_id);
+    } else {
+      const list = rawIds as unknown[];
+      if (list.length === 0 || list.length > 500) throw badRequest('INVALID_RESEND_TARGET', context.correlationId, 'studentUserIds');
+      studentUserIds = [...new Set(list.map((value) => requireUuid(typeof value === 'string' ? value : '', context.correlationId)))];
+    }
+    const result = await this.db.transaction((tx) => resendStudentInvitations(tx, {
+      institutionId: id, studentUserIds, actorUserId: context.authorization.principal.userId, reasonCode,
+      correlationId: context.correlationId, newId: () => this.ids.uuid(),
+    }));
+    return { resend: result, correlationId: context.correlationId };
   }
 
   @Post('/institutions/:institutionId/staff-role-assignments')
@@ -759,6 +766,9 @@ export class OperationsInstitutionOnboardingController {
         await tx.execute(sql`INSERT INTO institution_relationships (id, institution_id, student_user_id, state, effective_from) VALUES (${relationshipId}::uuid, ${id}::uuid, ${userId}::uuid, 'ACTIVE', now())`);
         await tx.execute(sql`UPDATE student_roster_import_rows SET state='COMMITTED', created_profile_id=${profileId}::uuid WHERE import_id=${importId}::uuid AND row_number=${row.row_number}`);
         await writeOutbox(tx, { id: this.ids.uuid(), aggregateType: 'institution_student_profile', aggregateId: profileId, eventType: 'institution.student_profile.created', payload: { profileId }, actorUserId: context.authorization.principal.userId, organizationId: id, correlationId: context.correlationId });
+        // One invitation and one delivery event per committed row; nothing is sent inside the import.
+        await createStudentInvitation(tx, { invitationId: this.ids.uuid(), institutionId: id, studentUserId: userId, email: row.email,
+          invitedByUserId: context.authorization.principal.userId, outboxEventId: this.ids.uuid(), auditId: this.ids.uuid(), correlationId: context.correlationId });
         committed += 1;
       }
       await tx.execute(sql`UPDATE student_roster_imports SET state='COMMITTED', committed_at=now() WHERE id=${importId}::uuid AND institution_id=${id}::uuid AND state='VALIDATED'`);
@@ -899,18 +909,6 @@ async function ensureInvitationNotificationTemplate(db: PersistenceDb, templateI
             1, 'en-IN', ${subject}, 'Invitation link is rendered only in the ephemeral local/test delivery sink.', ${actorUserId}::uuid, now())
     ON CONFLICT (stable_key, version, locale) DO NOTHING
   `);
-}
-
-function buildInvitationUrl(token: string): string {
-  const configured = process.env.PTP_INVITATION_BASE_URL ?? 'http://127.0.0.1:5173';
-  const base = new URL(configured);
-  const localHttp = base.protocol === 'http:' && ['127.0.0.1', 'localhost'].includes(base.hostname);
-  if (base.username || base.password || base.search || base.hash || (base.protocol !== 'https:' && !localHttp)) {
-    throw new Error('invitation base URL must be HTTPS or loopback HTTP');
-  }
-  const invitationUrl = new URL('/invitations/accept', base);
-  invitationUrl.searchParams.set('token', token);
-  return invitationUrl.toString();
 }
 
 async function writeAudit(db: PersistenceDb, input: { id: string; actorUserId: string; action: string; resourceType: string; resourceId: string; organizationId: string; correlationId: string; context?: Record<string, unknown> }): Promise<void> {
@@ -1184,56 +1182,6 @@ function normalizeEmail(value: string, correlationId: string): string {
   const normalized = value.trim().toLowerCase();
   if (!emailPattern.test(normalized) || normalized.length > 254) throw forbidden(correlationId);
   return normalized;
-}
-
-async function smtpSend(input: { readonly host: string; readonly port: number; readonly from: string; readonly to: string; readonly message: string }): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const socket = createConnection({ host: input.host, port: input.port });
-    let buffer = '';
-    let lastResponse = '';
-    const commands = [
-      `HELO planthepath.local\r\n`,
-      `MAIL FROM:<${input.from}>\r\n`,
-      `RCPT TO:<${input.to}>\r\n`,
-      'DATA\r\n',
-      `${input.message.replace(/\r?\n\./g, '\r\n..')}\r\n.\r\n`,
-      'QUIT\r\n',
-    ];
-    let commandIndex = 0;
-    const timeout = setTimeout(() => {
-      socket.destroy();
-      reject(new Error('local invitation mail sink timed out'));
-    }, 5_000);
-    socket.setEncoding('utf8');
-    socket.on('data', (chunk) => {
-      buffer += chunk;
-      if (!buffer.endsWith('\n')) return;
-      const lines = buffer.trimEnd().split(/\r?\n/);
-      buffer = '';
-      lastResponse = lines.at(-1) ?? '';
-      const code = Number(lastResponse.slice(0, 3));
-      if (!Number.isInteger(code) || code >= 500) {
-        clearTimeout(timeout);
-        socket.destroy();
-        reject(new Error('local invitation mail sink rejected message'));
-        return;
-      }
-      if (commandIndex < commands.length) socket.write(commands[commandIndex++]!);
-      else {
-        clearTimeout(timeout);
-        socket.end();
-        resolve(lastResponse.replace(/[^A-Za-z0-9._:-]/g, '').slice(0, 80) || 'accepted');
-      }
-    });
-    socket.on('error', (error) => {
-      clearTimeout(timeout);
-      reject(error);
-    });
-  });
-}
-
-function sanitizeHeader(value: string): string {
-  return value.replace(/[\r\n]+/g, ' ').slice(0, 160);
 }
 
 function mapOrganizationRow(row: Record<string, unknown>): Record<string, unknown> {

@@ -194,6 +194,8 @@ private class InstitutionData(
     val underReview: Int,
     val notifications: NotificationsEnvelope?,
     val attention: List<Pair<NotAttemptedDto, InstitutionExamDto>> = emptyList(),
+    /** Student invitation activation counts; null when the roster could not be read (shown as NA). */
+    val activation: Map<String, Int>? = null,
 )
 
 @Composable
@@ -220,13 +222,14 @@ internal fun InstitutionScaffold(
             val subjects = async { runCatching { Api.listSubjects(context, organizationId).size }.getOrDefault(0) }
             val review = async { runCatching { Api.countQuestions(context, organizationId, "UNDER_REVIEW") }.getOrDefault(0) }
             val inbox = async { runCatching { Api.listNotifications(context) }.getOrNull() }
+            val activation = async { runCatching { Api.institutionActivationSummary(context, organizationId) }.getOrNull() }
             val loadedExams = exams.await()
             val target = loadedExams.firstOrNull { it.lifecycleState == "PUBLISHED" && it.assignedCount > 0 }
             val attention = if (target != null) {
                 runCatching { Api.examResults(context, organizationId, target.id).notAttempted.map { it to target } }
                     .getOrDefault(emptyList())
             } else emptyList()
-            data = InstitutionData(loadedExams, subjects.await(), review.await(), inbox.await(), attention)
+            data = InstitutionData(loadedExams, subjects.await(), review.await(), inbox.await(), attention, activation.await())
         }
     }
 
@@ -354,6 +357,24 @@ private fun InstitutionHome(data: InstitutionData, onExams: () -> Unit) {
                     Row(Modifier.padding(vertical = 3.dp)) {
                         Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
                         Text("NA", style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+
+        // Student activation (INST-01): who has accepted their invitation. Same summary as the
+        // web Dashboard; resending invitations stays on the web Students page.
+        SectionTitle("Student activation")
+        PilotCard {
+            Column(Modifier.padding(14.dp)) {
+                listOf(
+                    "ACTIVATED" to "Activated", "INVITED" to "Invited", "EXPIRED" to "Expired",
+                    "BOUNCED" to "Bounced", "NOT_INVITED" to "Not invited",
+                ).forEach { (key, label) ->
+                    Row(Modifier.padding(vertical = 3.dp)) {
+                        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+                        Text(data.activation?.get(key)?.toString() ?: "NA", style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }

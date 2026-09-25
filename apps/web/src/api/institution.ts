@@ -28,6 +28,36 @@ export interface InstitutionStudentDto {
   readonly id: string; readonly institutionId: string; readonly institutionStudentId: string; readonly fullName: string; readonly email: string; readonly status: string;
   readonly relationship?: { readonly id: string; readonly state: string; readonly effectiveFrom: string; readonly effectiveTo?: string | null } | null;
   readonly units?: Record<string, string | null | undefined>;
+  readonly studentUserId?: string;
+  readonly activation?: InstitutionStudentActivationDto | null;
+}
+
+export type StudentActivationState = 'ACTIVATED' | 'INVITED' | 'EXPIRED' | 'BOUNCED' | 'NOT_INVITED';
+
+/** Whether a rostered student has accepted their invitation (INST-01). */
+export interface InstitutionStudentActivationDto {
+  readonly state: StudentActivationState;
+  readonly deliveryState: string | null;
+  readonly invitedAt: string | null;
+  readonly expiresAt: string | null;
+  readonly lastSentAt: string | null;
+}
+
+export const studentActivationLabels: Readonly<Record<StudentActivationState, string>> = {
+  ACTIVATED: 'Activated', INVITED: 'Invited', EXPIRED: 'Expired', BOUNCED: 'Bounced', NOT_INVITED: 'Not invited',
+};
+
+/** A plain reason for a delivery that has not happened, or null when nothing needs saying. */
+export function studentInvitationDeliveryNote(activation: InstitutionStudentActivationDto | null | undefined): string | null {
+  if (!activation || activation.state !== 'INVITED') return null;
+  if (activation.deliveryState === 'NOT_CONFIGURED') return 'Email not sent: no sender is set up yet';
+  if (activation.deliveryState === 'NOT_SENT') return 'Queued to send';
+  if (activation.deliveryState === 'FAILED') return 'Sending failed; will retry';
+  return null;
+}
+
+export function resendStudentInvitations(token: string, institutionId: string, body: { readonly reasonCode: string; readonly studentUserIds?: readonly string[]; readonly all?: true }): Promise<{ readonly resend: { readonly queued: number; readonly skipped: number } }> {
+  return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/student-invitations/resend`, { token, method: 'POST', body });
 }
 
 export interface InstitutionStudentCreateRequest {
@@ -100,7 +130,7 @@ export function institutionStudentScopeLabel(scope: InstitutionStudentScopeDto |
   return scope.units.map((unit) => unit.name).join(' · ');
 }
 
-export function listInstitutionStudents(token: string, institutionId: string, signal?: AbortSignal): Promise<{ readonly students: readonly InstitutionStudentDto[]; readonly scope?: InstitutionStudentScopeDto }> {
+export function listInstitutionStudents(token: string, institutionId: string, signal?: AbortSignal): Promise<{ readonly students: readonly InstitutionStudentDto[]; readonly scope?: InstitutionStudentScopeDto; readonly activationSummary?: Readonly<Record<StudentActivationState, number>> }> {
   return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/students`, { token, ...(signal ? { signal } : {}) });
 }
 

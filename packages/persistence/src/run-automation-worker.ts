@@ -3,6 +3,7 @@ import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import * as schema from './schema.js';
 import { N8nAutomationAdapter } from '@planthepath/automation/src/index.js';
+import { createConfiguredInvitationMailSink } from './invitation-mail.js';
 import { createEventBridgePublisher, createLocalIntegrationEventPublisher, createNotificationEventConsumer, dispatchAutomationOnce, publishOutboxOnce } from './automation-workers.js';
 
 /**
@@ -23,7 +24,8 @@ async function main(): Promise<void> {
   try {
     if (mode === 'local-dispatcher') {
       const db = drizzle(pool, { schema });
-      const local = createLocalIntegrationEventPublisher({ pool, db });
+      const invitationMailSink = createConfiguredInvitationMailSink();
+      const local = createLocalIntegrationEventPublisher({ pool, db, ...(invitationMailSink ? { invitationMailSink } : {}) });
       const adapter = new N8nAutomationAdapter(requireValue('PTP_N8N_BASE_URL'));
       const invocationSigningSecret = Buffer.from(requireValue('PTP_N8N_INVOCATION_SECRET'), 'utf8');
       const callbackSigningSecret = Buffer.from(requireValue('AUTOMATION_SIGNING_SECRET'), 'utf8');

@@ -162,6 +162,15 @@ object Api {
             request(context, "GET", "/api/v1/institutions/$institutionId/assessment-questions?status=$status"),
         ).questions.size
 
+    /**
+     * Invitation activation counts for the institution's roster (INST-01). The same
+     * server-computed summary the web Dashboard shows, so the phone and the web agree.
+     */
+    suspend fun institutionActivationSummary(context: Context, institutionId: String): Map<String, Int>? =
+        json.decodeFromString<RosterActivationEnvelope>(
+            request(context, "GET", "/api/v1/institutions/$institutionId/students"),
+        ).activationSummary
+
     suspend fun examResults(context: Context, institutionId: String, definitionId: String): ExamResultsDto =
         json.decodeFromString(
             request(context, "GET", "/api/v1/institutions/$institutionId/assessments/$definitionId/results"),
@@ -324,6 +333,8 @@ object Api {
 }
 
 @Serializable data class ErrorEnvelope(val error: ErrorBody? = null)
+/** Only the summary is read; the roster rows themselves stay on the web Students page. */
+@Serializable data class RosterActivationEnvelope(val activationSummary: Map<String, Int>? = null)
 @Serializable data class ErrorBody(val code: String? = null, val message: String? = null)
 
 @Serializable data class AssessmentsEnvelope(val assessments: List<AssessmentDto> = emptyList())

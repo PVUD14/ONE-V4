@@ -165,6 +165,14 @@ export const invitations = pgTable('invitations', {
   revokedAt: timestamp('revoked_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  // 0037: student invitations and delivery state.
+  kind: text('kind').notNull().default('STAFF'),
+  studentUserId: uuid('student_user_id').references(() => users.id),
+  deliveryState: text('delivery_state').notNull().default('NOT_SENT'),
+  sendCount: integer('send_count').notNull().default(0),
+  lastSentAt: timestamp('last_sent_at', { withTimezone: true }),
+  bouncedAt: timestamp('bounced_at', { withTimezone: true }),
+  reasonCode: text('reason_code'),
 }, (t) => [
   uniqueIndex('invitations_token_hash_uq').on(t.tokenHash),
   uniqueIndex('invitations_pending_email_org_uq')

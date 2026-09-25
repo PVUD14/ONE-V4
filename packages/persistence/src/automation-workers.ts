@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto';
+import { deliverStudentInvitation, STUDENT_INVITATION_REQUESTED } from './student-invitations.js';
+import type { InvitationMailSink } from './invitation-mail.js';
 import type { Pool } from 'pg';
 import type { IntegrationEventEnvelope } from '@planthepath/events/src/index.js';
 import type { PersistenceDb } from './repositories.js';
@@ -61,7 +63,7 @@ export async function publishOutboxOnce(input: {
  * is returned so "nothing is listening to this" stays visible in the worker log
  * rather than becoming silence.
  */
-export function createLocalIntegrationEventPublisher(input: { readonly pool: Pool; readonly db: PersistenceDb }): {
+export function createLocalIntegrationEventPublisher(input: { readonly pool: Pool; readonly db: PersistenceDb; readonly invitationMailSink?: InvitationMailSink }): {
   readonly publisher: IntegrationEventPublisher;
   readonly counts: () => { readonly handled: number; readonly unrouted: number };
 } {
@@ -74,6 +76,10 @@ export function createLocalIntegrationEventPublisher(input: { readonly pool: Poo
     },
     'content.generation.requested': async (event) => {
       await consumeSeededContentGenerationRequested(input.db, event);
+    },
+    // INST-01: with no sink configured the invitation is recorded NOT_CONFIGURED, not dropped.
+    [STUDENT_INVITATION_REQUESTED]: async (event) => {
+      await deliverStudentInvitation(input.db, event, input.invitationMailSink ? { mailSink: input.invitationMailSink } : {});
     },
   };
   return {

@@ -29,8 +29,11 @@ student invitation is `kind = 'STUDENT'`, `role IS NULL`, `organization_id` = th
 **Rejected: a dedicated `student_invitations` table.** It would duplicate the token hashing, expiry,
 single-use consumption, the "one pending invitation per email per organisation" index and — most
 importantly — the accept transaction, which is the security-critical part. Two accept paths drift;
-one path with a `kind` branch does not. The existing role/scope constraint already permits
-role-less invitations, so no existing constraint is relaxed.
+one path with a `kind` branch does not. The existing scope trigger (`enforce_invitation_scope`, 0001)
+requires a role on every organisation-scoped invitation, so 0037 redefines it with a **stricter**
+student branch in front — institution only, no role or unit scope, and the invited user must be
+rostered at that institution — and leaves the staff logic byte-for-byte as it was. No existing rule
+for staff invitations is relaxed.
 
 **Rejected: linking at first sign-in by email, with no invitation.** Decision 10.2 #1 requires
 activation by emailed invitation. Linking any sign-in whose email matches a roster row would let

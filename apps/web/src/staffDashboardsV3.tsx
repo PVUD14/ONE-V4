@@ -16,6 +16,8 @@ import {
   type InstitutionExamDto,
   type InstitutionStudentDto,
   type InstitutionUnitDto,
+  type StudentActivationState,
+  studentActivationLabels,
 } from './api.js';
 
 /**
@@ -47,6 +49,8 @@ function Funnel({ rows }: { readonly rows: readonly { readonly label: string; re
 
 interface InstitutionV3Data {
   readonly students: readonly InstitutionStudentDto[] | null;
+  /** Server-computed over the same roster the Students page lists, so the two always agree. */
+  readonly activation: Readonly<Record<StudentActivationState, number>> | null;
   readonly exams: readonly InstitutionExamDto[] | null;
   readonly units: readonly InstitutionUnitDto[] | null;
   readonly notAttempted: readonly (ExamNotAttemptedDto & { readonly examTitle: string; readonly endsAt: string })[];
@@ -59,16 +63,18 @@ export function InstitutionDashboardV3({ institutionId, basePath }: { readonly i
     if (!token) return undefined;
     const controller = new AbortController();
     void Promise.all([
-      listInstitutionStudents(token, institutionId, controller.signal).then((response) => response.students).catch(() => null),
+      listInstitutionStudents(token, institutionId, controller.signal).catch(() => null),
       listInstitutionExams(token, institutionId, controller.signal).then((response) => response.assessments).catch(() => null),
       listInstitutionUnits(token, institutionId, controller.signal).then((response) => response.units).catch(() => null),
-    ]).then(async ([students, exams, units]) => {
+    ]).then(async ([roster, exams, units]) => {
+      const students = roster?.students ?? null;
+      const activation = roster?.activationSummary ?? null;
       const target = exams?.find((exam) => exam.lifecycleState === 'PUBLISHED' && exam.assignedCount > 0) ?? null;
       const notAttempted = target
         ? await listInstitutionExamResults(token, institutionId, target.id).then((response) =>
             response.notAttempted.map((entry) => ({ ...entry, examTitle: target.title, endsAt: target.endsAt }))).catch(() => [])
         : [];
-      setData({ students, exams, units, notAttempted });
+      setData({ students, activation, exams, units, notAttempted });
     });
     return () => controller.abort();
   }, [token, institutionId]);
@@ -123,6 +129,15 @@ export function InstitutionDashboardV3({ institutionId, basePath }: { readonly i
           ]} />
         </section>
       </div>
+
+      <section className="pilot-card">
+        <div className="pilot-card-head"><h2>Student Activation</h2><button type="button" className="pilot-link" onClick={() => go(`${basePath}/students`)}>View Students</button></div>
+        <div className="pilot-legend">
+          {(['ACTIVATED', 'INVITED', 'EXPIRED', 'BOUNCED', 'NOT_INVITED'] as const).map((state) => (
+            <div key={state}><i style={{ background: '#e5eaf2' }} /> {studentActivationLabels[state]} <span className="num">{data.activation ? data.activation[state] : 'NA'}</span></div>
+          ))}
+        </div>
+      </section>
 
       <section className="pilot-card">
         <div className="pilot-card-head"><h2>Students Needing Attention</h2><button type="button" className="pilot-link" onClick={() => go(`${basePath}/assessments`)}>View All</button></div>

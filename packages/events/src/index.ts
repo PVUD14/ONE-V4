@@ -108,6 +108,17 @@ export const eventSchemas = {
     schemaRef: 'registry://identity.invitation.created/1',
     payload: { invitationId: { kind: 'uuid' } },
   },
+  // INST-01: one per rostered student; the outbox worker sends the invitation email.
+  studentInvitationRequestedV1: {
+    eventType: 'institution.student.invitation.requested',
+    eventVersion: 1,
+    producer: 'identity-organization',
+    aggregateType: 'invitation',
+    purpose: 'student-invitation-delivery',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://institution.student.invitation.requested/1',
+    payload: { invitationId: { kind: 'uuid' } },
+  },
   organizationCreatedV1: {
     eventType: 'organization.created',
     eventVersion: 1,

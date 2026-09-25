@@ -116,7 +116,7 @@ export async function acceptInvitationByTokenHashForVerifiedRecipientWithIdempot
 
     const invitationResult = await tx.execute(sql`
       SELECT id, email, organization_id, role, scope_organization_id, scope_institution_id,
-             scope_department_unit_id, scope_batch_unit_id, scope_employer_id
+             scope_department_unit_id, scope_batch_unit_id, scope_employer_id, kind, student_user_id
       FROM invitations
       WHERE token_hash = ${input.invitationTokenHash}
         AND lower(email) = ${input.normalizedRecipientEmail}
@@ -134,10 +134,13 @@ export async function acceptInvitationByTokenHashForVerifiedRecipientWithIdempot
       scope_department_unit_id: string | null;
       scope_batch_unit_id: string | null;
       scope_employer_id: string | null;
+      kind: 'STAFF' | 'STUDENT';
+      student_user_id: string | null;
     }>;
 
     const [invitation] = invitationResult.rows;
     if (!invitation) throw new Error('invitation is not usable');
+    const studentInvitation = invitation.kind === 'STUDENT';
 
     const existingUsers = await tx.execute(sql`
       SELECT id, external_subject, email
@@ -153,6 +156,9 @@ export async function acceptInvitationByTokenHashForVerifiedRecipientWithIdempot
       throw new Error('invitation recipient identity is ambiguous');
     }
     const acceptedUserId = existingUsers.rows[0]?.id ?? input.userId;
+    // A student invitation binds exactly the roster row the college created, never another
+    // account that happens to share the address (INST-01).
+    if (studentInvitation && acceptedUserId !== invitation.student_user_id) throw new Error('invitation is not usable');
     if (existingUsers.rows[0]) {
       await tx.execute(sql`
         UPDATE users
@@ -180,6 +186,15 @@ export async function acceptInvitationByTokenHashForVerifiedRecipientWithIdempot
       RETURNING id
     `) as QueryResult<{ id: string }>;
     if (consumed.rows.length !== 1) throw new Error('invitation is not usable');
+
+    if (studentInvitation) {
+      // Activation: the roster profile becomes ACTIVE so staff actions, assessments and hiring
+      // can see the student. The relationship was created ACTIVE with the profile.
+      await tx.execute(sql`
+        UPDATE institution_student_profiles SET status = 'ACTIVE', updated_at = now()
+        WHERE institution_id = ${invitation.organization_id}::uuid AND student_user_id = ${acceptedUserId}::uuid AND status = 'INVITED'
+      `);
+    }
 
     if (invitation.organization_id && invitation.role && invitation.scope_organization_id) {
       if (!input.membershipId) throw new Error('membership id required for scoped invitation');

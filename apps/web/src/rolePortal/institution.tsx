@@ -6,7 +6,7 @@
  * Split out of rolePortalPages.tsx so each stream owns its own surface. The
  * shell and the route dispatcher remain there and import from here.
  */
-import { ApiRequestError, apiBaseUrl, addInstitutionStudent, commitStudentRosterImport, createInstitutionUnit, endInstitutionStudentRelationship, getProtectedAccessToken, inviteInstitutionStaff, listInstitutionStaff, listInstitutionStudents, listInstitutionUnits, institutionStudentScopeLabel, previewStudentRosterImport, updateInstitutionStudent, updateInstitutionUnit } from '../api.js';
+import { ApiRequestError, apiBaseUrl, addInstitutionStudent, commitStudentRosterImport, createInstitutionUnit, endInstitutionStudentRelationship, getProtectedAccessToken, inviteInstitutionStaff, listInstitutionStaff, listInstitutionStudents, listInstitutionUnits, institutionStudentScopeLabel, previewStudentRosterImport, resendStudentInvitations, studentActivationLabels, studentInvitationDeliveryNote, updateInstitutionStudent, updateInstitutionUnit } from '../api.js';
 import type { InstitutionStaffDto, InstitutionStudentCreateRequest, InstitutionStudentDto, InstitutionUnitDto, RosterImportPreviewDto } from '../api.js';
 import { V2Stat } from '../dashboardsV2.js';
 import type { RolePortalConfig } from '../rolePortalConfig.js';
@@ -15,6 +15,14 @@ import type { AuthenticatedWorkspaceSummary } from './shared.js';
 import { Search } from 'lucide-react';
 import { NaListCard } from '../pilotParity/naWidgets.js';
 import { useEffect, useRef, useState } from 'react';
+
+/** Why an invitation is being sent again; recorded with the resend (INST-01). */
+const invitationResendReasons = [
+  ['NOT_RECEIVED', 'Student did not receive it'],
+  ['LINK_EXPIRED', 'Link expired'],
+  ['EMAIL_CORRECTED', 'Email address corrected'],
+  ['STUDENT_REQUESTED', 'Student asked for a new link'],
+] as const;
 
 function InstitutionAdminStudentsPage({ portal, authenticatedWorkspace }: { readonly portal: RolePortalConfig; readonly authenticatedWorkspace?: AuthenticatedWorkspaceSummary | undefined }): React.ReactElement {
   const token = getProtectedAccessToken();
@@ -29,6 +37,7 @@ function InstitutionAdminStudentsPage({ portal, authenticatedWorkspace }: { read
   const [relationshipError, setRelationshipError] = useState('');
   const [query, setQuery] = useState('');
   const [scopeLabel, setScopeLabel] = useState<string | null>(null);
+  const [resendReason, setResendReason] = useState<string>(invitationResendReasons[0][0]);
   const [form, setForm] = useState({ fullName: '', institutionStudentId: '', email: '', departmentUnitId: '', programUnitId: '', batchUnitId: '', sectionUnitId: '', academicStartDate: '', expectedGraduationDate: '' });
   const [csv, setCsv] = useState('institution_student_id,full_name,email,department,program,batch,section\n');
   useEffect(() => {
@@ -59,6 +68,16 @@ function InstitutionAdminStudentsPage({ portal, authenticatedWorkspace }: { read
       setNotice('Student added with institution relationship; global identity was not hard-deleted or bypassed.');
     } catch (error) {
       setStudentError(formatApiError(error, 'Add student failed.'));
+    }
+  }
+  async function resend(target: { readonly studentUserIds: readonly string[] } | { readonly all: true }): Promise<void> {
+    setStudentError('');
+    setNotice('');
+    try {
+      const result = await resendStudentInvitations(token!, institutionId, { reasonCode: resendReason, ...target });
+      setNotice(`${result.resend.queued} invitation${result.resend.queued === 1 ? '' : 's'} queued to send.${result.resend.skipped ? ` ${result.resend.skipped} skipped (already activated or no longer enrolled).` : ''}`);
+    } catch (error) {
+      setStudentError(formatApiError(error, 'Resending invitations failed.'));
     }
   }
   async function editStudent(student: InstitutionStudentDto): Promise<void> {
@@ -115,8 +134,9 @@ function InstitutionAdminStudentsPage({ portal, authenticatedWorkspace }: { read
     {loadError ? <p className="form-error" role="alert">{loadError}</p> : null}{relationshipError ? <p className="form-error" role="alert">{relationshipError}</p> : null}{notice ? <p className="role-api-success" role="status">{notice}</p> : null}
     <form className="role-card role-wide role-management-form" onSubmit={(event) => void addStudent(event)}><h2>Add Student</h2>{studentError ? <p className="form-error" role="alert">{studentError}</p> : null}<label><span>Full name *</span><input value={form.fullName} onChange={(event) => setForm((value) => ({ ...value, fullName: event.target.value }))} required /></label><label><span>Institution ID *</span><input value={form.institutionStudentId} onChange={(event) => setForm((value) => ({ ...value, institutionStudentId: event.target.value }))} required /></label><label><span>Email *</span><input type="email" value={form.email} onChange={(event) => setForm((value) => ({ ...value, email: event.target.value }))} required /></label><UnitSelect label="Department" value={form.departmentUnitId} units={unitsByKind('DEPARTMENT')} onChange={(departmentUnitId) => setForm((value) => ({ ...value, departmentUnitId }))} /><UnitSelect label="Program" value={form.programUnitId} units={unitsByKind('PROGRAM')} onChange={(programUnitId) => setForm((value) => ({ ...value, programUnitId }))} /><UnitSelect label="Batch" value={form.batchUnitId} units={unitsByKind('BATCH')} onChange={(batchUnitId) => setForm((value) => ({ ...value, batchUnitId }))} /><UnitSelect label="Section" value={form.sectionUnitId} units={unitsByKind('SECTION')} onChange={(sectionUnitId) => setForm((value) => ({ ...value, sectionUnitId }))} /><label><span>Academic start date</span><input type="date" value={form.academicStartDate} onChange={(event) => setForm((value) => ({ ...value, academicStartDate: event.target.value }))} /></label><label><span>Expected graduation date</span><input type="date" value={form.expectedGraduationDate} onChange={(event) => setForm((value) => ({ ...value, expectedGraduationDate: event.target.value }))} /></label><button type="submit">Add student</button></form>
     <section className="role-card role-wide"><h2>Import Students</h2>{csvError ? <p className="form-error" role="alert">{csvError}</p> : null}<p>CSV validates academic unit names, stores resolved institution unit IDs, and rejects unknown/cross-institution names.</p><textarea value={csv} onChange={(event) => setCsv(event.target.value)} rows={5} /><div className="role-record-actions"><button type="button" onClick={() => void previewImport()}>Validate CSV</button>{preview ? <button type="button" disabled={preview.rejectedCount > 0} onClick={() => void commitImport()}>Commit {preview.acceptedCount} rows</button> : null}</div>{preview ? <div><p>{preview.acceptedCount} accepted, {preview.warningCount} warnings, {preview.rejectedCount} rejected.</p><table className="role-record-table"><thead><tr><th>Row</th><th>Email</th><th>State</th><th>Resolved units</th><th>Issues</th></tr></thead><tbody>{preview.rows.map((row) => <tr key={row.rowNumber}><td>{row.rowNumber}</td><td>{row.email}</td><td>{row.state}</td><td>{[row.departmentUnitId, row.programUnitId, row.batchUnitId, row.sectionUnitId].filter(Boolean).length} IDs</td><td>{row.issues.join(', ') || 'None'}</td></tr>)}</tbody></table></div> : null}</section>
+    <section className="role-card role-wide role-management-form"><h2>Student invitations</h2><p>Each student gets an invitation email when they are added or imported. Resend to anyone who has not activated yet.</p><label><span>Reason for resending</span><select value={resendReason} onChange={(event) => setResendReason(event.target.value)}>{invitationResendReasons.map(([code, label]) => <option key={code} value={code}>{label}</option>)}</select></label><div className="role-record-actions"><button type="button" onClick={() => void resend({ all: true })}>Resend to all students not yet activated</button></div></section>
     <section className="role-card role-wide"><h2>Search students</h2><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search name, email, or institution ID" /></section>
-    <div className="role-record-table-wrap"><table className="role-record-table"><caption className="sr-only">{portal.roleName} real students</caption><thead><tr><th>Student</th><th>Institution ID</th><th>Units</th><th>Relationship</th><th>Invitation</th><th>Actions</th></tr></thead><tbody>{filteredStudents.map((student) => <tr key={student.id} className="role-record-row"><th scope="row"><strong>{student.fullName}</strong><span>{student.email}</span></th><td>{student.institutionStudentId}</td><td>{Object.values(student.units ?? {}).filter(Boolean).length} assigned</td><td>{student.relationship?.state ?? student.status}</td><td>{student.status}</td><td><div className="role-record-actions"><button type="button" className="secondary" onClick={() => void editStudent(student)}>Edit student</button><button type="button" onClick={() => void relationship(student.id, 'TRANSFERRED')}>Transfer</button><button type="button" onClick={() => void relationship(student.id, 'GRADUATED')}>Graduate</button><button type="button" className="secondary" onClick={() => void relationship(student.id, 'ENDED')}>End relationship</button><button type="button" className="secondary" onClick={() => void relationship(student.id, 'REVOKED')}>Revoke</button></div></td></tr>)}</tbody></table></div>
+    <div className="role-record-table-wrap"><table className="role-record-table"><caption className="sr-only">{portal.roleName} real students</caption><thead><tr><th>Student</th><th>Institution ID</th><th>Units</th><th>Relationship</th><th>Invitation</th><th>Actions</th></tr></thead><tbody>{filteredStudents.map((student) => <tr key={student.id} className="role-record-row"><th scope="row"><strong>{student.fullName}</strong><span>{student.email}</span></th><td>{student.institutionStudentId}</td><td>{Object.values(student.units ?? {}).filter(Boolean).length} assigned</td><td>{student.relationship?.state ?? student.status}</td><td>{student.activation ? studentActivationLabels[student.activation.state] : 'NA'}{studentInvitationDeliveryNote(student.activation) ? <span>{studentInvitationDeliveryNote(student.activation)}</span> : null}</td><td><div className="role-record-actions">{student.activation && student.activation.state !== 'ACTIVATED' && student.studentUserId ? <button type="button" className="secondary" onClick={() => void resend({ studentUserIds: [student.studentUserId!] })}>Resend invitation</button> : null}<button type="button" className="secondary" onClick={() => void editStudent(student)}>Edit student</button><button type="button" onClick={() => void relationship(student.id, 'TRANSFERRED')}>Transfer</button><button type="button" onClick={() => void relationship(student.id, 'GRADUATED')}>Graduate</button><button type="button" className="secondary" onClick={() => void relationship(student.id, 'ENDED')}>End relationship</button><button type="button" className="secondary" onClick={() => void relationship(student.id, 'REVOKED')}>Revoke</button></div></td></tr>)}</tbody></table></div>
   </section>;
 }
 

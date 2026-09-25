@@ -225,7 +225,7 @@ describe('deletion execution', () => {
       `SELECT category, disposition, basis FROM privacy_deletion_records
        WHERE request_id = $1 ORDER BY category`, [dueId],
     );
-    expect(records.rows).toHaveLength(9);
+    expect(records.rows).toHaveLength(10);
     const byCategory = Object.fromEntries(records.rows.map((r) => [r.category, r]));
     expect(byCategory.AUDIT.disposition).toBe('RETAINED');
     expect(byCategory.AUDIT.basis).toBeTruthy();

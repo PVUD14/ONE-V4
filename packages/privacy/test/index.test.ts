@@ -137,12 +137,14 @@ describe('deletion policy', () => {
       expect(deletionPolicyFor(category).disposition).toBe('ANONYMISED');
     }
     expect(deletionPolicyFor('AUDIT').disposition).toBe('RETAINED');
+    // OPS-05: support cases keep the service record and lose the person.
+    expect(deletionPolicyFor('SUPPORT_CASES').disposition).toBe('ANONYMISED');
   });
 
   it('covers every declared category exactly once', () => {
     const categories = DELETION_POLICY.map((entry) => entry.category);
     expect(new Set(categories).size).toBe(categories.length);
-    expect(categories).toHaveLength(9);
+    expect(categories).toHaveLength(10);
   });
 
   it('produces a deterministic, non-routable replacement identity', () => {

@@ -11,7 +11,7 @@ import { handleEventIdempotently } from './outbox-dispatcher.js';
 import { validateOutboxWriteInput, type PersistenceDb } from './repositories.js';
 import * as schema from './schema.js';
 
-const CONTENT_GENERATION_CONSUMER = 'learner-content-seeded-generation-v1';
+export const CONTENT_GENERATION_CONSUMER = 'learner-content-seeded-generation-v1';
 
 export interface SeededContentGenerationRequest {
   readonly requestId: string;

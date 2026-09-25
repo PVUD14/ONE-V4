@@ -34,6 +34,7 @@ import { OperationsAccountLookupPage, OperationsSupportDeskPage } from './rolePo
 import { OperationsTrustSafetyPage } from './rolePortal/trustSafety.js';
 import { OperationsStaffCapabilitiesPage } from './rolePortal/staffCapabilities.js';
 import { OperationsApprovalsPanel } from './rolePortal/approvals.js';
+import { OperationsSystemHealthPage } from './rolePortal/systemHealth.js';
 import type { AuthenticatedWorkspaceSummary } from './rolePortal/shared.js';
 import { AuthenticatedNotYetAvailable, AuthenticatedReadOnlyModule, institutionStaffWorkspaceRoles, institutionWorkspaceRoles, InstitutionWorkspaceError, isInstitutionStaffWorkspace, isInstitutionWorkspace } from './rolePortal/shared.js';
 import type { RoleFixture, RoleNavItem, RolePortalConfig } from './rolePortalConfig.js';
@@ -249,6 +250,7 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   // complete and role-gated, and pointing this item at the generic status page was the
   // only reason it looked unbuilt.
   if (!demoMode && portal.key === 'operations-admin' && /audit logs/i.test(route.label)) return <OperationsAuditLogPage />;
+  if (!demoMode && portal.key === 'operations-admin' && route.label === 'System Health') return <OperationsSystemHealthPage />;
   if (!demoMode && portal.key === 'operations-admin' && /system health|security|ai operations/i.test(route.label)) return <OperationsTechnicalReadOnlyPage routeLabel={route.label} />;
   if (!demoMode && portal.key === 'operations-admin' && /verification/i.test(route.label)) return <OperationsOrganizationsPage portal={portal} />;
   if (!demoMode && portal.key === 'operations-admin' && /feature flags/i.test(route.label)) return <OperationsFeatureFlagsPage />;

@@ -1,0 +1,31 @@
+# Background jobs alert check (OPS-04): one pass, then exit.
+# Raises one alert per breach (failed events over threshold, a due event waiting past
+# its limit, a configured consumer gone silent) and clears it on recovery; emails go
+# out only through the ops-failure workflow when it is switched on. Kept separate from
+# the automation worker so a stopped worker is still reported.
+[Unit]
+Description=ONE background jobs alert check
+Documentation=https://github.com/PVUD14/planthepath-next
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=aight
+Group=aight
+WorkingDirectory=/srv/planthepath-next/current
+EnvironmentFile=/srv/planthepath-next/shared/app.env
+ExecStart=/usr/bin/env corepack pnpm --filter @planthepath/persistence jobs:alert-check
+
+# Needs the database and nothing else.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

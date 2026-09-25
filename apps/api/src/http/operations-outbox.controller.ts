@@ -42,6 +42,7 @@ import {
 import { callerHasInternalCapability, dbCapabilityGrantLoader } from './internal-capability-guard.js';
 import { consumeOperationApproval } from '@planthepath/persistence/src/operation-approvals.js';
 import { approvalHttpError, approvalPayloads, approvalRequired, readApprovalId } from './operation-approval-gate.js';
+import { isOutboxReplayReason } from '@planthepath/authorization/src/index.js';
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const reasonCodePattern = /^[A-Z0-9_:-]{3,64}$/;
@@ -71,6 +72,8 @@ export class OperationsOutboxController {
     const context = await requireJobsOperator(request, this.db);
     if (!uuidPattern.test(eventId)) throw badRequest('OUTBOX_EVENT_INVALID', context.correlationId);
     const { reasonCode, ticketReference } = readReason(body, context.correlationId);
+    // OPS-04 (§5.3): a replay's reason comes from the fixed list the console offers.
+    if (!isOutboxReplayReason(reasonCode)) throw badRequest('OUTBOX_REASON_INVALID', context.correlationId);
 
     const replayed = await replayOutboxEvent(this.db, {
       eventId,
@@ -139,7 +142,7 @@ export class OperationsOutboxController {
  * and superseding a backlog suppresses many, so neither belongs to an ordinary support
  * role.
  */
-async function requireJobsOperator(request: ProtectedHttpRequest, db: PersistenceDb): Promise<ReturnType<typeof requireTrustedAuthorization>> {
+export async function requireJobsOperator(request: ProtectedHttpRequest, db: PersistenceDb): Promise<ReturnType<typeof requireTrustedAuthorization>> {
   const context = requireTrustedAuthorization(request);
   const permitted = await callerHasInternalCapability(context.authorization, dbCapabilityGrantLoader(db), 'OPS_JOBS_REPLAY');
   if (!permitted) throw new ForbiddenException(safeError('FORBIDDEN', context.correlationId));

@@ -1,0 +1,12 @@
+# Runs the background jobs alert check every five minutes (OPS-04).
+[Unit]
+Description=Run the ONE background jobs alert check every five minutes
+Documentation=https://github.com/PVUD14/planthepath-next
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=5min
+# No Persistent: an open breach stays open between runs, so a missed tick loses nothing.
+
+[Install]
+WantedBy=timers.target

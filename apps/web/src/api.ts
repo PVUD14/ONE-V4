@@ -20,3 +20,4 @@ export * from './api/hiring.js';
 export * from './api/assessments.js';
 export * from './api/assistant.js';
 export * from './api/platform.js';
+export * from './api/systemHealth.js';

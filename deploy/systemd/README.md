@@ -29,6 +29,38 @@ The service then emails you when pings stop arriving (host dead) or when the fai
 endpoint is hit (host alive but broken). Without these URLs the monitor still runs
 and logs, but nobody is told.
 
+## Background jobs alert check
+
+Every five minutes, one pass of `jobs:alert-check` (OPS-04). It looks at the outbox and
+consumer receipts and raises **one alert per breach**: failed events at or above
+`JOBS_ALERT_FAILED_THRESHOLD` (default 10), a due event waiting at least
+`JOBS_ALERT_PENDING_STALL_MINUTES` (default 30), or a consumer listed in
+`JOBS_ALERT_CONSUMER_SILENCE_MINUTES` with no receipt in its interval. It clears the alert
+when the condition recovers. Operators see open and recent alerts in Operations →
+System Health. It runs apart from the automation worker, so a stopped worker still shows
+up as a stalled queue.
+
+An alert is emailed to platform staff only when the `ops-failure` workflow is registered
+active, outside its kill switch, and an approved `ops-failure` notification template
+exists. Otherwise the alert is recorded as not emailed, and the screen says so.
+
+```bash
+sudo cp /srv/planthepath-next/current/deploy/systemd/planthepath-jobs-alerts.* /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now planthepath-jobs-alerts.timer
+sudo systemctl start planthepath-jobs-alerts.service && journalctl -u planthepath-jobs-alerts.service -n 3 --no-pager
+```
+
+A run logs one line:
+
+```json
+{"event":"jobs.alert.check","raised":[{"condition":"PENDING_EVENTS_STALLED","subject":null,"notice":"NOT_DELIVERED"}],"cleared":[],"open":1,"ignoredConfig":[]}
+```
+
+Until the pre-dispatcher backlog is superseded (System Health → Supersede the backlog),
+expect a `PENDING_EVENTS_STALLED` alert on the first run. That alert is correct: those
+events are waiting and nothing is delivering them.
+
 ## Off-host backup copy
 
 The backup script copies each verified dump off the machine when either is set in

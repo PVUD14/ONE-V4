@@ -72,8 +72,10 @@ nothing appended later moves it back:
 
 Consequences worth stating:
 
-- Assisted successes and wrong answers never change the stage — adding any number of them anywhere in
-  the history leaves it where it was (property-tested).
+- Assisted successes and wrong answers never count: adding any number of them anywhere in the history
+  never raises the stage, and below `TRANSFERRED` leaves it exactly where it was. At `TRANSFERRED` they
+  can only hold it back, because an item the student has already attempted — even wrongly, even with
+  help — is not a new problem (property-tested).
 - Two unaided successes on one day reach `RETAINED`, never `DEMONSTRATED` (baseline defect (c), for the
   engine).
 - A skill does not go back a stage because of a later wrong answer. The stage records what has been

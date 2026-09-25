@@ -17,6 +17,7 @@ import {
   type ProtectedQuestionVersion,
 } from '@planthepath/career-readiness/src/index.js';
 import { createIntegrationEventEnvelope } from '@planthepath/events/src/index.js';
+import { recordGradedAttemptSession } from './learning-attempts.js';
 
 type QueryResult<T> = { rows: T[]; rowCount: number | null };
 type DbClient = Pick<PoolClient, 'query'>;
@@ -563,6 +564,28 @@ async function recomputeReadiness(
   return { snapshotId, band: readiness.band, roadmapActionIds };
 }
 
+/**
+ * The readiness path for evidence written outside this file (the 0030 exam bridge), inside the
+ * caller's transaction. Before ENG-03 the bridge wrote evidence and left the band stale (C9).
+ *
+ * Returns null, recomputing nothing, while no readiness model or roadmap policy is published
+ * (an environment where the career-readiness pilot was never imported): a snapshot there would
+ * violate its foreign keys and roll back the exam result with it.
+ */
+export async function refreshReadinessAfterEvidence(
+  client: DbClient,
+  input: { readonly subjectUserId: string; readonly correlationId: string },
+): Promise<{ readonly snapshotId: string; readonly band: string } | null> {
+  const published = await client.query<{ ready: boolean }>(
+    `SELECT EXISTS (SELECT 1 FROM readiness_model_versions WHERE stable_key='career-readiness-fundamentals' AND active)
+        AND EXISTS (SELECT 1 FROM roadmap_policy_versions WHERE id=$1) AS ready`,
+    [ROADMAP_POLICY_ID],
+  );
+  if (!published.rows[0]?.ready) return null;
+  const recomputed = await recomputeReadiness(client, input);
+  return { snapshotId: recomputed.snapshotId, band: recomputed.band };
+}
+
 export async function startAssessmentAttempt(pool: Pool, input: {
   readonly subjectUserId: string; readonly assessmentDefinitionId: string; readonly correlationId: string; readonly selectionSeed: string;
 }): Promise<Record<string, unknown>> {
@@ -703,8 +726,8 @@ export async function submitAssessmentAttempt(pool: Pool, input: {
 }): Promise<Record<string, unknown>> {
   return transaction(pool, async (client) => {
     const attemptResult = await client.query<{
-      state: 'IN_PROGRESS' | 'SUBMITTED'; submission_idempotency_key: string | null; expires_at: Date; score_correct: number | null; score_possible: number | null;
-    }>('SELECT state, submission_idempotency_key, expires_at, score_correct, score_possible FROM assessment_attempts WHERE id=$1 AND subject_user_id=$2 FOR UPDATE',
+      state: 'IN_PROGRESS' | 'SUBMITTED'; submission_idempotency_key: string | null; expires_at: Date; started_at: Date; score_correct: number | null; score_possible: number | null;
+    }>('SELECT state, submission_idempotency_key, expires_at, started_at, score_correct, score_possible FROM assessment_attempts WHERE id=$1 AND subject_user_id=$2 FOR UPDATE',
     [input.attemptId, input.subjectUserId]);
     const attempt = attemptResult.rows[0];
     if (!attempt) throw new Error('assessment attempt was not found');
@@ -726,11 +749,16 @@ export async function submitAssessmentAttempt(pool: Pool, input: {
     }
     let scoreCorrect = 0;
     const topicScores = new Map<string, { demonstrated: number; possible: number }>();
+    const gradedResponses: Parameters<typeof recordGradedAttemptSession>[1]['responses'][number][] = [];
     for (const item of items.rows) {
       const selected = input.selectedOptions[item.question_id];
       if (!selected || !item.options.some((option) => option.id === selected)) throw new Error('every item requires a valid selected option');
       const isCorrect = selected === item.correct_option_id;
       if (isCorrect) scoreCorrect += 1;
+      gradedResponses.push({
+        itemSource: 'CAREER_READINESS_QUESTION', itemId: item.question_id, itemVersion: item.version, skillId: item.topic_id,
+        answered: true, correct: isCorrect, marksAwarded: isCorrect ? 1 : 0, marksPossible: 1,
+      });
       const topic = topicScores.get(item.topic_id) ?? { demonstrated: 0, possible: 0 };
       topicScores.set(item.topic_id, { demonstrated: topic.demonstrated + (isCorrect ? 1 : 0), possible: topic.possible + 1 });
       await client.query(
@@ -757,6 +785,13 @@ export async function submitAssessmentAttempt(pool: Pool, input: {
       [input.attemptId, input.idempotencyKey, scoreCorrect, items.rows.length],
     );
     await client.query("UPDATE assessment_assignments SET state='COMPLETED' WHERE id=(SELECT assignment_id FROM assessment_attempts WHERE id=$1)", [input.attemptId]);
+    // The attempt log (ENG-03): one row per graded response, in this transaction, so the log
+    // can never claim an attempt that rolled back or miss one that committed.
+    await recordGradedAttemptSession(client, {
+      subjectUserId: input.subjectUserId, mode: 'ASSESSMENT', context: 'ASSESSMENT',
+      sourceAttemptType: 'assessment_attempt', sourceAttemptId: input.attemptId,
+      startedAt: attempt.started_at, contentVersion: 'assessment-v1', responses: gradedResponses,
+    });
 
     const recomputed = await recomputeReadiness(client, { subjectUserId: input.subjectUserId, correlationId: input.correlationId });
 

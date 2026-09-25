@@ -16,6 +16,8 @@
 import { randomUUID } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import type { PersistenceDb } from './repositories.js';
+import { refreshReadinessAfterEvidence } from './career-readiness.js';
+import { drizzleAsPgClient } from './learning-attempts.js';
 
 type QueryResult<T> = { rows: T[] };
 
@@ -24,6 +26,11 @@ export interface ExamEvidenceOutcome {
   /** Subjects with no live topic mapping. Reported so the gap is visible, not filled. */
   readonly unmappedSubject: boolean;
   readonly topicIds: readonly string[];
+  /**
+   * The band after the readiness path ran on the new evidence (ENG-03, C9). Null when nothing
+   * was written, or while no readiness model is published in this environment.
+   */
+  readonly readiness?: { readonly snapshotId: string; readonly band: string } | null;
 }
 
 /**
@@ -41,10 +48,13 @@ export interface ExamEvidenceOutcome {
  *    counts are used instead of the score for exactly this reason.
  *  - Re-publishing does not double-count: evidence already recorded against this
  *    attempt is left alone.
+ *
+ * When evidence is written, readiness is recomputed through `recomputeReadiness` in the same
+ * transaction (ENG-03), so a mapped exam result moves the band as C9 requires.
  */
 export async function recordExamResultEvidence(
   db: PersistenceDb,
-  input: { readonly attemptId: string },
+  input: { readonly attemptId: string; readonly correlationId?: string },
 ): Promise<ExamEvidenceOutcome> {
   const none: ExamEvidenceOutcome = { written: 0, unmappedSubject: false, topicIds: [] };
 
@@ -97,7 +107,14 @@ export async function recordExamResultEvidence(
     `);
     topicIds.push(link.topic_id);
   }
-  return { written: topicIds.length, unmappedSubject: false, topicIds };
+  // Evidence moves the band in the same transaction that records it, through the one
+  // readiness path (ADR-034). Before ENG-03 this bridge stopped at the evidence and the
+  // band stayed where it was until the student happened to sit a readiness check (C9).
+  const readiness = await refreshReadinessAfterEvidence(drizzleAsPgClient(db), {
+    subjectUserId: row.student_user_id,
+    correlationId: input.correlationId ?? `exam-evidence:${input.attemptId}`,
+  });
+  return { written: topicIds.length, unmappedSubject: false, topicIds, readiness };
 }
 
 /** The mappings an institution has declared, for its own exam manager. */

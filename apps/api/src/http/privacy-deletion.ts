@@ -141,6 +141,20 @@ async function erase(deps: DeletionExecutionDeps, subjectUserId: string): Promis
   await db.execute(sql`DELETE FROM notification_commands WHERE subject_user_id = ${subjectUserId}::uuid`);
   await db.execute(sql`DELETE FROM notification_preferences WHERE user_id = ${subjectUserId}::uuid`);
 
+  // Engine behavioural data is erased (ADR-034, ENG-03). The attempt log and sessions are
+  // append-only; their trigger allows DELETE only for the subject named in the
+  // transaction-local setting set here, so this one transaction is the only way to remove
+  // them. Attempts before sessions, which they reference.
+  counts.LEARNING_ACTIVITY = await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT set_config('one.privacy_erase_subject', ${subjectUserId}, true)`);
+    const removed = async (query: ReturnType<typeof sql>): Promise<number> =>
+      Number(((await tx.execute(query)) as QueryResult<{ count: number }>).rows[0]?.count ?? 0);
+    const attempts = await removed(sql`WITH gone AS (DELETE FROM learning_attempt_events WHERE subject_user_id = ${subjectUserId}::uuid RETURNING 1) SELECT count(*)::int AS count FROM gone`);
+    const sessions = await removed(sql`WITH gone AS (DELETE FROM learning_sessions WHERE subject_user_id = ${subjectUserId}::uuid RETURNING 1) SELECT count(*)::int AS count FROM gone`);
+    const activity = await removed(sql`WITH gone AS (DELETE FROM learner_activity_events WHERE user_id = ${subjectUserId}::uuid RETURNING 1) SELECT count(*)::int AS count FROM gone`);
+    return attempts + sessions + activity;
+  });
+
   // Institution roster history survives, with the person removed from it.
   counts.INSTITUTION_ROSTER = await countOf(sql`SELECT count(*)::int AS count FROM institution_student_profiles WHERE student_user_id = ${subjectUserId}::uuid`);
   const replacement = anonymisedIdentity(subjectUserId);

@@ -142,7 +142,8 @@ export function assertExportDownloadable(input: {
 
 export type DeletionCategory =
   | 'IDENTITY' | 'STUDENT_PROFILE' | 'INSTITUTION_ROSTER' | 'DOCUMENTS'
-  | 'APPLICATIONS' | 'OFFERS' | 'ASSESSMENT_EVIDENCE' | 'NOTIFICATIONS' | 'AUDIT' | 'SUPPORT_CASES';
+  | 'APPLICATIONS' | 'OFFERS' | 'ASSESSMENT_EVIDENCE' | 'NOTIFICATIONS' | 'AUDIT' | 'SUPPORT_CASES'
+  | 'LEARNING_ACTIVITY';
 
 export type DeletionDisposition = 'ERASED' | 'ANONYMISED' | 'RETAINED';
 
@@ -172,6 +173,10 @@ export const DELETION_POLICY: readonly DeletionPolicyEntry[] = [
   // OPS-05: the operator's service record survives with the person removed from it — the
   // subject link, the typed summary and every note (docs/architecture/support-cases-table-design.md).
   { category: 'SUPPORT_CASES', disposition: 'ANONYMISED', basis: 'Support records are kept as a history of the service given, with the person, the summary and the notes removed.' },
+  // Engine behavioural data — the attempt log, learning sessions and learning activity
+  // telemetry — is only about the person, so it is erased, not anonymised (ADR-034). It is
+  // append-only for everyone else; only the deletion transaction may remove it.
+  { category: 'LEARNING_ACTIVITY', disposition: 'ERASED' },
   { category: 'AUDIT', disposition: 'RETAINED', basis: 'Security and access audit records are retained under the approved retention schedule.' },
 ];
 

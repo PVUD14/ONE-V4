@@ -40,6 +40,7 @@ import { InstitutionTeachingAssignmentsController } from './institution-teaching
 import { EmployerCompanyProfileController } from './employer-company-profile.controller.js';
 import { EmployerAccessRequestsController } from './employer-access-requests.controller.js';
 import { OperationsJobsController } from './operations-jobs.controller.js';
+import { InstitutionSettingsController } from './institution-settings.controller.js';
 
 @Module({})
 export class Phase1ApiSecurityModule {
@@ -60,7 +61,7 @@ export class Phase1ApiSecurityModule {
 
     return {
       module: Phase1ApiSecurityModule,
-      controllers: [StaffActionsController, Phase1SecurityController, OperationsInstitutionOnboardingController, StudentOperationalCoreController, StudentHiringController, EmployerHiringController, StudentDocumentsController, StudentPrivacyController, InstitutionAssessmentsController, StudentAssessmentAttemptsController, AssistantController, NotificationsController, ConsentsController, HelpController, StudentActivityController, OperationsAuditController, OperationsOutboxController, OperationsPrivacyController, OperationsApprovalsController, ExamTopicMappingController, CalendarController, EmployerAssessmentsController, EmployerTeamController, InstitutionTeachingAssignmentsController, EmployerCompanyProfileController, EmployerAccessRequestsController, OperationsSupportController, OperationsJobsController],
+      controllers: [StaffActionsController, Phase1SecurityController, OperationsInstitutionOnboardingController, StudentOperationalCoreController, StudentHiringController, EmployerHiringController, StudentDocumentsController, StudentPrivacyController, InstitutionAssessmentsController, StudentAssessmentAttemptsController, AssistantController, NotificationsController, ConsentsController, HelpController, StudentActivityController, OperationsAuditController, OperationsOutboxController, OperationsPrivacyController, OperationsApprovalsController, ExamTopicMappingController, CalendarController, EmployerAssessmentsController, EmployerTeamController, InstitutionTeachingAssignmentsController, EmployerCompanyProfileController, EmployerAccessRequestsController, OperationsSupportController, OperationsJobsController, InstitutionSettingsController],
       providers,
       exports: [
         API_IDENTITY_VERIFIER,

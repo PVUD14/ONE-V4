@@ -198,6 +198,8 @@ private class InstitutionData(
     val activation: Map<String, Int>? = null,
     /** Faculty "My Students" (INST-03). */
     val myStudents: MyStudentsState = MyStudentsState.NotFaculty,
+    /** Academic verification backlog (INST-04), server-counted over the reader's scope; null reads NA. */
+    val verification: VerificationSummaryDto? = null,
 )
 
 /**
@@ -233,8 +235,10 @@ internal fun InstitutionScaffold(
     var showThemeOv by remember { mutableStateOf(false) }
     var resultsFor by remember { mutableStateOf<InstitutionExamDto?>(null) }
     var showHelpOv by remember { mutableStateOf(false) }
+    var showVerifyOv by remember { mutableStateOf(false) }
+    var refresh by remember { mutableStateOf(0) }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(refresh) {
         coroutineScope {
             val exams = async { runCatching { Api.listInstitutionExams(context, organizationId) }.getOrDefault(emptyList()) }
             val subjects = async { runCatching { Api.listSubjects(context, organizationId).size }.getOrDefault(0) }
@@ -247,18 +251,21 @@ internal fun InstitutionScaffold(
                     onFailure = { if (it is Api.ApiException && it.status == 403) MyStudentsState.NotFaculty else MyStudentsState.Unavailable },
                 )
             }
+            val verification = async { runCatching { Api.verificationSummary(context, organizationId) }.getOrNull() }
             val loadedExams = exams.await()
             val target = loadedExams.firstOrNull { it.lifecycleState == "PUBLISHED" && it.assignedCount > 0 }
             val attention = if (target != null) {
                 runCatching { Api.examResults(context, organizationId, target.id).notAttempted.map { it to target } }
                     .getOrDefault(emptyList())
             } else emptyList()
-            data = InstitutionData(loadedExams, subjects.await(), review.await(), inbox.await(), attention, activation.await(), myStudents.await())
+            data = InstitutionData(loadedExams, subjects.await(), review.await(), inbox.await(), attention, activation.await(),
+                myStudents.await(), verification.await())
         }
     }
 
-    androidx.activity.compose.BackHandler(enabled = showInboxOv || showChatOv || showThemeOv || showHelpOv || resultsFor != null) {
+    androidx.activity.compose.BackHandler(enabled = showInboxOv || showChatOv || showThemeOv || showHelpOv || showVerifyOv || resultsFor != null) {
         when {
+            showVerifyOv -> showVerifyOv = false
             showChatOv -> showChatOv = false
             showThemeOv -> showThemeOv = false
             showInboxOv -> showInboxOv = false
@@ -268,6 +275,10 @@ internal fun InstitutionScaffold(
     }
     when {
         showHelpOv -> { SlideIn { HelpFaqPage(persona = "institution", onClose = { showHelpOv = false }) }; return }
+        showVerifyOv -> {
+            SlideIn { VerificationQueueOverlay(organizationId, onClose = { showVerifyOv = false }, onChanged = { refresh += 1 }) }
+            return
+        }
         showChatOv -> { SlideIn { ChatOverlay(persona = "institution", onClose = { showChatOv = false }) }; return }
         showThemeOv -> { SlideIn { ThemeOverlay(currentTheme, onThemeChange, onClose = { showThemeOv = false }) }; return }
         showInboxOv -> { SlideIn { StaffInboxOverlay(data?.notifications, onClose = { showInboxOv = false }) }; return }
@@ -321,7 +332,7 @@ internal fun InstitutionScaffold(
                 when {
                     data == null -> HomeSkeleton()
                     else -> when (tab) {
-                        0 -> InstitutionHome(data!!) { tab = 1 }
+                        0 -> InstitutionHome(data!!, onVerify = { showVerifyOv = true }) { tab = 1 }
                         1 -> InstitutionExams(data!!.exams) { resultsFor = it }
                         else -> StaffMore(onSignOut, onSwitchWorkspace,
                             "Question authoring, exam building, publishing and reopening stay on the web at one.ai8ht.pro.",
@@ -334,7 +345,7 @@ internal fun InstitutionScaffold(
 }
 
 @Composable
-private fun InstitutionHome(data: InstitutionData, onExams: () -> Unit) {
+private fun InstitutionHome(data: InstitutionData, onVerify: () -> Unit, onExams: () -> Unit) {
     val published = data.exams.count { it.lifecycleState == "PUBLISHED" }
     val assigned = data.exams.sumOf { it.assignedCount }
     val attempts = data.exams.sumOf { it.completedAttempts }
@@ -403,6 +414,24 @@ private fun InstitutionHome(data: InstitutionData, onExams: () -> Unit) {
                     Row(Modifier.padding(vertical = 3.dp)) {
                         Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
                         Text(data.activation?.get(key)?.toString() ?: "NA", style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+
+        // Academic verification (INST-04): the same scoped backlog as the web Dashboard. Tap to
+        // confirm or reject on the phone; bulk results upload stays on the web.
+        SectionTitle("Academic verification", trailing = "Review", onTrailing = onVerify)
+        PilotCard(Modifier.fillMaxWidth().clickable { onVerify() }) {
+            Column(Modifier.padding(14.dp)) {
+                listOf(
+                    "Waiting for a decision" to data.verification?.pending,
+                    "From former students or people not on the roster" to data.verification?.notCurrent,
+                ).forEach { (label, value) ->
+                    Row(Modifier.padding(vertical = 3.dp)) {
+                        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+                        Text(value?.toString() ?: "NA", style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }

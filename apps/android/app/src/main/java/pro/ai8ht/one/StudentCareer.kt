@@ -389,6 +389,12 @@ internal fun AcademicRecordsPage(onClose: () -> Unit) {
                                                 style = MaterialTheme.typography.bodySmall,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             )
+                                            if (term.source == "INSTITUTION_IMPORTED") {
+                                                // Said plainly, so a student knows this came from their college's
+                                                // results upload rather than from anything they entered.
+                                                Text("Recorded by your college", style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.primary)
+                                            }
                                         }
                                         if (term.verificationState == "SELF_REPORTED" || term.verificationState == "REJECTED") {
                                             TextButton(onClick = {

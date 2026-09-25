@@ -240,6 +240,10 @@ export async function submitTermForVerification(
  * Scoped to `q.institution_id = $institutionId`, so a second institution cannot verify
  * a record it did not issue however convenient that would be for a transfer student.
  * The trigger in 0070 additionally refuses to let a VERIFIED row move back.
+ *
+ * With a `reasonCode` and `correlationId` the decision and its audit row are written in
+ * one transaction (INST-04, Section 5.4): a decision nobody can trace is not one a
+ * college can stand behind.
  */
 export async function decideTermVerification(
   pool: Pool,
@@ -248,17 +252,41 @@ export async function decideTermVerification(
     readonly reviewerUserId: string;
     readonly termId: string;
     readonly decision: 'VERIFIED' | 'REJECTED';
+    readonly reasonCode?: string;
+    readonly correlationId?: string;
   },
 ): Promise<void> {
-  const result = await pool.query(
-    `UPDATE student_academic_terms t
+  const update = `UPDATE student_academic_terms t
      SET verification_state=$4, verified_by_user_id=$3, verified_at=now()
      FROM student_qualifications q
      WHERE t.id=$1 AND t.qualification_id=q.id AND q.institution_id=$2
-       AND t.verification_state = 'PENDING_VERIFICATION'`,
-    [input.termId, input.institutionId, input.reviewerUserId, input.decision],
-  );
-  if (!result.rowCount) throw new AcademicRecordError('ACADEMIC_TERM_NOT_REVIEWABLE');
+       AND t.verification_state = 'PENDING_VERIFICATION'`;
+  const parameters = [input.termId, input.institutionId, input.reviewerUserId, input.decision];
+  if (input.reasonCode === undefined || input.correlationId === undefined) {
+    const result = await pool.query(update, parameters);
+    if (!result.rowCount) throw new AcademicRecordError('ACADEMIC_TERM_NOT_REVIEWABLE');
+    return;
+  }
+  // A PoolClient (as the persistence tests pass) is already one connection; a Pool lends one.
+  const client = 'release' in pool ? null : await pool.connect();
+  const db: Queryable = client ?? pool;
+  try {
+    await db.query('BEGIN');
+    const result = await db.query(update, parameters);
+    if (!result.rowCount) throw new AcademicRecordError('ACADEMIC_TERM_NOT_REVIEWABLE');
+    await db.query(
+      `INSERT INTO audit_events (id, actor_user_id, action, resource_type, resource_id, organization_id, outcome, correlation_id, context)
+       VALUES ($1,$2,'academic_term.verification_decided','student_academic_term',$3,$4,'SUCCESS',$5,$6::jsonb)`,
+      [randomUUID(), input.reviewerUserId, input.termId, input.institutionId, input.correlationId,
+        JSON.stringify({ decision: input.decision, reasonCode: input.reasonCode })],
+    );
+    await db.query('COMMIT');
+  } catch (error) {
+    await db.query('ROLLBACK').catch(() => undefined);
+    throw error;
+  } finally {
+    client?.release();
+  }
 }
 
 /**
@@ -287,9 +315,18 @@ export async function listVerificationQueue(
   pool: Pool,
   institutionId: string,
   scope: InstitutionStudentScope = { kind: 'INSTITUTION' },
+  page: { readonly limit?: number; readonly after?: string | null } = {},
 ): Promise<readonly Record<string, unknown>[]> {
   const values: unknown[] = [institutionId];
   const inScope = scope.kind === 'INSTITUTION' ? 'TRUE' : institutionStudentScopeClause(scope, 'isp', values);
+  // Keyset pagination (Section 5.6): oldest request first, then by id for a stable order.
+  values.push(Math.min(Math.max(Math.trunc(page.limit ?? 200), 1), 200));
+  const limitRef = `$${values.length}`;
+  let after = 'TRUE';
+  if (page.after) {
+    values.push(page.after);
+    after = `(t.created_at, t.id) > (SELECT c.created_at, c.id FROM student_academic_terms c WHERE c.id = $${values.length}::uuid)`;
+  }
   const result = await pool.query(
     `SELECT t.id AS "termId", t.label, t.sequence, t.result_value AS "resultValue", t.result_scale AS "resultScale",
             t.result_letter AS "resultLetter", t.backlog_count AS "backlogCount", t.source,
@@ -306,17 +343,68 @@ export async function listVerificationQueue(
                      END
               FROM institution_relationships r
               WHERE r.institution_id = q.institution_id AND r.student_user_id = q.student_user_id
-            ), 'NONE') AS "relationship"
+            ), 'NONE') AS "relationship",
+            -- ADR-027: what staff may know about evidence without the student's consent for
+            -- that version -- title, type and version number. Never the filename, never a link.
+            CASE WHEN t.evidence_document_version_id IS NULL THEN NULL ELSE (
+              SELECT jsonb_build_object('title', dm.title, 'documentType', dm.document_type,
+                                        'versionNumber', dv.version_number, 'shared', false)
+              FROM student_document_versions dv
+              JOIN student_document_metadata dm ON dm.id = dv.document_id
+              WHERE dv.id = t.evidence_document_version_id
+            ) END AS "evidence",
+            -- A result this institution has already verified for the same term, when it
+            -- differs from the claim: the conflict a bulk upload left in place is shown to
+            -- the person deciding, never resolved by overwriting the student's value.
+            (
+              SELECT jsonb_build_object('resultValue', vt.result_value, 'resultScale', vt.result_scale,
+                                        'resultLetter', vt.result_letter, 'backlogCount', vt.backlog_count)
+              FROM student_academic_terms vt
+              JOIN student_qualifications vq ON vq.id = vt.qualification_id
+              WHERE vq.institution_id = q.institution_id AND vq.student_user_id = q.student_user_id
+                AND vt.sequence = t.sequence AND vt.verification_state = 'VERIFIED' AND vt.id <> t.id
+                AND (vt.result_scale IS DISTINCT FROM t.result_scale OR vt.result_value IS DISTINCT FROM t.result_value
+                     OR vt.result_letter IS DISTINCT FROM t.result_letter OR vt.backlog_count IS DISTINCT FROM t.backlog_count)
+              ORDER BY vt.verified_at DESC
+              LIMIT 1
+            ) AS "institutionRecord"
      FROM student_academic_terms t
      JOIN student_qualifications q ON q.id = t.qualification_id
      JOIN users u ON u.id = q.student_user_id
      LEFT JOIN institution_student_profiles isp
        ON isp.student_user_id = q.student_user_id AND isp.institution_id = q.institution_id
      WHERE q.institution_id=$1 AND t.verification_state='PENDING_VERIFICATION'
-       AND ${inScope}
-     ORDER BY t.created_at`, values,
+       AND ${inScope} AND ${after}
+     ORDER BY t.created_at, t.id
+     LIMIT ${limitRef}`, values,
   );
   return result.rows;
+}
+
+/**
+ * Counts for the dashboards, computed in SQL over the same scoped rows as the queue
+ * (Section 5.6: dashboards use summary endpoints, never lists counted in the browser).
+ */
+export async function verificationQueueSummary(
+  pool: Pool,
+  institutionId: string,
+  scope: InstitutionStudentScope = { kind: 'INSTITUTION' },
+): Promise<{ readonly pending: number; readonly notCurrent: number }> {
+  const values: unknown[] = [institutionId];
+  const inScope = scope.kind === 'INSTITUTION' ? 'TRUE' : institutionStudentScopeClause(scope, 'isp', values);
+  const result = await pool.query<{ pending: string; notCurrent: string }>(
+    `SELECT count(*)::text AS pending,
+            count(*) FILTER (WHERE NOT EXISTS (
+              SELECT 1 FROM institution_relationships r
+              WHERE r.institution_id = q.institution_id AND r.student_user_id = q.student_user_id
+                AND r.state IN ('VERIFIED','ACTIVE')))::text AS "notCurrent"
+     FROM student_academic_terms t
+     JOIN student_qualifications q ON q.id = t.qualification_id
+     LEFT JOIN institution_student_profiles isp
+       ON isp.student_user_id = q.student_user_id AND isp.institution_id = q.institution_id
+     WHERE q.institution_id=$1 AND t.verification_state='PENDING_VERIFICATION' AND ${inScope}`, values,
+  );
+  return { pending: Number(result.rows[0]?.pending ?? 0), notCurrent: Number(result.rows[0]?.notCurrent ?? 0) };
 }
 
 /**

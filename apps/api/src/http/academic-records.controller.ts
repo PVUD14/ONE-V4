@@ -22,6 +22,7 @@
 import {
   BadRequestException,
   Body,
+  ConflictException,
   Controller,
   ForbiddenException,
   Get,
@@ -43,16 +44,30 @@ import {
   listVerificationQueue,
   searchInstitutions,
   submitTermForVerification,
+  verificationQueueSummary,
   type ResultScale,
 } from '@planthepath/persistence/src/academic-records.js';
+import {
+  commitResultsImport,
+  previewResultsImport,
+  ResultsImportRejected,
+} from '@planthepath/persistence/src/academic-results-import.js';
 import { PG_POOL } from '../persistence.provider.js';
 import { ProtectedApiAuthenticationGuard, type ProtectedHttpRequest } from './api-security.js';
+import type { InstitutionStudentScope } from '@planthepath/authorization/src/index.js';
 import { institutionStudentScopeFor } from './institution-student-scope.js';
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 /** Same set staff_actions uses for ACADEMIC_VERIFICATION; Faculty included by design. */
 const verificationRoles = ['INSTITUTION_OWNER', 'INSTITUTION_ADMIN', 'PLACEMENT_ADMIN', 'DEPARTMENT_HEAD', 'FACULTY_LECTURER'];
+
+/**
+ * Bulk results upload is a registrar's act: the office, or a head of department for their
+ * own department (INST-04 design). Faculty and placement admins confirm one at a time.
+ */
+const resultsImportRoles = ['INSTITUTION_OWNER', 'INSTITUTION_ADMIN', 'DEPARTMENT_HEAD'];
+const reasonCodePattern = /^[A-Z0-9_:-]{3,64}$/;
 
 const qualificationTypes = ['BTECH', 'BE', 'BSC', 'BA', 'BCOM', 'BBA', 'BCA', 'MBBS', 'BDS', 'DIPLOMA',
   'MTECH', 'ME', 'MBA', 'MSC', 'MA', 'MCOM', 'MCA', 'PHD', 'OTHER'];
@@ -126,11 +141,27 @@ export class AcademicRecordsController {
 
   @Get('/institutions/:institutionId/academic-verification-queue')
   @UseGuards(ProtectedApiAuthenticationGuard)
-  async queue(@Req() request: ProtectedHttpRequest, @Param('institutionId') institutionId: string): Promise<Record<string, unknown>> {
+  async queue(
+    @Req() request: ProtectedHttpRequest,
+    @Param('institutionId') institutionId: string,
+    @Query('limit') limit?: string,
+    @Query('after') after?: string,
+  ): Promise<Record<string, unknown>> {
+    const id = requireUuid(institutionId);
+    requireInstitutionStaff(request, id);
+    const page = readPage(limit, after);
+    const scope = await institutionStudentScopeFor(this.pool, request, id, verificationRoles);
+    return queuePage(await listVerificationQueue(this.pool, id, scope, page), page.limit);
+  }
+
+  /** Counts for the dashboards, over the same scoped rows as the queue. */
+  @Get('/institutions/:institutionId/academic-verification-summary')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async summary(@Req() request: ProtectedHttpRequest, @Param('institutionId') institutionId: string): Promise<Record<string, unknown>> {
     const id = requireUuid(institutionId);
     requireInstitutionStaff(request, id);
     const scope = await institutionStudentScopeFor(this.pool, request, id, verificationRoles);
-    return { queue: await listVerificationQueue(this.pool, id, scope) };
+    return { summary: await verificationQueueSummary(this.pool, id, scope) };
   }
 
   @Post('/institutions/:institutionId/academic-verification/:termId/decide')
@@ -143,19 +174,118 @@ export class AcademicRecordsController {
   ): Promise<Record<string, unknown>> {
     const id = requireUuid(institutionId);
     const reviewerUserId = requireInstitutionStaff(request, id);
-    const decision = readDecision(body);
     const term = requireUuid(termId);
     // A reviewer may only decide a term they can see in their own queue (INST-02 scope).
+    // Checked before the body is read, so an out-of-scope caller learns nothing more.
     const scope = await institutionStudentScopeFor(this.pool, request, id, verificationRoles);
-    if (scope.kind !== 'INSTITUTION'
-      && !(await listVerificationQueue(this.pool, id, scope)).some((item) => item['termId'] === term)) throw safeForbidden();
+    if (scope.kind !== 'INSTITUTION' && !(await termInScope(this.pool, id, scope, term))) throw safeForbidden();
+    const { decision, reasonCode } = readDecision(body);
     try {
-      await decideTermVerification(this.pool, { institutionId: id, reviewerUserId, termId: term, decision });
+      await decideTermVerification(this.pool, {
+        institutionId: id, reviewerUserId, termId: term, decision, reasonCode, correlationId: correlationIdOf(request),
+      });
     } catch (error) {
       throw mapAcademicError(error);
     }
-    return { queue: await listVerificationQueue(this.pool, id, scope) };
+    const page = readPage(undefined, undefined);
+    return queuePage(await listVerificationQueue(this.pool, id, scope, page), page.limit);
   }
+
+  /**
+   * Bulk results upload, step one: a validated preview with row-level issues. Nothing is
+   * written except the audit row. The digest it returns is what commit must match.
+   */
+  @Post('/institutions/:institutionId/academic-results-imports/preview')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async previewResults(@Req() request: ProtectedHttpRequest, @Param('institutionId') institutionId: string, @Body() body: unknown): Promise<Record<string, unknown>> {
+    const id = requireUuid(institutionId);
+    const actorUserId = requireInstitutionStaff(request, id, resultsImportRoles);
+    const input = readResultsUpload(body, false);
+    const scope = await institutionStudentScopeFor(this.pool, request, id, resultsImportRoles);
+    try {
+      const preview = await previewResultsImport(this.pool, {
+        institutionId: id, scope, csv: input.csv, filename: input.filename, actorUserId, correlationId: correlationIdOf(request),
+      });
+      return { preview };
+    } catch (error) {
+      throw mapAcademicError(error);
+    }
+  }
+
+  /**
+   * Step two: commit exactly the preview the uploader saw. Invalid rows write nothing;
+   * a changed evaluation writes nothing and asks for a fresh preview; conflicts are
+   * reported and left as they are.
+   */
+  @Post('/institutions/:institutionId/academic-results-imports/commit')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async commitResults(@Req() request: ProtectedHttpRequest, @Param('institutionId') institutionId: string, @Body() body: unknown): Promise<Record<string, unknown>> {
+    const id = requireUuid(institutionId);
+    const actorUserId = requireInstitutionStaff(request, id, resultsImportRoles);
+    const input = readResultsUpload(body, true);
+    const scope = await institutionStudentScopeFor(this.pool, request, id, resultsImportRoles);
+    try {
+      const committed = await commitResultsImport(this.pool, {
+        institutionId: id, scope, csv: input.csv, filename: input.filename, previewDigest: input.previewDigest ?? '',
+        reasonCode: input.reasonCode ?? '', actorUserId, correlationId: correlationIdOf(request),
+      });
+      return { import: { reference: committed.reference, created: committed.created, confirmed: committed.confirmed,
+        counts: committed.evaluation.counts, rows: committed.evaluation.rows } };
+    } catch (error) {
+      if (error instanceof ResultsImportRejected) {
+        const payload = { error: { code: error.code }, preview: error.evaluation };
+        throw error.code === 'RESULTS_IMPORT_STALE' ? new ConflictException(payload) : new BadRequestException(payload);
+      }
+      if (error instanceof AcademicRecordError && error.code === 'RESULTS_IMPORT_STALE') {
+        throw new ConflictException({ error: { code: error.code } });
+      }
+      throw mapAcademicError(error);
+    }
+  }
+}
+
+function queuePage(queue: readonly Record<string, unknown>[], limit: number): Record<string, unknown> {
+  return { queue, nextCursor: queue.length === limit ? queue[queue.length - 1]?.['termId'] ?? null : null };
+}
+
+async function termInScope(pool: Pool, institutionId: string, scope: InstitutionStudentScope, termId: string): Promise<boolean> {
+  // Page through the scoped queue rather than widening it: the queue is the definition of
+  // what this reader may decide.
+  let after: string | null = null;
+  for (;;) {
+    const page = await listVerificationQueue(pool, institutionId, scope, { limit: 200, after });
+    if (page.some((item) => item['termId'] === termId)) return true;
+    if (page.length < 200) return false;
+    after = page[page.length - 1]?.['termId'] as string;
+  }
+}
+
+function readPage(limit: string | undefined, after: string | undefined): { readonly limit: number; readonly after: string | null } {
+  let size = 50;
+  if (limit !== undefined) {
+    if (!/^\d{1,3}$/.test(limit) || Number(limit) < 1 || Number(limit) > 200) throw safeBadRequest();
+    size = Number(limit);
+  }
+  return { limit: size, after: after === undefined || after === '' ? null : requireUuid(after) };
+}
+
+function readResultsUpload(body: unknown, commit: boolean): { csv: string; filename: string; previewDigest?: string; reasonCode?: string } {
+  const raw = readObject(body);
+  const allowed = commit ? ['csv', 'filename', 'previewDigest', 'reasonCode'] : ['csv', 'filename'];
+  if (Object.keys(raw).some((key) => !allowed.includes(key))) throw safeBadRequest();
+  const csv = raw.csv;
+  if (typeof csv !== 'string' || csv.length === 0 || csv.length > 512_000) throw safeBadRequest();
+  const filename = optionalText(raw.filename, 160) ?? 'results.csv';
+  if (!commit) return { csv, filename };
+  const previewDigest = raw.previewDigest;
+  if (typeof previewDigest !== 'string' || !/^[0-9a-f]{64}$/.test(previewDigest)) throw safeBadRequest();
+  const reasonCode = raw.reasonCode;
+  if (typeof reasonCode !== 'string' || !reasonCodePattern.test(reasonCode)) throw safeBadRequest();
+  return { csv, filename, previewDigest, reasonCode };
+}
+
+function correlationIdOf(request: ProtectedHttpRequest): string {
+  return request.planThePath?.correlationId ?? 'academic-records';
 }
 
 function requireLearnerId(request: ProtectedHttpRequest): string {
@@ -168,12 +298,12 @@ function requireLearnerId(request: ProtectedHttpRequest): string {
  * An active staff membership scoped to this institution. Both the organization and
  * the scope must match, so a membership in one institution cannot act on another.
  */
-function requireInstitutionStaff(request: ProtectedHttpRequest, institutionId: string): string {
+function requireInstitutionStaff(request: ProtectedHttpRequest, institutionId: string, roles: readonly string[] = verificationRoles): string {
   const authorization = request.planThePath?.authorization;
   const userId = authorization?.principal.userId;
   const permitted = (authorization?.memberships ?? []).some((membership) => (
     membership.state === 'ACTIVE'
-    && verificationRoles.includes(membership.role)
+    && roles.includes(membership.role)
     && membership.organizationId === institutionId
     && membership.scope.organizationId === institutionId
   ));
@@ -252,10 +382,14 @@ function readTerm(body: unknown): {
   };
 }
 
-function readDecision(body: unknown): 'VERIFIED' | 'REJECTED' {
-  const decision = readObject(body).decision;
+function readDecision(body: unknown): { decision: 'VERIFIED' | 'REJECTED'; reasonCode: string } {
+  const raw = readObject(body);
+  if (Object.keys(raw).some((key) => key !== 'decision' && key !== 'reasonCode')) throw safeBadRequest();
+  const { decision, reasonCode } = raw;
   if (decision !== 'VERIFIED' && decision !== 'REJECTED') throw safeBadRequest();
-  return decision;
+  // Section 5.4: every verification decision carries a reason code.
+  if (typeof reasonCode !== 'string' || !reasonCodePattern.test(reasonCode)) throw safeBadRequest();
+  return { decision, reasonCode };
 }
 
 function readObject(body: unknown): Record<string, unknown> {

@@ -4,6 +4,7 @@ import { MultiRing, Spark } from './pilot/pilotComponents.js';
 import {
   getProtectedAccessToken,
   getSecurityContext,
+  getVerificationSummary,
   listEmployerApplicants,
   listEmployerOpportunities,
   listInstitutionExamResults,
@@ -17,6 +18,7 @@ import {
   type InstitutionStudentDto,
   type InstitutionUnitDto,
   type StudentActivationState,
+  type VerificationSummaryDto,
   studentActivationLabels,
 } from './api.js';
 
@@ -47,6 +49,13 @@ function Funnel({ rows }: { readonly rows: readonly { readonly label: string; re
 
 // --- Institution -------------------------------------------------------------
 
+/** Where each institution portal reaches the verification queue (existing labels only). */
+function verificationPath(basePath: string): string | null {
+  if (basePath.endsWith('/faculty')) return `${basePath}/academic-verification`;
+  if (basePath.endsWith('/admin') || basePath.endsWith('/department-head')) return `${basePath}/students`;
+  return null;
+}
+
 interface InstitutionV3Data {
   readonly students: readonly InstitutionStudentDto[] | null;
   /** Server-computed over the same roster the Students page lists, so the two always agree. */
@@ -54,6 +63,8 @@ interface InstitutionV3Data {
   readonly exams: readonly InstitutionExamDto[] | null;
   readonly units: readonly InstitutionUnitDto[] | null;
   readonly notAttempted: readonly (ExamNotAttemptedDto & { readonly examTitle: string; readonly endsAt: string })[];
+  /** INST-04 verification backlog, counted server-side over the reader's scope; null reads NA. */
+  readonly verification: VerificationSummaryDto | null;
 }
 
 export function InstitutionDashboardV3({ institutionId, basePath }: { readonly institutionId: string; readonly basePath: string }): React.ReactElement {
@@ -66,7 +77,8 @@ export function InstitutionDashboardV3({ institutionId, basePath }: { readonly i
       listInstitutionStudents(token, institutionId, controller.signal).catch(() => null),
       listInstitutionExams(token, institutionId, controller.signal).then((response) => response.assessments).catch(() => null),
       listInstitutionUnits(token, institutionId, controller.signal).then((response) => response.units).catch(() => null),
-    ]).then(async ([roster, exams, units]) => {
+      getVerificationSummary(token, institutionId, controller.signal).then((response) => response.summary ?? null).catch(() => null),
+    ]).then(async ([roster, exams, units, verification]) => {
       const students = roster?.students ?? null;
       const activation = roster?.activationSummary ?? null;
       const target = exams?.find((exam) => exam.lifecycleState === 'PUBLISHED' && exam.assignedCount > 0) ?? null;
@@ -74,7 +86,7 @@ export function InstitutionDashboardV3({ institutionId, basePath }: { readonly i
         ? await listInstitutionExamResults(token, institutionId, target.id).then((response) =>
             response.notAttempted.map((entry) => ({ ...entry, examTitle: target.title, endsAt: target.endsAt }))).catch(() => [])
         : [];
-      setData({ students, activation, exams, units, notAttempted });
+      setData({ students, activation, exams, units, notAttempted, verification });
     });
     return () => controller.abort();
   }, [token, institutionId]);
@@ -136,6 +148,15 @@ export function InstitutionDashboardV3({ institutionId, basePath }: { readonly i
           {(['ACTIVATED', 'INVITED', 'EXPIRED', 'BOUNCED', 'NOT_INVITED'] as const).map((state) => (
             <div key={state}><i style={{ background: '#e5eaf2' }} /> {studentActivationLabels[state]} <span className="num">{data.activation ? data.activation[state] : 'NA'}</span></div>
           ))}
+        </div>
+      </section>
+
+      <section className="pilot-card">
+        <div className="pilot-card-head"><h2>Academic Verification</h2>{verificationPath(basePath)
+          ? <button type="button" className="pilot-link" onClick={() => go(verificationPath(basePath)!)}>Review Queue</button> : null}</div>
+        <div className="pilot-legend">
+          <div><i style={{ background: '#e5eaf2' }} /> Waiting for a decision <span className="num">{data.verification ? data.verification.pending : 'NA'}</span></div>
+          <div><i style={{ background: '#e5eaf2' }} /> From former students or people not on the roster <span className="num">{data.verification ? data.verification.notCurrent : 'NA'}</span></div>
         </div>
       </section>
 

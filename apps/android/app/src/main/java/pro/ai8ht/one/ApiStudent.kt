@@ -295,6 +295,8 @@ import kotlinx.serialization.Serializable
     val resultScale: String? = null,
     val resultLetter: String? = null,
     val backlogCount: Int? = null,
+    /** INSTITUTION_IMPORTED when the college recorded it in a results upload (INST-04). */
+    val source: String = "STUDENT_DECLARED",
     val verificationState: String = "SELF_REPORTED",
 )
 

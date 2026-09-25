@@ -18,7 +18,6 @@ import { OperationsDashboardV2 } from './dashboardsV2.js';
 import { InstitutionExamEnginePage } from './examManagerPage.js';
 import { HelpFaqPanel } from './helpFaqPanel.js';
 import { CalendarPage } from './calendarPage.js';
-import { AcademicVerificationPage } from './academicVerificationPage.js';
 import { EmployerAssessmentsPage } from './employerAssessmentsPage.js';
 import { LearnerContentStudio } from './learnerContentStudio.js';
 import { InstitutionReportsPage } from './institutionReportsPage.js';
@@ -29,6 +28,7 @@ import { EmployerRecruiterRealityPage } from './rolePortal/employer.js';
 import { EmployerOrganisationGate } from './rolePortal/employerOrganisationState.js';
 import { InstitutionAcademicStructurePage, InstitutionStaffActionsPage, InstitutionStaffPage, InstitutionStudentsPage } from './rolePortal/institution.js';
 import { FacultyMyStudentsPage, InstitutionFacultyAndStaffPage } from './rolePortal/institutionTeaching.js';
+import { AcademicVerificationSection, FacultyAcademicVerification } from './rolePortal/institutionAcademicVerification.js';
 import { OperationsAuditLogPage, OperationsContentReadOnlyPage, OperationsFeatureFlagsPage, OperationsOrganizationsPage, OperationsTechnicalReadOnlyPage, OperationsUsersAccessPage } from './rolePortal/operations.js';
 import { OperationsTrustSafetyPage } from './rolePortal/trustSafety.js';
 import { OperationsStaffCapabilitiesPage } from './rolePortal/staffCapabilities.js';
@@ -256,8 +256,21 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   if (!demoMode && portal.key === 'operations-admin' && route.label === 'Settings') return <><OperationsApprovalsPanel /><OperationsStaffCapabilitiesPage /></>;
   if (!demoMode && portal.key === 'operations-admin' && /subscriptions|billing|analytics|support|settings/i.test(route.label)) return <AuthenticatedNotYetAvailable title={route.label} detail="This Operations module is not yet backed by a Phase 2A persistent workflow." />;
   if (!demoMode && portal.key === 'institution-admin' && ['Students', 'Student Detail'].includes(route.label)) {
+    // INST-04: the admin reaches academic verification here, under Students (plan §4.2);
+    // there is no admin Academic Verification item and none is added.
     return <StaffPilotWrap title="Students" subtitle="Roster, readiness and the lifecycle of every student relationship.">
-      <InstitutionStudentsPage portal={portal} authenticatedWorkspace={authenticatedWorkspace} /></StaffPilotWrap>;
+      <InstitutionStudentsPage portal={portal} authenticatedWorkspace={authenticatedWorkspace} />
+      {route.label === 'Students' && isInstitutionWorkspace(authenticatedWorkspace)
+        ? <AcademicVerificationSection institutionId={authenticatedWorkspace.organizationId} canUpload /> : null}
+    </StaffPilotWrap>;
+  }
+  if (!demoMode && portal.key === 'department-head' && route.label === 'Students') {
+    // INST-04: the department's verification queue and results upload, scoped server-side
+    // to the department. The department roster itself is not built yet and says so.
+    return isInstitutionStaffWorkspace(authenticatedWorkspace)
+      ? <StaffPilotWrap title="Students" subtitle="Verify your department's academic results. The department roster is not built yet.">
+          <AcademicVerificationSection institutionId={authenticatedWorkspace.organizationId} canUpload={authenticatedWorkspace.role === 'DEPARTMENT_HEAD'} /></StaffPilotWrap>
+      : <InstitutionWorkspaceError title="Students" unauthorized={Boolean(authenticatedWorkspace && !institutionStaffWorkspaceRoles.has(authenticatedWorkspace.role))} />;
   }
   if (!demoMode && portal.key === 'institution-admin' && route.label === 'Academic Structure') return <InstitutionAcademicStructurePage portal={portal} authenticatedWorkspace={authenticatedWorkspace} />;
   if (!demoMode && route.label === 'Help & FAQ') return <HelpFaqPanel persona={portal.family === 'Employer' ? 'employer' : 'institution'} />;
@@ -325,8 +338,10 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
     // actually recorded, and they stay.
     const staffActions = <InstitutionStaffActionsPage routeLabel={route.label} authenticatedWorkspace={authenticatedWorkspace} />;
     if (route.label === 'Calendar') return <><CalendarPage />{staffActions}</>;
-    if (route.label === 'Academic Verification' && isInstitutionWorkspace(authenticatedWorkspace)) {
-      return <><AcademicVerificationPage institutionId={authenticatedWorkspace.organizationId} />{staffActions}</>;
+    // INST-04: staff roles, not the owner/admin-only check that left this unreachable for
+    // the faculty it was built for. The queue first, the staff-action list as a second tab.
+    if (route.label === 'Academic Verification' && isInstitutionStaffWorkspace(authenticatedWorkspace)) {
+      return <FacultyAcademicVerification institutionId={authenticatedWorkspace.organizationId} staffActions={staffActions} />;
     }
     return staffActions;
   }

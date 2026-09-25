@@ -198,14 +198,58 @@ export interface VerificationQueueEntryDto {
   readonly institutionStudentId: string | null;
   /** CURRENT and FORMER can be checked on the roster; NONE needs the archive. */
   readonly relationship: 'CURRENT' | 'FORMER' | 'NONE';
+  /** ADR-027 metadata only: never a filename or a link. `shared` stays false until per-version consent exists. */
+  readonly evidence?: { readonly title: string; readonly documentType: string; readonly versionNumber: number; readonly shared: boolean } | null;
+  /** A different value this institution has already verified for the same term (a conflict left in place). */
+  readonly institutionRecord?: { readonly resultValue: number | null; readonly resultScale: string | null; readonly resultLetter: string | null; readonly backlogCount: number | null } | null;
 }
 
-export function listVerificationQueue(token: string, institutionId: string, signal?: AbortSignal): Promise<{ readonly queue: readonly VerificationQueueEntryDto[] }> {
-  return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/academic-verification-queue`, { token, ...(signal ? { signal } : {}) });
+export interface VerificationQueuePage { readonly queue: readonly VerificationQueueEntryDto[]; readonly nextCursor?: string | null }
+
+export function listVerificationQueue(token: string, institutionId: string, signal?: AbortSignal, after?: string | null): Promise<VerificationQueuePage> {
+  const query = after ? `?after=${encodeURIComponent(after)}` : '';
+  return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/academic-verification-queue${query}`, { token, ...(signal ? { signal } : {}) });
 }
 
-export function decideVerification(token: string, institutionId: string, termId: string, decision: 'VERIFIED' | 'REJECTED'): Promise<{ readonly queue: readonly VerificationQueueEntryDto[] }> {
-  return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/academic-verification/${encodeURIComponent(termId)}/decide`, { token, method: 'POST', body: { decision } });
+/** Every decision carries a reason code (plan Section 5.4); the server refuses one without. */
+export function decideVerification(token: string, institutionId: string, termId: string, decision: 'VERIFIED' | 'REJECTED', reasonCode: string): Promise<VerificationQueuePage> {
+  return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/academic-verification/${encodeURIComponent(termId)}/decide`, { token, method: 'POST', body: { decision, reasonCode } });
+}
+
+export interface VerificationSummaryDto { readonly pending: number; readonly notCurrent: number }
+
+export function getVerificationSummary(token: string, institutionId: string, signal?: AbortSignal): Promise<{ readonly summary: VerificationSummaryDto }> {
+  return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/academic-verification-summary`, { token, ...(signal ? { signal } : {}) });
+}
+
+// --- Bulk academic results upload (INST-04) -------------------------------------
+
+export type ResultsImportOutcome = 'CREATE' | 'CONFIRM' | 'UNCHANGED' | 'CONFLICT' | 'INVALID';
+
+export interface RecordedResultDto {
+  readonly resultValue: string | null; readonly resultScale: string | null; readonly resultLetter: string | null;
+  readonly backlogCount: number | null; readonly verificationState: string;
+}
+
+export interface ResultsImportRowDto {
+  readonly rowNumber: number; readonly institutionStudentId: string; readonly studentName: string | null;
+  readonly termSequence: number | null; readonly termLabel: string; readonly scale: string; readonly result: string;
+  readonly backlogs: number | null; readonly outcome: ResultsImportOutcome; readonly issues: readonly string[];
+  readonly studentReported: RecordedResultDto | null; readonly verifiedRecord: RecordedResultDto | null;
+}
+
+export interface ResultsImportPreviewDto {
+  readonly digest: string; readonly rowCount: number;
+  readonly counts: { readonly create: number; readonly confirm: number; readonly unchanged: number; readonly conflict: number; readonly invalid: number; readonly differsFromStudent: number };
+  readonly rows: readonly ResultsImportRowDto[];
+}
+
+export function previewAcademicResults(token: string, institutionId: string, filename: string, csv: string): Promise<{ readonly preview: ResultsImportPreviewDto }> {
+  return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/academic-results-imports/preview`, { token, method: 'POST', body: { filename, csv } });
+}
+
+export function commitAcademicResults(token: string, institutionId: string, input: { readonly filename: string; readonly csv: string; readonly previewDigest: string; readonly reasonCode: string }): Promise<{ readonly import: { readonly reference: string; readonly created: number; readonly confirmed: number; readonly counts: ResultsImportPreviewDto['counts']; readonly rows: readonly ResultsImportRowDto[] } }> {
+  return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/academic-results-imports/commit`, { token, method: 'POST', body: input });
 }
 
 // --- Teaching assignments and My Students (INST-03) ---------------------------

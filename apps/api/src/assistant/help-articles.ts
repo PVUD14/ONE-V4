@@ -34,7 +34,7 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
     personas: ['all'],
     title: 'Notifications',
     keywords: ['notification', 'bell', 'alert', 'badge', 'unread'],
-    body: 'For students, notifications are derived from real account state: assessments assigned and still open, attempts in progress, and freshly published results. For institution staff, the bell summarises published assessments, completed attempts and questions awaiting review. There is no separate notification settings page yet.',
+    body: 'For students, notifications are derived from real account state: assessments assigned and still open, attempts in progress, and freshly published results. For institution staff, the bell summarises published assessments, completed attempts and questions awaiting review. Institution faculty and department heads can set email reminders and quiet hours under Settings; ONE does not send staff reminder emails yet.',
   },
   {
     id: 'privacy-data',

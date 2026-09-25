@@ -3,6 +3,7 @@ import {
   DELETION_GRACE_PERIOD_DAYS,
   DELETION_POLICY,
   PrivacyRuleError,
+  STATUTORY_RESPONSE_PERIOD_DAYS,
   anonymisedIdentity,
   assertExportDownloadable,
   assertPrivacyTransition,
@@ -11,6 +12,7 @@ import {
   deletionScheduledFor,
   exportExpiresAt,
   isDeletionDue,
+  statutoryResponseDueAt,
   type PrivacyRequestState,
 } from '../src/index.js';
 
@@ -154,5 +156,20 @@ describe('deletion policy', () => {
     expect(first).toEqual(anonymisedIdentity('11111111-1111-4111-8111-111111111111'));
     expect(first.email).toMatch(/@deleted\.invalid$/);
     expect(first.email).not.toEqual(anonymisedIdentity('22222222-2222-4222-8222-222222222222').email);
+  });
+});
+
+// OPS-06: the operations console prints a statutory due date only when a period is defined in
+// code. None is yet, so the answer is null (shown as NA), never a guessed deadline.
+describe('statutory response due dates', () => {
+  it('are not defined for any request type yet', () => {
+    expect(STATUTORY_RESPONSE_PERIOD_DAYS).toEqual({ EXPORT: null, DELETION: null });
+    expect(statutoryResponseDueAt('EXPORT', new Date('2026-03-01T10:00:00Z'))).toBeNull();
+    expect(statutoryResponseDueAt('DELETION', new Date('2026-03-01T10:00:00Z'))).toBeNull();
+  });
+
+  it('count from the real request time once a period exists', () => {
+    const due = statutoryResponseDueAt('EXPORT', new Date('2026-03-01T10:00:00Z'), { EXPORT: 30, DELETION: null });
+    expect(due?.toISOString()).toBe('2026-03-31T10:00:00.000Z');
   });
 });

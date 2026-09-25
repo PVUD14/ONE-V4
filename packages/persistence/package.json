@@ -12,6 +12,7 @@
     "db:seed:career-readiness": "tsx src/seed-career-readiness-pilot.ts",
     "db:seed:local-users": "tsx src/seed-local-users.ts",
     "db:seed:careers": "tsx src/seed-careers.ts",
+    "db:import:teaching-strategies-draft": "tsx src/import-teaching-strategies-draft.ts",
     "jobs:alert-check": "tsx src/run-jobs-alert-check.ts",
     "test": "vitest run --fileParallelism=false",
     "typecheck": "tsc -p tsconfig.json --noEmit",

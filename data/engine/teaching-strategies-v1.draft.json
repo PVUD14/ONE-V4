@@ -1,0 +1,78 @@
+{
+  "notice": "DRAFT — model-produced content (program Part B.8). Written by the coding agent under ENG-07 as a starting point for review. Import only as DRAFT with AGENT_DRAFTED provenance; never publish without a human reviewer approving each entry. Every entry cites its basis and lists the claims a learning-design expert must check; the citations were written from the agent's knowledge and must themselves be verified against the sources. Not shown on any screen.",
+  "generatorVersion": "claude-opus-5-5",
+  "promptVersion": "eng-07-teaching-strategies-v1",
+  "generatedAt": "2026-09-26T00:00:00.000Z",
+  "strategies": [
+    {
+      "code": "WORKED_EXAMPLE",
+      "strategyKind": "WORKED_EXAMPLE",
+      "title": "Worked example",
+      "description": "Show a complete, step-by-step solution to a problem of the same type before the student attempts one, naming the reason for each step. Intended for a skill the student has little evidence on, where solving unaided would mostly be guessing.",
+      "applicability": { "modes": ["LEARN", "PRACTICE"], "evidenceStages": ["ESTIMATED"], "triggers": ["NEW_SKILL", "STUCK"] },
+      "requiresModel": false,
+      "basis": "Worked-example effect in cognitive load theory: Sweller & Cooper (1985), 'The use of worked examples as a substitute for problem solving in learning algebra', Cognition and Instruction 2(1); Atkinson, Derry, Renkl & Wortham (2000), 'Learning from examples', Review of Educational Research 70(2).",
+      "expertCheckNotes": "Check: (1) that the effect applies to the adult vocational skills ONE targets (aptitude, networking, security operations) and not only school mathematics; (2) the choice to limit it to the ESTIMATED stage — the expertise-reversal effect (Kalyuga et al., 2003) suggests examples help novices and can hinder more able learners, but the stage boundary used here is our assumption; (3) whether STUCK should trigger it at later stages."
+    },
+    {
+      "code": "GUIDED_PRACTICE",
+      "strategyKind": "GUIDED_PRACTICE",
+      "title": "Guided practice",
+      "description": "The student solves a problem with the solution partly scaffolded (for example, early steps completed or the next step prompted), with the scaffold removed over successive items. Bridges from studying an example to solving alone.",
+      "applicability": { "modes": ["LEARN", "PRACTICE"], "evidenceStages": ["ESTIMATED", "RETAINED"], "triggers": ["NEW_SKILL", "REPEATED_ERROR"], "maxHintLevel": 2 },
+      "requiresModel": false,
+      "basis": "Fading worked examples into problems: Renkl & Atkinson (2003), 'Structuring the transition from example study to problem solving in cognitive skill acquisition', Educational Psychologist 38(1); Rosenshine (2012), 'Principles of instruction', American Educator 36(1).",
+      "expertCheckNotes": "Check: (1) the maxHintLevel 2 limit — chosen so guided practice is not offered once a student already needed heavy hints, which is our design assumption, not a finding; (2) whether RETAINED is an appropriate stage; (3) how many fading steps suit short mobile sessions."
+    },
+    {
+      "code": "SOCRATIC_QUESTIONING",
+      "strategyKind": "SOCRATIC_QUESTIONING",
+      "title": "Socratic questioning",
+      "description": "Ask a sequence of short questions that lead the student to find the flaw in their reasoning themselves, instead of stating the answer. Needs a tutor that can read free-text replies, so it is only available when an AI tutor is enabled and consented.",
+      "applicability": { "modes": ["LEARN", "PRACTICE"], "triggers": ["MISCONCEPTION_DETECTED", "REPEATED_ERROR"] },
+      "requiresModel": true,
+      "basis": "Tutorial dialogue research: Graesser, Person & Magliano (1995), 'Collaborative dialogue patterns in naturalistic one-to-one tutoring', Applied Cognitive Psychology 9(6); Chi, Siler, Jeong, Yamauchi & Hausmann (2001), 'Learning from human tutoring', Cognitive Science 25(4).",
+      "expertCheckNotes": "Check: (1) that the cited tutoring findings transfer to a model-driven tutor at all — this is unproven and is exactly what ENG-21's evaluation must measure; (2) requiresModel = true means the planner must never pick this while every AI flag is off (X2); (3) language: the dialogue must be in the student's chosen language (C6)."
+    },
+    {
+      "code": "HINT_LADDER",
+      "strategyKind": "HINT_LADDER",
+      "title": "Hint ladder",
+      "description": "Offer graded hints on the current item, from a general nudge up to a near-complete step, one level at a time, only when the student asks. A success after hint level 3 or higher is recorded as assisted and never counts toward DEMONSTRATED.",
+      "applicability": { "modes": ["PRACTICE", "LEARN"], "triggers": ["STUCK", "REPEATED_ERROR"] },
+      "requiresModel": false,
+      "basis": "Intelligent tutoring systems' graded hints: VanLehn (2006), 'The behavior of tutoring systems', International Journal of Artificial Intelligence in Education 16(3); Aleven & Koedinger (2000), 'Limitations of student control: do students know when they need help?', ITS 2000. The assisted rule is program D.1 / C5.",
+      "expertCheckNotes": "Check: (1) the four-level ladder shape (ENG-15 authors the hints) and whether help-abuse (Aleven & Koedinger) needs a rate limit; (2) that hint ladders suit every skill type in the pilot, including code practice."
+    },
+    {
+      "code": "ERROR_CORRECTION",
+      "strategyKind": "ERROR_CORRECTION",
+      "title": "Error correction",
+      "description": "Name the specific misconception the student's wrong answer signals, contrast it with the correct idea, and give a short targeted item that isolates the confused step before returning to the full problem (scenario X1: subnet boundaries practised through block size, then the full subnetting problem).",
+      "applicability": { "modes": ["PRACTICE", "LEARN", "REVIEW"], "triggers": ["MISCONCEPTION_DETECTED"], "minRecentErrors": 2 },
+      "requiresModel": false,
+      "basis": "Elaborated, error-specific feedback: Shute (2008), 'Focus on formative feedback', Review of Educational Research 78(1); Hattie & Timperley (2007), 'The power of feedback', Review of Educational Research 77(1). Refutation of misconceptions: Tippett (2010), 'Refutation text in science education: a review of two decades of research', IJSME 8(6).",
+      "expertCheckNotes": "Check: (1) minRecentErrors 2 — chosen so one slip does not label a student; the right threshold is unknown and should be set from pilot data (ENG-26); (2) that the misconception catalogue per skill is accurate before this is used — a wrong code produces wrong correction; (3) wording must not shame the student."
+    },
+    {
+      "code": "RETRIEVAL_PRACTICE",
+      "strategyKind": "RETRIEVAL_PRACTICE",
+      "title": "Retrieval practice",
+      "description": "Ask the student to recall and apply a skill they have practised before, without looking at material, at a spaced interval chosen by the review scheduler. Used for review, not for first learning.",
+      "applicability": { "modes": ["REVIEW", "PRACTICE"], "evidenceStages": ["RETAINED", "DEMONSTRATED", "TRANSFERRED"], "triggers": ["DUE_REVIEW", "NEAR_MASTERY"] },
+      "requiresModel": false,
+      "basis": "Testing effect: Roediger & Karpicke (2006), 'Test-enhanced learning', Psychological Science 17(3); spacing: Cepeda, Pashler, Vul, Wixted & Rohrer (2006), 'Distributed practice in verbal recall tasks', Psychological Bulletin 132(3). Scheduling is ENG-09 (FSRS).",
+      "expertCheckNotes": "Check: (1) the exclusion of the ESTIMATED stage — retrieval of something never learned is guessing, which is our reasoning; (2) that the testing-effect evidence, mostly from verbal and factual material, holds for procedural skills in the pilot tracks."
+    },
+    {
+      "code": "TEACH_BACK",
+      "strategyKind": "TEACH_BACK",
+      "title": "Teach-back",
+      "description": "Ask the student to explain the idea in their own words, as if to a peer, then check the explanation against the key points. Evaluating a free-text explanation needs a tutor, so it is only available when an AI tutor is enabled and consented.",
+      "applicability": { "modes": ["LEARN", "REVIEW"], "evidenceStages": ["RETAINED", "DEMONSTRATED"], "triggers": ["NEAR_MASTERY"] },
+      "requiresModel": true,
+      "basis": "Self-explanation effect: Chi, de Leeuw, Chiu & LaVancher (1994), 'Eliciting self-explanations improves understanding', Cognitive Science 18(3); learning by preparing to teach: Fiorella & Mayer (2013), 'The relative benefits of learning by teaching and teaching expectancy', Contemporary Educational Psychology 38(4).",
+      "expertCheckNotes": "Check: (1) whether a model can judge an explanation reliably enough — unproven until ENG-21; (2) requiresModel = true, so never chosen with AI off (X2); (3) a teach-back success must not become DEMONSTRATED evidence on its own (ADR-033: a model can only make evidence count less)."
+    }
+  ]
+}

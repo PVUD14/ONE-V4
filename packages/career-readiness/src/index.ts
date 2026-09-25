@@ -459,3 +459,6 @@ export function careerTargetProgress(gap: CareerGap): {
     percentOfEvaluated: evaluated === 0 ? null : Math.round((gap.requirementsMet / evaluated) * 100),
   };
 }
+
+// ENG-07: misconception codes, option tags and teaching strategies (pure rules).
+export * from './misconceptions.js';

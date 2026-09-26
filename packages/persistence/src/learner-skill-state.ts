@@ -1,7 +1,9 @@
 /**
  * The learner skill state projector (ENG-05): loads one student's facts, runs the pure rule
  * `learner-skill-state-v2` (packages/learning-model; since ENG-06 it includes `mastery-bkt-v1` in
- * shadow) and makes `learner_skill_state` equal to it.
+ * shadow) with the review columns filled by `review-scheduler-fsrs-v1` (packages/review-scheduler,
+ * ENG-09), and makes `learner_skill_state` equal to it. `listDueReviews` reads the due reviews back
+ * for the planner (C7).
  *
  * Why it exists: the planner, BKT shadow, review scheduler and faculty views all need "where does
  * this student stand on this skill", and ADR-034 requires that answer to be a projection rebuilt
@@ -20,11 +22,16 @@ import type { PoolClient } from 'pg';
 import { randomUUID } from 'node:crypto';
 import {
   LEARNER_SKILL_STATE_ALGORITHM_ID,
-  projectLearnerSkillStates,
   type AttemptContext,
-  type LearnerSkillStateRow,
   type ProjectionAttempt,
 } from '@planthepath/learning-model/src/index.js';
+import {
+  REVIEW_SCHEDULER_ALGORITHM_ID,
+  projectLearnerSkillStatesWithReviews,
+  selectDueReviews,
+  type DueReview,
+  type ScheduledSkillStateRow,
+} from '@planthepath/review-scheduler/src/index.js';
 import { createIntegrationEventEnvelope, type IntegrationEventEnvelope } from '@planthepath/events/src/index.js';
 import { hasConsentPurpose } from './consent-purposes.js';
 import { handleEventIdempotently } from './outbox-dispatcher.js';
@@ -100,7 +107,8 @@ export async function projectSubjectSkillState(db: PersistenceDb, subjectUserId:
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('learner_skill_state'), hashtext(${subjectUserId}))`);
     await tx.execute(sql`SELECT set_config('one.learner_skill_state_writer', ${WRITER}, true)`);
     const consented = await hasConsentPurpose(tx, subjectUserId, 'adaptive-learning');
-    const desired = consented ? projectLearnerSkillStates(await loadProjectionAttempts(tx, subjectUserId)) : [];
+    // learner-skill-state-v1 rows with the review columns filled by review-scheduler-fsrs-v1 (ENG-09).
+    const desired = consented ? projectLearnerSkillStatesWithReviews(await loadProjectionAttempts(tx, subjectUserId)) : [];
     const keep = desired.map((row) => row.skillId);
     const deleted = await tx.execute(sql`
       WITH gone AS (
@@ -210,8 +218,11 @@ export async function loadProjectionAttempts(db: PersistenceDb, subjectUserId: s
   }));
 }
 
-async function upsertRow(tx: PersistenceDb, subjectUserId: string, row: LearnerSkillStateRow): Promise<void> {
+async function upsertRow(tx: PersistenceDb, subjectUserId: string, row: ScheduledSkillStateRow): Promise<void> {
   if (row.algorithmVersion !== LEARNER_SKILL_STATE_ALGORITHM_ID) throw new Error('unexpected skill state algorithm');
+  if (row.reviewAlgorithmVersion !== null && row.reviewAlgorithmVersion !== REVIEW_SCHEDULER_ALGORITHM_ID) {
+    throw new Error('unexpected review algorithm');
+  }
   await tx.execute(sql`
     INSERT INTO learner_skill_state
       (subject_user_id, skill_id, institution_id, attempt_count, attempt_day_count, unaided_success_count,
@@ -223,7 +234,9 @@ async function upsertRow(tx: PersistenceDb, subjectUserId: string, row: LearnerS
             ${row.lastAttemptAt}::timestamptz, ${row.evidenceStage}, ${row.evidenceBand},
             ${textArrayLiteral(row.activeMisconceptionCodes)}::text[],
             ${storedProbability(row.masteryLikelihood)}::numeric, ${storedProbability(row.masteryUncertainty)}::numeric,
-            ${row.masteryAlgorithmVersion}, NULL, NULL, NULL, NULL, ${row.algorithmVersion})
+            ${row.masteryAlgorithmVersion},
+            ${row.reviewStability}::numeric, ${row.reviewDifficulty}::numeric, ${row.reviewDueAt}::timestamptz,
+            ${row.reviewAlgorithmVersion}, ${row.algorithmVersion})
     ON CONFLICT (subject_user_id, skill_id) DO UPDATE SET
       institution_id = EXCLUDED.institution_id,
       attempt_count = EXCLUDED.attempt_count,
@@ -251,6 +264,27 @@ function storedProbability(value: number | null): string | null {
   if (value === null) return null;
   if (!Number.isFinite(value) || value < 0 || value > 1) throw new Error('a mastery value is outside [0, 1]');
   return value.toFixed(4);
+}
+
+/**
+ * The skills due for review for one student, earliest due first (ENG-09, C7): the planner's input
+ * (ENG-08). Due means the review_due_at the projector stored has been reached by the database's
+ * now(); the ordering rule is review-scheduler's selectDueReviews, so it lives in one place.
+ * Rows exist only for students holding adaptive-learning, so a student without it has none.
+ * Not on any route: FSRS values are model state and are never shown as a number.
+ */
+export async function listDueReviews(db: PersistenceDb, subjectUserId: string): Promise<readonly DueReview[]> {
+  if (!UUID.test(subjectUserId)) throw new Error('subjectUserId must be a UUID');
+  const found = await db.execute(sql`
+    SELECT now() AS as_of, s.skill_id, s.review_due_at
+    FROM (SELECT 1) AS clock
+    LEFT JOIN learner_skill_state s
+      ON s.subject_user_id = ${subjectUserId}::uuid AND s.review_due_at IS NOT NULL
+  `) as QueryResult<{ as_of: Date | string; skill_id: string | null; review_due_at: Date | string | null }>;
+  const asOf = new Date(found.rows[0]!.as_of);
+  return selectDueReviews(found.rows.flatMap((row) => (row.skill_id === null || row.review_due_at === null
+    ? []
+    : [{ skillId: row.skill_id, reviewDueAt: new Date(row.review_due_at).toISOString() }])), asOf);
 }
 
 /** Codes match ^[A-Z][A-Z0-9_]{2,63}$ (0049), so they need no quoting inside an array literal. */

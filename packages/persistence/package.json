@@ -32,6 +32,7 @@
     "@planthepath/learner-content": "workspace:*",
     "@planthepath/learning-model": "workspace:*",
     "@planthepath/mastery-bkt": "workspace:*",
+    "@planthepath/review-scheduler": "workspace:*",
     "drizzle-orm": "^0.45.2",
     "pg": "^8.16.0",
     "@planthepath/ai-orchestration": "workspace:*"

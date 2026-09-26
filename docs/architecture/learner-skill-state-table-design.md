@@ -237,3 +237,9 @@ this table to decide readiness. No numeric readiness value is computed or shown.
 3. **Access requests.** Neither the attempt log (ENG-03) nor this projection is in the DPDP data export
    yet. Recommended: add both when the export is next revised (OPS-06 follow-up), as engine data about the
    person.
+
+## Update (ENG-06)
+
+The mastery columns are now filled by `mastery-bkt-v1` inside the projector, in shadow only, and the
+projector's ID is `learner-skill-state-v2`. Design, parameters and the shadow report:
+`mastery-bkt-shadow-design.md`.

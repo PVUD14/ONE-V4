@@ -191,7 +191,8 @@ describe('reachable behind existing labels only', () => {
     render_('department-head', 'Students', 'DEPARTMENT_HEAD');
     expect(await screen.findByText('Local Student')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Upload results' })).toBeInTheDocument();
-    expect(screen.getByText(/The department roster is not built yet/)).toBeInTheDocument();
+    // INST-07 built the department roster, so the page now shows it above the queue.
+    expect(await screen.findByText('No students match your scope and filters.')).toBeInTheDocument();
   });
 
   it('leaves every institution navigation label exactly as it was', () => {

@@ -25,7 +25,7 @@ import {
 } from './api-security.js';
 import { recordNotification } from './notify.js';
 import { institutionStudentScopeSql } from '@planthepath/persistence/src/institution-scope.js';
-import { institutionStudentScopeFor } from './institution-student-scope.js';
+import { institutionStudentScopeFor, institutionStudentWriteScopeFor } from './institution-student-scope.js';
 
 type QueryResult<T> = { rows: T[] };
 
@@ -432,33 +432,51 @@ export class InstitutionAssessmentsController {
     `) as QueryResult<{ lifecycle_state: string; title: string; ends_at: string }>;
     if (definition.rows[0]?.lifecycle_state !== 'PUBLISHED') throw badRequest('ASSESSMENT_NOT_PUBLISHED', context.correlationId);
 
+    // INST-SR-03: assigning pushes a notification to a student and cannot be undone, so it
+    // uses the write scope of the single helper — an unscoped department head, or faculty
+    // without an active teaching assignment, must be given a scope first (SCOPE_REQUIRED).
+    const writeScope = await institutionStudentWriteScopeFor(this.db, request, institutionId, assessmentStaffRoles);
+    if (writeScope.kind === 'NONE') throw scopeRequired(context.correlationId);
     // Roster profile ids resolve to user ids server-side; only ACTIVE
-    // relationships at this institution are eligible.
+    // relationships at this institution, inside the caller's scope, are eligible.
     const eligible = await this.db.execute(sql`
-      SELECT student_user_id FROM institution_student_profiles
-      WHERE institution_id = ${institutionId}::uuid AND status = 'ACTIVE'
-        AND id = ANY(${sql.raw(`ARRAY[${studentProfileIds.map((value) => `'${value}'::uuid`).join(',')}]`)})
+      SELECT student_user_id FROM institution_student_profiles p
+      WHERE p.institution_id = ${institutionId}::uuid AND p.status = 'ACTIVE'
+        AND p.id = ANY(${`{${studentProfileIds.join(',')}}`}::uuid[])
+        AND ${institutionStudentScopeSql(writeScope, 'p')}
     `) as QueryResult<{ student_user_id: string }>;
     const eligibleIds = [...new Set(eligible.rows.map((row) => row.student_user_id))];
 
-    let assigned = 0;
-    for (const studentUserId of eligibleIds) {
-      const inserted = await this.db.execute(sql`
-        INSERT INTO exam_assignments (id, institution_id, definition_id, student_user_id, assigned_by_user_id)
-        VALUES (${this.ids.uuid()}::uuid, ${institutionId}::uuid, ${id}::uuid, ${studentUserId}::uuid, ${actorId}::uuid)
-        ON CONFLICT DO NOTHING
-        RETURNING id
-      `) as QueryResult<{ id: string }>;
-      assigned += inserted.rows.length;
-      if (inserted.rows.length) {
-        await recordNotification(this.db, this.ids, {
-          userId: studentUserId,
-          kind: 'EXAM_ASSIGNED',
-          title: `Assessment assigned: ${definition.rows[0].title}`,
-          body: `Open until ${new Date(definition.rows[0].ends_at).toISOString()}. Find it under Assessments in your workspace.`,
-          data: { assessmentId: id },
-        });
+    // The assignments and their audit row are one transaction; notifications follow the
+    // commit, because a notification failure must never undo the assignment (§5.5).
+    const newlyAssignedIds = await this.db.transaction(async (tx) => {
+      const inserted: string[] = [];
+      for (const studentUserId of eligibleIds) {
+        const row = await tx.execute(sql`
+          INSERT INTO exam_assignments (id, institution_id, definition_id, student_user_id, assigned_by_user_id)
+          VALUES (${this.ids.uuid()}::uuid, ${institutionId}::uuid, ${id}::uuid, ${studentUserId}::uuid, ${actorId}::uuid)
+          ON CONFLICT DO NOTHING
+          RETURNING id
+        `) as QueryResult<{ id: string }>;
+        if (row.rows.length) inserted.push(studentUserId);
       }
+      await tx.execute(sql`
+        INSERT INTO audit_events (id, actor_user_id, action, resource_type, resource_id, organization_id, outcome, correlation_id, context)
+        VALUES (${this.ids.uuid()}::uuid, ${actorId}::uuid, 'institution.assessment.assigned', 'exam_definition', ${id},
+          ${institutionId}::uuid, 'SUCCESS', ${context.correlationId},
+          ${JSON.stringify({ requested: studentProfileIds.length, eligible: eligibleIds.length, newlyAssigned: inserted.length, studentUserIds: inserted })}::jsonb)
+      `);
+      return inserted;
+    });
+    const assigned = newlyAssignedIds.length;
+    for (const studentUserId of newlyAssignedIds) {
+      await recordNotification(this.db, this.ids, {
+        userId: studentUserId,
+        kind: 'EXAM_ASSIGNED',
+        title: `Assessment assigned: ${definition.rows[0].title}`,
+        body: `Open until ${new Date(definition.rows[0].ends_at).toISOString()}. Find it under Assessments in your workspace.`,
+        data: { assessmentId: id },
+      });
     }
     return {
       assignment: { assessmentId: id, requested: studentProfileIds.length, eligible: eligibleIds.length, newlyAssigned: assigned },
@@ -661,4 +679,9 @@ function asRuleError(error: unknown, correlationId: string): Error {
 
 function assessmentApiError(code: string, correlationId: string): { readonly error: { readonly code: string; readonly message: string; readonly correlationId: string } } {
   return { error: { code, message: 'The request could not be completed.', correlationId } };
+}
+
+/** INST-SR-02/03: the caller holds a staff role but no unit scope that permits this write. */
+function scopeRequired(correlationId: string): ForbiddenException {
+  return new ForbiddenException({ error: { code: 'SCOPE_REQUIRED', message: 'A department or teaching assignment is required for this change', correlationId } });
 }

@@ -30,6 +30,7 @@ import { EmployerOrganisationGate } from './rolePortal/employerOrganisationState
 import { InstitutionAcademicStructurePage, InstitutionStaffActionsPage, InstitutionStaffPage, InstitutionStudentsPage } from './rolePortal/institution.js';
 import { FacultyMyStudentsPage, InstitutionFacultyAndStaffPage } from './rolePortal/institutionTeaching.js';
 import { FacultyMessagesPage } from './rolePortal/institutionAnnouncements.js';
+import { DepartmentBatchesPage, DepartmentOverviewPage, DepartmentReadinessPage, DepartmentReportsAnalyticsPage, FacultyAssessmentDetailPage, FacultyClassReportsPage, OpportunitiesAndOffersPage, PlacementPipelinePage } from './rolePortal/institutionDepartment.js';
 import { AcademicVerificationSection, FacultyAcademicVerification } from './rolePortal/institutionAcademicVerification.js';
 import { OperationsAuditLogPage, OperationsContentReadOnlyPage, OperationsFeatureFlagsPage, OperationsOrganizationsPage, OperationsInvitationTrackingPanel, OperationsTechnicalReadOnlyPage } from './rolePortal/operations.js';
 import { OperationsAccountLookupPage, OperationsSupportDeskPage } from './rolePortal/support.js';
@@ -283,9 +284,10 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   }
   if (!demoMode && portal.key === 'department-head' && route.label === 'Students') {
     // INST-04: the department's verification queue and results upload, scoped server-side
-    // to the department. The department roster itself is not built yet and says so.
+    // to the department. INST-07: the department roster (read-only) above it.
     return isInstitutionStaffWorkspace(authenticatedWorkspace)
-      ? <StaffPilotWrap title="Students" subtitle="Verify your department's academic results. The department roster is not built yet.">
+      ? <StaffPilotWrap title="Students" subtitle="Your department's roster, and its academic results to verify.">
+          <InstitutionStudentsPage portal={portal} authenticatedWorkspace={authenticatedWorkspace} />
           <AcademicVerificationSection institutionId={authenticatedWorkspace.organizationId} canUpload={authenticatedWorkspace.role === 'DEPARTMENT_HEAD'} /></StaffPilotWrap>
       : <InstitutionWorkspaceError title="Students" unauthorized={Boolean(authenticatedWorkspace && !institutionStaffWorkspaceRoles.has(authenticatedWorkspace.role))} />;
   }
@@ -350,6 +352,16 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   // INST-03: only these two labels' branches change; navigation is untouched.
   if (!demoMode && portal.key === 'faculty' && route.label === 'My Students') return <FacultyMyStudentsPage authenticatedWorkspace={authenticatedWorkspace} />;
   if (!demoMode && portal.key === 'department-head' && route.label === 'Faculty and Staff') return <InstitutionFacultyAndStaffPage authenticatedWorkspace={authenticatedWorkspace} />;
+  // INST-07: the department head's and the lecturer's remaining items become real screens.
+  // Only these labels' branches change; navigation is untouched.
+  if (!demoMode && portal.key === 'department-head' && route.label === 'Department Overview') return <DepartmentOverviewPage authenticatedWorkspace={authenticatedWorkspace} basePath={portal.basePath} />;
+  if (!demoMode && portal.key === 'department-head' && route.label === 'Readiness') return <DepartmentReadinessPage authenticatedWorkspace={authenticatedWorkspace} />;
+  if (!demoMode && portal.key === 'department-head' && route.label === 'Batches') return <DepartmentBatchesPage authenticatedWorkspace={authenticatedWorkspace} />;
+  if (!demoMode && portal.key === 'department-head' && route.label === 'Placement Pipeline') return <PlacementPipelinePage authenticatedWorkspace={authenticatedWorkspace} basePath={portal.basePath} />;
+  if (!demoMode && portal.key === 'department-head' && route.label === 'Opportunities and Offers') return <OpportunitiesAndOffersPage authenticatedWorkspace={authenticatedWorkspace} />;
+  if (!demoMode && portal.key === 'department-head' && route.label === 'Reports and Analytics') return <DepartmentReportsAnalyticsPage authenticatedWorkspace={authenticatedWorkspace} />;
+  if (!demoMode && portal.key === 'faculty' && route.label === 'Assessment Detail') return <FacultyAssessmentDetailPage authenticatedWorkspace={authenticatedWorkspace} />;
+  if (!demoMode && portal.key === 'faculty' && route.label === 'Reports') return <FacultyClassReportsPage authenticatedWorkspace={authenticatedWorkspace} />;
   // INST-06: faculty Messages — announcements to assigned sections and the lecturer's inbox. Only this label's branch changes.
   if (!demoMode && portal.key === 'faculty' && route.label === 'Messages') return <FacultyMessagesPage authenticatedWorkspace={authenticatedWorkspace} />;
   if (!demoMode && ['faculty', 'department-head'].includes(portal.key) && ['Assigned Tasks', 'Student Detail', 'Academic Verification', 'Meetings', 'Calendar'].includes(route.label)) {

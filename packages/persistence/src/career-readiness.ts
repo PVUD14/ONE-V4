@@ -1,7 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import { suppressAggregateTable, type InstitutionStudentScope } from '@planthepath/authorization/src/index.js';
+import { sql, type SQL } from 'drizzle-orm';
 import { institutionStudentScopeClause } from './institution-scope.js';
+import type { PersistenceDb } from './repositories.js';
 import {
   calculateAdvisoryReadiness,
   deterministicPackageIdentity,
@@ -928,11 +930,27 @@ export async function getCareerReadinessOperationalStatus(pool: Pool): Promise<R
 /** Every readiness band, in display order: each is a cell of the institution report. */
 const institutionReportBands = ['NOT_ENOUGH_EVIDENCE', 'DEVELOPING', 'PROGRESSING', 'READY_FOR_NEXT_STEP'] as const satisfies readonly ReadinessBand[];
 
-export async function generateInstitutionAggregateReport(pool: Pool, input: {
+/** A readiness band distribution as it may leave the server: every band a cell, through the one suppression rule. */
+export interface InstitutionReadinessAggregate {
+  readonly suppressed: boolean;
+  readonly minimumCohortSize: number;
+  readonly cohortSize: number | null;
+  readonly cohortSizeSuppressed: boolean;
+  readonly bands: readonly { readonly band: string; readonly count: number | null; readonly suppressed: boolean }[];
+  readonly scope: 'INSTITUTION' | 'UNITS';
+}
+
+/**
+ * The suppressed band distribution of the students in `studentScope` over one period: each
+ * student's latest snapshot in the period, counted while their relationship with the
+ * institution authorised it. Shared by the stored report and the INST-07 department
+ * overview, so the two cannot disagree. The raw counts never leave this function.
+ * Callers enforce the period rule (institutionReportingMonth).
+ */
+export async function institutionReadinessDistribution(db: DbClient | PersistenceDb, input: {
   readonly institutionId: string; readonly periodStart: string; readonly periodEnd: string; readonly minimumCohortSize?: number;
-  /** INST-02: a department head's report covers their department only. Defaults to the whole institution. */
   readonly studentScope?: InstitutionStudentScope;
-}): Promise<Record<string, unknown>> {
+}): Promise<InstitutionReadinessAggregate> {
   const minimumCohortSize = input.minimumCohortSize ?? 5;
   if (!Number.isInteger(minimumCohortSize) || minimumCohortSize < 5) throw new Error('minimum cohort size must be at least 5');
   const studentScope = input.studentScope ?? { kind: 'INSTITUTION' as const };
@@ -940,43 +958,75 @@ export async function generateInstitutionAggregateReport(pool: Pool, input: {
   const scopeFilter = studentScope.kind === 'INSTITUTION' ? '' : `
          JOIN institution_student_profiles isp ON isp.institution_id=ir.institution_id AND isp.student_user_id=rs.subject_user_id
            AND ${institutionStudentScopeClause(studentScope, 'isp', values)}`;
+  const client = 'execute' in db ? drizzleQueryRunner(db) : db;
+  const result = await client.query<{ cohort_size: number; band: string; count: number }>(
+    `WITH latest AS (
+       SELECT DISTINCT ON (rs.subject_user_id) rs.subject_user_id, rs.band
+       FROM readiness_snapshots rs
+       JOIN institution_relationships ir ON ir.student_user_id=rs.subject_user_id
+         AND ir.institution_id=$1
+         AND (
+           ir.state IN ('VERIFIED','ACTIVE')
+           OR (ir.state IN ('TRANSFERRED','GRADUATED') AND ir.effective_to IS NOT NULL)
+         )
+         AND ir.effective_from <= rs.generated_at
+         AND (ir.effective_to IS NULL OR ir.effective_to > rs.generated_at)${scopeFilter}
+       WHERE rs.generated_at >= $2::date AND rs.generated_at < ($3::date + interval '1 day')
+       ORDER BY rs.subject_user_id, rs.generated_at DESC
+     )
+     SELECT count(*) OVER ()::int AS cohort_size, band, count(*)::int AS count FROM latest GROUP BY band`,
+    values,
+  );
+  // Record whose students the report counts, so a department's report is never read as the college's.
+  const scope = studentScope.kind === 'INSTITUTION' ? 'INSTITUTION' : 'UNITS';
+  // INST-SR-01: every band is a cell, zero included (a missing row is a published zero),
+  // through the one shared suppression rule. Only the suppressed form is returned or
+  // stored; the raw counts never leave this function.
+  const counts = new Map(result.rows.map(({ band, count }) => [band, count]));
+  const table = suppressAggregateTable(
+    institutionReportBands.map((band) => ({ key: band, count: counts.get(band) ?? 0 })),
+    minimumCohortSize,
+  );
+  return table.suppressed
+    ? { suppressed: true, minimumCohortSize, cohortSize: 0, cohortSizeSuppressed: true, bands: [], scope }
+    : {
+      suppressed: false, minimumCohortSize,
+      cohortSize: table.total.value, cohortSizeSuppressed: table.total.suppressed,
+      bands: table.cells.map((cell) => ({ band: cell.key, count: cell.count, suppressed: cell.suppressed })),
+      scope,
+    };
+}
+
+/**
+ * Run a positional-parameter query through drizzle, so the one readiness query serves both
+ * pg clients (the stored report) and the API's drizzle handle (the department overview).
+ * Every `$n` becomes a bound parameter; nothing is interpolated.
+ */
+function drizzleQueryRunner(db: PersistenceDb): DbClient {
+  return {
+    query: (async (text: string, values: readonly unknown[] = []) => {
+      const chunks: SQL[] = [];
+      let last = 0;
+      for (const match of text.matchAll(/\$(\d+)/g)) {
+        chunks.push(sql.raw(text.slice(last, match.index)));
+        // sql.param keeps an array one bound parameter (a template would spread it into a list).
+        chunks.push(sql`${sql.param(values[Number(match[1]) - 1])}`);
+        last = (match.index ?? 0) + match[0].length;
+      }
+      chunks.push(sql.raw(text.slice(last)));
+      const result = await db.execute(sql.join(chunks, sql``)) as unknown as { rows: unknown[] };
+      return { rows: result.rows };
+    }) as unknown as DbClient['query'],
+  };
+}
+
+export async function generateInstitutionAggregateReport(pool: Pool, input: {
+  readonly institutionId: string; readonly periodStart: string; readonly periodEnd: string; readonly minimumCohortSize?: number;
+  /** INST-02: a department head's report covers their department only. Defaults to the whole institution. */
+  readonly studentScope?: InstitutionStudentScope;
+}): Promise<Record<string, unknown>> {
   return transaction(pool, async (client) => {
-    const result = await client.query<{ cohort_size: number; band: string; count: number }>(
-      `WITH latest AS (
-         SELECT DISTINCT ON (rs.subject_user_id) rs.subject_user_id, rs.band
-         FROM readiness_snapshots rs
-         JOIN institution_relationships ir ON ir.student_user_id=rs.subject_user_id
-           AND ir.institution_id=$1
-           AND (
-             ir.state IN ('VERIFIED','ACTIVE')
-             OR (ir.state IN ('TRANSFERRED','GRADUATED') AND ir.effective_to IS NOT NULL)
-           )
-           AND ir.effective_from <= rs.generated_at
-           AND (ir.effective_to IS NULL OR ir.effective_to > rs.generated_at)${scopeFilter}
-         WHERE rs.generated_at >= $2::date AND rs.generated_at < ($3::date + interval '1 day')
-         ORDER BY rs.subject_user_id, rs.generated_at DESC
-       )
-       SELECT count(*) OVER ()::int AS cohort_size, band, count(*)::int AS count FROM latest GROUP BY band`,
-      values,
-    );
-    // Record whose students the report counts, so a department's report is never read as the college's.
-    const scope = studentScope.kind === 'INSTITUTION' ? 'INSTITUTION' : 'UNITS';
-    // INST-SR-01: every band is a cell, zero included (a missing row is a published zero),
-    // through the one shared suppression rule. Only the suppressed form is returned or
-    // stored; the raw counts never leave this function.
-    const counts = new Map(result.rows.map(({ band, count }) => [band, count]));
-    const table = suppressAggregateTable(
-      institutionReportBands.map((band) => ({ key: band, count: counts.get(band) ?? 0 })),
-      minimumCohortSize,
-    );
-    const aggregate = table.suppressed
-      ? { suppressed: true, minimumCohortSize, cohortSize: 0, cohortSizeSuppressed: true, bands: [], scope }
-      : {
-        suppressed: false, minimumCohortSize,
-        cohortSize: table.total.value, cohortSizeSuppressed: table.total.suppressed,
-        bands: table.cells.map((cell) => ({ band: cell.key, count: cell.count, suppressed: cell.suppressed })),
-        scope,
-      };
+    const aggregate = await institutionReadinessDistribution(client, input);
     const reportId = randomUUID();
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1_000);
     await client.query(

@@ -307,6 +307,9 @@ importers:
       '@planthepath/learning-model':
         specifier: workspace:*
         version: link:../learning-model
+      '@planthepath/learning-orchestrator':
+        specifier: workspace:*
+        version: link:../learning-orchestrator
       '@planthepath/mastery-bkt':
         specifier: workspace:*
         version: link:../mastery-bkt

@@ -150,7 +150,7 @@ async function erase(deps: DeletionExecutionDeps, subjectUserId: string): Promis
   await db.execute(sql`DELETE FROM notification_commands WHERE subject_user_id = ${subjectUserId}::uuid`);
   await db.execute(sql`DELETE FROM notification_preferences WHERE user_id = ${subjectUserId}::uuid`);
 
-  // Engine behavioural data is erased (ADR-034, ENG-03, ENG-05). The attempt log and sessions are
+  // Engine behavioural data is erased (ADR-034, ENG-03, ENG-05, ENG-08). The attempt log and sessions are
   // append-only; their trigger allows DELETE only for the subject named in the
   // transaction-local setting set here, so this one transaction is the only way to remove
   // them. Attempts before sessions, which they reference.
@@ -161,10 +161,12 @@ async function erase(deps: DeletionExecutionDeps, subjectUserId: string): Promis
     const attempts = await removed(sql`WITH gone AS (DELETE FROM learning_attempt_events WHERE subject_user_id = ${subjectUserId}::uuid RETURNING 1) SELECT count(*)::int AS count FROM gone`);
     const sessions = await removed(sql`WITH gone AS (DELETE FROM learning_sessions WHERE subject_user_id = ${subjectUserId}::uuid RETURNING 1) SELECT count(*)::int AS count FROM gone`);
     const activity = await removed(sql`WITH gone AS (DELETE FROM learner_activity_events WHERE user_id = ${subjectUserId}::uuid RETURNING 1) SELECT count(*)::int AS count FROM gone`);
+    // The planner's decision audit (ENG-08) holds the inputs each decision was made from.
+    const decisions = await removed(sql`WITH gone AS (DELETE FROM learning_decisions WHERE subject_user_id = ${subjectUserId}::uuid RETURNING 1) SELECT count(*)::int AS count FROM gone`);
     // Deletion triggers a rebuild of the skill state projection (ENG-05). With the facts gone the
     // rebuild is the empty set, so every projection row of the subject is removed here.
     const projection = await projectSubjectSkillState(tx, subjectUserId);
-    return attempts + sessions + activity + projection.deleted;
+    return attempts + sessions + activity + decisions + projection.deleted;
   });
 
   // Institution roster history survives, with the person removed from it.

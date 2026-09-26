@@ -40,8 +40,8 @@ strategy and the reasons for it. Two things make that answer trustworthy:
 | `strategies` | `listPublishedTeachingStrategies(db)` — **PUBLISHED only** | Drafts never reach the planner. |
 | `constraints` | faculty override and assignments (INST-16) | **No source exists yet**: INST-16 builds the faculty actions. The loader passes none; the planner and the table already carry them, so INST-16 only adds a loader. |
 
-The planner **normalises** its input (every list sorted by a total order, codes de-duplicated) before
-deciding, so input order never changes the result; the stored `inputs` are the normalised form.
+The planner **validates and normalises** its input (every list sorted by a total order, identifiers
+lower-cased, timestamps in ISO form; duplicates and unknown values are refused) before deciding, so input order never changes the result; the stored `inputs` are the normalised form.
 
 ### Why the BKT likelihood is not an input
 

@@ -455,14 +455,6 @@ export class StudentHiringController {
       `);
       // What the employer is told about this applicant's eligibility, frozen as it stood now.
       if (evaluation) await recordEligibilityEvaluation(tx, this.ids, { applicationId, versionId, trigger: 'APPLY', evaluation });
-      // EMP-07: the consented snapshot, built from the records as they stand in this transaction and
-      // bound to the version applied under. When the student reviewed a preview, what is stored must
-      // be exactly that; otherwise nothing is written and they are asked to look again.
-      const built = await this.buildSnapshot(tx, studentUserId, input, context.correlationId);
-      if (input.reviewedSnapshotHash !== null && input.reviewedSnapshotHash !== built.hash) {
-        throw new ConflictException(safeHiringError('SNAPSHOT_CHANGED', context.correlationId));
-      }
-      await writeApplicationSnapshot(tx, { id: this.ids.uuid(), applicationId, versionId, built });
       await this.writeAudit(studentUserId, 'application.submitted', 'application', applicationId, context.correlationId, tx);
       if (input.institutionVisibilityGranted) {
         await this.writeAudit(studentUserId, 'application.institution_visibility_granted', 'application', applicationId, context.correlationId, tx);
@@ -471,6 +463,14 @@ export class StudentHiringController {
         applicationId, opportunityId: input.opportunityId, employerId,
       }, studentUserId, employerId, context.correlationId, tx);
 
+      // EMP-07, last in the transaction: the consented snapshot, built from the records as they stand in this transaction and
+      // bound to the version applied under. When the student reviewed a preview, what is stored must
+      // be exactly that; otherwise the whole transaction rolls back and they are asked to look again.
+      const built = await this.buildSnapshot(tx, studentUserId, input, context.correlationId);
+      if (input.reviewedSnapshotHash !== null && input.reviewedSnapshotHash !== built.hash) {
+        throw new ConflictException(safeHiringError('SNAPSHOT_CHANGED', context.correlationId));
+      }
+      await writeApplicationSnapshot(tx, { id: this.ids.uuid(), applicationId, versionId, built });
       return { application: { id: applicationId, state: 'APPLIED' }, correlationId: context.correlationId };
     });
   }

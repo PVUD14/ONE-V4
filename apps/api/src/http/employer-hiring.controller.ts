@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm';
 import { detectOpportunitySignals, OPPORTUNITY_DETECTOR_VERSION } from '@planthepath/hiring/src/review-signals.js';
 import { summarizeHiringAnalytics, type HiringAggregateRow } from '@planthepath/hiring/src/analytics.js';
 import type { PersistenceDb } from '@planthepath/persistence/src/repositories.js';
+import { applicationHasLiveApplicantGrant, assertEmployerApplicationAccess } from '@planthepath/persistence/src/employer-authentication.js';
 import {
   HiringRuleError,
   assertApplicationTransition,
@@ -238,10 +239,12 @@ export class EmployerHiringController {
     const id = requireUuid(opportunityId, context.correlationId);
     await this.requireOwnedOpportunity(employerId, id, context.correlationId);
 
-    // Drafts are never visible. Withdrawn candidates stay listed so the employer knows
-    // to stop scheduling, but their identifying fields are withheld once consent ends.
+    // Drafts are never visible. Withdrawn, closed and otherwise ungranted candidates stay
+    // listed so the employer knows to stop scheduling, but their identifying fields are
+    // withheld once the student's grant is no longer live (EMP-SR-01).
     const rows = await this.db.execute(sql`
       SELECT a.id, a.state, a.submitted_at, a.updated_at, a.closed_at, a.consent_revoked_at,
+             ${applicationHasLiveApplicantGrant('a')} AS candidate_access,
              u.email AS student_email, isp.full_name, isp.institution_student_id,
              (SELECT count(*) FROM interviews i WHERE i.application_id = a.id AND i.state <> 'CANCELLED') AS interview_count,
              (SELECT o2.state FROM offers o2 WHERE o2.application_id = a.id AND o2.state IN ('DRAFT','EXTENDED','ACCEPTED') LIMIT 1) AS offer_state
@@ -286,30 +289,35 @@ export class EmployerHiringController {
     }
 
     const closes = toState === 'HIRED' || toState === 'REJECTED';
-    await this.db.execute(sql`
-      UPDATE applications
-      SET state = ${toState},
-          closed_at = ${closes ? sql`now()` : sql`NULL`},
-          rejection_reason_code = ${toState === 'REJECTED' ? reasonCode : null},
-          updated_at = now()
-      WHERE id = ${id}::uuid AND employer_id = ${employerId}::uuid
-    `);
-    await this.db.execute(sql`
-      INSERT INTO application_state_history (id, application_id, from_state, to_state, changed_by_user_id, actor_role, reason_code, note)
-      VALUES (${this.ids.uuid()}::uuid, ${id}::uuid, ${from}, ${toState}, ${actorId}::uuid, 'EMPLOYER', ${reasonCode}, ${note})
-    `);
-    // A closed application ends the employer's consented view of the student.
-    if (closes) {
-      await this.db.execute(sql`
-        UPDATE employer_applicant_access_grants SET revoked_at = now()
-        WHERE employer_id = ${employerId}::uuid
-          AND student_user_id = ${String(application.student_user_id)}::uuid
-          AND opportunity_id = ${String(application.opportunity_id)}::uuid
-          AND revoked_at IS NULL
+    await this.db.transaction(async (tx) => {
+      // The grant is checked at request time and share-locked, so a withdrawal or deletion
+      // that ends it cannot interleave with this move.
+      await this.requireLiveGrant(employerId, [id], context.correlationId, tx);
+      await tx.execute(sql`
+        UPDATE applications
+        SET state = ${toState},
+            closed_at = ${closes ? sql`now()` : sql`NULL`},
+            rejection_reason_code = ${toState === 'REJECTED' ? reasonCode : null},
+            updated_at = now()
+        WHERE id = ${id}::uuid AND employer_id = ${employerId}::uuid
       `);
-    }
-    await this.writeAudit(actorId, `application.${toState.toLowerCase()}`, 'application', id, context.correlationId);
-    await this.writeOutbox('application', id, `application.${toState.toLowerCase()}`, { applicationId: id, fromState: from, toState }, actorId, employerId, context.correlationId);
+      await tx.execute(sql`
+        INSERT INTO application_state_history (id, application_id, from_state, to_state, changed_by_user_id, actor_role, reason_code, note)
+        VALUES (${this.ids.uuid()}::uuid, ${id}::uuid, ${from}, ${toState}, ${actorId}::uuid, 'EMPLOYER', ${reasonCode}, ${note})
+      `);
+      // A closed application ends the employer's consented view of the student.
+      if (closes) {
+        await tx.execute(sql`
+          UPDATE employer_applicant_access_grants SET revoked_at = now()
+          WHERE employer_id = ${employerId}::uuid
+            AND student_user_id = ${String(application.student_user_id)}::uuid
+            AND opportunity_id = ${String(application.opportunity_id)}::uuid
+            AND revoked_at IS NULL
+        `);
+      }
+      await this.writeAudit(actorId, `application.${toState.toLowerCase()}`, 'application', id, context.correlationId, tx);
+      await this.writeOutbox('application', id, `application.${toState.toLowerCase()}`, { applicationId: id, fromState: from, toState }, actorId, employerId, context.correlationId, tx);
+    });
 
     return { application: { id, state: toState }, correlationId: context.correlationId };
   }
@@ -346,6 +354,10 @@ export class EmployerHiringController {
     const note = readOptionalSafeText(body, 'note', 1000, context.correlationId);
     const actorId = context.authorization.principal.userId;
 
+    // No live grant is required here, deliberately (EMP-SR-01). Feedback is only released
+    // on a REJECTED application, and rejecting is what revokes the grant, so requiring one
+    // would make the route unreachable. Nothing flows to the employer: the response echoes
+    // only what the employer sent, and the release goes to the candidate.
     const application = await this.requireOwnedApplication(employerId, id, context.correlationId);
     // Feedback on a live application would become a back channel for negotiating, and
     // feedback after HIRED is a different conversation entirely.
@@ -402,6 +414,8 @@ export class EmployerHiringController {
   async getMyInterview(@Req() request: ProtectedHttpRequest, @Param('employerId') employerId: string, @Param('interviewId') interviewId: string): Promise<Record<string, unknown>> {
     const context = await this.requireInterviewParticipant(request, employerId, interviewId);
     const rows = await this.readParticipantInterviews(context.authorization.principal.userId, employerId, interviewId);
+    // Without a live grant the brief keeps the slot and the role but loses the person, the
+    // same withholding a withdrawn candidate already gets (EMP-SR-01, mapCandidateFields).
     if (rows.rows.length !== 1) throw forbidden(context.correlationId);
     return { interview: mapParticipantInterview(rows.rows[0]!), correlationId: context.correlationId };
   }
@@ -420,7 +434,7 @@ export class EmployerHiringController {
       // Lock the authorization rows: removal, suspension, cancellation and consent
       // revocation cannot race a scorecard into an already-revoked scope.
       const locked = await tx.execute(sql`
-        SELECT i.id FROM interviews i
+        SELECT i.id, a.id AS application_id FROM interviews i
         JOIN applications a ON a.id = i.application_id AND a.employer_id = i.employer_id
         JOIN interview_participants p ON p.interview_id = i.id AND p.participant_user_id = ${actorId}::uuid AND p.removed_at IS NULL
         JOIN organization_memberships m ON m.user_id = ${actorId}::uuid AND m.organization_id = i.employer_id
@@ -429,8 +443,9 @@ export class EmployerHiringController {
           AND a.consent_revoked_at IS NULL AND a.closed_at IS NULL AND a.state <> 'DRAFT'
           AND ${activeInterviewAssignment(actorId)}
         FOR SHARE OF i, a, p, m
-      `) as QueryResult<{ id: string }>;
+      `) as QueryResult<{ id: string; application_id: string }>;
       if (!locked.rows.length) throw forbidden(context.correlationId);
+      await this.requireLiveGrant(employerId, [locked.rows[0]!.application_id], context.correlationId, tx);
       const saved = await tx.execute(sql`
         INSERT INTO interview_outcomes (id, interview_id, submitted_by_user_id, recommendation, overall_rating, strengths, concerns, notes)
         SELECT ${this.ids.uuid()}::uuid, i.id, ${actorId}::uuid, ${recommendation}, ${rating}, ${strengths}, ${concerns}, ${notes}
@@ -467,6 +482,7 @@ export class EmployerHiringController {
     return this.db.execute(sql`
       SELECT i.id, i.round_number, i.mode, i.state, i.scheduled_start, i.scheduled_end, i.location_detail, i.joining_link,
         a.consent_revoked_at, a.closed_at, v.title, v.summary, v.responsibilities,
+        ${applicationHasLiveApplicantGrant('a')} AS candidate_access,
         u.email AS student_email, isp.full_name, isp.institution_student_id
       FROM interviews i
       JOIN applications a ON a.id = i.application_id AND a.employer_id = i.employer_id
@@ -489,6 +505,7 @@ export class EmployerHiringController {
       SELECT i.id, i.application_id, i.round_number, i.mode, i.state, i.scheduled_start, i.scheduled_end,
              i.location_detail, i.joining_link, i.created_at, i.updated_at,
              a.state AS application_state, a.submitted_at, a.closed_at, a.consent_revoked_at,
+             ${applicationHasLiveApplicantGrant('a')} AS candidate_access,
              o.id AS opportunity_id, o.reference_code,
              v.title,
              u.email AS student_email, isp.full_name, isp.institution_student_id,
@@ -537,6 +554,7 @@ export class EmployerHiringController {
           AND consent_revoked_at IS NULL AND closed_at IS NULL AND state <> 'DRAFT' FOR UPDATE
       `) as QueryResult<{ id: string }>;
       if (lockedApplication.rows.length !== 1) throw forbidden(context.correlationId);
+      await this.requireLiveGrant(employerId, [id], context.correlationId, tx);
       if (participantIds.length) {
         const members = await tx.execute(sql`
           SELECT m.user_id FROM organization_memberships m JOIN users u ON u.id = m.user_id
@@ -592,10 +610,17 @@ export class EmployerHiringController {
     await assertEmployerState(this.db, employerId, 'candidates', context.correlationId);
 
     const rows = await this.db.execute(sql`
-      SELECT id, state FROM interviews WHERE id = ${id}::uuid AND employer_id = ${employerId}::uuid
+      SELECT i.id, i.state, ${applicationHasLiveApplicantGrant('a')} AS candidate_access
+      FROM interviews i JOIN applications a ON a.id = i.application_id AND a.employer_id = i.employer_id
+      WHERE i.id = ${id}::uuid AND i.employer_id = ${employerId}::uuid
     `) as QueryResult<Record<string, unknown>>;
     const [interview] = rows.rows;
     if (!interview) throw forbidden(context.correlationId);
+    // Rescheduling, completing or marking a no-show acts on the candidate and needs a live
+    // grant (EMP-SR-01). Cancelling does not: it only stands the employer down, carries
+    // nothing about the person, and must stay possible after a withdrawal or rejection so a
+    // slot is not left hanging over someone who has gone.
+    if (toState !== 'CANCELLED' && interview.candidate_access !== true) throw forbidden(context.correlationId);
 
     try {
       assertInterviewTransition(String(interview.state) as never, toState as never);
@@ -625,8 +650,10 @@ export class EmployerHiringController {
     const notes = readOptionalSafeText(body, 'notes', 4000, context.correlationId);
     const actorId = context.authorization.principal.userId;
 
-    const rows = await this.db.execute(sql`SELECT id FROM interviews WHERE id = ${id}::uuid AND employer_id = ${employerId}::uuid`) as QueryResult<{ id: string }>;
+    const rows = await this.db.execute(sql`SELECT id, application_id FROM interviews WHERE id = ${id}::uuid AND employer_id = ${employerId}::uuid`) as QueryResult<{ id: string; application_id: string }>;
     if (rows.rows.length !== 1) throw forbidden(context.correlationId);
+    // A scorecard is a judgement about a named person; it needs their live grant.
+    await this.requireLiveGrant(employerId, [rows.rows[0]!.application_id], context.correlationId);
 
     // One scorecard per interviewer is a unique index; a second submission is a
     // correction rather than an error.
@@ -658,6 +685,7 @@ export class EmployerHiringController {
              off.compensation_period, off.joining_date, off.offer_expires_at, off.conditions,
              off.extended_at, off.responded_at, off.withdrawn_at, off.created_at, off.updated_at,
              a.state AS application_state, a.submitted_at, a.closed_at, a.consent_revoked_at,
+             ${applicationHasLiveApplicantGrant('a')} AS candidate_access,
              o.id AS opportunity_id, o.reference_code,
              v.title,
              u.email AS student_email, isp.full_name, isp.institution_student_id
@@ -698,6 +726,7 @@ export class EmployerHiringController {
       throw ruleFailure(error, context.correlationId);
     }
 
+    await this.requireLiveGrant(employerId, [id], context.correlationId);
     const offerId = this.ids.uuid();
     const inserted = await this.db.execute(sql`
       INSERT INTO offers (id, application_id, employer_id, state, compensation_currency, compensation_amount, compensation_period, joining_date, offer_expires_at, conditions, extended_at, created_by_user_id)
@@ -717,6 +746,8 @@ export class EmployerHiringController {
   async withdrawOffer(@Req() request: ProtectedHttpRequest, @Param('employerId') employerId: string, @Param('offerId') offerId: string): Promise<Record<string, unknown>> {
     const context = await this.requireEmployer(request, employerId, employerManageRoles, 'candidates');
     const id = requireUuid(offerId, context.correlationId);
+    // No live grant is required to withdraw (EMP-SR-01): like cancelling an interview it
+    // only stands the employer down, and it returns nothing about the candidate.
     const rows = await this.db.execute(sql`SELECT id, state FROM offers WHERE id = ${id}::uuid AND employer_id = ${employerId}::uuid`) as QueryResult<Record<string, unknown>>;
     const [offer] = rows.rows;
     if (!offer) throw forbidden(context.correlationId);
@@ -742,6 +773,8 @@ export class EmployerHiringController {
   @Get('/employers/:employerId/hiring-analytics')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async hiringAnalytics(@Req() request: ProtectedHttpRequest, @Param('employerId') employerId: string): Promise<Record<string, unknown>> {
+    // Counts per opportunity and stage only, with no row for any one person, so the
+    // applicant grant does not apply here (EMP-SR-01); the organisation guard does.
     const context = await this.requireEmployer(request, employerId, employerManageRoles, 'candidates');
     const rows = await this.db.execute(sql`
       WITH scoped AS (
@@ -824,6 +857,20 @@ export class EmployerHiringController {
     const [row] = rows.rows;
     if (!row) throw forbidden(correlationId);
     return row;
+  }
+
+  /**
+   * EMP-SR-01: every read or write of one candidate's data needs the student's live
+   * applicant-access grant at request time. The check is the shared persistence assertion;
+   * any failure becomes the same safe 403 as every other refusal. Inside a transaction the
+   * grant rows are share-locked for the rest of the write.
+   */
+  private async requireLiveGrant(employerId: string, applicationIds: readonly string[], correlationId: string, tx?: Pick<PersistenceDb, 'execute'>): Promise<void> {
+    try {
+      await assertEmployerApplicationAccess(tx ?? this.db, { employerId, applicationIds, lockForMutation: tx !== undefined });
+    } catch {
+      throw forbidden(correlationId);
+    }
   }
 
   private async requireOwnedApplication(employerId: string, applicationId: string, correlationId: string): Promise<Record<string, unknown>> {
@@ -944,16 +991,12 @@ function mapEmployerOpportunity(row: Record<string, unknown>): Record<string, un
 }
 
 function mapApplicantRow(row: Record<string, unknown>): Record<string, unknown> {
-  // Once consent is revoked the employer keeps the fact of the application, for their
-  // own pipeline hygiene and for audit, but loses the person behind it.
-  const consentRevoked = row.consent_revoked_at != null;
+  // Once consent is revoked or the grant ends the employer keeps the fact of the
+  // application, for their own pipeline hygiene and for audit, but loses the person.
   return {
     id: row.id,
     state: row.state,
-    consentRevoked,
-    candidateName: consentRevoked ? null : (row.full_name ?? null),
-    candidateEmail: consentRevoked ? null : row.student_email,
-    institutionStudentId: consentRevoked ? null : (row.institution_student_id ?? null),
+    ...mapCandidateFields(row),
     submittedAt: row.submitted_at ?? null,
     closedAt: row.closed_at ?? null,
     interviewCount: Number(row.interview_count ?? 0),
@@ -962,13 +1005,20 @@ function mapApplicantRow(row: Record<string, unknown>): Record<string, unknown> 
   };
 }
 
+/**
+ * The person behind an application is shown only while consent stands and the student's
+ * applicant-access grant is live (`candidate_access`, from the shared persistence
+ * predicate). `candidateAccess` tells the client why the fields are empty.
+ */
 function mapCandidateFields(row: Record<string, unknown>): Record<string, unknown> {
   const consentRevoked = row.consent_revoked_at != null;
+  const candidateAccess = !consentRevoked && row.candidate_access === true;
   return {
     consentRevoked,
-    candidateName: consentRevoked ? null : (row.full_name ?? null),
-    candidateEmail: consentRevoked ? null : row.student_email,
-    institutionStudentId: consentRevoked ? null : (row.institution_student_id ?? null),
+    candidateAccess,
+    candidateName: candidateAccess ? (row.full_name ?? null) : null,
+    candidateEmail: candidateAccess ? row.student_email : null,
+    institutionStudentId: candidateAccess ? (row.institution_student_id ?? null) : null,
   };
 }
 
@@ -1002,10 +1052,10 @@ function mapParticipantInterview(row: Record<string, unknown>): Record<string, u
     id: row.id, title: row.title, roundNumber: Number(row.round_number), mode: row.mode, state: row.state,
     scheduledStart: row.scheduled_start, scheduledEnd: row.scheduled_end ?? null,
     ...candidate,
-    locationDetail: candidate.consentRevoked ? null : row.location_detail ?? null,
-    joiningLink: candidate.consentRevoked ? null : row.joining_link ?? null,
+    locationDetail: candidate.candidateAccess ? row.location_detail ?? null : null,
+    joiningLink: candidate.candidateAccess ? row.joining_link ?? null : null,
     summary: row.summary ?? null, responsibilities: row.responsibilities ?? null,
-    canRecordOutcome: !candidate.consentRevoked && row.closed_at == null,
+    canRecordOutcome: candidate.candidateAccess === true && row.closed_at == null,
   };
 }
 

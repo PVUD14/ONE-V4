@@ -156,8 +156,11 @@ async function expectRefused(p: Pipeline, call: Promise<unknown>): Promise<void>
   expect(error).toBeInstanceOf(ForbiddenException);
   const forbidden = error as ForbiddenException;
   expect(forbidden.getStatus()).toBe(403);
-  const body = forbidden.getResponse() as { error: { code: string; message: string } };
-  expect(body.error).toMatchObject({ code: 'FORBIDDEN', message: 'Access denied' });
+  // Each controller keeps its existing safe refusal: a FORBIDDEN code and a correlation id,
+  // with nothing else that could describe the candidate.
+  const body = forbidden.getResponse() as { error: Record<string, unknown> };
+  expect(body.error.code).toBe('FORBIDDEN');
+  expect(Object.keys(body.error).every((key) => ['code', 'message', 'correlationId'].includes(key))).toBe(true);
   expectNoPerson(p, body);
 }
 
@@ -191,7 +194,9 @@ async function expectAllReadsWithheld(p: Pipeline): Promise<void> {
   const own = rowOf(mine.interviews, 'id', p.interviewId);
   expect(own).toMatchObject({ candidateAccess: false, candidateName: null, candidateEmail: null, canRecordOutcome: false });
   expectNoPerson(p, mine);
-  await expectRefused(p, hiring.getMyInterview(p.request(), p.employerId, p.interviewId));
+  const brief = await hiring.getMyInterview(p.request(), p.employerId, p.interviewId);
+  expect(brief.interview).toMatchObject({ candidateAccess: false, candidateName: null, candidateEmail: null, canRecordOutcome: false, joiningLink: null });
+  expectNoPerson(p, brief);
 
   const offers = await hiring.listOffers(p.request(), p.employerId);
   expectNoPerson(p, offers);
@@ -321,8 +326,8 @@ describe('EMP-SR-02: an account entering deletion ends employer access', () => {
 
   it('revokes every grant when the deletion is executed', async () => {
     const p = await pipeline();
-    await pool.query(`INSERT INTO privacy_requests (id, subject_user_id, requested_by_user_id, request_type, state, deletion_scheduled_for, correlation_id)
-      VALUES ($1, $2, $2, 'DELETION', 'RECEIVED', now() - interval '1 day', 'grant-test')`, [randomUUID(), p.candidate.id]);
+    await pool.query(`INSERT INTO privacy_requests (id, subject_user_id, requested_by_user_id, request_type, state, requested_at, deletion_scheduled_for, correlation_id)
+      VALUES ($1, $2, $2, 'DELETION', 'RECEIVED', now() - interval '31 days', now() - interval '1 day', 'grant-test')`, [randomUUID(), p.candidate.id]);
 
     const summaries = await executeDueDeletions({ db, ids: { uuid: randomUUID } });
     expect(summaries.find((summary) => summary.subjectUserId === p.candidate.id)?.outcome).toBe('COMPLETED');

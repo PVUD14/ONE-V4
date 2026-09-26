@@ -183,7 +183,7 @@ internal fun MyInterviewsPage(employerId: String, onClose: () -> Unit) {
                         Column(Modifier.fillMaxWidth().clickable { open = interview }.padding(16.dp)) {
                             Row(verticalAlignment = Alignment.Top) {
                                 Column(Modifier.weight(1f)) {
-                                    Text(interview.candidateName, style = MaterialTheme.typography.titleMedium,
+                                    Text(candidateLabel(interview.candidateName, interview.consentRevoked, interview.candidateAccess), style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.SemiBold)
                                     Text(interview.opportunityTitle, style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -242,7 +242,7 @@ private fun InterviewScorecardPage(
                 Spacer(Modifier.height(12.dp))
                 PilotCard {
                     Column(Modifier.padding(16.dp)) {
-                        Text(interview.candidateName, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text(candidateLabel(interview.candidateName, interview.consentRevoked, interview.candidateAccess), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                         Text(interview.opportunityTitle, style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                         brief?.opportunitySummary?.takeIf { it.isNotBlank() }?.let {
@@ -392,7 +392,7 @@ internal fun EmployerOffersPage(employerId: String, onClose: () -> Unit) {
                             Column(Modifier.padding(16.dp)) {
                                 Row(verticalAlignment = Alignment.Top) {
                                     Column(Modifier.weight(1f)) {
-                                        Text(offer.candidateName, style = MaterialTheme.typography.titleMedium,
+                                        Text(candidateLabel(offer.candidateName, offer.consentRevoked, offer.candidateAccess), style = MaterialTheme.typography.titleMedium,
                                             fontWeight = FontWeight.SemiBold)
                                         Text(offer.opportunityTitle, style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -428,7 +428,7 @@ internal fun EmployerOffersPage(employerId: String, onClose: () -> Unit) {
             title = { Text("Withdraw this offer?") },
             text = {
                 Text(
-                    "${offer.candidateName} is waiting on this. Withdrawing is recorded against your " +
+                    "${offer.candidateName ?: "The candidate"} is waiting on this. Withdrawing is recorded against your " +
                         "organisation and the candidate is told.",
                 )
             },

@@ -398,7 +398,7 @@ function InvitePanel({ employerId, assessmentId, onSent, onFail, onCancel }: {
 
   // Closed or consent-revoked applicants are not offered: the server would refuse them,
   // and offering a checkbox that cannot work is worse than not offering it.
-  const invitable = applicants.filter((applicant) => !applicant.closedAt && !applicant.consentRevoked);
+  const invitable = applicants.filter((applicant) => !applicant.closedAt && !applicant.consentRevoked && applicant.candidateAccess !== false);
 
   async function send(): Promise<void> {
     const token = getAccessToken();

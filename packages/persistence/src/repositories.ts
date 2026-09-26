@@ -2,6 +2,7 @@ import { and, eq, gt, isNotNull, isNull, lte, or, sql } from 'drizzle-orm';
 import { createIntegrationEventEnvelope, requireCorrelationId, schemaForEvent } from '@planthepath/events/src/index.js';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from './schema.js';
+import { liveApplicantGrantCondition } from './employer-authentication.js';
 
 export type PersistenceDb = NodePgDatabase<typeof schema>;
 
@@ -88,19 +89,17 @@ export async function hasEmployerApplicantAccess(
   studentUserId: string,
   now: Date = new Date(),
 ): Promise<boolean> {
-  const rows = await db
-    .select({ id: schema.employerApplicantAccessGrants.id })
-    .from(schema.employerApplicantAccessGrants)
-    .where(and(
-      eq(schema.employerApplicantAccessGrants.employerId, employerId),
-      eq(schema.employerApplicantAccessGrants.opportunityId, opportunityId),
-      eq(schema.employerApplicantAccessGrants.studentUserId, studentUserId),
-      isNull(schema.employerApplicantAccessGrants.revokedAt),
-      or(isNull(schema.employerApplicantAccessGrants.expiresAt), gt(schema.employerApplicantAccessGrants.expiresAt, now)),
-    ))
-    .limit(1);
+  const result = await db.execute(sql`
+    SELECT grant_record.id
+    FROM employer_applicant_access_grants grant_record
+    WHERE grant_record.employer_id = ${employerId}::uuid
+      AND grant_record.opportunity_id = ${opportunityId}::uuid
+      AND grant_record.student_user_id = ${studentUserId}::uuid
+      AND ${liveApplicantGrantCondition('grant_record', now)}
+    LIMIT 1
+  `) as QueryResult<{ id: string }>;
 
-  return rows.length === 1;
+  return result.rows.length === 1;
 }
 
 export async function hasActiveMembership(
@@ -146,13 +145,12 @@ export async function assertActiveEmployerGrantForMutation(
   now: Date = new Date(),
 ): Promise<void> {
   const result = await db.execute(sql`
-    SELECT id
-    FROM employer_applicant_access_grants
-    WHERE employer_id = ${employerId}::uuid
-      AND opportunity_id = ${opportunityId}::uuid
-      AND student_user_id = ${studentUserId}::uuid
-      AND revoked_at IS NULL
-      AND (expires_at IS NULL OR expires_at > ${now})
+    SELECT grant_record.id
+    FROM employer_applicant_access_grants grant_record
+    WHERE grant_record.employer_id = ${employerId}::uuid
+      AND grant_record.opportunity_id = ${opportunityId}::uuid
+      AND grant_record.student_user_id = ${studentUserId}::uuid
+      AND ${liveApplicantGrantCondition('grant_record', now)}
     FOR UPDATE
   `) as QueryResult<{ id: string }>;
 

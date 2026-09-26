@@ -205,7 +205,7 @@ function AssignedInterviewWorkspace({ employerIds, routeLabel }: { readonly empl
     {current ? <section className="role-card role-wide">
       <h2>{routeLabel === 'Scorecards' ? 'Your scorecard' : 'Candidate brief'}</h2>
       <p><CandidateIdentity item={current} /></p>
-      {current.consentRevoked ? null : <>
+      {current.consentRevoked || current.candidateAccess === false ? null : <>
         <p>Email: {current.candidateEmail ?? 'NA'}</p><p>Location or phone arrangements: {current.locationDetail ?? 'NA'}</p>
         <p>Joining link: {current.joiningLink && /^https:\/\//i.test(current.joiningLink) ? <a href={current.joiningLink} target="_blank" rel="noopener noreferrer">Open interview meeting</a> : 'NA'}</p>
       </>}

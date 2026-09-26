@@ -131,6 +131,8 @@ export interface EmployerApplicantDto {
   readonly id: string;
   readonly state: string;
   readonly consentRevoked: boolean;
+  /** False once the student's applicant-access grant has ended; the person is then withheld. */
+  readonly candidateAccess?: boolean;
   readonly candidateName: string | null;
   readonly candidateEmail: string | null;
   readonly institutionStudentId: string | null;
@@ -149,6 +151,8 @@ export interface EmployerInterviewDto {
   readonly referenceCode: string | null;
   readonly title: string;
   readonly consentRevoked: boolean;
+  /** False once the student's applicant-access grant has ended; the person is then withheld. */
+  readonly candidateAccess?: boolean;
   readonly candidateName: string | null;
   readonly candidateEmail: string | null;
   readonly institutionStudentId: string | null;
@@ -174,6 +178,8 @@ export interface EmployerOfferDto {
   readonly referenceCode: string | null;
   readonly title: string;
   readonly consentRevoked: boolean;
+  /** False once the student's applicant-access grant has ended; the person is then withheld. */
+  readonly candidateAccess?: boolean;
   readonly candidateName: string | null;
   readonly candidateEmail: string | null;
   readonly institutionStudentId: string | null;
@@ -305,6 +311,8 @@ export interface ParticipantInterviewDto {
   readonly scheduledStart: string;
   readonly scheduledEnd: string | null;
   readonly consentRevoked: boolean;
+  /** False once the student's applicant-access grant has ended; the person is then withheld. */
+  readonly candidateAccess?: boolean;
   readonly candidateName: string | null;
   readonly candidateEmail: string | null;
   readonly institutionStudentId: string | null;

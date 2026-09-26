@@ -80,6 +80,18 @@ export function safeErrorMessage(code: string | undefined): string | undefined {
     case 'COMPANY_PROFILE_INVALID': return 'Check the fields: the description is up to 2000 characters and web addresses start with https://.';
     case 'EMPLOYER_ACCESS_REQUEST_NOT_PENDING': return 'This request has already been decided. Refresh to see its current state.';
     case 'EMPLOYER_ACCESS_REQUEST_ORGANIZATION_INVALID': return 'Choose the employer organisation you created for this request.';
+    // EMP-05: job lifecycle.
+    case 'OPPORTUNITY_VERSION_CONFLICT': return 'Someone saved a newer version of this job while you were editing. Reload it and make your change again.';
+    case 'OPPORTUNITY_NOT_EDITABLE': return 'A withdrawn job cannot be edited.';
+    case 'OPPORTUNITY_PAYMENT_DEMAND': return 'The job text asks candidates to pay. ONE does not allow asking candidates for fees or deposits.';
+    case 'OPPORTUNITY_TRANSITION_NOT_ALLOWED': return 'That action is not available for this job in its current state. Refresh to see where it is now.';
+    case 'OPPORTUNITY_HAS_OPEN_APPLICATIONS': return 'Decide every open application first: move each one on, or reject it. To stop new applications now, close the job instead.';
+    case 'OPPORTUNITY_DEADLINE_PASSED': return "This job's deadline has passed. Save a new version with a later deadline first.";
+    case 'OPPORTUNITY_NOT_PUBLISHABLE': return 'Only a draft or paused job can be published.';
+    case 'INVALID_APPLICATIONDEADLINE': return 'Choose a deadline in the future.';
+    case 'REASON_CODE_REQUIRED': return 'Choose a reason.';
+    case 'AUDIENCE_REQUIRED': return 'Choose who can see this job before it goes live.';
+    case 'EMPLOYER_ORGANISATION_UNVERIFIED': return 'Your company is not verified yet, so jobs cannot go live. You can keep editing drafts.';
     case 'FORBIDDEN': return 'You do not have permission to perform this action.';
     // INST-SR-02: permanent record changes need a department (heads) or a teaching assignment (faculty).
     case 'SCOPE_REQUIRED': return 'You can view these records, but confirming or uploading results needs a department or teaching assignment on your account. Ask your institution administrator to assign one.';

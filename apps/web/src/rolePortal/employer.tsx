@@ -13,6 +13,7 @@ import { getMyInterview, listMyInterviews, submitMyInterviewOutcome, type Partic
 import { StaffPilotWrap } from '../parityWraps.js';
 import { EmployerTeamPage } from './employerTeam.js';
 import { EmployerCompanyProfilePage } from './employerCompanyProfile.js';
+import { EmployerOpportunityDetailPage } from './employerOpportunityDetail.js';
 import type { RolePortalConfig } from '../rolePortalConfig.js';
 import { RestrictedApiState } from './shared.js';
 import { useEffect, useState } from 'react';
@@ -52,6 +53,9 @@ function EmployerManagementRealityPage({ portal, routeLabel }: { readonly portal
   if (/interview/i.test(routeLabel)) return <EmployerStageWorkspace key={`${employerId}-interviews`} employerId={employerId} stage="INTERVIEW" />;
   if (/offer/i.test(routeLabel)) return <EmployerStageWorkspace key={`${employerId}-offers`} employerId={employerId} stage="OFFER" />;
   if (/report|analytic/i.test(routeLabel)) return <StaffPilotWrap title="Reports" subtitle="Your employer's hiring funnel."><EmployerHiringAnalyticsPage key={employerId} employerId={employerId} /></StaffPilotWrap>;
+  // EMP-05: Opportunity Detail is one job — its versions, state and actions. It used to fall
+  // through to the list below.
+  if (routeLabel === 'Opportunity Detail') return <EmployerOpportunityDetailPage key={employerId} employerId={employerId} />;
   if (/opportunit/i.test(routeLabel)) {
     return <StaffPilotWrap title="Opportunities" subtitle="Post roles, choose their audience and publish. Applications land under Applicants.">
       <EmployerOpportunitiesPage key={employerId} employerId={employerId} /></StaffPilotWrap>;

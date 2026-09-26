@@ -554,6 +554,8 @@ internal fun NotificationDto.announcementSource(): String {
     val submittedAt: String? = null,
     /** True when the employer chose to tell this candidate why. The detail is a separate read. */
     val feedbackReleased: Boolean = false,
+    /** EMP-05: the employer changed a term this student applied under; they must accept or decline. */
+    val termsAcknowledgementPending: Boolean = false,
 )
 
 // --- Candidate feedback -------------------------------------------------------
@@ -687,6 +689,9 @@ internal fun NotificationDto.announcementSource(): String {
     val locationCity: String? = null,
     val applicationDeadline: String? = null,
     val publishedAt: String? = null,
+    /** EMP-05: when the role was closed or withdrawn, and its current version number. */
+    val closedAt: String? = null,
+    val versionNumber: Int? = null,
     val applicationCount: Int = 0,
     val openApplicationCount: Int = 0,
 )

@@ -123,6 +123,9 @@ export interface EmployerOpportunityDto {
   readonly locationCity: string | null;
   readonly applicationDeadline: string | null;
   readonly publishedAt: string | null;
+  /** EMP-05: when the job was closed or withdrawn, and its current version number. Absent from older API responses. */
+  readonly closedAt?: string | null;
+  readonly versionNumber?: number | null;
   readonly applicationCount: number;
   readonly openApplicationCount: number;
 }
@@ -140,6 +143,8 @@ export interface EmployerApplicantDto {
   readonly closedAt: string | null;
   readonly interviewCount: number;
   readonly offerState: string | null;
+  /** EMP-05: the job's terms changed after they applied and they have not accepted yet. */
+  readonly termsAcknowledgementPending?: boolean;
   readonly updatedAt: string;
 }
 
@@ -559,4 +564,106 @@ export const companyIndustryLabels: Readonly<Record<string, string>> = {
 
 export function companySizeLabel(band: string | null | undefined): string | null {
   return band ? `${band} employees` : null;
+}
+
+// --- Job lifecycle (EMP-05) -------------------------------------------------
+
+export type OpportunityLifecycleAction = 'PAUSE' | 'CLOSE' | 'REOPEN' | 'WITHDRAW';
+
+/** Every field of a version: what the edit form shows and sends back. */
+export interface OpportunityVersionTermsDto {
+  readonly id: string;
+  readonly versionNumber: number;
+  readonly title: string;
+  readonly summary: string | null;
+  readonly responsibilities: string | null;
+  readonly employmentType: string;
+  readonly workMode: string;
+  readonly locationCity: string | null;
+  readonly positionsAvailable: number | null;
+  readonly durationMonths: number | null;
+  readonly compensationDisclosed: boolean;
+  readonly compensationCurrency: string | null;
+  readonly compensationMin: string | null;
+  readonly compensationMax: string | null;
+  readonly compensationPeriod: string | null;
+  readonly joiningConditions: string | null;
+  readonly applicationDeadline: string | null;
+  readonly createdAt: string;
+}
+
+export interface OpportunityVersionHistoryDto {
+  readonly id: string;
+  readonly versionNumber: number;
+  readonly title: string;
+  readonly createdAt: string;
+  readonly isCurrent: boolean;
+  /** INITIAL for version 1; MATERIAL when a term an applicant applied under moved. */
+  readonly change: 'INITIAL' | 'EDITORIAL' | 'MATERIAL';
+  readonly changedTerms: readonly string[];
+}
+
+export interface EmployerOpportunityDetailDto {
+  readonly id: string;
+  readonly referenceCode: string;
+  readonly lifecycleState: string;
+  readonly publishedAt: string | null;
+  readonly closedAt: string | null;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly canEdit: boolean;
+  readonly availableActions: readonly OpportunityLifecycleAction[];
+  readonly reasonCodes: Readonly<Record<OpportunityLifecycleAction, readonly string[]>>;
+  readonly audiences: readonly { readonly kind: string; readonly institutionName: string | null; readonly unitName: string | null }[];
+  readonly applicationCount: number;
+  readonly openApplicationCount: number;
+  readonly awaitingAcknowledgementCount: number;
+  readonly lastLifecycleChange: { readonly action: string; readonly reasonCode: string | null; readonly trigger: string; readonly occurredAt: string } | null;
+}
+
+export function getEmployerOpportunity(token: string, employerId: string, opportunityId: string, signal?: AbortSignal): Promise<{
+  readonly opportunity: EmployerOpportunityDetailDto; readonly currentVersion: OpportunityVersionTermsDto | null; readonly versions: readonly OpportunityVersionHistoryDto[];
+}> {
+  return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/opportunities/${encodeURIComponent(opportunityId)}`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function createOpportunityVersion(token: string, employerId: string, opportunityId: string, body: Record<string, unknown>): Promise<{
+  readonly version: { readonly id: string; readonly versionNumber: number; readonly change: 'EDITORIAL' | 'MATERIAL'; readonly changedTerms: readonly string[] };
+  readonly applicants: { readonly termChangesRecorded: number; readonly acknowledgementsRequired: number };
+}> {
+  return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/opportunities/${encodeURIComponent(opportunityId)}/versions`, { token, method: 'POST', body });
+}
+
+export function changeOpportunityLifecycle(token: string, employerId: string, opportunityId: string, action: OpportunityLifecycleAction, reasonCode?: string): Promise<{ readonly opportunity: { readonly id: string; readonly lifecycleState: string } }> {
+  return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/opportunities/${encodeURIComponent(opportunityId)}/${action.toLowerCase()}`,
+    { token, method: 'POST', body: reasonCode ? { reasonCode } : {} });
+}
+
+/** The terms a student applied under (or last accepted), and the new ones they are asked to accept. */
+export interface StudentTermsDto {
+  readonly title: string;
+  readonly employmentType: string;
+  readonly workMode: string;
+  readonly locationCity: string | null;
+  readonly durationMonths: number | null;
+  readonly compensation: { readonly currency: string; readonly min: string; readonly max: string | null; readonly period: string } | null;
+  readonly joiningConditions: string | null;
+  readonly applicationDeadline: string | null;
+  readonly eligibility: readonly { readonly ruleType: string; readonly comparator: string; readonly valueNumeric: number | null; readonly valueText: string | null; readonly isBlocking: boolean }[];
+}
+
+export interface StudentTermsChangeDto {
+  readonly toVersionId: string;
+  readonly employerName: string;
+  readonly changedTerms: readonly string[];
+  readonly appliedTerms: StudentTermsDto;
+  readonly newTerms: StudentTermsDto;
+}
+
+export function readTermsChange(token: string, applicationId: string, signal?: AbortSignal): Promise<{ readonly termsChange: StudentTermsChangeDto | null }> {
+  return requestJson(`/api/v1/students/me/applications/${encodeURIComponent(applicationId)}/terms-change`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function respondToTermsChange(token: string, applicationId: string, decision: 'acknowledge' | 'decline', toVersionId: string): Promise<{ readonly application: { readonly id: string; readonly state: string } }> {
+  return requestJson(`/api/v1/students/me/applications/${encodeURIComponent(applicationId)}/terms-change/${decision}`, { token, method: 'POST', body: { toVersionId } });
 }

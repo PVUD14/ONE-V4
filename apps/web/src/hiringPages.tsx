@@ -10,6 +10,7 @@ import {
   listExternalApplications, getExternalApplication, createExternalApplication, updateExternalApplication,
   deleteExternalApplication, changeExternalInstitutionVisibility, type ExternalApplicationDto, type ExternalApplicationInput,
   companyIndustryLabels, companySizeLabel, type OpportunityCompanyDto,
+  readTermsChange, respondToTermsChange, type StudentTermsChangeDto, type StudentTermsDto,
 } from './api/hiring.js';
 import {
   ApiRequestError,
@@ -59,6 +60,8 @@ const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   OFFER_NOT_ACCEPTED: 'The candidate has to accept the offer before you can record the hire.',
   OFFER_EXPIRED: 'This offer has expired.',
   TERMS_ACKNOWLEDGEMENT_REQUIRED: 'The candidate still needs to accept the updated terms.',
+  TERMS_CHANGED_AGAIN: 'The employer changed the job again while you were reading. Review the latest terms.',
+  NO_TERMS_CHANGE_PENDING: 'There is nothing waiting for your answer on this application.',
   AUDIENCE_REQUIRED: 'Choose who can see this opportunity before publishing it.',
   DUPLICATE_REFERENCE_CODE: 'You already have an opportunity with that reference code.',
   ACTIVE_OFFER_EXISTS: 'There is already an active offer for this candidate.',
@@ -269,6 +272,35 @@ export function StudentApplicationsPage(): React.ReactElement {
   const [revoking, setRevoking] = useState(false);
   // null = closed, 'loading', 'none' = the employer withdrew it between list and read.
   const [feedback, setFeedback] = useState<StudentApplicationFeedbackDto | 'loading' | 'none' | null>(null);
+  // EMP-05: the changed terms one application is waiting on the student to answer.
+  const [termsChange, setTermsChange] = useState<{ readonly applicationId: string; readonly change: StudentTermsChangeDto } | null>(null);
+
+  async function openTermsChange(id: string): Promise<void> {
+    const token = getAccessToken();
+    if (!token) return;
+    try {
+      const response = await readTermsChange(token, id);
+      if (response.termsChange) setTermsChange({ applicationId: id, change: response.termsChange });
+      else await reload('Nothing is waiting for your answer on that application any more.');
+    } catch (error) {
+      setStatus(messageFor(error, 'The changed terms could not be loaded.'));
+    }
+  }
+
+  async function answerTermsChange(decision: 'acknowledge' | 'decline'): Promise<void> {
+    const token = getAccessToken();
+    if (!token || !termsChange) return;
+    try {
+      await respondToTermsChange(token, termsChange.applicationId, decision, termsChange.change.toVersionId);
+      setTermsChange(null);
+      await reload(decision === 'acknowledge'
+        ? 'You accepted the new terms. Your application carries on.'
+        : 'You declined the new terms, so your application was withdrawn. The employer no longer has access to your profile for this role.');
+    } catch (error) {
+      setTermsChange(null);
+      setStatus(messageFor(error, 'Your answer could not be saved.'));
+    }
+  }
 
   async function revokeVisibility(id: string): Promise<void> {
     const token = getAccessToken();
@@ -339,7 +371,10 @@ export function StudentApplicationsPage(): React.ReactElement {
             <td>{item.title}</td>
             <td>{item.employerName}</td>
             <td><span className={`hiring-state state-${item.state.toLowerCase()}`}>{humanise(item.state)}</span>
-              {item.termsAcknowledgementPending ? <span className="hiring-tag warn">Terms changed</span> : null}</td>
+              {item.termsAcknowledgementPending ? <>
+                <span className="hiring-tag warn">Terms changed</span>
+                <button type="button" className="secondary" onClick={() => { void openTermsChange(item.id); }}>Review new terms</button>
+              </> : null}</td>
             <td>{formatDate(item.submittedAt)}</td>
             <td>{item.feedbackReleased
               ? <button type="button" className="secondary" onClick={() => { void openFeedback(item.id); }}>See why</button>
@@ -354,9 +389,71 @@ export function StudentApplicationsPage(): React.ReactElement {
         </table></div>}
     </section>
     {feedback ? <StudentFeedbackCard feedback={feedback} onClose={() => setFeedback(null)} /> : null}
+    {termsChange ? <StudentTermsChangeCard change={termsChange.change} onAnswer={(decision) => { void answerTermsChange(decision); }}
+      onClose={() => setTermsChange(null)} /> : null}
     <StudentOffersPanel onChanged={() => { void reload(); }} />
     <StudentExternalApplicationsPanel />
   </div>;
+}
+
+const termNames: Readonly<Record<string, string>> = {
+  employmentType: 'Employment type', workMode: 'Work mode', locationCity: 'Location', compensationDisclosed: 'Pay',
+  compensationCurrency: 'Pay', compensationMin: 'Pay', compensationMax: 'Pay', compensationPeriod: 'Pay',
+  durationMonths: 'Duration', applicationDeadline: 'Deadline', joiningConditions: 'Joining conditions', eligibility: 'Eligibility',
+};
+
+function termsPay(terms: StudentTermsDto): string {
+  if (!terms.compensation) return 'Not disclosed';
+  const upper = terms.compensation.max ? `–${Number(terms.compensation.max).toLocaleString()}` : '';
+  const period = terms.compensation.period === 'TOTAL_STIPEND' ? 'total' : terms.compensation.period.toLowerCase();
+  return `${terms.compensation.currency} ${Number(terms.compensation.min).toLocaleString()}${upper} / ${period}`;
+}
+
+const comparatorWords: Readonly<Record<string, string>> = { GTE: 'at least', LTE: 'at most', EQ: 'equal to', IN: 'one of', NOT_IN: 'not one of' };
+
+function termsEligibility(terms: StudentTermsDto): string {
+  if (!terms.eligibility.length) return 'None stated';
+  return terms.eligibility.map((rule) => `${humanise(rule.ruleType)} ${comparatorWords[rule.comparator] ?? rule.comparator} ${rule.valueNumeric ?? rule.valueText ?? ''}`.trim()).join('; ');
+}
+
+/**
+ * The employer changed a term this student applied under (EMP-05). Shows what they applied
+ * under and what the job says now, side by side, and asks them to accept or decline. Declining
+ * withdraws the application, and the card says so before they choose.
+ */
+export function StudentTermsChangeCard({ change, onAnswer, onClose }: {
+  readonly change: StudentTermsChangeDto;
+  readonly onAnswer: (decision: 'acknowledge' | 'decline') => void;
+  readonly onClose: () => void;
+}): React.ReactElement {
+  const changed = new Set(change.changedTerms.map((term) => termNames[term] ?? term));
+  const months = (value: number | null) => value ? `${value} months` : 'NA';
+  const rows: readonly [string, string, string][] = [
+    ['Employment type', humanise(change.appliedTerms.employmentType), humanise(change.newTerms.employmentType)],
+    ['Work mode', humanise(change.appliedTerms.workMode), humanise(change.newTerms.workMode)],
+    ['Location', change.appliedTerms.locationCity ?? 'NA', change.newTerms.locationCity ?? 'NA'],
+    ['Pay', termsPay(change.appliedTerms), termsPay(change.newTerms)],
+    ['Duration', months(change.appliedTerms.durationMonths), months(change.newTerms.durationMonths)],
+    ['Joining conditions', change.appliedTerms.joiningConditions ?? 'NA', change.newTerms.joiningConditions ?? 'NA'],
+    ['Eligibility', termsEligibility(change.appliedTerms), termsEligibility(change.newTerms)],
+    ['Deadline', formatDate(change.appliedTerms.applicationDeadline), formatDate(change.newTerms.applicationDeadline)],
+  ];
+  return <section className="card wide-card" aria-label="Changed terms">
+    <h2>{change.employerName} changed this job</h2>
+    <p>{change.newTerms.title}. The employer cannot move your application on until you answer. Changed: {[...changed].join(', ')}.</p>
+    <div className="data-table-wrap"><table>
+      <thead><tr><th>Term</th><th>When you applied</th><th>Now</th></tr></thead>
+      <tbody>{rows.map(([label, before, after]) => <tr key={label}>
+        <td>{label}{changed.has(label) ? <span className="hiring-tag warn">Changed</span> : null}</td><td>{before}</td><td>{after}</td>
+      </tr>)}</tbody>
+    </table></div>
+    <p className="hiring-meta">Declining withdraws your application, and the employer loses access to your profile for this role.</p>
+    <div className="hiring-actions">
+      <button type="button" onClick={() => onAnswer('acknowledge')}>Accept the new terms</button>
+      <button type="button" className="secondary" onClick={() => onAnswer('decline')}>Decline and withdraw</button>
+      <button type="button" className="secondary" onClick={onClose}>Decide later</button>
+    </div>
+  </section>;
 }
 
 /**
@@ -663,7 +760,7 @@ export function EmployerOpportunitiesPage({ employerId }: { readonly employerId:
 
     <div className="v2-row v2-cols-4 career-stat-strip role-wide">
       <V2Stat icon="💼" tone="blue" value={opportunities.filter((item) => item.lifecycleState === 'PUBLISHED').length} label="Published" />
-      <V2Stat icon="✏️" tone="amber" value={opportunities.filter((item) => item.lifecycleState !== 'PUBLISHED').length} label="Drafts" />
+      <V2Stat icon="✏️" tone="amber" value={opportunities.filter((item) => item.lifecycleState === 'DRAFT').length} label="Drafts" />
       <V2Stat icon="📥" tone="green" value={opportunities.reduce((sum, item) => sum + item.applicationCount, 0)} label="Applications" />
       <V2Stat icon="🔄" tone="purple" value={opportunities.reduce((sum, item) => sum + item.openApplicationCount, 0)} label="Open applications" />
     </div>
@@ -704,11 +801,19 @@ export function EmployerOpportunitiesPage({ employerId }: { readonly employerId:
             <td>{item.applicationCount} ({item.openApplicationCount} open)</td>
             <td>{item.lifecycleState === 'DRAFT'
               ? <button type="button" onClick={() => { void publish(item.id); }}>Publish</button>
-              : <span className="hiring-meta">Live</span>}</td>
+              : null}
+              {/* EMP-05: edit, pause, close, reopen and withdraw live on Opportunity Detail. */}
+              <button type="button" className="secondary" onClick={() => openOpportunityDetail(item.id)}>Details</button></td>
           </tr>)}</tbody>
         </table></div>}
     </section>
   </section>;
+}
+
+/** Opens the existing Opportunity Detail screen on one job (same navigation item, no new route). */
+function openOpportunityDetail(opportunityId: string): void {
+  window.history.pushState(null, '', `/employer/recruiter/opportunity-detail?opportunity=${encodeURIComponent(opportunityId)}`);
+  window.dispatchEvent(new PopStateEvent('popstate'));
 }
 
 const PIPELINE_NEXT: Readonly<Record<string, readonly string[]>> = {
@@ -1147,7 +1252,8 @@ export function EmployerApplicantsPage({ employerId, applicationStateFilter }: {
           <thead><tr><th>Candidate</th><th>Stage</th><th>Applied</th><th>Interviews</th><th>Offer</th><th>Next step</th></tr></thead>
           <tbody>{visibleApplicants.map((item) => <tr key={item.id}>
             <td><CandidateIdentity item={item} /></td>
-            <td><span className={`hiring-state state-${item.state.toLowerCase()}`}>{humanise(item.state)}</span></td>
+            <td><span className={`hiring-state state-${item.state.toLowerCase()}`}>{humanise(item.state)}</span>
+              {item.termsAcknowledgementPending ? <span className="hiring-tag warn">Awaiting new-terms acceptance</span> : null}</td>
             <td>{formatDate(item.submittedAt)}</td>
             <td>{item.interviewCount}</td>
             <td>{item.offerState ? humanise(item.offerState) : '—'}</td>

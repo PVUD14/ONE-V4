@@ -23,6 +23,7 @@ import {
   type ApiIdGenerator,
   type ProtectedHttpRequest,
 } from './api-security.js';
+import { writeOpportunityDeadlineCloseRequested } from '@planthepath/persistence/src/opportunity-deadlines.js';
 import {
   assertEmployerState,
   employerStateRefusal,
@@ -163,8 +164,8 @@ export class EmployerHiringController {
   async listOpportunities(@Req() request: ProtectedHttpRequest, @Param('employerId') employerId: string): Promise<Record<string, unknown>> {
     const context = await this.requireEmployer(request, employerId, employerInterviewRoles, 'jobs.draft');
     const rows = await this.db.execute(sql`
-      SELECT o.id, o.reference_code, o.lifecycle_state, o.published_at, o.updated_at,
-             v.title, v.employment_type, v.work_mode, v.location_city, v.application_deadline,
+      SELECT o.id, o.reference_code, o.lifecycle_state, o.published_at, o.closed_at, o.updated_at,
+             v.title, v.employment_type, v.work_mode, v.location_city, v.application_deadline, v.version_number,
              (SELECT count(*) FROM applications a WHERE a.opportunity_id = o.id AND a.state <> 'DRAFT') AS application_count,
              (SELECT count(*) FROM applications a WHERE a.opportunity_id = o.id AND a.closed_at IS NULL AND a.state <> 'DRAFT') AS open_count
       FROM opportunities o
@@ -212,20 +213,47 @@ export class EmployerHiringController {
 
     await this.recordReviewSignals(id, employerId, context.authorization.principal.userId, context.correlationId);
 
+    const actorId = context.authorization.principal.userId;
     // The state is checked again in the UPDATE itself, holding a share lock on the
     // organisation row, so a suspension committing after the route guard cannot be
     // overtaken by this publish (suspension pauses published jobs in its own transaction).
-    const published = await this.db.execute(sql`
-      UPDATE opportunities SET lifecycle_state = 'PUBLISHED', published_at = coalesce(published_at, now()), updated_at = now()
-      WHERE id = ${id}::uuid AND employer_id = ${employerId}::uuid
-        AND EXISTS (SELECT 1 FROM organizations org WHERE org.id = ${employerId}::uuid AND org.kind = 'EMPLOYER'
-          AND org.verification_state = 'VERIFIED' AND org.active FOR SHARE)
-      RETURNING id
-    `) as QueryResult<{ id: string }>;
-    if (published.rows.length !== 1) throw forbidden(context.correlationId);
-    await this.writeAudit(context.authorization.principal.userId, 'opportunity.published', 'opportunity', id, context.correlationId);
-    await this.writeOutbox('opportunity', id, 'opportunity.published', { opportunityId: id, employerId }, context.authorization.principal.userId, employerId, context.correlationId);
+    // EMP-05: the UPDATE also requires the job still to be a draft or paused (a close or
+    // withdraw may have landed since it was read) and its deadline not to have passed; the
+    // audit, outbox and deadline-close rows commit with it.
+    await this.db.transaction(async (tx) => {
+      const published = await tx.execute(sql`
+        UPDATE opportunities SET lifecycle_state = 'PUBLISHED', published_at = coalesce(published_at, now()), updated_at = now()
+        WHERE id = ${id}::uuid AND employer_id = ${employerId}::uuid
+          AND lifecycle_state IN ('DRAFT', 'PAUSED')
+          AND NOT EXISTS (SELECT 1 FROM opportunity_versions dv WHERE dv.id = opportunities.current_version_id AND dv.application_deadline <= now())
+          AND EXISTS (SELECT 1 FROM organizations org WHERE org.id = ${employerId}::uuid AND org.kind = 'EMPLOYER'
+            AND org.verification_state = 'VERIFIED' AND org.active FOR SHARE)
+        RETURNING id, current_version_id
+      `) as QueryResult<{ id: string; current_version_id: string }>;
+      if (published.rows.length !== 1) throw await this.publishRefusal(tx, employerId, id, context.correlationId);
+      await this.writeAudit(actorId, 'opportunity.published', 'opportunity', id, context.correlationId, tx, employerId);
+      await this.writeOutbox('opportunity', id, 'opportunity.published', { opportunityId: id, employerId }, actorId, employerId, context.correlationId, tx);
+      const versionId = published.rows[0]!.current_version_id;
+      if (versionId) {
+        await writeOpportunityDeadlineCloseRequested(tx, { eventId: this.ids.uuid(), opportunityId: id, versionId, actorUserId: actorId, employerId, correlationId: context.correlationId });
+      }
+    });
     return { opportunity: { id, lifecycleState: 'PUBLISHED' }, correlationId: context.correlationId };
+  }
+
+  /** Why a guarded publish UPDATE changed nothing: a passed deadline or a state change say so; anything else stays 403. */
+  private async publishRefusal(tx: Pick<PersistenceDb, 'execute'>, employerId: string, opportunityId: string, correlationId: string): Promise<Error> {
+    const rows = await tx.execute(sql`
+      SELECT o.lifecycle_state, (v.application_deadline IS NOT NULL AND v.application_deadline <= now()) AS deadline_passed,
+             EXISTS (SELECT 1 FROM organizations org WHERE org.id = o.employer_id AND org.kind = 'EMPLOYER' AND org.verification_state = 'VERIFIED' AND org.active) AS good_standing
+      FROM opportunities o LEFT JOIN opportunity_versions v ON v.id = o.current_version_id
+      WHERE o.id = ${opportunityId}::uuid AND o.employer_id = ${employerId}::uuid
+    `) as QueryResult<{ lifecycle_state: string; deadline_passed: boolean; good_standing: boolean }>;
+    const [row] = rows.rows;
+    if (!row || !row.good_standing) return forbidden(correlationId);
+    if (row.lifecycle_state !== 'DRAFT' && row.lifecycle_state !== 'PAUSED') return badRequest('OPPORTUNITY_NOT_PUBLISHABLE', correlationId);
+    if (row.deadline_passed) return badRequest('OPPORTUNITY_DEADLINE_PASSED', correlationId);
+    return forbidden(correlationId);
   }
 
   // -------------------------------------------------------------------------
@@ -247,7 +275,9 @@ export class EmployerHiringController {
              ${applicationHasLiveApplicantGrant('a')} AS candidate_access,
              u.email AS student_email, isp.full_name, isp.institution_student_id,
              (SELECT count(*) FROM interviews i WHERE i.application_id = a.id AND i.state <> 'CANCELLED') AS interview_count,
-             (SELECT o2.state FROM offers o2 WHERE o2.application_id = a.id AND o2.state IN ('DRAFT','EXTENDED','ACCEPTED') LIMIT 1) AS offer_state
+             (SELECT o2.state FROM offers o2 WHERE o2.application_id = a.id AND o2.state IN ('DRAFT','EXTENDED','ACCEPTED') LIMIT 1) AS offer_state,
+             EXISTS (SELECT 1 FROM opportunity_term_change_acknowledgements t WHERE t.application_id = a.id AND t.acknowledgement_required
+               AND t.acknowledged_at IS NULL AND t.declined_at IS NULL) AS terms_pending
       FROM applications a
       JOIN users u ON u.id = a.student_user_id
       LEFT JOIN institution_student_profiles isp ON isp.student_user_id = a.student_user_id AND isp.status = 'ACTIVE'
@@ -711,6 +741,8 @@ export class EmployerHiringController {
     const application = await this.requireOwnedApplication(employerId, id, context.correlationId);
     if (application.consent_revoked_at != null) throw badRequest('CONSENT_REVOKED', context.correlationId);
     if (String(application.state) !== 'OFFER') throw badRequest('APPLICATION_NOT_AT_OFFER_STAGE', context.correlationId);
+    // EMP-05: an offer is progress too; it waits until the applicant accepts the job's changed terms.
+    if (Number(application.pending_terms ?? 0) > 0) throw badRequest('TERMS_ACKNOWLEDGEMENT_REQUIRED', context.correlationId);
 
     const currency = readRequiredCurrency(body, context.correlationId);
     const amount = readRequiredAmount(body, context.correlationId);
@@ -802,46 +834,7 @@ export class EmployerHiringController {
   }
 
   private async recordReviewSignals(opportunityId: string, employerId: string, actorId: string, correlationId: string): Promise<void> {
-    const rows = await this.db.execute(sql`
-      SELECT v.*,
-        EXISTS (SELECT 1 FROM opportunities other JOIN opportunity_versions ov ON ov.id = other.current_version_id
-          WHERE other.employer_id <> ${employerId}::uuid
-            AND lower(regexp_replace(trim(ov.title), '\\s+', ' ', 'g')) = lower(regexp_replace(trim(v.title), '\\s+', ' ', 'g'))
-            AND length(trim(concat_ws(' ', v.summary, v.responsibilities))) > 0
-            AND lower(regexp_replace(trim(concat_ws(' ', ov.summary, ov.responsibilities)), '\\s+', ' ', 'g')) =
-                lower(regexp_replace(trim(concat_ws(' ', v.summary, v.responsibilities)), '\\s+', ' ', 'g'))
-        ) AS cross_employer_duplicate
-      FROM opportunities o JOIN opportunity_versions v ON v.id = o.current_version_id
-      WHERE o.id = ${opportunityId}::uuid AND o.employer_id = ${employerId}::uuid
-    `) as QueryResult<Record<string, unknown>>;
-    const row = rows.rows[0];
-    if (!row) throw forbidden(correlationId);
-    const signals = detectOpportunitySignals({
-      text: [row.title, row.summary, row.responsibilities, row.joining_conditions].filter(Boolean).join('\n'),
-      crossEmployerDuplicate: row.cross_employer_duplicate === true,
-      currency: row.compensation_currency == null ? null : String(row.compensation_currency),
-      period: row.compensation_period == null ? null : String(row.compensation_period),
-      min: row.compensation_min == null ? null : String(row.compensation_min),
-      max: row.compensation_max == null ? null : String(row.compensation_max),
-    });
-    // Store evidence and its audit atomically; no lifecycle mutation or unregistered outbox event.
-    await this.db.transaction(async (tx) => {
-      for (const signal of signals) {
-        await tx.execute(sql`
-          INSERT INTO opportunity_review_signals (id, opportunity_id, employer_id, opportunity_version_id, signal_code, detector_version)
-          VALUES (${this.ids.uuid()}::uuid, ${opportunityId}::uuid, ${employerId}::uuid, ${String(row.id)}::uuid, ${signal}, ${OPPORTUNITY_DETECTOR_VERSION})
-          ON CONFLICT (opportunity_version_id, signal_code, detector_version) DO UPDATE SET last_detected_at = now()
-        `);
-      }
-      if (signals.length) {
-        await tx.execute(sql`
-          INSERT INTO audit_events (id, actor_user_id, action, resource_type, resource_id, organization_id, outcome, correlation_id, context)
-          VALUES (${this.ids.uuid()}::uuid, ${actorId}::uuid, 'opportunity.review_requested', 'opportunity', ${opportunityId}::uuid,
-            ${employerId}::uuid, 'SUCCESS', ${correlationId},
-            ${JSON.stringify({ versionId: row.id, signals, detectorVersion: OPPORTUNITY_DETECTOR_VERSION })}::jsonb)
-        `);
-      }
-    });
+    await recordOpportunityReviewSignals(this.db, (write) => this.db.transaction(write), this.ids, { opportunityId, employerId, actorId, correlationId });
   }
 
   /** Appendix 2 §5.1 via the shared helper: membership, then active, then verification state. */
@@ -878,7 +871,8 @@ export class EmployerHiringController {
       SELECT a.id, a.state, a.student_user_id, a.opportunity_id, a.consent_revoked_at, a.closed_at,
              (SELECT o.state FROM offers o WHERE o.application_id = a.id AND o.state IN ('DRAFT','EXTENDED','ACCEPTED') LIMIT 1) AS offer_state,
              (SELECT count(*) FROM opportunity_term_change_acknowledgements t
-               WHERE t.application_id = a.id AND t.acknowledged_at IS NULL AND t.declined_at IS NULL) AS pending_terms
+               WHERE t.application_id = a.id AND t.acknowledgement_required
+                 AND t.acknowledged_at IS NULL AND t.declined_at IS NULL) AS pending_terms
       FROM applications a
       WHERE a.id = ${applicationId}::uuid AND a.employer_id = ${employerId}::uuid AND a.state <> 'DRAFT'
     `) as QueryResult<Record<string, unknown>>;
@@ -887,30 +881,14 @@ export class EmployerHiringController {
     return row;
   }
 
-  private async insertVersion(opportunityId: string, versionId: string, versionNumber: number, input: OpportunityInput, actorId: string): Promise<void> {
-    const terms: MaterialTerms = {
-      employmentType: input.employmentType,
-      workMode: input.workMode,
-      locationCity: input.locationCity,
-      compensationDisclosed: input.compensationDisclosed,
-      compensationCurrency: input.compensationCurrency,
-      compensationMin: input.compensationMin,
-      compensationMax: input.compensationMax,
-      compensationPeriod: input.compensationPeriod,
-      durationMonths: input.durationMonths,
-      applicationDeadline: input.applicationDeadline,
-      joiningConditions: input.joiningConditions,
-    };
-    await this.db.execute(sql`
-      INSERT INTO opportunity_versions (id, opportunity_id, version_number, title, summary, responsibilities, employment_type, work_mode, location_city, positions_available, duration_months, compensation_disclosed, compensation_currency, compensation_min, compensation_max, compensation_period, joining_conditions, application_deadline, material_terms_hash, created_by_user_id)
-      VALUES (${versionId}::uuid, ${opportunityId}::uuid, ${versionNumber}, ${input.title}, ${input.summary}, ${input.responsibilities}, ${input.employmentType}, ${input.workMode}, ${input.locationCity}, ${input.positionsAvailable}, ${input.durationMonths}, ${input.compensationDisclosed}, ${input.compensationCurrency}, ${input.compensationMin}, ${input.compensationMax}, ${input.compensationPeriod}, ${input.joiningConditions}, ${input.applicationDeadline}::timestamptz, ${materialTermsHash(terms)}, ${actorId}::uuid)
-    `);
+  private async insertVersion(opportunityId: string, versionId: string, versionNumber: number, input: OpportunityVersionInput, actorId: string): Promise<void> {
+    await insertOpportunityVersion(this.db, { opportunityId, versionId, versionNumber, input, actorId });
   }
 
-  private async writeAudit(actorUserId: string, action: string, resourceType: string, resourceId: string, correlationId: string, db: Pick<PersistenceDb, 'execute'> = this.db): Promise<void> {
+  private async writeAudit(actorUserId: string, action: string, resourceType: string, resourceId: string, correlationId: string, db: Pick<PersistenceDb, 'execute'> = this.db, organizationId: string | null = null): Promise<void> {
     await db.execute(sql`
-      INSERT INTO audit_events (id, actor_user_id, action, resource_type, resource_id, outcome, correlation_id)
-      VALUES (${this.ids.uuid()}::uuid, ${actorUserId}::uuid, ${action}, ${resourceType}, ${resourceId}::uuid, 'SUCCESS', ${correlationId})
+      INSERT INTO audit_events (id, actor_user_id, action, resource_type, resource_id, organization_id, outcome, correlation_id)
+      VALUES (${this.ids.uuid()}::uuid, ${actorUserId}::uuid, ${action}, ${resourceType}, ${resourceId}::uuid, ${organizationId}::uuid, 'SUCCESS', ${correlationId})
     `);
   }
 
@@ -920,6 +898,89 @@ export class EmployerHiringController {
       VALUES (${this.ids.uuid()}::uuid, ${aggregateType}, ${aggregateId}, ${eventType}, ${JSON.stringify(payload)}::jsonb, ${actorUserId}::uuid, ${organizationId}::uuid, ${correlationId})
     `);
   }
+}
+
+/**
+ * Review evidence for the current version (0018): detected, stored and audited, never used to
+ * reject. Exported so a new version (EMP-05) records its signals inside its own transaction:
+ * `read` runs the detection query and `write` supplies the transaction for the inserts.
+ */
+export async function recordOpportunityReviewSignals(
+  read: Pick<PersistenceDb, 'execute'>,
+  write: (effect: (tx: Pick<PersistenceDb, 'execute'>) => Promise<void>) => Promise<void>,
+  ids: ApiIdGenerator,
+  input: { readonly opportunityId: string; readonly employerId: string; readonly actorId: string; readonly correlationId: string },
+): Promise<readonly string[]> {
+  const { opportunityId, employerId, actorId, correlationId } = input;
+  const rows = await read.execute(sql`
+      SELECT v.*,
+        EXISTS (SELECT 1 FROM opportunities other JOIN opportunity_versions ov ON ov.id = other.current_version_id
+          WHERE other.employer_id <> ${employerId}::uuid
+            AND lower(regexp_replace(trim(ov.title), '\\s+', ' ', 'g')) = lower(regexp_replace(trim(v.title), '\\s+', ' ', 'g'))
+            AND length(trim(concat_ws(' ', v.summary, v.responsibilities))) > 0
+            AND lower(regexp_replace(trim(concat_ws(' ', ov.summary, ov.responsibilities)), '\\s+', ' ', 'g')) =
+                lower(regexp_replace(trim(concat_ws(' ', v.summary, v.responsibilities)), '\\s+', ' ', 'g'))
+        ) AS cross_employer_duplicate
+      FROM opportunities o JOIN opportunity_versions v ON v.id = o.current_version_id
+      WHERE o.id = ${opportunityId}::uuid AND o.employer_id = ${employerId}::uuid
+    `) as QueryResult<Record<string, unknown>>;
+  const row = rows.rows[0];
+  if (!row) throw forbidden(correlationId);
+  const signals = detectOpportunitySignals({
+    text: [row.title, row.summary, row.responsibilities, row.joining_conditions].filter(Boolean).join('\n'),
+    crossEmployerDuplicate: row.cross_employer_duplicate === true,
+    currency: row.compensation_currency == null ? null : String(row.compensation_currency),
+    period: row.compensation_period == null ? null : String(row.compensation_period),
+    min: row.compensation_min == null ? null : String(row.compensation_min),
+    max: row.compensation_max == null ? null : String(row.compensation_max),
+  });
+  // Store evidence and its audit atomically; no lifecycle mutation or unregistered outbox event.
+  await write(async (tx) => {
+    for (const signal of signals) {
+      await tx.execute(sql`
+          INSERT INTO opportunity_review_signals (id, opportunity_id, employer_id, opportunity_version_id, signal_code, detector_version)
+          VALUES (${ids.uuid()}::uuid, ${opportunityId}::uuid, ${employerId}::uuid, ${String(row.id)}::uuid, ${signal}, ${OPPORTUNITY_DETECTOR_VERSION})
+          ON CONFLICT (opportunity_version_id, signal_code, detector_version) DO UPDATE SET last_detected_at = now()
+        `);
+    }
+    if (signals.length) {
+      await tx.execute(sql`
+          INSERT INTO audit_events (id, actor_user_id, action, resource_type, resource_id, organization_id, outcome, correlation_id, context)
+          VALUES (${ids.uuid()}::uuid, ${actorId}::uuid, 'opportunity.review_requested', 'opportunity', ${opportunityId}::uuid,
+            ${employerId}::uuid, 'SUCCESS', ${correlationId},
+            ${JSON.stringify({ versionId: row.id, signals, detectorVersion: OPPORTUNITY_DETECTOR_VERSION })}::jsonb)
+        `);
+    }
+  });
+  return signals;
+}
+
+/** The fields material_terms_hash covers, from a version body. */
+export function materialTermsOf(input: OpportunityVersionInput): MaterialTerms {
+  return {
+    employmentType: input.employmentType,
+    workMode: input.workMode,
+    locationCity: input.locationCity,
+    compensationDisclosed: input.compensationDisclosed,
+    compensationCurrency: input.compensationCurrency,
+    compensationMin: input.compensationMin,
+    compensationMax: input.compensationMax,
+    compensationPeriod: input.compensationPeriod,
+    durationMonths: input.durationMonths,
+    applicationDeadline: input.applicationDeadline,
+    joiningConditions: input.joiningConditions,
+  };
+}
+
+/** Insert one immutable version row. Shared by job creation and EMP-05's new versions. */
+export async function insertOpportunityVersion(db: Pick<PersistenceDb, 'execute'>, version: {
+  readonly opportunityId: string; readonly versionId: string; readonly versionNumber: number; readonly input: OpportunityVersionInput; readonly actorId: string;
+}): Promise<void> {
+  const { opportunityId, versionId, versionNumber, input, actorId } = version;
+  await db.execute(sql`
+    INSERT INTO opportunity_versions (id, opportunity_id, version_number, title, summary, responsibilities, employment_type, work_mode, location_city, positions_available, duration_months, compensation_disclosed, compensation_currency, compensation_min, compensation_max, compensation_period, joining_conditions, application_deadline, material_terms_hash, created_by_user_id)
+    VALUES (${versionId}::uuid, ${opportunityId}::uuid, ${versionNumber}, ${input.title}, ${input.summary}, ${input.responsibilities}, ${input.employmentType}, ${input.workMode}, ${input.locationCity}, ${input.positionsAvailable}, ${input.durationMonths}, ${input.compensationDisclosed}, ${input.compensationCurrency}, ${input.compensationMin}, ${input.compensationMax}, ${input.compensationPeriod}, ${input.joiningConditions}, ${input.applicationDeadline}::timestamptz, ${materialTermsHash(materialTermsOf(input))}, ${actorId}::uuid)
+  `);
 }
 
 interface OpportunityInput {
@@ -941,7 +1002,22 @@ interface OpportunityInput {
   readonly applicationDeadline: string | null;
 }
 
+/** Every field of a version: what a new job and a new version of a job (EMP-05) both carry. */
+export type OpportunityVersionInput = Omit<OpportunityInput, 'referenceCode'>;
+
+/** The field names a version body may carry; EMP-05's versions route rejects any other. */
+export const opportunityVersionFields = [
+  'title', 'summary', 'responsibilities', 'employmentType', 'workMode', 'locationCity', 'positionsAvailable', 'durationMonths',
+  'compensationDisclosed', 'compensationCurrency', 'compensationMin', 'compensationMax', 'compensationPeriod',
+  'joiningConditions', 'applicationDeadline',
+] as const;
+
 function readOpportunityInput(body: unknown, correlationId: string): OpportunityInput {
+  const version = readOpportunityVersionInput(body, correlationId);
+  return { referenceCode: readRequiredSafeText(body, 'referenceCode', 64, correlationId), ...version };
+}
+
+export function readOpportunityVersionInput(body: unknown, correlationId: string): OpportunityVersionInput {
   if (typeof body !== 'object' || body === null) throw badRequest('INVALID_BODY', correlationId);
   const employmentType = readEnum(body, 'employmentType', employmentTypes, correlationId);
   const workMode = readEnum(body, 'workMode', workModes, correlationId);
@@ -955,7 +1031,6 @@ function readOpportunityInput(body: unknown, correlationId: string): Opportunity
   const compensationPeriod = compensationDisclosed ? readEnum(body, 'compensationPeriod', compensationPeriods, correlationId) : null;
 
   return {
-    referenceCode: readRequiredSafeText(body, 'referenceCode', 64, correlationId),
     title: readRequiredSafeText(body, 'title', 200, correlationId),
     summary: readOptionalText(body, 'summary', 2000, correlationId),
     responsibilities: readOptionalText(body, 'responsibilities', 8000, correlationId),
@@ -985,6 +1060,8 @@ function mapEmployerOpportunity(row: Record<string, unknown>): Record<string, un
     locationCity: row.location_city ?? null,
     applicationDeadline: row.application_deadline ?? null,
     publishedAt: row.published_at ?? null,
+    closedAt: row.closed_at ?? null,
+    versionNumber: row.version_number == null ? null : Number(row.version_number),
     applicationCount: Number(row.application_count ?? 0),
     openApplicationCount: Number(row.open_count ?? 0),
   };
@@ -1001,6 +1078,8 @@ function mapApplicantRow(row: Record<string, unknown>): Record<string, unknown> 
     closedAt: row.closed_at ?? null,
     interviewCount: Number(row.interview_count ?? 0),
     offerState: row.offer_state ?? null,
+    // EMP-05: the job's terms changed after they applied and they have not accepted yet.
+    termsAcknowledgementPending: row.terms_pending === true,
     updatedAt: row.updated_at,
   };
 }

@@ -1046,14 +1046,33 @@ private fun EmployerHome(
                             Text("${role.applicationCount} applications · ${role.openApplicationCount} open",
                                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        StatusChip(prettify(role.lifecycleState),
-                            if (role.lifecycleState == "PUBLISHED") ChipKind.Positive else ChipKind.Muted)
+                        StatusChip(prettify(role.lifecycleState), roleStateChip(role.lifecycleState))
                     }
                 }
             }
         }
         Spacer(Modifier.height(20.dp))
     }
+}
+
+/**
+ * EMP-05: a role is live, paused (hidden, expected back), a draft, or closed/withdrawn.
+ * Editing, pausing, closing and reopening happen on the web's Opportunity Detail, where each
+ * change is confirmed and carries a reason; the app shows where every role stands.
+ */
+internal fun roleStateChip(state: String): ChipKind = when (state) {
+    "PUBLISHED" -> ChipKind.Positive
+    "PAUSED" -> ChipKind.Waiting
+    "DRAFT" -> ChipKind.Accent
+    else -> ChipKind.Muted
+}
+
+private fun roleStateNote(role: EmployerOpportunityDto): String? = when (role.lifecycleState) {
+    "PAUSED" -> "Paused: hidden from students, no new applications"
+    "CLOSED" -> "Closed to new applications" + (role.closedAt?.let { " since ${formatWhen(it)}" } ?: "")
+    "WITHDRAWN" -> "Withdrawn"
+    "DRAFT" -> "Draft: not visible to students yet"
+    else -> null
 }
 
 @Composable
@@ -1076,13 +1095,18 @@ private fun EmployerRoles(roles: List<EmployerOpportunityDto>) {
                             if (meta.isNotBlank()) Text(meta, style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        StatusChip(prettify(role.lifecycleState),
-                            if (role.lifecycleState == "PUBLISHED") ChipKind.Positive else ChipKind.Muted)
+                        StatusChip(prettify(role.lifecycleState), roleStateChip(role.lifecycleState))
                     }
                     Spacer(Modifier.height(8.dp))
                     Text("${role.applicationCount} applications · ${role.openApplicationCount} open" +
-                        (role.applicationDeadline?.let { " · apply by ${formatWhen(it)}" } ?: ""),
+                        (role.applicationDeadline?.let { " · apply by ${formatWhen(it)}" } ?: "") +
+                        (role.versionNumber?.takeIf { it > 1 }?.let { " · version $it" } ?: ""),
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    roleStateNote(role)?.let {
+                        Spacer(Modifier.height(4.dp))
+                        Text("$it. Edit, pause, close or reopen on the web.", style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
             }
         }

@@ -85,6 +85,8 @@ internal fun JobsScreen() {
     var openOpportunityId by remember { mutableStateOf<String?>(null) }
     var jobsOverlay by remember { mutableStateOf<JobsOverlay?>(null) }
     var feedback by remember { mutableStateOf<ApplicationFeedbackDto?>(null) }
+    // EMP-05: the changed terms one application is waiting on the student to answer.
+    var termsChange by remember { mutableStateOf<Pair<String, TermsChangeDto>?>(null) }
 
     LaunchedEffect(reload) {
         opportunities = runCatching { Api.listOpportunities(context) }.getOrNull()
@@ -104,6 +106,21 @@ internal fun JobsScreen() {
     feedback?.let { released ->
         SlideIn { FeedbackPage(released, onClose = { feedback = null }) }
         return
+    }
+
+    termsChange?.let { (applicationId, change) ->
+        TermsChangeDialog(change, onDismiss = { termsChange = null }, onAnswer = { accept ->
+            termsChange = null
+            scope.launch {
+                runCatching { Api.respondToTermsChange(context, applicationId, accept, change.toVersionId) }
+                    .onSuccess {
+                        notice = if (accept) "You accepted the new terms. Your application carries on."
+                        else "You declined the new terms, so your application was withdrawn."
+                        reload += 1
+                    }
+                    .onFailure { notice = (it as? Api.ApiException)?.detail ?: "Your answer could not be saved." }
+            }
+        })
     }
 
     // Full-screen overlays sit above the tab content and return to it on close.
@@ -238,6 +255,24 @@ internal fun JobsScreen() {
                                     Text("Submitted ${formatWhen(it)}", style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
+                                // EMP-05: the employer cannot move this application on until the
+                                // student answers the changed terms.
+                                if (app.termsAcknowledgementPending) {
+                                    Spacer(Modifier.height(8.dp))
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        StatusChip("Terms changed", ChipKind.Waiting)
+                                        TextButton(onClick = {
+                                            scope.launch {
+                                                runCatching { Api.termsChange(context, app.id) }
+                                                    .onSuccess { change ->
+                                                        if (change != null) termsChange = app.id to change
+                                                        else { notice = "Nothing is waiting for your answer on that application any more."; reload += 1 }
+                                                    }
+                                                    .onFailure { notice = (it as? Api.ApiException)?.detail ?: "Could not load the changed terms." }
+                                            }
+                                        }) { Text("Review new terms") }
+                                    }
+                                }
                                 // Only shown when the employer deliberately released
                                 // something. Silence stays silent rather than offering a
                                 // button that opens an empty page.
@@ -286,6 +321,69 @@ internal fun JobsScreen() {
             }
         }
     }
+}
+
+// --- Changed terms (EMP-05) ----------------------------------------------------
+
+private val termNames = mapOf(
+    "employmentType" to "Employment type", "workMode" to "Work mode", "locationCity" to "Location",
+    "compensationDisclosed" to "Pay", "compensationCurrency" to "Pay", "compensationMin" to "Pay", "compensationMax" to "Pay",
+    "compensationPeriod" to "Pay", "durationMonths" to "Duration", "applicationDeadline" to "Deadline",
+    "joiningConditions" to "Joining conditions", "eligibility" to "Eligibility",
+)
+
+private fun termsPay(terms: StudentTermsDto): String = terms.compensation?.let { pay ->
+    val upper = pay.max?.let { " to $it" } ?: ""
+    "${pay.currency} ${pay.min}$upper / ${if (pay.period == "TOTAL_STIPEND") "total" else pay.period.lowercase()}"
+} ?: "Not disclosed"
+
+/**
+ * What the student applied under beside what the job says now, for the terms that moved,
+ * with accept and decline. Declining withdraws the application, and the dialog says so first.
+ */
+@Composable
+private fun TermsChangeDialog(change: TermsChangeDto, onDismiss: () -> Unit, onAnswer: (Boolean) -> Unit) {
+    val changed = change.changedTerms.map { termNames[it] ?: it }.distinct()
+    val rows = listOf(
+        Triple("Employment type", prettify(change.appliedTerms.employmentType), prettify(change.newTerms.employmentType)),
+        Triple("Work mode", prettify(change.appliedTerms.workMode), prettify(change.newTerms.workMode)),
+        Triple("Location", change.appliedTerms.locationCity ?: "NA", change.newTerms.locationCity ?: "NA"),
+        Triple("Pay", termsPay(change.appliedTerms), termsPay(change.newTerms)),
+        Triple("Duration", change.appliedTerms.durationMonths?.let { "$it months" } ?: "NA", change.newTerms.durationMonths?.let { "$it months" } ?: "NA"),
+        Triple("Joining conditions", change.appliedTerms.joiningConditions ?: "NA", change.newTerms.joiningConditions ?: "NA"),
+        Triple("Deadline", change.appliedTerms.applicationDeadline?.let(::formatWhen) ?: "NA", change.newTerms.applicationDeadline?.let(::formatWhen) ?: "NA"),
+    ).filter { it.first in changed }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("${change.employerName} changed this job") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                Text("${change.newTerms.title}. The employer cannot move your application on until you answer.",
+                    style = MaterialTheme.typography.bodySmall)
+                rows.forEach { (label, before, after) ->
+                    Spacer(Modifier.height(10.dp))
+                    Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                    Text("When you applied: $before", style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Now: $after", style = MaterialTheme.typography.bodySmall)
+                }
+                if ("Eligibility" in changed) {
+                    Spacer(Modifier.height(10.dp))
+                    Text("The eligibility rules changed too. Open the role to see them.", style = MaterialTheme.typography.bodySmall)
+                }
+                Spacer(Modifier.height(12.dp))
+                Text("Declining withdraws your application, and the employer loses access to your profile for this role.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        },
+        confirmButton = { TextButton(onClick = { onAnswer(true) }) { Text("Accept") } },
+        dismissButton = {
+            Row {
+                TextButton(onClick = { onAnswer(false) }) { Text("Decline and withdraw") }
+                TextButton(onClick = onDismiss) { Text("Later") }
+            }
+        },
+    )
 }
 
 // --- ONE Assistant chat --------------------------------------------------------

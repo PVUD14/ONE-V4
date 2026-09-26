@@ -88,6 +88,9 @@ const operationApprovalActionKeys = [
   'CAREER_REQUIREMENT_SET_PUBLISH',
 ] as const;
 
+// EMP-05: opportunities.lifecycle_state (0007 CHECK).
+const opportunityLifecycleStates = ['DRAFT', 'PENDING_REVIEW', 'PUBLISHED', 'PAUSED', 'CLOSED', 'WITHDRAWN', 'ARCHIVED'] as const;
+
 // OPS-08: requirement-set lifecycle states (0051).
 const careerRequirementSetStates = ['DRAFT', 'IN_REVIEW', 'REVIEWED', 'PUBLISHED', 'SUPERSEDED', 'WITHDRAWN'] as const;
 
@@ -227,6 +230,91 @@ export const eventSchemas = {
       employerId: { kind: 'uuid' },
       cause: { kind: 'enum', values: ['ORGANIZATION_SUSPENDED'] },
     },
+  },
+  // EMP-05: an employer saved a new version of a job. `change` says whether the terms an
+  // applicant applied under moved (MATERIAL) or only the wording (EDITORIAL).
+  opportunityVersionCreatedV1: {
+    eventType: 'opportunity.version.created',
+    eventVersion: 1,
+    producer: 'hiring',
+    aggregateType: 'opportunity',
+    purpose: 'opportunity-versioning',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://opportunity.version.created/1',
+    payload: {
+      opportunityId: { kind: 'uuid' },
+      employerId: { kind: 'uuid' },
+      versionId: { kind: 'uuid' },
+      change: { kind: 'enum', values: ['EDITORIAL', 'MATERIAL'] },
+    },
+  },
+  // EMP-05: pause, close, reopen and withdraw by the employer, and the deadline job's close.
+  opportunityLifecycleChangedV1: {
+    eventType: 'opportunity.lifecycle.changed',
+    eventVersion: 1,
+    producer: 'hiring',
+    aggregateType: 'opportunity',
+    purpose: 'opportunity-lifecycle',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://opportunity.lifecycle.changed/1',
+    payload: {
+      opportunityId: { kind: 'uuid' },
+      employerId: { kind: 'uuid' },
+      fromState: { kind: 'enum', values: opportunityLifecycleStates },
+      toState: { kind: 'enum', values: opportunityLifecycleStates },
+      trigger: { kind: 'enum', values: ['EMPLOYER', 'DEADLINE'] },
+      reasonCode: { kind: 'string', maxLength: 64, minLength: 3, pattern: /^[A-Z0-9_:-]{3,64}$/, required: false },
+    },
+  },
+  // EMP-05: asks the deadline job to close a job when its current version's deadline passes.
+  // available_at is the deadline; a newer version with another deadline makes it a no-op.
+  opportunityDeadlineCloseRequestedV1: {
+    eventType: 'opportunity.deadline_close.requested',
+    eventVersion: 1,
+    producer: 'hiring',
+    aggregateType: 'opportunity',
+    purpose: 'opportunity-deadline-close',
+    dataClassification: 'internal',
+    schemaRef: 'registry://opportunity.deadline_close.requested/1',
+    payload: { opportunityId: { kind: 'uuid' }, versionId: { kind: 'uuid' } },
+  },
+  // EMP-05: an applicant's terms moved under them. Recorded for EMP-08's student
+  // notifications; nothing sends it to the student yet.
+  applicationTermsChangeRecordedV1: {
+    eventType: 'application.terms_change.recorded',
+    eventVersion: 1,
+    producer: 'hiring',
+    aggregateType: 'application',
+    purpose: 'application-terms-change',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://application.terms_change.recorded/1',
+    payload: {
+      applicationId: { kind: 'uuid' },
+      opportunityId: { kind: 'uuid' },
+      toVersionId: { kind: 'uuid' },
+      acknowledgement: { kind: 'enum', values: ['REQUIRED', 'NOT_REQUIRED'] },
+    },
+  },
+  applicationTermsChangeAcknowledgedV1: {
+    eventType: 'application.terms_change.acknowledged',
+    eventVersion: 1,
+    producer: 'hiring',
+    aggregateType: 'application',
+    purpose: 'application-terms-change',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://application.terms_change.acknowledged/1',
+    payload: { applicationId: { kind: 'uuid' }, toVersionId: { kind: 'uuid' } },
+  },
+  // Declining the new terms withdraws the application (the employer loses access).
+  applicationTermsChangeDeclinedV1: {
+    eventType: 'application.terms_change.declined',
+    eventVersion: 1,
+    producer: 'hiring',
+    aggregateType: 'application',
+    purpose: 'application-terms-change',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://application.terms_change.declined/1',
+    payload: { applicationId: { kind: 'uuid' }, toVersionId: { kind: 'uuid' } },
   },
   organizationRoleAssignedV1: {
     eventType: 'organization.role.assigned',

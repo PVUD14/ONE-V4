@@ -112,3 +112,102 @@ students still see the job; PENDING and REJECTED publish), 2 controls pass.
 **Limitations / not done:** logo (needs the file store and scanner configured; no column added until upload exists). No email confirmation of the requester (HG-7 — no production sender); the queue says every request's email is unconfirmed. Retention of declined and spam requests (proposed 180 days) is not yet in the privacy worker. No notifier consumes employer_access_request.submitted yet. The Organizations page's existing Edit prompt sends a partial profile and can null address fields — pre-existing, not changed here.
 **Risks / follow-ups:** if a proxy with a public address is ever put in front of the API, the per-address limit collapses to a per-proxy limit (the overall cap still holds) — revisit clientAddress then. Suite runtimes were long in this run (shared local Postgres), not a code issue.
 **Next goal:** EMP-18 (EM1 slice), then EMP-05.
+
+## EMP-05 — Job lifecycle: edit, pause, close, reopen — 2026-09-26
+**Result:** Complete. Employers can now edit a job, which saves a new immutable version. They can also pause, close, reopen or withdraw it, and a job closes on its own when its deadline passes. When an edit changes the terms someone applied under, that applicant has to accept the new terms before the employer can move them on.
+**Branch / PR:** feat/emp-job-lifecycle → feat/plan-phases-0-to-2 (pushed to onev4; merge by review). Commits d0bb65d (acceptance tests) and eeb2897 (implementation), cut from fc700af. A trial merge onto 7804fcd (EMP-SR-01/02) had no conflicts. On that merge, typecheck passed for api and web, and the lifecycle, hiring and student specs passed 65/65.
+**Files created:**
+- packages/hiring/src/opportunity-lifecycle.ts (lifecycle table, editable states, reason-code lists, term-change classification) and test/opportunity-lifecycle.test.ts.
+- packages/persistence/src/opportunity-deadlines.ts: the deadline job, both the scheduler write and the outbox consumer.
+- apps/api/src/http/employer-job-lifecycle.controller.ts (EmployerJobLifecycleController and StudentTermsChangeController) and employer-job-lifecycle.integration.spec.ts.
+- apps/web/src/rolePortal/employerOpportunityDetail.tsx, with its test.
+
+**Files modified:**
+- employer-hiring.controller.ts:
+  - Publish now runs in one transaction with its audit and outbox rows. The audit row now carries organisation_id. Publish is refused if the job's state changed or its deadline passed.
+  - The version insert and the review-signal recording are exported so the lifecycle controller can reuse them.
+  - The applicant list gains termsAcknowledgementPending.
+  - Pending-terms checks count only rows where acknowledgement_required is set.
+  - An offer is refused while a term change is pending.
+  - The opportunity list gains closedAt and versionNumber.
+- student-hiring.controller.ts: apply re-reads the job FOR SHARE inside its transaction and re-checks that it is PUBLISHED and before its deadline. The pending-terms count respects acknowledgement_required.
+- api-security.module.ts.
+- packages/events: opportunity.version.created, opportunity.lifecycle.changed, opportunity.deadline_close.requested, and application.terms_change.recorded / acknowledged / declined, all v1.
+- packages/persistence automation-workers.ts: routes the deadline events to their consumer.
+- packages/hiring index.ts: one new rule code.
+- Web:
+  - api/hiring.ts.
+  - hiringPages.tsx: a Details button on each Opportunities row, a "new terms pending" tag on Applicants, and the student's "Review new terms" card.
+  - rolePortal/employer.tsx: only the Opportunity Detail label's branch.
+  - rolePortal/shared.tsx: error messages.
+- student-hiring.controller.test.ts: the fixture answers the new locked re-read. No assertions changed.
+- Android: Api.kt, ApiStudent.kt, JobsAndMore.kt, StaffDashboards.kt.
+
+**Migrations added:** none. 0055 was not claimed: the 0007 tables already carry everything needed (opportunity_versions, opportunity_term_change_acknowledgements with acknowledgement_required, and the lifecycle CHECK).
+**Design docs / ADRs:** none, because no table was added. The decisions are recorded below and in the controller header.
+**Validation:** fresh database one_emp05_v.
+- `corepack pnpm db:migrate`: the first run applied 47, the second applied 0 (47 already applied).
+- `corepack pnpm typecheck`: passed.
+- `corepack pnpm -r --no-bail --workspace-concurrency=1 test`: exit 0, every package passing. Web 40 files / 718 tests, api 44 / 547, persistence 25 / 284. The other packages also passed, including hiring 9 / 178, which contains the 22 new lifecycle tests. The new API spec ran 20/20.
+- `corepack pnpm build`: passed.
+- Android `./gradlew --no-daemon -q :app:compileDebugKotlin` (Android Studio JBR): passed.
+
+**Acceptance criteria:**
+- [x] Editing creates a new version and old versions stay intact. Tests: `inserts version 2, keeps version 1 byte-for-byte, and keeps applicants bound to the version they applied to` and `carries skills, stages and eligibility forward to the new version`. A stale edit gets 409 OPPORTUNITY_VERSION_CONFLICT.
+- [x] Applicants are asked to acknowledge material changes and cannot progress until they do.
+  - `asks each open applicant to accept a pay change, blocks progress and offers, and lets them through once they accept`. This also covers a stale acknowledgement (409 TERMS_CHANGED_AGAIN), other students getting 403, and rejection still being possible.
+  - `withdraws the application when the applicant declines the new terms`: the grant is revoked and the history row records TERMS_DECLINED.
+- [x] Closed or paused jobs accept no applications. Tests: `pauses: students stop seeing and applying…`, `closes with a reason code: no new applications…` and `refuses an application that was waiting on a close that then committed`. The student listing and detail already required PUBLISHED; apply now re-checks it under a lock.
+- [x] POST …/pause, …/close, …/reopen and …/withdraw follow the lifecycle table, and close and withdraw require a reason code from a fixed list. Tests: `refuses transitions the lifecycle does not allow` and `withdraws only once every applicant is decided…`.
+- [x] A scheduled job closes jobs whose deadline passed, idempotently. Test: `queues the close at the deadline and closes once, idempotently; a moved deadline supersedes it`. An early delivery throws and is retried, and a replay does nothing. Publishing or reopening a job whose deadline has passed returns OPPORTUNITY_DEADLINE_PASSED.
+- [x] Opportunity Detail shows version history, current state and actions. Web tests are in employerOpportunityDetail.test.tsx. The navigation labels are unchanged: that label's branch now renders the detail instead of the list.
+- [x] §6.3 minimums:
+  - 401 without a token.
+  - 403 for another employer, an ended membership, and another employer's job.
+  - A SUSPENDED or REJECTED employer gets 403 EMPLOYER_ORGANISATION_INACTIVE on every lifecycle route.
+  - A PENDING employer can edit and withdraw drafts, but gets 403 EMPLOYER_ORGANISATION_UNVERIFIED on pause, close and reopen.
+  - An unknown field gets 400.
+  - Audit rows carry the organisation and the reason code.
+  - The detail response has no readiness, score or gap fields.
+- [x] Security findings EMP-SR-15 and EMP-SR-08 are closed for the job lifecycle:
+  - Each lifecycle write locks the organisation row FOR SHARE, re-applies the §5.1 rule and locks the job FOR UPDATE.
+  - Audit and outbox rows are written in the same transaction as the change, and unknown fields are rejected.
+  - Test: `refuses a reopen that was waiting on a suspension that then committed`.
+  - Publish is transactional, and its audit row now carries organisation_id.
+
+**Decisions for Divakar:**
+1. **What counts as material.** Every material_terms_hash field (employment type, work mode, location, pay fields, duration, joining conditions, deadline) plus the version's eligibility rules. Title, summary and responsibilities are wording: changing them creates a version but asks applicants nothing.
+2. **A deadline-only change is recorded without blocking anyone.** Its rows get acknowledgement_required = false. The deadline decides who may still apply, not what an applicant agreed to. This is a deliberate deviation: the plan lists the deadline as needing acknowledgement. A deadline change that comes with any other material change still needs it.
+3. **What applicants are compared against.** Each applicant is compared with the terms they last accepted: the version they applied to, or the newest change they acknowledged. Accepting a newer version also settles every older pending change. applications.applied_version_id is never rewritten.
+4. **Declining the new terms withdraws the application.** Consent and the grant are revoked, exactly as when the student withdraws.
+5. **Lifecycle transitions:**
+   - Pause: PUBLISHED→PAUSED.
+   - Close: PUBLISHED or PAUSED→CLOSED. Existing applicants carry on.
+   - Reopen: PAUSED or CLOSED→PUBLISHED. It needs an audience and a future deadline, and it clears closed_at.
+   - Withdraw: from DRAFT, PUBLISHED, PAUSED or CLOSED. It is terminal, and it is refused while any application is still open, because nothing rejects applicants automatically.
+   - The existing publish route still resumes a PAUSED job, which is EMP-03's reinstatement path.
+6. **Action groups.** Edits and withdraw use `jobs.draft`. Editing a live job (published, paused or closed) also needs `jobs.publish` and runs the payment-demand refusal (OPPORTUNITY_PAYMENT_DEMAND). Pause, close and reopen use `jobs.publish`. Reading one job uses `jobs.draft`, like the list.
+7. **Reason codes.**
+   - Pause (optional): HIRING_ON_HOLD, REVIEWING_APPLICANTS, UPDATING_DETAILS.
+   - Close: POSITION_FILLED, ENOUGH_APPLICANTS, HIRING_ON_HOLD, ROLE_CANCELLED, POSTED_IN_ERROR.
+   - Withdraw: POSTED_IN_ERROR, ROLE_CANCELLED, DUPLICATE_POSTING, TERMS_INCORRECT.
+   - The deadline job uses DEADLINE_PASSED.
+8. **How the deadline job runs.** It is an outbox event whose available_at and occurred_at are the deadline (ADR-028). It is written whenever a version with a deadline becomes current on a published or paused job, and on publish and reopen. audit_events requires an actor, so the audit row records the person who set the deadline.
+9. **Consistency with EMP-SR-01 (7804fcd).** The lifecycle routes return no per-candidate data to employers. The detail view gives counts only. The pending-terms flag sits on the applicant list, which EMP-SR-01's grant check already governs. The student terms-change routes are scoped to the student's own application.
+
+**Android:** changed.
+- Employer side: Roles and Home show paused, closed, draft and withdrawn states with their own chips, a note on the state, the closed date and the version number, and say that edits happen on the web. Changes stay web-only, like posting and publishing, because each one needs a confirmation and a reason.
+- Student side: My applications shows "Terms changed" with a "Review new terms" button. It opens a dialog showing what the student applied under beside what the job says now, with Accept or Decline and withdraw.
+
+**Limitations / not done:**
+- No student notification is sent. The application.terms_change.recorded event is written so EMP-08 can deliver it.
+- Skills, stages and eligibility are carried forward unchanged; they have no editor until EMP-06. Eligibility changes are already detected, so EMP-06 gets the acknowledgement step without extra work.
+- The version history is capped at 200 versions per job.
+- Android's terms dialog does not show the eligibility rules. It says they changed and points to the role.
+- The pre-existing hiring writes outside the lifecycle (transition, interviews, offers) still have the EMP-SR-08 and EMP-SR-15 gaps. Those belong to EMP-07, EMP-08 and EMP-12.
+
+**Risks / follow-ups:**
+- Jobs published before this change have no deadline event. They still drop out of the student listing at the deadline, as before, but stay PUBLISHED until someone edits, publishes or reopens them. A one-off backfill could fix this if wanted.
+- Deadline closes happen only while the worker is running.
+
+**Next goal:** EMP-06.

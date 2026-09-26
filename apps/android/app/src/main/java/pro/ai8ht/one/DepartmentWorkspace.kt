@@ -8,6 +8,10 @@ package pro.ai8ht.one
  * leaves it out. A group under five reads <5, readiness is bands only, and offers are never
  * shown with pay. The shared-application list (Opportunities and Offers) stays on the web:
  * reading it is an audited read of application records, not a glance on a home screen.
+ *
+ * INST-09 adds students by placement status to the pipeline card — the suppressed
+ * distribution, where "Nothing shared" is never "not applied". The per-student status
+ * list stays on the web for the same reason as the application list: it is audited.
  */
 
 import android.content.Context
@@ -76,6 +80,8 @@ import pro.ai8ht.one.ui.Tone
     val studentsSharing: SuppressedCountDto = SuppressedCountDto(),
     val stages: SuppressedTableDto = SuppressedTableDto(),
     val offers: SuppressedTableDto = SuppressedTableDto(),
+    /** INST-09: current students by placement status; absent from an older server. */
+    val placementStatus: SuppressedTableDto? = null,
 )
 @Serializable data class ClassAssessmentDto(
     val id: String = "", val title: String = "", val assigned: Int = 0, val completed: Int = 0,
@@ -204,6 +210,11 @@ private val pipelineStages = listOf(
     "APPLIED" to "Applied", "SHORTLISTED" to "Shortlisted", "INTERVIEW" to "Interview", "OFFER" to "Offer", "HIRED" to "Hired",
 )
 
+/** INST-09: the web's placement status labels. A student who shared nothing is not "not applied". */
+private val placementStatusOrder = listOf(
+    "NOT_SHARED" to "Nothing shared", "APPLIED" to "Applied", "IN_PROCESS" to "In process", "OFFER" to "Offer", "ACCEPTED" to "Accepted",
+)
+
 /** Placement pipeline over applications students shared with the college; NA when there is no source. */
 @Composable
 internal fun PlacementPipelineCard(pipeline: ScopedView<PlacementPipelineDto>) {
@@ -225,6 +236,31 @@ internal fun PlacementPipelineCard(pipeline: ScopedView<PlacementPipelineDto>) {
             Spacer(Modifier.height(6.dp))
             Text(
                 if (data == null) "Placement stages: NA for your role." else "Applications students have shared with the college. Offer pay is never shown.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+    // INST-09: every current student by placement status, from what they shared only.
+    Spacer(Modifier.height(10.dp))
+    PilotCard {
+        Column(Modifier.padding(14.dp)) {
+            Text("Students by placement status", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(6.dp))
+            val table = data?.placementStatus
+            val cells = table?.cells.orEmpty().associateBy { it.key }
+            val max = cells.values.mapNotNull { if (it.suppressed) null else it.count }.maxOrNull() ?: 1
+            placementStatusOrder.forEach { (key, label) ->
+                val cell = cells[key]
+                val text = when {
+                    table == null -> "NA"
+                    table.suppressed || cell == null -> "<5"
+                    else -> suppressedLabel(cell.count, cell.suppressed)
+                }
+                SuppressedFunnelRow(label, if (cell != null && !cell.suppressed) cell.count else null, max, text)
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "\"Nothing shared\" means a student has not shared an application with the college — not that they have not applied. Each student's status is on the web.",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }

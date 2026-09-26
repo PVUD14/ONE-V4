@@ -562,6 +562,9 @@ internal fun NotificationDto.announcementSource(): String {
     val feedbackReleased: Boolean = false,
     /** EMP-05: the employer changed a term this student applied under; they must accept or decline. */
     val termsAcknowledgementPending: Boolean = false,
+    /** ADR-019 / INST-09: when the student shared this application with their college, and when they stopped. */
+    val institutionVisibilityGrantedAt: String? = null,
+    val institutionVisibilityRevokedAt: String? = null,
 )
 
 // --- Candidate feedback -------------------------------------------------------

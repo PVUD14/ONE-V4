@@ -439,6 +439,11 @@ suspend fun Api.withdrawApplication(context: Context, applicationId: String) {
     request(context, "POST", "/api/v1/students/me/applications/$applicationId/withdraw")
 }
 
+/** INST-09: share an application with the student's college after applying; revocable at any time. */
+suspend fun Api.grantInstitutionVisibility(context: Context, applicationId: String) {
+    request(context, "POST", "/api/v1/students/me/applications/$applicationId/institution-visibility/grant")
+}
+
 suspend fun Api.revokeInstitutionVisibility(context: Context, applicationId: String) {
     request(context, "POST", "/api/v1/students/me/applications/$applicationId/institution-visibility/revoke")
 }

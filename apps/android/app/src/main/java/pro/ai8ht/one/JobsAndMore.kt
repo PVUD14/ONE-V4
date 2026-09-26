@@ -293,25 +293,42 @@ internal fun JobsScreen() {
                                 // withdraw something already settled would be a dead button.
                                 if (app.state !in setOf("WITHDRAWN", "REJECTED", "ACCEPTED", "DECLINED")) {
                                     Spacer(Modifier.height(8.dp))
-                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                        TextButton(onClick = {
-                                            scope.launch {
-                                                runCatching { Api.withdrawApplication(context, app.id) }
-                                                    .onSuccess { notice = "Application withdrawn."; reload += 1 }
-                                                    .onFailure { notice = (it as? Api.ApiException)?.detail ?: "Could not withdraw that." }
+                                    TextButton(onClick = {
+                                        scope.launch {
+                                            runCatching { Api.withdrawApplication(context, app.id) }
+                                                .onSuccess { notice = "Application withdrawn."; reload += 1 }
+                                                .onFailure { notice = (it as? Api.ApiException)?.detail ?: "Could not withdraw that." }
+                                        }
+                                    }) { Text("Withdraw") }
+                                }
+                                // INST-09 / ADR-019: sharing with the college is its own choice per
+                                // application — shown on every application, closed ones included, and
+                                // separate from withdrawing. Pay is never shared.
+                                val shared = app.institutionVisibilityGrantedAt != null && app.institutionVisibilityRevokedAt == null
+                                Spacer(Modifier.height(8.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    StatusChip(
+                                        when {
+                                            shared -> "Shared with college"
+                                            app.institutionVisibilityRevokedAt != null -> "Sharing stopped"
+                                            else -> "Not shared with college"
+                                        },
+                                        if (shared) ChipKind.Positive else ChipKind.Muted,
+                                    )
+                                    TextButton(onClick = {
+                                        scope.launch {
+                                            runCatching {
+                                                if (shared) Api.revokeInstitutionVisibility(context, app.id)
+                                                else Api.grantInstitutionVisibility(context, app.id)
                                             }
-                                        }) { Text("Withdraw") }
-                                        // Revoking institution visibility is separate from
-                                        // withdrawing: a student may want their college to
-                                        // stop seeing an application they are still pursuing.
-                                        TextButton(onClick = {
-                                            scope.launch {
-                                                runCatching { Api.revokeInstitutionVisibility(context, app.id) }
-                                                    .onSuccess { notice = "Your institution can no longer see this application." }
-                                                    .onFailure { notice = (it as? Api.ApiException)?.detail ?: "Could not update that." }
-                                            }
-                                        }) { Text("Hide from college") }
-                                    }
+                                                .onSuccess {
+                                                    notice = if (shared) "Your college can no longer see this application."
+                                                    else "Shared with your college: employer, role, stage, key dates and offer response — never pay."
+                                                    reload += 1
+                                                }
+                                                .onFailure { notice = (it as? Api.ApiException)?.detail ?: "Could not update that." }
+                                        }
+                                    }) { Text(if (shared) "Stop sharing with college" else "Share with college") }
                                 }
                             }
                         }

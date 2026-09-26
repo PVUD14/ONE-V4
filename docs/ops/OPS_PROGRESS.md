@@ -781,3 +781,147 @@ preflight cases)
 - Capture the `amr` claim (runbook C4) before deciding whether to assert it.
 
 **Next goal:** OPS-08.
+
+## OPS-08 — Job-role catalogue administration — 2026-09-26
+**Result:** Complete. All 108 catalogue roles load from the transcribed Appendix 4 and are searchable by code, name,
+branch and synonym under Content Management. A requirement set goes draft → review by someone other than its author →
+publish, and the publish needs CONTENT_PUBLISH plus a second person's approval (new OPS-02 action
+`CAREER_REQUIREMENT_SET_PUBLISH`). Students see the full catalogue only behind a flag that is off by default.
+
+**Branch / PR:** feat/ops-role-catalogue → feat/plan-phases-0-to-2. Commits, in order: design and input transcription
+(9808e3c), acceptance tests (65fac67), implementation (3acd3c3), and this report. Pushed to onev4. No PR was opened
+because `gh` is not installed.
+
+**Input:** docs/ops/inputs/job-role-catalogue.md did not exist, so per program rule B.3 Appendix 4 was transcribed into it
+first. It has 108 role rows (S 25, D 9, C 9, E 13, L 7, M 14, P 6, V 11, B 14) and 13 goal rows (G01–G13), plus the usage
+notes and the §H branch map. Planned releases: 1 V1, 13 V2, 38 V3, 56 selectable. Every row was reconstructed; none needed
+guessing. The counts are checked by code on every test run, and the §H V2 list matches exactly.
+
+**Files created:**
+- docs/ops/inputs/job-role-catalogue.md
+- docs/architecture/career-catalogue-table-design.md
+- packages/persistence/drizzle/0051_career_catalogue.sql
+- data/careers/catalogue-v1.json, generated from the input
+- packages/authorization/src/career-catalogue.ts (+ .test.ts)
+- packages/persistence/src/career-catalogue.ts, career-catalogue-input.ts, generate-career-catalogue.ts and
+  seed-career-catalogue.ts
+- packages/persistence/test/career-catalogue-input.test.ts and career-catalogue.integration.test.ts
+- apps/api/src/http/operations-career-catalogue.controller.ts (+ .integration.spec.ts)
+- apps/web/src/api/careerCatalogue.ts
+- apps/web/src/rolePortal/careerCatalogue.tsx (+ .test.tsx)
+
+**Files modified:**
+- packages/authorization/src/high-risk-actions.ts: the new action key, `legacyHighRiskActionKeys`, and its reasons.
+- packages/authorization/src/index.ts: export only.
+- packages/events/src/index.ts: the approval key, plus the events `career_requirement_set.state_changed` and
+  `career_requirement_set.published`.
+- packages/persistence/src/operation-approvals.ts: writes a post-0038 key to the extension columns and reads it back with
+  COALESCE.
+- packages/persistence/src/career-targets.ts: the student list and selection now depend on the flag.
+- packages/persistence/package.json: adds `db:seed:career-catalogue` and `catalogue:generate`.
+- apps/api/src/http/operation-approval-gate.ts and operations-approvals.controller.ts: the payload, the target check and the
+  queue summary for the new action.
+- apps/api/src/http/career-targets.controller.ts: resolves the flag.
+- apps/api/src/http/api-security.module.ts: registration only.
+- apps/web/src/api.ts and api/operations.ts: types and barrel.
+- apps/web/src/rolePortal/approvals.tsx: describes and executes the new action.
+- apps/web/src/rolePortalPages.tsx: the operations `Content Management` branch only. It now renders the catalogue above
+  LearnerContentStudio and OperationsContentReadOnlyPage, both of which are kept as they were.
+- apps/android/…/ApiStudent.kt and StudentCareer.kt.
+
+**Migrations added:** 0051_career_catalogue.sql:
+- catalogue columns on `career_roles`; every 0011 constraint is kept;
+- `required_evidence_types` on `career_role_requirements`, declared exactly as ENG-04's unmerged 0050 declares it, so the two
+  converge;
+- `career_role_synonyms`;
+- `career_requirement_sets` and `career_requirement_set_items`, with lifecycle, freeze and self-review triggers, and a publish
+  that needs an executed approval;
+- a release-label guard on `career_roles`;
+- extension columns on `operation_approvals`;
+- the flag `career-catalogue.selectable-roles`, off by default.
+
+It references only tables from 0001–0038. `db:migrate` ran twice on a freshly created `one_ops08` with no errors.
+
+**Design docs / ADRs:** career-catalogue-table-design.md covers the chosen design and the rejected options. No ADR was
+needed.
+
+**Validation (fresh `one_ops08`, only DATABASE_URL exported):**
+- `corepack pnpm db:migrate` ×2: pass.
+- `corepack pnpm typecheck`: pass.
+- `corepack pnpm -r --no-bail --workspace-concurrency=1 test`: pass, **1 824 passed, 0 failed**, including:
+  - api 673, with 13 new;
+  - web 530, with 13 new;
+  - persistence 248, with 12 new;
+  - authorization 168, with 12 new.
+- `corepack pnpm build`: pass.
+- Android `./gradlew --no-daemon -q :app:compileDebugKotlin`: pass.
+
+The replay hazard was also reproduced by hand in psql. With a sixth key in `action_key`, re-running 0038's DROP/ADD fails
+with "check constraint operation_approval_action_ck … is violated by some row".
+
+**Acceptance criteria:**
+- ✔ All 108 roles load and are searchable by code, name, branch and synonym. The seed test checks 108 roles, 5 mapped, 103
+  created, nothing verified, and that a rerun is idempotent. The API spec checks search by code (C01), starter code, name,
+  branch (`maths-strong`, `Geo-informatics`), synonym, and the family, branch and label filters.
+- ✔ A requirement-set change cannot go live without review and approval.
+  - Publishing without an approval returns 403 `APPROVAL_REQUIRED`.
+  - A self-review is refused by the API and by the database.
+  - Items are frozen once a set is submitted.
+  - The requester cannot approve their own publish.
+  - Execution by someone other than the requester, a changed payload (a different label) and an expired approval are each
+    rejected.
+  - The database refuses PUBLISHED without an executed approval for exactly that set.
+  - The release label can change only through a publish.
+- ✔ Existing career-target and gap tests pass unchanged, and `computeCareerGap` is untouched. A student's pre-catalogue target
+  and gap read identically after the seed and after a publish, with the same target id.
+- ✔ §6.6 minimums:
+  - 401 without a token.
+  - 403 without the capability, for OPERATIONS_ADMIN, SECURITY_ADMIN and an institution admin, and 200 with it.
+  - Input 400s, and pagination defaulting to 50 with a maximum of 200 and a keyset cursor.
+  - An audit row with the reason code on every write; break-glass is audited for the super admin.
+  - Detail shows only a count of live targets, never a student.
+  - Web tests cover real data, NA, loading, empty, an error with its reference, forbidden, reason-required dialogs, and
+    unchanged navigation labels.
+
+**Decisions for Divakar (recommendations adopted; see the design doc):**
+- **Approval-key storage.** OPS-02's plan to "widen the CHECK in a new migration" breaks every later migrate, because 0038
+  re-adds its five-key CHECK on each replay. A key added after 0038 now lives in `extended_action_key`/`extended_target_type`,
+  with its vocabulary in the replaceable function `operation_approval_extended_target_type()`. Every future approval action
+  should follow this pattern. The alternative is Divakar's call: an apply-once migration tracker, or a waiver to edit 0038.
+- **Starter mappings:** SOC_ANALYST→C01, SOFTWARE_ENGINEER→S01, DATA_ANALYST→D01, BUSINESS_ANALYST→S21 and
+  CUSTOMER_SUCCESS→B11. A mapped row keeps its starter code, title, family and summary; the catalogue name is kept in
+  `catalogue_title`.
+- **Labels.** Every role seeds as SELECTABLE, because nothing is verified today, C01 included. The V1/V2/V3 "Release" column
+  is stored as `planned_release`, which is plan data and not a label.
+- **Reviewer and author.** The reviewer is never the author, and there is no solo path for review. A lone operator therefore
+  needs a second person to review.
+- **Approval scope.** Every publish needs an approval, including one whose content is unchanged.
+- **Synonyms.** They get a new table, because `taxonomy_aliases` points at taxonomy nodes. None are seeded, since the catalogue
+  lists none.
+- **Goals.** G01–G13 are not stored, because no goal model exists on any branch. They are recorded as pending in the input
+  file and the JSON.
+- **Flag scope.** The flag resolves by user, then by the student's ACTIVE institution, then globally.
+
+**Limitations / not done:**
+- No worker recomputes students' gaps after a publish. The `career_requirement_set.published` event is emitted, and gaps are
+  recomputed through the existing paths.
+- The starter seed (`db:seed:careers`) still writes live requirements directly. It is an engineer-run deployment step.
+- There is no student-facing synonym matching ("I want to be a developer"). That is a later goal.
+- There is no web student career picker. Only Android has one.
+
+**Android:** changed, because students pick career targets there.
+- `CareerRoleDto` gains `releaseLabel` and `catalogueCode`, which are null while the flag is off.
+- When the flag is on, the picker shows a "Not yet verified" or "Verified" chip and a search once the list has more than 12
+  roles.
+- With the flag off, the screen is unchanged.
+- `compileDebugKotlin` passes.
+- There are no operator screens on Android (§4.3).
+
+**Risks / follow-ups:**
+- ENG-04's 0050 and this 0051 both declare `career_role_requirements.required_evidence_types`. They are identical, so either
+  merge order converges.
+- The approvals queue shows extended actions through the same DTO.
+- `privacy-operations.ts` counts `action_key = 'PRIVACY_HOLD_RELEASE'`. That is unaffected, because legacy keys stay in
+  `action_key`.
+
+**Next goal:** OPS-09.

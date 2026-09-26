@@ -12,7 +12,9 @@ import {
   deleteExternalApplication, changeExternalInstitutionVisibility, type ExternalApplicationDto, type ExternalApplicationInput,
   companyIndustryLabels, companySizeLabel, type OpportunityCompanyDto,
   readTermsChange, respondToTermsChange, type StudentTermsChangeDto, type StudentTermsDto,
+  previewApplication, applyWithSnapshot, type ApplicationPreviewDto, type SnapshotChoicesInput,
 } from './api/hiring.js';
+import { CandidateDetailPanel, SnapshotSummary } from './applicationSnapshotView.js';
 import {
   ApiRequestError,
   addOpportunityAudience,
@@ -79,6 +81,13 @@ const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   // EMP-06: the rules that stopped the application are listed under "Can you apply?".
   ELIGIBILITY_NOT_MET: 'You do not meet a rule this employer requires. The rule is shown under "Can you apply?".',
   ELIGIBILITY_UNKNOWN: 'ONE cannot confirm a rule this employer requires, because that information is not on your record yet. See "Can you apply?".',
+  // EMP-07: the consented snapshot.
+  SNAPSHOT_CHANGED: 'Something you would share changed after you reviewed it. Check "What the employer will see" again, then apply.',
+  RESUME_NOT_AVAILABLE: 'That résumé cannot be attached. Choose a résumé with an uploaded, scanned file, or apply without one.',
+  INVALID_CONTACT_PHONE: 'Enter a phone number with at least 7 digits, or leave it empty.',
+  INVALID_LINK_URL: 'Links must start with https://.',
+  INVALID_LINK_LABEL: 'Keep the link label under 60 characters, and do not start it with =, +, - or @.',
+  INVALID_LINKS: 'Check the links you added.',
 };
 
 function messageFor(error: unknown, fallback: string): string {
@@ -113,6 +122,12 @@ export function StudentOpportunitiesPage(): React.ReactElement {
   const [status, setStatus] = useState('Loading opportunities…');
   const [busy, setBusy] = useState(false);
   const [institutionVisibilityGranted, setInstitutionVisibilityGranted] = useState(false);
+  // EMP-07: what applying would share, reviewed before applying, with the choices it was built from.
+  const [preview, setPreview] = useState<{ readonly data: ApplicationPreviewDto; readonly choices: SnapshotChoicesInput } | null>(null);
+  const [previewStatus, setPreviewStatus] = useState('');
+  const [resumeChoice, setResumeChoice] = useState('');
+  const [phoneChoice, setPhoneChoice] = useState('');
+  const [linkChoice, setLinkChoice] = useState('');
 
   // `message` wins over the computed summary, so a confirmation survives the refresh
   // that follows it instead of being overwritten a moment later.
@@ -134,8 +149,37 @@ export function StudentOpportunitiesPage(): React.ReactElement {
     try {
       setInstitutionVisibilityGranted(false);
       setSelected(await getOpportunity(token, id));
+      setResumeChoice(''); setPhoneChoice(''); setLinkChoice(''); setPreview(null);
+      void loadPreview(id, {});
     } catch (error) {
       setStatus(messageFor(error, 'That opportunity could not be opened.'));
+    }
+  }
+
+  function currentChoices(resume = resumeChoice): SnapshotChoicesInput {
+    return {
+      ...(resume ? { resumeDocumentId: resume } : {}),
+      ...(phoneChoice.trim() ? { contactPhone: phoneChoice.trim() } : {}),
+      ...(linkChoice.trim() ? { links: [{ url: linkChoice.trim() }] } : {}),
+    };
+  }
+
+  async function loadPreview(id: string, choices: SnapshotChoicesInput): Promise<void> {
+    const token = getAccessToken();
+    if (!token) return;
+    setPreviewStatus('Preparing what the employer will see…');
+    try {
+      const response = await previewApplication(token, id, choices);
+      if (!response.preview?.snapshot) { setPreviewStatus('What you would share could not be shown right now.'); return; }
+      setPreview({ data: response.preview, choices });
+      setPreviewStatus('');
+    } catch (error) {
+      // The last reviewed preview stays, so applying still shares exactly what is on screen.
+      // Only the snapshot's own refusals are explained here; anything else (an eligibility refusal
+      // is shown under "Can you apply?") stays a plain sentence.
+      const snapshotCodes = ['RESUME_NOT_AVAILABLE', 'INVALID_CONTACT_PHONE', 'INVALID_LINK_URL', 'INVALID_LINK_LABEL', 'INVALID_LINKS'];
+      setPreviewStatus(error instanceof ApiRequestError && error.code && snapshotCodes.includes(error.code)
+        ? messageFor(error, '') : 'What you would share could not be shown right now.');
     }
   }
 
@@ -144,13 +188,16 @@ export function StudentOpportunitiesPage(): React.ReactElement {
     if (!token) return;
     setBusy(true);
     try {
-      await applyToOpportunity(token, id, institutionVisibilityGranted);
+      // EMP-07: apply with exactly the reviewed snapshot; the API refuses if it changed since.
+      if (preview) await applyWithSnapshot(token, id, institutionVisibilityGranted, preview.choices, preview.data.snapshotHash);
+      else await applyToOpportunity(token, id, institutionVisibilityGranted);
       await reload(search, 'Application submitted. You can track it under Applications.');
       await openDetail(id);
     } catch (error) {
       setStatus(messageFor(error, 'Your application could not be submitted.'));
       // Refresh the verdict, so the rule that stopped the application is the one on screen.
       if (error instanceof ApiRequestError && error.code?.startsWith('ELIGIBILITY_')) await openDetail(id);
+      if (error instanceof ApiRequestError && error.code === 'SNAPSHOT_CHANGED') await loadPreview(id, preview?.choices ?? {});
     } finally {
       setBusy(false);
     }
@@ -216,6 +263,34 @@ export function StudentOpportunitiesPage(): React.ReactElement {
 
       <h3>Can you apply?</h3>
       <EligibilityNotice eligibility={selected.eligibility} />
+
+      <h3>What {selected.opportunity.employerName} will see</h3>
+      <p className="hiring-consent-note">This is a copy of your profile as it stands now. It is kept with your application and never updated, and it never includes readiness, marks or your photo. Contact details are shown to the employer only if they shortlist you.</p>
+      {previewStatus ? <p role="status">{previewStatus}</p> : null}
+      {preview ? <>
+        <SnapshotSummary snapshot={preview.data.snapshot} audience="student" />
+        {selected.opportunity.alreadyApplied ? null : <div aria-label="What to share">
+          <label className="student-form-field"><span>Résumé to attach</span>
+            <select value={resumeChoice} disabled={busy} onChange={(event) => {
+              setResumeChoice(event.target.value);
+              void loadPreview(selected.opportunity.id, currentChoices(event.target.value));
+            }}>
+              <option value="">No résumé</option>
+              {preview.data.resumeOptions.map((option) => <option key={option.documentId} value={option.documentId}>{option.title} — {option.filename} (version {option.versionNumber})</option>)}
+            </select>
+          </label>
+          {preview.data.resumeOptions.length ? null : <p className="hiring-meta">Upload a résumé under Documents to attach one.</p>}
+          <label className="student-form-field"><span>Phone for this employer (optional)</span>
+            <input value={phoneChoice} disabled={busy} maxLength={20} onChange={(event) => setPhoneChoice(event.target.value)} placeholder="+91 98765 43210" />
+          </label>
+          <label className="student-form-field"><span>A link to share (optional, https://)</span>
+            <input value={linkChoice} disabled={busy} maxLength={256} onChange={(event) => setLinkChoice(event.target.value)} placeholder="https://github.com/you" />
+          </label>
+          <button type="button" className="secondary" disabled={busy} onClick={() => { void loadPreview(selected.opportunity.id, currentChoices()); }}>Update what I share</button>
+          {JSON.stringify(currentChoices()) !== JSON.stringify(preview.choices)
+            ? <p className="hiring-meta">Press "Update what I share" to include your changes; applying now shares what is shown above.</p> : null}
+        </div>}
+      </> : null}
 
       {/* PRIVACY REVIEW REQUIRED BEFORE SHIPPING: draft notice, not approved copy (ADR-019). */}
       <label className="hiring-checkbox"><input type="checkbox" checked={institutionVisibilityGranted}
@@ -1270,6 +1345,8 @@ export function EmployerApplicantsPage({ employerId, applicationStateFilter }: {
   }
 
   const [action, setAction] = useState<{ kind: 'interview' | 'offer' | 'feedback'; applicant: EmployerApplicantDto } | null>(null);
+  // EMP-07: the candidate being viewed (their consented snapshot, résumé, timeline).
+  const [viewing, setViewing] = useState<string | null>(null);
 
   async function saveFeedback(reasonCodes: readonly string[], note: string): Promise<void> {
     const token = getAccessToken();
@@ -1316,7 +1393,7 @@ export function EmployerApplicantsPage({ employerId, applicationStateFilter }: {
 
     <section className="role-card role-wide">
       <label className="student-form-field"><span>Opportunity</span>
-        <select value={selectedOpportunity} onChange={(event) => { setAction(null); setApplicants([]); setStages([]); setSelectedOpportunity(event.target.value); }}>
+        <select value={selectedOpportunity} onChange={(event) => { setAction(null); setViewing(null); setApplicants([]); setStages([]); setSelectedOpportunity(event.target.value); }}>
           <option value="">Select an opportunity</option>
           {opportunities.map((item) => <option key={item.id} value={item.id}>{item.title ?? item.referenceCode} ({item.applicationCount})</option>)}
         </select>
@@ -1334,7 +1411,9 @@ export function EmployerApplicantsPage({ employerId, applicationStateFilter }: {
         : <div className="role-record-table-wrap"><table className="role-record-table">
           <thead><tr><th>Candidate</th><th>Stage</th><th>Eligibility</th><th>Applied</th><th>Interviews</th><th>Offer</th><th>Next step</th></tr></thead>
           <tbody>{visibleApplicants.map((item) => <tr key={item.id}>
-            <td><CandidateIdentity item={item} /></td>
+            <td><CandidateIdentity item={item} />
+              {item.candidateAccess !== false && !item.consentRevoked
+                ? <div><a href="#candidate-detail" onClick={(event) => { event.preventDefault(); setViewing(item.id); }}>View candidate</a></div> : null}</td>
             <td><span className={`hiring-state state-${item.state.toLowerCase()}`}>{humanise(item.state)}</span>
               {stagesAt(stages, item.state) ? <span className="hiring-meta">{` ${stagesAt(stages, item.state)}`}</span> : null}
               {item.termsAcknowledgementPending ? <span className="hiring-tag warn">Awaiting new-terms acceptance</span> : null}</td>
@@ -1357,6 +1436,8 @@ export function EmployerApplicantsPage({ employerId, applicationStateFilter }: {
           </tr>)}</tbody>
         </table></div>}
     </section>
+    {viewing && visibleApplicants.some((item) => item.id === viewing && item.candidateAccess !== false && !item.consentRevoked)
+      ? <CandidateDetailPanel key={viewing} employerId={employerId} applicationId={viewing} onClose={() => setViewing(null)} /> : null}
     {action && !action.applicant.consentRevoked ? <section className="role-card role-wide">
       <h2>{action.kind === 'interview' ? 'Schedule interview' : action.kind === 'offer' ? 'Send offer' : 'Share feedback with this candidate'}</h2>
       <p><CandidateIdentity item={action.applicant} /></p>

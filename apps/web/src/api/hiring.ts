@@ -6,6 +6,7 @@
  * Split out of the single api.ts client so each stream appends to its own
  * file. `api.ts` re-exports every public module, so importers are unchanged.
  */
+import { ApiRequestError, apiBaseUrl } from './core.js';
 import { requestJson } from './http.js';
 
 export interface CompensationDto {
@@ -749,4 +750,89 @@ export interface SkillCatalogueDto {
 export function searchSkillCatalogue(token: string, employerId: string, q: string, signal?: AbortSignal): Promise<SkillCatalogueDto> {
   const query = q.trim() ? `?q=${encodeURIComponent(q.trim().slice(0, 80))}` : '';
   return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/skill-catalogue${query}`, { token, ...(signal ? { signal } : {}) });
+}
+
+// --- Consented application snapshot and candidate view (EMP-07) --------------
+
+export interface SnapshotLinkDto { readonly label: string | null; readonly url: string }
+export interface SnapshotResumeDto { readonly title: string; readonly filename: string; readonly versionNumber: number; readonly contentType: string; readonly byteSize: number }
+
+/** What the student shares with one employer at apply: their own words and records, never readiness or figures. */
+export interface ApplicationSnapshotDto {
+  readonly schemaVersion: number;
+  readonly candidate: { readonly fullName: string | null; readonly email: string | null; readonly phone: string | null; readonly contactVisibleFrom?: string | null };
+  readonly education: { readonly institutionName: string | null; readonly programmeName: string | null; readonly departmentName: string | null; readonly expectedGraduationYear: number | null } | null;
+  readonly qualifications: readonly {
+    readonly qualificationType: string; readonly programmeName: string; readonly institutionName: string | null;
+    readonly startedYear: number | null; readonly completedYear: number | null; readonly awarded: boolean; readonly verification: string;
+  }[];
+  readonly profile: { readonly headline: string | null; readonly summary: string | null };
+  readonly links: readonly SnapshotLinkDto[];
+  readonly resume: SnapshotResumeDto | null;
+}
+
+export interface ResumeOptionDto { readonly documentId: string; readonly title: string; readonly versionNumber: number; readonly filename: string; readonly contentType: string; readonly byteSize: number }
+
+export interface ApplicationPreviewDto {
+  readonly employerName: string;
+  readonly snapshot: ApplicationSnapshotDto;
+  readonly snapshotHash: string;
+  readonly resumeOptions: readonly ResumeOptionDto[];
+}
+
+/** The student's choices for one application. Every field is optional. */
+export interface SnapshotChoicesInput {
+  readonly resumeDocumentId?: string;
+  readonly contactPhone?: string;
+  readonly links?: readonly { readonly url: string; readonly label?: string }[];
+}
+
+export function previewApplication(token: string, opportunityId: string, choices: SnapshotChoicesInput = {}): Promise<{ readonly preview: ApplicationPreviewDto }> {
+  return requestJson('/api/v1/students/me/application-previews', { token, method: 'POST', body: { opportunityId, ...choices } });
+}
+
+/** Applying with the reviewed snapshot: the API refuses (SNAPSHOT_CHANGED) if what would be shared changed since. */
+export function applyWithSnapshot(token: string, opportunityId: string, institutionVisibilityGranted: boolean, choices: SnapshotChoicesInput, reviewedSnapshotHash: string): Promise<{ readonly application: { readonly id: string; readonly state: string } }> {
+  return requestJson('/api/v1/students/me/applications', { token, method: 'POST', body: { opportunityId, consentGranted: true, institutionVisibilityGranted, ...choices, reviewedSnapshotHash } });
+}
+
+export function getMyApplicationSnapshot(token: string, applicationId: string, signal?: AbortSignal): Promise<{ readonly snapshot: { readonly content: ApplicationSnapshotDto; readonly snapshotHash: string; readonly sharedAt: string } | null }> {
+  return requestJson(`/api/v1/students/me/applications/${encodeURIComponent(applicationId)}/snapshot`, { token, ...(signal ? { signal } : {}) });
+}
+
+export interface CandidateDetailDto {
+  readonly application: {
+    readonly id: string; readonly opportunityId: string; readonly state: string; readonly title: string;
+    readonly appliedVersionNumber: number; readonly currentVersionNumber: number | null;
+    readonly submittedAt: string | null; readonly closedAt: string | null; readonly updatedAt: string;
+    readonly termsAcknowledgementPending: boolean;
+  };
+  readonly snapshot: ApplicationSnapshotDto | null;
+  /** SHARED, NOT_CAPTURED (applied before snapshots existed), ERASED (account deleted) or UNREADABLE. */
+  readonly snapshotStatus: string;
+  readonly sharedAt: string | null;
+  readonly resumeAvailable: boolean;
+  readonly eligibility: ApplicantEligibilityDto | null;
+  readonly timeline: readonly { readonly fromState: string | null; readonly toState: string; readonly actor: string | null; readonly reasonCode: string | null; readonly occurredAt: string }[];
+  readonly interviews: readonly { readonly roundNumber: number; readonly mode: string; readonly state: string; readonly scheduledStart: string | null; readonly scheduledEnd: string | null; readonly scorecardCount: number }[];
+  readonly offer: { readonly state: string; readonly compensation: CompensationDto | null; readonly joiningDate: string | null; readonly expiresAt: string | null; readonly extendedAt: string | null; readonly respondedAt: string | null } | null;
+}
+
+export function getEmployerCandidate(token: string, employerId: string, applicationId: string, signal?: AbortSignal): Promise<{ readonly candidate: CandidateDetailDto }> {
+  return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/applications/${encodeURIComponent(applicationId)}`, { token, ...(signal ? { signal } : {}) });
+}
+
+/**
+ * Downloads the candidate's résumé: asks for a single-use link (audited), then redeems it at once
+ * with the same identity (audited again). Returns the bytes and the file name for the caller to save.
+ */
+export async function downloadCandidateResume(token: string, employerId: string, applicationId: string): Promise<{ readonly blob: Blob; readonly filename: string }> {
+  const { download } = await requestJson<{ readonly download: { readonly path: string; readonly expiresAt: string } }>(
+    `/api/v1/employers/${encodeURIComponent(employerId)}/applications/${encodeURIComponent(applicationId)}/resume`, { token });
+  const correlationId = crypto.randomUUID();
+  const response = await fetch(`${apiBaseUrl}${download.path}`, { headers: { Authorization: `Bearer ${token}`, 'X-Correlation-Id': correlationId } });
+  if (!response.ok) throw new ApiRequestError({ status: response.status, correlationId: response.headers?.get('x-correlation-id') ?? correlationId });
+  const disposition = response.headers?.get('content-disposition') ?? '';
+  const filename = /filename="([^"]+)"/.exec(disposition)?.[1] ?? 'resume';
+  return { blob: await response.blob(), filename };
 }

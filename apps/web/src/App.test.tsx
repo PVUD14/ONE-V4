@@ -252,7 +252,7 @@ describe('All-role portal registry and preview workflows', () => {
     expect(screen.queryByText(/Student Readiness/i)).not.toBeInTheDocument();
   });
 
-  it('routes recruiter Interviews and Offers to filtered Applicants while Talent Pool stays unfiltered', async () => {
+  it('routes recruiter Interviews and Offers to filtered Applicants while Talent Pool says it is not available yet', async () => {
     const recruiter = activeRolePortals.find((item) => item.key === 'recruiter')!;
     expect(recruiter.nav.filter((item) => item.group === 'Hiring').map((item) => [item.label, item.path])).toEqual([
       ['Opportunities', '/employer/recruiter/opportunities'],
@@ -290,9 +290,13 @@ describe('All-role portal registry and preview workflows', () => {
     cleanup();
     window.history.pushState(null, '', '/employer/recruiter/talent-pool');
     render(<App />);
-    expect(await screen.findByText('Aanya Interview')).toBeInTheDocument();
-    expect(screen.getByText('Ojas Offer')).toBeInTheDocument();
-    expect(screen.getByText('Mira Applied')).toBeInTheDocument();
+    // EMP-07: Talent Pool no longer borrows the applicants list; it says plainly that consented
+    // discovery (EMP-14) does not exist yet, and shows nobody.
+    expect(await screen.findByRole('heading', { name: 'Not available yet' })).toBeInTheDocument();
+    expect(screen.getByText(/Talent Pool will list students who have chosen to be discoverable/)).toBeInTheDocument();
+    expect(screen.queryByText('Aanya Interview')).not.toBeInTheDocument();
+    expect(screen.queryByText('Ojas Offer')).not.toBeInTheDocument();
+    expect(screen.queryByText('Mira Applied')).not.toBeInTheDocument();
     expect(screen.queryByText((_content, element) => element?.textContent?.startsWith('Application state filter:') ?? false)).not.toBeInTheDocument();
     expect(screen.queryByText('Not built yet')).not.toBeInTheDocument();
     expect(within(screen.getByLabelText('Recruiter navigation')).getByRole('button', { name: 'Talent Pool' })).toHaveAttribute('aria-current', 'page');

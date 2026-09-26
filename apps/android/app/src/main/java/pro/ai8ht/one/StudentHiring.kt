@@ -336,6 +336,58 @@ private fun SectionCard(title: String, body: String) {
 }
 
 // ---------------------------------------------------------------------------
+// Interviews (EMP-08)
+// ---------------------------------------------------------------------------
+
+private val interviewModeLabels = mapOf("VIDEO" to "Video", "PHONE" to "Phone", "ONSITE" to "On site")
+
+/**
+ * One of the student's interviews, as the web shows it under Applications: when, how, where or the
+ * joining link and what to prepare while it is ahead; past and cancelled ones without the link.
+ */
+@Composable
+internal fun StudentInterviewCard(item: StudentInterviewDto) {
+    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+    PilotCard {
+        Column(Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.Top) {
+                Column(Modifier.weight(1f)) {
+                    Text(item.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        listOf(item.employerName, item.stageLabel ?: "Round ${item.roundNumber}", interviewModeLabels[item.mode] ?: prettify(item.mode))
+                            .joinToString("  ·  "),
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                StatusChip(prettify(item.state), when {
+                    item.upcoming -> ChipKind.Accent
+                    item.state == "COMPLETED" -> ChipKind.Positive
+                    else -> ChipKind.Muted
+                })
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                item.scheduledStart?.let { start -> formatWhen(start) + (item.scheduledEnd?.let { " to ${formatWhen(it)}" } ?: "") } ?: "Time to be confirmed",
+                style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary,
+            )
+            item.locationDetail?.let {
+                Spacer(Modifier.height(6.dp))
+                Text((if (item.mode == "ONSITE") "Where: " else "Arrangements: ") + it, style = MaterialTheme.typography.bodySmall)
+            }
+            item.joiningLink?.let { link ->
+                Spacer(Modifier.height(4.dp))
+                TextButton(onClick = { runCatching { uriHandler.openUri(link) } }) { Text("Open joining link") }
+            }
+            if (item.upcoming) {
+                Spacer(Modifier.height(6.dp))
+                Text("What to prepare", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                Text(item.preparationNote ?: "NA — the employer has not added anything to prepare.", style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Offers
 // ---------------------------------------------------------------------------
 
@@ -382,7 +434,7 @@ internal fun OffersPage(onClose: () -> Unit) {
                                         else -> ChipKind.Waiting
                                     })
                                 }
-                                offer.respondBy?.let {
+                                (offer.respondBy ?: offer.offerExpiresAt)?.let {
                                     Spacer(Modifier.height(6.dp))
                                     Text("Respond by ${formatWhen(it)}", style = MaterialTheme.typography.labelMedium,
                                         color = MaterialTheme.colorScheme.primary)

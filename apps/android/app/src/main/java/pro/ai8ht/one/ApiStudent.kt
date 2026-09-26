@@ -110,7 +110,32 @@ import kotlinx.serialization.Serializable
     val title: String = "",
     val state: String = "",
     val respondBy: String? = null,
+    /** The API names the deadline offerExpiresAt; respondBy was never sent, so the date never showed. */
+    val offerExpiresAt: String? = null,
     val extendedAt: String? = null,
+)
+
+/**
+ * EMP-08: one of the student's own interviews. Where and how to join arrive only while it is
+ * still ahead; the employer's cancellation reason and panel are never sent.
+ */
+@Serializable data class StudentInterviewsEnvelope(val interviews: List<StudentInterviewDto> = emptyList())
+
+@Serializable data class StudentInterviewDto(
+    val id: String,
+    val employerName: String = "",
+    val title: String = "",
+    val roundNumber: Int = 1,
+    val stageLabel: String? = null,
+    val applicationState: String = "",
+    val mode: String = "",
+    val state: String = "",
+    val upcoming: Boolean = false,
+    val scheduledStart: String? = null,
+    val scheduledEnd: String? = null,
+    val locationDetail: String? = null,
+    val joiningLink: String? = null,
+    val preparationNote: String? = null,
 )
 
 @Serializable data class SavedOpportunitiesEnvelope(
@@ -447,6 +472,10 @@ suspend fun Api.grantInstitutionVisibility(context: Context, applicationId: Stri
 suspend fun Api.revokeInstitutionVisibility(context: Context, applicationId: String) {
     request(context, "POST", "/api/v1/students/me/applications/$applicationId/institution-visibility/revoke")
 }
+
+/** EMP-08: the student's interviews, upcoming first (soonest first), then past. */
+suspend fun Api.listStudentInterviews(context: Context): List<StudentInterviewDto> =
+    json.decodeFromString<StudentInterviewsEnvelope>(request(context, "GET", "/api/v1/students/me/interviews")).interviews
 
 suspend fun Api.listOffers(context: Context): List<OfferDto> =
     json.decodeFromString<OffersEnvelope>(request(context, "GET", "/api/v1/students/me/offers")).offers

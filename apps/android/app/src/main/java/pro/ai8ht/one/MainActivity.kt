@@ -1055,7 +1055,7 @@ private fun InboxOverlay(feed: NotificationsEnvelope?, onClose: () -> Unit, onAl
             feed == null || feed.notifications.isEmpty() ->
                 EmptyState(Icons.Filled.Notifications, Tone.Amber,
                     "All caught up",
-                    "Nothing needs your attention. College announcements, assignments, reopenings and results land here the moment they happen.")
+                    "Nothing needs your attention. College announcements, assignments, results, and news about your applications, interviews and offers land here the moment they happen.")
             else -> LazyColumn(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
                 // INST-06: college announcements get their own list, with who they are from.
                 val announcements = feed.notifications.filter { it.kind == "ANNOUNCEMENT" }

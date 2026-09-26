@@ -187,8 +187,8 @@ const api = () => request(app.getHttpServer());
 const auth = (userId: string) => ({ Authorization: 'Bearer ' + userId, 'X-Correlation-Id': 'ops-analytics-' + randomUUID() });
 const summaryPath = '/api/v1/operations/analytics/role-demand';
 const detailPath = (id: string) => `${summaryPath}/roles/${id}`;
-const suppressed = { suppressed: true, value: null, capped: false };
-const shown = (value: number) => ({ suppressed: false, value, capped: false });
+const suppressed = { suppressed: true, value: null };
+const shown = (value: number) => ({ suppressed: false, value });
 
 function expectNothingPersonal(body: unknown): void {
   const text = JSON.stringify(body);

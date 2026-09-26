@@ -12,7 +12,7 @@ import {
   suppressDemandBreakdown,
   withholdCollegeCount,
 } from './role-demand.js';
-import { suppressPeopleCount } from './operations-overview.js';
+import { suppressSmallCount } from './aggregate-suppression.js';
 
 const context = (role: string, state = 'ACTIVE', grants: readonly string[] = []) => ({ memberships: [{ role, state, grants }] });
 
@@ -63,13 +63,13 @@ describe('the promotion rule', () => {
 
 describe('suppression', () => {
   it('suppresses a role total below 5, zero included, and carries no value', () => {
-    for (const count of [0, 1, 4]) expect(suppressPeopleCount(count)).toEqual({ suppressed: true, value: null, capped: false });
-    expect(suppressPeopleCount(5)).toEqual({ suppressed: false, value: 5, capped: false });
+    for (const count of [0, 1, 4]) expect(suppressSmallCount(count)).toEqual({ suppressed: true, value: null });
+    expect(suppressSmallCount(5)).toEqual({ suppressed: false, value: 5 });
   });
 
   it('withholds the college count whenever the student count is suppressed', () => {
-    expect(withholdCollegeCount(suppressPeopleCount(4), 4)).toBeNull();
-    expect(withholdCollegeCount(suppressPeopleCount(6), 2)).toBe(2);
+    expect(withholdCollegeCount(suppressSmallCount(4), 4)).toBeNull();
+    expect(withholdCollegeCount(suppressSmallCount(6), 2)).toBe(2);
   });
 
   it('suppresses breakdown cells below 5 and keeps no value on them', () => {

@@ -25,7 +25,7 @@ export function formatPeople(count: RoleDemandPeopleCountDto | undefined, comple
   if (!count) return NA;
   if (complementary) return 'Withheld';
   if (count.suppressed) return '<5';
-  return count.capped ? `${count.value.toLocaleString()}+` : count.value.toLocaleString();
+  return count.value.toLocaleString();
 }
 
 const releaseLabelText: Readonly<Record<string, string>> = { SELECTABLE: 'Selectable', VERIFIED: 'Verified', NONE: 'Not in catalogue' };

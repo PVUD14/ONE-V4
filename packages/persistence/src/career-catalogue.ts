@@ -49,6 +49,7 @@ export type CareerCatalogueErrorCode =
   | 'CAREER_SET_EMPTY'
   | 'CAREER_SET_TRANSITION_NOT_ALLOWED'
   | 'CAREER_TOPIC_NOT_FOUND'
+  | 'CAREER_TOPIC_NOT_LIVE'
   | 'CAREER_CATALOGUE_REJECTED';
 
 export class CareerCatalogueError extends Error {
@@ -357,6 +358,8 @@ export interface RequirementItemView {
   readonly topicId: string;
   readonly topicKey: string | null;
   readonly topicTitle: string | null;
+  /** False for a pending topic (0056): drafted, not yet published. A set naming one cannot publish. */
+  readonly topicLive: boolean;
   readonly requirementLevel: 'ESSENTIAL' | 'IMPORTANT' | 'HELPFUL';
   readonly targetMastery: number;
   readonly rationale: string | null;
@@ -381,7 +384,17 @@ export interface RequirementSetView {
   readonly releaseLabelAtPublish: CareerReleaseLabel | null;
   readonly supersededAt: string | null;
   readonly withdrawnAt: string | null;
+  /** Who or what wrote the set (0056). review_state is `state`. */
+  readonly provenance: CareerSetProvenanceView;
   readonly items: readonly RequirementItemView[];
+}
+
+export interface CareerSetProvenanceView {
+  readonly source: 'AUTHORED' | 'AGENT_DRAFTED';
+  readonly generatorVersion: string | null;
+  readonly promptVersion: string | null;
+  readonly generatedAt: string | null;
+  readonly sourceBasis: string | null;
 }
 
 export interface CatalogueRoleDetail extends CatalogueRoleRow {
@@ -398,9 +411,9 @@ export interface CatalogueRoleDetail extends CatalogueRoleRow {
 
 const iso = (value: Date | string | null): string | null => (value === null ? null : new Date(value).toISOString());
 
-function mapItem(row: { topic_id: string; topic_key: string | null; topic_title: string | null; requirement_level: RequirementItemView['requirementLevel']; target_mastery: string; rationale: string | null; required_evidence_types: string[] | null }): RequirementItemView {
+function mapItem(row: { topic_id: string; topic_key: string | null; topic_title: string | null; topic_live: boolean | null; requirement_level: RequirementItemView['requirementLevel']; target_mastery: string; rationale: string | null; required_evidence_types: string[] | null }): RequirementItemView {
   return {
-    topicId: row.topic_id, topicKey: row.topic_key, topicTitle: row.topic_title, requirementLevel: row.requirement_level,
+    topicId: row.topic_id, topicKey: row.topic_key, topicTitle: row.topic_title, topicLive: row.topic_live === true, requirementLevel: row.requirement_level,
     targetMastery: Number(row.target_mastery), rationale: row.rationale, requiredEvidenceTypes: row.required_evidence_types ?? [],
   };
 }
@@ -417,7 +430,7 @@ export async function loadCatalogueRole(runner: SqlRunner, roleId: string): Prom
     WHERE career_role_id = ${roleId}::uuid AND removed_at IS NULL ORDER BY normalized
   `);
   const live = await rows<Parameters<typeof mapItem>[0]>(runner, sql`
-    SELECT q.topic_id, n.stable_key AS topic_key, n.name AS topic_title, q.requirement_level, q.target_mastery, q.rationale,
+    SELECT q.topic_id, n.stable_key AS topic_key, n.name AS topic_title, n.active AS topic_live, q.requirement_level, q.target_mastery, q.rationale,
            q.required_evidence_types
     FROM career_role_requirements q LEFT JOIN taxonomy_nodes n ON n.id = q.topic_id
     WHERE q.career_role_id = ${roleId}::uuid
@@ -428,10 +441,12 @@ export async function loadCatalogueRole(runner: SqlRunner, roleId: string): Prom
     created_by_user_id: string; author_email: string; created_at: Date; submitted_at: Date | null;
     reviewed_by_user_id: string | null; reviewer_email: string | null; reviewed_at: Date | null; review_reason_code: string | null; review_note: string | null;
     published_at: Date | null; publisher_email: string | null; release_label_at_publish: CareerReleaseLabel | null; superseded_at: Date | null; withdrawn_at: Date | null;
+    source: CareerSetProvenanceView['source']; generator_version: string | null; prompt_version: string | null; generated_at: Date | null; source_basis: string | null;
   }>(runner, sql`
     SELECT s.id, s.version, s.state, s.based_on, s.reason_code, s.created_by_user_id, au.email AS author_email, s.created_at,
            s.submitted_at, s.reviewed_by_user_id, ru.email AS reviewer_email, s.reviewed_at, s.review_reason_code, s.review_note,
-           s.published_at, pu.email AS publisher_email, s.release_label_at_publish, s.superseded_at, s.withdrawn_at
+           s.published_at, pu.email AS publisher_email, s.release_label_at_publish, s.superseded_at, s.withdrawn_at,
+           s.source, s.generator_version, s.prompt_version, s.generated_at, s.source_basis
     FROM career_requirement_sets s
     JOIN users au ON au.id = s.created_by_user_id
     LEFT JOIN users ru ON ru.id = s.reviewed_by_user_id
@@ -441,7 +456,7 @@ export async function loadCatalogueRole(runner: SqlRunner, roleId: string): Prom
     LIMIT 20
   `);
   const items = sets.length ? await rows<Parameters<typeof mapItem>[0] & { set_id: string }>(runner, sql`
-    SELECT i.set_id, i.topic_id, n.stable_key AS topic_key, n.name AS topic_title, i.requirement_level, i.target_mastery, i.rationale,
+    SELECT i.set_id, i.topic_id, n.stable_key AS topic_key, n.name AS topic_title, n.active AS topic_live, i.requirement_level, i.target_mastery, i.rationale,
            i.required_evidence_types
     FROM career_requirement_set_items i LEFT JOIN taxonomy_nodes n ON n.id = i.topic_id
     WHERE i.set_id IN (${sql.join(sets.map((set) => sql`${set.id}::uuid`), sql`, `)})
@@ -463,6 +478,10 @@ export async function loadCatalogueRole(runner: SqlRunner, roleId: string): Prom
       reviewedAt: iso(set.reviewed_at), reviewReasonCode: set.review_reason_code, reviewNote: set.review_note,
       publishedAt: iso(set.published_at), publisherEmail: set.publisher_email, releaseLabelAtPublish: set.release_label_at_publish,
       supersededAt: iso(set.superseded_at), withdrawnAt: iso(set.withdrawn_at),
+      provenance: {
+        source: set.source, generatorVersion: set.generator_version, promptVersion: set.prompt_version,
+        generatedAt: iso(set.generated_at), sourceBasis: set.source_basis,
+      },
       items: items.filter((item) => item.set_id === set.id).map(mapItem),
     })),
   };
@@ -558,7 +577,10 @@ async function stateChanged(tx: SqlRunner, input: {
  */
 export async function createRequirementSetDraft(db: TransactionalRunner, input: {
   readonly roleId: string; readonly reasonCode: string; readonly actor: CatalogueActor;
+  /** Set only for model-produced content (Part B.8); written once, immutable (0056). */
+  readonly provenance?: CareerSetProvenance;
 }): Promise<{ readonly id: string; readonly version: number }> {
+  const provenance = input.provenance ?? null;
   const id = randomUUID();
   try {
     return await db.transaction(async (tx) => {
@@ -580,9 +602,12 @@ export async function createRequirementSetDraft(db: TransactionalRunner, input: 
       `);
       const basedOn = published[0] ? 'SET' : Number(live?.count ?? 0) > 0 ? 'LIVE' : 'EMPTY';
       await tx.execute(sql`
-        INSERT INTO career_requirement_sets (id, career_role_id, version, state, based_on, based_on_set_id, reason_code, created_by_user_id)
+        INSERT INTO career_requirement_sets (id, career_role_id, version, state, based_on, based_on_set_id, reason_code, created_by_user_id,
+                                             source, generator_version, prompt_version, generated_at, source_basis)
         VALUES (${id}::uuid, ${input.roleId}::uuid, ${version}, 'DRAFT', ${basedOn}, ${published[0]?.id ?? null}::uuid,
-                ${input.reasonCode}, ${input.actor.userId}::uuid)
+                ${input.reasonCode}, ${input.actor.userId}::uuid,
+                ${provenance ? 'AGENT_DRAFTED' : 'AUTHORED'}, ${provenance?.generatorVersion ?? null}, ${provenance?.promptVersion ?? null},
+                ${provenance?.generatedAt ?? null}::timestamptz, ${provenance?.sourceBasis ?? null})
       `);
       if (basedOn === 'SET') {
         await tx.execute(sql`
@@ -600,7 +625,11 @@ export async function createRequirementSetDraft(db: TransactionalRunner, input: 
       await audit(tx, {
         actorUserId: input.actor.userId, action: 'operations.career_catalogue.requirement_set_created', resourceType: 'career_requirement_set',
         resourceId: id, correlationId: input.actor.correlationId,
-        context: { careerRoleId: input.roleId, version, basedOn, reasonCode: input.reasonCode, ...actorContext(input.actor) },
+        context: {
+          careerRoleId: input.roleId, version, basedOn, reasonCode: input.reasonCode,
+          ...(provenance ? { source: 'AGENT_DRAFTED', generatorVersion: provenance.generatorVersion, promptVersion: provenance.promptVersion } : {}),
+          ...actorContext(input.actor),
+        },
       });
       return { id, version };
     });
@@ -619,7 +648,19 @@ async function lockSet(tx: SqlRunner, setId: string): Promise<{ id: string; care
   return set;
 }
 
-/** Replace a draft's items. Topics must be active taxonomy topics. */
+/** Agent provenance for a requirement set (0056). `review_state` is the set's lifecycle state. */
+export interface CareerSetProvenance {
+  readonly generatorVersion: string;
+  readonly promptVersion: string;
+  readonly generatedAt: string;
+  readonly sourceBasis: string;
+}
+
+/**
+ * Replace a draft's items. Each topic must be a live (active) TOPIC, or a pending one: an
+ * inactive TOPIC whose content revision is still on its way to publication (0056). A retired
+ * topic is neither. A set naming a pending topic cannot publish until the topic is live.
+ */
 export async function saveRequirementSetItems(db: TransactionalRunner, input: {
   readonly setId: string; readonly items: readonly RequirementItemInput[]; readonly actor: CatalogueActor;
 }): Promise<void> {
@@ -629,8 +670,10 @@ export async function saveRequirementSetItems(db: TransactionalRunner, input: {
       if (set.state !== 'DRAFT') throw new CareerCatalogueError('CAREER_SET_NOT_DRAFT');
       if (input.items.length) {
         const found = await rows<{ id: string }>(tx, sql`
-          SELECT id FROM taxonomy_nodes WHERE kind = 'TOPIC' AND active
-            AND id IN (${sql.join(input.items.map((item) => sql`${item.topicId}::uuid`), sql`, `)})
+          SELECT n.id FROM taxonomy_nodes n JOIN content_revisions c ON c.id = n.content_revision_id
+          WHERE n.kind = 'TOPIC'
+            AND (n.active OR c.state IN ('DRAFT','IN_REVIEW','CHANGES_REQUESTED','APPROVED'))
+            AND n.id IN (${sql.join(input.items.map((item) => sql`${item.topicId}::uuid`), sql`, `)})
         `);
         if (found.length !== new Set(input.items.map((item) => item.topicId)).size) throw new CareerCatalogueError('CAREER_TOPIC_NOT_FOUND');
       }
@@ -738,6 +781,12 @@ export async function publishRequirementSet(db: TransactionalRunner, input: {
   return db.transaction(async (tx) => {
     const set = await lockSet(tx, input.setId);
     if (set.state !== 'REVIEWED') throw new CareerCatalogueError('CAREER_SET_NOT_REVIEWED');
+    // Checked before the approval is consumed, so a refused publish leaves it usable (0056 repeats this rule).
+    const pending = await rows<{ id: string }>(tx, sql`
+      SELECT i.topic_id AS id FROM career_requirement_set_items i JOIN taxonomy_nodes n ON n.id = i.topic_id
+      WHERE i.set_id = ${input.setId}::uuid AND NOT n.active LIMIT 1
+    `);
+    if (pending[0]) throw new CareerCatalogueError('CAREER_TOPIC_NOT_LIVE');
     const approval = await consumeOperationApproval(tx, {
       approvalId: input.approvalId, actionKey: 'CAREER_REQUIREMENT_SET_PUBLISH', payload: input.approvalPayload,
       executorUserId: input.actor.userId, correlationId: input.actor.correlationId,

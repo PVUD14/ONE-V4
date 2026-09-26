@@ -77,6 +77,8 @@ export interface RequirementItemDto {
   readonly topicId: string;
   readonly topicKey: string | null;
   readonly topicTitle: string | null;
+  /** False while the topic is drafted but not yet published; a set naming one cannot publish. */
+  readonly topicLive: boolean;
   readonly requirementLevel: CareerRequirementLevel;
   readonly targetMastery: number;
   readonly rationale: string | null;
@@ -101,6 +103,14 @@ export interface RequirementSetDto {
   readonly releaseLabelAtPublish: CareerReleaseLabel | null;
   readonly supersededAt: string | null;
   readonly withdrawnAt: string | null;
+  /** AGENT_DRAFTED sets are model-produced content awaiting human review. */
+  readonly provenance: {
+    readonly source: 'AUTHORED' | 'AGENT_DRAFTED';
+    readonly generatorVersion: string | null;
+    readonly promptVersion: string | null;
+    readonly generatedAt: string | null;
+    readonly sourceBasis: string | null;
+  };
   readonly items: readonly RequirementItemDto[];
 }
 

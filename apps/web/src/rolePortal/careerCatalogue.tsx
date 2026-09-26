@@ -258,6 +258,10 @@ function CatalogueRolePanel({ token, roleId, policy, onChanged, onClose }: {
       <div className="role-section-title"><h4>Version {set.version}</h4><StatusBadge label={label(set.state)} tone={setTone(set.state)} /></div>
       <p><small>Drafted by {set.author.email} ({set.reasonCode}, from {set.basedOn === 'LIVE' ? 'the live requirements' : set.basedOn === 'SET' ? 'the published set' : 'nothing'}) · {when(set.createdAt)}
         {set.reviewer ? ` · reviewed by ${set.reviewer.email}` : ''}{set.publishedAt ? ` · published ${when(set.publishedAt)} as ${releaseLabelText(set.releaseLabelAtPublish)}` : ''}</small></p>
+      {set.provenance?.source === 'AGENT_DRAFTED' ? <p><StatusBadge label="Agent-drafted" tone="warning" />{' '}
+        <small>Written by {set.provenance.generatorVersion ?? 'NA'} ({set.provenance.promptVersion ?? 'NA'}){set.provenance.generatedAt ? ` · ${when(set.provenance.generatedAt)}` : ''}.
+          Check every requirement against its basis before passing review. Basis: {set.provenance.sourceBasis ?? 'NA'}</small></p> : null}
+      {set.items.some((item) => item.topicLive === false) ? <p><small>{set.items.filter((item) => item.topicLive === false).length} of these topics are not yet published. This set cannot be published until they are.</small></p> : null}
       {set.reviewReasonCode && set.state !== 'PUBLISHED' && set.state !== 'SUPERSEDED' ? <p>Last review: {set.reviewReasonCode}{set.reviewNote ? ` — ${set.reviewNote}` : ''}</p> : null}
       {set.state === 'DRAFT' && policy.viewer.manage
         ? <RequirementEditor token={token} set={set} policy={policy} onSaved={(updated) => apply(updated, 'Draft saved.')} />
@@ -317,7 +321,8 @@ function RequirementTable({ items, empty }: { readonly items: readonly Requireme
   return <div className="role-record-table-wrap"><table className="role-record-table">
     <thead><tr><th>Topic</th><th>Level</th><th>Target depth</th><th>Required evidence</th><th>Rationale</th></tr></thead>
     <tbody>{items.map((item) => <tr key={item.topicId}>
-      <td>{item.topicTitle ?? 'NA'}{item.topicKey ? <><br /><small>{item.topicKey}</small></> : null}</td>
+      <td>{item.topicTitle ?? 'NA'}{item.topicKey ? <><br /><small>{item.topicKey}</small></> : null}
+        {item.topicLive === false ? <><br /><StatusBadge label="Topic not yet published" tone="warning" /></> : null}</td>
       <td>{label(item.requirementLevel)}</td>
       <td>{item.targetMastery.toFixed(2)}</td>
       <td>{item.requiredEvidenceTypes.length ? item.requiredEvidenceTypes.map(label).join(', ') : 'None'}</td>

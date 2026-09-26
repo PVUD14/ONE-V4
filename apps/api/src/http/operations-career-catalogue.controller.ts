@@ -356,7 +356,8 @@ function mapError(error: unknown, correlationId: string): HttpException {
   }
   if (error instanceof CareerCatalogueError) {
     if (error.code.endsWith('_NOT_FOUND') && error.code !== 'CAREER_TOPIC_NOT_FOUND') return new NotFoundException(domainError(error.code, correlationId));
-    if (error.code === 'CAREER_SYNONYM_EXISTS' || error.code === 'CAREER_SET_OPEN_EXISTS' || error.code === 'CAREER_SET_NOT_DRAFT' || error.code === 'CAREER_SET_NOT_REVIEWED') {
+    if (error.code === 'CAREER_SYNONYM_EXISTS' || error.code === 'CAREER_SET_OPEN_EXISTS' || error.code === 'CAREER_SET_NOT_DRAFT' || error.code === 'CAREER_SET_NOT_REVIEWED'
+        || error.code === 'CAREER_TOPIC_NOT_LIVE') {
       return new ConflictException(domainError(error.code, correlationId));
     }
     return badRequest(error.code, correlationId);

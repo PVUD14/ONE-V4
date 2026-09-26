@@ -131,15 +131,19 @@ internal fun OpportunityDetailPage(
                     item { Spacer(Modifier.height(12.dp)); SectionCard("What you would do", text) }
                 }
                 if (record.skills.isNotEmpty()) {
-                    item { Spacer(Modifier.height(12.dp)); SectionCard("Skills asked for", record.skills.joinToString("  ·  ")) }
-                }
-                if (record.selectionStages.isNotEmpty()) {
                     item {
                         Spacer(Modifier.height(12.dp))
-                        SectionCard("Selection process", record.selectionStages.mapIndexed { index, stage ->
-                            "${index + 1}. ${prettify(stage)}"
-                        }.joinToString("\n"))
+                        SectionCard("Skills asked for", record.skills.joinToString("  ·  ") { skill ->
+                            skill.name + if (skill.level == "PREFERRED") " (preferred)" else ""
+                        })
                     }
+                }
+                item {
+                    Spacer(Modifier.height(12.dp))
+                    SectionCard("Selection process", if (record.selectionStages.isEmpty()) "The employer has not listed its selection stages."
+                        else record.selectionStages.sortedBy { it.order }.mapIndexed { index, stage ->
+                            "${index + 1}. ${stage.label}" + (stage.detail?.takeIf { it.isNotBlank() }?.let { " — $it" } ?: "")
+                        }.joinToString("\n"))
                 }
 
                 item {
@@ -192,8 +196,16 @@ internal fun OpportunityDetailPage(
                                             runCatching { Api.applyToOpportunity(context, opportunityId, shareWithInstitution) }
                                                 .onSuccess { onApplied(); onClose() }
                                                 .onFailure {
-                                                    notice = (it as? Api.ApiException)?.detail
-                                                        ?: "Could not apply just now. Try again."
+                                                    // EMP-06: name the rule, and refresh the verdict so it is on screen.
+                                                    val code = (it as? Api.ApiException)?.code
+                                                    notice = when (code) {
+                                                        "ELIGIBILITY_NOT_MET" -> "You do not meet a rule this employer requires. It is marked under Eligibility above."
+                                                        "ELIGIBILITY_UNKNOWN" -> "ONE cannot confirm a rule this employer requires, because that information is not on your record yet."
+                                                        else -> (it as? Api.ApiException)?.detail ?: "Could not apply just now. Try again."
+                                                    }
+                                                    if (code?.startsWith("ELIGIBILITY_") == true) {
+                                                        runCatching { Api.opportunityDetail(context, opportunityId) }.onSuccess { refreshed -> detail = refreshed }
+                                                    }
                                                 }
                                             busy = false
                                         }
@@ -214,43 +226,86 @@ internal fun OpportunityDetailPage(
 
 @Composable
 private fun EligibilityCard(eligibility: EligibilityDto) {
-    // UNKNOWN gets its own treatment on purpose. The eligibility engine fails closed on
-    // a fact nobody has recorded -- usually a CGPA with no verified term behind it -- and
-    // presenting that as "not eligible" tells a student they failed when the truth is
-    // that their college has not verified their marks yet.
-    val (chipText, kind) = when (eligibility.outcome) {
-        "ELIGIBLE" -> "You meet the criteria" to ChipKind.Positive
-        "NOT_ELIGIBLE" -> "You do not meet the criteria" to ChipKind.Muted
+    // EMP-06: rule by rule. "Cannot be confirmed" gets its own treatment on purpose: the engine
+    // fails closed on a fact nobody has recorded, and presenting that as "not eligible" tells a
+    // student they failed when the truth is that the information is missing.
+    val (chipText, kind) = when {
+        eligibility.rules.isEmpty() -> "No eligibility rules" to ChipKind.Positive
+        eligibility.eligible -> "You meet every rule" to ChipKind.Positive
+        eligibility.blockingFailures.isNotEmpty() -> "You do not meet a rule" to ChipKind.Muted
         else -> "We cannot tell yet" to ChipKind.Waiting
     }
     PilotCard {
         Column(Modifier.padding(16.dp)) {
+            Text("Eligibility", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(6.dp))
             StatusChip(chipText, kind)
-            if (eligibility.outcome == "UNKNOWN") {
+            if (eligibility.rules.isEmpty()) {
                 Spacer(Modifier.height(8.dp))
-                Text(
-                    "Some of what this employer asks for has not been verified on your record yet. " +
-                        "Add your academic results under Profile and ask your institution to verify them.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Text("The employer has set no eligibility rules for this role.", style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            eligibility.reasons.takeIf { it.isNotEmpty() }?.let { reasons ->
+            eligibility.rules.forEach { rule ->
                 Spacer(Modifier.height(10.dp))
-                reasons.forEach { reason ->
-                    Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
-                        Text(prettify(reason.rule), Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
-                        Text(prettify(reason.outcome), style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(describeEligibilityRule(rule), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                    val (label, chip) = when (rule.outcome) {
+                        "MET" -> "You meet this" to ChipKind.Positive
+                        "NOT_MET" -> (if (rule.isBlocking) "You don't meet this" else "Preferred") to ChipKind.Muted
+                        "NOT_EVALUATED" -> "Employer decides" to ChipKind.Waiting
+                        else -> "Not confirmed" to ChipKind.Waiting
                     }
-                    reason.detail?.takeIf { it.isNotBlank() }?.let {
-                        Text(it, style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+                    StatusChip(label, chip)
+                }
+                val notes = listOfNotNull(
+                    rule.yourValue?.let { value -> "Your record: $value" + (rule.basis?.let { " (${basisLabel(it)})" } ?: "") },
+                    if (rule.outcome == "UNKNOWN") unknownReasonText(rule.unknownReason) else null,
+                    if (rule.outcome == "NOT_EVALUATED") "The employer will consider this with you; it does not stop you applying." else null,
+                    if (rule.basis == "SELF_REPORTED") "The employer sees that this rests on your own declaration." else null,
+                )
+                notes.forEach {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
     }
+}
+
+/** The same wording as the web app for a rule (apps/web/src/hiringEligibility.ts). */
+internal fun describeEligibilityRule(rule: EligibilityRuleOutcomeDto): String =
+    describeEligibilityRule(rule.ruleType, rule.comparator, rule.valueNumeric, rule.valueText, rule.displayValue)
+
+internal fun describeEligibilityRule(ruleType: String, comparator: String, valueNumeric: Double?, valueText: String?, displayValue: String?): String {
+    val number = valueNumeric?.let { if (it % 1.0 == 0.0) it.toLong().toString() else it.toString() }
+    val value = displayValue ?: number ?: valueText ?: ""
+    val not = comparator == "NOT_IN"
+    return when (ruleType) {
+        "MIN_CGPA" -> "Minimum CGPA $value (10-point scale)"
+        "MAX_BACKLOGS" -> if (valueNumeric == 0.0) "No active backlogs" else "At most $value active backlog" + if (valueNumeric == 1.0) "" else "s"
+        "GRADUATION_YEAR" -> when (comparator) {
+            "GTE" -> "Graduating in $value or later"
+            "LTE" -> "Graduated in $value or earlier"
+            else -> (if (not) "Not graduating in " else "Graduating in ") + value
+        }
+        "DEPARTMENT" -> (if (not) "Department not: " else "Department: ") + value
+        "PROGRAM" -> (if (not) "Programme not: " else "Programme: ") + value
+        "INSTITUTION" -> (if (not) "College not: " else "College: ") + value
+        "WORK_AUTHORIZATION" -> "Work authorisation: $value"
+        else -> value
+    }
+}
+
+internal fun basisLabel(basis: String): String = when (basis) {
+    "VERIFIED" -> "verified by the college"
+    "INSTITUTION_RECORD" -> "from the college record"
+    "SELF_REPORTED" -> "self-reported"
+    else -> prettify(basis)
+}
+
+private fun unknownReasonText(reason: String?): String = when (reason) {
+    "SCALE_NOT_COMPARABLE" -> "Your results are letter grades or pass/fail, which cannot be compared with this rule."
+    "NOT_RECORDED_BY_ONE" -> "ONE does not record this; the employer will check it with you."
+    else -> "This is not on your record yet. Add your results under More › Academic record, or ask your college."
 }
 
 /** The company block of a job, as plain lines: registered name and facts, description, links. */

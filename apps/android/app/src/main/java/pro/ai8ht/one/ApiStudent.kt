@@ -15,7 +15,11 @@ import kotlinx.serialization.Serializable
 // Opportunities, applications, offers
 // ---------------------------------------------------------------------------
 
-@Serializable data class OpportunityDetailEnvelope(val opportunity: OpportunityDetailDto)
+/** The verdict sits beside the opportunity in the response, not inside it (EMP-06). */
+@Serializable data class OpportunityDetailEnvelope(
+    val opportunity: OpportunityDetailDto,
+    val eligibility: EligibilityDto? = null,
+)
 
 @Serializable data class OpportunityDetailDto(
     val id: String,
@@ -29,9 +33,11 @@ import kotlinx.serialization.Serializable
     val applicationDeadline: String? = null,
     val alreadyApplied: Boolean = false,
     val compensationSummary: String? = null,
+    /** Filled from the envelope by [Api.opportunityDetail]. */
     val eligibility: EligibilityDto? = null,
-    val skills: List<String> = emptyList(),
-    val selectionStages: List<String> = emptyList(),
+    /** EMP-06: objects, not strings — decoding them as strings failed once employers set skills. */
+    val skills: List<OpportunitySkillDto> = emptyList(),
+    val selectionStages: List<SelectionStageDto> = emptyList(),
     /** EMP-04: the hiring company's verified profile. Absent from older API responses. */
     val company: OpportunityCompanyDto? = null,
 )
@@ -49,23 +55,50 @@ import kotlinx.serialization.Serializable
     val countryCode: String? = null,
 )
 
-/**
- * The eligibility verdict.
- *
- * `UNKNOWN` is not a soft `FAIL`. The engine fails closed on a fact nobody has recorded —
- * most often a CGPA with no verified academic term behind it — and telling a student they
- * are ineligible when the truth is "we cannot tell yet" would be a lie they can do
- * something about.
- */
-@Serializable data class EligibilityDto(
-    val outcome: String = "UNKNOWN",
-    val reasons: List<EligibilityReasonDto> = emptyList(),
+/** A skill a job asks for; `catalogue` when picked from the ONE skill catalogue (EMP-06). */
+@Serializable data class OpportunitySkillDto(
+    val name: String = "",
+    val level: String = "REQUIRED",
+    val catalogue: Boolean = false,
 )
 
-@Serializable data class EligibilityReasonDto(
-    val rule: String = "",
-    val outcome: String = "",
+/** One step of a job's selection process, in order. */
+@Serializable data class SelectionStageDto(
+    val order: Int = 0,
+    val kind: String = "",
+    val label: String = "",
     val detail: String? = null,
+    val applicationState: String? = null,
+)
+
+/**
+ * The eligibility verdict, as the API sends it (EMP-06).
+ *
+ * "Cannot be confirmed" is not a soft "not eligible". The engine fails closed on a fact
+ * nobody has recorded — most often a CGPA with no academic term behind it — and telling a
+ * student they are ineligible when the truth is "we cannot tell yet" would be a lie they can
+ * do something about.
+ */
+@Serializable data class EligibilityDto(
+    val eligible: Boolean = false,
+    val blockingFailures: List<String> = emptyList(),
+    val advisoryFailures: List<String> = emptyList(),
+    val needsMoreInformation: List<String> = emptyList(),
+    val rules: List<EligibilityRuleOutcomeDto> = emptyList(),
+)
+
+/** One rule: met or not, on what basis, and the student's own value. */
+@Serializable data class EligibilityRuleOutcomeDto(
+    val ruleType: String = "",
+    val comparator: String = "",
+    val valueNumeric: Double? = null,
+    val valueText: String? = null,
+    val displayValue: String? = null,
+    val isBlocking: Boolean = true,
+    val outcome: String = "UNKNOWN",
+    val basis: String? = null,
+    val unknownReason: String? = null,
+    val yourValue: String? = null,
 )
 
 @Serializable data class OffersEnvelope(val offers: List<OfferDto> = emptyList())
@@ -320,7 +353,7 @@ import kotlinx.serialization.Serializable
 suspend fun Api.opportunityDetail(context: Context, opportunityId: String): OpportunityDetailDto =
     json.decodeFromString<OpportunityDetailEnvelope>(
         request(context, "GET", "/api/v1/opportunities/$opportunityId"),
-    ).opportunity
+    ).let { envelope -> envelope.opportunity.copy(eligibility = envelope.eligibility) }
 
 /**
  * Applying carries a consent decision, because it is one.
@@ -367,6 +400,17 @@ suspend fun Api.applyToOpportunity(
     val compensation: TermsCompensationDto? = null,
     val joiningConditions: String? = null,
     val applicationDeadline: String? = null,
+    /** EMP-06: the rules under those terms; a college is named, never identified. */
+    val eligibility: List<TermsEligibilityRuleDto> = emptyList(),
+)
+
+@Serializable data class TermsEligibilityRuleDto(
+    val ruleType: String = "",
+    val comparator: String = "",
+    val valueNumeric: Double? = null,
+    val valueText: String? = null,
+    val isBlocking: Boolean = true,
+    val displayValue: String? = null,
 )
 
 @Serializable data class TermsCompensationDto(

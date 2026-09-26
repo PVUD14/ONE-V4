@@ -116,20 +116,38 @@ function unaidedSuccess(attempt: ProjectionAttempt): boolean {
  * same item. Codes are sorted and unique.
  */
 export function activeMisconceptionsBySkill(attempts: readonly ProjectionAttempt[]): ReadonlyMap<string, readonly string[]> {
+  return new Map([...unclearedMisconceptionSignals(attempts)].map(([skillId, counts]) => [skillId, [...counts.keys()].sort()]));
+}
+
+/**
+ * Uncleared misconception signals, by the code's skill and then by code: how many attempts
+ * signalled the code and have not been cleared by a later unaided correct attempt on the same
+ * item. The same clearing rule that makes a code active (a code is active exactly when its count
+ * is at least one), so the planner (ENG-08) can tell a repeated misconception from a single slip
+ * without a second definition of "cleared". Not part of the stored projection.
+ */
+export function unclearedMisconceptionSignals(
+  attempts: readonly ProjectionAttempt[],
+): ReadonlyMap<string, ReadonlyMap<string, number>> {
   validate(attempts);
   const ordered = [...attempts].sort(compareAttempts);
-  const active = new Map<string, Set<string>>();
+  const signals = new Map<string, Map<string, number>>();
   ordered.forEach((signal, index) => {
     if (signal.misconceptions.length === 0) return;
     const cleared = ordered.slice(index + 1).some((later) => later.itemId === signal.itemId && unaidedSuccess(later));
     if (cleared) return;
+    // One attempt counts once per code, even if two tags on its option named the same code.
+    const seen = new Set<string>();
     for (const misconception of signal.misconceptions) {
-      const codes = active.get(misconception.skillId) ?? new Set<string>();
-      codes.add(misconception.code);
-      active.set(misconception.skillId, codes);
+      const key = `${misconception.skillId}\u0000${misconception.code}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const counts = signals.get(misconception.skillId) ?? new Map<string, number>();
+      counts.set(misconception.code, (counts.get(misconception.code) ?? 0) + 1);
+      signals.set(misconception.skillId, counts);
     }
   });
-  return new Map([...active].map(([skillId, codes]) => [skillId, [...codes].sort()]));
+  return signals;
 }
 
 /**

@@ -186,11 +186,18 @@ async function attempt(studentId: string, fact: {
         highest_hint_level, assisted, content_version, source_attempt_type, source_attempt_id, occurred_at, misconception_code_ids)
      VALUES ($1,$2,$3,'CAREER_READINESS_QUESTION',$4,1,$5,'ASSESSMENT',true,$6,$7,0,false,'assessment-v1','assessment_attempt',$8,
              COALESCE($9::timestamptz, now()), $10::uuid[])`,
-    [attemptId, studentId, sessionId, fact.itemId, fact.skillId, fact.correct, fact.correct ? 1 : 0, sourceId, at,
+    [attemptId, studentId, sessionId, itemId(fact.itemId), fact.skillId, fact.correct, fact.correct ? 1 : 0, sourceId, at,
       `{${(fact.codeIds ?? []).join(',')}}`],
   );
   return attemptId;
 }
+
+/** Items are identified by UUID; the tests name them, and each name maps to one fixed id. */
+const items = new Map<string, string>();
+const itemId = (name: string): string => {
+  if (!items.has(name)) items.set(name, randomUUID());
+  return items.get(name)!;
+};
 
 const daysAgo = (days: number, hour = 5): string => new Date(Date.now() - days * 86_400_000 + hour * 3_600_000).toISOString();
 
@@ -247,7 +254,10 @@ describe('scenario X1 end to end', () => {
     expect(input.adaptive).toBe(true);
     expect(input.skillStates.find((s) => s.skillId === topicA)?.misconceptions).toEqual([{ code: boundaryCode, unclearedSignals: 3 }]);
     // Never the shadow BKT value or FSRS numbers.
-    expect(JSON.stringify(input)).not.toMatch(/mastery|stability|difficulty|likelihood/i);
+    for (const state of input.skillStates) {
+      expect(Object.keys(state).sort()).toEqual(['attemptCount', 'attemptDayCount', 'evidenceBand', 'evidenceStage',
+        'latestHintLevel', 'misconceptions', 'skillId', 'unaidedSuccessCount']);
+    }
 
     const remediate = await planNextLearningStep(db, { subjectUserId: studentId, sessionMinutes: 30, correlationId: `plan-${randomUUID()}` });
     expect(remediate.decision).toMatchObject({

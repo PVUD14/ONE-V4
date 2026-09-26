@@ -58,17 +58,17 @@ The placement officer has no placement item; §4.2 puts the placement register b
 | # | Nav label | State | Component (branch) | Built by / to be filled by | Android equivalent |
 |---|---|---|---|---|---|
 | 1 | Dashboard | Working | `InstitutionDashboardV3` (`rolePortalPages.tsx:194-196`) | INST-01, 04 | Home |
-| 2 | Department Overview | **View-only** | `AuthenticatedReadOnlyModule` (`rolePortalPages.tsx:376`) | INST-07 | Home (server-scoped cards) |
-| 3 | Students | Partial — verification queue and upload; subtitle says the department roster is not built yet | `AcademicVerificationSection` (`rolePortalPages.tsx:282-289`) | INST-04 built; INST-07 roster | Verification review overlay (`AcademicVerification.kt:132`) |
-| 4 | Readiness | **View-only** | `AuthenticatedReadOnlyModule` (`rolePortalPages.tsx:376`) | INST-07 (with INST-17) | Home "Cohort readiness", NA |
+| 2 | Department Overview | Working (INST-07) — roster, activation, assessments in progress, last month's readiness bands (<5 suppressed), open interventions/tasks, batches, pipeline | `DepartmentOverviewPage` (`rolePortal/institutionDepartment.tsx`) | INST-07 | Home "Department overview", "Cohort readiness" (`DepartmentWorkspace.kt`) |
+| 3 | Students | Working (INST-07) — read-only department roster with consented applications, then the verification queue and upload | `InstitutionStudentsPage` + `AcademicVerificationSection` | INST-04, INST-07 | Verification review overlay (`AcademicVerification.kt`) |
+| 4 | Readiness | Working (INST-07) — last month's bands plus the month-by-month scoped report; by career role is INST-17 | `DepartmentReadinessPage` | INST-07 (INST-17 adds career roles) | Home "Cohort readiness" |
 | 5 | Assessments | Working (with approval) | `InstitutionExamEnginePage` (`rolePortalPages.tsx:297-302`) | Pre-plan | Exams tab |
 | 6 | Interventions | Working | `InstitutionInterventionsPage` (`rolePortalPages.tsx:292-296`) | Pre-plan | Web only |
 | 7 | Faculty and Staff | Working | `InstitutionFacultyAndStaffPage` (`rolePortalPages.tsx:350`; `institutionTeaching.tsx:188`) | INST-03 | Web only |
-| 8 | Placement Pipeline | **View-only** | `AuthenticatedReadOnlyModule` (`rolePortalPages.tsx:376`) | INST-07 (after INST-12) | Home "Placement Pipeline", NA |
-| 9 | Opportunities and Offers | **View-only** | `AuthenticatedReadOnlyModule` (`rolePortalPages.tsx:376`) | INST-07 (after INST-12) | Web only |
-| 10 | Batches | **View-only** | `AuthenticatedReadOnlyModule` (`rolePortalPages.tsx:376`) | INST-07 | Web only |
+| 8 | Placement Pipeline | Working (INST-07) — shared-application stages and offer responses, suppressed under five, never pay; drives NA until INST-12 | `PlacementPipelinePage` | INST-07 | Home "Placement Pipeline" (`DepartmentWorkspace.kt`) |
+| 9 | Opportunities and Offers | Working (INST-07) — shared applications with offer existence and response, audited read | `OpportunitiesAndOffersPage` | INST-07 | Web only (audited record read) |
+| 10 | Batches | Working (INST-07) — department batches with roster, enrolled and activated counts (read-only structure) | `DepartmentBatchesPage` | INST-07 | Home "Department overview" batches |
 | 11 | Meetings | Working | `InstitutionStaffActionsPage` (`rolePortalPages.tsx:353-368`; `institution.tsx:350`) | Pre-plan | Web only |
-| 12 | Reports and Analytics | **View-only** | `AuthenticatedReadOnlyModule` (`rolePortalPages.tsx:376`) | INST-07 (INST-08 for capability-gated analytics) | Web only |
+| 12 | Reports and Analytics | Working (INST-07) — department summary, stages, scoped readiness report; exports NA until INST-08 | `DepartmentReportsAnalyticsPage` | INST-07 (INST-08 exports) | Web only |
 | 13 | Settings | Working — college settings read-only, personal notification preferences | `InstitutionSettingsPage personal` (`rolePortalPages.tsx:372`) | INST-05 | Academic calendar only |
 | 14 | Help & FAQ | Working | `HelpFaqPanel` (`rolePortalPages.tsx:291`) | Pre-plan | More → Help |
 
@@ -81,11 +81,11 @@ The placement officer has no placement item; §4.2 puts the placement register b
 | 3 | Student Detail | Partial — scoped faculty-notes list, no scoped student view | `InstitutionStaffActionsPage` (`rolePortalPages.tsx:353-368`) | INST-03 per §4.2 (profile view reported not done in INST-03) | Web only |
 | 4 | Academic Verification | Working — queue, with the staff-action list as a second tab | `FacultyAcademicVerification` (`rolePortalPages.tsx:362-364`; `institutionAcademicVerification.tsx:37`) | INST-04 | Verification review overlay (`AcademicVerification.kt:132`) |
 | 5 | Assessments | Working (no approval) | `InstitutionExamEnginePage` (`rolePortalPages.tsx:297-302`) | Pre-plan | Exams tab |
-| 6 | Assessment Detail | **View-only** | `AuthenticatedReadOnlyModule` (`rolePortalPages.tsx:376`) | INST-07 | Results overlay for one assessment (`StaffDashboards.kt:695`) |
+| 6 | Assessment Detail | Working (INST-07) — one assessment's scoped results, not-attempted list; average withheld under five | `FacultyAssessmentDetailPage` | INST-07 | Results overlay for one assessment |
 | 7 | Assigned Tasks | Working | `InstitutionStaffActionsPage` (`rolePortalPages.tsx:353-368`) | Pre-plan | Web only |
 | 8 | Interventions | Working | `InstitutionInterventionsPage` (`rolePortalPages.tsx:292-296`) | Pre-plan | Web only |
 | 9 | Learning Resources | **View-only** | `AuthenticatedReadOnlyModule` (`rolePortalPages.tsx:376`) | INST-16 (honest empty state until then) | Web only |
-| 10 | Reports | **View-only** | `AuthenticatedReadOnlyModule` (`rolePortalPages.tsx:376`) | INST-07 | Web only |
+| 10 | Reports | Working (INST-07) — a class report per assigned section or batch; averages withheld under five results | `FacultyClassReportsPage` | INST-07 | Home "My classes" (`DepartmentWorkspace.kt`) |
 | 11 | Calendar | Working — academic calendar, meetings feed, staff actions | `FacultyAcademicCalendar` + `CalendarPage` (`rolePortalPages.tsx:359`) | INST-05 | Home "Academic calendar" (`StaffDashboards.kt:426`) |
 | 12 | Messages | Working — announcements composer and own inbox | `FacultyMessagesPage` (`rolePortalPages.tsx:352`; `institutionAnnouncements.tsx:230`) | INST-06 | Sent announcements on Home (`StaffDashboards.kt:429`) and inbox overlay (`:303`, `:1117`); composing web only |
 | 13 | Profile | Working | `StaffProfilePage` (`rolePortalPages.tsx:370`) | INST-05 | Web only |
@@ -115,3 +115,9 @@ student view, INST-03 follow-up). Placement widgets on every dashboard show NA u
 Related navigation decision outstanding: **HG-3** — only faculty have a `Messages` item, so owners,
 admins, placement officers and department heads cannot reach the announcements composer the API
 already serves them.
+
+## Update after INST-07 (2026-09-26)
+
+The department head's six view-only items and the faculty Assessment Detail and Reports are now real
+screens (rows above updated). Remaining view-only items: admin Career Readiness (INST-17), admin
+Placement (INST-12) and faculty Learning Resources (INST-16). D3 is still not met until those land.

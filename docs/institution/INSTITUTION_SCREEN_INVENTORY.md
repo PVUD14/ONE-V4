@@ -26,13 +26,13 @@ Paths below are shortened to `StaffDashboards.kt` and `AcademicVerification.kt`.
 |---|---|---|---|---|---|
 | 1 | Dashboard | Working (placement and readiness widgets NA) | `InstitutionDashboardV3` (`rolePortalPages.tsx:194-196`; `staffDashboardsV3.tsx:70`, NA KPIs `:112-114`, `:128`) | INST-01, INST-04 built; INST-12 fills placement counts | Home (`StaffDashboards.kt:367`): activation `:433`, verification `:451`, placement NA `:468` |
 | 2 | Students | Working | `InstitutionStudentsPage` + `AcademicVerificationSection` with upload (`rolePortalPages.tsx:273-281`; `rolePortal/institution.tsx:493`; `institutionAcademicVerification.tsx:20`) | INST-01, 02, 04 built; INST-10 adds lifecycle and bulk actions | Activation counts and verification review overlay (`AcademicVerification.kt:132`); roster web only |
-| 3 | Student Detail | Working | `InstitutionStudentsPage` with consented applications panel (`rolePortalPages.tsx:273-281`; `institution.tsx:576`) | INST-01 built; INST-10 | Web only |
+| 3 | Student Detail | Working | `InstitutionStudentsPage` plus INST-09's `PlacementStatusList` (placement status per student, shared applications on request) | INST-01, INST-09 built; INST-10 | Web only |
 | 4 | Academic Structure | Working | `InstitutionAcademicStructurePage` (`rolePortalPages.tsx:290`; `institution.tsx:144`) | Pre-plan; no §4.2 goal | Web only |
 | 5 | Assessments | Working | `InstitutionExamEnginePage` (`rolePortalPages.tsx:297-302`; `examManagerPage.tsx:30`) | Pre-plan | Exams tab (`StaffDashboards.kt:660`, results `:695`) |
 | 6 | Interventions | Working | `InstitutionInterventionsPage` (`rolePortalPages.tsx:292-296`; `pilotParity/institutionInterventions.tsx:44`) | Pre-plan | Web only |
 | 7 | Staff | Working | `InstitutionStaffPage` (`rolePortalPages.tsx:333`; `institution.tsx:187`) | INST-03 built; INST-08 adds analytics capability grants | Web only |
 | 8 | Career Readiness | **View-only** | `AuthenticatedReadOnlyModule` (`rolePortalPages.tsx:339`) | INST-17 | Home "Cohort readiness", NA (`StaffDashboards.kt:399`) |
-| 9 | Placement | **View-only** | `AuthenticatedReadOnlyModule` (`rolePortalPages.tsx:339`) | INST-12 | Home "Placement Pipeline", NA (`StaffDashboards.kt:468`) |
+| 9 | Placement | Partial (INST-09) — consented placement status: suppressed distribution, stage and offer funnels, per-student status with shared applications; register, drives and statistics NA until INST-12 | `InstitutionPlacementPage` (`rolePortal/institutionPlacement.tsx`) | INST-09 built; INST-12 | Home pipeline card incl. students by placement status (`DepartmentWorkspace.kt`); per-student list web only |
 | 10 | Reports | Partial — readiness band report only | `InstitutionReportsPage` (`rolePortalPages.tsx:334-338`; `institutionReportsPage.tsx:31`) | INST-08, INST-13 (reports, exports, accreditation packs) | Web only |
 | 11 | Settings | Partial — profile, grading scales, calendar working; placement policies and data-processing terms "not built yet" | `InstitutionSettingsPage` (`rolePortalPages.tsx:341`; `institutionSettings.tsx:98`, empty sections `:115-119`) | INST-05 built; INST-12/EMP-06 (policies), INST-18 (data terms) | Academic calendar read-only (`StaffDashboards.kt:426`); rest web only |
 | 12 | Help & FAQ | Working | `HelpFaqPanel` (`rolePortalPages.tsx:291`) | Pre-plan | More → Help (`StaffDashboards.kt:1096`, `:1332`) |
@@ -44,8 +44,8 @@ Paths below are shortened to `StaffDashboards.kt` and `AcademicVerification.kt`.
 | 1 | Dashboard | Working (placement widgets NA) | `InstitutionDashboardV3` (`rolePortalPages.tsx:194-196`) | INST-12 (drive approvals via EMP-11, register summary) | Home |
 | 2 | Assessments | Working | `InstitutionExamEnginePage` (`rolePortalPages.tsx:297-302`) | Pre-plan | Exams tab |
 | 3 | Help & FAQ | Working | `HelpFaqPanel` (`rolePortalPages.tsx:291`) | Pre-plan | More → Help |
-| 4 | Students | Working | `InstitutionStudentsPage` incl. consented applications (`rolePortalPages.tsx:309-314`; `institution.tsx:576`) | INST-01 built; INST-09 extends consented application status | Activation counts on Home; roster web only |
-| 5 | Student Search | Working | Same page (`rolePortalPages.tsx:309-314`) | INST-01; INST-09 | Web only |
+| 4 | Students | Working | `InstitutionStudentsPage` incl. placement status column (INST-09) and consented applications | INST-01, INST-09 built | Activation counts and status distribution on Home; roster web only |
+| 5 | Student Search | Working | Same page | INST-01, INST-09 built | Web only |
 | 6 | Readiness | Partial — cohort band report, not by career role | `InstitutionReportsPage` (`rolePortalPages.tsx:315-322`) | INST-17 | Home "Cohort readiness", NA |
 | 7 | Departments | Working (read-only by design) | `InstitutionAcademicStructurePage canManage={false}` (`rolePortalPages.tsx:323-332`) | Pre-plan | Web only |
 | 8 | Batches | Working (read-only by design) | Same (`rolePortalPages.tsx:323-332`) | Pre-plan | Web only |
@@ -121,3 +121,10 @@ already serves them.
 The department head's six view-only items and the faculty Assessment Detail and Reports are now real
 screens (rows above updated). Remaining view-only items: admin Career Readiness (INST-17), admin
 Placement (INST-12) and faculty Learning Resources (INST-16). D3 is still not met until those land.
+
+## Update after INST-09 (2026-09-26)
+
+Admin Placement is no longer view-only: it shows consented placement status (INST-09); the placement
+register, drives and statistics on the same page stay NA until INST-12. Admin Student Detail and the
+placement officer's Students / Student Search carry each student's placement status. Remaining
+view-only items: admin Career Readiness (INST-17) and faculty Learning Resources (INST-16).

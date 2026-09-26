@@ -207,7 +207,8 @@ describe('Placement Officer roster', () => {
     expect(screen.getByText('Loading roster…')).toBeInTheDocument();
     const table = await screen.findByRole('table', { name: 'Placement student roster' });
     expect(within(table).getByRole('columnheader', { name: 'Readiness band' })).toBeInTheDocument();
-    expect(within(within(table).getByRole('row', { name: /Local placement student/ })).getAllByRole('cell', { name: 'NA' })).toHaveLength(3);
+    // INST-09 added the Placement status column: a roster row with no linked account has no status either, so NA (four NA cells).
+    expect(within(within(table).getByRole('row', { name: /Local placement student/ })).getAllByRole('cell', { name: 'NA' })).toHaveLength(4);
     expect(screen.queryByRole('button', { name: /Add student|Validate CSV|Edit/ })).not.toBeInTheDocument();
     expect(screen.queryByText(studentId)).not.toBeInTheDocument();
     expect(fetchMock.mock.calls.every(([url]) => String(url).includes('/institutions/' + institutionId + '/'))).toBe(true);
@@ -284,7 +285,10 @@ describe('External application distinction in the placement roster', () => {
   it('uses the student user ID and keeps declared HIRED separate from native counts and labels', async () => {
     mockRoster(); render(placement());
     await screen.findByRole('table', { name: 'Placement student roster' });
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    // Roster, units and (INST-09) the audited placement-status list — and no per-student application read until one is opened.
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).includes('/placement-status'))).toHaveLength(1);
+    expect(fetchMock.mock.calls.some(([url]) => /\/students\/[^/]+\/(external-)?applications/.test(String(url)))).toBe(false);
     await openFirst();
     const externalRegion = screen.getByRole('region', { name: 'Student-declared external applications (unverified)' });
     const nativeRegion = screen.getByRole('region', { name: 'Native applications' });

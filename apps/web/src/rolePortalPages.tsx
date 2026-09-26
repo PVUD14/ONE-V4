@@ -22,6 +22,7 @@ import { EmployerAssessmentsPage } from './employerAssessmentsPage.js';
 import { LearnerContentStudio } from './learnerContentStudio.js';
 import { OperationsCareerCataloguePage } from './rolePortal/careerCatalogue.js';
 import { InstitutionReportsPage } from './institutionReportsPage.js';
+import { InstitutionExportsPanel } from './rolePortal/institutionAnalytics.js';
 import { OperationsCareerReadinessPanel } from './operationsCareerReadinessPanel.js';
 import { StaffPilotWrap } from './parityWraps.js';
 import { InstitutionInterventionsPage } from './pilotParityPages.js';
@@ -334,9 +335,20 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   }
   if (!demoMode && portal.key === 'institution-admin' && route.label === 'Staff') return <InstitutionStaffPage portal={portal} authenticatedWorkspace={authenticatedWorkspace} />;
   if (!demoMode && portal.key === 'institution-admin' && route.label === 'Reports') {
+    // INST-08: the exports panel sits under the readiness report; the server decides who may export.
     return isInstitutionWorkspace(authenticatedWorkspace)
-      ? <InstitutionReportsPage key={authenticatedWorkspace.organizationId} institutionId={authenticatedWorkspace.organizationId} />
+      ? <InstitutionReportsPage key={authenticatedWorkspace.organizationId} institutionId={authenticatedWorkspace.organizationId}>
+          <InstitutionExportsPanel institutionId={authenticatedWorkspace.organizationId} /></InstitutionReportsPage>
       : <InstitutionWorkspaceError title="Reports" unauthorized={Boolean(authenticatedWorkspace && !institutionWorkspaceRoles.has(authenticatedWorkspace.role))} />;
+  }
+  // INST-08: the department head's existing Reports and Analytics item opens their
+  // department's readiness report (scoped server-side) and the exports panel. Navigation is unchanged.
+  if (!demoMode && portal.key === 'department-head' && route.label === 'Reports and Analytics') {
+    return isInstitutionStaffWorkspace(authenticatedWorkspace)
+      ? <InstitutionReportsPage key={authenticatedWorkspace.organizationId} institutionId={authenticatedWorkspace.organizationId} title="Reports and Analytics"
+          description="Career-readiness summaries for your department, and exports if your college has given you access. Select a month that has ended to generate a report.">
+          <InstitutionExportsPanel institutionId={authenticatedWorkspace.organizationId} /></InstitutionReportsPage>
+      : <InstitutionWorkspaceError title="Reports and Analytics" unauthorized={Boolean(authenticatedWorkspace && !institutionStaffWorkspaceRoles.has(authenticatedWorkspace.role))} />;
   }
   if (!demoMode && portal.key === 'institution-admin' && /career readiness|placement|reports/i.test(route.label)) return <AuthenticatedReadOnlyModule title={route.label} detail="Institution reports and readiness information are read-only in Phase 2A unless a dedicated persistent mutation is available." />;
   // INST-05: the admin's Settings label now opens the college settings; navigation is unchanged.

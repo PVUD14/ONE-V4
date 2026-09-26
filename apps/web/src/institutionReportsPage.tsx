@@ -54,7 +54,13 @@ const bandLabels: Record<string, string> = {
   READY_FOR_NEXT_STEP: 'Ready for next step',
 };
 
-export function InstitutionReportsPage({ institutionId }: { readonly institutionId: string }): React.ReactElement {
+/**
+ * `title`, `description` and `children` (INST-08) let the department head's Reports and
+ * Analytics page reuse this report, and both Reports pages carry the exports panel below it.
+ */
+export function InstitutionReportsPage({ institutionId, title = 'Reports', description = 'Career-readiness summaries for your institution. Select a month that has ended to generate a report.', children }: {
+  readonly institutionId: string; readonly title?: string; readonly description?: string; readonly children?: React.ReactNode;
+}): React.ReactElement {
   const token = getProtectedAccessToken();
   const latestMonth = latestEndedMonth(new Date().toISOString().slice(0, 10));
   const [month, setMonth] = useState(latestMonth);
@@ -115,8 +121,8 @@ export function InstitutionReportsPage({ institutionId }: { readonly institution
   }
 
   return <section className="role-module role-module--dense">
-    <div className="role-page-heading"><div><h1>Reports</h1>
-      <p>Career-readiness summaries for your institution. Select a month that has ended to generate a report.</p>
+    <div className="role-page-heading"><div><h1>{title}</h1>
+      <p>{description}</p>
     </div></div>
     {!token || !institutionId ? <p className="form-error" role="alert">Sign in to an institution workspace to generate reports.</p> : <>
       <form className="role-management-form role-card role-wide" onSubmit={(event) => void generate(event)}>
@@ -148,5 +154,6 @@ export function InstitutionReportsPage({ institutionId }: { readonly institution
         <p>Expires: <time dateTime={report.expiresAt}>{report.expiresAt.slice(0, 10)}</time></p>
       </section> : null}
     </>}
+    {children}
   </section>;
 }

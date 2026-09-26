@@ -6,6 +6,7 @@
  * Split out of the single api.ts client so each stream appends to its own
  * file. `api.ts` re-exports every public module, so importers are unchanged.
  */
+import { ApiRequestError, apiBaseUrl } from './core.js';
 import { requestJson } from './http.js';
 
 export interface InstitutionUnitDto {
@@ -501,4 +502,61 @@ export function createInstitutionAnnouncement(token: string, institutionId: stri
 
 export function cancelInstitutionAnnouncement(token: string, institutionId: string, announcementId: string, reasonCode: string): Promise<{ readonly announcement: InstitutionAnnouncementDto }> {
   return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/announcements/${encodeURIComponent(announcementId)}/cancel`, { token, method: 'POST', body: { reasonCode } });
+}
+
+// --- Analytics capability and CSV exports (INST-08) ---
+
+/** A member who may hold INSTITUTION_ANALYTICS (an active admin or department head), with their live grant. */
+export interface InstitutionAnalyticsAccessDto {
+  readonly membershipId: string;
+  readonly email: string;
+  readonly role: string;
+  readonly department: string | null;
+  readonly grant: { readonly capabilityId: string; readonly grantedAt: string; readonly reasonCode: string } | null;
+}
+
+export function listInstitutionAnalyticsAccess(token: string, institutionId: string, signal?: AbortSignal): Promise<{ readonly eligible?: readonly InstitutionAnalyticsAccessDto[] }> {
+  return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/capabilities`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function grantInstitutionAnalyticsAccess(token: string, institutionId: string, membershipId: string, reasonCode: string): Promise<{ readonly eligible?: readonly InstitutionAnalyticsAccessDto[] }> {
+  return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/capabilities`, { token, method: 'POST', body: { membershipId, capability: 'INSTITUTION_ANALYTICS', reasonCode } });
+}
+
+export function revokeInstitutionAnalyticsAccess(token: string, institutionId: string, capabilityId: string, reasonCode: string): Promise<{ readonly eligible?: readonly InstitutionAnalyticsAccessDto[] }> {
+  return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/capabilities/${encodeURIComponent(capabilityId)}/revoke`, { token, method: 'POST', body: { reasonCode } });
+}
+
+export type InstitutionExportPath = 'roster' | 'readiness-bands' | 'assessment-results' | 'staff-action-summary';
+
+export interface InstitutionExportRequest {
+  readonly reasonCode: string;
+  readonly month?: string;
+  readonly unitId?: string;
+  readonly assessmentId?: string;
+}
+
+/**
+ * Request one export and return the CSV with the file name the server chose. The route is
+ * authenticated like every other, so the file is fetched with the token and handed to the
+ * browser rather than linked. Errors carry only the code and reference, never upstream text.
+ */
+export async function downloadInstitutionExport(token: string, institutionId: string, path: InstitutionExportPath, body: InstitutionExportRequest): Promise<{ readonly filename: string; readonly csv: string }> {
+  const correlationId = crypto.randomUUID();
+  const response = await fetch(`${apiBaseUrl}/api/v1/institutions/${encodeURIComponent(institutionId)}/exports/${path}`, {
+    method: 'POST',
+    headers: { Accept: 'text/csv', 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, 'X-Correlation-Id': correlationId },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const failure = await response.json().catch(() => null) as { readonly error?: { readonly code?: string; readonly correlationId?: string } } | null;
+    throw new ApiRequestError({
+      status: response.status,
+      correlationId: failure?.error?.correlationId ?? correlationId,
+      ...(failure?.error?.code ? { code: failure.error.code } : {}),
+    });
+  }
+  const disposition = response.headers?.get('content-disposition') ?? '';
+  const filename = /filename="([A-Za-z0-9._-]+)"/.exec(disposition)?.[1] ?? `one-${path}.csv`;
+  return { filename, csv: await response.text() };
 }

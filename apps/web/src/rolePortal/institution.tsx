@@ -15,6 +15,7 @@ import type { AuthenticatedWorkspaceSummary } from './shared.js';
 import { Search } from 'lucide-react';
 import { NaListCard } from '../pilotParity/naWidgets.js';
 import { TeachingAssignmentsPanel } from './institutionTeaching.js';
+import { AnalyticsAccessPanel } from './institutionAnalytics.js';
 import { useEffect, useRef, useState } from 'react';
 
 /** Why an invitation is being sent again; recorded with the resend (INST-01). */
@@ -264,6 +265,7 @@ export function InstitutionStaffPage({ portal: _portal, authenticatedWorkspace }
           <span className="staff-readonly-note">Revoke/resend/end membership: NOT YET AVAILABLE</span></div></td></tr>;
       })}</tbody></table> : <p>No accepted staff memberships yet.</p>}</section>
     <TeachingAssignmentsPanel key={institutionId + ':' + token} token={token} institutionId={institutionId} />
+    <AnalyticsAccessPanel key={'analytics:' + institutionId + ':' + token} token={token} institutionId={institutionId} />
   </section>;
 }
 

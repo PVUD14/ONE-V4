@@ -11,6 +11,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
   },
+  "dependencies": {
+    "@planthepath/mastery-bkt": "workspace:*"
+  },
   "devDependencies": {
     "@types/node": "^22.13.0",
     "typescript": "^5.9.2",

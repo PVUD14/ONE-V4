@@ -1,6 +1,7 @@
 /**
  * The learner skill state projector (ENG-05): loads one student's facts, runs the pure rule
- * `learner-skill-state-v1` (packages/learning-model) and makes `learner_skill_state` equal to it.
+ * `learner-skill-state-v2` (packages/learning-model; since ENG-06 it includes `mastery-bkt-v1` in
+ * shadow) and makes `learner_skill_state` equal to it.
  *
  * Why it exists: the planner, BKT shadow, review scheduler and faculty views all need "where does
  * this student stand on this skill", and ADR-034 requires that answer to be a projection rebuilt
@@ -11,7 +12,8 @@
  *
  * Consent (ENG-01): nothing is written without the adaptive-learning purpose; a student without
  * it has their rows removed. Privacy deletion runs the projector after erasing the attempts, and
- * the rebuild of a student with no facts is the empty set. Nothing here touches readiness.
+ * the rebuild of a student with no facts is the empty set. Nothing here touches readiness: the BKT
+ * likelihood written to the mastery columns is shadow model state that no route reads.
  */
 import { sql } from 'drizzle-orm';
 import type { PoolClient } from 'pg';
@@ -88,7 +90,7 @@ export async function consumeSkillStateProjectionRequested(
 }
 
 /**
- * Make one student's rows equal to learner-skill-state-v1 over their facts. Without the
+ * Make one student's rows equal to learner-skill-state-v2 over their facts. Without the
  * adaptive-learning purpose the answer is "no rows". Runs in its own transaction (a savepoint
  * when the caller already has one), under a per-student lock so two workers cannot interleave.
  */
@@ -159,7 +161,7 @@ export async function rebuildLearnerSkillState(
  *    moment of the attempt, and only once the result is published (0030's rules).
  * Misconception ids recorded on the attempt become codes filed under each code's own skill.
  */
-async function loadProjectionAttempts(db: PersistenceDb, subjectUserId: string): Promise<ProjectionAttempt[]> {
+export async function loadProjectionAttempts(db: PersistenceDb, subjectUserId: string): Promise<ProjectionAttempt[]> {
   const found = await db.execute(sql`
     SELECT e.id, e.item_id, e.context, e.answered, e.correct, e.highest_hint_level, e.assisted, e.occurred_at,
            e.institution_id, e.misconception_code_ids,
@@ -219,7 +221,9 @@ async function upsertRow(tx: PersistenceDb, subjectUserId: string, row: LearnerS
     VALUES (${subjectUserId}::uuid, ${row.skillId}::uuid, ${row.institutionId}::uuid, ${row.attemptCount}, ${row.attemptDayCount},
             ${row.unaidedSuccessCount}, ${row.unaidedSuccessDayCount}, ${row.assistedSuccessCount},
             ${row.lastAttemptAt}::timestamptz, ${row.evidenceStage}, ${row.evidenceBand},
-            ${textArrayLiteral(row.activeMisconceptionCodes)}::text[], NULL, NULL, NULL, NULL, NULL, NULL, NULL, ${row.algorithmVersion})
+            ${textArrayLiteral(row.activeMisconceptionCodes)}::text[],
+            ${storedProbability(row.masteryLikelihood)}::numeric, ${storedProbability(row.masteryUncertainty)}::numeric,
+            ${row.masteryAlgorithmVersion}, NULL, NULL, NULL, NULL, ${row.algorithmVersion})
     ON CONFLICT (subject_user_id, skill_id) DO UPDATE SET
       institution_id = EXCLUDED.institution_id,
       attempt_count = EXCLUDED.attempt_count,
@@ -240,6 +244,13 @@ async function upsertRow(tx: PersistenceDb, subjectUserId: string, row: LearnerS
       review_algorithm_version = EXCLUDED.review_algorithm_version,
       algorithm_version = EXCLUDED.algorithm_version
   `);
+}
+
+/** A four-decimal probability as exact text, so numeric(5,4) stores precisely what the rule computed. */
+function storedProbability(value: number | null): string | null {
+  if (value === null) return null;
+  if (!Number.isFinite(value) || value < 0 || value > 1) throw new Error('a mastery value is outside [0, 1]');
+  return value.toFixed(4);
 }
 
 /** Codes match ^[A-Z][A-Z0-9_]{2,63}$ (0049), so they need no quoting inside an array literal. */

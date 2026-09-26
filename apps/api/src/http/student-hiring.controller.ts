@@ -7,12 +7,18 @@ import {
   assertApplicationTransition,
   assertCanSubmitApplication,
   assertOfferTransition,
-  evaluateEligibility,
   isOfferExpired,
-  type EligibilityRule,
   type OfferState,
-  type StudentEligibilityFacts,
 } from '@planthepath/hiring';
+import { evaluateStudentEligibility, type RuleOutcome } from '@planthepath/hiring/src/eligibility.js';
+import {
+  eligibilityDisplayNames,
+  mapEligibilityRuleRow,
+  readEligibilityRecords,
+  readVersionEligibilityRules,
+  recordEligibilityEvaluation,
+  studentRuleOutcomes,
+} from './opportunity-requirements.js';
 import {
   API_ID_GENERATOR,
   API_PERSISTENCE_DB,
@@ -227,14 +233,17 @@ export class StudentHiringController {
     if (!row) throw forbidden(context.correlationId);
 
     const versionId = String(row.version_id);
-    const [skills, stages, rules] = await Promise.all([
-      this.db.execute(sql`SELECT skill_name, requirement_level FROM opportunity_skill_requirements WHERE opportunity_version_id = ${versionId}::uuid ORDER BY requirement_level, lower(skill_name)`) as Promise<QueryResult<Record<string, unknown>>>,
+    const [skills, stages, rules, records] = await Promise.all([
+      this.db.execute(sql`SELECT skill_name, requirement_level, taxonomy_topic_id FROM opportunity_skill_requirements WHERE opportunity_version_id = ${versionId}::uuid ORDER BY requirement_level DESC, lower(skill_name)`) as Promise<QueryResult<Record<string, unknown>>>,
       this.db.execute(sql`SELECT stage_order, stage_kind, label, detail FROM opportunity_selection_stages WHERE opportunity_version_id = ${versionId}::uuid ORDER BY stage_order`) as Promise<QueryResult<Record<string, unknown>>>,
-      this.db.execute(sql`SELECT rule_type, comparator, value_numeric, value_text, is_blocking FROM opportunity_eligibility_rules WHERE opportunity_version_id = ${versionId}::uuid`) as Promise<QueryResult<Record<string, unknown>>>,
+      readVersionEligibilityRules(this.db, versionId),
+      readEligibilityRecords(this.db, studentUserId),
     ]);
 
-    const facts = await this.readEligibilityFacts(studentUserId);
-    const eligibility = evaluateEligibility(rules.rows.map(mapEligibilityRule), facts);
+    // EMP-06: the same evaluator apply enforces, from the student's own academic records.
+    const eligibility = evaluateStudentEligibility(rules, records);
+    const names = await eligibilityDisplayNames(this.db, rules);
+    const ruleTypes = (outcomes: readonly RuleOutcome[]) => outcomes.map((outcome) => outcome.ruleType);
 
     return {
       opportunity: {
@@ -244,16 +253,18 @@ export class StudentHiringController {
         locationCountry: row.location_country ?? null,
         positionsAvailable: row.positions_available ?? null,
         joiningConditions: row.joining_conditions ?? null,
-        skills: skills.rows.map((s) => ({ name: s.skill_name, level: s.requirement_level })),
+        skills: skills.rows.map((s) => ({ name: s.skill_name, level: s.requirement_level, catalogue: s.taxonomy_topic_id != null })),
         selectionStages: stages.rows.map((s) => ({ order: s.stage_order, kind: s.stage_kind, label: s.label, detail: s.detail ?? null })),
       },
       eligibility: {
         eligible: eligibility.eligible,
-        blockingFailures: eligibility.blockingFailures,
-        advisoryFailures: eligibility.advisoryFailures,
+        blockingFailures: ruleTypes(eligibility.blockingFailures),
+        advisoryFailures: ruleTypes(eligibility.outcomes.filter((outcome) => !outcome.isBlocking && outcome.outcome !== 'MET')),
         // Surfaced separately so the UI can say "we cannot confirm this yet" rather
         // than telling a student they do not qualify on missing data.
-        needsMoreInformation: eligibility.undeterminable,
+        needsMoreInformation: ruleTypes(eligibility.undetermined),
+        // Per rule: met or not, on what basis, and the student's own value (EMP-06).
+        rules: studentRuleOutcomes(eligibility, names),
       },
       correlationId: context.correlationId,
     };
@@ -332,10 +343,27 @@ export class StudentHiringController {
       if (!current || current.lifecycle_state !== 'PUBLISHED') throw badRequest('OPPORTUNITY_NOT_OPEN', context.correlationId);
       const versionId = String(current.current_version_id);
       const deadline = await tx.execute(sql`
-        SELECT (application_deadline IS NOT NULL AND application_deadline <= now()) AS deadline_passed
+        SELECT (application_deadline IS NOT NULL AND application_deadline <= now()) AS deadline_passed,
+          (SELECT json_agg(json_build_object('rule_type', r.rule_type, 'comparator', r.comparator, 'value_numeric', r.value_numeric,
+              'value_text', r.value_text, 'is_blocking', r.is_blocking) ORDER BY r.rule_type, r.comparator, r.value_numeric NULLS FIRST, r.value_text NULLS FIRST, r.id)
+            FROM opportunity_eligibility_rules r WHERE r.opportunity_version_id = ${versionId}::uuid) AS eligibility_rules
         FROM opportunity_versions WHERE id = ${versionId}::uuid
-      `) as QueryResult<{ deadline_passed: boolean }>;
+      `) as QueryResult<{ deadline_passed: boolean; eligibility_rules?: Record<string, unknown>[] | null }>;
       if (deadline.rows[0]?.deadline_passed !== false) throw badRequest('DEADLINE_PASSED', context.correlationId);
+
+      // EMP-06: the version's blocking eligibility rules are enforced here, against the student's
+      // own academic records, on the version the application binds to. A refusal names each rule
+      // that stopped it; nothing is written.
+      const rules = (deadline.rows[0]?.eligibility_rules ?? []).map(mapEligibilityRuleRow);
+      const evaluation = rules.length ? evaluateStudentEligibility(rules, await readEligibilityRecords(tx, studentUserId)) : null;
+      if (evaluation && !evaluation.eligible) {
+        const names = await eligibilityDisplayNames(tx, rules);
+        const failing = studentRuleOutcomes(evaluation, names).filter((outcome) => outcome.isBlocking && outcome.outcome !== 'MET');
+        throw new BadRequestException({ error: {
+          code: evaluation.blockingFailures.length ? 'ELIGIBILITY_NOT_MET' : 'ELIGIBILITY_UNKNOWN',
+          message: 'Request could not be completed', correlationId: context.correlationId, rules: failing,
+        } });
+      }
 
       // The partial unique index on open applications is the real guard against a
       // double submission racing this insert; ON CONFLICT keeps it a clean 200.
@@ -362,6 +390,8 @@ export class StudentHiringController {
         VALUES (${this.ids.uuid()}::uuid, ${employerId}::uuid, ${studentUserId}::uuid, ${input.opportunityId}::uuid, now())
         ON CONFLICT (employer_id, student_user_id, opportunity_id) WHERE revoked_at IS NULL DO NOTHING
       `);
+      // What the employer is told about this applicant's eligibility, frozen as it stood now.
+      if (evaluation) await recordEligibilityEvaluation(tx, this.ids, { applicationId, versionId, trigger: 'APPLY', evaluation });
       await this.writeAudit(studentUserId, 'application.submitted', 'application', applicationId, context.correlationId, tx);
       if (input.institutionVisibilityGranted) {
         await this.writeAudit(studentUserId, 'application.institution_visibility_granted', 'application', applicationId, context.correlationId, tx);
@@ -565,31 +595,6 @@ export class StudentHiringController {
     return { offer: { id, state: to }, correlationId: context.correlationId };
   }
 
-  private async readEligibilityFacts(studentUserId: string): Promise<StudentEligibilityFacts> {
-    const rows = await this.db.execute(sql`
-      SELECT isp.institution_id,
-             dept.name AS department_name,
-             prog.name AS program_name,
-             extract(year FROM isp.expected_graduation_date)::int AS graduation_year
-      FROM institution_student_profiles isp
-      LEFT JOIN institution_units dept ON dept.id = isp.department_unit_id
-      LEFT JOIN institution_units prog ON prog.id = isp.program_unit_id
-      WHERE isp.student_user_id = ${studentUserId}::uuid AND isp.status = 'ACTIVE'
-      ORDER BY isp.updated_at DESC
-      LIMIT 1
-    `) as QueryResult<Record<string, unknown>>;
-    const [row] = rows.rows;
-    if (!row) return {};
-    return {
-      institutionId: row.institution_id ? String(row.institution_id) : null,
-      departmentName: row.department_name ? String(row.department_name) : null,
-      programName: row.program_name ? String(row.program_name) : null,
-      graduationYear: row.graduation_year == null ? null : Number(row.graduation_year),
-      // CGPA and backlogs are not modelled yet; evaluateEligibility fails these closed
-      // rather than assuming the student qualifies.
-    };
-  }
-
   private async writeAudit(actorUserId: string, action: string, resourceType: string, resourceId: string, correlationId: string, db: Pick<PersistenceDb, 'execute'> = this.db): Promise<void> {
     await db.execute(sql`
       INSERT INTO audit_events (id, actor_user_id, action, resource_type, resource_id, outcome, correlation_id)
@@ -701,16 +706,6 @@ function mapApplication(row: Record<string, unknown>): Record<string, unknown> {
     updatedAt: row.updated_at,
     termsAcknowledgementPending: Number(row.pending_terms ?? 0) > 0,
     feedbackReleased: row.feedback_released === true,
-  };
-}
-
-function mapEligibilityRule(row: Record<string, unknown>): EligibilityRule {
-  return {
-    ruleType: row.rule_type as EligibilityRule['ruleType'],
-    comparator: row.comparator as EligibilityRule['comparator'],
-    valueNumeric: row.value_numeric == null ? null : Number(row.value_numeric),
-    valueText: row.value_text == null ? null : String(row.value_text),
-    isBlocking: Boolean(row.is_blocking),
   };
 }
 

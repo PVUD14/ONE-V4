@@ -34,6 +34,7 @@ import {
   assertApplicationTransition,
   changedMaterialTerms,
   type ApplicationState,
+  type EligibilityRule,
   type MaterialTerms,
 } from '@planthepath/hiring';
 import {
@@ -71,6 +72,19 @@ import {
   recordOpportunityReviewSignals,
   type OpportunityVersionInput,
 } from './employer-hiring.controller.js';
+import {
+  displayValue,
+  eligibilityDisplayNames,
+  opportunityRequirementFields,
+  readEligibilityRecords,
+  readOpportunityRequirementsInput,
+  readVersionEligibilityRules,
+  readVersionRequirements,
+  recordEligibilityEvaluation,
+  writeVersionRequirements,
+} from './opportunity-requirements.js';
+import { evaluateStudentEligibility } from '@planthepath/hiring/src/eligibility.js';
+import { opportunityVersionReasonCodes } from '@planthepath/hiring/src/opportunity-requirements.js';
 
 type QueryResult<T> = { rows: T[] };
 type Executor = Pick<PersistenceDb, 'execute'>;
@@ -97,7 +111,12 @@ const versionColumns = sql`v.id, v.version_number, v.title, v.summary, v.respons
   v.material_terms_hash, v.created_at,
   coalesce((SELECT string_agg(concat_ws('|', r.rule_type, r.comparator, r.value_numeric::text, r.value_text, r.is_blocking::text), ';'
       ORDER BY r.rule_type, r.comparator, r.value_numeric, r.value_text, r.is_blocking)
-    FROM opportunity_eligibility_rules r WHERE r.opportunity_version_id = v.id), '') AS eligibility_signature`;
+    FROM opportunity_eligibility_rules r WHERE r.opportunity_version_id = v.id), '') AS eligibility_signature,
+  coalesce((SELECT string_agg(concat_ws('|', lower(s.skill_name), s.requirement_level, s.taxonomy_topic_id::text), ';' ORDER BY lower(s.skill_name))
+    FROM opportunity_skill_requirements s WHERE s.opportunity_version_id = v.id), '') AS skills_signature,
+  coalesce((SELECT string_agg(concat_ws('|', st.stage_order::text, st.stage_kind, st.label, st.detail), ';' ORDER BY st.stage_order)
+    FROM opportunity_selection_stages st WHERE st.opportunity_version_id = v.id), '') AS stages_signature,
+  v.career_role_id`;
 
 type VersionRow = Record<string, unknown> & { id: string; version_number: number; eligibility_signature: string };
 
@@ -163,6 +182,8 @@ export class EmployerJobLifecycleController {
         isCurrent: version.id === opportunity.current_version_id,
         change: previous ? (changed.length ? 'MATERIAL' : 'EDITORIAL') : 'INITIAL',
         changedTerms: changed,
+        // EMP-06: skills, stages and the catalogue role change a version without moving anyone's terms.
+        changedDetails: previous ? changedDetails(previous, version) : [],
       };
     }).reverse();
     const current = versions.rows.find((version) => version.id === opportunity.current_version_id);
@@ -185,7 +206,8 @@ export class EmployerJobLifecycleController {
         awaitingAcknowledgementCount: Number(opportunity.awaiting_count ?? 0),
         lastLifecycleChange: last ? { action: last.action, reasonCode: last.reason_code ?? null, trigger: last.trigger ?? 'EMPLOYER', occurredAt: last.occurred_at } : null,
       },
-      currentVersion: current ? mapVersion(current) : null,
+      currentVersion: current ? { ...mapVersion(current), requirements: await readVersionRequirements(this.db, current.id) } : null,
+      requirementReasonCodes: opportunityVersionReasonCodes,
       versions: history,
       correlationId: context.correlationId,
     };
@@ -201,9 +223,12 @@ export class EmployerJobLifecycleController {
     // Membership, then input, then state: malformed input is refused before any query.
     const context = requireEmployerMembership(request, employerId, employerManageRoles);
     const id = requireUuid(opportunityId, context.correlationId);
-    rejectUnknownFields(body, [...opportunityVersionFields, 'expectedCurrentVersionId'], context.correlationId);
+    rejectUnknownFields(body, [...opportunityVersionFields, ...opportunityRequirementFields, 'expectedCurrentVersionId'], context.correlationId);
     const expectedCurrentVersionId = readRequiredUuid(body, 'expectedCurrentVersionId', context.correlationId);
     const input = readOpportunityVersionInput(body, context.correlationId);
+    // EMP-06: eligibility rules, skills, stages and the catalogue role change only here, as part
+    // of a new version; a field left out is carried forward from the current version unchanged.
+    const requirements = readOpportunityRequirementsInput(body, context.correlationId);
     if (input.applicationDeadline && Date.parse(input.applicationDeadline) <= Date.now()) throw badRequest('INVALID_APPLICATIONDEADLINE', context.correlationId);
     await assertEmployerState(this.db, employerId, 'jobs.draft', context.correlationId);
     const actorId = context.authorization.principal.userId;
@@ -227,24 +252,16 @@ export class EmployerJobLifecycleController {
       const versionId = this.ids.uuid();
       const versionNumber = Number(previousVersion.version_number) + 1;
       await insertOpportunityVersion(tx, { opportunityId: id, versionId, versionNumber, input, actorId });
-      // Skills, stages and eligibility belong to a version; a new version carries them forward
-      // unchanged until a screen edits them (EMP-06).
-      await tx.execute(sql`
-        INSERT INTO opportunity_skill_requirements (id, opportunity_version_id, skill_name, requirement_level)
-        SELECT gen_random_uuid(), ${versionId}::uuid, skill_name, requirement_level FROM opportunity_skill_requirements WHERE opportunity_version_id = ${expectedCurrentVersionId}::uuid
-      `);
-      await tx.execute(sql`
-        INSERT INTO opportunity_selection_stages (id, opportunity_version_id, stage_order, stage_kind, label, detail)
-        SELECT gen_random_uuid(), ${versionId}::uuid, stage_order, stage_kind, label, detail FROM opportunity_selection_stages WHERE opportunity_version_id = ${expectedCurrentVersionId}::uuid
-      `);
-      await tx.execute(sql`
-        INSERT INTO opportunity_eligibility_rules (id, opportunity_version_id, rule_type, comparator, value_numeric, value_text, is_blocking)
-        SELECT gen_random_uuid(), ${versionId}::uuid, rule_type, comparator, value_numeric, value_text, is_blocking FROM opportunity_eligibility_rules WHERE opportunity_version_id = ${expectedCurrentVersionId}::uuid
-      `);
+      // Skills, stages, eligibility and the catalogue role belong to a version: the body's, or
+      // the previous version's carried forward (EMP-06). The previous version is never touched.
+      await writeVersionRequirements(tx, { versionId, previousVersionId: expectedCurrentVersionId, requirements, correlationId: context.correlationId });
       await tx.execute(sql`UPDATE opportunities SET current_version_id = ${versionId}::uuid, updated_at = now() WHERE id = ${id}::uuid AND employer_id = ${employerId}::uuid`);
       const next = await tx.execute(sql`SELECT ${versionColumns} FROM opportunity_versions v WHERE v.id = ${versionId}::uuid`) as QueryResult<VersionRow>;
       const nextVersion = next.rows[0]!;
       const changed = changedTerms(previousVersion, nextVersion);
+      const detailsChanged = changedDetails(previousVersion, nextVersion);
+      // Changing a live job's eligibility moves the terms everyone applied under, so it says why.
+      if (live && changed.includes(ELIGIBILITY_TERM) && !requirements.reasonCode) throw badRequest('REASON_CODE_REQUIRED', context.correlationId);
 
       const termChanges = await this.recordApplicantTermChanges(tx, { employerId, opportunityId: id, versionId, nextVersion, actorId, correlationId: context.correlationId });
       await recordOpportunityReviewSignals(tx, (effect) => effect(tx), this.ids, { opportunityId: id, employerId, actorId, correlationId: context.correlationId });
@@ -252,7 +269,8 @@ export class EmployerJobLifecycleController {
       const change = changed.length ? 'MATERIAL' : 'EDITORIAL';
       await writeAudit(tx, this.ids, {
         actorId, action: 'opportunity.version_created', resourceType: 'opportunity', resourceId: id, employerId, correlationId: context.correlationId,
-        context: { versionId, versionNumber, change, changedTerms: changed, applicantsAffected: termChanges.recorded, acknowledgementsRequired: termChanges.required },
+        context: { versionId, versionNumber, change, changedTerms: changed, changedDetails: detailsChanged, applicantsAffected: termChanges.recorded,
+          acknowledgementsRequired: termChanges.required, ...(requirements.reasonCode ? { reasonCode: requirements.reasonCode } : {}) },
       });
       await writeOutbox(tx, this.ids, { aggregateType: 'opportunity', aggregateId: id, eventType: 'opportunity.version.created',
         payload: { opportunityId: id, employerId, versionId, change }, actorId, employerId, correlationId: context.correlationId });
@@ -261,7 +279,7 @@ export class EmployerJobLifecycleController {
       }
       return {
         opportunity: { id, lifecycleState: state, currentVersionId: versionId },
-        version: { id: versionId, versionNumber, change, changedTerms: changed },
+        version: { id: versionId, versionNumber, change, changedTerms: changed, changedDetails: detailsChanged },
         applicants: { termChangesRecorded: termChanges.recorded, acknowledgementsRequired: termChanges.required },
         correlationId: context.correlationId,
       };
@@ -463,13 +481,15 @@ export class StudentTermsChangeController {
     if (!pending) return { termsChange: null, correlationId: context.correlationId };
     const [from, to] = await Promise.all([readVersion(this.db, pending.acceptedVersionId), readVersion(this.db, pending.toVersionId)]);
     if (!from || !to) return { termsChange: null, correlationId: context.correlationId };
+    // EMP-06: a college in an eligibility rule is shown by its name, never its identifier.
+    const names = await eligibilityDisplayNames(this.db, [...eligibilityOf(from), ...eligibilityOf(to)]);
     return {
       termsChange: {
         toVersionId: pending.toVersionId,
         employerName: owned.rows[0].employer_name,
         changedTerms: changedTerms(from, to),
-        appliedTerms: studentTerms(from),
-        newTerms: studentTerms(to),
+        appliedTerms: studentTerms(from, names),
+        newTerms: studentTerms(to, names),
       },
       correlationId: context.correlationId,
     };
@@ -515,6 +535,16 @@ export class StudentTermsChangeController {
           AND to_version_id IN (SELECT v.id FROM opportunity_versions v WHERE v.opportunity_id = ${application.opportunity_id}::uuid
             AND v.version_number <= (SELECT version_number FROM opportunity_versions WHERE id = ${toVersionId}::uuid))
       `);
+      // EMP-06: accepting a version whose eligibility changed binds the applicant to rules nobody
+      // has evaluated for them, so the new rules are evaluated and frozen for the employer. A
+      // blocking rule the applicant no longer meets is a flag for a person, never a rejection.
+      if (decision === 'ACKNOWLEDGE') {
+        const [acceptedRules, newRules] = await Promise.all([readVersionEligibilityRules(tx, pending.acceptedVersionId), readVersionEligibilityRules(tx, toVersionId)]);
+        if (newRules.length && JSON.stringify(acceptedRules) !== JSON.stringify(newRules)) {
+          const evaluation = evaluateStudentEligibility(newRules, await readEligibilityRecords(tx, studentUserId));
+          await recordEligibilityEvaluation(tx, this.ids, { applicationId: id, versionId: toVersionId, trigger: 'TERMS_ACKNOWLEDGED', evaluation });
+        }
+      }
       const eventType = decision === 'ACKNOWLEDGE' ? 'application.terms_change.acknowledged' : 'application.terms_change.declined';
       await writeAudit(tx, this.ids, { actorId: studentUserId, action: eventType, resourceType: 'application', resourceId: id,
         employerId: null, correlationId: context.correlationId, context: { toVersionId } });
@@ -619,6 +649,15 @@ function changedTerms(from: VersionRow, to: VersionRow): readonly string[] {
   return changed;
 }
 
+/** Version details outside the material terms that differ: skills, stages, the catalogue role. */
+function changedDetails(from: VersionRow, to: VersionRow): readonly string[] {
+  const changed: string[] = [];
+  if (String(from.skills_signature ?? '') !== String(to.skills_signature ?? '')) changed.push('skills');
+  if (String(from.stages_signature ?? '') !== String(to.stages_signature ?? '')) changed.push('stages');
+  if ((from.career_role_id ?? null) !== (to.career_role_id ?? null)) changed.push('careerRole');
+  return changed;
+}
+
 function mapVersion(row: VersionRow): Record<string, unknown> {
   return {
     id: row.id,
@@ -643,7 +682,15 @@ function mapVersion(row: VersionRow): Record<string, unknown> {
 }
 
 /** What a student sees of a version's terms: the material fields and the eligibility rules. */
-function studentTerms(row: VersionRow): Record<string, unknown> {
+function eligibilityOf(row: VersionRow): EligibilityRule[] {
+  return (Array.isArray(row.eligibility) ? row.eligibility as Record<string, unknown>[] : []).map((rule) => ({
+    ruleType: rule.ruleType as EligibilityRule['ruleType'], comparator: rule.comparator as EligibilityRule['comparator'],
+    valueNumeric: rule.valueNumeric == null ? null : Number(rule.valueNumeric), valueText: rule.valueText == null ? null : String(rule.valueText),
+    isBlocking: rule.isBlocking === true,
+  }));
+}
+
+function studentTerms(row: VersionRow, names: ReadonlyMap<string, string>): Record<string, unknown> {
   return {
     title: row.title,
     employmentType: row.employment_type,
@@ -655,7 +702,7 @@ function studentTerms(row: VersionRow): Record<string, unknown> {
       : null,
     joiningConditions: row.joining_conditions ?? null,
     applicationDeadline: row.application_deadline ?? null,
-    eligibility: Array.isArray(row.eligibility) ? row.eligibility : [],
+    eligibility: eligibilityOf(row).map((rule) => ({ ...rule, displayValue: displayValue(rule, names) })),
   };
 }
 

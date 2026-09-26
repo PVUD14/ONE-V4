@@ -1,22 +1,27 @@
 /**
- * Unit and property tests for the learner skill state projection (ENG-05, learner-skill-state-v1).
+ * Unit and property tests for the learner skill state projection (ENG-05, ENG-06; now
+ * learner-skill-state-v2, which adds mastery-bkt-v1 in shadow).
  *
  * Why: the projection must be a pure function of facts, so that rebuilding it reproduces the
  * table exactly and a replayed projector changes nothing. These pin the rules the design
  * (docs/architecture/learner-skill-state-table-design.md) sets: which attempts bear on which
  * skill, that blanks and assisted successes never count (C5), that one attempt is never a band
- * (C3), when a misconception code is active, and that no numeric mastery or review value
- * appears before the goal that computes it. Random histories use a seeded generator.
+ * (C3), when a misconception code is active, that BKT mastery is computed from exactly the
+ * unaided answered attempts and always carries its algorithm, and that no review value appears
+ * before the goal that computes it. Random histories use a seeded generator.
  */
 import { describe, expect, it } from 'vitest';
 import {
   LEARNER_SKILL_STATE_ALGORITHM_ID,
   LearningModelError,
   activeMisconceptionsBySkill,
+  masteryObservationsBySkill,
   projectLearnerSkillStates,
+  skillMasteryTraces,
   summariseSkillEvidence,
   type ProjectionAttempt,
 } from '../src/index.js';
+import { estimateMastery, traceMastery, type BktParameters } from '@planthepath/mastery-bkt/src/index.js';
 
 const SKILL_A = 'aaaaaaaa-0000-4000-8000-000000000001';
 const SKILL_B = 'bbbbbbbb-0000-4000-8000-000000000002';
@@ -109,14 +114,56 @@ describe('projectLearnerSkillStates', () => {
     expect(row?.institutionId).toBe(OTHER_INSTITUTION);
   });
 
-  it('stamps its algorithm and leaves mastery and review values empty until ENG-06 and ENG-09 compute them', () => {
+  it('stamps its algorithm, fills BKT mastery in shadow, and leaves review values empty until ENG-09', () => {
     const [row] = projectLearnerSkillStates([attempt()]);
     expect(row).toMatchObject({
       algorithmVersion: LEARNER_SKILL_STATE_ALGORITHM_ID,
-      masteryLikelihood: null, masteryUncertainty: null, masteryAlgorithmVersion: null,
+      ...(() => { const e = estimateMastery([true])!; return { masteryLikelihood: e.likelihood, masteryUncertainty: e.uncertainty }; })(),
+      masteryAlgorithmVersion: 'mastery-bkt-v1',
       reviewStability: null, reviewDifficulty: null, reviewDueAt: null, reviewAlgorithmVersion: null,
     });
-    expect(LEARNER_SKILL_STATE_ALGORITHM_ID).toBe('learner-skill-state-v1');
+    expect(LEARNER_SKILL_STATE_ALGORITHM_ID).toBe('learner-skill-state-v2');
+  });
+
+  it('computes mastery over unaided answered attempts in time order, not input order', () => {
+    const history = [
+      attempt({ occurredAt: '2026-09-03T05:00:00.000Z', correct: true }),
+      attempt({ occurredAt: '2026-09-01T05:00:00.000Z', correct: false }),
+      attempt({ occurredAt: '2026-09-02T05:00:00.000Z', answered: false, correct: false }),
+      attempt({ occurredAt: '2026-09-02T06:00:00.000Z', correct: true, highestHintLevel: 3, assisted: true }),
+      attempt({ occurredAt: '2026-09-02T07:00:00.000Z', correct: false, tutorReplied: true }),
+      attempt({ occurredAt: '2026-09-04T05:00:00.000Z', correct: true }),
+    ];
+    expect(masteryObservationsBySkill(history).get(SKILL_A)).toEqual([false, true, true]);
+    const [row] = projectLearnerSkillStates(history);
+    expect(row?.masteryLikelihood).toBe(estimateMastery([false, true, true])!.likelihood);
+    expect(skillMasteryTraces(history).get(SKILL_A)).toEqual(traceMastery([false, true, true]));
+  });
+
+  it('never moves mastery on an assisted attempt, correct or wrong (C5)', () => {
+    const unaided = [attempt({ occurredAt: '2026-09-01T05:00:00.000Z', correct: false })];
+    const withHelp = [
+      ...unaided,
+      attempt({ occurredAt: '2026-09-02T05:00:00.000Z', highestHintLevel: 4, assisted: true }),
+      attempt({ occurredAt: '2026-09-03T05:00:00.000Z', correct: false, highestHintLevel: 3, assisted: true }),
+    ];
+    expect(projectLearnerSkillStates(withHelp)[0]?.masteryLikelihood).toBe(projectLearnerSkillStates(unaided)[0]?.masteryLikelihood);
+  });
+
+  it('leaves mastery empty when nothing was observed: only assisted attempts, or a misconception-only row', () => {
+    const [assistedOnly] = projectLearnerSkillStates([attempt({ highestHintLevel: 3, assisted: true })]);
+    expect(assistedOnly).toMatchObject({ masteryLikelihood: null, masteryUncertainty: null, masteryAlgorithmVersion: null });
+    const rows = projectLearnerSkillStates([attempt({ correct: false, misconceptions: [{ code: 'SUBNET_BOUNDARY', skillId: SKILL_B }] })]);
+    expect(rows.find((row) => row.skillId === SKILL_B)).toMatchObject({ attemptCount: 0, masteryLikelihood: null, masteryAlgorithmVersion: null });
+  });
+
+  it('uses a per-skill fitted parameter set only for its skill, and stamps the fit on the version', () => {
+    const fitted: BktParameters = { pInit: 0.3, pLearn: 0.15, pGuess: 0.25, pSlip: 0.08, source: 'FITTED', fitRunId: 'fit-1' };
+    const rows = projectLearnerSkillStates([attempt({ skillIds: [SKILL_A, SKILL_B] })], { fittedParameters: new Map([[SKILL_B, fitted]]) });
+    expect(rows.find((row) => row.skillId === SKILL_A)?.masteryAlgorithmVersion).toBe('mastery-bkt-v1');
+    expect(rows.find((row) => row.skillId === SKILL_B)).toMatchObject({
+      masteryAlgorithmVersion: 'mastery-bkt-v1+fit:fit-1', masteryLikelihood: estimateMastery([true], fitted)!.likelihood,
+    });
   });
 
   it('refuses the same attempt twice rather than double-counting it', () => {
@@ -251,7 +298,7 @@ function shuffle<T>(values: readonly T[], next: () => number): T[] {
   return copy;
 }
 
-describe('learner-skill-state-v1 properties', () => {
+describe('learner-skill-state-v2 properties', () => {
   it('is deterministic and independent of the order facts are read in (rebuild = incremental)', () => {
     const next = generator(5);
     for (let run = 0; run < RUNS; run += 1) {
@@ -274,7 +321,16 @@ describe('learner-skill-state-v1 properties', () => {
         expect(row.lastAttemptAt === null).toBe(row.attemptCount === 0);
         expect(row.activeMisconceptionCodes).toEqual([...new Set(row.activeMisconceptionCodes)].sort());
         if (row.attemptDayCount < 2) expect(row.evidenceBand).toBe('NOT_ENOUGH_EVIDENCE');
-        expect(row.masteryLikelihood).toBeNull();
+        // A number never appears without its algorithm, and stays within the column's bounds.
+        expect(row.masteryLikelihood === null).toBe(row.masteryAlgorithmVersion === null);
+        expect(row.masteryUncertainty === null).toBe(row.masteryAlgorithmVersion === null);
+        if (row.masteryLikelihood !== null) {
+          expect(row.masteryAlgorithmVersion).toBe('mastery-bkt-v1');
+          expect(row.masteryLikelihood).toBeGreaterThanOrEqual(0);
+          expect(row.masteryLikelihood).toBeLessThanOrEqual(1);
+          expect(Math.round(row.masteryLikelihood * 10_000) / 10_000).toBe(row.masteryLikelihood);
+        }
+        if (row.attemptCount === 0) expect(row.masteryLikelihood).toBeNull();
         expect(row.reviewDueAt).toBeNull();
       }
     }

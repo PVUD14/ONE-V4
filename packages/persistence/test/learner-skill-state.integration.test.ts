@@ -15,6 +15,7 @@ import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { sql } from 'drizzle-orm';
 import { createIntegrationEventEnvelope } from '@planthepath/events/src/index.js';
+import { estimateMastery } from '@planthepath/mastery-bkt/src/index.js';
 import type { ImportPackageManifest } from '@planthepath/career-readiness/src/index.js';
 import * as schema from '../src/schema.js';
 import type { PersistenceDb } from '../src/repositories.js';
@@ -387,7 +388,12 @@ describe('rebuilding from attempts reproduces the table exactly', () => {
     const firstA = incremental.find((row) => row.subject_user_id === first && row.skill_id === topicA)!;
     expect(firstA).toMatchObject({ attempt_count: 4, attempt_day_count: 4, unaided_success_count: 2, unaided_success_day_count: 2,
       assisted_success_count: 1, evidence_stage: 'DEMONSTRATED', evidence_band: 'DEMONSTRATED', institution_id: null,
-      algorithm_version: 'learner-skill-state-v1', mastery_likelihood: null, review_due_at: null });
+      algorithm_version: 'learner-skill-state-v2', review_due_at: null,
+      // BKT in shadow over the unaided answered attempts, in time order: wrong, correct, correct
+      // (the assisted success on day 5 and the blank on day 8 are not observations).
+      mastery_likelihood: estimateMastery([false, true, true])!.likelihood.toFixed(4),
+      mastery_uncertainty: estimateMastery([false, true, true])!.uncertainty.toFixed(4),
+      mastery_algorithm_version: 'mastery-bkt-v1' });
     // The exam item counts on the topic its subject was mapped to when it was sat.
     const firstB = incremental.find((row) => row.subject_user_id === first && row.skill_id === topicB)!;
     expect(firstB).toMatchObject({ attempt_count: 1, unaided_success_count: 1, evidence_stage: 'RETAINED', institution_id: institutionId });

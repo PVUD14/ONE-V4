@@ -89,7 +89,9 @@ afterAll(async () => {
   await app?.close(); await pool.end();
   await adminPool.query('DROP SCHEMA IF EXISTS ' + schemaName + ' CASCADE');
   await adminPool.end();
-});
+  // Dropping a full migrated schema under load can outlast the default hook timeout; a schema
+  // left behind makes unqualified information_schema checks in other suites see two copies.
+}, 120_000);
 
 async function unit(id: string, kind: string, name: string, parent: string | null) {
   await pool.query('INSERT INTO institution_units (id,institution_id,kind,name,parent_unit_id) VALUES ($1,$2,$3,$4,$5)', [id, institutionId, kind, name, parent]);

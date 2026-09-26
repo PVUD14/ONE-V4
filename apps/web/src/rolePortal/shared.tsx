@@ -119,6 +119,16 @@ export function safeErrorMessage(code: string | undefined): string | undefined {
     case 'APPROVAL_SOLO_COOLING_OFF': return 'As the only approver you can approve your own request 15 minutes after filing it.';
     case 'APPROVAL_SUBJECT_CONFLICT': return 'You cannot approve a grant of capability to yourself.';
     case 'APPROVAL_NOT_PENDING': return 'This request has already been decided.';
+    // OPS-09a: the skill map editor.
+    case 'SKILL_INVALID': return 'The skill is not ready: check every level is described, a licence is chosen (with attribution for a CC licence), and its prerequisites are known skills that do not loop back to it.';
+    case 'SKILL_KEY_EXISTS': return 'A skill with this key already exists.';
+    case 'SKILL_KEY_INVALID': return 'A key is 3 to 80 lower-case letters, digits and hyphens, starting with a letter or digit.';
+    case 'SKILL_OPEN_REVISION_EXISTS': return 'This skill already has a revision on its way. Finish that one first.';
+    case 'SKILL_REVISION_NOT_EDITABLE': return 'This revision is in review or approved, so it cannot be edited. A reviewer can send it back for changes.';
+    case 'SKILL_SELF_REVIEW_REFUSED': return 'You wrote or edited this revision, so someone else reviews it.';
+    case 'SKILL_SELF_PUBLISH_REFUSED': return 'You wrote or edited this revision, so someone else publishes it.';
+    case 'SKILL_PREREQUISITE_NOT_LIVE': return 'A prerequisite of this skill is not published yet. Publish its prerequisites first.';
+    case 'SKILL_RIGHTS_NOT_REVIEWED': return 'This revision has no rights review. It must be approved by a reviewer first.';
     default: return undefined;
   }
 }

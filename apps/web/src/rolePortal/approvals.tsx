@@ -18,6 +18,7 @@ import {
   grantStaffCapability,
   listOperationApprovals,
   publishCareerRequirementSet,
+  publishSkillRevision,
   releasePrivacyHold,
   requestOperationApproval,
   setFeatureFlagState,
@@ -50,6 +51,8 @@ export function describeApproval(approval: OperationApprovalDto): string {
     case 'CAPABILITY_GRANT_HIGH_RISK': return `Grant ${summary.capability ?? 'NA'} to ${summary.memberEmail ?? 'NA'}`;
     case 'CAREER_REQUIREMENT_SET_PUBLISH':
       return `Publish requirement set v${summary.careerSetVersion ?? 'NA'} for ${summary.careerRoleCatalogueCode ? `${summary.careerRoleCatalogueCode} ` : ''}${summary.careerRoleTitle ?? 'NA'} as ${summary.releaseLabel === 'VERIFIED' ? 'Verified' : 'Not yet verified'}`;
+    case 'CONTENT_SKILL_PUBLISH':
+      return `Publish revision ${summary.skillRevision ?? 'NA'} of the skill ${summary.skillName ?? 'NA'} (${summary.skillKey ?? 'NA'})`;
   }
 }
 
@@ -76,6 +79,8 @@ async function executeApproval(token: string, approval: OperationApprovalDto): P
       }); return;
     case 'CAREER_REQUIREMENT_SET_PUBLISH':
       await publishCareerRequirementSet(token, String(payload.setId), { releaseLabel: String(payload.releaseLabel), reasonCode, approvalId }); return;
+    case 'CONTENT_SKILL_PUBLISH':
+      await publishSkillRevision(token, String(payload.revisionId), { reasonCode, approvalId }); return;
   }
 }
 

@@ -86,6 +86,8 @@ const operationApprovalActionKeys = [
   'CAPABILITY_GRANT_HIGH_RISK',
   // OPS-08: stored in operation_approvals.extended_action_key (0051), not 0038's CHECK.
   'CAREER_REQUIREMENT_SET_PUBLISH',
+  // OPS-09a: extended key as well (0057).
+  'CONTENT_SKILL_PUBLISH',
 ] as const;
 
 // EMP-05: opportunities.lifecycle_state (0007 CHECK).
@@ -93,6 +95,9 @@ const opportunityLifecycleStates = ['DRAFT', 'PENDING_REVIEW', 'PUBLISHED', 'PAU
 
 // OPS-08: requirement-set lifecycle states (0051).
 const careerRequirementSetStates = ['DRAFT', 'IN_REVIEW', 'REVIEWED', 'PUBLISHED', 'SUPERSEDED', 'WITHDRAWN'] as const;
+
+// OPS-09a: the 0004 content-revision lifecycle, as a skill revision moves through it.
+const skillRevisionStates = ['DRAFT', 'IN_REVIEW', 'CHANGES_REQUESTED', 'APPROVED', 'PUBLISHED'] as const;
 
 export const eventSchemas = {
   identityInvitationAcceptedV1: {
@@ -592,6 +597,36 @@ export const eventSchemas = {
       setId: { kind: 'uuid' },
       careerRoleId: { kind: 'uuid' },
       releaseLabel: { kind: 'enum', values: ['SELECTABLE', 'VERIFIED'] },
+    },
+  },
+  // OPS-09a: skill map revisions. No consumer yet; identifiers and enums only.
+  skillMapRevisionStateChangedV1: {
+    eventType: 'skill_map.revision_state_changed',
+    eventVersion: 1,
+    producer: 'operations-content',
+    aggregateType: 'content_revision',
+    purpose: 'content-authoring',
+    dataClassification: 'internal',
+    schemaRef: 'registry://skill_map.revision_state_changed/1',
+    payload: {
+      revisionId: { kind: 'uuid' },
+      topicId: { kind: 'uuid' },
+      fromState: { kind: 'enum', values: skillRevisionStates },
+      toState: { kind: 'enum', values: skillRevisionStates },
+    },
+  },
+  skillMapSkillPublishedV1: {
+    eventType: 'skill_map.skill_published',
+    eventVersion: 1,
+    producer: 'operations-content',
+    aggregateType: 'content_revision',
+    purpose: 'content-authoring',
+    dataClassification: 'internal',
+    schemaRef: 'registry://skill_map.skill_published/1',
+    payload: {
+      revisionId: { kind: 'uuid' },
+      topicId: { kind: 'uuid' },
+      releaseManifestId: { kind: 'uuid' },
     },
   },
   learningLessonCompletedV1: {

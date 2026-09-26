@@ -476,3 +476,4 @@ export function careerTargetProgress(gap: CareerGap): {
 
 // ENG-07: misconception codes, option tags and teaching strategies (pure rules).
 export * from './misconceptions.js';
+export * from './skill-map.js';

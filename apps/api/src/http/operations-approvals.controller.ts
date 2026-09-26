@@ -38,11 +38,13 @@ import {
   isInternalCapability,
   refuseApprovalRequest,
   refuseInternalCapabilityGrant,
+  refuseSkillPublish,
   type ApprovalDecision,
   type HighRiskActionKey,
   type InternalCapabilityContext,
 } from '@planthepath/authorization/src/index.js';
 import { loadRequirementSetForPublish } from '@planthepath/persistence/src/career-catalogue.js';
+import { loadSkillRevisionForPublish } from '@planthepath/persistence/src/skill-map.js';
 import {
   countHighRiskApprovers,
   createOperationApproval,
@@ -257,6 +259,18 @@ export class OperationsApprovalsController {
         if (set.state !== 'REVIEWED') throw badRequest('APPROVAL_TARGET_STATE_INVALID', correlationId);
         return { targetId: setId, canonical: approvalPayloads.CAREER_REQUIREMENT_SET_PUBLISH({ setId, releaseLabel: payload.releaseLabel, reasonCode }) };
       }
+      case 'CONTENT_SKILL_PUBLISH': {
+        // OPS-09a: only an approved skill revision whose publish changes readiness inputs, and
+        // only by someone who wrote none of it (they will execute it).
+        const revisionId = requireUuidField(payload.revisionId, correlationId);
+        const revision = await loadSkillRevisionForPublish(this.db, revisionId);
+        if (!revision) throw new OperationApprovalError('APPROVAL_TARGET_NOT_FOUND');
+        if (revision.state !== 'APPROVED') throw badRequest('APPROVAL_TARGET_STATE_INVALID', correlationId);
+        if (!revision.needsApproval) throw new OperationApprovalError('APPROVAL_NOT_REQUIRED');
+        const refusal = refuseSkillPublish({ actor, contributorUserIds: revision.contributorUserIds });
+        if (refusal) throw new ForbiddenException(domainError(refusal, correlationId));
+        return { targetId: revisionId, canonical: approvalPayloads.CONTENT_SKILL_PUBLISH({ revisionId, contentHash: revision.contentHash, reasonCode }) };
+      }
     }
   }
 }
@@ -269,6 +283,7 @@ const payloadFields: Readonly<Record<HighRiskActionKey, readonly string[]>> = {
   PRIVACY_HOLD_RELEASE: ['holdId', 'reasonCode'],
   CAPABILITY_GRANT_HIGH_RISK: ['membershipId', 'capability', 'reasonCode', 'note'],
   CAREER_REQUIREMENT_SET_PUBLISH: ['setId', 'releaseLabel', 'reasonCode'],
+  CONTENT_SKILL_PUBLISH: ['revisionId', 'reasonCode'],
 };
 
 /**
@@ -303,6 +318,9 @@ function toApprovalDto(row: OperationApprovalRow, actor: Actor, approverCount: n
       careerRoleCatalogueCode: row.careerRoleCatalogueCode,
       careerSetVersion: row.careerSetVersion,
       releaseLabel: row.actionKey === 'CAREER_REQUIREMENT_SET_PUBLISH' ? payload.releaseLabel ?? null : null,
+      skillName: row.skillName,
+      skillKey: row.skillKey,
+      skillRevision: row.skillRevision,
     },
     reasonCode: row.reasonCode,
     note: row.note,

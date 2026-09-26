@@ -31,6 +31,9 @@ export const approvalPayloads = {
   // the exact content; the label the role will carry after publishing is part of the payload.
   CAREER_REQUIREMENT_SET_PUBLISH: (input: { readonly setId: string; readonly releaseLabel: string; readonly reasonCode: string }) =>
     ({ setId: input.setId.toLowerCase(), releaseLabel: input.releaseLabel, reasonCode: input.reasonCode }),
+  // OPS-09a: an APPROVED revision is frozen; its content hash makes the bound payload the exact content.
+  CONTENT_SKILL_PUBLISH: (input: { readonly revisionId: string; readonly contentHash: string; readonly reasonCode: string }) =>
+    ({ revisionId: input.revisionId.toLowerCase(), contentHash: input.contentHash, reasonCode: input.reasonCode }),
 } satisfies Record<HighRiskActionKey, (input: never) => Record<string, unknown> & { reasonCode: string }>;
 
 function domainError(code: string, correlationId: string): { readonly error: { readonly code: string; readonly message: string; readonly correlationId: string } } {

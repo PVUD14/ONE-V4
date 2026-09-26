@@ -180,6 +180,10 @@ export interface OperationApprovalRow {
   readonly careerRoleTitle: string | null;
   readonly careerRoleCatalogueCode: string | null;
   readonly careerSetVersion: number | null;
+  /** For a skill publish (OPS-09a): the skill's name and key and the revision number. */
+  readonly skillName: string | null;
+  readonly skillKey: string | null;
+  readonly skillRevision: number | null;
 }
 
 interface ApprovalDbRow {
@@ -190,6 +194,7 @@ interface ApprovalDbRow {
   solo: boolean; solo_notice_state: string | null; executed_at: Date | null;
   organization_name: string | null; member_email: string | null; member_user_id: string | null; hold_reason: string | null;
   career_role_title: string | null; career_role_catalogue_code: string | null; career_set_version: number | null;
+  skill_name: string | null; skill_key: string | null; skill_revision: number | null;
 }
 
 // Microsecond text timestamps for the keyset cursor: a millisecond cursor would repeat
@@ -206,7 +211,8 @@ const approvalSelect = sql`
          a.decided_by_user_id, du.email AS decider_email, a.decided_at, a.decision_reason_code,
          a.solo, a.solo_notice_state, a.executed_at,
          o.legal_name AS organization_name, mu.email AS member_email, mu.id AS member_user_id, h.reason_code AS hold_reason,
-         cr.title AS career_role_title, cr.catalogue_code AS career_role_catalogue_code, crs.version AS career_set_version
+         cr.title AS career_role_title, cr.catalogue_code AS career_role_catalogue_code, crs.version AS career_set_version,
+         COALESCE(skr.body->>'name', skn.name) AS skill_name, skn.stable_key AS skill_key, skr.revision AS skill_revision
   FROM operation_approvals a
   JOIN users ru ON ru.id = a.requested_by_user_id
   LEFT JOIN users du ON du.id = a.decided_by_user_id
@@ -215,7 +221,9 @@ const approvalSelect = sql`
   LEFT JOIN users mu ON mu.id = mm.user_id
   LEFT JOIN data_retention_holds h ON a.target_type = 'data_retention_hold' AND h.id::text = a.target_id
   LEFT JOIN career_requirement_sets crs ON a.extended_target_type = 'career_requirement_set' AND crs.id::text = a.target_id
-  LEFT JOIN career_roles cr ON cr.id = crs.career_role_id`;
+  LEFT JOIN career_roles cr ON cr.id = crs.career_role_id
+  LEFT JOIN content_revisions skr ON a.extended_target_type = 'content_revision' AND skr.id::text = a.target_id
+  LEFT JOIN taxonomy_nodes skn ON skn.id = skr.entity_id`;
 
 function mapApproval(row: ApprovalDbRow): OperationApprovalRow {
   const live = row.state === 'PENDING' || row.state === 'APPROVED';
@@ -250,6 +258,9 @@ function mapApproval(row: ApprovalDbRow): OperationApprovalRow {
     careerRoleTitle: row.career_role_title,
     careerRoleCatalogueCode: row.career_role_catalogue_code,
     careerSetVersion: row.career_set_version === null ? null : Number(row.career_set_version),
+    skillName: row.skill_name,
+    skillKey: row.skill_key,
+    skillRevision: row.skill_revision === null ? null : Number(row.skill_revision),
   };
 }
 

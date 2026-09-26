@@ -78,7 +78,9 @@ fun classifyWorkspaces(ctx: SecurityContextDto): List<Workspace> {
             role == "STUDENT" -> out += Workspace(WorkspaceKind.STUDENT, m.organizationId, m.role)
         }
     }
-    if (out.none { it.kind == WorkspaceKind.STUDENT } && ctx.studentRelationships.any { it.state == "ACTIVE" }) {
+    // INST-10: someone who graduated, transferred or left keeps their student workspace.
+    val student = ctx.studentRelationships.any { it.state == "ACTIVE" || it.state == "VERIFIED" } || ctx.formerStudentRelationships.isNotEmpty()
+    if (out.none { it.kind == WorkspaceKind.STUDENT } && student) {
         out += Workspace(WorkspaceKind.STUDENT, null, "STUDENT")
     }
     // One entry per kind+org.

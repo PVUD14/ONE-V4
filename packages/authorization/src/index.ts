@@ -116,3 +116,4 @@ export * from './aggregate-suppression.js';
 export * from './privacy-console.js';
 export * from './operations-overview.js';
 export * from './career-catalogue.js';
+export * from './institution-exports.js';

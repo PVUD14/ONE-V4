@@ -30,10 +30,8 @@ import {
 import type { Pool } from 'pg';
 import {
   PlatformControlError,
-  grantMembershipCapability,
   listFeatureFlags,
   listMembershipCapabilities,
-  revokeMembershipCapability,
   setFeatureFlagEnabled,
 } from '@planthepath/persistence/src/platform-controls.js';
 import { PG_POOL } from '../persistence.provider.js';
@@ -43,6 +41,12 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { isHighRiskFlagChange } from '@planthepath/authorization/src/index.js';
 import { OperationApprovalError, consumeOperationApproval } from '@planthepath/persistence/src/operation-approvals.js';
 import { approvalHttpError, approvalPayloads, readApprovalId } from './operation-approval-gate.js';
+import {
+  InstitutionExportError,
+  grantInstitutionAnalytics,
+  listInstitutionAnalyticsAccess,
+  revokeInstitutionAnalytics,
+} from '@planthepath/persistence/src/institution-exports.js';
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const reasonCodePattern = /^[A-Z0-9_:-]{3,64}$/;
@@ -107,7 +111,9 @@ export class PlatformControlsController {
   async capabilities(@Req() request: ProtectedHttpRequest, @Param('institutionId') institutionId: string): Promise<Record<string, unknown>> {
     const id = requireUuid(institutionId);
     requireInstitutionAdmin(request, id);
-    return { capabilities: await listMembershipCapabilities(this.pool, id) };
+    // INST-08: `eligible` lists who may hold INSTITUTION_ANALYTICS (active admins and
+    // department heads), with their live grant, so the Staff screen can grant and revoke.
+    return { capabilities: await listMembershipCapabilities(this.pool, id), eligible: await listInstitutionAnalyticsAccess(this.pool, id) };
   }
 
   @Post('/institutions/:institutionId/capabilities')
@@ -131,15 +137,17 @@ export class PlatformControlsController {
     );
     if (!owned.rowCount) throw new NotFoundException({ error: { code: 'MEMBERSHIP_NOT_FOUND' } });
 
+    const reasonCode = readReasonCode(raw.reasonCode);
     try {
-      await grantMembershipCapability(this.pool, {
-        membershipId: raw.membershipId, capability: 'INSTITUTION_ANALYTICS',
-        grantedByUserId: actorUserId, reasonCode: readReasonCode(raw.reasonCode),
+      // INST-08: the grant and its audit row in one transaction.
+      await grantInstitutionAnalytics(this.pool, {
+        institutionId: id, membershipId: raw.membershipId, actorUserId, reasonCode,
+        correlationId: request.planThePath?.correlationId ?? 'unknown',
       });
     } catch (error) {
       throw mapControlError(error);
     }
-    return { capabilities: await listMembershipCapabilities(this.pool, id) };
+    return { capabilities: await listMembershipCapabilities(this.pool, id), eligible: await listInstitutionAnalyticsAccess(this.pool, id) };
   }
 
   @Post('/institutions/:institutionId/capabilities/:capabilityId/revoke')
@@ -148,20 +156,24 @@ export class PlatformControlsController {
     @Req() request: ProtectedHttpRequest,
     @Param('institutionId') institutionId: string,
     @Param('capabilityId') capabilityId: string,
+    @Body() body: unknown,
   ): Promise<Record<string, unknown>> {
     const id = requireUuid(institutionId);
     const actorUserId = requireInstitutionAdmin(request, id);
-    const owned = await this.pool.query(
-      `SELECT 1 FROM membership_capabilities c JOIN organization_memberships m ON m.id = c.membership_id
-       WHERE c.id=$1 AND m.organization_id=$2`, [requireUuid(capabilityId), id],
-    );
-    if (!owned.rowCount) throw new NotFoundException({ error: { code: 'CAPABILITY_NOT_FOUND' } });
+    const capability = requireUuid(capabilityId);
+    // INST-08: a revocation carries a reason code, like the grant, and is audited in the same
+    // transaction. Only INSTITUTION_ANALYTICS grants of this institution can be revoked here:
+    // an operations grant on an institution membership is not the college's to remove.
+    const reasonCode = readReasonCode(readObject(body).reasonCode);
     try {
-      await revokeMembershipCapability(this.pool, { capabilityId, revokedByUserId: actorUserId });
+      await revokeInstitutionAnalytics(this.pool, {
+        institutionId: id, capabilityId: capability, actorUserId, reasonCode,
+        correlationId: request.planThePath?.correlationId ?? 'unknown',
+      });
     } catch (error) {
       throw mapControlError(error);
     }
-    return { capabilities: await listMembershipCapabilities(this.pool, id) };
+    return { capabilities: await listMembershipCapabilities(this.pool, id), eligible: await listInstitutionAnalyticsAccess(this.pool, id) };
   }
 }
 
@@ -207,7 +219,7 @@ function requireUuid(value: string): string {
 }
 
 function mapControlError(error: unknown): BadRequestException | NotFoundException {
-  if (error instanceof PlatformControlError) {
+  if (error instanceof PlatformControlError || error instanceof InstitutionExportError) {
     if (error.code.endsWith('NOT_FOUND')) return new NotFoundException({ error: { code: error.code } });
     return new BadRequestException({ error: { code: error.code } });
   }

@@ -11,6 +11,9 @@
  * an edit moved a term applicants applied under, and who must accept it. This page only says
  * what happened. Nothing is invented: a job with no deadline says "No deadline", a missing
  * value says "NA".
+ *
+ * EMP-06 adds the job's eligibility rules, skills and selection stages, shown here and edited as
+ * a new version like every other change (employerOpportunityRequirements.tsx).
  */
 import { useEffect, useState, type FormEvent } from 'react';
 import { ApiRequestError, getProtectedAccessToken } from '../api.js';
@@ -28,6 +31,7 @@ import {
 import { V2Stat, V2EmptyState } from '../dashboardsV2.js';
 import { StaffPilotWrap } from '../parityWraps.js';
 import { formatApiError } from './shared.js';
+import { OpportunityRequirementsEditor, OpportunityRequirementsSection } from './employerOpportunityRequirements.js';
 
 const actionLabels: Readonly<Record<OpportunityLifecycleAction, string>> = {
   PAUSE: 'Pause', CLOSE: 'Close', REOPEN: 'Reopen', WITHDRAW: 'Withdraw',
@@ -78,10 +82,12 @@ function pay(version: OpportunityVersionTermsDto): string {
   const upper = version.compensationMax ? `–${Number(version.compensationMax).toLocaleString()}` : '';
   return `${version.compensationCurrency} ${Number(version.compensationMin).toLocaleString()}${upper}${period ? ` / ${period}` : ''}`;
 }
+const detailLabels: Readonly<Record<string, string>> = { skills: 'Skills', stages: 'Selection stages', careerRole: 'Catalogue role' };
 function changeSummary(version: OpportunityVersionHistoryDto): string {
   if (version.change === 'INITIAL') return 'First version';
-  if (version.change === 'EDITORIAL') return 'Wording only';
-  return version.changedTerms.map((term) => termLabels[term] ?? term).join(', ');
+  const details = (version.changedDetails ?? []).map((detail) => detailLabels[detail] ?? detail);
+  if (version.change === 'EDITORIAL') return details.length ? details.join(', ') : 'Wording only';
+  return [...version.changedTerms.map((term) => termLabels[term] ?? term), ...details].join(', ');
 }
 /** An ISO timestamp as the value a datetime-local input takes, in the viewer's time. */
 function toLocalInput(value: string | null): string {
@@ -143,7 +149,8 @@ function OpportunityDetail({ employerId, opportunityId, token, onChanged }: {
   readonly employerId: string; readonly opportunityId: string; readonly token: string;
   readonly onChanged: (id: string, lifecycleState: string) => void;
 }): React.ReactElement {
-  const [detail, setDetail] = useState<{ opportunity: EmployerOpportunityDetailDto; currentVersion: OpportunityVersionTermsDto | null; versions: readonly OpportunityVersionHistoryDto[] } | null>(null);
+  const [detail, setDetail] = useState<{ opportunity: EmployerOpportunityDetailDto; currentVersion: OpportunityVersionTermsDto | null; versions: readonly OpportunityVersionHistoryDto[]; requirementReasonCodes?: readonly string[] } | null>(null);
+  const [editingRequirements, setEditingRequirements] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -246,7 +253,7 @@ function OpportunityDetail({ employerId, opportunityId, token, onChanged }: {
       {opportunity.awaitingAcknowledgementCount > 0 ? <p className="hiring-tag warn">{opportunity.awaitingAcknowledgementCount} applicant(s) have not yet accepted the changed terms; they stay where they are until they do.</p> : null}
 
       <div className="hiring-actions" role="group" aria-label="Job actions">
-        {opportunity.canEdit ? <button type="button" className="secondary" disabled={busy} onClick={() => { setEditing((value) => !value); setPending(null); }}>{editing ? 'Cancel edit' : 'Edit job'}</button> : null}
+        {opportunity.canEdit ? <button type="button" className="secondary" disabled={busy} onClick={() => { setEditing((value) => !value); setEditingRequirements(false); setPending(null); }}>{editing ? 'Cancel edit' : 'Edit job'}</button> : null}
         {opportunity.availableActions.map((action) => <button key={action} type="button" className={action === 'WITHDRAW' ? 'secondary' : undefined} disabled={busy}
           onClick={() => { setPending(action); setReason(''); setEditing(false); setError(''); }}>{actionLabels[action]}</button>)}
       </div>
@@ -290,6 +297,14 @@ function OpportunityDetail({ employerId, opportunityId, token, onChanged }: {
       <label><span>Application deadline</span><input name="applicationDeadline" type="datetime-local" defaultValue={toLocalInput(currentVersion.applicationDeadline)} /></label>
       <button type="submit" disabled={busy}>Save new version</button>
     </form> : null}
+
+    {editingRequirements && currentVersion ? <OpportunityRequirementsEditor employerId={employerId} opportunityId={opportunityId} token={token}
+      version={currentVersion} live={['PUBLISHED', 'PAUSED', 'CLOSED'].includes(opportunity.lifecycleState)} reasonCodes={detail.requirementReasonCodes ?? []}
+      onSaved={(message) => { setNotice(message); setError(''); setEditingRequirements(false); setReload((value) => value + 1); }}
+      onCancel={() => setEditingRequirements(false)} /> : null}
+
+    {currentVersion ? <OpportunityRequirementsSection requirements={currentVersion.requirements} canEdit={opportunity.canEdit} editing={editingRequirements} busy={busy}
+      onEdit={() => { setEditingRequirements((value) => !value); setEditing(false); setPending(null); }} /> : null}
 
     {currentVersion ? <section className="role-card role-wide" aria-label="Current terms">
       <h2>Current terms · version {currentVersion.versionNumber}</h2>

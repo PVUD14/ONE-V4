@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { getAccessToken } from './auth.js';
 import { V2Stat } from './dashboardsV2.js';
+import { basisLabels, describeEligibilityRule, stagesAhead, stagesAt, unknownReasonText } from './hiringEligibility.js';
 import {
   listEmployerInterviews, listEmployerOffers, updateInterviewState, submitInterviewOutcome,
   withdrawEmployerOffer, revokeInstitutionVisibility, getEmployerHiringAnalytics,
@@ -39,6 +40,7 @@ import {
   type EmployerOpportunityDto,
   type OpportunityDetailDto,
   type OpportunitySummaryDto,
+  type SelectionStageDto,
   type StudentApplicationDto,
   type StudentOfferDto,
 } from './api.js';
@@ -74,6 +76,9 @@ const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   EXTERNAL_APPLICATION_STALE: 'This record changed elsewhere. Refresh and reopen it before trying again.',
   INVALID_EXTERNAL_APPLICATION: 'Check the company, role, source, application date and HTTPS link. Future application dates are not allowed.',
   FORBIDDEN: 'You do not have access to that.',
+  // EMP-06: the rules that stopped the application are listed under "Can you apply?".
+  ELIGIBILITY_NOT_MET: 'You do not meet a rule this employer requires. The rule is shown under "Can you apply?".',
+  ELIGIBILITY_UNKNOWN: 'ONE cannot confirm a rule this employer requires, because that information is not on your record yet. See "Can you apply?".',
 };
 
 function messageFor(error: unknown, fallback: string): string {
@@ -144,6 +149,8 @@ export function StudentOpportunitiesPage(): React.ReactElement {
       await openDetail(id);
     } catch (error) {
       setStatus(messageFor(error, 'Your application could not be submitted.'));
+      // Refresh the verdict, so the rule that stopped the application is the one on screen.
+      if (error instanceof ApiRequestError && error.code?.startsWith('ELIGIBILITY_')) await openDetail(id);
     } finally {
       setBusy(false);
     }
@@ -205,7 +212,7 @@ export function StudentOpportunitiesPage(): React.ReactElement {
         : <p>No specific skills listed.</p>}
 
       {selected.opportunity.selectionStages.length ? <><h3>How the process runs</h3>
-        <ol className="hiring-stages">{selected.opportunity.selectionStages.map((stage) => <li key={stage.order}>{stage.label}{stage.detail ? ` — ${stage.detail}` : ''}</li>)}</ol></> : null}
+        <ol className="hiring-stages">{selected.opportunity.selectionStages.map((stage) => <li key={stage.order}>{stage.label}{stage.detail ? ` — ${stage.detail}` : ''}</li>)}</ol></> : <><h3>How the process runs</h3><p>The employer has not listed its selection stages.</p></>}
 
       <h3>Can you apply?</h3>
       <EligibilityNotice eligibility={selected.eligibility} />
@@ -250,6 +257,29 @@ function CompanyProfileCard({ company, employerName }: { readonly company: Oppor
 }
 
 function EligibilityNotice({ eligibility }: { readonly eligibility: EligibilityDto }): React.ReactElement {
+  // EMP-06: rule by rule — you meet it or you don't, on what basis, and your own value.
+  if (eligibility.rules) {
+    if (!eligibility.rules.length) return <p className="hiring-eligible">The employer has set no eligibility rules for this role.</p>;
+    return <div>
+      <p className={eligibility.eligible ? 'hiring-eligible' : 'hiring-blocked'}>{eligibility.eligible
+        ? 'You meet every rule that decides who can apply.'
+        : eligibility.blockingFailures.length ? 'You do not meet a rule that decides who can apply, so you cannot apply to this role.'
+          : 'ONE cannot confirm a rule that decides who can apply yet, so you cannot apply to this role until it can.'}</p>
+      <ul className="hiring-stages" aria-label="Eligibility rules">
+        {eligibility.rules.map((rule, index) => <li key={`${rule.ruleType}-${index}`}>
+          <strong>{describeEligibilityRule(rule)}</strong>
+          {' — '}
+          {rule.outcome === 'MET' ? <span className="hiring-tag">You meet this</span>
+            : rule.outcome === 'NOT_MET' ? <span className="hiring-tag warn">{rule.isBlocking ? "You don't meet this" : "You don't meet this (preferred, not required)"}</span>
+              : rule.outcome === 'NOT_EVALUATED' ? <span className="hiring-meta">The employer will consider this with you; it does not stop you applying.</span>
+                : <span className="hiring-tag warn">Cannot be confirmed yet</span>}
+          {rule.yourValue ? <span className="hiring-meta">{` Your record: ${rule.yourValue}${rule.basis ? ` (${basisLabels[rule.basis]})` : ''}.`}</span> : null}
+          {rule.outcome === 'UNKNOWN' ? <span className="hiring-meta">{` ${unknownReasonText(rule.unknownReason)}`}</span> : null}
+          {rule.basis === 'SELF_REPORTED' ? <span className="hiring-meta"> The employer sees that this rests on your own declaration.</span> : null}
+        </li>)}
+      </ul>
+    </div>;
+  }
   if (eligibility.eligible && eligibility.advisoryFailures.length === 0) {
     return <p className="hiring-eligible">You meet everything the employer asked for.</p>;
   }
@@ -413,7 +443,9 @@ const comparatorWords: Readonly<Record<string, string>> = { GTE: 'at least', LTE
 
 function termsEligibility(terms: StudentTermsDto): string {
   if (!terms.eligibility.length) return 'None stated';
-  return terms.eligibility.map((rule) => `${humanise(rule.ruleType)} ${comparatorWords[rule.comparator] ?? rule.comparator} ${rule.valueNumeric ?? rule.valueText ?? ''}`.trim()).join('; ');
+  // EMP-06: the same wording as the job page; a college by its name, never its identifier.
+  return terms.eligibility.map((rule) => rule.displayValue !== undefined ? describeEligibilityRule(rule)
+    : `${humanise(rule.ruleType)} ${comparatorWords[rule.comparator] ?? rule.comparator} ${rule.valueNumeric ?? rule.valueText ?? ''}`.trim()).join('; ');
 }
 
 /**
@@ -825,6 +857,38 @@ const PIPELINE_NEXT: Readonly<Record<string, readonly string[]>> = {
   OFFER: ['HIRED', 'REJECTED'],
 };
 
+/**
+ * EMP-06: what the pipeline offers next. With the job's stages, the stages still ahead in order
+ * (each labelled as the employer named it), then hire and reject; without, the standard steps.
+ */
+function nextSteps(stages: readonly SelectionStageDto[], state: string): { readonly state: string; readonly label: string }[] {
+  if (!stages.length) return (PIPELINE_NEXT[state] ?? []).map((next) => ({ state: next, label: humanise(next) }));
+  const ahead = stagesAhead(stages, state).map((stage) => ({ state: stage.applicationState ?? '', label: stage.label }));
+  // Shortlisting is a decision, not a stage; it stays available before the first stage past it.
+  const shortlist = (state === 'APPLIED' || state === 'SCREENING') && !ahead.some((step) => step.state === 'SHORTLISTED') ? [{ state: 'SHORTLISTED', label: 'Shortlist' }] : [];
+  const hire = state === 'OFFER' ? [{ state: 'HIRED', label: 'Hired' }] : [];
+  return [...ahead, ...shortlist, ...hire, { state: 'REJECTED', label: 'Rejected' }];
+}
+
+/**
+ * EMP-06: the applicant's eligibility as frozen when they applied — each rule met or not, and
+ * whether it rested on a verified, college or self-reported fact. Never the student's figures;
+ * nothing when the person is withheld.
+ */
+function ApplicantEligibility({ item }: { readonly item: EmployerApplicantDto }): React.ReactElement {
+  const eligibility = item.eligibility;
+  if (!eligibility) return <span className="hiring-meta">{item.candidateAccess === false || item.consentRevoked ? '—' : 'No rules'}</span>;
+  const flagged = eligibility.outcomes.filter((outcome) => outcome.flagged);
+  if (!flagged.length) return <span className="hiring-tag">Meets every rule (college records)</span>;
+  return <ul className="hiring-stages" aria-label="Eligibility flags">
+    {flagged.map((outcome, index) => <li key={`${outcome.ruleType}-${index}`}>
+      {describeEligibilityRule(outcome)}: {outcome.outcome === 'NOT_EVALUATED' ? 'for you to judge'
+        : outcome.outcome === 'MET' ? 'met' : outcome.outcome === 'NOT_MET' ? 'not met' : 'not known'}
+      {outcome.basis === 'SELF_REPORTED' ? <span className="hiring-tag warn">Self-reported</span> : null}
+    </li>)}
+  </ul>;
+}
+
 // Shared verbatim consent redaction from the Applicants table.
 export function CandidateIdentity({ item }: { readonly item: Pick<EmployerApplicantDto, 'consentRevoked' | 'candidateAccess' | 'candidateName' | 'candidateEmail' | 'institutionStudentId'> }): React.ReactElement {
   return item.consentRevoked
@@ -1153,6 +1217,7 @@ export function EmployerApplicantsPage({ employerId, applicationStateFilter }: {
   const [opportunities, setOpportunities] = useState<readonly EmployerOpportunityDto[]>([]);
   const [selectedOpportunity, setSelectedOpportunity] = useState<string>('');
   const [applicants, setApplicants] = useState<readonly EmployerApplicantDto[]>([]);
+  const [stages, setStages] = useState<readonly SelectionStageDto[]>([]);
   const [status, setStatus] = useState('Loading…');
 
   useEffect(() => {
@@ -1173,6 +1238,7 @@ export function EmployerApplicantsPage({ employerId, applicationStateFilter }: {
     if (!token || !opportunityId) return;
     const response = await listEmployerApplicants(token, employerId, opportunityId);
     setApplicants(response.applications);
+    setStages(response.stages ?? []);
     setStatus(response.applications.length ? '' : 'No applications for this opportunity yet.');
   };
   useEffect(() => { void reloadApplicants(selectedOpportunity).catch(() => setStatus('Applicants could not be loaded.')); }, [selectedOpportunity]);
@@ -1182,7 +1248,7 @@ export function EmployerApplicantsPage({ employerId, applicationStateFilter }: {
     if (!token) return;
     try {
       await transitionApplication(token, employerId, applicationId, toState);
-      setStatus(`Moved to ${humanise(toState)}.`);
+      setStatus(`Moved to ${stagesAt(stages, toState) || humanise(toState)}.`);
       await reloadApplicants(selectedOpportunity);
     } catch (error) {
       setStatus(messageFor(error, 'That change could not be saved.'));
@@ -1236,24 +1302,29 @@ export function EmployerApplicantsPage({ employerId, applicationStateFilter }: {
 
     <section className="role-card role-wide">
       <label className="student-form-field"><span>Opportunity</span>
-        <select value={selectedOpportunity} onChange={(event) => { setAction(null); setApplicants([]); setSelectedOpportunity(event.target.value); }}>
+        <select value={selectedOpportunity} onChange={(event) => { setAction(null); setApplicants([]); setStages([]); setSelectedOpportunity(event.target.value); }}>
           <option value="">Select an opportunity</option>
           {opportunities.map((item) => <option key={item.id} value={item.id}>{item.title ?? item.referenceCode} ({item.applicationCount})</option>)}
         </select>
       </label>
       {applicationStateFilter ? <p className="hiring-meta">Application state filter: <span className={`hiring-state state-${applicationStateFilter.toLowerCase()}`}>{humanise(applicationStateFilter)}</span></p> : null}
       {status ? <p role="status">{status}</p> : null}
+      {selectedOpportunity ? <p className="hiring-meta">{stages.length
+        ? `Selection stages: ${stages.map((stage) => `${stage.order}. ${stage.label}`).join(' → ')}`
+        : 'This job has no selection stages yet; set them on Opportunity Detail. The standard pipeline is offered meanwhile.'}</p> : null}
     </section>
 
     <section className="role-card role-wide">
       {visibleApplicants.length === 0
         ? <p>No applications to show.</p>
         : <div className="role-record-table-wrap"><table className="role-record-table">
-          <thead><tr><th>Candidate</th><th>Stage</th><th>Applied</th><th>Interviews</th><th>Offer</th><th>Next step</th></tr></thead>
+          <thead><tr><th>Candidate</th><th>Stage</th><th>Eligibility</th><th>Applied</th><th>Interviews</th><th>Offer</th><th>Next step</th></tr></thead>
           <tbody>{visibleApplicants.map((item) => <tr key={item.id}>
             <td><CandidateIdentity item={item} /></td>
             <td><span className={`hiring-state state-${item.state.toLowerCase()}`}>{humanise(item.state)}</span>
+              {stagesAt(stages, item.state) ? <span className="hiring-meta">{` ${stagesAt(stages, item.state)}`}</span> : null}
               {item.termsAcknowledgementPending ? <span className="hiring-tag warn">Awaiting new-terms acceptance</span> : null}</td>
+            <td><ApplicantEligibility item={item} /></td>
             <td>{formatDate(item.submittedAt)}</td>
             <td>{item.interviewCount}</td>
             <td>{item.offerState ? humanise(item.offerState) : '—'}</td>
@@ -1265,7 +1336,7 @@ export function EmployerApplicantsPage({ employerId, applicationStateFilter }: {
                   : null}
               </div>
               : <div className="hiring-actions">
-                {(PIPELINE_NEXT[item.state] ?? []).map((next) => <button key={next} type="button" className={next === 'REJECTED' ? 'secondary' : undefined} onClick={() => { void move(item.id, next); }}>{humanise(next)}</button>)}
+                {nextSteps(stages, item.state).map((next) => <button key={next.state} type="button" className={next.state === 'REJECTED' ? 'secondary' : undefined} onClick={() => { void move(item.id, next.state); }}>{next.label}</button>)}
                 {item.state === 'INTERVIEW' ? <button type="button" className="secondary" onClick={() => setAction({ kind: 'interview', applicant: item })}>Schedule interview</button> : null}
                 {item.state === 'OFFER' && !item.offerState ? <button type="button" onClick={() => setAction({ kind: 'offer', applicant: item })}>Send offer</button> : null}
               </div>}</td>

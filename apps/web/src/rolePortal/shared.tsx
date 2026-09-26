@@ -90,6 +90,19 @@ export function safeErrorMessage(code: string | undefined): string | undefined {
     case 'OPPORTUNITY_NOT_PUBLISHABLE': return 'Only a draft or paused job can be published.';
     case 'INVALID_APPLICATIONDEADLINE': return 'Choose a deadline in the future.';
     case 'REASON_CODE_REQUIRED': return 'Choose a reason.';
+    // EMP-06: eligibility, skills and stages.
+    case 'INVALID_ELIGIBILITY_RULES': return 'Check the eligibility rules: a minimum CGPA is on the 10-point scale (up to 10), backlogs are a whole number, and lists are separated by commas.';
+    case 'DUPLICATE_ELIGIBILITY_RULE': return 'Each kind of rule can be set once. Combine the values into one rule.';
+    case 'ELIGIBILITY_RULE_CANNOT_BLOCK': return 'Other requirements and work authorisation are shown to students but cannot decide who may apply.';
+    case 'ELIGIBILITY_RULE_PROTECTED_ATTRIBUTE': return 'A rule cannot refer to gender, religion, caste, age, disability, marital status, region of origin or a photo.';
+    case 'UNKNOWN_INSTITUTION': return 'A college in a rule is not on ONE.';
+    case 'INVALID_SKILLS': return 'Check the skills: each needs a name of up to 120 characters and a level.';
+    case 'DUPLICATE_SKILL': return 'That skill is already listed.';
+    case 'UNKNOWN_CATALOGUE_SKILL': return 'A chosen skill is no longer in the ONE catalogue. Search again.';
+    case 'UNKNOWN_CAREER_ROLE': return 'The chosen catalogue role is no longer available.';
+    case 'INVALID_STAGES': return 'Check the stages: each needs a kind and a name of up to 120 characters.';
+    case 'STAGE_ORDER_INVALID': return 'Put the stages in order: screening, then assessments and group discussions, then interviews, with any offer last.';
+    case 'INVALID_REASONCODE': return 'Choose a reason from the list.';
     case 'AUDIENCE_REQUIRED': return 'Choose who can see this job before it goes live.';
     case 'EMPLOYER_ORGANISATION_UNVERIFIED': return 'Your company is not verified yet, so jobs cannot go live. You can keep editing drafts.';
     case 'FORBIDDEN': return 'You do not have permission to perform this action.';

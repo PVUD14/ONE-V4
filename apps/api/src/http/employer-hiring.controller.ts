@@ -24,6 +24,7 @@ import {
   type ProtectedHttpRequest,
 } from './api-security.js';
 import { writeOpportunityDeadlineCloseRequested } from '@planthepath/persistence/src/opportunity-deadlines.js';
+import { selectionStagesOf } from './opportunity-requirements.js';
 import {
   assertEmployerState,
   employerStateRefusal,
@@ -277,17 +278,32 @@ export class EmployerHiringController {
              (SELECT count(*) FROM interviews i WHERE i.application_id = a.id AND i.state <> 'CANCELLED') AS interview_count,
              (SELECT o2.state FROM offers o2 WHERE o2.application_id = a.id AND o2.state IN ('DRAFT','EXTENDED','ACCEPTED') LIMIT 1) AS offer_state,
              EXISTS (SELECT 1 FROM opportunity_term_change_acknowledgements t WHERE t.application_id = a.id AND t.acknowledgement_required
-               AND t.acknowledged_at IS NULL AND t.declined_at IS NULL) AS terms_pending
+               AND t.acknowledged_at IS NULL AND t.declined_at IS NULL) AS terms_pending,
+             ev.eligible AS eligibility_eligible, ev.outcomes AS eligibility_outcomes, ev.flag_count AS eligibility_flag_count,
+             ev.self_reported_count AS eligibility_self_reported_count, ev.evaluated_at AS eligibility_evaluated_at,
+             ev.trigger AS eligibility_trigger, ev.version_number AS eligibility_version_number
       FROM applications a
       JOIN users u ON u.id = a.student_user_id
       LEFT JOIN institution_student_profiles isp ON isp.student_user_id = a.student_user_id AND isp.status = 'ACTIVE'
+      -- EMP-06: the latest frozen eligibility evaluation (outcome and basis only, never figures).
+      LEFT JOIN LATERAL (
+        SELECT e.eligible, e.outcomes, e.flag_count, e.self_reported_count, e.evaluated_at, e.trigger, ev_v.version_number
+        FROM application_eligibility_evaluations e JOIN opportunity_versions ev_v ON ev_v.id = e.opportunity_version_id
+        WHERE e.application_id = a.id ORDER BY ev_v.version_number DESC LIMIT 1
+      ) ev ON true
       WHERE a.opportunity_id = ${id}::uuid
         AND a.employer_id = ${employerId}::uuid
         AND a.state <> 'DRAFT'
       ORDER BY a.updated_at DESC
       LIMIT 500
     `) as QueryResult<Record<string, unknown>>;
-    return { applications: rows.rows.map(mapApplicantRow), correlationId: context.correlationId };
+    // EMP-06: the job's stages, in order, as the pipeline's template (current version).
+    const stages = await this.db.execute(sql`
+      SELECT st.stage_order, st.stage_kind, st.label, st.detail FROM opportunities o
+      JOIN opportunity_selection_stages st ON st.opportunity_version_id = o.current_version_id
+      WHERE o.id = ${id}::uuid AND o.employer_id = ${employerId}::uuid ORDER BY st.stage_order
+    `) as QueryResult<Record<string, unknown>>;
+    return { applications: rows.rows.map(mapApplicantRow), stages: selectionStagesOf(stages.rows), correlationId: context.correlationId };
   }
 
   @Post('/employers/:employerId/applications/:applicationId/transition')
@@ -1080,7 +1096,28 @@ function mapApplicantRow(row: Record<string, unknown>): Record<string, unknown> 
     offerState: row.offer_state ?? null,
     // EMP-05: the job's terms changed after they applied and they have not accepted yet.
     termsAcknowledgementPending: row.terms_pending === true,
+    eligibility: mapApplicantEligibility(row),
     updatedAt: row.updated_at,
+  };
+}
+
+/**
+ * EMP-06: what the employer is told about an applicant's eligibility — each rule's outcome and
+ * whether it rested on a verified, institution or self-reported fact, frozen when they applied
+ * (or accepted a version whose eligibility changed). Candidate data: withheld with the person
+ * when there is no live grant (EMP-SR-01). Null when the job had no rules to evaluate.
+ */
+function mapApplicantEligibility(row: Record<string, unknown>): Record<string, unknown> | null {
+  const consentRevoked = row.consent_revoked_at != null;
+  if (consentRevoked || row.candidate_access !== true || row.eligibility_outcomes == null) return null;
+  return {
+    eligible: row.eligibility_eligible === true,
+    evaluatedAt: row.eligibility_evaluated_at,
+    trigger: row.eligibility_trigger,
+    versionNumber: row.eligibility_version_number == null ? null : Number(row.eligibility_version_number),
+    flagCount: Number(row.eligibility_flag_count ?? 0),
+    selfReportedCount: Number(row.eligibility_self_reported_count ?? 0),
+    outcomes: Array.isArray(row.eligibility_outcomes) ? row.eligibility_outcomes : [],
   };
 }
 

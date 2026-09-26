@@ -51,7 +51,8 @@ export interface OpportunityDetailDto extends OpportunitySummaryDto {
   readonly responsibilities: string | null;
   readonly positionsAvailable: number | null;
   readonly joiningConditions: string | null;
-  readonly skills: readonly { readonly name: string; readonly level: string }[];
+  /** `catalogue`: picked from the ONE skill catalogue (EMP-06), not typed by the employer. */
+  readonly skills: readonly { readonly name: string; readonly level: string; readonly catalogue?: boolean }[];
   readonly selectionStages: readonly { readonly order: number; readonly kind: string; readonly label: string; readonly detail: string | null }[];
 }
 
@@ -60,6 +61,55 @@ export interface EligibilityDto {
   readonly blockingFailures: readonly string[];
   readonly advisoryFailures: readonly string[];
   readonly needsMoreInformation: readonly string[];
+  /** EMP-06: each rule, whether the student meets it, on what basis, and their own value. */
+  readonly rules?: readonly StudentEligibilityRuleDto[];
+}
+
+export type EligibilityBasis = 'VERIFIED' | 'INSTITUTION_RECORD' | 'SELF_REPORTED';
+export type EligibilityOutcome = 'MET' | 'NOT_MET' | 'UNKNOWN' | 'NOT_EVALUATED';
+
+/** One eligibility rule as a job states it; `displayValue` names a college rather than its identifier. */
+export interface EligibilityRuleDto {
+  readonly ruleType: string;
+  readonly comparator: string;
+  readonly valueNumeric: number | null;
+  readonly valueText: string | null;
+  readonly isBlocking: boolean;
+  readonly displayValue?: string;
+}
+
+export interface StudentEligibilityRuleDto extends EligibilityRuleDto {
+  readonly outcome: EligibilityOutcome;
+  readonly basis: EligibilityBasis | null;
+  readonly unknownReason: 'NO_RECORD' | 'SCALE_NOT_COMPARABLE' | 'NOT_RECORDED_BY_ONE' | null;
+  readonly yourValue: string | null;
+}
+
+/** What an employer is told per rule: the outcome and its basis, never the student's figure. */
+export interface EmployerEligibilityOutcomeDto extends EligibilityRuleDto {
+  readonly outcome: EligibilityOutcome;
+  readonly basis: EligibilityBasis | null;
+  readonly unknownReason: string | null;
+  readonly flagged: boolean;
+}
+
+export interface ApplicantEligibilityDto {
+  readonly eligible: boolean;
+  readonly evaluatedAt: string;
+  readonly trigger: 'APPLY' | 'TERMS_ACKNOWLEDGED';
+  readonly versionNumber: number | null;
+  readonly flagCount: number;
+  readonly selfReportedCount: number;
+  readonly outcomes: readonly EmployerEligibilityOutcomeDto[];
+}
+
+/** A job's selection stage, with the application state moving an applicant to it means. */
+export interface SelectionStageDto {
+  readonly order: number;
+  readonly kind: string;
+  readonly label: string;
+  readonly detail: string | null;
+  readonly applicationState: string | null;
 }
 
 export interface StudentApplicationDto {
@@ -145,6 +195,8 @@ export interface EmployerApplicantDto {
   readonly offerState: string | null;
   /** EMP-05: the job's terms changed after they applied and they have not accepted yet. */
   readonly termsAcknowledgementPending?: boolean;
+  /** EMP-06: frozen eligibility flags; null when the job had no rules or the person is withheld. */
+  readonly eligibility?: ApplicantEligibilityDto | null;
   readonly updatedAt: string;
 }
 
@@ -264,7 +316,7 @@ export function publishOpportunity(token: string, employerId: string, opportunit
   return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/opportunities/${encodeURIComponent(opportunityId)}/publish`, { token, method: 'POST' });
 }
 
-export function listEmployerApplicants(token: string, employerId: string, opportunityId: string, signal?: AbortSignal): Promise<{ readonly applications: readonly EmployerApplicantDto[] }> {
+export function listEmployerApplicants(token: string, employerId: string, opportunityId: string, signal?: AbortSignal): Promise<{ readonly applications: readonly EmployerApplicantDto[]; readonly stages?: readonly SelectionStageDto[] }> {
   return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/opportunities/${encodeURIComponent(opportunityId)}/applications`, { token, ...(signal ? { signal } : {}) });
 }
 
@@ -590,6 +642,15 @@ export interface OpportunityVersionTermsDto {
   readonly joiningConditions: string | null;
   readonly applicationDeadline: string | null;
   readonly createdAt: string;
+  /** EMP-06: what the version asks for. */
+  readonly requirements?: OpportunityRequirementsDto;
+}
+
+export interface OpportunityRequirementsDto {
+  readonly eligibilityRules: readonly EligibilityRuleDto[];
+  readonly skills: readonly { readonly name: string; readonly level: 'REQUIRED' | 'PREFERRED'; readonly taxonomyTopicId: string | null; readonly catalogue: boolean }[];
+  readonly stages: readonly SelectionStageDto[];
+  readonly careerRole: { readonly id: string; readonly code: string; readonly title: string } | null;
 }
 
 export interface OpportunityVersionHistoryDto {
@@ -601,6 +662,8 @@ export interface OpportunityVersionHistoryDto {
   /** INITIAL for version 1; MATERIAL when a term an applicant applied under moved. */
   readonly change: 'INITIAL' | 'EDITORIAL' | 'MATERIAL';
   readonly changedTerms: readonly string[];
+  /** EMP-06: skills, stages or catalogue role changed (never asks applicants anything). */
+  readonly changedDetails?: readonly string[];
 }
 
 export interface EmployerOpportunityDetailDto {
@@ -623,12 +686,13 @@ export interface EmployerOpportunityDetailDto {
 
 export function getEmployerOpportunity(token: string, employerId: string, opportunityId: string, signal?: AbortSignal): Promise<{
   readonly opportunity: EmployerOpportunityDetailDto; readonly currentVersion: OpportunityVersionTermsDto | null; readonly versions: readonly OpportunityVersionHistoryDto[];
+  readonly requirementReasonCodes?: readonly string[];
 }> {
   return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/opportunities/${encodeURIComponent(opportunityId)}`, { token, ...(signal ? { signal } : {}) });
 }
 
 export function createOpportunityVersion(token: string, employerId: string, opportunityId: string, body: Record<string, unknown>): Promise<{
-  readonly version: { readonly id: string; readonly versionNumber: number; readonly change: 'EDITORIAL' | 'MATERIAL'; readonly changedTerms: readonly string[] };
+  readonly version: { readonly id: string; readonly versionNumber: number; readonly change: 'EDITORIAL' | 'MATERIAL'; readonly changedTerms: readonly string[]; readonly changedDetails?: readonly string[] };
   readonly applicants: { readonly termChangesRecorded: number; readonly acknowledgementsRequired: number };
 }> {
   return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/opportunities/${encodeURIComponent(opportunityId)}/versions`, { token, method: 'POST', body });
@@ -649,7 +713,7 @@ export interface StudentTermsDto {
   readonly compensation: { readonly currency: string; readonly min: string; readonly max: string | null; readonly period: string } | null;
   readonly joiningConditions: string | null;
   readonly applicationDeadline: string | null;
-  readonly eligibility: readonly { readonly ruleType: string; readonly comparator: string; readonly valueNumeric: number | null; readonly valueText: string | null; readonly isBlocking: boolean }[];
+  readonly eligibility: readonly EligibilityRuleDto[];
 }
 
 export interface StudentTermsChangeDto {
@@ -666,4 +730,18 @@ export function readTermsChange(token: string, applicationId: string, signal?: A
 
 export function respondToTermsChange(token: string, applicationId: string, decision: 'acknowledge' | 'decline', toVersionId: string): Promise<{ readonly application: { readonly id: string; readonly state: string } }> {
   return requestJson(`/api/v1/students/me/applications/${encodeURIComponent(applicationId)}/terms-change/${decision}`, { token, method: 'POST', body: { toVersionId } });
+}
+
+// --- Eligibility, skills and stages (EMP-06) --------------------------------
+
+export interface SkillCatalogueDto {
+  readonly skills: readonly { readonly taxonomyTopicId: string; readonly name: string }[];
+  readonly nextCursor: string | null;
+  readonly careerRoles: readonly { readonly id: string; readonly code: string; readonly title: string; readonly family: string }[];
+}
+
+/** The ONE skill catalogue (OPS-08) a recruiter picks from; `q` filters skills and roles by name. */
+export function searchSkillCatalogue(token: string, employerId: string, q: string, signal?: AbortSignal): Promise<SkillCatalogueDto> {
+  const query = q.trim() ? `?q=${encodeURIComponent(q.trim().slice(0, 80))}` : '';
+  return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/skill-catalogue${query}`, { token, ...(signal ? { signal } : {}) });
 }

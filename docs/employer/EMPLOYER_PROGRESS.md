@@ -239,3 +239,78 @@ students still see the job; PENDING and REJECTED publish), 2 controls pass.
 - Deadline closes happen only while the worker is running.
 
 **Next goal:** EMP-06.
+
+## EMP-06 — Eligibility, required skills and selection stages — 2026-09-26
+**Result:** Complete. Employers set eligibility rules, required and preferred skills, ordered stages and a catalogue role on a job, always as a new version. Apply refuses a student who fails a blocking rule and names that rule. The employer sees each applicant's eligibility as it stood at apply: each outcome and whether it rested on a verified, college or self-reported fact, never the figures. The applicant pipeline offers the job's stages in order.
+**Branch / PR:** feat/emp-eligibility-stages → feat/plan-phases-0-to-2 (pushed to onev4; merge by review). Commits, in order: eb9f23a (design), e278b06 (tests), 30dbff4 (implementation), 91d814c (Android), then this report. Cut from 4ebcd3b.
+**Files created:**
+- docs/architecture/application-eligibility-evaluations-table-design.md
+- packages/hiring/src/eligibility.ts, which holds the pure evaluator; packages/hiring/src/opportunity-requirements.ts, which holds input rules, the stage→state map and reason codes; and test/eligibility.test.ts
+- apps/api/src/http/opportunity-requirements.ts (reads and writes), employer-skill-catalogue.controller.ts and employer-eligibility-stages.integration.spec.ts
+- apps/web/src/hiringEligibility.ts (+ .test.tsx), plus rolePortal/employerOpportunityRequirements.tsx (+ .test.tsx)
+
+**Files modified:**
+- API: employer-job-lifecycle.controller.ts, employer-hiring.controller.ts, student-hiring.controller.ts and api-security.module.ts. The last one only registers the new controller.
+- Web: api/hiring.ts, hiringPages.tsx, rolePortal/employerOpportunityDetail.tsx and rolePortal/shared.tsx. The shared.tsx change adds error messages only.
+- Android: Api.kt, ApiStudent.kt, StudentHiring.kt, JobsAndMore.kt, StaffDashboards.kt and EmployerWork.kt.
+**Migrations added:** 0054_opportunity_requirements_and_eligibility.sql (number claimed here):
+- `application_eligibility_evaluations`. It is written once, and a trigger refuses any UPDATE.
+- `opportunity_skill_requirements.taxonomy_topic_id`, nullable.
+- `opportunity_versions.career_role_id`, nullable.
+
+It is additive, idempotent and references only files numbered below 0054. Replaying the file twice by hand in psql succeeded.
+**Design docs / ADRs:** the design doc above, which gives the reasons and the rejected options. No ADR.
+**Validation:** fresh database one_emp06v, with only DATABASE_URL exported.
+- `corepack pnpm db:migrate` ×2: the first run applied 48 and the second applied 0, both exit 0.
+- `corepack pnpm typecheck`: passed.
+- `corepack pnpm -r --no-bail --workspace-concurrency=1 test`: exit 0.
+  - api: 46 files / 563 tests.
+  - web: 42 files / 739 tests.
+  - persistence: 26 files / 293 tests.
+  - hiring: 10 files / 201 tests, including 42 new evaluator and input tests.
+  - Every other package passed too.
+  - The new API spec ran 10/10.
+- `corepack pnpm build`: passed.
+- Android `./gradlew --no-daemon -q :app:compileDebugKotlin` (Android Studio JBR): passed.
+
+**Acceptance criteria:**
+- [x] A student below the CGPA or above the backlog limit cannot apply and is told which rule. Tests: `refuses a student below the CGPA and tells them which rule; nothing is written` (400 ELIGIBILITY_NOT_MET, whose `rules` field names MIN_CGPA) and `refuses a student above the backlog limit…`. A missing record gives ELIGIBILITY_UNKNOWN, and the student is told what is missing.
+- [x] Self-reported values are flagged to the employer. Test: `uses a self-reported record where nothing is verified, and flags it to the employer without the figure`. The outcome carries `basis: SELF_REPORTED, flagged: true`, and the figure appears nowhere in the response. The flags are withheld with the person once the grant ends (EMP-SR-01).
+- [x] Stages appear in the applicant pipeline in order. The applicant list returns `stages` with `applicationState`. On the web, Applicants offers the stages still ahead, labelled as the employer named them, and Android does the same.
+- [x] Every edit goes through the versioning path. The versions route takes `eligibilityRules`, `skills`, `stages`, `careerRoleId` and `reasonCode`, and any field left out is carried forward. Version 1 stays untouched, it runs in EMP-05's locked transaction, and unknown fields get 400.
+- [x] Evaluator unit tests cover scales (GPA_4 and PERCENTAGE are normalised at comparison only, while LETTER and PASS_FAIL are unknown), missing records, verified versus self-reported, the rejected-record rule, the current-college qualification and backlog sums.
+- [x] §6.3:
+  - 401 without a token.
+  - 403 for another employer.
+  - SUSPENDED gives 403 INACTIVE and PENDING gives 403 UNVERIFIED on a live-job edit.
+  - Validation errors give 400.
+  - The catalogue route caps `limit` at 200.
+  - The audit row carries the organisation, `changedDetails` and the reason code.
+  - Responses contain no readiness, mastery or score fields.
+  - Web navigation labels are unchanged: the editor sits inside the existing Opportunity Detail page.
+  - Pre-existing tests pass unchanged.
+
+**Decisions for Divakar:**
+1. **Self-reported values count, flagged.** The later plan (§5.4 and EMP-06 step 2) was followed over the frozen academic-records design, which said self-reported figures never satisfy a rule. Otherwise most students would be locked out until their college verifies. The employer always sees the basis.
+2. **Unknown still blocks** a blocking rule, with a distinct code and message. This keeps the existing fail-closed rule.
+3. **CGPA** comes from the latest numeric term of the student's qualification at their current college (otherwise their newest qualification). A verified term is preferred over a newer self-reported one. The value is compared as a 10-point equivalent with the same linear rule as `asCgpa10`, and a MIN_CGPA rule is always on the 10-point scale. **Backlogs** are the sum over verified terms, or over self-reported terms if no term is verified.
+4. **WORK_AUTHORIZATION can never block**, like CUSTOM, because ONE records no such fact. One rule per type is allowed, except up to 5 CUSTOM rules. Text naming a protected attribute or proxy is refused with ELIGIBILITY_RULE_PROTECTED_ATTRIBUTE, matched on whole words.
+5. **The frozen evaluation stores outcome and basis, never figures.** It is re-evaluated only when an applicant accepts a version whose eligibility changed. A blocking failure at that point is a flag, never a rejection.
+6. **Stages map to the fixed pipeline states.** GROUP_DISCUSSION maps to ASSESSMENT. The order must follow the pipeline, and an offer comes last. The transition route is not restricted to the stages: Shortlist and Reject stay available.
+7. **Catalogue skills** are active taxonomy topics named by an active role's live requirements. The skill's name is the topic name, set by the server. Free-text skills are still allowed, are marked "not in the ONE catalogue", and are never matched by name.
+8. **A live job's eligibility change requires a reason code**, from a fixed list of 8. For any other edit the reason code is optional.
+9. **The web editor offers no INSTITUTION rule**, because it has no college picker (audiences already target colleges). Existing INSTITUTION rules are kept as they were set and shown by college name.
+
+**Android:** changed. The student job detail could not have decoded jobs with skills or stages: it read them as plain strings and looked for the verdict in the wrong place. The DTOs are fixed. The student now sees each rule marked you meet / you don't, with its basis and what would fix an unknown. An apply refusal names the rule, and the terms dialog shows the eligibility rules before and after the change. On the employer side, Roles shows eligibility, skills and stages read-only (edits stay on the web), and the applicant page shows the eligibility flags and offers stage-labelled moves.
+
+**Limitations / not done:**
+- Interviews are not tied to a selection stage (interviews.selection_stage_id is unused).
+- The student web app has no academic-records screen, so the web says "ask your college". Android points students to More › Academic record.
+- The catalogue keyset cursor pages by name, so two topics whose names are equal ignoring case can be skipped.
+- The job creation route does not take requirements; they are set by an edit, which creates version 2.
+
+**Risks / follow-ups:**
+- EMP-13 can now join job skills to evidence through taxonomy_topic_id.
+- EMP-07's snapshot may want to reference the evaluation row.
+
+**Next goal:** EMP-07.

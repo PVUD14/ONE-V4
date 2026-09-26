@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { deliverStudentInvitation, STUDENT_INVITATION_REQUESTED } from './student-invitations.js';
 import { ANNOUNCEMENT_DISPATCH_REQUESTED, dispatchInstitutionAnnouncement } from './institution-announcements.js';
 import { OPPORTUNITY_DEADLINE_CLOSE_REQUESTED, closeOpportunityAtDeadline } from './opportunity-deadlines.js';
+import { HIRING_NOTIFICATION_EVENT_TYPES, consumeHiringNotificationEvent } from './hiring-notifications.js';
 import type { InvitationMailSink } from './invitation-mail.js';
 import type { Pool } from 'pg';
 import type { IntegrationEventEnvelope } from '@planthepath/events/src/index.js';
@@ -96,6 +97,11 @@ export function createLocalIntegrationEventPublisher(input: { readonly pool: Poo
     [LEARNER_SKILL_STATE_PROJECTION_REQUESTED]: async (event) => {
       await consumeSkillStateProjectionRequested(input.db, event);
     },
+    // EMP-08: stage changes, interviews and offers reach the student (and offer answers the
+    // employer) in-app; with no sink configured the student's email is recorded NOT_CONFIGURED.
+    ...Object.fromEntries(HIRING_NOTIFICATION_EVENT_TYPES.map((eventType) => [eventType, async (event: IntegrationEventEnvelope) => {
+      await consumeHiringNotificationEvent(input.db, event, input.invitationMailSink ? { mailSink: input.invitationMailSink } : {});
+    }])),
   };
   return {
     publisher: {

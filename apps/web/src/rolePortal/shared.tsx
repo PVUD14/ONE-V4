@@ -81,6 +81,8 @@ export function safeErrorMessage(code: string | undefined): string | undefined {
     case 'EMPLOYER_ACCESS_REQUEST_NOT_PENDING': return 'This request has already been decided. Refresh to see its current state.';
     case 'EMPLOYER_ACCESS_REQUEST_ORGANIZATION_INVALID': return 'Choose the employer organisation you created for this request.';
     case 'FORBIDDEN': return 'You do not have permission to perform this action.';
+    // INST-SR-02: permanent record changes need a department (heads) or a teaching assignment (faculty).
+    case 'SCOPE_REQUIRED': return 'You can view these records, but confirming or uploading results needs a department or teaching assignment on your account. Ask your institution administrator to assign one.';
     // OPS-02: dual control for high-risk actions.
     case 'APPROVAL_REQUIRED': return 'This is a high-risk action: it needs an approval from a second person first.';
     case 'APPROVAL_NOT_APPROVED': return 'This request has not been approved, or its approval was already used.';

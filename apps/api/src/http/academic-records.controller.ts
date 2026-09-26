@@ -55,7 +55,7 @@ import {
 import { PG_POOL } from '../persistence.provider.js';
 import { ProtectedApiAuthenticationGuard, type ProtectedHttpRequest } from './api-security.js';
 import type { InstitutionStudentScope } from '@planthepath/authorization/src/index.js';
-import { institutionStudentScopeFor } from './institution-student-scope.js';
+import { institutionStudentScopeFor, institutionStudentWriteScopeFor } from './institution-student-scope.js';
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -175,9 +175,11 @@ export class AcademicRecordsController {
     const id = requireUuid(institutionId);
     const reviewerUserId = requireInstitutionStaff(request, id);
     const term = requireUuid(termId);
-    // A reviewer may only decide a term they can see in their own queue (INST-02 scope).
-    // Checked before the body is read, so an out-of-scope caller learns nothing more.
-    const scope = await institutionStudentScopeFor(this.pool, request, id, verificationRoles);
+    // A decision is permanent, so it needs the write scope (INST-SR-02): an unscoped head or
+    // faculty without a teaching assignment is refused with SCOPE_REQUIRED, and anyone else
+    // may only decide a term inside that scope. Checked before the body is read, so an
+    // out-of-scope caller learns nothing more.
+    const scope = await requireWriteScope(this.pool, request, id, verificationRoles);
     if (scope.kind !== 'INSTITUTION' && !(await termInScope(this.pool, id, scope, term))) throw safeForbidden();
     const { decision, reasonCode } = readDecision(body);
     try {
@@ -200,8 +202,8 @@ export class AcademicRecordsController {
   async previewResults(@Req() request: ProtectedHttpRequest, @Param('institutionId') institutionId: string, @Body() body: unknown): Promise<Record<string, unknown>> {
     const id = requireUuid(institutionId);
     const actorUserId = requireInstitutionStaff(request, id, resultsImportRoles);
+    const scope = await requireWriteScope(this.pool, request, id, resultsImportRoles);
     const input = readResultsUpload(body, false);
-    const scope = await institutionStudentScopeFor(this.pool, request, id, resultsImportRoles);
     try {
       const preview = await previewResultsImport(this.pool, {
         institutionId: id, scope, csv: input.csv, filename: input.filename, actorUserId, correlationId: correlationIdOf(request),
@@ -222,8 +224,8 @@ export class AcademicRecordsController {
   async commitResults(@Req() request: ProtectedHttpRequest, @Param('institutionId') institutionId: string, @Body() body: unknown): Promise<Record<string, unknown>> {
     const id = requireUuid(institutionId);
     const actorUserId = requireInstitutionStaff(request, id, resultsImportRoles);
+    const scope = await requireWriteScope(this.pool, request, id, resultsImportRoles);
     const input = readResultsUpload(body, true);
-    const scope = await institutionStudentScopeFor(this.pool, request, id, resultsImportRoles);
     try {
       const committed = await commitResultsImport(this.pool, {
         institutionId: id, scope, csv: input.csv, filename: input.filename, previewDigest: input.previewDigest ?? '',
@@ -242,6 +244,18 @@ export class AcademicRecordsController {
       throw mapAcademicError(error);
     }
   }
+}
+
+/**
+ * The write scope for a permanent academic-record change (INST-SR-02). Its NONE means the
+ * caller holds the role but no scope that permits the write — an unscoped department head,
+ * or faculty before any active teaching assignment — which the screens explain as "ask
+ * your administrator to assign you a department or teaching assignment".
+ */
+async function requireWriteScope(pool: Pool, request: ProtectedHttpRequest, institutionId: string, roles: readonly string[]): Promise<InstitutionStudentScope> {
+  const scope = await institutionStudentWriteScopeFor(pool, request, institutionId, roles);
+  if (scope.kind === 'NONE') throw scopeRequired();
+  return scope;
 }
 
 function queuePage(queue: readonly Record<string, unknown>[], limit: number): Record<string, unknown> {
@@ -436,6 +450,10 @@ function mapAcademicError(error: unknown): BadRequestException | NotFoundExcepti
 
 function safeBadRequest(): BadRequestException {
   return new BadRequestException({ error: { code: 'INVALID_REQUEST', message: 'Request could not be processed' } });
+}
+
+function scopeRequired(): ForbiddenException {
+  return new ForbiddenException({ error: { code: 'SCOPE_REQUIRED', message: 'A department or teaching assignment is required for this change' } });
 }
 
 function safeForbidden(): ForbiddenException {

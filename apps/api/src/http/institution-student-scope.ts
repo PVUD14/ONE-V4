@@ -10,7 +10,7 @@
 import { sql } from 'drizzle-orm';
 import type { Pool } from 'pg';
 import { institutionScopeAnchors, type InstitutionStaffScopeMembership, type InstitutionStudentScope } from '@planthepath/authorization/src/index.js';
-import { resolveInstitutionStudentScope, withTeachingAssignments } from '@planthepath/persistence/src/institution-scope.js';
+import { resolveInstitutionStudentScope, resolveInstitutionStudentWriteScope, withTeachingAssignments } from '@planthepath/persistence/src/institution-scope.js';
 import type { PersistenceDb } from '@planthepath/persistence/src/repositories.js';
 import type { ProtectedHttpRequest } from './api-security.js';
 
@@ -45,6 +45,20 @@ export async function institutionStudentScopeFor(
   roles: readonly string[],
 ): Promise<InstitutionStudentScope> {
   return resolveInstitutionStudentScope(db, institutionId, institutionStaffScopeMemberships(request, institutionId, roles));
+}
+
+/**
+ * The caller's scope for permanent student-record writes (INST-SR-02). NONE means the
+ * caller holds one of the roles but no unit scope that permits the write — an unscoped
+ * department head, or faculty without an active teaching assignment.
+ */
+export async function institutionStudentWriteScopeFor(
+  db: PersistenceDb | Pool,
+  request: ProtectedHttpRequest,
+  institutionId: string,
+  roles: readonly string[],
+): Promise<InstitutionStudentScope> {
+  return resolveInstitutionStudentWriteScope(db, institutionId, institutionStaffScopeMemberships(request, institutionId, roles));
 }
 
 /** The units a scoped caller is anchored on, for the page subtitle. Empty when institution-wide. */

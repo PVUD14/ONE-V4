@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
-import type { InstitutionStudentScope } from '@planthepath/authorization/src/index.js';
+import { suppressAggregateTable, type InstitutionStudentScope } from '@planthepath/authorization/src/index.js';
 import { institutionStudentScopeClause } from './institution-scope.js';
 import {
   calculateAdvisoryReadiness,
@@ -15,6 +15,7 @@ import {
   type EvidenceInput,
   type ImportPackageManifest,
   type ProtectedQuestionVersion,
+  type ReadinessBand,
 } from '@planthepath/career-readiness/src/index.js';
 import { createIntegrationEventEnvelope } from '@planthepath/events/src/index.js';
 import { attemptOutcomeBand, isAssistedAttempt } from '@planthepath/learning-model/src/index.js';
@@ -924,6 +925,9 @@ export async function getCareerReadinessOperationalStatus(pool: Pool): Promise<R
     outboxFailures: outboxFailures.rows, workflows: workflows.rows, automationCommands: commands.rows };
 }
 
+/** Every readiness band, in display order: each is a cell of the institution report. */
+const institutionReportBands = ['NOT_ENOUGH_EVIDENCE', 'DEVELOPING', 'PROGRESSING', 'READY_FOR_NEXT_STEP'] as const satisfies readonly ReadinessBand[];
+
 export async function generateInstitutionAggregateReport(pool: Pool, input: {
   readonly institutionId: string; readonly periodStart: string; readonly periodEnd: string; readonly minimumCohortSize?: number;
   /** INST-02: a department head's report covers their department only. Defaults to the whole institution. */
@@ -955,12 +959,24 @@ export async function generateInstitutionAggregateReport(pool: Pool, input: {
        SELECT count(*) OVER ()::int AS cohort_size, band, count(*)::int AS count FROM latest GROUP BY band`,
       values,
     );
-    const cohortSize = result.rows.reduce((sum, row) => sum + row.count, 0);
     // Record whose students the report counts, so a department's report is never read as the college's.
     const scope = studentScope.kind === 'INSTITUTION' ? 'INSTITUTION' : 'UNITS';
-    const aggregate = cohortSize < minimumCohortSize
-      ? { suppressed: true, minimumCohortSize, cohortSize: 0, bands: [], scope }
-      : { suppressed: false, minimumCohortSize, cohortSize, bands: result.rows.map(({ band, count }) => ({ band, count })), scope };
+    // INST-SR-01: every band is a cell, zero included (a missing row is a published zero),
+    // through the one shared suppression rule. Only the suppressed form is returned or
+    // stored; the raw counts never leave this function.
+    const counts = new Map(result.rows.map(({ band, count }) => [band, count]));
+    const table = suppressAggregateTable(
+      institutionReportBands.map((band) => ({ key: band, count: counts.get(band) ?? 0 })),
+      minimumCohortSize,
+    );
+    const aggregate = table.suppressed
+      ? { suppressed: true, minimumCohortSize, cohortSize: 0, cohortSizeSuppressed: true, bands: [], scope }
+      : {
+        suppressed: false, minimumCohortSize,
+        cohortSize: table.total.value, cohortSizeSuppressed: table.total.suppressed,
+        bands: table.cells.map((cell) => ({ band: cell.key, count: cell.count, suppressed: cell.suppressed })),
+        scope,
+      };
     const reportId = randomUUID();
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1_000);
     await client.query(

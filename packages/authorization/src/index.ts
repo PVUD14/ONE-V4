@@ -112,5 +112,6 @@ export * from './internal-capabilities.js';
 export * from './high-risk-actions.js';
 export * from './support-desk.js';
 export * from './jobs-console.js';
+export * from './aggregate-suppression.js';
 export * from './privacy-console.js';
 export * from './operations-overview.js';

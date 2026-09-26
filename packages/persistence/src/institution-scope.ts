@@ -12,6 +12,7 @@ import type { Pool, PoolClient } from 'pg';
 import { sql, type SQL } from 'drizzle-orm';
 import {
   institutionStudentScope,
+  institutionStudentWriteScope,
   type InstitutionStaffScopeMembership,
   type InstitutionStudentScope,
   type InstitutionUnitNode,
@@ -93,6 +94,22 @@ export async function resolveInstitutionStudentScope(
   const trivial = institutionStudentScope(resolved, []);
   if (trivial.kind !== 'UNITS') return trivial;
   return institutionStudentScope(resolved, await loadInstitutionUnitTree(db, institutionId));
+}
+
+/**
+ * Resolve the write scope (INST-SR-02) for permanent student-record writes: the read scope
+ * without its fallbacks, so an unscoped department head, or a faculty member with no active
+ * teaching assignment, resolves to NONE.
+ */
+export async function resolveInstitutionStudentWriteScope(
+  db: PersistenceDb | Pool | PoolClient,
+  institutionId: string,
+  memberships: readonly InstitutionStaffScopeMembership[],
+): Promise<InstitutionStudentScope> {
+  const resolved = await withTeachingAssignments(db, institutionId, memberships);
+  const trivial = institutionStudentWriteScope(resolved, []);
+  if (trivial.kind !== 'UNITS') return trivial;
+  return institutionStudentWriteScope(resolved, await loadInstitutionUnitTree(db, institutionId));
 }
 
 /** Drizzle predicate: true when the profile row `alias` is inside the scope. */

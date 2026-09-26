@@ -18,6 +18,7 @@
  * operator can already see each item on the linked screen, and hiding "3 failed
  * deliveries" would hide work, not protect anyone.
  */
+import { aggregateSuppressionThreshold, suppressSmallCount } from './aggregate-suppression.js';
 import { hasInternalCapability, internalCapabilities, type InternalCapability, type InternalCapabilityContext } from './internal-capabilities.js';
 
 export const operationsOverviewSections = [
@@ -68,21 +69,16 @@ export function operationsOverviewSectionsFor(context: InternalCapabilityContext
   return operationsOverviewSections.filter((section) => hasInternalCapability(context, operationsOverviewSectionCapabilities[section]));
 }
 
-/** Appendix 1 §5.5: any aggregate cell representing fewer than 5 people shows <5. */
-export const overviewSuppressionThreshold = 5;
-
 export type SuppressedPeopleCount =
   | { readonly suppressed: true; readonly value: null; readonly capped: false }
   | { readonly suppressed: false; readonly value: number; readonly capped: boolean };
 
 /**
- * A count of people as it may leave the server. Below the threshold — zero included,
- * since "none" is also fewer than 5 — only the fact of suppression is returned, never the
- * value, so no screen or network inspector can recover it. `capped` carries through from
- * a bounded count (the value is then a lower bound).
+ * A count of people as it may leave the server, through the one shared suppression rule
+ * (OPS-SR-24). `capped` carries through from a bounded count (the value is then a lower
+ * bound); a suppressed count is never marked capped.
  */
-export function suppressPeopleCount(count: number, capped = false, threshold: number = overviewSuppressionThreshold): SuppressedPeopleCount {
-  if (!Number.isInteger(count) || count < 0) throw new RangeError('count must be a non-negative integer');
-  if (!Number.isInteger(threshold) || threshold < 1) throw new RangeError('threshold must be a positive integer');
-  return count < threshold ? { suppressed: true, value: null, capped: false } : { suppressed: false, value: count, capped };
+export function suppressPeopleCount(count: number, capped = false, threshold: number = aggregateSuppressionThreshold): SuppressedPeopleCount {
+  const published = suppressSmallCount(count, threshold);
+  return published.suppressed ? { suppressed: true, value: null, capped: false } : { suppressed: false, value: published.value, capped };
 }

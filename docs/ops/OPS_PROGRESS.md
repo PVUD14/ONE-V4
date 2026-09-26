@@ -1055,3 +1055,84 @@ ranks by, and college cells do not partition it, because a student can belong to
 Overview and has no Analytics screen.
 
 **Next goal:** OPS-12.
+
+## OPS-09a — Skill map editor — 2026-09-26
+**Result:** Complete. Skills are drafted, reviewed by someone who did not write them (which includes a real rights review), and published through a release manifest. A publish that changes readiness inputs also needs a second person's approval. ENG-11's pending SOC topics now have a path to go live.
+
+**Branch / PR:** `feat/ops-skill-map-editor`, cut from `onev4/stack/emp-06` (ee4818a) to get ENG-11's 0056. Its target is `feat/plan-phases-0-to-2`, and the coordinator merges it.
+
+**Files created:**
+- `docs/architecture/skill-map-editor-design.md`
+- `packages/persistence/drizzle/0057_skill_map_editor.sql`
+- `packages/career-readiness/src/skill-map.ts` (pure content rules; the graph check uses `assertAcyclicPrerequisites`)
+- `packages/authorization/src/skill-map.ts`
+- `packages/persistence/src/skill-map.ts`
+- `apps/api/src/http/operations-skill-map.controller.ts`
+- `apps/web/src/api/skillMap.ts`
+- `apps/web/src/rolePortal/skillMap.tsx`
+- Tests: `packages/career-readiness/test/skill-map.test.ts`, `packages/authorization/src/skill-map.test.ts`, `apps/api/src/http/operations-skill-map.integration.spec.ts` and `apps/web/src/rolePortal/skillMap.test.tsx`
+
+**Files modified:**
+- `packages/authorization/src/high-risk-actions.ts` and `index.ts` (new extended key `CONTENT_SKILL_PUBLISH`)
+- `packages/career-readiness/src/index.ts`
+- `packages/events/src/index.ts` (`skill_map.revision_state_changed` and `skill_map.skill_published`)
+- `packages/persistence/src/operation-approvals.ts` (the queue summary names the skill)
+- `apps/api/src/http/operation-approval-gate.ts`, `operations-approvals.controller.ts` and `api-security.module.ts`
+- `apps/web/src/api.ts` and `api/operations.ts`
+- `apps/web/src/rolePortal/approvals.tsx` and `shared.tsx`
+- `apps/web/src/rolePortalPages.tsx`: the Content Management branch only. The skill map sits under the catalogue.
+
+**Migrations added:** `0057_skill_map_editor.sql`. There is no new table. It does three things:
+- replaces `operation_approval_extended_target_type` to add `CONTENT_SKILL_PUBLISH → content_revision`, keeping 0051's key;
+- adds `content_review_author_publish_guard`, so a revision's author never publishes it (TOPIC only);
+- adds `taxonomy_node_published_content_guard`, so on update a topic moves only to a published revision of itself and goes live only on published content.
+
+**Design docs / ADRs:** `docs/architecture/skill-map-editor-design.md`. No ADR was needed.
+
+**Validation:** on a fresh database `one_ops09a`:
+- `corepack pnpm db:migrate` ran twice: 51 applied, then 0 applied.
+- `corepack pnpm typecheck` passed.
+- `corepack pnpm -r --no-bail --workspace-concurrency=1 test` passed 2186 of 2187 tests: web 630, api 832, persistence 321/322, authorization 254, career-readiness 51, and all other packages passed.
+- The one failure was `migration-runner.integration.test.ts`. Its `afterEach` `DROP SCHEMA` hit "out of shared memory" on the shared dev Postgres while other agents were loading it. Rerun alone, it passed 7/7.
+- `corepack pnpm build` passed.
+- New tests: 12 career-readiness unit, 8 authorization unit, 17 API integration and 14 web.
+
+**Acceptance criteria:**
+- ✔ **Draft → review → publish works.** Create a pending skill; save, submit, request changes, resubmit; approve with the rights review; publish through a release manifest (approved by the reviewer, published by the publisher); the node goes live; a later revision republishes and the older revision stays PUBLISHED.
+- ✔ **Self-review is rejected.**
+  - The author holding CONTENT_REVIEW gets 403 `SKILL_SELF_REVIEW_REFUSED`.
+  - Someone who only edited another person's draft is refused too (contributors come from audit rows).
+  - The author holding CONTENT_PUBLISH is refused at the approval request and at publish.
+  - A direct PUBLISH insert by the author is refused by 0057.
+- ✔ **Prerequisite cycles are rejected.** `assertAcyclicPrerequisites` checks on every save and submit and again at publish against the live map. Prerequisites must be live first, so skills publish in prerequisite order. A refused publish leaves its approval usable.
+- ✔ **Publishing needs CONTENT_PUBLISH, plus an approval when readiness inputs change** (a first publish, or a skill a live requirement names). The approval binds the revision id, content hash and reason. Tested: required, payload mismatch, requester-cannot-approve, APPROVAL_NOT_REQUIRED, consumption.
+- ✔ **Every transition is audited:** `operations.content.skill_created`, `…skill_revision_started`, `…skill_draft_saved`, `…skill_transitioned`, `…skill_rights_reviewed` and `…skill_published`, each with its reason code and break_glass, plus outbox events.
+- ✔ **Rights review is not bypassed.** Approving writes a release-eligible source record (with its rights review, SME review and provenance), and the 0004 manifest trigger demands it at publish.
+- ✔ **ENG-11 pending topic.** Integration imports the real SOC pack; a person writes the levels and someone else reviews. Publishing `soc-networking-fundamentals` satisfies 0056: the node goes live, AGENT_DRAFTED provenance is kept, and expertCheck, packKey and provenance stay in the body. The C01 draft set now shows 3 live and 12 pending.
+- ✔ **§6.6 minimums:** 401; 403 (no capability, institution member); 200 (catalogue manager read-only); input 400s; 404; keyset pagination.
+- ✔ **Web states:** real data, NA, loading, empty, error with reference, forbidden, reason-code dialogs, the rights reason on approve, a contributor not offered review, an approval request instead of publish, the direct publish, the approvals-queue execute, and unchanged navigation labels.
+- Not applicable to 09a: answer keys (09b) and bulk import (09d).
+
+**Decisions for Divakar (recommendations adopted):**
+- **Per-skill approvals.** The 13 C01 skills need 13 approvals, each with a 15-minute solo cooling-off; a batch publish is a follow-up.
+- **All four levels are required to submit.**
+- **Licences** are AI8HT-Owned, CC-BY-4.0 and CC-BY-SA-4.0.
+- **Contributors** are the author plus anyone who saved an edit. None of them reviews or publishes that revision.
+- **Prerequisites live in the revision body.** No table was added, because nothing reads them yet.
+- **The node's `version` is not bumped.** The content revision number is the skill's version.
+- **Console-authored source packages** record the SHA-1 of the reviewed body in `source_commit`.
+
+**Limitations / not done:**
+- There is no retire or withdraw.
+- An APPROVED revision that is never published blocks new revisions of that skill.
+- Levels and prerequisites are not shown to students.
+- The web client shows one summarised message instead of the individual validation problem codes.
+
+**Risks / follow-ups:**
+- Any later goal adding an approval key must repeat both `CAREER_REQUIREMENT_SET_PUBLISH` and `CONTENT_SKILL_PUBLISH` in its replacement of `operation_approval_extended_target_type`.
+- Merges with other approval-key goals will conflict in `operations-approvals.controller.ts`, `operation-approval-gate.ts` and `approvals.tsx`.
+- A pilot seed configured with the same author and publisher would now be refused by 0057.
+
+**Android:** no change. The skill map is an operator surface, and operator screens are web-only (Appendix 1 §4.3).
+
+**Next goal:** OPS-09b.

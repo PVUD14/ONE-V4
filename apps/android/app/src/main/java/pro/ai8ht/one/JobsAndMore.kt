@@ -368,8 +368,15 @@ private fun TermsChangeDialog(change: TermsChangeDto, onDismiss: () -> Unit, onA
                     Text("Now: $after", style = MaterialTheme.typography.bodySmall)
                 }
                 if ("Eligibility" in changed) {
+                    // EMP-06: the rules themselves, before and after, in the job page's wording.
+                    fun rules(list: List<TermsEligibilityRuleDto>) = list.takeIf { it.isNotEmpty() }?.joinToString("; ") {
+                        describeEligibilityRule(it.ruleType, it.comparator, it.valueNumeric, it.valueText, it.displayValue)
+                    } ?: "None stated"
                     Spacer(Modifier.height(10.dp))
-                    Text("The eligibility rules changed too. Open the role to see them.", style = MaterialTheme.typography.bodySmall)
+                    Text("Eligibility", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                    Text("When you applied: ${rules(change.appliedTerms.eligibility)}", style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Now: ${rules(change.newTerms.eligibility)}", style = MaterialTheme.typography.bodySmall)
                 }
                 Spacer(Modifier.height(12.dp))
                 Text("Declining withdraws your application, and the employer loses access to your profile for this role.",

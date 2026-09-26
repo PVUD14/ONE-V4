@@ -804,6 +804,8 @@ internal fun EmployerScaffold(
     openApplicant?.let { applicant ->
         SlideIn {
             ApplicantActionsPage(
+                eligibility = applicant.eligibility,
+                stages = applicant.stages,
                 employerId = organizationId,
                 applicantName = candidateLabel(applicant.candidateName, applicant.consentRevoked, applicant.candidateAccess),
                 applicationId = applicant.id,
@@ -904,7 +906,7 @@ internal fun EmployerScaffold(
                         }
                         1 -> Column(Modifier.fillMaxSize()) {
                             if (awaitingVerification) EmployerVerificationNotice()
-                            EmployerRoles(roles!!)
+                            EmployerRoles(organizationId, roles!!)
                         }
                         else -> StaffMore(onSignOut, onSwitchWorkspace,
                             "Posting roles, publishing and candidate review stay on the web at one.ai8ht.pro.",
@@ -1059,7 +1061,8 @@ private fun roleStateNote(role: EmployerOpportunityDto): String? = when (role.li
 }
 
 @Composable
-private fun EmployerRoles(roles: List<EmployerOpportunityDto>) {
+private fun EmployerRoles(employerId: String, roles: List<EmployerOpportunityDto>) {
+    var expanded by remember { mutableStateOf<String?>(null) }
     if (roles.isEmpty()) {
         EmptyState(Icons.Filled.WorkOutline, Tone.Violet, "No roles yet",
             "Post opportunities on the web; applications and their states track here.")
@@ -1090,10 +1093,51 @@ private fun EmployerRoles(roles: List<EmployerOpportunityDto>) {
                         Text("$it. Edit, pause, close or reopen on the web.", style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
+                    // EMP-06: eligibility, skills and stages, read-only; they are edited on the web.
+                    TextButton(onClick = { expanded = if (expanded == role.id) null else role.id }) {
+                        Text(if (expanded == role.id) "Hide eligibility, skills and stages" else "Eligibility, skills and stages")
+                    }
+                    if (expanded == role.id) RoleRequirements(employerId, role.id)
                 }
             }
         }
         item { Spacer(Modifier.height(18.dp)) }
+    }
+}
+
+/** A role's current eligibility, skills and stages, as the server returns them. Nothing is invented. */
+@Composable
+private fun RoleRequirements(employerId: String, opportunityId: String) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var state by remember(opportunityId) { mutableStateOf<Load<OpportunityRequirementsDto?>>(Load.Loading) }
+    LaunchedEffect(opportunityId) {
+        state = loadOf { Api.employerOpportunityRequirements(context, employerId, opportunityId) }
+    }
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    when (val current = state) {
+        Load.Loading -> Text("Loading…", style = MaterialTheme.typography.bodySmall, color = muted)
+        is Load.Failed -> Text(current.message, style = MaterialTheme.typography.bodySmall, color = muted)
+        is Load.Ready -> {
+            val requirements = current.value
+            Text("Who can apply", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+            val rules = requirements?.eligibilityRules.orEmpty()
+            Text(if (rules.isEmpty()) "No eligibility rules." else rules.joinToString("\n") {
+                describeEligibilityRule(it.ruleType, it.comparator, it.valueNumeric, it.valueText, it.displayValue) +
+                    if (it.isBlocking) "" else " (shown; does not stop anyone applying)"
+            }, style = MaterialTheme.typography.bodySmall)
+            Spacer(Modifier.height(6.dp))
+            Text("Skills", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+            val skills = requirements?.skills.orEmpty()
+            Text(if (skills.isEmpty()) "No skills listed." else skills.joinToString("  ·  ") {
+                it.name + (if (it.level == "PREFERRED") " (preferred)" else "") + (if (it.catalogue) "" else " · not in the ONE catalogue")
+            }, style = MaterialTheme.typography.bodySmall)
+            Text("Catalogue role: ${requirements?.careerRole?.let { "${it.title} (${it.code})" } ?: "NA"}", style = MaterialTheme.typography.bodySmall, color = muted)
+            Spacer(Modifier.height(6.dp))
+            Text("Selection stages", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+            val stages = requirements?.stages.orEmpty()
+            Text(if (stages.isEmpty()) "No stages set." else stages.sortedBy { it.order }.joinToString("\n") { "${it.order}. ${it.label}" },
+                style = MaterialTheme.typography.bodySmall)
+        }
     }
 }
 

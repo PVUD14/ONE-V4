@@ -60,8 +60,28 @@ private val pipelineMoves = listOf(
     "REJECTED" to "Reject",
 )
 
+/**
+ * EMP-06: with the job's stages, the stages still ahead of this applicant, in order, one per
+ * application state (labelled as the employer named them), then shortlist and reject; without
+ * stages, the standard moves.
+ */
+private val pipelineOrder = listOf("APPLIED", "SCREENING", "SHORTLISTED", "ASSESSMENT", "INTERVIEW", "OFFER")
+internal fun applicantMoves(stages: List<SelectionStageDto>, currentState: String): List<Pair<String, String>> {
+    if (stages.isEmpty()) return pipelineMoves.filter { it.first != currentState }
+    val current = pipelineOrder.indexOf(currentState)
+    val seen = mutableSetOf<String>()
+    val ahead = stages.sortedBy { it.order }.mapNotNull { stage ->
+        val target = stage.applicationState ?: return@mapNotNull null
+        if (pipelineOrder.indexOf(target) <= current || !seen.add(target)) null else target to "Move to ${stage.label}"
+    }
+    val shortlist = if ((currentState == "APPLIED" || currentState == "SCREENING") && ahead.none { it.first == "SHORTLISTED" }) listOf("SHORTLISTED" to "Shortlist") else emptyList()
+    return ahead + shortlist + listOf("REJECTED" to "Reject")
+}
+
 @Composable
 internal fun ApplicantActionsPage(
+    eligibility: ApplicantEligibilityDto? = null,
+    stages: List<SelectionStageDto> = emptyList(),
     employerId: String,
     applicantName: String,
     applicationId: String,
@@ -84,6 +104,31 @@ internal fun ApplicantActionsPage(
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(4.dp))
                     StatusChip(prettify(currentState), ChipKind.Accent)
+                    stages.filter { it.applicationState == currentState }.map { it.label }.takeIf { it.isNotEmpty() }?.let {
+                        Spacer(Modifier.height(4.dp))
+                        Text(it.joinToString(" / "), style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+            // EMP-06: eligibility as it stood when they applied. Outcome and basis only, never a figure.
+            eligibility?.let { record ->
+                Spacer(Modifier.height(12.dp))
+                PilotCard {
+                    Column(Modifier.padding(16.dp)) {
+                        Text("Eligibility", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.height(4.dp))
+                        val flagged = record.outcomes.filter { it.flagged }
+                        if (flagged.isEmpty()) {
+                            StatusChip("Meets every rule (college records)", ChipKind.Positive)
+                        } else flagged.forEach { outcome ->
+                            Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text(describeEligibilityRule(outcome.ruleType, outcome.comparator, outcome.valueNumeric, outcome.valueText, null) + ": " +
+                                    when (outcome.outcome) { "MET" -> "met"; "NOT_MET" -> "not met"; "NOT_EVALUATED" -> "for you to judge"; else -> "not known" },
+                                    Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+                                if (outcome.basis == "SELF_REPORTED") StatusChip("Self-reported", ChipKind.Waiting)
+                            }
+                        }
+                    }
                 }
             }
             notice?.let {
@@ -104,7 +149,7 @@ internal fun ApplicantActionsPage(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(10.dp))
-                    pipelineMoves.filter { it.first != currentState }.forEach { (state, label) ->
+                    applicantMoves(stages, currentState).forEach { (state, label) ->
                         TextButton(
                             onClick = { confirming = state to label },
                             enabled = !busy,

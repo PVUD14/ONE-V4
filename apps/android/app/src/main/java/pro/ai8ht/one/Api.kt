@@ -221,7 +221,13 @@ object Api {
     suspend fun listEmployerApplicants(context: Context, employerId: String, opportunityId: String): List<EmployerApplicantDto> =
         json.decodeFromString<EmployerApplicantsEnvelope>(
             request(context, "GET", "/api/v1/employers/$employerId/opportunities/$opportunityId/applications"),
-        ).applications
+        ).let { envelope -> envelope.applications.map { it.copy(stages = envelope.stages) } }
+
+    /** EMP-06: what a role's current version asks for, read-only (edits stay on the web). */
+    suspend fun employerOpportunityRequirements(context: Context, employerId: String, opportunityId: String): OpportunityRequirementsDto? =
+        json.decodeFromString<EmployerOpportunityDetailEnvelope>(
+            request(context, "GET", "/api/v1/employers/$employerId/opportunities/$opportunityId"),
+        ).currentVersion?.requirements
 
     suspend fun assistantChat(
         context: Context,
@@ -784,7 +790,11 @@ internal fun NotificationDto.announcementSource(): String {
     val days: List<ActivityDayDto> = emptyList(),
 )
 @Serializable data class ActivityDayDto(val date: String = "", val count: Int = 0)
-@Serializable data class EmployerApplicantsEnvelope(val applications: List<EmployerApplicantDto> = emptyList())
+@Serializable data class EmployerApplicantsEnvelope(
+    val applications: List<EmployerApplicantDto> = emptyList(),
+    /** EMP-06: the job's selection stages, in order — the pipeline's template. */
+    val stages: List<SelectionStageDto> = emptyList(),
+)
 @Serializable data class EmployerApplicantDto(
     val id: String,
     val state: String = "",
@@ -793,4 +803,37 @@ internal fun NotificationDto.announcementSource(): String {
     val candidateAccess: Boolean = true,
     val interviewCount: Int = 0,
     val offerState: String? = null,
+    /** EMP-06: eligibility as frozen at apply — outcome and basis only; null when withheld or no rules. */
+    val eligibility: ApplicantEligibilityDto? = null,
+    /** Copied from the envelope by [Api.listEmployerApplicants]; not part of the row. */
+    val stages: List<SelectionStageDto> = emptyList(),
 )
+
+@Serializable data class ApplicantEligibilityDto(
+    val eligible: Boolean = false,
+    val flagCount: Int = 0,
+    val selfReportedCount: Int = 0,
+    val versionNumber: Int? = null,
+    val outcomes: List<ApplicantEligibilityOutcomeDto> = emptyList(),
+)
+
+@Serializable data class ApplicantEligibilityOutcomeDto(
+    val ruleType: String = "",
+    val comparator: String = "",
+    val valueNumeric: Double? = null,
+    val valueText: String? = null,
+    val isBlocking: Boolean = true,
+    val outcome: String = "",
+    val basis: String? = null,
+    val flagged: Boolean = false,
+)
+
+@Serializable data class EmployerOpportunityDetailEnvelope(val currentVersion: EmployerOpportunityVersionDto? = null)
+@Serializable data class EmployerOpportunityVersionDto(val requirements: OpportunityRequirementsDto? = null)
+@Serializable data class OpportunityRequirementsDto(
+    val eligibilityRules: List<TermsEligibilityRuleDto> = emptyList(),
+    val skills: List<OpportunitySkillDto> = emptyList(),
+    val stages: List<SelectionStageDto> = emptyList(),
+    val careerRole: CareerRoleRefDto? = null,
+)
+@Serializable data class CareerRoleRefDto(val id: String = "", val code: String = "", val title: String = "")

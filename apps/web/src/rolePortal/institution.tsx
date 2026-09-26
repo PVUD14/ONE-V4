@@ -16,6 +16,7 @@ import { Search } from 'lucide-react';
 import { NaListCard } from '../pilotParity/naWidgets.js';
 import { TeachingAssignmentsPanel } from './institutionTeaching.js';
 import { AnalyticsAccessPanel } from './institutionAnalytics.js';
+import { PlacementStatusChip, useRosterPlacementStatus } from './institutionPlacementStatus.js';
 import { useEffect, useRef, useState } from 'react';
 
 /** Why an invitation is being sent again; recorded with the resend (INST-01). */
@@ -513,6 +514,8 @@ function PlacementStudentRoster({ token, institutionId, eyebrow = 'Institution p
   const [error, setError] = useState('');
   const [refresh, setRefresh] = useState(0);
   const [filters, setFilters] = useState({ query: '', department: '', batch: '', status: '' });
+  // INST-09: each student's placement status, from what they shared with the college only.
+  const placement = useRosterPlacementStatus(token, institutionId, refresh);
   useEffect(() => {
     const controller = new AbortController();
     setData(null); setError('');
@@ -544,14 +547,19 @@ function PlacementStudentRoster({ token, institutionId, eyebrow = 'Institution p
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {!data ? <p role="status">{error ? 'Roster unavailable.' : 'Loading roster…'}</p> :
       <div className="role-record-table-wrap"><table className="role-record-table"><caption className="sr-only">Placement student roster</caption>
-        <thead><tr><th>Name</th><th>Roll number</th><th>Department</th><th>Batch</th><th>Status</th><th>Readiness band</th><th>Applications</th><th>Last activity</th></tr></thead>
-        <tbody>{students.length ? students.map((student) => <tr key={student.id}><th>{student.fullName}</th><td>{student.institutionStudentId}</td>
+        <thead><tr><th>Name</th><th>Roll number</th><th>Department</th><th>Batch</th><th>Status</th><th>Readiness band</th><th>Placement status</th><th>Applications</th><th>Last activity</th></tr></thead>
+        <tbody>{students.length ? students.map((student) => {
+          const shared = student.studentUserId ? placement.byStudent?.get(student.studentUserId) : undefined;
+          return <tr key={student.id}><th>{student.fullName}</th><td>{student.institutionStudentId}</td>
           <td>{unitName(student.units?.departmentUnitId)}</td><td>{unitName(student.units?.batchUnitId)}</td><td>{(student.relationship?.state ?? student.status).replaceAll('_', ' ')}</td>
-          <td>NA</td><td>{student.studentUserId ? <button type="button" className="secondary" aria-label={'View applications for ' + student.fullName} onClick={() => setSelectedStudentId(student.id)}>View applications</button> : 'NA'}</td><td>NA</td></tr>) : <tr><td colSpan={8}>No students match your scope and filters.</td></tr>}</tbody>
+          <td>NA</td><td>{shared ? <PlacementStatusChip status={shared.status} /> : placement.byStudent === null ? '…' : 'NA'}</td>
+          <td>{student.studentUserId ? <button type="button" className="secondary" aria-label={'View applications for ' + student.fullName} onClick={() => setSelectedStudentId(student.id)}>View applications</button> : 'NA'}</td>
+          <td>{shared?.lastSharedActivityAt?.slice(0, 10) ?? 'NA'}</td></tr>;
+        }) : <tr><td colSpan={9}>No students match your scope and filters.</td></tr>}</tbody>
       </table></div>}
     {selectedStudent?.studentUserId ? <section className="role-card role-wide" aria-label={'Shared applications for ' + selectedStudent.fullName}>
       <h2>Shared applications for {selectedStudent.fullName}</h2>
-      <p>Only records currently available with institution consent are shown. These counts are not cohort totals.</p>
+      <p>Only records currently available with institution consent are shown. These counts are not cohort totals. Anything the student has not shared reads "Not shared" and is never counted as not applied.</p>
       <button type="button" className="secondary" onClick={() => setSelectedStudentId('')}>Close applications</button>
       {[false, true].map((external) => <StudentApplicationRecords key={selectedStudent.studentUserId + ':' + external}
         token={token} institutionId={institutionId} studentUserId={selectedStudent.studentUserId!} external={external} />)}
@@ -567,7 +575,7 @@ interface ExternalInstitutionApplication {
   id: string; companyName: string; roleTitle: string; stage: string; appliedOn: string;
   source: 'STUDENT_DECLARED'; verificationState: 'UNVERIFIED'; sourceKind: string;
 }
-function StudentApplicationRecords({ token, institutionId, studentUserId, external }: {
+export function StudentApplicationRecords({ token, institutionId, studentUserId, external }: {
   readonly token: string; readonly institutionId: string; readonly studentUserId: string; readonly external: boolean;
 }): React.ReactElement {
   const [rows, setRows] = useState<readonly { id: string; company: string; title: string; stage: string; date: string | null; detail: string }[] | null>(null);

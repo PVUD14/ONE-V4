@@ -1,6 +1,8 @@
 package pro.ai8ht.one
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -94,9 +96,11 @@ internal fun ApplicantActionsPage(
     var busy by remember { mutableStateOf(false) }
     var notice by remember { mutableStateOf<String?>(null) }
     var confirming by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var shared by remember { mutableIntStateOf(0) }
 
     OverlayScaffold(title = applicantName, onClose = onClose) {
-        Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
+        // Scrolls: the shared snapshot (EMP-07) can be longer than a screen.
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp)) {
             Spacer(Modifier.height(12.dp))
             PilotCard {
                 Column(Modifier.padding(16.dp)) {
@@ -110,6 +114,8 @@ internal fun ApplicantActionsPage(
                     }
                 }
             }
+            // EMP-07: what the applicant chose to share, read-only, while their grant is live.
+            CandidateSharedCards(employerId, applicationId, shared)
             // EMP-06: eligibility as it stood when they applied. Outcome and basis only, never a figure.
             eligibility?.let { record ->
                 Spacer(Modifier.height(12.dp))
@@ -176,7 +182,7 @@ internal fun ApplicantActionsPage(
                     busy = true
                     scope.launch {
                         runCatching { Api.transitionApplication(context, employerId, applicationId, state) }
-                            .onSuccess { notice = "Moved to ${prettify(state)}."; onChanged() }
+                            .onSuccess { notice = "Moved to ${prettify(state)}."; shared++; onChanged() }
                             .onFailure { notice = (it as? Api.ApiException)?.detail ?: "That move was not allowed." }
                         busy = false
                     }

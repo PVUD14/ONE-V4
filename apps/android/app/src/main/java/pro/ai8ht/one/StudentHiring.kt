@@ -67,6 +67,9 @@ internal fun OpportunityDetailPage(
     var shareWithInstitution by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var notice by remember { mutableStateOf<String?>(null) }
+    // EMP-07: the snapshot the student reviewed, and the choices it was built from.
+    var reviewed by remember { mutableStateOf<Pair<ApplicationPreviewDto, SnapshotChoices>?>(null) }
+    var reviewReload by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(opportunityId) {
         runCatching { Api.opportunityDetail(context, opportunityId) }
@@ -175,6 +178,14 @@ internal fun OpportunityDetailPage(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                                 Spacer(Modifier.height(10.dp))
+                                ApplicationReviewSection(
+                                    opportunityId = opportunityId,
+                                    employerName = record.employerName,
+                                    enabled = !busy,
+                                    onPreview = { preview, choices -> reviewed = preview?.let { it to choices } },
+                                    reload = reviewReload,
+                                )
+                                Spacer(Modifier.height(10.dp))
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Checkbox(checked = shareWithInstitution, onCheckedChange = { shareWithInstitution = it })
                                     Column(Modifier.weight(1f)) {
@@ -193,7 +204,12 @@ internal fun OpportunityDetailPage(
                                         busy = true
                                         notice = null
                                         scope.launch {
-                                            runCatching { Api.applyToOpportunity(context, opportunityId, shareWithInstitution) }
+                                            val review = reviewed
+                                            runCatching {
+                                                // EMP-07: apply with exactly the reviewed snapshot; the server refuses if it changed.
+                                                if (review != null) Api.applyWithSnapshot(context, opportunityId, shareWithInstitution, review.second, review.first.snapshotHash)
+                                                else Api.applyToOpportunity(context, opportunityId, shareWithInstitution)
+                                            }
                                                 .onSuccess { onApplied(); onClose() }
                                                 .onFailure {
                                                     // EMP-06: name the rule, and refresh the verdict so it is on screen.
@@ -201,8 +217,10 @@ internal fun OpportunityDetailPage(
                                                     notice = when (code) {
                                                         "ELIGIBILITY_NOT_MET" -> "You do not meet a rule this employer requires. It is marked under Eligibility above."
                                                         "ELIGIBILITY_UNKNOWN" -> "ONE cannot confirm a rule this employer requires, because that information is not on your record yet."
+                                                        "SNAPSHOT_CHANGED" -> "Something you would share changed after you reviewed it. Check what the employer will see again, then apply."
                                                         else -> (it as? Api.ApiException)?.detail ?: "Could not apply just now. Try again."
                                                     }
+                                                    if (code == "SNAPSHOT_CHANGED") reviewReload++
                                                     if (code?.startsWith("ELIGIBILITY_") == true) {
                                                         runCatching { Api.opportunityDetail(context, opportunityId) }.onSuccess { refreshed -> detail = refreshed }
                                                     }

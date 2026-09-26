@@ -19,6 +19,7 @@ import {
   projectLearnerSkillStates,
   skillMasteryTraces,
   summariseSkillEvidence,
+  unclearedMisconceptionSignals,
   type ProjectionAttempt,
 } from '../src/index.js';
 import { estimateMastery, traceMastery, type BktParameters } from '@planthepath/mastery-bkt/src/index.js';
@@ -348,6 +349,49 @@ describe('learner-skill-state-v2 properties', () => {
         expect(same.unaidedSuccessCount).toBe(row.unaidedSuccessCount);
         expect(same.activeMisconceptionCodes).toEqual(row.activeMisconceptionCodes);
       }
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Uncleared misconception signals (ENG-08: the planner's "repeated" input)
+// ---------------------------------------------------------------------------
+
+describe('unclearedMisconceptionSignals', () => {
+  const code = { code: 'BOUNDARY_OFF_BY_ONE', skillId: SKILL_A };
+
+  it('counts each uncleared signalling attempt, and a later unaided success on the same item clears only that item (X1)', () => {
+    const wrong = (itemId: string, occurredAt: string) => attempt({ itemId, occurredAt, correct: false, misconceptions: [code] });
+    const history = [
+      attempt({ itemId: 'hosts-1', occurredAt: '2026-09-01T05:00:00.000Z' }),
+      wrong('boundary-1', '2026-09-01T05:01:00.000Z'),
+      wrong('boundary-2', '2026-09-01T05:02:00.000Z'),
+      wrong('boundary-3', '2026-09-01T05:03:00.000Z'),
+    ];
+    expect(unclearedMisconceptionSignals(history).get(SKILL_A)?.get('BOUNDARY_OFF_BY_ONE')).toBe(3);
+    const cleared = [
+      ...history,
+      attempt({ itemId: 'boundary-1', occurredAt: '2026-09-02T05:00:00.000Z' }),
+      attempt({ itemId: 'boundary-2', occurredAt: '2026-09-02T05:01:00.000Z' }),
+    ];
+    expect(unclearedMisconceptionSignals(cleared).get(SKILL_A)?.get('BOUNDARY_OFF_BY_ONE')).toBe(1);
+    // An assisted success does not clear (C5).
+    const assisted = [...history, attempt({ itemId: 'boundary-3', occurredAt: '2026-09-02T05:02:00.000Z', highestHintLevel: 3, assisted: true })];
+    expect(unclearedMisconceptionSignals(assisted).get(SKILL_A)?.get('BOUNDARY_OFF_BY_ONE')).toBe(3);
+  });
+
+  it('agrees with the active codes for every history: a code is active exactly when its count is at least one', () => {
+    const next = generator(31);
+    for (let run = 0; run < RUNS; run += 1) {
+      const history = randomHistory(next);
+      const counts = unclearedMisconceptionSignals(history);
+      const active = activeMisconceptionsBySkill(history);
+      expect([...active.keys()].sort()).toEqual([...counts.keys()].sort());
+      for (const [skillId, codes] of active) {
+        expect([...counts.get(skillId)!.keys()].sort()).toEqual(codes);
+        for (const count of counts.get(skillId)!.values()) expect(count).toBeGreaterThanOrEqual(1);
+      }
+      expect(unclearedMisconceptionSignals(shuffle(history, next))).toEqual(counts);
     }
   });
 });

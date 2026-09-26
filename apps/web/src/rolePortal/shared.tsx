@@ -61,6 +61,7 @@ export function formatApiError(error: unknown, fallback: string): string {
 
 export function safeErrorMessage(code: string | undefined): string | undefined {
   switch (code) {
+    case 'CAREER_TOPIC_NOT_LIVE': return 'This set names topics that are not yet published. Publish those topics first, then publish the set.';
     case 'STUDENT_EMAIL_ALREADY_EXISTS': return 'This email is already associated with a ONE identity and cannot be attached automatically. Use the approved onboarding/recovery workflow.';
     case 'INSTITUTION_STUDENT_ID_ALREADY_EXISTS': return 'A Student with this institution ID already exists.';
     case 'INVALID_ACADEMIC_DATE_WINDOW': return 'Expected graduation date must be on or after academic start date.';

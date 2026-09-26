@@ -586,6 +586,8 @@ export class EmployerHiringController {
     const locationDetail = readOptionalSafeText(body, 'locationDetail', 500, context.correlationId);
     const joiningLink = readOptionalHttpsUrl(body, 'joiningLink', context.correlationId);
     if (mode === 'ONSITE' && !locationDetail) throw badRequest('LOCATION_REQUIRED', context.correlationId);
+    // EMP-08: what the candidate should prepare, shown to them as written in their interview view.
+    const preparationNote = readOptionalSafeText(body, 'preparationNote', 1000, context.correlationId);
 
     const record = body as Record<string, unknown>;
     const suppliedParticipants = record.participantUserIds ?? [];
@@ -616,8 +618,8 @@ export class EmployerHiringController {
       `) as QueryResult<{ next: number }>;
 
       await tx.execute(sql`
-        INSERT INTO interviews (id, application_id, employer_id, round_number, mode, state, scheduled_start, scheduled_end, location_detail, joining_link, created_by_user_id)
-        VALUES (${interviewId}::uuid, ${id}::uuid, ${employerId}::uuid, ${nextRound.rows[0]?.next ?? 1}, ${mode}, 'SCHEDULED', ${scheduledStart}::timestamptz, ${scheduledEnd}::timestamptz, ${locationDetail}, ${joiningLink}, ${context.authorization.principal.userId}::uuid)
+        INSERT INTO interviews (id, application_id, employer_id, round_number, mode, state, scheduled_start, scheduled_end, location_detail, joining_link, preparation_note, created_by_user_id)
+        VALUES (${interviewId}::uuid, ${id}::uuid, ${employerId}::uuid, ${nextRound.rows[0]?.next ?? 1}, ${mode}, 'SCHEDULED', ${scheduledStart}::timestamptz, ${scheduledEnd}::timestamptz, ${locationDetail}, ${joiningLink}, ${preparationNote}, ${context.authorization.principal.userId}::uuid)
       `);
       for (const participantId of participantIds) {
         await tx.execute(sql`
@@ -674,13 +676,17 @@ export class EmployerHiringController {
       throw ruleFailure(error, context.correlationId);
     }
 
-    await this.db.execute(sql`
-      UPDATE interviews SET state = ${toState}, cancellation_reason = ${toState === 'CANCELLED' ? reason : null},
-        scheduled_start = coalesce(${scheduledStart}::timestamptz, scheduled_start),
-        scheduled_end = coalesce(${scheduledEnd}::timestamptz, scheduled_end), updated_at = now()
-      WHERE id = ${id}::uuid AND employer_id = ${employerId}::uuid
-    `);
-    await this.writeAudit(context.authorization.principal.userId, `interview.${toState.toLowerCase()}`, 'interview', id, context.correlationId);
+    // EMP-08: the change, its audit row and the event that tells the candidate commit together.
+    await this.db.transaction(async (tx) => {
+      await tx.execute(sql`
+        UPDATE interviews SET state = ${toState}, cancellation_reason = ${toState === 'CANCELLED' ? reason : null},
+          scheduled_start = coalesce(${scheduledStart}::timestamptz, scheduled_start),
+          scheduled_end = coalesce(${scheduledEnd}::timestamptz, scheduled_end), updated_at = now()
+        WHERE id = ${id}::uuid AND employer_id = ${employerId}::uuid
+      `);
+      await this.writeAudit(context.authorization.principal.userId, `interview.${toState.toLowerCase()}`, 'interview', id, context.correlationId, tx);
+      await this.writeOutbox('interview', id, 'interview.state_changed', { interviewId: id, toState }, context.authorization.principal.userId, employerId, context.correlationId, tx);
+    });
     return { interview: { id, state: toState }, correlationId: context.correlationId };
   }
 
@@ -806,11 +812,15 @@ export class EmployerHiringController {
       throw ruleFailure(error, context.correlationId);
     }
 
-    await this.db.execute(sql`
-      UPDATE offers SET state = 'WITHDRAWN', withdrawn_at = now(), updated_at = now()
-      WHERE id = ${id}::uuid AND employer_id = ${employerId}::uuid
-    `);
-    await this.writeAudit(context.authorization.principal.userId, 'offer.withdrawn', 'offer', id, context.correlationId);
+    // EMP-08: the withdrawal, its audit row and the event that tells the candidate commit together.
+    await this.db.transaction(async (tx) => {
+      await tx.execute(sql`
+        UPDATE offers SET state = 'WITHDRAWN', withdrawn_at = now(), updated_at = now()
+        WHERE id = ${id}::uuid AND employer_id = ${employerId}::uuid
+      `);
+      await this.writeAudit(context.authorization.principal.userId, 'offer.withdrawn', 'offer', id, context.correlationId, tx);
+      await this.writeOutbox('offer', id, 'offer.withdrawn', { offerId: id }, context.authorization.principal.userId, employerId, context.correlationId, tx);
+    });
     return { offer: { id, state: 'WITHDRAWN' }, correlationId: context.correlationId };
   }
 

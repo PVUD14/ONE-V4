@@ -567,6 +567,44 @@ export class StudentHiringController {
     return { application: { id, state: 'WITHDRAWN' }, correlationId: context.correlationId };
   }
 
+  /**
+   * EMP-08: the student's own interviews, upcoming first (soonest first), then past (latest first).
+   * Where and how to join is shown only while the interview is still ahead; the employer's
+   * cancellation reason and interview panel stay the employer's. Per-student counts are small, so
+   * a bounded list (default 50, at most 200) serves it without a cursor.
+   */
+  @Get('/students/me/interviews')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async listInterviews(@Req() request: ProtectedHttpRequest, @Query('limit') limit?: string): Promise<Record<string, unknown>> {
+    const context = requireTrustedAuthorization(request);
+    let size = 50;
+    if (limit !== undefined) {
+      size = Number(limit);
+      if (!/^[0-9]{1,3}$/.test(limit) || size < 1 || size > 200) throw badRequest('INVALID_LIMIT', context.correlationId);
+    }
+    const rows = await this.db.execute(sql`
+      SELECT * FROM (
+        SELECT i.id, i.round_number, i.mode, i.state, i.scheduled_start, i.scheduled_end, i.location_detail, i.joining_link,
+               i.preparation_note, st.label AS stage_label,
+               a.state AS application_state, org.legal_name AS employer_name, v.title,
+               (i.state IN ('SCHEDULED', 'RESCHEDULED') AND a.closed_at IS NULL AND a.consent_revoked_at IS NULL
+                 AND coalesce(i.scheduled_end, i.scheduled_start + interval '1 hour') > now()) AS upcoming
+        FROM interviews i
+        JOIN applications a ON a.id = i.application_id AND a.employer_id = i.employer_id
+        JOIN organizations org ON org.id = a.employer_id
+        JOIN opportunity_versions v ON v.id = a.applied_version_id
+        LEFT JOIN opportunity_selection_stages st ON st.id = i.selection_stage_id
+        WHERE a.student_user_id = ${context.authorization.principal.userId}::uuid AND a.state <> 'DRAFT'
+      ) listed
+      ORDER BY upcoming DESC,
+               CASE WHEN upcoming THEN scheduled_start END ASC NULLS LAST,
+               CASE WHEN NOT upcoming THEN scheduled_start END DESC NULLS LAST,
+               id
+      LIMIT ${size}
+    `) as QueryResult<Record<string, unknown>>;
+    return { interviews: rows.rows.map(mapStudentInterview), correlationId: context.correlationId };
+  }
+
   @Get('/students/me/offers')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async listOffers(@Req() request: ProtectedHttpRequest): Promise<Record<string, unknown>> {
@@ -755,6 +793,33 @@ function mapOffer(row: Record<string, unknown>): Record<string, unknown> {
     offerExpiresAt: row.offer_expires_at ?? null,
     conditions: row.conditions ?? null,
     extendedAt: row.extended_at ?? null,
+  };
+}
+
+function isoOrNull(value: unknown): string | null {
+  if (value == null) return null;
+  const parsed = value instanceof Date ? value : new Date(String(value));
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
+/** EMP-08: an interview as its candidate sees it. The link and place only while it is ahead. */
+function mapStudentInterview(row: Record<string, unknown>): Record<string, unknown> {
+  const upcoming = row.upcoming === true;
+  return {
+    id: row.id,
+    employerName: row.employer_name,
+    title: row.title,
+    roundNumber: Number(row.round_number),
+    stageLabel: row.stage_label ?? null,
+    applicationState: row.application_state,
+    mode: row.mode,
+    state: row.state,
+    upcoming,
+    scheduledStart: isoOrNull(row.scheduled_start),
+    scheduledEnd: isoOrNull(row.scheduled_end),
+    locationDetail: upcoming ? row.location_detail ?? null : null,
+    joiningLink: upcoming ? row.joining_link ?? null : null,
+    preparationNote: row.state === 'CANCELLED' ? null : row.preparation_note ?? null,
   };
 }
 

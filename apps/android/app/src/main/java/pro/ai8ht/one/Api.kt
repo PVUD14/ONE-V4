@@ -493,7 +493,32 @@ internal fun NotificationDto.announcementSource(): String {
     val department: String? = null,
     val program: String? = null,
     val batch: String? = null,
+    /** INST-10: the college's name, and whether the student has left it (graduated, transferred or ended). */
+    val institutionName: String? = null,
+    val formerStudent: Boolean = false,
+    val relationship: StudentRelationshipWindowDto? = null,
 )
+@Serializable data class StudentRelationshipWindowDto(val state: String = "", val effectiveTo: String? = null)
+
+private val alumniDate = java.time.format.DateTimeFormatter.ofPattern("d MMMM yyyy", java.util.Locale.ENGLISH)
+
+/**
+ * INST-10: "Graduated from Local College on 31 May 2026" for someone who has left their college,
+ * or null for a current student. The date is read in India time, as the college set it.
+ */
+internal fun StudentDto.formerStudentLine(): String? {
+    if (!formerStudent) return null
+    val college = institutionName?.takeIf { it.isNotBlank() } ?: "your college"
+    val verb = when (relationship?.state ?: academicStatus) {
+        "GRADUATED" -> "Graduated from"
+        "TRANSFERRED" -> "Transferred from"
+        else -> "Left"
+    }
+    val date = relationship?.effectiveTo?.let { iso ->
+        runCatching { java.time.Instant.parse(iso).atZone(java.time.ZoneId.of("Asia/Kolkata")).format(alumniDate) }.getOrNull()
+    }
+    return if (date != null) "$verb $college on $date" else "$verb $college"
+}
 
 // --- Career readiness / learning ---------------------------------------------
 
@@ -643,6 +668,8 @@ internal fun NotificationDto.announcementSource(): String {
     val userId: String = "",
     val memberships: List<MembershipDto> = emptyList(),
     val studentRelationships: List<StudentRelationshipDto> = emptyList(),
+    /** INST-10: relationships left by graduating, transferring or ending; the person keeps the student workspace. */
+    val formerStudentRelationships: List<StudentRelationshipDto> = emptyList(),
 )
 @Serializable data class MembershipDto(val organizationId: String = "", val role: String = "")
 @Serializable data class StudentRelationshipDto(val institutionId: String = "", val state: String = "")

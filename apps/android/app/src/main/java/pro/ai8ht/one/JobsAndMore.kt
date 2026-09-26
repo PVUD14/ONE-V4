@@ -606,6 +606,13 @@ internal fun MoreMenuScreen(
                         Spacer(Modifier.height(6.dp))
                         StatusChip(prettify(student.academicStatus), ChipKind.Accent)
                     }
+                    // INST-10: a former student is told where they stand and what they keep.
+                    student?.formerStudentLine()?.let { line ->
+                        Spacer(Modifier.height(6.dp))
+                        Text(line, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                        Text("Your ONE account, records and choices stay yours. ${student.institutionName ?: "Your college"} now sees only what happened before that date.",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }

@@ -312,3 +312,6 @@ export function checkRequiredEvidenceTypes(
   return { algorithmId: LEARNING_MODEL_ALGORITHM_ID, topicId: requirement.topicId,
     satisfied: missingTypes.length === 0, presentTypes, missingTypes };
 }
+
+// The learner skill state projection rule (ENG-05) builds on everything above.
+export * from './skill-state.js';

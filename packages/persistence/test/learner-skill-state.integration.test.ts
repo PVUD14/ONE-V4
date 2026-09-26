@@ -213,6 +213,9 @@ async function recordFact(studentId: string, fact: AttemptFact): Promise<void> {
     );
     await requestSkillStateProjection(client, { subjectUserId: studentId, reason: 'ATTEMPTS_RECORDED', correlationId: `skill-state-test-${randomUUID()}` });
     await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
   } finally {
     client.release();
   }

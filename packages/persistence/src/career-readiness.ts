@@ -19,6 +19,7 @@ import {
 import { createIntegrationEventEnvelope } from '@planthepath/events/src/index.js';
 import { attemptOutcomeBand, isAssistedAttempt } from '@planthepath/learning-model/src/index.js';
 import { recordGradedAttemptSession, skillStageAtCapture } from './learning-attempts.js';
+import { resolveResponseMisconceptionsWith } from './misconceptions.js';
 
 type QueryResult<T> = { rows: T[]; rowCount: number | null };
 type DbClient = Pick<PoolClient, 'query'>;
@@ -761,7 +762,7 @@ export async function submitAssessmentAttempt(pool: Pool, input: {
       if (isCorrect) scoreCorrect += 1;
       gradedResponses.push({
         itemSource: 'CAREER_READINESS_QUESTION', itemId: item.question_id, itemVersion: item.version, skillId: item.topic_id,
-        answered: true, correct: isCorrect, marksAwarded: isCorrect ? 1 : 0, marksPossible: 1,
+        answered: true, correct: isCorrect, marksAwarded: isCorrect ? 1 : 0, marksPossible: 1, selectedOptionId: selected,
       });
       const topic = topicScores.get(item.topic_id) ?? { demonstrated: 0, possible: 0 };
       topicScores.set(item.topic_id, { demonstrated: topic.demonstrated + (isCorrect ? 1 : 0), possible: topic.possible + 1 });
@@ -776,13 +777,22 @@ export async function submitAssessmentAttempt(pool: Pool, input: {
       [input.attemptId, input.idempotencyKey, scoreCorrect, items.rows.length],
     );
     await client.query("UPDATE assessment_assignments SET state='COMPLETED' WHERE id=(SELECT assignment_id FROM assessment_attempts WHERE id=$1)", [input.attemptId]);
+    // ENG-07 link (0052): the published misconceptions each chosen option signals, fixed on the
+    // attempt row now, so a later re-tag never rewrites what this answer meant. Correct answers
+    // and untagged options resolve to none.
+    const signalled = await resolveResponseMisconceptionsWith(client, gradedResponses.map((response) => ({
+      questionVersionId: response.itemId, selectedOptionId: response.selectedOptionId ?? null,
+    })));
+    const withMisconceptions = gradedResponses.map((response, index) => ({
+      ...response, misconceptionCodeIds: signalled[index]!.misconceptions.map((item) => item.misconceptionCodeId),
+    }));
     // The attempt log (ENG-03): one row per graded response, in this transaction, so the log
     // can never claim an attempt that rolled back or miss one that committed. Written before the
     // evidence (ENG-04) so each evidence row's stage at capture includes this submission.
     await recordGradedAttemptSession(client, {
       subjectUserId: input.subjectUserId, mode: 'ASSESSMENT', context: 'ASSESSMENT',
       sourceAttemptType: 'assessment_attempt', sourceAttemptId: input.attemptId,
-      startedAt: attempt.started_at, contentVersion: 'assessment-v1', responses: gradedResponses,
+      startedAt: attempt.started_at, contentVersion: 'assessment-v1', responses: withMisconceptions,
     });
 
     const evidenceIds: string[] = [];

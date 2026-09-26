@@ -204,9 +204,10 @@ export const DELETION_POLICY: readonly DeletionPolicyEntry[] = [
   // OPS-05: the operator's service record survives with the person removed from it — the
   // subject link, the typed summary and every note (docs/architecture/support-cases-table-design.md).
   { category: 'SUPPORT_CASES', disposition: 'ANONYMISED', basis: 'Support records are kept as a history of the service given, with the person, the summary and the notes removed.' },
-  // Engine behavioural data — the attempt log, learning sessions and learning activity
-  // telemetry — is only about the person, so it is erased, not anonymised (ADR-034). It is
-  // append-only for everyone else; only the deletion transaction may remove it.
+  // Engine behavioural data — the attempt log, learning sessions, learning activity
+  // telemetry and the learner skill state projection (ENG-05) — is only about the person, so it
+  // is erased, not anonymised (ADR-034). It is append-only (or projector-only) for everyone
+  // else; only the deletion transaction may remove it.
   { category: 'LEARNING_ACTIVITY', disposition: 'ERASED' },
   { category: 'AUDIT', disposition: 'RETAINED', basis: 'Security and access audit records are retained under the approved retention schedule.' },
 ];

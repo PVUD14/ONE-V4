@@ -172,6 +172,11 @@ must not depend on either, so it delivers the resolution and designs the link:
   *Rejected:* adding the columns to 0047's table from 0049 — 0049 does sort after 0047, but the brief
   forbids this goal depending on an unmerged branch, and the columns belong to the attempt log's design.
 
+  **Built by ENG-05** (`0052_learner_skill_state.sql`, `learner-skill-state-table-design.md`): the two
+  columns exactly as above, filled by the readiness-check submit; the projector files active codes under
+  each code's skill, and a signal clears when the same item is later answered correctly without help.
+  The acceptance test is `packages/persistence/test/learner-skill-state.integration.test.ts`.
+
 ## Consent and privacy
 
 The three tables hold content, not student data. The only personal reference is the staff author

@@ -29,6 +29,7 @@ import {
   resolveClaimedEmailDelivery,
 } from './automation-runtime.js';
 import { consumeSeededContentGenerationRequested } from './content-generation.js';
+import { LEARNER_SKILL_STATE_PROJECTION_REQUESTED, consumeSkillStateProjectionRequested } from './learner-skill-state.js';
 
 export async function publishOutboxOnce(input: {
   readonly db: PersistenceDb; readonly publisher: IntegrationEventPublisher; readonly leaseOwner: string; readonly now: Date;
@@ -85,6 +86,10 @@ export function createLocalIntegrationEventPublisher(input: { readonly pool: Poo
     // INST-06: sends a due announcement once; with no sink its email is recorded NOT_CONFIGURED.
     [ANNOUNCEMENT_DISPATCH_REQUESTED]: async (event) => {
       await dispatchInstitutionAnnouncement(input.db, event, input.invitationMailSink ? { mailSink: input.invitationMailSink } : {});
+    },
+    // ENG-05: recompute one student's learner_skill_state from facts (consent checked there).
+    [LEARNER_SKILL_STATE_PROJECTION_REQUESTED]: async (event) => {
+      await consumeSkillStateProjectionRequested(input.db, event);
     },
   };
   return {

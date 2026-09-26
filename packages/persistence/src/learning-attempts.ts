@@ -27,6 +27,7 @@ import {
   type EvidenceStage,
 } from '@planthepath/learning-model/src/index.js';
 import type { PersistenceDb } from './repositories.js';
+import { requestSkillStateProjection } from './learner-skill-state.js';
 
 export type PgClient = Pick<PoolClient, 'query'>;
 
@@ -54,6 +55,10 @@ export interface GradedResponseInput {
   readonly highestHintLevel?: number;
   /** Any AI tutor reply on the item (ADR-033's recommended rule). */
   readonly tutorReplied?: boolean;
+  /** The option chosen on a choice item from the readiness bank (ENG-07 link, 0052). */
+  readonly selectedOptionId?: string | null;
+  /** Published misconception_codes.id values the chosen option signalled, from resolveResponseMisconceptions. */
+  readonly misconceptionCodeIds?: readonly string[];
 }
 
 export interface NormalisedLearningAttempt {
@@ -67,7 +72,13 @@ export interface NormalisedLearningAttempt {
   readonly responseTimeMs: number | null;
   readonly highestHintLevel: number;
   readonly assisted: boolean;
+  readonly selectedOptionId: string | null;
+  readonly misconceptionCodeIds: readonly string[];
 }
+
+/** The 0052 CHECK allows at most this many codes on one attempt. */
+export const MAX_MISCONCEPTIONS_PER_ATTEMPT = 16;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export class LearningAttemptError extends Error {
   constructor(message: string) {
@@ -81,7 +92,9 @@ export class LearningAttemptError extends Error {
  *
  * - an unanswered item is never correct;
  * - score is the fraction of credit earned, clamped to [0, 1] and rounded to the column's 4 places;
- * - a hint level of 3 or more, or a tutor reply, makes the attempt assisted.
+ * - a hint level of 3 or more, or a tutor reply, makes the attempt assisted;
+ * - misconception codes are recorded only on a wrong answer (sorted, unique); a blank records
+ *   neither an option nor a code.
  */
 export function normaliseLearningAttempt(input: GradedResponseInput): NormalisedLearningAttempt {
   if (!Number.isInteger(input.itemVersion) || input.itemVersion < 1) throw new LearningAttemptError('item version must be a positive integer');
@@ -94,6 +107,14 @@ export function normaliseLearningAttempt(input: GradedResponseInput): Normalised
 
   const answered = input.answered;
   const correct = answered && input.correct;
+  const selectedOptionId = input.selectedOptionId ?? null;
+  if (selectedOptionId !== null && (!answered || selectedOptionId.length < 1 || selectedOptionId.length > 64)) {
+    throw new LearningAttemptError('a selected option must be 1 to 64 characters on an answered item');
+  }
+  const misconceptionCodeIds = [...new Set(input.misconceptionCodeIds ?? [])].sort();
+  if (misconceptionCodeIds.some((id) => !UUID.test(id))) throw new LearningAttemptError('a misconception code id must be a UUID');
+  if (misconceptionCodeIds.length > MAX_MISCONCEPTIONS_PER_ATTEMPT) throw new LearningAttemptError('too many misconception codes on one attempt');
+  if (misconceptionCodeIds.length > 0 && (!answered || correct)) throw new LearningAttemptError('only a wrong answer can signal a misconception');
   const fraction = Math.min(1, Math.max(0, input.marksAwarded / input.marksPossible));
   const score = answered ? Math.round(fraction * 10_000) / 10_000 : 0;
   return {
@@ -107,6 +128,8 @@ export function normaliseLearningAttempt(input: GradedResponseInput): Normalised
     responseTimeMs: time === null ? null : Math.round(time),
     highestHintLevel: hint,
     assisted: isAssistedAttempt({ highestHintLevel: hint, tutorReplied: input.tutorReplied === true }),
+    selectedOptionId,
+    misconceptionCodeIds,
   };
 }
 
@@ -157,14 +180,24 @@ export async function recordGradedAttemptSession(
       `INSERT INTO learning_attempt_events
          (id, subject_user_id, institution_id, session_id, item_source, item_id, item_version, skill_id, context,
           answered, correct, score, response_time_ms, highest_hint_level, assisted, content_version,
-          source_attempt_type, source_attempt_id, occurred_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,now())
+          source_attempt_type, source_attempt_id, occurred_at, selected_option_id, misconception_code_ids)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,now(),$19,$20::uuid[])
        ON CONFLICT (source_attempt_type, source_attempt_id, item_source, item_id) DO NOTHING`,
       [randomUUID(), input.subjectUserId, institution, sessionId, attempt.itemSource, attempt.itemId, attempt.itemVersion,
         attempt.skillId, input.context, attempt.answered, attempt.correct, attempt.score, attempt.responseTimeMs,
-        attempt.highestHintLevel, attempt.assisted, input.contentVersion, input.sourceAttemptType, input.sourceAttemptId],
+        attempt.highestHintLevel, attempt.assisted, input.contentVersion, input.sourceAttemptType, input.sourceAttemptId,
+        attempt.selectedOptionId, `{${attempt.misconceptionCodeIds.join(',')}}`],
     );
     written += inserted.rowCount ?? 0;
+  }
+  // ENG-05: ask the worker to project this student's skill state from the new facts. Same
+  // transaction, so the request exists exactly when the attempts do. Consent is checked when the
+  // projector runs, not here: recording is not profiling.
+  if (written > 0) {
+    await requestSkillStateProjection(client, {
+      subjectUserId: input.subjectUserId, reason: 'ATTEMPTS_RECORDED',
+      correlationId: `skill-state:${input.sourceAttemptType}:${input.sourceAttemptId}`,
+    });
   }
   return { sessionId, written };
 }

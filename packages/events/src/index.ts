@@ -480,6 +480,19 @@ export const eventSchemas = {
     schemaRef: 'registry://learning.lesson.completed/1',
     payload: { progressId: { kind: 'uuid' }, lessonVersionId: { kind: 'uuid' }, evidenceId: { kind: 'uuid' } },
   },
+  // ENG-05: asks the skill-state projector to recompute one student from facts. Written in the
+  // grading transaction (ATTEMPTS_RECORDED) or with an adaptive-learning grant (CONSENT_GRANTED).
+  // Carries no learning data: the projector reads the facts itself, under the consent then live.
+  learningSkillStateProjectionRequestedV1: {
+    eventType: 'learning.skill_state.projection_requested',
+    eventVersion: 1,
+    producer: 'learning-engine',
+    aggregateType: 'user',
+    purpose: 'adaptive-learning-projection',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://learning.skill_state.projection_requested/1',
+    payload: { subjectUserId: { kind: 'uuid' }, reason: { kind: 'enum', values: ['ATTEMPTS_RECORDED', 'CONSENT_GRANTED'] } },
+  },
   assessmentAttemptStartedV1: {
     eventType: 'assessment.attempt.started',
     eventVersion: 1,

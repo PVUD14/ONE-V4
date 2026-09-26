@@ -1,6 +1,8 @@
 import { BadRequestException, Body, Controller, ForbiddenException, Get, Inject, Post, Req, UseGuards } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import type { PersistenceDb } from '@planthepath/persistence/src/repositories.js';
+import { clearLearnerSkillStateForWithdrawal, requestSkillStateProjection } from '@planthepath/persistence/src/learner-skill-state.js';
+import { drizzleAsPgClient } from '@planthepath/persistence/src/learning-attempts.js';
 import {
   API_ID_GENERATOR,
   API_PERSISTENCE_DB,
@@ -122,10 +124,16 @@ export class ConsentsController {
       throw new BadRequestException(apiError('CONSENT_NOT_HELD', correlationId));
     }
 
-    await this.db.execute(sql`
-      INSERT INTO user_consents (id, user_id, consent_key, version, action, correlation_id)
-      VALUES (${this.ids.uuid()}::uuid, ${userId}::uuid, ${consentKey}, ${row.granted_version}, 'WITHDRAWN', ${correlationId})
-    `);
+    await this.db.transaction(async (tx) => {
+      await tx.execute(sql`
+        INSERT INTO user_consents (id, user_id, consent_key, version, action, correlation_id)
+        VALUES (${this.ids.uuid()}::uuid, ${userId}::uuid, ${consentKey}, ${row.granted_version}, 'WITHDRAWN', ${correlationId})
+      `);
+      // ENG-05: the skill state projection is the profile adaptive-learning was granted for, so
+      // it goes with the withdrawal, in the same transaction. The attempts stay; a later grant
+      // rebuilds the same rows.
+      if (consentKey === 'adaptive-learning') await clearLearnerSkillStateForWithdrawal(tx, userId);
+    });
     return {
       withdrawn: true,
       consentKey,
@@ -153,10 +161,17 @@ export class ConsentsController {
     if (!requiredVersion || version !== requiredVersion) {
       throw new BadRequestException(apiError('CONSENT_VERSION_MISMATCH', correlationId));
     }
-    await this.db.execute(sql`
-      INSERT INTO user_consents (id, user_id, consent_key, version, action, correlation_id)
-      VALUES (${this.ids.uuid()}::uuid, ${userId}::uuid, ${consentKey}, ${version}, ${action}, ${correlationId})
-    `);
+    await this.db.transaction(async (tx) => {
+      await tx.execute(sql`
+        INSERT INTO user_consents (id, user_id, consent_key, version, action, correlation_id)
+        VALUES (${this.ids.uuid()}::uuid, ${userId}::uuid, ${consentKey}, ${version}, ${action}, ${correlationId})
+      `);
+      // ENG-05: a student who consents to adaptive learning later gets their existing history
+      // projected. The worker does it; nothing heavy runs in this request.
+      if (consentKey === 'adaptive-learning') {
+        await requestSkillStateProjection(drizzleAsPgClient(tx), { subjectUserId: userId, reason: 'CONSENT_GRANTED', correlationId });
+      }
+    });
     return { granted: true, consentKey, version, correlationId };
   }
 

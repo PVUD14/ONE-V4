@@ -32,7 +32,9 @@ import {
   type TeachingStrategyDraft,
   type TeachingStrategyKind,
 } from '@planthepath/career-readiness';
+import type { PoolClient } from 'pg';
 import type { PersistenceDb } from './repositories.js';
+import { drizzleAsPgClient } from './learning-attempts.js';
 
 type QueryResult<T> = { rows: T[] };
 
@@ -336,20 +338,33 @@ export async function resolveResponseMisconceptions(
   db: PersistenceDb,
   responses: readonly GradedChoice[],
 ): Promise<readonly (GradedChoice & { readonly misconceptions: readonly ResponseMisconception[] })[]> {
+  return resolveResponseMisconceptionsWith(drizzleAsPgClient(db), responses);
+}
+
+/**
+ * The same resolution over a pg-style client, so the readiness-check submit (a pg transaction)
+ * can resolve its responses and store the ids on the attempt rows it writes (ENG-05, 0052).
+ */
+export async function resolveResponseMisconceptionsWith(
+  client: Pick<PoolClient, 'query'>,
+  responses: readonly GradedChoice[],
+): Promise<readonly (GradedChoice & { readonly misconceptions: readonly ResponseMisconception[] })[]> {
   if (responses.length === 0) return [];
   const ids = uuidArrayLiteral([...new Set(responses.map((response) => response.questionVersionId))], 'questionVersionId');
-  const found = await rows<{
+  const found = (await client.query<{
     question_version_id: string; correct_option_id: string;
     option_id: string | null; misconception_code_id: string | null; code: string | null;
-  }>(db, sql`
-    SELECT q.id AS question_version_id, k.correct_option_id, t.option_id, c.id AS misconception_code_id, c.code
-    FROM question_versions q
-    JOIN question_answer_keys k ON k.question_version_id = q.id
-    LEFT JOIN question_option_misconceptions t
-      ON t.question_revision_id = q.content_revision_id AND t.review_state = 'PUBLISHED'
-    LEFT JOIN misconception_codes c ON c.id = t.misconception_code_id AND c.review_state = 'PUBLISHED'
-    WHERE q.id = ANY(${ids}::uuid[])
-  `);
+  }>(
+    `SELECT q.id AS question_version_id, k.correct_option_id, t.option_id, c.id AS misconception_code_id, c.code
+     FROM question_versions q
+     JOIN question_answer_keys k ON k.question_version_id = q.id
+     LEFT JOIN question_option_misconceptions t
+       ON t.question_revision_id = q.content_revision_id AND t.review_state = 'PUBLISHED'
+     LEFT JOIN misconception_codes c ON c.id = t.misconception_code_id AND c.review_state = 'PUBLISHED'
+     WHERE q.id = ANY($1::uuid[])
+     ORDER BY q.id, t.option_id, c.id`,
+    [ids],
+  )).rows;
   const byQuestion = new Map<string, { correctOptionId: string; tags: { optionId: string; misconceptionCodeId: string; code: string }[] }>();
   for (const row of found) {
     const entry = byQuestion.get(row.question_version_id) ?? { correctOptionId: row.correct_option_id, tags: [] };

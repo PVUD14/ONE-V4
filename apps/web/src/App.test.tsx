@@ -357,6 +357,31 @@ describe('All-role portal registry and preview workflows', () => {
     expect(screen.queryByText('OPERATIONS_ADMIN')).not.toBeInTheDocument();
   });
 
+  it('keeps a graduated student in their own workspace and tells them where they stand (INST-10)', async () => {
+    configureHostedCallback('graduate@example.test');
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url === 'https://uat-auth.example.test/oauth2/token') return { ok: true, json: async () => ({ access_token: 'graduate-token', id_token: jwtWithEmail('graduate@example.test') }) };
+      if (url.endsWith('/health')) return { ok: true };
+      if (url.endsWith('/api/v1/me/consents/privacy-notice')) return { ok: true, json: async () => ({ requiredVersion: null, grantedVersion: null, required: false }) };
+      if (url.endsWith('/api/v1/security/context')) {
+        return { ok: true, json: async () => ({ userId: 'graduate-user', memberships: [], studentRelationships: [],
+          formerStudentRelationships: [{ institutionId: 'institution-1', state: 'GRADUATED', effectiveFrom: '2022-07-01T00:00:00.000Z', effectiveTo: '2026-05-30T18:30:00.000Z' }] }) };
+      }
+      if (url.endsWith('/api/v1/students/me')) {
+        return { ok: true, json: async () => ({ student: { userId: 'graduate-user', verifiedEmail: 'graduate@example.test', fullName: 'Asha Rao', institutionStudentId: 'CSE-001',
+          institutionId: 'institution-1', institutionName: 'Local College', formerStudent: true, academicStatus: 'GRADUATED',
+          relationship: { id: 'rel-1', state: 'GRADUATED', effectiveFrom: '2022-07-01T00:00:00.000Z', effectiveTo: '2026-05-30T18:30:00.000Z' } } }) };
+      }
+      return { ok: false, status: 404, headers: { get: () => null }, json: async () => ({}) };
+    });
+    render(<App />);
+    await waitFor(() => expect(window.location.pathname).toBe('/student'));
+    expect(await screen.findByText('Graduated from Local College on 31 May 2026')).toBeInTheDocument();
+    expect(screen.getByText(/Your ONE account, your records and your choices stay yours/)).toBeInTheDocument();
+    expect(screen.queryByText(/No active ONE workspace/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Student identity unavailable/)).not.toBeInTheDocument();
+  });
+
   it('ignores an aborted workspace context request instead of showing a false workspace failure', async () => {
     configureHostedCallback();
     fetchMock.mockImplementation(async (url: string) => {

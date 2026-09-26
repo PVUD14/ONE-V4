@@ -9,6 +9,7 @@ import {
   institutionAnnouncementSender,
   institutionScopeAnchors,
   institutionStudentScope,
+  institutionStudentWriteScope,
   institutionUnitDescendants,
   isUnitWithin,
   isStudentInInstitutionScope,
@@ -154,6 +155,56 @@ describe('unit containment for scoped writes', () => {
     expect(isUnitWithin('dept-a', 'dept-a', units)).toBe(true);
     expect(isUnitWithin('batch-b1', 'dept-a', units)).toBe(false);
     expect(isUnitWithin('dept-a', 'batch-a1', units)).toBe(false);
+  });
+});
+
+// INST-SR-02: permanent writes (verification decisions, results import) do not inherit the
+// read fallbacks. Reads are unchanged — see "keeps an unscoped %s institution-wide" above.
+describe('write scope for permanent student-record changes', () => {
+  it.each(['INSTITUTION_OWNER', 'INSTITUTION_ADMIN'])('keeps %s institution-wide', (role) => {
+    expect(institutionStudentWriteScope([{ role }], units)).toEqual({ kind: 'INSTITUTION' });
+  });
+
+  it('keeps an unscoped placement admin institution-wide, as for reads', () => {
+    expect(institutionStudentWriteScope([{ role: 'PLACEMENT_ADMIN' }], units)).toEqual({ kind: 'INSTITUTION' });
+  });
+
+  it('gives a department head without a department nobody, where reads give the whole institution', () => {
+    expect(institutionStudentScope([{ role: 'DEPARTMENT_HEAD' }], units)).toEqual({ kind: 'INSTITUTION' });
+    expect(institutionStudentWriteScope([{ role: 'DEPARTMENT_HEAD' }], units)).toEqual({ kind: 'NONE' });
+    expect(institutionStudentWriteScope([{ role: 'DEPARTMENT_HEAD', batchUnitId: 'batch-a1' }], units)).toEqual({ kind: 'NONE' });
+  });
+
+  it('leaves a department head with a department exactly as for reads', () => {
+    const membership = [{ role: 'DEPARTMENT_HEAD', departmentUnitId: 'dept-a' }];
+    expect(institutionStudentWriteScope(membership, units)).toEqual(institutionStudentScope(membership, units));
+  });
+
+  it('gives faculty nobody before any active teaching assignment, whatever the membership scope', () => {
+    expect(institutionStudentScope([{ role: 'FACULTY_LECTURER' }], units)).toEqual({ kind: 'INSTITUTION' });
+    expect(institutionStudentWriteScope([{ role: 'FACULTY_LECTURER' }], units)).toEqual({ kind: 'NONE' });
+    expect(institutionStudentWriteScope([{ role: 'FACULTY_LECTURER', departmentUnitId: 'dept-a' }], units)).toEqual({ kind: 'NONE' });
+    expect(institutionStudentWriteScope([{ role: 'FACULTY_LECTURER', teachingUnitIds: [] }], units)).toEqual({ kind: 'NONE' });
+  });
+
+  it('limits faculty with a teaching assignment to the assigned units, as for reads', () => {
+    const scope = institutionStudentWriteScope([{ role: 'FACULTY_LECTURER', departmentUnitId: 'dept-b', teachingUnitIds: ['batch-a1'] }], units);
+    expect(isStudentInInstitutionScope(scope, studentA1)).toBe(true);
+    expect(isStudentInInstitutionScope(scope, studentA2)).toBe(false);
+    expect(isStudentInInstitutionScope(scope, studentB1)).toBe(false);
+  });
+
+  it('keeps a scoped membership held alongside an unscoped head', () => {
+    const scope = institutionStudentWriteScope([{ role: 'DEPARTMENT_HEAD' }, { role: 'FACULTY_LECTURER', teachingUnitIds: ['batch-b1'] }], units);
+    expect(isStudentInInstitutionScope(scope, studentB1)).toBe(true);
+    expect(isStudentInInstitutionScope(scope, studentA1)).toBe(false);
+  });
+
+  it('is the definition announcements send through', () => {
+    for (const membership of [{ role: 'DEPARTMENT_HEAD' }, { role: 'DEPARTMENT_HEAD', departmentUnitId: 'dept-b' }, { role: 'FACULTY_LECTURER', departmentUnitId: 'dept-a' },
+      { role: 'FACULTY_LECTURER', teachingUnitIds: ['section-a1-1'] }, { role: 'PLACEMENT_ADMIN', departmentUnitId: 'dept-a' }, { role: 'INSTITUTION_ADMIN' }]) {
+      expect(institutionAnnouncementScope([membership], units), membership.role).toEqual(institutionStudentWriteScope([membership], units));
+    }
   });
 });
 

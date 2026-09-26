@@ -31,6 +31,8 @@ const row = (overrides: Record<string, unknown>) => ({
 });
 const counts = (overrides: Record<string, number> = {}) => ({ create: 1, confirm: 0, unchanged: 0, conflict: 0, invalid: 0, differsFromStudent: 0, ...overrides });
 const fetchMock = vi.fn();
+/** INST-SR-02: the API's answer to an unscoped head, or faculty without a teaching assignment. */
+const scopeRequired = Symbol('SCOPE_REQUIRED');
 const ok = (body: unknown) => ({ ok: true, status: 200, headers: { get: () => null }, json: async () => body });
 
 function routes(table: Readonly<Record<string, unknown>>): void {
@@ -38,6 +40,7 @@ function routes(table: Readonly<Record<string, unknown>>): void {
     const path = String(url).replace(/^https?:\/\/[^/]+/, '').split('?')[0] ?? '';
     const body = table[path];
     if (body instanceof Error) return { ok: false, status: 500, headers: { get: () => 'corr-500' }, json: async () => ({}) };
+    if (body === scopeRequired) return { ok: false, status: 403, headers: { get: () => 'corr-403' }, json: async () => ({ error: { code: 'SCOPE_REQUIRED', message: 'A department or teaching assignment is required for this change' } }) };
     return ok(body ?? {});
   });
 }
@@ -80,6 +83,16 @@ describe('verification queue', () => {
     expect(bodyOf('/decide')).toEqual({ decision: 'VERIFIED', reasonCode: 'MATCHES_INSTITUTION_RECORD' });
   });
 
+  it('explains SCOPE_REQUIRED in plain words when a decision needs a department or teaching assignment', async () => {
+    routes({ [`${base}/academic-verification-queue`]: { queue: [entry] }, [`${base}/academic-verification/term-1/decide`]: scopeRequired });
+    render(<AcademicVerificationPage institutionId={institutionId} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Confirm' }));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(
+      /confirming or uploading results needs a department or teaching assignment on your account\. Ask your institution administrator to assign one\. Reference: corr-403/));
+    expect(screen.getByRole('status')).not.toHaveTextContent(/SCOPE_REQUIRED|permanent and cannot be reversed/);
+    expect(screen.getByText('Local Student')).toBeInTheDocument();
+  });
+
   it('shows a plain error with a reference when the queue cannot load', async () => {
     routes({ [`${base}/academic-verification-queue`]: new Error('down') });
     render(<AcademicVerificationPage institutionId={institutionId} />);
@@ -110,6 +123,14 @@ describe('results upload', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Validate results' }));
     expect(await screen.findByText('No student with this ID on the roster you manage')).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent(/Nothing is recorded while any row is invalid/);
+    expect(screen.queryByRole('button', { name: /^Record / })).not.toBeInTheDocument();
+  });
+
+  it('explains SCOPE_REQUIRED when an upload needs a department', async () => {
+    routes({ [previewPath]: scopeRequired });
+    render(<AcademicResultsUpload institutionId={institutionId} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Validate results' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/needs a department or teaching assignment on your account\. Ask your institution administrator to assign one\. Reference: corr-403/);
     expect(screen.queryByRole('button', { name: /^Record / })).not.toBeInTheDocument();
   });
 

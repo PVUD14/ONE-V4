@@ -324,13 +324,71 @@ describe('Career Readiness Fundamentals production path', () => {
       periodStart: '2026-05-01',
       periodEnd: '2026-06-30',
     });
+    // Five authorized DEVELOPING snapshots, none of the unauthorized READY ones. Every other
+    // band is an empty cell, so it shows as suppressed, and the total is withheld because it
+    // would say those bands are empty (INST-SR-01).
     expect(report).toMatchObject({
       aggregate: {
         suppressed: false,
         minimumCohortSize: 5,
-        cohortSize: 5,
-        bands: [{ band: 'DEVELOPING', count: 5 }],
+        cohortSize: null,
+        cohortSizeSuppressed: true,
+        bands: [
+          { band: 'NOT_ENOUGH_EVIDENCE', count: null, suppressed: true },
+          { band: 'DEVELOPING', count: 5, suppressed: false },
+          { band: 'PROGRESSING', count: null, suppressed: true },
+          { band: 'READY_FOR_NEXT_STEP', count: null, suppressed: true },
+        ],
       },
+    });
+  });
+
+  it('suppresses every band under 5 and any total that would recover one, in the response and the stored report', async () => {
+    const institutionId = randomUUID();
+    await pool.query(`INSERT INTO organizations (id, kind, legal_name, verification_state) VALUES ($1,'INSTITUTION','Band Suppression Test','VERIFIED')`, [institutionId]);
+    const model = await pool.query<{ id: string }>(`SELECT id FROM readiness_model_versions WHERE active ORDER BY published_at DESC LIMIT 1`);
+    const modelVersionId = model.rows[0]!.id;
+    async function cohort(bandCounts: Readonly<Record<string, number>>, month: string): Promise<void> {
+      for (const [band, count] of Object.entries(bandCounts)) {
+        for (let index = 0; index < count; index += 1) {
+          const userId = randomUUID();
+          await pool.query(`INSERT INTO users (id, external_subject, email, state) VALUES ($1,$2,$3,'ACTIVE')`,
+            [userId, `band-suppression:${userId}`, `band-suppression-${userId}@example.test`]);
+          await pool.query(`INSERT INTO institution_relationships (id, institution_id, student_user_id, state, effective_from)
+            VALUES ($1,$2,$3,'ACTIVE','2026-01-01T00:00:00Z')`, [randomUUID(), institutionId, userId]);
+          await pool.query(`INSERT INTO readiness_snapshots (id, subject_user_id, model_version_id, evidence_ids, evidence_set_hash, band, explanation, generated_at)
+            VALUES ($1,$2,$3,'{}'::uuid[],$4,$5,'{}'::jsonb,$6)`,
+          [randomUUID(), userId, modelVersionId, createHash('sha256').update(`band-suppression:${userId}`).digest('hex'), band, `${month}-10T00:00:00Z`]);
+        }
+      }
+    }
+    // One student alone in READY_FOR_NEXT_STEP: 7 + 6 + 1 published beside 14 would name them.
+    await cohort({ DEVELOPING: 7, PROGRESSING: 6, READY_FOR_NEXT_STEP: 1 }, '2026-03');
+    const lonely = await generateInstitutionAggregateReport(pool, { institutionId, periodStart: '2026-03-01', periodEnd: '2026-03-31' });
+    expect(lonely.aggregate).toEqual({
+      suppressed: false, minimumCohortSize: 5, cohortSize: null, cohortSizeSuppressed: true, scope: 'INSTITUTION',
+      bands: [
+        { band: 'NOT_ENOUGH_EVIDENCE', count: null, suppressed: true },
+        { band: 'DEVELOPING', count: 7, suppressed: false },
+        { band: 'PROGRESSING', count: 6, suppressed: false },
+        { band: 'READY_FOR_NEXT_STEP', count: null, suppressed: true },
+      ],
+    });
+    const stored = await pool.query<{ aggregate: unknown }>('SELECT aggregate FROM institution_aggregate_reports WHERE id=$1', [lonely['reportId']]);
+    expect(stored.rows[0]!.aggregate).toEqual(lonely.aggregate);
+    expect(JSON.stringify(stored.rows[0]!.aggregate)).not.toMatch(/"count":[0-4][,}]|"cohortSize":14/);
+
+    // Hidden bands holding 5 between them (3 + 2) leave the total safe to publish.
+    await cohort({ NOT_ENOUGH_EVIDENCE: 3, DEVELOPING: 8, PROGRESSING: 2, READY_FOR_NEXT_STEP: 6 }, '2026-04');
+    const grouped = await generateInstitutionAggregateReport(pool, { institutionId, periodStart: '2026-04-01', periodEnd: '2026-04-30' });
+    expect(grouped.aggregate).toMatchObject({
+      suppressed: false, cohortSize: 19, cohortSizeSuppressed: false,
+      bands: [
+        { band: 'NOT_ENOUGH_EVIDENCE', count: null, suppressed: true },
+        { band: 'DEVELOPING', count: 8, suppressed: false },
+        { band: 'PROGRESSING', count: null, suppressed: true },
+        { band: 'READY_FOR_NEXT_STEP', count: 6, suppressed: false },
+      ],
     });
   });
 

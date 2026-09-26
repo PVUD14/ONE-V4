@@ -35,11 +35,13 @@ import {
   LEARNER_SKILL_STATE_PROJECTION_REQUESTED,
   clearLearnerSkillStateForWithdrawal,
   consumeSkillStateProjectionRequested,
+  listDueReviews,
   projectSubjectSkillState,
   rebuildLearnerSkillState,
   requestSkillStateProjection,
 } from '../src/learner-skill-state.js';
 import { createLocalIntegrationEventPublisher } from '../src/automation-workers.js';
+import { scheduleReviewDays } from '@planthepath/review-scheduler/src/index.js';
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) throw new Error('DATABASE_URL is required for persistence integration tests');
@@ -387,7 +389,20 @@ describe('rebuilding from attempts reproduces the table exactly', () => {
     const firstA = incremental.find((row) => row.subject_user_id === first && row.skill_id === topicA)!;
     expect(firstA).toMatchObject({ attempt_count: 4, attempt_day_count: 4, unaided_success_count: 2, unaided_success_day_count: 2,
       assisted_success_count: 1, evidence_stage: 'DEMONSTRATED', evidence_band: 'DEMONSTRATED', institution_id: null,
-      algorithm_version: 'learner-skill-state-v1', mastery_likelihood: null, review_due_at: null });
+      algorithm_version: 'learner-skill-state-v1', mastery_likelihood: null });
+    // ENG-09: the review columns hold review-scheduler-fsrs-v1 over the same attempts — one review per
+    // Kolkata day: wrong (AGAIN), right (GOOD), right only after hint 3 (AGAIN: assisted is not a
+    // successful review), right (GOOD); the blank on day 8 is not a review.
+    const expectedReview = scheduleReviewDays([
+      { day: '2026-08-02', rating: 'AGAIN' }, { day: '2026-08-03', rating: 'GOOD' },
+      { day: '2026-08-05', rating: 'AGAIN' }, { day: '2026-08-06', rating: 'GOOD' },
+    ])!;
+    expect(firstA).toMatchObject({
+      review_algorithm_version: 'review-scheduler-fsrs-v1',
+      review_stability: expectedReview.stability.toFixed(4),
+      review_difficulty: expectedReview.difficulty.toFixed(4),
+    });
+    expect(new Date(firstA.review_due_at as string).toISOString()).toBe(expectedReview.dueAt);
     // The exam item counts on the topic its subject was mapped to when it was sat.
     const firstB = incremental.find((row) => row.subject_user_id === first && row.skill_id === topicB)!;
     expect(firstB).toMatchObject({ attempt_count: 1, unaided_success_count: 1, evidence_stage: 'RETAINED', institution_id: institutionId });
@@ -560,3 +575,63 @@ describe('privacy deletion', () => {
   });
 });
 
+
+// ---------------------------------------------------------------------------
+// ENG-09: the review scheduler's state and the due reviews the planner reads
+// ---------------------------------------------------------------------------
+
+describe('due reviews (ENG-09, C7)', () => {
+  const daysAgo = (days: number): string => new Date(Date.now() - days * 86_400_000).toISOString();
+
+  it('puts a skill not practised for its due interval first, and drops a skill once it is practised again', async () => {
+    const studentId = await newUser();
+    await consent(studentId, 'GRANTED');
+    // topicA: two good days two months ago. topicB: two good days a month ago. Both are past due.
+    await recordFact(studentId, { skillId: topicA, occurredAt: daysAgo(61) });
+    await recordFact(studentId, { skillId: topicA, occurredAt: daysAgo(60) });
+    await recordFact(studentId, { skillId: topicB, occurredAt: daysAgo(31) });
+    await recordFact(studentId, { skillId: topicB, occurredAt: daysAgo(30) });
+    await drain();
+    const due = await listDueReviews(db, studentId);
+    expect(due.map((item) => item.skillId)).toEqual([topicA, topicB]);
+    expect(due[0]!.dueAt < due[1]!.dueAt).toBe(true);
+
+    // Practising topicB today reschedules it into the future; topicA is still due, and first.
+    await recordFact(studentId, { skillId: topicB, occurredAt: daysAgo(0.01) });
+    await drain();
+    expect((await listDueReviews(db, studentId)).map((item) => item.skillId)).toEqual([topicA]);
+    const rows = await pool.query<{ skill_id: string; review_due_at: Date }>(
+      'SELECT skill_id, review_due_at FROM learner_skill_state WHERE subject_user_id=$1', [studentId]);
+    expect(rows.rows.find((row) => row.skill_id === topicB)!.review_due_at.getTime()).toBeGreaterThan(Date.now());
+
+    // The schedule is projection state: a rebuild reproduces it, and nobody edits it by hand.
+    const before = await snapshot([studentId]);
+    await rebuildLearnerSkillState(db);
+    expect(await snapshot([studentId])).toEqual(before);
+    await expect(pool.query("UPDATE learner_skill_state SET review_due_at = now() + interval '1 year' WHERE subject_user_id=$1", [studentId]))
+      .rejects.toThrow(/only the projector writes it/);
+  });
+
+  it('treats a success after hint 3 as a lapse, so the skill comes due sooner than an unaided success', async () => {
+    const unaided = await newUser();
+    const assisted = await newUser();
+    for (const id of [unaided, assisted]) {
+      await consent(id, 'GRANTED');
+      await recordFact(id, { skillId: topicA, occurredAt: daysAgo(20) });
+    }
+    await recordFact(unaided, { skillId: topicA, occurredAt: daysAgo(10) });
+    await recordFact(assisted, { skillId: topicA, occurredAt: daysAgo(10), hint: 3 });
+    await drain();
+    const dueAt = async (id: string): Promise<number> => (await pool.query<{ review_due_at: Date }>(
+      'SELECT review_due_at FROM learner_skill_state WHERE subject_user_id=$1 AND skill_id=$2', [id, topicA])).rows[0]!.review_due_at.getTime();
+    expect(await dueAt(assisted)).toBeLessThan(await dueAt(unaided));
+  });
+
+  it('has no due reviews for a student without adaptive-learning consent, however old their attempts', async () => {
+    const studentId = await newUser();
+    await recordFact(studentId, { skillId: topicA, occurredAt: daysAgo(90) });
+    await drain();
+    expect(await snapshot([studentId])).toEqual([]);
+    expect(await listDueReviews(db, studentId)).toEqual([]);
+  });
+});

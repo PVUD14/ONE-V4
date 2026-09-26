@@ -29,6 +29,7 @@ import {
 import { PG_POOL } from '../persistence.provider.js';
 import { ProtectedApiAuthenticationGuard, type ProtectedHttpRequest } from './api-security.js';
 import { resolveInstitutionStudentScope } from '@planthepath/persistence/src/institution-scope.js';
+import { institutionReportingMonth } from '@planthepath/authorization/src/index.js';
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const idempotencyKeyPattern = /^[A-Za-z0-9._:-]{8,128}$/;
@@ -155,6 +156,9 @@ export class CareerReadinessController {
     const membership = request.planThePath?.authorization?.selectedMembership;
     if (!membership || membership.organizationId !== id || !institutionReportRoles.includes(membership.role)) throw safeForbidden();
     if (!isIsoDate(periodStart) || !isIsoDate(periodEnd) || periodEnd < periodStart) throw safeBadRequest();
+    // INST-SR-01: one whole calendar month that has ended, so two reports can never be
+    // differenced to isolate one student (overlapping windows, or a window still filling).
+    if (!institutionReportingMonth(periodStart, periodEnd, new Date().toISOString().slice(0, 10))) throw reportPeriodInvalid();
     const studentScope = await resolveInstitutionStudentScope(this.pool, id, [{
       role: membership.role, membershipId: membership.id, departmentUnitId: membership.scope.departmentId ?? null, batchUnitId: membership.scope.batchId ?? null,
     }]);
@@ -234,6 +238,10 @@ function mapDomainError(error: unknown): BadRequestException | ConflictException
     } });
   }
   return safeBadRequest();
+}
+
+function reportPeriodInvalid(): BadRequestException {
+  return new BadRequestException({ error: { code: 'REPORT_PERIOD_INVALID', message: 'A report covers one whole calendar month that has ended' } });
 }
 
 function safeBadRequest(): BadRequestException {

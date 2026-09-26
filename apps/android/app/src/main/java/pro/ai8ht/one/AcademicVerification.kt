@@ -105,6 +105,14 @@ suspend fun Api.decideVerification(
             "{\"decision\":\"$decision\",\"reasonCode\":\"$reasonCode\"}"),
     )
 
+/**
+ * INST-SR-02: a permanent decision needs a department (heads) or an active teaching
+ * assignment (faculty). Same wording as the web.
+ */
+internal const val scopeRequiredNotice =
+    "You can view these records, but confirming or uploading results needs a department or teaching " +
+        "assignment on your account. Ask your institution administrator to assign one."
+
 /** Same codes as the web; a confirmation records MATCHES_INSTITUTION_RECORD. */
 private val rejectionReasons = listOf(
     "DOES_NOT_MATCH_RECORD" to "Does not match our record",
@@ -158,7 +166,10 @@ internal fun VerificationQueueOverlay(organizationId: String, onClose: () -> Uni
                     else "Rejected. The student can correct the record and submit it again."
                     onChanged()
                 }
-                .onFailure { notice = "That decision could not be recorded. Pull the queue again and retry." }
+                .onFailure { error ->
+                    notice = if (error is Api.ApiException && error.code == "SCOPE_REQUIRED") scopeRequiredNotice
+                    else "That decision could not be recorded. Pull the queue again and retry."
+                }
             busy = false; confirming = null; rejecting = null; reason = null
         }
     }

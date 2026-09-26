@@ -8,9 +8,10 @@
  *
  * Owners and admins see the whole institution. A placement admin, department head or
  * faculty member sees the units their membership is scoped to, including every unit
- * below them (a department's programmes, batches and sections). A membership with no
- * unit scope stays institution-wide: that is how staff actions have always treated it,
- * and failing closed would empty every existing department-head workspace.
+ * below them (a department's programmes, batches and sections). For reads, a membership
+ * with no unit scope stays institution-wide: that is how staff actions have always treated
+ * it, and failing closed would empty every existing department-head workspace. Permanent
+ * writes do not inherit that fallback — see `institutionStudentWriteScope`.
  *
  * Faculty (INST-03): once an institution records teaching assignments, a faculty
  * membership carries `teachingUnitIds` — the sections and batches of its active
@@ -136,22 +137,46 @@ export function isStudentInInstitutionScope(scope: InstitutionStudentScope, stud
 export const institutionAnnouncementSenderRoles = ['INSTITUTION_OWNER', 'INSTITUTION_ADMIN', 'PLACEMENT_ADMIN', 'DEPARTMENT_HEAD', 'FACULTY_LECTURER'] as const;
 
 /**
- * Who a membership may send an announcement to. The same definition as reads, with two
- * deliberate differences, because the read fallbacks would widen a sender to the whole
- * college: a faculty member sends only through active teaching assignments (none recorded
- * means nobody), and a department head needs a department on their membership.
+ * Which students a membership may make a permanent change to the record of (INST-SR-02):
+ * verification decisions, bulk results import, and the sending scope of announcements.
+ *
+ * The same definition as reads, with the two read fallbacks removed, because each would
+ * widen a writer to the whole college: a department head needs a department on their
+ * membership (as for teaching-assignment writes), and a faculty member writes only through
+ * active teaching assignments — before their institution records any, that is nobody,
+ * whatever department or batch the membership carries. Owners, admins, placement admins
+ * and department heads with a department are exactly as for reads. NONE here, for a caller who holds one of
+ * the endpoint's roles, means "assign this person a scope first" (SCOPE_REQUIRED), not
+ * "no such student".
+ *
+ * Reads keep the fallbacks for now: whether an unscoped head should see the whole college
+ * is a product decision that has not been taken.
+ */
+export function institutionStudentWriteScope(
+  memberships: readonly InstitutionStaffScopeMembership[],
+  units: readonly InstitutionUnitNode[],
+): InstitutionStudentScope {
+  const writers = memberships
+    .filter((membership) => membership.role !== 'DEPARTMENT_HEAD' || Boolean(membership.departmentUnitId))
+    .map((membership) => membership.role === 'FACULTY_LECTURER'
+      ? { ...membership, teachingUnitIds: membership.teachingUnitIds ?? [] }
+      : membership);
+  return institutionStudentScope(writers, units);
+}
+
+/**
+ * Who a membership may send an announcement to: the write scope over the sender roles. A
+ * faculty member sends only through active teaching assignments (none recorded means
+ * nobody), and a department head needs a department on their membership.
  */
 export function institutionAnnouncementScope(
   memberships: readonly InstitutionStaffScopeMembership[],
   units: readonly InstitutionUnitNode[],
 ): InstitutionStudentScope {
-  const senders = memberships
-    .filter((membership) => (institutionAnnouncementSenderRoles as readonly string[]).includes(membership.role))
-    .filter((membership) => membership.role !== 'DEPARTMENT_HEAD' || Boolean(membership.departmentUnitId))
-    .map((membership) => membership.role === 'FACULTY_LECTURER'
-      ? { ...membership, teachingUnitIds: membership.teachingUnitIds ?? [] }
-      : membership);
-  return institutionStudentScope(senders, units);
+  return institutionStudentWriteScope(
+    memberships.filter((membership) => (institutionAnnouncementSenderRoles as readonly string[]).includes(membership.role)),
+    units,
+  );
 }
 
 /**

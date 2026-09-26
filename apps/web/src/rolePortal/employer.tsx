@@ -14,6 +14,7 @@ import { StaffPilotWrap } from '../parityWraps.js';
 import { EmployerTeamPage } from './employerTeam.js';
 import { EmployerCompanyProfilePage } from './employerCompanyProfile.js';
 import { EmployerOpportunityDetailPage } from './employerOpportunityDetail.js';
+import { EmployerCandidateDetailPage, EmployerTalentPoolPage } from './employerCandidateDetail.js';
 import type { RolePortalConfig } from '../rolePortalConfig.js';
 import { RestrictedApiState } from './shared.js';
 import { useEffect, useState } from 'react';
@@ -60,6 +61,10 @@ function EmployerManagementRealityPage({ portal, routeLabel }: { readonly portal
     return <StaffPilotWrap title="Opportunities" subtitle="Post roles, choose their audience and publish. Applications land under Applicants.">
       <EmployerOpportunitiesPage key={employerId} employerId={employerId} /></StaffPilotWrap>;
   }
+  // EMP-07: Candidate Detail shows one applicant as they chose to be seen, and Talent Pool says it
+  // is not available yet (EMP-14). Both used to fall through to the applicants list below.
+  if (routeLabel === 'Candidate Detail') return <EmployerCandidateDetailPage key={employerId} employerId={employerId} />;
+  if (routeLabel === 'Talent Pool') return <EmployerTalentPoolPage />;
   if (/applicant|candidate|talent/i.test(routeLabel)) {
     return <StaffPilotWrap title="Applicants" subtitle="Move real candidates through your process; every change is logged.">
       <EmployerApplicantsPage key={employerId} employerId={employerId} /></StaffPilotWrap>;

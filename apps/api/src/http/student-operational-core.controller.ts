@@ -31,7 +31,7 @@ export class StudentOperationalCoreController {
   @UseGuards(ProtectedApiAuthenticationGuard)
   async getProfile(@Req() request: ProtectedHttpRequest): Promise<Record<string, unknown>> {
     const context = requireTrustedAuthorization(request);
-    await requireActiveStudentRelationship(this.db, context.authorization.principal.userId, context.correlationId);
+    await requireStudentRelationship(this.db, context.authorization.principal.userId, context.correlationId);
     const rows = await this.db.execute(sql`
       SELECT u.id AS user_id, u.email, sp.target_career, sp.career_interests, sp.profile_headline,
              sp.profile_summary, sp.portfolio_url, sp.visibility_state, sp.employer_discovery_enabled, sp.updated_at
@@ -48,7 +48,7 @@ export class StudentOperationalCoreController {
   @UseGuards(ProtectedApiAuthenticationGuard)
   async updateProfile(@Req() request: ProtectedHttpRequest, @Body() body: unknown): Promise<Record<string, unknown>> {
     const context = requireTrustedAuthorization(request);
-    await requireActiveStudentRelationship(this.db, context.authorization.principal.userId, context.correlationId);
+    await requireStudentRelationship(this.db, context.authorization.principal.userId, context.correlationId);
     const input = readProfileInput(body, context.correlationId);
     await this.db.execute(sql`
       INSERT INTO student_profiles (user_id, target_career, career_interests, profile_headline, profile_summary, portfolio_url, visibility_state, employer_discovery_enabled, updated_at)
@@ -81,7 +81,7 @@ export class StudentOperationalCoreController {
   @UseGuards(ProtectedApiAuthenticationGuard)
   async listDocuments(@Req() request: ProtectedHttpRequest): Promise<Record<string, unknown>> {
     const context = requireTrustedAuthorization(request);
-    await requireActiveStudentRelationship(this.db, context.authorization.principal.userId, context.correlationId);
+    await requireStudentRelationship(this.db, context.authorization.principal.userId, context.correlationId);
     const rows = await this.db.execute(sql`
       SELECT d.id, d.title, d.document_type, d.description, d.verification_state, d.archived_at, d.created_at, d.updated_at,
              v.version_number, f.original_filename, f.byte_size, f.content_type
@@ -99,7 +99,7 @@ export class StudentOperationalCoreController {
   @UseGuards(ProtectedApiAuthenticationGuard)
   async createDocument(@Req() request: ProtectedHttpRequest, @Body() body: unknown): Promise<Record<string, unknown>> {
     const context = requireTrustedAuthorization(request);
-    await requireActiveStudentRelationship(this.db, context.authorization.principal.userId, context.correlationId);
+    await requireStudentRelationship(this.db, context.authorization.principal.userId, context.correlationId);
     const input = readDocumentInput(body, context.correlationId);
     const id = this.ids.uuid();
     await this.db.execute(sql`
@@ -115,7 +115,7 @@ export class StudentOperationalCoreController {
   async getDocument(@Req() request: ProtectedHttpRequest, @Param('documentId') documentId: string): Promise<Record<string, unknown>> {
     const context = requireTrustedAuthorization(request);
     const id = requireUuid(documentId, context.correlationId);
-    await requireActiveStudentRelationship(this.db, context.authorization.principal.userId, context.correlationId);
+    await requireStudentRelationship(this.db, context.authorization.principal.userId, context.correlationId);
     const rows = await this.db.execute(sql`
       SELECT d.id, d.title, d.document_type, d.description, d.verification_state, d.archived_at, d.created_at, d.updated_at,
              v.version_number, f.original_filename, f.byte_size, f.content_type
@@ -134,7 +134,7 @@ export class StudentOperationalCoreController {
   async updateDocument(@Req() request: ProtectedHttpRequest, @Param('documentId') documentId: string, @Body() body: unknown): Promise<Record<string, unknown>> {
     const context = requireTrustedAuthorization(request);
     const id = requireUuid(documentId, context.correlationId);
-    await requireActiveStudentRelationship(this.db, context.authorization.principal.userId, context.correlationId);
+    await requireStudentRelationship(this.db, context.authorization.principal.userId, context.correlationId);
     const input = readDocumentInput(body, context.correlationId);
     const updated = await this.db.execute(sql`
       UPDATE student_document_metadata
@@ -153,7 +153,7 @@ export class StudentOperationalCoreController {
   async archiveDocument(@Req() request: ProtectedHttpRequest, @Param('documentId') documentId: string): Promise<Record<string, unknown>> {
     const context = requireTrustedAuthorization(request);
     const id = requireUuid(documentId, context.correlationId);
-    await requireActiveStudentRelationship(this.db, context.authorization.principal.userId, context.correlationId);
+    await requireStudentRelationship(this.db, context.authorization.principal.userId, context.correlationId);
     const updated = await this.db.execute(sql`
       UPDATE student_document_metadata
       SET archived_at = now(), updated_at = now()
@@ -169,7 +169,7 @@ export class StudentOperationalCoreController {
   @UseGuards(ProtectedApiAuthenticationGuard)
   async listSavedOpportunities(@Req() request: ProtectedHttpRequest): Promise<Record<string, unknown>> {
     const context = requireTrustedAuthorization(request);
-    await requireActiveStudentRelationship(this.db, context.authorization.principal.userId, context.correlationId);
+    await requireStudentRelationship(this.db, context.authorization.principal.userId, context.correlationId);
     const rows = await this.db.execute(sql`
       SELECT id, opportunity_ref, title, organization_name, source, notes, created_at, updated_at, archived_at
       FROM student_saved_opportunities
@@ -184,7 +184,7 @@ export class StudentOperationalCoreController {
   @UseGuards(ProtectedApiAuthenticationGuard)
   async saveOpportunity(@Req() request: ProtectedHttpRequest, @Body() body: unknown): Promise<Record<string, unknown>> {
     const context = requireTrustedAuthorization(request);
-    await requireActiveStudentRelationship(this.db, context.authorization.principal.userId, context.correlationId);
+    await requireStudentRelationship(this.db, context.authorization.principal.userId, context.correlationId);
     const input = readSavedOpportunityInput(body, context.correlationId);
     const id = this.ids.uuid();
     await this.db.execute(sql`
@@ -206,7 +206,7 @@ export class StudentOperationalCoreController {
   async removeSavedOpportunity(@Req() request: ProtectedHttpRequest, @Param('savedOpportunityId') savedOpportunityId: string): Promise<Record<string, unknown>> {
     const context = requireTrustedAuthorization(request);
     const id = requireUuid(savedOpportunityId, context.correlationId);
-    await requireActiveStudentRelationship(this.db, context.authorization.principal.userId, context.correlationId);
+    await requireStudentRelationship(this.db, context.authorization.principal.userId, context.correlationId);
     const updated = await this.db.execute(sql`
       UPDATE student_saved_opportunities
       SET archived_at = now(), updated_at = now()
@@ -219,14 +219,21 @@ export class StudentOperationalCoreController {
   }
 }
 
-async function requireActiveStudentRelationship(db: PersistenceDb, userId: string, correlationId: string): Promise<void> {
+/**
+ * The caller is a student: a current relationship, or (INST-10, decision 10.2 #12) one they left
+ * by graduating, transferring or ending. Every route behind this reads or writes only the caller's
+ * own rows, and leaving college does not take those away. REVOKED — a roster link the college
+ * withdrew as a mistake — and a person who was never rostered are still refused.
+ */
+async function requireStudentRelationship(db: PersistenceDb, userId: string, correlationId: string): Promise<void> {
   const rows = await db.execute(sql`
     SELECT id
     FROM institution_relationships
     WHERE student_user_id = ${userId}::uuid
-      AND state IN ('ACTIVE','VERIFIED')
-      AND effective_from <= now()
-      AND (effective_to IS NULL OR effective_to > now())
+      AND (
+        (state IN ('ACTIVE','VERIFIED') AND effective_from <= now() AND (effective_to IS NULL OR effective_to > now()))
+        OR state IN ('GRADUATED','TRANSFERRED','ENDED')
+      )
     LIMIT 1
   `) as QueryResult<{ id: string }>;
   if (rows.rows.length !== 1) throw forbidden(correlationId);

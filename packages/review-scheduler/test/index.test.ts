@@ -6,6 +6,7 @@
 import { describe, expect, it } from 'vitest';
 import { FSRSVersion, default_w, generatorParameters } from 'ts-fsrs';
 import type { ProjectionAttempt } from '@planthepath/learning-model/src/index.js';
+import { LEARNER_SKILL_STATE_ALGORITHM_ID } from '@planthepath/learning-model/src/index.js';
 import {
   PINNED_TS_FSRS_VERSION,
   REVIEW_SCHEDULER_ALGORITHM_ID,
@@ -137,8 +138,8 @@ describe('learner_skill_state rows with reviews', () => {
       { answered: true, correct: false, occurredAt: at(3) },
     ])!.dueAt);
     expect(b).toMatchObject({ attemptCount: 0, reviewStability: null, reviewDifficulty: null, reviewDueAt: null, reviewAlgorithmVersion: null });
-    // The learning-model columns are exactly learner-skill-state-v1's.
-    expect(a!.algorithmVersion).toBe('learner-skill-state-v1');
+    // The learning-model columns are exactly the learning model's own rule (v2 since ENG-06).
+    expect(a!.algorithmVersion).toBe(LEARNER_SKILL_STATE_ALGORITHM_ID);
   });
 
   it('counts an exam item mapped to two topics as a review of both', () => {

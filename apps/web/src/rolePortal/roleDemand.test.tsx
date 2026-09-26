@@ -14,8 +14,8 @@ vi.mock('../api.js', async (original) => ({
   ...await original<typeof import('../api.js')>(), getProtectedAccessToken: vi.fn(),
 }));
 
-const shown = (value: number) => ({ suppressed: false as const, value, capped: false });
-const suppressed = { suppressed: true as const, value: null, capped: false as const };
+const shown = (value: number) => ({ suppressed: false as const, value });
+const suppressed = { suppressed: true as const, value: null };
 const bigId = crypto.randomUUID();
 const smallId = crypto.randomUUID();
 
@@ -177,7 +177,7 @@ describe('role demand dashboard', () => {
     expect(formatPeople(undefined)).toBe('NA');
     expect(formatPeople(suppressed)).toBe('<5');
     expect(formatPeople(shown(12), true)).toBe('Withheld');
-    expect(formatPeople({ suppressed: false, value: 10_000, capped: true })).toBe('10,000+');
+    expect(formatPeople(shown(10_000))).toBe('10,000');
   });
 
   it('keeps the Operations navigation labels unchanged', () => {

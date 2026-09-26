@@ -10,8 +10,8 @@ import { requestJson } from './http.js';
 
 /** A count of people: below 5 it is suppressed and carries no value. */
 export type RoleDemandPeopleCountDto =
-  | { readonly suppressed: true; readonly value: null; readonly capped: false }
-  | { readonly suppressed: false; readonly value: number; readonly capped: boolean };
+  | { readonly suppressed: true; readonly value: null }
+  | { readonly suppressed: false; readonly value: number };
 
 export type RolePromotionStatusDto = 'MEETS' | 'NOT_MET' | 'NOT_APPLICABLE';
 

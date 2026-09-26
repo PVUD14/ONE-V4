@@ -4,13 +4,12 @@
  *
  * Every count is computed in bounded SQL and every count of people is suppressed here,
  * before it can reach a controller: role totals and trend months through
- * `suppressPeopleCount`, breakdowns (colleges, departments, release labels) through
+ * `suppressSmallCount`, breakdowns (colleges, departments, release labels) through
  * `suppressDemandBreakdown`, which also applies complementary suppression and hides the
  * true order of suppressed rows. No student name, email or identifier is selected.
  *
- * Suppression helper: `suppressPeopleCount` from packages/authorization's
- * operations-overview.ts. INST-SR-01 consolidates it with privacy-console.ts's
- * `suppressSmallCount`; switch to the consolidated name when that lands (same threshold).
+ * Suppression helper: `suppressSmallCount` from packages/authorization's
+ * aggregate-suppression.ts, the one shared rule (INST-SR-01 / OPS-SR-24).
  *
  * Design: docs/architecture/role-demand-dashboard-design.md
  */
@@ -18,10 +17,10 @@ import { sql, type SQL } from 'drizzle-orm';
 import {
   evaluateRolePromotion,
   suppressDemandBreakdown,
-  suppressPeopleCount,
+  suppressSmallCount,
   withholdCollegeCount,
   type RolePromotionEvaluation,
-  type SuppressedPeopleCount,
+  type SuppressedCount,
 } from '@planthepath/authorization/src/index.js';
 
 export interface RoleDemandSqlRunner {
@@ -73,7 +72,7 @@ export interface RoleDemandRole {
   readonly releaseLabel: 'SELECTABLE' | 'VERIFIED' | null;
   readonly plannedRelease: 'V1' | 'V2' | 'V3' | null;
   readonly active: boolean;
-  readonly students: SuppressedPeopleCount;
+  readonly students: SuppressedCount;
   /** Distinct colleges of those students; null (withheld) whenever `students` is suppressed. */
   readonly colleges: number | null;
   readonly promotion: RolePromotionEvaluation;
@@ -81,7 +80,7 @@ export interface RoleDemandRole {
 
 export interface RoleDemandBreakdownCell {
   readonly label: string;
-  readonly students: SuppressedPeopleCount;
+  readonly students: SuppressedCount;
   readonly complementary: boolean;
 }
 
@@ -89,7 +88,7 @@ export interface RoleDemandSummary {
   readonly generatedAt: string;
   readonly totals: {
     /** Distinct students with at least one live target. */
-    readonly studentsWithTarget: SuppressedPeopleCount;
+    readonly studentsWithTarget: SuppressedCount;
     readonly roles: number;
     readonly catalogueRoles: number;
     readonly rolesMeetingPromotionRule: number;
@@ -97,7 +96,7 @@ export interface RoleDemandSummary {
   readonly roles: readonly RoleDemandRole[];
   readonly rolesCapped: boolean;
   readonly byReleaseLabel: readonly (RoleDemandBreakdownCell & { readonly releaseLabel: 'SELECTABLE' | 'VERIFIED' | 'NONE'; readonly roles: number })[];
-  readonly trend: readonly { readonly month: string; readonly students: SuppressedPeopleCount }[];
+  readonly trend: readonly { readonly month: string; readonly students: SuppressedCount }[];
   /** No opportunity or employer request references a career role, so employer demand cannot be read. */
   readonly employerDemand: { readonly available: false; readonly reason: 'NO_ROLE_MAPPING' };
 }
@@ -109,7 +108,7 @@ type RoleRow = {
 };
 
 function toRole(row: RoleRow): RoleDemandRole {
-  const students = suppressPeopleCount(Number(row.students));
+  const students = suppressSmallCount(Number(row.students));
   return {
     id: row.id,
     code: row.code,
@@ -209,7 +208,7 @@ export async function readRoleDemandSummary(runner: RoleDemandSqlRunner): Promis
   return {
     generatedAt: new Date(clock!.now).toISOString(),
     totals: {
-      studentsWithTarget: suppressPeopleCount(Number(totals?.students ?? 0)),
+      studentsWithTarget: suppressSmallCount(Number(totals?.students ?? 0)),
       roles: Number(totals?.roles ?? 0),
       catalogueRoles: Number(totals?.catalogue_roles ?? 0),
       rolesMeetingPromotionRule: roles.filter((role) => role.promotion.status === 'MEETS').length,
@@ -217,7 +216,7 @@ export async function readRoleDemandSummary(runner: RoleDemandSqlRunner): Promis
     roles,
     rolesCapped,
     byReleaseLabel,
-    trend: trendRows.map((row) => ({ month: row.month, students: suppressPeopleCount(Number(row.students)) })),
+    trend: trendRows.map((row) => ({ month: row.month, students: suppressSmallCount(Number(row.students)) })),
     employerDemand: { available: false, reason: 'NO_ROLE_MAPPING' },
   };
 }

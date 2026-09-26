@@ -44,11 +44,12 @@ Definitions used by the code (`packages/persistence/src/role-demand.ts`):
 Every count of people passes through the shared helper before it leaves the persistence layer, so a raw small count
 never reaches a controller, the network or a screen.
 
-- **Helper.** `suppressPeopleCount` in `packages/authorization/src/operations-overview.ts` (OPS-03). A count below 5 —
-  zero included — returns `{ suppressed: true, value: null }`. INST-SR-01 (`fix/inst-report-suppression-and-scoped-writes`,
-  not merged when this goal started) consolidates this helper with `privacy-console.ts`'s `suppressSmallCount`; when it
-  lands, `role-demand.ts` should switch to the consolidated name. The threshold and semantics are identical, so the
-  switch is a rename.
+- **Helper.** `suppressSmallCount` in `packages/authorization/src/aggregate-suppression.ts`, the one shared rule since
+  INST-SR-01 / OPS-SR-24. A count below 5 — zero included — returns `{ suppressed: true, value: null }`.
+- **Why not `suppressAggregateTable`.** That helper protects a table whose cells partition a published total by
+  withholding the total. Here the total is the role's own count, which the summary shows and ranks by, and a student
+  related to two colleges is counted in both, so college cells do not partition it. The breakdown helper below withholds
+  a cell instead, and every value it publishes still passes through `suppressSmallCount`.
 - **Role totals.** Each role's student count is suppressed below 5.
 - **Colleges per role.** A count of colleges is not a count of people, but a role with fewer than 5 students and, say,
   4 colleges tells the reader it has exactly 4 students. So whenever the role's student count is suppressed, its

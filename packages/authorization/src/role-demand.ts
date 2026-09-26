@@ -10,7 +10,7 @@
  * Design: docs/architecture/role-demand-dashboard-design.md
  */
 import { hasInternalCapability, type InternalCapabilityContext } from './internal-capabilities.js';
-import { overviewSuppressionThreshold, suppressPeopleCount, type SuppressedPeopleCount } from './operations-overview.js';
+import { aggregateSuppressionThreshold, suppressSmallCount, type SuppressedCount } from './aggregate-suppression.js';
 
 /** Aggregate analytics (Appendix 1 §6.2): OPERATIONS_ADMIN and the super admin by baseline, anyone else by grant. */
 export function canViewRoleDemand(context: InternalCapabilityContext): boolean {
@@ -59,7 +59,7 @@ export function evaluateRolePromotion(input: {
  * A count of colleges beside a role's student count. When the student count is suppressed
  * the college count is withheld too: 4 colleges beside "<5 students" means exactly 4.
  */
-export function withholdCollegeCount(students: SuppressedPeopleCount, colleges: number): number | null {
+export function withholdCollegeCount(students: SuppressedCount, colleges: number): number | null {
   return students.suppressed ? null : colleges;
 }
 
@@ -73,13 +73,19 @@ export interface DemandBreakdownInput<K> {
 export interface DemandBreakdownCell<K> {
   readonly key: K;
   readonly label: string;
-  readonly count: SuppressedPeopleCount;
+  readonly count: SuppressedCount;
   /** Withheld only because a smaller cell beside it would otherwise be recoverable. Not below 5. */
   readonly complementary: boolean;
 }
 
 /**
  * Suppresses one breakdown of people whose total is shown elsewhere.
+ *
+ * Why not `suppressAggregateTable`: that rule withholds the table's total when suppressed
+ * cells could be recovered from it. Here the total is the role's own count, shown and
+ * ranked in the summary, and a student related to two colleges is counted in both, so the
+ * cells do not partition it. So the complementary step withholds a cell instead of the
+ * total. Every published value still goes through `suppressSmallCount`.
  *
  * 1. Every cell below the threshold is suppressed.
  * 2. Complementary suppression: if the suppressed cells hold between 1 and threshold-1
@@ -91,7 +97,7 @@ export interface DemandBreakdownCell<K> {
  */
 export function suppressDemandBreakdown<K>(
   cells: readonly DemandBreakdownInput<K>[],
-  threshold: number = overviewSuppressionThreshold,
+  threshold: number = aggregateSuppressionThreshold,
 ): readonly DemandBreakdownCell<K>[] {
   for (const cell of cells) {
     if (!Number.isInteger(cell.count) || cell.count < 0) throw new RangeError('count must be a non-negative integer');
@@ -109,11 +115,11 @@ export function suppressDemandBreakdown<K>(
     ...complementary.map((cell) => ({ cell, complementary: true })),
   ].sort((a, b) => byLabel(a.cell, b.cell));
   return [
-    ...visible.map((cell) => ({ key: cell.key, label: cell.label, count: suppressPeopleCount(cell.count, false, threshold), complementary: false })),
+    ...visible.map((cell) => ({ key: cell.key, label: cell.label, count: suppressSmallCount(cell.count, threshold), complementary: false })),
     ...withheld.map(({ cell, complementary: isComplementary }) => ({
       key: cell.key,
       label: cell.label,
-      count: { suppressed: true, value: null, capped: false } as const,
+      count: { suppressed: true, value: null } as const,
       complementary: isComplementary,
     })),
   ];

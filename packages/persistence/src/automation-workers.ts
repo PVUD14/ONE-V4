@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { deliverStudentInvitation, STUDENT_INVITATION_REQUESTED } from './student-invitations.js';
 import { ANNOUNCEMENT_DISPATCH_REQUESTED, dispatchInstitutionAnnouncement } from './institution-announcements.js';
 import { OPPORTUNITY_DEADLINE_CLOSE_REQUESTED, closeOpportunityAtDeadline } from './opportunity-deadlines.js';
+import { RELATIONSHIP_ENDED, notifyStudentOfRelationshipChange } from './institution-relationship-notices.js';
 import type { InvitationMailSink } from './invitation-mail.js';
 import type { Pool } from 'pg';
 import type { IntegrationEventEnvelope } from '@planthepath/events/src/index.js';
@@ -91,6 +92,10 @@ export function createLocalIntegrationEventPublisher(input: { readonly pool: Poo
     // EMP-05: closes a job whose current deadline has passed; a moved deadline makes it a no-op.
     [OPPORTUNITY_DEADLINE_CLOSE_REQUESTED]: async (event) => {
       await closeOpportunityAtDeadline(input.db, event);
+    },
+    // INST-10: tells the student their college graduated, transferred or ended them; once per event.
+    [RELATIONSHIP_ENDED]: async (event) => {
+      await notifyStudentOfRelationshipChange(input.db, event);
     },
     // ENG-05: recompute one student's learner_skill_state from facts (consent checked there).
     [LEARNER_SKILL_STATE_PROJECTION_REQUESTED]: async (event) => {

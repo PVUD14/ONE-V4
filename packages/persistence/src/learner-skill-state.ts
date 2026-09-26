@@ -107,7 +107,7 @@ export async function projectSubjectSkillState(db: PersistenceDb, subjectUserId:
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('learner_skill_state'), hashtext(${subjectUserId}))`);
     await tx.execute(sql`SELECT set_config('one.learner_skill_state_writer', ${WRITER}, true)`);
     const consented = await hasConsentPurpose(tx, subjectUserId, 'adaptive-learning');
-    // learner-skill-state-v1 rows with the review columns filled by review-scheduler-fsrs-v1 (ENG-09).
+    // learner-skill-state-v2 rows (BKT in shadow) with the review columns filled by review-scheduler-fsrs-v1 (ENG-09).
     const desired = consented ? projectLearnerSkillStatesWithReviews(await loadProjectionAttempts(tx, subjectUserId)) : [];
     const keep = desired.map((row) => row.skillId);
     const deleted = await tx.execute(sql`

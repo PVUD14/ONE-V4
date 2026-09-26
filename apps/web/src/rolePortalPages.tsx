@@ -347,15 +347,6 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
           <InstitutionExportsPanel institutionId={authenticatedWorkspace.organizationId} /></InstitutionReportsPage>
       : <InstitutionWorkspaceError title="Reports" unauthorized={Boolean(authenticatedWorkspace && !institutionWorkspaceRoles.has(authenticatedWorkspace.role))} />;
   }
-  // INST-08: the department head's existing Reports and Analytics item opens their
-  // department's readiness report (scoped server-side) and the exports panel. Navigation is unchanged.
-  if (!demoMode && portal.key === 'department-head' && route.label === 'Reports and Analytics') {
-    return isInstitutionStaffWorkspace(authenticatedWorkspace)
-      ? <InstitutionReportsPage key={authenticatedWorkspace.organizationId} institutionId={authenticatedWorkspace.organizationId} title="Reports and Analytics"
-          description="Career-readiness summaries for your department, and exports if your college has given you access. Select a month that has ended to generate a report.">
-          <InstitutionExportsPanel institutionId={authenticatedWorkspace.organizationId} /></InstitutionReportsPage>
-      : <InstitutionWorkspaceError title="Reports and Analytics" unauthorized={Boolean(authenticatedWorkspace && !institutionStaffWorkspaceRoles.has(authenticatedWorkspace.role))} />;
-  }
   if (!demoMode && portal.key === 'institution-admin' && /career readiness|placement|reports/i.test(route.label)) return <AuthenticatedReadOnlyModule title={route.label} detail="Institution reports and readiness information are read-only in Phase 2A unless a dedicated persistent mutation is available." />;
   // INST-05: the admin's Settings label now opens the college settings; navigation is unchanged.
   if (!demoMode && portal.key === 'institution-admin' && route.label === 'Settings') return <InstitutionSettingsPage authenticatedWorkspace={authenticatedWorkspace} />;
@@ -375,6 +366,7 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   if (!demoMode && portal.key === 'department-head' && route.label === 'Batches') return <DepartmentBatchesPage authenticatedWorkspace={authenticatedWorkspace} />;
   if (!demoMode && portal.key === 'department-head' && route.label === 'Placement Pipeline') return <PlacementPipelinePage authenticatedWorkspace={authenticatedWorkspace} basePath={portal.basePath} />;
   if (!demoMode && portal.key === 'department-head' && route.label === 'Opportunities and Offers') return <OpportunitiesAndOffersPage authenticatedWorkspace={authenticatedWorkspace} />;
+  // INST-08's exports panel lives inside this page (see DepartmentReportsAnalyticsPage).
   if (!demoMode && portal.key === 'department-head' && route.label === 'Reports and Analytics') return <DepartmentReportsAnalyticsPage authenticatedWorkspace={authenticatedWorkspace} />;
   if (!demoMode && portal.key === 'faculty' && route.label === 'Assessment Detail') return <FacultyAssessmentDetailPage authenticatedWorkspace={authenticatedWorkspace} />;
   if (!demoMode && portal.key === 'faculty' && route.label === 'Reports') return <FacultyClassReportsPage authenticatedWorkspace={authenticatedWorkspace} />;

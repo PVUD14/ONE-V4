@@ -40,6 +40,7 @@ import type {
 } from '../api.js';
 import { V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { InstitutionReportsPage } from '../institutionReportsPage.js';
+import { InstitutionExportsPanel } from './institutionAnalytics.js';
 import { go } from '../pilotParity/naWidgets.js';
 import { InstitutionWorkspaceError, RestrictedApiState, formatApiError, isInstitutionStaffWorkspace } from './shared.js';
 import type { AuthenticatedWorkspaceSummary } from './shared.js';
@@ -392,9 +393,7 @@ export function DepartmentReportsAnalyticsPage({ authenticatedWorkspace }: Works
           <tbody>{stages.cells.map((cell) => <tr key={cell.key}><th scope="row">{applicationStageLabels[cell.key] ?? cell.key}</th><td>{suppressedCountLabel(cell)}</td></tr>)}
             <tr><th scope="row">Total</th><td>{stages.total.suppressed ? 'withheld' : suppressedCountLabel(stages.total)}</td></tr></tbody></table></div>}
     </section>
-    <section className="role-card role-wide"><h2>Exports</h2>
-      <p>NA — downloadable exports need the institution analytics capability, which is not built yet. Nothing here is exported.</p>
-    </section>
+    {authenticatedWorkspace?.organizationId ? <InstitutionExportsPanel institutionId={authenticatedWorkspace.organizationId} /> : null}
     <InstitutionReportsPage key={authenticatedWorkspace?.organizationId ?? ''} institutionId={authenticatedWorkspace?.organizationId ?? ''} />
   </section>;
 }

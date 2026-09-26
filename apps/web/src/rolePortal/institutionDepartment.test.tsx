@@ -150,12 +150,14 @@ describe('department head workspace', () => {
     expect(screen.getByRole('button', { name: 'Generate report' })).toBeInTheDocument();
   });
 
-  it('Reports and Analytics shows department summaries and says exports are not available', async () => {
+  it('Reports and Analytics shows department summaries and the exports panel', async () => {
     routes({ [`${base}/department-overview`]: overview, [`${base}/placement-pipeline`]: pipeline });
     open('department-head', 'Reports and Analytics', 'DEPARTMENT_HEAD');
     const summary = (await screen.findByRole('heading', { name: 'Department summary' })).closest('section')!;
     await waitFor(() => expect(within(summary).getByText('11')).toBeInTheDocument());
-    expect(screen.getByText(/NA — downloadable exports/)).toBeInTheDocument();
+    // INST-08 built the exports; the panel replaces the earlier NA note.
+    expect(screen.getByRole('heading', { name: 'Exports' })).toBeInTheDocument();
+    expect(screen.queryByText(/NA — downloadable exports/)).not.toBeInTheDocument();
     const stages = screen.getByRole('heading', { name: 'Shared applications by stage' }).closest('section')!;
     await waitFor(() => expect(within(stages).getByText('withheld')).toBeInTheDocument());
   });

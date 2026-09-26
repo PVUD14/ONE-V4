@@ -99,8 +99,9 @@ unadopted model decide what a student is told.
    the skill's stage, triggers (`NEW_SKILL`, `DUE_REVIEW`, `MISCONCEPTION_DETECTED`, `REPEATED_ERROR` at two
    uncleared signals, `STUCK`, `NEAR_MASTERY`), active codes, recent errors (the focus code's signal count
    when remediating, else the highest count) and the latest hint level. Ranking among the strategies that
-   apply: one naming the focus code (or any active code) first; then the more specific (more rules
-   present); then code. None applies → strategy null and `NO_APPLICABLE_STRATEGY` — the "non-strategy
+   apply: one naming the focus code (or any active code) first; then one written for the step's defining
+   trigger (`DUE_REVIEW` for a review, `MISCONCEPTION_DETECTED` for remediation, `NEW_SKILL` for learning);
+   then the more specific (more rules present); then code. None applies → strategy null and `NO_APPLICABLE_STRATEGY` — the "non-strategy
    default, said plainly" that ENG-07 asked for. Thresholds such as `minRecentErrors` live in the reviewed
    strategy content, not in planner code.
 
@@ -110,7 +111,8 @@ unadopted model decide what a student is told.
 entirely (a property test proves the output does not depend on them) and the loader does not read them.
 It still honours faculty constraints, and it walks the career gap in `career-gap-v1` order — the "next
 actions" order the student is already shown today, which predates the engine and is not built from the
-attempt-history profile. Every non-adaptive decision carries `NON_ADAPTIVE_NO_CONSENT` and no strategy
+attempt-history profile. The action comes from the gap status alone: `PARTIAL` → `PRACTICE`, `UNKNOWN` or
+`MISSING` → `LEARN`. Every non-adaptive decision carries `NON_ADAPTIVE_NO_CONSENT` and no strategy
 (a strategy is chosen from the student's skill state, which is exactly what consent gates).
 *Rejected:* refusing to plan (an error) — ENG-01 says the fallback is the non-adaptive path, never an
 error. *Rejected:* a fixed catalogue order ignoring the gap — it would tell a student to start a

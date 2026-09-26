@@ -925,3 +925,133 @@ with "check constraint operation_approval_action_ck … is violated by some row"
   `action_key`.
 
 **Next goal:** OPS-09.
+
+## OPS-11 — Role demand dashboard (Analytics) — 2026-09-26
+**Result:** Complete. Operations → Analytics is now the role demand dashboard. It ranks every career role by how many
+students target it, shows colleges per role and demand by release label, gives a 12-month selection trend, marks each
+role against the catalogue's promotion rule, and opens any role to show its colleges and their departments. Every count of
+people below 5 is suppressed on the server.
+
+**Branch / PR:** feat/ops-role-demand → feat/plan-phases-0-to-2, rebased onto 7804fcd. Commits, in order:
+- design note: 5f6e048;
+- acceptance tests: d36a204;
+- implementation: 987f4eb;
+- the switch to the shared suppression helper: 576199f;
+- this report.
+
+Pushed to onev4. No PR was opened because `gh` is not installed.
+
+**Files created:**
+- docs/architecture/role-demand-dashboard-design.md
+- packages/authorization/src/role-demand.ts (+ .test.ts)
+- packages/persistence/src/role-demand.ts
+- apps/api/src/http/operations-analytics.controller.ts (+ .integration.spec.ts)
+- apps/web/src/api/roleDemand.ts
+- apps/web/src/rolePortal/roleDemand.tsx (+ .test.tsx)
+
+**Files modified:**
+- packages/authorization/src/index.ts: export only.
+- apps/api/src/http/api-security.module.ts: registration only.
+- apps/web/src/api.ts: barrel only.
+- apps/web/src/rolePortalPages.tsx: only the operations `Analytics` branch. Subscriptions and Billing keep the
+  not-yet-available state (ADR-022).
+
+**Migrations added:** none. Everything read already exists: 0000, 0001, 0005, 0011 and 0051.
+
+**Design docs / ADRs:** role-demand-dashboard-design.md records the demand definitions, the suppression rules, the
+promotion-rule constants and the rejected options. No ADR was needed.
+
+**API:**
+- `GET /api/v1/operations/analytics/role-demand` is one bounded summary. It takes no parameters, and any query parameter
+  returns 400.
+- `GET /api/v1/operations/analytics/role-demand/roles/:roleId` is the drill-down, bounded at 200 colleges and 50
+  departments per college.
+- Both need ANALYTICS_VIEW. Both are read-only aggregates with no student names, emails or ids, so, like the Overview,
+  they write no audit row.
+
+**What demand counts, from what is actually recorded:**
+- A student is counted for a role when they have a live `student_career_targets` row for it and their account is not
+  deleted, pending deletion or anonymised. PRIMARY and SECONDARY targets both count, and each student counts once per role.
+- A student's college comes from a current `institution_relationships` row (VERIFIED or ACTIVE, in window) or a
+  GRADUATED one. Past graduates count at the college they left; anyone else is "No college recorded".
+- Branch is the student's department unit at that college, under the college's own name. Names are not matched across
+  colleges.
+- The trend counts distinct students who selected a target in each UTC month.
+- Employer demand shows **NA** in its own slot. Nothing links an opportunity or a paying employer to a career role, and
+  no mapping is inferred from job titles or skills.
+- The engine goal table does not exist, so goals are not counted.
+
+**Suppression (§5.5)**, through the shared `suppressSmallCount` in aggregate-suppression.ts (INST-SR-01):
+- Role totals, trend months and totals are suppressed below 5, zero included.
+- The colleges count is withheld whenever the role's student count is suppressed.
+- Breakdowns (colleges, departments, release labels) go through `suppressDemandBreakdown`, which adds complementary
+  suppression. When the suppressed cells hold 1–4 people between them, the smallest shown cell is also withheld and marked
+  `complementary`; the screen says "Withheld", not "<5".
+- A suppressed parent has no breakdown behind it.
+- Suppressed rows are ordered by code, never by their true size, and have no rank.
+
+`suppressAggregateTable` was not used. It withholds the table total, but here the total is the role count the dashboard
+ranks by, and college cells do not partition it, because a student can belong to two colleges.
+
+**Validation (fresh `one_ops11` on base 7804fcd, only DATABASE_URL exported):**
+- `corepack pnpm db:migrate` ×2: pass (47 applied, then 0 applied / 47 already applied).
+- `corepack pnpm typecheck`: pass.
+- `corepack pnpm -r --no-bail --workspace-concurrency=1 test`: 2 130 passed and 1 failed.
+  - The one failure was the web `App.test.tsx` test "resolves every visible navigation item for every new role", which
+    timed out at 20 s under machine load. It exercises demo-mode preview portals, which this change does not touch.
+  - Re-run alone, `App.test.tsx` passed 96/96.
+  - On the pre-rebase base, the same full suite exited 0.
+  - New tests: authorization 16, api 10 (integration, real Postgres), web 11.
+- `corepack pnpm build`: pass.
+
+**Acceptance criteria:**
+- ✔ **No individual student is identifiable, and suppression is unit-tested.** Unit tests cover:
+  - below 5, zero included;
+  - complementary withholding, and that only one extra cell is withheld;
+  - no complementary cell when the suppressed mass is already 5 or more;
+  - label order for suppressed cells;
+  - withholding the colleges count.
+
+  Integration tests cover:
+  - no raw count below 5 anywhere in the summary;
+  - a college withheld so the no-college bucket and a 2-student college cannot be recovered by subtraction;
+  - no breakdown for a role with 3 students;
+  - no student email, roll number or id in any response;
+  - deleted, pending-deletion and cleared targets not counted.
+- ✔ **The indicator matches the documented rule** (docs/ops/inputs/job-role-catalogue.md §H):
+  - The rule's numbers are code constants: `rolePromotionMinimumStudents` = 200 and `rolePromotionMinimumColleges` = 3.
+  - MEETS exactly at 200 students across 3 colleges; NOT_MET at 199, and with 2 colleges.
+  - NOT_APPLICABLE for verified or uncatalogued roles.
+  - The employer arm is always NOT_RECORDED, and the screen says so.
+  - Integration: 200 students across 3 colleges gives MEETS; 200 across 2 gives NOT_MET.
+- ✔ **§6.6 minimums:**
+  - 401 without a token.
+  - 403 for SECURITY_ADMIN without a grant, for an institution admin and for a suspended operator.
+  - 200 for OPERATIONS_ADMIN, the super admin, and SECURITY_ADMIN with an ANALYTICS_VIEW grant.
+  - 400 for query parameters and for a malformed id; 404 for an unknown role.
+  - Pagination is not applicable: this is one bounded summary with caps.
+  - No audit row, because this is a read-only aggregate, the same as the Overview.
+  - Web tests cover real data, <5 and Withheld, NA for employer demand, empty, error with its reference, forbidden,
+    loading, sign-in, and unchanged navigation labels.
+
+**Decisions for Divakar (recommendations adopted):**
+- **College for promotion counting.** A college counts toward "3 colleges" when at least one demanding student belongs to
+  it, including graduates of that college.
+- **Demand counts PRIMARY and SECONDARY targets** as one distinct-student count. Showing them side by side would let one be
+  recovered from the other.
+- **Branch stays within a college.** Names are not normalised across colleges.
+- **Complementary suppression** withholds a cell rather than the total, for the reason above.
+
+**Limitations / not done:**
+- There is no per-role trend. It would be 108 × 12 cells, mostly <5, and it would multiply subtraction risk.
+- The employer arm of the promotion rule cannot be evaluated until opportunities reference a career role and a paying
+  employer's request is recorded.
+
+**Risks / follow-ups:**
+- OPS-08's catalogue role detail (Content Management) returns `liveTargetCount` unsuppressed. It is a count of people
+  below 5 on an operator screen, and should pass through `suppressSmallCount`. It is outside this goal and is left as found.
+
+**Android:** no change. Operations stay web-only (Appendix 1 §4.3). The Android operations dashboard is the view-only
+Overview and has no Analytics screen.
+
+**Next goal:** OPS-12.

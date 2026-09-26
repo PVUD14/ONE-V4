@@ -515,3 +515,42 @@ describe('students', () => {
     }
   });
 });
+
+describe('agent-drafted sets on pending topics (ENG-11, 0056)', () => {
+  it('lets a draft name a pending topic, and refuses its publish with 409 CAREER_TOPIC_NOT_LIVE, leaving the approval usable', async () => {
+    const c02 = (await pool.query("SELECT id FROM career_roles WHERE catalogue_code='C02'")).rows[0].id as string;
+    // A pending topic: DRAFT revision, inactive, agent-drafted — as the ENG-11 import writes one.
+    const pendingId = randomUUID();
+    const revision = randomUUID();
+    await pool.query(`INSERT INTO content_revisions (id, entity_type, entity_id, revision, author_user_id, state, content_hash, body)
+      VALUES ($1,'TOPIC',$2,1,$3,'DRAFT',$4,'{}')`, [revision, pendingId, author.userId, SHA]);
+    await pool.query(`INSERT INTO taxonomy_nodes (id, kind, stable_key, version, name, description, content_revision_id, active, source, generator_version, prompt_version, generated_at)
+      VALUES ($1,'TOPIC','eng11-pending-skill',1,'Synthetic pending skill','Synthetic pending topic for ENG-11 tests',$2,false,'AGENT_DRAFTED','test-generator','test-prompt',now())`, [pendingId, revision]);
+
+    const created = await api().post(`${base}/roles/${c02}/requirement-sets`).set(auth(author.userId)).send({ reasonCode: 'NEW_REQUIREMENT_SET' });
+    expect(created.status, JSON.stringify(created.body)).toBe(201);
+    const setId = created.body.setId as string;
+    const saved = await api().post(`${base}/requirement-sets/${setId}/items`).set(auth(author.userId)).send({
+      reasonCode: 'DRAFT_EDIT', items: [{ topicId: pendingId, requirementLevel: 'ESSENTIAL', targetMastery: 0.7, requiredEvidenceTypes: ['ASSESSMENT_OUTCOME'] }],
+    });
+    expect(saved.status, JSON.stringify(saved.body)).toBe(201);
+    const shown = (await api().get(`${base}/roles/${c02}`).set(auth(reviewer.userId))).body.role.requirementSets.find((entry: { id: string }) => entry.id === setId);
+    expect(shown.items[0]).toMatchObject({ topicKey: 'eng11-pending-skill', topicLive: false });
+    expect(shown.provenance).toMatchObject({ source: 'AUTHORED' });
+
+    expect((await transition(author, setId, 'IN_REVIEW', 'READY_FOR_REVIEW')).status).toBe(201);
+    expect((await transition(reviewer, setId, 'REVIEWED', 'REVIEW_PASSED')).status).toBe(201);
+    const filed = await requestApproval(publisher, { setId, releaseLabel: 'SELECTABLE', reasonCode: 'NEW_REQUIREMENT_SET' });
+    expect(filed.status, JSON.stringify(filed.body)).toBe(201);
+    const approvalId = filed.body.approval.id as string;
+    expect((await decide(secondApprover, approvalId)).status).toBe(201);
+
+    const refused = await publish(publisher, setId, { releaseLabel: 'SELECTABLE', reasonCode: 'NEW_REQUIREMENT_SET', approvalId });
+    expect(refused.status).toBe(409);
+    expect(refused.body.error.code).toBe('CAREER_TOPIC_NOT_LIVE');
+    expect(JSON.stringify(refused.body)).not.toMatch(/every topic|taxonomy|SQL/i);
+    expect((await pool.query('SELECT state FROM career_requirement_sets WHERE id=$1', [setId])).rows[0].state).toBe('REVIEWED');
+    expect((await pool.query('SELECT state FROM operation_approvals WHERE id=$1', [approvalId])).rows[0].state).toBe('APPROVED');
+    expect((await pool.query('SELECT count(*)::int AS n FROM career_role_requirements WHERE career_role_id=$1', [c02])).rows[0].n).toBe(0);
+  });
+});

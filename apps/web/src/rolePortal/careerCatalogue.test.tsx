@@ -259,3 +259,36 @@ describe('the approvals queue carries out an approved publish', () => {
     expect(JSON.parse(String(posts()[0]![1].body))).toEqual({ releaseLabel: 'SELECTABLE', reasonCode: 'NEW_REQUIREMENT_SET', approvalId });
   });
 });
+
+describe('an agent-drafted requirement set (ENG-11)', () => {
+  it('tells the reviewer it is agent-drafted, what it rests on, and which topics are not yet published', async () => {
+    const pendingId = crypto.randomUUID();
+    detailBody = detail({ requirementSets: [set({
+      state: 'IN_REVIEW', submittedAt: '2026-09-26T11:00:00.000Z', reasonCode: 'NEW_REQUIREMENT_SET',
+      author: { userId: otherAuthorId, email: 'importer@example.test' },
+      provenance: { source: 'AGENT_DRAFTED', generatorVersion: 'agent-model', promptVersion: 'eng-11-soc-analyst-l1-target-v1', generatedAt: '2026-09-26T00:00:00.000Z', sourceBasis: 'NQR qualification file' },
+      items: [
+        { topicId, topicKey: 'incident-handover', topicTitle: 'Incident handover', topicLive: true, requirementLevel: 'ESSENTIAL', targetMastery: 0.75, rationale: null, requiredEvidenceTypes: [] },
+        { topicId: pendingId, topicKey: 'soc-alert-triage', topicTitle: 'Alert triage and prioritisation', topicLive: false, requirementLevel: 'ESSENTIAL', targetMastery: 0.7, rationale: 'Core of the job.', requiredEvidenceTypes: ['ASSESSMENT_OUTCOME'] },
+      ],
+    })] });
+    const region = await openRole();
+    const card = within(region).getByRole('article', { name: 'Requirement set v1' });
+    expect(within(card).getByText('Agent-drafted')).toBeInTheDocument();
+    expect(card).toHaveTextContent('eng-11-soc-analyst-l1-target-v1');
+    expect(card).toHaveTextContent('Basis: NQR qualification file');
+    expect(card).toHaveTextContent('1 of these topics are not yet published. This set cannot be published until they are.');
+    expect(within(card).getAllByText('Topic not yet published')).toHaveLength(1);
+    // A person, not the drafter, reviews it.
+    expect(within(card).getByRole('button', { name: 'Pass review…' })).toBeInTheDocument();
+  });
+
+  it('shows no agent notice on a set a person drafted', async () => {
+    detailBody = detail({ requirementSets: [set({ state: 'IN_REVIEW', submittedAt: '2026-09-26T11:00:00.000Z', author: { userId: otherAuthorId, email: 'author@example.test' },
+      provenance: { source: 'AUTHORED', generatorVersion: null, promptVersion: null, generatedAt: null, sourceBasis: null } })] });
+    const region = await openRole();
+    const card = within(region).getByRole('article', { name: 'Requirement set v1' });
+    expect(within(card).queryByText('Agent-drafted')).toBeNull();
+    expect(within(card).queryByText('Topic not yet published')).toBeNull();
+  });
+});

@@ -165,6 +165,22 @@ describe('employer applicant pipeline', () => {
     expect(screen.getByText('Withdrawn — details no longer shared')).toBeInTheDocument();
   });
 
+  it('says the details are no longer shared once the applicant-access grant ends, and offers no pipeline move', async () => {
+    stubFetch({
+      [`/api/v1/employers/${employerId}/opportunities`]: { opportunities: [employerOpportunity] },
+      [`/api/v1/employers/${employerId}/opportunities/${opportunity.id}/applications`]: { applications: [
+        { id: 'a-1', state: 'SHORTLISTED', consentRevoked: false, candidateAccess: false, candidateName: null, candidateEmail: null,
+          institutionStudentId: null, submittedAt: '2026-08-10T00:00:00.000Z', closedAt: null, interviewCount: 0, offerState: null, updatedAt: '2026-08-10T00:00:00.000Z' },
+      ] },
+    });
+    await authenticate();
+    render(<EmployerApplicantsPage employerId={employerId} />);
+    expect(await screen.findByText('Details no longer shared')).toBeInTheDocument();
+    expect(screen.queryByText('NA')).not.toBeInTheDocument();
+    expect(screen.getByText('Closed')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Interview' })).not.toBeInTheDocument();
+  });
+
   it('offers only the next steps that are legal from the current stage', async () => {
     stubFetch({
       [`/api/v1/employers/${employerId}/opportunities`]: { opportunities: [employerOpportunity] },

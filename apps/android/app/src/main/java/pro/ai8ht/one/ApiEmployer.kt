@@ -18,7 +18,9 @@ import kotlinx.serialization.Serializable
 @Serializable data class InterviewDto(
     val id: String,
     val applicationId: String = "",
-    val candidateName: String = "",
+    val candidateName: String? = null,
+    val consentRevoked: Boolean = false,
+    val candidateAccess: Boolean = true,
     val opportunityTitle: String = "",
     val stage: String = "",
     val state: String = "",
@@ -32,7 +34,9 @@ import kotlinx.serialization.Serializable
 
 @Serializable data class InterviewBriefDto(
     val id: String,
-    val candidateName: String = "",
+    val candidateName: String? = null,
+    val consentRevoked: Boolean = false,
+    val candidateAccess: Boolean = true,
     val candidateEmail: String? = null,
     val opportunityTitle: String = "",
     val opportunitySummary: String? = null,
@@ -48,11 +52,25 @@ import kotlinx.serialization.Serializable
 @Serializable data class EmployerOfferDto(
     val id: String,
     val applicationId: String = "",
-    val candidateName: String = "",
+    val candidateName: String? = null,
+    val consentRevoked: Boolean = false,
+    val candidateAccess: Boolean = true,
     val opportunityTitle: String = "",
     val state: String = "",
     val respondBy: String? = null,
 )
+
+/**
+ * What to show where a candidate's name goes. The server withholds the person once they
+ * withdraw or once their applicant-access grant ends (the application closed, the grant
+ * expired, or their account is being deleted); the row stays so the pipeline adds up, and
+ * the label says plainly why the name is missing.
+ */
+fun candidateLabel(name: String?, consentRevoked: Boolean, candidateAccess: Boolean): String = when {
+    consentRevoked -> "Withdrawn — details no longer shared"
+    !candidateAccess -> "Details no longer shared"
+    else -> name ?: "Candidate"
+}
 
 @Serializable data class HiringAnalyticsDto(
     val opportunitiesOpen: Int = 0,

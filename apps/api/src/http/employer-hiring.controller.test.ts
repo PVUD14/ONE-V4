@@ -76,7 +76,8 @@ describe('interview rescheduling', () => {
   });
   it('saves both times under employer ownership and audits the state change', async () => {
     const id = randomUUID();
-    const { controller, queries } = fixture([[{ id, state: 'SCHEDULED' }]]);
+    // The interview's candidate still holds a live applicant-access grant (EMP-SR-01).
+    const { controller, queries } = fixture([[{ id, state: 'SCHEDULED', candidate_access: true }]]);
     await controller.updateInterviewState(request(), employerId, id, { toState: 'RESCHEDULED', scheduledStart: '2099-01-01T09:00Z', scheduledEnd: '2099-01-01T10:00Z' });
     expect(queries[1]!.params).toEqual(['RESCHEDULED', null, '2099-01-01T09:00:00.000Z', '2099-01-01T10:00:00.000Z', id, employerId]);
     expect(queries[2]!.params).toContain('interview.rescheduled');

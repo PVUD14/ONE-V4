@@ -35,6 +35,7 @@ import {
   type QuestionType,
 } from '@planthepath/assessments';
 import type { PersistenceDb } from '@planthepath/persistence/src/repositories.js';
+import { applicationHasLiveApplicantGrant, assertEmployerApplicationAccess } from '@planthepath/persistence/src/employer-authentication.js';
 import {
   API_ID_GENERATOR,
   API_PERSISTENCE_DB,
@@ -290,6 +291,14 @@ export class EmployerAssessmentsController {
 
     const created: string[] = [];
     await this.db.transaction(async (tx) => {
+      // EMP-SR-01: an invitation reaches a named person, so every one of them needs a live
+      // applicant-access grant now, share-locked while the invitations are written. The
+      // state checks above keep their own error; this is the shared safe 403.
+      try {
+        await assertEmployerApplicationAccess(tx, { employerId, applicationIds: input.applicationIds, lockForMutation: true });
+      } catch {
+        throw forbidden(context.correlationId);
+      }
       for (const applicationId of input.applicationIds) {
         const invitationId = this.ids.uuid();
         // Re-inviting the same application to the same assessment is a no-op rather than
@@ -327,6 +336,9 @@ export class EmployerAssessmentsController {
       ) isp ON true
       WHERE v.assessment_id = ${id}::uuid AND v.employer_id = ${employerId}::uuid
         AND a.consent_revoked_at IS NULL
+        -- EMP-SR-01: a score is one person's result, so it is shown only while their
+        -- applicant-access grant is live, like a revoked consent above.
+        AND ${applicationHasLiveApplicantGrant('a')}
       ORDER BY t.percentage DESC NULLS LAST, v.invited_at
     `) as QueryResult<Record<string, unknown>>;
     // No readiness band, and no other employer's results. The employer sees what they

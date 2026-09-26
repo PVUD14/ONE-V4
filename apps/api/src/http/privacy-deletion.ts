@@ -111,6 +111,14 @@ async function erase(deps: DeletionExecutionDeps, subjectUserId: string): Promis
   const countOf = async (query: ReturnType<typeof sql>): Promise<number> =>
     Number(((await db.execute(query)) as QueryResult<{ count: number }>).rows[0]?.count ?? 0);
 
+  // Every employer's access to this person ends now and for good (EMP-SR-02). While the
+  // request was open the shared grant predicate already withheld them; this makes it
+  // permanent. It runs first, so a run that fails part-way has still closed that access.
+  await db.execute(sql`
+    UPDATE employer_applicant_access_grants SET revoked_at = now(), updated_at = now()
+    WHERE student_user_id = ${subjectUserId}::uuid AND revoked_at IS NULL
+  `);
+
   // Retained and anonymised categories are counted before identity changes, so the
   // record reflects what existed at the moment of deletion.
   counts.APPLICATIONS = await countOf(sql`SELECT count(*)::int AS count FROM applications WHERE student_user_id = ${subjectUserId}::uuid`);

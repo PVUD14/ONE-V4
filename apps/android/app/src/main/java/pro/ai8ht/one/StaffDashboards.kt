@@ -822,7 +822,7 @@ internal fun EmployerScaffold(
         SlideIn {
             ApplicantActionsPage(
                 employerId = organizationId,
-                applicantName = applicant.candidateName ?: "Candidate",
+                applicantName = candidateLabel(applicant.candidateName, applicant.consentRevoked, applicant.candidateAccess),
                 applicationId = applicant.id,
                 currentState = applicant.state,
                 onClose = { openApplicant = null },
@@ -1002,7 +1002,7 @@ private fun EmployerHome(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(Modifier.weight(1f)) {
-                            Text(applicant.candidateName ?: "Candidate", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                            Text(candidateLabel(applicant.candidateName, applicant.consentRevoked, applicant.candidateAccess), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                             Text(prettify(applicant.state), style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }

@@ -784,6 +784,8 @@ internal fun NotificationDto.announcementSource(): String {
     val id: String,
     val state: String = "",
     val candidateName: String? = null,
+    val consentRevoked: Boolean = false,
+    val candidateAccess: Boolean = true,
     val interviewCount: Int = 0,
     val offerState: String? = null,
 )

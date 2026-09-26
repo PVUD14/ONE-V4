@@ -721,10 +721,12 @@ const PIPELINE_NEXT: Readonly<Record<string, readonly string[]>> = {
 };
 
 // Shared verbatim consent redaction from the Applicants table.
-export function CandidateIdentity({ item }: { readonly item: Pick<EmployerApplicantDto, 'consentRevoked' | 'candidateName' | 'candidateEmail' | 'institutionStudentId'> }): React.ReactElement {
+export function CandidateIdentity({ item }: { readonly item: Pick<EmployerApplicantDto, 'consentRevoked' | 'candidateAccess' | 'candidateName' | 'candidateEmail' | 'institutionStudentId'> }): React.ReactElement {
   return item.consentRevoked
     ? <span className="hiring-meta">Withdrawn — details no longer shared</span>
-    : <>{item.candidateName ?? item.candidateEmail ?? 'NA'}{item.institutionStudentId ? <span className="hiring-meta"> · {item.institutionStudentId}</span> : null}</>;
+    : item.candidateAccess === false
+      ? <span className="hiring-meta">Details no longer shared</span>
+      : <>{item.candidateName ?? item.candidateEmail ?? 'NA'}{item.institutionStudentId ? <span className="hiring-meta"> · {item.institutionStudentId}</span> : null}</>;
 }
 
 function formatDateTime(value: string | null): string {
@@ -1149,7 +1151,7 @@ export function EmployerApplicantsPage({ employerId, applicationStateFilter }: {
             <td>{formatDate(item.submittedAt)}</td>
             <td>{item.interviewCount}</td>
             <td>{item.offerState ? humanise(item.offerState) : '—'}</td>
-            <td>{item.closedAt || item.consentRevoked
+            <td>{item.closedAt || item.consentRevoked || item.candidateAccess === false
               ? <div className="hiring-actions">
                 <span className="hiring-meta">Closed</span>
                 {item.state === 'REJECTED' && !item.consentRevoked

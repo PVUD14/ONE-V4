@@ -430,6 +430,15 @@ describe('institution consent and reports', () => {
     expect(postsTo('/withdraw')).toHaveLength(0);
     expect(await screen.findByText('Institution sharing stopped. Your application is unchanged.')).toBeInTheDocument();
   });
+  it('lets students share an application with their institution after applying (INST-09)', async () => {
+    stubFetch({ '/api/v1/students/me/applications': { applications: [{ id: 'app', title: 'Role', employerName: 'Employer', state: 'INTERVIEW', closedAt: null, institutionVisibilityGrantedAt: null, institutionVisibilityRevokedAt: '2026-08-02' }] }, '/api/v1/students/me/offers': { offers: [] } });
+    await authenticate(); render(<StudentApplicationsPage />);
+    expect(await screen.findByText('Sharing stopped')).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: 'Share Role with my institution' }));
+    await waitFor(() => expect(postsTo('/institution-visibility/grant')).toHaveLength(1));
+    expect(postsTo('/withdraw')).toHaveLength(0);
+    expect(await screen.findByText(/Shared with your institution: employer, role, stage, key dates and offer response — never pay/)).toBeInTheDocument();
+  });
   it('keeps analytics widgets present with NA when data cannot be loaded', async () => {
     stubFetch({}, { '/api/v1/employers/employer/hiring-analytics': { status: 500, body: {} } });
     await authenticate(); render(<EmployerHiringAnalyticsPage employerId="employer" />);

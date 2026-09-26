@@ -85,6 +85,8 @@ beforeAll(async () => {
   const topicId = await seedTopic(opsId);
   await seedSkillState(subjectId, topicId);
   await seedSkillState(opsId, topicId);
+  await seedDecision(subjectId);
+  await seedDecision(opsId);
 });
 
 async function seedTopic(authorId: string): Promise<string> {
@@ -116,6 +118,15 @@ async function seedSkillState(userId: string, topicId: string): Promise<void> {
   } finally {
     client.release();
   }
+}
+
+/** One planner decision (ENG-08): nothing to plan, recorded with its inputs as the planner does. */
+async function seedDecision(userId: string): Promise<void> {
+  await pool.query(
+    `INSERT INTO learning_decisions (id, subject_user_id, policy_version, adaptive, inputs, inputs_hash, action, reason_codes, correlation_id)
+     VALUES ($1,$2,'learning-orchestrator-v1',false,'{"adaptive":false}'::jsonb,$3,'NONE','{NO_CAREER_TARGET,NON_ADAPTIVE_NO_CONSENT}','privacy-test')`,
+    [randomUUID(), userId, 'f'.repeat(64)],
+  );
 }
 
 /** One session, one attempt and one activity event, as the assessment paths write them. */
@@ -255,6 +266,25 @@ describe('learning activity is append-only outside deletion', () => {
     expect(kept.rows[0].count).toBe(1);
   });
 
+  it('refuses to change or delete a planner decision outside the deletion transaction for that person', async () => {
+    await expect(pool.query("UPDATE learning_decisions SET action = 'LEARN' WHERE subject_user_id = $1", [subjectId]))
+      .rejects.toThrow(/append-only/);
+    await expect(pool.query('DELETE FROM learning_decisions WHERE subject_user_id = $1', [subjectId]))
+      .rejects.toThrow(/append-only/);
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query("SELECT set_config('one.privacy_erase_subject', $1, true)", [opsId]);
+      await expect(client.query('DELETE FROM learning_decisions WHERE subject_user_id = $1', [subjectId]))
+        .rejects.toThrow(/append-only/);
+    } finally {
+      await client.query('ROLLBACK');
+      client.release();
+    }
+    const kept = await pool.query('SELECT count(*)::int AS count FROM learning_decisions WHERE subject_user_id = $1', [subjectId]);
+    expect(kept.rows[0].count).toBe(1);
+  });
+
   it('refuses to delete the skill state projection outside the projector or the deletion transaction for that person', async () => {
     await expect(pool.query('DELETE FROM learner_skill_state WHERE subject_user_id = $1', [subjectId]))
       .rejects.toThrow(/only the projector writes it/);
@@ -325,6 +355,9 @@ describe('deletion execution', () => {
     // The skill state projection (ENG-05) is rebuilt from no facts, which erases it.
     expect(await learning('learner_skill_state', 'subject_user_id', subjectId)).toBe(0);
     expect(await learning('learner_skill_state', 'subject_user_id', opsId)).toBe(1);
+    // The planner's decisions (ENG-08) are engine behavioural data too.
+    expect(await learning('learning_decisions', 'subject_user_id', subjectId)).toBe(0);
+    expect(await learning('learning_decisions', 'subject_user_id', opsId)).toBe(1);
 
     // What the employer lawfully holds survives, detached from the person.
     const applications = await pool.query('SELECT state FROM applications WHERE student_user_id = $1', [subjectId]);
@@ -341,8 +374,8 @@ describe('deletion execution', () => {
     const byCategory = Object.fromEntries(records.rows.map((r) => [r.category, r]));
     expect(byCategory.SUPPORT_CASES.disposition).toBe('ANONYMISED');
     expect(byCategory.LEARNING_ACTIVITY.disposition).toBe('ERASED');
-    // One attempt, one session, one activity event and one skill state row were erased.
-    expect(byCategory.LEARNING_ACTIVITY.record_count).toBe(4);
+    // One attempt, one session, one activity event, one skill state row and one planner decision were erased.
+    expect(byCategory.LEARNING_ACTIVITY.record_count).toBe(5);
     expect(byCategory.AUDIT.disposition).toBe('RETAINED');
     expect(byCategory.AUDIT.basis).toBeTruthy();
     expect(byCategory.APPLICATIONS.disposition).toBe('ANONYMISED');

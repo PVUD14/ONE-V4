@@ -669,3 +669,54 @@ async function authenticate(): Promise<void> {
   window.history.pushState(null, '', '/auth/callback?code=code-123&state=state-123');
   await completeHostedLoginFromLocation();
 }
+
+describe('EMP-05 changed terms on a student application', () => {
+  const applicationId = '44444444-4444-4444-8444-444444444444';
+  const toVersionId = '55555555-5555-4555-8555-555555555555';
+  const pendingApplication = {
+    id: applicationId, state: 'APPLIED', opportunityId: opportunity.id, employerName: 'Aster Mobility',
+    title: 'SOC Analyst Intern', employmentType: 'INTERNSHIP', workMode: 'ONSITE', locationCity: 'Bengaluru',
+    submittedAt: '2026-08-10T00:00:00.000Z', closedAt: null, consentRevokedAt: null,
+    updatedAt: '2026-08-12T00:00:00.000Z', termsAcknowledgementPending: true, feedbackReleased: false,
+  };
+  const terms = (min: string) => ({ title: 'SOC Analyst Intern', employmentType: 'INTERNSHIP', workMode: 'ONSITE', locationCity: 'Bengaluru',
+    durationMonths: 6, compensation: { currency: 'INR', min, max: null, period: 'MONTH' }, joiningConditions: null, applicationDeadline: null, eligibility: [] });
+  const routes = {
+    '/api/v1/students/me/applications': { applications: [pendingApplication] },
+    '/api/v1/students/me/offers': { offers: [] },
+    [`/api/v1/students/me/applications/${applicationId}/terms-change`]: { termsChange: {
+      toVersionId, employerName: 'Aster Mobility', changedTerms: ['compensationMin'], appliedTerms: terms('25000.00'), newTerms: terms('22000.00') } },
+    [`/api/v1/students/me/applications/${applicationId}/terms-change/acknowledge`]: { application: { id: applicationId, state: 'APPLIED' } },
+    [`/api/v1/students/me/applications/${applicationId}/terms-change/decline`]: { application: { id: applicationId, state: 'WITHDRAWN' } },
+  };
+  const posted = (suffix: string) => vi.mocked(fetch).mock.calls.filter(([url, init]) => String(url).endsWith(suffix) && init?.method === 'POST');
+
+  it('shows what changed side by side and accepts the terms the student saw', async () => {
+    stubFetch(routes);
+    await authenticate();
+    render(<StudentApplicationsPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Review new terms' }));
+    const card = await screen.findByRole('region', { name: 'Changed terms' });
+    expect(within(card).getByText('Aster Mobility changed this job')).toBeInTheDocument();
+    const payRow = within(card).getByText('Pay').closest('tr')!;
+    expect(within(payRow).getByText('Changed')).toBeInTheDocument();
+    expect(within(payRow).getByText('INR 25,000 / month')).toBeInTheDocument();
+    expect(within(payRow).getByText('INR 22,000 / month')).toBeInTheDocument();
+    expect(within(card).getByText(/Declining withdraws your application/)).toBeInTheDocument();
+    fireEvent.click(within(card).getByRole('button', { name: 'Accept the new terms' }));
+    expect(await screen.findByText('You accepted the new terms. Your application carries on.')).toBeInTheDocument();
+    const [call] = posted('/terms-change/acknowledge');
+    const init = call?.[1];
+    expect(JSON.parse(String(init!.body))).toEqual({ toVersionId });
+  });
+
+  it('says declining withdraws the application, and reports a change made while reading', async () => {
+    stubFetch(routes, { [`/api/v1/students/me/applications/${applicationId}/terms-change/decline`]: { status: 409, body: { error: { code: 'TERMS_CHANGED_AGAIN', correlationId: 'c-1' } } } });
+    await authenticate();
+    render(<StudentApplicationsPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Review new terms' }));
+    fireEvent.click(within(await screen.findByRole('region', { name: 'Changed terms' })).getByRole('button', { name: 'Decline and withdraw' }));
+    expect(await screen.findByText('The employer changed the job again while you were reading. Review the latest terms.')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Changed terms' })).not.toBeInTheDocument();
+  });
+});

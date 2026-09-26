@@ -8,7 +8,7 @@
  * Add a role-specific page to its family module, not here.
  */
 import type { ApiHealth } from './api.js';
-import { getProtectedAccessToken, listExamQuestions, listInstitutionExams } from './api.js';
+import { getProtectedAccessToken, listExamQuestions, listInstitutionExams, listMyNotifications, markAllNotificationsRead } from './api.js';
 import { AssistantWidget } from './assistantWidget.js';
 import type { AuthStatus } from './auth.js';
 import { AuthControls } from './authControls.js';
@@ -136,6 +136,19 @@ function RolePortalInner({ portal, apiHealth, authStatus, authNotice, showDevelo
               const published = examsResponse.assessments.filter((exam) => exam.lifecycleState === 'PUBLISHED').length;
               const completed = examsResponse.assessments.reduce((sum, exam) => sum + exam.completedAttempts, 0);
               setTopbarNotice(`Notifications: ${published} published assessment(s), ${completed} completed attempt(s), ${reviewResponse.questions.length} question(s) awaiting review.`);
+            }).catch(() => setTopbarNotice('Notifications could not be loaded right now.'));
+            return;
+          }
+          // EMP-08: employers hear when a candidate answers an offer, in their own notification feed.
+          if (portal.family === 'Employer') {
+            const token = getProtectedAccessToken();
+            if (!token) { setTopbarNotice('Sign in to load notifications.'); return; }
+            void listMyNotifications(token).then((feed) => {
+              const latest = feed.notifications[0];
+              setTopbarNotice(latest
+                ? `Notifications: ${feed.unreadCount} unread. Latest: ${latest.title} — ${latest.body}`
+                : 'No notifications yet. You will be told here when a candidate accepts or declines an offer.');
+              if (feed.unreadCount > 0) void markAllNotificationsRead(token).catch(() => undefined);
             }).catch(() => setTopbarNotice('Notifications could not be loaded right now.'));
             return;
           }

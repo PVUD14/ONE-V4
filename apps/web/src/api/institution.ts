@@ -167,6 +167,40 @@ export function inviteInstitutionStaff(token: string, institutionId: string, ema
   return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/staff-role-assignments`, { token, method: 'POST', body });
 }
 
+/** INST-10: year-end batch actions — graduate, transfer or end a unit or a list of roll numbers. */
+export type RelationshipBatchState = 'GRADUATED' | 'TRANSFERRED' | 'ENDED';
+
+export interface RelationshipBatchRequest {
+  readonly state: RelationshipBatchState;
+  readonly unitId?: string;
+  readonly institutionStudentIds?: readonly string[];
+  readonly effectiveTo?: string;
+}
+
+export interface RelationshipBatchRowDto {
+  readonly institutionStudentId: string;
+  readonly fullName: string | null;
+  readonly currentState: string | null;
+  readonly outcome: 'CHANGE' | 'UNCHANGED' | 'INVALID';
+  readonly issues: readonly string[];
+}
+
+export interface RelationshipBatchPreviewDto {
+  readonly state: RelationshipBatchState;
+  readonly effectiveTo: string | null;
+  readonly counts: { readonly change: number; readonly unchanged: number; readonly invalid: number };
+  readonly digest: string;
+  readonly rows: readonly RelationshipBatchRowDto[];
+}
+
+export function previewRelationshipBatch(token: string, institutionId: string, request: RelationshipBatchRequest): Promise<{ readonly batch: RelationshipBatchPreviewDto }> {
+  return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/relationship-batches/preview`, { token, method: 'POST', body: request });
+}
+
+export function commitRelationshipBatch(token: string, institutionId: string, request: RelationshipBatchRequest & { readonly previewDigest: string; readonly reasonCode: string }): Promise<{ readonly batch: RelationshipBatchPreviewDto & { readonly changed: number; readonly effectiveTo: string } }> {
+  return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/relationship-batches/commit`, { token, method: 'POST', body: request });
+}
+
 export function previewStudentRosterImport(token: string, institutionId: string, filename: string, csv: string): Promise<{ readonly import: RosterImportPreviewDto }> {
   return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/student-imports`, { token, method: 'POST', body: { filename, csv } });
 }

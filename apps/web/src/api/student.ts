@@ -16,6 +16,9 @@ export interface CurrentStudentDto {
   readonly fullName: string;
   readonly institutionStudentId: string;
   readonly institutionId: string;
+  /** INST-10: the college's name, and whether the student has left it (graduated, transferred or ended). */
+  readonly institutionName?: string | null;
+  readonly formerStudent?: boolean;
   readonly academicStatus: string;
   readonly department?: string | null;
   readonly program?: string | null;

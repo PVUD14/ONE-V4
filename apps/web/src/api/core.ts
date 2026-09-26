@@ -89,6 +89,8 @@ export interface SecurityContextDto {
   readonly selectedOrganizationId?: string | null;
   readonly memberships: readonly { readonly organizationId: string; readonly role: string; readonly scope: Record<string, string | undefined> }[];
   readonly studentRelationships?: readonly { readonly institutionId: string; readonly state: string; readonly effectiveFrom: string; readonly effectiveTo?: string | null }[];
+  /** INST-10: relationships the person left by graduating, transferring or ending; they keep the student workspace. */
+  readonly formerStudentRelationships?: readonly { readonly institutionId: string; readonly state: string; readonly effectiveFrom: string; readonly effectiveTo?: string | null }[];
 }
 
 export function getSecurityContext(token: string, signal?: AbortSignal): Promise<SecurityContextDto> {

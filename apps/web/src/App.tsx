@@ -545,6 +545,10 @@ function resolveAuthorizedWorkspaces(context: SecurityContextDto): readonly Auth
   };
   if ((context.studentRelationships?.length ?? 0) > 0) {
     pushUnique({ ...portalChoices[0], role: 'STUDENT', organizationId: context.studentRelationships?.[0]?.institutionId ?? null });
+  } else if ((context.formerStudentRelationships?.length ?? 0) > 0) {
+    // INST-10: someone who graduated, transferred or left keeps their student workspace for their
+    // own data. No college is attached to it: they have left, and nothing may scope by it.
+    pushUnique({ ...portalChoices[0], role: 'STUDENT', organizationId: null });
   }
   for (const membership of context.memberships) {
     const workspace = workspaceForMembership(membership);
@@ -804,9 +808,26 @@ function AuthenticatedStudentStatus({ currentStudent }: { readonly currentStuden
   if (currentStudent.state !== 'resolved') {
     return <section className="student-preview-status" role="status" aria-live="polite"><div><strong>Loading real Student identity</strong><span>ONE is loading your protected Student profile from the API.</span></div></section>;
   }
+  // INST-10: a former student is told plainly where they stand and what they keep.
+  if (currentStudent.student.formerStudent) return <FormerStudentNotice student={currentStudent.student} />;
   // Resolved: render nothing. The top bar already shows the user's name and
   // role; repeating email and account state here read as debug output (UAT #18).
   return <></>;
+}
+
+const formerStudentWords: Readonly<Record<string, string>> = { GRADUATED: 'Graduated from', TRANSFERRED: 'Transferred from', ENDED: 'Left' };
+
+/** What an alumnus sees above their workspace: where they stand, and what they keep (INST-10). */
+export function FormerStudentNotice({ student }: { readonly student: CurrentStudentDto }): React.ReactElement {
+  const college = student.institutionName ?? 'your college';
+  const state = student.relationship?.state ?? student.academicStatus;
+  const when = student.relationship?.effectiveTo
+    ? new Date(student.relationship.effectiveTo).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'long', year: 'numeric' })
+    : null;
+  return <section className="student-preview-status" role="status" aria-live="polite"><div>
+    <strong>{formerStudentWords[state] ?? 'Left'} {college}{when ? ` on ${when}` : ''}</strong>
+    <span>Your ONE account, your records and your choices stay yours. {college} now sees only what happened before that date. You can still ask it to verify past results from Academic record.</span>
+  </div></section>;
 }
 
 function studentIdentityFromAuth(authStatus: AuthStatus, currentStudent: CurrentStudentState): { readonly name: string; readonly initials: string; readonly detail: string } {

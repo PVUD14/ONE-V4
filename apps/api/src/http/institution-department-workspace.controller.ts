@@ -15,6 +15,10 @@
  * student has shared with the college, counted while the relationship authorises them
  * (ADR-019); offers are reported by existence and response only, never pay (ADR-024);
  * readiness is bands only (ADR-020). Reading application records is audited (§5.4).
+ *
+ * INST-09 adds the placement status per student (Not shared, Applied, In process, Offer,
+ * Accepted) for the placement office, admins and heads, from the same shared rows, and
+ * its suppressed distribution on the pipeline.
  */
 import { BadRequestException, Controller, ForbiddenException, Get, Inject, Param, Query, Req, UseGuards } from '@nestjs/common';
 import { sql, type SQL } from 'drizzle-orm';
@@ -22,6 +26,8 @@ import {
   institutionUnitDescendants,
   latestReportingMonth,
   narrowInstitutionStudentScope,
+  placementStatuses,
+  studentPlacementStatus,
   suppressAggregateTable,
   suppressSmallCount,
   type InstitutionStudentScope,
@@ -180,14 +186,100 @@ export class InstitutionDepartmentWorkspaceController {
       stageCounts.set(row.state, (stageCounts.get(row.state) ?? 0) + 1);
       if (row.offer_state) offerCounts.set(row.offer_state, (offerCounts.get(row.offer_state) ?? 0) + 1);
     }
+    // INST-09: each current student's placement status, from the same shared rows. A
+    // student who shared nothing is NOT_SHARED — never counted as unplaced.
+    const current = await this.db.execute(sql`
+      SELECT sp.student_user_id FROM institution_student_profiles sp
+      WHERE sp.institution_id = ${reader.institutionId}::uuid AND ${institutionStudentScopeSql(reader.scope, 'sp')} AND ${currentRelationshipSql('sp')}
+    `) as Rows<{ student_user_id: string }>;
+    const statusCounts = new Map<string, number>();
+    const byStudent = groupShared(rows.rows);
+    for (const { student_user_id: studentId } of current.rows) {
+      const status = studentPlacementStatus(byStudent.get(studentId) ?? []);
+      statusCounts.set(status, (statusCounts.get(status) ?? 0) + 1);
+    }
     return {
       scope: await describeInstitutionStudentScope(this.db, request, reader.institutionId, departmentWorkspaceRoles, reader.own),
       unit: reader.unit,
       studentsSharing: suppressSmallCount(new Set(rows.rows.map((row) => row.student_user_id)).size),
       stages: suppressAggregateTable(applicationStages.map((key) => ({ key, count: stageCounts.get(key) ?? 0 }))),
       offers: suppressAggregateTable(offerStates.map((key) => ({ key, count: offerCounts.get(key) ?? 0 }))),
+      placementStatus: suppressAggregateTable(placementStatuses.map((key) => ({ key, count: statusCounts.get(key) ?? 0 }))),
       correlationId: reader.correlationId,
     };
+  }
+
+  /**
+   * INST-09: where each student in scope is in their placement journey, derived only from
+   * what they shared (ADR-019). Every current student in scope is listed — the roster the
+   * reader can already see — with NOT_SHARED where nothing is shared. Keyset-paginated by
+   * name. Audited: it is a per-student read of application records (§5.4).
+   */
+  @Get('/institutions/:institutionId/placement-status')
+  async placementStatus(
+    @Req() request: ProtectedHttpRequest,
+    @Param('institutionId') institutionId: string,
+    @Query('unitId') unitId?: string,
+    @Query('limit') limitParam?: string,
+    @Query('cursor') cursorParam?: string,
+  ): Promise<Record<string, unknown>> {
+    const reader = await this.reader(request, institutionId, departmentWorkspaceRoles, unitId);
+    const limit = readLimit(limitParam, reader.correlationId);
+    const cursor = readNameCursor(cursorParam, reader.correlationId);
+    const id = reader.institutionId;
+    return this.db.transaction(async (tx) => {
+      const students = await tx.execute(sql`
+        SELECT sp.student_user_id, sp.full_name, sp.institution_student_id, dept.name AS department_name, batch.name AS batch_name
+        FROM institution_student_profiles sp
+        LEFT JOIN institution_units dept ON dept.id = sp.department_unit_id AND dept.institution_id = sp.institution_id
+        LEFT JOIN institution_units batch ON batch.id = sp.batch_unit_id AND batch.institution_id = sp.institution_id
+        WHERE sp.institution_id = ${id}::uuid AND ${institutionStudentScopeSql(reader.scope, 'sp')} AND ${currentRelationshipSql('sp')}
+          AND (${cursor?.[0] ?? null}::text IS NULL
+            OR (sp.full_name, sp.student_user_id) > (${cursor?.[0] ?? null}::text, ${cursor?.[1] ?? null}::uuid))
+        ORDER BY sp.full_name, sp.student_user_id
+        LIMIT ${limit + 1}
+      `) as Rows<{ student_user_id: string; full_name: string; institution_student_id: string; department_name: string | null; batch_name: string | null }>;
+      const page = students.rows.slice(0, limit);
+      const ids = uuidArray(page.map((row) => row.student_user_id));
+      const shared = await tx.execute(sql`
+        ${sharedApplicationsCte(reader)}
+        SELECT student_user_id, state, offer_state, updated_at FROM shared WHERE student_user_id = ANY(${ids}::uuid[])
+      `) as Rows<{ student_user_id: string; state: string; offer_state: string | null; updated_at: Date | string }>;
+      const external = await tx.execute(sql`
+        ${sharedExternalCte(reader)}
+        SELECT student_user_id, count(*)::int AS declarations, max(updated_at) AS updated_at FROM shared_external
+        WHERE student_user_id = ANY(${ids}::uuid[]) GROUP BY student_user_id
+      `) as Rows<{ student_user_id: string; declarations: number; updated_at: Date | string }>;
+      const byStudent = groupShared(shared.rows);
+      const declared = new Map(external.rows.map((row) => [row.student_user_id, row]));
+      await tx.execute(sql`
+        INSERT INTO audit_events (id, actor_user_id, action, resource_type, resource_id, organization_id, outcome, correlation_id, context)
+        VALUES (${this.ids.uuid()}::uuid, ${reader.actorUserId}::uuid, 'institution.placement_status.listed', 'institution',
+          ${id}, ${id}::uuid, 'SUCCESS', ${reader.correlationId},
+          ${JSON.stringify({ returned: page.length, unitId: reader.unit?.id ?? null, page: cursor ? 'NEXT' : 'FIRST' })}::jsonb)
+      `);
+      return {
+        students: page.map((row) => {
+          const applications = shared.rows.filter((entry) => entry.student_user_id === row.student_user_id);
+          const declaration = declared.get(row.student_user_id);
+          const times = [...applications.map((entry) => new Date(entry.updated_at).getTime()), ...(declaration ? [new Date(declaration.updated_at).getTime()] : [])];
+          return {
+            studentUserId: row.student_user_id,
+            fullName: row.full_name,
+            institutionStudentId: row.institution_student_id,
+            department: row.department_name,
+            batch: row.batch_name,
+            status: studentPlacementStatus(byStudent.get(row.student_user_id) ?? []),
+            sharedApplications: applications.length,
+            sharedExternalDeclarations: declaration?.declarations ?? 0,
+            lastSharedActivityAt: times.length ? new Date(Math.max(...times)).toISOString() : null,
+          };
+        }),
+        nextCursor: students.rows.length > limit ? encodeCursor([page.at(-1)!.full_name, page.at(-1)!.student_user_id]) : null,
+        unit: reader.unit,
+        correlationId: reader.correlationId,
+      };
+    });
   }
 
   /** The shared application records behind "Opportunities and Offers". Audited: these are application records (§5.4). */
@@ -455,6 +547,48 @@ function sharedApplicationsCte(reader: ReaderScope): SQL {
     )`;
 }
 
+/**
+ * Student-declared external applications the reader may count (0019, ADR-019): shared and
+ * not revoked, of a student in scope with a current relationship and an active profile
+ * and account, with the declared date, creation and last change inside a relationship
+ * that authorised activity then — the per-student external read's rule. Declarations are
+ * unverified; they are counted beside a placement status, never folded into it.
+ */
+function sharedExternalCte(reader: ReaderScope): SQL {
+  const id = reader.institutionId;
+  const authorisedAt = (at: SQL) => sql`EXISTS (
+    SELECT 1 FROM institution_relationships r
+    WHERE r.institution_id = ${id}::uuid AND r.student_user_id = e.student_user_id
+      AND (r.state IN ('VERIFIED', 'ACTIVE') OR (r.state IN ('TRANSFERRED', 'GRADUATED') AND r.effective_to IS NOT NULL))
+      AND r.effective_from <= ${at} AND (r.effective_to IS NULL OR r.effective_to > ${at}))`;
+  return sql`
+    WITH scoped AS (
+      SELECT sp.student_user_id
+      FROM institution_student_profiles sp JOIN users u ON u.id = sp.student_user_id
+      WHERE sp.institution_id = ${id}::uuid AND sp.status = 'ACTIVE' AND u.state = 'ACTIVE'
+        AND ${currentRelationshipSql('sp')}
+        AND ${institutionStudentScopeSql(reader.scope, 'sp')}
+    ), shared_external AS (
+      SELECT e.id, e.student_user_id, e.stage, e.updated_at
+      FROM external_applications e
+      JOIN scoped s ON s.student_user_id = e.student_user_id
+      WHERE e.institution_visibility_granted_at IS NOT NULL AND e.institution_visibility_revoked_at IS NULL
+        AND ${authorisedAt(sql`(e.applied_on::text || 'T00:00:00Z')::timestamptz`)}
+        AND ${authorisedAt(sql`e.created_at`)} AND ${authorisedAt(sql`e.updated_at`)}
+    )`;
+}
+
+/** Shared application rows grouped per student, in the shape the status rule reads. */
+function groupShared(rows: readonly { student_user_id: string; state: string; offer_state: string | null }[]): Map<string, { state: string; offerState: string | null }[]> {
+  const grouped = new Map<string, { state: string; offerState: string | null }[]>();
+  for (const row of rows) {
+    const list = grouped.get(row.student_user_id) ?? [];
+    list.push({ state: row.state, offerState: row.offer_state });
+    grouped.set(row.student_user_id, list);
+  }
+  return grouped;
+}
+
 /** True when the profile row has a relationship with the institution that is current now. */
 function currentRelationshipSql(alias: 'sp'): SQL {
   const p = sql.raw(alias);
@@ -503,6 +637,17 @@ function readCursor(value: string | undefined, correlationId: string): [string, 
     const parsed = JSON.parse(Buffer.from(value, 'base64url').toString('utf8')) as unknown;
     if (Array.isArray(parsed) && parsed.length === 2 && typeof parsed[0] === 'string' && parsed[0].length <= 64
       && timestampPattern.test(parsed[0]) && typeof parsed[1] === 'string' && uuidPattern.test(parsed[1])) return [parsed[0], parsed[1]];
+  } catch { /* fall through */ }
+  throw invalid('INVALID_QUERY', correlationId, 'cursor');
+}
+
+/** A keyset cursor over (full name, student id). */
+function readNameCursor(value: string | undefined, correlationId: string): [string, string] | null {
+  if (value === undefined || value === '') return null;
+  try {
+    const parsed = JSON.parse(Buffer.from(value, 'base64url').toString('utf8')) as unknown;
+    if (Array.isArray(parsed) && parsed.length === 2 && typeof parsed[0] === 'string' && parsed[0].length <= 300
+      && typeof parsed[1] === 'string' && uuidPattern.test(parsed[1])) return [parsed[0], parsed[1]];
   } catch { /* fall through */ }
   throw invalid('INVALID_QUERY', correlationId, 'cursor');
 }

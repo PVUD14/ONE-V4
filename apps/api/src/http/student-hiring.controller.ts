@@ -429,6 +429,40 @@ export class StudentHiringController {
     };
   }
 
+  /**
+   * INST-09: share an application with the college after applying (ADR-019: consent is the
+   * student's to give and withdraw, per application). Mirrors the external-application
+   * grant: a stopped share can be restarted, which starts a new sharing period. An
+   * unsubmitted DRAFT cannot be shared. Idempotent: sharing what is already shared writes
+   * nothing. The college still sees it only while the relationship authorises it.
+   */
+  @Post('/students/me/applications/:applicationId/institution-visibility/grant')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async grantInstitutionVisibility(@Req() request: ProtectedHttpRequest, @Param('applicationId') applicationId: string): Promise<Record<string, unknown>> {
+    const context = requireTrustedAuthorization(request);
+    const studentUserId = context.authorization.principal.userId;
+    const id = requireUuid(applicationId, context.correlationId);
+    await this.db.transaction(async (tx) => {
+      const locked = await tx.execute(sql`
+        SELECT state, institution_visibility_granted_at, institution_visibility_revoked_at FROM applications
+        WHERE id = ${id}::uuid AND student_user_id = ${studentUserId}::uuid
+        FOR UPDATE
+      `) as QueryResult<{ state: string; institution_visibility_granted_at: Date | null; institution_visibility_revoked_at: Date | null }>;
+      const row = locked.rows[0];
+      if (!row || row.state === 'DRAFT') throw forbidden(context.correlationId);
+      if (row.institution_visibility_granted_at !== null && row.institution_visibility_revoked_at === null) return;
+      await tx.execute(sql`
+        UPDATE applications SET institution_visibility_granted_at = now(), institution_visibility_revoked_at = NULL
+        WHERE id = ${id}::uuid AND student_user_id = ${studentUserId}::uuid
+      `);
+      await tx.execute(sql`
+        INSERT INTO audit_events (id, actor_user_id, action, resource_type, resource_id, outcome, correlation_id)
+        VALUES (${this.ids.uuid()}::uuid, ${studentUserId}::uuid, 'application.institution_visibility_granted', 'application', ${id}::uuid, 'SUCCESS', ${context.correlationId})
+      `);
+    });
+    return { ok: true, correlationId: context.correlationId };
+  }
+
   @Post('/students/me/applications/:applicationId/institution-visibility/revoke')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async revokeInstitutionVisibility(@Req() request: ProtectedHttpRequest, @Param('applicationId') applicationId: string): Promise<Record<string, unknown>> {

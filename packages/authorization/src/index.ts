@@ -118,3 +118,4 @@ export * from './operations-overview.js';
 export * from './career-catalogue.js';
 export * from './institution-exports.js';
 export * from './role-demand.js';
+export * from './placement-status.js';

@@ -469,7 +469,12 @@ export class StaffActionsController {
   }
 
 
-  /** ADR-019/024: explicit institution consent plus current scope and canonical activity-date access. */
+  /**
+   * ADR-019/024: explicit institution consent plus current scope and canonical activity-date access.
+   * INST-09: aligned with the placement views INST-07 built — an unsubmitted DRAFT application
+   * is not shared, and an employer's unsent DRAFT offer is not disclosed as an offer — and
+   * every read is audited, a read outside scope as DENIED (§5.4).
+   */
   @Get('/institutions/:institutionId/students/:studentUserId/applications')
   async studentApplications(@Req() request: ProtectedHttpRequest, @Param('institutionId') institutionId: string, @Param('studentUserId') studentUserId: string) {
     return this.db.transaction(async (tx) => {
@@ -479,7 +484,10 @@ export class StaffActionsController {
         // Reuse current relationship and department/batch checks, holding their read locks.
         await this.subject(tx, scope, studentId);
       } catch (error) {
-        if (error instanceof ForbiddenException) return { applications: [] };
+        if (error instanceof ForbiddenException) {
+          await this.auditStudentRead(tx, scope, studentId, 'institution.student_applications.read', 'DENIED', 0);
+          return { applications: [] };
+        }
         throw error;
       }
       const result = await tx.execute(sql`
@@ -489,6 +497,7 @@ export class StaffActionsController {
         JOIN organizations employer ON employer.id = a.employer_id AND employer.kind = 'EMPLOYER'
         JOIN opportunity_versions v ON v.id = a.applied_version_id AND v.opportunity_id = a.opportunity_id
         WHERE a.student_user_id = ${studentId}::uuid
+          AND a.state <> 'DRAFT'
           AND a.institution_visibility_granted_at IS NOT NULL
           AND a.institution_visibility_revoked_at IS NULL
         ORDER BY a.created_at DESC, a.id
@@ -513,7 +522,7 @@ export class StaffActionsController {
         const offers = await tx.execute(sql`
           SELECT state, created_at, updated_at
           FROM offers
-          WHERE application_id = ${row.id}::uuid AND employer_id = ${row.employer_id}::uuid
+          WHERE application_id = ${row.id}::uuid AND employer_id = ${row.employer_id}::uuid AND state <> 'DRAFT'
           ORDER BY created_at DESC, id DESC LIMIT 1 FOR SHARE
         `) as Rows<{ state: string; created_at: Date; updated_at: Date }>;
         const offer = offers.rows[0];
@@ -526,6 +535,7 @@ export class StaffActionsController {
           offer: { exists: Boolean(offer), responseState: offer?.state ?? null },
         });
       }
+      await this.auditStudentRead(tx, scope, studentId, 'institution.student_applications.read', 'SUCCESS', applications.length);
       return { applications };
     });
   }
@@ -541,7 +551,10 @@ export class StaffActionsController {
       try {
         await this.subject(tx, scope, studentId);
       } catch (error) {
-        if (error instanceof ForbiddenException) return { externalApplications: [] };
+        if (error instanceof ForbiddenException) {
+          await this.auditStudentRead(tx, scope, studentId, 'institution.student_external_applications.read', 'DENIED', 0);
+          return { externalApplications: [] };
+        }
         throw error;
       }
       const result = await tx.execute(sql`
@@ -574,8 +587,19 @@ export class StaffActionsController {
           createdAt: row.created_at, updatedAt: row.updated_at,
         });
       }
+      await this.auditStudentRead(tx, scope, studentId, 'institution.student_external_applications.read', 'SUCCESS', externalApplications.length);
       return { externalApplications };
     });
+  }
+
+  /** INST-09: a read of one student's application records, with how many were disclosed. */
+  private async auditStudentRead(tx: PersistenceDb, scope: Scope, studentId: string, action: string, outcome: 'SUCCESS' | 'DENIED', returned: number): Promise<void> {
+    await tx.execute(sql`
+      INSERT INTO audit_events (id, actor_user_id, action, resource_type, resource_id, organization_id, outcome, correlation_id, context)
+      VALUES (${this.ids.uuid()}::uuid, ${scope.user_id}::uuid, ${action}, 'institution_student', ${studentId},
+        ${scope.institutionId}::uuid, ${outcome}, ${scope.correlationId},
+        ${JSON.stringify({ returned, actorMembershipId: scope.id })}::jsonb)
+    `);
   }
 
   private async audit(tx: PersistenceDb, scope: Scope, id: string, action: string, context: Record<string, unknown>): Promise<void> {

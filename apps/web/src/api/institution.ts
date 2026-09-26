@@ -603,6 +603,27 @@ export interface PlacementPipelineDto {
   readonly studentsSharing: SuppressedCountDto;
   readonly stages: SuppressedTableDto<ApplicationStage>;
   readonly offers: SuppressedTableDto<OfferResponseState>;
+  /** INST-09: current students by placement status, small groups suppressed. */
+  readonly placementStatus?: SuppressedTableDto<PlacementStatus>;
+}
+
+/**
+ * INST-09: where a student is in their placement journey, from applications they shared
+ * with the college only. NOT_SHARED is not "not applied" — the college cannot tell.
+ */
+export type PlacementStatus = 'NOT_SHARED' | 'APPLIED' | 'IN_PROCESS' | 'OFFER' | 'ACCEPTED';
+
+export interface PlacementStatusRowDto {
+  readonly studentUserId: string;
+  readonly fullName: string;
+  readonly institutionStudentId: string;
+  readonly department: string | null;
+  readonly batch: string | null;
+  readonly status: PlacementStatus;
+  readonly sharedApplications: number;
+  /** Unverified student declarations; they never change the status. */
+  readonly sharedExternalDeclarations: number;
+  readonly lastSharedActivityAt: string | null;
 }
 
 export interface PlacementApplicationDto {
@@ -645,6 +666,12 @@ export function getPlacementPipeline(token: string, institutionId: string, signa
 export function listPlacementApplications(token: string, institutionId: string, cursor?: string | null, signal?: AbortSignal): Promise<{ readonly applications: readonly PlacementApplicationDto[]; readonly nextCursor: string | null }> {
   const query = cursor ? `?limit=50&cursor=${encodeURIComponent(cursor)}` : '?limit=50';
   return requestJson(`${institutionPath(institutionId)}/placement-applications${query}`, { token, ...(signal ? { signal } : {}) });
+}
+
+/** One page of per-student placement status (audited server-side). */
+export function listPlacementStatus(token: string, institutionId: string, options: { readonly cursor?: string | null; readonly limit?: number } = {}, signal?: AbortSignal): Promise<{ readonly students: readonly PlacementStatusRowDto[]; readonly nextCursor: string | null }> {
+  const query = `?limit=${options.limit ?? 50}${options.cursor ? `&cursor=${encodeURIComponent(options.cursor)}` : ''}`;
+  return requestJson(`${institutionPath(institutionId)}/placement-status${query}`, { token, ...(signal ? { signal } : {}) });
 }
 
 export function listDepartmentStaff(token: string, institutionId: string, signal?: AbortSignal): Promise<DepartmentStaffDto> {

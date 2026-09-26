@@ -223,6 +223,11 @@ export function revokeInstitutionVisibility(token: string, applicationId: string
   return requestJson(`/api/v1/students/me/applications/${encodeURIComponent(applicationId)}/institution-visibility/revoke`, { token, method: 'POST' });
 }
 
+/** INST-09: share an application with the student's college after applying; revocable at any time. */
+export function grantInstitutionVisibility(token: string, applicationId: string): Promise<{ readonly ok: boolean }> {
+  return requestJson(`/api/v1/students/me/applications/${encodeURIComponent(applicationId)}/institution-visibility/grant`, { token, method: 'POST' });
+}
+
 export function withdrawApplication(token: string, applicationId: string, reason?: string): Promise<Record<string, unknown>> {
   return requestJson(`/api/v1/students/me/applications/${encodeURIComponent(applicationId)}/withdraw`, { token, method: 'POST', body: reason ? { reason } : {} });
 }

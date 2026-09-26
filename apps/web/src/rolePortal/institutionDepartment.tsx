@@ -41,6 +41,7 @@ import type {
 import { V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { InstitutionReportsPage } from '../institutionReportsPage.js';
 import { InstitutionExportsPanel } from './institutionAnalytics.js';
+import { placementStatusLabels } from './institutionPlacementStatus.js';
 import { go } from '../pilotParity/naWidgets.js';
 import { InstitutionWorkspaceError, RestrictedApiState, formatApiError, isInstitutionStaffWorkspace } from './shared.js';
 import type { AuthenticatedWorkspaceSummary } from './shared.js';
@@ -64,13 +65,13 @@ export const offerResponseLabels: Readonly<Record<string, string>> = {
 };
 
 /** A load error as the screen may show it: plain words and the reference, never upstream text. */
-function loadError(error: unknown, fallback: string): string {
+export function loadError(error: unknown, fallback: string): string {
   if (error instanceof ApiRequestError && error.status === 403) return `You do not have permission to view this. Reference: ${error.correlationId}`;
   return formatApiError(error, fallback);
 }
 
 /** Load one resource for the signed-in institution workspace; null data until it arrives. */
-function useWorkspaceResource<T>(workspace: AuthenticatedWorkspaceSummary | undefined, load: (token: string, institutionId: string, signal: AbortSignal) => Promise<T>, fallback: string): { readonly data: T | null; readonly error: string } {
+export function useWorkspaceResource<T>(workspace: AuthenticatedWorkspaceSummary | undefined, load: (token: string, institutionId: string, signal: AbortSignal) => Promise<T>, fallback: string): { readonly data: T | null; readonly error: string } {
   const token = getProtectedAccessToken();
   const institutionId = workspace?.organizationId ?? '';
   const [state, setState] = useState<{ readonly data: T | null; readonly error: string }>({ data: null, error: '' });
@@ -88,18 +89,18 @@ function useWorkspaceResource<T>(workspace: AuthenticatedWorkspaceSummary | unde
 }
 
 /** The sign-in and workspace guards every page here shares. Null when the page may render. */
-function workspaceGuard(title: string, workspace: AuthenticatedWorkspaceSummary | undefined, roles?: readonly string[]): React.ReactElement | null {
+export function workspaceGuard(title: string, workspace: AuthenticatedWorkspaceSummary | undefined, roles?: readonly string[]): React.ReactElement | null {
   if (!getProtectedAccessToken()) return <RestrictedApiState title={title} message="Sign in to your institution staff workspace." />;
   if (!isInstitutionStaffWorkspace(workspace)) return <InstitutionWorkspaceError title={title} />;
   if (roles && !roles.includes(workspace.role)) return <InstitutionWorkspaceError title={title} unauthorized />;
   return null;
 }
 
-function PageHead({ title, summary, scopeLabel }: { readonly title: string; readonly summary: string; readonly scopeLabel?: string | null }): React.ReactElement {
+export function PageHead({ title, summary, scopeLabel }: { readonly title: string; readonly summary: string; readonly scopeLabel?: string | null }): React.ReactElement {
   return <div className="pilot-page-head"><div className="pilot-greeting"><h1>{title}</h1><p>{summary}</p>{scopeLabel ? <p>Showing students in {scopeLabel}.</p> : null}</div></div>;
 }
 
-function Kpis({ items }: { readonly items: readonly (readonly [string, string, string, typeof Users])[] }): React.ReactElement {
+export function Kpis({ items }: { readonly items: readonly (readonly [string, string, string, typeof Users])[] }): React.ReactElement {
   return <div className={`pilot-row cols-${items.length}`}>
     {items.map(([label, value, tone, Icon]) => <section key={label} className="pilot-card pilot-kpi">
       <span className={`pilot-tile ${tone}`}><Icon size={17} /></span>
@@ -109,7 +110,7 @@ function Kpis({ items }: { readonly items: readonly (readonly [string, string, s
 }
 
 /** A funnel over a suppressed table: a cell under five reads <5 and draws no bar. */
-function SuppressedFunnel({ table, labels }: { readonly table: SuppressedTableDto | null; readonly labels: Readonly<Record<string, string>> }): React.ReactElement {
+export function SuppressedFunnel({ table, labels }: { readonly table: SuppressedTableDto | null; readonly labels: Readonly<Record<string, string>> }): React.ReactElement {
   const keys = Object.keys(labels);
   const cells = new Map((table?.cells ?? []).map((cell) => [cell.key, cell]));
   const max = Math.max(1, ...[...cells.values()].map((cell) => cell.count ?? 0));
@@ -284,6 +285,11 @@ export function PlacementPipelinePage({ authenticatedWorkspace, basePath }: Work
       <section className="pilot-card">
         <div className="pilot-card-head"><h2>Offers by response</h2></div>
         <SuppressedFunnel table={data?.offers ?? null} labels={offerResponseLabels} />
+      </section>
+      {/* INST-09: every current student by placement status; "Nothing shared" is never "not applied". */}
+      <section className="pilot-card">
+        <div className="pilot-card-head"><h2>Students by placement status</h2></div>
+        <SuppressedFunnel table={data?.placementStatus ?? null} labels={placementStatusLabels} />
       </section>
     </div>
     <aside className="pilot-rail">

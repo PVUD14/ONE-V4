@@ -31,6 +31,7 @@ import { EmployerOrganisationGate } from './rolePortal/employerOrganisationState
 import { InstitutionAcademicStructurePage, InstitutionStaffActionsPage, InstitutionStaffPage, InstitutionStudentsPage } from './rolePortal/institution.js';
 import { FacultyMyStudentsPage, InstitutionFacultyAndStaffPage } from './rolePortal/institutionTeaching.js';
 import { FacultyMessagesPage } from './rolePortal/institutionAnnouncements.js';
+import { InstitutionPlacementPage, PlacementStatusList } from './rolePortal/institutionPlacement.js';
 import { DepartmentBatchesPage, DepartmentOverviewPage, DepartmentReadinessPage, DepartmentReportsAnalyticsPage, FacultyAssessmentDetailPage, FacultyClassReportsPage, OpportunitiesAndOffersPage, PlacementPipelinePage } from './rolePortal/institutionDepartment.js';
 import { AcademicVerificationSection, FacultyAcademicVerification } from './rolePortal/institutionAcademicVerification.js';
 import { OperationsAuditLogPage, OperationsContentReadOnlyPage, OperationsFeatureFlagsPage, OperationsOrganizationsPage, OperationsInvitationTrackingPanel, OperationsTechnicalReadOnlyPage } from './rolePortal/operations.js';
@@ -285,6 +286,9 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
       <InstitutionStudentsPage portal={portal} authenticatedWorkspace={authenticatedWorkspace} />
       {route.label === 'Students' && isInstitutionWorkspace(authenticatedWorkspace)
         ? <AcademicVerificationSection institutionId={authenticatedWorkspace.organizationId} canUpload /> : null}
+      {/* INST-09: Student Detail adds each student's consented placement status and shared applications. */}
+      {route.label === 'Student Detail' && isInstitutionWorkspace(authenticatedWorkspace) && getProtectedAccessToken()
+        ? <PlacementStatusList key={authenticatedWorkspace.organizationId} token={getProtectedAccessToken()!} institutionId={authenticatedWorkspace.organizationId} /> : null}
     </StaffPilotWrap>;
   }
   if (!demoMode && portal.key === 'department-head' && route.label === 'Students') {
@@ -347,6 +351,8 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
           <InstitutionExportsPanel institutionId={authenticatedWorkspace.organizationId} /></InstitutionReportsPage>
       : <InstitutionWorkspaceError title="Reports" unauthorized={Boolean(authenticatedWorkspace && !institutionWorkspaceRoles.has(authenticatedWorkspace.role))} />;
   }
+  // INST-09: the admin's Placement label opens consented placement status; only this label's branch changes.
+  if (!demoMode && portal.key === 'institution-admin' && route.label === 'Placement') return <InstitutionPlacementPage authenticatedWorkspace={authenticatedWorkspace} />;
   if (!demoMode && portal.key === 'institution-admin' && /career readiness|placement|reports/i.test(route.label)) return <AuthenticatedReadOnlyModule title={route.label} detail="Institution reports and readiness information are read-only in Phase 2A unless a dedicated persistent mutation is available." />;
   // INST-05: the admin's Settings label now opens the college settings; navigation is unchanged.
   if (!demoMode && portal.key === 'institution-admin' && route.label === 'Settings') return <InstitutionSettingsPage authenticatedWorkspace={authenticatedWorkspace} />;

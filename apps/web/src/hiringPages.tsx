@@ -3,7 +3,7 @@ import { getAccessToken } from './auth.js';
 import { V2Stat } from './dashboardsV2.js';
 import {
   listEmployerInterviews, listEmployerOffers, updateInterviewState, submitInterviewOutcome,
-  withdrawEmployerOffer, revokeInstitutionVisibility, getEmployerHiringAnalytics,
+  withdrawEmployerOffer, revokeInstitutionVisibility, grantInstitutionVisibility, getEmployerHiringAnalytics,
   type EmployerInterviewDto, type EmployerOfferDto, type InterviewScheduleInput,
   type InterviewStateInput, type InterviewOutcomeInput, type OfferInput, type HiringAnalyticsDto,
   listInterviewParticipantOptions, type InterviewParticipantOptionDto,
@@ -216,7 +216,7 @@ export function StudentOpportunitiesPage(): React.ReactElement {
         onChange={(event) => setInstitutionVisibilityGranted(event.target.checked)} />
         <span>Also share this application's employer, role, stage, key dates and offer response with my institution while our relationship is active (optional).</span>
       </label>
-      <p className="hiring-consent-note">This does not share offer compensation, documents or readiness information. You can stop sharing from Applications at any time, without withdrawing your application.</p>
+      <p className="hiring-consent-note">This does not share offer compensation, documents or readiness information. You can share later or stop sharing from Applications at any time, without withdrawing your application.</p>
 
       <div className="hiring-actions">
         <button type="button" disabled={busy || selected.opportunity.alreadyApplied === true} onClick={() => { void apply(selected.opportunity.id); }}>
@@ -302,6 +302,19 @@ export function StudentApplicationsPage(): React.ReactElement {
     }
   }
 
+  // INST-09: sharing can be chosen after applying too, per application, and stopped again.
+  async function grantVisibility(id: string): Promise<void> {
+    const token = getAccessToken();
+    if (!token || revoking) return;
+    setRevoking(true);
+    try {
+      await grantInstitutionVisibility(token, id);
+      await reload('Shared with your institution: employer, role, stage, key dates and offer response — never pay. You can stop at any time.');
+    } catch (error) {
+      setStatus(messageFor(error, 'This application could not be shared with your institution.'));
+    } finally { setRevoking(false); }
+  }
+
   async function revokeVisibility(id: string): Promise<void> {
     const token = getAccessToken();
     if (!token || revoking) return;
@@ -380,8 +393,9 @@ export function StudentApplicationsPage(): React.ReactElement {
               ? <button type="button" className="secondary" onClick={() => { void openFeedback(item.id); }}>See why</button>
               : <span className="hiring-meta">{item.state === 'REJECTED' ? 'None shared' : '—'}</span>}</td>
             <td>{item.institutionVisibilityGrantedAt && !item.institutionVisibilityRevokedAt
-              ? <button type="button" className="secondary" disabled={revoking} onClick={() => { void revokeVisibility(item.id); }}>Stop institution sharing</button>
-              : <span>{item.institutionVisibilityRevokedAt ? 'Sharing stopped' : 'Not shared'}</span>}</td>
+              ? <><span>Shared with institution</span> <button type="button" className="secondary" disabled={revoking} onClick={() => { void revokeVisibility(item.id); }}>Stop institution sharing</button></>
+              : <><span>{item.institutionVisibilityRevokedAt ? 'Sharing stopped' : 'Not shared'}</span> <button type="button" className="secondary" disabled={revoking}
+                aria-label={'Share ' + item.title + ' with my institution'} onClick={() => { void grantVisibility(item.id); }}>Share with institution</button></>}</td>
             <td>{item.closedAt
               ? <span className="hiring-meta">Closed</span>
               : <button type="button" className="secondary" onClick={() => { void withdraw(item.id); }}>Withdraw</button>}</td>

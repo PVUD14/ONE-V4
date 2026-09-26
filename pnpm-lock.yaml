@@ -238,6 +238,22 @@ importers:
         version: 3.2.7(@types/node@22.20.1)(jsdom@26.1.0)(tsx@4.23.12)
 
   packages/learning-model:
+    dependencies:
+      '@planthepath/mastery-bkt':
+        specifier: workspace:*
+        version: link:../mastery-bkt
+    devDependencies:
+      '@types/node':
+        specifier: ^22.13.0
+        version: 22.20.1
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@22.20.1)(jsdom@26.1.0)(tsx@4.23.12)
+
+  packages/mastery-bkt:
     devDependencies:
       '@types/node':
         specifier: ^22.13.0
@@ -275,6 +291,9 @@ importers:
       '@planthepath/learning-model':
         specifier: workspace:*
         version: link:../learning-model
+      '@planthepath/mastery-bkt':
+        specifier: workspace:*
+        version: link:../mastery-bkt
       drizzle-orm:
         specifier: ^0.45.2
         version: 0.45.2(@types/pg@8.23.1)(pg@8.23.0)

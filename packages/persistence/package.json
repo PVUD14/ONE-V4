@@ -14,6 +14,7 @@
     "db:seed:careers": "tsx src/seed-careers.ts",
     "db:import:teaching-strategies-draft": "tsx src/import-teaching-strategies-draft.ts",
     "engine:rebuild-skill-state": "tsx src/rebuild-learner-skill-state.ts",
+    "engine:bkt-shadow-report": "tsx src/run-bkt-shadow-report.ts",
     "jobs:alert-check": "tsx src/run-jobs-alert-check.ts",
     "test": "vitest run --fileParallelism=false",
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -28,6 +29,7 @@
     "@planthepath/events": "workspace:*",
     "@planthepath/learner-content": "workspace:*",
     "@planthepath/learning-model": "workspace:*",
+    "@planthepath/mastery-bkt": "workspace:*",
     "drizzle-orm": "^0.45.2",
     "pg": "^8.16.0",
     "@planthepath/ai-orchestration": "workspace:*"

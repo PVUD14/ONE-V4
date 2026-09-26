@@ -269,7 +269,8 @@ export class StudentHiringController {
              o.id AS opportunity_id, org.legal_name AS employer_name,
              v.title, v.employment_type, v.work_mode, v.location_city,
              (SELECT count(*) FROM opportunity_term_change_acknowledgements t
-               WHERE t.application_id = a.id AND t.acknowledged_at IS NULL AND t.declined_at IS NULL) AS pending_terms,
+               WHERE t.application_id = a.id AND t.acknowledgement_required
+                 AND t.acknowledged_at IS NULL AND t.declined_at IS NULL) AS pending_terms,
              EXISTS (SELECT 1 FROM application_feedback_releases f
                WHERE f.application_id = a.id AND f.superseded_at IS NULL) AS feedback_released
       FROM applications a
@@ -316,7 +317,25 @@ export class StudentHiringController {
     return this.db.transaction(async (tx) => {
       const applicationId = this.ids.uuid();
       const employerId = String(opportunity.employer_id);
-      const versionId = String(opportunity.current_version_id);
+      // EMP-05: re-read the job under a share lock. A pause, close or withdraw, or a new
+      // version, takes this row FOR UPDATE, so it either commits before this read (and the
+      // application is refused, or binds to the new version) or waits for this one (and then
+      // sees this application among the applicants whose terms it changes).
+      // The lock is taken on the job row alone, and the version is read by the next statement,
+      // so a version committed while this waited is seen (a join here would keep the old one).
+      const locked = await tx.execute(sql`
+        SELECT lifecycle_state, current_version_id FROM opportunities
+        WHERE id = ${input.opportunityId}::uuid AND employer_id = ${employerId}::uuid
+        FOR SHARE
+      `) as QueryResult<{ lifecycle_state: string; current_version_id: string }>;
+      const [current] = locked.rows;
+      if (!current || current.lifecycle_state !== 'PUBLISHED') throw badRequest('OPPORTUNITY_NOT_OPEN', context.correlationId);
+      const versionId = String(current.current_version_id);
+      const deadline = await tx.execute(sql`
+        SELECT (application_deadline IS NOT NULL AND application_deadline <= now()) AS deadline_passed
+        FROM opportunity_versions WHERE id = ${versionId}::uuid
+      `) as QueryResult<{ deadline_passed: boolean }>;
+      if (deadline.rows[0]?.deadline_passed !== false) throw badRequest('DEADLINE_PASSED', context.correlationId);
 
       // The partial unique index on open applications is the real guard against a
       // double submission racing this insert; ON CONFLICT keeps it a clean 200.

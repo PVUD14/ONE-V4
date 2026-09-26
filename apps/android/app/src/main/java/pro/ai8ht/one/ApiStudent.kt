@@ -345,6 +345,52 @@ suspend fun Api.applyToOpportunity(
     )
 }
 
+// EMP-05: the employer changed a term the student applied under. The student sees what they
+// applied under and what the job says now, and accepts or declines; declining withdraws.
+
+@Serializable data class TermsChangeEnvelope(val termsChange: TermsChangeDto? = null)
+
+@Serializable data class TermsChangeDto(
+    val toVersionId: String,
+    val employerName: String = "",
+    val changedTerms: List<String> = emptyList(),
+    val appliedTerms: StudentTermsDto = StudentTermsDto(),
+    val newTerms: StudentTermsDto = StudentTermsDto(),
+)
+
+@Serializable data class StudentTermsDto(
+    val title: String = "",
+    val employmentType: String = "",
+    val workMode: String = "",
+    val locationCity: String? = null,
+    val durationMonths: Int? = null,
+    val compensation: TermsCompensationDto? = null,
+    val joiningConditions: String? = null,
+    val applicationDeadline: String? = null,
+)
+
+@Serializable data class TermsCompensationDto(
+    val currency: String = "",
+    val min: String = "",
+    val max: String? = null,
+    val period: String = "",
+)
+
+/** Null when nothing is waiting for the student's answer on this application. */
+suspend fun Api.termsChange(context: Context, applicationId: String): TermsChangeDto? =
+    json.decodeFromString<TermsChangeEnvelope>(
+        request(context, "GET", "/api/v1/students/me/applications/$applicationId/terms-change"),
+    ).termsChange
+
+/** Answers for the exact version shown; the server refuses it if the job changed again meanwhile. */
+suspend fun Api.respondToTermsChange(context: Context, applicationId: String, accept: Boolean, toVersionId: String) {
+    val decision = if (accept) "acknowledge" else "decline"
+    request(
+        context, "POST", "/api/v1/students/me/applications/$applicationId/terms-change/$decision",
+        buildJson("toVersionId" to quoted(toVersionId)),
+    )
+}
+
 suspend fun Api.withdrawApplication(context: Context, applicationId: String) {
     request(context, "POST", "/api/v1/students/me/applications/$applicationId/withdraw")
 }

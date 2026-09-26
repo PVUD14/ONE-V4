@@ -34,6 +34,9 @@ describe('institution visibility consent controller', () => {
   it.each([undefined, false, true])('captures only explicit institution consent (%s)', async (choice) => {
     const { controller, queries } = fixture([
       [{ id: opportunityId, employer_id: randomUUID(), current_version_id: randomUUID(), lifecycle_state: 'PUBLISHED', application_deadline: null }],
+      // EMP-05: the job re-read under a share lock inside the apply transaction.
+      [{ lifecycle_state: 'PUBLISHED', current_version_id: randomUUID() }],
+      [{ deadline_passed: false }],
       [{ id: applicationId }],
     ]);
     await controller.apply(request, { opportunityId, consentGranted: true, ...(choice === undefined ? {} : { institutionVisibilityGranted: choice }) });

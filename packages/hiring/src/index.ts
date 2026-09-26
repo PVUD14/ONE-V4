@@ -29,7 +29,8 @@ export type HiringRuleCode =
   | 'OPPORTUNITY_NOT_OPEN'
   | 'DEADLINE_PASSED'
   | 'OFFER_NOT_ACCEPTED'
-  | 'TERMS_ACKNOWLEDGEMENT_REQUIRED';
+  | 'TERMS_ACKNOWLEDGEMENT_REQUIRED'
+  | 'OPPORTUNITY_TRANSITION_NOT_ALLOWED';
 
 export class HiringRuleError extends Error {
   constructor(readonly code: HiringRuleCode, message: string) {

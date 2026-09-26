@@ -11,6 +11,7 @@ import { ApiRequestError, createTeachingAssignment, endTeachingAssignment, getPr
 import type { MyStudentsDto, TeachingAssignmentDto, TeachingAssignmentListDto } from '../api.js';
 import { V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { InstitutionWorkspaceError, RestrictedApiState, formatApiError, isInstitutionStaffWorkspace } from './shared.js';
+import { DepartmentStaffSection } from './institutionDepartment.js';
 import type { AuthenticatedWorkspaceSummary } from './shared.js';
 import { useEffect, useState } from 'react';
 
@@ -191,7 +192,8 @@ export function InstitutionFacultyAndStaffPage({ authenticatedWorkspace }: { rea
   if (!isInstitutionStaffWorkspace(authenticatedWorkspace)) return <InstitutionWorkspaceError title="Faculty and Staff" />;
   return <section className="role-module role-module--dense">
     <div className="role-page-heading"><div><span className="eyebrow">Your department</span><h1>Faculty and Staff</h1>
-      <p>Assign lecturers to the sections and batches of your department. You can assign any lecturer of the college, but only to your own department's sections and batches.</p></div></div>
+      <p>Your department's staff, and who teaches its sections and batches. You can assign any lecturer of the college, but only to your own department's sections and batches.</p></div></div>
+    <DepartmentStaffSection authenticatedWorkspace={authenticatedWorkspace} />
     <TeachingAssignmentsPanel key={authenticatedWorkspace.organizationId + ':' + token} token={token} institutionId={authenticatedWorkspace.organizationId} />
   </section>;
 }

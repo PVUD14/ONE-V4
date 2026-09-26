@@ -493,17 +493,20 @@ function StaffActionWorkflow({ token, institutionId, type, title, routeLabel }: 
 type InstitutionPageProps = { readonly portal: RolePortalConfig; readonly authenticatedWorkspace?: AuthenticatedWorkspaceSummary | undefined };
 
 export function InstitutionStudentsPage(props: InstitutionPageProps): React.ReactElement {
-  if (props.authenticatedWorkspace?.role === 'PLACEMENT_ADMIN') {
+  // INST-07: a department head gets the same read-only roster as the placement office,
+  // scoped to their department by the server; roster management stays with admins.
+  if (props.authenticatedWorkspace?.role === 'PLACEMENT_ADMIN' || props.authenticatedWorkspace?.role === 'DEPARTMENT_HEAD') {
     const token = getProtectedAccessToken();
     if (!token) return <RestrictedApiState title="Students" message="Sign in to your institution staff workspace." />;
     if (!isInstitutionStaffWorkspace(props.authenticatedWorkspace)) return <InstitutionWorkspaceError title="Students" unauthorized />;
     return <PlacementStudentRoster key={props.authenticatedWorkspace.organizationId + ':' + token}
-      token={token} institutionId={props.authenticatedWorkspace.organizationId} />;
+      token={token} institutionId={props.authenticatedWorkspace.organizationId}
+      eyebrow={props.authenticatedWorkspace.role === 'DEPARTMENT_HEAD' ? 'Your department' : 'Institution placement'} />;
   }
   return <InstitutionAdminStudentsPage {...props} />;
 }
 
-function PlacementStudentRoster({ token, institutionId }: { readonly token: string; readonly institutionId: string }): React.ReactElement {
+function PlacementStudentRoster({ token, institutionId, eyebrow = 'Institution placement' }: { readonly token: string; readonly institutionId: string; readonly eyebrow?: string }): React.ReactElement {
   // The roster response includes studentUserId separately from its profile id.
   const [data, setData] = useState<{ students: readonly (InstitutionStudentDto & { readonly studentUserId?: string })[]; units: readonly InstitutionUnitDto[]; scopeLabel?: string | null } | null>(null);
   const [selectedStudentId, setSelectedStudentId] = useState('');
@@ -514,7 +517,7 @@ function PlacementStudentRoster({ token, institutionId }: { readonly token: stri
     const controller = new AbortController();
     setData(null); setError('');
     void Promise.all([listInstitutionStudents(token, institutionId, controller.signal), listInstitutionUnits(token, institutionId, controller.signal)])
-      .then(([roster, structure]) => { if (!controller.signal.aborted) setData({ students: roster.students, units: structure.units, scopeLabel: institutionStudentScopeLabel(roster.scope) }); })
+      .then(([roster, structure]) => { if (!controller.signal.aborted) setData({ students: roster.students ?? [], units: structure.units ?? [], scopeLabel: institutionStudentScopeLabel(roster.scope) }); })
       .catch((cause: unknown) => { if (!controller.signal.aborted) setError(workflowError(cause)); });
     return () => controller.abort();
   }, [token, institutionId, refresh]);
@@ -527,7 +530,7 @@ function PlacementStudentRoster({ token, institutionId }: { readonly token: stri
       .join(' ').toLowerCase().includes(filters.query.trim().toLowerCase()));
   const selectedStudent = students.find((student) => student.id === selectedStudentId);
   return <section className="role-module role-module--dense">
-    <div className="role-page-heading"><div><span className="eyebrow">Institution placement</span><h1>Students</h1><p>Search your institution roster. Unavailable placement information is shown as NA.</p>{data?.scopeLabel && <p>Showing students in {data.scopeLabel}.</p>}</div></div>
+    <div className="role-page-heading"><div><span className="eyebrow">{eyebrow}</span><h1>Students</h1><p>Search your institution roster. Unavailable placement information is shown as NA.</p>{data?.scopeLabel && <p>Showing students in {data.scopeLabel}.</p>}</div></div>
     <section className="role-card role-wide role-management-form">
       <label>Search students<input type="search" value={filters.query} onChange={(event) => setFilters({ ...filters, query: event.target.value })} /></label>
       <label>Department<select value={filters.department} onChange={(event) => setFilters({ ...filters, department: event.target.value })}><option value="">All departments</option>

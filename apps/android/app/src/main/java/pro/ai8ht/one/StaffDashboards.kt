@@ -204,6 +204,12 @@ private class InstitutionData(
     val academicTerms: List<CalendarTermDto>? = null,
     /** Cohort announcements (INST-06); NotSender when the server says this caller cannot send (403). */
     val announcements: AnnouncementsState = AnnouncementsState.NotSender,
+    /** INST-07: department overview (heads, admins, placement officers); NotForRole for faculty-only callers. */
+    val department: ScopedView<DepartmentOverviewDto> = ScopedView.NotForRole,
+    /** INST-07: shared-application stages, suppressed under five. */
+    val pipeline: ScopedView<PlacementPipelineDto> = ScopedView.NotForRole,
+    /** INST-07: the lecturer's class reports; NotForRole when the caller holds no faculty role. */
+    val classes: ScopedView<ClassReportsDto> = ScopedView.NotForRole,
 )
 
 private sealed interface AnnouncementsState {
@@ -271,6 +277,9 @@ internal fun InstitutionScaffold(
                     onFailure = { if (it is Api.ApiException && it.status == 403) AnnouncementsState.NotSender else AnnouncementsState.Unavailable },
                 )
             }
+            val department = async { scopedView { Api.departmentOverview(context, organizationId) } }
+            val pipeline = async { scopedView { Api.placementPipeline(context, organizationId) } }
+            val classes = async { scopedView { Api.classReports(context, organizationId) } }
             val loadedExams = exams.await()
             val target = loadedExams.firstOrNull { it.lifecycleState == "PUBLISHED" && it.assignedCount > 0 }
             val attention = if (target != null) {
@@ -278,7 +287,8 @@ internal fun InstitutionScaffold(
                     .getOrDefault(emptyList())
             } else emptyList()
             data = InstitutionData(loadedExams, subjects.await(), review.await(), inbox.await(), attention, activation.await(),
-                myStudents.await(), verification.await(), calendar.await(), announcements.await())
+                myStudents.await(), verification.await(), calendar.await(), announcements.await(),
+                department.await(), pipeline.await(), classes.await())
         }
     }
 
@@ -386,40 +396,19 @@ private fun InstitutionHome(data: InstitutionData, onVerify: () -> Unit, onExams
             StatCell("NA", "Students placed", Tone.Gray, Icons.Filled.School, Modifier.weight(1f))
         }
 
-        // Cohort readiness: how many students sit in each band, not an average.
-        //
-        // This drew an "AVG" ring and four categories — Job Ready, Nearly Ready,
-        // Developing, Needs Support — which had two problems. An average readiness is a
-        // numeric readiness value, which ADR-020 forbids and the database refuses to
-        // store; and those four names are not the bands the product uses, so an
-        // institution would learn a vocabulary that appears nowhere else. The bands
-        // below are the real ones. A count of students per band is not a readiness
-        // value, so this is the shape the widget can legitimately take once there is a
-        // cohort aggregate behind it — there is no such endpoint yet, so each reads NA.
-        SectionTitle("Cohort readiness")
-        PilotCard {
-            Column(Modifier.padding(14.dp)) {
-                Text(
-                    "Advisory bands, shared with you and the student. Employers never see them.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(10.dp))
-                listOf(
-                    "Ready for next step", "Progressing", "Developing", "Not enough evidence",
-                ).forEach { label ->
-                    Row(Modifier.padding(vertical = 3.dp)) {
-                        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
-                        Text("NA", style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            }
-        }
+        // Cohort readiness: how many students sit in each band, never an average (ADR-020).
+        // INST-07: last ended month's bands for the reader's scope, from the department
+        // overview; a band under five reads <5, and NA when this caller has no such view.
+        CohortReadinessCard(data.department)
+
+        // INST-07: department overview for heads, admins and placement officers.
+        (data.department as? ScopedView.Loaded)?.let { DepartmentOverviewSection(it.value) }
 
         // Faculty "My Students" (INST-03): the students of this lecturer's active teaching
         // assignments, as the server scopes them. Assigning stays on the web Staff screen.
         if (data.myStudents !is MyStudentsState.NotFaculty) MyStudentsSection(data.myStudents)
+        // INST-07: the lecturer's class reports (web: faculty Reports).
+        if (data.classes !is ScopedView.NotForRole) ClassReportsSection(data.classes)
 
         // Academic calendar (INST-05): the college's current and upcoming terms, examination
         // periods and breaks, as its admins set them on the web Settings screen.
@@ -464,15 +453,9 @@ private fun InstitutionHome(data: InstitutionData, onVerify: () -> Unit, onExams
             }
         }
 
-        // Pilot: Placement Pipeline - NA funnel until drives exist.
-        SectionTitle("Placement Pipeline")
-        PilotCard {
-            Column(Modifier.padding(14.dp)) {
-                listOf("Eligible", "Applied", "Shortlisted", "Offers", "Placed").forEach { label ->
-                    FunnelRow(label, null, 1)
-                }
-            }
-        }
+        // Placement Pipeline (INST-07): stages of applications students shared with the college,
+        // suppressed under five; NA for a caller with no department view.
+        PlacementPipelineCard(data.pipeline)
 
         // Pilot: Students Needing Attention - real, from assessment data.
         SectionTitle("Needing attention")

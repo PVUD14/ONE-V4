@@ -130,6 +130,20 @@ export function isStudentInInstitutionScope(scope: InstitutionStudentScope, stud
 }
 
 /**
+ * INST-07: the reader's scope narrowed to one unit and everything below it (`covered`, from
+ * `institutionUnitDescendants`). Used when an administrator filters a department view to
+ * one department, or a lecturer's class report to one section: a student must be inside
+ * the reader's scope AND inside the unit. It can only ever narrow — a department head who
+ * asks for another department gets nobody, never that department.
+ */
+export function narrowInstitutionStudentScope(scope: InstitutionStudentScope, covered: readonly string[]): InstitutionStudentScope {
+  if (scope.kind === 'NONE') return scope;
+  const unit = [...new Set(covered)].sort();
+  if (scope.kind === 'INSTITUTION') return { kind: 'UNITS', clauses: [[unit]] };
+  return { kind: 'UNITS', clauses: scope.clauses.map((anchors) => [...anchors, unit]) };
+}
+
+/**
  * Announcement senders (INST-06, decision 10.2 #8): owners, admins and placement admins
  * institution-wide (a placement admin narrowed by their membership's unit scope, as for
  * reads); department heads their department; faculty their sections.

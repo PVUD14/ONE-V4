@@ -8,6 +8,7 @@
  */
 import { ApiRequestError, apiBaseUrl } from './core.js';
 import { requestJson } from './http.js';
+import type { SuppressedCountDto } from './privacyOperations.js';
 
 export interface InstitutionUnitDto {
   readonly id: string; readonly institutionId: string; readonly kind: string; readonly name: string; readonly parentUnitId?: string | null;
@@ -559,4 +560,104 @@ export async function downloadInstitutionExport(token: string, institutionId: st
   const disposition = response.headers?.get('content-disposition') ?? '';
   const filename = /filename="([A-Za-z0-9._-]+)"/.exec(disposition)?.[1] ?? `one-${path}.csv`;
   return { filename, csv: await response.text() };
+}
+
+// --- Department head and faculty workspaces (INST-07) ---
+
+
+/** A table whose cells partition a total, after the one suppression rule (Appendix 3 §5.3). */
+export interface SuppressedTableDto<K extends string = string> {
+  readonly suppressed: boolean;
+  readonly total: SuppressedCountDto;
+  readonly cells: readonly { readonly key: K; readonly count: number | null; readonly suppressed: boolean }[];
+}
+
+export interface ReadinessAggregateDto {
+  readonly suppressed: boolean;
+  readonly minimumCohortSize: number;
+  readonly cohortSize: number | null;
+  readonly cohortSizeSuppressed: boolean;
+  readonly bands: readonly { readonly band: string; readonly count: number | null; readonly suppressed: boolean }[];
+}
+
+export interface DepartmentUnitDto { readonly id: string; readonly kind: string; readonly name: string }
+
+export interface DepartmentOverviewDto {
+  readonly scope?: InstitutionStudentScopeDto;
+  readonly unit: DepartmentUnitDto | null;
+  readonly students: { readonly onRoster: number; readonly current: number };
+  readonly activation: Readonly<Record<StudentActivationState, number>>;
+  readonly assessments: { readonly inProgress: number; readonly assignedStudents: number; readonly completedStudents: number };
+  /** Last ended month's bands (a report covers one whole ended month). */
+  readonly readiness: { readonly month: string | null; readonly aggregate: ReadinessAggregateDto | null };
+  readonly staffActions: { readonly openInterventions: number; readonly openTasks: number };
+  readonly batches: readonly { readonly id: string; readonly name: string; readonly parentName: string | null; readonly students: number; readonly current: number; readonly activated: number }[];
+}
+
+export type ApplicationStage = 'APPLIED' | 'SCREENING' | 'SHORTLISTED' | 'ASSESSMENT' | 'INTERVIEW' | 'OFFER' | 'HIRED' | 'REJECTED' | 'WITHDRAWN';
+export type OfferResponseState = 'EXTENDED' | 'ACCEPTED' | 'DECLINED' | 'WITHDRAWN' | 'EXPIRED';
+
+export interface PlacementPipelineDto {
+  readonly scope?: InstitutionStudentScopeDto;
+  readonly unit: DepartmentUnitDto | null;
+  readonly studentsSharing: SuppressedCountDto;
+  readonly stages: SuppressedTableDto<ApplicationStage>;
+  readonly offers: SuppressedTableDto<OfferResponseState>;
+}
+
+export interface PlacementApplicationDto {
+  readonly id: string;
+  readonly student: { readonly fullName: string; readonly institutionStudentId: string };
+  readonly employer: { readonly name: string };
+  readonly opportunityTitle: string;
+  readonly state: ApplicationStage;
+  readonly submittedAt: string | null;
+  readonly updatedAt: string;
+  readonly offer: { readonly exists: boolean; readonly responseState: OfferResponseState | null };
+}
+
+export interface DepartmentStaffDto {
+  readonly scope?: InstitutionStudentScopeDto;
+  readonly staff: readonly { readonly email: string; readonly role: string; readonly department: string | null; readonly batch: string | null;
+    readonly assignments: readonly { readonly unitName: string; readonly subject: string | null; readonly academicTerm: string }[] }[];
+}
+
+export interface ClassReportDto {
+  readonly unit: DepartmentUnitDto;
+  readonly subjects: readonly string[];
+  readonly students: number;
+  readonly activated: number;
+  readonly openTasks: number;
+  readonly assessments: readonly { readonly id: string; readonly title: string; readonly lifecycleState: string; readonly startsAt: string; readonly endsAt: string;
+    readonly assigned: number; readonly completed: number; readonly averagePercentage: number | null; readonly averageSuppressed: boolean }[];
+}
+
+export interface ClassReportsDto { readonly mode: 'ASSIGNMENTS' | 'MEMBERSHIP'; readonly classes: readonly ClassReportDto[] }
+
+export function getDepartmentOverview(token: string, institutionId: string, signal?: AbortSignal): Promise<DepartmentOverviewDto> {
+  return requestJson(`${institutionPath(institutionId)}/department-overview`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function getPlacementPipeline(token: string, institutionId: string, signal?: AbortSignal): Promise<PlacementPipelineDto> {
+  return requestJson(`${institutionPath(institutionId)}/placement-pipeline`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function listPlacementApplications(token: string, institutionId: string, cursor?: string | null, signal?: AbortSignal): Promise<{ readonly applications: readonly PlacementApplicationDto[]; readonly nextCursor: string | null }> {
+  const query = cursor ? `?limit=50&cursor=${encodeURIComponent(cursor)}` : '?limit=50';
+  return requestJson(`${institutionPath(institutionId)}/placement-applications${query}`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function listDepartmentStaff(token: string, institutionId: string, signal?: AbortSignal): Promise<DepartmentStaffDto> {
+  return requestJson(`${institutionPath(institutionId)}/department-staff`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function listClassReports(token: string, institutionId: string, signal?: AbortSignal): Promise<ClassReportsDto> {
+  return requestJson(`${institutionPath(institutionId)}/class-reports`, { token, ...(signal ? { signal } : {}) });
+}
+
+/** How a suppressed count is shown: never the number, always "<5". */
+export function suppressedCountLabel(count: { readonly suppressed: boolean; readonly value?: number | null; readonly count?: number | null } | null | undefined): string {
+  if (!count) return 'NA';
+  const value = count.value !== undefined ? count.value : count.count;
+  return count.suppressed || value === null || value === undefined ? '<5' : String(value);
 }

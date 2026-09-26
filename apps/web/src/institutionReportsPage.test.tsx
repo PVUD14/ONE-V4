@@ -24,13 +24,22 @@ const report = {
   periodStart: '2026-08-01',
   periodEnd: '2026-08-31',
   expiresAt: '2026-10-05T00:00:00.000Z',
+  // As the API now returns it (INST-SR-01): every band, those under 5 withheld, and the
+  // total withheld because the two hidden bands hold fewer than 5 between them.
   aggregate: {
     suppressed: false,
     minimumCohortSize: 5,
-    cohortSize: 7,
-    bands: [{ band: 'DEVELOPING', count: 5 }, { band: 'READY_FOR_NEXT_STEP', count: 2 }],
+    cohortSize: null,
+    cohortSizeSuppressed: true,
+    bands: [
+      { band: 'NOT_ENOUGH_EVIDENCE', count: null, suppressed: true },
+      { band: 'DEVELOPING', count: 5, suppressed: false },
+      { band: 'PROGRESSING', count: 6, suppressed: false },
+      { band: 'READY_FOR_NEXT_STEP', count: null, suppressed: true },
+    ],
   },
 };
+const month = report.periodStart.slice(0, 7);
 
 beforeEach(() => {
   vi.mocked(getProtectedAccessToken).mockReturnValue('local-report-test-token');
@@ -49,8 +58,7 @@ afterEach(() => {
 });
 
 function choosePeriod(): void {
-  fireEvent.change(screen.getByLabelText('Start date'), { target: { value: report.periodStart } });
-  fireEvent.change(screen.getByLabelText('End date'), { target: { value: report.periodEnd } });
+  fireEvent.change(screen.getByLabelText('Month'), { target: { value: month } });
 }
 function generate(): void {
   fireEvent.click(screen.getByRole('button', { name: 'Generate report' }));
@@ -68,7 +76,7 @@ describe('Institution Reports — C1', () => {
     fetchMock.mockResolvedValue({ ok: true, json: async () => report });
     renderRoute({ role, organizationId: institutionId });
     // The consent gate answers before the workspace renders (ENG-01).
-    await screen.findByLabelText('Start date');
+    await screen.findByLabelText('Month');
     expect(fetchMock).not.toHaveBeenCalled();
     choosePeriod();
     generate();
@@ -80,12 +88,43 @@ describe('Institution Reports — C1', () => {
     expect(Object.fromEntries(endpoint.searchParams)).toEqual({ periodStart: report.periodStart, periodEnd: report.periodEnd });
     expect(options).toMatchObject({ method: 'POST', headers: { Authorization: 'Bearer local-report-test-token', Accept: 'application/json' } });
     expect(options.headers['X-Correlation-Id']).toMatch(/^[0-9a-f-]{36}$/);
-    expect(screen.getByText(/Students with readiness records:/)).toHaveTextContent('7');
+    expect(screen.getByText(/Students with readiness records:/)).toHaveTextContent('withheld');
     const table = screen.getByRole('table', { name: 'Readiness distribution' });
+    expect(within(table).getByRole('row', { name: 'Not enough evidence <5' })).toBeInTheDocument();
     expect(within(table).getByRole('row', { name: 'Developing 5' })).toBeInTheDocument();
-    expect(within(table).getByRole('row', { name: 'Ready for next step 2' })).toBeInTheDocument();
+    expect(within(table).getByRole('row', { name: 'Progressing 6' })).toBeInTheDocument();
+    expect(within(table).getByRole('row', { name: 'Ready for next step <5' })).toBeInTheDocument();
     expect(screen.getByText('Report reference: ' + report.reportId)).toBeInTheDocument();
     expect(screen.queryByText('Rahul Kumar')).not.toBeInTheDocument();
+  });
+
+  it('shows the total when the server publishes it, and <5 for every hidden band', async () => {
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ ...report, aggregate: {
+      suppressed: false, minimumCohortSize: 5, cohortSize: 23, cohortSizeSuppressed: false,
+      bands: [
+        { band: 'NOT_ENOUGH_EVIDENCE', count: null, suppressed: true },
+        { band: 'DEVELOPING', count: 10, suppressed: false },
+        { band: 'PROGRESSING', count: null, suppressed: true },
+        { band: 'READY_FOR_NEXT_STEP', count: 8, suppressed: false },
+      ],
+    } }) });
+    render(<InstitutionReportsPage institutionId={institutionId} />);
+    generate();
+    const table = await screen.findByRole('table', { name: 'Readiness distribution' });
+    expect(screen.getByText(/Students with readiness records:/)).toHaveTextContent('23');
+    expect(within(table).getAllByText('<5')).toHaveLength(2);
+    expect(screen.getByText(/A band with fewer than 5 students shows <5/)).toBeInTheDocument();
+  });
+
+  it('never shows a band count under 5, even one a server failed to mark', async () => {
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ ...report, aggregate: {
+      suppressed: false, minimumCohortSize: 5, cohortSize: 9, bands: [{ band: 'DEVELOPING', count: 7 }, { band: 'READY_FOR_NEXT_STEP', count: 2 }],
+    } }) });
+    render(<InstitutionReportsPage institutionId={institutionId} />);
+    generate();
+    const table = await screen.findByRole('table', { name: 'Readiness distribution' });
+    expect(within(table).getByRole('row', { name: 'Ready for next step <5' })).toBeInTheDocument();
+    expect(within(table).queryByText('2')).not.toBeInTheDocument();
   });
 
   it('keeps suppressed counts and bands hidden', async () => {
@@ -106,18 +145,27 @@ describe('Institution Reports — C1', () => {
     generate();
     expect(screen.getByRole('status')).toHaveTextContent('Generating');
     expect(screen.getByRole('button', { name: 'Generating report…' })).toBeDisabled();
-    expect(screen.getByLabelText('Start date')).toBeDisabled();
+    expect(screen.getByLabelText('Month')).toBeDisabled();
     const signal = fetchMock.mock.calls[0]![1].signal as AbortSignal;
     view.unmount();
     expect(signal.aborted).toBe(true);
   });
 
-  it('rejects an inverted date range without requesting a report', () => {
+  it('offers only whole months that have ended, defaulting to the latest one', () => {
     render(<InstitutionReportsPage institutionId={institutionId} />);
-    choosePeriod();
-    fireEvent.change(screen.getByLabelText('Start date'), { target: { value: '2026-09-01' } });
+    const now = new Date();
+    const latest = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1)).toISOString().slice(0, 7);
+    const input = screen.getByLabelText('Month');
+    expect(input).toHaveAttribute('type', 'month');
+    expect(input).toHaveValue(latest);
+    expect(input).toHaveAttribute('max', latest);
+  });
+
+  it('rejects the month still in progress without requesting a report', () => {
+    render(<InstitutionReportsPage institutionId={institutionId} />);
+    fireEvent.change(screen.getByLabelText('Month'), { target: { value: new Date().toISOString().slice(0, 7) } });
     fireEvent.submit(screen.getByRole('button', { name: 'Generate report' }).closest('form')!);
-    expect(screen.getByRole('alert')).toHaveTextContent('Choose a start date on or before the end date.');
+    expect(screen.getByRole('alert')).toHaveTextContent('Choose a month that has ended.');
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -148,6 +196,7 @@ describe('Institution Reports — C1', () => {
 
   it.each([
     [401, 'Your session has expired.'],
+    [400, 'Reports cover one whole month that has ended.'],
     [403, 'You do not have permission'],
     [500, 'Unable to generate the report.'],
   ])('handles HTTP %s without rendering a report', async (status, message) => {

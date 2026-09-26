@@ -199,6 +199,42 @@ describe('verification queue and decisions', () => {
     expect((await pool.query('SELECT verification_state FROM student_academic_terms WHERE id=$1', [outside])).rows[0].verification_state).toBe('PENDING_VERIFICATION');
   });
 
+  // INST-SR-02: a decision is permanent, so it needs a department (heads) or an active
+  // teaching assignment (faculty). Reading the queue is unchanged.
+  it('refuses a decision from a department head with no department, with SCOPE_REQUIRED, while the queue stays readable', async () => {
+    const term = await declaredTerm(studentA.userId);
+    const head = await staff('DEPARTMENT_HEAD');
+    const queue = await api().get(base() + '/academic-verification-queue').set(auth(head.id)).expect(200);
+    expect(queue.body.queue.map((entry: { termId: string }) => entry.termId)).toEqual([term]);
+    const refused = await api().post(base() + '/academic-verification/' + term + '/decide').set(auth(head.id))
+      .send({ decision: 'VERIFIED', reasonCode: 'MATCHES_INSTITUTION_RECORD' }).expect(403);
+    expect(refused.body.error.code).toBe('SCOPE_REQUIRED');
+    expect((await pool.query('SELECT verification_state FROM student_academic_terms WHERE id=$1', [term])).rows[0].verification_state).toBe('PENDING_VERIFICATION');
+    expect((await auditActions()).filter((entry) => entry.action === 'academic_term.verification_decided')).toEqual([]);
+  });
+
+  it('refuses a decision from faculty without an active teaching assignment, and allows one inside an assignment', async () => {
+    const batch = randomUUID();
+    await pool.query("INSERT INTO institution_units (id,institution_id,kind,name,parent_unit_id) VALUES ($1,$2,'BATCH','Batch A1',$3)", [batch, institutionId, programmeA]);
+    await pool.query('UPDATE institution_student_profiles SET batch_unit_id=$1 WHERE id=$2', [batch, studentA.profileId]);
+    const inside = await declaredTerm(studentA.userId);
+    const outside = await declaredTerm(studentA2.userId);
+    const faculty = await staff('FACULTY_LECTURER', departmentA);
+    // Before the college records any teaching assignment, reads fall back to the department; writes do not.
+    const blocked = await api().post(base() + '/academic-verification/' + inside + '/decide').set(auth(faculty.id))
+      .send({ decision: 'VERIFIED', reasonCode: 'MATCHES_INSTITUTION_RECORD' }).expect(403);
+    expect(blocked.body.error.code).toBe('SCOPE_REQUIRED');
+    await pool.query(`INSERT INTO faculty_teaching_assignments (id,institution_id,faculty_membership_id,unit_id,subject_code,academic_term,assigned_by_user_id,reason_code)
+      VALUES ($1,$2,$3,$4,'CS101','2026-ODD',$5,'TEACHING_ASSIGNED')`, [randomUUID(), institutionId, faculty.membershipId, batch, admin.id]);
+    const other = await api().post(base() + '/academic-verification/' + outside + '/decide').set(auth(faculty.id))
+      .send({ decision: 'VERIFIED', reasonCode: 'MATCHES_INSTITUTION_RECORD' }).expect(403);
+    expect(other.body.error.code).toBe('FORBIDDEN');
+    await api().post(base() + '/academic-verification/' + inside + '/decide').set(auth(faculty.id))
+      .send({ decision: 'VERIFIED', reasonCode: 'MATCHES_INSTITUTION_RECORD' }).expect(201);
+    const states = await pool.query('SELECT id, verification_state FROM student_academic_terms WHERE id = ANY($1::uuid[]) ORDER BY id', [[inside, outside]]);
+    expect(Object.fromEntries(states.rows.map((row) => [row.id, row.verification_state]))).toEqual({ [inside]: 'VERIFIED', [outside]: 'PENDING_VERIFICATION' });
+  });
+
   it('counts the backlog in SQL over the reader scope', async () => {
     await declaredTerm(studentA.userId);
     await declaredTerm(studentB.userId);
@@ -360,6 +396,17 @@ describe('bulk results upload', () => {
       .toEqual([['INVALID', ['student_not_found'], null], ['CREATE', [], 'Student B One']]);
     const adminView = (await preview(admin, csv).expect(201)).body.preview;
     expect(adminView.counts).toMatchObject({ create: 2, invalid: 0 });
+  });
+
+  it('refuses a results upload from a department head with no department, at preview and at commit, with SCOPE_REQUIRED', async () => {
+    const head = await staff('DEPARTMENT_HEAD');
+    const csv = csvOf('A-001,4,Semester 4,CGPA_10,8.4,0,BTECH,', 'B-001,4,Semester 4,CGPA_10,7.2,0,BTECH,Mechanical Engineering');
+    const previewRefused = await preview(head, csv).expect(403);
+    expect(previewRefused.body.error.code).toBe('SCOPE_REQUIRED');
+    const digest = (await preview(admin, csv).expect(201)).body.preview.digest as string;
+    const commitRefused = await commit(head, csv, digest).expect(403);
+    expect(commitRefused.body.error.code).toBe('SCOPE_REQUIRED');
+    expect(await count('student_academic_terms')).toBe(0);
   });
 
   it('asks for the programme type when the student has no institution record yet', async () => {

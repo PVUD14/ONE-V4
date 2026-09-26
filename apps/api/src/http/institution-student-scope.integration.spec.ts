@@ -228,8 +228,17 @@ describe('institution readiness report', () => {
   async function snapshots(subjects: readonly string[], modelVersionId: string) {
     for (const subject of subjects) {
       await pool.query(`INSERT INTO readiness_snapshots (id,subject_user_id,model_version_id,evidence_ids,evidence_set_hash,band,explanation,generated_at)
-        VALUES ($1,$2,$3,'{}'::uuid[],$4,'DEVELOPING','{}'::jsonb,now()-interval '1 day')`, [randomUUID(), subject, modelVersionId, randomUUID().replaceAll('-', '').padEnd(64, '0')]);
+        VALUES ($1,$2,$3,'{}'::uuid[],$4,'DEVELOPING','{}'::jsonb,$5)`, [randomUUID(), subject, modelVersionId, randomUUID().replaceAll('-', '').padEnd(64, '0'), lastMonth().periodStart.slice(0, 7) + '-10T00:00:00Z']);
     }
+    // The relationships in this file start two days ago; the snapshots are last month's.
+    await pool.query("UPDATE institution_relationships SET effective_from='2020-01-01T00:00:00Z' WHERE institution_id=$1", [institutionId]);
+  }
+  /** INST-SR-01: a report covers one whole calendar month that has ended. */
+  function lastMonth(): { periodStart: string; periodEnd: string } {
+    const now = new Date();
+    const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+    const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 0));
+    return { periodStart: start.toISOString().slice(0, 10), periodEnd: end.toISOString().slice(0, 10) };
   }
   it('counts only the department head department, and the whole college for the administrator', async () => {
     const modelVersionId = randomUUID();
@@ -244,13 +253,44 @@ describe('institution readiness report', () => {
       departmentBStudents.push((await student('B-' + index, 'Department B cohort ' + index, departmentB, null)).userId);
     }
     await snapshots([...departmentAStudents, ...departmentBStudents], modelVersionId);
-    const today = new Date().toISOString().slice(0, 10);
-    const period = '?periodStart=' + new Date(Date.now() - 3 * 86_400_000).toISOString().slice(0, 10) + '&periodEnd=' + today;
+    const period = '?periodStart=' + lastMonth().periodStart + '&periodEnd=' + lastMonth().periodEnd;
+    const developing = (body: { aggregate: { bands: { band: string; count: number | null }[] } }) =>
+      body.aggregate.bands.find((entry) => entry.band === 'DEVELOPING')?.count;
     const head = await staff('DEPARTMENT_HEAD', departmentB);
     const scoped = await api().post(base() + '/career-readiness/reports' + period).set(auth(head.id)).expect(201);
-    expect(scoped.body.aggregate).toMatchObject({ suppressed: false, cohortSize: 5, scope: 'UNITS' });
+    // Every student is DEVELOPING, so the other bands are empty cells (<5) and the total is
+    // withheld: publishing it would say those bands are empty (INST-SR-01).
+    expect(scoped.body.aggregate).toMatchObject({ suppressed: false, cohortSize: null, cohortSizeSuppressed: true, scope: 'UNITS' });
+    expect(developing(scoped.body)).toBe(5);
     const whole = await api().post(base() + '/career-readiness/reports' + period).set(auth(admin.id)).expect(201);
-    expect(whole.body.aggregate).toMatchObject({ suppressed: false, cohortSize: 12, scope: 'INSTITUTION' });
+    expect(whole.body.aggregate).toMatchObject({ suppressed: false, cohortSize: null, cohortSizeSuppressed: true, scope: 'INSTITUTION' });
+    expect(developing(whole.body)).toBe(12);
+    for (const body of [scoped.body, whole.body]) {
+      expect(body.aggregate.bands.map((entry: { band: string }) => entry.band)).toEqual(['NOT_ENOUGH_EVIDENCE', 'DEVELOPING', 'PROGRESSING', 'READY_FOR_NEXT_STEP']);
+      for (const entry of body.aggregate.bands as { count: number | null; suppressed: boolean }[]) {
+        if (entry.suppressed) expect(entry.count).toBeNull();
+        else expect(entry.count).toBeGreaterThanOrEqual(5);
+      }
+    }
+  });
+
+  it('refuses any period but one whole calendar month that has ended, and stores nothing', async () => {
+    const now = new Date();
+    const thisMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString().slice(0, 10);
+    const thisMonthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)).toISOString().slice(0, 10);
+    const twoMonthsAgo = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 2, 1)).toISOString().slice(0, 10);
+    const { periodStart, periodEnd } = lastMonth();
+    const secondDay = periodStart.slice(0, 8) + '02';
+    for (const [start, end] of [
+      [thisMonthStart, thisMonthEnd],          // still filling: could be regenerated and compared day by day
+      [secondDay, periodEnd],                  // overlaps the whole month by all but one day
+      [periodStart, secondDay],                // part of a month
+      [twoMonthsAgo, periodEnd],               // two months, overlapping last month's report
+    ]) {
+      const refused = await api().post(base() + '/career-readiness/reports?periodStart=' + start + '&periodEnd=' + end).set(auth(admin.id)).expect(400);
+      expect(refused.body.error.code).toBe('REPORT_PERIOD_INVALID');
+    }
+    expect((await pool.query('SELECT count(*)::int AS n FROM institution_aggregate_reports WHERE institution_id=$1', [institutionId])).rows[0].n).toBe(0);
   });
 });
 

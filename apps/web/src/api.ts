@@ -24,3 +24,4 @@ export * from './api/systemHealth.js';
 export * from './api/privacyOperations.js';
 export * from './api/operationsOverview.js';
 export * from './api/careerCatalogue.js';
+export * from './api/roleDemand.js';

@@ -44,6 +44,7 @@ import { EmployerCompanyProfileController } from './employer-company-profile.con
 import { EmployerAccessRequestsController } from './employer-access-requests.controller.js';
 import { OperationsJobsController } from './operations-jobs.controller.js';
 import { OperationsOverviewController } from './operations-overview.controller.js';
+import { OperationsAnalyticsController } from './operations-analytics.controller.js';
 import { InstitutionSettingsController } from './institution-settings.controller.js';
 
 @Module({})
@@ -66,7 +67,7 @@ export class Phase1ApiSecurityModule {
 
     return {
       module: Phase1ApiSecurityModule,
-      controllers: [StaffActionsController, Phase1SecurityController, OperationsInstitutionOnboardingController, StudentOperationalCoreController, StudentHiringController, EmployerHiringController, StudentDocumentsController, StudentPrivacyController, InstitutionAssessmentsController, StudentAssessmentAttemptsController, AssistantController, NotificationsController, ConsentsController, HelpController, StudentActivityController, OperationsAuditController, OperationsOutboxController, OperationsPrivacyController, OperationsApprovalsController, ExamTopicMappingController, CalendarController, EmployerAssessmentsController, EmployerTeamController, InstitutionTeachingAssignmentsController, EmployerCompanyProfileController, EmployerAccessRequestsController, OperationsSupportController, OperationsJobsController, InstitutionSettingsController, InstitutionAnnouncementsController, OperationsOverviewController, OperationsCareerCatalogueController],
+      controllers: [StaffActionsController, Phase1SecurityController, OperationsInstitutionOnboardingController, StudentOperationalCoreController, StudentHiringController, EmployerHiringController, StudentDocumentsController, StudentPrivacyController, InstitutionAssessmentsController, StudentAssessmentAttemptsController, AssistantController, NotificationsController, ConsentsController, HelpController, StudentActivityController, OperationsAuditController, OperationsOutboxController, OperationsPrivacyController, OperationsApprovalsController, ExamTopicMappingController, CalendarController, EmployerAssessmentsController, EmployerTeamController, InstitutionTeachingAssignmentsController, EmployerCompanyProfileController, EmployerAccessRequestsController, OperationsSupportController, OperationsJobsController, InstitutionSettingsController, InstitutionAnnouncementsController, OperationsOverviewController, OperationsCareerCatalogueController, OperationsAnalyticsController],
       providers,
       exports: [
         API_IDENTITY_VERIFIER,

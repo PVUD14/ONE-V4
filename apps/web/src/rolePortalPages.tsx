@@ -38,6 +38,7 @@ import { OperationsTrustSafetyPage } from './rolePortal/trustSafety.js';
 import { OperationsStaffCapabilitiesPage } from './rolePortal/staffCapabilities.js';
 import { OperationsApprovalsPanel } from './rolePortal/approvals.js';
 import { OperationsSystemHealthPage } from './rolePortal/systemHealth.js';
+import { OperationsRoleDemandPage } from './rolePortal/roleDemand.js';
 import { OperationsPrivacyConsolePage } from './rolePortal/privacyConsole.js';
 import type { AuthenticatedWorkspaceSummary } from './rolePortal/shared.js';
 import { AuthenticatedNotYetAvailable, AuthenticatedReadOnlyModule, institutionStaffWorkspaceRoles, institutionWorkspaceRoles, InstitutionWorkspaceError, isInstitutionStaffWorkspace, isInstitutionWorkspace } from './rolePortal/shared.js';
@@ -271,6 +272,9 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   // OPS-05: Support is the case desk. Only this label's branch changes; Subscriptions,
   // Billing and Analytics keep the not-yet-available state below.
   if (!demoMode && portal.key === 'operations-admin' && route.label === 'Support') return <OperationsSupportDeskPage />;
+  // OPS-11: Analytics is the role demand dashboard. Only this label's branch changes;
+  // Subscriptions and Billing keep the not-yet-available state below (ADR-022).
+  if (!demoMode && portal.key === 'operations-admin' && route.label === 'Analytics') return <OperationsRoleDemandPage />;
   if (!demoMode && portal.key === 'operations-admin' && /subscriptions|billing|analytics|support|settings/i.test(route.label)) return <AuthenticatedNotYetAvailable title={route.label} detail="This Operations module is not yet backed by a Phase 2A persistent workflow." />;
   if (!demoMode && portal.key === 'institution-admin' && ['Students', 'Student Detail'].includes(route.label)) {
     // INST-04: the admin reaches academic verification here, under Students (plan §4.2);

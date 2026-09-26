@@ -13,6 +13,7 @@ import {
   institutionUnitDescendants,
   isUnitWithin,
   isStudentInInstitutionScope,
+  narrowInstitutionStudentScope,
   type InstitutionUnitNode,
 } from './index.js';
 
@@ -264,5 +265,38 @@ describe('announcement senders (INST-06, decision 10.2 #8)', () => {
     expect(institutionAnnouncementSender(memberships, units, 'section-a1-1')?.membership.membershipId).toBe('head');
     expect(institutionAnnouncementSender(memberships, units, 'batch-b1')).toBeNull();
     expect(institutionAnnouncementSender([memberships[0]!], units, 'section-a1-1')?.membership.membershipId).toBe('faculty');
+  });
+});
+
+describe('narrowing a scope to one unit (INST-07 department and class views)', () => {
+  it('turns the whole institution into exactly that unit and everything below it', () => {
+    const scope = narrowInstitutionStudentScope({ kind: 'INSTITUTION' }, institutionUnitDescendants('dept-a', units));
+    expect(isStudentInInstitutionScope(scope, studentA1)).toBe(true);
+    expect(isStudentInInstitutionScope(scope, studentA2)).toBe(true);
+    expect(isStudentInInstitutionScope(scope, studentB1)).toBe(false);
+    expect(isStudentInInstitutionScope(scope, unplaced)).toBe(false);
+  });
+
+  it('never widens a scoped reader: a head narrowed to another department sees nobody', () => {
+    const head = institutionStudentScope([{ role: 'DEPARTMENT_HEAD', departmentUnitId: 'dept-a' }], units);
+    const elsewhere = narrowInstitutionStudentScope(head, institutionUnitDescendants('dept-b', units));
+    for (const student of [studentA1, studentA2, studentB1]) expect(isStudentInInstitutionScope(elsewhere, student)).toBe(false);
+    const ownBatch = narrowInstitutionStudentScope(head, institutionUnitDescendants('batch-a1', units));
+    expect(isStudentInInstitutionScope(ownBatch, studentA1)).toBe(true);
+    expect(isStudentInInstitutionScope(ownBatch, studentA2)).toBe(false);
+  });
+
+  it('keeps nobody as nobody', () => {
+    expect(narrowInstitutionStudentScope({ kind: 'NONE' }, ['dept-a'])).toEqual({ kind: 'NONE' });
+  });
+
+  it('narrows every clause of a union', () => {
+    const union = institutionStudentScope([
+      { role: 'DEPARTMENT_HEAD', departmentUnitId: 'dept-a' },
+      { role: 'FACULTY_LECTURER', batchUnitId: 'batch-b1' },
+    ], units);
+    const narrowed = narrowInstitutionStudentScope(union, institutionUnitDescendants('batch-b1', units));
+    expect(isStudentInInstitutionScope(narrowed, studentB1)).toBe(true);
+    expect(isStudentInInstitutionScope(narrowed, studentA1)).toBe(false);
   });
 });

@@ -361,9 +361,10 @@ describe('EMP-07: the résumé leaves only through a single-use, short-lived lin
     const issued = await resumeLink(p.employerId, p.recruiterId, p.applicationId).expect(200);
     const { path, expiresAt } = issued.body.download;
     expect(path).toMatch(new RegExp(`^/api/v1/employers/${p.employerId}/applications/${p.applicationId}/resume/file\\?token=[A-Za-z0-9_-]{43}$`));
-    const lifetime = Date.parse(expiresAt) - Date.now();
-    expect(lifetime).toBeGreaterThan(30_000);
-    expect(lifetime).toBeLessThanOrEqual(61_000);
+    // Measured against the database clock, which can run ahead of Node's.
+    const window = await pool.query('SELECT extract(epoch FROM expires_at - issued_at)::int AS seconds, expires_at FROM application_resume_download_links WHERE application_id = $1', [p.applicationId]);
+    expect(window.rows[0].seconds).toBe(60);
+    expect(Date.parse(expiresAt)).toBe(new Date(window.rows[0].expires_at).getTime());
 
     // Another recruiter of the same employer cannot use someone else's link.
     const other = await colleague(p.employerId);

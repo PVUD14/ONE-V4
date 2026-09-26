@@ -28,7 +28,7 @@ describe('csvCell', () => {
 
 describe('toCsv', () => {
   it('writes a byte-order mark, a header and CRLF rows', () => {
-    expect(toCsv(['A', 'B'], [['x', 1], ['=y', null]])).toBe('﻿"A","B"\r\n"x",1\r\n"\'=y",""\r\n');
+    expect(toCsv(['A', 'B'], [['x', 1], ['=y', null]])).toBe('\uFEFF"A","B"\r\n"x",1\r\n"\'=y",""\r\n');
   });
 
   it('refuses a row that does not match the header', () => {

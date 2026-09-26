@@ -120,7 +120,7 @@ const auth = (id: string) => ({ Authorization: 'Bearer ' + id, 'X-Correlation-Id
 const audits = async (action: string) => (await pool.query('SELECT actor_user_id, organization_id, outcome, context FROM audit_events WHERE action=$1 ORDER BY occurred_at', [action])).rows;
 /** Parse the writer's own output: quoted cells, CRLF rows, a leading byte-order mark. */
 function parseCsv(text: string): string[][] {
-  expect(text.startsWith('﻿')).toBe(true);
+  expect(text.startsWith('\uFEFF')).toBe(true);
   const rows: string[][] = [];
   let row: string[] = []; let cell = ''; let quoted = false;
   const body = text.slice(1);

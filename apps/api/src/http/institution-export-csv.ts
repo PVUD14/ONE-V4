@@ -15,7 +15,7 @@ import { institutionForbiddenDisclosureFields } from '@planthepath/authorization
 export type CsvValue = string | number | boolean | null | undefined;
 
 const formulaStart = /^[=+\-@\t\r]/;
-const byteOrderMark = '﻿';
+const byteOrderMark = '\uFEFF';
 
 export function csvCell(value: CsvValue): string {
   if (value === null || value === undefined) return '""';

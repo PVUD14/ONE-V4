@@ -112,7 +112,9 @@ export interface CatalogueRoleDetailDto extends CatalogueRoleDto {
   readonly synonyms: readonly { readonly id: string; readonly synonym: string; readonly reasonCode: string; readonly createdAt: string }[];
   readonly liveRequirements: readonly RequirementItemDto[];
   readonly requirementSets: readonly RequirementSetDto[];
-  readonly liveTargetCount: number;
+  /** Null when fewer than five students; the screen shows "<5". */
+  readonly liveTargetCount: number | null;
+  readonly liveTargetCountSuppressed?: boolean;
 }
 
 export interface CatalogueRoleFiltersDto {

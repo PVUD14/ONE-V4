@@ -305,12 +305,12 @@ describe('the catalogue', () => {
     expect(await codes(author, { q: 'cyber defender' })).toEqual(['C01']);
   });
 
-  it('shows a role with its planning data, live requirements and a target count, never a student', async () => {
+  it('shows a role with its planning data, live requirements and a suppressed target count, never a student', async () => {
     const response = await api().get(`${base}/roles/${socId}`).set(auth(reviewer.userId));
     expect(response.status).toBe(200);
     expect(response.body.role).toMatchObject({
       code: 'SOC_ANALYST', title: 'Security Operations Analyst', catalogueCode: 'C01', catalogueTitle: 'SOC Analyst L1',
-      catalogueFamily: 'B', plannedRelease: 'V1', releaseLabel: 'SELECTABLE', origin: 'STARTER', liveTargetCount: 1,
+      catalogueFamily: 'B', plannedRelease: 'V1', releaseLabel: 'SELECTABLE', origin: 'STARTER', liveTargetCount: null, liveTargetCountSuppressed: true,
       eligibleBranches: ['CSE', 'IT', 'ECE'], requirementSets: [],
     });
     expect(response.body.role.liveRequirements).toHaveLength(1);

@@ -16,6 +16,7 @@ import { sql, type SQL } from 'drizzle-orm';
 import type { Pool } from 'pg';
 import {
   normalizeCareerSynonym,
+  suppressSmallCount,
   type CareerReleaseLabel,
   type CareerRequirementSetState,
 } from '@planthepath/authorization/src/index.js';
@@ -393,7 +394,9 @@ export interface CatalogueRoleDetail extends CatalogueRoleRow {
   readonly liveRequirements: readonly RequirementItemView[];
   readonly requirementSets: readonly RequirementSetView[];
   /** Students with this role as a live target: a count, never names (no personal data here). */
-  readonly liveTargetCount: number;
+  /** Students with a live target on this role; null when under the shared small-count threshold. */
+  readonly liveTargetCount: number | null;
+  readonly liveTargetCountSuppressed: boolean;
 }
 
 const iso = (value: Date | string | null): string | null => (value === null ? null : new Date(value).toISOString());
@@ -453,7 +456,7 @@ export async function loadCatalogueRole(runner: SqlRunner, roleId: string): Prom
     coreSkillAreas: role.core_skill_areas,
     mainEvidence: role.main_evidence,
     catalogueVersion: role.catalogue_version,
-    liveTargetCount: Number(role.live_target_count),
+    ...liveTargetCountFor(Number(role.live_target_count)),
     synonyms: synonyms.map((row) => ({ id: row.id, synonym: row.synonym, reasonCode: row.reason_code, createdAt: iso(row.created_at)! })),
     liveRequirements: live.map(mapItem),
     requirementSets: sets.map((set) => ({
@@ -789,4 +792,10 @@ export async function publishRequirementSet(db: TransactionalRunner, input: {
     });
     return { approval, careerRoleId: set.career_role_id, version: Number(set.version) };
   });
+}
+
+/** A count of people on an operator screen goes through the one suppression rule (aggregate-suppression.ts). */
+function liveTargetCountFor(count: number): { liveTargetCount: number | null; liveTargetCountSuppressed: boolean } {
+  const shown = suppressSmallCount(count);
+  return { liveTargetCount: shown.value, liveTargetCountSuppressed: shown.suppressed };
 }

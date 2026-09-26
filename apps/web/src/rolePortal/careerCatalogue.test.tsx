@@ -154,11 +154,12 @@ describe('job-role catalogue', () => {
     });
   });
 
-  it('shows a role with its draft skill areas, live requirements and a target count', async () => {
+  it('shows a role with its draft skill areas, live requirements and a target count under five as <5', async () => {
     const panel = await openRole();
     expect(within(panel).getByText('Networking, SIEM alert triage')).toBeInTheDocument();
     expect(within(panel).getByText('SOC_ANALYST')).toBeInTheDocument();
-    expect(within(panel).getByText('3')).toBeInTheDocument();
+    // Even if a count under five ever reached the screen, it is shown only as <5.
+    expect(within(panel).getByText('Students targeting it').nextSibling?.textContent).toBe('<5');
     expect(within(panel).getByText('Incident handover')).toBeInTheDocument();
     expect(within(panel).getByText(/Written by the starter seed; not yet versioned/)).toBeInTheDocument();
   });

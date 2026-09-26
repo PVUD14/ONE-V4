@@ -691,3 +691,93 @@ What each role sees:
 - If a later module adds a queue, it needs a section, a capability entry in the authorization table, and a tile.
 
 **Next goal:** OPS-07.
+
+## OPS-07 — Staff access readiness (non-AWS parts) — 2026-09-26
+
+**Result:** Complete (non-AWS scope). Once a staff pool is configured, the internal platform roles count only for tokens that pool issued. The configuration is absent by default and changes nothing while it is unset. Preflight and runbook are in place; the AWS steps are left to Divakar.
+**Branch / PR:** feat/ops-staff-access → feat/plan-phases-0-to-2 (coordinator merges)
+**Files created:** packages/identity/src/staff-pool.ts, packages/identity/test/staff-pool-policy.test.ts, apps/api/src/staff-pool-config.test.ts,
+apps/api/src/http/staff-pool-access.integration.spec.ts, deploy/scripts/test-preflight-production.sh, docs/ops/runbook-staff-pool.md
+**Files modified:** packages/identity/src/cognito.ts (two-pool aws-jwt-verify when a staff pool is given), packages/identity/src/principal.ts
+(membership filter), apps/api/src/config.ts (`COGNITO_STAFF_USER_POOL_ID` / `COGNITO_STAFF_CLIENT_ID`, both or neither), apps/api/src/runtime-auth.ts,
+apps/api/src/app.module.ts, apps/api/src/http/api-security.ts and api-security.module.ts (optional `API_STAFF_POOL_POLICY` injected into the
+one protected guard), deploy/scripts/preflight-production.sh, deploy/systemd/README.md, .env.example, .github/workflows/phase1-ci.yml (runs the
+preflight cases)
+**Migrations added:** none
+**Design docs / ADRs:** none new. The work implements ADR-025 steps 2 and 5 (the runbook). ADR-025 is unchanged.
+**Validation (fresh database `one_ops07`):**
+- `corepack pnpm db:migrate` run twice: pass.
+- `corepack pnpm typecheck`: pass.
+- `corepack pnpm -r --no-bail --workspace-concurrency=1 test`: pass, 123 files and 1804 tests. That includes api 37 files / 674 tests, web 41 / 517,
+  identity 5 / 41 and persistence 20 / 236.
+- `corepack pnpm build`: pass.
+- `bash deploy/scripts/test-preflight-production.sh`: all 9 synthetic cases pass.
+
+**Tests added:**
+- identity `staff-pool-policy.test.ts`, 16 tests:
+  - a student-pool token loses the internal roles and keeps the rest;
+  - a staff token in either Cognito issuer format keeps them;
+  - the staff issuer with another client is not staff;
+  - with no policy nothing changes;
+  - platform organisation selection is refused;
+  - end to end with RS256 tokens signed by two pools;
+  - a student token claiming the staff client is unauthenticated;
+  - the runtime aws-jwt-verify multi-pool verifier builds, and refuses duplicate or half pools.
+- api `staff-pool-config.test.ts`, 7 tests: absent by default in production; both or neither; no staff pool without a student pool; the student
+  pool or client cannot pose as the staff pool; malformed pool id; the policy covers the three internal roles.
+- api `staff-pool-access.integration.spec.ts`, 7 tests on real Postgres through the real guard:
+  - a student-pool token gets 403 on `/operations/audit-events`, and the error body names no pool or role;
+  - the same person with a staff token gets 200;
+  - a controller outside the security module (`/operations/staff`) is covered too;
+  - organisation selection is refused;
+  - other memberships survive;
+  - without a staff pool the behaviour is unchanged;
+  - an unauthenticated request still gets 401.
+
+**Acceptance criteria:**
+- ✔ With the staff pool configured, a student-pool token cannot act as an internal role. This is proven in the identity unit tests and in the API
+  integration tests.
+- ✔ Preflight fails clearly when staff-pool configuration is missing:
+  - it exits 2 under `--require-staff-pool`;
+  - a half-configured pool, the student pool reused, the student client reused, or a malformed id always exits 2;
+  - it prints names only, and a test fails if any value is echoed.
+- ✔ The runbook covers:
+  - the pool: MFA REQUIRED, TOTP first with SMS allowed, email and phone required, email-only recovery;
+  - app clients and the scoped reset IAM policy;
+  - DLT registration and leaving the SNS sandbox;
+  - verification without the app, capturing a token for `amr`, and a timed lockout and recovery;
+  - a local enforcement check, re-binding with audit rows, enforcement, and rollback.
+
+  It has one explicit stop point (below). A stop point is not an open question.
+
+**Decisions for Divakar (recommendations adopted):**
+- **Enforced roles.** Only `PLATFORM_SUPER_ADMIN`, `OPERATIONS_ADMIN` and `SECURITY_ADMIN` are enforced, as the goal text says. ADR-025's wider
+  "all non-student roles" follows once those users have staff-pool accounts; widening it earlier locks them out. It is one list, in
+  `createRuntimeStaffPoolPolicy`.
+- **Filter, not reject.** A student-pool token loses the internal memberships but keeps its other access, so a person who is also a student or
+  college staff is not locked out.
+- **Preflight default.** A missing staff pool is a named warning by default and a failure only with `--require-staff-pool`. A default failure
+  would block every release until the AWS work is done. The runbook says to use the flag from the security go-live release onward.
+- **Startup.** The API does not require a staff pool in production (current production has none). It refuses a partial or confused one.
+
+**Limitations / not done:**
+- **ADR-025 step 3 (staff sign-in entry) is not built.** Neither web nor Android can start a staff-pool sign-in. The runbook stops before
+  re-binding (Part E) and enforcement (Part F) in production until it ships. I recommend it as its own goal, because it touches the sign-in
+  screens in both clients.
+- **Re-binding is a hand-run SQL step** by Divakar, written in the runbook with an audit row. There is no operator screen for it, and building one
+  was not in this goal.
+- **`CONTENT_REVIEW_EXTERNAL` (OPS-10)** sits on faculty memberships and is not staff-pool-gated until institution roles join the list.
+
+**Android:** no code change, and nothing needed to compile.
+- The app's workspaces come from `/api/v1/security/context` (`classifyWorkspaces`, StaffDashboards.kt), which the server now filters. With
+  enforcement on, a student-pool token simply has no OPS workspace.
+- By default nothing changes.
+- The staff-pool sign-in for Android is part of ADR-025 step 3. The existing dormant hosted-UI flow (OAuth.kt) was written for it and needs the
+  staff pool's domain and client as a second choice.
+- Operator screens stay web-only (§4.3).
+
+**Risks / follow-ups:**
+- A phone that has an OPS workspace saved sees 403s once enforcement is on, until the user signs in again.
+- Capture the `amr` claim (runbook C4) before deciding whether to assert it.
+
+**Next goal:** OPS-08.

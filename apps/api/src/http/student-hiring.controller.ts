@@ -29,6 +29,8 @@ import {
   type ProtectedHttpRequest,
 } from './api-security.js';
 import { employerInGoodStandingSql } from './employer-organisation-state.js';
+import { readSnapshotChoices, SnapshotInputError, type SnapshotChoices } from '@planthepath/hiring/src/application-snapshot.js';
+import { buildSnapshotFor, readResumeOptions, SnapshotResumeUnavailable, writeApplicationSnapshot, type BuiltSnapshot } from './application-snapshots.js';
 
 type QueryResult<T> = { rows: T[] };
 
@@ -295,6 +297,67 @@ export class StudentHiringController {
     return { applications: rows.rows.map(mapApplication), correlationId: context.correlationId };
   }
 
+  /**
+   * EMP-07: what applying would share with this employer, for the student to review first. The
+   * same builder apply uses, from the same records, with the student's choices (résumé, phone,
+   * links); apply rebuilds it and refuses if it no longer matches the hash reviewed here. Only the
+   * student's own data comes back, with the résumés they may attach.
+   */
+  @Post('/students/me/application-previews')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async previewApplication(@Req() request: ProtectedHttpRequest, @Body() body: unknown): Promise<Record<string, unknown>> {
+    const context = requireTrustedAuthorization(request);
+    const studentUserId = context.authorization.principal.userId;
+    const input = readSnapshotRequest(body, ['opportunityId', 'resumeDocumentId', 'contactPhone', 'links'], context.correlationId);
+    const rows = await this.db.execute(sql`
+      SELECT o.id, org.legal_name AS employer_name FROM opportunities o
+      JOIN organizations org ON org.id = o.employer_id
+      WHERE o.id = ${input.opportunityId}::uuid AND o.lifecycle_state = 'PUBLISHED'
+        AND ${visibleToStudent(studentUserId)}
+        AND ${employerInGoodStanding}
+    `) as QueryResult<Record<string, unknown>>;
+    const [row] = rows.rows;
+    if (!row) throw forbidden(context.correlationId);
+    const built = await this.buildSnapshot(this.db, studentUserId, input, context.correlationId);
+    return {
+      preview: {
+        employerName: row.employer_name,
+        snapshot: built.snapshot,
+        snapshotHash: built.hash,
+        resumeOptions: await readResumeOptions(this.db, studentUserId),
+      },
+      correlationId: context.correlationId,
+    };
+  }
+
+  /** EMP-07: the student's own stored snapshot for one of their applications, exactly as shared. */
+  @Get('/students/me/applications/:applicationId/snapshot')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async applicationSnapshot(@Req() request: ProtectedHttpRequest, @Param('applicationId') applicationId: string): Promise<Record<string, unknown>> {
+    const context = requireTrustedAuthorization(request);
+    const id = requireUuid(applicationId, context.correlationId);
+    const rows = await this.db.execute(sql`
+      SELECT a.id, s.snapshot, s.snapshot_hash, s.created_at
+      FROM applications a LEFT JOIN application_profile_snapshots s ON s.application_id = a.id
+      WHERE a.id = ${id}::uuid AND a.student_user_id = ${context.authorization.principal.userId}::uuid AND a.state <> 'DRAFT'
+    `) as QueryResult<Record<string, unknown>>;
+    const [row] = rows.rows;
+    if (!row) throw forbidden(context.correlationId);
+    return {
+      snapshot: row.snapshot_hash ? { content: row.snapshot, snapshotHash: row.snapshot_hash, sharedAt: row.created_at } : null,
+      correlationId: context.correlationId,
+    };
+  }
+
+  private async buildSnapshot(db: Pick<PersistenceDb, 'execute'>, studentUserId: string, input: { resumeDocumentId: string | null; choices: SnapshotChoices }, correlationId: string): Promise<BuiltSnapshot> {
+    try {
+      return await buildSnapshotFor(db, studentUserId, input.resumeDocumentId, input.choices);
+    } catch (error) {
+      if (error instanceof SnapshotResumeUnavailable) throw badRequest('RESUME_NOT_AVAILABLE', correlationId);
+      throw error;
+    }
+  }
+
   @Post('/students/me/applications')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async apply(@Req() request: ProtectedHttpRequest, @Body() body: unknown): Promise<Record<string, unknown>> {
@@ -392,6 +455,14 @@ export class StudentHiringController {
       `);
       // What the employer is told about this applicant's eligibility, frozen as it stood now.
       if (evaluation) await recordEligibilityEvaluation(tx, this.ids, { applicationId, versionId, trigger: 'APPLY', evaluation });
+      // EMP-07: the consented snapshot, built from the records as they stand in this transaction and
+      // bound to the version applied under. When the student reviewed a preview, what is stored must
+      // be exactly that; otherwise nothing is written and they are asked to look again.
+      const built = await this.buildSnapshot(tx, studentUserId, input, context.correlationId);
+      if (input.reviewedSnapshotHash !== null && input.reviewedSnapshotHash !== built.hash) {
+        throw new ConflictException(safeHiringError('SNAPSHOT_CHANGED', context.correlationId));
+      }
+      await writeApplicationSnapshot(tx, { id: this.ids.uuid(), applicationId, versionId, built });
       await this.writeAudit(studentUserId, 'application.submitted', 'application', applicationId, context.correlationId, tx);
       if (input.institutionVisibilityGranted) {
         await this.writeAudit(studentUserId, 'application.institution_visibility_granted', 'application', applicationId, context.correlationId, tx);
@@ -783,15 +854,43 @@ function readDecision(body: unknown, correlationId: string): 'ACCEPT' | 'DECLINE
   return value;
 }
 
-function readApplyInput(body: unknown, correlationId: string): { opportunityId: string; consentGranted: boolean; institutionVisibilityGranted: boolean } {
-  if (typeof body !== 'object' || body === null) throw badRequest('INVALID_BODY', correlationId);
+const applyFields = ['opportunityId', 'consentGranted', 'institutionVisibilityGranted', 'resumeDocumentId', 'contactPhone', 'links', 'reviewedSnapshotHash'];
+
+function readApplyInput(body: unknown, correlationId: string): {
+  opportunityId: string; consentGranted: boolean; institutionVisibilityGranted: boolean;
+  resumeDocumentId: string | null; choices: SnapshotChoices; reviewedSnapshotHash: string | null;
+} {
+  const snapshot = readSnapshotRequest(body, applyFields, correlationId);
   const record = body as Record<string, unknown>;
-  const opportunityId = typeof record.opportunityId === 'string' ? record.opportunityId : '';
-  if (!uuidPattern.test(opportunityId)) throw badRequest('INVALID_OPPORTUNITY_ID', correlationId);
   if (record.institutionVisibilityGranted !== undefined && typeof record.institutionVisibilityGranted !== 'boolean') {
     throw badRequest('INVALID_INSTITUTION_VISIBILITY_CONSENT', correlationId);
   }
-  return { opportunityId, consentGranted: record.consentGranted === true, institutionVisibilityGranted: record.institutionVisibilityGranted === true };
+  let reviewedSnapshotHash: string | null = null;
+  if (record.reviewedSnapshotHash !== undefined && record.reviewedSnapshotHash !== null) {
+    if (typeof record.reviewedSnapshotHash !== 'string' || !/^[0-9a-f]{64}$/.test(record.reviewedSnapshotHash)) throw badRequest('INVALID_SNAPSHOT_HASH', correlationId);
+    reviewedSnapshotHash = record.reviewedSnapshotHash;
+  }
+  return { ...snapshot, consentGranted: record.consentGranted === true, institutionVisibilityGranted: record.institutionVisibilityGranted === true, reviewedSnapshotHash };
+}
+
+/** The opportunity and the student's snapshot choices, shared by preview and apply. Unknown fields are refused. */
+function readSnapshotRequest(body: unknown, allowed: readonly string[], correlationId: string): { opportunityId: string; resumeDocumentId: string | null; choices: SnapshotChoices } {
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) throw badRequest('INVALID_BODY', correlationId);
+  const record = body as Record<string, unknown>;
+  if (Object.keys(record).some((key) => !allowed.includes(key))) throw badRequest('UNKNOWN_FIELD', correlationId);
+  const opportunityId = typeof record.opportunityId === 'string' ? record.opportunityId : '';
+  if (!uuidPattern.test(opportunityId)) throw badRequest('INVALID_OPPORTUNITY_ID', correlationId);
+  let resumeDocumentId: string | null = null;
+  if (record.resumeDocumentId !== undefined && record.resumeDocumentId !== null) {
+    if (typeof record.resumeDocumentId !== 'string' || !uuidPattern.test(record.resumeDocumentId)) throw badRequest('INVALID_RESUME_DOCUMENT', correlationId);
+    resumeDocumentId = record.resumeDocumentId;
+  }
+  try {
+    return { opportunityId, resumeDocumentId, choices: readSnapshotChoices(record) };
+  } catch (error) {
+    if (error instanceof SnapshotInputError) throw badRequest(error.code, correlationId);
+    throw error;
+  }
 }
 
 function readOptionalText(body: unknown, field: string, max: number, correlationId: string): string | null {

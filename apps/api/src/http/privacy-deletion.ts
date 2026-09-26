@@ -3,6 +3,7 @@ import type { PersistenceDb } from '@planthepath/persistence/src/repositories.js
 import { DELETION_POLICY, anonymisedIdentity, isDeletionDue, type DeletionCategory, type PrivacyRequestState } from '@planthepath/privacy';
 import { detachSupportCasesForDeletedUser } from '@planthepath/persistence/src/support-cases.js';
 import { projectSubjectSkillState } from '@planthepath/persistence/src/learner-skill-state.js';
+import { ERASED_SNAPSHOT, snapshotHash } from '@planthepath/hiring/src/application-snapshot.js';
 import type { FileStorage } from '../storage/file-storage.js';
 
 type QueryResult<T> = { rows: T[] };
@@ -125,6 +126,20 @@ async function erase(deps: DeletionExecutionDeps, subjectUserId: string): Promis
   counts.OFFERS = await countOf(sql`SELECT count(*)::int AS count FROM offers o JOIN applications a ON a.id = o.application_id WHERE a.student_user_id = ${subjectUserId}::uuid`);
   counts.ASSESSMENT_EVIDENCE = await countOf(sql`SELECT count(*)::int AS count FROM evidence_records WHERE subject_user_id = ${subjectUserId}::uuid`);
   counts.AUDIT = await countOf(sql`SELECT count(*)::int AS count FROM audit_events WHERE actor_user_id = ${subjectUserId}::uuid`);
+
+  // EMP-07: application snapshots keep their row (APPLICATIONS are anonymised, not erased) and
+  // lose what the student shared. This must precede the document deletion below, because a
+  // snapshot points at the résumé version it carried. The 0058 trigger allows this one update
+  // only inside the transaction-local erase setting for this subject.
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT set_config('one.privacy_erase_subject', ${subjectUserId}, true)`);
+    await tx.execute(sql`
+      UPDATE application_profile_snapshots
+      SET snapshot = ${JSON.stringify(ERASED_SNAPSHOT)}::jsonb, snapshot_hash = ${snapshotHash(ERASED_SNAPSHOT)},
+          resume_document_id = NULL, resume_document_version_id = NULL, resume_file_id = NULL, erased_at = now()
+      WHERE erased_at IS NULL AND application_id IN (SELECT id FROM applications WHERE student_user_id = ${subjectUserId}::uuid)
+    `);
+  });
 
   // Documents: remove the bytes, then the rows that point at them.
   const files = await db.execute(sql`

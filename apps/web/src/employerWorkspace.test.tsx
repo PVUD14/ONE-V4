@@ -27,6 +27,8 @@ const opportunity = {
   publishedAt: null, applicationCount: 0, openApplicationCount: 0,
 };
 
+let employerFeed: { notifications: Record<string, unknown>[]; unreadCount: number } = { notifications: [], unreadCount: 0 };
+
 type Membership = { readonly organizationId: string; readonly role: string; readonly scope: Record<string, string> };
 
 function employerMembership(role: string): Membership {
@@ -49,6 +51,9 @@ function signInWith(email: string, memberships: readonly Membership[]): void {
     if (url.endsWith('/health')) return { ok: true };
     if (url.endsWith('/api/v1/me/consents/privacy-notice')) return { ok: true, json: async () => ({ requiredVersion: null, grantedVersion: null, required: false }) };
     if (url.endsWith('/api/v1/security/context')) return { ok: true, json: async () => ({ userId: 'employer-user', memberships, studentRelationships: [] }) };
+    // EMP-08: the employer's own notification feed (offer answers).
+    if (url.endsWith('/api/v1/me/notifications')) return { ok: true, json: async () => employerFeed };
+    if (url.endsWith('/api/v1/me/notifications/read-all')) return { ok: true, json: async () => ({ marked: employerFeed.unreadCount }) };
     if (url.endsWith(`/api/v1/employers/${employerId}/opportunities`)) return { ok: true, json: async () => ({ opportunities: [opportunity] }) };
     if (url.endsWith(`/api/v1/employers/${employerId}/team`)) return { ok: true, json: async () => ({ team: {
       actorRole: memberships.find((item) => item.organizationId === employerId)?.role, invitableRoles: ['RECRUITER'], deliveryConfigured: false,
@@ -169,5 +174,29 @@ describe('EMP-01: employer workspace behaviour for each role', () => {
     expect(await screen.findByText('team.viewer@uat.example.test (you)')).toBeInTheDocument();
     expect(screen.queryByText('Not built yet')).not.toBeInTheDocument();
     expect(screen.queryByText('Managed by your owner or admin')).not.toBeInTheDocument();
+  });
+});
+
+describe('EMP-08: an employer hears when a candidate answers an offer', () => {
+  it('shows the latest notice from the feed when the bell is pressed, naming no candidate', async () => {
+    employerFeed = { unreadCount: 1, notifications: [{ id: 'n-1', kind: 'OFFER_RESPONDED', title: 'Offer accepted: Fixture Draft Role',
+      body: 'A candidate accepted your offer for Fixture Draft Role (EMP01-FIXTURE). Open Offers to see it and record the hire.',
+      data: { screen: 'offers', opportunityTitle: 'Fixture Draft Role' }, createdAt: '2026-09-26T00:00:00.000Z', readAt: null }] };
+    signInWith('recruiter@uat.example.test', [employerMembership('RECRUITER')]);
+    const { App } = await import('./App.js');
+    render(React.createElement(App));
+    await waitFor(() => expect(window.location.pathname).toBe('/employer/recruiter'));
+    (await screen.findByRole('button', { name: 'Notifications' })).click();
+    expect(await screen.findByText(/Notifications: 1 unread\. Latest: Offer accepted: Fixture Draft Role — A candidate accepted your offer/)).toBeInTheDocument();
+  });
+
+  it('says plainly when there is nothing yet', async () => {
+    employerFeed = { unreadCount: 0, notifications: [] };
+    signInWith('recruiter@uat.example.test', [employerMembership('RECRUITER')]);
+    const { App } = await import('./App.js');
+    render(React.createElement(App));
+    await waitFor(() => expect(window.location.pathname).toBe('/employer/recruiter'));
+    (await screen.findByRole('button', { name: 'Notifications' })).click();
+    expect(await screen.findByText('No notifications yet. You will be told here when a candidate accepts or declines an offer.')).toBeInTheDocument();
   });
 });

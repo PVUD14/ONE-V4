@@ -285,6 +285,28 @@ export function withdrawApplication(token: string, applicationId: string, reason
   return requestJson(`/api/v1/students/me/applications/${encodeURIComponent(applicationId)}/withdraw`, { token, method: 'POST', body: reason ? { reason } : {} });
 }
 
+/** EMP-08: an interview as its candidate sees it; where and how to join only while it is ahead. */
+export interface StudentInterviewDto {
+  readonly id: string;
+  readonly employerName: string;
+  readonly title: string;
+  readonly roundNumber: number;
+  readonly stageLabel: string | null;
+  readonly applicationState: string;
+  readonly mode: 'VIDEO' | 'PHONE' | 'ONSITE';
+  readonly state: 'SCHEDULED' | 'RESCHEDULED' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW';
+  readonly upcoming: boolean;
+  readonly scheduledStart: string | null;
+  readonly scheduledEnd: string | null;
+  readonly locationDetail: string | null;
+  readonly joiningLink: string | null;
+  readonly preparationNote: string | null;
+}
+
+export function listStudentInterviews(token: string, signal?: AbortSignal): Promise<{ readonly interviews: readonly StudentInterviewDto[] }> {
+  return requestJson('/api/v1/students/me/interviews', { token, ...(signal ? { signal } : {}) });
+}
+
 export function listStudentOffers(token: string, signal?: AbortSignal): Promise<{ readonly offers: readonly StudentOfferDto[] }> {
   return requestJson('/api/v1/students/me/offers', { token, ...(signal ? { signal } : {}) });
 }
@@ -358,6 +380,8 @@ export interface InterviewScheduleInput {
   readonly joiningLink?: string;
   readonly participantUserIds?: readonly string[];
   readonly participantVisibilityAcknowledged?: boolean;
+  /** EMP-08: shown to the candidate as written, in their interview view. */
+  readonly preparationNote?: string;
 }
 
 export interface InterviewParticipantOptionDto {

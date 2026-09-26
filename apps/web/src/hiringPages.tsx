@@ -13,6 +13,7 @@ import {
   companyIndustryLabels, companySizeLabel, type OpportunityCompanyDto,
   readTermsChange, respondToTermsChange, type StudentTermsChangeDto, type StudentTermsDto,
   previewApplication, applyWithSnapshot, type ApplicationPreviewDto, type SnapshotChoicesInput,
+  listStudentInterviews, type StudentInterviewDto,
 } from './api/hiring.js';
 import { CandidateDetailPanel, SnapshotSummary } from './applicationSnapshotView.js';
 import {
@@ -74,6 +75,7 @@ const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   INVALID_SCHEDULE: 'Choose an end time after the interview starts.',
   INVALID_PARTICIPANTS: 'Select current members of this employer to join the interview.',
   PARTICIPANT_VISIBILITY_REQUIRED: 'Confirm that the selected participants may see the candidate for this interview.',
+  INVALID_PREPARATIONNOTE: 'Keep the preparation note under 1000 characters, and do not start it with =, +, - or @.',
   EXTERNAL_APPLICATION_LIMIT: 'You can hold up to 500 external applications. Permanently delete a record before adding another.',
   EXTERNAL_APPLICATION_STALE: 'This record changed elsewhere. Refresh and reopen it before trying again.',
   INVALID_EXTERNAL_APPLICATION: 'Check the company, role, source, application date and HTTPS link. Future application dates are not allowed.',
@@ -510,6 +512,7 @@ export function StudentApplicationsPage(): React.ReactElement {
     {feedback ? <StudentFeedbackCard feedback={feedback} onClose={() => setFeedback(null)} /> : null}
     {termsChange ? <StudentTermsChangeCard change={termsChange.change} onAnswer={(decision) => { void answerTermsChange(decision); }}
       onClose={() => setTermsChange(null)} /> : null}
+    <StudentInterviewsPanel />
     <StudentOffersPanel onChanged={() => { void reload(); }} />
     <StudentExternalApplicationsPanel />
   </div>;
@@ -755,6 +758,64 @@ function ExternalApplicationForm({ initial, busy, onSave, onCancel }: {
     {error ? <p role="alert">{error}</p> : null}
     <button type="submit" disabled={busy}>Save external application</button><button type="button" className="secondary" disabled={busy} onClick={onCancel}>Cancel external edit</button>
   </form>;
+}
+
+const interviewModeLabels: Readonly<Record<string, string>> = { VIDEO: 'Video', PHONE: 'Phone', ONSITE: 'On site' };
+
+function interviewWindow(item: StudentInterviewDto): string {
+  if (!item.scheduledStart) return 'Time to be confirmed';
+  const start = new Date(item.scheduledStart);
+  if (Number.isNaN(start.getTime())) return 'Time to be confirmed';
+  const end = item.scheduledEnd ? new Date(item.scheduledEnd) : null;
+  const day = start.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+  const from = start.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  const to = end && !Number.isNaN(end.getTime()) ? `–${end.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}` : '';
+  return `${day}, ${from}${to}`;
+}
+
+/**
+ * EMP-08: the student's interviews, inside Applications (no new navigation item). Upcoming ones
+ * show when, how, where or the joining link, and what the employer asked them to prepare; past
+ * and cancelled ones stay for the record without the link.
+ */
+export function StudentInterviewsPanel(): React.ReactElement {
+  const [interviews, setInterviews] = useState<readonly StudentInterviewDto[] | null>(null);
+  const [status, setStatus] = useState('');
+  useEffect(() => {
+    const token = getAccessToken();
+    if (!token) return;
+    const abort = new AbortController();
+    listStudentInterviews(token, abort.signal).then((response) => {
+      if (abort.signal.aborted) return;
+      if (!Array.isArray(response.interviews)) throw new Error('malformed');
+      setInterviews(response.interviews);
+    }).catch(() => { if (!abort.signal.aborted) { setInterviews([]); setStatus('Your interviews could not be loaded. Please refresh.'); } });
+    return () => abort.abort();
+  }, []);
+  const upcoming = (interviews ?? []).filter((item) => item.upcoming);
+  const past = (interviews ?? []).filter((item) => !item.upcoming);
+  const row = (item: StudentInterviewDto) => <li key={item.id} className="hiring-list-item">
+    <div>
+      <h3>{item.title}</h3>
+      <p className="hiring-meta">{item.employerName} · {item.stageLabel ?? `Round ${item.roundNumber}`} · {interviewModeLabels[item.mode] ?? humanise(item.mode)}</p>
+      <p className="hiring-meta">{interviewWindow(item)}</p>
+      {item.joiningLink ? <p>Join: <a href={item.joiningLink} target="_blank" rel="noopener noreferrer">{item.joiningLink}</a></p> : null}
+      {item.locationDetail ? <p>{item.mode === 'ONSITE' ? 'Where' : 'Arrangements'}: {item.locationDetail}</p> : null}
+      {item.upcoming ? <p><strong>What to prepare:</strong> {item.preparationNote ?? 'NA — the employer has not added anything to prepare.'}</p> : null}
+    </div>
+    <div className="hiring-actions"><span className={`hiring-state state-${item.state.toLowerCase()}`}>{humanise(item.state)}</span></div>
+  </li>;
+  return <section className="card wide-card" aria-label="Your interviews">
+    <h2>Your interviews</h2>
+    {status ? <p role="status">{status}</p> : null}
+    {interviews === null ? <p>Loading your interviews…</p> : <>
+      <h3>Upcoming</h3>
+      {upcoming.length ? <ul className="hiring-list" aria-label="Upcoming interviews">{upcoming.map(row)}</ul>
+        : <p>No upcoming interviews. When an employer schedules one, it appears here with the time and how to join.</p>}
+      <h3>Past</h3>
+      {past.length ? <ul className="hiring-list" aria-label="Past interviews">{past.map(row)}</ul> : <p>No past interviews yet.</p>}
+    </>}
+  </section>;
 }
 
 export function StudentOffersPanel({ onChanged }: { readonly onChanged?: () => void }): React.ReactElement {
@@ -1040,6 +1101,7 @@ function InterviewForm({ employerId, onSave, onCancel }: { readonly employerId: 
         ...(selectedParticipants.length ? { participantUserIds: selectedParticipants, participantVisibilityAcknowledged: visibilityAcknowledged } : {}),
         ...(mode === 'VIDEO' ? { joiningLink: String(form.get('joiningLink')) } : {}),
         ...(mode === 'ONSITE' || form.get('locationDetail') ? { locationDetail: String(form.get('locationDetail')) } : {}),
+        ...(String(form.get('preparationNote') ?? '').trim() ? { preparationNote: String(form.get('preparationNote')).trim() } : {}),
       });
     } catch (failure) { setError(messageFor(failure, 'The interview could not be scheduled.')); }
     finally { setBusy(false); }
@@ -1051,6 +1113,7 @@ function InterviewForm({ employerId, onSave, onCancel }: { readonly employerId: 
     </select></label>
     {mode === 'VIDEO' ? <label><span>Joining link</span><input name="joiningLink" type="url" pattern="https://[^\s]+" required maxLength={512} /></label>
       : <label><span>{mode === 'ONSITE' ? 'Location' : 'Phone arrangements (optional)'}</span><input key={mode} name="locationDetail" required={mode === 'ONSITE'} maxLength={500} /></label>}
+    <label><span>What to prepare (optional, shown to the candidate)</span><textarea name="preparationNote" maxLength={1000} rows={3} /></label>
     <fieldset disabled={busy}><legend>Interview participants</legend>
       <p>Adding a participant lets that person see the candidate details shared for this interview and record a scorecard. Access ends when the assignment is removed or the interview ends.</p>
       {participantStatus ? <p role="status">{participantStatus}</p> : null}

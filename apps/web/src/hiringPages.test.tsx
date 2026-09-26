@@ -389,6 +389,16 @@ describe('interview and offer management', () => {
     expect(document.body.textContent).not.toContain(participantId);
   });
 
+  it('sends what to prepare only when the employer writes it (EMP-08)', async () => {
+    stubApplicant('INTERVIEW'); await authenticate(); render(<EmployerApplicantsPage employerId={employerId} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Schedule interview' }));
+    fillSchedule(); fireEvent.change(screen.getByLabelText('Joining link'), { target: { value: 'https://meet.example.test/x' } });
+    fireEvent.change(screen.getByLabelText('What to prepare (optional, shown to the candidate)'), { target: { value: '  Bring your project notes.  ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save interview' }));
+    await waitFor(() => expect(postsTo('/interviews')).toHaveLength(1));
+    expect(JSON.parse(postsTo('/interviews')[0]![1]!.body as string)).toEqual({ mode: 'VIDEO', joiningLink: 'https://meet.example.test/x', preparationNote: 'Bring your project notes.', ...expectedWindow() });
+  });
+
   function stubApplicant(state: string): void {
     stubFetch({ [`${base}/opportunities`]: { opportunities: [{ ...opportunity, lifecycleState: 'PUBLISHED', applicationCount: 1 }] },
       [`${base}/opportunities/${opportunity.id}/applications`]: { applications: [{ ...interview, id: 'application-a', state, offerState: null, interviewCount: 0 }] } });
@@ -743,5 +753,54 @@ describe('EMP-05 changed terms on a student application', () => {
     fireEvent.click(within(await screen.findByRole('region', { name: 'Changed terms' })).getByRole('button', { name: 'Decline and withdraw' }));
     expect(await screen.findByText('The employer changed the job again while you were reading. Review the latest terms.')).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Changed terms' })).not.toBeInTheDocument();
+  });
+});
+
+describe('EMP-08 the student sees their interviews inside Applications', () => {
+  const upcoming = {
+    id: '66666666-6666-4666-8666-666666666666', employerName: 'Aster Mobility', title: 'SOC Analyst Intern', roundNumber: 1, stageLabel: null,
+    applicationState: 'INTERVIEW', mode: 'VIDEO', state: 'SCHEDULED', upcoming: true,
+    scheduledStart: '2099-10-01T09:30:00.000Z', scheduledEnd: '2099-10-01T10:15:00.000Z',
+    locationDetail: null, joiningLink: 'https://meet.example.test/room', preparationNote: 'Walk us through one alert you triaged.',
+  };
+  const past = { ...upcoming, id: '77777777-7777-4777-8777-777777777777', roundNumber: 2, stageLabel: 'HR round', mode: 'ONSITE', state: 'COMPLETED', upcoming: false,
+    scheduledStart: '2026-08-01T09:30:00.000Z', scheduledEnd: '2026-08-01T10:30:00.000Z', joiningLink: null, preparationNote: null };
+  const routes = (interviews: unknown) => ({ '/api/v1/students/me/applications': { applications: [] }, '/api/v1/students/me/offers': { offers: [] },
+    '/api/v1/students/me/interviews': interviews });
+
+  it('shows an upcoming interview with when, how to join and what to prepare, and a past one without the link', async () => {
+    stubFetch(routes({ interviews: [upcoming, past] }));
+    await authenticate();
+    render(<StudentApplicationsPage />);
+    const upcomingList = await screen.findByRole('list', { name: 'Upcoming interviews' });
+    expect(within(upcomingList).getByText('SOC Analyst Intern')).toBeInTheDocument();
+    expect(within(upcomingList).getByText(/Aster Mobility · Round 1 · Video/)).toBeInTheDocument();
+    expect(within(upcomingList).getByRole('link', { name: 'https://meet.example.test/room' })).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(within(upcomingList).getByText('Walk us through one alert you triaged.')).toBeInTheDocument();
+    const pastList = screen.getByRole('list', { name: 'Past interviews' });
+    expect(within(pastList).getByText(/HR round · On site/)).toBeInTheDocument();
+    expect(within(pastList).getByText('Completed')).toBeInTheDocument();
+    expect(within(pastList).queryByRole('link')).not.toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/readiness|score/i);
+  });
+
+  it('says NA when the employer gave nothing to prepare, and says plainly when there are no interviews', async () => {
+    stubFetch(routes({ interviews: [{ ...upcoming, preparationNote: null }] }));
+    await authenticate();
+    render(<StudentApplicationsPage />);
+    expect(await screen.findByText('NA — the employer has not added anything to prepare.')).toBeInTheDocument();
+    expect(screen.getByText('No past interviews yet.')).toBeInTheDocument();
+    cleanup();
+    stubFetch(routes({ interviews: [] }));
+    render(<StudentApplicationsPage />);
+    expect(await screen.findByText(/No upcoming interviews\. When an employer schedules one/)).toBeInTheDocument();
+  });
+
+  it('shows a safe message when the interviews cannot be loaded', async () => {
+    stubFetch(routes({}), { '/api/v1/students/me/interviews': { status: 500, body: { error: { code: 'INTERNAL', correlationId: 'c-1', detail: 'stack at db.ts:12' } } } });
+    await authenticate();
+    render(<StudentApplicationsPage />);
+    expect(await screen.findByText('Your interviews could not be loaded. Please refresh.')).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain('db.ts');
   });
 });

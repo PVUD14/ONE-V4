@@ -80,6 +80,9 @@ internal fun JobsScreen() {
     var tab by remember { mutableIntStateOf(0) }
     var opportunities by remember { mutableStateOf<List<OpportunityDto>?>(null) }
     var applications by remember { mutableStateOf<List<ApplicationDto>?>(null) }
+    // EMP-08: the student's interviews, shown at the top of My applications (no new tab).
+    var interviews by remember { mutableStateOf<List<StudentInterviewDto>?>(null) }
+    var interviewsFailed by remember { mutableStateOf(false) }
     var notice by remember { mutableStateOf<String?>(null) }
     var reload by remember { mutableIntStateOf(0) }
     var openOpportunityId by remember { mutableStateOf<String?>(null) }
@@ -91,6 +94,9 @@ internal fun JobsScreen() {
     LaunchedEffect(reload) {
         opportunities = runCatching { Api.listOpportunities(context) }.getOrNull()
         applications = runCatching { Api.listApplications(context) }.getOrNull()
+        val loaded = runCatching { Api.listStudentInterviews(context) }
+        interviews = loaded.getOrNull() ?: emptyList()
+        interviewsFailed = loaded.isFailure
     }
 
     // Back closes the overlay above the tab, rather than quitting the app.
@@ -234,6 +240,37 @@ internal fun JobsScreen() {
                     "No applications yet",
                     "Apply to an opportunity and every stage — submitted, shortlisted, offered — is tracked here.")
                 else -> LazyColumn(Modifier.fillMaxSize()) {
+                    val upcoming = interviews.orEmpty().filter { it.upcoming }
+                    val past = interviews.orEmpty().filter { !it.upcoming }
+                    item(key = "interviews-heading") {
+                        Spacer(Modifier.height(12.dp))
+                        Text("Your interviews", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        if (interviewsFailed) {
+                            Text("Your interviews could not be loaded right now.",
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        } else if (upcoming.isEmpty()) {
+                            Text("No upcoming interviews. When an employer schedules one, it appears here with the time and how to join.",
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    items(upcoming, key = { "interview-" + it.id }) { item ->
+                        Spacer(Modifier.height(10.dp))
+                        StudentInterviewCard(item)
+                    }
+                    if (past.isNotEmpty()) {
+                        item(key = "interviews-past") {
+                            Spacer(Modifier.height(12.dp))
+                            Text("Past interviews", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                        }
+                        items(past, key = { "interview-" + it.id }) { item ->
+                            Spacer(Modifier.height(10.dp))
+                            StudentInterviewCard(item)
+                        }
+                    }
+                    item(key = "applications-heading") {
+                        Spacer(Modifier.height(16.dp))
+                        Text("Your applications", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    }
                     items(applications!!, key = { it.id }) { app ->
                         Spacer(Modifier.height(12.dp))
                         PilotCard {

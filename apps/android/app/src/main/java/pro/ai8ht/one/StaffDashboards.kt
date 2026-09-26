@@ -1170,7 +1170,7 @@ private fun StaffInboxOverlay(feed: NotificationsEnvelope?, onClose: () -> Unit)
         when {
             feed == null || feed.notifications.isEmpty() ->
                 EmptyState(Icons.Filled.Notifications, Tone.Amber, "All caught up",
-                    "Platform updates for your account land here.")
+                    "Platform updates for your account land here, including a candidate's answer to an offer you made.")
             else -> LazyColumn(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
                 items(feed.notifications, key = { it.id }) { note ->
                     Column(Modifier.padding(vertical = 10.dp)) {

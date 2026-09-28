@@ -162,11 +162,14 @@ export async function setStudentCareerTarget(
     readonly subjectUserId: string; readonly careerRoleId: string; readonly priority: 'PRIMARY' | 'SECONDARY';
     /** OPS-08: a catalogue-only role may be targeted only while the catalogue is open to this learner. */
     readonly catalogueOpen?: boolean;
+    /** ENG-19: where the role goal mirrored from this target came from; the 0068 trigger reads it. */
+    readonly goalOrigin?: 'ONBOARDING' | 'GOALS' | 'DISCOVERY_SUGGESTION';
   },
 ): Promise<{ readonly targetId: string }> {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    if (input.goalOrigin) await client.query("SELECT set_config('one.goal_origin', $1, true)", [input.goalOrigin]);
     const role = await client.query<{ id: string }>(
       "SELECT id FROM career_roles WHERE id=$1 AND active AND ($2 OR origin = 'STARTER')", [input.careerRoleId, input.catalogueOpen === true],
     );

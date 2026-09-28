@@ -9,6 +9,7 @@ import { createLocalDiskStorage, type FileStorage } from './storage/file-storage
 import { createEncryptedStorage, parseFileEncryptionKey } from './storage/encrypted-storage.js';
 import { CareerReadinessController } from './http/career-readiness.controller.js';
 import { CareerTargetsController } from './http/career-targets.controller.js';
+import { LearnerGoalsController } from './http/learner-goals.controller.js';
 import { AcademicRecordsController } from './http/academic-records.controller.js';
 import { PlatformControlsController } from './http/platform-controls.controller.js';
 import { InstitutionExportsController } from './http/institution-exports.controller.js';
@@ -50,7 +51,7 @@ const configuredScanner = runtimeConfig.documents.clamavSocketPath
       ...(configuredScanner ? { fileScanner: configuredScanner } : {}),
     }),
   ],
-  controllers: [HealthController, CareerReadinessController, CareerTargetsController, AcademicRecordsController, PlatformControlsController, InstitutionExportsController, TrustSafetyController, OperationsStaffController, AutomationCallbackController, LearnerContentController, PublicProfileController],
+  controllers: [HealthController, CareerReadinessController, CareerTargetsController, LearnerGoalsController, AcademicRecordsController, PlatformControlsController, InstitutionExportsController, TrustSafetyController, OperationsStaffController, AutomationCallbackController, LearnerContentController, PublicProfileController],
   providers: [
     { provide: RUNTIME_CONFIG, useValue: runtimeConfig },
     // The public-profile controller lives here because it needs the pool, and it needs the

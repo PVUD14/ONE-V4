@@ -4,7 +4,7 @@
  * Reference content, deployed on purpose like `db:seed:careers`. Run the starter seed
  * first so the five starter roles are mapped onto their catalogue rows rather than
  * duplicated. Idempotent; writes no requirement set, publishes nothing, marks nothing
- * verified, and stores no goal (no goal model exists yet).
+ * verified. Goal rows (Appendix 4 §G) are stored by `seedCareerCatalogueGoals` (ENG-19).
  *
  * Design: docs/architecture/career-catalogue-table-design.md
  */
@@ -12,7 +12,7 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { Pool } from 'pg';
 import { verifyCatalogueCounts, type CareerCatalogueFile } from './career-catalogue-input.js';
-import { seedCareerCatalogue } from './career-catalogue.js';
+import { seedCareerCatalogue, seedCareerCatalogueGoals } from './career-catalogue.js';
 
 async function main(): Promise<void> {
   const connectionString = process.env.DATABASE_URL?.trim();
@@ -24,7 +24,8 @@ async function main(): Promise<void> {
   const pool = new Pool({ connectionString });
   try {
     const result = await seedCareerCatalogue(pool, file);
-    console.log(JSON.stringify({ event: 'career.catalogue.seeded', version: file.version, roles: file.roles.length, ...result }));
+    const goals = await seedCareerCatalogueGoals(pool, file);
+    console.log(JSON.stringify({ event: 'career.catalogue.seeded', version: file.version, roles: file.roles.length, ...result, ...goals }));
   } finally {
     await pool.end();
   }

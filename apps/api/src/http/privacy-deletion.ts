@@ -159,6 +159,13 @@ async function erase(deps: DeletionExecutionDeps, subjectUserId: string): Promis
 
   counts.STUDENT_PROFILE = await countOf(sql`SELECT count(*)::int AS count FROM student_profiles WHERE user_id = ${subjectUserId}::uuid`);
   await db.execute(sql`DELETE FROM student_profiles WHERE user_id = ${subjectUserId}::uuid`);
+  // Goals and "Not sure yet" survey answers (ENG-19, 0068) are about the person: erased with the profile.
+  // The 0068 guard allows DELETE only inside the transaction-local erase setting for this subject.
+  counts.STUDENT_PROFILE += await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT set_config('one.privacy_erase_subject', ${subjectUserId}, true)`);
+    const gone = await tx.execute(sql`WITH gone AS (DELETE FROM learner_goals WHERE student_user_id = ${subjectUserId}::uuid RETURNING 1) SELECT count(*)::int AS count FROM gone`) as QueryResult<{ count: number }>;
+    return Number(gone.rows[0]?.count ?? 0);
+  });
   await db.execute(sql`DELETE FROM student_saved_opportunities WHERE student_user_id = ${subjectUserId}::uuid`);
 
   counts.NOTIFICATIONS = await countOf(sql`SELECT count(*)::int AS count FROM notification_commands WHERE subject_user_id = ${subjectUserId}::uuid`);

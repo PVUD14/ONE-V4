@@ -200,6 +200,58 @@ export async function seedCareerCatalogue(pool: Pool, file: CareerCatalogueFile)
   return { created, updated, mappedStarterRoles: mapped, mappingConflicts: conflicts, goalsStored: 0 };
 }
 
+/**
+ * ENG-19: how each Appendix 4 §G goal is held by a student (docs/architecture/learner-goals-table-design.md).
+ * G08 needs an employer's drive target, G10 and G11 are held as real topics, G12 is not a V1 goal type, and
+ * G13 is the "Not sure yet" survey, so none of those is selectable by reference.
+ */
+export const catalogueGoalMapping: Readonly<Record<string, { readonly learnerGoalType: 'EXAM' | 'COMPANY' | 'TOPIC' | 'DISCOVERY' | null; readonly selectable: boolean }>> = {
+  G01: { learnerGoalType: 'EXAM', selectable: true },
+  G02: { learnerGoalType: 'EXAM', selectable: true },
+  G03: { learnerGoalType: 'EXAM', selectable: true },
+  G04: { learnerGoalType: 'EXAM', selectable: true },
+  G05: { learnerGoalType: 'EXAM', selectable: true },
+  G06: { learnerGoalType: 'COMPANY', selectable: true },
+  G07: { learnerGoalType: 'COMPANY', selectable: true },
+  G08: { learnerGoalType: 'COMPANY', selectable: false },
+  G09: { learnerGoalType: 'EXAM', selectable: true },
+  G10: { learnerGoalType: 'TOPIC', selectable: false },
+  G11: { learnerGoalType: 'TOPIC', selectable: false },
+  G12: { learnerGoalType: null, selectable: false },
+  G13: { learnerGoalType: 'DISCOVERY', selectable: false },
+};
+
+/**
+ * Stores the catalogue's thirteen goal rows (ENG-19), idempotently. Separate from `seedCareerCatalogue`,
+ * which still stores no goal; `db:seed:career-catalogue` runs both. Source cells are kept verbatim.
+ */
+export async function seedCareerCatalogueGoals(pool: Pool, file: CareerCatalogueFile): Promise<{ readonly goalsStored: number }> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    for (const goal of file.goals) {
+      const mapping = catalogueGoalMapping[goal.code];
+      if (!mapping) throw new Error(`catalogue goal ${goal.code} has no ENG-19 mapping`);
+      await client.query(
+        `INSERT INTO career_catalogue_goals (code, title, source_goal_type, links_to_roles, main_evidence, release, learner_goal_type, selectable, catalogue_version)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+         ON CONFLICT (code) DO UPDATE SET title = EXCLUDED.title, source_goal_type = EXCLUDED.source_goal_type,
+           links_to_roles = EXCLUDED.links_to_roles, main_evidence = EXCLUDED.main_evidence, release = EXCLUDED.release,
+           learner_goal_type = EXCLUDED.learner_goal_type, selectable = EXCLUDED.selectable,
+           catalogue_version = EXCLUDED.catalogue_version, updated_at = now()`,
+        [goal.code, goal.title, goal.goalType, goal.linksToRoles, goal.mainEvidence, goal.release, mapping.learnerGoalType, mapping.selectable, file.version],
+      );
+    }
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+  return { goalsStored: file.goals.length };
+}
+
 // ---------------------------------------------------------------------------
 // Catalogue reads
 // ---------------------------------------------------------------------------

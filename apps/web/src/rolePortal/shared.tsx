@@ -142,6 +142,24 @@ export function safeErrorMessage(code: string | undefined): string | undefined {
     case 'QUESTION_SELF_PUBLISH_REFUSED': return 'You wrote, edited or submitted this revision, so someone else publishes it.';
     case 'QUESTION_MISCONCEPTION_NOT_PUBLISHED': return 'A misconception tagged on this question is not published yet, so the question cannot go live.';
     case 'QUESTION_RIGHTS_NOT_REVIEWED': return 'This revision has no rights review. It must be approved by a reviewer first.';
+    // OPS-09c: the lesson and variant editor.
+    case 'LESSON_INVALID': return 'The lesson is not ready: check the title and summary, the licence (with attribution for a CC licence), and for a lesson its module, skill and prerequisites, which must be known lessons that do not loop back to it.';
+    case 'LESSON_KEY_EXISTS': return 'A lesson with this key already exists.';
+    case 'LESSON_KEY_INVALID': return 'A key is 3 to 80 lower-case letters, digits and hyphens, starting with a letter or digit.';
+    case 'LESSON_VARIANT_EXISTS': return 'This lesson already has a variant in that language, level and style.';
+    case 'LESSON_BASE_NOT_LIVE': return 'Variants are made of published lessons. Publish the lesson first.';
+    case 'LESSON_NOT_A_BASE': return 'A variant is made of the lesson itself, not of another variant.';
+    case 'LESSON_TOPIC_UNKNOWN': return 'No live or pending skill has this key.';
+    case 'LESSON_TOPIC_NOT_LIVE': return 'The skill of this lesson is not published yet. Publish the skill first.';
+    case 'LESSON_MODULE_UNKNOWN': return 'No published module has this key.';
+    case 'LESSON_PREREQUISITE_NOT_LIVE': return 'A prerequisite of this lesson is not published yet. Publish its prerequisites first.';
+    case 'LESSON_OPEN_REVISION_EXISTS': return 'This lesson already has a revision on its way. Finish that one first.';
+    case 'LESSON_NOT_LIVE': return 'Only a published lesson can take a new revision; edit its draft instead.';
+    case 'LESSON_REVISION_NOT_EDITABLE': return 'This revision is in review or approved, so it cannot be edited. A reviewer can send it back for changes.';
+    case 'LESSON_SELF_REVIEW_REFUSED': return 'You wrote, edited or submitted this revision, so someone else reviews it.';
+    case 'LESSON_SELF_PUBLISH_REFUSED': return 'You wrote, edited or submitted this revision, so someone else publishes it.';
+    case 'LESSON_APPROVER_PUBLISH_REFUSED': return 'You approved this revision, so someone else publishes it.';
+    case 'LESSON_RIGHTS_NOT_REVIEWED': return 'This revision has no rights review. It must be approved by a reviewer first.';
     default: return undefined;
   }
 }

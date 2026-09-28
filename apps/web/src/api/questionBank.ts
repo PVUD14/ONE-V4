@@ -98,6 +98,10 @@ export interface BankQuestionRevisionDto {
   readonly topic: BankQuestionTopicDto | null;
   readonly tags: readonly { readonly optionId: string; readonly code: string; readonly codeVersion: number; readonly codeTitle: string; readonly codeState: string; readonly tagState: string }[];
   readonly ladder: { readonly source: string; readonly state: string; readonly generatorVersion: string | null; readonly promptVersion: string | null; readonly generatedAt: string | null } | null;
+  /** Set when an import pack drafted the revision (program B.8); null when a person wrote it. */
+  readonly agentDraft: { readonly generatorVersion: string; readonly promptVersion: string; readonly generatedAt: string } | null;
+  /** The agent draft's note for the subject expert. */
+  readonly expertCheck: string | null;
   readonly rightsReview: { readonly licenceLabel: string; readonly reviewerEmail: string; readonly reasonCode: string; readonly reviewedAt: string } | null;
 }
 

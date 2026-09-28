@@ -216,3 +216,32 @@ export function withholdAnswerKey(fields: QuestionDraftFields): QuestionDraftFie
     options: fields.options.map((option) => ({ ...option, misconception: null })),
   };
 }
+
+/** Where an agent-drafted body came from (program B.8), as an import pack recorded it. */
+export interface AgentDraftBodyProvenance {
+  readonly generatorVersion: string;
+  readonly promptVersion: string;
+  /** ISO timestamp. */
+  readonly generatedAt: string;
+  /** What a subject expert must check; null when the body carries no note. */
+  readonly expertCheck: string | null;
+}
+
+/**
+ * The agent-draft provenance a question (or skill) body carries under `provenance`, or null for
+ * a body a person wrote. Only a complete record counts: source AGENT_DRAFTED, generator and
+ * prompt versions of 1–128 characters, and a parseable timestamp — the same rule the 0049, 0056
+ * and 0061 provenance CHECKs apply to the rows it is copied into.
+ */
+export function readAgentDraftProvenance(body: unknown): AgentDraftBodyProvenance | null {
+  const raw = asRecord(body);
+  const provenance = asRecord(raw.provenance);
+  if (provenance.source !== 'AGENT_DRAFTED') return null;
+  const generatorVersion = clean(provenance.generatorVersion);
+  const promptVersion = clean(provenance.promptVersion);
+  const generatedAt = clean(provenance.generatedAt);
+  if (!generatorVersion || generatorVersion.length > 128 || !promptVersion || promptVersion.length > 128) return null;
+  if (!generatedAt || Number.isNaN(Date.parse(generatedAt))) return null;
+  const expertCheck = cleanBlock(raw.expertCheck);
+  return { generatorVersion, promptVersion, generatedAt: new Date(generatedAt).toISOString(), expertCheck: expertCheck ? expertCheck.slice(0, 4000) : null };
+}

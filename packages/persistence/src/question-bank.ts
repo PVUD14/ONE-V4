@@ -22,6 +22,7 @@ import {
   publishedQuestionColumns,
   questionMisconceptionTags,
   QUESTION_LICENCES_REQUIRING_ATTRIBUTION,
+  readAgentDraftProvenance,
   readQuestionDraftFields,
   sha256Hex,
   stableStringify,
@@ -38,6 +39,7 @@ import {
 } from '@planthepath/authorization/src/index.js';
 import { consumeOperationApproval, type ConsumedApproval } from './operation-approvals.js';
 import { validateAuditWriteInput, validateOutboxWriteInput } from './repositories.js';
+import { agentDraftBodyKeys, type AgentDraftProvenance } from './skill-map.js';
 
 // The content rules, for callers (the API) that do not depend on packages/career-readiness directly.
 export {
@@ -324,6 +326,10 @@ export interface QuestionRevisionView {
   /** The tag rows written at submission, with their states; empty when the key is withheld. */
   readonly tags: readonly QuestionTagView[];
   readonly ladder: { readonly source: string; readonly state: string; readonly generatorVersion: string | null; readonly promptVersion: string | null; readonly generatedAt: string | null } | null;
+  /** Set when an import pack drafted this revision (program B.8); null when a person wrote it. */
+  readonly agentDraft: { readonly generatorVersion: string; readonly promptVersion: string; readonly generatedAt: string } | null;
+  /** The note for the subject expert an agent draft carries. */
+  readonly expertCheck: string | null;
   readonly rightsReview: { readonly licenceLabel: string; readonly reviewerEmail: string; readonly reasonCode: string; readonly reviewedAt: string } | null;
 }
 
@@ -389,6 +395,7 @@ async function revisionView(runner: SqlRunner, revisionId: string, answerKeys: b
     SELECT source, review_state, generator_version, prompt_version, generated_at FROM question_hint_ladders WHERE question_revision_id = ${row.id}::uuid
   `);
   const fields = readQuestionDraftFields(row.body);
+  const drafted = readAgentDraftProvenance(row.body);
   return {
     id: row.id, revision: Number(row.revision), state: row.state, contentHash: row.content_hash,
     author: { userId: row.author_user_id, email: row.author_email },
@@ -399,6 +406,8 @@ async function revisionView(runner: SqlRunner, revisionId: string, answerKeys: b
     topic: await topicById(runner, fields.topicId),
     tags: tags.map((tag) => ({ optionId: tag.option_id, code: tag.code, codeVersion: Number(tag.version), codeTitle: tag.title, codeState: tag.code_state, tagState: tag.tag_state })),
     ladder: ladder ? { source: ladder.source, state: ladder.review_state, generatorVersion: ladder.generator_version, promptVersion: ladder.prompt_version, generatedAt: iso(ladder.generated_at) } : null,
+    agentDraft: drafted ? { generatorVersion: drafted.generatorVersion, promptVersion: drafted.promptVersion, generatedAt: drafted.generatedAt } : null,
+    expertCheck: drafted ? drafted.expertCheck : null,
     rightsReview: rights ? { licenceLabel: rights.license_label, reviewerEmail: rights.reviewer_email, reasonCode: rights.reason_code, reviewedAt: iso(rights.reviewed_at)! } : null,
   };
 }
@@ -496,9 +505,13 @@ async function keyInUse(tx: SqlRunner, stableKey: string): Promise<boolean> {
   return Boolean(row?.used);
 }
 
-/** Create a question: revision 1 in DRAFT, tagged to a live or pending topic. */
+/**
+ * Create a question: revision 1 in DRAFT, tagged to a live or pending topic. `agentDraft` is given
+ * only by an import pack (ENG-10): the body then carries its provenance and expert-check note.
+ */
 export async function createQuestion(db: TransactionalRunner, input: {
   readonly stableKey: string; readonly topicKey: string; readonly prompt: string; readonly reasonCode: string; readonly actor: QuestionActor;
+  readonly agentDraft?: AgentDraftProvenance;
 }): Promise<{ readonly questionId: string; readonly revisionId: string }> {
   const questionId = randomUUID();
   const revisionId = randomUUID();
@@ -513,14 +526,17 @@ export async function createQuestion(db: TransactionalRunner, input: {
       };
       const problems = validateQuestionDraft(input.stableKey, fields, false);
       if (problems.length) throw new QuestionBankError('QUESTION_INVALID', problems);
-      const body = composeQuestionBody({}, input.stableKey, fields);
+      const body = composeQuestionBody(input.agentDraft ? agentDraftBodyKeys(input.agentDraft) : {}, input.stableKey, fields);
       await tx.execute(sql`
         INSERT INTO content_revisions (id, entity_type, entity_id, revision, author_user_id, state, content_hash, body)
         VALUES (${revisionId}::uuid, 'QUESTION', ${questionId}::uuid, 1, ${input.actor.userId}::uuid, 'DRAFT', ${contentHashOf(body)}, ${JSON.stringify(body)}::jsonb)
       `);
       await audit(tx, {
         actor: input.actor, action: 'operations.content.question_created', revisionId,
-        context: { questionId, stableKey: input.stableKey, topicId: topic.id, revision: 1, reasonCode: input.reasonCode },
+        context: {
+          questionId, stableKey: input.stableKey, topicId: topic.id, revision: 1, reasonCode: input.reasonCode,
+          ...(input.agentDraft ? { source: 'AGENT_DRAFTED', packKey: input.agentDraft.packKey } : {}),
+        },
       });
     });
   } catch (error) {
@@ -645,14 +661,26 @@ async function moveRevision(tx: SqlRunner, input: { readonly revisionId: string;
 async function materialiseForReview(tx: SqlRunner, revision: LockedRevision & { stableKey: string }, fields: QuestionDraftFields, actor: QuestionActor, reasonCode: string): Promise<void> {
   const [ladder] = await rows<{ id: string }>(tx, sql`SELECT id FROM question_hint_ladders WHERE question_revision_id = ${revision.id}::uuid`);
   const [h1, h2, h3, h4] = fields.hints;
+  // An agent-drafted item (ENG-10) gives agent-drafted ladder and tag rows: a person submitting
+  // or editing it checks it, and the review record says so, but it does not become AUTHORED.
+  const drafted = readAgentDraftProvenance(revision.body);
+  const agent = drafted
+    ? {
+      source: 'AGENT_DRAFTED', generatorVersion: drafted.generatorVersion as string | null, promptVersion: drafted.promptVersion as string | null,
+      generatedAt: drafted.generatedAt as string | null,
+      expertCheckNotes: (drafted.expertCheck ?? 'Drafted by the coding agent: check every claim against its basis.') as string | null,
+    }
+    : { source: 'AUTHORED', generatorVersion: null, promptVersion: null, generatedAt: null, expertCheckNotes: null };
   if (ladder) {
     await tx.execute(sql`
       UPDATE question_hint_ladders SET hint_1 = ${h1}, hint_2 = ${h2}, hint_3 = ${h3}, hint_4 = ${h4}, updated_at = now() WHERE id = ${ladder.id}::uuid
     `);
   } else {
     await tx.execute(sql`
-      INSERT INTO question_hint_ladders (id, question_revision_id, hint_1, hint_2, hint_3, hint_4, source, created_by_user_id)
-      VALUES (${randomUUID()}::uuid, ${revision.id}::uuid, ${h1}, ${h2}, ${h3}, ${h4}, 'AUTHORED', ${actor.userId}::uuid)
+      INSERT INTO question_hint_ladders (id, question_revision_id, hint_1, hint_2, hint_3, hint_4, source, generator_version, prompt_version,
+                                         generated_at, expert_check_notes, created_by_user_id)
+      VALUES (${randomUUID()}::uuid, ${revision.id}::uuid, ${h1}, ${h2}, ${h3}, ${h4}, ${agent.source}, ${agent.generatorVersion}, ${agent.promptVersion},
+              ${agent.generatedAt}::timestamptz, ${agent.expertCheckNotes}, ${actor.userId}::uuid)
     `);
   }
   const basis = `Question bank editor: ${revision.stableKey} revision ${Number(revision.revision)}`;
@@ -679,15 +707,18 @@ async function materialiseForReview(tx: SqlRunner, revision: LockedRevision & { 
       from = 'DRAFT';
       const tagBody = {
         questionRevisionId: revision.id, optionId: tag.optionId, misconceptionCodeId: tag.codeId, rationale: tag.rationale,
-        basis, expertCheckNotes: null, source: 'AUTHORED', generatorVersion: null, promptVersion: null, generatedAt: null,
+        basis, expertCheckNotes: agent.expertCheckNotes, source: agent.source, generatorVersion: agent.generatorVersion,
+        promptVersion: agent.promptVersion, generatedAt: agent.generatedAt,
       };
       await tx.execute(sql`
         INSERT INTO content_revisions (id, entity_type, entity_id, revision, author_user_id, state, content_hash, body)
         VALUES (${tagRevisionId}::uuid, 'QUESTION_OPTION_MISCONCEPTION', ${tagId}::uuid, 1, ${actor.userId}::uuid, 'DRAFT', ${contentHashOf(tagBody)}, ${JSON.stringify(tagBody)}::jsonb)
       `);
       await tx.execute(sql`
-        INSERT INTO question_option_misconceptions (id, question_revision_id, option_id, misconception_code_id, rationale, basis, source, content_revision_id, created_by_user_id)
-        VALUES (${tagId}::uuid, ${revision.id}::uuid, ${tag.optionId}, ${tag.codeId}::uuid, ${tag.rationale}, ${basis}, 'AUTHORED', ${tagRevisionId}::uuid, ${actor.userId}::uuid)
+        INSERT INTO question_option_misconceptions (id, question_revision_id, option_id, misconception_code_id, rationale, basis, expert_check_notes,
+                                                    source, generator_version, prompt_version, generated_at, content_revision_id, created_by_user_id)
+        VALUES (${tagId}::uuid, ${revision.id}::uuid, ${tag.optionId}, ${tag.codeId}::uuid, ${tag.rationale}, ${basis}, ${agent.expertCheckNotes},
+                ${agent.source}, ${agent.generatorVersion}, ${agent.promptVersion}, ${agent.generatedAt}::timestamptz, ${tagRevisionId}::uuid, ${actor.userId}::uuid)
       `);
     }
     await moveRevision(tx, { revisionId: tagRevisionId, from, to: 'IN_REVIEW', action: 'SUBMIT', reasonCode, actor });

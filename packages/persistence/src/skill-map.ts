@@ -440,9 +440,38 @@ function rethrow(error: unknown): never {
   throw new SkillMapError('SKILL_MAP_REJECTED');
 }
 
-/** Create a skill: a pending TOPIC (inactive, AUTHORED) with revision 1 in DRAFT. */
+/**
+ * Where agent-drafted content came from (program B.8). Given only by an import pack (ENG-10); the
+ * operator screen never passes it. On a skill it sets 0056's AGENT_DRAFTED node columns, which are
+ * immutable after insert, and the revision body carries it (with the pack key and the note for
+ * the subject expert) unchanged from save to save.
+ */
+export interface AgentDraftProvenance {
+  readonly generatorVersion: string;
+  readonly promptVersion: string;
+  /** ISO timestamp the pack was written. */
+  readonly generatedAt: string;
+  readonly packKey: string;
+  /** What a subject expert must check before this is submitted. */
+  readonly expertCheck: string;
+  /** Other pack keys the body should carry (for the aptitude block, `area`). */
+  readonly carried?: Readonly<Record<string, string>>;
+}
+
+/** The body keys an agent draft carries; the editors' compose functions keep them on every save. */
+export function agentDraftBodyKeys(draft: AgentDraftProvenance): Record<string, unknown> {
+  return {
+    ...(draft.carried ?? {}),
+    packKey: draft.packKey,
+    expertCheck: draft.expertCheck,
+    provenance: { source: 'AGENT_DRAFTED', generatorVersion: draft.generatorVersion, promptVersion: draft.promptVersion, generatedAt: new Date(draft.generatedAt).toISOString() },
+  };
+}
+
+/** Create a skill: a pending TOPIC (inactive; AUTHORED, or AGENT_DRAFTED from an import pack) with revision 1 in DRAFT. */
 export async function createSkill(db: TransactionalRunner, input: {
   readonly stableKey: string; readonly name: string; readonly description: string; readonly reasonCode: string; readonly actor: SkillActor;
+  readonly agentDraft?: AgentDraftProvenance;
 }): Promise<{ readonly topicId: string; readonly revisionId: string }> {
   const fields: SkillDraftFields = {
     name: input.name, description: input.description, levels: { AWARE: '', GUIDED: '', INDEPENDENT: '', TROUBLESHOOT: '' },
@@ -458,18 +487,31 @@ export async function createSkill(db: TransactionalRunner, input: {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'skill-map:' + input.stableKey}))`);
       const existing = await rows<{ id: string }>(tx, sql`SELECT id FROM taxonomy_nodes WHERE kind = 'TOPIC' AND stable_key = ${input.stableKey} LIMIT 1`);
       if (existing[0]) throw new SkillMapError('SKILL_KEY_EXISTS');
-      const body = composeSkillBody({}, input.stableKey, fields);
+      const draft = input.agentDraft;
+      const body = composeSkillBody(draft ? agentDraftBodyKeys(draft) : {}, input.stableKey, fields);
       await tx.execute(sql`
         INSERT INTO content_revisions (id, entity_type, entity_id, revision, author_user_id, state, content_hash, body)
         VALUES (${revisionId}::uuid, 'TOPIC', ${topicId}::uuid, 1, ${input.actor.userId}::uuid, 'DRAFT', ${contentHashOf(body)}, ${JSON.stringify(body)}::jsonb)
       `);
-      await tx.execute(sql`
-        INSERT INTO taxonomy_nodes (id, kind, stable_key, version, name, description, content_revision_id, active)
-        VALUES (${topicId}::uuid, 'TOPIC', ${input.stableKey}, 1, ${input.name}, ${input.description}, ${revisionId}::uuid, false)
-      `);
+      if (draft) {
+        await tx.execute(sql`
+          INSERT INTO taxonomy_nodes (id, kind, stable_key, version, name, description, content_revision_id, active,
+                                      source, generator_version, prompt_version, generated_at)
+          VALUES (${topicId}::uuid, 'TOPIC', ${input.stableKey}, 1, ${input.name}, ${input.description}, ${revisionId}::uuid, false,
+                  'AGENT_DRAFTED', ${draft.generatorVersion}, ${draft.promptVersion}, ${new Date(draft.generatedAt).toISOString()}::timestamptz)
+        `);
+      } else {
+        await tx.execute(sql`
+          INSERT INTO taxonomy_nodes (id, kind, stable_key, version, name, description, content_revision_id, active)
+          VALUES (${topicId}::uuid, 'TOPIC', ${input.stableKey}, 1, ${input.name}, ${input.description}, ${revisionId}::uuid, false)
+        `);
+      }
       await audit(tx, {
         actor: input.actor, action: 'operations.content.skill_created', revisionId,
-        context: { topicId, stableKey: input.stableKey, revision: 1, reasonCode: input.reasonCode },
+        context: {
+          topicId, stableKey: input.stableKey, revision: 1, reasonCode: input.reasonCode,
+          ...(draft ? { source: 'AGENT_DRAFTED', packKey: draft.packKey } : {}),
+        },
       });
     });
   } catch (error) {

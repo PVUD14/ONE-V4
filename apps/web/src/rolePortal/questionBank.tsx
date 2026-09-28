@@ -310,6 +310,10 @@ function QuestionView({ revision, policy }: { readonly revision: BankQuestionRev
       <div><dt>Skill</dt><dd>{revision.topic ? `${revision.topic.name} (${revision.topic.stableKey})` : 'NA'}</dd></div>
       <div><dt>Licence</dt><dd>{fields.licenceLabel ?? 'NA'}{fields.attribution ? ` — ${fields.attribution}` : ''}</dd></div>
       <div><dt>Basis</dt><dd>{fields.basis ?? 'NA'}</dd></div>
+      <div><dt>Drafted by</dt><dd>{revision.agentDraft
+        ? `The coding agent (${revision.agentDraft.generatorVersion}, ${revision.agentDraft.promptVersion}, ${when(revision.agentDraft.generatedAt)}) — check it against its basis`
+        : 'A person'}</dd></div>
+      {revision.expertCheck ? <div><dt>For the subject expert</dt><dd>{revision.expertCheck}</dd></div> : null}
       <div><dt>Rights review</dt><dd>{revision.rightsReview
         ? `${revision.rightsReview.licenceLabel} confirmed by ${revision.rightsReview.reviewerEmail} (${revision.rightsReview.reasonCode}) · ${when(revision.rightsReview.reviewedAt)}`
         : 'Not yet reviewed'}</dd></div>

@@ -326,7 +326,9 @@ describe('EMP-06: apply enforces blocking eligibility from academic records', ()
     const verifiedApp = (await applyAs(verified, id).expect(201)).body.application.id as string;
     const list = await api().get(base(employerId) + '/' + id + '/applications').set(auth(recruiterId)).expect(200);
     noReadiness(list.body);
-    expect(JSON.stringify(list.body)).not.toContain('8.37');
+    // The student's figure must not reach the employer. Match it as a standalone number: a timestamp's
+    // milliseconds (e.g. "…:18.379Z") can contain the same digits and made this assertion flaky.
+    expect(JSON.stringify(list.body)).not.toMatch(/(^|[^0-9])8\.37([^0-9]|$)/);
     const row = (applicationId: string) => list.body.applications.find((item: { id: string }) => item.id === applicationId);
     const declaredCgpa = row(declaredApp).eligibility.outcomes.find((outcome: { ruleType: string }) => outcome.ruleType === 'MIN_CGPA');
     expect(declaredCgpa).toMatchObject({ outcome: 'MET', basis: 'SELF_REPORTED', flagged: true });

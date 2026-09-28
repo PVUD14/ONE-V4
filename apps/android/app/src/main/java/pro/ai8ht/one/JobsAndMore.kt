@@ -227,6 +227,11 @@ internal fun JobsScreen() {
                                     Text("Apply by ${formatWhen(it)}", style = MaterialTheme.typography.labelMedium,
                                         color = MaterialTheme.colorScheme.primary)
                                 }
+                                // EMP-11: this reaches the student through their college's approved drive.
+                                opp.campusDrives.forEach { drive ->
+                                    Spacer(Modifier.height(6.dp))
+                                    StatusChip("Campus drive · ${drive.institutionName}", ChipKind.Accent)
+                                }
                                 if (!opp.alreadyApplied) {
                                     Spacer(Modifier.height(10.dp))
                                     // Opens the role rather than applying. Applying carries a
@@ -299,6 +304,11 @@ internal fun JobsScreen() {
                                     Spacer(Modifier.height(6.dp))
                                     Text("Submitted ${formatWhen(it)}", style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                // EMP-11: applied through the college's campus drive.
+                                app.campusDrive?.let {
+                                    Spacer(Modifier.height(6.dp))
+                                    StatusChip("Campus drive · ${it.institutionName}", ChipKind.Accent)
                                 }
                                 // EMP-05: the employer cannot move this application on until the
                                 // student answers the changed terms.

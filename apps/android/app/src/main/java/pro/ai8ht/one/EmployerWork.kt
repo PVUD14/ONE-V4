@@ -236,7 +236,7 @@ internal fun MyInterviewsPage(employerId: String, onClose: () -> Unit) {
                                 Column(Modifier.weight(1f)) {
                                     Text(candidateLabel(interview.candidateName, interview.consentRevoked, interview.candidateAccess), style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.SemiBold)
-                                    Text(interview.opportunityTitle, style = MaterialTheme.typography.bodySmall,
+                                    Text(interview.displayTitle, style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                                 StatusChip(prettify(interview.state), when (interview.state) {
@@ -282,10 +282,14 @@ private fun InterviewScorecardPage(
     var concerns by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var notice by remember { mutableStateOf<String?>(null) }
+    // EMP-09: one rating per criterion of the stage's scorecard template, when it has one.
+    var criteria by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
 
     LaunchedEffect(interview.id) {
         brief = runCatching { Api.myInterviewBrief(context, employerId, interview.id) }.getOrNull()
     }
+    val template = brief?.scorecardTemplate
+    val criteriaComplete = template == null || template.criteria.all { criteria.containsKey(it.id) }
 
     OverlayScaffold(title = "Scorecard", onClose = onClose) {
         LazyColumn(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
@@ -294,11 +298,26 @@ private fun InterviewScorecardPage(
                 PilotCard {
                     Column(Modifier.padding(16.dp)) {
                         Text(candidateLabel(interview.candidateName, interview.consentRevoked, interview.candidateAccess), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        Text(interview.opportunityTitle, style = MaterialTheme.typography.bodyMedium,
+                        Text(interview.displayTitle, style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        brief?.opportunitySummary?.takeIf { it.isNotBlank() }?.let {
+                        (brief?.summary ?: brief?.opportunitySummary)?.takeIf { it.isNotBlank() }?.let {
                             Spacer(Modifier.height(8.dp))
                             Text(it, style = MaterialTheme.typography.bodySmall)
+                        }
+                        // EMP-09: the stage and, for the panellist's own calendar, the slot.
+                        Spacer(Modifier.height(6.dp))
+                        Text("Stage: ${brief?.stageLabel ?: "NA"}  ·  Scorecard: ${template?.name ?: "free text"}",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        val slot = brief?.scheduledStart ?: interview.scheduledStart
+                        if (slot != null) {
+                            TextButton(onClick = {
+                                val added = addInterviewToCalendar(
+                                    context, "Interview panel: ${interview.displayTitle}", slot, brief?.scheduledEnd ?: interview.scheduledEnd,
+                                    brief?.joiningLink ?: brief?.locationDetail,
+                                    "Round ${brief?.roundNumber ?: interview.roundNumber}. The candidate brief and any change are in ONE under My interviews.",
+                                )
+                                if (!added) notice = "No calendar app was found on this phone."
+                            }) { Text("Add to calendar") }
                         }
                     }
                 }
@@ -355,6 +374,12 @@ private fun InterviewScorecardPage(
                     }
                 }
             }
+            if (template != null) {
+                item {
+                    Spacer(Modifier.height(12.dp))
+                    CriteriaRatingPicker(template, criteria) { id, value -> criteria = criteria + (id to value) }
+                }
+            }
             item {
                 Spacer(Modifier.height(12.dp))
                 PilotCard {
@@ -388,7 +413,7 @@ private fun InterviewScorecardPage(
                             runCatching {
                                 Api.submitInterviewOutcome(
                                     context, employerId, interview.id, recommendation,
-                                    rating.takeIf { it > 0 }, strengths.trim(), concerns.trim(),
+                                    rating.takeIf { it > 0 }, strengths.trim(), concerns.trim(), criteria,
                                 )
                             }
                                 .onSuccess { onSubmitted() }
@@ -396,7 +421,7 @@ private fun InterviewScorecardPage(
                             busy = false
                         }
                     },
-                    enabled = !busy && recommendation.isNotBlank(),
+                    enabled = !busy && recommendation.isNotBlank() && criteriaComplete,
                     shape = RoundedCornerShape(10.dp),
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text(if (busy) "Submitting…" else "Submit scorecard") }
@@ -546,4 +571,4 @@ internal fun HiringAnalyticsPage(employerId: String, onClose: () -> Unit) {
 }
 
 /** Employer sub-pages reachable from the dashboard. */
-internal enum class EmployerOverlay { MyInterviews, Offers, Analytics, Team, CompanyProfile }
+internal enum class EmployerOverlay { MyInterviews, Interviews, Offers, Analytics, Team, CompanyProfile }

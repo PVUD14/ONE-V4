@@ -28,7 +28,18 @@ import kotlinx.serialization.Serializable
     val scheduledEnd: String? = null,
     val mode: String? = null,
     val location: String? = null,
-)
+    // What the API sends; `opportunityTitle` stays for older callers.
+    val title: String = "",
+    val roundNumber: Int = 1,
+    // EMP-09: the job stage, its scorecard template, and the latest change with its reason.
+    val stageLabel: String? = null,
+    val scorecardTemplate: ScorecardTemplateRefDto? = null,
+    val lastChange: InterviewLastChangeDto? = null,
+    val outcomeCount: Int = 0,
+    val closedAt: String? = null,
+) {
+    val displayTitle: String get() = title.ifBlank { opportunityTitle }
+}
 
 @Serializable data class InterviewBriefEnvelope(val interview: InterviewBriefDto)
 
@@ -45,6 +56,17 @@ import kotlinx.serialization.Serializable
     val state: String = "",
     val scheduledStart: String? = null,
     val outcomeRecorded: Boolean = false,
+    // What the API sends for the brief (EMP-08/EMP-09).
+    val title: String = "",
+    val summary: String? = null,
+    val scheduledEnd: String? = null,
+    val mode: String? = null,
+    val roundNumber: Int = 1,
+    val locationDetail: String? = null,
+    val joiningLink: String? = null,
+    val canRecordOutcome: Boolean = false,
+    val stageLabel: String? = null,
+    val scorecardTemplate: ScorecardTemplateDto? = null,
 )
 
 @Serializable data class EmployerOffersEnvelope(val offers: List<EmployerOfferDto> = emptyList())
@@ -132,7 +154,12 @@ suspend fun Api.submitInterviewOutcome(
     overallRating: Int?,
     strengths: String,
     concerns: String,
+    // EMP-09: one rating (1-5) per criterion of the stage's scorecard template, when it has one.
+    criteria: Map<String, Int> = emptyMap(),
 ) {
+    val ratings = criteria.entries.joinToString(prefix = "[", postfix = "]") { (id, rating) ->
+        buildJson("criterionId" to quoted(id), "rating" to rating.toString())
+    }
     request(
         context, "POST", "/api/v1/employers/$employerId/my-interviews/$interviewId/outcome",
         buildJson(
@@ -140,6 +167,7 @@ suspend fun Api.submitInterviewOutcome(
             *(if (overallRating == null) emptyArray() else arrayOf("overallRating" to overallRating.toString())),
             "strengths" to quoted(strengths),
             "concerns" to quoted(concerns),
+            *(if (criteria.isEmpty()) emptyArray() else arrayOf("criteria" to ratings)),
         ),
     )
 }

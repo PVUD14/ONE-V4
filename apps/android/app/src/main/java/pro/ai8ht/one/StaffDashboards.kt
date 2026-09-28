@@ -823,6 +823,10 @@ internal fun EmployerScaffold(
             SlideIn { MyInterviewsPage(organizationId, onClose = { employerOverlay = null }) }
             return
         }
+        EmployerOverlay.Interviews -> {
+            SlideIn { EmployerInterviewsPage(organizationId, onClose = { employerOverlay = null }) }
+            return
+        }
         EmployerOverlay.Offers -> {
             SlideIn { EmployerOffersPage(organizationId, onClose = { employerOverlay = null }) }
             return
@@ -969,6 +973,8 @@ private fun EmployerHome(
                 Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TextButton(onClick = { onOpenOverlay(EmployerOverlay.MyInterviews) }) { Text("My interviews") }
+                    // EMP-09: every interview, its history and its scorecards, read-only.
+                    TextButton(onClick = { onOpenOverlay(EmployerOverlay.Interviews) }) { Text("Interviews") }
                     TextButton(onClick = { onOpenOverlay(EmployerOverlay.Offers) }) { Text("Offers") }
                     TextButton(onClick = { onOpenOverlay(EmployerOverlay.Analytics) }) { Text("Hiring") }
                 }

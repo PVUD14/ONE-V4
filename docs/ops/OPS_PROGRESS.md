@@ -1391,3 +1391,92 @@ No misconception table was created: the editor writes to ENG-07's `question_opti
 **Android:** no change. Bulk import is an operator surface, and operator screens are web-only (Appendix 1 §4.3). Nothing a student sees changes: imported rows are drafts.
 
 **Next goal:** OPS-10.
+
+## OPS-10 — External reviewer access for college faculty — 2026-09-29
+**Result:** Complete. A college faculty member or department head holding `CONTENT_REVIEW_EXTERNAL` sees only the ONE drafts an internal reviewer assigned to them, for a fixed period, never an answer key and never a student, and records an audited, advisory decision. Approving (the rights review) and publishing stay with internal `CONTENT_REVIEW` and `CONTENT_PUBLISH` holders.
+
+**Branch / PR:** `feat/ops-external-reviewers`, cut from `onev4/feat/plan-phases-0-to-2` (edd5de8). The coordinator merges it. Commits, in order: design (1118052), acceptance tests (b5d9a68), implementation (62bce8f), this report.
+
+**Files created:**
+- `docs/architecture/ADR-037-external-faculty-content-review.md`, `docs/architecture/external-review-assignments-table-design.md`
+- `packages/persistence/drizzle/0066_external_review_assignments.sql`
+- `packages/authorization/src/external-review.ts` (who grants, who assigns, which membership may act in which college, conflict rules, reasons, derived status)
+- `packages/career-readiness/src/external-review.ts` (the whitelist view a faculty reviewer is shown, per content type)
+- `packages/persistence/src/external-reviews.ts`
+- `apps/api/src/http/operations-external-reviews.controller.ts`, `apps/api/src/http/institution-content-reviews.controller.ts`
+- `apps/web/src/api/externalReviews.ts`, `apps/web/src/rolePortal/externalReviews.tsx`
+- Tests: `packages/authorization/src/external-review.test.ts`, `packages/career-readiness/test/external-review.test.ts`, `apps/api/src/http/external-reviews.integration.spec.ts`, `apps/web/src/rolePortal/externalReviews.test.tsx`
+
+**Files modified:**
+- `packages/authorization/src/index.ts`, `packages/career-readiness/src/index.ts` (exports)
+- `packages/events/src/index.ts`: `external_review.assigned`, `external_review.decided`, `external_review.revoked`. Grant and revoke reuse OPS-01's `organization_membership.capability_granted` / `_revoked`.
+- `apps/api/src/http/api-security.module.ts` (two controllers registered)
+- `apps/web/src/api.ts` (client export)
+- `apps/web/src/rolePortalPages.tsx`, three branches only:
+  - Operations **Content Management**: the faculty review panel sits below bulk import.
+  - Faculty **Learning Resources**: the review queue sits above the read-only notice that label showed before.
+  - Department head **Assessments**: the queue is a section below the exam engine, rendered only for a holder of the grant.
+
+**Migrations added:** `0066_external_review_assignments.sql`. It adds:
+- the `external_review_assignments` table: revision, content hash, reviewer membership/user/college, assigner, DB-stamped times, a 1–30 day window, reason, `ASSIGNED`/`DECIDED`/`REVOKED`, decision columns, revocation columns, and shape CHECKs;
+- a partial unique index (one open assignment per revision and reviewer), plus list indexes;
+- `external_review_membership_eligible()`, and a guard trigger. On insert it requires an IN_REVIEW skill, question or lesson revision whose hash matches; an ACTIVE institution faculty or department-head membership of the stated college holding a live grant; a reviewer who is not the author and not the assigner; and a window of 1–30 days. On update the identity columns never change, and a row moves only `ASSIGNED → DECIDED` (refused after expiry, if the revision moved on, or if the grant or membership lapsed) or `ASSIGNED → REVOKED`. Rows are never deleted.
+
+It changes no existing table or migration.
+
+**Design docs / ADRs:** ADR-037 (the next free number on every onev4 branch), and `external-review-assignments-table-design.md`.
+
+**Validation:** see the amendment below.
+
+**Acceptance criteria:**
+- ✔ **A faculty reviewer sees only assigned drafts and cannot reach any student record through this path.**
+  - The queue and detail are filtered by the caller's user, their ACTIVE granted memberships in the path's college, and the assignment.
+  - Another reviewer's assignment gives 404, whether in the same college or another. Another college's path gives 403. A student's id used as an assignment id gives 404.
+  - The spec plants a student and an answer-key marker and finds neither, nor any email, in the faculty responses.
+  - The content is a whitelist, and is returned only while the assignment is OPEN. It is withheld once expired, withdrawn, revoked, or closed because the revision left review.
+- ✔ **Their decision is recorded and audited; publishing still needs an internal CONTENT_PUBLISH holder.**
+  - The decision writes `institution.content_review.decided` (actor, college, revision, decision, reason, comment length only) and outbox `external_review.decided`.
+  - The revision stays IN_REVIEW. The faculty member gets 403 on the editor's approve and publish.
+  - The spec then completes the journey (J9): an internal reviewer approves with the rights review, a publisher files an approval, a second person approves it, and the publisher publishes.
+- ✔ **ADR: a scoped CONTENT_REVIEW_EXTERNAL grantable to FACULTY_LECTURER and DEPARTMENT_HEAD; content access only; no student data; no publishing.** ADR-037 covers this, enforced by 0039's trigger (unchanged) and 0066's.
+- ✔ **Review queue in the institution portal under the existing faculty navigation, no new items.** Tested: assigned drafts only; approve, or request changes with a comment. The web test asserts the operations, faculty and department-head labels are unchanged.
+- ✔ **Conflict rules.**
+  - A contributor (author, editor or submitter, from the audit log as the editors compute it) cannot assign a draft (403 `EXTERNAL_REVIEW_CONTRIBUTOR_REFUSED`) and cannot be assigned it (API 403, and the trigger for the author).
+  - Assignments need `CONTENT_REVIEW`. The assigner is never the reviewer.
+- ✔ **Integration specs including cross-tenant denial tests; web tests.** The §6.6 minimums are covered:
+  - 401, and 403 for plain operations, institution admin, faculty on the operator side, non-grantees and other colleges;
+  - 200, and input 400s (unknown fields, reasons, window, empty set, email lookup not exact);
+  - 404, and keyset pagination with bounds (0/201/x);
+  - audit rows with reason codes, and `break_glass` for a super-admin assignment;
+  - the trigger refusals, and no delete.
+  - Web: real data, NA, loading, empty, error with reference, forbidden, reason-code dialogs, powers per viewer, the comment required to request changes, and unchanged labels.
+
+**Decisions for Divakar (recommendations adopted):**
+- **The faculty decision is advisory.** It does not move the revision, because approval is AI8HT's rights review. Faculty add the subject-matter check, shown beside the draft in Content Management.
+- **No answer keys for faculty.** The goal does not extend OPS-09b's rule that keys go only to CONTENT_EDIT and CONTENT_REVIEW, so question review shows the prompt, options, difficulty and skill. Hints are withheld too, since the ladder can walk to the answer. Showing keys inside the review surface only is a separate decision.
+- **Scope is per revision**, with several revisions assigned in one all-or-nothing action (an item set). Scoping by track was rejected because tracks are not one entity across skills, questions and lessons.
+- **Time limit on the assignment**, not on the grant: 1–30 days, 14 by default. Standing grants fall under the quarterly access review (OPS-15).
+- **Granting needs CAPABILITY_ADMIN, from Content Management**, never from the Settings staff screen, and not on oneself. It is not high-risk under §5.4, so there is no dual control. The college is not asked in-product: agree it out of band and record the reason `FACULTY_REVIEWER_AGREED`. The college's control is the membership, and ending it cuts access on the next request.
+- **Revoking the grant withdraws open assignments** in the same transaction, with reason `GRANT_REVOKED`.
+- **Staff-pool gating:** faculty are not gated. OPS-07 gates the three platform roles only, and this grant opens drafts, never student or operator data.
+- **Reason codes:**
+  - grant: `FACULTY_REVIEWER_AGREED`, `CORRECTION`
+  - revoke: `REVIEW_PROGRAMME_ENDED`, `COLLEGE_REQUEST`, `LEAVER`, `SECURITY_INCIDENT`, `CORRECTION`
+  - assign: `SUBJECT_EXPERT_REVIEW`, `CURRICULUM_ALIGNMENT`, `AGENT_DRAFT_CHECK`
+  - withdraw: `NO_LONGER_NEEDED`, `REASSIGNED`, `CORRECTION`
+  - approve: `REVIEW_PASSED`
+  - request changes (comment required): `CONTENT_INACCURATE`, `OUT_OF_SYLLABUS`, `UNCLEAR_WORDING`, `LEVEL_MISMATCH`, `ANSWER_OPTIONS_WEAK`, `OTHER_CONCERN`
+
+**Limitations / not done:**
+- The editors' own screens do not show faculty decisions inline. The internal reviewer reads them in the Faculty review panel just below, filtered by draft.
+- There is no notification to the faculty member when something is assigned. The mail sender is HG-7, so they see it in their queue.
+- One decision per assignment, with no discussion thread. A re-review is a new assignment.
+- Faculty opening a draft is not audited as a read. Only the decision is, because the content is ONE's global content, not personal data.
+
+**Risks / follow-ups:**
+- Any goal that changes the editors' contributor actions must also update `draftSavedActions`/`transitionedActions` in `persistence/src/external-reviews.ts`.
+- `docs/security/reviews/OPERATIONS-CONSOLE-SECURITY-REVIEW.md` §3.8 said "no API can grant it today". That is now superseded by this goal, and the review should record the new controls.
+
+**Android:** no change, and nothing to compile. Faculty content review is a desk task (reading drafts, writing comments), like the operator screens §4.3 keeps web-only. The phone's institution workspace has home, verification and exams, and no Learning Resources screen; adding one would be a new navigation entry. The contract change is additive, as new endpoints only, so nothing the app calls changes.
+
+**Next goal:** OPS-12 (OPS-11 is already complete).

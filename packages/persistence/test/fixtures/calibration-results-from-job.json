@@ -1,0 +1,69 @@
+{
+  "format": "one-calibration-results-v1",
+  "runId": "0e130000-0000-4000-8000-000000000001",
+  "algorithmId": "item-calibration-2pl-v1",
+  "library": "girth==0.8.0 numpy==2.4.6 scipy==1.17.1",
+  "minResponses": 200,
+  "exportedAt": "2026-09-28T00:00:00.000Z",
+  "generatedAt": "2026-09-28T00:00:00Z",
+  "learnersRead": 300,
+  "responsesRead": 1240,
+  "itemsRead": 5,
+  "items": [
+    {
+      "itemSource": "CAREER_READINESS_QUESTION",
+      "itemId": "0e130000-0000-4000-8000-000000000000",
+      "itemVersion": 1,
+      "model": "2PL",
+      "difficulty": -2.7096,
+      "discrimination": 0.3392,
+      "responsesUsed": 300,
+      "status": "CALIBRATED",
+      "statusReason": null
+    },
+    {
+      "itemSource": "CAREER_READINESS_QUESTION",
+      "itemId": "0e130001-0000-4000-8000-000000000001",
+      "itemVersion": 1,
+      "model": "2PL",
+      "difficulty": 1.4871,
+      "discrimination": 1.1636,
+      "responsesUsed": 300,
+      "status": "CALIBRATED",
+      "statusReason": null
+    },
+    {
+      "itemSource": "CAREER_READINESS_QUESTION",
+      "itemId": "0e130002-0000-4000-8000-000000000002",
+      "itemVersion": 1,
+      "model": "2PL",
+      "difficulty": -1.0682,
+      "discrimination": 2.5314,
+      "responsesUsed": 300,
+      "status": "CALIBRATED",
+      "statusReason": null
+    },
+    {
+      "itemSource": "CAREER_READINESS_QUESTION",
+      "itemId": "0e130003-0000-4000-8000-000000000003",
+      "itemVersion": 1,
+      "model": "2PL",
+      "difficulty": -1.4278,
+      "discrimination": 0.738,
+      "responsesUsed": 300,
+      "status": "CALIBRATED",
+      "statusReason": null
+    },
+    {
+      "itemSource": "CAREER_READINESS_QUESTION",
+      "itemId": "0e130009-0000-4000-8000-000000000009",
+      "itemVersion": 1,
+      "model": "2PL",
+      "difficulty": 0.6931,
+      "discrimination": 1.0,
+      "responsesUsed": 40,
+      "status": "PROVISIONAL",
+      "statusReason": "TOO_FEW_RESPONSES"
+    }
+  ]
+}

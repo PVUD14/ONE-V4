@@ -18,6 +18,7 @@ import {
   grantStaffCapability,
   listOperationApprovals,
   publishCareerRequirementSet,
+  publishBankQuestionRevision,
   publishSkillRevision,
   releasePrivacyHold,
   requestOperationApproval,
@@ -53,6 +54,8 @@ export function describeApproval(approval: OperationApprovalDto): string {
       return `Publish requirement set v${summary.careerSetVersion ?? 'NA'} for ${summary.careerRoleCatalogueCode ? `${summary.careerRoleCatalogueCode} ` : ''}${summary.careerRoleTitle ?? 'NA'} as ${summary.releaseLabel === 'VERIFIED' ? 'Verified' : 'Not yet verified'}`;
     case 'CONTENT_SKILL_PUBLISH':
       return `Publish revision ${summary.skillRevision ?? 'NA'} of the skill ${summary.skillName ?? 'NA'} (${summary.skillKey ?? 'NA'})`;
+    case 'CONTENT_QUESTION_PUBLISH':
+      return `Publish revision ${summary.questionRevision ?? 'NA'} of the question ${summary.questionKey ?? 'NA'} to the readiness check`;
   }
 }
 
@@ -81,6 +84,8 @@ async function executeApproval(token: string, approval: OperationApprovalDto): P
       await publishCareerRequirementSet(token, String(payload.setId), { releaseLabel: String(payload.releaseLabel), reasonCode, approvalId }); return;
     case 'CONTENT_SKILL_PUBLISH':
       await publishSkillRevision(token, String(payload.revisionId), { reasonCode, approvalId }); return;
+    case 'CONTENT_QUESTION_PUBLISH':
+      await publishBankQuestionRevision(token, String(payload.revisionId), { reasonCode, approvalId }); return;
   }
 }
 
@@ -267,7 +272,7 @@ export function RequestApprovalDialog({ token, actionKey, payload, title, detail
       .catch((cause) => { if (!controller.signal.aborted) setError(formatApiError(cause, 'Unable to load the approval policy.')); });
     return () => controller.abort();
   }, [token]);
-  const reasons = fixedReasons ?? policy?.actions.find((action) => action.actionKey === actionKey)?.reasons ?? [];
+  const reasons = fixedReasons ?? policy?.actions?.find((action) => action.actionKey === actionKey)?.reasons ?? [];
   const submit = async (event: React.FormEvent): Promise<void> => {
     event.preventDefault();
     if (!reasonCode) { setError('Choose a reason code.'); return; }

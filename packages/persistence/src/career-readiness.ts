@@ -685,12 +685,15 @@ export async function startAssessmentAttempt(pool: Pool, input: {
     if (Number(consumed.rows[0]?.used ?? 0) >= published.attempt_limit) {
       throw new Error('assessment attempt limit reached');
     }
+    // Current versions only: a question republished through the question bank editor (OPS-09b,
+    // 0061) supersedes its earlier version, which stays for the attempts that already hold it.
     const questionRows = await client.query<{
       id: string; topic_id: string; prompt: string; options: ProtectedQuestionVersion['options']; version: number; correct_option_id: string;
     }>(
       `SELECT q.id, q.topic_id, q.prompt, q.options, q.version, k.correct_option_id
        FROM question_versions q JOIN question_answer_keys k ON k.question_version_id=q.id
-       JOIN release_manifests rm ON rm.id=q.release_manifest_id AND rm.status='PUBLISHED' ORDER BY q.id`,
+       JOIN release_manifests rm ON rm.id=q.release_manifest_id AND rm.status='PUBLISHED'
+       WHERE q.superseded_at IS NULL ORDER BY q.id`,
     );
     const protectedQuestions = questionRows.rows.map((question) => ({
       id: question.id, topicId: question.topic_id, prompt: question.prompt, options: question.options,

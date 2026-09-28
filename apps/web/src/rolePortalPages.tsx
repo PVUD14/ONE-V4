@@ -22,6 +22,7 @@ import { EmployerAssessmentsPage } from './employerAssessmentsPage.js';
 import { LearnerContentStudio } from './learnerContentStudio.js';
 import { OperationsCareerCataloguePage } from './rolePortal/careerCatalogue.js';
 import { OperationsSkillMapPage } from './rolePortal/skillMap.js';
+import { OperationsQuestionBankPage } from './rolePortal/questionBank.js';
 import { InstitutionReportsPage } from './institutionReportsPage.js';
 import { InstitutionExportsPanel } from './rolePortal/institutionAnalytics.js';
 import { OperationsCareerReadinessPanel } from './operationsCareerReadinessPanel.js';
@@ -268,7 +269,7 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   // OPS-08: the job-role catalogue sits above both; only this label's branch changes.
   // OPS-09a: the skill map editor sits under the catalogue, whose sets name its skills.
   if (!demoMode && portal.key === 'operations-admin' && route.label === 'Content Management') {
-    return <><OperationsCareerCataloguePage /><OperationsSkillMapPage /><LearnerContentStudio /><OperationsContentReadOnlyPage /></>;
+    return <><OperationsCareerCataloguePage /><OperationsSkillMapPage /><OperationsQuestionBankPage /><LearnerContentStudio /><OperationsContentReadOnlyPage /></>;
   }
   // Audit Logs leaves the shared technical panel: the audit-event search endpoint is
   // complete and role-gated, and pointing this item at the generic status page was the

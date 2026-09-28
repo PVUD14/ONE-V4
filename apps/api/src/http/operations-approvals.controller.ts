@@ -38,6 +38,7 @@ import {
   isInternalCapability,
   refuseApprovalRequest,
   refuseInternalCapabilityGrant,
+  refuseQuestionPublish,
   refuseSkillPublish,
   type ApprovalDecision,
   type HighRiskActionKey,
@@ -45,6 +46,7 @@ import {
 } from '@planthepath/authorization/src/index.js';
 import { loadRequirementSetForPublish } from '@planthepath/persistence/src/career-catalogue.js';
 import { loadSkillRevisionForPublish } from '@planthepath/persistence/src/skill-map.js';
+import { loadQuestionRevisionForPublish } from '@planthepath/persistence/src/question-bank.js';
 import {
   countHighRiskApprovers,
   createOperationApproval,
@@ -271,6 +273,18 @@ export class OperationsApprovalsController {
         if (refusal) throw new ForbiddenException(domainError(refusal, correlationId));
         return { targetId: revisionId, canonical: approvalPayloads.CONTENT_SKILL_PUBLISH({ revisionId, contentHash: revision.contentHash, reasonCode }) };
       }
+      case 'CONTENT_QUESTION_PUBLISH': {
+        // OPS-09b: only an approved question revision, and only by someone who wrote, edited and
+        // submitted none of it (they will execute it).
+        const revisionId = requireUuidField(payload.revisionId, correlationId);
+        const revision = await loadQuestionRevisionForPublish(this.db, revisionId);
+        if (!revision) throw new OperationApprovalError('APPROVAL_TARGET_NOT_FOUND');
+        if (revision.state !== 'APPROVED') throw badRequest('APPROVAL_TARGET_STATE_INVALID', correlationId);
+        if (!revision.needsApproval) throw new OperationApprovalError('APPROVAL_NOT_REQUIRED');
+        const refusal = refuseQuestionPublish({ actor, contributorUserIds: revision.contributorUserIds });
+        if (refusal) throw new ForbiddenException(domainError(refusal, correlationId));
+        return { targetId: revisionId, canonical: approvalPayloads.CONTENT_QUESTION_PUBLISH({ revisionId, contentHash: revision.contentHash, reasonCode }) };
+      }
     }
   }
 }
@@ -284,6 +298,7 @@ const payloadFields: Readonly<Record<HighRiskActionKey, readonly string[]>> = {
   CAPABILITY_GRANT_HIGH_RISK: ['membershipId', 'capability', 'reasonCode', 'note'],
   CAREER_REQUIREMENT_SET_PUBLISH: ['setId', 'releaseLabel', 'reasonCode'],
   CONTENT_SKILL_PUBLISH: ['revisionId', 'reasonCode'],
+  CONTENT_QUESTION_PUBLISH: ['revisionId', 'reasonCode'],
 };
 
 /**
@@ -321,6 +336,8 @@ function toApprovalDto(row: OperationApprovalRow, actor: Actor, approverCount: n
       skillName: row.skillName,
       skillKey: row.skillKey,
       skillRevision: row.skillRevision,
+      questionKey: row.questionKey,
+      questionRevision: row.questionRevision,
     },
     reasonCode: row.reasonCode,
     note: row.note,

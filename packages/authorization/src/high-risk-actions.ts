@@ -10,6 +10,7 @@
  */
 import { careerPublishReasons } from './career-catalogue.js';
 import { skillPublishReasons } from './skill-map.js';
+import { questionPublishReasons } from './question-bank.js';
 import { hasInternalCapability, internalCapabilityGrantReasons, type InternalCapability, type InternalCapabilityContext } from './internal-capabilities.js';
 
 export const highRiskActionKeys = [
@@ -23,6 +24,8 @@ export const highRiskActionKeys = [
   'CAREER_REQUIREMENT_SET_PUBLISH',
   // OPS-09a. Extended key too (0057 adds it to operation_approval_extended_target_type).
   'CONTENT_SKILL_PUBLISH',
+  // OPS-09b. Extended key too (0061 adds it to operation_approval_extended_target_type).
+  'CONTENT_QUESTION_PUBLISH',
 ] as const;
 
 /** The keys 0038's CHECK allows in `action_key`; any other key is an extended key (0051). */
@@ -51,6 +54,7 @@ export const highRiskActions: Readonly<Record<HighRiskActionKey, HighRiskActionD
   CAPABILITY_GRANT_HIGH_RISK: { capability: 'CAPABILITY_ADMIN', targetType: 'organization_membership', label: 'Grant a high-risk capability' },
   CAREER_REQUIREMENT_SET_PUBLISH: { capability: 'CONTENT_PUBLISH', targetType: 'career_requirement_set', label: 'Publish a career-role requirement set' },
   CONTENT_SKILL_PUBLISH: { capability: 'CONTENT_PUBLISH', targetType: 'content_revision', label: 'Publish a skill that changes readiness inputs' },
+  CONTENT_QUESTION_PUBLISH: { capability: 'CONTENT_PUBLISH', targetType: 'content_revision', label: 'Publish a readiness-check question' },
 };
 
 export function isLegacyHighRiskActionKey(key: HighRiskActionKey): boolean {
@@ -73,6 +77,7 @@ export const approvalRequestReasons: Readonly<Record<HighRiskActionKey, readonly
   CAPABILITY_GRANT_HIGH_RISK: internalCapabilityGrantReasons,
   CAREER_REQUIREMENT_SET_PUBLISH: careerPublishReasons,
   CONTENT_SKILL_PUBLISH: skillPublishReasons,
+  CONTENT_QUESTION_PUBLISH: questionPublishReasons,
 };
 
 /** Hours from request to expiry; one window covers deciding and executing. */

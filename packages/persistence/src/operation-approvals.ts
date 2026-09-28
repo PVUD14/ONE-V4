@@ -184,6 +184,9 @@ export interface OperationApprovalRow {
   readonly skillName: string | null;
   readonly skillKey: string | null;
   readonly skillRevision: number | null;
+  /** For a question publish (OPS-09b): the question's key and the revision number — never its answer. */
+  readonly questionKey: string | null;
+  readonly questionRevision: number | null;
 }
 
 interface ApprovalDbRow {
@@ -195,6 +198,7 @@ interface ApprovalDbRow {
   organization_name: string | null; member_email: string | null; member_user_id: string | null; hold_reason: string | null;
   career_role_title: string | null; career_role_catalogue_code: string | null; career_set_version: number | null;
   skill_name: string | null; skill_key: string | null; skill_revision: number | null;
+  question_key: string | null; question_revision: number | null;
 }
 
 // Microsecond text timestamps for the keyset cursor: a millisecond cursor would repeat
@@ -212,7 +216,10 @@ const approvalSelect = sql`
          a.solo, a.solo_notice_state, a.executed_at,
          o.legal_name AS organization_name, mu.email AS member_email, mu.id AS member_user_id, h.reason_code AS hold_reason,
          cr.title AS career_role_title, cr.catalogue_code AS career_role_catalogue_code, crs.version AS career_set_version,
-         COALESCE(skr.body->>'name', skn.name) AS skill_name, skn.stable_key AS skill_key, skr.revision AS skill_revision
+         CASE WHEN skr.entity_type = 'TOPIC' THEN COALESCE(skr.body->>'name', skn.name) END AS skill_name, skn.stable_key AS skill_key,
+         CASE WHEN skr.entity_type = 'TOPIC' THEN skr.revision END AS skill_revision,
+         CASE WHEN skr.entity_type = 'QUESTION' THEN skr.body->>'stableKey' END AS question_key,
+         CASE WHEN skr.entity_type = 'QUESTION' THEN skr.revision END AS question_revision
   FROM operation_approvals a
   JOIN users ru ON ru.id = a.requested_by_user_id
   LEFT JOIN users du ON du.id = a.decided_by_user_id
@@ -261,6 +268,8 @@ function mapApproval(row: ApprovalDbRow): OperationApprovalRow {
     skillName: row.skill_name,
     skillKey: row.skill_key,
     skillRevision: row.skill_revision === null ? null : Number(row.skill_revision),
+    questionKey: row.question_key,
+    questionRevision: row.question_revision === null ? null : Number(row.question_revision),
   };
 }
 

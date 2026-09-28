@@ -34,6 +34,9 @@ export const approvalPayloads = {
   // OPS-09a: an APPROVED revision is frozen; its content hash makes the bound payload the exact content.
   CONTENT_SKILL_PUBLISH: (input: { readonly revisionId: string; readonly contentHash: string; readonly reasonCode: string }) =>
     ({ revisionId: input.revisionId.toLowerCase(), contentHash: input.contentHash, reasonCode: input.reasonCode }),
+  // OPS-09b: the same binding for a question revision — the hash covers its answer key, tags and hints.
+  CONTENT_QUESTION_PUBLISH: (input: { readonly revisionId: string; readonly contentHash: string; readonly reasonCode: string }) =>
+    ({ revisionId: input.revisionId.toLowerCase(), contentHash: input.contentHash, reasonCode: input.reasonCode }),
 } satisfies Record<HighRiskActionKey, (input: never) => Record<string, unknown> & { reasonCode: string }>;
 
 function domainError(code: string, correlationId: string): { readonly error: { readonly code: string; readonly message: string; readonly correlationId: string } } {

@@ -41,6 +41,7 @@ import {
   type CalendarResponse,
 } from './interview-scheduling.js';
 import { selectionStagesOf } from './opportunity-requirements.js';
+import { opportunityHasAudienceSql } from './campus-drives.js';
 import {
   assertEmployerState,
   employerStateRefusal,
@@ -224,8 +225,10 @@ export class EmployerHiringController {
       throw badRequest('OPPORTUNITY_NOT_PUBLISHABLE', context.correlationId);
     }
     // An opportunity with no audience reaches nobody. Publishing it would look like
-    // success while silently going nowhere, so it is refused.
-    const audiences = await this.db.execute(sql`SELECT count(*)::int AS count FROM opportunity_audiences WHERE opportunity_id = ${id}::uuid`) as QueryResult<{ count: number }>;
+    // success while silently going nowhere, so it is refused. EMP-11: a campus drive that is
+    // pending or live counts; until the college approves it the job reaches nobody, and the
+    // employer's drive list says so.
+    const audiences = await this.db.execute(sql`SELECT (CASE WHEN ${opportunityHasAudienceSql(id)} THEN 1 ELSE 0 END)::int AS count`) as QueryResult<{ count: number }>;
     if ((audiences.rows[0]?.count ?? 0) === 0) throw badRequest('AUDIENCE_REQUIRED', context.correlationId);
 
     await this.recordReviewSignals(id, employerId, context.authorization.principal.userId, context.correlationId);

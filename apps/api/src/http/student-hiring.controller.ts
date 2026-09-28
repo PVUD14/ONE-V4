@@ -33,6 +33,7 @@ import { readSnapshotChoices, SnapshotInputError, type SnapshotChoices } from '@
 import { buildSnapshotFor, readResumeOptions, SnapshotResumeUnavailable, writeApplicationSnapshot, type BuiltSnapshot } from './application-snapshots.js';
 import { loadInterviewCalendar } from '@planthepath/persistence/src/interview-calendar-source.js';
 import { sendCalendar } from './interview-scheduling.js';
+import { linkApplicationToCampusDrives, readListedCampusDrives, readStudentCampusDrives, visibleThroughCampusDriveSql } from './campus-drives.js';
 
 type QueryResult<T> = { rows: T[] };
 
@@ -206,7 +207,12 @@ export class StudentHiringController {
       LIMIT 100
     `) as QueryResult<Record<string, unknown>>;
 
-    return { opportunities: rows.rows.map(mapOpportunitySummary), correlationId: context.correlationId };
+    // EMP-11: which of these reach the student through a drive their college approved.
+    const drives = await readListedCampusDrives(this.db, studentUserId, rows.rows.map((row) => String(row.id)));
+    return {
+      opportunities: rows.rows.map((row) => ({ ...mapOpportunitySummary(row), campusDrives: drives.get(String(row.id)) ?? [] })),
+      correlationId: context.correlationId,
+    };
   }
 
   @Get('/opportunities/:opportunityId')
@@ -237,11 +243,14 @@ export class StudentHiringController {
     if (!row) throw forbidden(context.correlationId);
 
     const versionId = String(row.version_id);
-    const [skills, stages, rules, records] = await Promise.all([
+    const [skills, stages, rules, records, campusDrives] = await Promise.all([
       this.db.execute(sql`SELECT skill_name, requirement_level, taxonomy_topic_id FROM opportunity_skill_requirements WHERE opportunity_version_id = ${versionId}::uuid ORDER BY requirement_level DESC, lower(skill_name)`) as Promise<QueryResult<Record<string, unknown>>>,
       this.db.execute(sql`SELECT stage_order, stage_kind, label, detail FROM opportunity_selection_stages WHERE opportunity_version_id = ${versionId}::uuid ORDER BY stage_order`) as Promise<QueryResult<Record<string, unknown>>>,
       readVersionEligibilityRules(this.db, versionId),
       readEligibilityRecords(this.db, studentUserId),
+      // EMP-11: the drives at the student's colleges, the placement policy in force at each, and
+      // whether it would stop this student — told before they try, not only when refused.
+      readStudentCampusDrives(this.db, studentUserId, id),
     ]);
 
     // EMP-06: the same evaluator apply enforces, from the student's own academic records.
@@ -270,6 +279,10 @@ export class StudentHiringController {
         // Per rule: met or not, on what basis, and the student's own value (EMP-06).
         rules: studentRuleOutcomes(eligibility, names),
       },
+      campusDrives: campusDrives.map(({ id: _driveId, placementPolicy, ...drive }) => ({
+        ...drive,
+        placementPolicy: placementPolicy ? { policyType: placementPolicy.policyType, allowDriveExceptions: placementPolicy.allowDriveExceptions, note: placementPolicy.note } : null,
+      })),
       correlationId: context.correlationId,
     };
   }
@@ -291,7 +304,10 @@ export class StudentHiringController {
              -- EMP-10: whether the employer started a conversation, and how many of its messages are unread.
              EXISTS (SELECT 1 FROM application_message_threads mt WHERE mt.application_id = a.id) AS conversation_started,
              (SELECT count(*) FROM application_messages m JOIN application_message_threads mt ON mt.id = m.thread_id
-               WHERE mt.application_id = a.id AND m.sender_side = 'EMPLOYER' AND m.read_at IS NULL AND m.erased_at IS NULL) AS unread_messages
+               WHERE mt.application_id = a.id AND m.sender_side = 'EMPLOYER' AND m.read_at IS NULL AND m.erased_at IS NULL) AS unread_messages,
+             (SELECT inst.legal_name FROM campus_drive_applications l
+               JOIN campus_drives cd ON cd.id = l.campus_drive_id JOIN organizations inst ON inst.id = cd.institution_id
+               WHERE l.application_id = a.id ORDER BY l.created_at, cd.id LIMIT 1) AS campus_drive_institution
       FROM applications a
       JOIN opportunities o ON o.id = a.opportunity_id
       JOIN opportunity_versions v ON v.id = a.applied_version_id
@@ -434,6 +450,23 @@ export class StudentHiringController {
         } });
       }
 
+      // EMP-11: a live drive at the student's college governs this application, whichever listing
+      // the student used, and the college's placement policy is enforced here (decision 10.2 #11).
+      // The drives are held FOR SHARE so a cancellation either lands first or waits for this.
+      const drives = await readStudentCampusDrives(tx, studentUserId, input.opportunityId, true);
+      const blocking = drives.find((drive) => drive.blocksYou);
+      if (blocking) {
+        throw new BadRequestException({ error: {
+          code: 'PLACEMENT_POLICY_ONE_OFFER', message: 'Request could not be completed', correlationId: context.correlationId,
+          institutionName: blocking.institutionName, policyType: blocking.placementPolicy?.policyType ?? 'ONE_OFFER_PER_STUDENT',
+        } });
+      }
+      // Visibility again, under the drive locks: a drive cancelled since the first read no longer admits the student.
+      const stillVisible = await tx.execute(sql`
+        SELECT 1 FROM opportunities o WHERE o.id = ${input.opportunityId}::uuid AND ${visibleToStudent(studentUserId)}
+      `) as QueryResult<Record<string, unknown>>;
+      if (stillVisible.rows.length !== 1) throw forbidden(context.correlationId);
+
       // The partial unique index on open applications is the real guard against a
       // double submission racing this insert; ON CONFLICT keeps it a clean 200.
       const inserted = await tx.execute(sql`
@@ -459,6 +492,7 @@ export class StudentHiringController {
         VALUES (${this.ids.uuid()}::uuid, ${employerId}::uuid, ${studentUserId}::uuid, ${input.opportunityId}::uuid, now())
         ON CONFLICT (employer_id, student_user_id, opportunity_id) WHERE revoked_at IS NULL DO NOTHING
       `);
+      await linkApplicationToCampusDrives(tx, applicationId, input.opportunityId, drives);
       // What the employer is told about this applicant's eligibility, frozen as it stood now.
       if (evaluation) await recordEligibilityEvaluation(tx, this.ids, { applicationId, versionId, trigger: 'APPLY', evaluation });
       await this.writeAudit(studentUserId, 'application.submitted', 'application', applicationId, context.correlationId, tx);
@@ -798,7 +832,8 @@ export class StudentHiringController {
 const employerInGoodStanding = employerInGoodStandingSql(sql`o.employer_id`);
 
 function visibleToStudent(studentUserId: string) {
-  return sql`EXISTS (
+  // EMP-11: or through a campus drive the student's college has approved (ADR-038).
+  return sql`(${visibleThroughCampusDriveSql(studentUserId)} OR EXISTS (
     SELECT 1 FROM opportunity_audiences oa
     WHERE oa.opportunity_id = o.id
       AND (
@@ -814,7 +849,7 @@ function visibleToStudent(studentUserId: string) {
               FROM institution_student_profiles isp
               WHERE isp.student_user_id = ${studentUserId}::uuid AND isp.status = 'ACTIVE'))
       )
-  )`;
+  ))`;
 }
 
 function mapOpportunitySummary(row: Record<string, unknown>): Record<string, unknown> {
@@ -883,6 +918,8 @@ function mapApplication(row: Record<string, unknown>): Record<string, unknown> {
     feedbackReleased: row.feedback_released === true,
     conversationStarted: row.conversation_started === true,
     unreadMessages: Number(row.unread_messages ?? 0),
+    // EMP-11: the college whose drive this application came through, if any.
+    campusDrive: typeof row.campus_drive_institution === 'string' ? { institutionName: row.campus_drive_institution } : null,
   };
 }
 

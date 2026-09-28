@@ -19,7 +19,8 @@ import { randomUUID } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import type { IntegrationEventEnvelope } from '@planthepath/events/src/index.js';
 import { handleEventIdempotently } from './outbox-dispatcher.js';
-import { PermanentMailRejection, type InvitationMailSink } from './invitation-mail.js';
+import { PermanentMailRejection, type InvitationMailSink, type MailAttachment } from './invitation-mail.js';
+import { loadInterviewCalendar } from './interview-calendar-source.js';
 import { validateOutboxWriteInput, type PersistenceDb } from './repositories.js';
 
 type QueryResult<T> = { rows: T[] };
@@ -85,6 +86,11 @@ export interface HiringNoticeFacts {
   /** OFFER_RESPONDED (employer notice). */
   readonly offerResponse?: 'ACCEPTED' | 'DECLINED';
   readonly referenceCode?: string | null;
+  /**
+   * EMP-09: who reads an INTERVIEW_* notice. The candidate (default) or a member of the interview
+   * panel; a panel notice names the job and never the candidate.
+   */
+  readonly audience?: 'CANDIDATE' | 'PANEL';
 }
 
 const modeLabels: Readonly<Record<string, string>> = { ONSITE: 'on site', VIDEO: 'video', PHONE: 'phone' };
@@ -132,10 +138,25 @@ export function renderHiringNotice(facts: HiringNoticeFacts, timeZone?: string |
       body = `${employer} changed the terms of ${job} after you applied. Review them under Applications and accept or decline; your application waits until you answer.`;
       break;
     case 'INTERVIEW_SCHEDULED':
+      if (facts.audience === 'PANEL') {
+        title = `Interview panel: ${job}`;
+        body = `You are on the panel for ${round} (${mode}) for ${job} on ${when}. The candidate brief and how to join are under My Interviews.`;
+        break;
+      }
       title = `Interview scheduled: ${job}`;
       body = `${employer} scheduled ${round} (${mode}) for ${job} on ${when}. The location or joining link, and what to prepare, are under Applications.`;
       break;
     case 'INTERVIEW_CHANGED':
+      if (facts.audience === 'PANEL') {
+        if (facts.interviewChange === 'CANCELLED') {
+          title = `Panel interview cancelled: ${job}`;
+          body = `${capitalise(round)} for ${job}, which you were on the panel for, was cancelled.`;
+        } else {
+          title = `Panel interview moved: ${job}`;
+          body = `${capitalise(round)} (${mode}) for ${job}, which you are on the panel for, moved to ${when}. The details are under My Interviews.`;
+        }
+        break;
+      }
       if (facts.interviewChange === 'CANCELLED') {
         title = `Interview cancelled: ${job}`;
         body = `${employer} cancelled ${round} for ${job}. If they reschedule, you will be told here.`;
@@ -180,6 +201,10 @@ export function renderHiringEmail(notice: { readonly title: string; readonly bod
   };
 }
 
+function capitalise(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
 function truncate(value: string, max: number): string {
   return value.length <= max ? value : `${value.slice(0, max - 1)}…`;
 }
@@ -209,7 +234,12 @@ export async function consumeHiringNotificationEvent(
   });
   if (!result.executed || !result.result) return { executed: false };
   const { outcome, recipients } = result.result;
-  const emails = outcome === 'NOTIFIED' && deps.mailSink ? await deliverHiringEmails(db, event.eventId, deps.mailSink, event.correlationId) : undefined;
+  let emails: HiringEmailCounts | undefined;
+  if (outcome === 'NOTIFIED' && deps.mailSink) {
+    // EMP-09: an interview email carries the calendar invite for the revision the event names.
+    const attachments = await interviewAttachments(db, event);
+    emails = await deliverHiringEmails(db, event.eventId, deps.mailSink, event.correlationId, attachments);
+  }
   return { executed: true, outcome, recipients, ...(emails ? { emails } : {}) };
 }
 
@@ -272,18 +302,24 @@ async function notify(tx: PersistenceDb, event: IntegrationEventEnvelope, sinkCo
       if (toState !== 'RESCHEDULED' && toState !== 'CANCELLED') return none('NOT_APPLICABLE');
       change = toState;
     }
+    const interviewId = payloadUuid(event, 'interviewId');
     const found = await tx.execute(sql`
       SELECT ${applicationContextColumns}, i.round_number, i.mode, i.scheduled_start
       FROM interviews i JOIN applications a ON a.id = i.application_id AND a.employer_id = i.employer_id
       ${applicationContextJoins}
-      WHERE i.id = ${payloadUuid(event, 'interviewId')}::uuid
+      WHERE i.id = ${interviewId}::uuid
     `) as QueryResult<ApplicationContext & { round_number: number; mode: string; scheduled_start: Date | string | null }>;
     const row = found.rows[0];
     if (!row) return none('NOT_FOUND');
     const interview = { roundNumber: Number(row.round_number), mode: row.mode, scheduledStart: row.scheduled_start ? new Date(row.scheduled_start) : null };
-    return studentNotice(tx, event, row, change
+    const facts: StudentFacts = change
       ? { kind: 'INTERVIEW_CHANGED', interview, interviewChange: change }
-      : { kind: 'INTERVIEW_SCHEDULED', interview }, sinkConfigured);
+      : { kind: 'INTERVIEW_SCHEDULED', interview };
+    const student = await studentNotice(tx, event, row, facts, sinkConfigured);
+    // EMP-09: everyone on the panel hears about it too, once each.
+    const panel = await panelNotices(tx, event, row, interviewId, facts, sinkConfigured);
+    const recipients = student.recipients + panel;
+    return { outcome: recipients ? 'NOTIFIED' : 'NOT_APPLICABLE', recipients };
   }
 
   // Offers.
@@ -323,6 +359,61 @@ async function notify(tx: PersistenceDb, event: IntegrationEventEnvelope, sinkCo
   return { outcome: written ? 'NOTIFIED' : 'NOT_APPLICABLE', recipients: written };
 }
 
+/** The template row names who approved the wording: the employer member whose action sent it. */
+async function ensureHiringTemplate(tx: Executor, event: IntegrationEventEnvelope, kind: Exclude<HiringNotificationKind, 'OFFER_RESPONDED'>): Promise<void> {
+  const approver = event.actorId;
+  if (!approver) throw new Error('hiring event has no actor');
+  await tx.execute(sql`
+    INSERT INTO notification_templates (id, stable_key, version, locale, subject_template, body_template, approved_by_user_id, published_at)
+    VALUES (${templateIds[kind]}::uuid, ${hiringTemplateKey(kind)}, ${HIRING_TEMPLATE_VERSION}, 'en-IN', '{title}',
+            'Rendered by the hiring notification consumer: the in-app notice title and body, then where to act and how to turn hiring emails off.',
+            ${approver}::uuid, now())
+    ON CONFLICT DO NOTHING
+  `);
+}
+
+/**
+ * EMP-09: an in-app notice and an email to each active panellist of the interview — assigned, not
+ * removed, still an active member of that employer, and an active account — each in their own
+ * timezone. The notice names the job, never the candidate: the brief in ONE is where the person
+ * is shown, and only while the candidate's grant is live.
+ */
+async function panelNotices(
+  tx: PersistenceDb, event: IntegrationEventEnvelope, context: ApplicationContext, interviewId: string, facts: StudentFacts, sinkConfigured: boolean,
+): Promise<number> {
+  const panel = await tx.execute(sql`
+    SELECT DISTINCT p.participant_user_id, np.timezone
+    FROM interview_participants p
+    JOIN interviews i ON i.id = p.interview_id
+    JOIN organization_memberships m ON m.user_id = p.participant_user_id AND m.organization_id = i.employer_id
+      AND m.scope_organization_id = i.employer_id AND m.scope_employer_id = i.employer_id AND m.state = 'ACTIVE'
+    JOIN users u ON u.id = p.participant_user_id AND u.state = 'ACTIVE'
+    LEFT JOIN notification_preferences np ON np.user_id = p.participant_user_id
+    WHERE p.interview_id = ${interviewId}::uuid AND p.removed_at IS NULL
+    ORDER BY p.participant_user_id
+  `) as QueryResult<{ participant_user_id: string; timezone: string | null }>;
+  if (!panel.rows.length) return 0;
+  const kind = facts.kind as Exclude<HiringNotificationKind, 'OFFER_RESPONDED'>;
+  await ensureHiringTemplate(tx, event, kind);
+  let written = 0;
+  for (const member of panel.rows) {
+    const notice = renderHiringNotice({ ...facts, audience: 'PANEL', employerName: context.employer_name, opportunityTitle: context.title }, member.timezone);
+    written += await writeNotices(tx, {
+      eventId: event.eventId, applicationId: context.application_id, kind, recipientKind: 'EMPLOYER_MEMBER', recipientIds: [member.participant_user_id], notice,
+      data: { screen: 'my-interviews', employerName: context.employer_name, opportunityTitle: context.title }, email: true, sinkConfigured,
+    });
+  }
+  return written;
+}
+
+/** The calendar invite for an interview event's revision, as an email attachment; none for other events. */
+async function interviewAttachments(db: PersistenceDb, event: IntegrationEventEnvelope): Promise<readonly MailAttachment[]> {
+  if (event.eventType !== 'interview.scheduled' && event.eventType !== 'interview.state_changed') return [];
+  const revisionId = typeof event.payload.revisionId === 'string' ? payloadUuid(event, 'revisionId') : null;
+  const file = await loadInterviewCalendar(db, { interviewId: payloadUuid(event, 'interviewId'), revisionId, reader: 'EMAIL' });
+  return file ? [file] : [];
+}
+
 async function loadApplication(tx: Executor, applicationId: string): Promise<ApplicationContext | undefined> {
   const found = await tx.execute(sql`
     SELECT ${applicationContextColumns} FROM applications a ${applicationContextJoins}
@@ -337,17 +428,8 @@ async function studentNotice(
   tx: PersistenceDb, event: IntegrationEventEnvelope, context: ApplicationContext, facts: StudentFacts, sinkConfigured: boolean,
 ): Promise<{ outcome: HiringNotificationOutcome; recipients: number }> {
   const notice = renderHiringNotice({ ...facts, employerName: context.employer_name, opportunityTitle: context.title }, context.timezone);
-  // The template row names who approved the wording: the employer member whose action sent it.
   const kind = facts.kind as Exclude<HiringNotificationKind, 'OFFER_RESPONDED'>;
-  const approver = event.actorId;
-  if (!approver) throw new Error('hiring event has no actor');
-  await tx.execute(sql`
-    INSERT INTO notification_templates (id, stable_key, version, locale, subject_template, body_template, approved_by_user_id, published_at)
-    VALUES (${templateIds[kind]}::uuid, ${hiringTemplateKey(kind)}, ${HIRING_TEMPLATE_VERSION}, 'en-IN', '{title}',
-            'Rendered by the hiring notification consumer: the in-app notice title and body, then where to act and how to turn hiring emails off.',
-            ${approver}::uuid, now())
-    ON CONFLICT DO NOTHING
-  `);
+  await ensureHiringTemplate(tx, event, kind);
   const written = await writeNotices(tx, {
     eventId: event.eventId, applicationId: context.application_id, kind, recipientKind: 'STUDENT', recipientIds: [context.student_user_id], notice,
     data: { screen: kind.startsWith('OFFER') ? 'offers' : 'applications', employerName: context.employer_name, opportunityTitle: context.title },
@@ -438,7 +520,9 @@ async function queueOfferExpiryReminder(tx: Executor, offerId: string, employerI
  * by a conditional update, so two workers never send the same one; the outcome is recorded per
  * recipient. A failure is recorded and never undoes anything else.
  */
-export async function deliverHiringEmails(db: PersistenceDb, eventId: string, mailSink: InvitationMailSink, correlationId: string): Promise<HiringEmailCounts> {
+export async function deliverHiringEmails(
+  db: PersistenceDb, eventId: string, mailSink: InvitationMailSink, correlationId: string, attachments: readonly MailAttachment[] = [],
+): Promise<HiringEmailCounts> {
   const counts = { sent: 0, failed: 0, bounced: 0 };
   for (;;) {
     const claimed = await db.execute(sql`
@@ -457,7 +541,8 @@ export async function deliverHiringEmails(db: PersistenceDb, eventId: string, ma
     const email = renderHiringEmail({ title: recipient.title, body: recipient.body });
     let outcome: 'SENT' | 'FAILED' | 'BOUNCED' = 'SENT';
     try {
-      await mailSink.send({ toEmail: recipient.email, subject: email.subject, textBody: email.textBody, invitationId: eventId, correlationId });
+      await mailSink.send({ toEmail: recipient.email, subject: email.subject, textBody: email.textBody, invitationId: eventId, correlationId,
+        ...(attachments.length ? { attachments } : {}) });
     } catch (error) {
       outcome = error instanceof PermanentMailRejection ? 'BOUNCED' : 'FAILED';
     }

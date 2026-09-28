@@ -106,11 +106,15 @@ export interface ApplicantEligibilityDto {
 
 /** A job's selection stage, with the application state moving an applicant to it means. */
 export interface SelectionStageDto {
+  /** Present where a screen acts on the stage now (the applicant pipeline schedules against it). */
+  readonly id?: string;
   readonly order: number;
   readonly kind: string;
   readonly label: string;
   readonly detail: string | null;
   readonly applicationState: string | null;
+  /** EMP-09: the scorecard template an interview stage uses. Absent from older responses. */
+  readonly scorecardTemplate?: { readonly id: string; readonly name: string | null } | null;
 }
 
 export interface StudentApplicationDto {
@@ -220,7 +224,13 @@ export interface EmployerInterviewDto {
   readonly scheduledStart: string | null;
   readonly scheduledEnd: string | null;
   readonly locationDetail: string | null;
+  /** EMP-09: only for the member who scheduled it and the panel; otherwise null and `joiningLinkWithheld`. */
   readonly joiningLink: string | null;
+  readonly joiningLinkWithheld?: boolean;
+  readonly stageLabel?: string | null;
+  readonly scorecardTemplate?: { readonly id: string; readonly name: string } | null;
+  /** EMP-09: the latest schedule change, with its reason code. */
+  readonly lastChange?: { readonly kind: string; readonly reasonCode: string | null; readonly at: string | null } | null;
   readonly submittedAt: string | null;
   readonly closedAt: string | null;
   readonly outcomeCount: number;
@@ -382,6 +392,8 @@ export interface InterviewScheduleInput {
   readonly participantVisibilityAcknowledged?: boolean;
   /** EMP-08: shown to the candidate as written, in their interview view. */
   readonly preparationNote?: string;
+  /** EMP-09: the interview or group-discussion stage; its scorecard template is copied onto the interview. */
+  readonly selectionStageId?: string;
 }
 
 export interface InterviewParticipantOptionDto {
@@ -408,6 +420,99 @@ export interface ParticipantInterviewDto {
   readonly summary: string | null;
   readonly responsibilities: string | null;
   readonly canRecordOutcome: boolean;
+  /** EMP-09: on the brief only. */
+  readonly stageLabel?: string | null;
+  readonly scorecardTemplate?: ScorecardTemplateDto | null;
+}
+
+/** EMP-09: an employer's scorecard template: criteria and guidance an interview stage uses. */
+export interface ScorecardTemplateDto {
+  readonly id: string;
+  readonly name: string;
+  readonly guidance: string | null;
+  readonly retiredAt: string | null;
+  readonly createdAt?: string | null;
+  readonly criteria: readonly { readonly id: string; readonly position: number; readonly label: string; readonly guidance: string | null }[];
+}
+
+export interface ScorecardTemplateInput {
+  readonly name: string;
+  readonly guidance?: string;
+  readonly criteria: readonly { readonly label: string; readonly guidance?: string }[];
+}
+
+export function listScorecardTemplates(token: string, employerId: string, signal?: AbortSignal): Promise<{ readonly templates: readonly ScorecardTemplateDto[] }> {
+  return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/scorecard-templates`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function createScorecardTemplate(token: string, employerId: string, body: ScorecardTemplateInput): Promise<{ readonly template: ScorecardTemplateDto }> {
+  return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/scorecard-templates`, { token, method: 'POST', body });
+}
+
+export const scorecardTemplateRetireReasons = ['NO_LONGER_USED', 'REPLACED', 'CREATED_IN_ERROR'] as const;
+
+export function retireScorecardTemplate(token: string, employerId: string, templateId: string, reasonCode: typeof scorecardTemplateRetireReasons[number]): Promise<{ readonly template: ScorecardTemplateDto }> {
+  return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/scorecard-templates/${encodeURIComponent(templateId)}/retire`, { token, method: 'POST', body: { reasonCode } });
+}
+
+/** EMP-09: one change to an interview's schedule, oldest first. */
+export interface InterviewRevisionDto {
+  readonly revisionNumber: number;
+  readonly changeKind: 'BASELINE' | 'SCHEDULED' | 'RESCHEDULED' | 'CANCELLED' | 'COMPLETED' | 'NO_SHOW';
+  readonly reasonCode: string | null;
+  readonly note: string | null;
+  readonly mode: string;
+  readonly scheduledStart: string | null;
+  readonly scheduledEnd: string | null;
+  readonly locationDetail: string | null;
+  readonly joiningLink: string | null;
+  readonly actorLabel: string;
+  readonly recordedAt: string | null;
+}
+
+export function listInterviewHistory(token: string, employerId: string, interviewId: string, signal?: AbortSignal): Promise<{ readonly revisions: readonly InterviewRevisionDto[] }> {
+  return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/interviews/${encodeURIComponent(interviewId)}/history`, { token, ...(signal ? { signal } : {}) });
+}
+
+/** EMP-09: every scorecard on an interview, per interviewer and criterion. Never a total. */
+export interface InterviewScorecardsDto {
+  readonly template: ScorecardTemplateDto | null;
+  readonly scorecards: readonly {
+    readonly submittedBy: string; readonly recommendation: string; readonly overallRating: number | null;
+    readonly strengths: string | null; readonly concerns: string | null; readonly notes: string | null; readonly submittedAt: string | null;
+    readonly ratings: readonly { readonly criterionId: string; readonly label: string; readonly rating: number; readonly note: string | null }[];
+  }[];
+}
+
+export function getInterviewScorecards(token: string, employerId: string, interviewId: string, signal?: AbortSignal): Promise<InterviewScorecardsDto> {
+  return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/interviews/${encodeURIComponent(interviewId)}/scorecards`, { token, ...(signal ? { signal } : {}) });
+}
+
+/** EMP-09: an interview's calendar invite, fetched with the access token for the browser to save. */
+async function downloadCalendar(token: string, path: string): Promise<{ readonly blob: Blob; readonly filename: string }> {
+  const correlationId = crypto.randomUUID();
+  const response = await fetch(`${apiBaseUrl}${path}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'text/calendar', 'X-Correlation-Id': correlationId } });
+  if (!response.ok) throw new ApiRequestError({ status: response.status, correlationId: response.headers?.get('x-correlation-id') ?? correlationId });
+  const disposition = response.headers?.get('content-disposition') ?? '';
+  const filename = /filename="([^"]+)"/.exec(disposition)?.[1] ?? 'interview.ics';
+  return { blob: await response.blob(), filename };
+}
+
+export function downloadStudentInterviewCalendar(token: string, interviewId: string): Promise<{ readonly blob: Blob; readonly filename: string }> {
+  return downloadCalendar(token, `/api/v1/students/me/interviews/${encodeURIComponent(interviewId)}/calendar`);
+}
+
+export function downloadMyInterviewCalendar(token: string, employerId: string, interviewId: string): Promise<{ readonly blob: Blob; readonly filename: string }> {
+  return downloadCalendar(token, `/api/v1/employers/${encodeURIComponent(employerId)}/my-interviews/${encodeURIComponent(interviewId)}/calendar`);
+}
+
+/** Hand a downloaded file to the browser to save. */
+export function saveDownloadedFile(file: { readonly blob: Blob; readonly filename: string }): void {
+  const url = URL.createObjectURL(file.blob);
+  const link = document.createElement('a');
+  link.href = url; link.download = file.filename; link.rel = 'noopener';
+  document.body.appendChild(link); link.click(); link.remove();
+  URL.revokeObjectURL(url);
 }
 
 export function listInterviewParticipantOptions(token: string, employerId: string, signal?: AbortSignal): Promise<{ readonly participants: readonly InterviewParticipantOptionDto[] }> {
@@ -435,9 +540,16 @@ export interface OfferInput {
   readonly conditions?: string;
 }
 
+/** EMP-09: why an interview moved or was cancelled. Never shown to the candidate. */
+export const interviewRescheduleReasons = ['CANDIDATE_REQUESTED', 'INTERVIEWER_UNAVAILABLE', 'SCHEDULING_CONFLICT', 'LOGISTICS_CHANGED', 'TECHNICAL_ISSUE'] as const;
+export const interviewCancelReasons = ['CANDIDATE_REQUESTED', 'CANDIDATE_WITHDREW', 'INTERVIEWER_UNAVAILABLE', 'POSITION_FILLED', 'PROCESS_CHANGED', 'SCHEDULED_IN_ERROR'] as const;
+
 export interface InterviewStateInput {
   readonly toState: 'RESCHEDULED' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW';
-  readonly reason?: string;
+  /** Required for RESCHEDULED and CANCELLED (EMP-09). */
+  readonly reasonCode?: string;
+  /** Internal; never shown to the candidate. */
+  readonly note?: string;
   readonly scheduledStart?: string;
   readonly scheduledEnd?: string;
 }
@@ -448,6 +560,8 @@ export interface InterviewOutcomeInput {
   readonly strengths?: string;
   readonly concerns?: string;
   readonly notes?: string;
+  /** EMP-09: one rating (1–5) per criterion of the interview's scorecard template, when it has one. */
+  readonly criteria?: readonly { readonly criterionId: string; readonly rating: number; readonly note?: string }[];
 }
 
 export function updateInterviewState(token: string, employerId: string, interviewId: string, body: InterviewStateInput): Promise<{ readonly interview: { readonly id: string; readonly state: string } }> {

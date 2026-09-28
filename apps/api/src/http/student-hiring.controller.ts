@@ -1,4 +1,4 @@
-import { BadRequestException, Body, ConflictException, Controller, Delete, ForbiddenException, Get, Inject, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, ConflictException, Controller, Delete, ForbiddenException, Get, Inject, NotFoundException, Param, Patch, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { externalApplicationCap, externalFields, externalInputRecord, externalRevision, ExternalApplicationInputError, type ExternalApplicationFields } from '@planthepath/hiring/src/external-applications.js';
 import { sql } from 'drizzle-orm';
 import type { PersistenceDb } from '@planthepath/persistence/src/repositories.js';
@@ -31,6 +31,8 @@ import {
 import { employerInGoodStandingSql } from './employer-organisation-state.js';
 import { readSnapshotChoices, SnapshotInputError, type SnapshotChoices } from '@planthepath/hiring/src/application-snapshot.js';
 import { buildSnapshotFor, readResumeOptions, SnapshotResumeUnavailable, writeApplicationSnapshot, type BuiltSnapshot } from './application-snapshots.js';
+import { loadInterviewCalendar } from '@planthepath/persistence/src/interview-calendar-source.js';
+import { sendCalendar } from './interview-scheduling.js';
 
 type QueryResult<T> = { rows: T[] };
 
@@ -674,6 +676,32 @@ export class StudentHiringController {
       LIMIT ${size}
     `) as QueryResult<Record<string, unknown>>;
     return { interviews: rows.rows.map(mapStudentInterview), correlationId: context.correlationId };
+  }
+
+  /**
+   * EMP-09: the calendar invite for one of the student's own interviews, while it is ahead (with
+   * how to join and what to prepare) or once it is cancelled (so their calendar can drop it).
+   * Past and completed interviews have none. Someone else's interview is refused like a missing one.
+   */
+  @Get('/students/me/interviews/:interviewId/calendar')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async interviewCalendar(@Req() request: ProtectedHttpRequest, @Param('interviewId') interviewId: string,
+    @Res() response: { setHeader(name: string, value: string): void; send(body: string): void }): Promise<void> {
+    const context = requireTrustedAuthorization(request);
+    const id = requireUuid(interviewId, context.correlationId);
+    const rows = await this.db.execute(sql`
+      SELECT i.state, (i.state IN ('SCHEDULED', 'RESCHEDULED') AND a.closed_at IS NULL AND a.consent_revoked_at IS NULL
+               AND coalesce(i.scheduled_end, i.scheduled_start + interval '1 hour') > now()) AS upcoming
+      FROM interviews i JOIN applications a ON a.id = i.application_id AND a.employer_id = i.employer_id
+      WHERE i.id = ${id}::uuid AND a.student_user_id = ${context.authorization.principal.userId}::uuid AND a.state <> 'DRAFT'
+    `) as QueryResult<{ state: string; upcoming: boolean }>;
+    const [interview] = rows.rows;
+    if (!interview) throw forbidden(context.correlationId);
+    const file = interview.upcoming === true || interview.state === 'CANCELLED'
+      ? await loadInterviewCalendar(this.db, { interviewId: id, reader: 'STUDENT' })
+      : null;
+    if (!file) throw new NotFoundException({ error: { code: 'CALENDAR_NOT_AVAILABLE', message: 'Request could not be completed', correlationId: context.correlationId } });
+    sendCalendar(response, file);
   }
 
   @Get('/students/me/offers')

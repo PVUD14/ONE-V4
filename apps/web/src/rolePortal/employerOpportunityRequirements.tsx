@@ -11,9 +11,10 @@
  * stage order, which skills are in the ONE catalogue, and whether a live job's eligibility
  * change needs a reason. This screen offers the same choices and reports the server's answer.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   createOpportunityVersion,
+  listScorecardTemplates,
   searchSkillCatalogue,
   type EligibilityRuleDto,
   type OpportunityRequirementsDto,
@@ -47,7 +48,9 @@ const reasonLabels: Readonly<Record<string, string>> = {
 
 interface RuleDraft { readonly key: number; ruleType: string; comparator: string; value: string; isBlocking: boolean; readonly locked?: EligibilityRuleDto }
 interface SkillDraft { readonly key: number; name: string; taxonomyTopicId: string | null; level: 'REQUIRED' | 'PREFERRED' }
-interface StageDraft { readonly key: number; kind: string; label: string; detail: string }
+interface StageDraft { readonly key: number; kind: string; label: string; detail: string; scorecardTemplateId: string }
+/** EMP-09: the stage kinds whose interviews are scored, and so may carry a scorecard template. */
+const scoredStageKinds = ['INTERVIEW', 'GROUP_DISCUSSION'];
 
 let nextKey = 1;
 const key = () => nextKey++;
@@ -110,7 +113,21 @@ export function OpportunityRequirementsEditor({ employerId, opportunityId, token
   const initial = version.requirements;
   const [rules, setRules] = useState<RuleDraft[]>(() => (initial?.eligibilityRules ?? []).map(toRuleDraft));
   const [skills, setSkills] = useState<SkillDraft[]>(() => (initial?.skills ?? []).map((skill) => ({ key: key(), name: skill.name, taxonomyTopicId: skill.taxonomyTopicId, level: skill.level })));
-  const [stages, setStages] = useState<StageDraft[]>(() => (initial?.stages ?? []).map((stage) => ({ key: key(), kind: stage.kind, label: stage.label, detail: stage.detail ?? '' })));
+  const [stages, setStages] = useState<StageDraft[]>(() => (initial?.stages ?? []).map((stage) => ({ key: key(), kind: stage.kind, label: stage.label, detail: stage.detail ?? '', scorecardTemplateId: stage.scorecardTemplate?.id ?? '' })));
+  // EMP-09: the employer's scorecard templates to choose from; the stages' current ones stay listed even if retired.
+  const [templates, setTemplates] = useState<readonly { readonly id: string; readonly name: string; readonly retired: boolean }[]>(() =>
+    (initial?.stages ?? []).flatMap((stage) => stage.scorecardTemplate ? [{ id: stage.scorecardTemplate.id, name: stage.scorecardTemplate.name ?? 'Current template', retired: false }] : []));
+  useEffect(() => {
+    const abort = new AbortController();
+    listScorecardTemplates(token, employerId, abort.signal).then((response) => {
+      if (abort.signal.aborted) return;
+      setTemplates((current) => {
+        const loaded = (response.templates ?? []).map((template) => ({ id: template.id, name: template.name, retired: template.retiredAt !== null }));
+        return [...loaded, ...current.filter((existing) => !loaded.some((item) => item.id === existing.id))];
+      });
+    }).catch(() => undefined);
+    return () => abort.abort();
+  }, [token, employerId]);
   const [careerRoleId, setCareerRoleId] = useState<string>(initial?.careerRole?.id ?? '');
   const [roleOptions, setRoleOptions] = useState<SkillCatalogueDto['careerRoles']>(initial?.careerRole ? [{ ...initial.careerRole, family: '' }] : []);
   const [reasonCode, setReasonCode] = useState('');
@@ -151,7 +168,8 @@ export function OpportunityRequirementsEditor({ employerId, opportunityId, token
           isBlocking: neverBlocks(rule.ruleType) ? false : rule.isBlocking,
         }),
       skills: skills.map((skill) => skill.taxonomyTopicId ? { taxonomyTopicId: skill.taxonomyTopicId, level: skill.level } : { name: skill.name, level: skill.level }),
-      stages: stages.map((stage) => ({ kind: stage.kind, label: stage.label, ...(stage.detail.trim() ? { detail: stage.detail } : {}) })),
+      stages: stages.map((stage) => ({ kind: stage.kind, label: stage.label, ...(stage.detail.trim() ? { detail: stage.detail } : {}),
+        ...(stage.scorecardTemplateId && scoredStageKinds.includes(stage.kind) ? { scorecardTemplateId: stage.scorecardTemplateId } : {}) })),
       careerRoleId: careerRoleId || null,
       ...(reasonCode ? { reasonCode } : {}),
     };
@@ -245,11 +263,15 @@ export function OpportunityRequirementsEditor({ employerId, opportunityId, token
         </select></label>
         <label><span>Name</span><input value={stage.label} required maxLength={120} onChange={(event) => patchStage(stage.key, { label: event.target.value })} /></label>
         <label><span>Detail (optional)</span><input value={stage.detail} maxLength={1000} onChange={(event) => patchStage(stage.key, { detail: event.target.value })} /></label>
+        {scoredStageKinds.includes(stage.kind) ? <label><span>Scorecard template</span><select value={stage.scorecardTemplateId} onChange={(event) => patchStage(stage.key, { scorecardTemplateId: event.target.value })}>
+          <option value="">None (free-text scorecard)</option>
+          {templates.filter((template) => !template.retired || template.id === stage.scorecardTemplateId).map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}
+        </select></label> : null}
         <button type="button" className="secondary" disabled={index === 0} onClick={() => moveStage(index, -1)}>Up</button>
         <button type="button" className="secondary" disabled={index === stages.length - 1} onClick={() => moveStage(index, 1)}>Down</button>
         <button type="button" className="secondary" onClick={() => setStages((current) => current.filter((item) => item.key !== stage.key))}>Remove</button>
       </div>)}
-      <button type="button" className="secondary" onClick={() => setStages((current) => [...current, { key: key(), kind: 'INTERVIEW', label: '', detail: '' }])}>Add a stage</button>
+      <button type="button" className="secondary" onClick={() => setStages((current) => [...current, { key: key(), kind: 'INTERVIEW', label: '', detail: '', scorecardTemplateId: '' }])}>Add a stage</button>
     </fieldset>
 
     {live ? <label className="student-form-field"><span>Reason for the change (needed when eligibility changes)</span>

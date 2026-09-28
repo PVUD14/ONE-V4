@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, ForbiddenException, Get, Inject, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, ForbiddenException, Get, Inject, NotFoundException, Param, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { detectOpportunitySignals, OPPORTUNITY_DETECTOR_VERSION } from '@planthepath/hiring/src/review-signals.js';
 import { summarizeHiringAnalytics, type HiringAggregateRow } from '@planthepath/hiring/src/analytics.js';
@@ -24,6 +24,22 @@ import {
   type ProtectedHttpRequest,
 } from './api-security.js';
 import { writeOpportunityDeadlineCloseRequested } from '@planthepath/persistence/src/opportunity-deadlines.js';
+import { loadInterviewCalendar } from '@planthepath/persistence/src/interview-calendar-source.js';
+import { interviewCancelReasonCodes, interviewRescheduleReasonCodes, isAcceptableJoiningLink } from '@planthepath/hiring/src/interview-scheduling.js';
+import {
+  interviewStateFields,
+  isoOrNull,
+  joiningLinkVisibleSql,
+  lockEmployerForWrite,
+  readCriterionRatings,
+  readScorecardTemplates,
+  recordScorecard,
+  rejectUnknownFields,
+  scheduleInterviewFields,
+  sendCalendar,
+  writeScheduleRevision,
+  type CalendarResponse,
+} from './interview-scheduling.js';
 import { selectionStagesOf } from './opportunity-requirements.js';
 import {
   assertEmployerState,
@@ -299,8 +315,9 @@ export class EmployerHiringController {
     `) as QueryResult<Record<string, unknown>>;
     // EMP-06: the job's stages, in order, as the pipeline's template (current version).
     const stages = await this.db.execute(sql`
-      SELECT st.stage_order, st.stage_kind, st.label, st.detail FROM opportunities o
+      SELECT st.id, st.stage_order, st.stage_kind, st.label, st.detail, st.scorecard_template_id, t.name AS scorecard_template_name FROM opportunities o
       JOIN opportunity_selection_stages st ON st.opportunity_version_id = o.current_version_id
+      LEFT JOIN interview_scorecard_templates t ON t.id = st.scorecard_template_id
       WHERE o.id = ${id}::uuid AND o.employer_id = ${employerId}::uuid ORDER BY st.stage_order
     `) as QueryResult<Record<string, unknown>>;
     return { applications: rows.rows.map(mapApplicantRow), stages: selectionStagesOf(stages.rows), correlationId: context.correlationId };
@@ -463,7 +480,23 @@ export class EmployerHiringController {
     // Without a live grant the brief keeps the slot and the role but loses the person, the
     // same withholding a withdrawn candidate already gets (EMP-SR-01, mapCandidateFields).
     if (rows.rows.length !== 1) throw forbidden(context.correlationId);
-    return { interview: mapParticipantInterview(rows.rows[0]!), correlationId: context.correlationId };
+    const row = rows.rows[0]!;
+    // EMP-09: the scorecard the panellist fills in, criteria and guidance, as the stage set it.
+    const [template] = row.scorecard_template_id
+      ? await readScorecardTemplates(this.db, sql`t.id = ${String(row.scorecard_template_id)}::uuid AND t.employer_id = ${employerId}::uuid`)
+      : [];
+    return { interview: { ...mapParticipantInterview(row), stageLabel: row.stage_label ?? null, scorecardTemplate: template ?? null }, correlationId: context.correlationId };
+  }
+
+  /** EMP-09: an assigned panellist's calendar invite; the link and location only while the candidate's grant is live. */
+  @Get('/employers/:employerId/my-interviews/:interviewId/calendar')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async myInterviewCalendar(@Req() request: ProtectedHttpRequest, @Param('employerId') employerId: string, @Param('interviewId') interviewId: string,
+    @Res() response: CalendarResponse): Promise<void> {
+    const context = await this.requireInterviewParticipant(request, employerId, interviewId);
+    const file = await loadInterviewCalendar(this.db, { interviewId, reader: 'PANEL' });
+    if (!file) throw new NotFoundException(safeHiringError('CALENDAR_NOT_AVAILABLE', context.correlationId));
+    sendCalendar(response, file);
   }
 
   @Post('/employers/:employerId/my-interviews/:interviewId/outcome')
@@ -476,6 +509,8 @@ export class EmployerHiringController {
     const strengths = readOptionalSafeText(body, 'strengths', 2000, context.correlationId);
     const concerns = readOptionalSafeText(body, 'concerns', 2000, context.correlationId);
     const notes = readOptionalSafeText(body, 'notes', 4000, context.correlationId);
+    // EMP-09: the ratings of the interview's scorecard template, when it has one.
+    const criteria = readCriterionRatings(body, context.correlationId);
     await this.db.transaction(async (tx) => {
       // Lock the authorization rows: removal, suspension, cancellation and consent
       // revocation cannot race a scorecard into an already-revoked scope.
@@ -492,16 +527,11 @@ export class EmployerHiringController {
       `) as QueryResult<{ id: string; application_id: string }>;
       if (!locked.rows.length) throw forbidden(context.correlationId);
       await this.requireLiveGrant(employerId, [locked.rows[0]!.application_id], context.correlationId, tx);
-      const saved = await tx.execute(sql`
-        INSERT INTO interview_outcomes (id, interview_id, submitted_by_user_id, recommendation, overall_rating, strengths, concerns, notes)
-        SELECT ${this.ids.uuid()}::uuid, i.id, ${actorId}::uuid, ${recommendation}, ${rating}, ${strengths}, ${concerns}, ${notes}
-        FROM interviews i WHERE i.id = ${interviewId}::uuid AND i.employer_id = ${employerId}::uuid AND ${activeInterviewAssignment(actorId)}
-        ON CONFLICT (interview_id, submitted_by_user_id) DO UPDATE SET
-          recommendation = EXCLUDED.recommendation, overall_rating = EXCLUDED.overall_rating,
-          strengths = EXCLUDED.strengths, concerns = EXCLUDED.concerns, notes = EXCLUDED.notes, submitted_at = now()
-        RETURNING id
-      `) as QueryResult<{ id: string }>;
-      if (saved.rows.length !== 1) throw forbidden(context.correlationId);
+      const saved = await recordScorecard(tx, {
+        outcomeId: this.ids.uuid(), interviewId, employerId, actorId, recommendation, rating, strengths, concerns, notes, criteria,
+        guard: activeInterviewAssignment(actorId), correlationId: context.correlationId,
+      });
+      if (!saved) throw forbidden(context.correlationId);
       await tx.execute(sql`
         INSERT INTO audit_events (id, actor_user_id, action, resource_type, resource_id, organization_id, outcome, correlation_id)
         VALUES (${this.ids.uuid()}::uuid, ${actorId}::uuid, 'interview.outcome_recorded', 'interview', ${interviewId}::uuid,
@@ -527,6 +557,7 @@ export class EmployerHiringController {
   private async readParticipantInterviews(actorId: string, employerId: string, interviewId?: string) {
     return this.db.execute(sql`
       SELECT i.id, i.round_number, i.mode, i.state, i.scheduled_start, i.scheduled_end, i.location_detail, i.joining_link,
+        i.scorecard_template_id, st.label AS stage_label,
         a.consent_revoked_at, a.closed_at, v.title, v.summary, v.responsibilities,
         ${applicationHasLiveApplicantGrant('a')} AS candidate_access,
         u.email AS student_email, isp.full_name, isp.institution_student_id
@@ -534,6 +565,7 @@ export class EmployerHiringController {
       JOIN applications a ON a.id = i.application_id AND a.employer_id = i.employer_id
       JOIN opportunity_versions v ON v.id = a.applied_version_id AND v.opportunity_id = a.opportunity_id
       JOIN users u ON u.id = a.student_user_id
+      LEFT JOIN opportunity_selection_stages st ON st.id = i.selection_stage_id
       LEFT JOIN LATERAL (SELECT full_name, institution_student_id FROM institution_student_profiles
         WHERE student_user_id = a.student_user_id AND status = 'ACTIVE' ORDER BY updated_at DESC LIMIT 1) isp ON true
       WHERE i.employer_id = ${employerId}::uuid AND a.state <> 'DRAFT'
@@ -552,8 +584,10 @@ export class EmployerHiringController {
              i.location_detail, i.joining_link, i.created_at, i.updated_at,
              a.state AS application_state, a.submitted_at, a.closed_at, a.consent_revoked_at,
              ${applicationHasLiveApplicantGrant('a')} AS candidate_access,
+             ${joiningLinkVisibleSql(context.authorization.principal.userId)} AS link_visible,
              o.id AS opportunity_id, o.reference_code,
-             v.title,
+             v.title, st.label AS stage_label, t.id AS scorecard_template_id, t.name AS scorecard_template_name,
+             last_change.change_kind AS last_change_kind, last_change.reason_code AS last_change_reason_code, last_change.recorded_at AS last_change_at,
              u.email AS student_email, isp.full_name, isp.institution_student_id,
              (SELECT count(*) FROM interview_outcomes io WHERE io.interview_id = i.id) AS outcome_count
       FROM interviews i
@@ -561,6 +595,10 @@ export class EmployerHiringController {
       JOIN opportunities o ON o.id = a.opportunity_id AND o.employer_id = i.employer_id
       JOIN opportunity_versions v ON v.id = a.applied_version_id
       JOIN users u ON u.id = a.student_user_id
+      LEFT JOIN opportunity_selection_stages st ON st.id = i.selection_stage_id
+      LEFT JOIN interview_scorecard_templates t ON t.id = i.scorecard_template_id
+      LEFT JOIN LATERAL (SELECT r.change_kind, r.reason_code, r.recorded_at FROM interview_schedule_revisions r
+        WHERE r.interview_id = i.id ORDER BY r.revision_number DESC LIMIT 1) last_change ON true
       LEFT JOIN institution_student_profiles isp ON isp.student_user_id = a.student_user_id AND isp.status = 'ACTIVE'
       WHERE i.employer_id = ${employerId}::uuid
         AND a.state <> 'DRAFT'
@@ -579,6 +617,7 @@ export class EmployerHiringController {
     if (application.consent_revoked_at != null) throw badRequest('CONSENT_REVOKED', context.correlationId);
     if (application.closed_at != null) throw badRequest('APPLICATION_CLOSED', context.correlationId);
 
+    rejectUnknownFields(body, scheduleInterviewFields, context.correlationId);
     const mode = readEnum(body, 'mode', interviewModes, context.correlationId);
     const scheduledStart = readRequiredIsoDate(body, 'scheduledStart', context.correlationId);
     const scheduledEnd = readOptionalIsoDate(body, 'scheduledEnd', context.correlationId);
@@ -588,6 +627,8 @@ export class EmployerHiringController {
     if (mode === 'ONSITE' && !locationDetail) throw badRequest('LOCATION_REQUIRED', context.correlationId);
     // EMP-08: what the candidate should prepare, shown to them as written in their interview view.
     const preparationNote = readOptionalSafeText(body, 'preparationNote', 1000, context.correlationId);
+    // EMP-09: the job stage this interview is for; its scorecard template is copied onto it.
+    const selectionStageId = readOptionalUuid(body, 'selectionStageId', context.correlationId);
 
     const record = body as Record<string, unknown>;
     const suppliedParticipants = record.participantUserIds ?? [];
@@ -597,12 +638,25 @@ export class EmployerHiringController {
     const participantIds = [...new Set(suppliedParticipants as string[])];
     if (participantIds.length && record.participantVisibilityAcknowledged !== true) throw badRequest('PARTICIPANT_VISIBILITY_REQUIRED', context.correlationId);
     return this.db.transaction(async (tx) => {
+      await lockEmployerForWrite(tx, employerId, 'candidates', context.correlationId);
       const lockedApplication = await tx.execute(sql`
         SELECT id FROM applications WHERE id = ${id}::uuid AND employer_id = ${employerId}::uuid
           AND consent_revoked_at IS NULL AND closed_at IS NULL AND state <> 'DRAFT' FOR UPDATE
       `) as QueryResult<{ id: string }>;
       if (lockedApplication.rows.length !== 1) throw forbidden(context.correlationId);
       await this.requireLiveGrant(employerId, [id], context.correlationId, tx);
+      let scorecardTemplateId: string | null = null;
+      if (selectionStageId) {
+        // An interview or group-discussion stage of the job as it stands now (the pipeline's stages).
+        const stage = await tx.execute(sql`
+          SELECT st.id, st.scorecard_template_id FROM applications a
+          JOIN opportunities o ON o.id = a.opportunity_id AND o.employer_id = a.employer_id
+          JOIN opportunity_selection_stages st ON st.opportunity_version_id = o.current_version_id
+          WHERE a.id = ${id}::uuid AND st.id = ${selectionStageId}::uuid AND st.stage_kind IN ('INTERVIEW', 'GROUP_DISCUSSION')
+        `) as QueryResult<{ id: string; scorecard_template_id: string | null }>;
+        if (!stage.rows[0]) throw badRequest('INVALID_SELECTIONSTAGEID', context.correlationId);
+        scorecardTemplateId = stage.rows[0].scorecard_template_id;
+      }
       if (participantIds.length) {
         const members = await tx.execute(sql`
           SELECT m.user_id FROM organization_memberships m JOIN users u ON u.id = m.user_id
@@ -618,8 +672,10 @@ export class EmployerHiringController {
       `) as QueryResult<{ next: number }>;
 
       await tx.execute(sql`
-        INSERT INTO interviews (id, application_id, employer_id, round_number, mode, state, scheduled_start, scheduled_end, location_detail, joining_link, preparation_note, created_by_user_id)
-        VALUES (${interviewId}::uuid, ${id}::uuid, ${employerId}::uuid, ${nextRound.rows[0]?.next ?? 1}, ${mode}, 'SCHEDULED', ${scheduledStart}::timestamptz, ${scheduledEnd}::timestamptz, ${locationDetail}, ${joiningLink}, ${preparationNote}, ${context.authorization.principal.userId}::uuid)
+        INSERT INTO interviews (id, application_id, employer_id, round_number, mode, state, scheduled_start, scheduled_end, location_detail, joining_link, preparation_note, created_by_user_id,
+                                selection_stage_id, scorecard_template_id)
+        VALUES (${interviewId}::uuid, ${id}::uuid, ${employerId}::uuid, ${nextRound.rows[0]?.next ?? 1}, ${mode}, 'SCHEDULED', ${scheduledStart}::timestamptz, ${scheduledEnd}::timestamptz, ${locationDetail}, ${joiningLink}, ${preparationNote}, ${context.authorization.principal.userId}::uuid,
+                ${selectionStageId}::uuid, ${scorecardTemplateId}::uuid)
       `);
       for (const participantId of participantIds) {
         await tx.execute(sql`
@@ -635,8 +691,10 @@ export class EmployerHiringController {
             ${JSON.stringify({ participantUserIds: participantIds, visibilityAcknowledged: true })}::jsonb)
         `);
       }
-      await this.writeAudit(context.authorization.principal.userId, 'interview.scheduled', 'interview', interviewId, context.correlationId, tx);
-      await this.writeOutbox('interview', interviewId, 'interview.scheduled', { interviewId, applicationId: id }, context.authorization.principal.userId, employerId, context.correlationId, tx);
+      // EMP-09: revision 1 of the interview's history, which its calendar invite is built from.
+      const revision = await writeScheduleRevision(tx, { id: this.ids.uuid(), interviewId, employerId, changeKind: 'SCHEDULED', reasonCode: null, note: null, actorId: context.authorization.principal.userId });
+      await this.writeAudit(context.authorization.principal.userId, 'interview.scheduled', 'interview', interviewId, context.correlationId, tx, employerId);
+      await this.writeOutbox('interview', interviewId, 'interview.scheduled', { interviewId, applicationId: id, revisionId: revision.id }, context.authorization.principal.userId, employerId, context.correlationId, tx);
 
       return { interview: { id: interviewId, state: 'SCHEDULED', roundNumber: nextRound.rows[0]?.next ?? 1 }, correlationId: context.correlationId };
     });
@@ -649,45 +707,160 @@ export class EmployerHiringController {
     // refused before the database is touched at all.
     const context = requireEmployerMembership(request, employerId, employerManageRoles);
     const id = requireUuid(interviewId, context.correlationId);
+    const actorId = context.authorization.principal.userId;
+    rejectUnknownFields(body, interviewStateFields, context.correlationId);
     const toState = readEnum(body, 'toState', ['RESCHEDULED', 'COMPLETED', 'CANCELLED', 'NO_SHOW'] as const, context.correlationId);
-    const reason = readOptionalSafeText(body, 'reason', 1000, context.correlationId);
+    // EMP-09: why it moved or was cancelled (a fixed list), and an internal note never shown to
+    // the candidate. `reason` is the note's earlier name and is still accepted.
+    const record = (typeof body === 'object' && body !== null ? body : {}) as Record<string, unknown>;
+    const allowedReasons: readonly string[] = toState === 'RESCHEDULED' ? interviewRescheduleReasonCodes : toState === 'CANCELLED' ? interviewCancelReasonCodes : [];
+    const suppliedReason = record.reasonCode === undefined || record.reasonCode === null ? null : record.reasonCode;
+    if (suppliedReason !== null && (typeof suppliedReason !== 'string' || !allowedReasons.includes(suppliedReason))) throw badRequest('INVALID_REASONCODE', context.correlationId);
+    const reasonCode = suppliedReason as string | null;
+    const note = readOptionalSafeText(body, 'note', 1000, context.correlationId) ?? readOptionalSafeText(body, 'reason', 1000, context.correlationId);
 
     const scheduledStart = toState === 'RESCHEDULED' ? readRequiredIsoDate(body, 'scheduledStart', context.correlationId) : null;
     const scheduledEnd = toState === 'RESCHEDULED' ? readRequiredIsoDate(body, 'scheduledEnd', context.correlationId) : null;
     if (scheduledStart && scheduledEnd && scheduledEnd <= scheduledStart) throw badRequest('INVALID_SCHEDULE', context.correlationId);
-    await assertEmployerState(this.db, employerId, 'candidates', context.correlationId);
-
-    const rows = await this.db.execute(sql`
-      SELECT i.id, i.state, ${applicationHasLiveApplicantGrant('a')} AS candidate_access
-      FROM interviews i JOIN applications a ON a.id = i.application_id AND a.employer_id = i.employer_id
-      WHERE i.id = ${id}::uuid AND i.employer_id = ${employerId}::uuid
-    `) as QueryResult<Record<string, unknown>>;
-    const [interview] = rows.rows;
-    if (!interview) throw forbidden(context.correlationId);
-    // Rescheduling, completing or marking a no-show acts on the candidate and needs a live
-    // grant (EMP-SR-01). Cancelling does not: it only stands the employer down, carries
-    // nothing about the person, and must stay possible after a withdrawal or rejection so a
-    // slot is not left hanging over someone who has gone.
-    if (toState !== 'CANCELLED' && interview.candidate_access !== true) throw forbidden(context.correlationId);
-
-    try {
-      assertInterviewTransition(String(interview.state) as never, toState as never);
-    } catch (error) {
-      throw ruleFailure(error, context.correlationId);
+    // A reschedule may also change how the interview happens. Given a new mode, the location and
+    // link are exactly what the body says; otherwise an absent field keeps its value and null clears it.
+    const touchesHow = record.mode !== undefined || record.locationDetail !== undefined || record.joiningLink !== undefined;
+    if (toState !== 'RESCHEDULED' && (touchesHow || record.scheduledStart !== undefined || record.scheduledEnd !== undefined)) {
+      throw badRequest('UNKNOWN_FIELD', context.correlationId);
     }
+    const newMode = toState === 'RESCHEDULED' && record.mode !== undefined ? readEnum(body, 'mode', interviewModes, context.correlationId) : null;
+    const locationDetail = readOptionalSafeText(body, 'locationDetail', 500, context.correlationId);
+    const joiningLink = readOptionalHttpsUrl(body, 'joiningLink', context.correlationId);
+    if (newMode === 'ONSITE' && !locationDetail) throw badRequest('LOCATION_REQUIRED', context.correlationId);
+    await assertEmployerState(this.db, employerId, 'candidates', context.correlationId);
+    if ((toState === 'RESCHEDULED' || toState === 'CANCELLED') && reasonCode === null) throw badRequest('REASON_CODE_REQUIRED', context.correlationId);
 
-    // EMP-08: the change, its audit row and the event that tells the candidate commit together.
-    await this.db.transaction(async (tx) => {
+    // EMP-08/EMP-09: the change, its history row, its audit row and the event that tells the
+    // candidate and the panel commit together, under the organisation and interview locks.
+    return this.db.transaction(async (tx) => {
+      await lockEmployerForWrite(tx, employerId, 'candidates', context.correlationId);
+      const rows = await tx.execute(sql`
+        SELECT i.id, i.state, i.mode, i.location_detail, i.joining_link, a.id AS application_id,
+               ${applicationHasLiveApplicantGrant('a')} AS candidate_access, now() AS db_now
+        FROM interviews i JOIN applications a ON a.id = i.application_id AND a.employer_id = i.employer_id
+        WHERE i.id = ${id}::uuid AND i.employer_id = ${employerId}::uuid
+        FOR UPDATE OF i
+      `) as QueryResult<Record<string, unknown>>;
+      const [interview] = rows.rows;
+      if (!interview) throw forbidden(context.correlationId);
+      // Rescheduling, completing or marking a no-show acts on the candidate and needs a live
+      // grant (EMP-SR-01), share-locked for the rest of the write. Cancelling does not: it only
+      // stands the employer down, carries nothing about the person, and must stay possible after
+      // a withdrawal or rejection so a slot is not left hanging over someone who has gone.
+      if (toState !== 'CANCELLED') {
+        if (interview.candidate_access !== true) throw forbidden(context.correlationId);
+        await this.requireLiveGrant(employerId, [String(interview.application_id)], context.correlationId, tx);
+      }
+      try {
+        assertInterviewTransition(String(interview.state) as never, toState as never);
+      } catch (error) {
+        throw ruleFailure(error, context.correlationId);
+      }
+      // Judged on the database clock, never this process's.
+      if (scheduledStart && new Date(scheduledStart) <= new Date(interview.db_now as string | Date)) throw badRequest('SCHEDULE_IN_PAST', context.correlationId);
+      const mode = newMode ?? String(interview.mode);
+      const keep = (field: 'locationDetail' | 'joiningLink', given: string | null, current: unknown): string | null =>
+        toState !== 'RESCHEDULED' || (newMode === null && record[field] === undefined) ? (current == null ? null : String(current)) : given;
+      const nextLocation = keep('locationDetail', locationDetail, interview.location_detail);
+      const nextLink = keep('joiningLink', joiningLink, interview.joining_link);
+      if (mode === 'ONSITE' && !nextLocation) throw badRequest('LOCATION_REQUIRED', context.correlationId);
+
       await tx.execute(sql`
-        UPDATE interviews SET state = ${toState}, cancellation_reason = ${toState === 'CANCELLED' ? reason : null},
+        UPDATE interviews SET state = ${toState}, cancellation_reason = ${toState === 'CANCELLED' ? note : null},
           scheduled_start = coalesce(${scheduledStart}::timestamptz, scheduled_start),
-          scheduled_end = coalesce(${scheduledEnd}::timestamptz, scheduled_end), updated_at = now()
+          scheduled_end = coalesce(${scheduledEnd}::timestamptz, scheduled_end),
+          mode = ${mode}, location_detail = ${nextLocation}, joining_link = ${nextLink}, updated_at = now()
         WHERE id = ${id}::uuid AND employer_id = ${employerId}::uuid
       `);
-      await this.writeAudit(context.authorization.principal.userId, `interview.${toState.toLowerCase()}`, 'interview', id, context.correlationId, tx);
-      await this.writeOutbox('interview', id, 'interview.state_changed', { interviewId: id, toState }, context.authorization.principal.userId, employerId, context.correlationId, tx);
+      const revision = await writeScheduleRevision(tx, { id: this.ids.uuid(), interviewId: id, employerId, changeKind: toState, reasonCode, note, actorId });
+      await tx.execute(sql`
+        INSERT INTO audit_events (id, actor_user_id, action, resource_type, resource_id, organization_id, outcome, correlation_id, context)
+        VALUES (${this.ids.uuid()}::uuid, ${actorId}::uuid, ${`interview.${toState.toLowerCase()}`}, 'interview', ${id}::uuid, ${employerId}::uuid, 'SUCCESS',
+          ${context.correlationId}, ${JSON.stringify({ reasonCode, revisionNumber: revision.revisionNumber, modeChanged: newMode !== null && newMode !== interview.mode })}::jsonb)
+      `);
+      await this.writeOutbox('interview', id, 'interview.state_changed', { interviewId: id, toState, revisionId: revision.id }, actorId, employerId, context.correlationId, tx);
+      return { interview: { id, state: toState, revisionNumber: revision.revisionNumber }, correlationId: context.correlationId };
     });
-    return { interview: { id, state: toState }, correlationId: context.correlationId };
+  }
+
+  /**
+   * EMP-09: an interview's schedule history, oldest first — each change, who made it, when and
+   * why. It names no candidate, so it needs no applicant grant; the joining link follows the same
+   * rule as the list.
+   */
+  @Get('/employers/:employerId/interviews/:interviewId/history')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async interviewHistory(@Req() request: ProtectedHttpRequest, @Param('employerId') employerId: string, @Param('interviewId') interviewId: string): Promise<Record<string, unknown>> {
+    const context = await this.requireEmployer(request, employerId, employerManageRoles, 'candidates');
+    const id = requireUuid(interviewId, context.correlationId);
+    const rows = await this.db.execute(sql`
+      SELECT r.revision_number, r.change_kind, r.reason_code, r.note, r.mode, r.scheduled_start, r.scheduled_end, r.location_detail,
+             r.joining_link, r.recorded_at, actor.email AS actor_email,
+             ${joiningLinkVisibleSql(context.authorization.principal.userId)} AS link_visible
+      FROM interviews i
+      JOIN applications a ON a.id = i.application_id AND a.employer_id = i.employer_id
+      JOIN interview_schedule_revisions r ON r.interview_id = i.id AND r.employer_id = i.employer_id
+      JOIN users actor ON actor.id = r.actor_user_id
+      WHERE i.id = ${id}::uuid AND i.employer_id = ${employerId}::uuid
+      ORDER BY r.revision_number
+      LIMIT 200
+    `) as QueryResult<Record<string, unknown>>;
+    if (!rows.rows.length) throw forbidden(context.correlationId);
+    return {
+      revisions: rows.rows.map((row) => ({
+        revisionNumber: Number(row.revision_number), changeKind: row.change_kind, reasonCode: row.reason_code ?? null, note: row.note ?? null,
+        mode: row.mode, scheduledStart: isoOrNull(row.scheduled_start), scheduledEnd: isoOrNull(row.scheduled_end),
+        locationDetail: row.location_detail ?? null, joiningLink: row.link_visible === true ? row.joining_link ?? null : null,
+        actorLabel: row.actor_email, recordedAt: isoOrNull(row.recorded_at),
+      })),
+      correlationId: context.correlationId,
+    };
+  }
+
+  /**
+   * EMP-09: every scorecard on an interview, per interviewer, with each criterion's rating as the
+   * stage's template defined it. A judgement about a named person: it needs the live grant, and
+   * reading it is audited. Nothing is summed, averaged or ranked (Appendix 2 §5.3).
+   */
+  @Get('/employers/:employerId/interviews/:interviewId/scorecards')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async interviewScorecards(@Req() request: ProtectedHttpRequest, @Param('employerId') employerId: string, @Param('interviewId') interviewId: string): Promise<Record<string, unknown>> {
+    const context = await this.requireEmployer(request, employerId, employerManageRoles, 'candidates');
+    const id = requireUuid(interviewId, context.correlationId);
+    const found = await this.db.execute(sql`
+      SELECT i.application_id, i.scorecard_template_id FROM interviews i WHERE i.id = ${id}::uuid AND i.employer_id = ${employerId}::uuid
+    `) as QueryResult<{ application_id: string; scorecard_template_id: string | null }>;
+    const [interview] = found.rows;
+    if (!interview) throw forbidden(context.correlationId);
+    await this.requireLiveGrant(employerId, [interview.application_id], context.correlationId);
+    const [template] = interview.scorecard_template_id
+      ? await readScorecardTemplates(this.db, sql`t.id = ${interview.scorecard_template_id}::uuid AND t.employer_id = ${employerId}::uuid`)
+      : [];
+    const cards = await this.db.execute(sql`
+      SELECT o.recommendation, o.overall_rating, o.strengths, o.concerns, o.notes, o.submitted_at, u.email AS submitted_by,
+             coalesce((SELECT json_agg(json_build_object('criterionId', c.id, 'label', c.label, 'rating', r.rating, 'note', r.note) ORDER BY c.position)
+                       FROM interview_outcome_criterion_ratings r JOIN interview_scorecard_criteria c ON c.id = r.criterion_id
+                       WHERE r.outcome_id = o.id), '[]'::json) AS ratings
+      FROM interview_outcomes o JOIN users u ON u.id = o.submitted_by_user_id
+      WHERE o.interview_id = ${id}::uuid
+      ORDER BY o.submitted_at, o.id
+      LIMIT 50
+    `) as QueryResult<Record<string, unknown>>;
+    await this.writeAudit(context.authorization.principal.userId, 'interview.scorecards.viewed', 'interview', id, context.correlationId, this.db, employerId);
+    return {
+      template: template ?? null,
+      scorecards: cards.rows.map((row) => ({
+        submittedBy: row.submitted_by, recommendation: row.recommendation, overallRating: row.overall_rating ?? null,
+        strengths: row.strengths ?? null, concerns: row.concerns ?? null, notes: row.notes ?? null, submittedAt: isoOrNull(row.submitted_at),
+        ratings: Array.isArray(row.ratings) ? row.ratings : [],
+      })),
+      correlationId: context.correlationId,
+    };
   }
 
   @Post('/employers/:employerId/interviews/:interviewId/outcome')
@@ -700,27 +873,24 @@ export class EmployerHiringController {
     const strengths = readOptionalSafeText(body, 'strengths', 2000, context.correlationId);
     const concerns = readOptionalSafeText(body, 'concerns', 2000, context.correlationId);
     const notes = readOptionalSafeText(body, 'notes', 4000, context.correlationId);
+    const criteria = readCriterionRatings(body, context.correlationId);
     const actorId = context.authorization.principal.userId;
 
-    const rows = await this.db.execute(sql`SELECT id, application_id FROM interviews WHERE id = ${id}::uuid AND employer_id = ${employerId}::uuid`) as QueryResult<{ id: string; application_id: string }>;
-    if (rows.rows.length !== 1) throw forbidden(context.correlationId);
-    // A scorecard is a judgement about a named person; it needs their live grant.
-    await this.requireLiveGrant(employerId, [rows.rows[0]!.application_id], context.correlationId);
-
-    // One scorecard per interviewer is a unique index; a second submission is a
-    // correction rather than an error.
-    await this.db.execute(sql`
-      INSERT INTO interview_outcomes (id, interview_id, submitted_by_user_id, recommendation, overall_rating, strengths, concerns, notes)
-      VALUES (${this.ids.uuid()}::uuid, ${id}::uuid, ${actorId}::uuid, ${recommendation}, ${rating}, ${strengths}, ${concerns}, ${notes})
-      ON CONFLICT (interview_id, submitted_by_user_id) DO UPDATE SET
-        recommendation = EXCLUDED.recommendation,
-        overall_rating = EXCLUDED.overall_rating,
-        strengths = EXCLUDED.strengths,
-        concerns = EXCLUDED.concerns,
-        notes = EXCLUDED.notes,
-        submitted_at = now()
-    `);
-    await this.writeAudit(actorId, 'interview.outcome_recorded', 'interview', id, context.correlationId);
+    // One scorecard per interviewer is a unique index; a second submission is a correction
+    // rather than an error. EMP-09: under the organisation lock, against the stage template.
+    await this.db.transaction(async (tx) => {
+      await lockEmployerForWrite(tx, employerId, 'candidates', context.correlationId);
+      const rows = await tx.execute(sql`SELECT id, application_id FROM interviews WHERE id = ${id}::uuid AND employer_id = ${employerId}::uuid FOR SHARE`) as QueryResult<{ id: string; application_id: string }>;
+      if (rows.rows.length !== 1) throw forbidden(context.correlationId);
+      // A scorecard is a judgement about a named person; it needs their live grant.
+      await this.requireLiveGrant(employerId, [rows.rows[0]!.application_id], context.correlationId, tx);
+      const saved = await recordScorecard(tx, {
+        outcomeId: this.ids.uuid(), interviewId: id, employerId, actorId, recommendation, rating, strengths, concerns, notes, criteria,
+        guard: sql`true`, correlationId: context.correlationId,
+      });
+      if (!saved) throw forbidden(context.correlationId);
+      await this.writeAudit(actorId, 'interview.outcome_recorded', 'interview', id, context.correlationId, tx, employerId);
+    });
     return { ok: true, correlationId: context.correlationId };
   }
 
@@ -1163,7 +1333,12 @@ function mapEmployerInterviewRow(row: Record<string, unknown>): Record<string, u
     scheduledStart: row.scheduled_start ?? null,
     scheduledEnd: row.scheduled_end ?? null,
     locationDetail: row.location_detail ?? null,
-    joiningLink: row.joining_link ?? null,
+    // EMP-09: the link only for the member who scheduled it and the panel, while the grant is live.
+    joiningLink: row.link_visible === true ? row.joining_link ?? null : null,
+    joiningLinkWithheld: row.joining_link != null && row.link_visible !== true,
+    stageLabel: row.stage_label ?? null,
+    scorecardTemplate: row.scorecard_template_id ? { id: row.scorecard_template_id, name: row.scorecard_template_name } : null,
+    lastChange: row.last_change_kind ? { kind: row.last_change_kind, reasonCode: row.last_change_reason_code ?? null, at: isoOrNull(row.last_change_at) } : null,
     submittedAt: row.submitted_at ?? null,
     closedAt: row.closed_at ?? null,
     outcomeCount: Number(row.outcome_count ?? 0),
@@ -1306,7 +1481,8 @@ function readOptionalIsoDate(body: unknown, field: string, correlationId: string
 function readOptionalHttpsUrl(body: unknown, field: string, correlationId: string): string | null {
   const value = readOptionalText(body, field, 512, correlationId);
   if (value == null) return null;
-  if (!/^https:\/\/[^\s]+$/i.test(value)) throw badRequest(`INVALID_${field.toUpperCase()}`, correlationId);
+  // EMP-09: plain https with a host and no embedded credentials.
+  if (!isAcceptableJoiningLink(value)) throw badRequest(`INVALID_${field.toUpperCase()}`, correlationId);
   return value;
 }
 

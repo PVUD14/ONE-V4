@@ -233,7 +233,12 @@ export interface SelectionStageInput {
   readonly kind: SelectionStageKind;
   readonly label: string;
   readonly detail: string | null;
+  /** EMP-09: the scorecard template an INTERVIEW or GROUP_DISCUSSION stage uses, if any. */
+  readonly scorecardTemplateId: string | null;
 }
+
+/** Stage kinds whose interviews are scored, so the only ones that may carry a scorecard template. */
+export const SCORED_STAGE_KINDS: readonly SelectionStageKind[] = ['INTERVIEW', 'GROUP_DISCUSSION'];
 
 /**
  * Parse the ordered stages of a version (order = position in the list). The order must follow
@@ -245,11 +250,18 @@ export function parseSelectionStages(value: unknown): SelectionStageInput[] {
   if (!Array.isArray(value) || value.length > MAX_STAGES) throw new RequirementInputError(code);
   const stages = value.map((entry): SelectionStageInput => {
     if (!isRecord(entry)) throw new RequirementInputError(code);
-    rejectUnknown(entry, ['kind', 'label', 'detail'], code);
+    rejectUnknown(entry, ['kind', 'label', 'detail', 'scorecardTemplateId'], code);
     const kind = entry.kind as SelectionStageKind;
     if (!SELECTION_STAGE_KINDS.includes(kind)) throw new RequirementInputError(code);
     const detail = entry.detail === undefined || entry.detail === null || entry.detail === '' ? null : safeText(entry.detail, 1000, code);
-    return { kind, label: safeText(entry.label, 120, code), detail };
+    let scorecardTemplateId: string | null = null;
+    if (entry.scorecardTemplateId !== undefined && entry.scorecardTemplateId !== null) {
+      if (typeof entry.scorecardTemplateId !== 'string' || !uuidPattern.test(entry.scorecardTemplateId) || !SCORED_STAGE_KINDS.includes(kind)) {
+        throw new RequirementInputError(code);
+      }
+      scorecardTemplateId = entry.scorecardTemplateId.toLowerCase();
+    }
+    return { kind, label: safeText(entry.label, 120, code), detail, scorecardTemplateId };
   });
   let previous = -1;
   stages.forEach((stage, index) => {

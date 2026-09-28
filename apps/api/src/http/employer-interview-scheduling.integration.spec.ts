@@ -247,6 +247,8 @@ describe('EMP-09: reschedules and cancellations carry a reason code and keep the
 describe('EMP-09: everyone on the interview is told once, with a calendar invite', () => {
   it('notifies the student and each panellist once per change with an .ics, and a replayed event adds nothing', async () => {
     const hiring = await applied();
+    // Earlier tests leave their own events in the outbox; deliver those first so only this test's mail is counted.
+    await drain(null);
     const id = await scheduled(hiring);
     await reschedule(hiring, id).expect(201);
     await cancel(hiring, id).expect(201);
@@ -315,7 +317,7 @@ describe('EMP-09: calendar downloads inside ONE', () => {
     expect(first.headers['cache-control']).toBe('no-store');
     expect(icsValue(first.text, 'URL')).toBe('https://meet.example.test/room-1');
     expect(icsValue(first.text, 'SEQUENCE')).toBe('0');
-    expect(first.text).toContain('Bring a short walkthrough');
+    expect(icsLines(first.text).join(' ')).toContain('Bring a short walkthrough');
 
     await reschedule(hiring, id).expect(201);
     const moved = await api().get(path).set(auth(hiring.studentId)).expect(200);
@@ -430,14 +432,18 @@ describe('EMP-09: scorecards follow the stage template', () => {
     expect((await editStages(team.employerId, team.recruiterId, jobId, v1, [{ kind: 'SCREENING', label: 'Screen', scorecardTemplateId: scorecard.id }]).expect(400)).body.error.code).toBe('INVALID_STAGES');
     await editStages(team.employerId, team.recruiterId, jobId, v1, [{ kind: 'SCREENING', label: 'Screen' }, { kind: 'INTERVIEW', label: 'Technical interview', scorecardTemplateId: scorecard.id }]).expect(201);
     const detail = await api().get(employerBase(team.employerId) + '/opportunities/' + jobId).set(auth(team.recruiterId)).expect(200);
-    const stages = detail.body.currentVersion.requirements.stages as { id: string; label: string; scorecardTemplate: { id: string; name: string } | null }[];
-    expect(stages.map((stage) => [stage.label, stage.scorecardTemplate])).toEqual([['Screen', null], ['Technical interview', { id: scorecard.id, name: 'Technical round' }]]);
+    const versionStages = detail.body.currentVersion.requirements.stages as { label: string; scorecardTemplate: { id: string; name: string } | null }[];
+    expect(versionStages.map((stage) => [stage.label, stage.scorecardTemplate])).toEqual([['Screen', null], ['Technical interview', { id: scorecard.id, name: 'Technical round' }]]);
 
     await api().post(employerBase(team.employerId) + '/opportunities/' + jobId + '/audiences').set(auth(team.recruiterId)).send({ audienceKind: 'PUBLIC' }).expect(201);
     await api().post(employerBase(team.employerId) + '/opportunities/' + jobId + '/publish').set(auth(team.recruiterId)).expect(201);
     const studentId = await user();
     const applicationId = (await api().post('/api/v1/students/me/applications').set(auth(studentId)).send({ opportunityId: jobId, consentGranted: true }).expect(201)).body.application.id as string;
     const hiring = { ...team, opportunityId: jobId, studentId, applicationId };
+    // The applicant pipeline carries the stages it schedules against, with their ids.
+    const pipeline = await api().get(employerBase(team.employerId) + '/opportunities/' + jobId + '/applications').set(auth(team.recruiterId)).expect(200);
+    const stages = pipeline.body.stages as { id: string; label: string; scorecardTemplate: { id: string; name: string } | null }[];
+    expect(stages.map((stage) => [stage.label, stage.scorecardTemplate])).toEqual([['Screen', null], ['Technical interview', { id: scorecard.id, name: 'Technical round' }]]);
 
     expect((await schedule(hiring, { selectionStageId: stages[0]!.id }).expect(400)).body.error.code).toBe('INVALID_SELECTIONSTAGEID');
     expect((await schedule(hiring, { selectionStageId: randomUUID() }).expect(400)).body.error.code).toBe('INVALID_SELECTIONSTAGEID');

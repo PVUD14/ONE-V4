@@ -1219,3 +1219,91 @@ No misconception table was created: the editor writes to ENG-07's `question_opti
 **Android:** no change. The question bank is an operator surface, and operator screens are web-only (Appendix 1 §4.3). Nothing a student sees changes shape: the readiness check returns the same fields.
 
 **Next goal:** OPS-09c.
+
+## OPS-09c — Lesson and variant editor — 2026-09-28
+**Result:** Complete. Operators draft lessons and their language, level and style variants. Someone who did not write, edit or submit a revision reviews it, and that review records the rights review. A third person, who neither wrote nor approved it, publishes it, which is the learner-content lifecycle's rule. A lesson's first publish, or a revision that changes its skill or prerequisites, also needs a second person's approval. Publishing writes the `lesson_versions` row students complete. A variant writes none, because it is another rendering of the same lesson.
+
+**Branch / PR:** `feat/ops-lesson-variant-editor`, cut from `onev4/feat/plan-phases-0-to-2` (bc3350d). The coordinator merges it.
+
+**Files created:**
+- `docs/architecture/lesson-variant-editor-design.md`
+- `packages/persistence/drizzle/0065_lesson_variant_editor.sql`
+- `packages/career-readiness/src/lesson-editor.ts` (pure body rules, variant vocabularies, `lessonGraphProblems`, `publishedLessonBody`)
+- `packages/authorization/src/lesson-editor.ts`
+- `packages/persistence/src/lesson-editor.ts`
+- `apps/api/src/http/operations-lessons.controller.ts`
+- `apps/web/src/api/lessons.ts`, `apps/web/src/rolePortal/lessons.tsx`
+- Tests: `packages/career-readiness/test/lesson-editor.test.ts`, `packages/authorization/src/lesson-editor.test.ts`, `apps/api/src/http/operations-lessons.integration.spec.ts`, `apps/web/src/rolePortal/lessons.test.tsx`
+
+**Files modified:**
+- `packages/authorization/src/high-risk-actions.ts` and `index.ts` (extended key `CONTENT_LESSON_PUBLISH`); `packages/career-readiness/src/index.ts`
+- `packages/events/src/index.ts`: `lesson_editor.revision_state_changed`, `lesson_editor.lesson_published` and the approval key.
+- `packages/persistence/src/career-readiness.ts`: learner reads resolve a lesson by its stable key.
+  - The catalogue lists current versions only.
+  - Completion is idempotent per lesson.
+  - A prerequisite is met by completing any version of it.
+  - Progress is reported against the current version.
+  - Evidence provenance names the lesson's own manifest.
+- `packages/persistence/src/operation-approvals.ts`: the queue names the lesson key, variant and revision.
+- `apps/api/src/http/operation-approval-gate.ts`, `operations-approvals.controller.ts`, `api-security.module.ts`
+- `apps/web/src/api.ts`, `api/operations.ts`, `rolePortal/approvals.tsx`, `rolePortal/shared.tsx`
+- `apps/web/src/rolePortalPages.tsx`: the Content Management branch only. The lesson editor sits under the question bank.
+
+**Migrations added:** `0065_lesson_variant_editor.sql`. It adds no table. It adds:
+- `lesson_versions.superseded_at`, with a guard: it is the only change a lesson version ever takes, only once, and versions are never deleted.
+- A replacement of `operation_approval_extended_target_type` that repeats `CAREER_REQUIREMENT_SET_PUBLISH`, `CONTENT_SKILL_PUBLISH` and `CONTENT_QUESTION_PUBLISH` and adds `CONTENT_LESSON_PUBLISH`.
+- `content_review_author_publish_guard`, extended from TOPIC and QUESTION to LESSON.
+- An expression index for lesson key lookups.
+
+**Design docs / ADRs:** `lesson-variant-editor-design.md`. No ADR was needed.
+
+**Validation:** pending — recorded here once the full run completes.
+
+**Acceptance criteria:**
+- ✔ **Draft → review → publish works; self-review is rejected.**
+  - The author, anyone who saved an edit and anyone who submitted are contributors, taken from the audit log. They get 403 `LESSON_SELF_REVIEW_REFUSED` or `LESSON_SELF_PUBLISH_REFUSED`, at the approval request as well as at publish.
+  - The approver gets 403 `LESSON_APPROVER_PUBLISH_REFUSED`.
+  - 0065 refuses a direct PUBLISH insert by the author.
+  - Every move is checked against both the 0004 lifecycle and the learner-content lifecycle.
+- ✔ **Prerequisite cycles are rejected.** `assertAcyclicPrerequisites` runs on stable keys:
+  - on every save and submit, over the drafts being built;
+  - at publish, over the live lessons, and every prerequisite must be live.
+  - Tested among drafts and through the pilot's live chain.
+- ✔ **Publishing needs CONTENT_PUBLISH, plus an approval when readiness inputs change.** That means a base lesson's first publish, or a change of skill or prerequisites, because completion writes `LESSON_COMPLETION` evidence. A wording revision and every variant publish directly; requesting an approval for them returns `APPROVAL_NOT_REQUIRED`. Tested: APPROVAL_REQUIRED, payload mismatch, execution, and a refused publish that leaves the approval usable.
+- ✔ **Every transition is audited:** `operations.content.lesson_created`, `…lesson_variant_created`, `…lesson_revision_started`, `…lesson_draft_saved`, `…lesson_transitioned`, `…lesson_rights_reviewed` and `…lesson_published`. Each carries its reason code, the variant and break_glass. The outbox events are registered.
+- ✔ **Rights review is not bypassed:** approval writes a release-eligible source record with its rights review, and 0004 refuses the release manifest without it.
+- ✔ **Imports and edits land as DRAFT:** every new lesson, variant and revision starts as DRAFT, and nothing publishes automatically. `createLessonVariant` takes agent-draft provenance for ENG-16, and the screen marks agent drafts and shows their expert note.
+- ✔ **A revision does not disturb learners.** Integration tests cover a republished pilot lesson:
+  - version 1 is superseded, and the old row is immutable;
+  - the catalogue lists the lesson once, and the next lesson's prerequisite names the new version;
+  - a learner who completed version 1 sees version 2 as done;
+  - completing version 2 is an idempotent replay with no new evidence;
+  - the dependent lesson unlocks.
+- Not applicable to 09c: answer keys (09b) and bulk import (09d).
+- ✔ **§6.6 minimums:** 401; 403 for plain operations, institution admin, student, a reviewer creating and a catalogue manager creating; 200 for a catalogue manager reading; input 400s; 404; keyset pagination; audit rows with reason codes.
+- ✔ **Web states:** real data, NA, loading, empty, error with reference, forbidden, and reason-code dialogs, including the rights reason. A contributor is not offered review and the approver is not offered publish. A first publish files an approval; a variant publishes directly. The variant shows what it renders and whether it is stale. The approvals-queue execute and unchanged navigation labels are tested.
+
+**Decisions for Divakar (recommendations adopted):**
+- **Lessons are the 0004 lessons** (`content_revisions` LESSON → `lesson_versions`), not `learner_content_items` rows. The goal and the coordinator pointed at the learner-content lifecycle (0024/0026). But `learner_content_items` has no LESSON type, no versions, and nothing a student completes reads it. So review *follows* that lifecycle (its states, transitions and both separation rules) over the storage students actually use. Recorded in the design, Decision 1.
+- **Three people per lesson.** The approver never publishes, following the learner-content lifecycle. Relaxing this is one rule in `refuseLessonPublish`.
+- **Variants are their own reviewed entities.** Each carries language, level and style, with an English base. A variant writes no `lesson_versions` row and is completed as its lesson; ENG-16 serves it and falls back to English.
+- **Variant vocabularies:** eleven languages (ISO 639-1), three levels (FOUNDATION, STANDARD, ADVANCED) and four styles (EXPLANATION, WORKED_EXAMPLE, STEP_BY_STEP, SUMMARY).
+- **Stale variants may publish.** A variant based on an older base revision is shown as stale; ENG-16 decides whether to serve it.
+- **Approvals only when completion evidence changes:** a first publish, a new skill or new prerequisites.
+
+**Limitations / not done:**
+- Modules are chosen, not authored. Only the pilot module exists, so a new track's lessons need a module first.
+- No student language selection. That is ENG-16.
+- There is no retire or withdraw. An APPROVED revision that is never published blocks new revisions of that lesson.
+- **Recommendation, not built:** misconception codes (ENG-07) still have no console path to review and publish them, as ENG-10 noted, and a question tagged with an unpublished code cannot publish. A small review/publish screen reusing this lifecycle beside the editors would fit naturally.
+
+**Risks / follow-ups:**
+- Any later approval key must repeat all four extended keys in its replacement of `operation_approval_extended_target_type`.
+- Merges with other approval-key goals will conflict in `operations-approvals.controller.ts`, `operation-approval-gate.ts`, `approvals.tsx`, `operation-approvals.ts` and `packages/events`.
+- The learner reads in `career-readiness.ts` now join `lesson_versions` by stable key. Pilot data behaves exactly as before, because it has one version per key.
+
+**Android:** no change.
+- The editor is an operator surface, and operator screens are web-only (Appendix 1 §4.3).
+- The learner contract keeps its shape: the catalogue and progress DTOs have the same fields, now resolved to current versions. The Android app shows revised lessons and completion correctly with no client change, so it was not rebuilt.
+
+**Next goal:** OPS-09d.

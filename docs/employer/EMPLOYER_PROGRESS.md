@@ -314,3 +314,37 @@ It is additive, idempotent and references only files numbered below 0054. Replay
 - EMP-07's snapshot may want to reference the evaluation row.
 
 **Next goal:** EMP-07.
+
+## EMP-07 — Consented application snapshot and candidate view (2026-09-28)
+
+Written by the coordinator: the goal's agent stopped on a usage limit after its code and tests were
+committed but before it wrote this report. Merged in c4bcdb3 with EMP-08 and INST-10.
+
+- **Built.** The student reviews exactly what they share before applying; the snapshot is written once
+  at apply, last in the apply transaction, bound to the job version applied under, never edited
+  (0058 hardens `application_profile_snapshots`). Employers read it on Candidate Detail, only while
+  the live applicant-access grant holds. Résumés leave only through short-lived, single-use, audited
+  download links (`application_resume_download_links`), timed on the database clock.
+- **Android.** Students review the snapshot before applying; recruiters read what was shared.
+- **Tests.** `employer-candidate-view.integration.spec.ts`, `packages/hiring/test/application-snapshot.test.ts`,
+  `applicationSnapshotView.test.tsx`, plus hiring and employer workspace web tests.
+- **Validation.** Fresh one_stack7: migrate 53 then 0, typecheck, 2,612 tests passed, build, Android.
+- **Decision for Divakar.** Grant expiry: the 180-day ceiling is adopted, but every close already revokes
+  at once (stricter); keeping a hired candidate visible for up to 180 days is a one-line change left to you.
+- Design: `docs/architecture/application-snapshots-table-design.md`.
+
+## EMP-08 — Student hiring notifications and interview view (2026-09-28)
+
+Written by the coordinator for the same reason as EMP-07.
+
+- **Built.** The hiring events employers already wrote to the outbox (stage changes, interviews,
+  offers, EMP-05 terms changes) are registered and delivered by the outbox worker, never from a request
+  handler, one `hiring_notification_deliveries` row per event and recipient (0059). Students see their
+  interviews under Applications; employers see offer answers; one reminder 24 hours before an offer lapses.
+- **Android.** Interviews in My applications and the offer deadline.
+- **Tests.** `hiring-notifications.integration.spec.ts`, `hiring-notification-templates.test.ts`, web tests.
+- **Validation.** As EMP-07.
+- **Decisions for Divakar.** (1) Email sender and domain (HG-7): until decided, notices are in-app and every
+  email is recorded `NOT_CONFIGURED` — nothing claims an email was sent. (2) Quiet hours and the daily cap
+  are not applied to these time-critical notices; the email switch is honoured. (3) One reminder, 24 hours
+  before expiry. Design: `docs/architecture/hiring-notification-deliveries-table-design.md`.

@@ -232,3 +232,22 @@ their fixes, never earlier.
 **Limitations / not done:** the roster pages load the status list in pages of 200, up to 5 000 students (the roster endpoint itself is unpaginated); the placement register, drives and statistics on admin Placement stay NA until INST-12; the placement officer's Dashboard placement widgets stay NA (INST-12).
 **Risks / follow-ups:** ADR-019's "notice text is a privacy-review item" still applies to the apply-time and share-later copy. **Android:** students see and change sharing per application (grant endpoint added; before, "Hide from college" showed on every open application whether or not it was shared); the institution home's pipeline card shows students by placement status (suppressed). The per-student status list is web-only, like INST-07's application list, because it is an audited read of application records.
 **Next goal:** INST-10 (or as scheduled by the coordinator).
+
+## INST-10 — Year-end batch actions and alumni (2026-09-28)
+
+Written by the coordinator: the goal's agent stopped on a usage limit after its code, tests and screen
+inventory update were done. Merged in c4bcdb3 with EMP-07 and EMP-08.
+
+- **Built.** A Year-end actions panel on Students: graduate, transfer or end a unit or a list of roll
+  numbers, preview then commit (the results-import digest pattern), owner/admin only, audited in one
+  transaction with reason codes. No migration: the existing relationship states and CHECKs model it.
+- **Alumni.** A graduated or transferred student keeps their ONE account and student workspace, sees where
+  they stand, and can still request verification retroactively; the college reads only activity dated
+  before `effective_to`. `REVOKED` is not treated as a former student.
+- **Android.** A graduate keeps the student app and sees their status. Year-end actions are web-only desk tasks.
+- **Tests.** `institution-batch-lifecycle.integration.spec.ts`, `relationship-lifecycle.test.ts`,
+  `institutionBatchLifecycle.test.tsx`, App tests.
+- **Validation.** Fresh one_stack7: migrate 53 then 0, typecheck, 2,612 tests passed, build, Android.
+- **Decisions for Divakar.** Whether department heads may run batch actions for their department (today
+  relationship writes are owner/admin only); whether a revoked link should ever grant a student workspace.
+  Design: `docs/architecture/institution-batch-lifecycle-design.md`.

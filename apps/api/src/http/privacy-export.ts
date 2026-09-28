@@ -16,7 +16,7 @@ export async function assembleSubjectExport(db: PersistenceDb, subjectUserId: st
   const one = async (query: ReturnType<typeof sql>): Promise<Record<string, unknown>[]> =>
     ((await db.execute(query)) as QueryResult<Record<string, unknown>>).rows;
 
-  const [identity, profile, relationships, roster, documents, savedOpportunities, applications, offers, requests] = await Promise.all([
+  const [identity, profile, relationships, roster, documents, savedOpportunities, applications, offers, requests, sharedNotes, heldNotes] = await Promise.all([
     one(sql`SELECT id, email, state, created_at, anonymised_at FROM users WHERE id = ${subjectUserId}::uuid`),
     one(sql`SELECT target_career, career_interests, profile_headline, profile_summary, portfolio_url, visibility_state, employer_discovery_enabled, updated_at
             FROM student_profiles WHERE user_id = ${subjectUserId}::uuid`),
@@ -44,6 +44,18 @@ export async function assembleSubjectExport(db: PersistenceDb, subjectUserId: st
             WHERE a.student_user_id = ${subjectUserId}::uuid ORDER BY o.created_at`),
     one(sql`SELECT request_type, state, requested_at, completed_at FROM privacy_requests
             WHERE subject_user_id = ${subjectUserId}::uuid ORDER BY requested_at`),
+    // INST-11: counselling notes the college shared with the subject, in full; for the ones it has
+    // not shared, how many each college holds (DPDP s.11 summary), never their text.
+    one(sql`SELECT org.legal_name AS institution_name, a.title, a.note, a.created_at
+            FROM staff_actions a JOIN organizations org ON org.id = a.institution_id
+            WHERE a.subject_student_user_id = ${subjectUserId}::uuid AND a.action_type = 'COUNSELLING_NOTE'
+              AND a.visibility = 'SUBJECT_VISIBLE'
+            ORDER BY a.created_at, a.id`),
+    one(sql`SELECT org.legal_name AS institution_name, count(*)::int AS staff_only_notes
+            FROM staff_actions a JOIN organizations org ON org.id = a.institution_id
+            WHERE a.subject_student_user_id = ${subjectUserId}::uuid AND a.action_type = 'COUNSELLING_NOTE'
+              AND a.visibility = 'STAFF_ONLY'
+            GROUP BY org.legal_name ORDER BY org.legal_name`),
   ]);
 
   return {
@@ -52,7 +64,7 @@ export async function assembleSubjectExport(db: PersistenceDb, subjectUserId: st
     // Says plainly what is not here, so an omission is not mistaken for "we hold nothing".
     notIncluded: [
       'Interview scorecards and employer notes, which are the employer\'s assessment rather than your record.',
-      'Institution counselling notes held about you by your college.',
+      'The text of counselling notes your college has not shared with you. How many each college holds is listed under counsellingNotes; the college can share them with you.',
       'Security audit records, which are retained under the approved retention schedule.',
     ],
     identity: identity[0] ?? null,
@@ -64,5 +76,9 @@ export async function assembleSubjectExport(db: PersistenceDb, subjectUserId: st
     applications,
     offers,
     privacyRequests: requests,
+    counsellingNotes: {
+      shared: sharedNotes.map((row) => ({ institutionName: row.institution_name, title: row.title, note: row.note, createdAt: row.created_at })),
+      heldByCollege: heldNotes.map((row) => ({ institutionName: row.institution_name, staffOnlyNotes: row.staff_only_notes })),
+    },
   };
 }

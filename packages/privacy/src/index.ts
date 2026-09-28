@@ -174,7 +174,7 @@ export function assertExportDownloadable(input: {
 export type DeletionCategory =
   | 'IDENTITY' | 'STUDENT_PROFILE' | 'INSTITUTION_ROSTER' | 'DOCUMENTS'
   | 'APPLICATIONS' | 'OFFERS' | 'ASSESSMENT_EVIDENCE' | 'NOTIFICATIONS' | 'AUDIT' | 'SUPPORT_CASES'
-  | 'LEARNING_ACTIVITY';
+  | 'LEARNING_ACTIVITY' | 'COUNSELLING_NOTES';
 
 export type DeletionDisposition = 'ERASED' | 'ANONYMISED' | 'RETAINED';
 
@@ -209,6 +209,9 @@ export const DELETION_POLICY: readonly DeletionPolicyEntry[] = [
   // is erased, not anonymised (ADR-034). It is append-only (or projector-only) for everyone
   // else; only the deletion transaction may remove it.
   { category: 'LEARNING_ACTIVITY', disposition: 'ERASED' },
+  // INST-11: counselling notes a college wrote about the person, and the list of staff on their
+  // counselling case, are erased with them (docs/architecture/counselling-notes-table-design.md).
+  { category: 'COUNSELLING_NOTES', disposition: 'ERASED' },
   { category: 'AUDIT', disposition: 'RETAINED', basis: 'Security and access audit records are retained under the approved retention schedule.' },
 ];
 

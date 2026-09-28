@@ -352,7 +352,7 @@ export interface StaffActionSummaryRow {
 /**
  * Staff actions about students in the scope, opened in one whole month: counts only, each
  * through the shared suppression rule, zero included. No text, no totals. Only the suppressed
- * form leaves this function.
+ * form leaves this function. Counselling notes (INST-11) are never counted, not even suppressed.
  */
 export async function exportStaffActionSummary(client: Queryable, input: {
   readonly institutionId: string; readonly scope: InstitutionStudentScope; readonly periodStart: string; readonly periodEnd: string;
@@ -364,6 +364,7 @@ export async function exportStaffActionSummary(client: Queryable, input: {
     FROM staff_actions a
     JOIN institution_student_profiles p ON p.institution_id = a.institution_id AND p.student_user_id = a.subject_student_user_id
     WHERE a.institution_id = $1 AND a.subject_student_user_id IS NOT NULL
+      AND a.action_type <> 'COUNSELLING_NOTE'
       AND a.created_at >= $2::date AND a.created_at < ($3::date + interval '1 day')
       AND ${relationshipAuthorises('a.subject_student_user_id', 'a.created_at')}
       AND ${scopeClause}

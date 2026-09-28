@@ -128,6 +128,8 @@ export class CalendarController {
       JOIN organizations org ON org.id = a.institution_id
       WHERE a.subject_student_user_id = ${userId}::uuid
         AND a.visibility = 'SUBJECT_VISIBLE'
+        -- A counselling note is a record, not a calendar item, even when shared (INST-11).
+        AND a.action_type <> 'COUNSELLING_NOTE'
         AND a.archived_at IS NULL
         AND a.state IN ('OPEN','IN_PROGRESS','UNDER_REVIEW','CHANGES_REQUESTED')
         AND COALESCE(a.scheduled_start_at, a.due_at) BETWEEN ${range.from.toISOString()} AND ${range.to.toISOString()}
@@ -210,7 +212,8 @@ export class CalendarController {
     const rows = await this.db.execute(sql`
       SELECT a.id, a.title, a.note, a.action_type, a.due_at, a.scheduled_start_at, a.scheduled_end_at
       FROM staff_actions a
-      WHERE a.assigned_to_membership_id IN (${sql.join(membershipIds.map((id) => sql`${id}::uuid`), sql`, `)})
+      WHERE a.action_type <> 'COUNSELLING_NOTE'
+        AND a.assigned_to_membership_id IN (${sql.join(membershipIds.map((id) => sql`${id}::uuid`), sql`, `)})
         AND a.archived_at IS NULL
         AND a.state IN ('OPEN','IN_PROGRESS','UNDER_REVIEW','CHANGES_REQUESTED')
         AND COALESCE(a.scheduled_start_at, a.due_at) BETWEEN ${range.from.toISOString()} AND ${range.to.toISOString()}

@@ -21,6 +21,10 @@ const apiState = vi.hoisted(() => ({
   applicationsError: null as string | null,
 }));
 const supportApi = vi.hoisted(() => ({ current: vi.fn(), list: vi.fn(), complete: vi.fn() }));
+const counsellingApi = vi.hoisted(() => ({ shared: vi.fn() }));
+
+// INST-11: the Support card also reads the counselling notes the college shared.
+vi.mock('./api/counselling.js', () => ({ listMySharedCounsellingNotes: counsellingApi.shared }));
 
 vi.mock('./api/student.js', () => ({
   getCurrentStudent: supportApi.current,
@@ -66,6 +70,7 @@ beforeEach(() => {
   supportApi.current.mockReset().mockResolvedValue({ student: { institutionId: 'student-institution' } });
   supportApi.list.mockReset().mockResolvedValue({ actions: [] });
   supportApi.complete.mockReset();
+  counsellingApi.shared.mockReset().mockResolvedValue({ notes: [] });
   apiState.learner = {
     catalog,
     progress: [], attempts: [], evidence: [], roadmap: [], notificationPreferences: null, notifications: [],
@@ -165,6 +170,31 @@ describe('Student support', () => {
     expect(within(section).getByText('Assigned by your college')).toBeInTheDocument();
     expect(within(section).getByText('Due: NA')).toBeInTheDocument();
     expect(section.textContent).not.toMatch(/private-role-id|private-state-id|Invalid Date/);
+  });
+
+  it('shows only the counselling notes the college shared, with the writer role and no names or ids (INST-11)', async () => {
+    counsellingApi.shared.mockResolvedValue({ notes: [{
+      id: 'note-internal-id', title: 'Plan agreed together', note: 'Weekly check-in until exams.',
+      createdAt: '2030-04-02T09:00:00Z', authorRole: 'DEPARTMENT_HEAD',
+    }] });
+    render(<StudentDashboardV3 studentName="Aanya Rao" />);
+    const section = await supportSection();
+    expect(await within(section).findByText('Weekly check-in until exams.')).toBeInTheDocument();
+    expect(counsellingApi.shared).toHaveBeenCalledWith('learner-token', 'student-institution', expect.any(AbortSignal));
+    expect(within(section).getByText('Plan agreed together')).toBeInTheDocument();
+    expect(within(section).getByText(/Shared by your department head/)).toBeInTheDocument();
+    expect(section.textContent).not.toMatch(/note-internal-id|DEPARTMENT_HEAD/);
+  });
+
+  it('says plainly when no counselling note has been shared, and NA when the read fails', async () => {
+    render(<StudentDashboardV3 studentName="Aanya Rao" />);
+    expect(await within(await supportSection()).findByText('Your college has not shared any counselling notes with you.')).toBeInTheDocument();
+    cleanup();
+    counsellingApi.shared.mockRejectedValue(new Error('internal stack trace'));
+    render(<StudentDashboardV3 studentName="Aanya Rao" />);
+    const section = await supportSection();
+    expect(await within(section).findByText('NA — shared counselling notes are unavailable right now.')).toBeInTheDocument();
+    expect(section.textContent).not.toMatch(/stack trace/);
   });
 
   it('plainly says when nothing has been assigned', async () => {

@@ -548,7 +548,13 @@ Every write:
 - writes history, an audit row carrying the organisation and reason code, and the outbox event in one transaction;
 - refuses unknown fields.
 
-**Validation:** PENDING — the run on a fresh database follows this report.
+**Validation:** fresh database one_emp11, with only DATABASE_URL exported.
+- `corepack pnpm db:migrate` twice: the first run applied 61 and created the ledger; the second applied 0.
+- `corepack pnpm typecheck`: passed.
+- `corepack pnpm -r --no-bail --workspace-concurrency=1 test`: exit 0. 18 suites and 3,011 tests, all passed, none failed. The largest suites had 991, 729 and 392 tests. The new API spec ran 7/7, the new hiring unit spec 8/8, and the new web tests 12/12.
+- `corepack pnpm build`: passed.
+- CI parity: `corepack pnpm audit --prod --audit-level=high` exited 0, with 2 moderate advisories and no high or critical ones. The optional-chain policy grep printed nothing, and there are no private-key blocks or merge markers.
+- Android `./gradlew --no-daemon -q :app:compileDebugKotlin` (Android Studio JBR): passed.
 
 **Acceptance criteria:**
 - [x] A drive cannot go live without placement-office approval. Test: `keeps a published drive-only job from the college's students until the college approves, and from everyone else after`.

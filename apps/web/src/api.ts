@@ -26,3 +26,4 @@ export * from './api/operationsOverview.js';
 export * from './api/careerCatalogue.js';
 export * from './api/roleDemand.js';
 export * from './api/skillMap.js';
+export * from './api/questionBank.js';

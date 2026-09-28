@@ -129,6 +129,19 @@ export function safeErrorMessage(code: string | undefined): string | undefined {
     case 'SKILL_SELF_PUBLISH_REFUSED': return 'You wrote or edited this revision, so someone else publishes it.';
     case 'SKILL_PREREQUISITE_NOT_LIVE': return 'A prerequisite of this skill is not published yet. Publish its prerequisites first.';
     case 'SKILL_RIGHTS_NOT_REVIEWED': return 'This revision has no rights review. It must be approved by a reviewer first.';
+    // OPS-09b: the question bank editor.
+    case 'QUESTION_INVALID': return 'The question is not ready: check the skill, every option, the correct answer and explanation, the difficulty, all four hints and the licence (with attribution for a CC licence). A misconception can only sit on a wrong option and must belong to the skill of the question.';
+    case 'QUESTION_KEY_EXISTS': return 'A question with this key already exists.';
+    case 'QUESTION_KEY_INVALID': return 'A key is 3 to 80 lower-case letters, digits and hyphens, starting with a letter or digit.';
+    case 'QUESTION_TOPIC_UNKNOWN': return 'No live or pending skill has this key.';
+    case 'QUESTION_TOPIC_NOT_LIVE': return 'The skill of this question is not published yet. Publish the skill first.';
+    case 'QUESTION_OPEN_REVISION_EXISTS': return 'This question already has a revision on its way. Finish that one first.';
+    case 'QUESTION_NOT_LIVE': return 'Only a published question can take a new revision; edit its draft instead.';
+    case 'QUESTION_REVISION_NOT_EDITABLE': return 'This revision is in review or approved, so it cannot be edited. A reviewer can send it back for changes.';
+    case 'QUESTION_SELF_REVIEW_REFUSED': return 'You wrote, edited or submitted this revision, so someone else reviews it.';
+    case 'QUESTION_SELF_PUBLISH_REFUSED': return 'You wrote, edited or submitted this revision, so someone else publishes it.';
+    case 'QUESTION_MISCONCEPTION_NOT_PUBLISHED': return 'A misconception tagged on this question is not published yet, so the question cannot go live.';
+    case 'QUESTION_RIGHTS_NOT_REVIEWED': return 'This revision has no rights review. It must be approved by a reviewer first.';
     default: return undefined;
   }
 }

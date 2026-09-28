@@ -88,6 +88,8 @@ const operationApprovalActionKeys = [
   'CAREER_REQUIREMENT_SET_PUBLISH',
   // OPS-09a: extended key as well (0057).
   'CONTENT_SKILL_PUBLISH',
+  // OPS-09b: extended key as well (0061).
+  'CONTENT_QUESTION_PUBLISH',
 ] as const;
 
 // EMP-05: opportunities.lifecycle_state (0007 CHECK).
@@ -775,6 +777,37 @@ export const eventSchemas = {
     payload: {
       revisionId: { kind: 'uuid' },
       topicId: { kind: 'uuid' },
+      releaseManifestId: { kind: 'uuid' },
+    },
+  },
+  // OPS-09b: question bank revisions. No consumer yet; identifiers and enums only — never an answer.
+  questionBankRevisionStateChangedV1: {
+    eventType: 'question_bank.revision_state_changed',
+    eventVersion: 1,
+    producer: 'operations-content',
+    aggregateType: 'content_revision',
+    purpose: 'content-authoring',
+    dataClassification: 'internal',
+    schemaRef: 'registry://question_bank.revision_state_changed/1',
+    payload: {
+      revisionId: { kind: 'uuid' },
+      questionId: { kind: 'uuid' },
+      fromState: { kind: 'enum', values: skillRevisionStates },
+      toState: { kind: 'enum', values: skillRevisionStates },
+    },
+  },
+  questionBankQuestionPublishedV1: {
+    eventType: 'question_bank.question_published',
+    eventVersion: 1,
+    producer: 'operations-content',
+    aggregateType: 'content_revision',
+    purpose: 'content-authoring',
+    dataClassification: 'internal',
+    schemaRef: 'registry://question_bank.question_published/1',
+    payload: {
+      revisionId: { kind: 'uuid' },
+      questionId: { kind: 'uuid' },
+      questionVersionId: { kind: 'uuid' },
       releaseManifestId: { kind: 'uuid' },
     },
   },

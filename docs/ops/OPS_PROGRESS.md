@@ -1136,3 +1136,79 @@ Overview and has no Analytics screen.
 **Android:** no change. The skill map is an operator surface, and operator screens are web-only (Appendix 1 §4.3).
 
 **Next goal:** OPS-09b.
+
+## OPS-09b — Question bank editor — 2026-09-28
+**Result:** Complete (validation run pending; this entry is amended with the results). Operators draft readiness-check questions with a skill tag, answer key, difficulty band, a misconception per wrong option and a four-step hint ladder. Someone who did not write, edit or submit the question reviews it, and that review records the rights review. Every publish goes through a second person's approval. It writes the learner-facing version and the grading-only answer key, and supersedes the previous version in the readiness-check pool.
+
+**Branch / PR:** `feat/ops-question-bank-editor`, cut from `onev4/feat/plan-phases-0-to-2` (94fd0d8). The coordinator merges it.
+
+**Files created:**
+- `docs/architecture/question-bank-editor-design.md`, `docs/architecture/question-hint-ladders-table-design.md`
+- `packages/persistence/drizzle/0061_question_bank_editor.sql`
+- `packages/career-readiness/src/question-bank.ts` (pure body rules; `publishedQuestionColumns` decides what reaches `question_versions`)
+- `packages/authorization/src/question-bank.ts`
+- `packages/persistence/src/question-bank.ts`
+- `apps/api/src/http/operations-question-bank.controller.ts`
+- `apps/web/src/api/questionBank.ts`, `apps/web/src/rolePortal/questionBank.tsx`
+- Tests: `packages/career-readiness/test/question-bank.test.ts`, `packages/authorization/src/question-bank.test.ts`, `apps/api/src/http/operations-question-bank.integration.spec.ts`, `apps/web/src/rolePortal/questionBank.test.tsx`
+
+**Files modified:**
+- `packages/authorization/src/high-risk-actions.ts` and `index.ts` (extended key `CONTENT_QUESTION_PUBLISH`); `packages/career-readiness/src/index.ts`
+- `packages/events/src/index.ts` (`question_bank.revision_state_changed`, `question_bank.question_published`, the approval key)
+- `packages/persistence/src/career-readiness.ts`: the readiness-check pool excludes superseded versions (one SQL line).
+- `packages/persistence/src/operation-approvals.ts`: the queue names the question key and revision. The skill columns now fill only for TOPIC targets.
+- `apps/api/src/http/operation-approval-gate.ts`, `operations-approvals.controller.ts`, `api-security.module.ts`
+- `apps/web/src/api.ts`, `api/operations.ts`, `rolePortal/approvals.tsx`, `rolePortal/shared.tsx`
+- `apps/web/src/rolePortalPages.tsx`: the Content Management branch only. The question bank sits under the skill map.
+- CI parity: `hiringPages.tsx`, `rolePortal/institutionPlacement.tsx`, `privacyConsole.tsx`, `roleDemand.tsx`, `support.tsx`, `systemHealth.tsx` and `approvals.tsx` had ten pre-existing `?.x.method` chains that the foundation-policy grep rejects. Each is now guarded (`?.x?.method`) with no change in behaviour, and the grep prints nothing.
+
+**Migrations added:** `0061_question_bank_editor.sql`. It adds:
+- `question_hint_ladders`: one row per QUESTION revision, hints 1–4, provenance as in 0049, `review_state` mirrored from the question revision, a guard trigger, and no deletes.
+- `question_versions.superseded_at`, with a guard: it is the only change a published version ever takes, and only once.
+- A replacement of `operation_approval_extended_target_type` that repeats `CAREER_REQUIREMENT_SET_PUBLISH` and `CONTENT_SKILL_PUBLISH` and adds `CONTENT_QUESTION_PUBLISH`.
+- `content_review_author_publish_guard`, extended from TOPIC to TOPIC and QUESTION.
+- An expression index for question key lookups.
+
+No misconception table was created: the editor writes to ENG-07's `question_option_misconceptions`.
+
+**Design docs / ADRs:** the two design documents above. No ADR was needed.
+
+**Validation:** pending (see the amendment below).
+
+**Acceptance criteria:**
+- ✔ **Draft → review → publish works; self-review is rejected.** The author, anyone who saved an edit and anyone who submitted count as contributors, taken from the audit log. They get 403 `QUESTION_SELF_REVIEW_REFUSED` or `QUESTION_SELF_PUBLISH_REFUSED`, at the approval request as well as at publish. 0061 refuses a direct PUBLISH insert by the author.
+- ✔ **Answer keys never appear in learner DTOs (toLearnerQuestionDto).**
+  - Unit: passing `publishedQuestionColumns` through `toLearnerQuestionDto` leaves no key, explanation, tag, hint or difficulty.
+  - Integration: the published `question_versions.options` hold only `{id, text}`. After a pilot question is republished, a student starting the readiness check gets only `id, topicId, prompt, options, publishedRevision`.
+  - An operator with only CONTENT_PUBLISH sees the key, explanation and tags withheld. The approvals queue and the audit and outbox rows carry no answer.
+- Not applicable to 09b: prerequisite cycles (09a) and bulk import (09d).
+- ✔ **Publishing needs CONTENT_PUBLISH plus an approval when it changes readiness inputs.** Today that is every publish, because the check draws from every published question. Tested: APPROVAL_REQUIRED, payload mismatch, execution, and a refused publish that leaves the approval usable.
+- ✔ **Every transition is audited:** `operations.content.question_created`, `…question_revision_started`, `…question_draft_saved`, `…question_transitioned`, `…question_rights_reviewed` and `…question_published`, each with its reason code and break_glass. The outbox events are registered.
+- ✔ **Rights review is not bypassed:** approval writes a release-eligible source record with its rights review, and 0004 refuses the release manifest (question plus its tags) without it.
+- ✔ **Imports and edits land as DRAFT:** every new question and revision starts as DRAFT, and nothing publishes automatically.
+- ✔ **§6.6 minimums:** 401; 403 for plain operations, catalogue manager, institution admin and student (a reviewer cannot create); 200; input 400s; 404; keyset pagination; audit rows with reason codes.
+- ✔ **Web states:** real data, NA, loading, empty, error with reference, forbidden, reason-code dialogs, the rights reason, a contributor not offered review, publish filing an approval, the withheld-key view, the approvals-queue execute, and unchanged navigation labels.
+
+**Decisions for Divakar (recommendations adopted):**
+- **Every question publish needs an approval** while the readiness check draws from every published question.
+- **The readiness-check pool is not scoped by topic** (unchanged), so a question published here joins the Career Readiness Fundamentals check. Recommended follow-up: select only the blueprint's declared topics, then relax the approval rule for items outside every live blueprint.
+- **Tagging a wrong option is optional.** ENG-10's pack validation enforces its own "at least one".
+- **A complete four-hint ladder is required to submit.** The six pilot questions have none, so their next revision needs one.
+- **The hint ladder is reviewed with its question** and has no revision of its own. Adding a ladder to a published question needs a new question revision.
+- **Tags are written at submission** by the submitter and reused on resubmission. A dropped tag stays in CHANGES_REQUESTED and is never published, because 0049 forbids deleting it.
+- **Difficulty bands** are FOUNDATION, INTERMEDIATE and ADVANCED. Licences are as in OPS-09a.
+- **Answer keys** go only to CONTENT_EDIT and CONTENT_REVIEW. Readers are CONTENT_EDIT, CONTENT_REVIEW and CONTENT_PUBLISH, not CATALOGUE_MANAGE.
+
+**Limitations / not done:**
+- Misconception codes are chosen here, not authored. ENG-07 has no operator path to draft or publish a code, and a question tagged with an unpublished code cannot publish.
+- No learner route shows hints yet (ENG-15/ENG-18).
+- There is no retire or withdraw. An APPROVED revision that is never published blocks new revisions of that question.
+- `corepack pnpm audit --prod --audit-level=high` exits 1 on the base and on this branch. The cause is three pre-existing high advisories in `multer` via `@nestjs/platform-express`; this goal adds no dependency. Fixing it needs a dependency override and a lockfile change shared by every branch, so it is left to the coordinator.
+
+**Risks / follow-ups:**
+- Any later approval key must repeat all three extended keys in its replacement of `operation_approval_extended_target_type`. Expect conflicts in `operations-approvals.controller.ts`, `operation-approval-gate.ts`, `approvals.tsx`, `operation-approvals.ts` and `packages/events`.
+- The optional-chain fixes touch six files that other goals also edit. Any conflicts there are one line each.
+
+**Android:** no change. The question bank is an operator surface, and operator screens are web-only (Appendix 1 §4.3). Nothing a student sees changes shape: the readiness check returns the same fields.
+
+**Next goal:** OPS-09c.

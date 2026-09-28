@@ -1426,7 +1426,14 @@ It changes no existing table or migration.
 
 **Design docs / ADRs:** ADR-037 (the next free number on every onev4 branch), and `external-review-assignments-table-design.md`.
 
-**Validation:** see the amendment below.
+**Validation:** on a freshly created database `one_ops10`, with only DATABASE_URL exported:
+- `corepack pnpm db:migrate` ran twice: 60 applied, then 0 applied. `0066` was also replayed twice by hand over the migrated database without error.
+- `corepack pnpm typecheck` passed.
+- `corepack pnpm -r --no-bail --workspace-concurrency=1 test` passed 2984 of 2984 tests, with no failures and no teardown errors. That includes api 984, web 717 and persistence 392.
+- `corepack pnpm build` passed.
+- `corepack pnpm audit --prod --audit-level=high` exited 0 (two moderate advisories, none high).
+- The foundation-policy greps (optional chains in `apps/web/src`, conflict markers, private keys) print nothing.
+- New tests: 12 authorization unit, 4 career-readiness unit, 18 API integration and 11 web.
 
 **Acceptance criteria:**
 - ✔ **A faculty reviewer sees only assigned drafts and cannot reach any student record through this path.**

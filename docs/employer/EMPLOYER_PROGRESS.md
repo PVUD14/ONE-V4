@@ -375,7 +375,14 @@ Written by the coordinator for the same reason as EMP-07.
 - New: GET …/interviews/:id/history; GET …/interviews/:id/scorecards (live grant, audited `interview.scorecards.viewed`); GET and POST …/scorecard-templates; POST …/scorecard-templates/:id/retire; GET …/my-interviews/:id/calendar; GET /students/me/interviews/:id/calendar.
 - POST …/applications/:id/interviews gains `selectionStageId`; both outcome routes gain `criteria`.
 
-**Validation:** see the amendment below.
+**Validation:** fresh database one_emp09, only DATABASE_URL exported.
+- `corepack pnpm db:migrate` twice: the first run applied 57 and the second applied 0. 0063 was also replayed twice by hand in psql.
+- `corepack pnpm typecheck`: passed.
+- `corepack pnpm -r --no-bail --workspace-concurrency=1 test`: exit 0. 17 suites and 2,768 tests, all passed (the largest suites had 930, 678 and 355 tests). The new API spec ran 14/14 and the new hiring unit spec 34/34.
+- `corepack pnpm build`: passed.
+- CI parity: `corepack pnpm audit --prod --audit-level=high` found 2 moderate advisories and no high or critical ones. The optional-chain policy grep printed nothing, and there are no private-key blocks or merge markers.
+- Android `./gradlew --no-daemon -q :app:compileDebugKotlin` (Android Studio JBR): passed.
+- The test commit was not run on its own against the base, because its routes and tables do not exist there.
 **Acceptance criteria:**
 - [x] Reschedules notify everyone once and keep history: `notifies the student and each panellist once per change with an .ics, and a replayed event adds nothing`; `keeps every revision in order with who, when, why and the schedule it produced, and the history cannot be rewritten`.
 - [x] Reschedule and cancel with reason codes and student notification: `refuses a reschedule or cancellation without a listed reason code, with an unknown field or into the past, and writes nothing`. The student is told that it moved or was cancelled, never why (the EMP-08 assertion is kept).

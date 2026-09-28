@@ -187,6 +187,10 @@ export interface OperationApprovalRow {
   /** For a question publish (OPS-09b): the question's key and the revision number — never its answer. */
   readonly questionKey: string | null;
   readonly questionRevision: number | null;
+  /** For a lesson publish (OPS-09c): the lesson's key, the variant it is (language/level/style) and the revision. */
+  readonly lessonKey: string | null;
+  readonly lessonVariant: string | null;
+  readonly lessonRevision: number | null;
 }
 
 interface ApprovalDbRow {
@@ -199,6 +203,7 @@ interface ApprovalDbRow {
   career_role_title: string | null; career_role_catalogue_code: string | null; career_set_version: number | null;
   skill_name: string | null; skill_key: string | null; skill_revision: number | null;
   question_key: string | null; question_revision: number | null;
+  lesson_key: string | null; lesson_variant: string | null; lesson_revision: number | null;
 }
 
 // Microsecond text timestamps for the keyset cursor: a millisecond cursor would repeat
@@ -219,7 +224,11 @@ const approvalSelect = sql`
          CASE WHEN skr.entity_type = 'TOPIC' THEN COALESCE(skr.body->>'name', skn.name) END AS skill_name, skn.stable_key AS skill_key,
          CASE WHEN skr.entity_type = 'TOPIC' THEN skr.revision END AS skill_revision,
          CASE WHEN skr.entity_type = 'QUESTION' THEN skr.body->>'stableKey' END AS question_key,
-         CASE WHEN skr.entity_type = 'QUESTION' THEN skr.revision END AS question_revision
+         CASE WHEN skr.entity_type = 'QUESTION' THEN skr.revision END AS question_revision,
+         CASE WHEN skr.entity_type = 'LESSON' THEN skr.body->>'stableKey' END AS lesson_key,
+         CASE WHEN skr.entity_type = 'LESSON' THEN concat_ws('/', COALESCE(skr.body #>> '{variant,language}', 'en'),
+           COALESCE(skr.body #>> '{variant,level}', 'STANDARD'), COALESCE(skr.body #>> '{variant,style}', 'EXPLANATION')) END AS lesson_variant,
+         CASE WHEN skr.entity_type = 'LESSON' THEN skr.revision END AS lesson_revision
   FROM operation_approvals a
   JOIN users ru ON ru.id = a.requested_by_user_id
   LEFT JOIN users du ON du.id = a.decided_by_user_id
@@ -270,6 +279,9 @@ function mapApproval(row: ApprovalDbRow): OperationApprovalRow {
     skillRevision: row.skill_revision === null ? null : Number(row.skill_revision),
     questionKey: row.question_key,
     questionRevision: row.question_revision === null ? null : Number(row.question_revision),
+    lessonKey: row.lesson_key,
+    lessonVariant: row.lesson_variant,
+    lessonRevision: row.lesson_revision === null ? null : Number(row.lesson_revision),
   };
 }
 

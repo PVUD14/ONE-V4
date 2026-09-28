@@ -11,6 +11,7 @@
 import { careerPublishReasons } from './career-catalogue.js';
 import { skillPublishReasons } from './skill-map.js';
 import { questionPublishReasons } from './question-bank.js';
+import { lessonPublishReasons } from './lesson-editor.js';
 import { hasInternalCapability, internalCapabilityGrantReasons, type InternalCapability, type InternalCapabilityContext } from './internal-capabilities.js';
 
 export const highRiskActionKeys = [
@@ -26,6 +27,8 @@ export const highRiskActionKeys = [
   'CONTENT_SKILL_PUBLISH',
   // OPS-09b. Extended key too (0061 adds it to operation_approval_extended_target_type).
   'CONTENT_QUESTION_PUBLISH',
+  // OPS-09c. Extended key too (0065 adds it to operation_approval_extended_target_type).
+  'CONTENT_LESSON_PUBLISH',
 ] as const;
 
 /** The keys 0038's CHECK allows in `action_key`; any other key is an extended key (0051). */
@@ -55,6 +58,7 @@ export const highRiskActions: Readonly<Record<HighRiskActionKey, HighRiskActionD
   CAREER_REQUIREMENT_SET_PUBLISH: { capability: 'CONTENT_PUBLISH', targetType: 'career_requirement_set', label: 'Publish a career-role requirement set' },
   CONTENT_SKILL_PUBLISH: { capability: 'CONTENT_PUBLISH', targetType: 'content_revision', label: 'Publish a skill that changes readiness inputs' },
   CONTENT_QUESTION_PUBLISH: { capability: 'CONTENT_PUBLISH', targetType: 'content_revision', label: 'Publish a readiness-check question' },
+  CONTENT_LESSON_PUBLISH: { capability: 'CONTENT_PUBLISH', targetType: 'content_revision', label: 'Publish a lesson that changes readiness inputs' },
 };
 
 export function isLegacyHighRiskActionKey(key: HighRiskActionKey): boolean {
@@ -78,6 +82,7 @@ export const approvalRequestReasons: Readonly<Record<HighRiskActionKey, readonly
   CAREER_REQUIREMENT_SET_PUBLISH: careerPublishReasons,
   CONTENT_SKILL_PUBLISH: skillPublishReasons,
   CONTENT_QUESTION_PUBLISH: questionPublishReasons,
+  CONTENT_LESSON_PUBLISH: lessonPublishReasons,
 };
 
 /** Hours from request to expiry; one window covers deciding and executing. */

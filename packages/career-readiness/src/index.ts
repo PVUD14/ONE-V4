@@ -478,3 +478,4 @@ export function careerTargetProgress(gap: CareerGap): {
 export * from './misconceptions.js';
 export * from './skill-map.js';
 export * from './question-bank.js';
+export * from './lesson-editor.js';

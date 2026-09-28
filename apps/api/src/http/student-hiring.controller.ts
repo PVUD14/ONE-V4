@@ -287,7 +287,11 @@ export class StudentHiringController {
                WHERE t.application_id = a.id AND t.acknowledgement_required
                  AND t.acknowledged_at IS NULL AND t.declined_at IS NULL) AS pending_terms,
              EXISTS (SELECT 1 FROM application_feedback_releases f
-               WHERE f.application_id = a.id AND f.superseded_at IS NULL) AS feedback_released
+               WHERE f.application_id = a.id AND f.superseded_at IS NULL) AS feedback_released,
+             -- EMP-10: whether the employer started a conversation, and how many of its messages are unread.
+             EXISTS (SELECT 1 FROM application_message_threads mt WHERE mt.application_id = a.id) AS conversation_started,
+             (SELECT count(*) FROM application_messages m JOIN application_message_threads mt ON mt.id = m.thread_id
+               WHERE mt.application_id = a.id AND m.sender_side = 'EMPLOYER' AND m.read_at IS NULL AND m.erased_at IS NULL) AS unread_messages
       FROM applications a
       JOIN opportunities o ON o.id = a.opportunity_id
       JOIN opportunity_versions v ON v.id = a.applied_version_id
@@ -877,6 +881,8 @@ function mapApplication(row: Record<string, unknown>): Record<string, unknown> {
     updatedAt: row.updated_at,
     termsAcknowledgementPending: Number(row.pending_terms ?? 0) > 0,
     feedbackReleased: row.feedback_released === true,
+    conversationStarted: row.conversation_started === true,
+    unreadMessages: Number(row.unread_messages ?? 0),
   };
 }
 

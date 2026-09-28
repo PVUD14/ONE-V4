@@ -158,7 +158,9 @@ afterAll(async () => {
 const api = () => request(app.getHttpServer());
 const auth = (userId: string) => ({ Authorization: 'Bearer ' + userId, 'X-Correlation-Id': 'ops-lesson-' + randomUUID() });
 const base = '/api/v1/operations/lessons';
-const [firstPilot, secondPilot, thirdPilot] = [0, 1, 2].map((index) => () => fixture.lessons[index]!);
+const firstPilot = () => fixture.lessons[0]!;
+const secondPilot = () => fixture.lessons[1]!;
+const thirdPilot = () => fixture.lessons[2]!;
 
 function complete(over: Record<string, unknown> = {}): Record<string, unknown> {
   return {

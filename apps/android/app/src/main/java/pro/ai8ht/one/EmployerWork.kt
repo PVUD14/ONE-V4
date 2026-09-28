@@ -116,6 +116,8 @@ internal fun ApplicantActionsPage(
             }
             // EMP-07: what the applicant chose to share, read-only, while their grant is live.
             CandidateSharedCards(employerId, applicationId, shared)
+            // EMP-10: the conversation with this candidate, while they share their details.
+            EmployerConversationSection(employerId, applicationId, applicantName, shared)
             // EMP-06: eligibility as it stood when they applied. Outcome and basis only, never a figure.
             eligibility?.let { record ->
                 Spacer(Modifier.height(12.dp))

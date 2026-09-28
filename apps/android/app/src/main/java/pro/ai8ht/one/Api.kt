@@ -590,6 +590,9 @@ internal fun StudentDto.formerStudentLine(): String? {
     /** ADR-019 / INST-09: when the student shared this application with their college, and when they stopped. */
     val institutionVisibilityGrantedAt: String? = null,
     val institutionVisibilityRevokedAt: String? = null,
+    /** EMP-10: the employer started a conversation, and how many of its messages are unread. */
+    val conversationStarted: Boolean = false,
+    val unreadMessages: Int = 0,
 )
 
 // --- Candidate feedback -------------------------------------------------------

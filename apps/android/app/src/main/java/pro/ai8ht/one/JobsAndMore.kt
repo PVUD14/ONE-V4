@@ -90,6 +90,8 @@ internal fun JobsScreen() {
     var feedback by remember { mutableStateOf<ApplicationFeedbackDto?>(null) }
     // EMP-05: the changed terms one application is waiting on the student to answer.
     var termsChange by remember { mutableStateOf<Pair<String, TermsChangeDto>?>(null) }
+    // EMP-10: the application whose conversation is open (inside My applications; no new tab).
+    var conversationFor by remember { mutableStateOf<ApplicationDto?>(null) }
 
     LaunchedEffect(reload) {
         opportunities = runCatching { Api.listOpportunities(context) }.getOrNull()
@@ -108,6 +110,12 @@ internal fun JobsScreen() {
         if (openOpportunityId != null) openOpportunityId = null else jobsOverlay = null
     }
     androidx.activity.compose.BackHandler(enabled = feedback != null) { feedback = null }
+    androidx.activity.compose.BackHandler(enabled = conversationFor != null) { conversationFor = null; reload += 1 }
+
+    conversationFor?.let { app ->
+        SlideIn { StudentConversationPage(app.id, "${app.title} · ${app.employerName}", onClose = { conversationFor = null; reload += 1 }) }
+        return
+    }
 
     feedback?.let { released ->
         SlideIn { FeedbackPage(released, onClose = { feedback = null }) }
@@ -308,6 +316,13 @@ internal fun JobsScreen() {
                                                     .onFailure { notice = (it as? Api.ApiException)?.detail ?: "Could not load the changed terms." }
                                             }
                                         }) { Text("Review new terms") }
+                                    }
+                                }
+                                // EMP-10: the conversation the employer started, with unread messages counted.
+                                if (app.conversationStarted) {
+                                    Spacer(Modifier.height(8.dp))
+                                    TextButton(onClick = { conversationFor = app }) {
+                                        Text(if (app.unreadMessages > 0) "Messages (${app.unreadMessages} new)" else "Messages")
                                     }
                                 }
                                 // Only shown when the employer deliberately released

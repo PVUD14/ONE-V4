@@ -1257,7 +1257,14 @@ No misconception table was created: the editor writes to ENG-07's `question_opti
 
 **Design docs / ADRs:** `lesson-variant-editor-design.md`. No ADR was needed.
 
-**Validation:** pending — recorded here once the full run completes.
+**Validation:** on a fresh database `one_ops09c`:
+- `corepack pnpm db:migrate` ran twice: 57 applied, then 0 applied. `0065` was also replayed twice by hand over the migrated database without error.
+- `corepack pnpm -r --no-bail --workspace-concurrency=1 test` passed 2794 of 2794 tests across all packages, with no teardown failures.
+- `corepack pnpm build` passed.
+- `corepack pnpm audit --prod --audit-level=high` exited 0 (two moderate advisories, none high).
+- The foundation-policy greps (optional chains in `apps/web/src`, conflict markers, private keys) print nothing.
+- `corepack pnpm typecheck` first failed on the new integration spec: an array destructure typed the pilot-lesson accessors as possibly undefined. The fix is in 1a0d615 and changes no assertion. The re-run then passed.
+- New tests: 8 career-readiness unit, 6 authorization unit, 17 API integration and 16 web.
 
 **Acceptance criteria:**
 - ✔ **Draft → review → publish works; self-review is rejected.**

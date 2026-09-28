@@ -16,6 +16,7 @@ import { EmployerTeamPage } from './employerTeam.js';
 import { EmployerCompanyProfilePage } from './employerCompanyProfile.js';
 import { EmployerOpportunityDetailPage } from './employerOpportunityDetail.js';
 import { EmployerCandidateDetailPage, EmployerTalentPoolPage } from './employerCandidateDetail.js';
+import { EmployerMessagesPage } from '../applicationMessages.js';
 import type { RolePortalConfig } from '../rolePortalConfig.js';
 import { RestrictedApiState } from './shared.js';
 import { useEffect, useState } from 'react';
@@ -93,6 +94,13 @@ function EmployerManagementRealityPage({ portal, routeLabel }: { readonly portal
   // EMP-04: Company Profile is live for every employer role; the server decides who may edit
   // (owners and admins) and who only reads (recruiters).
   if (routeLabel === 'Company Profile') return <EmployerCompanyProfilePage key={employerId} employerId={employerId} />;
+
+  // EMP-10: the existing Messages item shows the conversations, one per application. It is live for
+  // every employer role (Appendix 2 §5.1: messages pass for owner, admin and recruiter).
+  if (routeLabel === 'Messages') {
+    return <StaffPilotWrap title="Messages" subtitle="Conversations with shortlisted candidates, one per application.">
+      <EmployerMessagesPage key={employerId} employerId={employerId} /></StaffPilotWrap>;
+  }
 
   // Routes whose backend does not exist yet keep saying so rather than borrowing
   // another page's data.

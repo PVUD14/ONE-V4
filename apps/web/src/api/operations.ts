@@ -194,6 +194,21 @@ export function openTrustCaseFromSignal(token: string, body: unknown): Promise<{
   return requestJson('/api/v1/operations/trust-safety/cases', { token, method: 'POST', body });
 }
 
+/** EMP-10: a reported application conversation, as evidence on a case. Operators only; audited. */
+export interface TrustCaseMessageThreadDto {
+  readonly employerName: string;
+  readonly opportunityTitle: string;
+  readonly startedAt: string;
+  readonly messages: readonly {
+    readonly from: 'EMPLOYER' | 'STUDENT'; readonly body: string | null; readonly containsLink: boolean; readonly sentAt: string;
+    readonly erasedAt: string | null; readonly reported: boolean; readonly reportReasonCode: string | null;
+  }[];
+}
+
+export function getTrustCaseMessageThreads(token: string, caseId: string, signal?: AbortSignal): Promise<{ readonly threads: readonly TrustCaseMessageThreadDto[] }> {
+  return requestJson(`/api/v1/operations/trust-safety/cases/${encodeURIComponent(caseId)}/message-threads`, { token, ...(signal ? { signal } : {}) });
+}
+
 export function transitionTrustCase(token: string, caseId: string, toState: string, reasonCode: string): Promise<Record<string, unknown>> {
   return requestJson(`/api/v1/operations/trust-safety/cases/${encodeURIComponent(caseId)}/transition`, { token, method: 'POST', body: { toState, reasonCode } });
 }

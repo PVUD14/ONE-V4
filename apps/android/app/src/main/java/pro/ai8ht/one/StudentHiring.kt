@@ -366,6 +366,8 @@ private val interviewModeLabels = mapOf("VIDEO" to "Video", "PHONE" to "Phone", 
 @Composable
 internal fun StudentInterviewCard(item: StudentInterviewDto) {
     val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var calendarNotice by remember { mutableStateOf<String?>(null) }
     PilotCard {
         Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.Top) {
@@ -400,6 +402,31 @@ internal fun StudentInterviewCard(item: StudentInterviewDto) {
                 Spacer(Modifier.height(6.dp))
                 Text("What to prepare", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
                 Text(item.preparationNote ?: "NA — the employer has not added anything to prepare.", style = MaterialTheme.typography.bodySmall)
+                // EMP-09: into the phone's own calendar, with how to join.
+                item.scheduledStart?.let { start ->
+                    TextButton(onClick = {
+                        val added = addInterviewToCalendar(
+                            context, "Interview: ${item.title} with ${item.employerName}", start, item.scheduledEnd,
+                            item.joiningLink ?: item.locationDetail,
+                            listOfNotNull(
+                                "${interviewModeLabels[item.mode] ?: prettify(item.mode)} interview (${item.stageLabel ?: "round ${item.roundNumber}"}).",
+                                item.joiningLink?.let { "Join: $it" },
+                                item.preparationNote?.let { "Prepare: $it" },
+                                "Any change to this interview is in ONE under My applications.",
+                            ).joinToString("\n"),
+                        )
+                        calendarNotice = if (added) null else "No calendar app was found on this phone."
+                    }) { Text("Add to calendar") }
+                }
+                if (item.state == "RESCHEDULED") {
+                    Text("This interview was moved. If you added it to your calendar before, add it again and remove the old time.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                calendarNotice?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+            } else if (item.state == "CANCELLED") {
+                Spacer(Modifier.height(6.dp))
+                Text("Cancelled. If you added it to your calendar, remove it there.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }

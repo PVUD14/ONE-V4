@@ -37,6 +37,9 @@ export const approvalPayloads = {
   // OPS-09b: the same binding for a question revision — the hash covers its answer key, tags and hints.
   CONTENT_QUESTION_PUBLISH: (input: { readonly revisionId: string; readonly contentHash: string; readonly reasonCode: string }) =>
     ({ revisionId: input.revisionId.toLowerCase(), contentHash: input.contentHash, reasonCode: input.reasonCode }),
+  // OPS-09c: the same binding for a lesson revision (a base lesson or a variant).
+  CONTENT_LESSON_PUBLISH: (input: { readonly revisionId: string; readonly contentHash: string; readonly reasonCode: string }) =>
+    ({ revisionId: input.revisionId.toLowerCase(), contentHash: input.contentHash, reasonCode: input.reasonCode }),
 } satisfies Record<HighRiskActionKey, (input: never) => Record<string, unknown> & { reasonCode: string }>;
 
 function domainError(code: string, correlationId: string): { readonly error: { readonly code: string; readonly message: string; readonly correlationId: string } } {

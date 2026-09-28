@@ -38,6 +38,7 @@ import {
   isInternalCapability,
   refuseApprovalRequest,
   refuseInternalCapabilityGrant,
+  refuseLessonPublish,
   refuseQuestionPublish,
   refuseSkillPublish,
   type ApprovalDecision,
@@ -47,6 +48,7 @@ import {
 import { loadRequirementSetForPublish } from '@planthepath/persistence/src/career-catalogue.js';
 import { loadSkillRevisionForPublish } from '@planthepath/persistence/src/skill-map.js';
 import { loadQuestionRevisionForPublish } from '@planthepath/persistence/src/question-bank.js';
+import { loadLessonRevisionForPublish } from '@planthepath/persistence/src/lesson-editor.js';
 import {
   countHighRiskApprovers,
   createOperationApproval,
@@ -285,6 +287,18 @@ export class OperationsApprovalsController {
         if (refusal) throw new ForbiddenException(domainError(refusal, correlationId));
         return { targetId: revisionId, canonical: approvalPayloads.CONTENT_QUESTION_PUBLISH({ revisionId, contentHash: revision.contentHash, reasonCode }) };
       }
+      case 'CONTENT_LESSON_PUBLISH': {
+        // OPS-09c: only an approved lesson revision whose publish changes completion evidence, and
+        // only by someone who neither wrote, edited or submitted it nor approved it (they will execute it).
+        const revisionId = requireUuidField(payload.revisionId, correlationId);
+        const revision = await loadLessonRevisionForPublish(this.db, revisionId);
+        if (!revision) throw new OperationApprovalError('APPROVAL_TARGET_NOT_FOUND');
+        if (revision.state !== 'APPROVED') throw badRequest('APPROVAL_TARGET_STATE_INVALID', correlationId);
+        if (!revision.needsApproval) throw new OperationApprovalError('APPROVAL_NOT_REQUIRED');
+        const refusal = refuseLessonPublish({ actor, contributorUserIds: revision.contributorUserIds, approverUserId: revision.approverUserId });
+        if (refusal) throw new ForbiddenException(domainError(refusal, correlationId));
+        return { targetId: revisionId, canonical: approvalPayloads.CONTENT_LESSON_PUBLISH({ revisionId, contentHash: revision.contentHash, reasonCode }) };
+      }
     }
   }
 }
@@ -299,6 +313,7 @@ const payloadFields: Readonly<Record<HighRiskActionKey, readonly string[]>> = {
   CAREER_REQUIREMENT_SET_PUBLISH: ['setId', 'releaseLabel', 'reasonCode'],
   CONTENT_SKILL_PUBLISH: ['revisionId', 'reasonCode'],
   CONTENT_QUESTION_PUBLISH: ['revisionId', 'reasonCode'],
+  CONTENT_LESSON_PUBLISH: ['revisionId', 'reasonCode'],
 };
 
 /**
@@ -338,6 +353,9 @@ function toApprovalDto(row: OperationApprovalRow, actor: Actor, approverCount: n
       skillRevision: row.skillRevision,
       questionKey: row.questionKey,
       questionRevision: row.questionRevision,
+      lessonKey: row.lessonKey,
+      lessonVariant: row.lessonVariant,
+      lessonRevision: row.lessonRevision,
     },
     reasonCode: row.reasonCode,
     note: row.note,

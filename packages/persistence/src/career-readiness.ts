@@ -401,12 +401,17 @@ export async function getPublishedCareerReadinessCatalog(pool: Pool): Promise<Re
     `SELECT m.id, m.stable_key AS "stableKey", m.version, m.title, m.description,
        COALESCE(jsonb_agg(jsonb_build_object(
          'id', l.id, 'stableKey', l.stable_key, 'version', l.version, 'title', l.title, 'body', l.body,
-         'topicId', l.topic_id, 'prerequisiteLessonIds', COALESCE((SELECT jsonb_agg(p.prerequisite_lesson_version_id)
-           FROM lesson_prerequisites p WHERE p.lesson_version_id=l.id), '[]'::jsonb)
+         'topicId', l.topic_id, 'prerequisiteLessonIds', COALESCE((SELECT jsonb_agg(DISTINCT cur.id)
+           FROM lesson_prerequisites p
+           JOIN lesson_versions pv ON pv.id = p.prerequisite_lesson_version_id
+           JOIN lesson_versions cur ON cur.stable_key = pv.stable_key AND cur.superseded_at IS NULL
+           WHERE p.lesson_version_id=l.id), '[]'::jsonb)
        ) ORDER BY l.stable_key) FILTER (WHERE l.id IS NOT NULL), '[]'::jsonb) AS lessons
      FROM learning_modules m
      JOIN release_manifests rm ON rm.id=m.release_manifest_id AND rm.status='PUBLISHED'
-     LEFT JOIN lesson_versions l ON l.module_id=m.id
+     -- Current versions only: a lesson revised in the lesson editor (OPS-09c, 0065) is listed once.
+     -- Prerequisites are named by their current version, since a lesson is its stable key.
+     LEFT JOIN lesson_versions l ON l.module_id=m.id AND l.superseded_at IS NULL
      GROUP BY m.id ORDER BY m.stable_key`,
   );
   const assessments = await pool.query(
@@ -423,8 +428,14 @@ export async function completeLesson(pool: Pool, input: {
   readonly subjectUserId: string; readonly lessonVersionId: string; readonly correlationId: string;
 }): Promise<{ readonly progressId: string; readonly evidenceId: string; readonly idempotentReplay: boolean }> {
   return transaction(pool, async (client) => {
+    // A lesson is its stable key (OPS-09c): completing any version of it completes the lesson, so a
+    // revised lesson is not completed a second time for a second piece of the same evidence.
     const existing = await client.query<{ id: string }>(
-      `SELECT id FROM learner_progress WHERE subject_user_id=$1 AND lesson_version_id=$2 AND state='COMPLETED'`,
+      `SELECT lp.id FROM learner_progress lp
+       JOIN lesson_versions done ON done.id = lp.lesson_version_id
+       JOIN lesson_versions target ON target.stable_key = done.stable_key
+       WHERE lp.subject_user_id=$1 AND target.id=$2 AND lp.state='COMPLETED'
+       ORDER BY lp.completed_at LIMIT 1`,
       [input.subjectUserId, input.lessonVersionId],
     );
     if (existing.rows[0]) {
@@ -434,9 +445,10 @@ export async function completeLesson(pool: Pool, input: {
       );
       return { progressId: existing.rows[0].id, evidenceId: evidence.rows[0]?.id ?? '', idempotentReplay: true };
     }
-    const lesson = await client.query<{ topic_id: string; version: number }>(
-      `SELECT l.topic_id, l.version FROM lesson_versions l JOIN learning_modules m ON m.id=l.module_id
-       JOIN release_manifests rm ON rm.id=m.release_manifest_id AND rm.status='PUBLISHED' WHERE l.id=$1`,
+    const lesson = await client.query<{ topic_id: string; version: number; release_manifest_id: string | null }>(
+      `SELECT l.topic_id, l.version, cr.release_manifest_id FROM lesson_versions l JOIN learning_modules m ON m.id=l.module_id
+       JOIN release_manifests rm ON rm.id=m.release_manifest_id AND rm.status='PUBLISHED'
+       LEFT JOIN content_revisions cr ON cr.id=l.content_revision_id WHERE l.id=$1`,
       [input.lessonVersionId],
     );
     if (!lesson.rows[0]) throw new Error('published lesson was not found');
@@ -444,8 +456,8 @@ export async function completeLesson(pool: Pool, input: {
       `SELECT lv.title FROM lesson_prerequisites p
        JOIN lesson_versions lv ON lv.id = p.prerequisite_lesson_version_id
        WHERE p.lesson_version_id=$2 AND p.required AND NOT EXISTS (
-         SELECT 1 FROM learner_progress lp WHERE lp.subject_user_id=$1
-           AND lp.lesson_version_id=p.prerequisite_lesson_version_id AND lp.state='COMPLETED')
+         SELECT 1 FROM learner_progress lp JOIN lesson_versions done ON done.id = lp.lesson_version_id
+         WHERE lp.subject_user_id=$1 AND done.stable_key=lv.stable_key AND lp.state='COMPLETED')
        ORDER BY lv.title`,
       [input.subjectUserId, input.lessonVersionId],
     );
@@ -472,7 +484,7 @@ export async function completeLesson(pool: Pool, input: {
         content_version, provenance, occurred_at, assisted, stage_at_capture)
        VALUES ($1,$2,'LESSON_COMPLETION',$3,1,1,'learner_progress',$4,$5,$6::jsonb,now(),false,$7)`,
       [evidenceId, input.subjectUserId, lesson.rows[0].topic_id, progressId, `lesson-v${lesson.rows[0].version}`,
-        JSON.stringify({ lessonVersionId: input.lessonVersionId, releaseManifestId: PILOT_RELEASE_ID }), stageAtCapture],
+        JSON.stringify({ lessonVersionId: input.lessonVersionId, releaseManifestId: lesson.rows[0].release_manifest_id ?? PILOT_RELEASE_ID }), stageAtCapture],
     );
     await insertOutbox(client, { aggregateType: 'learner_progress', aggregateId: progressId, eventType: 'learning.lesson.completed',
       actorUserId: input.subjectUserId, correlationId: input.correlationId,
@@ -843,8 +855,13 @@ export async function submitAssessmentAttempt(pool: Pool, input: {
 export async function getLearnerCareerReadinessState(pool: Pool, subjectUserId: string): Promise<Record<string, unknown>> {
   const [catalog, progress, attempts, evidence, projections, readiness, readinessHistory, roadmap, notificationPreferences, notifications] = await Promise.all([
     getPublishedCareerReadinessCatalog(pool),
-    pool.query(`SELECT lesson_version_id AS "lessonVersionId", state, started_at AS "startedAt", completed_at AS "completedAt"
-      FROM learner_progress WHERE subject_user_id=$1 ORDER BY updated_at`, [subjectUserId]),
+    // Progress is reported against each lesson's current version (OPS-09c): a completion of an
+    // earlier version still shows the revised lesson as done, on web and Android alike.
+    pool.query(`SELECT COALESCE(cur.id, lp.lesson_version_id) AS "lessonVersionId", lp.state, lp.started_at AS "startedAt", lp.completed_at AS "completedAt"
+      FROM learner_progress lp
+      JOIN lesson_versions done ON done.id = lp.lesson_version_id
+      LEFT JOIN lesson_versions cur ON cur.stable_key = done.stable_key AND cur.superseded_at IS NULL
+      WHERE lp.subject_user_id=$1 ORDER BY lp.updated_at`, [subjectUserId]),
     // assessmentDefinitionId is carried so a client can tell which assessments this
     // learner has already attempted. The server limit is one attempt per blueprint, and
     // without this the UI could only approximate that by blocking everything.

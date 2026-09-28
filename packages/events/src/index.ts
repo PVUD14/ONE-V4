@@ -90,6 +90,8 @@ const operationApprovalActionKeys = [
   'CONTENT_SKILL_PUBLISH',
   // OPS-09b: extended key as well (0061).
   'CONTENT_QUESTION_PUBLISH',
+  // OPS-09c: extended key as well (0065).
+  'CONTENT_LESSON_PUBLISH',
 ] as const;
 
 // EMP-05: opportunities.lifecycle_state (0007 CHECK).
@@ -810,6 +812,41 @@ export const eventSchemas = {
       questionId: { kind: 'uuid' },
       questionVersionId: { kind: 'uuid' },
       releaseManifestId: { kind: 'uuid' },
+    },
+  },
+  // OPS-09c: lesson editor revisions (base lessons and their variants). No consumer yet;
+  // identifiers and enums only.
+  lessonEditorRevisionStateChangedV1: {
+    eventType: 'lesson_editor.revision_state_changed',
+    eventVersion: 1,
+    producer: 'operations-content',
+    aggregateType: 'content_revision',
+    purpose: 'content-authoring',
+    dataClassification: 'internal',
+    schemaRef: 'registry://lesson_editor.revision_state_changed/1',
+    payload: {
+      revisionId: { kind: 'uuid' },
+      lessonId: { kind: 'uuid' },
+      fromState: { kind: 'enum', values: skillRevisionStates },
+      toState: { kind: 'enum', values: skillRevisionStates },
+    },
+  },
+  lessonEditorLessonPublishedV1: {
+    eventType: 'lesson_editor.lesson_published',
+    eventVersion: 1,
+    producer: 'operations-content',
+    aggregateType: 'content_revision',
+    purpose: 'content-authoring',
+    dataClassification: 'internal',
+    schemaRef: 'registry://lesson_editor.lesson_published/1',
+    payload: {
+      revisionId: { kind: 'uuid' },
+      lessonId: { kind: 'uuid' },
+      // Absent for a variant: it writes no lesson version.
+      lessonVersionId: { kind: 'uuid', required: false },
+      releaseManifestId: { kind: 'uuid' },
+      kind: { kind: 'enum', values: ['BASE', 'VARIANT'] },
+      language: { kind: 'enum', values: ['en', 'hi', 'te', 'ta', 'kn', 'ml', 'mr', 'bn', 'gu', 'pa', 'or'] },
     },
   },
   learningLessonCompletedV1: {

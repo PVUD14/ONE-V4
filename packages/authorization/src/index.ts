@@ -120,6 +120,7 @@ export * from './skill-map.js';
 export * from './question-bank.js';
 export * from './lesson-editor.js';
 export * from './content-import.js';
+export * from './external-review.js';
 export * from './institution-exports.js';
 export * from './role-demand.js';
 export * from './placement-status.js';

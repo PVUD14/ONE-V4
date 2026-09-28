@@ -849,6 +849,49 @@ export const eventSchemas = {
       language: { kind: 'enum', values: ['en', 'hi', 'te', 'ta', 'kn', 'ml', 'mr', 'bn', 'gu', 'pa', 'or'] },
     },
   },
+  // OPS-10 (ADR-037): external faculty review assignments. No consumer yet; identifiers and
+  // enums only — never the draft, the comment or the reviewer's identity.
+  externalReviewAssignedV1: {
+    eventType: 'external_review.assigned',
+    eventVersion: 1,
+    producer: 'operations-content',
+    aggregateType: 'external_review_assignment',
+    purpose: 'content-authoring',
+    dataClassification: 'internal',
+    schemaRef: 'registry://external_review.assigned/1',
+    payload: {
+      assignmentId: { kind: 'uuid' },
+      revisionId: { kind: 'uuid' },
+      entityType: { kind: 'enum', values: ['TOPIC', 'QUESTION', 'LESSON'] },
+    },
+  },
+  externalReviewDecidedV1: {
+    eventType: 'external_review.decided',
+    eventVersion: 1,
+    producer: 'operations-content',
+    aggregateType: 'external_review_assignment',
+    purpose: 'content-authoring',
+    dataClassification: 'internal',
+    schemaRef: 'registry://external_review.decided/1',
+    payload: {
+      assignmentId: { kind: 'uuid' },
+      revisionId: { kind: 'uuid' },
+      decision: { kind: 'enum', values: ['APPROVE', 'REQUEST_CHANGES'] },
+    },
+  },
+  externalReviewRevokedV1: {
+    eventType: 'external_review.revoked',
+    eventVersion: 1,
+    producer: 'operations-content',
+    aggregateType: 'external_review_assignment',
+    purpose: 'content-authoring',
+    dataClassification: 'internal',
+    schemaRef: 'registry://external_review.revoked/1',
+    payload: {
+      assignmentId: { kind: 'uuid' },
+      revisionId: { kind: 'uuid' },
+    },
+  },
   learningLessonCompletedV1: {
     eventType: 'learning.lesson.completed',
     eventVersion: 1,

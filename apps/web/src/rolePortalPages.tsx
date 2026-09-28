@@ -25,6 +25,7 @@ import { OperationsSkillMapPage } from './rolePortal/skillMap.js';
 import { OperationsQuestionBankPage } from './rolePortal/questionBank.js';
 import { OperationsLessonsPage } from './rolePortal/lessons.js';
 import { OperationsContentImportPage } from './rolePortal/contentImport.js';
+import { FacultyContentReviewsPage, OperationsExternalReviewsPage } from './rolePortal/externalReviews.js';
 import { InstitutionReportsPage } from './institutionReportsPage.js';
 import { InstitutionExportsPanel } from './rolePortal/institutionAnalytics.js';
 import { OperationsCareerReadinessPanel } from './operationsCareerReadinessPanel.js';
@@ -273,7 +274,7 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   // OPS-09a: the skill map editor sits under the catalogue, whose sets name its skills.
   // OPS-09d: bulk import sits under the three editors it writes through.
   if (!demoMode && portal.key === 'operations-admin' && route.label === 'Content Management') {
-    return <><OperationsCareerCataloguePage /><OperationsSkillMapPage /><OperationsQuestionBankPage /><OperationsLessonsPage /><OperationsContentImportPage /><LearnerContentStudio /><OperationsContentReadOnlyPage /></>;
+    return <><OperationsCareerCataloguePage /><OperationsSkillMapPage /><OperationsQuestionBankPage /><OperationsLessonsPage /><OperationsContentImportPage /><OperationsExternalReviewsPage /><LearnerContentStudio /><OperationsContentReadOnlyPage /></>;
   }
   // Audit Logs leaves the shared technical panel: the audit-event search endpoint is
   // complete and role-gated, and pointing this item at the generic status page was the
@@ -330,9 +331,12 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
       : <InstitutionWorkspaceError title="Interventions" />;
   }
     if (!demoMode && ['institution-admin', 'placement-officer', 'department-head', 'faculty'].includes(portal.key) && route.label === 'Assessments') {
+      // OPS-10: a department head's content review queue is a section of Assessments, shown only
+      // to a holder of faculty review (HG-3: no navigation item is added).
       return isInstitutionStaffWorkspace(authenticatedWorkspace)
-        ? <StaffPilotWrap title="Assessments" subtitle="Create, publish and track assessments over the governed question bank.">
+        ? <><StaffPilotWrap title="Assessments" subtitle="Create, publish and track assessments over the governed question bank.">
             <InstitutionExamEnginePage institutionId={authenticatedWorkspace.organizationId} canApprove={portal.key !== 'faculty'} /></StaffPilotWrap>
+          {portal.key === 'department-head' ? <FacultyContentReviewsPage institutionId={authenticatedWorkspace.organizationId} hideWhenForbidden /> : null}</>
         : <InstitutionWorkspaceError title='Assessments' />;
     }
   // Placement Officer's real portal. Each screen is routed to a surface this role is
@@ -398,6 +402,15 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   if (!demoMode && portal.key === 'department-head' && route.label === 'Reports and Analytics') return <DepartmentReportsAnalyticsPage authenticatedWorkspace={authenticatedWorkspace} />;
   if (!demoMode && portal.key === 'faculty' && route.label === 'Assessment Detail') return <FacultyAssessmentDetailPage authenticatedWorkspace={authenticatedWorkspace} />;
   if (!demoMode && portal.key === 'faculty' && route.label === 'Reports') return <FacultyClassReportsPage authenticatedWorkspace={authenticatedWorkspace} />;
+  // OPS-10: faculty Learning Resources holds the lecturer's content review queue (drafts of ONE's
+  // learning content assigned to them), above the read-only notice it showed before. Only this
+  // label's branch changes; no navigation item is added (HG-3).
+  if (!demoMode && portal.key === 'faculty' && route.label === 'Learning Resources') {
+    return isInstitutionStaffWorkspace(authenticatedWorkspace)
+      ? <><FacultyContentReviewsPage institutionId={authenticatedWorkspace.organizationId} />
+          <AuthenticatedReadOnlyModule title={route.label} detail="This authenticated staff role can view authorized context only in Phase 2A. Assessment, task, resource, workload, intervention, and meeting mutations are disabled until persistent APIs exist." /></>
+      : <InstitutionWorkspaceError title="Learning Resources" />;
+  }
   // INST-06: faculty Messages — announcements to assigned sections and the lecturer's inbox. Only this label's branch changes.
   if (!demoMode && portal.key === 'faculty' && route.label === 'Messages') return <FacultyMessagesPage authenticatedWorkspace={authenticatedWorkspace} />;
   if (!demoMode && ['faculty', 'department-head'].includes(portal.key) && ['Assigned Tasks', 'Student Detail', 'Academic Verification', 'Meetings', 'Calendar'].includes(route.label)) {

@@ -1356,7 +1356,7 @@ export function EmployerHiringAnalyticsPage({ employerId }: { readonly employerI
       <p>Time-to-offer runs from application submission to the first extended offer, using records with valid timestamps.</p>
     </section>
     <section className="role-card role-wide"><h2>Per-opportunity funnel</h2>
-      {analytics?.opportunities.length ? <div className="role-record-table-wrap"><table className="role-record-table"><thead><tr><th>Opportunity</th><th>Applications</th>{analytics.opportunities[0]?.funnel.map((item) => <th key={item.stage}>{humanise(item.stage)}</th>)}</tr></thead>
+      {analytics?.opportunities?.length ? <div className="role-record-table-wrap"><table className="role-record-table"><thead><tr><th>Opportunity</th><th>Applications</th>{analytics.opportunities[0]?.funnel?.map((item) => <th key={item.stage}>{humanise(item.stage)}</th>)}</tr></thead>
         <tbody>{analytics.opportunities.map((item, index) => <tr key={index}><td>{item.title}</td><td>{item.applicationCount}</td>{item.funnel.map((stage) => <td key={stage.stage}>{stage.count}</td>)}</tr>)}</tbody>
       </table></div> : <p>{analytics ? 'No opportunities to report yet.' : 'NA'}</p>}
     </section>

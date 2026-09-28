@@ -400,7 +400,7 @@ export function OpenCaseDialog({ token, policy, subject, onCancel, onOpened }: {
           </select></label>
         <label><span>Summary <em>required</em> ({summaryLimit} characters) — the problem, not contact details</span>
           <input value={form.summary} maxLength={summaryLimit} onChange={(event) => setForm({ ...form, summary: event.target.value })} /></label>
-        {subject?.organizations.length ? <label><span>Organisation</span>
+        {subject?.organizations?.length ? <label><span>Organisation</span>
           <select value={form.organizationId} onChange={pick('organizationId')}>
             <option value="">None</option>
             {subject.organizations.map((organization) => <option key={organization.id} value={organization.id}>{organization.name}</option>)}

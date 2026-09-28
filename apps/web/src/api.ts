@@ -28,3 +28,4 @@ export * from './api/roleDemand.js';
 export * from './api/skillMap.js';
 export * from './api/questionBank.js';
 export * from './api/lessons.js';
+export * from './api/contentImport.js';

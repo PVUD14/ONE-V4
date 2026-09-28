@@ -24,6 +24,7 @@ import { OperationsCareerCataloguePage } from './rolePortal/careerCatalogue.js';
 import { OperationsSkillMapPage } from './rolePortal/skillMap.js';
 import { OperationsQuestionBankPage } from './rolePortal/questionBank.js';
 import { OperationsLessonsPage } from './rolePortal/lessons.js';
+import { OperationsContentImportPage } from './rolePortal/contentImport.js';
 import { InstitutionReportsPage } from './institutionReportsPage.js';
 import { InstitutionExportsPanel } from './rolePortal/institutionAnalytics.js';
 import { OperationsCareerReadinessPanel } from './operationsCareerReadinessPanel.js';
@@ -270,8 +271,9 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   // replacing it: that panel reports on a different content pipeline and still works.
   // OPS-08: the job-role catalogue sits above both; only this label's branch changes.
   // OPS-09a: the skill map editor sits under the catalogue, whose sets name its skills.
+  // OPS-09d: bulk import sits under the three editors it writes through.
   if (!demoMode && portal.key === 'operations-admin' && route.label === 'Content Management') {
-    return <><OperationsCareerCataloguePage /><OperationsSkillMapPage /><OperationsQuestionBankPage /><OperationsLessonsPage /><LearnerContentStudio /><OperationsContentReadOnlyPage /></>;
+    return <><OperationsCareerCataloguePage /><OperationsSkillMapPage /><OperationsQuestionBankPage /><OperationsLessonsPage /><OperationsContentImportPage /><LearnerContentStudio /><OperationsContentReadOnlyPage /></>;
   }
   // Audit Logs leaves the shared technical panel: the audit-event search endpoint is
   // complete and role-gated, and pointing this item at the generic status page was the

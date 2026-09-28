@@ -409,3 +409,156 @@ Written by the coordinator for the same reason as EMP-07.
 
 **Limitations / not done:** no two-way calendar sync (EMP-17: none in this plan). The phone adds to its calendar by intent rather than importing the `.ics`, because Android calendar apps do not reliably import files, so a moved interview must be added again there. Participants still cannot be added to or removed from an existing interview. Emails stay NOT_CONFIGURED until HG-7.
 **Next goal:** EMP-10.
+
+## EMP-11 — Campus drives with placement-office approval — 2026-09-29
+**Result:** Complete. An employer asks a college for a campus drive for one of its jobs, and the job reaches that college's students only once the college's placement office approves it. Where the college has set one offer per student, the policy is enforced at apply for every application that comes through its drive, and the student is told why before they try. Once a drive completes, the college sees suppressed counts, and it sees names only for students who shared that application with it. The employer gains nothing about candidates from a drive: candidate data still flows only through the grant written at apply.
+**Branch / PR:** feat/emp-campus-drives, cut from onev4/feat/plan-phases-0-to-2 at d527f88 and pushed to onev4; merge by review. Commits, in order:
+- d728ce8: design and ADR
+- f95696d: acceptance and unit tests
+- 90f3449: migration and API
+- 65537fd: web
+- 058ae5d: help text
+- ca4dab9: Android
+- then this report
+
+**Files created:**
+- docs/architecture/campus-drives-table-design.md
+- docs/architecture/ADR-038-campus-drive-is-an-opportunity-published-through-institution-approval.md
+- packages/persistence/drizzle/0069_campus_drives.sql
+- packages/hiring/src/campus-drives.ts, which holds the state machine per side, the reason-code lists and the one-offer rule; packages/hiring/test/campus-drives.test.ts
+- apps/api/src/http/campus-drives.ts, which holds the student-side SQL shared by the listing, detail, preview and apply, and the audience check used by publish and reopen
+- apps/api/src/http/campus-drives.controller.ts, which holds EmployerCampusDrivesController and InstitutionCampusDrivesController
+- apps/api/src/http/campus-drives.integration.spec.ts
+- Web: apps/web/src/api/campusDrives.ts, apps/web/src/rolePortal/employerCampusDrives.tsx, apps/web/src/rolePortal/institutionCampusDrives.tsx and apps/web/src/rolePortal/campusDrives.test.tsx
+- Android: apps/android/.../CampusDrives.kt
+
+**Files modified:**
+- API:
+  - student-hiring.controller.ts: a live drive at the student's college counts as a route to the job. Listing and detail carry the drives. Apply enforces the policy, re-checks visibility under the drive locks and links the application. The applications list carries `campusDrive`.
+  - employer-hiring.controller.ts and employer-job-lifecycle.controller.ts: publish and reopen accept a pending or live drive as the job's audience.
+  - api-security.module.ts: registers the two controllers.
+  - assistant/help-articles.ts: describes how drives now work.
+- Packages:
+  - hiring index.ts: one rule code.
+  - events: `campus_drive.state_changed` v1 is registered.
+- Web:
+  - api.ts and api/hiring.ts
+  - hiringPages.tsx: the student's campus drive tag and notice, and Apply disabled when the policy stops the student. The employer create form gains "Who can see it: All students / Only colleges that approve a campus drive".
+  - rolePortal/employerOpportunityDetail.tsx: the Campus drives section.
+  - rolePortalPages.tsx: only the placement-officer Dashboard branch changes.
+  - rolePortal/institutionPlacement.tsx: approvals on the admin's Placement page.
+  - rolePortal/institutionSettings.tsx: the real placement-policies section replaces the "not built yet" placeholder.
+  - rolePortal/shared.tsx: error messages only.
+  - staffDashboardsV3.tsx: the "Upcoming Drives" and "Campus Drives" cards show real drives instead of NA.
+- Android: Api.kt, ApiStudent.kt, StudentHiring.kt, JobsAndMore.kt and StaffDashboards.kt.
+
+**Existing tests touched (no assertion weakened):**
+- student-hiring.controller.test.ts: the apply fixture answers the two new in-transaction reads (no live drive, still visible), as EMP-05 did for its locked re-read. Its assertions are unchanged.
+- employerOpportunityDetail.test.tsx and employerOpportunityRequirements.test.tsx: the fetch fixtures answer the new drives read with none.
+- institutionSettings.test.tsx: the assertion that "Placement policies — not built yet" is shown is replaced by assertions that the placeholder is gone, the real section says plainly that no policy is in force, and it offers the set-policy form. The fixture answers the policies read.
+
+**Migrations added:** 0069_campus_drives.sql (the number assigned). It adds four tables:
+- `campus_drives`. It uses a revision counter and CHECKs on decision, reason, close and schedule. A partial unique index allows one open drive per job and college, and a composite FK to `opportunities(id, employer_id)`.
+- `campus_drive_state_history`, append-only, enforced by a trigger.
+- `campus_drive_applications`, append-only. Composite FKs prove that the drive and the application belong to the same job.
+- `institution_placement_policies`. A trigger allows only ACTIVE→RETIRED, and there is one ACTIVE policy per college and type.
+
+It is additive, references only files below 0069, and every statement is guarded, so the bootstrap replay is a no-op.
+
+**Design docs / ADRs:** the table design above, which gives the reasoning, the rejected options and the open points. ADR-038 records a drive as an opportunity published to one institution through that institution's approval. It rejects a drive as a separate job object, drives without approval, and approval writing an `INSTITUTION` audience row.
+
+**Routes:**
+- Employer:
+  - `GET /employers/:id/campus-drive-institutions?q=`: verified, active colleges, by name.
+  - `GET /employers/:id/campus-drives?opportunityId=`
+  - `POST /employers/:id/opportunities/:oid/campus-drives`
+  - `POST /employers/:id/campus-drives/:did/{resubmit|cancel|complete}`
+  - `GET …/campus-drives/:did/history`
+- College:
+  - `GET /institutions/:id/campus-drives?state&limit(1–200)&cursor`: keyset-paginated, with `canDecide`.
+  - `POST …/campus-drives/:did/{approve|reject|request-changes|schedule|cancel|complete}`
+  - `GET …/history`
+  - `GET …/results`
+  - `GET/POST /institutions/:id/placement-policies`
+  - `POST …/placement-policies/:pid/retire`
+- Student:
+  - `GET /opportunities` and `GET /opportunities/:id` gain `campusDrives`. The detail version carries `placementPolicy` and `blocksYou`.
+  - Apply may return 400 `PLACEMENT_POLICY_ONE_OFFER`, with `institutionName`.
+
+Every write:
+- names the revision it read (409 `CAMPUS_DRIVE_CHANGED` otherwise);
+- locks the drive FOR UPDATE, and on the employer side also locks the organisation row FOR SHARE;
+- writes history, an audit row carrying the organisation and reason code, and the outbox event in one transaction;
+- refuses unknown fields.
+
+**Validation:** PENDING — the run on a fresh database follows this report.
+
+**Acceptance criteria:**
+- [x] A drive cannot go live without placement-office approval. Test: `keeps a published drive-only job from the college's students until the college approves, and from everyone else after`.
+  - Before approval the job is published but absent from the listing, and detail and apply return 403.
+  - After approval it is listed with the drive, and the student applies and is linked.
+  - A student at another college never sees it.
+  - When the college withdraws its approval, the job is gone on the next request and existing applications stand.
+  - `gives the employer no way to make a drive live, …`: the employer has no approve route (404), and the college's routes return 403 to the employer.
+- [x] A student with an accepted offer is blocked from further drive applications where the college set ONE_OFFER_PER_STUDENT, and is told why. Test: `blocks a student with an accepted offer from further drive applications and says why; others apply`.
+  - The detail shows the policy and `blocksYou`. Apply returns 400 `PLACEMENT_POLICY_ONE_OFFER` and writes nothing. A hire blocks too.
+  - A public job elsewhere stays open to the student (decision 10.2 #11).
+  - `applies the policy to a public job that also runs as a drive at the college, and honours a drive exception`: the policy cannot be sidestepped through the public listing, the exception applies only when both the policy and the drive allow it, retiring the policy needs a listed reason, and the row can only be retired.
+- [x] Named results respect each student's institution-visibility choice. Test: `shows suppressed counts after completion and named results only for shared applications in scope, audited`.
+  - Of 6 applicants, the 2 who shared are named.
+  - Counts appear only once the drive is COMPLETED. The count of 6 is shown; the 2 offered and 0 selected read suppressed.
+  - A revoke removes the name on the next request.
+  - Every read is audited `institution.campus_drive_results.read`, and faculty get 403.
+  - No compensation or readiness appears in the response.
+- [x] Integration specs for both sides: 7 tests. Policy and state-machine unit tests: 8. Web tests: 9 in campusDrives.test.tsx and 3 in hiringPages.test.tsx.
+- [x] §6.3:
+  - 401 without a token.
+  - 403 for another employer and for another college's staff.
+  - A PENDING employer gets 403 UNVERIFIED on a request. A SUSPENDED employer gets 403 INACTIVE on writes, and its drive cannot be approved (409).
+  - Department heads and faculty cannot decide. A placement admin narrowed to one department gets 403 `INSTITUTION_WIDE_SCOPE_REQUIRED`.
+  - Unknown fields, bad dates, schedule order, venue, reason codes and policy type each give 400.
+  - A stale revision gives 409.
+  - Paging bounds: `limit` must be 1–200, and an invalid state is refused.
+  - Audit rows carry the organisation and the reason code, and outbox rows are written.
+  - No readiness appears in employer or college responses.
+  - Web: real data, plus the empty, cannot-decide and error states (with a reference). Navigation labels are unchanged for the placement officer and the recruiter (asserted).
+
+**Decisions for Divakar (recommendations taken):**
+1. **No Drives navigation item (HG-3).** The plan recommends adding one (10.2 #4), but adding a navigation item is a hard gate, so the plan's fallback was taken:
+   - the placement officer decides drives and sets the policy on their Dashboard;
+   - the admin decides drives on Placement and sets policies in Settings;
+   - the employer requests drives from Opportunity Detail.
+
+   Adding the Drives item later means moving two sections.
+2. **Visibility is derived from the drive's state.** Nothing is written to `opportunity_audiences` (ADR-038).
+3. **Publish and reopen accept a pending or live drive as the audience.** A drive-only job can be published before the college decides; it reaches nobody until approval, and the employer's screen says so.
+4. **A live drive at the student's college governs the application whichever listing the student used.** This closes the sidestep through a public listing.
+5. **Any accepted offer in ONE counts** toward the one-offer rule, as does a hire. The rule is checked only at apply and never withdraws an existing application, because that would be an automatic rejection.
+6. **`CHANGES_REQUESTED` is added to the plan's state list**, so the employer can tell "waiting on the college" from "waiting on you".
+7. **Only colleges decide.** Deciding needs an owner, admin or placement admin with an institution-wide write scope, because a drive reaches the whole college. Department heads read drives; faculty cannot.
+8. **Tier exception:** one per-drive flag set by the college, honoured only when the policy allows exceptions. Categories such as Dream, Core and Mass belong to INST-12.
+9. **Counts only after completion.** A live count could be differenced to follow one student, so counts appear only once a drive is complete. Names are available after approval, but only for students who shared the application.
+10. **Notices:**
+    - The requester and the college's placement staff get an in-app SYSTEM notice after commit, best-effort.
+    - The outbox event `campus_drive.state_changed` has no consumer yet.
+    - No email is sent, so nothing is marked NOT_CONFIGURED.
+
+**Android:** changed and compiled with the Android Studio JBR.
+- Students see the "Campus drive · college" chip on jobs and applications. The job page has a campus drive card with the date, venue and the college's policy. Apply is disabled when the policy stops the student, and a refusal is explained.
+- The college home gains a read-only Campus drives section: requests awaiting a decision and scheduled drives ahead. It is hidden for faculty.
+- The employer's Roles gain a read-only list of each role's drives, with the college's decision and reason.
+- Deciding, requesting and setting policies stay on the web, like editing a job, because each needs a reason and a confirmation.
+
+**Limitations / not done:**
+- Direct `INSTITUTION` audiences still reach a college without approval. Retiring them for new jobs is the recommended next step (design doc, open point 1).
+- Drives cannot target a single department.
+- Approving a drive does not message every student; the college can use INST-06 announcements to circulate it.
+- The phone decides nothing.
+- The one-offer check at apply and a concurrent offer acceptance are not serialised. An acceptance committing during an apply can let that one application through.
+- The college's drive list is keyset-paginated, but the dashboards read only the first page (up to 50).
+
+**Risks / follow-ups:**
+- INST-12 (register, categories), INST-14 (nominations) and EMP-15 (reports by drive) can build on `campus_drive_applications`.
+- The in-app notices use the SYSTEM kind. A dedicated kind needs a widening of the `user_notifications_kind_ck` CHECK in a later migration.
+
+**Next goal:** EMP-12 (or as scheduled by the coordinator).

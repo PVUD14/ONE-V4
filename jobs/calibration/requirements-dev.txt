@@ -1,0 +1,3 @@
+# ENG-13 calibration job — test dependencies (not installed on a server).
+-r requirements.txt
+pytest==9.1.1

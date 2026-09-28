@@ -363,7 +363,7 @@ internal fun InstitutionScaffold(
                 when {
                     data == null -> HomeSkeleton()
                     else -> when (tab) {
-                        0 -> InstitutionHome(data!!, onVerify = { showVerifyOv = true }) { tab = 1 }
+                        0 -> InstitutionHome(organizationId, data!!, onVerify = { showVerifyOv = true }) { tab = 1 }
                         1 -> InstitutionExams(data!!.exams) { resultsFor = it }
                         else -> StaffMore(onSignOut, onSwitchWorkspace,
                             "Question authoring, exam building, publishing and reopening stay on the web at one.ai8ht.pro.",
@@ -376,7 +376,7 @@ internal fun InstitutionScaffold(
 }
 
 @Composable
-private fun InstitutionHome(data: InstitutionData, onVerify: () -> Unit, onExams: () -> Unit) {
+private fun InstitutionHome(organizationId: String, data: InstitutionData, onVerify: () -> Unit, onExams: () -> Unit) {
     val published = data.exams.count { it.lifecycleState == "PUBLISHED" }
     val assigned = data.exams.sumOf { it.assignedCount }
     val attempts = data.exams.sumOf { it.completedAttempts }
@@ -458,6 +458,10 @@ private fun InstitutionHome(data: InstitutionData, onVerify: () -> Unit, onExams
         // Placement Pipeline (INST-07): stages of applications students shared with the college,
         // suppressed under five; NA for a caller with no department view.
         PlacementPipelineCard(data.pipeline)
+
+        // EMP-11: campus drive requests awaiting the placement office and drives scheduled ahead,
+        // read-only; deciding stays on the web (hidden for faculty, who have no placement role).
+        CollegeCampusDrivesSection(organizationId)
 
         // Pilot: Students Needing Attention - real, from assessment data.
         SectionTitle("Needing attention")
@@ -1071,6 +1075,7 @@ private fun roleStateNote(role: EmployerOpportunityDto): String? = when (role.li
 @Composable
 private fun EmployerRoles(employerId: String, roles: List<EmployerOpportunityDto>) {
     var expanded by remember { mutableStateOf<String?>(null) }
+    var drivesFor by remember { mutableStateOf<String?>(null) }
     if (roles.isEmpty()) {
         EmptyState(Icons.Filled.WorkOutline, Tone.Violet, "No roles yet",
             "Post opportunities on the web; applications and their states track here.")
@@ -1106,6 +1111,11 @@ private fun EmployerRoles(employerId: String, roles: List<EmployerOpportunityDto
                         Text(if (expanded == role.id) "Hide eligibility, skills and stages" else "Eligibility, skills and stages")
                     }
                     if (expanded == role.id) RoleRequirements(employerId, role.id)
+                    // EMP-11: the role's campus drives and each college's decision, read-only.
+                    TextButton(onClick = { drivesFor = if (drivesFor == role.id) null else role.id }) {
+                        Text(if (drivesFor == role.id) "Hide campus drives" else "Campus drives")
+                    }
+                    if (drivesFor == role.id) RoleCampusDrives(employerId, role.id)
                 }
             }
         }

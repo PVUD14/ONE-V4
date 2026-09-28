@@ -19,6 +19,28 @@ import kotlinx.serialization.Serializable
 @Serializable data class OpportunityDetailEnvelope(
     val opportunity: OpportunityDetailDto,
     val eligibility: EligibilityDto? = null,
+    /** EMP-11: beside the opportunity too, like the verdict. */
+    val campusDrives: List<StudentCampusDriveDto> = emptyList(),
+)
+
+/**
+ * EMP-11: a campus drive through which this job reaches the student, the placement policy their
+ * college has in force for it, and whether that policy stops this student applying.
+ */
+@Serializable data class StudentCampusDriveDto(
+    val institutionName: String = "",
+    val state: String = "",
+    val scheduledStartAt: String? = null,
+    val scheduledEndAt: String? = null,
+    val venueMode: String? = null,
+    val offerHoldersEligible: Boolean = false,
+    val placementPolicy: StudentPlacementPolicyDto? = null,
+    val blocksYou: Boolean = false,
+)
+@Serializable data class StudentPlacementPolicyDto(
+    val policyType: String = "",
+    val allowDriveExceptions: Boolean = false,
+    val note: String? = null,
 )
 
 @Serializable data class OpportunityDetailDto(
@@ -40,6 +62,8 @@ import kotlinx.serialization.Serializable
     val selectionStages: List<SelectionStageDto> = emptyList(),
     /** EMP-04: the hiring company's verified profile. Absent from older API responses. */
     val company: OpportunityCompanyDto? = null,
+    /** Filled from the envelope by [Api.opportunityDetail] (EMP-11). */
+    val campusDrives: List<StudentCampusDriveDto> = emptyList(),
 )
 
 /** What a student sees about the company behind a job (EMP-04). Unfilled fields are null. */
@@ -392,7 +416,7 @@ import kotlinx.serialization.Serializable
 suspend fun Api.opportunityDetail(context: Context, opportunityId: String): OpportunityDetailDto =
     json.decodeFromString<OpportunityDetailEnvelope>(
         request(context, "GET", "/api/v1/opportunities/$opportunityId"),
-    ).let { envelope -> envelope.opportunity.copy(eligibility = envelope.eligibility) }
+    ).let { envelope -> envelope.opportunity.copy(eligibility = envelope.eligibility, campusDrives = envelope.campusDrives) }
 
 /**
  * Applying carries a consent decision, because it is one.

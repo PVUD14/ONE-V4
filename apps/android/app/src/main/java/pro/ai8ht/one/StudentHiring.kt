@@ -120,6 +120,14 @@ internal fun OpportunityDetailPage(
                     }
                 }
 
+                // EMP-11: the college's drive and its placement policy, before the student tries.
+                if (record.campusDrives.isNotEmpty()) {
+                    item {
+                        Spacer(Modifier.height(12.dp))
+                        CampusDriveCard(record.campusDrives)
+                    }
+                }
+
                 // EMP-04: the company behind the job, as its verified profile describes it.
                 // Nothing is guessed: a company without a description says so.
                 item {
@@ -218,6 +226,7 @@ internal fun OpportunityDetailPage(
                                                         "ELIGIBILITY_NOT_MET" -> "You do not meet a rule this employer requires. It is marked under Eligibility above."
                                                         "ELIGIBILITY_UNKNOWN" -> "ONE cannot confirm a rule this employer requires, because that information is not on your record yet."
                                                         "SNAPSHOT_CHANGED" -> "Something you would share changed after you reviewed it. Check what the employer will see again, then apply."
+                                                        "PLACEMENT_POLICY_ONE_OFFER" -> "Your college allows one accepted offer per student, and you already hold one, so you cannot apply through its campus drive."
                                                         else -> (it as? Api.ApiException)?.detail ?: "Could not apply just now. Try again."
                                                     }
                                                     if (code == "SNAPSHOT_CHANGED") reviewReload++
@@ -228,7 +237,7 @@ internal fun OpportunityDetailPage(
                                             busy = false
                                         }
                                     },
-                                    enabled = !busy,
+                                    enabled = !busy && record.campusDrives.none { it.blocksYou },
                                     shape = RoundedCornerShape(10.dp),
                                     modifier = Modifier.fillMaxWidth(),
                                 ) { Text(if (busy) "Applying…" else "Apply") }
@@ -236,6 +245,47 @@ internal fun OpportunityDetailPage(
                         }
                     }
                     Spacer(Modifier.height(24.dp))
+                }
+            }
+        }
+    }
+}
+
+/**
+ * EMP-11: the campus drives through which this job reaches the student, with the college's
+ * placement policy said plainly — so a refusal is never the first the student hears of it.
+ */
+@Composable
+private fun CampusDriveCard(drives: List<StudentCampusDriveDto>) {
+    PilotCard {
+        Column(Modifier.padding(16.dp)) {
+            Text("Campus drive", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            drives.forEach { drive ->
+                Spacer(Modifier.height(6.dp))
+                StatusChip(drive.institutionName, ChipKind.Accent)
+                Spacer(Modifier.height(6.dp))
+                val venue = when (drive.venueMode) { "ON_CAMPUS" -> "on campus"; "VIRTUAL" -> "virtual"; "OFF_CAMPUS" -> "off campus"; else -> null }
+                Text(
+                    "Your college's placement office approved this role for its students. " +
+                        (drive.scheduledStartAt?.let { "Scheduled for ${formatWhen(it)}" + (venue?.let { v -> " ($v)" } ?: "") + "." }
+                            ?: "The college has not confirmed a date yet."),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Spacer(Modifier.height(6.dp))
+                val policy = drive.placementPolicy
+                Text(
+                    if (policy == null) "Your college has not set a placement policy for its drives."
+                    else "Your college's placement policy: one accepted offer per student" +
+                        (if (drive.offerHoldersEligible && policy.allowDriveExceptions) ", but this drive is open to students who already hold an offer" else "") + "." +
+                        (policy.note?.takeIf { it.isNotBlank() }?.let { " \u201C$it\u201D" } ?: ""),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (drive.blocksYou) {
+                    Spacer(Modifier.height(6.dp))
+                    StatusChip("You cannot apply through this drive", ChipKind.Muted)
+                    Text("You already hold an accepted offer, and your college allows one per student.",
+                        style = MaterialTheme.typography.bodySmall)
                 }
             }
         }

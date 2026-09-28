@@ -571,6 +571,13 @@ internal fun StudentDto.formerStudentLine(): String? {
     val locationCity: String? = null,
     val applicationDeadline: String? = null,
     val alreadyApplied: Boolean = false,
+    /** EMP-11: live campus drives at the student's college through which this job reaches them. */
+    val campusDrives: List<ListedCampusDriveDto> = emptyList(),
+)
+@Serializable data class ListedCampusDriveDto(
+    val institutionName: String = "",
+    val state: String = "",
+    val scheduledStartAt: String? = null,
 )
 @Serializable data class ApplicationsEnvelope(val applications: List<ApplicationDto> = emptyList())
 @Serializable data class ApplicationDto(
@@ -590,7 +597,10 @@ internal fun StudentDto.formerStudentLine(): String? {
     /** ADR-019 / INST-09: when the student shared this application with their college, and when they stopped. */
     val institutionVisibilityGrantedAt: String? = null,
     val institutionVisibilityRevokedAt: String? = null,
+    /** EMP-11: the college whose campus drive this application came through, if any. */
+    val campusDrive: CampusDriveRefDto? = null,
 )
+@Serializable data class CampusDriveRefDto(val institutionName: String = "")
 
 // --- Candidate feedback -------------------------------------------------------
 

@@ -32,8 +32,10 @@ const item = (pack: AptitudeBankPack, key: string): AptitudeItem => {
 };
 const correctText = (entry: AptitudeItem): string => entry.options.find((option) => option.id === entry.correctOptionId)!.text;
 /** A deep copy of the built pack with one change applied. */
-const withChange = (change: (pack: { -readonly [K in keyof AptitudeBankPack]: AptitudeBankPack[K] } & Record<string, unknown>) => void): AptitudeBankPack => {
-  const copy = JSON.parse(JSON.stringify(built));
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- a mutable JSON copy, edited freely by each case
+type MutablePack = any;
+const withChange = (change: (pack: MutablePack) => void): AptitudeBankPack => {
+  const copy: MutablePack = JSON.parse(JSON.stringify(built));
   change(copy);
   return copy as AptitudeBankPack;
 };
@@ -158,7 +160,7 @@ describe('validateAptitudeBankPack refuses an incomplete pack', () => {
   it('an item with no misconception-tagged distractor', () => {
     const pack = withChange((copy) => {
       const target = (copy.items as AptitudeItem[]).find((entry) => entry.stableKey === 'apt-q-averages-001')!;
-      for (const option of target.options as { misconception: unknown }[]) option.misconception = null;
+      for (const option of target.options as unknown as { misconception: unknown }[]) option.misconception = null;
     });
     expect(validateAptitudeBankPack(pack)).toContain('ITEM_NO_TAGGED_DISTRACTOR:apt-q-averages-001');
   });

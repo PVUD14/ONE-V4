@@ -1,0 +1,17 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//AI8HT//ONE Interviews//EN
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+BEGIN:VEVENT
+UID:a1b2c3d4e5f60718293a4b5c6d7e8f90@one.ai8ht.pro
+SEQUENCE:2
+DTSTAMP:20990221T090000Z
+DTSTART:20990302T043000Z
+DTEND:20990302T053000Z
+SUMMARY:Cancelled: Interview: Robotics engineer with Acme Robotics\, Pune (round 1)
+DESCRIPTION:This interview was cancelled.\nVideo interview (round 1) for Robotics engineer with Acme Robotics\, Pune.\nSign in to ONE for the joining link or location\, what to prepare and any change to this interview.
+STATUS:CANCELLED
+TRANSP:TRANSPARENT
+END:VEVENT
+END:VCALENDAR

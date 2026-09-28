@@ -348,3 +348,57 @@ Written by the coordinator for the same reason as EMP-07.
   email is recorded `NOT_CONFIGURED` — nothing claims an email was sent. (2) Quiet hours and the daily cap
   are not applied to these time-critical notices; the email switch is honoured. (3) One reminder, 24 hours
   before expiry. Design: `docs/architecture/hiring-notification-deliveries-table-design.md`.
+
+## EMP-09 — Interview scheduling essentials — 2026-09-28
+**Result:** Complete — reschedules and cancellations carry a reason code and keep an append-only history; the student and every panellist are told once per change with an `.ics` that updates in place; the joining link is shown only to the people on the interview; scorecards follow the stage's template criterion by criterion. Web and Android carry it.
+**Branch / PR:** feat/emp-interview-scheduling, cut from onev4/stack/eng13 (4c89cba), pushed to onev4; merge by review. Commits b332541 (design), 04b0537 (acceptance tests), d349863 (implementation), 7584595 (Android), then this report.
+**Files created:**
+- docs/architecture/interview-scheduling-and-scorecards-table-design.md
+- packages/persistence/drizzle/0063_interview_scheduling_and_scorecards.sql
+- packages/hiring/src/interview-scheduling.ts (reason codes, joining-link rule, template input, ratings-follow-template) and packages/hiring/src/interview-calendar.ts (RFC 5545 builder); packages/hiring/test/interview-scheduling.test.ts with fixtures interview-rescheduled.ics.txt and interview-cancelled-emailed.ics.txt
+- packages/persistence/src/interview-calendar-source.ts (the invite for one revision, shared by the consumer and the downloads)
+- apps/api/src/http/interview-scheduling.ts (revision writer, organisation lock, link-visibility SQL, scorecard recorder), apps/api/src/http/employer-scorecard-templates.controller.ts, apps/api/src/http/employer-interview-scheduling.integration.spec.ts
+- apps/web/src/interviewScheduling.tsx (+ .test.tsx)
+- apps/android/.../InterviewScheduling.kt
+
+**Files modified:**
+- API: employer-hiring.controller.ts (schedule, state and outcome routes; history, scorecards and panellist calendar routes; list and brief fields), student-hiring.controller.ts (student calendar route), opportunity-requirements.ts and employer-job-lifecycle.controller.ts (a stage's template is written, carried forward and part of the stage signature), api-security.module.ts (controller registered).
+- Packages: hiring opportunity-requirements.ts (stage `scorecardTemplateId`); persistence hiring-notifications.ts (panel notices, `.ics` attachment), invitation-mail.ts (optional attachments, multipart in the loopback sink), package.json and pnpm-lock.yaml (persistence depends on @planthepath/hiring); events (optional `revisionId` on interview.scheduled and interview.state_changed v1).
+- Web: api/hiring.ts, hiringPages.tsx, rolePortal/employer.tsx, rolePortal/employerOpportunityRequirements.tsx.
+- Android: ApiEmployer.kt, EmployerWork.kt, StaffDashboards.kt, StudentHiring.kt.
+
+**Existing tests touched (no assertion weakened):** five call sites now send the reason code the route requires (employer-applicant-access x3, employer-hiring.controller.integration x1, hiring-notifications x2). The state-route unit test in employer-hiring.controller.test.ts asserts the same UPDATE parameters and audit action, found by statement rather than by index, because the route now locks and writes history first. Two web tests in hiringPages.test.tsx pick a reason in the new form instead of answering window.confirm, and assert that the reason code is posted.
+**Migrations added:** 0063_interview_scheduling_and_scorecards.sql (number assigned): interview_schedule_revisions (append-only, reason required for RESCHEDULED and CANCELLED, BASELINE backfill); interview_scorecard_templates and interview_scorecard_criteria (immutable except retiring); `scorecard_template_id` on opportunity_selection_stages, interviews and interview_outcomes; interview_outcome_criterion_ratings. References only tables below 0063; idempotent (replayed twice by hand in psql after the migrator).
+**Design docs / ADRs:** the design doc above (reasoning, rejected options, decisions). No ADR.
+**Routes:**
+- POST …/interviews/:id/state: `reasonCode` now required for RESCHEDULED and CANCELLED; optional `note` (`reason` still accepted); for a reschedule, optional `mode`, `locationDetail`, `joiningLink`. Unknown fields 400; a past start 400 SCHEDULE_IN_PAST on the database clock.
+- New: GET …/interviews/:id/history; GET …/interviews/:id/scorecards (live grant, audited `interview.scorecards.viewed`); GET and POST …/scorecard-templates; POST …/scorecard-templates/:id/retire; GET …/my-interviews/:id/calendar; GET /students/me/interviews/:id/calendar.
+- POST …/applications/:id/interviews gains `selectionStageId`; both outcome routes gain `criteria`.
+
+**Validation:** see the amendment below.
+**Acceptance criteria:**
+- [x] Reschedules notify everyone once and keep history: `notifies the student and each panellist once per change with an .ics, and a replayed event adds nothing`; `keeps every revision in order with who, when, why and the schedule it produced, and the history cannot be rewritten`.
+- [x] Reschedule and cancel with reason codes and student notification: `refuses a reschedule or cancellation without a listed reason code, with an unknown field or into the past, and writes nothing`. The student is told that it moved or was cancelled, never why (the EMP-08 assertion is kept).
+- [x] `.ics` files open correctly in common calendars (fixture test): packages/hiring `builds the downloaded invite for a rescheduled interview exactly as the fixture` and `builds the emailed invite for a cancellation…`, plus RFC 5545 checks (CRLF, lines of at most 75 octets folded without splitting a character, escaping, UTC times, one VEVENT, stable UID, SEQUENCE). Over the API: one UID across every email, SEQUENCE 0/1/2, STATUS CANCELLED on the cancellation.
+- [x] Video link validated as https and shown only to participants and the student: `shows it to the scheduler and the panel, not to other members, and refuses a link that is not plain https`. Student and panellist downloads carry it; emails never do.
+- [x] Scorecards follow the stage template: `binds a template to an interview stage through a new job version, copies it to the interview, and requires every criterion`; `carries a stage template forward…`; `creates, lists and retires templates…`.
+- [x] Participants see only their interviews (unchanged): `keeps participants to their own interviews (unchanged rule)` and the existing assignment specs.
+- [x] §6.3: 401 without a token; another employer 403; SUSPENDED gets 403 INACTIVE on every new route; PENDING may prepare templates but gets UNVERIFIED on candidate routes; no grant gives 403 on scorecards; audit rows carry the organisation and the reason code; no readiness, score or total fields; web real data, NA, empty and error states; navigation labels unchanged ("Scorecard templates" is a view button inside Interviews, not a navigation item).
+
+**Decisions for Divakar (recommendations taken):**
+1. The member who scheduled an interview keeps seeing its link. Other non-participant members see only that a link exists.
+2. Emailed invites carry no joining link, location or preparation note (EMP-08's rule); downloads inside ONE carry them. One-tap join from email is one flag in the consumer if wanted.
+3. `METHOD:PUBLISH` with `STATUS:CANCELLED`, not REQUEST/CANCEL: those need an organizer mailbox that receives replies, which waits on HG-7. No calendar provider is integrated and none needs credentials, so there is nothing to put behind an interface yet.
+4. Reason codes are fixed lists (reschedule 5, cancel 6, retire 3), with no OTHER; the note carries detail.
+5. Rescheduling into the past is refused; scheduling a new interview in the past stays allowed, as before.
+6. The two outcome routes still ignore unknown fields: an existing test pins that a spoofed `submittedByUserId` is ignored rather than refused. Every other EMP-09 write refuses unknown fields.
+7. A stage keeps a retired template when carried forward; retiring only stops it being chosen again.
+
+**Android:** changed.
+- Students: "Add to calendar" on an upcoming interview (the phone's calendar app, prefilled with how to join), and a note when it moved or was cancelled.
+- Panellists: stage and scorecard template on the brief, criterion-by-criterion ratings (submit waits for every criterion), and add-to-calendar.
+- Employers: a new read-only Interviews view from Home: state, stage, last change and reason, full history, per-criterion scorecards. Reschedule, cancel and templates stay on the web.
+- Compiled with the Android Studio JBR.
+
+**Limitations / not done:** no two-way calendar sync (EMP-17: none in this plan). The phone adds to its calendar by intent rather than importing the `.ics`, because Android calendar apps do not reliably import files, so a moved interview must be added again there. Participants still cannot be added to or removed from an existing interview. Emails stay NOT_CONFIGURED until HG-7.
+**Next goal:** EMP-10.

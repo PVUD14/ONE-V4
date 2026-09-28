@@ -11,6 +11,7 @@ import { EmployerConversationPanel, StudentConversationCard } from './applicatio
 import { StudentApplicationsPage } from './hiringPages.js';
 import { rolePortals } from './rolePortalConfig.js';
 import { EmployerRecruiterRealityPage } from './rolePortal/employer.js';
+import { OperationsTrustSafetyPage } from './rolePortal/trustSafety.js';
 
 vi.mock('./auth.js', async (importOriginal) => ({ ...await importOriginal<typeof import('./auth.js')>(), getAccessToken: vi.fn(() => 'session-token') }));
 vi.mock('./api.js', async (importOriginal) => ({
@@ -191,5 +192,25 @@ describe('EMP-10 student conversation', () => {
     expect(screen.getByText('None yet')).toBeInTheDocument();
     fireEvent.click(open);
     expect(await screen.findByRole('log', { name: 'Messages' })).toBeInTheDocument();
+  });
+});
+
+describe('EMP-10 operations: the reported conversation is the case evidence', () => {
+  it('shows the conversation on request, as text, with what was reported', async () => {
+    const caseId = '66666666-6666-4666-8666-666666666666';
+    routes['GET /api/v1/operations/trust-safety/cases'] = () => ({ body: { pendingSignals: [], cases: [{ id: caseId, caseType: 'EMPLOYER_ACCOUNTABILITY',
+      subjectKind: 'ORGANIZATION', state: 'REPORTED', severity: 'HIGH', organizationId: employerId, organizationName: 'Acme Robotics', reportedByUserId: 'u',
+      openedAt: '2026-09-21T00:00:00.000Z', closedAt: null, evidenceCount: 3, liveActions: 0 }] } });
+    routes[`GET /api/v1/operations/trust-safety/cases/${caseId}/message-threads`] = () => ({ body: { threads: [{ employerName: 'Acme Robotics',
+      opportunityTitle: 'Robotics engineer', startedAt: '2026-09-20T05:00:00.000Z', messages: [
+        { from: 'EMPLOYER', body: 'Pay the deposit at pay-now.in', containsLink: true, sentAt: '2026-09-20T05:00:00.000Z', erasedAt: null, reported: true, reportReasonCode: 'SCAM_OR_PAYMENT_REQUEST' },
+        { from: 'STUDENT', body: 'No.', containsLink: false, sentAt: '2026-09-20T06:00:00.000Z', erasedAt: null, reported: false, reportReasonCode: null },
+      ] }] } });
+    render(<OperationsTrustSafetyPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Reported conversation' }));
+    const section = await screen.findByRole('region', { name: 'Reported conversation' });
+    expect(within(section).getByText('Pay the deposit at pay-now.in (contains a link)')).toBeInTheDocument();
+    expect(within(section).getByText('SCAM_OR_PAYMENT_REQUEST')).toBeInTheDocument();
+    expect(within(section).queryByRole('link')).toBeNull();
   });
 });

@@ -12,10 +12,11 @@
  * Opening a case applies no penalty — spec 38 is explicit that a report does not
  * automatically penalise an employer — so this screen opens and moves cases and
  * carries no enforcement controls. Enforcement acts on a decided case, alongside the
- * decision that justified it.
+ * decision that justified it. EMP-10: a case a student opened by reporting an employer's message
+ * shows that conversation, on request, as the evidence it is.
  */
-import { getProtectedAccessToken, listTrustCases, openTrustCaseFromSignal, transitionTrustCase } from '../api.js';
-import type { ReviewSignalDto, TrustCaseDto } from '../api.js';
+import { getProtectedAccessToken, getTrustCaseMessageThreads, listTrustCases, openTrustCaseFromSignal, transitionTrustCase } from '../api.js';
+import type { ReviewSignalDto, TrustCaseDto, TrustCaseMessageThreadDto } from '../api.js';
 import { V2Stat } from '../dashboardsV2.js';
 import { StatusBadge } from '../studentComponents.js';
 import { formatApiError, RestrictedApiState } from './shared.js';
@@ -28,6 +29,8 @@ export function OperationsTrustSafetyPage(): React.ReactElement {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
   const [reload, setReload] = useState(0);
+  // EMP-10: the reported conversation attached to one case, read on request (audited).
+  const [evidence, setEvidence] = useState<{ readonly caseId: string; readonly threads: readonly TrustCaseMessageThreadDto[] } | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -55,6 +58,18 @@ export function OperationsTrustSafetyPage(): React.ReactElement {
       setReload((value) => value + 1);
     } catch (cause) {
       setError(formatApiError(cause, 'The case could not be opened.'));
+    } finally {
+      setBusy('');
+    }
+  };
+
+  const readConversation = async (record: TrustCaseDto): Promise<void> => {
+    setBusy(record.id);
+    try {
+      const result = await getTrustCaseMessageThreads(token, record.id);
+      setEvidence({ caseId: record.id, threads: result.threads });
+    } catch (cause) {
+      setError(formatApiError(cause, 'The reported conversation could not be loaded.'));
     } finally {
       setBusy('');
     }
@@ -103,7 +118,8 @@ export function OperationsTrustSafetyPage(): React.ReactElement {
           <td>{record.organizationName ?? 'Platform'}</td>
           <td><StatusBadge label={record.severity} tone={record.severity === 'CRITICAL' ? 'danger' : record.severity === 'HIGH' ? 'warning' : 'neutral'} /></td>
           <td>{record.state}</td>
-          <td>{record.evidenceCount}</td>
+          <td>{record.evidenceCount}{record.caseType === 'EMPLOYER_ACCOUNTABILITY'
+            ? <> <button type="button" className="pilot-btn" disabled={busy === record.id} onClick={() => void readConversation(record)}>Reported conversation</button></> : null}</td>
           <td>{new Date(record.openedAt).toLocaleDateString()}</td>
           <td>{record.state === 'REPORTED'
             ? <button type="button" className="pilot-btn" disabled={busy === record.id} onClick={() => void advance(record, 'TRIAGED')}>Triage</button>
@@ -112,5 +128,22 @@ export function OperationsTrustSafetyPage(): React.ReactElement {
               : <span>&mdash;</span>}</td>
         </tr>)}</tbody></table></div> : null}
     </section>
+    {evidence ? <section className="role-card role-wide" aria-label="Reported conversation">
+      <h2>Reported conversation</h2>
+      <p>Evidence on this case. Reading it is recorded. Message text is shown as written and never as a link.</p>
+      {!evidence.threads.length ? <p>No application conversation is attached to this case.</p> : evidence.threads.map((thread) => <div key={thread.startedAt + thread.opportunityTitle}>
+        <h3>{thread.employerName} · {thread.opportunityTitle}</h3>
+        <div className="role-record-table-wrap"><table className="role-record-table">
+          <thead><tr><th>From</th><th>Sent</th><th>Message</th><th>Report</th></tr></thead>
+          <tbody>{thread.messages.map((message, index) => <tr key={index}>
+            <td>{message.from === 'EMPLOYER' ? 'Employer' : 'Candidate'}</td>
+            <td>{new Date(message.sentAt).toLocaleString()}</td>
+            <td style={{ whiteSpace: 'pre-wrap' }}>{message.body ?? 'Erased'}{message.containsLink ? ' (contains a link)' : ''}</td>
+            <td>{message.reported ? <StatusBadge label={message.reportReasonCode ?? 'REPORTED'} tone="warning" /> : null}</td>
+          </tr>)}</tbody>
+        </table></div>
+      </div>)}
+      <button type="button" className="pilot-btn" onClick={() => setEvidence(null)}>Close</button>
+    </section> : null}
   </section>;
 }

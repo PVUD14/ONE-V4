@@ -125,14 +125,14 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
     personas: ['institution'],
     title: 'Roster, drives and interventions',
     keywords: ['roster', 'batch', 'department', 'drive', 'intervention', 'analytics', 'placement'],
-    body: 'The institution portal carries your student roster by department and batch, placement drives, skill interventions and analytics. Assessments are assigned against active roster students. Readiness analytics are aggregate and advisory — they inform your placement work and are never exposed to employers at student level.',
+    body: 'The institution portal carries your student roster by department and batch, campus drives, skill interventions and analytics. Employers ask to run a role as a campus drive; it reaches your students only after your placement office approves it (the placement officer decides on the Dashboard, an administrator under Placement), and your one-offer-per-student policy, set under Settings or on the placement officer Dashboard, applies to applications through your drives. Assessments are assigned against active roster students. Readiness analytics are aggregate and advisory — they inform your placement work and are never exposed to employers at student level.',
   },
   {
     id: 'employer-roles-drives',
     personas: ['employer'],
     title: 'Roles and campus drives',
     keywords: ['role', 'post', 'job', 'drive', 'campus', 'pipeline', 'applications', 'shortlist', 'offer'],
-    body: 'Post roles from the employer portal and run structured campus drives with partner institutions. Applications, shortlists and offers are tracked per role so the pipeline stays in one view.',
+    body: 'Post roles from the employer portal. To run a campus drive, open the role under Opportunity Detail and ask a college for one: the role reaches the students of that college only after its placement office approves, and the placement rules of the college apply to applications through the drive. Applications, shortlists and offers are tracked per role so the pipeline stays in one view.',
   },
   {
     id: 'employer-candidates',

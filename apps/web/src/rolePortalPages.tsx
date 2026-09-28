@@ -38,6 +38,7 @@ import { InstitutionAcademicStructurePage, InstitutionStaffActionsPage, Institut
 import { FacultyMyStudentsPage, InstitutionFacultyAndStaffPage } from './rolePortal/institutionTeaching.js';
 import { FacultyMessagesPage } from './rolePortal/institutionAnnouncements.js';
 import { InstitutionPlacementPage, PlacementStatusList } from './rolePortal/institutionPlacement.js';
+import { CampusDriveApprovalsSection, PlacementPoliciesSection } from './rolePortal/institutionCampusDrives.js';
 import { DepartmentBatchesPage, DepartmentOverviewPage, DepartmentReadinessPage, DepartmentReportsAnalyticsPage, FacultyAssessmentDetailPage, FacultyClassReportsPage, OpportunitiesAndOffersPage, PlacementPipelinePage } from './rolePortal/institutionDepartment.js';
 import { AcademicVerificationSection, FacultyAcademicVerification } from './rolePortal/institutionAcademicVerification.js';
 import { OperationsAuditLogPage, OperationsContentReadOnlyPage, OperationsFeatureFlagsPage, OperationsOrganizationsPage, OperationsInvitationTrackingPanel, OperationsTechnicalReadOnlyPage } from './rolePortal/operations.js';
@@ -217,6 +218,13 @@ function initialsFor(value: string): string {
 
 function AuthenticatedDashboardChooser({ portal, routeLabel, onNavigate, authenticatedWorkspace }: { readonly portal: RolePortalConfig; readonly routeLabel: string; readonly onNavigate: (path: string) => void; readonly authenticatedWorkspace?: AuthenticatedWorkspaceSummary | undefined }): React.ReactElement {
   if (portal.family === 'Institution' && ['institution-admin', 'placement-officer', 'department-head', 'faculty'].includes(portal.key) && isInstitutionStaffWorkspace(authenticatedWorkspace)) {
+    // EMP-11: the placement officer has no Drives item (HG-3), so drive approvals and the college's
+    // placement policy are sections of their Dashboard (Appendix 2 §4.2).
+    if (portal.key === 'placement-officer') {
+      return <><InstitutionDashboardV3 institutionId={authenticatedWorkspace.organizationId} basePath={portal.basePath} />
+        <section className="role-module role-module--dense"><CampusDriveApprovalsSection institutionId={authenticatedWorkspace.organizationId} />
+          <PlacementPoliciesSection institutionId={authenticatedWorkspace.organizationId} /></section></>;
+    }
     return <InstitutionDashboardV3 institutionId={authenticatedWorkspace.organizationId} basePath={portal.basePath} />;
   }
   if (portal.family === 'Employer') return <EmployerOrganisationGate employerId={authenticatedWorkspace?.organizationId} routeLabel={routeLabel}><EmployerDashboardV3 basePath={portal.basePath} /></EmployerOrganisationGate>;

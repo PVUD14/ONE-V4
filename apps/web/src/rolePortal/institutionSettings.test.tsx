@@ -56,6 +56,8 @@ function respond({ canEdit = true, role = 'INSTITUTION_ADMIN' }: { canEdit?: boo
     if (url.includes('/academic-terms')) return Promise.resolve(ok(terms(canEdit)));
     if (url.includes('/settings')) return Promise.resolve(ok({ settings: settings(canEdit) }));
     if (url.includes('/calendar')) return Promise.resolve(ok({ entries: [] }));
+    // EMP-11: the college's placement policies (none in force yet).
+    if (url.includes('/placement-policies')) return Promise.resolve(ok({ policies: [], canManage: canEdit }));
     return Promise.resolve(ok({ students: [], actions: [] }));
   });
 }
@@ -96,7 +98,10 @@ describe('admin Settings', () => {
     expect(within(bcom).getAllByText('NA')).toHaveLength(2);
     expect(within(within(scales).getByRole('row', { name: /BTech Computer Science/ })).getAllByRole('cell')[0]).toHaveTextContent('CGPA out of 10');
     expect(await screen.findByText('2026-27 Odd semester')).toBeInTheDocument();
-    expect(screen.getByText('Placement policies — not built yet')).toBeInTheDocument();
+    // EMP-11 built placement policies: the section is real, and says plainly that none is in force.
+    expect(screen.queryByText('Placement policies — not built yet')).not.toBeInTheDocument();
+    expect(await screen.findByText('No placement policy is in force. Students may apply through your drives whatever offers they hold.')).toBeInTheDocument();
+    expect(screen.getByRole('form', { name: 'Set placement policy' })).toBeInTheDocument();
     expect(screen.getByText('Data-processing terms — not built yet')).toBeInTheDocument();
     expect(screen.queryByText('Not built yet')).not.toBeInTheDocument();
     expect(screen.queryByText(programme)).not.toBeInTheDocument();

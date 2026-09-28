@@ -21,6 +21,7 @@ import {
   type VerificationSummaryDto,
   studentActivationLabels,
 } from './api.js';
+import { campusDriveStateLabels, listEmployerCampusDrives, listInstitutionCampusDrives, type CampusDriveDto } from './api/campusDrives.js';
 
 /**
  * Pilot-exact staff dashboards. Same rule as the student V3: the pilot's
@@ -65,6 +66,22 @@ interface InstitutionV3Data {
   readonly notAttempted: readonly (ExamNotAttemptedDto & { readonly examTitle: string; readonly endsAt: string })[];
   /** INST-04 verification backlog, counted server-side over the reader's scope; null reads NA. */
   readonly verification: VerificationSummaryDto | null;
+  /** EMP-11: confirmed drives ahead and requests awaiting a decision; null (NA) when this role cannot read drives. */
+  readonly drives: { readonly upcoming: readonly CampusDriveDto[]; readonly waiting: number } | null;
+}
+
+/** EMP-11: the college's scheduled drives still ahead, soonest first, and how many requests wait. */
+async function loadCollegeDrives(token: string, institutionId: string, signal: AbortSignal): Promise<InstitutionV3Data['drives']> {
+  const [scheduled, requested] = await Promise.all([
+    listInstitutionCampusDrives(token, institutionId, { state: 'SCHEDULED' }, signal),
+    listInstitutionCampusDrives(token, institutionId, { state: 'REQUESTED' }, signal),
+  ]);
+  const now = Date.now();
+  return {
+    upcoming: (scheduled.drives ?? []).filter((drive) => drive.scheduledStartAt && Date.parse(drive.scheduledStartAt) >= now)
+      .sort((a, b) => Date.parse(a.scheduledStartAt ?? '') - Date.parse(b.scheduledStartAt ?? '')),
+    waiting: (requested.drives ?? []).length,
+  };
 }
 
 export function InstitutionDashboardV3({ institutionId, basePath }: { readonly institutionId: string; readonly basePath: string }): React.ReactElement {
@@ -78,7 +95,8 @@ export function InstitutionDashboardV3({ institutionId, basePath }: { readonly i
       listInstitutionExams(token, institutionId, controller.signal).then((response) => response.assessments).catch(() => null),
       listInstitutionUnits(token, institutionId, controller.signal).then((response) => response.units).catch(() => null),
       getVerificationSummary(token, institutionId, controller.signal).then((response) => response.summary ?? null).catch(() => null),
-    ]).then(async ([roster, exams, units, verification]) => {
+      loadCollegeDrives(token, institutionId, controller.signal).catch(() => null),
+    ]).then(async ([roster, exams, units, verification, drives]) => {
       const students = roster?.students ?? null;
       const activation = roster?.activationSummary ?? null;
       const target = exams?.find((exam) => exam.lifecycleState === 'PUBLISHED' && exam.assignedCount > 0) ?? null;
@@ -86,7 +104,7 @@ export function InstitutionDashboardV3({ institutionId, basePath }: { readonly i
         ? await listInstitutionExamResults(token, institutionId, target.id).then((response) =>
             response.notAttempted.map((entry) => ({ ...entry, examTitle: target.title, endsAt: target.endsAt }))).catch(() => [])
         : [];
-      setData({ students, activation, exams, units, notAttempted, verification });
+      setData({ students, activation, exams, units, notAttempted, verification, drives });
     });
     return () => controller.abort();
   }, [token, institutionId]);
@@ -181,8 +199,16 @@ export function InstitutionDashboardV3({ institutionId, basePath }: { readonly i
         <Spark points={[0, 0, 0, 0, 0, 0, 0]} tone="green" />
       </section>
       <section className="pilot-card">
-        <div className="pilot-card-head"><h2>Upcoming Drives</h2><span className="pilot-chip slate">NA</span></div>
-        <p style={{ color: 'var(--p-muted)', margin: '4px 0' }}>Placement drives are not built yet — NA.</p>
+        <div className="pilot-card-head"><h2>Upcoming Drives</h2>{data.drives
+          ? <span className={`pilot-chip ${data.drives.waiting ? 'amber' : 'slate'}`}>{data.drives.waiting} awaiting decision</span>
+          : <span className="pilot-chip slate">NA</span>}</div>
+        {!data.drives ? <p style={{ color: 'var(--p-muted)', margin: '4px 0' }}>Campus drives are not available to your role — NA.</p>
+          : data.drives.upcoming.length ? <div className="pilot-list">{data.drives.upcoming.slice(0, 4).map((drive) => (
+            <div key={drive.id} className="pilot-list-row">
+              <span className="pilot-tile blue"><Building2 size={16} /></span>
+              <div className="grow"><strong>{drive.employerName}</strong><small>{drive.opportunityTitle ?? 'Untitled'} · {new Date(drive.scheduledStartAt ?? '').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</small></div>
+            </div>))}</div>
+            : <p style={{ color: 'var(--p-muted)', margin: '4px 0' }}>No drive is scheduled yet.</p>}
       </section>
       <section className="pilot-card">
         <h2>Department Readiness</h2>
@@ -200,6 +226,8 @@ export function InstitutionDashboardV3({ institutionId, basePath }: { readonly i
 // --- Employer ----------------------------------------------------------------
 
 interface EmployerV3Data {
+  /** EMP-11: this employer's campus drives; null (NA) when they could not be read. */
+  readonly drives: readonly CampusDriveDto[] | null;
   readonly opportunities: readonly EmployerOpportunityDto[];
   readonly applicants: readonly (EmployerApplicantDto & { readonly opportunityTitle: string })[];
 }
@@ -221,7 +249,8 @@ export function EmployerDashboardV3({ basePath }: { readonly basePath: string })
         listEmployerApplicants(token, membership.organizationId, opportunity.id, controller.signal)
           .then((response) => response.applications.map((applicant) => ({ ...applicant, opportunityTitle: opportunity.title ?? opportunity.referenceCode })))
           .catch(() => [])));
-      setData({ opportunities, applicants: groups.flat() });
+      const drives = await listEmployerCampusDrives(token, membership.organizationId, undefined, controller.signal).then((response) => response.drives ?? []).catch(() => null);
+      setData({ opportunities, applicants: groups.flat(), drives });
     }).catch(() => setError('Unable to resolve employer context.'));
     return () => controller.abort();
   }, [token]);
@@ -312,8 +341,18 @@ export function EmployerDashboardV3({ basePath }: { readonly basePath: string })
         </div>
       </section>
       <section className="pilot-card">
-        <div className="pilot-card-head"><h2>Campus Drives</h2><span className="pilot-chip slate">NA</span></div>
-        <p style={{ color: 'var(--p-muted)', margin: '4px 0' }}>Structured campus drives are not built yet — NA.</p>
+        <div className="pilot-card-head"><h2>Campus Drives</h2>{data.drives
+          ? <span className="pilot-chip slate">{data.drives.filter((drive) => drive.state === 'REQUESTED').length} awaiting colleges</span>
+          : <span className="pilot-chip slate">NA</span>}</div>
+        {!data.drives ? <p style={{ color: 'var(--p-muted)', margin: '4px 0' }}>Campus drives could not be loaded — NA.</p>
+          : data.drives.filter((drive) => !['REJECTED', 'COMPLETED', 'CANCELLED'].includes(drive.state)).length
+            ? <div className="pilot-list">{data.drives.filter((drive) => !['REJECTED', 'COMPLETED', 'CANCELLED'].includes(drive.state)).slice(0, 4).map((drive) => (
+              <div key={drive.id} className="pilot-list-row">
+                <span className="pilot-tile indigo"><Building2 size={16} /></span>
+                <div className="grow"><strong>{drive.institutionName}</strong><small>{drive.opportunityTitle ?? 'Untitled'}</small></div>
+                <span className="pilot-chip blue">{campusDriveStateLabels[drive.state]}</span>
+              </div>))}</div>
+            : <p style={{ color: 'var(--p-muted)', margin: '4px 0' }}>No open campus drives. Request one from a job's Opportunity Detail.</p>}
       </section>
       <div className="pilot-banner blue"><TrendingUp size={17} /> {inPipeline > 0 ? `${inPipeline} open application${inPipeline === 1 ? '' : 's'} awaiting your review.` : 'No open applications right now.'}</div>
     </aside>

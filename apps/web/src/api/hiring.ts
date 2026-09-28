@@ -8,6 +8,7 @@
  */
 import { ApiRequestError, apiBaseUrl } from './core.js';
 import { requestJson } from './http.js';
+import type { CampusDriveState, StudentCampusDriveDto } from './campusDrives.js';
 
 export interface CompensationDto {
   readonly currency: string | null;
@@ -33,6 +34,8 @@ export interface OpportunitySummaryDto {
   readonly alreadyApplied?: boolean;
   /** EMP-04: the hiring company's profile. Absent from older API responses. */
   readonly company?: OpportunityCompanyDto;
+  /** EMP-11: live campus drives at the student's college through which this job reaches them. */
+  readonly campusDrives?: readonly { readonly institutionName: string; readonly state: CampusDriveState; readonly scheduledStartAt: string | null }[];
 }
 
 /** What a student sees about the company behind a job (EMP-04). Unfilled fields are null. */
@@ -135,6 +138,8 @@ export interface StudentApplicationDto {
   readonly termsAcknowledgementPending: boolean;
   /** True when the employer chose to tell this candidate why. Fetch the detail separately. */
   readonly feedbackReleased: boolean;
+  /** EMP-11: the college whose campus drive this application came through, if any. */
+  readonly campusDrive?: { readonly institutionName: string } | null;
 }
 
 export interface CandidateFeedbackReasonDto {
@@ -270,7 +275,7 @@ export function listOpportunities(token: string, q = '', signal?: AbortSignal): 
   return requestJson(`/api/v1/opportunities${query}`, { token, ...(signal ? { signal } : {}) });
 }
 
-export function getOpportunity(token: string, opportunityId: string, signal?: AbortSignal): Promise<{ readonly opportunity: OpportunityDetailDto; readonly eligibility: EligibilityDto }> {
+export function getOpportunity(token: string, opportunityId: string, signal?: AbortSignal): Promise<{ readonly opportunity: OpportunityDetailDto; readonly eligibility: EligibilityDto; readonly campusDrives?: readonly StudentCampusDriveDto[] }> {
   return requestJson(`/api/v1/opportunities/${encodeURIComponent(opportunityId)}`, { token, ...(signal ? { signal } : {}) });
 }
 

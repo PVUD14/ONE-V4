@@ -807,3 +807,46 @@ describe('EMP-08 the student sees their interviews inside Applications', () => {
     expect(document.body.textContent).not.toContain('db.ts');
   });
 });
+
+describe('EMP-11 campus drives for the student', () => {
+  const campus = { institutionName: 'Synthetic Institute of Technology', state: 'SCHEDULED', scheduledStartAt: '2027-01-12T04:30:00.000Z' };
+  const policy = { policyType: 'ONE_OFFER_PER_STUDENT', allowDriveExceptions: false, note: 'One offer per student this season.' };
+  const driveDetail = (blocksYou: boolean) => ({
+    ...detail,
+    campusDrives: [{ ...campus, scheduledEndAt: null, venueMode: 'ON_CAMPUS', offerHoldersEligible: false, placementPolicy: policy, blocksYou }],
+  });
+
+  it('marks a job that reaches the student through their college\'s drive, and states the policy before they apply', async () => {
+    stubFetch({ '/api/v1/opportunities': { opportunities: [{ ...opportunity, campusDrives: [campus] }] }, [`/api/v1/opportunities/${opportunity.id}`]: driveDetail(false) });
+    await authenticate();
+    render(<StudentOpportunitiesPage />);
+    expect(await screen.findByText('Campus drive · Synthetic Institute of Technology')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'View details' }));
+    const notice = await screen.findByLabelText('Campus drive');
+    expect(notice).toHaveTextContent("Synthetic Institute of Technology's placement office approved this role for its students.");
+    expect(notice).toHaveTextContent('one accepted offer per student');
+    expect(notice).toHaveTextContent('One offer per student this season.');
+    expect(screen.getByRole('button', { name: 'Apply and share my profile' })).toBeEnabled();
+  });
+
+  it('tells a student holding an accepted offer why they cannot apply through the drive, and does not offer the button', async () => {
+    stubFetch({ '/api/v1/opportunities': { opportunities: [{ ...opportunity, campusDrives: [campus] }] }, [`/api/v1/opportunities/${opportunity.id}`]: driveDetail(true) });
+    await authenticate();
+    render(<StudentOpportunitiesPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'View details' }));
+    expect(await screen.findByText(/You already hold an accepted offer, so you cannot apply through this drive\./)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Apply and share my profile' })).toBeDisabled();
+  });
+
+  it('explains the policy refusal in plain words if apply is refused', async () => {
+    stubFetch(
+      { '/api/v1/opportunities': { opportunities: [{ ...opportunity, campusDrives: [campus] }] }, [`/api/v1/opportunities/${opportunity.id}`]: driveDetail(false) },
+      { '/api/v1/students/me/applications': { status: 400, body: { error: { code: 'PLACEMENT_POLICY_ONE_OFFER', message: 'Request could not be completed', correlationId: 'corr-policy' } } } },
+    );
+    await authenticate();
+    render(<StudentOpportunitiesPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'View details' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Apply and share my profile' }));
+    expect(await screen.findByText(/Your college allows one accepted offer per student, and you already hold one/)).toBeInTheDocument();
+  });
+});

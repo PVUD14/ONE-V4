@@ -14,6 +14,8 @@
  *
  * EMP-06 adds the job's eligibility rules, skills and selection stages, shown here and edited as
  * a new version like every other change (employerOpportunityRequirements.tsx).
+ *
+ * EMP-11 adds the job's campus drives (employerCampusDrives.tsx) as a section of this page.
  */
 import { useEffect, useState, type FormEvent } from 'react';
 import { ApiRequestError, getProtectedAccessToken } from '../api.js';
@@ -32,6 +34,7 @@ import { V2Stat, V2EmptyState } from '../dashboardsV2.js';
 import { StaffPilotWrap } from '../parityWraps.js';
 import { formatApiError } from './shared.js';
 import { OpportunityRequirementsEditor, OpportunityRequirementsSection } from './employerOpportunityRequirements.js';
+import { EmployerCampusDrivesSection } from './employerCampusDrives.js';
 
 const actionLabels: Readonly<Record<OpportunityLifecycleAction, string>> = {
   PAUSE: 'Pause', CLOSE: 'Close', REOPEN: 'Reopen', WITHDRAW: 'Withdraw',
@@ -249,7 +252,7 @@ function OpportunityDetail({ employerId, opportunityId, token, onChanged }: {
         {last.reasonCode ? ` — ${reasonLabels[last.reasonCode] ?? humanise(last.reasonCode)}` : ''}{last.trigger === 'DEADLINE' ? ' (automatically, at the deadline)' : ''}</p> : null}
       <p className="hiring-meta">Audience: {opportunity.audiences.length
         ? opportunity.audiences.map((audience) => audience.kind === 'PUBLIC' ? 'All students' : [audience.institutionName, audience.unitName].filter(Boolean).join(' · ') || humanise(audience.kind)).join('; ')
-        : 'None yet — nobody can see this job.'}</p>
+        : 'None of its own — students see it only through a campus drive a college has approved (below).'}</p>
       {opportunity.awaitingAcknowledgementCount > 0 ? <p className="hiring-tag warn">{opportunity.awaitingAcknowledgementCount} applicant(s) have not yet accepted the changed terms; they stay where they are until they do.</p> : null}
 
       <div className="hiring-actions" role="group" aria-label="Job actions">
@@ -270,6 +273,9 @@ function OpportunityDetail({ employerId, opportunityId, token, onChanged }: {
         </div>
       </div> : null}
     </section>
+
+    {/* EMP-11: campus drives for this job, requested here and decided by each college. */}
+    <EmployerCampusDrivesSection employerId={employerId} opportunityId={opportunityId} token={token} lifecycleState={opportunity.lifecycleState} />
 
     {editing && currentVersion ? <form className="role-card role-wide role-management-form" aria-label="Edit job" onSubmit={(event) => { void saveVersion(event); }}>
       <h2>Edit job — saves version {currentVersion.versionNumber + 1}</h2>

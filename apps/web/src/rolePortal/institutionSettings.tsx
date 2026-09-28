@@ -33,6 +33,7 @@ import { V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { StaffPilotWrap } from '../parityWraps.js';
 import { InstitutionWorkspaceError, RestrictedApiState, formatApiError, isInstitutionStaffWorkspace } from './shared.js';
 import type { AuthenticatedWorkspaceSummary } from './shared.js';
+import { PlacementPoliciesSection } from './institutionCampusDrives.js';
 
 const notProvided = 'Not provided';
 
@@ -112,9 +113,8 @@ export function InstitutionSettingsPage({ authenticatedWorkspace, personal = fal
     <CollegeSettingsSections key={'settings:' + institutionId} token={token} institutionId={institutionId} />
     <AcademicCalendarPanel key={'calendar:' + institutionId} token={token} institutionId={institutionId} />
     {!personal ? <>
-      <div className="role-wide" aria-label="Placement policies"><V2EmptyState icon="🧭" title="Placement policies — not built yet"
-        note="ONE has no placement policy engine yet, so there is nothing to set here. Eligibility rules for drives will read the grading scales above once they exist."
-        hint="Grading scales and the calendar on this page are live today." /></div>
+      {/* EMP-11: the college's placement policies, enforced at apply for its campus drives. */}
+      <PlacementPoliciesSection key={'policies:' + institutionId} institutionId={institutionId} />
       <div className="role-wide" aria-label="Data-processing terms"><V2EmptyState icon="📄" title="Data-processing terms — not built yet"
         note="Versioned data-processing terms, the college data export and exit are not built yet. Nothing has been accepted on your college's behalf."
         hint="Contact AI8HT operations about your agreement in the meantime." /></div>

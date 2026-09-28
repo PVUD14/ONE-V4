@@ -78,6 +78,8 @@ beforeEach(() => {
     }
     if (requested === base) return response({ opportunities: [{ id: jobId, referenceCode: 'GA-01', lifecycleState: 'PUBLISHED', title: 'Graduate analyst', versionNumber: 2, applicationCount: 1, openApplicationCount: 1 }] });
     if (requested === `${base}/${jobId}`) return response(detail);
+    // EMP-11: the job's campus drives section (none for this job).
+    if (requested === `/api/v1/employers/${employerId}/campus-drives`) return response({ drives: [] });
     if (requested === `/api/v1/employers/${employerId}/skill-catalogue`) {
       return response({ skills: [{ taxonomyTopicId: crypto.randomUUID(), name: 'Data visualisation' }], nextCursor: null,
         careerRoles: [{ id: roleId, code: 'D01', title: 'Data analyst', family: 'D' }] });

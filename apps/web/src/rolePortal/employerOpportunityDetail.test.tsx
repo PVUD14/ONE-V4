@@ -87,6 +87,8 @@ beforeEach(() => {
     }
     if (requested === base) return response({ opportunities: jobs });
     if (requested === `${base}/${jobId}`) return response(detail);
+    // EMP-11: the job's campus drives section (none for this job).
+    if (requested === `/api/v1/employers/${employerId}/campus-drives`) return response({ drives: [] });
     throw new Error('Unexpected endpoint ' + requested);
   }));
 });

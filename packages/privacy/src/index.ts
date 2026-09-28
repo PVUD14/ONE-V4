@@ -174,7 +174,7 @@ export function assertExportDownloadable(input: {
 export type DeletionCategory =
   | 'IDENTITY' | 'STUDENT_PROFILE' | 'INSTITUTION_ROSTER' | 'DOCUMENTS'
   | 'APPLICATIONS' | 'OFFERS' | 'ASSESSMENT_EVIDENCE' | 'NOTIFICATIONS' | 'AUDIT' | 'SUPPORT_CASES'
-  | 'LEARNING_ACTIVITY' | 'COUNSELLING_NOTES';
+  | 'LEARNING_ACTIVITY' | 'COUNSELLING_NOTES' | 'APPLICATION_MESSAGES';
 
 export type DeletionDisposition = 'ERASED' | 'ANONYMISED' | 'RETAINED';
 
@@ -212,6 +212,10 @@ export const DELETION_POLICY: readonly DeletionPolicyEntry[] = [
   // INST-11: counselling notes a college wrote about the person, and the list of staff on their
   // counselling case, are erased with them (docs/architecture/counselling-notes-table-design.md).
   { category: 'COUNSELLING_NOTES', disposition: 'ERASED' },
+  // EMP-10: the text of every message in the person's application conversations, both sides — the
+  // whole conversation is about them. The rows stay without text so an employer's pipeline and a
+  // trust case's references remain valid (docs/architecture/application-messages-table-design.md).
+  { category: 'APPLICATION_MESSAGES', disposition: 'ERASED' },
   { category: 'AUDIT', disposition: 'RETAINED', basis: 'Security and access audit records are retained under the approved retention schedule.' },
 ];
 

@@ -475,6 +475,18 @@ export const eventSchemas = {
     schemaRef: 'registry://offer.expiry_reminder.requested/1',
     payload: { offerId: { kind: 'uuid' } },
   },
+  // EMP-10: one message in an application's conversation. The payload never carries the text; the
+  // hiring-notification consumer reads the message at consume time and re-checks the grant.
+  applicationMessageSentV1: {
+    eventType: 'application.message.sent',
+    eventVersion: 1,
+    producer: 'hiring',
+    aggregateType: 'application',
+    purpose: 'application-messages',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://application.message.sent/1',
+    payload: { applicationId: { kind: 'uuid' }, messageId: { kind: 'uuid' } },
+  },
   organizationRoleAssignedV1: {
     eventType: 'organization.role.assigned',
     eventVersion: 1,

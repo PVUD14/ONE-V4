@@ -16,7 +16,7 @@ export async function assembleSubjectExport(db: PersistenceDb, subjectUserId: st
   const one = async (query: ReturnType<typeof sql>): Promise<Record<string, unknown>[]> =>
     ((await db.execute(query)) as QueryResult<Record<string, unknown>>).rows;
 
-  const [identity, profile, relationships, roster, documents, savedOpportunities, applications, offers, requests, sharedNotes, heldNotes] = await Promise.all([
+  const [identity, profile, relationships, roster, documents, savedOpportunities, applications, offers, requests, sharedNotes, heldNotes, messages] = await Promise.all([
     one(sql`SELECT id, email, state, created_at, anonymised_at FROM users WHERE id = ${subjectUserId}::uuid`),
     one(sql`SELECT target_career, career_interests, profile_headline, profile_summary, portfolio_url, visibility_state, employer_discovery_enabled, updated_at
             FROM student_profiles WHERE user_id = ${subjectUserId}::uuid`),
@@ -56,6 +56,17 @@ export async function assembleSubjectExport(db: PersistenceDb, subjectUserId: st
             WHERE a.subject_student_user_id = ${subjectUserId}::uuid AND a.action_type = 'COUNSELLING_NOTE'
               AND a.visibility = 'STAFF_ONLY'
             GROUP BY org.legal_name ORDER BY org.legal_name`),
+    // EMP-10: the subject's application conversations — both sides, which company, never which recruiter.
+    one(sql`SELECT t.id AS thread_id, org.legal_name AS employer_name, v.title, t.started_at,
+                   m.sender_side, m.body, m.sent_at, m.read_at, m.erased_at, m.erasure_reason,
+                   CASE WHEN m.sender_side = 'EMPLOYER' THEN m.reported_at END AS reported_at
+            FROM application_message_threads t
+            JOIN applications a ON a.id = t.application_id
+            JOIN opportunity_versions v ON v.id = a.applied_version_id
+            JOIN organizations org ON org.id = t.employer_id
+            JOIN application_messages m ON m.thread_id = t.id
+            WHERE t.student_user_id = ${subjectUserId}::uuid
+            ORDER BY t.started_at, t.id, m.sent_at, m.id`),
   ]);
 
   return {
@@ -66,6 +77,7 @@ export async function assembleSubjectExport(db: PersistenceDb, subjectUserId: st
       'Interview scorecards and employer notes, which are the employer\'s assessment rather than your record.',
       'The text of counselling notes your college has not shared with you. How many each college holds is listed under counsellingNotes; the college can share them with you.',
       'Security audit records, which are retained under the approved retention schedule.',
+      'Which member of an employer team wrote each application message, and how operations handled any message you reported.',
     ],
     identity: identity[0] ?? null,
     studentProfile: profile[0] ?? null,
@@ -76,9 +88,32 @@ export async function assembleSubjectExport(db: PersistenceDb, subjectUserId: st
     applications,
     offers,
     privacyRequests: requests,
+    applicationMessages: groupConversations(messages),
     counsellingNotes: {
       shared: sharedNotes.map((row) => ({ institutionName: row.institution_name, title: row.title, note: row.note, createdAt: row.created_at })),
       heldByCollege: heldNotes.map((row) => ({ institutionName: row.institution_name, staffOnlyNotes: row.staff_only_notes })),
     },
   };
+}
+
+/** One entry per conversation, its messages in order. Erased text says so rather than vanishing. */
+function groupConversations(rows: readonly Record<string, unknown>[]): Record<string, unknown>[] {
+  const byThread = new Map<string, { employerName: unknown; title: unknown; startedAt: unknown; messages: Record<string, unknown>[] }>();
+  for (const row of rows) {
+    const key = String(row.thread_id);
+    let conversation = byThread.get(key);
+    if (!conversation) {
+      conversation = { employerName: row.employer_name, title: row.title, startedAt: row.started_at, messages: [] };
+      byThread.set(key, conversation);
+    }
+    conversation.messages.push({
+      from: row.sender_side === 'STUDENT' ? 'YOU' : 'EMPLOYER',
+      text: row.body ?? null,
+      erased: row.erased_at != null ? { at: row.erased_at, reason: row.erasure_reason } : null,
+      sentAt: row.sent_at,
+      readAt: row.read_at ?? null,
+      reportedByYouAt: row.reported_at ?? null,
+    });
+  }
+  return [...byThread.values()];
 }

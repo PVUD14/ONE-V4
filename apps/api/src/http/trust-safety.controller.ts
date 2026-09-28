@@ -34,6 +34,7 @@ import {
   transitionTrustCase,
   type TrustCaseState,
 } from '@planthepath/persistence/src/trust-safety.js';
+import { readTrustCaseMessageEvidence } from '@planthepath/persistence/src/application-messages.js';
 import { PG_POOL } from '../persistence.provider.js';
 import { ProtectedApiAuthenticationGuard, type ProtectedHttpRequest } from './api-security.js';
 import { callerHasInternalCapability, poolCapabilityGrantLoader } from './internal-capability-guard.js';
@@ -69,6 +70,22 @@ export class TrustSafetyController {
     const found = await getTrustCase(this.pool, requireUuid(caseId));
     if (!found) throw new NotFoundException({ error: { code: 'TRUST_CASE_NOT_FOUND' } });
     return { case: found };
+  }
+
+  /**
+   * EMP-10: the application conversations that are evidence on this case, for judging a student's
+   * report. Only threads the case references; audited. Operators see the text regardless of the
+   * employer's grant, because deciding the report needs it.
+   */
+  @Get('/cases/:caseId/message-threads')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async messageEvidence(@Req() request: ProtectedHttpRequest, @Param('caseId') caseId: string): Promise<Record<string, unknown>> {
+    const actorUserId = await requireTrustOperator(request, this.pool, 'TRUST_SAFETY_INVESTIGATE');
+    const threads = await readTrustCaseMessageEvidence(this.pool, {
+      caseId: requireUuid(caseId), actorUserId, correlationId: request.planThePath?.correlationId ?? 'unknown',
+    });
+    if (!threads) throw new NotFoundException({ error: { code: 'TRUST_CASE_NOT_FOUND' } });
+    return { threads };
   }
 
   @Post('/cases')

@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import type { PersistenceDb } from '@planthepath/persistence/src/repositories.js';
 import { DELETION_POLICY, anonymisedIdentity, isDeletionDue, type DeletionCategory, type PrivacyRequestState } from '@planthepath/privacy';
 import { detachSupportCasesForDeletedUser } from '@planthepath/persistence/src/support-cases.js';
+import { eraseApplicationMessagesForSubject } from '@planthepath/persistence/src/application-messages.js';
 import { projectSubjectSkillState } from '@planthepath/persistence/src/learner-skill-state.js';
 import { ERASED_SNAPSHOT, snapshotHash } from '@planthepath/hiring/src/application-snapshot.js';
 import type { FileStorage } from '../storage/file-storage.js';
@@ -140,6 +141,10 @@ async function erase(deps: DeletionExecutionDeps, subjectUserId: string): Promis
       WHERE erased_at IS NULL AND application_id IN (SELECT id FROM applications WHERE student_user_id = ${subjectUserId}::uuid)
     `);
   });
+
+  // EMP-10: the text of every message in the person's application conversations, both sides. The
+  // rows stay without text (append-only; 0067) so pipelines and trust-case references stay valid.
+  counts.APPLICATION_MESSAGES = await eraseApplicationMessagesForSubject(db, subjectUserId);
 
   // Documents: remove the bytes, then the rows that point at them.
   const files = await db.execute(sql`

@@ -19,6 +19,7 @@ import { randomUUID } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import type { IntegrationEventEnvelope } from '@planthepath/events/src/index.js';
 import { handleEventIdempotently } from './outbox-dispatcher.js';
+import { applicationHasLiveApplicantGrant } from './employer-authentication.js';
 import { PermanentMailRejection, type InvitationMailSink, type MailAttachment } from './invitation-mail.js';
 import { loadInterviewCalendar } from './interview-calendar-source.js';
 import { validateOutboxWriteInput, type PersistenceDb } from './repositories.js';
@@ -28,6 +29,8 @@ type Executor = Pick<PersistenceDb, 'execute'>;
 
 export const HIRING_NOTIFICATION_CONSUMER = 'hiring-notifications';
 export const OFFER_EXPIRY_REMINDER_REQUESTED = 'offer.expiry_reminder.requested';
+/** EMP-10: one message in an application's conversation. */
+export const APPLICATION_MESSAGE_SENT = 'application.message.sent';
 export const HIRING_TEMPLATE_VERSION = 1;
 /** How long before an offer expires the one reminder is sent. */
 export const OFFER_REMINDER_LEAD_HOURS = 24;
@@ -46,14 +49,20 @@ export const HIRING_NOTIFICATION_EVENT_TYPES: readonly string[] = [
   OFFER_EXPIRY_REMINDER_REQUESTED,
   'offer.accepted',
   'offer.declined',
+  APPLICATION_MESSAGE_SENT,
 ];
 
 export type HiringNotificationKind =
   | 'APPLICATION_STAGE_CHANGED' | 'APPLICATION_TERMS_CHANGED' | 'INTERVIEW_SCHEDULED' | 'INTERVIEW_CHANGED'
-  | 'OFFER_EXTENDED' | 'OFFER_WITHDRAWN' | 'OFFER_EXPIRING' | 'OFFER_RESPONDED';
+  | 'OFFER_EXTENDED' | 'OFFER_WITHDRAWN' | 'OFFER_EXPIRING' | 'OFFER_RESPONDED'
+  | 'EMPLOYER_MESSAGE' | 'CANDIDATE_MESSAGE';
+
+/** The kinds that are in-app only, for employer members: they never email and use no template. */
+type InAppOnlyKind = 'OFFER_RESPONDED' | 'CANDIDATE_MESSAGE';
+type EmailedKind = Exclude<HiringNotificationKind, InAppOnlyKind>;
 
 // Fixed template row ids, one per kind that emails (the body is rendered by renderHiringEmail).
-const templateIds: Readonly<Record<Exclude<HiringNotificationKind, 'OFFER_RESPONDED'>, string>> = {
+const templateIds: Readonly<Record<EmailedKind, string>> = {
   APPLICATION_STAGE_CHANGED: '26000000-0000-4000-8000-000000059001',
   APPLICATION_TERMS_CHANGED: '26000000-0000-4000-8000-000000059002',
   INTERVIEW_SCHEDULED: '26000000-0000-4000-8000-000000059003',
@@ -61,6 +70,7 @@ const templateIds: Readonly<Record<Exclude<HiringNotificationKind, 'OFFER_RESPON
   OFFER_EXTENDED: '26000000-0000-4000-8000-000000059005',
   OFFER_WITHDRAWN: '26000000-0000-4000-8000-000000059006',
   OFFER_EXPIRING: '26000000-0000-4000-8000-000000059007',
+  EMPLOYER_MESSAGE: '26000000-0000-4000-8000-000000067001',
 };
 
 export function hiringTemplateKey(kind: HiringNotificationKind): string {
@@ -179,6 +189,16 @@ export function renderHiringNotice(facts: HiringNoticeFacts, timeZone?: string |
       title = `Offer expires soon: ${job}`;
       body = `Your offer from ${employer} for ${job} expires on ${deadline ?? 'its deadline'}. Accept or decline it under Applications before then.`;
       break;
+    // EMP-10: never the text of the message — an email can be forwarded, and the text may carry
+    // contact details. The employer's notice never names the candidate (it outlives the grant).
+    case 'EMPLOYER_MESSAGE':
+      title = `Message from ${employer}`;
+      body = `${employer} sent you a message about ${job}. Read and reply under Applications.`;
+      break;
+    case 'CANDIDATE_MESSAGE':
+      title = `Candidate message: ${job}`;
+      body = `A candidate replied about ${job}${reference}. Open Messages to read it.`;
+      break;
     case 'OFFER_RESPONDED':
       title = facts.offerResponse === 'ACCEPTED' ? `Offer accepted: ${job}` : `Offer declined: ${job}`;
       body = facts.offerResponse === 'ACCEPTED'
@@ -271,6 +291,8 @@ async function notify(tx: PersistenceDb, event: IntegrationEventEnvelope, sinkCo
   const type = event.eventType;
   const none = (outcome: HiringNotificationOutcome) => ({ outcome, recipients: 0 });
 
+  if (type === APPLICATION_MESSAGE_SENT) return messageNotice(tx, event, sinkConfigured);
+
   if (type.startsWith('application.') && type !== 'application.terms_change.recorded') {
     const stage = String(event.payload.toState ?? '') as StageState;
     if (!stageStates.includes(stage) || type !== `application.${stage.toLowerCase()}`) throw new Error('invalid application stage event');
@@ -360,7 +382,7 @@ async function notify(tx: PersistenceDb, event: IntegrationEventEnvelope, sinkCo
 }
 
 /** The template row names who approved the wording: the employer member whose action sent it. */
-async function ensureHiringTemplate(tx: Executor, event: IntegrationEventEnvelope, kind: Exclude<HiringNotificationKind, 'OFFER_RESPONDED'>): Promise<void> {
+async function ensureHiringTemplate(tx: Executor, event: IntegrationEventEnvelope, kind: EmailedKind): Promise<void> {
   const approver = event.actorId;
   if (!approver) throw new Error('hiring event has no actor');
   await tx.execute(sql`
@@ -393,7 +415,7 @@ async function panelNotices(
     ORDER BY p.participant_user_id
   `) as QueryResult<{ participant_user_id: string; timezone: string | null }>;
   if (!panel.rows.length) return 0;
-  const kind = facts.kind as Exclude<HiringNotificationKind, 'OFFER_RESPONDED'>;
+  const kind = facts.kind as EmailedKind;
   await ensureHiringTemplate(tx, event, kind);
   let written = 0;
   for (const member of panel.rows) {
@@ -404,6 +426,70 @@ async function panelNotices(
     });
   }
   return written;
+}
+
+/**
+ * EMP-10: a message in an application's conversation. Read at consume time: nothing is sent for a
+ * message that has been erased or read already, when the employer's grant is no longer live, or when
+ * an earlier message from the same side is still unread — five messages in a row make one notice.
+ * An employer's message tells the student (in-app and email) unless they muted the conversation; a
+ * student's reply tells the members who have written in it (in-app only).
+ */
+async function messageNotice(tx: PersistenceDb, event: IntegrationEventEnvelope, sinkConfigured: boolean): Promise<{ outcome: HiringNotificationOutcome; recipients: number }> {
+  const none = (outcome: HiringNotificationOutcome) => ({ outcome, recipients: 0 });
+  const found = await tx.execute(sql`
+    SELECT ${applicationContextColumns}, m.sender_side, m.erased_at, m.read_at, t.id AS thread_id, t.student_muted_at, t.started_by_user_id,
+           ${applicationHasLiveApplicantGrant('a')} AS grant_live,
+           EXISTS (SELECT 1 FROM application_messages earlier
+             WHERE earlier.thread_id = m.thread_id AND earlier.sender_side = m.sender_side AND earlier.read_at IS NULL
+               AND earlier.erased_at IS NULL AND (earlier.sent_at, earlier.id) < (m.sent_at, m.id)) AS earlier_unread
+    FROM application_messages m
+    JOIN application_message_threads t ON t.id = m.thread_id
+    JOIN applications a ON a.id = t.application_id
+    ${applicationContextJoins}
+    WHERE m.id = ${payloadUuid(event, 'messageId')}::uuid AND t.application_id = ${payloadUuid(event, 'applicationId')}::uuid
+  `) as QueryResult<ApplicationContext & { sender_side: 'EMPLOYER' | 'STUDENT'; erased_at: unknown; read_at: unknown; thread_id: string;
+    student_muted_at: unknown; started_by_user_id: string; grant_live: boolean; earlier_unread: boolean }>;
+  const row = found.rows[0];
+  if (!row) return none('NOT_FOUND');
+  if (row.erased_at != null || row.read_at != null || row.grant_live !== true || row.earlier_unread) return none('NOT_APPLICABLE');
+
+  if (row.sender_side === 'EMPLOYER') {
+    if (row.student_muted_at != null) return none('NOT_APPLICABLE');
+    return studentNotice(tx, event, row, { kind: 'EMPLOYER_MESSAGE' }, sinkConfigured);
+  }
+  const recipients = await messageRecipients(tx, row.employer_id, row.thread_id, row.started_by_user_id);
+  if (!recipients.length) return none('NOT_APPLICABLE');
+  const notice = renderHiringNotice({ kind: 'CANDIDATE_MESSAGE', employerName: row.employer_name, opportunityTitle: row.title, referenceCode: row.reference_code });
+  const written = await writeNotices(tx, {
+    eventId: event.eventId, applicationId: row.application_id, kind: 'CANDIDATE_MESSAGE', recipientKind: 'EMPLOYER_MEMBER',
+    recipientIds: recipients, notice, data: { screen: 'messages', opportunityTitle: row.title }, email: false, sinkConfigured,
+  });
+  return { outcome: written ? 'NOTIFIED' : 'NOT_APPLICABLE', recipients: written };
+}
+
+/**
+ * Who hears that a candidate replied: the active members who have written in the conversation;
+ * otherwise the member who started it, if still active; otherwise the employer's active owners and admins.
+ */
+async function messageRecipients(tx: Executor, employerId: string, threadId: string, starterUserId: string): Promise<string[]> {
+  const members = await tx.execute(sql`
+    SELECT DISTINCT m.user_id,
+           EXISTS (SELECT 1 FROM application_messages sent WHERE sent.thread_id = ${threadId}::uuid AND sent.sender_side = 'EMPLOYER'
+             AND sent.sender_user_id = m.user_id) AS wrote,
+           (m.user_id = ${starterUserId}::uuid) AS started,
+           (m.role IN ('EMPLOYER_OWNER', 'EMPLOYER_ADMIN')) AS manages
+    FROM organization_memberships m JOIN users u ON u.id = m.user_id AND u.state = 'ACTIVE'
+    WHERE m.organization_id = ${employerId}::uuid AND m.scope_organization_id = ${employerId}::uuid AND m.scope_employer_id = ${employerId}::uuid
+      AND m.state = 'ACTIVE' AND m.role IN ('EMPLOYER_OWNER', 'EMPLOYER_ADMIN', 'RECRUITER')
+  `) as QueryResult<{ user_id: string; wrote: boolean; started: boolean; manages: boolean }>;
+  const pick = (test: (row: { wrote: boolean; started: boolean; manages: boolean }) => boolean) =>
+    [...new Set(members.rows.filter(test).map((row) => row.user_id))].sort();
+  const writers = pick((row) => row.wrote);
+  if (writers.length) return writers;
+  const starter = pick((row) => row.started);
+  if (starter.length) return starter;
+  return pick((row) => row.manages);
 }
 
 /** The calendar invite for an interview event's revision, as an email attachment; none for other events. */
@@ -428,7 +514,7 @@ async function studentNotice(
   tx: PersistenceDb, event: IntegrationEventEnvelope, context: ApplicationContext, facts: StudentFacts, sinkConfigured: boolean,
 ): Promise<{ outcome: HiringNotificationOutcome; recipients: number }> {
   const notice = renderHiringNotice({ ...facts, employerName: context.employer_name, opportunityTitle: context.title }, context.timezone);
-  const kind = facts.kind as Exclude<HiringNotificationKind, 'OFFER_RESPONDED'>;
+  const kind = facts.kind as EmailedKind;
   await ensureHiringTemplate(tx, event, kind);
   const written = await writeNotices(tx, {
     eventId: event.eventId, applicationId: context.application_id, kind, recipientKind: 'STUDENT', recipientIds: [context.student_user_id], notice,

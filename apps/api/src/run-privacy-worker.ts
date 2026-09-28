@@ -3,10 +3,12 @@ import { randomUUID } from 'node:crypto';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import * as schema from '@planthepath/persistence/src/schema.js';
 import { executeDueDeletions } from './http/privacy-deletion.js';
+import { eraseExpiredApplicationMessages, MESSAGE_RETENTION_DAYS_AFTER_GRANT } from '@planthepath/persistence/src/application-messages.js';
 import { createLocalDiskStorage } from './storage/file-storage.js';
 
 /**
- * Executes deletions whose 30-day grace period has elapsed.
+ * Executes deletions whose 30-day grace period has elapsed, then erases application messages whose
+ * retention after the employer's access ended has run out (EMP-10).
  *
  * Deliberately a one-shot run rather than a loop: a deletion sweep is a daily job,
  * and a long-lived process holding a connection to do nothing most of the time is
@@ -42,6 +44,11 @@ async function main(): Promise<void> {
       // rather than reporting a clean sweep.
       ...(storageRoot ? {} : { warning: 'FILE_STORAGE_ROOT unset; stored document bytes were not removed' }),
     }));
+
+    // EMP-10: message text is kept 180 days after the employer's access ended, then erased — the
+    // same daily sweep, because it is the same kind of promise about how long ONE keeps data.
+    const erasedMessages = await eraseExpiredApplicationMessages(db);
+    console.log(JSON.stringify({ event: 'application.messages.retention_sweep', retentionDays: MESSAGE_RETENTION_DAYS_AFTER_GRANT, erased: erasedMessages }));
 
     for (const failure of failed) {
       console.error(JSON.stringify({ event: 'privacy.deletion.failed', requestId: failure.requestId, detail: failure.detail }));

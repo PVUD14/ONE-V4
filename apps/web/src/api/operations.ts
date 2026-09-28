@@ -255,7 +255,7 @@ export function revokeStaffCapability(
 // --- Approvals for high-risk actions (OPS-02) -------------------------------
 
 export type HighRiskActionKey = 'ORGANIZATION_SUSPEND' | 'FEATURE_FLAG_HIGH_RISK_CHANGE' | 'OUTBOX_BACKLOG_SUPERSEDE' | 'PRIVACY_HOLD_RELEASE' | 'CAPABILITY_GRANT_HIGH_RISK'
-  | 'CAREER_REQUIREMENT_SET_PUBLISH' | 'CONTENT_SKILL_PUBLISH' | 'CONTENT_QUESTION_PUBLISH';
+  | 'CAREER_REQUIREMENT_SET_PUBLISH' | 'CONTENT_SKILL_PUBLISH' | 'CONTENT_QUESTION_PUBLISH' | 'CONTENT_LESSON_PUBLISH';
 
 export interface ApprovalDecisionReasonsDto {
   readonly APPROVE: readonly string[];
@@ -288,6 +288,8 @@ export interface OperationApprovalDto {
     readonly skillName?: string | null; readonly skillKey?: string | null; readonly skillRevision?: number | null;
     /** OPS-09b: a question publish names the question's key and revision — never its answer. */
     readonly questionKey?: string | null; readonly questionRevision?: number | null;
+    /** OPS-09c: a lesson publish names the lesson's key, its variant (language/level/style) and revision. */
+    readonly lessonKey?: string | null; readonly lessonVariant?: string | null; readonly lessonRevision?: number | null;
   };
   readonly reasonCode: string;
   readonly note: string | null;

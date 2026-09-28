@@ -1316,7 +1316,7 @@ No misconception table was created: the editor writes to ENG-07's `question_opti
 **Next goal:** OPS-09d.
 
 ## OPS-09d — Bulk import — 2026-09-28
-**Result:** Complete (validation pending, see below). Operators with Content Edit import a CSV or JSON file of skills, questions, lessons or lesson variants. Preview runs every row through the editors and reports each row's problems, writing no content. Commit writes exactly the previewed file, all rows or none, and every row lands as a DRAFT authored by the importer, who can never review or publish it.
+**Result:** Complete. Operators with Content Edit import a CSV or JSON file of skills, questions, lessons or lesson variants. Preview runs every row through the editors and reports each row's problems, writing no content. Commit writes exactly the previewed file, all rows or none, and every row lands as a DRAFT authored by the importer, who can never review or publish it.
 
 **Branch / PR:** `feat/ops-content-bulk-import`, cut from `onev4/stack/ops09c` (f8809e1: the base plus the assistant-off/mail-sender fix, ENG-14 and OPS-09c). The coordinator merges it.
 
@@ -1345,7 +1345,15 @@ No misconception table was created: the editor writes to ENG-07's `question_opti
 - Skills and lessons are created first and saved in prerequisite order within the file, as the ENG-10/ENG-11 packs do, so a row may name a prerequisite a later row defines and the editor's acyclic check runs on each save.
 - Caps: 200 rows and 90,000 characters per file (the API's unchanged 100 KB JSON body limit is the outer bound). Unknown, duplicated or missing CSV columns are file problems; unknown JSON fields are row issues.
 
-**Validation:** to be amended after the full run on a fresh database `one_ops09d`.
+**Validation:** on a fresh database `one_ops09d`:
+- `corepack pnpm db:migrate` ran twice: 59 applied, then 0 applied (no migration added).
+- `corepack pnpm typecheck` passed.
+- `corepack pnpm -r --no-bail --workspace-concurrency=1 test` passed 2938 of 2939 tests: web 706, api 965/966, persistence 392, authorization 283, career-readiness 92, and every other package in full.
+  - The one failure was `employer-eligibility-stages.integration.spec.ts` › "uses a self-reported record where nothing is verified…". It asserts that the stringified application list does not contain `8.37`, and the response also carries timestamps such as `…:58.37…`, so it fails whenever a timestamp happens to contain those digits. It is pre-existing, EMP-06's, and unrelated to this change. Re-run alone, it passed 10/10. It was not edited.
+- `corepack pnpm build` passed.
+- `corepack pnpm audit --prod --audit-level=high` exited 0 (two moderate advisories, none high).
+- The foundation-policy greps (optional chains in `apps/web/src`, conflict markers, private keys) print nothing.
+- New tests: 17 career-readiness unit, 5 authorization unit, 14 API integration and 10 web. They all passed, the new API spec inside the full run as well.
 
 **Acceptance criteria:**
 - ✔ **An invalid file shows row-level errors and writes nothing.** The integration spec counts twelve tables (content revisions, taxonomy nodes, lesson and question versions, answer keys, hint ladders, misconception tags, review actions, source records, release manifests, audit, outbox) before and after:
@@ -1378,6 +1386,7 @@ No misconception table was created: the editor writes to ENG-07's `question_opti
 **Risks / follow-ups:**
 - Each row runs the editors' queries twice (preview and commit). Lesson saves scan every lesson revision for the draft graph, so very large lesson sets would need the outbox job above.
 - The screen reads the file in the browser and refuses a file above the cap before upload.
+- Flaky EMP-06 assertion (above): matching `'8.37'` against the whole JSON collides with timestamps. It should assert on the eligibility fields instead. This was left for its owner goal, because changing a test's assertion is outside this goal.
 
 **Android:** no change. Bulk import is an operator surface, and operator screens are web-only (Appendix 1 §4.3). Nothing a student sees changes: imported rows are drafts.
 

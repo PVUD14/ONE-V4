@@ -174,6 +174,9 @@ async function erase(deps: DeletionExecutionDeps, subjectUserId: string): Promis
     const removed = async (query: ReturnType<typeof sql>): Promise<number> =>
       Number(((await tx.execute(query)) as QueryResult<{ count: number }>).rows[0]?.count ?? 0);
     const attempts = await removed(sql`WITH gone AS (DELETE FROM learning_attempt_events WHERE subject_user_id = ${subjectUserId}::uuid RETURNING 1) SELECT count(*)::int AS count FROM gone`);
+    // Placement sittings (ENG-14, 0064): served items, then sittings, before the sessions they reference.
+    const placementItems = await removed(sql`WITH gone AS (DELETE FROM placement_test_items WHERE subject_user_id = ${subjectUserId}::uuid RETURNING 1) SELECT count(*)::int AS count FROM gone`);
+    const placementTests = await removed(sql`WITH gone AS (DELETE FROM placement_tests WHERE subject_user_id = ${subjectUserId}::uuid RETURNING 1) SELECT count(*)::int AS count FROM gone`);
     const sessions = await removed(sql`WITH gone AS (DELETE FROM learning_sessions WHERE subject_user_id = ${subjectUserId}::uuid RETURNING 1) SELECT count(*)::int AS count FROM gone`);
     const activity = await removed(sql`WITH gone AS (DELETE FROM learner_activity_events WHERE user_id = ${subjectUserId}::uuid RETURNING 1) SELECT count(*)::int AS count FROM gone`);
     // The planner's decision audit (ENG-08) holds the inputs each decision was made from.
@@ -181,7 +184,7 @@ async function erase(deps: DeletionExecutionDeps, subjectUserId: string): Promis
     // Deletion triggers a rebuild of the skill state projection (ENG-05). With the facts gone the
     // rebuild is the empty set, so every projection row of the subject is removed here.
     const projection = await projectSubjectSkillState(tx, subjectUserId);
-    return attempts + sessions + activity + decisions + projection.deleted;
+    return attempts + placementItems + placementTests + sessions + activity + decisions + projection.deleted;
   });
 
   // Institution roster history survives, with the person removed from it.

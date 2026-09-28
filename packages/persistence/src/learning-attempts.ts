@@ -33,10 +33,12 @@ export type PgClient = Pick<PoolClient, 'query'>;
 
 export const learningAttemptContexts = ['PRACTICE', 'DIAGNOSTIC', 'ASSESSMENT', 'REVIEW'] as const;
 export type LearningAttemptContext = (typeof learningAttemptContexts)[number];
-export const learningSessionModes = ['LEARN', 'PRACTICE', 'REVIEW', 'ASSESSMENT', 'EXPLORE'] as const;
+/** DIAGNOSTIC (0064) is the placement test's sitting (ENG-14). */
+export const learningSessionModes = ['LEARN', 'PRACTICE', 'REVIEW', 'ASSESSMENT', 'EXPLORE', 'DIAGNOSTIC'] as const;
 export type LearningSessionMode = (typeof learningSessionModes)[number];
 export type LearningItemSource = 'CAREER_READINESS_QUESTION' | 'INSTITUTION_EXAM_QUESTION';
-export type LearningSourceAttemptType = 'assessment_attempt' | 'exam_attempt';
+/** placement_test (0064): the source of the placement test's DIAGNOSTIC attempts (ENG-14). */
+export type LearningSourceAttemptType = 'assessment_attempt' | 'exam_attempt' | 'placement_test';
 
 /** The assisted rule lives in learning-model (ENG-04); re-exported so existing imports keep working. */
 export { ASSISTED_HINT_LEVEL, MAX_HINT_LEVEL };
@@ -224,7 +226,7 @@ export async function skillStageAtCapture(client: PgClient, subjectUserId: strin
 }
 
 /** The institution a student currently belongs to — the same rule `currentContext` uses. */
-async function currentInstitutionOf(client: PgClient, subjectUserId: string): Promise<string | null> {
+export async function currentInstitutionOf(client: PgClient, subjectUserId: string): Promise<string | null> {
   const result = await client.query<{ institution_id: string }>(
     `SELECT institution_id FROM institution_relationships
      WHERE student_user_id=$1 AND state IN ('ACTIVE','VERIFIED')

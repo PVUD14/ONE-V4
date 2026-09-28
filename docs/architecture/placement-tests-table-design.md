@@ -33,7 +33,7 @@ Pure and deterministic (ADR-034): no database, clock, randomness or network; the
 | Model | 2PL, `P(correct | θ) = 1 / (1 + exp(−a(θ − b)))`, using each item's `difficulty` b and `discrimination` a as stored in `item_calibrations`. |
 | Ability estimate | Expected a posteriori (EAP) over a fixed grid θ ∈ [−4, 4] in steps of 0.05 with a standard-normal prior; the standard error is the posterior standard deviation. Chosen over maximum likelihood because ML has no finite estimate after all-correct or all-wrong answers — exactly the first few answers of every test. |
 | Next question | Content balance first: the area (quantitative, logical, verbal) with the fewest questions asked so far, ties in fixed area order; then, within it, the unasked item with the greatest Fisher information `a²·P·(1−P)` at the current estimate; ties by item key. No randomness, so a replay chooses the same item. |
-| Stop | In order: 25 minutes elapsed (`TIME_LIMIT`); no unasked item left (`POOL_EXHAUSTED`); 25 questions answered (`MAX_ITEMS`); at least 8 answered and standard error ≤ 0.30 (`CONFIDENT`). |
+| Stop | In order: 25 minutes elapsed (`TIME_LIMIT`); 25 questions answered (`MAX_ITEMS`); at least 8 answered and standard error ≤ 0.30 (`CONFIDENT`); no unasked item left (`POOL_EXHAUSTED`). |
 | Result | A **placement level**, never a number: θ < −1 → `AWARE`, −1 ≤ θ < 0 → `GUIDED`, 0 ≤ θ < 1 → `INDEPENDENT`, θ ≥ 1 → `TROUBLESHOOT`; or `NOT_ENOUGH_EVIDENCE` when the standard error is still above 0.5 (for example the time ran out after three questions). |
 
 **Why the skill map's levels as the result vocabulary.** The skill map (OPS-09a, ENG-10) already describes

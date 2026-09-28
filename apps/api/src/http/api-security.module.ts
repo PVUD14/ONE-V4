@@ -55,6 +55,7 @@ import { InstitutionSettingsController } from './institution-settings.controller
 import { InstitutionDepartmentWorkspaceController } from './institution-department-workspace.controller.js';
 import { InstitutionRelationshipBatchesController } from './institution-relationship-batches.controller.js';
 import { CounsellingNotesController } from './counselling-notes.controller.js';
+import { PlacementTestController } from './placement-test.controller.js';
 
 @Module({})
 export class Phase1ApiSecurityModule {
@@ -76,7 +77,7 @@ export class Phase1ApiSecurityModule {
 
     return {
       module: Phase1ApiSecurityModule,
-      controllers: [StaffActionsController, Phase1SecurityController, OperationsInstitutionOnboardingController, StudentOperationalCoreController, StudentHiringController, EmployerHiringController, StudentDocumentsController, StudentPrivacyController, InstitutionAssessmentsController, StudentAssessmentAttemptsController, AssistantController, NotificationsController, ConsentsController, HelpController, StudentActivityController, OperationsAuditController, OperationsOutboxController, OperationsPrivacyController, OperationsApprovalsController, ExamTopicMappingController, CalendarController, EmployerAssessmentsController, EmployerTeamController, EmployerJobLifecycleController, StudentTermsChangeController, InstitutionTeachingAssignmentsController, EmployerCompanyProfileController, EmployerAccessRequestsController, OperationsSupportController, OperationsJobsController, InstitutionSettingsController, InstitutionAnnouncementsController, OperationsOverviewController, OperationsCareerCatalogueController, OperationsSkillMapController, OperationsAnalyticsController, InstitutionDepartmentWorkspaceController, EmployerSkillCatalogueController, EmployerScorecardTemplatesController, EmployerCandidateViewController, InstitutionRelationshipBatchesController, CounsellingNotesController, OperationsQuestionBankController],
+      controllers: [StaffActionsController, Phase1SecurityController, OperationsInstitutionOnboardingController, StudentOperationalCoreController, StudentHiringController, EmployerHiringController, StudentDocumentsController, StudentPrivacyController, InstitutionAssessmentsController, StudentAssessmentAttemptsController, AssistantController, NotificationsController, ConsentsController, HelpController, StudentActivityController, OperationsAuditController, OperationsOutboxController, OperationsPrivacyController, OperationsApprovalsController, ExamTopicMappingController, CalendarController, EmployerAssessmentsController, EmployerTeamController, EmployerJobLifecycleController, StudentTermsChangeController, InstitutionTeachingAssignmentsController, EmployerCompanyProfileController, EmployerAccessRequestsController, OperationsSupportController, OperationsJobsController, InstitutionSettingsController, InstitutionAnnouncementsController, OperationsOverviewController, OperationsCareerCatalogueController, OperationsSkillMapController, OperationsAnalyticsController, InstitutionDepartmentWorkspaceController, EmployerSkillCatalogueController, EmployerScorecardTemplatesController, EmployerCandidateViewController, InstitutionRelationshipBatchesController, CounsellingNotesController, OperationsQuestionBankController, PlacementTestController],
       providers,
       exports: [
         API_IDENTITY_VERIFIER,

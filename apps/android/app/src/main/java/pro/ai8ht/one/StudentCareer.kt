@@ -225,6 +225,9 @@ internal fun SupportTasksPage(institutionId: String?, onClose: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
     var actions by remember { mutableStateOf<List<StaffActionDto>?>(null) }
+    // INST-11: null while loading; a failed read is shown as NA, never invented.
+    var sharedNotes by remember { mutableStateOf<List<SharedCounsellingNoteDto>?>(null) }
+    var sharedUnavailable by remember { mutableStateOf(false) }
     var reload by remember { mutableIntStateOf(0) }
     var notice by remember { mutableStateOf<String?>(null) }
 
@@ -233,6 +236,13 @@ internal fun SupportTasksPage(institutionId: String?, onClose: () -> Unit) {
             emptyList()
         } else {
             runCatching { Api.listStaffActions(context, institutionId) }.getOrNull() ?: emptyList()
+        }
+        if (institutionId.isNullOrBlank()) {
+            sharedNotes = emptyList()
+        } else {
+            val result = runCatching { Api.listSharedCounsellingNotes(context, institutionId) }
+            sharedNotes = result.getOrNull()
+            sharedUnavailable = result.isFailure
         }
     }
 
@@ -247,11 +257,13 @@ internal fun SupportTasksPage(institutionId: String?, onClose: () -> Unit) {
             }
             when {
                 actions == null -> LoadingSpinner()
-                actions!!.isEmpty() -> EmptyState(
-                    Icons.Filled.TaskAlt, Tone.Green, "Nothing assigned to you",
-                    "When your placement cell or a tutor assigns you something, it appears here.",
-                )
                 else -> LazyColumn(Modifier.fillMaxSize()) {
+                    if (actions!!.isEmpty()) item {
+                        EmptyState(
+                            Icons.Filled.TaskAlt, Tone.Green, "Nothing assigned to you",
+                            "When your placement cell or a tutor assigns you something, it appears here.",
+                        )
+                    }
                     items(actions!!, key = { it.id }) { action ->
                         Spacer(Modifier.height(12.dp))
                         PilotCard {
@@ -268,7 +280,7 @@ internal fun SupportTasksPage(institutionId: String?, onClose: () -> Unit) {
                                         else -> ChipKind.Accent
                                     })
                                 }
-                                action.detail?.takeIf { it.isNotBlank() }?.let {
+                                action.note?.takeIf { it.isNotBlank() }?.let {
                                     Spacer(Modifier.height(6.dp))
                                     Text(it, style = MaterialTheme.typography.bodyMedium)
                                 }
@@ -277,12 +289,12 @@ internal fun SupportTasksPage(institutionId: String?, onClose: () -> Unit) {
                                     Text("Due ${formatWhen(it)}", style = MaterialTheme.typography.labelMedium,
                                         color = MaterialTheme.colorScheme.primary)
                                 }
-                                if (action.state != "COMPLETED") {
+                                if (action.canComplete) {
                                     Spacer(Modifier.height(10.dp))
                                     Button(
                                         onClick = {
                                             scope.launch {
-                                                runCatching { Api.completeStaffAction(context, action.id, "Completed from the app.") }
+                                                runCatching { Api.completeStaffAction(context, action.id, action.version, "Completed from the app.") }
                                                     .onSuccess { notice = "Marked as done."; reload += 1 }
                                                     .onFailure { notice = (it as? Api.ApiException)?.detail ?: "Could not update that." }
                                             }
@@ -293,7 +305,48 @@ internal fun SupportTasksPage(institutionId: String?, onClose: () -> Unit) {
                             }
                         }
                     }
+                    item { SharedCounsellingNotesSection(sharedNotes, sharedUnavailable) }
                     item { Spacer(Modifier.height(24.dp)) }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * INST-11: counselling notes the college chose to share with the student, as on the web Support
+ * card. A college's notes are staff only unless shared; the writer shows as a role, never a name.
+ */
+@Composable
+private fun SharedCounsellingNotesSection(notes: List<SharedCounsellingNoteDto>?, unavailable: Boolean) {
+    Column {
+        Spacer(Modifier.height(18.dp))
+        Text("Counselling notes shared with you", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(6.dp))
+        when {
+            unavailable -> Text("NA — shared counselling notes are unavailable right now.", style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            notes == null -> LoadingSpinner()
+            notes.isEmpty() -> Text("Your college has not shared any counselling notes with you.", style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            else -> notes.forEach { note ->
+                Spacer(Modifier.height(10.dp))
+                PilotCard {
+                    Column(Modifier.padding(16.dp)) {
+                        Text(note.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.height(4.dp))
+                        Text(note.note, style = MaterialTheme.typography.bodyMedium)
+                        Spacer(Modifier.height(6.dp))
+                        val writer = when (note.authorRole) {
+                            "INSTITUTION_OWNER", "INSTITUTION_ADMIN" -> "Shared by your college administration"
+                            "PLACEMENT_ADMIN" -> "Shared by your placement office"
+                            "DEPARTMENT_HEAD" -> "Shared by your department head"
+                            "FACULTY_LECTURER" -> "Shared by your faculty"
+                            else -> "Shared by your college"
+                        }
+                        Text(writer + (note.createdAt?.let { " · ${formatWhen(it)}" } ?: ""), style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
             }
         }

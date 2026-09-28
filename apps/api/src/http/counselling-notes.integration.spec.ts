@@ -145,10 +145,10 @@ async function audits(action: string) {
 
 describe('who may read a counselling note', () => {
   it('lets the author, the owner and an admin read it, and nobody else by default', async () => {
-    const created = await write(faculty, studentA);
+    const created = await write(headA, studentA);
     expect(created.status).toBe(201);
     expect(created.body.visibility).toBe('STAFF_ONLY');
-    for (const reader of [faculty, owner, admin]) {
+    for (const reader of [headA, owner, admin]) {
       const read = await api().get(notesOf(studentA)).set(auth(reader.id));
       expect(read.status).toBe(200);
       expect(read.body.notes.map((note: { id: string }) => note.id)).toEqual([created.body.id]);
@@ -170,9 +170,9 @@ describe('who may read a counselling note', () => {
     expect(cases.body.cases).toEqual([]);
   });
 
-  it('denies other faculty in the same department, and audits the refusal of an out-of-scope head as DENIED', async () => {
+  it('denies faculty of the same department, and audits the refusal of an out-of-scope head as DENIED', async () => {
     await write(admin, studentA);
-    const colleague = await api().get(notesOf(studentA)).set(auth(suspended.id));
+    const colleague = await api().get(notesOf(studentA)).set(auth(faculty.id));
     expect(colleague.status).toBe(200);
     expect(colleague.body.notes).toEqual([]);
     const other = await api().get(notesOf(studentA)).set(auth(headB.id));
@@ -206,9 +206,9 @@ describe('who may read a counselling note', () => {
   });
 
   it('stops an author reading their own note once the student leaves their scope', async () => {
-    await write(faculty, studentA);
-    await pool.query('UPDATE organization_memberships SET scope_department_unit_id = $2 WHERE id = $1', [faculty.membershipId, departmentB]);
-    expect((await api().get(notesOf(studentA)).set(auth(faculty.id))).status).toBe(403);
+    expect((await write(headA, studentA)).status).toBe(201);
+    await pool.query('UPDATE organization_memberships SET scope_department_unit_id = $2 WHERE id = $1', [headA.membershipId, departmentB]);
+    expect((await api().get(notesOf(studentA)).set(auth(headA.id))).status).toBe(403);
     // The admin still can.
     expect((await api().get(notesOf(studentA)).set(auth(admin.id))).body.notes).toHaveLength(1);
   });
@@ -257,9 +257,23 @@ describe('writing', () => {
     expect((await api().post(inst() + '/students/not-a-uuid/counselling-notes').set(auth(admin.id)).send({ title: 't', note: 'n' })).status).toBe(400);
   });
 
-  it('audits every write without the note text', async () => {
+  it('lets faculty write only through a teaching assignment (the write scope)', async () => {
+    const none = await write(faculty, studentA);
+    expect(none.status).toBe(403);
+    expect(none.body.error.code).toBe('SCOPE_REQUIRED');
+    await pool.query(`INSERT INTO faculty_teaching_assignments (id, institution_id, faculty_membership_id, unit_id, subject_code, academic_term, assigned_by_user_id, reason_code)
+      VALUES ($1, $2, $3, $4, 'CS101', '2026-ODD', $5, 'TERM_PLAN')`, [randomUUID(), institutionId, faculty.membershipId, batchA1, admin.id]);
     const created = await write(faculty, studentA);
-    await api().get(notesOf(studentA)).set(auth(faculty.id));
+    expect(created.status).toBe(201);
+    const read = await api().get(notesOf(studentA)).set(auth(faculty.id));
+    expect(read.body.notes.map((note: { id: string }) => note.id)).toEqual([created.body.id]);
+    // A lecturer with no assignment in a college that uses them reads nothing and learns nothing.
+    expect((await api().get(notesOf(studentA)).set(auth(suspended.id))).status).toBe(403);
+  });
+
+  it('audits every write without the note text', async () => {
+    const created = await write(headA, studentA);
+    await api().get(notesOf(studentA)).set(auth(headA.id));
     const rows = [...await audits('counselling_note.created'), ...await audits('counselling_note.read')];
     expect(rows.map((row) => row.outcome)).toEqual(['SUCCESS', 'SUCCESS']);
     expect(rows[0]!.resource_id).toBe(created.body.id);
@@ -271,7 +285,7 @@ describe('writing', () => {
   it('keeps the database from giving a note a due date or another owner', async () => {
     await write(admin, studentA);
     await expect(pool.query("UPDATE staff_actions SET due_at = now() WHERE action_type = 'COUNSELLING_NOTE'")).rejects.toThrow(/counselling_shape/);
-    await expect(pool.query("UPDATE staff_actions SET assigned_to_membership_id = $1 WHERE action_type = 'COUNSELLING_NOTE'", [faculty.membershipId])).rejects.toThrow(/counselling_shape/);
+    await expect(pool.query("UPDATE staff_actions SET assigned_to_membership_id = $1 WHERE action_type = 'COUNSELLING_NOTE'", [headA.membershipId])).rejects.toThrow(/counselling_shape/);
   });
 });
 
@@ -298,13 +312,13 @@ describe('case participants', () => {
 
 describe('sharing with the student', () => {
   it('is STAFF_ONLY by default; the author can share and withdraw; a participant cannot', async () => {
-    const created = await write(faculty, studentA);
+    const created = await write(headA, studentA);
     const mine = () => api().get('/api/v1/students/me/counselling-notes?institutionId=' + institutionId).set(auth(studentA.id));
     expect((await mine()).body.notes).toEqual([]);
     await addParticipant(admin, studentA, counsellor);
     expect((await api().post(inst() + '/counselling-notes/' + created.body.id + '/visibility').set(auth(counsellor.id))
       .send({ visibility: 'SUBJECT_VISIBLE', version: 1 })).status).toBe(403);
-    const shared = await api().post(inst() + '/counselling-notes/' + created.body.id + '/visibility').set(auth(faculty.id))
+    const shared = await api().post(inst() + '/counselling-notes/' + created.body.id + '/visibility').set(auth(headA.id))
       .send({ visibility: 'SUBJECT_VISIBLE', version: 1 });
     expect(shared.status).toBe(201);
     expect(shared.body.version).toBe(2);
@@ -312,7 +326,7 @@ describe('sharing with the student', () => {
     expect(seen.body.notes).toEqual([expect.objectContaining({ id: created.body.id, note: SECRET })]);
     expect(seen.body.notes[0]).not.toHaveProperty('authorName');
     // Stale version.
-    expect((await api().post(inst() + '/counselling-notes/' + created.body.id + '/visibility').set(auth(faculty.id))
+    expect((await api().post(inst() + '/counselling-notes/' + created.body.id + '/visibility').set(auth(headA.id))
       .send({ visibility: 'STAFF_ONLY', version: 1 })).status).toBe(409);
     expect((await api().post(inst() + '/counselling-notes/' + created.body.id + '/visibility').set(auth(admin.id))
       .send({ visibility: 'STAFF_ONLY', version: 2 })).status).toBe(201);
@@ -373,8 +387,8 @@ describe('privacy', () => {
     await write(admin, studentB);
     await addParticipant(admin, studentA, counsellor);
     const requestId = randomUUID();
-    await pool.query(`INSERT INTO privacy_requests (id, subject_user_id, requested_by_user_id, request_type, state, deletion_scheduled_for)
-      VALUES ($1, $2, $2, 'DELETION', 'RECEIVED', now() - interval '1 day')`, [requestId, studentA.id]);
+    await pool.query(`INSERT INTO privacy_requests (id, subject_user_id, requested_by_user_id, request_type, state, requested_at, deletion_scheduled_for)
+      VALUES ($1, $2, $2, 'DELETION', 'RECEIVED', now() - interval '31 days', now() - interval '1 day')`, [requestId, studentA.id]);
     const summaries = await executeDueDeletions({ db, ids: { uuid: () => randomUUID() } });
     expect(summaries[0]?.outcome).toBe('COMPLETED');
     const left = await pool.query(`SELECT subject_student_user_id FROM staff_actions WHERE action_type = 'COUNSELLING_NOTE'`);
@@ -385,8 +399,9 @@ describe('privacy', () => {
   });
 
   it('lets an owner or admin erase one note with a reason code, audited without text', async () => {
-    const created = await write(faculty, studentA);
-    expect((await api().post(inst() + '/counselling-notes/' + created.body.id + '/erase').set(auth(faculty.id)).send({ reasonCode: 'STUDENT_REQUEST' })).status).toBe(403);
+    const created = await write(headA, studentA);
+    expect(created.status).toBe(201);
+    expect((await api().post(inst() + '/counselling-notes/' + created.body.id + '/erase').set(auth(headA.id)).send({ reasonCode: 'STUDENT_REQUEST' })).status).toBe(403);
     expect((await api().post(inst() + '/counselling-notes/' + created.body.id + '/erase').set(auth(admin.id)).send({})).status).toBe(400);
     expect((await api().post(inst() + '/counselling-notes/' + created.body.id + '/erase').set(auth(admin.id)).send({ reasonCode: 'STUDENT_REQUEST' })).status).toBe(201);
     expect((await pool.query('SELECT 1 FROM staff_actions WHERE id = $1', [created.body.id])).rows).toHaveLength(0);

@@ -192,6 +192,15 @@ async function erase(deps: DeletionExecutionDeps, subjectUserId: string): Promis
     WHERE student_user_id = ${subjectUserId}::uuid
   `);
 
+  // Counselling notes (INST-11) are only about the person: erased, with their case's participant
+  // list. The audit rows that recorded reads of them stay (AUDIT is retained) and carry no text.
+  // The count is notes plus participant rows: both are records about the person.
+  counts.COUNSELLING_NOTES = await countOf(sql`
+    WITH gone AS (DELETE FROM staff_actions WHERE subject_student_user_id = ${subjectUserId}::uuid AND action_type = 'COUNSELLING_NOTE' RETURNING 1)
+    SELECT count(*)::int AS count FROM gone`) + await countOf(sql`
+    WITH gone AS (DELETE FROM counselling_case_participants WHERE student_user_id = ${subjectUserId}::uuid RETURNING 1)
+    SELECT count(*)::int AS count FROM gone`);
+
   // Support cases (OPS-05) keep the service record and lose the person: the subject
   // link, the typed summary and every note on those cases.
   counts.SUPPORT_CASES = await detachSupportCasesForDeletedUser(db, subjectUserId);

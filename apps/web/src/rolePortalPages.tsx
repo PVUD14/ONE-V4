@@ -27,6 +27,7 @@ import { InstitutionExportsPanel } from './rolePortal/institutionAnalytics.js';
 import { OperationsCareerReadinessPanel } from './operationsCareerReadinessPanel.js';
 import { StaffPilotWrap } from './parityWraps.js';
 import { InstitutionInterventionsPage } from './pilotParityPages.js';
+import { CounsellingNotesSection } from './rolePortal/institutionCounselling.js';
 import { EmployerRecruiterRealityPage } from './rolePortal/employer.js';
 import { EmployerOrganisationGate } from './rolePortal/employerOrganisationState.js';
 import { InstitutionAcademicStructurePage, InstitutionStaffActionsPage, InstitutionStaffPage, InstitutionStudentsPage } from './rolePortal/institution.js';
@@ -318,8 +319,10 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   if (!demoMode && portal.key === 'institution-admin' && route.label === 'Academic Structure') return <InstitutionAcademicStructurePage portal={portal} authenticatedWorkspace={authenticatedWorkspace} />;
   if (!demoMode && route.label === 'Help & FAQ') return <HelpFaqPanel persona={portal.family === 'Employer' ? 'employer' : 'institution'} />;
   if (!demoMode && portal.family === 'Institution' && route.label === 'Interventions') {
+    // INST-11: restricted counselling notes are a section of Interventions, not a new item (HG-3).
     return isInstitutionStaffWorkspace(authenticatedWorkspace)
-      ? <InstitutionInterventionsPage institutionId={authenticatedWorkspace.organizationId} basePath={portal.basePath} />
+      ? <><InstitutionInterventionsPage institutionId={authenticatedWorkspace.organizationId} basePath={portal.basePath} />
+          <CounsellingNotesSection institutionId={authenticatedWorkspace.organizationId} /></>
       : <InstitutionWorkspaceError title="Interventions" />;
   }
     if (!demoMode && ['institution-admin', 'placement-officer', 'department-head', 'faculty'].includes(portal.key) && route.label === 'Assessments') {

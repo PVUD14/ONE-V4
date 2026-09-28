@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ArrowRight, Award, BookOpen, Building2, CalendarDays, CheckCircle2, ClipboardCheck, Flame, Play, Star, Target, TrendingUp, Trophy } from 'lucide-react';
 import { Spark, toneColor } from './pilot/pilotComponents.js';
 import { completeStudentStaffAction, getCurrentStudent, listStudentStaffActions, type StudentStaffActionDto } from './api/student.js';
+import { SharedCounsellingNotes } from './studentCounsellingNotes.js';
 import {
   getLearnerCareerReadinessState,
   getProtectedAccessToken,
@@ -276,6 +277,8 @@ function StudentSupport({ token }: { readonly token: string | null }): React.Rea
         </div></li>;
       })}
     </ul> : <p>{view.unavailable ? 'No support items are available right now.' : 'Nothing has been assigned to you yet.'}</p>}
+    {/* INST-11: only notes the college explicitly shared; staff-only notes never reach this read. */}
+    {token && view.institutionId ? <SharedCounsellingNotes token={token} institutionId={view.institutionId} /> : null}
   </section>;
 }
 

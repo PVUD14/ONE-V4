@@ -168,15 +168,29 @@ import kotlinx.serialization.Serializable
 // Support tasks, career targets, academic records
 // ---------------------------------------------------------------------------
 
-@Serializable data class StaffActionsEnvelope(val staffActions: List<StaffActionDto> = emptyList())
+/** The API answers `{ actions: [...] }` with `note`, `version` and `canComplete` (staff-actions.controller.ts). */
+@Serializable data class StaffActionsEnvelope(val actions: List<StaffActionDto> = emptyList())
 
 @Serializable data class StaffActionDto(
     val id: String,
     val actionType: String = "",
     val title: String = "",
-    val detail: String? = null,
+    val note: String? = null,
     val state: String = "",
     val dueAt: String? = null,
+    val version: Int = 1,
+    val canComplete: Boolean = false,
+)
+
+/** INST-11: a counselling note the student's college chose to share. Staff-only notes never reach this read. */
+@Serializable data class SharedCounsellingNotesEnvelope(val notes: List<SharedCounsellingNoteDto> = emptyList())
+
+@Serializable data class SharedCounsellingNoteDto(
+    val id: String,
+    val title: String = "",
+    val note: String = "",
+    val createdAt: String? = null,
+    val authorRole: String = "",
 )
 
 @Serializable data class CareerRolesEnvelope(val careerRoles: List<CareerRoleDto> = emptyList())
@@ -540,14 +554,20 @@ suspend fun Api.setExternalApplicationVisibility(context: Context, id: String, v
 suspend fun Api.listStaffActions(context: Context, institutionId: String): List<StaffActionDto> =
     json.decodeFromString<StaffActionsEnvelope>(
         request(context, "GET", "/api/v1/students/me/staff-actions?institutionId=$institutionId"),
-    ).staffActions
+    ).actions
 
-suspend fun Api.completeStaffAction(context: Context, actionId: String, note: String) {
+/** Completion names the version the student saw, so a changed item is refused rather than overwritten. */
+suspend fun Api.completeStaffAction(context: Context, actionId: String, version: Int, note: String) {
     request(
         context, "POST", "/api/v1/students/me/staff-actions/$actionId/complete",
-        buildJson("note" to quoted(note)),
+        buildJson("version" to version.toString(), "responseNote" to quoted(note)),
     )
 }
+
+suspend fun Api.listSharedCounsellingNotes(context: Context, institutionId: String): List<SharedCounsellingNoteDto> =
+    json.decodeFromString<SharedCounsellingNotesEnvelope>(
+        request(context, "GET", "/api/v1/students/me/counselling-notes?institutionId=$institutionId"),
+    ).notes
 
 suspend fun Api.careerRoleCatalog(context: Context): List<CareerRoleDto> =
     json.decodeFromString<CareerRolesEnvelope>(

@@ -29,7 +29,7 @@ Paths below are shortened to `StaffDashboards.kt` and `AcademicVerification.kt`.
 | 3 | Student Detail | Working | `InstitutionStudentsPage` plus INST-09's `PlacementStatusList` (placement status per student, shared applications on request) | INST-01, INST-09 built; INST-10: a graduated student stays on the roster with the new state and end date | Web only |
 | 4 | Academic Structure | Working | `InstitutionAcademicStructurePage` (`rolePortalPages.tsx:290`; `institution.tsx:144`) | Pre-plan; no §4.2 goal | Web only |
 | 5 | Assessments | Working | `InstitutionExamEnginePage` (`rolePortalPages.tsx:297-302`; `examManagerPage.tsx:30`) | Pre-plan | Exams tab (`StaffDashboards.kt:660`, results `:695`) |
-| 6 | Interventions | Working | `InstitutionInterventionsPage` (`rolePortalPages.tsx:292-296`; `pilotParity/institutionInterventions.tsx:44`) | Pre-plan | Web only |
+| 6 | Interventions | Working | `InstitutionInterventionsPage` (`rolePortalPages.tsx:292-296`; `pilotParity/institutionInterventions.tsx:44`) + restricted counselling notes section `CounsellingNotesSection` (`rolePortal/institutionCounselling.tsx`) | Pre-plan; INST-11 | Web only (students see shared notes on web and Android) |
 | 7 | Staff | Working | `InstitutionStaffPage` (`rolePortalPages.tsx:333`; `institution.tsx:187`) | INST-03 built; INST-08 adds analytics capability grants | Web only |
 | 8 | Career Readiness | **View-only** | `AuthenticatedReadOnlyModule` (`rolePortalPages.tsx:339`) | INST-17 | Home "Cohort readiness", NA (`StaffDashboards.kt:399`) |
 | 9 | Placement | Partial (INST-09) — consented placement status: suppressed distribution, stage and offer funnels, per-student status with shared applications; register, drives and statistics NA until INST-12 | `InstitutionPlacementPage` (`rolePortal/institutionPlacement.tsx`) | INST-09 built; INST-12 | Home pipeline card incl. students by placement status (`DepartmentWorkspace.kt`); per-student list web only |
@@ -62,7 +62,7 @@ The placement officer has no placement item; §4.2 puts the placement register b
 | 3 | Students | Working (INST-07) — read-only department roster with consented applications, then the verification queue and upload | `InstitutionStudentsPage` + `AcademicVerificationSection` | INST-04, INST-07 | Verification review overlay (`AcademicVerification.kt`) |
 | 4 | Readiness | Working (INST-07) — last month's bands plus the month-by-month scoped report; by career role is INST-17 | `DepartmentReadinessPage` | INST-07 (INST-17 adds career roles) | Home "Cohort readiness" |
 | 5 | Assessments | Working (with approval) | `InstitutionExamEnginePage` (`rolePortalPages.tsx:297-302`) | Pre-plan | Exams tab |
-| 6 | Interventions | Working | `InstitutionInterventionsPage` (`rolePortalPages.tsx:292-296`) | Pre-plan | Web only |
+| 6 | Interventions | Working | `InstitutionInterventionsPage` (`rolePortalPages.tsx:292-296`) + counselling notes section (`rolePortal/institutionCounselling.tsx`) | Pre-plan; INST-11 | Web only |
 | 7 | Faculty and Staff | Working | `InstitutionFacultyAndStaffPage` (`rolePortalPages.tsx:350`; `institutionTeaching.tsx:188`) | INST-03 | Web only |
 | 8 | Placement Pipeline | Working (INST-07) — shared-application stages and offer responses, suppressed under five, never pay; drives NA until INST-12 | `PlacementPipelinePage` | INST-07 | Home "Placement Pipeline" (`DepartmentWorkspace.kt`) |
 | 9 | Opportunities and Offers | Working (INST-07) — shared applications with offer existence and response, audited read | `OpportunitiesAndOffersPage` | INST-07 | Web only (audited record read) |
@@ -83,7 +83,7 @@ The placement officer has no placement item; §4.2 puts the placement register b
 | 5 | Assessments | Working (no approval) | `InstitutionExamEnginePage` (`rolePortalPages.tsx:297-302`) | Pre-plan | Exams tab |
 | 6 | Assessment Detail | Working (INST-07) — one assessment's scoped results, not-attempted list; average withheld under five | `FacultyAssessmentDetailPage` | INST-07 | Results overlay for one assessment |
 | 7 | Assigned Tasks | Working | `InstitutionStaffActionsPage` (`rolePortalPages.tsx:353-368`) | Pre-plan | Web only |
-| 8 | Interventions | Working | `InstitutionInterventionsPage` (`rolePortalPages.tsx:292-296`) | Pre-plan | Web only |
+| 8 | Interventions | Working | `InstitutionInterventionsPage` (`rolePortalPages.tsx:292-296`) + counselling notes section (`rolePortal/institutionCounselling.tsx`) | Pre-plan; INST-11 | Web only |
 | 9 | Learning Resources | **View-only** | `AuthenticatedReadOnlyModule` (`rolePortalPages.tsx:376`) | INST-16 (honest empty state until then) | Web only |
 | 10 | Reports | Working (INST-07) — a class report per assigned section or batch; averages withheld under five results | `FacultyClassReportsPage` | INST-07 | Home "My classes" (`DepartmentWorkspace.kt`) |
 | 11 | Calendar | Working — academic calendar, meetings feed, staff actions | `FacultyAcademicCalendar` + `CalendarPage` (`rolePortalPages.tsx:359`) | INST-05 | Home "Academic calendar" (`StaffDashboards.kt:426`) |

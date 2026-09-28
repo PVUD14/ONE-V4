@@ -412,7 +412,7 @@ Written by the coordinator for the same reason as EMP-07.
 
 ## EMP-10 — Application-bound messages — 2026-09-29
 **Result:** Complete — one conversation per application between the candidate and the employer's team, inside ONE: the employer may start it from SHORTLISTED, reads and writes only while the student's applicant-access grant is live, and a student can reply, mute and report a message into a trust case with the conversation as evidence. Web, Android and the operations Trust and Safety screen carry it.
-**Branch / PR:** feat/emp-messages, cut from onev4/feat/plan-phases-0-to-2 (edd5de8), pushed to onev4; merge by review. Commits b59c42b (design), 70491fe (acceptance tests), 50667ee (API, migration, consumer), d40ded0 (web), c7ac74f (Android), c3c360a (operations view), then this report.
+**Branch / PR:** feat/emp-messages, cut from onev4/feat/plan-phases-0-to-2 (edd5de8), pushed to onev4; merge by review. Commits b59c42b (design), 70491fe (acceptance tests), 50667ee (API, migration, consumer), d40ded0 (web), c7ac74f (Android), c3c360a (operations view), then this report, d85cb58 and 9678b6f (test fixes found by the validation run).
 **Files created:**
 - docs/architecture/application-messages-table-design.md
 - packages/persistence/drizzle/0067_application_messages.sql
@@ -428,7 +428,7 @@ Written by the coordinator for the same reason as EMP-07.
 - Web: api/hiring.ts, api/operations.ts, hiringPages.tsx (Messages column in My applications), rolePortal/employer.tsx (the existing Messages label), rolePortal/employerCandidateDetail.tsx, rolePortal/trustSafety.tsx.
 - Android: Api.kt, EmployerWork.kt, JobsAndMore.kt.
 
-**Existing tests touched (no assertion weakened):** packages/privacy/test/index.test.ts counts 13 declared deletion categories (was 12) and lists APPLICATION_MESSAGES among the erased ones. rolePortal/employerCompanyProfile.test.tsx used "Messages" as its example of a label that still says "Not built yet"; Messages is now built, so the same assertion uses "Settings" (EMP-16, still unbuilt). packages/persistence/test/hiring-notification-templates.test.ts gains one case.
+**Existing tests touched (no assertion weakened):** apps/api/src/http/privacy.integration.spec.ts expects 13 deletion records (was 12) and asserts APPLICATION_MESSAGES is ERASED. packages/privacy/test/index.test.ts counts 13 declared deletion categories (was 12) and lists APPLICATION_MESSAGES among the erased ones. rolePortal/employerCompanyProfile.test.tsx used "Messages" as its example of a label that still says "Not built yet"; Messages is now built, so the same assertion uses "Settings" (EMP-16, still unbuilt). packages/persistence/test/hiring-notification-templates.test.ts gains one case.
 **Migrations added:** 0067_application_messages.sql (number assigned by the coordinator): `application_message_threads` (one per application; composite FKs to the application's employer, student and job), `application_messages` (text ≤ 2,000, link flag, read time, report columns, erasure; append-only trigger). Widens `user_notifications_kind_ck` (+CANDIDATE_MESSAGE, 0059's read-and-union pattern), `hiring_notification_deliveries_kind_ck` (+EMPLOYER_MESSAGE, CANDIDATE_MESSAGE), `trust_case_evidence_kind_ck` (+APPLICATION_MESSAGE_THREAD, APPLICATION_MESSAGE) and `privacy_deletion_category_ck` (+APPLICATION_MESSAGES, 0060's full list kept). Every statement guarded; replayed twice by hand in psql after the migrator.
 **Design docs / ADRs:** the design doc above (who reads, retention, deletion, export, moderation, what employers cannot see, no attachments, rejected options). No ADR.
 **Routes:**
@@ -436,7 +436,13 @@ Written by the coordinator for the same reason as EMP-07.
 - Student: GET and POST /students/me/applications/:a/messages, POST …/messages/mute, POST …/messages/:messageId/report.
 - Operations (TRUST_SAFETY_INVESTIGATE): GET /operations/trust-safety/cases/:caseId/message-threads.
 
-**Validation:** see the amendment below (run after this report was pushed).
+**Validation:** fresh database one_emp10, only DATABASE_URL exported.
+- `corepack pnpm db:migrate` twice: first run applied 60 (ledger created), second applied 0. 0067 was also replayed twice by hand in psql.
+- `corepack pnpm typecheck`: the first run failed on three first-element reads in the new API spec (noUncheckedIndexedAccess); fixed in d85cb58 (assertions unchanged) and re-run: passed.
+- `corepack pnpm -r --no-bail --workspace-concurrency=1 test`: 18 suites, 2,972 passed and 1 failed — privacy.integration.spec.ts pinned 12 deletion records, and EMP-10 declares a 13th category. Updated in 9678b6f to 13 with the new record asserted ERASED; that file re-run alone: 13/13 passed. The API suite ran 982 tests (59 files), including application-messages.integration.spec.ts 16/16.
+- `corepack pnpm build`: passed.
+- CI parity: `corepack pnpm audit --prod --audit-level=high` exit 0 (2 moderate, no high or critical); the optional-chain policy grep printed nothing; no private-key blocks or merge markers in the diff.
+- Android `./gradlew --no-daemon -q :app:compileDebugKotlin` (Android Studio JBR): passed.
 **Acceptance criteria:**
 - [x] No message can be sent without a live grant: `stops the employer on the next request after a withdrawal, and leaves the student a read-only copy`; `refuses both sides when the grant is revoked, expired, or the student asks to be deleted` (rejection too); nothing is written on a refusal.
 - [x] Reported messages create a trust case with the thread as evidence: `opens one case per conversation, keeps adding to it, and tells the employer nothing` (EMPLOYER_ACCOUNTABILITY / ORGANIZATION / REPORTED, evidence APPLICATION_MESSAGE_THREAD + APPLICATION_MESSAGE + REPORTER_STATEMENT, no action taken, operators read it audited, nobody else can).

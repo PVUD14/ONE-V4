@@ -22,6 +22,7 @@ import { V2EmptyState } from '../dashboardsV2.js';
 import { Kpis, PageHead, SuppressedFunnel, applicationStageLabels, loadError, offerResponseLabels, useWorkspaceResource, workspaceGuard } from './institutionDepartment.js';
 import { StudentApplicationRecords } from './institution.js';
 import type { AuthenticatedWorkspaceSummary } from './shared.js';
+import { CampusDriveApprovalsSection } from './institutionCampusDrives.js';
 
 /** The admin's Placement item: the status distribution, the stage funnel and every student's status. */
 export function InstitutionPlacementPage({ authenticatedWorkspace }: { readonly authenticatedWorkspace?: AuthenticatedWorkspaceSummary | undefined }): React.ReactElement {
@@ -58,6 +59,8 @@ export function InstitutionPlacementPage({ authenticatedWorkspace }: { readonly 
         <SuppressedFunnel table={data?.offers ?? null} labels={offerResponseLabels} />
       </section>
       <PlacementStatusList key={(authenticatedWorkspace?.organizationId ?? '') + ':' + token} token={token} institutionId={authenticatedWorkspace!.organizationId!} />
+      {/* EMP-11: campus drive approvals sit on the admin's existing Placement item. */}
+      <CampusDriveApprovalsSection institutionId={authenticatedWorkspace!.organizationId!} />
     </div>
     <aside className="pilot-rail">
       <section className="pilot-card"><div className="pilot-card-head"><h2>What is counted</h2></div>
@@ -70,7 +73,7 @@ export function InstitutionPlacementPage({ authenticatedWorkspace }: { readonly 
         </ul>
       </section>
       <section className="pilot-card"><div className="pilot-card-head"><h2>Placement register</h2></div>
-        <p style={{ color: 'var(--p-muted)', margin: '4px 0' }}>Drives, the placement register and season statistics: NA — not built yet.</p>
+        <p style={{ color: 'var(--p-muted)', margin: '4px 0' }}>The placement register and season statistics: NA — not built yet. Campus drives are decided on this page; their policies are under Settings.</p>
       </section>
     </aside>
   </div></div>;

@@ -160,6 +160,19 @@ export function safeErrorMessage(code: string | undefined): string | undefined {
     case 'LESSON_SELF_PUBLISH_REFUSED': return 'You wrote, edited or submitted this revision, so someone else publishes it.';
     case 'LESSON_APPROVER_PUBLISH_REFUSED': return 'You approved this revision, so someone else publishes it.';
     case 'LESSON_RIGHTS_NOT_REVIEWED': return 'This revision has no rights review. It must be approved by a reviewer first.';
+    // EMP-11: campus drives and placement policies.
+    case 'CAMPUS_DRIVE_ALREADY_OPEN': return 'There is already an open campus drive request for this job at that college.';
+    case 'CAMPUS_DRIVE_INSTITUTION_UNAVAILABLE': return 'That college cannot take campus drive requests in ONE yet.';
+    case 'CAMPUS_DRIVE_OPPORTUNITY_UNAVAILABLE': return 'This job can no longer run as a campus drive.';
+    case 'CAMPUS_DRIVE_CHANGED': return 'This drive changed while you were looking at it. Refresh and try again.';
+    case 'CAMPUS_DRIVE_TRANSITION_NOT_ALLOWED': return 'That step is not available for this drive any more.';
+    case 'CAMPUS_DRIVE_EMPLOYER_NOT_IN_GOOD_STANDING': return 'This employer is not currently verified in ONE, so the drive cannot be approved or scheduled.';
+    case 'INSTITUTION_WIDE_SCOPE_REQUIRED': return 'Deciding campus drives and placement policies needs a placement role for the whole college, not one department or campus.';
+    case 'PLACEMENT_POLICY_ALREADY_ACTIVE': return 'This policy is already in force. Retire it first to change it.';
+    case 'PLACEMENT_POLICY_NOT_ACTIVE': return 'This policy has already been retired.';
+    case 'INVALID_REASON_CODE': return 'Choose a reason.';
+    case 'INVALID_TIMESTAMP': return 'Enter a valid date and time.';
+    case 'INVALID_SCHEDULE': return 'Choose an end time after the start.';
     default: return undefined;
   }
 }

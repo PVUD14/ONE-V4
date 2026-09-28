@@ -21,6 +21,7 @@ import {
 } from './interviewScheduling.js';
 import { CandidateDetailPanel, SnapshotSummary } from './applicationSnapshotView.js';
 import { StudentConversationCard } from './applicationMessages.js';
+import { venueModeLabels, type StudentCampusDriveDto } from './api/campusDrives.js';
 import {
   ApiRequestError,
   addOpportunityAudience,
@@ -95,6 +96,18 @@ const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   INVALID_LINK_URL: 'Links must start with https://.',
   INVALID_LINK_LABEL: 'Keep the link label under 60 characters, and do not start it with =, +, - or @.',
   INVALID_LINKS: 'Check the links you added.',
+  // EMP-11: campus drives and the college's placement policy.
+  PLACEMENT_POLICY_ONE_OFFER: 'Your college allows one accepted offer per student, and you already hold one, so you cannot apply through its campus drive.',
+  CAMPUS_DRIVE_ALREADY_OPEN: 'There is already an open campus drive request for this role at that college.',
+  CAMPUS_DRIVE_INSTITUTION_UNAVAILABLE: 'That college cannot take campus drive requests in ONE yet.',
+  CAMPUS_DRIVE_OPPORTUNITY_UNAVAILABLE: 'This role can no longer run as a campus drive.',
+  CAMPUS_DRIVE_CHANGED: 'This drive changed while you were looking at it. Refresh and try again.',
+  CAMPUS_DRIVE_TRANSITION_NOT_ALLOWED: 'That step is not available for this drive any more.',
+  CAMPUS_DRIVE_EMPLOYER_NOT_IN_GOOD_STANDING: 'This employer is not currently verified in ONE, so the drive cannot be approved.',
+  INSTITUTION_WIDE_SCOPE_REQUIRED: 'Deciding campus drives and placement policies needs a placement role for the whole college.',
+  PLACEMENT_POLICY_ALREADY_ACTIVE: 'This policy is already in force. Retire it first to change it.',
+  INVALID_REASON_CODE: 'Choose a reason.',
+  INVALID_TIMESTAMP: 'Enter a valid date and time.',
 };
 
 function messageFor(error: unknown, fallback: string): string {
@@ -124,7 +137,7 @@ function humanise(value: string): string {
 
 export function StudentOpportunitiesPage(): React.ReactElement {
   const [opportunities, setOpportunities] = useState<readonly OpportunitySummaryDto[]>([]);
-  const [selected, setSelected] = useState<{ opportunity: OpportunityDetailDto; eligibility: EligibilityDto } | null>(null);
+  const [selected, setSelected] = useState<{ opportunity: OpportunityDetailDto; eligibility: EligibilityDto; campusDrives?: readonly StudentCampusDriveDto[] } | null>(null);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('Loading opportunities…');
   const [busy, setBusy] = useState(false);
@@ -244,6 +257,7 @@ export function StudentOpportunitiesPage(): React.ReactElement {
               </p>
             </div>
             <div className="hiring-actions">
+              {(item.campusDrives ?? []).map((drive) => <span key={drive.institutionName} className="hiring-tag">Campus drive · {drive.institutionName}</span>)}
               {item.alreadyApplied ? <span className="hiring-tag">Applied</span> : null}
               <button type="button" className="secondary" onClick={() => { void openDetail(item.id); }}>View details</button>
             </div>
@@ -270,6 +284,7 @@ export function StudentOpportunitiesPage(): React.ReactElement {
 
       <h3>Can you apply?</h3>
       <EligibilityNotice eligibility={selected.eligibility} />
+      <CampusDriveNotice drives={selected.campusDrives ?? []} />
 
       <h3>What {selected.opportunity.employerName} will see</h3>
       <p className="hiring-consent-note">This is a copy of your profile as it stands now. It is kept with your application and never updated, and it never includes readiness, marks or your photo. Contact details are shown to the employer only if they shortlist you.</p>
@@ -308,7 +323,7 @@ export function StudentOpportunitiesPage(): React.ReactElement {
       <p className="hiring-consent-note">This does not share offer compensation, documents or readiness information. You can share later or stop sharing from Applications at any time, without withdrawing your application.</p>
 
       <div className="hiring-actions">
-        <button type="button" disabled={busy || selected.opportunity.alreadyApplied === true} onClick={() => { void apply(selected.opportunity.id); }}>
+        <button type="button" disabled={busy || selected.opportunity.alreadyApplied === true || (selected.campusDrives ?? []).some((drive) => drive.blocksYou)} onClick={() => { void apply(selected.opportunity.id); }}>
           {selected.opportunity.alreadyApplied ? 'Already applied' : 'Apply and share my profile'}
         </button>
         <button type="button" className="secondary" onClick={() => setSelected(null)}>Close</button>
@@ -336,6 +351,27 @@ function CompanyProfileCard({ company, employerName }: { readonly company: Oppor
       {company.careersPageUrl ? <a href={company.careersPageUrl} target="_blank" rel="noopener noreferrer">Careers page</a> : null}
     </p> : null}
   </section>;
+}
+
+/**
+ * EMP-11: the campus drives through which this job reaches the student, and the college's
+ * placement policy — shown before applying, so a refusal is never the first the student hears.
+ */
+function CampusDriveNotice({ drives }: { readonly drives: readonly StudentCampusDriveDto[] }): React.ReactElement | null {
+  if (!drives.length) return null;
+  return <div aria-label="Campus drive">
+    {drives.map((drive) => <div key={drive.institutionName}>
+      <p className="hiring-meta"><span className="hiring-tag">Campus drive</span> {drive.institutionName}'s placement office approved this role for its students.
+        {drive.scheduledStartAt ? ` Scheduled for ${formatDateTime(drive.scheduledStartAt)}${drive.venueMode ? ` (${venueModeLabels[drive.venueMode]})` : ''}.` : ' The college has not confirmed a date yet.'}</p>
+      {drive.placementPolicy
+        ? <p className={drive.blocksYou ? 'hiring-blocked' : 'hiring-meta'}>
+            Your college's placement policy: one accepted offer per student{drive.offerHoldersEligible && drive.placementPolicy.allowDriveExceptions ? ', but this drive is open to students who already hold an offer' : ''}.
+            {drive.placementPolicy.note ? ` "${drive.placementPolicy.note}"` : ''}
+            {drive.blocksYou ? ' You already hold an accepted offer, so you cannot apply through this drive.' : ''}
+          </p>
+        : <p className="hiring-meta">Your college has not set a placement policy for its drives.</p>}
+    </div>)}
+  </div>;
 }
 
 function EligibilityNotice({ eligibility }: { readonly eligibility: EligibilityDto }): React.ReactElement {
@@ -496,7 +532,7 @@ export function StudentApplicationsPage(): React.ReactElement {
           <thead><tr><th>Role</th><th>Company</th><th>Stage</th><th>Applied</th><th>Messages</th><th>Feedback</th><th>Institution sharing</th><th>Action</th></tr></thead>
           <tbody>{applications.map((item) => <tr key={item.id}>
             <td>{item.title}</td>
-            <td>{item.employerName}</td>
+            <td>{item.employerName}{item.campusDrive ? <span className="hiring-tag">Campus drive · {item.campusDrive.institutionName}</span> : null}</td>
             <td><span className={`hiring-state state-${item.state.toLowerCase()}`}>{humanise(item.state)}</span>
               {item.termsAcknowledgementPending ? <>
                 <span className="hiring-tag warn">Terms changed</span>
@@ -926,9 +962,15 @@ export function EmployerOpportunitiesPage({ employerId }: { readonly employerId:
         } : { compensationDisclosed: false }),
       });
       // A new opportunity reaches nobody until it has an audience, so the default
-      // is set here rather than leaving a draft that cannot be published.
-      await addOpportunityAudience(token, employerId, created.opportunity.id, { audienceKind: 'PUBLIC' });
-      setStatus('Draft created and open to all students. Publish it when you are ready.');
+      // is set here rather than leaving a draft that cannot be published. EMP-11: a
+      // campus-drives-only role has no audience of its own; it reaches a college's
+      // students only once that college approves a drive (requested from Details).
+      if (form.get('audience') === 'CAMPUS_DRIVES_ONLY') {
+        setStatus('Draft created for campus drives only. Open Details to ask a college for a drive; students see it only once the college approves.');
+      } else {
+        await addOpportunityAudience(token, employerId, created.opportunity.id, { audienceKind: 'PUBLIC' });
+        setStatus('Draft created and open to all students. Publish it when you are ready.');
+      }
       setCreating(false);
       await reload();
     } catch (error) {
@@ -978,6 +1020,10 @@ export function EmployerOpportunitiesPage({ employerId }: { readonly employerId:
         </select></label>
         <label><span>Location</span><input name="locationCity" maxLength={120} placeholder="Bengaluru" /></label>
         <label><span>Summary</span><textarea name="summary" maxLength={2000} /></label>
+        <label><span>Who can see it</span><select name="audience" defaultValue="PUBLIC">
+          <option value="PUBLIC">All students</option>
+          <option value="CAMPUS_DRIVES_ONLY">Only colleges that approve a campus drive</option>
+        </select></label>
         <label className="hiring-checkbox"><input type="checkbox" name="compensationDisclosed" /><span>Show the pay on the listing</span></label>
         <label><span>Currency</span><input name="compensationCurrency" defaultValue="INR" maxLength={3} /></label>
         <label><span>Amount</span><input name="compensationMin" type="number" min={0} step={100} /></label>

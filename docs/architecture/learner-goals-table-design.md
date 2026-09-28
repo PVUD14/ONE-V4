@@ -60,7 +60,7 @@ keeps the invariant for any future writer, and costs nothing on read.
 | `goal_type` | `ROLE`, `TOPIC`, `EXAM`, `COMPANY`, `DISCOVERY` |
 | `career_target_id` | uuid NULL → `student_career_targets(id)`; set **exactly** for ROLE |
 | `topic_id` | uuid NULL → `taxonomy_nodes(id)`; set exactly for TOPIC |
-| `catalogue_goal_code` | text NULL → `career_catalogue_goals(code)`; set exactly for EXAM, COMPANY and DISCOVERY (G13) |
+| `catalogue_goal_code` | text NULL → `career_catalogue_goals(code)`; set exactly for EXAM and COMPANY. A DISCOVERY goal *is* G13 by type and carries no reference, so "Not sure yet" works whether or not the catalogue has been seeded |
 | `priority` | `PRIMARY` or `SECONDARY`; **PRIMARY only for ROLE** (CHECK) |
 | `status` | `ACTIVE`, `ACHIEVED`, `WITHDRAWN` |
 | `origin` | `ONBOARDING`, `GOALS`, `DISCOVERY_SUGGESTION`, `CAREER_TARGET` (a target set through the existing career-target routes) |
@@ -73,8 +73,8 @@ keeps the invariant for any future writer, and costs nothing on read.
 Indexes (partial, live rows = `status = 'ACTIVE'`):
 
 - one live PRIMARY per student — **one primary role goal**;
-- one live goal per `(student, career_target_id)`, per `(student, topic_id)`, per `(student, catalogue_goal_code)` —
-  no duplicate goals, and at most one live "Not sure yet";
+- one goal per `career_target_id`; one live goal per `(student, topic_id)` and per `(student, catalogue_goal_code)` —
+  no duplicate goals; one live DISCOVERY goal per student;
 - `(student_user_id, created_at DESC)` for the goals read; `(institution_id, created_at)` for scoped reads later.
 
 Any number of TOPIC, EXAM and COMPANY goals may be live beside the primary role goal ("one primary role goal plus
@@ -96,7 +96,7 @@ The thirteen Appendix 4 §G rows, stored at last, by a new idempotent `seedCaree
 | `code` | text PK, `^G[0-9]{2}$` |
 | `title`, `source_goal_type`, `links_to_roles`, `main_evidence`, `release` | the source cells, verbatim, length-checked |
 | `learner_goal_type` | `EXAM`, `COMPANY`, `TOPIC`, `DISCOVERY` or NULL (not a V1 goal type) |
-| `selectable` | boolean — whether a student can hold it as an EXAM/COMPANY/DISCOVERY goal |
+| `selectable` | boolean — whether a student can hold it as an EXAM or COMPANY goal |
 | `catalogue_version`, `updated_at` | which file wrote it |
 
 Mapping (decided; source wording kept in `source_goal_type`):
@@ -110,7 +110,7 @@ Mapping (decided; source wording kept in `source_goal_type`):
 | Topic | G11 "Any single topic" | TOPIC | no — a topic goal names a real topic (`topic_id`), not G11 |
 | Topic | G10 "Communication and interview skills" | TOPIC | no — no single topic node is that goal; a student picks the published topics instead |
 | Explore | G12 | NULL | no — "Explore" is not a V1 goal type |
-| Career discovery | G13 "Not sure yet" | DISCOVERY | yes (through the survey only) |
+| Career discovery | G13 "Not sure yet" | DISCOVERY | no — held as a DISCOVERY goal through the survey, without a reference |
 
 EXAM and COMPANY goals are catalogue content that has no track yet, exactly like the 103 catalogue roles, so they
 are offered to a student **only while `career-catalogue.selectable-roles` is on for them** (the OPS-08 rule), always

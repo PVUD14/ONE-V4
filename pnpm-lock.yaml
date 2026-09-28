@@ -316,6 +316,9 @@ importers:
       '@planthepath/mastery-bkt':
         specifier: workspace:*
         version: link:../mastery-bkt
+      '@planthepath/placement':
+        specifier: workspace:*
+        version: link:../placement
       '@planthepath/review-scheduler':
         specifier: workspace:*
         version: link:../review-scheduler
@@ -329,6 +332,21 @@ importers:
       '@types/pg':
         specifier: ^8.15.0
         version: 8.23.1
+      tsx:
+        specifier: ^4.20.5
+        version: 4.23.12
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@22.20.1)(jsdom@26.1.0)(tsx@4.23.12)
+
+  packages/placement:
+    devDependencies:
+      '@types/node':
+        specifier: ^22.13.0
+        version: 22.20.1
       tsx:
         specifier: ^4.20.5
         version: 4.23.12

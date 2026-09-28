@@ -74,6 +74,13 @@ export interface AssistantServiceOptions {
   readonly apiKey?: string | undefined;
   readonly model?: string | undefined;
   readonly fetchImpl?: typeof fetch | undefined;
+  /**
+   * The assistant is off unless this is true (default: ASSISTANT_ENABLED === 'true'). Divakar switched it
+   * off on 2026-09-28 (security finding OPS-SR-02): it calls a model directly from a request handler,
+   * which CLAUDE.md forbids, so an API key alone must never turn it on. It comes back only once it runs
+   * through ONE AI Orchestration.
+   */
+  readonly enabled?: boolean | undefined;
 }
 
 export class AssistantService {
@@ -81,15 +88,17 @@ export class AssistantService {
   private readonly apiKey: string | undefined;
   private readonly model: string;
   private readonly fetchImpl: typeof fetch;
+  private readonly enabled: boolean;
 
   constructor(options: AssistantServiceOptions = {}) {
     this.apiKey = options.apiKey ?? process.env.ANTHROPIC_API_KEY;
     this.model = options.model ?? process.env.ASSISTANT_MODEL ?? DEFAULT_MODEL;
     this.fetchImpl = options.fetchImpl ?? fetch;
+    this.enabled = options.enabled ?? process.env.ASSISTANT_ENABLED === 'true';
   }
 
   get configured(): boolean {
-    return Boolean(this.apiKey);
+    return this.enabled && Boolean(this.apiKey);
   }
 
   /** Throws AssistantRateLimitedError once a user passes the daily cap. */
@@ -105,6 +114,7 @@ export class AssistantService {
   }
 
   async streamChat(input: AssistantStreamInput): Promise<string> {
+    if (!this.enabled) throw new AssistantUnconfiguredError('the assistant is switched off');
     if (!this.apiKey) throw new AssistantUnconfiguredError('ANTHROPIC_API_KEY is not set');
     const lastUser = [...input.messages].reverse().find((message) => message.role === 'user');
     const articles = selectArticles(input.persona, lastUser?.content ?? '');

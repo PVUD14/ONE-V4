@@ -26,6 +26,18 @@ export class PermanentMailRejection extends Error {
   }
 }
 
+/**
+ * The address every ONE email is sent from. Divakar chose info@ai8ht.pro (HG-7, 2026-09-28); an
+ * environment may override it with PTP_MAIL_FROM, which must still be a plain address on a domain
+ * that has been set up to send (SPF/DKIM) — a bad value is refused rather than sent.
+ */
+export const DEFAULT_MAIL_SENDER = 'info@ai8ht.pro';
+export function mailSender(): string {
+  const configured = (process.env.PTP_MAIL_FROM ?? DEFAULT_MAIL_SENDER).trim();
+  if (!/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(configured)) throw new Error('PTP_MAIL_FROM must be a plain email address');
+  return configured;
+}
+
 export class LoopbackSmtpInvitationMailSink implements InvitationMailSink {
   constructor(readonly host = process.env.PTP_LOCAL_MAILPIT_HOST ?? '127.0.0.1', readonly port = Number(process.env.PTP_LOCAL_MAILPIT_SMTP_PORT ?? '1025')) {
     if (!['127.0.0.1', 'localhost'].includes(host) || !Number.isInteger(port) || port < 1 || port > 65_535) {
@@ -34,13 +46,14 @@ export class LoopbackSmtpInvitationMailSink implements InvitationMailSink {
   }
 
   async send(input: { readonly toEmail: string; readonly subject: string; readonly textBody: string; readonly invitationId: string; readonly correlationId: string }): Promise<{ readonly providerReference?: string }> {
+    const sender = mailSender();
     const transcript = await smtpSend({
       host: this.host,
       port: this.port,
-      from: 'no-reply@one.local',
+      from: sender,
       to: input.toEmail,
       message: [
-        `From: ONE <no-reply@one.local>`,
+        `From: AI8HT ONE <${sender}>`,
         `To: ${input.toEmail}`,
         `Subject: ${sanitizeHeader(input.subject)}`,
         `X-ONE-Correlation-Id: ${sanitizeHeader(input.correlationId)}`,

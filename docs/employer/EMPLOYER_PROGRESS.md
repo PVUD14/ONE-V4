@@ -409,3 +409,54 @@ Written by the coordinator for the same reason as EMP-07.
 
 **Limitations / not done:** no two-way calendar sync (EMP-17: none in this plan). The phone adds to its calendar by intent rather than importing the `.ics`, because Android calendar apps do not reliably import files, so a moved interview must be added again there. Participants still cannot be added to or removed from an existing interview. Emails stay NOT_CONFIGURED until HG-7.
 **Next goal:** EMP-10.
+
+## EMP-10 — Application-bound messages — 2026-09-29
+**Result:** Complete — one conversation per application between the candidate and the employer's team, inside ONE: the employer may start it from SHORTLISTED, reads and writes only while the student's applicant-access grant is live, and a student can reply, mute and report a message into a trust case with the conversation as evidence. Web, Android and the operations Trust and Safety screen carry it.
+**Branch / PR:** feat/emp-messages, cut from onev4/feat/plan-phases-0-to-2 (edd5de8), pushed to onev4; merge by review. Commits b59c42b (design), 70491fe (acceptance tests), 50667ee (API, migration, consumer), d40ded0 (web), c7ac74f (Android), c3c360a (operations view), then this report.
+**Files created:**
+- docs/architecture/application-messages-table-design.md
+- packages/persistence/drizzle/0067_application_messages.sql
+- packages/hiring/src/application-messages.ts (+ test/application-messages.test.ts)
+- packages/persistence/src/application-messages.ts (deletion erase, 180-day retention sweep, trust-case evidence read)
+- apps/api/src/http/application-messages.controller.ts, apps/api/src/http/application-messages.integration.spec.ts
+- apps/web/src/applicationMessages.tsx (+ .test.tsx)
+- apps/android/.../ApplicationMessages.kt
+
+**Files modified:**
+- API: api-security.module.ts (controller registered), student-hiring.controller.ts (`conversationStarted`, `unreadMessages` on My applications), trust-safety.controller.ts (GET …/cases/:caseId/message-threads), privacy-deletion.ts (APPLICATION_MESSAGES erased), privacy-export.ts (`applicationMessages`), run-privacy-worker.ts (retention sweep after deletions).
+- Packages: events (`application.message.sent` v1 registered), persistence hiring-notifications.ts (EMPLOYER_MESSAGE / CANDIDATE_MESSAGE through the EMP-08 consumer), privacy (APPLICATION_MESSAGES category, ERASED).
+- Web: api/hiring.ts, api/operations.ts, hiringPages.tsx (Messages column in My applications), rolePortal/employer.tsx (the existing Messages label), rolePortal/employerCandidateDetail.tsx, rolePortal/trustSafety.tsx.
+- Android: Api.kt, EmployerWork.kt, JobsAndMore.kt.
+
+**Existing tests touched (no assertion weakened):** packages/privacy/test/index.test.ts counts 13 declared deletion categories (was 12) and lists APPLICATION_MESSAGES among the erased ones. rolePortal/employerCompanyProfile.test.tsx used "Messages" as its example of a label that still says "Not built yet"; Messages is now built, so the same assertion uses "Settings" (EMP-16, still unbuilt). packages/persistence/test/hiring-notification-templates.test.ts gains one case.
+**Migrations added:** 0067_application_messages.sql (number assigned by the coordinator): `application_message_threads` (one per application; composite FKs to the application's employer, student and job), `application_messages` (text ≤ 2,000, link flag, read time, report columns, erasure; append-only trigger). Widens `user_notifications_kind_ck` (+CANDIDATE_MESSAGE, 0059's read-and-union pattern), `hiring_notification_deliveries_kind_ck` (+EMPLOYER_MESSAGE, CANDIDATE_MESSAGE), `trust_case_evidence_kind_ck` (+APPLICATION_MESSAGE_THREAD, APPLICATION_MESSAGE) and `privacy_deletion_category_ck` (+APPLICATION_MESSAGES, 0060's full list kept). Every statement guarded; replayed twice by hand in psql after the migrator.
+**Design docs / ADRs:** the design doc above (who reads, retention, deletion, export, moderation, what employers cannot see, no attachments, rejected options). No ADR.
+**Routes:**
+- Employer (requireActiveEmployer `candidates`, then the live grant on every request): GET /employers/:e/message-threads (inbox; live-grant conversations only, keyset cursor, default 50, max 200, withheld ones counted), GET and POST /employers/:e/applications/:a/messages.
+- Student: GET and POST /students/me/applications/:a/messages, POST …/messages/mute, POST …/messages/:messageId/report.
+- Operations (TRUST_SAFETY_INVESTIGATE): GET /operations/trust-safety/cases/:caseId/message-threads.
+
+**Validation:** see the amendment below (run after this report was pushed).
+**Acceptance criteria:**
+- [x] No message can be sent without a live grant: `stops the employer on the next request after a withdrawal, and leaves the student a read-only copy`; `refuses both sides when the grant is revoked, expired, or the student asks to be deleted` (rejection too); nothing is written on a refusal.
+- [x] Reported messages create a trust case with the thread as evidence: `opens one case per conversation, keeps adding to it, and tells the employer nothing` (EMPLOYER_ACCOUNTABILITY / ORGANIZATION / REPORTED, evidence APPLICATION_MESSAGE_THREAD + APPLICATION_MESSAGE + REPORTER_STATEMENT, no action taken, operators read it audited, nobody else can).
+- [x] Build 1 — table design, text only ≤ 2,000, sender, read state, report flag, retention tied to the grant: design doc; `refuses unknown fields, empty or overlong text and attachments`; `erases text 180 days after the grant ended, but not while a report on it is open`; `never lets a message be rewritten or deleted`.
+- [x] Build 2 — employers start only from SHORTLISTED; students reply, mute and report: `lets the team start it from SHORTLISTED onward…`; mute in `tells the members who wrote when the candidate replies… and honours mute`.
+- [x] Build 3 — rate limits per employer and per thread; links allowed but flagged; no attachments: `stops an employer after three unanswered messages and a student after ten in an hour`; `flags a message that carries a link`; per-employer hourly and new-thread limits in code.
+- [x] Build 4 — Messages screen for employers; message view inside the student's application: the existing Messages label and Candidate Detail; My applications (web and Android).
+- [x] Verify — integration and web tests: application-messages.integration.spec.ts (16), applicationMessages.test.tsx (8), hiring unit (9).
+- [x] §6.3: 401 without a token; another employer 403; ended membership 403; SUSPENDED 403 INACTIVE; PENDING 403 UNVERIFIED; no grant 403; validation 400s; pagination bounds; audit rows with the organisation; no readiness, mute, report or recruiter identity in any employer or student response; web NA / empty / closed / error states; navigation labels unchanged (asserted).
+
+**Decisions for Divakar (recommendations taken):**
+1. "The employer's team on that job" = the employer's active owners, admins and recruiters. ONE has no per-job team; every member already sees every applicant; interviewers are recruiters (10.2 #2).
+2. Retention: text erased 180 days after the grant ends (10.2 #7's period), skipped while the thread is evidence on an open trust case. The student keeps a read-only copy until then.
+3. Deletion erases both sides' text (the whole conversation is about the student); rows stay without text. Operations keep a reported conversation by placing a retention hold, the existing mechanism.
+4. Rate limits: 10 per side per thread per hour; an employer may send 3 in a row without a reply; 200 per employer per hour; 50 new conversations per employer per day; 60 per student per hour.
+5. Links are allowed, flagged, never rendered as tappable links; the student sees a "never pay a fee" warning.
+6. Notices never carry the message text; one notice per unread run; employer notices go to the members who wrote in the conversation, never naming the candidate, in-app only; student emails are NOT_CONFIGURED until a sink is configured (sender info@ai8ht.pro via mailSender()).
+7. Only students report (the plan's scope); a report opens or joins one case per conversation per student; a payment request is HIGH severity.
+8. HG-3: no navigation item was added, removed, renamed or reordered. The recruiter portal already had a Messages item ("Not built yet"); it now shows the inbox. Students use My applications — a student Messages item would need HG-3 and is not made.
+
+**Android:** changed. Recruiters see the conversation on the applicant's page (read, start once shortlisted, reply); students open it from My applications with an unread count, reply, mute and report. Plain text only, same link warning. The operations Trust and Safety view is web-only, like the rest of the operations console. Compiled with the Android Studio JBR.
+**Limitations / not done:** no employer inbox on Android (the conversation is on the applicant's page; a phone inbox would be a new navigation entry). Per-employer and per-student limits are counted without a global lock (abuse brakes, not quotas). If a later migration re-declares `privacy_deletion_category_ck` or `trust_case_evidence_kind_ck` it must keep these values. Emails stay NOT_CONFIGURED until a mail sink is configured.
+**Next goal:** EMP-11.

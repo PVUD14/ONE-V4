@@ -1314,3 +1314,71 @@ No misconception table was created: the editor writes to ENG-07's `question_opti
 - The learner contract keeps its shape: the catalogue and progress DTOs have the same fields, now resolved to current versions. The Android app shows revised lessons and completion correctly with no client change, so it was not rebuilt.
 
 **Next goal:** OPS-09d.
+
+## OPS-09d — Bulk import — 2026-09-28
+**Result:** Complete (validation pending, see below). Operators with Content Edit import a CSV or JSON file of skills, questions, lessons or lesson variants. Preview runs every row through the editors and reports each row's problems, writing no content. Commit writes exactly the previewed file, all rows or none, and every row lands as a DRAFT authored by the importer, who can never review or publish it.
+
+**Branch / PR:** `feat/ops-content-bulk-import`, cut from `onev4/stack/ops09c` (f8809e1: the base plus the assistant-off/mail-sender fix, ENG-14 and OPS-09c). The coordinator merges it.
+
+**Files created:**
+- `docs/architecture/content-bulk-import-design.md`
+- `packages/career-readiness/src/content-import.ts` (pure file rules: CSV/JSON parsing, unknown-field refusal, caps, row → editor input, prerequisite order within a file, the report and its digest)
+- `packages/authorization/src/content-import.ts` (CONTENT_EDIT; reason codes)
+- `packages/persistence/src/content-import.ts` (preview and commit through the editors' functions)
+- `apps/api/src/http/operations-content-import.controller.ts`
+- `apps/web/src/api/contentImport.ts`, `apps/web/src/rolePortal/contentImport.tsx`
+- Tests: `packages/career-readiness/test/content-import.test.ts`, `packages/authorization/src/content-import.test.ts`, `apps/api/src/http/operations-content-import.integration.spec.ts`, `apps/web/src/rolePortal/contentImport.test.tsx`
+
+**Files modified:**
+- `packages/career-readiness/src/index.ts`, `packages/authorization/src/index.ts` (exports)
+- `apps/api/src/http/api-security.module.ts` (controller registered)
+- `apps/web/src/api.ts` (client export)
+- `apps/web/src/rolePortalPages.tsx`: the Content Management branch only. Bulk import sits under the lesson editor.
+
+**Migrations added:** none. 0066 was reserved and is left unused: every row lands in existing tables and states, and the preview is a rolled-back transaction rather than a stored copy (design, Decisions 2–3).
+
+**Design docs / ADRs:** `content-bulk-import-design.md`. No ADR was needed.
+
+**How it works:**
+- `POST /api/v1/operations/content-imports/preview` `{kind, format, filename, content}` parses the file, then runs every row through `createSkill`/`saveSkillDraft`, `createQuestion`/`saveQuestionDraft`, `createLesson`/`saveLessonDraft` or `createLessonVariant`/`saveLessonDraft` inside one transaction, each row in its own savepoint, and rolls the transaction back. It returns per row: number, key, outcome (`CREATE`/`INVALID`) and issue codes, plus file problems and a SHA-256 digest over the file's normalised rows and every row's outcome and issues. Its one write is an `operations.content.import_previewed` audit row.
+- `POST …/commit` adds `previewDigest` and `reasonCode`, re-runs the same evaluation and keeps it only when no row is invalid (else 400 `IMPORT_HAS_INVALID_ROWS`) and the digest matches (else 409 `IMPORT_STALE`); a file problem is 400 `IMPORT_FILE_INVALID`. A refused commit writes nothing, not even an audit row. A kept commit writes `operations.content.import_committed` (kind, format, file name, digest, reason, count and keys) beside the editors' own `*_created` and `*_draft_saved` rows, which carry the chosen reason code.
+- Skills and lessons are created first and saved in prerequisite order within the file, as the ENG-10/ENG-11 packs do, so a row may name a prerequisite a later row defines and the editor's acyclic check runs on each save.
+- Caps: 200 rows and 90,000 characters per file (the API's unchanged 100 KB JSON body limit is the outer bound). Unknown, duplicated or missing CSV columns are file problems; unknown JSON fields are row issues.
+
+**Validation:** to be amended after the full run on a fresh database `one_ops09d`.
+
+**Acceptance criteria:**
+- ✔ **An invalid file shows row-level errors and writes nothing.** The integration spec counts twelve tables (content revisions, taxonomy nodes, lesson and question versions, answer keys, hint ladders, misconception tags, review actions, source records, release manifests, audit, outbox) before and after:
+  - a preview of a file with a missing field, a taken key, a prerequisite cycle, an unknown prerequisite and a bad key: every row's problem is reported, and only the preview's audit row is written;
+  - the commit of that file: 400 `IMPORT_HAS_INVALID_ROWS` with the fresh report, and nothing is written;
+  - an unknown CSV column, an unknown JSON field, a stale digest (409), and a second commit of an already-imported file: nothing is written.
+- ✔ **Every imported row lands as DRAFT; never auto-publish.** Skills, questions, lessons and variants are created in DRAFT, with nodes inactive and no `lesson_versions` or `question_versions` row. Nothing in the import moves a revision.
+- ✔ **The importer can never review or publish what they imported.** An importer holding Content Edit, Review and Publish submits an imported skill, is refused approval (403 `SKILL_SELF_REVIEW_REFUSED`), and after another reviewer approves is refused publish (403 `SKILL_SELF_PUBLISH_REFUSED`). This is the editors' contributor rule plus the 0057/0061/0065 author-publish guard; the import adds no path around it.
+- ✔ **Through the editors' functions:** row issues are the editors' own codes (`SKILL_KEY_EXISTS`, `SKILL_PREREQUISITE_CYCLE`, `LESSON_PREREQUISITE_CYCLE`, `QUESTION_TOPIC_UNKNOWN`, `QUESTION_MISCONCEPTION_UNKNOWN`, `LESSON_BASE_NOT_LIVE` …). Provenance, rights fields and audit rows are the editors'.
+- ✔ **Prerequisite cycles are rejected** for skills and for lessons within a file.
+- ✔ **Answer keys never appear in learner DTOs, audit, outbox or approval payloads.** The report never echoes a row's text. The spec plants a marker in the correct option and explanation and finds it only in `content_revisions.body`: not in the preview or commit responses, any audit context or any outbox payload, and no `question_versions` row is written. An import files no approval.
+- ✔ **Rules for all four** hold unchanged: the author never reviews or publishes, publishing still needs CONTENT_PUBLISH and the editors' approvals, and every write is audited with a reason code.
+- ✔ **§6.6 minimums:** 401; 403 for Review-only, Publish-only, Catalogue Manage, plain operations and institution admin on every endpoint; 200 policy; input 400s (unknown body field, kind, format, empty and oversized content, file name, missing digest, bad reason code); audit rows with reason codes.
+- ✔ **Web states:** fields and caps per kind, NA counts, loading, empty, error with reference, forbidden, row problems in plain words, file problems, no commit offered while anything is wrong, a confirm dialog that requires a reason code and says no approval is needed, the commit sending the previewed digest, a re-preview after a stale refusal, and unchanged navigation labels.
+- Not applicable to 09d: the editors' own draft → review → publish flows (09a–c), unchanged.
+
+**Decisions for Divakar (recommendations adopted):**
+- **Create-only imports.** A key that exists is a row error. Revisions of existing content stay in the editors, where the reviewer sees the published revision beside the change.
+- **200 rows and 90,000 characters per file.** Larger sets are split. Raising the caps means moving the evaluation to an outbox job.
+- **No approval for an import.** Every row is a draft; dual control stays at publish, where the editors already require it.
+- **Reason codes:** `TRACK_BUILD`, `CONTENT_MIGRATION`, `EXPERT_BATCH`.
+- **Misconceptions are named by code** in the file and resolved to the latest non-archived version; the editor then checks it belongs to the question's skill.
+- **One kind per file**, chosen on the screen.
+
+**Limitations / not done:**
+- No import of revisions, retirements or the misconception codes themselves.
+- Agent-draft provenance cannot be set from an upload: an operator's file is the operator's authorship. Agent packs keep their engineer-run path.
+- The screen puts the common problems into plain words; rarer editor codes are shown as the code.
+
+**Risks / follow-ups:**
+- Each row runs the editors' queries twice (preview and commit). Lesson saves scan every lesson revision for the draft graph, so very large lesson sets would need the outbox job above.
+- The screen reads the file in the browser and refuses a file above the cap before upload.
+
+**Android:** no change. Bulk import is an operator surface, and operator screens are web-only (Appendix 1 §4.3). Nothing a student sees changes: imported rows are drafts.
+
+**Next goal:** OPS-10.

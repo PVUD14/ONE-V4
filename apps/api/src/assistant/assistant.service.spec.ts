@@ -54,6 +54,24 @@ describe('assistant retrieval', () => {
 });
 
 describe('assistant service', () => {
+  it('stays switched off with an API key unless it is explicitly enabled, and never calls the model', async () => {
+    const fetchImpl = (() => { throw new Error('must not be called'); }) as unknown as typeof fetch;
+    const off = new AssistantService({ apiKey: 'test-key', enabled: false, fetchImpl });
+    expect(off.configured).toBe(false);
+    await expect(off.streamChat({ persona: 'student', messages: [{ role: 'user', content: 'hi' }], onDelta: () => {} }))
+      .rejects.toBeInstanceOf(AssistantUnconfiguredError);
+  });
+
+  it('is off by default when ASSISTANT_ENABLED is not set, even with a key', () => {
+    const previous = process.env.ASSISTANT_ENABLED;
+    delete process.env.ASSISTANT_ENABLED;
+    try {
+      expect(new AssistantService({ apiKey: 'test-key' }).configured).toBe(false);
+    } finally {
+      if (previous !== undefined) process.env.ASSISTANT_ENABLED = previous;
+    }
+  });
+
   it('refuses to stream without an API key', async () => {
     const service = new AssistantService({ apiKey: undefined, fetchImpl: (() => { throw new Error('must not be called'); }) as unknown as typeof fetch });
     // Guard against ambient env making this test lie.
@@ -63,7 +81,7 @@ describe('assistant service', () => {
   });
 
   it('enforces the daily cap per user', () => {
-    const service = new AssistantService({ apiKey: 'test-key' });
+    const service = new AssistantService({ apiKey: 'test-key', enabled: true });
     for (let i = 0; i < 40; i += 1) service.consumeAllowance('user-1');
     expect(() => service.consumeAllowance('user-1')).toThrow(AssistantRateLimitedError);
     expect(() => service.consumeAllowance('user-2')).not.toThrow();
@@ -72,7 +90,7 @@ describe('assistant service', () => {
   it('assembles the streamed answer from SSE deltas and forwards each one', async () => {
     const deltas: string[] = [];
     const fetchImpl = (async () => new Response(sseBody(['Open ', 'Assessments ', 'from the sidebar.']), { status: 200 })) as unknown as typeof fetch;
-    const service = new AssistantService({ apiKey: 'test-key', fetchImpl });
+    const service = new AssistantService({ apiKey: 'test-key', enabled: true, fetchImpl });
     const answer = await service.streamChat({
       persona: 'student',
       messages: [{ role: 'user', content: 'where are my assessments?' }],
@@ -88,7 +106,7 @@ describe('assistant service', () => {
       captured = JSON.parse(init.body);
       return new Response(sseBody(['ok']), { status: 200 });
     }) as unknown as typeof fetch;
-    const service = new AssistantService({ apiKey: 'test-key', fetchImpl });
+    const service = new AssistantService({ apiKey: 'test-key', enabled: true, fetchImpl });
     await service.streamChat({
       persona: 'student',
       messages: [
@@ -106,7 +124,7 @@ describe('assistant service', () => {
 
   it('surfaces upstream failures as typed errors', async () => {
     const fetchImpl = (async () => new Response('nope', { status: 500 })) as unknown as typeof fetch;
-    const service = new AssistantService({ apiKey: 'test-key', fetchImpl });
+    const service = new AssistantService({ apiKey: 'test-key', enabled: true, fetchImpl });
     await expect(service.streamChat({ persona: 'student', messages: [{ role: 'user', content: 'hi' }], onDelta: () => {} }))
       .rejects.toThrow('assistant upstream returned 500');
   });

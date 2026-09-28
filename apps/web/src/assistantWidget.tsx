@@ -84,7 +84,7 @@ export function AssistantWidget({ persona }: { readonly persona: AssistantPerson
     } catch (error) {
       setEntries((current) => current.slice(0, -1));
       if (error instanceof ApiRequestError && error.status === 503) {
-        setNotice('The assistant is not switched on for this server yet. Please use the Help section or contact support.');
+        setNotice('The assistant is switched off for now. Please use Help & FAQ, or contact support.');
       } else if (error instanceof ApiRequestError && error.status === 429) {
         setNotice('You have reached today’s assistant limit. It resets tomorrow — for anything urgent, contact your placement cell or support.');
       } else {

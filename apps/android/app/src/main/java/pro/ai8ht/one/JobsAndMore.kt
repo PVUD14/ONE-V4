@@ -476,9 +476,14 @@ internal fun ChatOverlay(persona: String = "student", onClose: () -> Unit) {
                 Api.assistantChat(context, history.map { it.role to it.content }, persona) { delta ->
                     messages = messages.dropLast(1) + messages.last().copy(content = messages.last().content + delta)
                 }
-            }.onFailure {
-                messages = messages.dropLast(1) +
-                    ChatMessage("assistant", "The assistant could not answer just now. Please try again in a moment.")
+            }.onFailure { error ->
+                // 503 means the assistant is switched off on the server (OPS-SR-02), not a passing fault.
+                val text = if (error is Api.ApiException && error.status == 503) {
+                    "The assistant is switched off for now. Please use Help & FAQ, or contact support."
+                } else {
+                    "The assistant could not answer just now. Please try again in a moment."
+                }
+                messages = messages.dropLast(1) + ChatMessage("assistant", text)
             }
             busy = false
         }

@@ -114,7 +114,7 @@ const versionColumns = sql`v.id, v.version_number, v.title, v.summary, v.respons
     FROM opportunity_eligibility_rules r WHERE r.opportunity_version_id = v.id), '') AS eligibility_signature,
   coalesce((SELECT string_agg(concat_ws('|', lower(s.skill_name), s.requirement_level, s.taxonomy_topic_id::text), ';' ORDER BY lower(s.skill_name))
     FROM opportunity_skill_requirements s WHERE s.opportunity_version_id = v.id), '') AS skills_signature,
-  coalesce((SELECT string_agg(concat_ws('|', st.stage_order::text, st.stage_kind, st.label, st.detail), ';' ORDER BY st.stage_order)
+  coalesce((SELECT string_agg(concat_ws('|', st.stage_order::text, st.stage_kind, st.label, st.detail, st.scorecard_template_id::text), ';' ORDER BY st.stage_order)
     FROM opportunity_selection_stages st WHERE st.opportunity_version_id = v.id), '') AS stages_signature,
   v.career_role_id`;
 

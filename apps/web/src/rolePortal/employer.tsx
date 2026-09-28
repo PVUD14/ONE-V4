@@ -9,7 +9,8 @@
 import { getProtectedAccessToken, getSecurityContext } from '../api.js';
 import { V2EmptyState } from '../dashboardsV2.js';
 import { EmployerApplicantsPage, EmployerOpportunitiesPage, EmployerInterviewsPage, EmployerOffersPage, EmployerHiringAnalyticsPage, CandidateIdentity, InterviewActionForm } from '../hiringPages.js';
-import { getMyInterview, listMyInterviews, submitMyInterviewOutcome, type ParticipantInterviewDto, type InterviewOutcomeInput } from '../api/hiring.js';
+import { downloadMyInterviewCalendar, getMyInterview, listMyInterviews, submitMyInterviewOutcome, type ParticipantInterviewDto, type InterviewOutcomeInput } from '../api/hiring.js';
+import { AddToCalendarButton, ScorecardTemplatesPanel } from '../interviewScheduling.js';
 import { StaffPilotWrap } from '../parityWraps.js';
 import { EmployerTeamPage } from './employerTeam.js';
 import { EmployerCompanyProfilePage } from './employerCompanyProfile.js';
@@ -109,15 +110,18 @@ function EmployerManagementRealityPage({ portal, routeLabel }: { readonly portal
 
 /** Preserve integration's stage entry view alongside the delivered record workflows. */
 function EmployerStageWorkspace({ employerId, stage }: { readonly employerId: string; readonly stage: 'INTERVIEW' | 'OFFER' }): React.ReactElement {
-  const [showRecords, setShowRecords] = useState(false);
+  const [view, setView] = useState<'applicants' | 'records' | 'templates'>('applicants');
   const interviews = stage === 'INTERVIEW';
   return <StaffPilotWrap title={interviews ? 'Interviews' : 'Offers'} subtitle={interviews ? 'Schedule interviews and record outcomes.' : 'Send offers and track candidate responses.'}>
     <div className="hiring-actions" role="group" aria-label={interviews ? 'Interview views' : 'Offer views'}>
-      <button type="button" aria-pressed={!showRecords} onClick={() => setShowRecords(false)}>{interviews ? 'Applicants at interview stage' : 'Applicants at offer stage'}</button>
-      <button type="button" aria-pressed={showRecords} onClick={() => setShowRecords(true)}>{interviews ? 'Scheduled interviews' : 'Sent offers'}</button>
+      <button type="button" aria-pressed={view === 'applicants'} onClick={() => setView('applicants')}>{interviews ? 'Applicants at interview stage' : 'Applicants at offer stage'}</button>
+      <button type="button" aria-pressed={view === 'records'} onClick={() => setView('records')}>{interviews ? 'Scheduled interviews' : 'Sent offers'}</button>
+      {/* EMP-09: a view inside Interviews, not a navigation item. */}
+      {interviews ? <button type="button" aria-pressed={view === 'templates'} onClick={() => setView('templates')}>Scorecard templates</button> : null}
     </div>
-    {showRecords ? interviews ? <EmployerInterviewsPage employerId={employerId} /> : <EmployerOffersPage employerId={employerId} />
-      : <EmployerApplicantsPage employerId={employerId} applicationStateFilter={stage} />}
+    {view === 'templates' && interviews ? <ScorecardTemplatesPanel employerId={employerId} />
+      : view === 'records' ? interviews ? <EmployerInterviewsPage employerId={employerId} /> : <EmployerOffersPage employerId={employerId} />
+        : <EmployerApplicantsPage employerId={employerId} applicationStateFilter={stage} />}
   </StaffPilotWrap>;
 }
 
@@ -218,9 +222,13 @@ function AssignedInterviewWorkspace({ employerIds, routeLabel }: { readonly empl
         <p>Email: {current.candidateEmail ?? 'NA'}</p><p>Location or phone arrangements: {current.locationDetail ?? 'NA'}</p>
         <p>Joining link: {current.joiningLink && /^https:\/\//i.test(current.joiningLink) ? <a href={current.joiningLink} target="_blank" rel="noopener noreferrer">Open interview meeting</a> : 'NA'}</p>
       </>}
+      {/* EMP-09: the stage, its scorecard guidance, and the invite for the panellist's own calendar. */}
+      <p>Stage: {current.stageLabel ?? 'NA'} · Scorecard: {current.scorecardTemplate ? current.scorecardTemplate.name : 'Free-text scorecard (no stage template)'}</p>
+      {current.scorecardTemplate?.guidance ? <p className="hiring-meta">{current.scorecardTemplate.guidance}</p> : null}
+      <AddToCalendarButton download={(accessToken) => downloadMyInterviewCalendar(accessToken, current.employerId, current.id)} />
       <h3>{current.title || 'NA'}</h3><p>{current.summary ?? 'NA'}</p><p>{current.responsibilities ?? 'NA'}</p>
       {routeLabel === 'Scorecards' ? current.canRecordOutcome && !current.consentRevoked
-        ? <InterviewActionForm key={`${current.employerId}-${current.id}`} kind="outcome" onCancel={() => { setDetail(null); setSelected(null); }} onSave={async (body) => {
+        ? <InterviewActionForm key={`${current.employerId}-${current.id}`} kind="outcome" template={current.scorecardTemplate ?? null} onCancel={() => { setDetail(null); setSelected(null); }} onSave={async (body) => {
           if (!token) throw new Error('Unavailable');
           try {
             await submitMyInterviewOutcome(token, current.employerId, current.id, body as InterviewOutcomeInput);

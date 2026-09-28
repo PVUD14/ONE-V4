@@ -76,11 +76,21 @@ describe('interview rescheduling', () => {
   });
   it('saves both times under employer ownership and audits the state change', async () => {
     const id = randomUUID();
-    // The interview's candidate still holds a live applicant-access grant (EMP-SR-01).
-    const { controller, queries } = fixture([[{ id, state: 'SCHEDULED', candidate_access: true }]]);
-    await controller.updateInterviewState(request(), employerId, id, { toState: 'RESCHEDULED', scheduledStart: '2099-01-01T09:00Z', scheduledEnd: '2099-01-01T10:00Z' });
-    expect(queries[1]!.params).toEqual(['RESCHEDULED', null, '2099-01-01T09:00:00.000Z', '2099-01-01T10:00:00.000Z', id, employerId]);
-    expect(queries[2]!.params).toContain('interview.rescheduled');
+    const applicationId = randomUUID();
+    // The interview's candidate still holds a live applicant-access grant (EMP-SR-01). EMP-09 locks
+    // the interview, re-checks the grant under a share lock and writes a history row first.
+    const { controller, queries } = fixture([
+      [{ id, state: 'SCHEDULED', mode: 'VIDEO', location_detail: null, joining_link: null, application_id: applicationId, candidate_access: true, db_now: '2026-09-28T00:00:00.000Z' }],
+      [{ id: applicationId }],
+      [],
+      [{ revision_number: 2 }],
+    ]);
+    await controller.updateInterviewState(request(), employerId, id, { toState: 'RESCHEDULED', scheduledStart: '2099-01-01T09:00Z', scheduledEnd: '2099-01-01T10:00Z', reasonCode: 'CANDIDATE_REQUESTED' });
+    const update = queries.find((query) => query.sql.includes('UPDATE interviews SET state'))!;
+    expect(update.params).toEqual(['RESCHEDULED', null, '2099-01-01T09:00:00.000Z', '2099-01-01T10:00:00.000Z', 'VIDEO', null, null, id, employerId]);
+    const audit = queries.find((query) => query.sql.includes('INSERT INTO audit_events'))!;
+    expect(audit.params).toContain('interview.rescheduled');
+    expect(audit.params).toContain(employerId);
   });
 });
 describe('opportunity review recording', () => {

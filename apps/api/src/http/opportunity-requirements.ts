@@ -125,14 +125,29 @@ export async function writeVersionRequirements(tx: Executor, input: {
   }
 
   if (requirements.stages === undefined) {
+    // EMP-09: a stage keeps its scorecard template when it is carried forward, even a retired
+    // one — retiring only stops a template being chosen again.
     await tx.execute(sql`
-      INSERT INTO opportunity_selection_stages (id, opportunity_version_id, stage_order, stage_kind, label, detail)
-      SELECT gen_random_uuid(), ${versionId}::uuid, stage_order, stage_kind, label, detail FROM opportunity_selection_stages WHERE opportunity_version_id = ${previousVersionId}::uuid
+      INSERT INTO opportunity_selection_stages (id, opportunity_version_id, stage_order, stage_kind, label, detail, scorecard_template_id)
+      SELECT gen_random_uuid(), ${versionId}::uuid, stage_order, stage_kind, label, detail, scorecard_template_id FROM opportunity_selection_stages WHERE opportunity_version_id = ${previousVersionId}::uuid
     `);
   } else if (requirements.stages.length) {
+    const templateIds = [...new Set(requirements.stages.map((stage) => stage.scorecardTemplateId).filter((id): id is string => id !== null))];
+    if (templateIds.length) {
+      // A newly chosen template must be one of this job's employer's, and not retired.
+      const found = await tx.execute(sql`
+        SELECT count(*)::int AS count FROM interview_scorecard_templates t
+        JOIN opportunity_versions v ON v.id = ${versionId}::uuid
+        JOIN opportunities o ON o.id = v.opportunity_id AND o.employer_id = t.employer_id
+        WHERE t.id IN (${sql.join(templateIds.map((id) => sql`${id}::uuid`), sql`, `)})
+          AND (t.retired_at IS NULL OR EXISTS (SELECT 1 FROM opportunity_selection_stages prior
+            WHERE prior.opportunity_version_id = ${previousVersionId}::uuid AND prior.scorecard_template_id = t.id))
+      `) as QueryResult<{ count: number }>;
+      if (found.rows[0]?.count !== templateIds.length) throw badRequest('UNKNOWN_SCORECARD_TEMPLATE', correlationId);
+    }
     await tx.execute(sql`
-      INSERT INTO opportunity_selection_stages (id, opportunity_version_id, stage_order, stage_kind, label, detail)
-      VALUES ${sql.join(requirements.stages.map((stage, index) => sql`(gen_random_uuid(), ${versionId}::uuid, ${index + 1}, ${stage.kind}, ${stage.label}, ${stage.detail})`), sql`, `)}
+      INSERT INTO opportunity_selection_stages (id, opportunity_version_id, stage_order, stage_kind, label, detail, scorecard_template_id)
+      VALUES ${sql.join(requirements.stages.map((stage, index) => sql`(gen_random_uuid(), ${versionId}::uuid, ${index + 1}, ${stage.kind}, ${stage.label}, ${stage.detail}, ${stage.scorecardTemplateId}::uuid)`), sql`, `)}
     `);
   }
 
@@ -202,8 +217,9 @@ export async function readVersionRequirements(db: Executor, versionId: string): 
       WHERE opportunity_version_id = ${versionId}::uuid ORDER BY requirement_level DESC, lower(skill_name)
     `) as Promise<QueryResult<Record<string, unknown>>>,
     db.execute(sql`
-      SELECT stage_order, stage_kind, label, detail FROM opportunity_selection_stages
-      WHERE opportunity_version_id = ${versionId}::uuid ORDER BY stage_order
+      SELECT st.stage_order, st.stage_kind, st.label, st.detail, st.scorecard_template_id, t.name AS scorecard_template_name
+      FROM opportunity_selection_stages st LEFT JOIN interview_scorecard_templates t ON t.id = st.scorecard_template_id
+      WHERE st.opportunity_version_id = ${versionId}::uuid ORDER BY st.stage_order
     `) as Promise<QueryResult<Record<string, unknown>>>,
     db.execute(sql`
       SELECT cr.id, cr.code, coalesce(cr.catalogue_title, cr.title) AS title, cr.catalogue_code FROM opportunity_versions v
@@ -225,8 +241,13 @@ export async function readVersionRequirements(db: Executor, versionId: string): 
 
 export function selectionStagesOf(rows: readonly Record<string, unknown>[]): Record<string, unknown>[] {
   return rows.map((row) => ({
+    // A stage row is per version, so its id is given only where a screen acts on it now (the
+    // applicant pipeline schedules against it); a version's requirements compare across versions.
+    ...(row.id ? { id: row.id } : {}),
     order: Number(row.stage_order), kind: row.stage_kind, label: row.label, detail: row.detail ?? null,
     applicationState: STAGE_APPLICATION_STATE[row.stage_kind as SelectionStageKind] ?? null,
+    // EMP-09: the stage's scorecard template, by name; its criteria are read where they are used.
+    scorecardTemplate: row.scorecard_template_id ? { id: row.scorecard_template_id, name: row.scorecard_template_name ?? null } : null,
   }));
 }
 

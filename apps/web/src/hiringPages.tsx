@@ -14,7 +14,11 @@ import {
   readTermsChange, respondToTermsChange, type StudentTermsChangeDto, type StudentTermsDto,
   previewApplication, applyWithSnapshot, type ApplicationPreviewDto, type SnapshotChoicesInput,
   listStudentInterviews, type StudentInterviewDto,
+  listScorecardTemplates, downloadStudentInterviewCalendar, interviewRescheduleReasons, interviewCancelReasons, type ScorecardTemplateDto,
 } from './api/hiring.js';
+import {
+  AddToCalendarButton, CriteriaRatingFields, InterviewHistoryPanel, InterviewScorecardsPanel, interviewReasonLabels, lastChangeText, readCriteriaRatings,
+} from './interviewScheduling.js';
 import { CandidateDetailPanel, SnapshotSummary } from './applicationSnapshotView.js';
 import {
   ApiRequestError,
@@ -802,6 +806,8 @@ export function StudentInterviewsPanel(): React.ReactElement {
       {item.joiningLink ? <p>Join: <a href={item.joiningLink} target="_blank" rel="noopener noreferrer">{item.joiningLink}</a></p> : null}
       {item.locationDetail ? <p>{item.mode === 'ONSITE' ? 'Where' : 'Arrangements'}: {item.locationDetail}</p> : null}
       {item.upcoming ? <p><strong>What to prepare:</strong> {item.preparationNote ?? 'NA — the employer has not added anything to prepare.'}</p> : null}
+      {/* EMP-09: the invite updates in place when the interview moves; a cancelled one clears it. */}
+      {item.upcoming || item.state === 'CANCELLED' ? <AddToCalendarButton download={(token) => downloadStudentInterviewCalendar(token, item.id)} /> : null}
     </div>
     <div className="hiring-actions"><span className={`hiring-state state-${item.state.toLowerCase()}`}>{humanise(item.state)}</span></div>
   </li>;
@@ -1071,8 +1077,13 @@ function scheduleWindow(form: FormData): { scheduledStart: string; scheduledEnd:
   return { scheduledStart: start.toISOString(), scheduledEnd: new Date(start.getTime() + duration * 60_000).toISOString() };
 }
 
-function InterviewForm({ employerId, onSave, onCancel }: { readonly employerId: string; readonly onSave: (input: InterviewScheduleInput) => Promise<void>; readonly onCancel: () => void }): React.ReactElement {
+function InterviewForm({ employerId, stages = [], onSave, onCancel }: {
+  readonly employerId: string; readonly stages?: readonly SelectionStageDto[];
+  readonly onSave: (input: InterviewScheduleInput) => Promise<void>; readonly onCancel: () => void;
+}): React.ReactElement {
   const [mode, setMode] = useState<InterviewScheduleInput['mode']>('VIDEO');
+  // EMP-09: the job's interview stages; choosing one brings its scorecard template.
+  const interviewStages = stages.filter((stage) => stage.id && (stage.kind === 'INTERVIEW' || stage.kind === 'GROUP_DISCUSSION'));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [participants, setParticipants] = useState<readonly InterviewParticipantOptionDto[]>([]);
@@ -1102,6 +1113,7 @@ function InterviewForm({ employerId, onSave, onCancel }: { readonly employerId: 
         ...(mode === 'VIDEO' ? { joiningLink: String(form.get('joiningLink')) } : {}),
         ...(mode === 'ONSITE' || form.get('locationDetail') ? { locationDetail: String(form.get('locationDetail')) } : {}),
         ...(String(form.get('preparationNote') ?? '').trim() ? { preparationNote: String(form.get('preparationNote')).trim() } : {}),
+        ...(form.get('selectionStageId') ? { selectionStageId: String(form.get('selectionStageId')) } : {}),
       });
     } catch (failure) { setError(messageFor(failure, 'The interview could not be scheduled.')); }
     finally { setBusy(false); }
@@ -1114,6 +1126,10 @@ function InterviewForm({ employerId, onSave, onCancel }: { readonly employerId: 
     {mode === 'VIDEO' ? <label><span>Joining link</span><input name="joiningLink" type="url" pattern="https://[^\s]+" required maxLength={512} /></label>
       : <label><span>{mode === 'ONSITE' ? 'Location' : 'Phone arrangements (optional)'}</span><input key={mode} name="locationDetail" required={mode === 'ONSITE'} maxLength={500} /></label>}
     <label><span>What to prepare (optional, shown to the candidate)</span><textarea name="preparationNote" maxLength={1000} rows={3} /></label>
+    {interviewStages.length ? <label><span>Stage (optional; its scorecard template applies)</span><select name="selectionStageId" defaultValue="">
+      <option value="">No stage</option>
+      {interviewStages.map((stage) => <option key={stage.id} value={stage.id}>{stage.label}{stage.scorecardTemplate?.name ? ` — scorecard: ${stage.scorecardTemplate.name}` : ''}</option>)}
+    </select></label> : null}
     <fieldset disabled={busy}><legend>Interview participants</legend>
       <p>Adding a participant lets that person see the candidate details shared for this interview and record a scorecard. Access ends when the assignment is removed or the interview ends.</p>
       {participantStatus ? <p role="status">{participantStatus}</p> : null}
@@ -1211,51 +1227,74 @@ function useEmployerList<T>(employerId: string, loader: (token: string, id: stri
   return { rows: result.employerId === employerId ? result.rows : [], status, loading, busy, act };
 }
 
+type InterviewAction = 'outcome' | 'reschedule' | 'cancel' | 'history' | 'scorecards';
+
 export function EmployerInterviewsPage({ employerId }: { readonly employerId: string }): React.ReactElement {
   const { rows, status, loading, busy, act } = useEmployerList(employerId, loadInterviews);
-  const [selected, setSelected] = useState<{ id: string; kind: 'outcome' | 'reschedule' } | null>(null);
+  const [selected, setSelected] = useState<{ id: string; kind: InterviewAction } | null>(null);
+  // EMP-09: the templates, so a templated interview's scorecard form shows its criteria.
+  const [templates, setTemplates] = useState<readonly ScorecardTemplateDto[]>([]);
+  useEffect(() => {
+    const token = getAccessToken();
+    if (!token || !rows.some((item) => item.scorecardTemplate)) return;
+    const abort = new AbortController();
+    listScorecardTemplates(token, employerId, abort.signal)
+      .then((response) => { if (!abort.signal.aborted) setTemplates(response.templates ?? []); })
+      .catch(() => undefined);
+    return () => abort.abort();
+  }, [employerId, rows]);
   const interviews = [...rows].sort((a, b) => (a.scheduledStart ? Date.parse(a.scheduledStart) : Infinity) - (b.scheduledStart ? Date.parse(b.scheduledStart) : Infinity));
-  const selectedInterview = rows.find((item) => item.id === selected?.id && !item.consentRevoked && !item.closedAt);
+  const selectedInterview = rows.find((item) => item.id === selected?.id);
+  const actionable = selectedInterview && !selectedInterview.consentRevoked && !selectedInterview.closedAt ? selectedInterview : undefined;
+  const templateFor = (item: EmployerInterviewDto | undefined) => item?.scorecardTemplate ? templates.find((template) => template.id === item.scorecardTemplate!.id) ?? null : null;
   async function change(id: string, toState: InterviewStateInput['toState']): Promise<void> {
-    if (toState === 'CANCELLED' && !window.confirm('Cancel this interview?')) return;
     await act((token) => updateInterviewState(token, employerId, id, { toState }), 'Interview updated.').catch(() => undefined);
   }
+  const formTitles: Readonly<Record<string, string>> = { outcome: 'Record outcome', reschedule: 'Reschedule interview', cancel: 'Cancel interview' };
+  const formTarget = selected && (selected.kind === 'outcome' || selected.kind === 'reschedule' || selected.kind === 'cancel' ? actionable : undefined);
   return <section className="role-module role-module--dense">
     <div className="role-page-heading"><div><h1>Interviews</h1><p>Scheduled interviews, in start-time order. Times are shown in your local timezone.</p></div></div>
     <section className="role-card role-wide">
       {status ? <p role="status">{status}</p> : null}
       {!loading && !status && rows.length === 0 ? <p>No interviews are scheduled.</p> : null}
       {rows.length ? <div className="role-record-table-wrap"><table className="role-record-table">
-        <thead><tr>{['Candidate', 'Opportunity', 'Round', 'Mode', 'Start', 'End', 'State', 'Outcomes', 'Actions'].map((title) => <th key={title}>{title}</th>)}</tr></thead>
+        <thead><tr>{['Candidate', 'Opportunity', 'Round', 'Mode', 'Start', 'End', 'State', 'Last change', 'Outcomes', 'Actions'].map((title) => <th key={title}>{title}</th>)}</tr></thead>
         <tbody>{interviews.map((item) => <tr key={item.id}>
-          <td><CandidateIdentity item={item} /></td><td>{item.title || 'NA'}</td><td>{item.roundNumber}</td><td>{humanise(item.mode)}</td>
-          <td>{formatDateTime(item.scheduledStart)}</td><td>{formatDateTime(item.scheduledEnd)}</td><td>{humanise(item.state)}</td><td>{item.outcomeCount}</td>
+          <td><CandidateIdentity item={item} /></td><td>{item.title || 'NA'}{item.stageLabel ? <span className="hiring-meta"> · {item.stageLabel}</span> : null}</td><td>{item.roundNumber}</td><td>{humanise(item.mode)}</td>
+          <td>{formatDateTime(item.scheduledStart)}</td><td>{formatDateTime(item.scheduledEnd)}</td><td>{humanise(item.state)}</td>
+          <td>{lastChangeText(item.lastChange)}</td><td>{item.outcomeCount}</td>
           <td>{!item.consentRevoked && !item.closedAt ? <div className="hiring-actions">
             {['SCHEDULED', 'RESCHEDULED'].includes(item.state) ? <>
               <button disabled={busy} onClick={() => setSelected({ id: item.id, kind: 'reschedule' })}>Reschedule</button>
               <button disabled={busy} onClick={() => { void change(item.id, 'COMPLETED'); }}>Mark completed</button>
               <button disabled={busy} onClick={() => { void change(item.id, 'NO_SHOW'); }}>Mark no show</button>
-              <button className="secondary" disabled={busy} onClick={() => { void change(item.id, 'CANCELLED'); }}>Cancel interview</button>
+              <button className="secondary" disabled={busy} onClick={() => setSelected({ id: item.id, kind: 'cancel' })}>Cancel interview</button>
             </> : null}
             {item.state === 'COMPLETED' ? <button disabled={busy} onClick={() => setSelected({ id: item.id, kind: 'outcome' })}>Record outcome</button> : null}
+            <button className="secondary" disabled={busy} onClick={() => setSelected({ id: item.id, kind: 'history' })}>History</button>
+            {item.candidateAccess !== false && item.outcomeCount > 0 ? <button className="secondary" disabled={busy} onClick={() => setSelected({ id: item.id, kind: 'scorecards' })}>Scorecards</button> : null}
           </div> : <span className="hiring-meta">Closed</span>}</td>
         </tr>)}</tbody>
       </table></div> : null}
     </section>
-    {selected && selectedInterview ? <section className="role-card role-wide">
-      <h2>{selected.kind === 'outcome' ? 'Record outcome' : 'Reschedule interview'}</h2><p><CandidateIdentity item={selectedInterview} /></p>
-      <InterviewActionForm key={`${selected.id}-${selected.kind}`} kind={selected.kind} onCancel={() => setSelected(null)} onSave={async (body) => {
-        await act((token) => selected.kind === 'outcome'
-          ? submitInterviewOutcome(token, employerId, selected.id, body as InterviewOutcomeInput)
-          : updateInterviewState(token, employerId, selected.id, body as InterviewStateInput), 'Interview updated.');
-        setSelected(null);
-      }} />
+    {selected?.kind === 'history' ? <InterviewHistoryPanel key={selected.id} employerId={employerId} interviewId={selected.id} onClose={() => setSelected(null)} /> : null}
+    {selected?.kind === 'scorecards' ? <InterviewScorecardsPanel key={selected.id} employerId={employerId} interviewId={selected.id} onClose={() => setSelected(null)} /> : null}
+    {selected && formTarget ? <section className="role-card role-wide">
+      <h2>{formTitles[selected.kind]}</h2><p><CandidateIdentity item={formTarget} /></p>
+      <InterviewActionForm key={`${selected.id}-${selected.kind}`} kind={selected.kind as 'outcome' | 'reschedule' | 'cancel'} template={templateFor(formTarget)}
+        onCancel={() => setSelected(null)} onSave={async (body) => {
+          await act((token) => selected.kind === 'outcome'
+            ? submitInterviewOutcome(token, employerId, selected.id, body as InterviewOutcomeInput)
+            : updateInterviewState(token, employerId, selected.id, body as InterviewStateInput), 'Interview updated.');
+          setSelected(null);
+        }} />
     </section> : null}
   </section>;
 }
 
-export function InterviewActionForm({ kind, onSave, onCancel }: {
-  readonly kind: 'outcome' | 'reschedule'; readonly onSave: (body: InterviewOutcomeInput | InterviewStateInput) => Promise<void>; readonly onCancel: () => void;
+export function InterviewActionForm({ kind, template = null, onSave, onCancel }: {
+  readonly kind: 'outcome' | 'reschedule' | 'cancel'; readonly template?: ScorecardTemplateDto | null;
+  readonly onSave: (body: InterviewOutcomeInput | InterviewStateInput) => Promise<void>; readonly onCancel: () => void;
 }): React.ReactElement {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -1263,28 +1302,41 @@ export function InterviewActionForm({ kind, onSave, onCancel }: {
     event.preventDefault();
     if (busy) return;
     const form = new FormData(event.currentTarget);
+    const note = String(form.get('note') ?? '').trim();
+    if (kind !== 'outcome' && !form.get('reasonCode')) { setError('Choose a reason.'); return; }
     let body: InterviewOutcomeInput | InterviewStateInput;
     if (kind === 'reschedule') {
-      try { body = { toState: 'RESCHEDULED', ...scheduleWindow(form) }; }
+      try { body = { toState: 'RESCHEDULED', ...scheduleWindow(form), reasonCode: String(form.get('reasonCode')), ...(note ? { note } : {}) }; }
       catch { setError('Choose a future date and a duration between 1 and 1440 minutes.'); return; }
+    } else if (kind === 'cancel') {
+      body = { toState: 'CANCELLED', reasonCode: String(form.get('reasonCode')), ...(note ? { note } : {}) };
     } else {
       body = { recommendation: String(form.get('recommendation')) as InterviewOutcomeInput['recommendation'],
         ...(form.get('overallRating') ? { overallRating: Number(form.get('overallRating')) } : {}),
-        strengths: String(form.get('strengths')), concerns: String(form.get('concerns')), notes: String(form.get('notes')) };
+        strengths: String(form.get('strengths')), concerns: String(form.get('concerns')), notes: String(form.get('notes')),
+        ...(template ? { criteria: readCriteriaRatings(form, template) } : {}) };
     }
     setBusy(true); setError('');
     try { await onSave(body); } catch { setError('The change could not be saved.'); } finally { setBusy(false); }
   }
+  const reasons = kind === 'reschedule' ? interviewRescheduleReasons : interviewCancelReasons;
   return <form className="role-management-form" onSubmit={(event) => { void submit(event); }}>
-    {kind === 'reschedule' ? <ScheduleFields /> : <>
+    {kind === 'outcome' ? <>
       <p>Submitting again replaces your previous outcome for this interview.</p>
       <label><span>Recommendation</span><select name="recommendation" required defaultValue=""><option value="" disabled>Select recommendation</option>
         {['STRONG_YES', 'YES', 'NEUTRAL', 'NO', 'STRONG_NO'].map((value) => <option key={value} value={value}>{humanise(value)}</option>)}
       </select></label>
+      {template ? <CriteriaRatingFields template={template} /> : null}
       <label><span>Interview rating (optional, 1–5)</span><input name="overallRating" type="number" min={1} max={5} step={1} /></label>
       <label><span>Strengths</span><textarea name="strengths" maxLength={2000} /></label>
       <label><span>Concerns</span><textarea name="concerns" maxLength={2000} /></label>
       <label><span>Notes</span><textarea name="notes" maxLength={4000} /></label>
+    </> : <>
+      {kind === 'reschedule' ? <ScheduleFields /> : <p>The candidate and the panel are told the interview is cancelled. The reason stays with your team.</p>}
+      <label><span>Reason</span><select name="reasonCode" required defaultValue=""><option value="" disabled>Choose a reason</option>
+        {reasons.map((reason) => <option key={reason} value={reason}>{interviewReasonLabels[reason] ?? humanise(reason)}</option>)}
+      </select></label>
+      <label><span>Internal note (optional, never shown to the candidate)</span><textarea name="note" maxLength={1000} /></label>
     </>}
     {error ? <p role="alert">{error}</p> : null}
     <button disabled={busy} type="submit">Save changes</button><button disabled={busy} type="button" className="secondary" onClick={onCancel}>Close form</button>
@@ -1505,7 +1557,7 @@ export function EmployerApplicantsPage({ employerId, applicationStateFilter }: {
       <h2>{action.kind === 'interview' ? 'Schedule interview' : action.kind === 'offer' ? 'Send offer' : 'Share feedback with this candidate'}</h2>
       <p><CandidateIdentity item={action.applicant} /></p>
       {action.kind === 'interview'
-        ? <InterviewForm employerId={employerId} onSave={saveInterview} onCancel={() => setAction(null)} />
+        ? <InterviewForm employerId={employerId} stages={stages} onSave={saveInterview} onCancel={() => setAction(null)} />
         : action.kind === 'offer'
           ? <OfferForm onSave={saveOffer} onCancel={() => setAction(null)} />
           : <FeedbackForm employerId={employerId} onSave={saveFeedback} onCancel={() => setAction(null)} />}

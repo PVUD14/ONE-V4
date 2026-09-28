@@ -33,6 +33,7 @@
     "@planthepath/identity": "workspace:*",
     "@planthepath/automation": "workspace:*",
     "@planthepath/events": "workspace:*",
+    "@planthepath/hiring": "workspace:*",
     "@planthepath/learner-content": "workspace:*",
     "@planthepath/learning-model": "workspace:*",
     "@planthepath/learning-orchestrator": "workspace:*",

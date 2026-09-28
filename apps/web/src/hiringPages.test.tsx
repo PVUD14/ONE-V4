@@ -287,16 +287,18 @@ describe('interview and offer management', () => {
     expect(within(rows[2]!).getByText('2')).toBeInTheDocument();
   });
 
-  it('requires confirmation before cancelling, then posts the typed state body', async () => {
+  // EMP-09: a cancellation now needs a reason, so the confirmation step is the reason form.
+  it('requires a reason before cancelling, then posts the typed state body', async () => {
     stubFetch({ [`${base}/interviews`]: { interviews: [interview] }, [`${base}/interviews/${interview.id}/state`]: { interview: { id: interview.id, state: 'CANCELLED' } } });
-    const confirm = vi.fn().mockReturnValue(false); vi.stubGlobal('confirm', confirm);
     await authenticate(); render(<EmployerInterviewsPage employerId={employerId} />);
     fireEvent.click(await screen.findByRole('button', { name: 'Cancel interview' }));
     expect(postsTo('/state')).toHaveLength(0);
-    confirm.mockReturnValue(true);
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel interview' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(postsTo('/state')).toHaveLength(0);
+    fireEvent.change(screen.getByLabelText('Reason'), { target: { value: 'POSITION_FILLED' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
     await waitFor(() => expect(postsTo('/state')).toHaveLength(1));
-    expect(JSON.parse(postsTo('/state')[0]![1]!.body as string)).toEqual({ toState: 'CANCELLED' });
+    expect(JSON.parse(postsTo('/state')[0]![1]!.body as string)).toEqual({ toState: 'CANCELLED', reasonCode: 'POSITION_FILLED' });
   });
 
   it('records an outcome and reschedules with actual times', async () => {
@@ -313,9 +315,10 @@ describe('interview and offer management', () => {
     render(<EmployerInterviewsPage employerId={employerId} />);
     fireEvent.click(await screen.findByRole('button', { name: 'Reschedule' }));
     fillSchedule();
+    fireEvent.change(screen.getByLabelText('Reason'), { target: { value: 'CANDIDATE_REQUESTED' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
     await waitFor(() => expect(postsTo('/state')).toHaveLength(1));
-    expect(JSON.parse(postsTo('/state')[0]![1]!.body as string)).toEqual({ toState: 'RESCHEDULED', ...expectedWindow() });
+    expect(JSON.parse(postsTo('/state')[0]![1]!.body as string)).toEqual({ toState: 'RESCHEDULED', ...expectedWindow(), reasonCode: 'CANDIDATE_REQUESTED' });
   });
 
   it('confirms offer withdrawal, preserves missing slots and withholds revoked identity', async () => {

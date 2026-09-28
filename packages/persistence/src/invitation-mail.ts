@@ -8,6 +8,13 @@
  */
 import { createConnection } from 'node:net';
 
+/** A file sent with a message: today only the EMP-09 calendar invite (text/calendar). */
+export interface MailAttachment {
+  readonly filename: string;
+  readonly contentType: string;
+  readonly content: string;
+}
+
 export interface InvitationMailSink {
   send(input: {
     readonly toEmail: string;
@@ -15,6 +22,7 @@ export interface InvitationMailSink {
     readonly textBody: string;
     readonly invitationId: string;
     readonly correlationId: string;
+    readonly attachments?: readonly MailAttachment[];
   }): Promise<{ readonly providerReference?: string }>;
 }
 
@@ -33,21 +41,23 @@ export class LoopbackSmtpInvitationMailSink implements InvitationMailSink {
     }
   }
 
-  async send(input: { readonly toEmail: string; readonly subject: string; readonly textBody: string; readonly invitationId: string; readonly correlationId: string }): Promise<{ readonly providerReference?: string }> {
+  async send(input: { readonly toEmail: string; readonly subject: string; readonly textBody: string; readonly invitationId: string; readonly correlationId: string; readonly attachments?: readonly MailAttachment[] }): Promise<{ readonly providerReference?: string }> {
+    const headers = [
+      `From: ONE <no-reply@one.local>`,
+      `To: ${input.toEmail}`,
+      `Subject: ${sanitizeHeader(input.subject)}`,
+      `X-ONE-Correlation-Id: ${sanitizeHeader(input.correlationId)}`,
+    ];
+    const attachments = input.attachments ?? [];
+    const message = attachments.length === 0
+      ? [...headers, 'Content-Type: text/plain; charset=utf-8', '', input.textBody].join('\r\n')
+      : multipartMessage(headers, input.textBody, attachments, input.invitationId);
     const transcript = await smtpSend({
       host: this.host,
       port: this.port,
       from: 'no-reply@one.local',
       to: input.toEmail,
-      message: [
-        `From: ONE <no-reply@one.local>`,
-        `To: ${input.toEmail}`,
-        `Subject: ${sanitizeHeader(input.subject)}`,
-        `X-ONE-Correlation-Id: ${sanitizeHeader(input.correlationId)}`,
-        'Content-Type: text/plain; charset=utf-8',
-        '',
-        input.textBody,
-      ].join('\r\n'),
+      message,
     });
     return { providerReference: `mailpit:${input.invitationId}:${transcript}`.slice(0, 256) };
   }
@@ -114,6 +124,24 @@ async function smtpSend(input: { readonly host: string; readonly port: number; r
       reject(error);
     });
   });
+}
+
+/** multipart/mixed: the text, then each attachment base64-encoded in 76-character lines. */
+function multipartMessage(headers: readonly string[], textBody: string, attachments: readonly MailAttachment[], seed: string): string {
+  const boundary = `one-${seed.replace(/[^A-Za-z0-9]/g, '').slice(0, 32)}-part`;
+  const parts = [
+    `--${boundary}`, 'Content-Type: text/plain; charset=utf-8', '', textBody,
+    ...attachments.flatMap((attachment) => [
+      `--${boundary}`,
+      `Content-Type: ${sanitizeHeader(attachment.contentType)}`,
+      'Content-Transfer-Encoding: base64',
+      `Content-Disposition: attachment; filename="${sanitizeHeader(attachment.filename).replace(/["\\]/g, '')}"`,
+      '',
+      ...(Buffer.from(attachment.content, 'utf8').toString('base64').match(/.{1,76}/g) ?? []),
+    ]),
+    `--${boundary}--`,
+  ];
+  return [...headers, 'MIME-Version: 1.0', `Content-Type: multipart/mixed; boundary="${boundary}"`, '', ...parts].join('\r\n');
 }
 
 function sanitizeHeader(value: string): string {

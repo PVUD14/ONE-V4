@@ -407,7 +407,8 @@ export const eventSchemas = {
     purpose: 'interview-schedule',
     dataClassification: 'confidential',
     schemaRef: 'registry://interview.scheduled/1',
-    payload: { interviewId: { kind: 'uuid' }, applicationId: { kind: 'uuid' } },
+    // EMP-09: the schedule revision this event announces; optional so events written before 0063 still validate.
+    payload: { interviewId: { kind: 'uuid' }, applicationId: { kind: 'uuid' }, revisionId: { kind: 'uuid', required: false } },
   },
   // EMP-08: the interview-state route wrote only an audit row; the student needs to hear about
   // a reschedule or a cancellation. COMPLETED and NO_SHOW are recorded and notify nobody.
@@ -419,7 +420,7 @@ export const eventSchemas = {
     purpose: 'interview-schedule',
     dataClassification: 'confidential',
     schemaRef: 'registry://interview.state_changed/1',
-    payload: { interviewId: { kind: 'uuid' }, toState: { kind: 'enum', values: ['RESCHEDULED', 'COMPLETED', 'CANCELLED', 'NO_SHOW'] } },
+    payload: { interviewId: { kind: 'uuid' }, toState: { kind: 'enum', values: ['RESCHEDULED', 'COMPLETED', 'CANCELLED', 'NO_SHOW'] }, revisionId: { kind: 'uuid', required: false } },
   },
   offerExtendedV1: {
     eventType: 'offer.extended',

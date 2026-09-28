@@ -135,6 +135,10 @@ export interface StudentApplicationDto {
   readonly termsAcknowledgementPending: boolean;
   /** True when the employer chose to tell this candidate why. Fetch the detail separately. */
   readonly feedbackReleased: boolean;
+  /** EMP-10: the employer started a conversation on this application. Absent from older API responses. */
+  readonly conversationStarted?: boolean;
+  /** EMP-10: the employer's messages the student has not opened yet. */
+  readonly unreadMessages?: number;
 }
 
 export interface CandidateFeedbackReasonDto {
@@ -973,4 +977,110 @@ export async function downloadCandidateResume(token: string, employerId: string,
   const disposition = response.headers?.get('content-disposition') ?? '';
   const filename = /filename="([^"]+)"/.exec(disposition)?.[1] ?? 'resume';
   return { blob: await response.blob(), filename };
+}
+
+// ---------------------------------------------------------------------------
+// EMP-10: application-bound messages
+// ---------------------------------------------------------------------------
+
+/** One message as either side sees it. Never the sender's identity; `mine` says whether you wrote it. */
+export interface ConversationMessageDto {
+  readonly id: string;
+  readonly from: 'EMPLOYER' | 'STUDENT';
+  readonly mine: boolean;
+  /** Null once erased (account deletion or the retention period). */
+  readonly body: string | null;
+  /** The text looks like it carries a link. Shown as plain text with a warning, never as a link. */
+  readonly containsLink: boolean;
+  readonly sentAt: string;
+  readonly readAt: string | null;
+  readonly erased: boolean;
+  /** Student side only: when you reported this employer message. */
+  readonly reportedAt?: string | null;
+}
+
+export interface EmployerConversationDto {
+  readonly applicationId: string;
+  readonly applicationState: string;
+  readonly title: string;
+  readonly started: boolean;
+  readonly startedAt: string | null;
+  readonly canSend: boolean;
+  readonly sendBlockedReason: 'APPLICATION_CLOSED' | 'NOT_SHORTLISTED' | null;
+  readonly messages: readonly ConversationMessageDto[];
+  readonly hasEarlier: boolean;
+}
+
+export interface StudentConversationDto {
+  readonly applicationId: string;
+  readonly employerName: string;
+  readonly title: string;
+  readonly started: boolean;
+  readonly startedAt: string | null;
+  readonly muted: boolean;
+  readonly canReply: boolean;
+  readonly replyBlockedReason: 'NOT_STARTED' | 'ACCESS_ENDED' | null;
+  readonly messages: readonly ConversationMessageDto[];
+  readonly hasEarlier: boolean;
+}
+
+export interface MessageThreadSummaryDto {
+  readonly applicationId: string;
+  readonly opportunityId: string;
+  readonly title: string;
+  readonly referenceCode: string | null;
+  readonly candidateName: string | null;
+  readonly applicationState: string;
+  readonly startedAt: string;
+  readonly lastMessageAt: string;
+  readonly lastFrom: 'EMPLOYER' | 'STUDENT' | null;
+  readonly messageCount: number;
+  readonly unreadCount: number;
+}
+
+export const messageReportReasons = [
+  { code: 'SCAM_OR_PAYMENT_REQUEST', label: 'Asked me for money or a fee' },
+  { code: 'OFF_PLATFORM_PRESSURE', label: 'Pushed me to talk outside ONE' },
+  { code: 'HARASSMENT', label: 'Harassment or threats' },
+  { code: 'INAPPROPRIATE_CONTENT', label: 'Inappropriate content' },
+  { code: 'DISCRIMINATION', label: 'Discrimination' },
+  { code: 'OTHER', label: 'Something else' },
+] as const;
+export type MessageReportReason = typeof messageReportReasons[number]['code'];
+
+const messagesPath = (employerId: string, applicationId: string) =>
+  `/api/v1/employers/${encodeURIComponent(employerId)}/applications/${encodeURIComponent(applicationId)}/messages`;
+const studentMessagesPath = (applicationId: string) => `/api/v1/students/me/applications/${encodeURIComponent(applicationId)}/messages`;
+
+export function listEmployerMessageThreads(token: string, employerId: string, cursor?: string, signal?: AbortSignal): Promise<{
+  readonly threads: readonly MessageThreadSummaryDto[]; readonly withheldCount: number; readonly nextCursor: string | null;
+}> {
+  const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
+  return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/message-threads${query}`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function getEmployerConversation(token: string, employerId: string, applicationId: string, signal?: AbortSignal): Promise<{ readonly conversation: EmployerConversationDto }> {
+  return requestJson(messagesPath(employerId, applicationId), { token, ...(signal ? { signal } : {}) });
+}
+
+export function sendEmployerMessage(token: string, employerId: string, applicationId: string, body: string): Promise<{ readonly message: ConversationMessageDto }> {
+  return requestJson(messagesPath(employerId, applicationId), { token, method: 'POST', body: { body } });
+}
+
+export function getStudentConversation(token: string, applicationId: string, signal?: AbortSignal): Promise<{ readonly conversation: StudentConversationDto }> {
+  return requestJson(studentMessagesPath(applicationId), { token, ...(signal ? { signal } : {}) });
+}
+
+export function sendStudentMessage(token: string, applicationId: string, body: string): Promise<{ readonly message: ConversationMessageDto }> {
+  return requestJson(studentMessagesPath(applicationId), { token, method: 'POST', body: { body } });
+}
+
+export function muteConversation(token: string, applicationId: string, muted: boolean): Promise<{ readonly conversation: { readonly applicationId: string; readonly muted: boolean } }> {
+  return requestJson(`${studentMessagesPath(applicationId)}/mute`, { token, method: 'POST', body: { muted } });
+}
+
+export function reportMessage(token: string, applicationId: string, messageId: string, reasonCode: MessageReportReason, statement?: string): Promise<{ readonly report: { readonly messageId: string; readonly reportedAt: string } }> {
+  return requestJson(`${studentMessagesPath(applicationId)}/${encodeURIComponent(messageId)}/report`, {
+    token, method: 'POST', body: statement ? { reasonCode, statement } : { reasonCode },
+  });
 }

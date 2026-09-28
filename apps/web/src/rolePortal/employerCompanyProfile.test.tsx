@@ -121,7 +121,8 @@ describe('EMP-04 employer Company Profile screen', () => {
   });
 
   it('leaves every other unbuilt label saying so', async () => {
-    show('Messages');
+    // Messages was the example until EMP-10 built it; Settings (EMP-16) is still unbuilt.
+    show('Settings');
     expect(await screen.findByText('Not built yet')).toBeInTheDocument();
     expect(vi.mocked(fetch)).not.toHaveBeenCalled();
   });

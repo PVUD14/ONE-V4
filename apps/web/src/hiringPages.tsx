@@ -20,6 +20,7 @@ import {
   AddToCalendarButton, CriteriaRatingFields, InterviewHistoryPanel, InterviewScorecardsPanel, interviewReasonLabels, lastChangeText, readCriteriaRatings,
 } from './interviewScheduling.js';
 import { CandidateDetailPanel, SnapshotSummary } from './applicationSnapshotView.js';
+import { StudentConversationCard } from './applicationMessages.js';
 import {
   ApiRequestError,
   addOpportunityAudience,
@@ -385,6 +386,8 @@ export function StudentApplicationsPage(): React.ReactElement {
   const [feedback, setFeedback] = useState<StudentApplicationFeedbackDto | 'loading' | 'none' | null>(null);
   // EMP-05: the changed terms one application is waiting on the student to answer.
   const [termsChange, setTermsChange] = useState<{ readonly applicationId: string; readonly change: StudentTermsChangeDto } | null>(null);
+  // EMP-10: the application whose conversation is open.
+  const [conversationId, setConversationId] = useState<string | null>(null);
 
   async function openTermsChange(id: string): Promise<void> {
     const token = getAccessToken();
@@ -490,7 +493,7 @@ export function StudentApplicationsPage(): React.ReactElement {
       {applications.length === 0
         ? <p>When you apply to an opportunity it will appear here, with the stage it has reached.</p>
         : <div className="data-table-wrap"><table>
-          <thead><tr><th>Role</th><th>Company</th><th>Stage</th><th>Applied</th><th>Feedback</th><th>Institution sharing</th><th>Action</th></tr></thead>
+          <thead><tr><th>Role</th><th>Company</th><th>Stage</th><th>Applied</th><th>Messages</th><th>Feedback</th><th>Institution sharing</th><th>Action</th></tr></thead>
           <tbody>{applications.map((item) => <tr key={item.id}>
             <td>{item.title}</td>
             <td>{item.employerName}</td>
@@ -500,6 +503,10 @@ export function StudentApplicationsPage(): React.ReactElement {
                 <button type="button" className="secondary" onClick={() => { void openTermsChange(item.id); }}>Review new terms</button>
               </> : null}</td>
             <td>{formatDate(item.submittedAt)}</td>
+            <td>{item.conversationStarted
+              ? <button type="button" className="secondary" aria-label={'Messages for ' + item.title} onClick={() => setConversationId(item.id)}>
+                {item.unreadMessages ? `Messages (${item.unreadMessages} new)` : 'Messages'}</button>
+              : <span className="hiring-meta">None yet</span>}</td>
             <td>{item.feedbackReleased
               ? <button type="button" className="secondary" onClick={() => { void openFeedback(item.id); }}>See why</button>
               : <span className="hiring-meta">{item.state === 'REJECTED' ? 'None shared' : '—'}</span>}</td>
@@ -513,6 +520,8 @@ export function StudentApplicationsPage(): React.ReactElement {
           </tr>)}</tbody>
         </table></div>}
     </section>
+    {conversationId ? <StudentConversationCard key={conversationId} applicationId={conversationId} onClose={() => setConversationId(null)}
+      onChanged={() => { void reload().catch(() => undefined); }} /> : null}
     {feedback ? <StudentFeedbackCard feedback={feedback} onClose={() => setFeedback(null)} /> : null}
     {termsChange ? <StudentTermsChangeCard change={termsChange.change} onAnswer={(decision) => { void answerTermsChange(decision); }}
       onClose={() => setTermsChange(null)} /> : null}

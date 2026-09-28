@@ -4,7 +4,8 @@
  * The screens behind two existing navigation labels that used to fall through to the applicants
  * list (EMPLOYER_BASELINE D-7). Candidate Detail now shows one applicant as they chose to be seen:
  * pick a job and an applicant whose details are still shared, and the consented snapshot, résumé,
- * eligibility flags, timeline, interviews and offer appear (CandidateDetailPanel). Talent Pool says
+ * eligibility flags, timeline, interviews and offer appear (CandidateDetailPanel), with the EMP-10
+ * conversation beneath them (EmployerConversationPanel). Talent Pool says
  * plainly that it is not available yet — consented discovery is EMP-14 — instead of borrowing the
  * applicants list to look populated. No navigation item is added, removed, renamed or moved.
  */
@@ -14,6 +15,7 @@ import { V2EmptyState } from '../dashboardsV2.js';
 import { StaffPilotWrap } from '../parityWraps.js';
 import { listEmployerApplicants, listEmployerOpportunities, type EmployerApplicantDto, type EmployerOpportunityDto } from '../api.js';
 import { CandidateDetailPanel } from '../applicationSnapshotView.js';
+import { EmployerConversationPanel } from '../applicationMessages.js';
 
 function humanise(value: string): string {
   return value.replace(/_/g, ' ').toLowerCase().replace(/^./, (c) => c.toUpperCase());
@@ -76,7 +78,12 @@ export function EmployerCandidateDetailPage({ employerId }: { readonly employerI
       {withheld > 0 ? <p className="hiring-meta">{withheld} {withheld === 1 ? 'applicant is' : 'applicants are'} no longer sharing their details and cannot be opened.</p> : null}
       {status ? <p role="status">{status}</p> : null}
     </section>
-    {applicationId ? <CandidateDetailPanel key={applicationId} employerId={employerId} applicationId={applicationId} />
+    {applicationId ? <>
+      <CandidateDetailPanel key={applicationId} employerId={employerId} applicationId={applicationId} />
+      {/* EMP-10: the conversation with this candidate, inside Candidate Detail. */}
+      <EmployerConversationPanel key={`messages-${applicationId}`} employerId={employerId} applicationId={applicationId}
+        candidateName={shared.find((item) => item.id === applicationId)?.candidateName ?? null} />
+    </>
       : <div className="role-wide"><V2EmptyState icon="🧾" title="Choose a candidate"
         note="Pick a job and an applicant to see the profile, résumé and links they shared with you."
         hint="Contact details appear once you shortlist someone. Every view is recorded." /></div>}

@@ -590,6 +590,161 @@ suspend fun Api.clearCareerTarget(context: Context, targetId: String) {
     request(context, "DELETE", "/api/v1/students/me/career-targets/$targetId")
 }
 
+// --- Goals and onboarding (ENG-19) --------------------------------------------
+// The same contract as the web: live goals, whether the student is still onboarding, the skills the goals
+// need (each once), goal options searched by name and synonym, and "Not sure yet". Statuses and reasons
+// only; never a readiness value or a score.
+
+@Serializable data class GoalRoleRefDto(
+    val careerRoleId: String = "",
+    val targetId: String = "",
+    val code: String = "",
+    val title: String = "",
+    val family: String = "",
+    val releaseLabel: String? = null,
+)
+
+@Serializable data class GoalTopicRefDto(val topicId: String = "", val name: String = "")
+
+@Serializable data class GoalCatalogueRefDto(val code: String = "", val title: String = "", val release: String = "")
+
+@Serializable data class LearnerGoalDto(
+    val id: String,
+    val goalType: String = "",
+    val priority: String = "SECONDARY",
+    val origin: String = "",
+    val role: GoalRoleRefDto? = null,
+    val topic: GoalTopicRefDto? = null,
+    val catalogueGoal: GoalCatalogueRefDto? = null,
+) {
+    val title: String get() = role?.title ?: topic?.name ?: catalogueGoal?.title ?: "Exploring roles"
+}
+
+@Serializable data class GoalSkillLinkDto(val goalId: String = "", val goalType: String = "", val status: String? = null)
+
+@Serializable data class GoalSkillDto(val topicId: String = "", val topicTitle: String? = null, val goals: List<GoalSkillLinkDto> = emptyList())
+
+@Serializable data class GoalSkillsDto(val skills: List<GoalSkillDto> = emptyList())
+
+@Serializable data class LearnerGoalsDto(
+    val onboarding: Boolean = true,
+    val catalogueOpen: Boolean = false,
+    val goals: List<LearnerGoalDto> = emptyList(),
+    val skills: GoalSkillsDto = GoalSkillsDto(),
+)
+
+@Serializable data class GoalRoleOptionDto(
+    val id: String,
+    val code: String = "",
+    val title: String = "",
+    val family: String = "",
+    val summary: String? = null,
+    val releaseLabel: String? = null,
+    val catalogueCode: String? = null,
+    val matchedSynonym: String? = null,
+)
+
+@Serializable data class GoalTopicOptionDto(val id: String, val name: String = "")
+
+@Serializable data class GoalCatalogueOptionDto(val code: String, val title: String = "", val goalType: String = "", val release: String = "")
+
+@Serializable data class GoalOptionsDto(
+    val catalogueOpen: Boolean = false,
+    val roles: List<GoalRoleOptionDto> = emptyList(),
+    val topics: List<GoalTopicOptionDto> = emptyList(),
+    val catalogueGoals: List<GoalCatalogueOptionDto> = emptyList(),
+)
+
+@Serializable data class SurveyChoiceDto(val code: String, val label: String = "")
+
+@Serializable data class DiscoverySurveyDto(
+    val interests: List<SurveyChoiceDto> = emptyList(),
+    val strengths: List<SurveyChoiceDto> = emptyList(),
+    val branches: List<String> = emptyList(),
+)
+
+@Serializable data class DiscoveryAnswersDto(
+    val interests: List<String> = emptyList(),
+    val strengths: List<String> = emptyList(),
+    val branch: String = "",
+)
+
+@Serializable data class DiscoveryReasonDto(val code: String = "", val detail: String? = null)
+
+@Serializable data class DiscoverySuggestionDto(val role: GoalRoleOptionDto, val reasons: List<DiscoveryReasonDto> = emptyList())
+
+@Serializable data class DiscoveryResultDto(
+    val suggestions: List<DiscoverySuggestionDto> = emptyList(),
+    val usedShownSkills: Boolean = false,
+    val fewerThanMinimum: Boolean = false,
+)
+
+@Serializable data class CareerDiscoveryDto(
+    val survey: DiscoverySurveyDto = DiscoverySurveyDto(),
+    val answers: DiscoveryAnswersDto? = null,
+    val result: DiscoveryResultDto? = null,
+)
+
+@Serializable data class CareerDiscoveryEnvelope(val discovery: CareerDiscoveryDto = CareerDiscoveryDto())
+
+private fun jsonStrings(values: List<String>): String = values.joinToString(prefix = "[", postfix = "]") { quoted(it) }
+
+suspend fun Api.learnerGoals(context: Context): LearnerGoalsDto =
+    json.decodeFromString<LearnerGoalsDto>(request(context, "GET", "/api/v1/students/me/goals"))
+
+suspend fun Api.goalOptions(context: Context, query: String): GoalOptionsDto =
+    json.decodeFromString<GoalOptionsDto>(
+        request(context, "GET", "/api/v1/students/me/goals/options?q=" + java.net.URLEncoder.encode(query.trim(), "UTF-8")),
+    )
+
+suspend fun Api.setRoleGoal(context: Context, careerRoleId: String, primary: Boolean, origin: String): LearnerGoalsDto =
+    json.decodeFromString<LearnerGoalsDto>(
+        request(
+            context, "POST", "/api/v1/students/me/goals",
+            buildJson(
+                "goalType" to quoted("ROLE"), "careerRoleId" to quoted(careerRoleId),
+                "priority" to quoted(if (primary) "PRIMARY" else "SECONDARY"), "origin" to quoted(origin),
+            ),
+        ),
+    )
+
+suspend fun Api.setTopicGoal(context: Context, topicId: String): LearnerGoalsDto =
+    json.decodeFromString<LearnerGoalsDto>(
+        request(
+            context, "POST", "/api/v1/students/me/goals",
+            buildJson("goalType" to quoted("TOPIC"), "topicId" to quoted(topicId), "origin" to quoted("GOALS")),
+        ),
+    )
+
+suspend fun Api.setCatalogueGoal(context: Context, goalType: String, code: String): LearnerGoalsDto =
+    json.decodeFromString<LearnerGoalsDto>(
+        request(
+            context, "POST", "/api/v1/students/me/goals",
+            buildJson("goalType" to quoted(goalType), "catalogueGoalCode" to quoted(code), "origin" to quoted("GOALS")),
+        ),
+    )
+
+suspend fun Api.endGoal(context: Context, goalId: String, status: String): LearnerGoalsDto =
+    json.decodeFromString<LearnerGoalsDto>(
+        request(context, "POST", "/api/v1/students/me/goals/$goalId/end", buildJson("status" to quoted(status))),
+    )
+
+suspend fun Api.careerDiscovery(context: Context): CareerDiscoveryDto =
+    json.decodeFromString<CareerDiscoveryEnvelope>(request(context, "GET", "/api/v1/students/me/goals/discovery")).discovery
+
+suspend fun Api.submitCareerDiscovery(
+    context: Context, interests: List<String>, strengths: List<String>, branch: String, origin: String,
+): CareerDiscoveryDto =
+    json.decodeFromString<CareerDiscoveryEnvelope>(
+        request(
+            context, "POST", "/api/v1/students/me/goals/discovery",
+            buildJson(
+                "interests" to jsonStrings(interests), "strengths" to jsonStrings(strengths),
+                "branch" to quoted(branch), "origin" to quoted(origin),
+            ),
+        ),
+    ).discovery
+
 suspend fun Api.transitionRoadmapAction(context: Context, actionId: String, toState: String) {
     request(
         context, "POST", "/api/v1/students/me/roadmap-actions/$actionId/transition",

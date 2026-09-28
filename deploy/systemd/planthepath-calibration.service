@@ -1,0 +1,34 @@
+# ENG-13: runs one item-calibration pass (deploy/scripts/run-calibration.sh).
+# Written in the repository only — not installed on any server by the agent.
+[Unit]
+Description=ONE item calibration (offline 2PL fit)
+Documentation=https://github.com/PVUD14/planthepath-next
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=aight
+Group=aight
+WorkingDirectory=/srv/planthepath-next/current
+EnvironmentFile=/srv/planthepath-next/shared/app.env
+ExecStart=/usr/bin/env bash deploy/scripts/run-calibration.sh
+
+# A batch job on the production host: it must never starve the API or the database.
+Nice=10
+CPUQuota=50%
+MemoryMax=1G
+TimeoutStartSec=2h
+
+# It needs the database and a private temporary directory, nothing else.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

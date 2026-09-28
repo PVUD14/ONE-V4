@@ -75,11 +75,13 @@ or score. The file header holds only the run id, the format tag and the database
 - only students whose latest consent action on the **live** `model-improvement` definition is `GRANTED`.
   Until HG-6 publishes the engine purposes there is no live definition, so the export is empty — the
   pipeline fails closed and every run fits nothing;
-- `assisted = false` only. A response given after substantial help says little about the item's own
-  difficulty and would make it look easier;
 - the **first** response of each learner to each item version (by `occurred_at`, then `id`). IRT assumes
   one independent response per learner and item; repeats of a reviewed item are practice, not new
   information about the item;
+- and only if that first response was **unaided** (`assisted = false`). A response given after
+  substantial help says little about the item's own difficulty and would make it look easier; a later
+  unaided answer to the same item is not used instead, because by then the learner has seen it with
+  help;
 - unanswered items on a submitted paper count as incorrect (`correct = false` already); the student saw
   the item and did not answer it.
 

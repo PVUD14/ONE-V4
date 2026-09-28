@@ -19,6 +19,8 @@
     "engine:rebuild-skill-state": "tsx src/rebuild-learner-skill-state.ts",
     "engine:bkt-shadow-report": "tsx src/run-bkt-shadow-report.ts",
     "engine:replay-decisions": "tsx src/replay-learning-decisions.ts",
+    "engine:calibration-export": "tsx src/run-calibration-export.ts",
+    "engine:calibration-import": "tsx src/run-calibration-import.ts",
     "jobs:alert-check": "tsx src/run-jobs-alert-check.ts",
     "test": "vitest run --fileParallelism=false",
     "typecheck": "tsc -p tsconfig.json --noEmit",

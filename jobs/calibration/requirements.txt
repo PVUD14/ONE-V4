@@ -1,0 +1,7 @@
+# ENG-13 calibration job — runtime dependencies, pinned. Why pinned: the fit must give the same
+# numbers for the same export; an upgrade is a deliberate change re-checked by the
+# parameter-recovery tests. Licences (checked 2026-09-28 from package metadata):
+# girth MIT; numpy BSD-3-Clause; scipy BSD-3-Clause. Requires Python >= 3.11.
+girth==0.8.0
+numpy==2.4.6
+scipy==1.17.1

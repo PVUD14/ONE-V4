@@ -1,0 +1,15 @@
+# ENG-13: weekly item calibration. Written in the repository only — not installed by the agent.
+[Unit]
+Description=Run ONE item calibration weekly
+Documentation=https://github.com/PVUD14/planthepath-next
+
+[Timer]
+# Sunday 22:00 UTC (Monday 03:30 IST): calibrations move slowly and the export reads the
+# whole attempt log, so once a week at the quietest hour is enough.
+OnCalendar=Sun *-*-* 22:00:00 UTC
+# A missed week runs on the next boot; online code keeps using the previous run meanwhile.
+Persistent=true
+RandomizedDelaySec=600
+
+[Install]
+WantedBy=timers.target

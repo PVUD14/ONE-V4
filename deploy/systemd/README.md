@@ -167,3 +167,34 @@ clean sweep.
 The unit runs as `aight` from `/srv/planthepath-next/current`, so it always uses the
 release currently serving traffic and needs no update when a new release is switched
 in. `ReadWritePaths` grants it the storage root and nothing else.
+
+## Item calibration (ENG-13)
+
+Weekly (Sunday 22:00 UTC), one offline 2PL calibration run: the TypeScript export writes a
+de-identified file of first, unaided responses from students holding the live
+`model-improvement` consent; the Python job (`jobs/calibration`, girth 2PL) fits item
+difficulty and discrimination; the TypeScript import validates the result and stores it in
+`item_calibrations`. Until the engine consent purposes are published (HG-6) the export is
+empty and every run fits nothing — that is the intended fail-closed behaviour. Design:
+`docs/architecture/item-calibrations-table-design.md`.
+
+**Written, not installed.** Installing it is a manual step:
+
+```bash
+# Python 3.11 or newer; the job's pinned dependencies in their own venv.
+python3 -m venv /srv/planthepath-next/shared/calibration-venv
+/srv/planthepath-next/shared/calibration-venv/bin/pip install -r /srv/planthepath-next/current/jobs/calibration/requirements.txt
+sudo cp /srv/planthepath-next/current/deploy/systemd/planthepath-calibration.* /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now planthepath-calibration.timer
+```
+
+A run logs three lines of counts — never a pseudonym, user or item:
+
+```json
+{"event":"engine.calibration.exported","runId":"…","learners":0,"items":0,"responses":0}
+{"event":"engine.calibration.fitted","runId":"…","learners":0,"responses":0,"items":0,"statuses":{}}
+{"event":"engine.calibration.imported","runId":"…","imported":true,"calibrated":0,"provisional":0}
+```
+
+`CALIBRATION_MIN_RESPONSES` in `app.env` overrides the CALIBRATED threshold (default 200).

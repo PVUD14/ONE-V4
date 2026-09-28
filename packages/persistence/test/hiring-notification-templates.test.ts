@@ -91,6 +91,21 @@ describe('hiring notice wording, version 1', () => {
     }
   });
 
+  it('EMP-10: says a message arrived and where, never what it says, and never names the candidate to the employer', () => {
+    expect(renderHiringNotice({ ...base, kind: 'EMPLOYER_MESSAGE' })).toEqual({
+      title: 'Message from Acme Robotics', body: 'Acme Robotics sent you a message about Robotics engineer. Read and reply under Applications.' });
+    expect(renderHiringNotice({ ...base, kind: 'CANDIDATE_MESSAGE', referenceCode: 'ROB-7' })).toEqual({
+      title: 'Candidate message: Robotics engineer', body: 'A candidate replied about Robotics engineer (ROB-7). Open Messages to read it.' });
+    expect(hiringTemplateKey('EMPLOYER_MESSAGE')).toBe('hiring-employer-message');
+    for (const kind of ['EMPLOYER_MESSAGE', 'CANDIDATE_MESSAGE'] as const) {
+      const notice = renderHiringNotice({ employerName: 'E'.repeat(300), opportunityTitle: 'T'.repeat(300), kind });
+      expect(notice.title.length).toBeLessThanOrEqual(160);
+      expect(notice.body.length).toBeLessThanOrEqual(500);
+      expect(JSON.stringify(renderHiringNotice({ ...base, kind }))).not.toMatch(/readiness|band|score|mastery|gap|fit/i);
+    }
+    expect(HIRING_NOTIFICATION_EVENT_TYPES).toContain('application.message.sent');
+  });
+
   it('names a stable template per kind, and consumes only registered events', () => {
     expect(hiringTemplateKey('INTERVIEW_SCHEDULED')).toBe('hiring-interview-scheduled');
     for (const eventType of HIRING_NOTIFICATION_EVENT_TYPES) expect(() => schemaForEvent(eventType, 1)).not.toThrow();

@@ -267,7 +267,7 @@ export function RequestApprovalDialog({ token, actionKey, payload, title, detail
       .catch((cause) => { if (!controller.signal.aborted) setError(formatApiError(cause, 'Unable to load the approval policy.')); });
     return () => controller.abort();
   }, [token]);
-  const reasons = fixedReasons ?? policy?.actions.find((action) => action.actionKey === actionKey)?.reasons ?? [];
+  const reasons = fixedReasons ?? policy?.actions?.find((action) => action.actionKey === actionKey)?.reasons ?? [];
   const submit = async (event: React.FormEvent): Promise<void> => {
     event.preventDefault();
     if (!reasonCode) { setError('Choose a reason code.'); return; }

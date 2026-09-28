@@ -131,7 +131,7 @@ export function OperationsSystemHealthPage(): React.ReactElement {
   }
 
   const summary = health?.summary;
-  const consumerLabel = (name: string): string => summary?.consumers.find((consumer) => consumer.name === name)?.label ?? name;
+  const consumerLabel = (name: string): string => summary?.consumers?.find((consumer) => consumer.name === name)?.label ?? name;
   const verdict = summary ? verdictText[summary.worker.verdict] : null;
 
   const inspect = async (event: FailedJobDto): Promise<void> => {

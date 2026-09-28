@@ -123,7 +123,7 @@ export function OperationsRoleDemandPage(): React.ReactElement {
 
     <div className="v2-row v2-cols-2 role-wide">
       <section className="role-card"><h2>Demand by release label</h2>
-        {demand?.byReleaseLabel.length
+        {demand?.byReleaseLabel?.length
           ? <dl>{demand.byReleaseLabel.map((row) => <div key={row.releaseLabel}><dt>{releaseLabelText[row.releaseLabel] ?? row.releaseLabel} ({row.roles} roles)</dt><dd>{formatPeople(row.students, row.complementary)}</dd></div>)}</dl>
           : <p>{NA}</p>}
         <p>{ruleText}</p>
@@ -131,7 +131,7 @@ export function OperationsRoleDemandPage(): React.ReactElement {
       </section>
       <section className="role-card"><h2>New target selections by month</h2>
         <p>Students who chose a career target in each month (UTC), whether or not they kept it.</p>
-        {demand?.trend.length
+        {demand?.trend?.length
           ? <ul className="role-check-list" aria-label="Monthly trend">{demand.trend.map((month) => <li key={month.month}>
               <span>{month.month}: <strong>{formatPeople(month.students)}</strong></span>
               {month.students.suppressed ? null : <V2Bar percent={(month.students.value / trendMax) * 100} />}

@@ -29,7 +29,7 @@ export function InstitutionPlacementPage({ authenticatedWorkspace }: { readonly 
   const guard = workspaceGuard('Placement', authenticatedWorkspace);
   if (guard) return guard;
   const data = pipeline.data;
-  const statusCell = (key: PlacementStatus) => data?.placementStatus?.cells.find((cell) => cell.key === key) ?? null;
+  const statusCell = (key: PlacementStatus) => data?.placementStatus?.cells?.find((cell) => cell.key === key) ?? null;
   const token = getProtectedAccessToken()!;
   return <div className="pilot pilot-embed"><div className="pilot-page">
     <div className="pilot-content">

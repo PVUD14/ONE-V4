@@ -230,7 +230,7 @@ export function OperationsPrivacyConsolePage(): React.ReactElement {
       {holdsError ? <p className="form-error" role="alert">{holdsError}</p> : null}
       {!holds && !holdsError ? <p>Loading legal holds…</p> : null}
       {holds && !holds.holds.length ? <V2EmptyState icon="⚖️" title="No holds in force" note="No person's erasure is suspended." /> : null}
-      {holds?.holds.length ? <div className="role-record-table-wrap"><table className="role-record-table">
+      {holds?.holds?.length ? <div className="role-record-table-wrap"><table className="role-record-table">
         <thead><tr><th>Person</th><th>Reason</th><th>Context</th><th>Placed</th><th>Blocks</th><th>Release</th></tr></thead>
         <tbody>{holds.holds.map((hold) => <tr key={hold.id}>
           <th scope="row">{subjectLabel(hold.subject)}</th>
@@ -294,11 +294,11 @@ function ConsentCoverageSection({ coverage, error }: { readonly coverage: Consen
         <td>{coverageCell(key, (counts) => counts.withdrawn)}</td>
         <td>{coverageCell(key, (counts) => counts.onOlderVersion)}</td>
       </tr>)}</tbody></table></div> : null}
-    {coverage?.keys.some((key) => key.status === 'NOT_PUBLISHED')
+    {coverage?.keys?.some((key) => key.status === 'NOT_PUBLISHED')
       ? <p>Not published: the learning-engine consents are drafted but their wording waits for legal approval, so nobody has been asked yet and there is no coverage to report.</p> : null}
     <h3>Definitions and versions</h3>
     {coverage && !coverage.definitions.length ? <V2EmptyState icon="📜" title="No consent definitions" note="The consent registry has no definitions in this environment." /> : null}
-    {coverage?.definitions.length ? <div className="role-record-table-wrap"><table className="role-record-table">
+    {coverage?.definitions?.length ? <div className="role-record-table-wrap"><table className="role-record-table">
       <thead><tr><th>Consent</th><th>Version</th><th>Status</th><th>Enforcement</th><th>Withdrawable</th><th>In force from</th><th>Retired</th></tr></thead>
       <tbody>{coverage.definitions.map((definition) => <tr key={`${definition.consentKey}:${definition.version}`}>
         <th scope="row">{definition.title}<br /><small>{definition.consentKey}</small></th>

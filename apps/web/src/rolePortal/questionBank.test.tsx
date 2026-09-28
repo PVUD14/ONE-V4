@@ -67,7 +67,7 @@ const revision = (over: Record<string, unknown> = {}) => ({
   id: revisionId, revision: 1, state: 'DRAFT', contentHash: 'c'.repeat(64), author: { userId: otherId, email: 'author@example.test' },
   contributors: [{ userId: otherId, email: 'author@example.test' }], createdAt: '2026-09-28T10:00:00.000Z', publishedAt: null,
   fields: fields(), answerKeyWithheld: false, topic,
-  tags: [], ladder: null, rightsReview: null, ...over,
+  tags: [], ladder: null, agentDraft: null, expertCheck: null, rightsReview: null, ...over,
 });
 const detail = (over: Record<string, unknown> = {}) => ({
   ...summaryRow(), current: null, open: revision(), versions: [],
@@ -274,6 +274,24 @@ describe('question bank', () => {
     expect(within(region).getAllByText('Withheld').length).toBeGreaterThanOrEqual(3);
     expect(within(region).getByText('Basis').nextSibling?.textContent).toBe('NA');
     expect(within(region).getByText('Only one option has a deadline.')).toBeInTheDocument();
+  });
+
+  it('marks an agent-drafted item and shows its note for the subject expert', async () => {
+    detailBody = detail({ open: revision({
+      state: 'IN_REVIEW',
+      agentDraft: { generatorVersion: 'claude-opus-5-5', promptVersion: 'eng-10-aptitude-bank-v1', generatedAt: '2026-09-28T00:00:00.000Z' },
+      expertCheck: 'Check the answer key and that only one option is correct.',
+    }) });
+    const region = await openQuestion();
+    expect(within(region).getByText('Drafted by').nextSibling?.textContent).toMatch(/^The coding agent \(claude-opus-5-5, eng-10-aptitude-bank-v1, .+\) — check it against its basis$/);
+    expect(within(region).getByText('For the subject expert').nextSibling?.textContent).toBe('Check the answer key and that only one option is correct.');
+  });
+
+  it('says a person wrote an item that carries no agent provenance', async () => {
+    detailBody = detail({ open: revision({ state: 'IN_REVIEW' }) });
+    const region = await openQuestion();
+    expect(within(region).getByText('Drafted by').nextSibling?.textContent).toBe('A person');
+    expect(within(region).queryByText('For the subject expert')).not.toBeInTheDocument();
   });
 
   it('keeps the Operations navigation labels unchanged', () => {

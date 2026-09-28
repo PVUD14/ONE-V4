@@ -10,6 +10,7 @@ import {
   composeQuestionBody,
   publishedQuestionColumns,
   questionMisconceptionTags,
+  readAgentDraftProvenance,
   readQuestionDraftFields,
   toLearnerQuestionDto,
   validateQuestionDraft,
@@ -144,5 +145,31 @@ describe('tags and the answer key', () => {
 
   it('refuses to publish an incomplete question', () => {
     expect(() => publishedQuestionColumns(complete({ correctOptionId: null }))).toThrow();
+  });
+});
+
+describe('readAgentDraftProvenance (ENG-10)', () => {
+  const provenance = { source: 'AGENT_DRAFTED', generatorVersion: 'claude-opus-5-5', promptVersion: 'eng-10-aptitude-bank-v1', generatedAt: '2026-09-28T00:00:00.000Z' };
+
+  it('reads a complete agent-draft record and its note for the subject expert', () => {
+    expect(readAgentDraftProvenance({ provenance, expertCheck: ' Check the key. ' })).toEqual({
+      generatorVersion: 'claude-opus-5-5', promptVersion: 'eng-10-aptitude-bank-v1', generatedAt: '2026-09-28T00:00:00.000Z', expertCheck: 'Check the key.',
+    });
+    expect(readAgentDraftProvenance({ provenance })?.expertCheck).toBeNull();
+  });
+
+  it('is null for a body a person wrote, and for an incomplete or malformed record', () => {
+    expect(readAgentDraftProvenance({})).toBeNull();
+    expect(readAgentDraftProvenance(null)).toBeNull();
+    expect(readAgentDraftProvenance({ provenance: { ...provenance, source: 'AUTHORED' } })).toBeNull();
+    expect(readAgentDraftProvenance({ provenance: { ...provenance, generatorVersion: '' } })).toBeNull();
+    expect(readAgentDraftProvenance({ provenance: { ...provenance, promptVersion: 'x'.repeat(129) } })).toBeNull();
+    expect(readAgentDraftProvenance({ provenance: { ...provenance, generatedAt: 'not a date' } })).toBeNull();
+  });
+
+  it('survives an editor save: composeQuestionBody carries the provenance keys', () => {
+    const body = composeQuestionBody({ provenance, expertCheck: 'Check it.', packKey: 'aptitude-bank-v1' }, 'apt-q-x-001', complete());
+    expect(readAgentDraftProvenance(body)).toMatchObject({ promptVersion: 'eng-10-aptitude-bank-v1', expertCheck: 'Check it.' });
+    expect(body.packKey).toBe('aptitude-bank-v1');
   });
 });

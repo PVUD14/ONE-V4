@@ -132,7 +132,7 @@ describe('interview access follows assignment', () => {
 
   it.each(['COMPLETED', 'CANCELLED', 'NO_SHOW'])('ends read and scorecard access at %s', async (toState) => {
     const f = await assignedInterview();
-    await employer.updateInterviewState(f.request, f.employerId, f.interviewId, { toState });
+    await employer.updateInterviewState(f.request, f.employerId, f.interviewId, toState === 'CANCELLED' ? { toState, reasonCode: 'POSITION_FILLED' } : { toState });
     expect(await employer.listMyInterviews(f.participantRequest, f.employerId)).toMatchObject({ interviews: [] });
     await expect(employer.getMyInterview(f.participantRequest, f.employerId, f.interviewId)).rejects.toMatchObject({ status: 403 });
     await expect(employer.submitMyOutcome(f.participantRequest, f.employerId, f.interviewId, { recommendation: 'YES' })).rejects.toMatchObject({ status: 403 });

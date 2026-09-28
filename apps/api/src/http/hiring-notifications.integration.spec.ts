@@ -289,8 +289,8 @@ describe('EMP-08: interviews reach the student, and the student sees them', () =
     const first = await schedule(hiring.employerId, hiring.recruiterId, hiring.applicationId).expect(201);
     const statePath = (id: string) => employerBase(hiring.employerId) + '/interviews/' + id + '/state';
     await api().post(statePath(first.body.interview.id)).set(auth(hiring.recruiterId))
-      .send({ toState: 'RESCHEDULED', scheduledStart: '2099-03-02T04:30:00.000Z', scheduledEnd: '2099-03-02T05:30:00.000Z' }).expect(201);
-    await api().post(statePath(first.body.interview.id)).set(auth(hiring.recruiterId)).send({ toState: 'CANCELLED', reason: 'Panel unavailable' }).expect(201);
+      .send({ toState: 'RESCHEDULED', scheduledStart: '2099-03-02T04:30:00.000Z', scheduledEnd: '2099-03-02T05:30:00.000Z', reasonCode: 'CANDIDATE_REQUESTED' }).expect(201);
+    await api().post(statePath(first.body.interview.id)).set(auth(hiring.recruiterId)).send({ toState: 'CANCELLED', reasonCode: 'INTERVIEWER_UNAVAILABLE', reason: 'Panel unavailable' }).expect(201);
     const second = await schedule(hiring.employerId, hiring.recruiterId, hiring.applicationId).expect(201);
     await api().post(statePath(second.body.interview.id)).set(auth(hiring.recruiterId)).send({ toState: 'COMPLETED' }).expect(201);
     await drain();

@@ -219,7 +219,7 @@ describe('EMP-SR-01: a live grant is required for every candidate route', () => 
     await expect(hiring.submitOutcome(p.request(), p.employerId, p.interviewId, { recommendation: 'YES' })).resolves.toMatchObject({ ok: true });
     await expect(hiring.submitMyOutcome(p.request(), p.employerId, p.interviewId, { recommendation: 'YES' })).resolves.toMatchObject({ ok: true });
     await expect(hiring.updateInterviewState(p.request(), p.employerId, p.interviewId, {
-      toState: 'RESCHEDULED', scheduledStart: '2099-01-06T09:00:00.000Z', scheduledEnd: '2099-01-06T10:00:00.000Z',
+      toState: 'RESCHEDULED', scheduledStart: '2099-01-06T09:00:00.000Z', scheduledEnd: '2099-01-06T10:00:00.000Z', reasonCode: 'CANDIDATE_REQUESTED',
     })).resolves.toMatchObject({ interview: { state: 'RESCHEDULED' } });
     await expect(hiring.scheduleInterview(p.request(), p.employerId, p.applicationId, {
       mode: 'VIDEO', scheduledStart: '2099-01-07T09:00:00.000Z', scheduledEnd: '2099-01-07T10:00:00.000Z',
@@ -254,7 +254,7 @@ describe('EMP-SR-01: a live grant is required for every candidate route', () => 
     await expectRefused(p, hiring.submitOutcome(p.request(), p.employerId, p.interviewId, { recommendation: 'NO' }));
     await expectRefused(p, hiring.submitMyOutcome(p.request(), p.employerId, p.interviewId, { recommendation: 'NO' }));
     await expectRefused(p, hiring.updateInterviewState(p.request(), p.employerId, p.interviewId, {
-      toState: 'RESCHEDULED', scheduledStart: '2099-01-08T09:00:00.000Z', scheduledEnd: '2099-01-08T10:00:00.000Z',
+      toState: 'RESCHEDULED', scheduledStart: '2099-01-08T09:00:00.000Z', scheduledEnd: '2099-01-08T10:00:00.000Z', reasonCode: 'CANDIDATE_REQUESTED',
     }));
     await expectRefused(p, hiring.updateInterviewState(p.request(), p.employerId, p.interviewId, { toState: 'COMPLETED' }));
     await expectRefused(p, assessments.invite(p.request(), p.employerId, p.assessmentId, { applicationIds: [p.applicationId], closesAt: tomorrow() }));
@@ -278,7 +278,7 @@ describe('EMP-SR-01: a live grant is required for every candidate route', () => 
     });
     await revokeGrant(p);
 
-    const cancelled = await hiring.updateInterviewState(p.request(), p.employerId, p.interviewId, { toState: 'CANCELLED', reason: 'Position filled' });
+    const cancelled = await hiring.updateInterviewState(p.request(), p.employerId, p.interviewId, { toState: 'CANCELLED', reasonCode: 'POSITION_FILLED', reason: 'Position filled' });
     expect(cancelled).toMatchObject({ interview: { state: 'CANCELLED' } });
     expectNoPerson(p, cancelled);
     const withdrawn = await hiring.withdrawOffer(p.request(), p.employerId, (extended.offer as { id: string }).id);

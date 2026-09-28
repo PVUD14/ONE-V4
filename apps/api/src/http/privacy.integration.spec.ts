@@ -370,8 +370,10 @@ describe('deletion execution', () => {
       `SELECT category, disposition, basis, record_count FROM privacy_deletion_records
        WHERE request_id = $1 ORDER BY category`, [dueId],
     );
-    expect(records.rows).toHaveLength(12);
+    // EMP-10 added APPLICATION_MESSAGES: one record per declared category, 13 in all.
+    expect(records.rows).toHaveLength(13);
     const byCategory = Object.fromEntries(records.rows.map((r) => [r.category, r]));
+    expect(byCategory.APPLICATION_MESSAGES.disposition).toBe('ERASED');
     // INST-11: counselling notes about the person are erased with them.
     expect(byCategory.COUNSELLING_NOTES.disposition).toBe('ERASED');
     expect(byCategory.SUPPORT_CASES.disposition).toBe('ANONYMISED');

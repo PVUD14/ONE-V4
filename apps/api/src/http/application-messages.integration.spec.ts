@@ -458,7 +458,7 @@ describe('EMP-10: notices go through the EMP-08 outbox path only', () => {
     await drain(captureSink);
     const recruiterNotes = (await feed(p.recruiterId)).filter((note) => note.kind === 'CANDIDATE_MESSAGE');
     expect(recruiterNotes).toHaveLength(1);
-    expect(recruiterNotes[0].title).toBe('Candidate message: Robotics engineer');
+    expect(recruiterNotes[0]!.title).toBe('Candidate message: Robotics engineer');
     expect(JSON.stringify(recruiterNotes)).not.toMatch(/Hi there|example\.test/);
     // The owner did not write in the conversation, so is not told.
     expect((await feed(p.ownerId)).filter((note) => note.kind === 'CANDIDATE_MESSAGE')).toHaveLength(0);
@@ -484,8 +484,8 @@ describe('EMP-10: notices go through the EMP-08 outbox path only', () => {
     await drain(captureSink);
     const emails = delivered.filter((mail) => mail.toEmail === p.studentId + '@example.test');
     expect(emails).toHaveLength(1);
-    expect(emails[0].subject).toBe('Message from Acme Robotics');
-    expect(emails[0].textBody).not.toContain('7788');
+    expect(emails[0]!.subject).toBe('Message from Acme Robotics');
+    expect(emails[0]!.textBody).not.toContain('7788');
     const mutes = await pool.query("SELECT action FROM audit_events WHERE resource_id = $1 AND action LIKE 'application.messages.%muted' ORDER BY occurred_at", [p.applicationId]);
     expect(mutes.rows.map((r) => r.action)).toEqual(['application.messages.muted', 'application.messages.unmuted']);
   });

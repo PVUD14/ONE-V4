@@ -37,6 +37,9 @@ describe('institution visibility consent controller', () => {
       // EMP-05: the job re-read under a share lock inside the apply transaction.
       [{ lifecycle_state: 'PUBLISHED', current_version_id: randomUUID() }],
       [{ deadline_passed: false }],
+      // EMP-11: no live campus drive for this job at the student's college, and still visible.
+      [],
+      [{ visible: 1 }],
       [{ id: applicationId }],
     ]);
     await controller.apply(request, { opportunityId, consentGranted: true, ...(choice === undefined ? {} : { institutionVisibilityGranted: choice }) });

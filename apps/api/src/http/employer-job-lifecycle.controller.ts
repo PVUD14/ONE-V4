@@ -57,6 +57,7 @@ import {
   type ApiIdGenerator,
   type ProtectedHttpRequest,
 } from './api-security.js';
+import { opportunityHasAudienceSql } from './campus-drives.js';
 import {
   employerStateRefusal,
   requireActiveEmployer,
@@ -396,11 +397,12 @@ export class EmployerJobLifecycleController {
         const open = await tx.execute(sql`SELECT count(*)::int AS count FROM applications WHERE opportunity_id = ${id}::uuid AND state <> 'DRAFT' AND closed_at IS NULL`) as QueryResult<{ count: number }>;
         if ((open.rows[0]?.count ?? 0) > 0) throw badRequest('OPPORTUNITY_HAS_OPEN_APPLICATIONS', context.correlationId);
       }
-      // Reopening puts the job back in front of students: it needs an audience and a
+      // Reopening puts the job back in front of students: it needs an audience (or a pending or
+      // live campus drive, EMP-11) and a
       // deadline still ahead (move the deadline with a new version first).
       if (action === 'REOPEN') {
         const checks = await tx.execute(sql`
-          SELECT EXISTS (SELECT 1 FROM opportunity_audiences WHERE opportunity_id = ${id}::uuid) AS has_audience,
+          SELECT ${opportunityHasAudienceSql(id)} AS has_audience,
                  EXISTS (SELECT 1 FROM opportunity_versions v WHERE v.id = ${String(opportunity.current_version_id)}::uuid AND v.application_deadline <= now()) AS deadline_passed
         `) as QueryResult<{ has_audience: boolean; deadline_passed: boolean }>;
         if (!checks.rows[0]?.has_audience) throw badRequest('AUDIENCE_REQUIRED', context.correlationId);

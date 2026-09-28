@@ -106,6 +106,9 @@ const skillRevisionStates = ['DRAFT', 'IN_REVIEW', 'CHANGES_REQUESTED', 'APPROVE
 // EMP-08: applications.state (0007 CHECK).
 const applicationStates = ['DRAFT', 'APPLIED', 'SCREENING', 'SHORTLISTED', 'ASSESSMENT', 'INTERVIEW', 'OFFER', 'HIRED', 'REJECTED', 'WITHDRAWN'] as const;
 
+// EMP-11: campus_drives.state (0069 CHECK).
+const campusDriveStates = ['REQUESTED', 'CHANGES_REQUESTED', 'APPROVED', 'SCHEDULED', 'REJECTED', 'COMPLETED', 'CANCELLED'] as const;
+
 export const eventSchemas = {
   identityInvitationAcceptedV1: {
     eventType: 'identity.invitation.accepted',
@@ -292,6 +295,27 @@ export const eventSchemas = {
   },
   // EMP-05: an applicant's terms moved under them. Recorded for EMP-08's student
   // notifications; nothing sends it to the student yet.
+  // EMP-11: a campus drive changed state (requested, decided, scheduled, cancelled, completed).
+  // The outbox row is the durable record; the in-app notice is written by the route after commit.
+  campusDriveStateChangedV1: {
+    eventType: 'campus_drive.state_changed',
+    eventVersion: 1,
+    producer: 'hiring',
+    aggregateType: 'campus_drive',
+    purpose: 'campus-drive-lifecycle',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://campus_drive.state_changed/1',
+    payload: {
+      campusDriveId: { kind: 'uuid' },
+      opportunityId: { kind: 'uuid' },
+      employerId: { kind: 'uuid' },
+      institutionId: { kind: 'uuid' },
+      fromState: { kind: 'enum', values: campusDriveStates, required: false },
+      toState: { kind: 'enum', values: campusDriveStates },
+      actorSide: { kind: 'enum', values: ['EMPLOYER', 'INSTITUTION'] },
+      reasonCode: { kind: 'string', maxLength: 64, minLength: 3, pattern: /^[A-Z0-9_:-]{3,64}$/, required: false },
+    },
+  },
   applicationTermsChangeRecordedV1: {
     eventType: 'application.terms_change.recorded',
     eventVersion: 1,

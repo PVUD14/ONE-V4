@@ -128,7 +128,7 @@ describe('deletion policy', () => {
   });
 
   it('erases what is only about the person', () => {
-    for (const category of ['STUDENT_PROFILE', 'DOCUMENTS', 'NOTIFICATIONS', 'LEARNING_ACTIVITY'] as const) {
+    for (const category of ['STUDENT_PROFILE', 'DOCUMENTS', 'NOTIFICATIONS', 'LEARNING_ACTIVITY', 'COUNSELLING_NOTES'] as const) {
       expect(deletionPolicyFor(category).disposition).toBe('ERASED');
     }
   });
@@ -146,9 +146,9 @@ describe('deletion policy', () => {
   it('covers every declared category exactly once', () => {
     const categories = DELETION_POLICY.map((entry) => entry.category);
     expect(new Set(categories).size).toBe(categories.length);
-    // OPS-05 added SUPPORT_CASES and ENG-03 LEARNING_ACTIVITY: both must be declared.
-    expect(categories).toHaveLength(11);
-    expect(categories).toEqual(expect.arrayContaining(['SUPPORT_CASES', 'LEARNING_ACTIVITY']));
+    // OPS-05 added SUPPORT_CASES, ENG-03 LEARNING_ACTIVITY and INST-11 COUNSELLING_NOTES: all must be declared.
+    expect(categories).toHaveLength(12);
+    expect(categories).toEqual(expect.arrayContaining(['SUPPORT_CASES', 'LEARNING_ACTIVITY', 'COUNSELLING_NOTES']));
   });
 
   it('produces a deterministic, non-routable replacement identity', () => {

@@ -1138,7 +1138,7 @@ Overview and has no Analytics screen.
 **Next goal:** OPS-09b.
 
 ## OPS-09b — Question bank editor — 2026-09-28
-**Result:** Complete (validation run pending; this entry is amended with the results). Operators draft readiness-check questions with a skill tag, answer key, difficulty band, a misconception per wrong option and a four-step hint ladder. Someone who did not write, edit or submit the question reviews it, and that review records the rights review. Every publish goes through a second person's approval. It writes the learner-facing version and the grading-only answer key, and supersedes the previous version in the readiness-check pool.
+**Result:** Complete. Operators draft readiness-check questions with a skill tag, answer key, difficulty band, a misconception per wrong option and a four-step hint ladder. Someone who did not write, edit or submit the question reviews it, and that review records the rights review. Every publish goes through a second person's approval. It writes the learner-facing version and the grading-only answer key, and supersedes the previous version in the readiness-check pool.
 
 **Branch / PR:** `feat/ops-question-bank-editor`, cut from `onev4/feat/plan-phases-0-to-2` (94fd0d8). The coordinator merges it.
 
@@ -1173,7 +1173,14 @@ No misconception table was created: the editor writes to ENG-07's `question_opti
 
 **Design docs / ADRs:** the two design documents above. No ADR was needed.
 
-**Validation:** pending (see the amendment below).
+**Validation:** on a fresh database `one_ops09b`:
+- `corepack pnpm db:migrate` ran twice: 54 applied, then 0 applied. `0061` was also replayed twice by hand over the migrated database without error.
+- `corepack pnpm typecheck` passed.
+- `corepack pnpm -r --no-bail --workspace-concurrency=1 test` passed 2662 of 2662 tests across all packages (api 892, web 664, persistence 335, authorization 272, and the rest). There were no teardown failures.
+- `corepack pnpm build` passed.
+- The foundation-policy optional-chain grep over `apps/web/src` (excluding tests) prints nothing.
+- New tests: 13 career-readiness unit, 9 authorization unit, 14 API integration and 14 web.
+- `corepack pnpm audit --prod --audit-level=high` exits 1 because of the pre-existing multer advisories (see Limitations).
 
 **Acceptance criteria:**
 - ✔ **Draft → review → publish works; self-review is rejected.** The author, anyone who saved an edit and anyone who submitted count as contributors, taken from the audit log. They get 403 `QUESTION_SELF_REVIEW_REFUSED` or `QUESTION_SELF_PUBLISH_REFUSED`, at the approval request as well as at publish. 0061 refuses a direct PUBLISH insert by the author.

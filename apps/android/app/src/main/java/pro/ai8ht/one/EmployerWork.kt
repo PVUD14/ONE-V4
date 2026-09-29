@@ -57,6 +57,8 @@ import pro.ai8ht.one.ui.Tone
 /** The forward moves a recruiter makes most; the server still decides what is legal. */
 private val pipelineMoves = listOf(
     "SHORTLISTED" to "Shortlist",
+    // EMP-12: screening tests go to candidates in the Assessment stage, as on the web.
+    "ASSESSMENT" to "Move to assessment",
     "INTERVIEW" to "Move to interview",
     "OFFER" to "Make an offer",
     "REJECTED" to "Reject",
@@ -116,6 +118,8 @@ internal fun ApplicantActionsPage(
             }
             // EMP-07: what the applicant chose to share, read-only, while their grant is live.
             CandidateSharedCards(employerId, applicationId, shared)
+            // EMP-12: their results on this employer's own screening tests, while they share their details.
+            CandidateScreeningSection(employerId, applicationId, shared)
             // EMP-10: the conversation with this candidate, while they share their details.
             EmployerConversationSection(employerId, applicationId, applicantName, shared)
             // EMP-06: eligibility as it stood when they applied. Outcome and basis only, never a figure.
@@ -574,3 +578,70 @@ internal fun HiringAnalyticsPage(employerId: String, onClose: () -> Unit) {
 
 /** Employer sub-pages reachable from the dashboard. */
 internal enum class EmployerOverlay { MyInterviews, Interviews, Offers, Analytics, Team, CompanyProfile }
+
+// ---------------------------------------------------------------------------
+// EMP-12: screening test results for one candidate (read only)
+// ---------------------------------------------------------------------------
+
+/**
+ * This employer's own screening tests for this application, question by question, with how
+ * each attempt ended. Read only: tests are built and sent on the web. The server returns them
+ * only while the candidate's applicant-access grant is live and records every read; nothing
+ * here is readiness or anything ONE or the college measured.
+ */
+@Composable
+internal fun CandidateScreeningSection(employerId: String, applicationId: String, reload: Int) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var results by remember { mutableStateOf<List<CandidateAssessmentDto>?>(null) }
+    var status by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(employerId, applicationId, reload) {
+        runCatching { Api.listCandidateAssessments(context, employerId, applicationId) }
+            .onSuccess { results = it; status = null }
+            .onFailure {
+                results = null
+                status = if ((it as? Api.ApiException)?.status == 403)
+                    "This candidate is no longer sharing their application with you, so their test results are not shown."
+                else "Their screening test results could not be loaded."
+            }
+    }
+    Spacer(Modifier.height(12.dp))
+    Text("Screening tests", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+    Text("Your own tests for this application only. A score is information, not a decision.",
+        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    status?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+    val shown = results
+    when {
+        shown == null && status == null -> LoadingSpinner()
+        shown != null && shown.isEmpty() -> Text(
+            "You have not sent this candidate a screening test. Tests go to candidates in the Assessment stage, from Assessments on the web.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+        shown != null -> shown.forEach { item ->
+            Spacer(Modifier.height(8.dp))
+            PilotCard {
+                Column(Modifier.padding(16.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(item.title, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                        StatusChip(prettify(item.state), if (item.state == "SUBMITTED") ChipKind.Positive else ChipKind.Muted)
+                    }
+                    Text("${item.durationSeconds / 60} min · window ${formatWhen(item.opensAt)} to ${formatWhen(item.closesAt)}",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(4.dp))
+                    val ended = when (item.endedBy) { "TIME_LIMIT" -> " · time ran out"; "CANDIDATE" -> " · submitted by the candidate"; else -> "" }
+                    Text(
+                        (item.percentage?.let { "Score: ${it.toInt()}% (${item.score?.toInt() ?: 0} / ${item.maxScore?.toInt() ?: 0})" } ?: "Score: NA") + ended,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    item.questions.forEach { question ->
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "${question.displayOrder}. ${question.questionText} — ${question.marksAwarded.toInt()} / ${question.marks.toInt()}" +
+                                if (question.answered) "" else " (not answered)",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}

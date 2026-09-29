@@ -198,3 +198,36 @@ suspend fun Api.withdrawOffer(context: Context, employerId: String, offerId: Str
 
 suspend fun Api.hiringAnalytics(context: Context, employerId: String): HiringAnalyticsDto =
     json.decodeFromString(request(context, "GET", "/api/v1/employers/$employerId/hiring-analytics"))
+
+// --- EMP-12: one candidate's results on this employer's screening tests (read only) ---------
+
+@Serializable data class CandidateAssessmentsEnvelope(val assessments: List<CandidateAssessmentDto> = emptyList())
+
+@Serializable data class CandidateAssessmentDto(
+    val invitationId: String = "",
+    val title: String = "",
+    val durationSeconds: Int = 0,
+    val opensAt: String = "",
+    val closesAt: String = "",
+    val state: String = "",
+    val submittedAt: String? = null,
+    /** CANDIDATE when they submitted, TIME_LIMIT when the time or window ran out. */
+    val endedBy: String? = null,
+    val score: Double? = null,
+    val maxScore: Double? = null,
+    val percentage: Double? = null,
+    val questions: List<CandidateAssessmentQuestionDto> = emptyList(),
+)
+
+@Serializable data class CandidateAssessmentQuestionDto(
+    val displayOrder: Int = 0,
+    val questionText: String = "",
+    val marks: Double = 0.0,
+    val marksAwarded: Double = 0.0,
+    val answered: Boolean = false,
+)
+
+/** Needs the candidate's live applicant-access grant; the server refuses (403) otherwise, and records every read. */
+suspend fun Api.listCandidateAssessments(context: Context, employerId: String, applicationId: String): List<CandidateAssessmentDto> =
+    json.decodeFromString<CandidateAssessmentsEnvelope>(
+        request(context, "GET", "/api/v1/employers/$employerId/applications/$applicationId/assessment-results")).assessments

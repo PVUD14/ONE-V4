@@ -38,6 +38,7 @@ import { StudentPreviewProvider, useStudentPreview } from './studentPreviewState
 import { PlacementOfficerPortal } from './staffPages.js';
 import { StudentApplicationsPage, StudentOpportunitiesPage } from './hiringPages.js';
 import { StudentPrivacyPanel } from './privacyPanel.js';
+import { StudentOutcomesCard } from './studentOutcomes.js';
 import { PilotApp } from './pilot/PilotApp.js';
 import { isPilotIdentity } from './pilot/pilotIdentity.js';
 import { CareerReadinessApiPanel } from './careerReadinessApiPanel.js';
@@ -882,7 +883,7 @@ function RouteScreen({ route, authenticated, currentStudent }: { readonly route:
 
 function AuthenticatedStudentRoute({ route, currentStudent }: { readonly route: RouteKey; readonly currentStudent: CurrentStudentState }): React.ReactElement {
   if (route === 'dashboard') return <AuthenticatedStudentDashboard currentStudent={currentStudent} />;
-  if (route === 'profile') return <StudentProfileV3><AuthenticatedStudentProfile /><ShareProfilePanel /></StudentProfileV3>;
+  if (route === 'profile') return <StudentProfileV3><AuthenticatedStudentProfile /><ShareProfilePanel /><StudentOutcomesCard /></StudentProfileV3>;
   if (route === 'documents') return <AuthenticatedStudentDocuments />;
   if (route === 'opportunities') return <StudentOpportunitiesV3><StudentOpportunitiesPage /><AuthenticatedStudentSavedOpportunities /></StudentOpportunitiesV3>;
   if (route === 'applications') return <StudentApplicationsPage />;

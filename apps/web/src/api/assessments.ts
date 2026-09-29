@@ -138,6 +138,8 @@ export interface EmployerQuestionDto {
   readonly approvalStatus: string;
   readonly version: number;
   readonly optionCount: number;
+  /** EMP-12: the text names a protected attribute or proxy; flagged for the reviewer, never refused. */
+  readonly mentionsProtectedAttribute?: boolean;
 }
 
 export interface EmployerAssessmentDto {
@@ -158,13 +160,54 @@ export interface EmployerAssessmentResultDto {
   readonly applicationId: string;
   readonly state: string;
   readonly candidateName: string | null;
-  readonly candidateEmail: string;
+  /** Only from SHORTLISTED onward (decision 10.2 #9). */
+  readonly candidateEmail: string | null;
+  readonly invitedAt?: string;
+  readonly opensAt?: string;
   readonly closesAt: string;
   readonly score: number | null;
   readonly maxScore: number | null;
   readonly percentage: number | null;
   readonly submittedAt: string | null;
+  /** How a submitted attempt ended: the candidate submitted, or the time limit or window ran out. */
+  readonly endedBy?: 'CANDIDATE' | 'TIME_LIMIT' | null;
 }
+
+/** EMP-12: one candidate's results on this employer's tests for one application. */
+export interface EmployerCandidateAssessmentDto {
+  readonly invitationId: string;
+  readonly assessmentId: string;
+  readonly title: string;
+  readonly durationSeconds: number;
+  readonly totalMarks: number;
+  readonly invitedAt: string;
+  readonly opensAt: string;
+  readonly closesAt: string;
+  readonly state: string;
+  readonly startedAt: string | null;
+  readonly submittedAt: string | null;
+  readonly endedBy: 'CANDIDATE' | 'TIME_LIMIT' | null;
+  readonly score: number | null;
+  readonly maxScore: number | null;
+  readonly percentage: number | null;
+  readonly questions: readonly {
+    readonly displayOrder: number; readonly questionText: string; readonly questionType: string;
+    readonly marks: number; readonly marksAwarded: number; readonly answered: boolean;
+  }[];
+}
+
+/** Fixed reason codes (server lists; Appendix 2 section 5.7). */
+export const QUESTION_REJECT_REASONS = [
+  ['INACCURATE', 'Inaccurate'], ['AMBIGUOUS', 'Ambiguous'], ['NOT_RELEVANT_TO_ROLE', 'Not relevant to the role'],
+  ['DUPLICATE', 'Duplicate'], ['UNFAIR_OR_BIASED', 'Unfair or biased'],
+] as const;
+export const QUESTION_ARCHIVE_REASONS = [
+  ['OUTDATED', 'Outdated'], ['REPLACED', 'Replaced'], ['FLAWED', 'Flawed'], ['NO_LONGER_USED', 'No longer used'],
+] as const;
+export const ASSESSMENT_CLOSE_REASONS = [
+  ['ROLE_FILLED', 'Role filled'], ['ROLE_CLOSED', 'Role closed'], ['SCREENING_COMPLETE', 'Screening complete'],
+  ['REPLACED_BY_NEW_TEST', 'Replaced by a new test'], ['CONTENT_FLAWED', 'Content flawed'],
+] as const;
 
 export interface ScreeningInvitationDto {
   readonly id: string;
@@ -178,10 +221,42 @@ export interface ScreeningInvitationDto {
   readonly attemptId: string | null;
   readonly attemptState: string | null;
   readonly percentage: number | null;
+  /** EMP-12: whether it can be started or continued now (employer in good standing, application shared, window open). */
+  readonly available?: boolean;
+  readonly questionCount?: number;
+  readonly totalMarks?: number;
+  readonly remainingSeconds?: number | null;
+}
+
+/** EMP-12: what the candidate is about to be assessed on, read before starting. */
+export interface ScreeningBriefDto {
+  readonly id: string;
+  readonly title: string;
+  readonly employerName: string;
+  readonly roleTitle: string;
+  readonly state: string;
+  readonly attemptState: string | null;
+  readonly opensAt: string;
+  readonly closesAt: string;
+  readonly notOpenYet: boolean;
+  readonly durationSeconds: number;
+  readonly totalMarks: number;
+  readonly questionCount: number;
+  readonly questionFormats: readonly { readonly questionType: string; readonly count: number }[];
+  readonly minutesAvailableIfStartedNow: number | null;
+  readonly available: boolean;
+  readonly rules: {
+    readonly oneSitting: boolean; readonly timerRunsOnServer: boolean; readonly timerPauses: boolean;
+    readonly cameraOrMicrophone: boolean; readonly screenCapture: boolean; readonly tabSwitchesRecorded: boolean;
+    readonly resultGoesTo: string; readonly learningEvidence: boolean; readonly readinessChanged: boolean;
+  };
 }
 
 export interface ScreeningAttemptDto {
   readonly id: string;
+  readonly title?: string | null;
+  /** Seconds left by the server's clock when the paper was sent; the server enforces it. */
+  readonly remainingSeconds?: number;
   readonly questions: readonly {
     readonly questionId: string;
     readonly displayOrder: number;
@@ -208,8 +283,8 @@ export function createEmployerQuestion(token: string, employerId: string, body: 
   return requestJson(`${employerBase(employerId)}/assessment-questions`, { token, method: 'POST', body });
 }
 
-export function transitionEmployerQuestion(token: string, employerId: string, questionId: string, toState: string): Promise<{ readonly question: { readonly id: string; readonly approvalStatus: string } }> {
-  return requestJson(`${employerBase(employerId)}/assessment-questions/${encodeURIComponent(questionId)}/transition`, { token, method: 'POST', body: { toState } });
+export function transitionEmployerQuestion(token: string, employerId: string, questionId: string, toState: string, reasonCode?: string): Promise<{ readonly question: { readonly id: string; readonly approvalStatus: string } }> {
+  return requestJson(`${employerBase(employerId)}/assessment-questions/${encodeURIComponent(questionId)}/transition`, { token, method: 'POST', body: reasonCode ? { toState, reasonCode } : { toState } });
 }
 
 export function listEmployerAssessments(token: string, employerId: string, signal?: AbortSignal): Promise<{ readonly assessments: readonly EmployerAssessmentDto[] }> {
@@ -227,20 +302,35 @@ export function publishEmployerAssessment(token: string, employerId: string, ass
   return requestJson(`${employerBase(employerId)}/assessments/${encodeURIComponent(assessmentId)}/publish`, { token, method: 'POST' });
 }
 
-export function inviteToEmployerAssessment(token: string, employerId: string, assessmentId: string, applicationIds: readonly string[], closesAt: string): Promise<{ readonly invited: number }> {
-  return requestJson(`${employerBase(employerId)}/assessments/${encodeURIComponent(assessmentId)}/invitations`, { token, method: 'POST', body: { applicationIds, closesAt } });
+export function closeEmployerAssessment(token: string, employerId: string, assessmentId: string, reasonCode: string): Promise<{ readonly assessment: { readonly id: string } }> {
+  return requestJson(`${employerBase(employerId)}/assessments/${encodeURIComponent(assessmentId)}/close`, { token, method: 'POST', body: { reasonCode } });
 }
 
-export function listEmployerAssessmentResults(token: string, employerId: string, assessmentId: string, signal?: AbortSignal): Promise<{ readonly results: readonly EmployerAssessmentResultDto[] }> {
-  return requestJson(`${employerBase(employerId)}/assessments/${encodeURIComponent(assessmentId)}/results`, { token, ...(signal ? { signal } : {}) });
+export function inviteToEmployerAssessment(token: string, employerId: string, assessmentId: string, applicationIds: readonly string[], closesAt: string, opensAt?: string): Promise<{ readonly invited: number }> {
+  return requestJson(`${employerBase(employerId)}/assessments/${encodeURIComponent(assessmentId)}/invitations`, { token, method: 'POST', body: opensAt ? { applicationIds, opensAt, closesAt } : { applicationIds, closesAt } });
+}
+
+export function listEmployerAssessmentResults(token: string, employerId: string, assessmentId: string, signal?: AbortSignal, cursor?: string | null): Promise<{ readonly results: readonly EmployerAssessmentResultDto[]; readonly nextCursor?: string | null }> {
+  const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
+  return requestJson(`${employerBase(employerId)}/assessments/${encodeURIComponent(assessmentId)}/results${query}`, { token, ...(signal ? { signal } : {}) });
+}
+
+/** EMP-12: one candidate's results on this employer's tests; needs the live applicant-access grant. */
+export function listEmployerCandidateAssessments(token: string, employerId: string, applicationId: string, signal?: AbortSignal): Promise<{ readonly assessments: readonly EmployerCandidateAssessmentDto[] }> {
+  return requestJson(`${employerBase(employerId)}/applications/${encodeURIComponent(applicationId)}/assessment-results`, { token, ...(signal ? { signal } : {}) });
 }
 
 export function listScreeningInvitations(token: string, signal?: AbortSignal): Promise<{ readonly invitations: readonly ScreeningInvitationDto[] }> {
   return requestJson('/api/v1/students/me/screening-assessments', { token, ...(signal ? { signal } : {}) });
 }
 
+export function getScreeningBrief(token: string, invitationId: string, signal?: AbortSignal): Promise<{ readonly assessment: ScreeningBriefDto }> {
+  return requestJson(`/api/v1/students/me/screening-assessments/${encodeURIComponent(invitationId)}`, { token, ...(signal ? { signal } : {}) });
+}
+
+/** Starting records that the candidate read the brief and accepts its terms. */
 export function startScreeningAttempt(token: string, invitationId: string): Promise<{ readonly attempt: ScreeningAttemptDto }> {
-  return requestJson(`/api/v1/students/me/screening-assessments/${encodeURIComponent(invitationId)}/start`, { token, method: 'POST' });
+  return requestJson(`/api/v1/students/me/screening-assessments/${encodeURIComponent(invitationId)}/start`, { token, method: 'POST', body: { acknowledged: true } });
 }
 
 export function saveScreeningAnswer(token: string, attemptId: string, questionId: string, selectedOptionKeys: readonly string[]): Promise<{ readonly saved: boolean }> {

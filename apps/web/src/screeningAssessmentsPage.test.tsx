@@ -11,8 +11,18 @@ const invitation = {
   attemptId: null, attemptState: null, percentage: null,
 };
 
+const brief = {
+  id: 'inv-1', title: 'SOC screening test', employerName: 'Aster Mobility', roleTitle: 'SOC Analyst Intern',
+  state: 'INVITED', attemptState: null, opensAt: '2026-09-01T00:00:00.000Z', closesAt: '2099-09-30T00:00:00.000Z',
+  notOpenYet: false, durationSeconds: 1800, totalMarks: 2, questionCount: 1,
+  questionFormats: [{ questionType: 'SINGLE_CHOICE_MCQ', count: 1 }], minutesAvailableIfStartedNow: 30, available: true,
+  rules: { oneSitting: true, timerRunsOnServer: true, timerPauses: false, cameraOrMicrophone: false, screenCapture: false,
+    tabSwitchesRecorded: false, resultGoesTo: 'EMPLOYER_FOR_THIS_APPLICATION', learningEvidence: false, readinessChanged: false },
+};
+
 const attempt = {
   id: 'attempt-1',
+  remainingSeconds: 1800,
   questions: [{
     questionId: 'q-1', displayOrder: 1, questionText: 'Which log shows failed logins?',
     questionType: 'SINGLE_CHOICE_MCQ', marks: 2,
@@ -40,11 +50,13 @@ describe('screening tests, candidate side', () => {
   it('shows no hint of which option is correct', async () => {
     stub({
       '/api/v1/students/me/screening-assessments': { invitations: [invitation] },
+      '/api/v1/students/me/screening-assessments/inv-1': { assessment: brief },
       '/api/v1/students/me/screening-assessments/inv-1/start': { attempt },
     });
     await authenticate();
     render(<ScreeningAssessmentsPage />);
     fireEvent.click(await screen.findByRole('button', { name: 'Start' }));
+    await agreeAndBegin();
     expect(await screen.findByText('Which log shows failed logins?')).toBeInTheDocument();
     expect(screen.getByLabelText('Auth log')).toBeInTheDocument();
     // Nothing in the rendered paper distinguishes the right answer.
@@ -54,6 +66,7 @@ describe('screening tests, candidate side', () => {
   it('warns that submitting is final before it happens, not after', async () => {
     stub({
       '/api/v1/students/me/screening-assessments': { invitations: [invitation] },
+      '/api/v1/students/me/screening-assessments/inv-1': { assessment: brief },
       '/api/v1/students/me/screening-assessments/inv-1/start': { attempt },
       '/api/v1/students/me/screening-attempts/attempt-1/answers': { saved: true },
       '/api/v1/students/me/screening-attempts/attempt-1/submit': { result: { score: 2, maxScore: 2, percentage: 100 } },
@@ -61,6 +74,7 @@ describe('screening tests, candidate side', () => {
     await authenticate();
     render(<ScreeningAssessmentsPage />);
     fireEvent.click(await screen.findByRole('button', { name: 'Start' }));
+    await agreeAndBegin();
     fireEvent.click(await screen.findByLabelText('Auth log'));
     fireEvent.click(screen.getByRole('button', { name: 'Submit test' }));
     expect(await screen.findByText(/Submitting is final/)).toBeInTheDocument();
@@ -76,6 +90,37 @@ describe('screening tests, candidate side', () => {
     expect(screen.queryByRole('button', { name: 'Start' })).not.toBeInTheDocument();
   });
 
+  it('shows what the test covers and its terms, and starts only after the candidate agrees (EMP-12)', async () => {
+    const calls = stub({
+      '/api/v1/students/me/screening-assessments': { invitations: [invitation] },
+      '/api/v1/students/me/screening-assessments/inv-1': { assessment: { ...brief, minutesAvailableIfStartedNow: 12 } },
+      '/api/v1/students/me/screening-assessments/inv-1/start': { attempt },
+    });
+    await authenticate();
+    render(<ScreeningAssessmentsPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Start' }));
+    expect(await screen.findByText(/1 question, 2 marks in total: 1 single choice/)).toBeInTheDocument();
+    expect(screen.getByText(/if you start now you have 12 minutes/)).toBeInTheDocument();
+    expect(screen.getByText(/No camera, microphone or screen capture is used/)).toBeInTheDocument();
+    expect(screen.getByText(/Your result goes to Aster Mobility for this application only/)).toBeInTheDocument();
+    expect(screen.getByText(/not part of your academic record or your learning evidence/)).toBeInTheDocument();
+    const begin = screen.getByRole('button', { name: 'Begin the test' });
+    expect(begin).toBeDisabled();
+    expect(calls.some((call) => call.url.endsWith('/start'))).toBe(false);
+    await agreeAndBegin();
+    expect(await screen.findByRole('timer')).toHaveTextContent('Time left: 30:00');
+    const started = calls.find((call) => call.url.endsWith('/start'));
+    expect(started?.body).toEqual({ acknowledged: true });
+  });
+
+  it('says plainly when an invitation can no longer be taken', async () => {
+    stub({ '/api/v1/students/me/screening-assessments': { invitations: [{ ...invitation, available: false }] } });
+    await authenticate();
+    render(<ScreeningAssessmentsPage />);
+    expect(await screen.findByText(/This test is no longer available/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Start' })).not.toBeInTheDocument();
+  });
+
   it('says there is nothing rather than showing an example', async () => {
     stub({ '/api/v1/students/me/screening-assessments': { invitations: [] } });
     await authenticate();
@@ -84,12 +129,21 @@ describe('screening tests, candidate side', () => {
   });
 });
 
-function stub(routes: Readonly<Record<string, unknown>>): void {
-  vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+function stub(routes: Readonly<Record<string, unknown>>): { url: string; body: unknown }[] {
+  const calls: { url: string; body: unknown }[] = [];
+  vi.stubGlobal('fetch', vi.fn(async (url: string, init?: { body?: string }) => {
     if (url.endsWith('/oauth2/token')) return { ok: true, json: async () => ({ access_token: 'test-access-token' }) };
+    calls.push({ url, body: init?.body ? JSON.parse(init.body) as unknown : undefined });
     const path = url.replace(/^https?:\/\/[^/]+/, '').split('?')[0] ?? '';
     return { ok: true, status: 200, json: async () => routes[path] ?? {} };
   }));
+  return calls;
+}
+
+/** EMP-12: the candidate reads the brief, ticks that they have, and begins. */
+async function agreeAndBegin(): Promise<void> {
+  fireEvent.click(await screen.findByLabelText(/I have read what this test covers/));
+  fireEvent.click(screen.getByRole('button', { name: 'Begin the test' }));
 }
 
 async function authenticate(): Promise<void> {

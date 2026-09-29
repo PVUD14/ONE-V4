@@ -13,7 +13,8 @@
  * automatically penalise an employer — so this screen opens and moves cases and
  * carries no enforcement controls. Enforcement acts on a decided case, alongside the
  * decision that justified it. EMP-10: a case a student opened by reporting an employer's message
- * shows that conversation, on request, as the evidence it is.
+ * shows that conversation, on request, as the evidence it is. EMP-16: each case has a timeline with
+ * the employer's responses and appeal, and asking an employer to respond shares a summary first.
  */
 import { getProtectedAccessToken, getTrustCaseMessageThreads, listTrustCases, openTrustCaseFromSignal, transitionTrustCase } from '../api.js';
 import type { ReviewSignalDto, TrustCaseDto, TrustCaseMessageThreadDto } from '../api.js';
@@ -21,6 +22,7 @@ import { V2Stat } from '../dashboardsV2.js';
 import { StatusBadge } from '../studentComponents.js';
 import { formatApiError, RestrictedApiState } from './shared.js';
 import { useEffect, useState } from 'react';
+import { getOperatorTrustCase, requestEmployerTrustResponse, shareEmployerTrustStatement, type OperatorTrustCaseTimelineDto } from '../api/employerTerms.js';
 
 export function OperationsTrustSafetyPage(): React.ReactElement {
   const token = getProtectedAccessToken();
@@ -31,6 +33,9 @@ export function OperationsTrustSafetyPage(): React.ReactElement {
   const [reload, setReload] = useState(0);
   // EMP-10: the reported conversation attached to one case, read on request (audited).
   const [evidence, setEvidence] = useState<{ readonly caseId: string; readonly threads: readonly TrustCaseMessageThreadDto[] } | null>(null);
+  // EMP-16: one case's timeline — state moves plus what was shared with, and answered by, the employer.
+  const [timeline, setTimeline] = useState<OperatorTrustCaseTimelineDto | null>(null);
+  const [summary, setSummary] = useState('');
 
   useEffect(() => {
     if (!token) return;
@@ -70,6 +75,51 @@ export function OperationsTrustSafetyPage(): React.ReactElement {
       setEvidence({ caseId: record.id, threads: result.threads });
     } catch (cause) {
       setError(formatApiError(cause, 'The reported conversation could not be loaded.'));
+    } finally {
+      setBusy('');
+    }
+  };
+
+  const readTimeline = async (caseId: string): Promise<void> => {
+    setBusy(caseId);
+    try {
+      setTimeline((await getOperatorTrustCase(token, caseId)).case);
+      setSummary('');
+    } catch (cause) {
+      setError(formatApiError(cause, 'The case timeline could not be loaded.'));
+    } finally {
+      setBusy('');
+    }
+  };
+
+  // EMP-16: asking an employer to respond shares a summary with it first; a case about anyone else
+  // moves as before.
+  const askForResponse = async (record: TrustCaseDto): Promise<void> => {
+    setBusy(record.id);
+    try {
+      const loaded = (await getOperatorTrustCase(token, record.id)).case;
+      if (loaded.subjectEmployerId) { setTimeline(loaded); setSummary(''); return; }
+      await transitionTrustCase(token, record.id, 'AWAITING_RESPONSE', 'OPERATIONS_REVIEW');
+      setReload((value) => value + 1);
+    } catch (cause) {
+      setError(formatApiError(cause, 'The case could not be moved.'));
+    } finally {
+      setBusy('');
+    }
+  };
+
+  const shareWithEmployer = async (event: React.FormEvent): Promise<void> => {
+    event.preventDefault();
+    if (!timeline || !summary.trim()) return;
+    setBusy(timeline.id);
+    try {
+      const updated = timeline.state === 'TRIAGED'
+        ? (await requestEmployerTrustResponse(token, timeline.id, summary.trim())).case
+        : (await shareEmployerTrustStatement(token, timeline.id, 'DECISION_SUMMARY', summary.trim())).case;
+      setTimeline(updated); setSummary('');
+      setReload((value) => value + 1);
+    } catch (cause) {
+      setError(formatApiError(cause, 'The summary could not be shared.'));
     } finally {
       setBusy('');
     }
@@ -124,10 +174,32 @@ export function OperationsTrustSafetyPage(): React.ReactElement {
           <td>{record.state === 'REPORTED'
             ? <button type="button" className="pilot-btn" disabled={busy === record.id} onClick={() => void advance(record, 'TRIAGED')}>Triage</button>
             : record.state === 'TRIAGED'
-              ? <button type="button" className="pilot-btn" disabled={busy === record.id} onClick={() => void advance(record, 'AWAITING_RESPONSE')}>Ask for response</button>
-              : <span>&mdash;</span>}</td>
+              ? <button type="button" className="pilot-btn" disabled={busy === record.id} onClick={() => void askForResponse(record)}>Ask for response</button>
+              : <span>&mdash;</span>}{' '}
+            <button type="button" className="pilot-btn" disabled={busy === record.id} onClick={() => void readTimeline(record.id)}>Timeline</button></td>
         </tr>)}</tbody></table></div> : null}
     </section>
+    {timeline ? <section className="role-card role-wide" aria-label="Case timeline">
+      <h2>Case timeline</h2>
+      <div className="role-record-table-wrap"><table className="role-record-table">
+        <thead><tr><th>When</th><th>What</th><th>Detail</th></tr></thead>
+        <tbody>{[
+          ...timeline.events.map((item) => ({ at: item.occurred_at, what: `${item.from_state} → ${item.to_state}`, detail: item.reason_code })),
+          ...timeline.employerStatements.map((item) => ({ at: item.createdAt,
+            what: item.authorSide === 'EMPLOYER' ? (item.kind === 'EMPLOYER_APPEAL' ? 'Employer appeal' : 'Employer response') : (item.kind === 'DECISION_SUMMARY' ? 'Decision shared with employer' : 'Concern shared with employer'),
+            detail: item.body })),
+        ].sort((a, b) => a.at.localeCompare(b.at)).map((row, index) => <tr key={index}>
+          <td>{new Date(row.at).toLocaleString()}</td><td>{row.what}</td><td style={{ whiteSpace: 'pre-wrap' }}>{row.detail}</td>
+        </tr>)}</tbody>
+      </table></div>
+      {timeline.subjectEmployerId && ['TRIAGED', 'DECIDED', 'ACTIONED', 'CLOSED', 'APPEALED'].includes(timeline.state)
+        ? <form className="role-management-form" aria-label={timeline.state === 'TRIAGED' ? 'Ask the employer to respond' : 'Share the decision with the employer'} onSubmit={(event) => void shareWithEmployer(event)}>
+          <label><span>{timeline.state === 'TRIAGED' ? 'Summary of the concern (the employer reads this exactly as written; never identify the reporter)' : 'Decision summary (the employer reads this exactly as written)'}</span>
+            <textarea value={summary} maxLength={4000} rows={4} onChange={(event) => setSummary(event.target.value)} /></label>
+          <button type="submit" disabled={busy === timeline.id || !summary.trim()}>{timeline.state === 'TRIAGED' ? 'Share and ask for response' : 'Share decision'}</button>
+        </form> : null}
+      <button type="button" className="pilot-btn" onClick={() => setTimeline(null)}>Close</button>
+    </section> : null}
     {evidence ? <section className="role-card role-wide" aria-label="Reported conversation">
       <h2>Reported conversation</h2>
       <p>Evidence on this case. Reading it is recorded. Message text is shown as written and never as a link.</p>

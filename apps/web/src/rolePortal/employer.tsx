@@ -14,6 +14,7 @@ import { AddToCalendarButton, ScorecardTemplatesPanel } from '../interviewSchedu
 import { StaffPilotWrap } from '../parityWraps.js';
 import { EmployerTeamPage } from './employerTeam.js';
 import { EmployerCompanyProfilePage } from './employerCompanyProfile.js';
+import { EmployerSettingsPage } from './employerSettings.js';
 import { EmployerOpportunityDetailPage } from './employerOpportunityDetail.js';
 import { EmployerCandidateDetailPage, EmployerTalentPoolPage } from './employerCandidateDetail.js';
 import { EmployerMessagesPage } from '../applicationMessages.js';
@@ -92,6 +93,10 @@ function EmployerManagementRealityPage({ portal, routeLabel }: { readonly portal
 
   // EMP-02: Team is live for owners and admins; recruiters were answered above.
   if (routeLabel === 'Team') return <EmployerTeamPage key={employerId} employerId={employerId} />;
+
+  // EMP-16: Settings is live for owners and admins (recruiters were answered above): the employer
+  // terms, what ONE keeps about candidates, the viewer's notifications and trust cases.
+  if (routeLabel === 'Settings') return <EmployerSettingsPage key={employerId} employerId={employerId} />;
 
   // EMP-04: Company Profile is live for every employer role; the server decides who may edit
   // (owners and admins) and who only reads (recruiters).

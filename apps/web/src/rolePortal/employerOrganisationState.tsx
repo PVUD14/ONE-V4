@@ -10,11 +10,13 @@
  * once the organisation is verified.
  *
  * This is display only. The server remains the authority: if the status cannot be
- * read the page renders as before and the API still refuses what it must.
+ * read the page renders as before and the API still refuses what it must. EMP-16: the status
+ * page carries the organisation's trust cases, which a suspended employer may still answer.
  */
 import { useEffect, useState } from 'react';
 import { getEmployerOrganisationStatus, getProtectedAccessToken, type EmployerOrganisationStatusDto } from '../api.js';
 import { V2EmptyState } from '../dashboardsV2.js';
+import { EmployerTrustCasesPanel } from './employerSettings.js';
 
 const candidateRoutePattern = /applicant|candidate|talent|interview|offer|report|analytic|scorecard/i;
 
@@ -47,7 +49,7 @@ export function EmployerOrganisationGate({ employerId, routeLabel, children }: {
   if (gate.state === 'unknown') return <>{children}</>;
 
   const { organisation } = gate;
-  if (!organisation.canDraft) return <EmployerOrganisationStatusPage organisation={organisation} routeLabel={routeLabel} />;
+  if (!organisation.canDraft) return <EmployerOrganisationStatusPage organisation={organisation} routeLabel={routeLabel} employerId={employerId ?? null} />;
   if (!organisation.canReachCandidates) {
     const notice = <section className="role-preview-notice" role="note"><span><strong>Awaiting verification</strong> - AI8HT operations is reviewing your organisation. You can prepare draft jobs now; publishing and candidates open once it is verified.</span></section>;
     if (candidateRoutePattern.test(routeLabel)) {
@@ -73,16 +75,22 @@ function isOrganisationStatus(value: unknown): value is EmployerOrganisationStat
   return typeof record.verificationState === 'string' && typeof record.canDraft === 'boolean' && typeof record.canReachCandidates === 'boolean';
 }
 
-/** The plain status page for a suspended, rejected or inactive employer. */
-export function EmployerOrganisationStatusPage({ organisation, routeLabel }: { readonly organisation: EmployerOrganisationStatusDto; readonly routeLabel: string }): React.ReactElement {
+/**
+ * The plain status page for a suspended, rejected or inactive employer. EMP-16: it also lists the
+ * trust and safety cases about the organisation, because answering one is the thing such an
+ * employer can still do (§5.1).
+ */
+export function EmployerOrganisationStatusPage({ organisation, routeLabel, employerId = null }: {
+  readonly organisation: EmployerOrganisationStatusDto; readonly routeLabel: string; readonly employerId?: string | null;
+}): React.ReactElement {
   const rejected = organisation.verificationState === 'REJECTED';
   const title = rejected ? 'Your organisation was not verified' : organisation.verificationState === 'SUSPENDED' ? 'Your organisation is suspended' : 'Your organisation is not active';
   const note = rejected
     ? 'AI8HT operations did not verify this employer organisation, so it cannot publish jobs or see candidates.'
     : 'AI8HT operations has suspended this employer organisation. While it is suspended you cannot publish jobs or see candidates, and your published jobs are paused so students no longer see them.';
   const hint = rejected
-    ? 'If you think this is a mistake, contact AI8HT operations. Responding to a review from inside ONE is not available yet.'
-    : 'Contact AI8HT operations to resolve this. When the suspension is lifted your jobs stay paused until you publish them again. Responding to a review from inside ONE is not available yet.';
+    ? 'If you think this is a mistake, contact AI8HT operations. If operations has asked you to respond to a concern, or decided one, it is listed below.'
+    : 'Contact AI8HT operations to resolve this. When the suspension is lifted your jobs stay paused until you publish them again. If operations has asked you to respond to a concern, or decided one, it is listed below.';
   return <section className="role-module role-module--dense">
     <div className="role-page-heading"><div>
       <span className="eyebrow">Organisation status</span>
@@ -90,5 +98,6 @@ export function EmployerOrganisationStatusPage({ organisation, routeLabel }: { r
       <p role="status">{title}.</p>
     </div></div>
     <div className="role-wide"><V2EmptyState icon="⛔" title={title} note={note} hint={hint} /></div>
+    {employerId ? <EmployerTrustCasesPanel employerId={employerId} /> : null}
   </section>;
 }

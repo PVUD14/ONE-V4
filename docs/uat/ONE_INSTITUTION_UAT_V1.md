@@ -49,7 +49,7 @@ CE-2A.
 | J8 | Placement register | **Not in this slice** — INST-12 | — |
 | J9 | Nominations | **Not in this slice** — INST-14 | — |
 | J10 | Faculty assigns a practice set | Built in INST-16 (Learning Resources → Assign; the student's next step on Learning) — to be walked in the next UAT round | — |
-| J11 | Preparation sprint by role | **Not in this slice** — INST-17 | — |
+| J11 | Preparation sprint by role | Built (INST-17) — script below | [design](../architecture/preparation-sprints-table-design.md) |
 | J12 | College offboarding | **Not in this slice** — INST-18 | — |
 | I-S | Settings, grading scales and calendar (supplementary) | In slice | [settings](../institution/sop-settings-and-calendar.md) |
 | I-C | Student meets the consent gate (supplementary, ENG-01) | In slice (engine purposes unpublished, HG-6) | — |
@@ -159,3 +159,23 @@ it; student 0002 has reported semester 3 as 7.0.
 | J5 | | | | |
 | I-S | | | | |
 | I-C | | | | |
+
+---
+
+## J11 — Preparation sprint by role (INST-17)
+
+**Actor:** placement officer (PLACEMENT_ADMIN) of a seeded college; seeded students with evidence dated last month;
+a published practice set or lesson on the role's essential requirement; optionally a live campus drive whose job
+maps to the role. Synthetic data only.
+
+| Step | Action | Expected |
+|---|---|---|
+| 1 | Open **Readiness**; under the monthly report, choose "SOC Analyst L1" (or the campus drive naming it) | Each essential requirement shows Met / Partly there / Not yet / Too little evidence / No evidence yet as counts, gaps and unknowns; any group under five reads `<5`; no score, percentage or student name anywhere; "As at the end of <last month>" |
+| 2 | Choose the current month | Refused: "Choose a whole calendar month that has ended" with a reference |
+| 3 | On a requirement with published content, **Run a sprint**: the practice set, 14 days, reason "Preparing for a campus drive" | "Sprint started for N students until <date>" (N `<5` when under five); the students with gaps are told in the app |
+| 4 | Sign in as a student who had a gap; open Learning | "From your college" card shows the work as "preparation sprint from <college> until <date>"; planning a step brings it up |
+| 5 | Next day, reopen Readiness | The sprint lists Reached, Now meet it / New evidence / Nothing new yet and Work done, counted to the start of the day |
+| 6 | As a lecturer, open the same URL | Forbidden; the lecturer's own tools stay on My Students and Learning Resources |
+| 7 | End the sprint early with a reason | "Sprint ended"; the work leaves the students' Learning page |
+| 8 | Android: open the institution home as the placement officer | "Readiness by career role" and "Preparation sprints" show the same counts, read-only |
+

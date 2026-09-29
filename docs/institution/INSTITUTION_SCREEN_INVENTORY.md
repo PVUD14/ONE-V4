@@ -156,3 +156,17 @@ plan a group session (a MEETING on their Calendar, with attendees and linked con
 next step with a reason code. The cohort section on My Students links each stuck skill, common misconception
 and due student to these actions. Students see "From your lecturer" on the Learning page (web) and the
 Learning tab (Android). Remaining view-only item: admin Career Readiness (INST-17).
+
+## Update after INST-17 (2026-09-30)
+
+Admin **Career Readiness** is no longer view-only: it shows cohort readiness by career role — choose a catalogue
+role or the role behind one of the college's live campus drives; for each essential requirement, how the
+reader's cohort stood at the end of an ended month (Met / Partly there / Not yet / Too little evidence / No
+evidence yet, with gaps and unknowns; bands only, groups under five `<5`, no student named) — and preparation
+sprints: a time-boxed INST-16 assignment of published practice or a lesson to the students with a gap, with
+progress (now meet it / new evidence / nothing new, work done) cut at the start of each day. The same section
+sits under the monthly report on the placement officer's **Readiness** (completing that partial item) and on the
+department head's **Readiness**. Students see a sprint in the existing Learning card, headed "From your
+college" with its end date (web and Android). Android shows the sprints and one role's view read-only on the
+institution home. No navigation item added, removed, renamed or reordered. **No view-only navigation item
+remains** for the institution roles.

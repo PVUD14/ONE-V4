@@ -42,6 +42,10 @@ let employerId: string;
 // EMP-12 screening attempts: the subject's (one submitted, one still in progress) and another candidate's.
 let subjectSubmittedAttemptId: string; let subjectOpenAttemptId: string; let subjectOpenInvitationId: string;
 let otherCandidateId: string; let otherAttemptId: string;
+// The records every later goal added (docs/architecture/privacy-export-coverage.md), seeded for the
+// subject and for the other candidate so the export and deletion can be shown to reach only the subject's.
+let fixtures: Fixtures;
+let subjectRecords: PersonalRecords; let otherRecords: PersonalRecords;
 
 const ids = { uuid: () => randomUUID() };
 
@@ -78,7 +82,8 @@ beforeAll(async () => {
 
   // Data the subject owns, and an application the employer lawfully holds.
   await pool.query(`INSERT INTO student_profiles (user_id, target_career) VALUES ($1, 'SOC Analyst')`, [subjectId]);
-  await pool.query(`INSERT INTO student_document_metadata (id, student_user_id, title, document_type) VALUES ($1, $2, 'My CV', 'RESUME')`, [randomUUID(), subjectId]);
+  const subjectDocumentId = randomUUID();
+  await pool.query(`INSERT INTO student_document_metadata (id, student_user_id, title, document_type) VALUES ($1, $2, 'My CV', 'RESUME')`, [subjectDocumentId, subjectId]);
   const subjectApplicationId = await seedApplication(subjectId);
   otherCandidateId = randomUUID();
   await db.insert(schema.users).values({ id: otherCandidateId, externalSubject: `sub:${randomUUID()}`, email: 'candidate@uat.test', state: 'ACTIVE' });
@@ -98,6 +103,9 @@ beforeAll(async () => {
   await seedSkillState(opsId, topicId);
   await seedDecision(subjectId);
   await seedDecision(opsId);
+  fixtures = await seedFixtures(topicId);
+  subjectRecords = await seedPersonalRecords(subjectId, subjectApplicationId, 'Subjectmark', subjectDocumentId);
+  otherRecords = await seedPersonalRecords(otherCandidateId, otherApplicationId, 'Othermark', null);
 });
 
 async function seedTopic(authorId: string): Promise<string> {
@@ -236,6 +244,250 @@ async function seedScreening(applicationId: string, candidateUserId: string, sta
   return { attemptId, invitationId };
 }
 
+// --- Every personal record the export now covers (docs/architecture/privacy-export-coverage.md) ---------
+
+const SHA = 'e'.repeat(64);
+
+interface Fixtures {
+  institutionId: string; lecturerId: string; lecturerMembershipId: string;
+  topicId: string; questionId: string; lessonId: string; roleId: string;
+  readinessModelId: string; roadmapPolicyId: string; assessmentDefinitionId: string; blueprintId: string;
+  examDefinitionId: string;
+}
+
+/** What each person's seed leaves behind that the export must never carry, and what deletion must remove. */
+interface PersonalRecords {
+  deviceToken: string; tokenDigest: string; photoKey: string; documentVersionId: string; verificationActionId: string;
+}
+
+/** A college with a lecturer, published content on the topic, and the shared definitions the records point at. */
+async function seedFixtures(topicId: string): Promise<Fixtures> {
+  const institutionId = randomUUID();
+  await pool.query("INSERT INTO organizations (id, kind, legal_name, verification_state, active) VALUES ($1,'INSTITUTION','Privacy Test College','VERIFIED',true)", [institutionId]);
+  const lecturerId = randomUUID();
+  const lecturerMembershipId = randomUUID();
+  await db.insert(schema.users).values({ id: lecturerId, externalSubject: `sub:${randomUUID()}`, email: 'lecturer@uat.test', state: 'ACTIVE' });
+  await pool.query(`INSERT INTO organization_memberships (id,organization_id,user_id,role,state,scope_organization_id,scope_institution_id)
+    VALUES ($1,$2,$3,'FACULTY_LECTURER','ACTIVE',$2,$2)`, [lecturerMembershipId, institutionId, lecturerId]);
+
+  // One published release carrying an answer-keyed question, a lesson and a readiness check on the topic.
+  const [runId, packageId, sourceRecordId] = [randomUUID(), randomUUID(), randomUUID()];
+  await pool.query(`INSERT INTO migration_runs (id, package_identity, source_repository, source_commit, manifest_hash, transform_version, status, started_by_user_id, completed_at)
+    VALUES ($1, $2, 'synthetic/privacy', $3, $4, 'privacy-test', 'STAGED', $5, now())`, [runId, `privacy-${runId}`, 'c'.repeat(40), SHA, opsId]);
+  await pool.query(`INSERT INTO source_packages (id, migration_run_id, deterministic_key, source_repository, source_commit, package_hash, transform_version, source_paths, checksums, manifest)
+    VALUES ($1, $2, $3, 'synthetic/privacy', $4, $5, 'privacy-test', '[]', '{}', '{}')`, [packageId, runId, `privacy-${packageId}`, 'c'.repeat(40), SHA]);
+  await pool.query(`INSERT INTO source_records (id, package_id, source_entity_type, source_record_id, source_path, source_hash, license_label,
+      rights_state, sme_state, quality_state, mapping_state, duplicate_state, release_state, release_eligible)
+    VALUES ($1, $2, 'ENGINE_CONTENT', 'privacy', 'synthetic.json', $3, 'Synthetic', 'APPROVED', 'APPROVED', 'APPROVED', 'MAPPED', 'UNIQUE', 'ELIGIBLE', true)`,
+  [sourceRecordId, packageId, SHA]);
+  const manifestId = randomUUID();
+  await pool.query(`INSERT INTO release_manifests (id, name, version, manifest_hash, status) VALUES ($1, $2, 1, $3, 'DRAFT')`,
+    [manifestId, `privacy-${manifestId}`, manifestId.replace(/-/g, '').repeat(2)]);
+  const [questionId, moduleId, lessonId, blueprintId] = [randomUUID(), randomUUID(), randomUUID(), randomUUID()];
+  const revisionOf = new Map<string, string>();
+  for (const [entityType, entityId] of [['QUESTION', questionId], ['MODULE', moduleId], ['LESSON', lessonId], ['ASSESSMENT_BLUEPRINT', blueprintId]] as const) {
+    const revisionId = randomUUID();
+    revisionOf.set(entityId, revisionId);
+    await pool.query(`INSERT INTO content_revisions (id, entity_type, entity_id, revision, author_user_id, state, content_hash, body)
+      VALUES ($1, $2, $3, 1, $4, 'DRAFT', $5, '{}')`, [revisionId, entityType, entityId, opsId, SHA]);
+    await pool.query('INSERT INTO release_manifest_items (manifest_id, content_revision_id, source_record_id, item_hash) VALUES ($1, $2, $3, $4)',
+      [manifestId, revisionId, sourceRecordId, SHA]);
+  }
+  await pool.query("UPDATE release_manifests SET status = 'APPROVED', approved_by_user_id = $2, approved_at = now() WHERE id = $1", [manifestId, opsId]);
+  await pool.query("UPDATE release_manifests SET status = 'PUBLISHED', published_by_user_id = $2, published_at = now() WHERE id = $1", [manifestId, opsId]);
+  await pool.query(`INSERT INTO question_versions (id, stable_key, version, topic_id, prompt, options, content_revision_id, release_manifest_id, published_at)
+    VALUES ($1, $2, 1, $3, 'Which port does SSH use?', $4::jsonb, $5, $6, now())`,
+  [questionId, `privacy-q-${questionId}`, topicId, JSON.stringify([{ id: 'a', text: '22' }, { id: 'b', text: '80' }]), revisionOf.get(questionId), manifestId]);
+  await pool.query(`INSERT INTO question_answer_keys (question_version_id, correct_option_id, explanation, answer_hash) VALUES ($1, 'a', 'Synthetic explanation.', $2)`, [questionId, SHA]);
+  await pool.query(`INSERT INTO learning_modules (id, stable_key, version, title, description, content_revision_id, release_manifest_id, published_at)
+    VALUES ($1, $2, 1, 'Synthetic module', 'Synthetic', $3, $4, now())`, [moduleId, `privacy-m-${moduleId}`, revisionOf.get(moduleId), manifestId]);
+  await pool.query(`INSERT INTO lesson_versions (id, module_id, stable_key, version, title, body, topic_id, content_revision_id, published_at)
+    VALUES ($1, $2, $3, 1, 'Reading auth logs', '{}', $4, $5, now())`, [lessonId, moduleId, `privacy-l-${lessonId}`, topicId, revisionOf.get(lessonId)]);
+  const assessmentDefinitionId = randomUUID();
+  await pool.query(`INSERT INTO assessment_definitions (id, stable_key, version, title, content_revision_id, release_manifest_id, attempt_limit, time_limit_seconds, published_at)
+    VALUES ($1, $2, 1, 'Networking readiness check', $3, $4, 3, 900, now())`, [assessmentDefinitionId, `privacy-a-${assessmentDefinitionId}`, revisionOf.get(blueprintId), manifestId]);
+  await pool.query(`INSERT INTO assessment_blueprints (id, assessment_definition_id, version, selection_count, algorithm_version, constraints)
+    VALUES ($1, $2, 1, 1, 'sha256-ranked-v1', '{}'::jsonb)`, [blueprintId, assessmentDefinitionId]);
+
+  const roleId = randomUUID();
+  await pool.query(`INSERT INTO career_roles (id, code, title, family) VALUES ($1, $2, 'Privacy check analyst', 'TEST')`, [roleId, 'PRIV_' + roleId.slice(0, 8).toUpperCase()]);
+  const readinessModelId = randomUUID();
+  await pool.query(`INSERT INTO readiness_model_versions (id, stable_key, version, policy, published_by_user_id, published_at)
+    VALUES ($1, $2, 1, '{}'::jsonb, $3, now())`, [readinessModelId, `privacy-model-${readinessModelId}`, opsId]);
+  const roadmapPolicyId = randomUUID();
+  await pool.query(`INSERT INTO roadmap_policy_versions (id, stable_key, version, policy, published_by_user_id, published_at)
+    VALUES ($1, $2, 1, '{}'::jsonb, $3, now())`, [roadmapPolicyId, `privacy-roadmap-${roadmapPolicyId}`, opsId]);
+  await pool.query(`INSERT INTO consent_definitions (consent_key, version, title, enforcement) VALUES ('privacy-notice', 'privacy-test-v1', 'Privacy notice', 'BLOCKING')
+    ON CONFLICT (consent_key, version) DO NOTHING`);
+
+  const examSubjectId = randomUUID();
+  await pool.query("INSERT INTO exam_subjects (id, institution_id, name) VALUES ($1, $2, 'Computer networks')", [examSubjectId, institutionId]);
+  const examDefinitionId = randomUUID();
+  await pool.query(`INSERT INTO exam_definitions (id, institution_id, subject_id, title, exam_kind, lifecycle_state, total_marks, duration_seconds, starts_at, ends_at, created_by_user_id, published_at)
+    VALUES ($1, $2, $3, 'Networks unit test', 'UNIT_TEST', 'PUBLISHED', 10, 600, now() - interval '2 days', now() + interval '2 days', $4, now())`,
+  [examDefinitionId, institutionId, examSubjectId, lecturerId]);
+
+  return { institutionId, lecturerId, lecturerMembershipId, topicId, questionId, lessonId, roleId, readinessModelId, roadmapPolicyId, assessmentDefinitionId, blueprintId, examDefinitionId };
+}
+
+/**
+ * One of every record the export now covers, for one person. Every text the person or their college
+ * wrote carries `tag`, so a bundle can be searched for the other person's tag and shown not to hold it.
+ */
+async function seedPersonalRecords(userId: string, applicationId: string, tag: string, documentId: string | null): Promise<PersonalRecords> {
+  const f = fixtures;
+  const q = (text: string, values: unknown[]) => pool.query(text, values);
+  const relationshipId = randomUUID();
+  await q(`INSERT INTO institution_relationships (id, institution_id, student_user_id, state, effective_from) VALUES ($1,$2,$3,'ACTIVE','2024-06-01T00:00:00Z')`, [relationshipId, f.institutionId, userId]);
+  await q(`INSERT INTO institution_student_profiles (id, institution_id, student_user_id, institution_student_id, full_name, status)
+    VALUES ($1,$2,$3,$4,$5,'ACTIVE')`, [randomUUID(), f.institutionId, userId, `R-${userId.slice(0, 8)}`, `${tag} Person`]);
+
+  // Account: consent, notifications, a device, the college's invitation and a support case.
+  await q(`INSERT INTO user_consents (id, user_id, consent_key, version, action) VALUES ($1,$2,'privacy-notice','privacy-test-v1','GRANTED')`, [randomUUID(), userId]);
+  await q(`INSERT INTO notification_preferences (user_id, email_enabled, timezone) VALUES ($1, false, 'Asia/Kolkata')`, [userId]);
+  await q(`INSERT INTO user_notifications (id, user_id, kind, title, body, data) VALUES ($1,$2,'SYSTEM',$3,'Your interview moved to Friday.', $4::jsonb)`,
+    [randomUUID(), userId, `${tag} notice`, JSON.stringify({ internalRef: 'internal-reference-marker' })]);
+  const deviceToken = `device-token-${randomUUID()}`;
+  await q(`INSERT INTO device_push_tokens (id, user_id, platform, token) VALUES ($1,$2,'ANDROID',$3)`, [randomUUID(), userId, deviceToken]);
+  await q(`INSERT INTO invitations (id, email, token_hash, invited_by_user_id, organization_id, expires_at, kind, student_user_id)
+    VALUES ($1,$2,$3,$4,$5, now() + interval '7 days', 'STUDENT', $6)`,
+  [randomUUID(), `${tag.toLowerCase()}.invite@uat.test`, randomUUID().replace(/-/g, '').repeat(2), f.lecturerId, f.institutionId, userId]);
+  await q(`INSERT INTO support_cases (id, subject_user_id, channel, category, severity, summary, opened_by_user_id, opening_reason_code, sla_due_at)
+    VALUES ($1,$2,'EMAIL','HOW_TO','LOW',$3,$4,'USER_REQUEST', now() + interval '2 days')`, [randomUUID(), userId, `${tag} asked how to share a CV`, opsId]);
+
+  // Profile and records.
+  // SECONDARY: the deletion test later gives the subject a PRIMARY target of its own.
+  await q(`INSERT INTO student_career_targets (id, student_user_id, career_role_id, priority) VALUES ($1,$2,$3,'SECONDARY')`, [randomUUID(), userId, f.roleId]);
+  await q(`INSERT INTO career_gap_snapshots (id, student_user_id, career_role_id, model_version, requirements_total, requirements_met, requirements_unknown)
+    VALUES ($1,$2,$3,'career-gap-v1',7,3,2)`, [randomUUID(), userId, f.roleId]);
+  await q(`INSERT INTO learner_goals (id, student_user_id, institution_id, goal_type, topic_id, origin) VALUES ($1,$2,$3,'TOPIC',$4,'GOALS')`,
+    [randomUUID(), userId, f.institutionId, f.topicId]);
+  await q(`INSERT INTO student_outcome_declarations (id, student_user_id, institution_id, outcome) VALUES ($1,$2,$3,'HIGHER_STUDIES')`, [randomUUID(), userId, f.institutionId]);
+  await q(`INSERT INTO external_applications (id, student_user_id, company_name, role_title, source_kind, applied_on)
+    VALUES ($1,$2,$3,'Security intern','JOB_BOARD','2026-08-01')`, [randomUUID(), userId, `${tag} Robotics`]);
+
+  // A document version: evidence for an academic term and for a college verification action.
+  let ownDocumentId = documentId;
+  if (!ownDocumentId) {
+    ownDocumentId = randomUUID();
+    await q(`INSERT INTO student_document_metadata (id, student_user_id, title, document_type) VALUES ($1,$2,'Marksheet','TRANSCRIPT')`, [ownDocumentId, userId]);
+  }
+  const fileId = randomUUID();
+  const documentVersionId = randomUUID();
+  await q(`INSERT INTO stored_files (id, storage_key, original_filename, content_type, uploaded_by_user_id) VALUES ($1,$2,'marksheet.pdf','application/pdf',$3)`,
+    [fileId, `documents/${fileId}`, userId]);
+  await q(`INSERT INTO student_document_versions (id, document_id, version_number, file_id, created_by_user_id) VALUES ($1,$2,1,$3,$4)`,
+    [documentVersionId, ownDocumentId, fileId, userId]);
+  const qualificationId = randomUUID();
+  const termId = randomUUID();
+  await q(`INSERT INTO student_qualifications (id, student_user_id, institution_id, qualification_type, programme_name, started_on)
+    VALUES ($1,$2,$3,'BTECH',$4,'2023-08-01')`, [qualificationId, userId, f.institutionId, `${tag} Computer Science`]);
+  await q(`INSERT INTO student_academic_terms (id, qualification_id, sequence, label, result_value, result_scale, source, evidence_document_version_id)
+    VALUES ($1,$2,1,'Semester 1',8.2,'CGPA_10','DOCUMENT_BACKED',$3)`, [termId, qualificationId, documentVersionId]);
+  await q(`INSERT INTO student_academic_subjects (id, term_id, subject_code, subject_name, grade_letter, grade_scale)
+    VALUES ($1,$2,'CS101','Programming basics','A','LETTER')`, [randomUUID(), termId]);
+  const tokenDigest = randomUUID().replace(/-/g, '').repeat(2);
+  await q(`INSERT INTO public_profile_links (id, student_user_id, token_digest, show_photo, expires_at) VALUES ($1,$2,$3,true, now() + interval '30 days')`,
+    [randomUUID(), userId, tokenDigest]);
+  const photoKey = `profile-photos/${userId}/${randomUUID()}`;
+  await storage.put(photoKey, Buffer.from(`${tag} photo bytes`));
+  await q(`INSERT INTO student_profile_photos (student_user_id, storage_key, content_type, byte_size) VALUES ($1,$2,'image/png',17)`, [userId, photoKey]);
+
+  // Hiring: what was shared, how it moved, an interview, released feedback, who had access, and a nomination.
+  await q(`INSERT INTO application_profile_snapshots (id, application_id, opportunity_version_id, schema_version, snapshot, snapshot_hash)
+    VALUES ($1,$2,(SELECT applied_version_id FROM applications WHERE id = $2),1,$3::jsonb,$4)`,
+    [randomUUID(), applicationId, JSON.stringify({ schemaVersion: 1, candidate: { fullName: `${tag} Person`, phone: '+91 90000 00000' } }), SHA]);
+  await q(`INSERT INTO application_state_history (id, application_id, from_state, to_state, actor_role, note) VALUES ($1,$2,'APPLIED','SCREENING','RECRUITER',$3)`,
+    [randomUUID(), applicationId, `${tag} internal recruiter note`]);
+  await q(`INSERT INTO interviews (id, application_id, employer_id, round_number, mode, state, scheduled_start, scheduled_end, joining_link, preparation_note, created_by_user_id)
+    VALUES ($1,$2,$3,1,'VIDEO','SCHEDULED', now() + interval '3 days', now() + interval '3 days 1 hour', 'https://meet.example.test/room', $4, $5)`,
+  [randomUUID(), applicationId, employerId, `${tag} bring your portfolio`, opsId]);
+  const releaseId = randomUUID();
+  await q(`INSERT INTO application_feedback_releases (id, application_id, employer_id, released_by_user_id, note) VALUES ($1,$2,$3,$4,$5)`,
+    [releaseId, applicationId, employerId, opsId, `${tag} feedback note`]);
+  await q(`INSERT INTO application_feedback_release_reasons (release_id, reason_code) VALUES ($1,'CORE_SKILL_GAP')`, [releaseId]);
+  const opportunityId = (await q('SELECT opportunity_id FROM applications WHERE id = $1', [applicationId])).rows[0].opportunity_id as string;
+  await q(`INSERT INTO employer_applicant_access_grants (id, employer_id, student_user_id, opportunity_id, granted_at) VALUES ($1,$2,$3,$4, now())`,
+    [randomUUID(), employerId, userId, opportunityId]);
+  const driveId = randomUUID();
+  await q(`INSERT INTO campus_drives (id, employer_id, opportunity_id, institution_id, requested_by_user_id, state, decided_by_user_id, decided_at)
+    VALUES ($1,$2,$3,$4,$5,'APPROVED',$6, now())`, [driveId, employerId, opportunityId, f.institutionId, opsId, f.lecturerId]);
+  await q(`INSERT INTO campus_drive_nominations (id, campus_drive_id, opportunity_id, institution_id, student_user_id, nominated_by_user_id, nominated_by_role, reason_code, note)
+    VALUES ($1,$2,$3,$4,$5,$6,'PLACEMENT_ADMIN','MEETS_ELIGIBILITY',$7)`, [randomUUID(), driveId, opportunityId, f.institutionId, userId, f.lecturerId, `${tag} strong fit`]);
+
+  // The college: a shared task, a staff-only note, a verification action on the document, a group
+  // session, a lecturer's assignment and next step, and a published exam result.
+  const staffAction = async (type: string, visibility: string, title: string, extra: { evidence?: string; meeting?: boolean } = {}): Promise<string> => {
+    const id = randomUUID();
+    const aboutStudent = !extra.meeting;
+    await q(`INSERT INTO staff_actions (id, institution_id, subject_student_user_id, institution_relationship_id, actor_user_id, actor_membership_id,
+        action_type, state, title, note, visibility, evidence_document_version_id, scheduled_start_at, scheduled_end_at, updated_by_user_id)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,'OPEN',$8,$9,$10,$11,$12,$13,$5)`,
+    [id, f.institutionId, aboutStudent ? userId : null, aboutStudent ? relationshipId : null, f.lecturerId, f.lecturerMembershipId,
+      type, title, `${title} details`, visibility, extra.evidence ?? null,
+      extra.meeting ? new Date(Date.now() + 86_400_000).toISOString() : null, extra.meeting ? new Date(Date.now() + 90_000_000).toISOString() : null]);
+    return id;
+  };
+  await staffAction('ASSIGNED_TASK', 'SUBJECT_VISIBLE', `${tag} finish the lab report`);
+  await staffAction('FACULTY_NOTE', 'STAFF_ONLY', `${tag} staff-only observation`);
+  const verificationActionId = await staffAction('ACADEMIC_VERIFICATION', 'STAFF_ONLY', `${tag} verify semester 1`, { evidence: documentVersionId });
+  const meetingId = await staffAction('MEETING', 'STAFF_ONLY', `${tag} revision session`, { meeting: true });
+  await q(`INSERT INTO staff_action_attendees (staff_action_id, student_user_id, institution_id) VALUES ($1,$2,$3)`, [meetingId, userId, f.institutionId]);
+  const assignmentId = randomUUID();
+  await q(`INSERT INTO learning_assignments (id, institution_id, assigned_by_user_id, assigned_by_membership_id, content_kind, skill_id, target_kind, note)
+    VALUES ($1,$2,$3,$4,'PRACTICE',$5,'STUDENTS',$6)`, [assignmentId, f.institutionId, f.lecturerId, f.lecturerMembershipId, f.topicId, `${tag} practise before Monday`]);
+  await q(`INSERT INTO learning_assignment_students (assignment_id, student_user_id, institution_id) VALUES ($1,$2,$3)`, [assignmentId, userId, f.institutionId]);
+  await q(`INSERT INTO learning_plan_overrides (id, institution_id, student_user_id, created_by_user_id, created_by_membership_id, action, content_kind, skill_id, lesson_version_id, reason_code, note)
+    VALUES ($1,$2,$3,$4,$5,'LEARN','LESSON',$6,$7,'CATCH_UP',$8)`,
+  [randomUUID(), f.institutionId, userId, f.lecturerId, f.lecturerMembershipId, f.topicId, f.lessonId, `${tag} start with the lesson`]);
+  const examAttemptId = randomUUID();
+  await q(`INSERT INTO exam_assignments (id, institution_id, definition_id, student_user_id, assigned_by_user_id) VALUES ($1,$2,$3,$4,$5)`,
+    [randomUUID(), f.institutionId, f.examDefinitionId, userId, f.lecturerId]);
+  await q(`INSERT INTO exam_attempts (id, institution_id, definition_id, student_user_id, attempt_number, status, paper_seed, submitted_at, screen_shift_count)
+    VALUES ($1,$2,$3,$4,1,'SUBMITTED','paper-seed-secret',now(),2)`, [examAttemptId, f.institutionId, f.examDefinitionId, userId]);
+  await q(`INSERT INTO exam_results (id, attempt_id, score, max_score, percentage, correct_count, wrong_count, not_attempted_count, time_taken_seconds, published)
+    VALUES ($1,$2,7,10,70,7,2,1,420,true)`, [randomUUID(), examAttemptId]);
+
+  // The learning engine: a practice step with its served question, a placement sitting, a lesson,
+  // evidence, bands, the roadmap and a readiness check.
+  const decisionId = randomUUID();
+  await q(`INSERT INTO learning_decisions (id, subject_user_id, policy_version, adaptive, inputs, inputs_hash, action, skill_id, reason_codes, correlation_id)
+    VALUES ($1,$2,'learning-orchestrator-v1',true,$3::jsonb,$4,'PRACTICE',$5,'{WEAKEST_SKILL}','privacy-test')`,
+  [decisionId, userId, JSON.stringify({ plannerSecretEstimate: 0.4137 }), SHA, f.topicId]);
+  const stepSessionId = randomUUID();
+  await q(`INSERT INTO learning_sessions (id, subject_user_id, mode, source_type, source_id, started_at) VALUES ($1,$2,'PRACTICE','learning_step',$3, now())`,
+    [stepSessionId, userId, decisionId]);
+  await q(`INSERT INTO learning_step_items (id, decision_id, subject_user_id, session_id, position, item_source, item_id, item_version, skill_id)
+    VALUES ($1,$2,$3,$4,1,'CAREER_READINESS_QUESTION',$5,1,$6)`, [randomUUID(), decisionId, userId, stepSessionId, f.questionId, f.topicId]);
+  const placementSessionId = randomUUID();
+  const placementId = randomUUID();
+  await q(`INSERT INTO learning_sessions (id, subject_user_id, mode, source_type, source_id, started_at) VALUES ($1,$2,'DIAGNOSTIC','placement_test',$3, now())`,
+    [placementSessionId, userId, placementId]);
+  await q(`INSERT INTO placement_tests (id, subject_user_id, session_id, scope, algorithm_id, state, started_at, deadline_at)
+    VALUES ($1,$2,$3,'APTITUDE_V1','placement-2pl-eap-v1','IN_PROGRESS', now(), now() + interval '20 minutes')`, [placementId, userId, placementSessionId]);
+  await q(`UPDATE placement_tests SET state = 'COMPLETED', completed_at = now(), stop_reason = 'MAX_ITEMS', placement_level = 'GUIDED', items_answered = 12 WHERE id = $1`, [placementId]);
+  await q(`INSERT INTO learner_progress (id, subject_user_id, lesson_version_id, state, started_at, completed_at, last_correlation_id)
+    VALUES ($1,$2,$3,'COMPLETED', now(), now(), 'privacy-test-progress')`, [randomUUID(), userId, f.lessonId]);
+  const evidenceId = randomUUID();
+  await q(`INSERT INTO evidence_records (id, subject_user_id, evidence_type, topic_id, demonstrated, possible, source_aggregate_type, source_aggregate_id, content_version, provenance, occurred_at)
+    VALUES ($1,$2,'TOPIC_DEMONSTRATION',$3,3,4,'privacy_test',$4,'privacy-v1','{}'::jsonb, now())`, [evidenceId, userId, f.topicId, randomUUID()]);
+  await q(`INSERT INTO mastery_projections (id, subject_user_id, topic_id, algorithm_version, evidence_ids, evidence_set_hash, band)
+    VALUES ($1,$2,$3,'mastery-v1',$4::uuid[],$5,'PROGRESSING')`, [randomUUID(), userId, f.topicId, [evidenceId], SHA]);
+  await q(`INSERT INTO readiness_snapshots (id, subject_user_id, model_version_id, evidence_ids, evidence_set_hash, band, explanation)
+    VALUES ($1,$2,$3,$4::uuid[],$5,'DEVELOPING', $6::jsonb)`, [randomUUID(), userId, f.readinessModelId, [evidenceId], SHA, JSON.stringify({ modelWeight: 0.731 })]);
+  await q(`INSERT INTO roadmap_actions (id, subject_user_id, policy_version_id, topic_id, action_code, reason_code, evidence_ids, state)
+    VALUES ($1,$2,$3,$4,'RETRY_PRACTICE','LOW_EVIDENCE',$5::uuid[],'RECOMMENDED')`, [randomUUID(), userId, f.roadmapPolicyId, f.topicId, [evidenceId]]);
+  const checkAssignmentId = randomUUID();
+  await q(`INSERT INTO assessment_assignments (id, assessment_definition_id, subject_user_id, assigned_by_user_id, available_at, due_at, state)
+    VALUES ($1,$2,$3,$3, now() - interval '1 hour', now() + interval '1 hour', 'COMPLETED')`, [checkAssignmentId, f.assessmentDefinitionId, userId]);
+  await q(`INSERT INTO assessment_attempts (id, assignment_id, subject_user_id, blueprint_id, selection_seed, state, started_at, expires_at, submitted_at,
+      submission_idempotency_key, score_correct, score_possible, correlation_id)
+    VALUES ($1,$2,$3,$4,'selection-seed-secret-0001', 'SUBMITTED', now() - interval '30 minutes', now() + interval '30 minutes', now(), $5, 4, 5, 'privacy-test-check')`,
+  [randomUUID(), checkAssignmentId, userId, f.blueprintId, `submit-${randomUUID()}`]);
+
+  return { deviceToken, tokenDigest, photoKey, documentVersionId, verificationActionId };
+}
+
 afterAll(async () => {
   await app?.close();
   await pool?.end();
@@ -301,6 +553,104 @@ describe('data export', () => {
     expect(text).not.toContain(otherAttemptId);
     expect(text).not.toContain(otherCandidateId);
     expect(bundle.notIncluded.join(' ')).toMatch(/answer key to employer screening tests/i);
+  });
+
+  it('includes every personal record added since the export was written, and only the subject\'s', async () => {
+    const download = await api().get(`/api/v1/students/me/privacy/exports/${exportRequestId}/download`).set(auth()).expect(200);
+    const bundle = download.body as Record<string, any>;
+
+    // Account.
+    expect(bundle.consents).toEqual([expect.objectContaining({ consentKey: 'privacy-notice', title: 'Privacy notice', version: 'privacy-test-v1', action: 'GRANTED' })]);
+    expect(bundle.notificationPreferences).toMatchObject({ emailEnabled: false, timezone: 'Asia/Kolkata' });
+    expect(bundle.notifications).toEqual([expect.objectContaining({ kind: 'SYSTEM', title: 'Subjectmark notice', body: 'Your interview moved to Friday.', readAt: null })]);
+    expect(bundle.devices).toEqual([expect.objectContaining({ platform: 'ANDROID', revokedAt: null })]);
+    expect(bundle.invitations).toEqual([expect.objectContaining({ organizationName: 'Privacy Test College', kind: 'STUDENT', sentTo: 'subjectmark.invite@uat.test' })]);
+    expect(bundle.supportCases).toEqual([expect.objectContaining({ channel: 'EMAIL', category: 'HOW_TO', state: 'OPEN' })]);
+
+    // Profile and records.
+    expect(bundle.careerTargets).toEqual([expect.objectContaining({ roleTitle: 'Privacy check analyst', priority: 'SECONDARY', clearedAt: null })]);
+    expect(bundle.careerGaps).toEqual([expect.objectContaining({ roleTitle: 'Privacy check analyst', requirementsTotal: 7, requirementsMet: 3, requirementsUnknown: 2 })]);
+    expect(bundle.goals).toEqual(expect.arrayContaining([
+      expect.objectContaining({ goalType: 'ROLE', roleTitle: 'Privacy check analyst', origin: 'CAREER_TARGET', status: 'ACTIVE' }),
+      expect.objectContaining({ goalType: 'TOPIC', topicName: 'Synthetic topic', origin: 'GOALS', institutionName: 'Privacy Test College' }),
+    ]));
+    expect(bundle.goals).toHaveLength(2);
+    expect(bundle.outcomeDeclarations).toEqual([expect.objectContaining({ institutionName: 'Privacy Test College', outcome: 'HIGHER_STUDIES', withdrawnAt: null })]);
+    expect(bundle.externalApplications).toEqual([expect.objectContaining({
+      companyName: 'Subjectmark Robotics', roleTitle: 'Security intern', sourceKind: 'JOB_BOARD', appliedOn: '2026-08-01', stage: 'APPLIED', source: 'STUDENT_DECLARED' })]);
+    expect(bundle.academicRecords).toEqual([expect.objectContaining({
+      institutionName: 'Privacy Test College', qualificationType: 'BTECH', programmeName: 'Subjectmark Computer Science', startedOn: '2023-08-01', verificationState: 'SELF_REPORTED',
+      terms: [expect.objectContaining({ sequence: 1, label: 'Semester 1', resultValue: 8.2, resultScale: 'CGPA_10', source: 'DOCUMENT_BACKED',
+        subjects: [expect.objectContaining({ subjectCode: 'CS101', subjectName: 'Programming basics', gradeLetter: 'A', gradeScale: 'LETTER' })] })],
+    })]);
+    expect(bundle.publicProfile.photo).toMatchObject({ contentType: 'image/png', byteSize: 17 });
+    expect(bundle.publicProfile.links).toEqual([expect.objectContaining({ cover: 'MIDNIGHT', revokedAt: null, shows: expect.objectContaining({ photo: true, assessments: false }) })]);
+
+    // Hiring.
+    expect(bundle.applicationSnapshots).toEqual([expect.objectContaining({ employerName: 'Aster Mobility', title: 'SOC Analyst Intern', erasedAt: null,
+      snapshot: { schemaVersion: 1, candidate: { fullName: 'Subjectmark Person', phone: '+91 90000 00000' } } })]);
+    expect(bundle.applicationHistory).toEqual([expect.objectContaining({ employerName: 'Aster Mobility', fromState: 'APPLIED', toState: 'SCREENING' })]);
+    expect(bundle.interviews).toEqual([expect.objectContaining({ employerName: 'Aster Mobility', roundNumber: 1, mode: 'VIDEO', state: 'SCHEDULED',
+      joiningLink: 'https://meet.example.test/room', preparationNote: 'Subjectmark bring your portfolio' })]);
+    expect(bundle.feedbackReleased).toEqual([expect.objectContaining({ employerName: 'Aster Mobility', note: 'Subjectmark feedback note',
+      reasons: ['A core skill for this role was not yet demonstrated'] })]);
+    expect(bundle.employerAccess).toEqual([expect.objectContaining({ employerName: 'Aster Mobility', revokedAt: null })]);
+    expect(bundle.campusDriveNominations).toEqual([expect.objectContaining({ institutionName: 'Privacy Test College', employerName: 'Aster Mobility',
+      nominatedByRole: 'PLACEMENT_ADMIN', reasonCode: 'MEETS_ELIGIBILITY', note: 'Subjectmark strong fit', state: 'INVITED' })]);
+
+    // The college: what it shared in full, what it keeps to itself as a count.
+    expect(bundle.collegeActions.shared).toEqual([expect.objectContaining({ institutionName: 'Privacy Test College', actionType: 'ASSIGNED_TASK',
+      title: 'Subjectmark finish the lab report', note: 'Subjectmark finish the lab report details', state: 'OPEN' })]);
+    expect(bundle.collegeActions.heldByCollege).toEqual([
+      { institutionName: 'Privacy Test College', actionType: 'ACADEMIC_VERIFICATION', staffOnlyActions: 1 },
+      { institutionName: 'Privacy Test College', actionType: 'FACULTY_NOTE', staffOnlyActions: 1 },
+    ]);
+    expect(bundle.fromYourLecturers.assignments).toEqual([expect.objectContaining({ institutionName: 'Privacy Test College', kind: 'PRACTICE',
+      skillName: 'Synthetic topic', note: 'Subjectmark practise before Monday', withdrawnAt: null })]);
+    expect(bundle.fromYourLecturers.nextSteps).toEqual([expect.objectContaining({ institutionName: 'Privacy Test College', action: 'LEARN', kind: 'LESSON',
+      title: 'Reading auth logs', skillName: 'Synthetic topic', reasonCode: 'CATCH_UP', note: 'Subjectmark start with the lesson', state: 'PENDING' })]);
+    expect(bundle.fromYourLecturers.sessions).toEqual([expect.objectContaining({ institutionName: 'Privacy Test College', title: 'Subjectmark revision session', state: 'OPEN' })]);
+    expect(bundle.collegeExams).toEqual([expect.objectContaining({ institutionName: 'Privacy Test College', examTitle: 'Networks unit test', subjectName: 'Computer networks',
+      attempts: [expect.objectContaining({ attemptNumber: 1, status: 'SUBMITTED', autoSubmitted: false, focusLossCount: 2,
+        result: { score: 7, maxScore: 10, percentage: 70, correct: 7, wrong: 2, notAttempted: 1, timeTakenSeconds: 420 } })] })]);
+
+    // The learning engine: what happened and the bands the student sees, not the engine's estimates.
+    const learning = bundle.learning as Record<string, any>;
+    expect(learning.sessions.map((session: Record<string, unknown>) => session.mode).sort()).toEqual(['ASSESSMENT', 'DIAGNOSTIC', 'PRACTICE']);
+    expect(learning.attempts).toEqual([expect.objectContaining({ context: 'ASSESSMENT', answered: true, correct: true, assisted: false, highestHintLevel: 0 })]);
+    expect(learning.activity).toEqual([expect.objectContaining({ eventType: 'EXAM_ATTEMPT_SUBMITTED' })]);
+    expect(learning.lessons).toEqual([expect.objectContaining({ lessonTitle: 'Reading auth logs', state: 'COMPLETED' })]);
+    expect(learning.steps).toEqual(expect.arrayContaining([
+      expect.objectContaining({ action: 'PRACTICE', skillName: 'Synthetic topic', reasonCodes: ['WEAKEST_SKILL'], adaptive: true,
+        items: [expect.objectContaining({ position: 1, skillName: 'Synthetic topic', highestHintShown: 0 })] }),
+      expect.objectContaining({ action: 'NONE', skillName: null, items: [] }),
+    ]));
+    expect(learning.placementTests).toEqual([expect.objectContaining({ scope: 'APTITUDE_V1', state: 'COMPLETED', placementLevel: 'GUIDED', itemsAnswered: 12, stopReason: 'MAX_ITEMS' })]);
+    expect(learning.skills).toEqual([expect.objectContaining({ skillName: 'Synthetic topic', attemptCount: 1, evidenceStage: 'RETAINED', evidenceBand: 'NOT_ENOUGH_EVIDENCE' })]);
+    expect(learning.evidence).toEqual([expect.objectContaining({ evidenceType: 'TOPIC_DEMONSTRATION', topicName: 'Synthetic topic', demonstrated: 3, possible: 4 })]);
+    expect(learning.topicBands).toEqual([expect.objectContaining({ topicName: 'Synthetic topic', band: 'PROGRESSING' })]);
+    expect(learning.readiness).toEqual([expect.objectContaining({ band: 'DEVELOPING' })]);
+    expect(learning.roadmap).toEqual([expect.objectContaining({ actionCode: 'RETRY_PRACTICE', topicName: 'Synthetic topic', state: 'RECOMMENDED' })]);
+    expect(learning.readinessChecks).toEqual([expect.objectContaining({ title: 'Networking readiness check', state: 'SUBMITTED', scoreCorrect: 4, scorePossible: 5 })]);
+
+    // Nothing of the other student, and nothing the rules keep out.
+    const text = JSON.stringify(bundle);
+    for (const forbidden of [
+      'Othermark', otherCandidateId, otherRecords.deviceToken, otherRecords.tokenDigest,
+      // Credentials and storage internals.
+      subjectRecords.deviceToken, subjectRecords.tokenDigest, subjectRecords.photoKey, 'token_digest', 'tokenDigest', 'storage_key', 'storageKey',
+      // Staff-only text, operators' notes and employers' own notes, and who wrote any of it.
+      'staff-only observation', 'verify semester 1', 'asked how to share a CV', 'internal recruiter note', fixtures.lecturerId, opsId,
+      // Engine estimates, planner inputs, seeds and internal references.
+      'plannerSecretEstimate', '0.4137', 'modelWeight', 'mastery_likelihood', 'masteryLikelihood', 'reviewStability', 'difficulty', 'discrimination',
+      'paper-seed-secret', 'selection-seed-secret', 'internal-reference-marker', fixtures.questionId,
+    ]) {
+      expect(text, `export must not carry ${forbidden}`).not.toContain(forbidden);
+    }
+    const notIncluded = bundle.notIncluded.join(' ');
+    expect(notIncluded).toMatch(/estimates/i);
+    expect(notIncluded).toMatch(/retention hold/i);
+    expect(notIncluded).toMatch(/staff-only/i);
   });
 
   it('refuses a second open export rather than duplicating work', async () => {
@@ -384,7 +734,8 @@ describe('learning activity is append-only outside deletion', () => {
       client.release();
     }
     const kept = await pool.query('SELECT count(*)::int AS count FROM learning_decisions WHERE subject_user_id = $1', [subjectId]);
-    expect(kept.rows[0].count).toBe(1);
+    // The first seed's decision and the coverage seed's practice step.
+    expect(kept.rows[0].count).toBe(2);
   });
 
   it('refuses to delete the skill state projection outside the projector or the deletion transaction for that person', async () => {
@@ -452,6 +803,35 @@ describe('deletion execution', () => {
     expect((await pool.query('SELECT 1 FROM student_career_targets WHERE student_user_id = $1', [subjectId])).rows).toHaveLength(0);
     expect((await pool.query('SELECT 1 FROM student_career_targets WHERE student_user_id = $1', [opsId])).rows).toHaveLength(1);
 
+    // What the export gap audit found left behind (privacy-export-coverage.md), each the subject's only;
+    // the other candidate's copy of every one is untouched.
+    const rowsOf = async (query: string, userId: string): Promise<number> => (await pool.query(query, [userId])).rows.length;
+    for (const query of [
+      'SELECT 1 FROM user_notifications WHERE user_id = $1',
+      'SELECT 1 FROM device_push_tokens WHERE user_id = $1',
+      'SELECT 1 FROM external_applications WHERE student_user_id = $1',
+      'SELECT 1 FROM career_gap_snapshots WHERE student_user_id = $1',
+      'SELECT 1 FROM student_qualifications WHERE student_user_id = $1',
+      'SELECT 1 FROM student_academic_terms t JOIN student_qualifications q ON q.id = t.qualification_id WHERE q.student_user_id = $1',
+      'SELECT 1 FROM public_profile_links WHERE student_user_id = $1',
+      'SELECT 1 FROM student_profile_photos WHERE student_user_id = $1',
+    ]) {
+      expect(await rowsOf(query, subjectId), query).toBe(0);
+      expect(await rowsOf(query, otherCandidateId), query).toBe(1);
+    }
+    expect(await rowsOf('SELECT 1 FROM student_academic_subjects s JOIN student_academic_terms t ON t.id = s.term_id JOIN student_qualifications q ON q.id = t.qualification_id WHERE q.student_user_id = $1', otherCandidateId)).toBe(1);
+    expect((await pool.query('SELECT count(*)::int AS count FROM student_academic_subjects')).rows[0].count).toBe(1);
+    // The photo's bytes go with its row; the other person's stay.
+    await expect(storage.get(subjectRecords.photoKey)).rejects.toThrow();
+    expect((await storage.get(otherRecords.photoKey)).toString()).toBe('Othermark photo bytes');
+    // The college's invitation no longer carries the person's address.
+    expect((await pool.query('SELECT email FROM invitations WHERE student_user_id = $1', [subjectId])).rows).toEqual([{ email: expect.stringMatching(/@deleted\.invalid$/) }]);
+    expect((await pool.query('SELECT email FROM invitations WHERE student_user_id = $1', [otherCandidateId])).rows).toEqual([{ email: 'othermark.invite@uat.test' }]);
+    // The verification action survives (decision 3 in the design) without its link to the erased document,
+    // which is what made this deletion end FAILED before.
+    expect((await pool.query('SELECT evidence_document_version_id FROM staff_actions WHERE id = $1', [subjectRecords.verificationActionId])).rows[0].evidence_document_version_id).toBeNull();
+    expect((await pool.query('SELECT evidence_document_version_id FROM staff_actions WHERE id = $1', [otherRecords.verificationActionId])).rows[0].evidence_document_version_id).toBe(otherRecords.documentVersionId);
+
     // Engine behavioural data is erased (ENG-03) -- the subject's only; the other
     // person's attempt log is untouched.
     const learning = async (table: string, column: string, userId: string): Promise<number> =>
@@ -516,8 +896,10 @@ describe('deletion execution', () => {
     expect(byCategory.COUNSELLING_NOTES.disposition).toBe('ERASED');
     expect(byCategory.SUPPORT_CASES.disposition).toBe('ANONYMISED');
     expect(byCategory.LEARNING_ACTIVITY.disposition).toBe('ERASED');
-    // One attempt, one session, one activity event, one skill state row and one planner decision were erased.
-    expect(byCategory.LEARNING_ACTIVITY.record_count).toBe(5);
+    // The first seed: one attempt, one session, one activity event, one skill state row and one planner
+    // decision. The coverage seed adds a practice step (decision, session, served item), a placement
+    // sitting (test, session) and three lecturer actions (assignment, next step, session invitation): 13.
+    expect(byCategory.LEARNING_ACTIVITY.record_count).toBe(13);
     expect(byCategory.AUDIT.disposition).toBe('RETAINED');
     expect(byCategory.AUDIT.basis).toBeTruthy();
     expect(byCategory.APPLICATIONS.disposition).toBe('ANONYMISED');

@@ -716,7 +716,13 @@ Every write:
 
 **Tests added:** `data export > includes the subject's own screening attempts and answers, never the answer key or another candidate`; the deletion-execution test `erases the person and keeps the employer record once the hold is released` gains the screening assertions (attempt and score kept, selections erased, marking kept, open sitting EXPIRED and unscored with its invitation, another candidate's answers and score untouched); `records what it erased, anonymised and retained` asserts 14 records and the EMPLOYER_SCREENING row; the package test `detaches rather than destroys another party record` asserts the new disposition and basis. The test commit was run alone first: 3 failed for the gap (no export section, answers still present, 13 records), 11 passed.
 
-**Validation:** pending — amended below when the full run finishes.
+**Validation:** fresh database one_privfix2, only DATABASE_URL exported.
+- `corepack pnpm db:migrate` twice: the first run applied 67, the second applied 0 ("67 already applied"). Both exit 0. The live `privacy_deletion_category_ck` lists all 14 categories.
+- `corepack pnpm typecheck`: passed.
+- `corepack pnpm -r --no-bail --workspace-concurrency=1 test`: exit 0; 18 suites, 230 files, 3,153 tests, all passed (api 65 files / 1,043, web 64 / 766, persistence 36 / 404, privacy 1 / 22, the rest all passing). No out-of-shared-memory reruns were needed.
+- `corepack pnpm build`: passed.
+- CI parity: `corepack pnpm audit --prod --audit-level=high` exit 0 (2 moderate, no high or critical); the optional-chain policy grep printed nothing; no private-key blocks or merge markers in the diff.
+- Before the fix, the test commit alone: privacy.integration.spec.ts 3 failed / 11 passed (the gap); after it, 14/14, and packages/privacy 22/22.
 
 **Android / web:** no change. Both clients download the export as a file without interpreting its sections (web privacyPanel, Android Api.kt), and neither lists deletion categories. No screen, route, label or navigation item changed.
 **Limitations / not done:** `answered_at` on erased answers is kept (NOT NULL, identifies no one once the response and the person are gone; recorded in the design). The export includes the question text the candidate was shown, which is the employer's material; the design records why (an answer is meaningless without its question) and that it discloses no key.

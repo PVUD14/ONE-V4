@@ -22,7 +22,9 @@ Settings → Privacy; ONE then stops personalising from that moment. What you ha
 your record. [Proposed addition, INST-15, for legal review:] If you study at a college that uses ONE,
 the lecturers who teach your section can see the skills you are stuck on and the skills due for
 review; common mistakes are shown to them only as class totals of five or more students. They never
-see a score.
+see a score. [Proposed addition, INST-16, for legal review:] Before changing your next step, such a
+lecturer can also see the step ONE has planned for you and why. Whether or not you agree, your lecturers
+can assign you practice and lessons and see whether you have done the work they set.
 
 **AI tutor (optional).** If you agree, when you ask the tutor for help, the question you are working on
 and your answer so far are sent to our AI provider to write a hint. The tutor never gives you the

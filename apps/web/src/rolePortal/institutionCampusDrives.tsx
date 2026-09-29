@@ -11,7 +11,8 @@
  * The server decides who may act (institution-wide owners, admins and placement admins; the
  * list says `canDecide`) and which actions exist per drive. Results show suppressed counts once a
  * drive is complete, and names only for students who shared that application with the college.
- * Nothing is invented: a missing date reads NA; pay never appears.
+ * Nothing is invented: a missing date reads NA; pay never appears. INST-12 adds the college's own
+ * category label on each drive (college staff only).
  */
 import { useEffect, useState, type FormEvent } from 'react';
 import { getProtectedAccessToken, suppressedCountLabel } from '../api.js';
@@ -40,6 +41,7 @@ import {
 } from '../api/campusDrives.js';
 import { applicationStageLabels, offerResponseLabels } from './institutionDepartment.js';
 import { formatApiError } from './shared.js';
+import { DriveCategoryCell, useActiveDriveCategories } from './institutionPlacementRegister.js';
 
 function formatWhen(value: string | null | undefined): string {
   if (!value) return 'NA';
@@ -84,6 +86,8 @@ export function CampusDriveApprovalsSection({ institutionId }: { readonly instit
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState<{ readonly driveId: string; readonly history: readonly CampusDriveHistoryDto[]; readonly results: CampusDriveResultsDto | null; readonly resultsError: string } | null>(null);
   const [reload, setReload] = useState(0);
+  // INST-12: the college's own categories, for labelling drives (college staff only).
+  const categories = useActiveDriveCategories(institutionId);
 
   useEffect(() => {
     if (!token) return;
@@ -165,12 +169,14 @@ export function CampusDriveApprovalsSection({ institutionId }: { readonly instit
           : <>
             {!state && waiting ? <p className="hiring-tag warn">{waiting} request{waiting === 1 ? '' : 's'} awaiting your decision.</p> : null}
             <div className="role-record-table-wrap"><table className="role-record-table">
-              <thead><tr><th>Employer</th><th>Job</th><th>State</th><th>Proposed</th><th>Confirmed</th><th>Employer's note</th><th>Action</th></tr></thead>
+              <thead><tr><th>Employer</th><th>Job</th><th>State</th><th>Category</th><th>Proposed</th><th>Confirmed</th><th>Employer's note</th><th>Action</th></tr></thead>
               <tbody>{drives.map((drive) => <tr key={drive.id}>
                 <td>{drive.employerName}{drive.employerInGoodStanding ? null : <span className="hiring-tag warn">Not currently verified</span>}</td>
                 <td>{drive.opportunityTitle ?? 'Untitled'}<span className="hiring-meta"> · closes {formatWhen(drive.applicationDeadline)}</span></td>
                 <td><span className="hiring-tag">{campusDriveStateLabels[drive.state]}</span>
                   {drive.offerHoldersEligible ? <span className="hiring-meta"> · open to offer holders</span> : null}</td>
+                <td><DriveCategoryCell institutionId={institutionId} driveId={drive.id} current={drive.category} categories={categories} canSet={page.canDecide}
+                  onChanged={(message, failed) => { if (failed) { setError(message); } else { setNotice(message); setReload((value) => value + 1); } }} /></td>
                 <td>{formatWhen(drive.proposedStartAt)}{drive.venueMode ? ` · ${venueModeLabels[drive.venueMode]}` : ''}</td>
                 <td>{formatWhen(drive.scheduledStartAt)}</td>
                 <td>{drive.employerNote ?? 'NA'}</td>

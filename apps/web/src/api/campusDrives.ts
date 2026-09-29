@@ -37,6 +37,8 @@ export interface CampusDriveDto {
   readonly createdAt: string | null;
   readonly updatedAt: string | null;
   readonly availableActions: readonly CampusDriveAction[];
+  /** College side only (INST-12): the college's own category label; never sent to employers. */
+  readonly category?: { readonly id: string; readonly name: string; readonly retired: boolean } | null;
   /** Employer side only: applications that came through this drive. */
   readonly applicationCount?: number;
 }

@@ -102,6 +102,8 @@ describe('admin Placement', () => {
     let calls = 0;
     fetchMock.mockImplementation(async (url: string) => {
       if (String(url).includes('/placement-pipeline')) return ok(pipeline);
+      // INST-12's statistics and register load on the same page; only the status list pages.
+      if (!String(url).includes('/placement-status')) return ok({});
       calls += 1;
       return ok(calls === 1 ? { students: [statusRows[0]], nextCursor: 'next-page' } : { students: [statusRows[1]], nextCursor: null });
     });

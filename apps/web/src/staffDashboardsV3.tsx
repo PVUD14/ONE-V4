@@ -22,6 +22,8 @@ import {
   studentActivationLabels,
 } from './api.js';
 import { campusDriveStateLabels, listEmployerCampusDrives, listInstitutionCampusDrives, type CampusDriveDto } from './api/campusDrives.js';
+import { getPlacementStatistics, type PlacementStatisticsDto } from './api/placementRegister.js';
+import type { SuppressedCountDto } from './api/privacyOperations.js';
 
 /**
  * Pilot-exact staff dashboards. Same rule as the student V3: the pilot's
@@ -35,20 +37,31 @@ function go(path: string): void {
   window.dispatchEvent(new PopStateEvent('popstate'));
 }
 
-function Funnel({ rows }: { readonly rows: readonly { readonly label: string; readonly value: number | null }[] }): React.ReactElement {
+function Funnel({ rows }: { readonly rows: readonly { readonly label: string; readonly value: number | null; readonly display?: string }[] }): React.ReactElement {
   const max = Math.max(...rows.map((row) => row.value ?? 0), 1);
   return <div className="pilot-funnel">
     {rows.map((row) => (
       <div key={row.label} className="pilot-funnel-row">
         <span>{row.label}</span>
         <div className="pilot-bar"><i style={{ width: `${((row.value ?? 0) / max) * 100}%` }} /></div>
-        <span className="num">{row.value ?? 'NA'}</span>
+        <span className="num">{row.display ?? row.value ?? 'NA'}</span>
       </div>
     ))}
   </div>;
 }
 
+/** INST-12: a suppressed count for the funnel: the bar only when published, <5 when withheld, NA without a source. */
+function funnelRow(label: string, count: SuppressedCountDto | null | undefined): { readonly label: string; readonly value: number | null; readonly display: string } {
+  if (!count) return { label, value: null, display: 'NA' };
+  return count.suppressed ? { label, value: null, display: '<5' } : { label, value: count.value, display: String(count.value) };
+}
+
 // --- Institution -------------------------------------------------------------
+
+function countLabel(count: SuppressedCountDto | null | undefined): string {
+  if (!count) return 'NA';
+  return count.suppressed ? '<5' : String(count.value);
+}
 
 /** Where each institution portal reaches the verification queue (existing labels only). */
 function verificationPath(basePath: string): string | null {
@@ -68,6 +81,8 @@ interface InstitutionV3Data {
   readonly verification: VerificationSummaryDto | null;
   /** EMP-11: confirmed drives ahead and requests awaiting a decision; null (NA) when this role cannot read drives. */
   readonly drives: { readonly upcoming: readonly CampusDriveDto[]; readonly waiting: number } | null;
+  /** INST-12: season statistics as of the last month end; null (NA) when this role cannot read them. */
+  readonly placement: PlacementStatisticsDto | null;
 }
 
 /** EMP-11: the college's scheduled drives still ahead, soonest first, and how many requests wait. */
@@ -96,7 +111,8 @@ export function InstitutionDashboardV3({ institutionId, basePath }: { readonly i
       listInstitutionUnits(token, institutionId, controller.signal).then((response) => response.units).catch(() => null),
       getVerificationSummary(token, institutionId, controller.signal).then((response) => response.summary ?? null).catch(() => null),
       loadCollegeDrives(token, institutionId, controller.signal).catch(() => null),
-    ]).then(async ([roster, exams, units, verification, drives]) => {
+      getPlacementStatistics(token, institutionId, controller.signal).then((response) => (response && response.overall ? response : null)).catch(() => null),
+    ]).then(async ([roster, exams, units, verification, drives, placement]) => {
       const students = roster?.students ?? null;
       const activation = roster?.activationSummary ?? null;
       const target = exams?.find((exam) => exam.lifecycleState === 'PUBLISHED' && exam.assignedCount > 0) ?? null;
@@ -104,7 +120,7 @@ export function InstitutionDashboardV3({ institutionId, basePath }: { readonly i
         ? await listInstitutionExamResults(token, institutionId, target.id).then((response) =>
             response.notAttempted.map((entry) => ({ ...entry, examTitle: target.title, endsAt: target.endsAt }))).catch(() => [])
         : [];
-      setData({ students, activation, exams, units, notAttempted, verification, drives });
+      setData({ students, activation, exams, units, notAttempted, verification, drives, placement });
     });
     return () => controller.abort();
   }, [token, institutionId]);
@@ -127,9 +143,9 @@ export function InstitutionDashboardV3({ institutionId, basePath }: { readonly i
       <div className="pilot-row cols-5">
         {([
           ['Active Students', String(activeStudents), 'blue', Users],
-          ['Placement Eligible', 'NA', 'indigo', ClipboardCheck],
-          ['Offers This Season', 'NA', 'green', TrendingUp],
-          ['Students Placed', 'NA', 'teal', Building2],
+          ['Placement Eligible', data.placement ? countLabel(data.placement.overall.eligible) : 'NA', 'indigo', ClipboardCheck],
+          ['Students With Offers', data.placement ? countLabel(data.placement.overall.withOffer) : 'NA', 'green', TrendingUp],
+          ['Students Placed', data.placement ? countLabel(data.placement.overall.placed) : 'NA', 'teal', Building2],
           ['Need Intervention', String(data.notAttempted.length), 'rose', AlertTriangle],
         ] as const).map(([label, value, tone, Icon]) => (
           <section key={label} className="pilot-card pilot-kpi">
@@ -152,11 +168,12 @@ export function InstitutionDashboardV3({ institutionId, basePath }: { readonly i
           </div>
         </section>
         <section className="pilot-card">
-          <div className="pilot-card-head"><h2>Placement Pipeline</h2><small style={{ color: 'var(--p-muted)' }}>This season</small></div>
+          <div className="pilot-card-head"><h2>Placement Pipeline</h2><small style={{ color: 'var(--p-muted)' }}>{data.placement ? `As of ${data.placement.asOf.lastDay}` : 'NA'}</small></div>
           <Funnel rows={[
-            { label: 'Eligible', value: null }, { label: 'Applied', value: null },
-            { label: 'Shortlisted', value: null }, { label: 'Offers', value: null }, { label: 'Placed', value: null },
+            funnelRow('Eligible', data.placement?.overall.eligible), funnelRow('Applied', data.placement?.overall.applied),
+            funnelRow('Shortlisted', data.placement?.overall.shortlisted), funnelRow('Offers', data.placement?.overall.withOffer), funnelRow('Placed', data.placement?.overall.placed),
           ]} />
+          <small style={{ color: 'var(--p-muted)' }}>From applications students shared with the college. A student who shared nothing is not counted as unplaced.</small>
         </section>
       </div>
 
@@ -195,8 +212,13 @@ export function InstitutionDashboardV3({ institutionId, basePath }: { readonly i
 
     <aside className="pilot-rail">
       <section className="pilot-card">
-        <div className="pilot-card-head"><h2>Offers Trend</h2><span className="pilot-chip slate">NA</span></div>
-        <Spark points={[0, 0, 0, 0, 0, 0, 0]} tone="green" />
+        <div className="pilot-card-head"><h2>Offers Trend</h2><span className="pilot-chip slate">{data.placement ? 'Last 6 months' : 'NA'}</span></div>
+        {data.placement && data.placement.offersByMonth.length && data.placement.offersByMonth.every((entry) => !entry.offers.suppressed)
+          ? <Spark points={data.placement.offersByMonth.map((entry) => entry.offers.value ?? 0)} tone="green" />
+          : <Spark points={[0, 0, 0, 0, 0, 0, 0]} tone="green" />}
+        {data.placement ? <div className="pilot-legend">{data.placement.offersByMonth.map((entry) => (
+          <div key={entry.month}><i style={{ background: '#e5eaf2' }} /> {entry.month} <span className="num">{countLabel(entry.offers)}</span></div>))}</div>
+          : <p style={{ color: 'var(--p-muted)', margin: '4px 0' }}>Offer figures are not available to your role — NA.</p>}
       </section>
       <section className="pilot-card">
         <div className="pilot-card-head"><h2>Upcoming Drives</h2>{data.drives

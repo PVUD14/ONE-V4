@@ -34,6 +34,7 @@ import { StaffPilotWrap } from '../parityWraps.js';
 import { InstitutionWorkspaceError, RestrictedApiState, formatApiError, isInstitutionStaffWorkspace } from './shared.js';
 import type { AuthenticatedWorkspaceSummary } from './shared.js';
 import { PlacementPoliciesSection } from './institutionCampusDrives.js';
+import { DriveCategoriesSection } from './institutionPlacementRegister.js';
 
 const notProvided = 'Not provided';
 
@@ -115,6 +116,8 @@ export function InstitutionSettingsPage({ authenticatedWorkspace, personal = fal
     {!personal ? <>
       {/* EMP-11: the college's placement policies, enforced at apply for its campus drives. */}
       <PlacementPoliciesSection key={'policies:' + institutionId} institutionId={institutionId} />
+      {/* INST-12: the college's own drive categories (Dream, Core, Mass…), set here and given to drives. */}
+      <DriveCategoriesSection key={'categories:' + institutionId} institutionId={institutionId} />
       <div className="role-wide" aria-label="Data-processing terms"><V2EmptyState icon="📄" title="Data-processing terms — not built yet"
         note="Versioned data-processing terms, the college data export and exit are not built yet. Nothing has been accepted on your college's behalf."
         hint="Contact AI8HT operations about your agreement in the meantime." /></div>

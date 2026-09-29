@@ -263,7 +263,7 @@ export function DepartmentReadinessPage({ authenticatedWorkspace }: WorkspacePro
 
 // --- Placement Pipeline ------------------------------------------------------------
 
-export function PlacementPipelinePage({ authenticatedWorkspace, basePath }: WorkspaceProps & { readonly basePath: string }): React.ReactElement {
+export function PlacementPipelinePage({ authenticatedWorkspace, basePath, statistics }: WorkspaceProps & { readonly basePath: string; readonly statistics?: React.ReactNode }): React.ReactElement {
   const pipeline = useWorkspaceResource<PlacementPipelineDto>(authenticatedWorkspace, getPlacementPipeline, 'Unable to load the placement pipeline.');
   const guard = workspaceGuard('Placement Pipeline', authenticatedWorkspace);
   if (guard) return guard;
@@ -291,6 +291,8 @@ export function PlacementPipelinePage({ authenticatedWorkspace, basePath }: Work
         <div className="pilot-card-head"><h2>Students by placement status</h2></div>
         <SuppressedFunnel table={data?.placementStatus ?? null} labels={placementStatusLabels} />
       </section>
+      {/* INST-12: the department's season statistics by batch. */}
+      {statistics ?? null}
     </div>
     <aside className="pilot-rail">
       <section className="pilot-card"><div className="pilot-card-head"><h2>What is counted</h2></div>
@@ -298,7 +300,7 @@ export function PlacementPipelinePage({ authenticatedWorkspace, basePath }: Work
           <li>Only applications a student has shared with the college, while they are enrolled. Withdrawing consent removes an application on the next load.</li>
           <li>Any group of fewer than five reads &lt;5; a total that would reveal one is withheld.</li>
           <li>Offer pay and terms are never shown to the college.</li>
-          <li>Placement drives are not built yet — NA.</li>
+          <li>Season statistics stand at the end of the last full month; a student who shared nothing is "Not shared", never unplaced.</li>
         </ul>
       </section>
     </aside>

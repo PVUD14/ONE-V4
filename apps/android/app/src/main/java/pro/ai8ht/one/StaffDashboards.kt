@@ -212,8 +212,13 @@ private class InstitutionData(
     val pipeline: ScopedView<PlacementPipelineDto> = ScopedView.NotForRole,
     /** INST-07: the lecturer's class reports; NotForRole when the caller holds no faculty role. */
     val classes: ScopedView<ClassReportsDto> = ScopedView.NotForRole,
+<<<<<<< HEAD
     /** INST-12: season placement statistics; NotForRole for faculty-only callers. */
     val statistics: ScopedView<PlacementStatisticsDto> = ScopedView.NotForRole,
+=======
+    /** INST-15: the lecturer's cohort view over the learning engine; NotForRole for non-faculty callers. */
+    val learning: ScopedView<LearningCohortView> = ScopedView.NotForRole,
+>>>>>>> 1132d6c (feat(android): lecturers see learning across their students, read-only (INST-15))
 )
 
 private sealed interface AnnouncementsState {
@@ -284,7 +289,11 @@ internal fun InstitutionScaffold(
             val department = async { scopedView { Api.departmentOverview(context, organizationId) } }
             val pipeline = async { scopedView { Api.placementPipeline(context, organizationId) } }
             val classes = async { scopedView { Api.classReports(context, organizationId) } }
+<<<<<<< HEAD
             val statistics = async { scopedView { Api.placementStatistics(context, organizationId) } }
+=======
+            val learning = async { scopedView { Api.learningCohort(context, organizationId) } }
+>>>>>>> 1132d6c (feat(android): lecturers see learning across their students, read-only (INST-15))
             val loadedExams = exams.await()
             val target = loadedExams.firstOrNull { it.lifecycleState == "PUBLISHED" && it.assignedCount > 0 }
             val attention = if (target != null) {
@@ -293,7 +302,11 @@ internal fun InstitutionScaffold(
             } else emptyList()
             data = InstitutionData(loadedExams, subjects.await(), review.await(), inbox.await(), attention, activation.await(),
                 myStudents.await(), verification.await(), calendar.await(), announcements.await(),
+<<<<<<< HEAD
                 department.await(), pipeline.await(), classes.await(), statistics.await())
+=======
+                department.await(), pipeline.await(), classes.await(), learning.await())
+>>>>>>> 1132d6c (feat(android): lecturers see learning across their students, read-only (INST-15))
         }
     }
 
@@ -415,6 +428,8 @@ private fun InstitutionHome(organizationId: String, data: InstitutionData, onVer
         if (data.myStudents !is MyStudentsState.NotFaculty) MyStudentsSection(data.myStudents)
         // INST-07: the lecturer's class reports (web: faculty Reports).
         if (data.classes !is ScopedView.NotForRole) ClassReportsSection(data.classes)
+        // INST-15: learning across the lecturer's students (web: My Students), read-only.
+        LearningCohortSection(data.learning)
 
         // Academic calendar (INST-05): the college's current and upcoming terms, examination
         // periods and breaks, as its admins set them on the web Settings screen.

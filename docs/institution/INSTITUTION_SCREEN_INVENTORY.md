@@ -77,7 +77,7 @@ The placement officer has no placement item; §4.2 puts the placement register b
 | # | Nav label | State | Component (branch) | Built by / to be filled by | Android equivalent |
 |---|---|---|---|---|---|
 | 1 | Dashboard | Working | `InstitutionDashboardV3` (`rolePortalPages.tsx:194-196`) | INST-01, 04 | Home |
-| 2 | My Students | Working | `FacultyMyStudentsPage` (`rolePortalPages.tsx:349`; `institutionTeaching.tsx:43`) | INST-03 | Home "My students" (`StaffDashboards.kt:422`, `:601`) |
+| 2 | My Students | Working | `FacultyMyStudentsPage` (`rolePortalPages.tsx:349`; `institutionTeaching.tsx:43`); INST-15 adds the section "Learning across your students" (`FacultyLearningCohortSection`, `institutionLearningCohort.tsx`) — stuck skills, misconceptions ≥5, reviews due; NA until the adaptive-learning consent is published | INST-03, INST-15 | Home "My students" (`StaffDashboards.kt:422`, `:601`); "Learning across your students" (`LearningCohort.kt`) |
 | 3 | Student Detail | Partial — scoped faculty-notes list, no scoped student view | `InstitutionStaffActionsPage` (`rolePortalPages.tsx:353-368`) | INST-03 per §4.2 (profile view reported not done in INST-03) | Web only |
 | 4 | Academic Verification | Working — queue, with the staff-action list as a second tab | `FacultyAcademicVerification` (`rolePortalPages.tsx:362-364`; `institutionAcademicVerification.tsx:37`) | INST-04 | Verification review overlay (`AcademicVerification.kt:132`) |
 | 5 | Assessments | Working (no approval) | `InstitutionExamEnginePage` (`rolePortalPages.tsx:297-302`) | Pre-plan | Exams tab |

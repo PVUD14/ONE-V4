@@ -173,6 +173,28 @@ async function erase(deps: DeletionExecutionDeps, subjectUserId: string): Promis
   // rows stay without text (append-only; 0067) so pipelines and trust-case references stay valid.
   counts.APPLICATION_MESSAGES = await eraseApplicationMessagesForSubject(db, subjectUserId);
 
+  // Records that point at the person's document versions must let go before the versions go
+  // (privacy-export-coverage.md). A college verification action keeps its row — whether it is the
+  // college's record or the person's is decision 3 there — but loses the link to the erased document.
+  // The person's academic records are erased with the profile (decision 2); a document-backed term
+  // references its evidence, so they go first. Before 2026-09-30 either link made the deletion FAIL.
+  await db.execute(sql`
+    UPDATE staff_actions SET evidence_document_version_id = NULL
+    WHERE evidence_document_version_id IN (
+      SELECT v.id FROM student_document_versions v JOIN student_document_metadata d ON d.id = v.document_id
+      WHERE d.student_user_id = ${subjectUserId}::uuid)
+  `);
+  const academicRecords = await countOf(sql`
+    WITH qualifications AS (SELECT id FROM student_qualifications WHERE student_user_id = ${subjectUserId}::uuid),
+         terms AS (SELECT id FROM student_academic_terms WHERE qualification_id IN (SELECT id FROM qualifications)),
+         subjects AS (DELETE FROM student_academic_subjects WHERE term_id IN (SELECT id FROM terms) RETURNING 1)
+    SELECT count(*)::int AS count FROM subjects`)
+    + await countOf(sql`WITH gone AS (DELETE FROM student_academic_terms WHERE qualification_id IN (
+        SELECT id FROM student_qualifications WHERE student_user_id = ${subjectUserId}::uuid) RETURNING 1)
+      SELECT count(*)::int AS count FROM gone`)
+    + await countOf(sql`WITH gone AS (DELETE FROM student_qualifications WHERE student_user_id = ${subjectUserId}::uuid RETURNING 1)
+      SELECT count(*)::int AS count FROM gone`);
+
   // Documents: remove the bytes, then the rows that point at them.
   const files = await db.execute(sql`
     SELECT f.id, f.storage_key FROM stored_files f
@@ -191,6 +213,24 @@ async function erase(deps: DeletionExecutionDeps, subjectUserId: string): Promis
 
   counts.STUDENT_PROFILE = await countOf(sql`SELECT count(*)::int AS count FROM student_profiles WHERE user_id = ${subjectUserId}::uuid`);
   await db.execute(sql`DELETE FROM student_profiles WHERE user_id = ${subjectUserId}::uuid`);
+  counts.STUDENT_PROFILE += academicRecords;
+  // The public profile (0071): its share links, and the photo with its bytes. The public photo route
+  // reads the link and the photo without the account state, so a live link kept serving a deleted
+  // person's photo until 2026-09-30.
+  const photos = await db.execute(sql`SELECT storage_key FROM student_profile_photos WHERE student_user_id = ${subjectUserId}::uuid`) as QueryResult<{ storage_key: string }>;
+  for (const photo of photos.rows) {
+    if (deps.storage) await deps.storage.delete(String(photo.storage_key)).catch(() => undefined);
+  }
+  counts.STUDENT_PROFILE += await countOf(sql`WITH gone AS (DELETE FROM student_profile_photos WHERE student_user_id = ${subjectUserId}::uuid RETURNING 1)
+    SELECT count(*)::int AS count FROM gone`);
+  counts.STUDENT_PROFILE += await countOf(sql`WITH gone AS (DELETE FROM public_profile_links WHERE student_user_id = ${subjectUserId}::uuid RETURNING 1)
+    SELECT count(*)::int AS count FROM gone`);
+  // Applications the person declared themselves (0019) and the gap counts computed for the roles they
+  // chose (0011) are only about them. Both were left behind until 2026-09-30.
+  counts.STUDENT_PROFILE += await countOf(sql`WITH gone AS (DELETE FROM external_applications WHERE student_user_id = ${subjectUserId}::uuid RETURNING 1)
+    SELECT count(*)::int AS count FROM gone`);
+  counts.STUDENT_PROFILE += await countOf(sql`WITH gone AS (DELETE FROM career_gap_snapshots WHERE student_user_id = ${subjectUserId}::uuid RETURNING 1)
+    SELECT count(*)::int AS count FROM gone`);
   // Goals and "Not sure yet" survey answers (ENG-19, 0068) are about the person: erased with the profile.
   // The 0068 guard allows DELETE only inside the transaction-local erase setting for this subject.
   counts.STUDENT_PROFILE += await db.transaction(async (tx) => {
@@ -209,6 +249,12 @@ async function erase(deps: DeletionExecutionDeps, subjectUserId: string): Promis
   counts.NOTIFICATIONS = await countOf(sql`SELECT count(*)::int AS count FROM notification_commands WHERE subject_user_id = ${subjectUserId}::uuid`);
   await db.execute(sql`DELETE FROM notification_commands WHERE subject_user_id = ${subjectUserId}::uuid`);
   await db.execute(sql`DELETE FROM notification_preferences WHERE user_id = ${subjectUserId}::uuid`);
+  // The in-app notifications (their text names employers, jobs and times) and the devices registered for
+  // push (0013). Delivery logs that point at a notification keep their row; the FK sets it NULL.
+  counts.NOTIFICATIONS += await countOf(sql`WITH gone AS (DELETE FROM user_notifications WHERE user_id = ${subjectUserId}::uuid RETURNING 1)
+    SELECT count(*)::int AS count FROM gone`);
+  counts.NOTIFICATIONS += await countOf(sql`WITH gone AS (DELETE FROM device_push_tokens WHERE user_id = ${subjectUserId}::uuid RETURNING 1)
+    SELECT count(*)::int AS count FROM gone`);
 
   // Engine behavioural data is erased (ADR-034, ENG-03, ENG-05, ENG-08). The attempt log and sessions are
   // append-only; their trigger allows DELETE only for the subject named in the
@@ -270,6 +316,13 @@ async function erase(deps: DeletionExecutionDeps, subjectUserId: string): Promis
   // Support cases (OPS-05) keep the service record and lose the person: the subject
   // link, the typed summary and every note on those cases.
   counts.SUPPORT_CASES = await detachSupportCasesForDeletedUser(db, subjectUserId);
+
+  // The college's invitations to the person keep their row (the college's send record) and lose the
+  // address, which is the person's identity as much as the account's email is.
+  await db.execute(sql`
+    UPDATE invitations SET email = ${replacement.email}, updated_at = now()
+    WHERE (student_user_id = ${subjectUserId}::uuid OR accepted_by_user_id = ${subjectUserId}::uuid) AND email <> ${replacement.email}
+  `);
 
   // Identity last: once this lands the person is gone, and every earlier step has
   // already been recorded.

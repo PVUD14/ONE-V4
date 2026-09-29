@@ -625,3 +625,106 @@ Every write:
 - The in-app notices use the SYSTEM kind. A dedicated kind needs a widening of the `user_notifications_kind_ck` CHECK in a later migration.
 
 **Next goal:** EMP-12 (or as scheduled by the coordinator).
+
+## EMP-15 — Employer dashboard and reports — 2026-09-29
+**Result:** Complete. The employer Dashboard now reads one summary that the server computes in SQL: open jobs, new applicants in the last 7 days, interviews this week, offers awaiting an answer, drives awaiting a college, and the pipeline's current stages. Every number reconciles with the applicant pipeline. Reports cover the funnel and stage drop-off by job, by college and by campus drive, the median time to shortlist, interview, offer and hire, and offer outcomes with an acceptance rate. Every figure about people in a report goes through aggregate-suppression, and no report carries a candidate. Web and Android both carry this.
+
+**Branch / PR:** feat/emp-reports, cut from onev4/feat/plan-phases-0-to-2 at 2887b02 and pushed to onev4; merge by review. Commits:
+- 934730c: acceptance tests
+- a3e35c6: API
+- 5423057: web and help text
+- 47840df: Android
+- then this report
+
+**Files created:**
+- apps/api/src/http/employer-reports.ts: the pure report model. It builds the partition, applies suppression per table and holds the named-college rule, the acceptance-rate guard and the median guard.
+- apps/api/src/http/employer-reports.test.ts
+- apps/api/src/http/employer-reports.controller.ts
+- apps/api/src/http/employer-reports.integration.spec.ts
+- apps/web/src/rolePortal/employerReports.tsx
+- apps/web/src/rolePortal/employerReports.test.tsx
+
+**Files modified:**
+- API:
+  - api-security.module.ts registers the controller.
+  - campus-drives.controller.ts: drive results count only shared applications.
+  - campus-drives.integration.spec.ts
+  - assistant/help-articles.ts: the employer article says what the Dashboard and Reports count.
+- Web:
+  - api/hiring.ts
+  - staffDashboardsV3.tsx: only `EmployerDashboardV3`.
+  - rolePortal/employer.tsx: only the Reports branch changes.
+- Android: ApiEmployer.kt, EmployerWork.kt, StaffDashboards.kt.
+
+**Existing tests touched (no assertion weakened):** campus-drives.integration.spec.ts `shows suppressed counts after completion…`.
+- That test had 6 applicants, 2 of them shared, and it pinned `applied: 6`.
+- With the alignment below, only the 2 shared applications count, so every count is now withheld, and the assertion says so.
+- A new test in the same file pins the positive case: 7 applicants, 5 shared, `applied: 5`.
+- This makes the college see less, not more.
+
+**Migrations added:** none. Migration 0076 was not needed: every figure comes from existing tables.
+
+**Design docs / ADRs:** none. The goal adds no table. The reasoning is in the controller and model headers and in the decisions below.
+
+**Routes:**
+- `GET /employers/:e/summary` and `GET /employers/:e/reports`:
+  - both use `requireActiveEmployer(…, 'candidates')` for owner, admin and recruiter;
+  - both refuse unknown query parameters with 400 `UNKNOWN_FIELD`, so no filter such as `?gender=` can be asked for;
+  - reports are audited as `employer.reports.viewed` against the employer.
+- `GET /institutions/:i/campus-drives/:d/results`: the counts now cover only applications the student shared with the college.
+
+**Validation:** fresh database one_emp15, with only DATABASE_URL exported. Results pending; they follow in the amendment below.
+
+**Acceptance criteria:**
+- [x] Build 1, the summary: open jobs, new applicants in 7 days, interviews this week, offers pending and drives awaiting approval, computed in SQL. It also carries the current stage counts, open applications, hires, changes-requested drives and the week window. Test: `gives the dashboard summary in SQL, matching the applicant, interview, offer and drive lists`.
+- [x] Build 2, the reports: the funnel by job, college and drive; time to shortlist, interview, offer and hire; offer acceptance rate; stage drop-off. Only the employer's own data is used. Test: `reports the funnel by job, college and drive, time to each stage and offer acceptance, suppressed and reconciled`.
+- [x] Build 3, the Dashboard uses the summary, and missing sources show NA:
+  - the web KPI tiles, funnel, pipeline mix, campus-drive chip and banner all read the summary;
+  - This Week's Interviews was an NA placeholder. It now shows the server's count and the week's interviews, with the person named only while their grant is live;
+  - when the summary fails, every slot reads NA (web test);
+  - the Android Home does the same.
+- [x] Every number reconciles with the applicant pipeline for a fixture dataset:
+  - the summary equals counts over GET opportunities, the per-job applications, interviews in the returned window (not cancelled), live EXTENDED offers and REQUESTED drives;
+  - every unsuppressed report cell equals the matching pipeline stage count.
+- [x] No other employer's data is reachable. Test: `refuses another employer's recruiter and never counts another employer's applications`. It covers 403 both ways, and the rival's own figures exclude employer E's applications, including the shared college.
+- [x] §6.3:
+  - 401 without a token;
+  - 403 for an ended membership;
+  - SUSPENDED gives 403 `EMPLOYER_ORGANISATION_INACTIVE`, and PENDING gives 403 `EMPLOYER_ORGANISATION_UNVERIFIED`;
+  - validation returns 400 on unknown parameters;
+  - the reports read writes an audit row;
+  - neither response carries readiness, a person's name, email or ID, or a protected attribute;
+  - web: real data, NA, empty and error states with a reference, and navigation labels unchanged (asserted).
+  - Candidate-grant tests do not apply: neither route returns one candidate's data.
+
+**Decisions for Divakar (recommendations taken):**
+1. **The summary is exact; the reports are suppressed.** Each summary figure is a count of rows the same employer already sees one by one in its own lists. That is how the acceptance test reconciles them, and withholding "2 offers awaiting an answer" would hide nothing the Offers page shows. The reports break applications down by dimensions the employer does not see side by side (college, drive, durations), so every figure about people there goes through `suppressAggregateTable` / `suppressSmallCount`.
+2. **One partition per group.** Each application sits in exactly one cell:
+   - its current stage while open;
+   - HIRED;
+   - or `LEFT_AT_<stage>`, the stage it was rejected or withdrew at.
+
+   That single table is both the funnel and the drop-off. Publishing those as two tables over the same people would let one be subtracted from the other. A cumulative "reached at least" funnel was rejected: with the helper's zero-is-under-five rule, any zero hires would withhold every reached figure.
+3. **College** is the name the student put in the application snapshot they chose to share (EMP-07), never ONE's roster. Names are grouped regardless of case and spacing, and each college is shown with the spelling most students used.
+   - A college is named only from 5 applications. The rest form one "Other colleges or not stated" row.
+   - If that row would hold 1–4, the smallest named college joins it.
+   - Named rows are ordered by name, never by size.
+   - An erased snapshot counts as "not stated".
+4. **Medians are shown only over at least 5 applications.** The acceptance rate is accepted ÷ (accepted + declined + expired), shown only when the accepted and not-accepted groups each hold at least 5, because a rate over smaller groups is a small count in disguise. Offers are counted per application, using its latest non-draft offer.
+5. **"This week" is Monday to Sunday in Asia/Kolkata**, computed by the database clock, and returned with the summary so clients list the same window. "Offers pending" means EXTENDED and not yet past expiry; a lapsed offer still marked EXTENDED is not waiting on anyone.
+6. **Reports are lifetime-to-date, not a period.** The month-end period rule protects a college's view of students it cannot otherwise see. An employer already sees each of its applications' stage individually, so differencing its own live report over time reveals nothing it does not hold.
+7. **Drive results are aligned with INST-12:** the college's counts for a completed drive now include only applications shared with the college, the same consent its named rows need. This was INST-12's recommendation, taken here because the reports touch drive outcomes.
+8. **HG-3:** no navigation item was added, removed, renamed or reordered, and this is asserted. Reports stays on the existing label. On Android, the Home card's button that opens the overlay now reads "Reports" instead of "Hiring"; that is a button, not a navigation item.
+9. **No export was added.** Exports are EMP-17's and would reuse INST-08's writer.
+
+**Android:** changed and compiled with the Android Studio JBR (`:app:compileDebugKotlin` passed).
+- Employer Home reads the same summary: Open Roles, Total Applicants, In Pipeline, Offers awaiting an answer, New in 7 days, Drives awaiting colleges, the funnel, and "N this week" on This Week's Interviews. Each shows NA when the summary cannot be read.
+- The Hiring overlay decoded top-level fields the API never sent, so it showed zeros that were not real. It is replaced by a read-only Reports overlay with the same suppressed figures as the web.
+- The Roles tab is unchanged; it already lists each role's counts and drives.
+
+**Limitations / not done:**
+- `GET /employers/:e/hiring-analytics` (unsuppressed, exempted by EMP-SR-01) and the web's `EmployerHiringAnalyticsPage` still exist, because an existing test covers the page. No screen on the web or the phone reads them any more. Recommended: retire both in a follow-up.
+- Job and drive rows are capped at the 200 most recent, with a `…Truncated` flag.
+- Suppression is applied per table. The college and job tables are not jointly protected against subtraction from the overall table. Within the threat model, that could reveal only facts the employer was given at apply time (the college in the shared snapshot) or already sees (each application's stage).
+
+**Next goal:** coordinator's choice (EMP-16 or EMP-17).

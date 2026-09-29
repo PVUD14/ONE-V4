@@ -169,7 +169,7 @@ async function start(studentId: string, invitationId: string): Promise<Paper> {
 function correctKey(paper: Paper): string {
   return paper.questions[0]!.options.find((option) => option.text === 'Correct answer')!.key;
 }
-async function answer(studentId: string, paper: Paper, keys: string[]) {
+function answer(studentId: string, paper: Paper, keys: string[]) {
   return api().post('/api/v1/students/me/screening-attempts/' + paper.id + '/answers').set(auth(studentId))
     .send({ questionId: paper.questions[0]!.questionId, selectedOptionKeys: keys });
 }
@@ -313,7 +313,7 @@ describe('EMP-12: tests go to applicants at the ASSESSMENT stage, in a window se
     const { hiring, assessmentId, studentId, invitationId } = await invitedCandidate();
     const paper = await start(studentId, invitationId);
     await answer(studentId, paper, [correctKey(paper)]).expect(201);
-    await pool.query("UPDATE employer_assessment_invitations SET closes_at = now() - interval '1 second' WHERE id=$1", [invitationId]);
+    await pool.query("UPDATE employer_assessment_invitations SET opens_at = now() - interval '1 hour', closes_at = now() - interval '1 second' WHERE id=$1", [invitationId]);
 
     const results = await api().get(base(hiring.employerId) + '/assessments/' + assessmentId + '/results').set(auth(hiring.recruiterId)).expect(200);
     expect(results.body.results).toEqual([expect.objectContaining({ invitationId, state: 'SUBMITTED', percentage: 100, endedBy: 'TIME_LIMIT' })]);

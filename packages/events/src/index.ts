@@ -499,6 +499,18 @@ export const eventSchemas = {
     schemaRef: 'registry://offer.expiry_reminder.requested/1',
     payload: { offerId: { kind: 'uuid' } },
   },
+  // EMP-12: an employer sent an applicant a screening test. Written in the invitation transaction;
+  // the hiring-notification consumer re-reads the invitation and the grant at consume time.
+  employerAssessmentInvitedV1: {
+    eventType: 'employer_assessment.invited',
+    eventVersion: 1,
+    producer: 'hiring',
+    aggregateType: 'employer_assessment_invitation',
+    purpose: 'employer-assessments',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://employer_assessment.invited/1',
+    payload: { invitationId: { kind: 'uuid' }, applicationId: { kind: 'uuid' }, assessmentId: { kind: 'uuid' } },
+  },
   // EMP-10: one message in an application's conversation. The payload never carries the text; the
   // hiring-notification consumer reads the message at consume time and re-checks the grant.
   applicationMessageSentV1: {

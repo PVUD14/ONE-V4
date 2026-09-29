@@ -86,6 +86,13 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
     body: 'If an assessment shows Opens soon, its window has not started yet. Window closed means the start window has passed. Completed with no attempts left means you used your allowance. In all three cases only your institution can help: staff can reopen the window, add attempts, or change the per-attempt duration. Ask your placement cell — the assistant cannot change assessment windows. Also note assessments are laptop-only: on a phone you will see the assignment but the start button is replaced with a laptop-only notice.',
   },
   {
+    id: 'employer-screening-tests',
+    personas: ['student'],
+    title: 'Screening tests from employers',
+    keywords: ['screening', 'employer', 'screening test', 'invited', 'recruiter test', 'phone'],
+    body: 'An employer can send you a screening test once your application reaches its Assessment stage; you are told in your notifications, and it appears under Assessments (and Screening tests in the app, where you can take it). Before you start you see what it covers: how many questions, their formats, the marks, and the minutes you will have. It is one sitting; the timer runs on ONE’s server from the moment you begin and does not pause, and if the test’s window closes first you get less time. No camera, microphone or screen capture is used. Your result goes only to that employer, for that application, while you share it with them; it is not part of your academic record or learning evidence and never changes your readiness.',
+  },
+  {
     id: 'learning-lessons',
     personas: ['student'],
     title: 'Learning and lesson completion',
@@ -142,11 +149,18 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
     body: 'You meet candidates through profiles they have consented to share — current skills, projects and certifications, opened from a link or a QR code the student presents. ONE does not expose internal readiness scores to employers by design: candidates are evaluated on real evidence, and your own assessments, not on an opaque platform ranking.',
   },
   {
+    id: 'employer-screening-assessments',
+    personas: ['employer'],
+    title: 'Screening tests for applicants',
+    keywords: ['assessment', 'screening', 'test', 'question bank', 'invite', 'window', 'results'],
+    body: 'Under Assessments you write questions into your own bank (someone other than the author approves each one), build a test from approved questions, publish it and send it to applicants who are in the Assessment stage, with a window of up to 30 days. Each candidate gets the test’s full length unless the window closes first, and ONE’s server keeps the time. Results are listed in the order candidates were sent the test, never ranked by score, and each candidate’s answers question by question appear in Candidate Detail — only while they share their application with you. Rejecting or archiving a question and closing a test ask for a reason. Your bank is yours alone: you cannot see a college’s question bank, and it cannot see yours.',
+  },
+  {
     id: 'mobile-app',
     personas: ['all'],
     title: 'The ONE mobile app',
     keywords: ['app', 'mobile', 'android', 'phone', 'theme', 'install', 'sign in'],
-    body: 'The Android app signs in with the same email and password as the web. Students see their dashboard, assessments and results, learning, jobs and notifications; institution and employer staff see live monitoring dashboards; operations accounts see a view-only overview. Exams are never taken in the app - a laptop is required. Pick your look from six themes via the palette icon at the top of any screen. Demo accounts work only in the web pilot, not the app.',
+    body: 'The Android app signs in with the same email and password as the web. Students see their dashboard, assessments and results, learning, jobs and notifications; institution and employer staff see live monitoring dashboards; operations accounts see a view-only overview. College exams are never taken in the app - a laptop is required; screening tests an employer sends can be taken on the phone. Pick your look from six themes via the palette icon at the top of any screen. Demo accounts work only in the web pilot, not the app.',
   },
   {
     id: 'help-faq',

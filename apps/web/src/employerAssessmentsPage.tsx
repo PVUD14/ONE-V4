@@ -6,16 +6,26 @@
  * question is approved by somebody other than its author, so the screen says so instead of
  * letting a recruiter discover it as an error. And the results table carries no readiness
  * band — an employer sees what they measured and nothing else.
+ *
+ * EMP-12: rejecting or archiving a question and closing a test each need a reason from a fixed
+ * list; a test goes only to applicants in the Assessment stage, in a window the server checks;
+ * results are listed in the order candidates were invited — never ranked by score — a page at a
+ * time, with how each attempt ended.
  */
 import React, { useEffect, useState } from 'react';
 import { getAccessToken } from './auth.js';
 import {
+  ASSESSMENT_CLOSE_REASONS,
+  QUESTION_ARCHIVE_REASONS,
+  QUESTION_REJECT_REASONS,
+  closeEmployerAssessment,
   createEmployerAssessment,
   createEmployerQuestion,
   inviteToEmployerAssessment,
   listEmployerApplicants,
   listEmployerAssessmentResults,
   listEmployerAssessments,
+  listEmployerCandidateAssessments,
   listEmployerOpportunities,
   listEmployerQuestions,
   publishEmployerAssessment,
@@ -23,6 +33,7 @@ import {
   type EmployerApplicantDto,
   type EmployerAssessmentDto,
   type EmployerAssessmentResultDto,
+  type EmployerCandidateAssessmentDto,
   type EmployerOpportunityDto,
   type EmployerQuestionDto,
 } from './api.js';
@@ -43,8 +54,10 @@ function messageFor(error: unknown, fallback: string): string {
   if (code === 'DUPLICATE_QUESTION') return 'That question is already in your bank.';
   if (code === 'QUESTIONS_NOT_APPROVED') return 'Every question in a test has to be approved first.';
   if (code === 'ASSESSMENT_HAS_NO_QUESTIONS') return 'Add at least one question before publishing.';
-  if (code === 'APPLICATION_NOT_INVITABLE') return 'One of those candidates can no longer be sent a test — they may have withdrawn, been rejected, or revoked consent.';
-  if (code === 'ASSESSMENT_NOT_PUBLISHED') return 'Publish the test before sending it to anybody.';
+  if (code === 'APPLICATION_NOT_INVITABLE') return 'One of those candidates cannot be sent this test — a test goes only to candidates in the Assessment stage, and they may have withdrawn, been rejected, or revoked consent.';
+  if (code === 'ASSESSMENT_NOT_PUBLISHED') return 'This test is not published — publish it first, or build a new test if it was closed.';
+  if (code === 'INVALID_WINDOW') return 'Choose a window that opens now or later and closes within 30 days.';
+  if (code === 'REASON_CODE_REQUIRED' || code === 'INVALID_REASONCODE') return 'Choose a reason from the list.';
   return fallback;
 }
 
@@ -118,17 +131,22 @@ function QuestionBank({ employerId, questions, onDone, onFail }: {
   readonly onFail: (message: string) => void;
 }): React.ReactElement {
   const [adding, setAdding] = useState(false);
+  const [deciding, setDeciding] = useState<{ readonly questionId: string; readonly toState: 'REJECTED' | 'ARCHIVED' } | null>(null);
+  const [reason, setReason] = useState('');
 
-  async function move(questionId: string, toState: string): Promise<void> {
+  async function move(questionId: string, toState: string, reasonCode?: string): Promise<void> {
     const token = getAccessToken();
     if (!token) return;
     try {
-      await transitionEmployerQuestion(token, employerId, questionId, toState);
+      await transitionEmployerQuestion(token, employerId, questionId, toState, reasonCode);
+      setDeciding(null);
+      setReason('');
       onDone(toState === 'APPROVED' ? 'Question approved and available for a test.' : 'Question updated.');
     } catch (error) {
       onFail(messageFor(error, 'That change could not be saved.'));
     }
   }
+  const reasons = deciding?.toState === 'ARCHIVED' ? QUESTION_ARCHIVE_REASONS : QUESTION_REJECT_REASONS;
 
   return <>
     <section className="role-card role-wide">
@@ -145,7 +163,8 @@ function QuestionBank({ employerId, questions, onDone, onFail }: {
         : <div className="role-record-table-wrap"><table className="role-record-table">
           <thead><tr><th>Question</th><th>Type</th><th>Marks</th><th>State</th><th>Next</th></tr></thead>
           <tbody>{questions.map((question) => <tr key={question.id}>
-            <td>{question.questionText}</td>
+            <td>{question.questionText}
+              {question.mentionsProtectedAttribute ? <><br /><span className="hiring-state state-rejected">Names a protected attribute — check it does not screen people on who they are</span></> : null}</td>
             <td>{QUESTION_TYPES.find(([code]) => code === question.questionType)?.[1] ?? question.questionType}</td>
             <td>{question.marks}</td>
             <td><span className={`hiring-state state-${question.approvalStatus.toLowerCase()}`}>{question.approvalStatus.replace(/_/g, ' ').toLowerCase()}</span></td>
@@ -153,10 +172,23 @@ function QuestionBank({ employerId, questions, onDone, onFail }: {
               {question.approvalStatus === 'DRAFT' ? <button type="button" className="secondary" onClick={() => { void move(question.id, 'UNDER_REVIEW'); }}>Send for review</button> : null}
               {question.approvalStatus === 'UNDER_REVIEW' ? <>
                 <button type="button" onClick={() => { void move(question.id, 'APPROVED'); }}>Approve</button>
-                <button type="button" className="secondary" onClick={() => { void move(question.id, 'REJECTED'); }}>Reject</button>
+                <button type="button" className="secondary" onClick={() => { setReason(''); setDeciding({ questionId: question.id, toState: 'REJECTED' }); }}>Reject</button>
               </> : null}
               {question.approvalStatus === 'APPROVED' ? <span className="hiring-meta">Ready to use</span> : null}
-            </div></td>
+              {question.approvalStatus === 'APPROVED' || question.approvalStatus === 'REJECTED'
+                ? <button type="button" className="secondary" onClick={() => { setReason(''); setDeciding({ questionId: question.id, toState: 'ARCHIVED' }); }}>Archive</button>
+                : null}
+            </div>
+            {deciding?.questionId === question.id ? <div className="hiring-actions">
+              <label className="student-form-field"><span>{deciding.toState === 'ARCHIVED' ? 'Why archive it' : 'Why reject it'}</span>
+                <select value={reason} onChange={(event) => setReason(event.target.value)}>
+                  <option value="">Choose a reason</option>
+                  {reasons.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
+                </select>
+              </label>
+              <button type="button" disabled={!reason} onClick={() => { void move(question.id, deciding.toState, reason); }}>{deciding.toState === 'ARCHIVED' ? 'Archive' : 'Reject'} question</button>
+              <button type="button" className="secondary" onClick={() => setDeciding(null)}>Cancel</button>
+            </div> : null}</td>
           </tr>)}</tbody>
         </table></div>}
     </section>
@@ -235,6 +267,21 @@ function TestList({ employerId, assessments, approved, openResults, onOpenResult
 }): React.ReactElement {
   const [building, setBuilding] = useState(false);
   const [inviting, setInviting] = useState<string | null>(null);
+  const [closing, setClosing] = useState<string | null>(null);
+  const [closeReason, setCloseReason] = useState('');
+
+  async function close(assessmentId: string): Promise<void> {
+    const token = getAccessToken();
+    if (!token || !closeReason) return;
+    try {
+      await closeEmployerAssessment(token, employerId, assessmentId, closeReason);
+      setClosing(null);
+      setCloseReason('');
+      onDone('Test closed. Candidates already sent it keep their window.');
+    } catch (error) {
+      onFail(messageFor(error, 'That test could not be closed.'));
+    }
+  }
 
   async function publish(assessmentId: string): Promise<void> {
     const token = getAccessToken();
@@ -271,8 +318,19 @@ function TestList({ employerId, assessments, approved, openResults, onOpenResult
             <td><div className="hiring-actions">
               {assessment.lifecycleState === 'DRAFT' ? <button type="button" onClick={() => { void publish(assessment.id); }}>Publish</button> : null}
               {assessment.lifecycleState === 'PUBLISHED' ? <button type="button" className="secondary" onClick={() => setInviting(assessment.id)}>Send to applicants</button> : null}
+              {assessment.lifecycleState === 'PUBLISHED' ? <button type="button" className="secondary" onClick={() => { setCloseReason(''); setClosing(assessment.id); }}>Close</button> : null}
               {assessment.invitedCount > 0 ? <button type="button" className="secondary" onClick={() => onOpenResults(openResults === assessment.id ? null : assessment.id)}>Results</button> : null}
-            </div></td>
+            </div>
+            {closing === assessment.id ? <div className="hiring-actions">
+              <label className="student-form-field"><span>Why close it</span>
+                <select value={closeReason} onChange={(event) => setCloseReason(event.target.value)}>
+                  <option value="">Choose a reason</option>
+                  {ASSESSMENT_CLOSE_REASONS.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
+                </select>
+              </label>
+              <button type="button" disabled={!closeReason} onClick={() => { void close(assessment.id); }}>Close test</button>
+              <button type="button" className="secondary" onClick={() => setClosing(null)}>Cancel</button>
+            </div> : null}</td>
           </tr>)}</tbody>
         </table></div>}
     </section>
@@ -374,6 +432,7 @@ function InvitePanel({ employerId, assessmentId, onSent, onFail, onCancel }: {
   const [applicants, setApplicants] = useState<readonly EmployerApplicantDto[]>([]);
   const [selected, setSelected] = useState<readonly string[]>([]);
   const [days, setDays] = useState('7');
+  const [opensAt, setOpensAt] = useState('');
   const [sending, setSending] = useState(false);
 
   useEffect(() => {
@@ -396,17 +455,19 @@ function InvitePanel({ employerId, assessmentId, onSent, onFail, onCancel }: {
       .catch(() => undefined);
   }, [employerId, opportunityId]);
 
-  // Closed or consent-revoked applicants are not offered: the server would refuse them,
-  // and offering a checkbox that cannot work is worse than not offering it.
-  const invitable = applicants.filter((applicant) => !applicant.closedAt && !applicant.consentRevoked && applicant.candidateAccess !== false);
+  // Only open, shared applications in the Assessment stage are offered: the server would refuse
+  // anything else, and offering a checkbox that cannot work is worse than not offering it.
+  const invitable = applicants.filter((applicant) => applicant.state === 'ASSESSMENT' && !applicant.closedAt && !applicant.consentRevoked && applicant.candidateAccess !== false);
+  const elsewhere = applicants.filter((applicant) => applicant.state !== 'ASSESSMENT' && !applicant.closedAt).length;
 
   async function send(): Promise<void> {
     const token = getAccessToken();
     if (!token || selected.length === 0) return;
     setSending(true);
     try {
-      const closesAt = new Date(Date.now() + Number(days) * 86400000).toISOString();
-      const response = await inviteToEmployerAssessment(token, employerId, assessmentId, selected, closesAt);
+      const start = opensAt ? new Date(opensAt) : null;
+      const closesAt = new Date((start ? start.getTime() : Date.now()) + Number(days) * 86400000).toISOString();
+      const response = await inviteToEmployerAssessment(token, employerId, assessmentId, selected, closesAt, start ? start.toISOString() : undefined);
       onSent(response.invited);
     } catch (error) {
       onFail(messageFor(error, 'That test could not be sent.'));
@@ -420,11 +481,15 @@ function InvitePanel({ employerId, assessmentId, onSent, onFail, onCancel }: {
         {opportunities.map((opportunity) => <option key={opportunity.id} value={opportunity.id}>{opportunity.title ?? opportunity.referenceCode}</option>)}
       </select>
     </label>
-    <label className="student-form-field"><span>Open for how many days</span>
-      <input type="number" min="1" max="60" value={days} onChange={(event) => setDays(event.target.value)} />
+    <label className="student-form-field"><span>Opens (leave empty to open now)</span>
+      <input type="datetime-local" value={opensAt} onChange={(event) => setOpensAt(event.target.value)} />
     </label>
+    <label className="student-form-field"><span>Open for how many days</span>
+      <input type="number" min="1" max="30" value={days} onChange={(event) => setDays(event.target.value)} />
+    </label>
+    <p className="hiring-meta">A candidate has the test&rsquo;s full length unless the window closes first. ONE&rsquo;s server keeps the time.</p>
     {invitable.length === 0
-      ? <p>No candidates on this role can be sent a test right now.</p>
+      ? <p>No candidates on this role are in the Assessment stage. Move a candidate to Assessment in Applicants to send them a test.</p>
       : <ul className="check-stack">
         {invitable.map((applicant) => <li key={applicant.id}>
           <label>
@@ -439,6 +504,7 @@ function InvitePanel({ employerId, assessmentId, onSent, onFail, onCancel }: {
           </label>
         </li>)}
       </ul>}
+    {invitable.length > 0 && elsewhere > 0 ? <p className="hiring-meta">{elsewhere} other {elsewhere === 1 ? 'candidate is' : 'candidates are'} not in the Assessment stage and cannot be sent a test yet.</p> : null}
     <div className="hiring-actions">
       <button type="button" disabled={sending || selected.length === 0} onClick={() => { void send(); }}>Send test</button>
       <button type="button" className="secondary" onClick={onCancel}>Cancel</button>
@@ -448,6 +514,7 @@ function InvitePanel({ employerId, assessmentId, onSent, onFail, onCancel }: {
 
 function ResultsPanel({ employerId, assessmentId }: { readonly employerId: string; readonly assessmentId: string }): React.ReactElement {
   const [results, setResults] = useState<readonly EmployerAssessmentResultDto[] | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [status, setStatus] = useState('Loading results…');
 
   useEffect(() => {
@@ -455,24 +522,92 @@ function ResultsPanel({ employerId, assessmentId }: { readonly employerId: strin
     if (!token) return;
     const abort = new AbortController();
     listEmployerAssessmentResults(token, employerId, assessmentId, abort.signal)
-      .then((response) => { setResults(response.results); setStatus(''); })
+      .then((response) => { setResults(response.results); setNextCursor(response.nextCursor ?? null); setStatus(''); })
       .catch(() => { if (!abort.signal.aborted) setStatus('Those results could not be loaded.'); });
     return () => abort.abort();
   }, [employerId, assessmentId]);
 
+  async function more(): Promise<void> {
+    const token = getAccessToken();
+    if (!token || !nextCursor) return;
+    try {
+      const response = await listEmployerAssessmentResults(token, employerId, assessmentId, undefined, nextCursor);
+      setResults((current) => [...(current ?? []), ...response.results]);
+      setNextCursor(response.nextCursor ?? null);
+    } catch {
+      setStatus('More results could not be loaded.');
+    }
+  }
+
   return <section className="role-card role-wide">
     <h2>Results</h2>
-    <p>A score is information, not a decision. Nothing here moves a candidate — you do.</p>
+    <p>A score is information, not a decision. Nothing here moves a candidate — you do. Candidates are listed in the order they were sent the test, not by score.</p>
     {status ? <p role="status">{status}</p> : null}
     {results && results.length > 0 ? <div className="role-record-table-wrap"><table className="role-record-table">
-      <thead><tr><th>Candidate</th><th>State</th><th>Score</th><th>Submitted</th></tr></thead>
+      <thead><tr><th>Candidate</th><th>State</th><th>Score</th><th>Submitted</th><th>Ended</th></tr></thead>
       <tbody>{results.map((result) => <tr key={result.invitationId}>
-        <td>{result.candidateName ?? result.candidateEmail}</td>
+        <td>{result.candidateName ?? result.candidateEmail ?? 'NA'}</td>
         <td><span className={`hiring-state state-${result.state.toLowerCase()}`}>{result.state.toLowerCase()}</span></td>
         <td>{result.percentage === null ? <span className="hiring-meta">NA</span> : `${result.percentage}%`}
           {result.score !== null ? <><br /><span className="hiring-meta">{result.score} / {result.maxScore}</span></> : null}</td>
         <td>{result.submittedAt ? new Date(result.submittedAt).toLocaleDateString() : <span className="hiring-meta">Not yet</span>}</td>
+        <td>{result.endedBy === 'TIME_LIMIT' ? 'Time ran out' : result.endedBy === 'CANDIDATE' ? 'Submitted by candidate'
+          : result.submittedAt ? 'Submitted' : <span className="hiring-meta">Not yet</span>}</td>
       </tr>)}</tbody>
     </table></div> : null}
+    {nextCursor ? <button type="button" className="secondary" onClick={() => { void more(); }}>Show more</button> : null}
+  </section>;
+}
+
+/**
+ * EMP-12: one candidate's results on this employer's screening tests, inside Candidate Detail.
+ * Read only while the candidate's applicant-access grant is live (the server refuses otherwise,
+ * and every read is recorded). Question by question, with how the attempt ended. Nothing about
+ * readiness, and nothing from ONE's or the college's own assessments.
+ */
+export function EmployerCandidateAssessmentsPanel({ employerId, applicationId }: { readonly employerId: string; readonly applicationId: string }): React.ReactElement {
+  const [assessments, setAssessments] = useState<readonly EmployerCandidateAssessmentDto[] | null>(null);
+  const [status, setStatus] = useState('Loading screening tests…');
+
+  useEffect(() => {
+    const token = getAccessToken();
+    if (!token) { setStatus('You are not signed in.'); return undefined; }
+    const abort = new AbortController();
+    listEmployerCandidateAssessments(token, employerId, applicationId, abort.signal)
+      .then((response) => { setAssessments(response.assessments ?? []); setStatus(''); })
+      .catch((error: unknown) => {
+        if (abort.signal.aborted) return;
+        const failure = error as { status?: number; correlationId?: string };
+        setStatus(failure?.status === 403
+          ? 'This candidate is no longer sharing their application with you, so their test results are not shown.'
+          : `Their screening test results could not be loaded.${failure?.correlationId ? ` Reference: ${failure.correlationId}` : ''}`);
+      });
+    return () => abort.abort();
+  }, [employerId, applicationId]);
+
+  return <section className="role-card role-wide">
+    <h2>Screening tests</h2>
+    <p className="hiring-meta">Your own tests for this application only. A score is information, not a decision.</p>
+    {status ? <p role="status">{status}</p> : null}
+    {assessments && assessments.length === 0 ? <p>You have not sent this candidate a screening test. Tests go to candidates in the Assessment stage, from Assessments.</p> : null}
+    {(assessments ?? []).map((item) => <div key={item.invitationId} className="role-record-table-wrap">
+      <h3>{item.title}</h3>
+      <p className="hiring-meta">
+        <span className={`hiring-state state-${item.state.toLowerCase()}`}>{item.state.toLowerCase()}</span>
+        {' '}· window {new Date(item.opensAt).toLocaleString()} – {new Date(item.closesAt).toLocaleString()}
+        {' '}· {Math.round(item.durationSeconds / 60)} min
+      </p>
+      <p>{item.percentage === null ? 'Score: NA' : `Score: ${item.percentage}% (${item.score} / ${item.maxScore})`}
+        {item.endedBy === 'TIME_LIMIT' ? ' · time ran out' : item.endedBy === 'CANDIDATE' ? ' · submitted by the candidate' : ''}</p>
+      {item.questions.length > 0 ? <table className="role-record-table">
+        <thead><tr><th>#</th><th>Question</th><th>Marks</th><th>Answered</th></tr></thead>
+        <tbody>{item.questions.map((question) => <tr key={question.displayOrder}>
+          <td>{question.displayOrder}</td>
+          <td>{question.questionText}</td>
+          <td>{question.marksAwarded} / {question.marks}</td>
+          <td>{question.answered ? 'Yes' : 'No'}</td>
+        </tr>)}</tbody>
+      </table> : null}
+    </div>)}
   </section>;
 }

@@ -848,3 +848,122 @@ Every write:
 **Android / web:** no change. Both clients download the export as a file without interpreting its sections (web privacyPanel, Android Api.kt), and neither lists deletion categories. No screen, route, label or navigation item changed.
 **Limitations / not done:** `answered_at` on erased answers is kept (NOT NULL, identifies no one once the response and the person are gone; recorded in the design). The export includes the question text the candidate was shown, which is the employer's material; the design records why (an answer is meaningless without its question) and that it discloses no key.
 **Next goal:** as scheduled by the coordinator.
+
+## EMP-16 — Employer terms, data retention and trust-case participation — 2026-09-29
+**Result:** Complete. Employers now accept versioned terms before publishing, and the terms text is labelled as a draft for legal review. The daily worker revokes expired grants. An employer can now answer a trust case about itself and appeal a decision once; operators see the response and the appeal on the case timeline. Web, operations and Android all carry it.
+**Branch / PR:** feat/emp-terms-trust, cut from onev4/feat/plan-phases-0-to-2 @ 9460a62, pushed to onev4; merge by review. Commits: b41b494 (design and draft terms), cb847f6 (acceptance tests), 3ad2671 (migration and API), b28e063 (web), d807aaa (Android), then this report.
+**Files created:**
+- docs/architecture/employer-terms-and-trust-participation-design.md
+- docs/legal/employer-terms-DRAFT-for-legal-review.md
+- packages/persistence/drizzle/0084_employer_terms_and_trust_participation.sql
+- packages/persistence/src/employer-terms.ts
+- apps/api/src/http/employer-settings.controller.ts, employer-trust-cases.controller.ts, operations-employer-terms.controller.ts, employer-terms-gate.ts
+- apps/api/src/http/employer-terms-trust.integration.spec.ts
+- apps/web/src/api/employerTerms.ts
+- apps/web/src/rolePortal/employerSettings.tsx (+ .test.tsx), rolePortal/operationsEmployerTerms.tsx
+- apps/android/.../EmployerTermsTrust.kt
+
+**Files modified:**
+- Packages:
+  - persistence trust-safety.ts: the employer view, respond, appeal, share summary and request response; statements on the operator detail; AWAITING_RESPONSE now needs an allegation summary when the subject is an employer.
+  - persistence application-messages.ts: the retention sweep skips a student under an active retention hold.
+  - events: four events registered.
+- API:
+  - employer-hiring.controller.ts: the terms gate is inside the guarded publish UPDATE, and the refusal is explained.
+  - employer-job-lifecycle.controller.ts: reopen is gated.
+  - campus-drives.controller.ts: a drive request and a resubmit are gated.
+  - employer-organisation-state.ts: new `trust.cases` action group, allowed in every state.
+  - trust-safety.controller.ts: new routes `POST …/cases/:id/request-response` and `POST …/cases/:id/employer-statements`.
+  - run-privacy-worker.ts: grant expiry sweep.
+  - api-security.module.ts and app.module.ts: controllers registered.
+- Web:
+  - rolePortal/employer.tsx: only the Settings label's branch changed.
+  - rolePortal/employerOrganisationState.tsx: the status page lists trust cases.
+  - rolePortal/trustSafety.tsx: case timeline; "Ask for response" shares a summary first.
+  - rolePortal/operations.tsx: collapsed Employer terms section on Organizations.
+  - rolePortal/shared.tsx: plain messages for the new codes.
+- Android: EmployerWork.kt (the TermsTrust overlay), StaffDashboards.kt (a Home entry, and a link from the suspended/rejected status screen).
+
+**Existing tests touched (none weakened):**
+- rolePortal/employerCompanyProfile.test.tsx `leaves every other unbuilt label saying so` used "Settings" as its example of an unbuilt label.
+- Every recruiter label now has a screen, so the test now uses a label the dispatcher does not route. It checks the same fallback: "Not built yet" is shown and nothing is fetched.
+
+**Migrations added:** 0084_employer_terms_and_trust_participation.sql (number assigned by the coordinator; it references only 0000–0032 tables: users, organizations, trust_cases). It adds three append-only tables (UPDATE/DELETE refused by trigger):
+- `employer_terms_versions`: immutable. The body's sha256 is computed in SQL. It carries the legal-review state and requires a reference when LEGAL_APPROVED. A trigger requires the first version to be material.
+- `employer_terms_acceptances`: owner only, one per version per employer, employer-kind trigger.
+- `trust_case_employer_statements`: operator summaries and employer response/appeal, side tied to kind by CHECK, one appeal per case by partial unique index.
+
+Nothing is seeded, following 0028's precedent: until operations publish a version, publishing behaves as before. The migration is idempotent: `db:migrate` ran twice and 0084 was replayed by hand in psql.
+**Design docs / ADRs:** the design doc above. It covers: why not the consent registry or an organisations column; the gate and non-retroactivity; the expiry job; purges and holds; why a statements table rather than notes or evidence; what an employer sees and never sees; privacy. No ADR.
+
+**Routes:**
+- Employer:
+  - GET /employers/:e/settings: every employer role; `organisation.manage`.
+  - POST /employers/:e/terms/accept {version}: owner only; the latest version only.
+  - POST /employers/:e/settings/notification-preferences: the caller's own row.
+  - GET /employers/:e/trust-cases and GET …/trust-cases/:caseId: owner and admin; `trust.cases`, any organisation state.
+  - POST …/trust-cases/:caseId/response and …/appeal {statement}: owner and admin.
+- Operations:
+  - GET and POST /operations/employer-terms (OPS_ORG_MANAGE).
+  - POST /operations/trust-safety/cases/:caseId/request-response {summary, reasonCode} and …/employer-statements {kind, body} (TRUST_SAFETY_INVESTIGATE).
+  - GET …/cases/:caseId now also returns `employerStatements` and `subjectEmployerId`.
+
+**Validation:** pending — the long run follows this commit; the results are amended here.
+
+**Acceptance criteria:**
+- [x] *An employer that has not accepted current terms cannot publish.* Tests: `refuses to publish, reopen or request a drive until an owner accepts the current terms` (403 EMPLOYER_TERMS_NOT_ACCEPTED, the job stays DRAFT, no drive row) and `never acts retroactively…`:
+  - after a material v2, a live job stays PUBLISHED, students still see it and the process continues;
+  - a new publish and a reopen are refused until the owner accepts v2;
+  - a non-material version asks nobody to accept again.
+  - `publishes exactly as before while no terms have been published`.
+- [x] *Expired grants remove candidate access and exports.* Test: `removes candidate access the moment a grant expires, and the daily job makes it durable`.
+  - On the next request the person is withheld from the list; the candidate view, the résumé link and transitions answer 403.
+  - `revokeExpiredApplicantGrants` revokes only expired grants, once, with an actor-less `employer_applicant_access.expired` event, and leaves the application alone.
+  - Exports: ONE has no employer export yet (EMP-17). Any export built on the shared live-grant predicate, or on `revoked_at`, already excludes these grants.
+- [x] *Employer responses and appeals appear on the operator case timeline.* Test: `puts the employer response and appeal on the operator case timeline, and never names the reporter`.
+  - The operator detail's `employerStatements` holds the summary, response, decision and appeal with author side.
+  - `events` holds AWAITING_RESPONSE→UNDER_INVESTIGATION (EMPLOYER_RESPONDED, by the admin) and ACTIONED→APPEALED (EMPLOYER_APPEAL, by the owner).
+  - There are audit rows with the organisation and outbox rows without text. The web operator timeline shows both.
+- [x] Build 1: versioned terms, owner acceptance, re-acceptance on material change. The terms text is DRAFT for legal review (docs/legal/…, and a "Draft — pending legal review" label on every screen).
+- [x] Build 2: the grant expiry job runs in the daily retention worker on the database clock. Deletion propagation was already complete (EMP-SR-02) and was not duplicated.
+  - Purges never take what a case or hold needs: `never erases message text a retention hold still needs`. Open-case evidence was already skipped (EMP-10).
+- [x] Build 3: the employer sees allegations and evidence summaries that may be shared, responds, and appeals; operators decide.
+  - Only cases about itself, once disclosed: `shows an employer only the cases about itself, with its own job evidence`.
+  - Evidence is limited to its own job and detector signals; the rest is counted, never described.
+  - No reporter id, statement, message text, severity, notes or opening time. A suspended employer can still read its cases.
+- [x] Build 4: the Settings screen shows terms status, retention information and notification preferences (web `employerSettings.test.tsx`, 11 tests).
+- [x] §6.3:
+  - 401 without a token; another employer 403; recruiter 403 on trust routes and on accepting; SUSPENDED 403 INACTIVE on Settings and accept (trust routes deliberately allowed); PENDING can accept.
+  - Validation 400s (unknown fields, version pattern, reason codes, empty or overlong statements).
+  - Audit rows written; no readiness, score or band in any response.
+  - Navigation labels unchanged (asserted).
+
+**Decisions for Divakar (recommendations taken):**
+1. **Legal text is a draft.** Nothing is seeded, and operations publish a version deliberately. A version may be published as DRAFT_FOR_LEGAL_REVIEW, and it then shows as a draft everywhere. Recommendation: publish to real employers only after legal review, as LEGAL_APPROVED with the reviewer's reference.
+2. **Only owners accept.** This follows the goal text ("acceptance by an owner"), although the §5.1 matrix lists admins for "employer terms". Admins and recruiters read.
+3. **Scope of the gate.** It covers what puts a job in front of students anew: publish (from DRAFT or PAUSED), reopen, and a campus-drive request or resubmit. Editing a live job, pause, close, interviews and offers are not gated. It is never retroactive, and there is no grace period.
+4. **Decision 10.2 #7 is kept stricter.** Every close already revokes the grant at once. The sweep acts only on grants that carry an `expires_at`, and nothing sets one yet.
+5. **Disclosure.** An employer sees a case only once operations asked it to respond or decided the case. Asking needs a summary written by the operator. The operator screen warns that the employer reads the summary verbatim and that it must not identify the reporter.
+6. **Who answers.** Owners and admins act for the organisation; recruiters do not. There is one appeal per case with no time window. A response moves the case to UNDER_INVESTIGATION.
+7. **Publishing terms** needs OPS_ORG_MANAGE, is audited and needs a reason code. There is no OPS-02 dual control. Recommendation: add it if material versions become frequent.
+8. **HG-3:** no navigation item was added, removed, renamed or reordered.
+   - Settings was an existing label.
+   - Trust cases live inside Settings and on the status page.
+   - Terms publishing is a collapsed section of Organizations, and the timeline is inside Trust and Safety.
+
+**Android:** changed. The employer Home screen has a "Terms and trust" entry that opens a read-only overlay. It shows:
+- the terms with their DRAFT label and acceptance status;
+- what ONE keeps about candidates;
+- the disclosed trust cases with shared statements and actions.
+
+A suspended or rejected employer's status screen links to it. Accepting, responding and appealing stay on the web, and the overlay says so. `./gradlew --no-daemon -q :app:compileDebugKotlin` passed (Android Studio JBR).
+
+**Limitations / not done:**
+- No in-app notification tells owners that a response is requested or that new terms need accepting. That needs `user_notifications_kind_ck` widened; the outbox events exist for a consumer.
+- Operators cannot reverse an enforcement action on appeal (no route existed before; this is operations-plan work).
+- Nothing sets `expires_at` today.
+- The employer data export (EMP-17) is not built.
+- Closed-case retention is still undecided (0032 open point 4).
+
+**Risks / follow-ups:** if a later migration re-declares the trust-case tables' constraints, it must keep 0084's statement table in step. Moving an employer case straight to AWAITING_RESPONSE through the plain transition route now needs a summary; the web uses the combined route.
+**Next goal:** EMP-17 or EMP-18, as scheduled by the coordinator.

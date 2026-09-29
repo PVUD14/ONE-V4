@@ -1597,3 +1597,167 @@ It changes no existing table or migration.
 - `docs/security/reviews/OPERATIONS-CONSOLE-SECURITY-REVIEW.md` should record this control when the console review is next updated.
 
 **Next goal:** OPS-16.
+
+## OPS-14 — College health and account fields (Analytics, Organizations) — 2026-09-29
+**Result:** Complete. Operations → Analytics now shows college health beneath role demand. For every college it shows rostered and signed-in students, weekly active learners, staff activity, open support cases, verification state and renewal date, sorted by renewal date or by activity. Each college's own view adds a four-week trend, assessments taken and the readiness band distribution. Operations → Organization Detail now carries the college account fields: renewal date, contract reference, AI8HT account owner and masked college contacts. They are editable only with ACCOUNT_MANAGE, each change needs a reason code, and every change is audited.
+
+**Branch / PR:** feat/ops-college-health, cut from onev4/feat/plan-phases-0-to-2 @ e472cef → feat/plan-phases-0-to-2. Commits, in order:
+- design: eb5fcec
+- acceptance tests: bbe0861
+- migration, persistence and API: 82fa78c
+- web: 6664e64
+- this report
+
+Pushed to onev4. No PR was opened because `gh` is not installed.
+
+**Files created:**
+- docs/architecture/institution-accounts-table-design.md
+- packages/persistence/drizzle/0078_institution_accounts.sql
+- packages/authorization/src/college-health.ts (+ .test.ts)
+- packages/persistence/src/college-health.ts
+- packages/persistence/src/institution-accounts.ts
+- apps/api/src/http/operations-college-health.controller.ts (+ .integration.spec.ts)
+- apps/web/src/api/collegeHealth.ts
+- apps/web/src/rolePortal/collegeHealth.tsx (+ .test.tsx)
+
+**Files modified:**
+- packages/authorization/src/index.ts: export only.
+- apps/api/src/http/api-security.module.ts: registration only.
+- apps/web/src/api.ts: barrel only.
+- apps/web/src/rolePortalPages.tsx: two operations branches only.
+  - `Analytics` shows role demand, then college health.
+  - `Organization Detail` shows the organisation list, then the account panel.
+
+**Migrations added:** 0078_institution_accounts.sql (the number assigned). It adds two tables:
+- `institution_accounts`: one row per college, never deleted. Its trigger:
+  - requires the row to belong to an INSTITUTION;
+  - requires the owner, when set or changed, to be an ACTIVE internal membership of the PLATFORM organisation;
+  - stamps times from the database clock.
+
+  The contract reference is an identifier (`[A-Za-z0-9/_.:-]`, no spaces), so an amount cannot be stored in it.
+- `institution_account_contacts`: the only update allowed is live → removed. Removal erases the name, email and phone, and a CHECK enforces the erasure. Rows are never deleted.
+
+Every statement is guarded. `db:migrate` ran twice, and the file was also replayed twice by hand with psql; both replays exited 0.
+
+**Design docs / ADRs:** institution-accounts-table-design.md. It records the table, the privacy rules, each figure's source and definition, the fixed windows and the ordering rule. It also records the rejected options:
+- columns on `organization_profiles`;
+- contacts as a jsonb array;
+- contacts as `users`;
+- a composite health score;
+- rolling windows;
+- a stored contract value;
+- dual control.
+
+No ADR was needed.
+
+**API:**
+- `GET /api/v1/operations/analytics/colleges`: one bounded summary of at most 500 colleges. Any query parameter returns 400.
+- `GET /api/v1/operations/analytics/colleges/:collegeId`: one college.
+  - Both analytics routes need ANALYTICS_VIEW.
+  - Both return suppressed aggregates, so, like the Overview and OPS-11, they write no audit row.
+- `GET /api/v1/operations/college-accounts/policy` and `GET /api/v1/operations/college-accounts/:collegeId`: masked reads.
+- `PATCH /api/v1/operations/college-accounts/:collegeId`: renewal date, contract reference and owner, with `expectedVersion`. A stale version returns 409.
+- `POST …/contacts`, `POST …/contacts/:id/remove` and `POST …/contacts/:id/reveal`.
+- Every account route needs ACCOUNT_MANAGE and returns 400 for unknown fields. Every write takes a reason code from `packages/authorization/src/college-health.ts` and an optional note of at most 500 characters.
+- Audit actions are `operations.institution_account.{updated,contact_added,contact_removed,contact_revealed}`, each written in the same transaction as its change.
+  - The update row records each field's before and after value.
+  - No audit row ever carries a contact's name, email or phone.
+- The route parameter is named `collegeId` because the authentication guard reads an `institutionId` parameter as the caller's own organisation, and would refuse every operator.
+
+**What each figure counts:**
+- **Rostered:** students with a current VERIFIED or ACTIVE relationship whose account is not deleted, pending deletion or anonymised.
+- **Signed in:** the account is activated (INST-01). "Signed in" and "not yet" go through `suppressAggregateTable`, which withholds the total when it would reveal a hidden cell.
+- **Weekly active learners:** distinct students with a `learner_activity_events` row in the last complete ISO week (UTC), whose relationship covered the event. The list shows one week; the college view shows four.
+- **Assessments:** submitted and auto-submitted `exam_attempts` in the last ended month, as a count of attempts and of distinct students.
+- **Readiness bands:** the college's own `institutionReadinessDistribution` over the last ended month. Bands only.
+- **Staff:** active memberships, split into those that did and did not write an audit event for the college in the week. The split is suppressed.
+- **Staff actions opened in the week:** counselling notes are never counted.
+- **Open support cases:** cases still open, and how many are overdue against their SLA. These are work items, so they are not suppressed.
+- **Verification state and renewal date:** as stored.
+- **Readiness band movement:** NA, with the reason on screen.
+- No count of people is summed across colleges. The header totals count only colleges and cases.
+
+**Validation (fresh local DB `one_ops14`, only DATABASE_URL exported):** PENDING — the full run is recorded below once it finishes. Before this report:
+- `db:migrate` ×2: pass (67 applied, then 0).
+- 0078 replayed twice by hand: pass.
+- `corepack pnpm typecheck`: pass.
+- The new suites pass on their own:
+  - authorization college-health: 9/9;
+  - api operations-college-health integration: 15/15;
+  - web collegeHealth: 15/15, with roleDemand still 11/11.
+- CI parity:
+  - optional-chain grep empty;
+  - `pnpm audit --prod --audit-level=high` exit 0 (2 moderate);
+  - no private-key blocks or conflict markers.
+
+**Acceptance criteria:**
+- ✔ **Every figure has a real source or NA.**
+  - Each figure above is read from an existing table.
+  - Readiness band movement shows NA in its slot, because no computation exists for it.
+  - An unrecorded renewal date shows NA.
+  - The integration tests seed each source (students, events, attempts, snapshots, audit events, staff actions, cases) and assert the exact published value.
+  - The web tests assert NA in every stat slot when loading fails, and NA for a college with no account yet.
+- ✔ **Band distributions under 5 students show <5.**
+  - With 5 DEVELOPING and 1 PROGRESSING, the 1 and both zeros show <5 and the total is withheld.
+  - A college with fewer than 5 readiness updates shows no bands at all.
+  - Every other count of people follows the same rule:
+    - Beta's 3 students and 2 learners show <5.
+    - Alpha has 12 rostered students (10 signed in, 2 not), and its total is withheld.
+  - A college's position in the list never reveals a suppressed count: a unit test shows two different true counts give the same order.
+- ✔ **Account fields are editable only with ACCOUNT_MANAGE, audited with reason codes, and unknown fields are rejected.**
+  - 401 without a token.
+  - 403 for SECURITY_ADMIN without a grant, for an institution admin, and for a suspended operator.
+  - ANALYTICS_VIEW opens health only; ACCOUNT_MANAGE opens accounts only.
+  - 400 for each of:
+    - unknown fields (`contractValue`, `salary`);
+    - a missing or unlisted reason code;
+    - an impossible date;
+    - "Rs 5,00,000" as a contract reference;
+    - a malformed owner id;
+    - an overlong note;
+    - a request that changes nothing.
+  - 404 for an employer or an unknown id.
+  - 409 for a stale version, and 409 for an eleventh contact.
+  - The owner rule is checked in both the API and the trigger.
+  - The database refuses deleting an account, editing a contact in place, and deleting a contact.
+- ✔ **No student-level data.**
+  - Every health response is checked for student emails, roll numbers and ids, and contains none.
+  - No numeric readiness value appears anywhere.
+- ✔ **Contacts are masked** (`m***@alpha.edu`, `***2345`).
+  - The full value comes only from a reason-coded reveal, which is audited before the value is returned.
+  - Removing a contact with PRIVACY_REQUEST leaves the name, email and phone NULL.
+- ✔ **§6.6 web minimums:**
+  - real data, <5 and Withheld, and NA;
+  - empty and loading states;
+  - error and forbidden states, each with its reference;
+  - confirm dialogs that require a reason code (account fields and reveal);
+  - navigation labels unchanged.
+- **Dual control: not applicable.** §5.4 lists none of these actions.
+
+**Decisions for Divakar (recommendations adopted):**
+- **Fixed windows:** the last complete ISO week (UTC) and the last ended month. Rolling windows were rejected because they can be differenced from one day to the next (INST-SR-01).
+- **"Signed in" means an activated account.** ONE keeps no per-sign-in history for students.
+- **Staff count as "active"** when they wrote an audit event for the college that week. Viewing alone is not recorded, and the screen says so.
+- **The owner's email appears only in the account view** (ACCOUNT_MANAGE), not in the analytics list.
+- **At most 10 live contacts per college.** Correcting a contact means removing it and adding it again.
+- **Layout without new navigation:**
+  - Analytics stacks college health beneath role demand.
+  - Organization Detail stacks the account panel, with a college picker, beneath the organisation list.
+  - No navigation item was added, renamed or reordered (HG-3).
+
+**Limitations / not done:**
+- Not built:
+  - per-student readiness movement;
+  - a renewal reminder;
+  - an outbox event for account changes (nothing consumes one yet).
+- The rostered and signed-in counts are a live stock. Reading them daily can show that a student joined, but never which student.
+- The list is capped at 500 colleges with no pagination, the same bounded-summary approach as OPS-11.
+- The Organization Detail college picker lists institutions from the existing organisations endpoint, which is capped at 200.
+
+**Risks / follow-ups:**
+- OPS-15's access review should include holders of ACCOUNT_MANAGE, because contacts are personal data.
+- A contact is not a ONE user, so the user-deletion flow does not reach them. A contact's privacy request is served by removing them with PRIVACY_REQUEST, and the SOPs should say so.
+
+**Android:** no change, and nothing to compile. Operator screens are web-only (Appendix 1 §4.3). The app's only operations call is the read-only `GET /operations/overview` (Api.kt:212), which this goal does not change.
+
+**Next goal:** OPS-15, or as scheduled by the coordinator.

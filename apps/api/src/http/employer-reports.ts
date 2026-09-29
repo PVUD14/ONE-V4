@@ -45,7 +45,7 @@ export function reportCellFor(state: string, leftFrom: string | null): ReportCel
   return `LEFT_AT_${from}` as ReportCell;
 }
 
-export interface GroupedCellCount {
+export interface GroupedCellCount extends Record<string, unknown> {
   readonly cell: string;
   readonly count: number | string;
 }

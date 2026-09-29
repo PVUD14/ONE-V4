@@ -981,3 +981,119 @@ A suspended or rejected employer's status screen links to it. Accepting, respond
 
 **Risks / follow-ups:** if a later migration re-declares the trust-case tables' constraints, it must keep 0084's statement table in step. Moving an employer case straight to AWAITING_RESPONSE through the plain transition route now needs a summary; the web uses the combined route.
 **Next goal:** EMP-17 or EMP-18, as scheduled by the coordinator.
+
+## EMP-17 — Applicant exports and calendar integration — 2026-09-30
+**Result:** Complete. Owners and admins of a verified, active employer can now export one job's applicants as a CSV file. The export works like this:
+- It includes only candidates whose applicant-access grant is live at the moment of export.
+- It includes only what each student shared, and contact details only from Shortlisted onward.
+- Cells that start like a formula are neutralised.
+- Row count is capped, each person has a daily limit, and every export is audited with its reason and SHA-256 before the file is sent.
+
+Calendar invites remain EMP-09's. No calendar provider is integrated.
+
+**Branch / PR:** feat/emp-exports, cut from onev4/stack/batch24 (4fab0c6), pushed to onev4; merge by review. Commits: 6f747f7 (design), cd7ed55 (acceptance tests), 034279c (API), ff921c4 (web), then this report.
+
+**Files created:**
+- docs/architecture/employer-applicant-exports-design.md
+- apps/api/src/http/employer-applicant-export.ts (content rules, header rule, hash)
+- apps/api/src/http/employer-applicant-export.controller.ts
+- apps/api/src/http/employer-applicant-export.test.ts, with fixture employer-applicant-export.fixture.csv
+- apps/api/src/http/employer-applicant-export.integration.spec.ts, with fixture employer-applicant-export.integration.fixture.csv
+- apps/web/src/rolePortal/employerApplicantExport.tsx (+ .test.tsx)
+
+**Files modified:**
+- apps/api/src/http/institution-export-csv.ts: document assembly moved into a shared `csvDocument`. `toCsv` keeps its compensation-header check and behaves as before; its tests are unchanged.
+- apps/api/src/http/api-security.module.ts: the new controller is registered.
+- apps/web/src/api/hiring.ts: the export client and the reason list.
+- apps/web/src/hiringPages.tsx: optional `canExport` on EmployerApplicantsPage.
+- apps/web/src/rolePortal/employer.tsx: only the Applicants branch changed; it now passes the owner/admin flag.
+
+**Existing tests touched:** none.
+
+**Migrations added:** none. 0086 was not claimed: every export is an `audit_events` row, and no file is stored.
+
+**Design docs / ADRs:** the design doc above. It covers who may export, rows and columns, what is never written, caps, limits, audit and hash, the calendar decision, and rejected options. No ADR.
+
+**Route:** `POST /api/v1/employers/:e/opportunities/:o/applicant-export` with body `{reasonCode, scope?}`.
+- `reasonCode` is one of: SHORTLIST_REVIEW, INTERVIEW_PLANNING, HIRING_COMMITTEE, OFFER_PREPARATION, RECORD_KEEPING.
+- `scope` is ALL_OPEN (the default) or SHORTLISTED_ONWARD.
+- The response is `text/csv` with a BOM and CRLF line ends, sent with `attachment`, `no-store`, `nosniff` and `X-Export-Sha256`.
+- Refusals:
+  - 401 without a token.
+  - 403 FORBIDDEN for a recruiter, another employer, an ended membership, another employer's job, or a malformed id.
+  - 403 EMPLOYER_ORGANISATION_INACTIVE or EMPLOYER_ORGANISATION_UNVERIFIED.
+  - 400 REASON_CODE_REQUIRED, EXPORT_SCOPE_INVALID or UNKNOWN_FIELD.
+  - 422 EXPORT_TOO_LARGE above 5,000 rows.
+  - 429 EXPORT_RATE_LIMITED after 20 exports per person per employer in 24 hours, counted under an advisory lock.
+- Each export writes an audit row, `employer.applicants.exported`, with the reason, scope, job, row count, the number of applications withheld for having no live grant, the exported application ids, and the sha256.
+
+**Validation:** ran on a fresh database, one_emp17, with only DATABASE_URL exported.
+- `corepack pnpm db:migrate`, run twice: the first run applied 74 migrations and created the ledger; the second applied 0.
+- `corepack pnpm typecheck`: passed.
+- `corepack pnpm -r --no-bail --workspace-concurrency=1 test` exited 1, but no test assertion failed.
+  - All 9 failing files failed with "error: out of shared memory" during schema setup or teardown on the shared local Postgres:
+    - persistence: internal-capabilities;
+    - API: assessments, campus-drives, counselling-notes, employer-terms-trust, institution-announcements, institution-department-workspace, institution-settings, operations-career-catalogue.
+  - Totals for that run:
+    - web: 75 files, 873 tests, all passed;
+    - API: 69 of 77 files passed; all 1,219 tests passed;
+    - persistence: 35 of 36 files passed; all 404 tests passed;
+    - every other package passed: authorization 363, hiring 192, career-readiness 105, learning-model 72, learning-orchestrator 54, identity 41, placement 31, mastery-bkt 29, review-scheduler 23, privacy 22, ai-orchestration 19, assessments 15, events 14, learner-content 7, automation 7.
+  - The new files all passed: employer-applicant-export.integration.spec.ts 9/9, employer-applicant-export.test.ts 25/25, employerApplicantExport.test.tsx 8/8.
+- The 9 failing files were then re-run one at a time:
+  - 8 passed first time: internal-capabilities 15/15, campus-drives 8/8, counselling-notes 22/22, employer-terms-trust 9/9, institution-announcements 21/21, institution-department-workspace 17/17, institution-settings 24/24, operations-career-catalogue 14/14.
+  - assessments passed 16/16 but hit shared memory again in teardown. A second re-run passed 16/16 with the file green.
+- `corepack pnpm build`: passed.
+- CI parity:
+  - `corepack pnpm audit --prod --audit-level=high` exits 0 (2 moderate, no high or critical).
+  - The optional-chain policy grep prints nothing.
+  - The diff has no private-key blocks, merge markers, frozen files or migrations.
+- Android was not compiled, because nothing under apps/android changed.
+- The test commit was not run on its own against the base, because the route does not exist there.
+
+**Acceptance criteria:**
+- [x] *Export contains only candidates with live grants.* Test: `writes the live-grant candidates exactly as the fixture, and leaves out withdrawn, expired and deleting students`.
+  - The check is EMP-SR-01's predicate, run inside the audit transaction on the database clock.
+  - Left out: a withdrawn student; a grant that expired and was revoked by EMP-16's `revokeExpiredApplicantGrants`; a grant past `expires_at` that the sweep has not reached yet; a student with an open deletion request.
+- [x] *Cells beginning with =, +, - or @ are neutralised.*
+  - The same fixture test covers a name starting `@`, a headline starting `=HYPERLINK`, a summary `-2+3`, and a phone starting `+`.
+  - The unit test checks `=`, `+` and `@` against the committed CSV fixture.
+  - INST-08's `csvCell` is reused, not copied.
+- [x] *Build 1: owners and admins only (decision 10.2 #10).* Tests: `refuses a recruiter, another employer, an ended membership, a missing token and another employer's job`, and `…an admin may export as well as the owner`.
+- [x] *Build 1: snapshot fields and stage only.* An application with no snapshot is written with nothing shared (`…never the live profile`). Contact details appear from Shortlisted onward (`exports only Shortlisted onward…`, plus the fixture rows).
+- [x] *Build 1: audited and rate-limited.* Tests: `audits every export before sending…SHA-256 of the bytes sent`, and `allows 20 exports per person per employer in 24 hours and refuses the next without writing anything`.
+- [x] *Build 2: calendar invites delivered with EMP-09; no two-way sync.* EMP-09's `.ics` builder, its email attachments, and the student and panellist downloads are unchanged. See decisions.
+- [x] §6.3:
+  - 401 without a token; 403 for another employer and for an ended membership.
+  - A suspended or rejected employer gets INACTIVE; an unverified one gets UNVERIFIED.
+  - A candidate without a grant is not in the file.
+  - Validation 400s, the row cap, and the audit row are covered.
+  - No readiness, identifier, roll number, compensation or protected attribute appears in the file (`writes no readiness, no identifier…`, plus the header word rule in the writer).
+  - Web: real data, forbidden and error states, and navigation labels unchanged (asserted).
+
+**Decisions for Divakar (recommendations taken):**
+1. **Snapshot only.** Applications made before EMP-07 have no snapshot. They are exported with stage and date only, marked "Not captured". The file never falls back to the roster or the live profile, although the Applicants list still shows a roster name for them.
+2. **Limits.** 5,000 rows per file and 20 exports per person per employer in 24 hours. INST-08 used 10,000 and 30; these are tighter because an employer's file carries contact details.
+3. **Fixed reason list** rather than free text, so the screen offers a plain choice and the audit stays queryable.
+4. **Exported application ids are kept in the audit row**, so ONE can say whose data left in which file. The file itself carries no ids.
+5. **A phone number starting with `+` is written as `'+91…`**, the same rule as every other formula-leading cell. Spreadsheets show the apostrophe as a text marker.
+6. **No calendar provider (Google or Microsoft).**
+   - Plan §4.3 and the goal text rule out two-way sync.
+   - A provider would need OAuth client credentials and per-user tokens, which ONE must not hold or invent.
+   - No interface was built, because nothing would call it.
+   - If sync is wanted later, it starts with a design for the token store and an ADR.
+   - Nothing needs credentials today.
+7. **HG-3.** The export is a section of the existing Applicants page. No navigation item was added, removed, renamed or reordered.
+
+**Android:** no change.
+- Exports are desk tasks: a CSV opens in a spreadsheet on a computer. INST-08 made the same call for every institution export.
+- Calendar on Android is EMP-09's existing add-to-calendar intent (InterviewScheduling.kt, StudentHiring.kt, EmployerWork.kt). EMP-17 does not change it.
+- Nothing Android changed, so no Gradle compile was needed.
+
+**Limitations / not done:**
+- There is no export across all jobs; each export covers one job.
+- Assessment results and scorecards are not exported; EMP-12 and EMP-09 keep them inside ONE.
+- Nothing is sent by email; the file downloads in the browser only.
+- There is no operator screen for exports beyond the existing audit views.
+
+**Next goal:** EMP-18.

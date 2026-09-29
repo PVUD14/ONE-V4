@@ -48,7 +48,7 @@ CE-2A.
 | J7 | Counselling note | **Not in this slice** — INST-11 | — |
 | J8 | Placement register | **Not in this slice** — INST-12 | — |
 | J9 | Nominations | **Not in this slice** — INST-14 | — |
-| J10 | Faculty assigns a practice set | **Not in this slice** — INST-16 (engine) | — |
+| J10 | Faculty assigns a practice set | Built in INST-16 (Learning Resources → Assign; the student's next step on Learning) — to be walked in the next UAT round | — |
 | J11 | Preparation sprint by role | **Not in this slice** — INST-17 | — |
 | J12 | College offboarding | **Not in this slice** — INST-18 | — |
 | I-S | Settings, grading scales and calendar (supplementary) | In slice | [settings](../institution/sop-settings-and-calendar.md) |

@@ -236,7 +236,7 @@ describe('faculty workspace', () => {
     expect(await screen.findByText('No classes to report on')).toBeInTheDocument();
   });
 
-  it('leaves only Learning Resources on the view-only state, with the navigation unchanged', async () => {
+  it('leaves no faculty item on the view-only state (INST-16 made Learning Resources real), with the navigation unchanged', async () => {
     const portal = rolePortals.find((item) => item.key === 'faculty')!;
     expect(portal.nav.map((item) => item.label)).toEqual(['Dashboard', 'My Students', 'Student Detail', 'Academic Verification', 'Assessments', 'Assessment Detail', 'Assigned Tasks', 'Interventions', 'Learning Resources', 'Reports', 'Calendar', 'Messages', 'Profile', 'Settings', 'Help & FAQ']);
     routes({ [`${base}/assessments`]: { assessments: [] }, [`${base}/class-reports`]: { mode: 'ASSIGNMENTS', classes: [] } });
@@ -247,6 +247,7 @@ describe('faculty workspace', () => {
       cleanup();
     }
     open('faculty', 'Learning Resources', 'FACULTY_LECTURER');
-    expect(await screen.findByText('View-only for your role')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Assign and plan learning' })).toBeInTheDocument();
+    expect(screen.queryByText('View-only for your role')).not.toBeInTheDocument();
   });
 });

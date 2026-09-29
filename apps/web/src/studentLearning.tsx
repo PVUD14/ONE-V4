@@ -16,6 +16,7 @@ import {
   answerPlacementQuestion,
   answerStepQuestion,
   getLearningPath,
+  getMyLearningActions,
   getPlacementTest,
   revealStepHint,
   startNextLearningStep,
@@ -28,7 +29,9 @@ import {
   type PlacementLevel,
   type StepAction,
   type StepAnswerDto,
+  type StudentLearningActionsDto,
 } from './api.js';
+import { FromYourLecturerCard, hasLecturerWork, isStudentLearningActions } from './studentLearningActions.js';
 import { go } from './pilotParity/naWidgets.js';
 
 /** Plain words for every reason code the planner and the path grouping can give. */
@@ -89,10 +92,16 @@ export function StudentLearningPlan(): React.ReactElement {
   const [step, setStep] = useState<LearningStepDto | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
+  // INST-16: what the student's lecturers set for them (assignments, sessions, a chosen next step).
+  const [lecturer, setLecturer] = useState<StudentLearningActionsDto | null>(null);
+  const [lecturerStatus, setLecturerStatus] = useState('Loading…');
 
   function load(signal?: AbortSignal): void {
     const token = getAccessToken();
-    if (!token) { setStatus('You are not signed in.'); return; }
+    if (!token) { setStatus('You are not signed in.'); setLecturerStatus('You are not signed in.'); return; }
+    getMyLearningActions(token, signal)
+      .then((loaded) => { if (!isStudentLearningActions(loaded)) throw new Error('unexpected learning actions response'); setLecturer(loaded); setLecturerStatus(''); })
+      .catch(() => { if (!signal?.aborted) setLecturerStatus('NA — what your lecturers set could not be loaded right now.'); });
     getLearningPath(token, signal)
       .then((loaded) => {
         const value = loaded?.path;
@@ -125,18 +134,21 @@ export function StudentLearningPlan(): React.ReactElement {
     }
   }
 
+  const lecturerWork = hasLecturerWork(lecturer);
   return <>
     <PlacementCard />
+    <FromYourLecturerCard actions={lecturer} status={lecturerStatus} busy={busy} onStart={() => void planNext()} />
     <section className="pilot-card" aria-labelledby="next-step-heading">
       <div className="pilot-card-head">
         <h2 id="next-step-heading">Your next step</h2>
         {step ? <span className="pilot-chip purple">{ACTION_LABEL[step.action]}</span> : <span className="pilot-chip slate">NA</span>}
       </div>
       {notice ? <p role="alert" className="pilot-chip rose" style={{ display: 'inline-block' }}>{notice}</p> : null}
-      {!path ? <p style={muted}>{status}</p> : !path.target ? <>
+      {!path ? <p style={muted}>{status}</p> : !path.target && !lecturerWork ? <>
         <p style={muted}>Choose the job you want first. Your path and next steps are planned against it.</p>
         <button type="button" className="pilot-btn small" onClick={() => go('/student/career-path')}>Go to My Career</button>
       </> : <>
+        {!path.target ? <p style={muted}>Your lecturer’s work is planned now. Choose the job you want in My Career to plan the rest of your path.</p> : null}
         {step ? <StepCard step={step} onStep={(next) => { setStep(next); load(); }} /> : <p style={muted}>No step planned yet.</p>}
         <div style={{ marginTop: 12 }}>
           <button type="button" className="pilot-btn small" disabled={busy} onClick={() => void planNext()}>

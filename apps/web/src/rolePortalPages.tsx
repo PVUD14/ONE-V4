@@ -32,6 +32,7 @@ import { OperationsCareerReadinessPanel } from './operationsCareerReadinessPanel
 import { StaffPilotWrap } from './parityWraps.js';
 import { InstitutionInterventionsPage } from './pilotParityPages.js';
 import { FacultyLearningCohortSection } from './rolePortal/institutionLearningCohort.js';
+import { FacultyLearningActionsPage } from './rolePortal/institutionLearningActions.js';
 import { CounsellingNotesSection } from './rolePortal/institutionCounselling.js';
 import { EmployerRecruiterRealityPage } from './rolePortal/employer.js';
 import { EmployerOrganisationGate } from './rolePortal/employerOrganisationState.js';
@@ -431,12 +432,13 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   if (!demoMode && portal.key === 'faculty' && route.label === 'Assessment Detail') return <FacultyAssessmentDetailPage authenticatedWorkspace={authenticatedWorkspace} />;
   if (!demoMode && portal.key === 'faculty' && route.label === 'Reports') return <FacultyClassReportsPage authenticatedWorkspace={authenticatedWorkspace} />;
   // OPS-10: faculty Learning Resources holds the lecturer's content review queue (drafts of ONE's
-  // learning content assigned to them), above the read-only notice it showed before. Only this
+  // learning content assigned to them). INST-16: below it, the approved content the lecturer can
+  // assign, group sessions and next-step overrides, replacing the read-only notice. Only this
   // label's branch changes; no navigation item is added (HG-3).
   if (!demoMode && portal.key === 'faculty' && route.label === 'Learning Resources') {
     return isInstitutionStaffWorkspace(authenticatedWorkspace)
       ? <><FacultyContentReviewsPage institutionId={authenticatedWorkspace.organizationId} />
-          <AuthenticatedReadOnlyModule title={route.label} detail="This authenticated staff role can view authorized context only in Phase 2A. Assessment, task, resource, workload, intervention, and meeting mutations are disabled until persistent APIs exist." /></>
+          <FacultyLearningActionsPage authenticatedWorkspace={authenticatedWorkspace} /></>
       : <InstitutionWorkspaceError title="Learning Resources" />;
   }
   // INST-06: faculty Messages — announcements to assigned sections and the lecturer's inbox. Only this label's branch changes.

@@ -101,14 +101,22 @@ describe('Learning across your students', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Unable to load learning across your students.');
   });
 
-  it('links each item to an action the lecturer already has', async () => {
+  it('links each item to its INST-16 action on Learning Resources, prefilled from the row', async () => {
     route();
     render(section());
     const stuck = (await screen.findByText('Subnetting', { selector: 'th' })).closest('tr')!;
-    fireEvent.click(within(stuck).getByRole('button', { name: 'Assign a task' }));
-    expect(window.location.pathname).toBe('/institution/faculty/assigned-tasks');
-    fireEvent.click(screen.getByRole('button', { name: 'Plan an intervention' }));
-    expect(window.location.pathname).toBe('/institution/faculty/interventions');
+    fireEvent.click(within(stuck).getByRole('button', { name: 'Assign practice' }));
+    expect(window.location.pathname).toBe('/institution/faculty/learning-resources');
+    const assign = new URLSearchParams(window.location.search);
+    expect(assign.get('assign')).toBe('PRACTICE');
+    expect(assign.get('skill')).toBe(cohort.stuckSkills[0]!.skillId);
+    expect(assign.get('students')).toBe(`${asha.profileId},${ravi.profileId}`);
+    fireEvent.click(screen.getByRole('button', { name: 'Plan a group session' }));
+    expect(window.location.pathname).toBe('/institution/faculty/learning-resources');
+    expect(new URLSearchParams(window.location.search).get('q')).toBe('Subnetting');
+    const dueRow = screen.getByText('Subnetting, Ports').closest('tr')!;
+    fireEvent.click(within(dueRow).getByRole('button', { name: 'Set next step' }));
+    expect(new URLSearchParams(window.location.search).get('override')).toBe(asha.profileId);
   });
 
   it('renders nothing and asks nothing for a role other than faculty', () => {

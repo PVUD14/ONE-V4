@@ -39,3 +39,4 @@ export * from './api/accessReviews.js';
 export * from './api/goals.js';
 export * from './api/learning.js';
 export * from './api/incidents.js';
+export * from './api/learningActions.js';

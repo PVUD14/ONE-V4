@@ -7,7 +7,8 @@
  * teaching assignments and to students who hold the adaptive-learning consent; nothing is
  * filtered here. Until students have been asked for that consent the section says so and shows
  * NA. No number about a student's learning is shown — names, skill names and counts of students,
- * with counts under 5 shown as "<5" or withheld by the server.
+ * with counts under 5 shown as "<5" or withheld by the server. Each item opens the lecturer's INST-16
+ * actions on Learning Resources: assign practice, plan a group session, set a student's next step.
  */
 import { useEffect, useState } from 'react';
 import { ApiRequestError, getLearningCohort, getProtectedAccessToken, listLearningCohortDueReviews, suppressedCountLabel } from '../api.js';
@@ -72,7 +73,12 @@ export function FacultyLearningCohortSection({ authenticatedWorkspace, basePath 
 
   const offered = cohort?.consent.offered ?? false;
   const stuckStudents = cohort ? new Set(cohort.stuckSkills.flatMap((skill) => skill.students.map((student) => student.profileId))).size : null;
-  const assignTask = <button type="button" className="pilot-link" onClick={() => go(`${basePath}/assigned-tasks`)}>Assign a task</button>;
+  // INST-16: each item opens the lecturer's real actions on Learning Resources, prefilled from this row.
+  const resources = `${basePath}/learning-resources`;
+  const assignPractice = (skillId: string, profileIds: readonly string[]) => <button type="button" className="pilot-link"
+    onClick={() => go(`${resources}?assign=PRACTICE&skill=${encodeURIComponent(skillId)}&students=${profileIds.map(encodeURIComponent).join(',')}`)}>Assign practice</button>;
+  const setNextStep = (profileId: string) => <button type="button" className="pilot-link"
+    onClick={() => go(`${resources}?override=${encodeURIComponent(profileId)}`)}>Set next step</button>;
   return <section className="role-card role-wide" aria-label="Learning across your students">
     <div className="pilot-card-head"><h2>Learning across your students</h2></div>
     <p>From the practice your students have done in ONE, for students in your teaching assignments who have chosen to share their learning data.</p>
@@ -94,14 +100,14 @@ export function FacultyLearningCohortSection({ authenticatedWorkspace, basePath 
       {cohort.stuckSkills.length ? <div className="role-record-table-wrap"><table className="role-record-table"><caption className="sr-only">Skills your students are stuck on</caption>
         <thead><tr><th scope="col">Skill</th><th scope="col">Students</th><th scope="col">Who</th><th scope="col">Action</th></tr></thead>
         <tbody>{cohort.stuckSkills.map((skill) => <tr key={skill.skillId}><th scope="row">{skill.skillName}</th><td>{skill.studentCount}</td>
-          <td>{skill.students.map((student) => `${student.fullName} (${student.rollNumber})`).join(', ')}</td><td>{assignTask}</td></tr>)}</tbody></table></div>
+          <td>{skill.students.map((student) => `${student.fullName} (${student.rollNumber})`).join(', ')}</td><td>{assignPractice(skill.skillId, skill.students.map((student) => student.profileId))}</td></tr>)}</tbody></table></div>
         : <p>No student is stuck on a skill right now.</p>}
       <h3>Most common misconceptions</h3>
       <p>Mistakes held by five or more of your students. Smaller groups are not shown, so no student can be singled out.</p>
       {cohort.misconceptions.length ? <div className="role-record-table-wrap"><table className="role-record-table"><caption className="sr-only">Common misconceptions</caption>
         <thead><tr><th scope="col">Misconception</th><th scope="col">Skill</th><th scope="col">Students</th><th scope="col">Action</th></tr></thead>
         <tbody>{cohort.misconceptions.map((entry) => <tr key={entry.code}><th scope="row">{entry.title}</th><td>{entry.skillName}</td><td>{entry.students}</td>
-          <td><button type="button" className="pilot-link" onClick={() => go(`${basePath}/interventions`)}>Plan an intervention</button></td></tr>)}</tbody></table></div>
+          <td><button type="button" className="pilot-link" onClick={() => go(`${resources}?session=1&q=${encodeURIComponent(entry.skillName)}`)}>Plan a group session</button></td></tr>)}</tbody></table></div>
         : <p>{cohort.misconceptionsWithheld ? 'Some misconceptions are held by fewer than five students, so none is shown.' : 'No misconception is common among your students right now.'}</p>}
       {cohort.misconceptions.length && cohort.misconceptionsWithheld ? <p>Other misconceptions are held by fewer than five students and are not shown.</p> : null}
       <h3>Reviews due</h3>
@@ -109,7 +115,7 @@ export function FacultyLearningCohortSection({ authenticatedWorkspace, basePath 
       {due && due.students.length ? <div className="role-record-table-wrap"><table className="role-record-table"><caption className="sr-only">Students with reviews due</caption>
         <thead><tr><th scope="col">Student</th><th scope="col">Skills due</th><th scope="col">Action</th></tr></thead>
         <tbody>{due.students.map((student) => <tr key={student.profileId}><th scope="row"><strong>{student.fullName}</strong><span>{student.rollNumber}</span></th>
-          <td>{student.dueSkills.join(', ') || 'NA'}</td><td>{assignTask}</td></tr>)}</tbody></table></div>
+          <td>{student.dueSkills.join(', ') || 'NA'}</td><td>{setNextStep(student.profileId)}</td></tr>)}</tbody></table></div>
         : due ? <p>No student has a review due right now.</p> : null}
       {due?.nextCursor ? <div className="role-record-actions"><button type="button" className="secondary" onClick={() => void moreDue()}>Load more students</button></div> : null}
     </> : null}

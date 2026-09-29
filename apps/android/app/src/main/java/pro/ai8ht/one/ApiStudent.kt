@@ -330,12 +330,43 @@ import kotlinx.serialization.Serializable
     val attemptId: String? = null,
     val attemptState: String? = null,
     val percentage: Double? = null,
+    /** EMP-12: can be started or continued now (employer in good standing, application shared, window open). */
+    val available: Boolean = true,
+    val questionCount: Int = 0,
+    val totalMarks: Double = 0.0,
+    val remainingSeconds: Int? = null,
 )
+
+/** EMP-12: what the candidate is about to be assessed on, read before starting. */
+@Serializable data class ScreeningBriefEnvelope(val assessment: ScreeningBriefDto)
+
+@Serializable data class ScreeningBriefDto(
+    val id: String = "",
+    val title: String = "",
+    val employerName: String = "",
+    val roleTitle: String = "",
+    val state: String = "",
+    val attemptState: String? = null,
+    val opensAt: String = "",
+    val closesAt: String = "",
+    val notOpenYet: Boolean = false,
+    val durationSeconds: Int = 0,
+    val totalMarks: Double = 0.0,
+    val questionCount: Int = 0,
+    val questionFormats: List<ScreeningFormatDto> = emptyList(),
+    val minutesAvailableIfStartedNow: Int? = null,
+    val available: Boolean = false,
+)
+
+@Serializable data class ScreeningFormatDto(val questionType: String = "", val count: Int = 0)
 
 @Serializable data class ScreeningAttemptEnvelope(val attempt: ScreeningAttemptDto)
 
 @Serializable data class ScreeningAttemptDto(
     val id: String = "",
+    val title: String? = null,
+    /** Seconds left by the server's clock when the paper was sent; the server enforces it. */
+    val remainingSeconds: Int? = null,
     val questions: List<ScreeningQuestionDto> = emptyList(),
 )
 
@@ -827,9 +858,15 @@ suspend fun Api.listScreeningInvitations(context: Context): List<ScreeningInvita
     json.decodeFromString<ScreeningInvitationsEnvelope>(
         request(context, "GET", "/api/v1/students/me/screening-assessments")).invitations
 
+suspend fun Api.getScreeningBrief(context: Context, invitationId: String): ScreeningBriefDto =
+    json.decodeFromString<ScreeningBriefEnvelope>(
+        request(context, "GET", "/api/v1/students/me/screening-assessments/$invitationId")).assessment
+
+/** EMP-12: starting records that the candidate read the brief and accepts its terms. */
 suspend fun Api.startScreeningAttempt(context: Context, invitationId: String): ScreeningAttemptDto =
     json.decodeFromString<ScreeningAttemptEnvelope>(
-        request(context, "POST", "/api/v1/students/me/screening-assessments/$invitationId/start")).attempt
+        request(context, "POST", "/api/v1/students/me/screening-assessments/$invitationId/start",
+            buildJson("acknowledged" to "true"))).attempt
 
 suspend fun Api.saveScreeningAnswer(context: Context, attemptId: String, questionId: String, keys: List<String>) {
     val encoded = keys.joinToString(",") { quoted(it) }

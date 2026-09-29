@@ -80,7 +80,7 @@ export function EmployerReportsPage({ employerId }: { readonly employerId: strin
     return () => abort.abort();
   }, [employerId]);
   const reports = result?.employerId === employerId ? result.reports : null;
-  const timing = (metric: string) => reports?.timeToStage.find((row) => row.metric === metric);
+  const timing = (metric: string) => reports?.timeToStage?.find((row) => row.metric === metric);
   const offerDays = timing('OFFER');
 
   return <section className="role-module role-module--dense">

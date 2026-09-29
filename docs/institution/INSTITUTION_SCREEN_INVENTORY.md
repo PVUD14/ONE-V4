@@ -85,7 +85,7 @@ register and statistics are Dashboard sections (EMP-11, INST-12).
 | 6 | Assessment Detail | Working (INST-07) — one assessment's scoped results, not-attempted list; average withheld under five | `FacultyAssessmentDetailPage` | INST-07 | Results overlay for one assessment |
 | 7 | Assigned Tasks | Working | `InstitutionStaffActionsPage` (`rolePortalPages.tsx:353-368`) | Pre-plan | Web only |
 | 8 | Interventions | Working | `InstitutionInterventionsPage` (`rolePortalPages.tsx:292-296`) + counselling notes section (`rolePortal/institutionCounselling.tsx`) | Pre-plan; INST-11 | Web only |
-| 9 | Learning Resources | **View-only** | `AuthenticatedReadOnlyModule` (`rolePortalPages.tsx:376`) | INST-16 (honest empty state until then) | Web only |
+| 9 | Learning Resources | Working | OPS-10's content review queue, then INST-16's "Assign and plan learning" (`FacultyLearningActionsPage`, `institutionLearningActions.tsx`): published practice sets and lessons, assign to a taught class or selected students, group sessions, a student's next step with a reason; the student's plan shown only with their adaptive-learning consent | OPS-10, INST-16 | Home "Assigned learning", read-only (`LearningActions.kt`); students: "From your lecturer" on the Learning tab |
 | 10 | Reports | Working (INST-07) — a class report per assigned section or batch; averages withheld under five results | `FacultyClassReportsPage` | INST-07 | Home "My classes" (`DepartmentWorkspace.kt`) |
 | 11 | Calendar | Working — academic calendar, meetings feed, staff actions | `FacultyAcademicCalendar` + `CalendarPage` (`rolePortalPages.tsx:359`) | INST-05 | Home "Academic calendar" (`StaffDashboards.kt:426`) |
 | 12 | Messages | Working — announcements composer and own inbox | `FacultyMessagesPage` (`rolePortalPages.tsx:352`; `institutionAnnouncements.tsx:230`) | INST-06 | Sent announcements on Home (`StaffDashboards.kt:429`) and inbox overlay (`:303`, `:1117`); composing web only |
@@ -137,3 +137,12 @@ Dashboard carries them as sections (no Drives item, HG-3); the department head's
 carries the department's statistics; admin Settings gains drive categories; the dashboard placement
 KPIs, pipeline funnel and offers trend read real, suppressed figures. Remaining view-only items:
 admin Career Readiness (INST-17) and faculty Learning Resources (INST-16).
+
+## Update after INST-16 (2026-09-29)
+
+Faculty Learning Resources is no longer view-only: below the content review queue it lists the published
+practice sets and lessons a lecturer can assign, and lets them assign to a taught class or selected students,
+plan a group session (a MEETING on their Calendar, with attendees and linked content) and set one student's
+next step with a reason code. The cohort section on My Students links each stuck skill, common misconception
+and due student to these actions. Students see "From your lecturer" on the Learning page (web) and the
+Learning tab (Android). Remaining view-only item: admin Career Readiness (INST-17).

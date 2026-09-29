@@ -440,11 +440,12 @@ describe('EMP-10: notices go through the EMP-08 outbox path only', () => {
     await employerSend(p, { body: 'Also bring your ID.' }).expect(201);
     const published = await drain();
     expect(published.filter((event) => event.eventType === 'application.message.sent')).toHaveLength(2);
-    expect(published.every((event) => !JSON.stringify(event.payload).includes('4411'))).toBe(true);
+    // Look for the message text itself, not the bare digits: random ids in the payload can contain "4411".
+    expect(published.every((event) => !/joining code|(^|[^0-9a-f])4411([^0-9a-f]|$)/i.test(JSON.stringify(event.payload)))).toBe(true);
     const notes = (await feed(p.studentId)).filter((note) => note.kind === 'EMPLOYER_MESSAGE');
     expect(notes).toHaveLength(1);
     expect(notes[0]).toMatchObject({ title: 'Message from Acme Robotics', body: 'Acme Robotics sent you a message about Robotics engineer. Read and reply under Applications.' });
-    expect(JSON.stringify(notes)).not.toMatch(/4411|bring your ID/);
+    expect(JSON.stringify(notes)).not.toMatch(/joining code|(^|[^0-9a-f])4411([^0-9a-f]|$)|bring your ID/i);
     const rows = await pool.query("SELECT recipient_user_id, recipient_kind, email_state, email_template_key FROM hiring_notification_deliveries WHERE application_id = $1 AND kind = 'EMPLOYER_MESSAGE'", [p.applicationId]);
     expect(rows.rows).toEqual([{ recipient_user_id: p.studentId, recipient_kind: 'STUDENT', email_state: 'NOT_CONFIGURED', email_template_key: 'hiring-employer-message' }]);
   });

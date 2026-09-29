@@ -16,7 +16,7 @@ export async function assembleSubjectExport(db: PersistenceDb, subjectUserId: st
   const one = async (query: ReturnType<typeof sql>): Promise<Record<string, unknown>[]> =>
     ((await db.execute(query)) as QueryResult<Record<string, unknown>>).rows;
 
-  const [identity, profile, relationships, roster, documents, savedOpportunities, applications, offers, requests, sharedNotes, heldNotes, messages] = await Promise.all([
+  const [identity, profile, relationships, roster, documents, savedOpportunities, applications, offers, requests, sharedNotes, heldNotes, messages, screenings, screeningQuestions] = await Promise.all([
     one(sql`SELECT id, email, state, created_at, anonymised_at FROM users WHERE id = ${subjectUserId}::uuid`),
     one(sql`SELECT target_career, career_interests, profile_headline, profile_summary, portfolio_url, visibility_state, employer_discovery_enabled, updated_at
             FROM student_profiles WHERE user_id = ${subjectUserId}::uuid`),
@@ -67,6 +67,32 @@ export async function assembleSubjectExport(db: PersistenceDb, subjectUserId: st
             JOIN application_messages m ON m.thread_id = t.id
             WHERE t.student_user_id = ${subjectUserId}::uuid
             ORDER BY t.started_at, t.id, m.sent_at, m.id`),
+    // Employer screening tests sent on the subject's applications, and their own attempt at each: what
+    // they already see on My applications (the percentage), never the raw score or how it was marked.
+    one(sql`SELECT v.id AS invitation_id, org.legal_name AS employer_name, ov.title AS role_title, s.title,
+                   v.invited_at, v.opens_at, v.closes_at,
+                   CASE WHEN v.state = 'INVITED' AND v.closes_at <= now() THEN 'EXPIRED' ELSE v.state END AS state,
+                   t.id AS attempt_id, t.state AS attempt_state, t.started_at, t.submitted_at, t.percentage
+            FROM employer_assessment_invitations v
+            JOIN employer_assessments s ON s.id = v.assessment_id
+            JOIN applications a ON a.id = v.application_id
+            JOIN opportunity_versions ov ON ov.id = a.applied_version_id
+            JOIN organizations org ON org.id = v.employer_id
+            LEFT JOIN employer_assessment_attempts t ON t.invitation_id = v.id AND t.candidate_user_id = ${subjectUserId}::uuid
+            WHERE a.student_user_id = ${subjectUserId}::uuid
+            ORDER BY v.invited_at, v.id`),
+    // Each question they were served, the options as shown to them and what they chose. Option
+    // correctness (the answer key) and the marks each answer earned are never selected.
+    one(sql`SELECT aq.attempt_id, aq.display_order, aq.option_map, q.question_text,
+                   (SELECT coalesce(jsonb_object_agg(o.option_key, o.option_text), '{}'::jsonb)
+                    FROM employer_assessment_question_options o WHERE o.question_id = aq.question_id) AS option_texts,
+                   ans.selected_option_keys, ans.numeric_response
+            FROM employer_assessment_attempt_questions aq
+            JOIN employer_assessment_attempts t ON t.id = aq.attempt_id
+            JOIN employer_assessment_questions q ON q.id = aq.question_id
+            LEFT JOIN employer_assessment_answers ans ON ans.attempt_id = aq.attempt_id AND ans.question_id = aq.question_id
+            WHERE t.candidate_user_id = ${subjectUserId}::uuid
+            ORDER BY aq.attempt_id, aq.display_order`),
   ]);
 
   return {
@@ -78,6 +104,7 @@ export async function assembleSubjectExport(db: PersistenceDb, subjectUserId: st
       'The text of counselling notes your college has not shared with you. How many each college holds is listed under counsellingNotes; the college can share them with you.',
       'Security audit records, which are retained under the approved retention schedule.',
       'Which member of an employer team wrote each application message, and how operations handled any message you reported.',
+      'The answer key to employer screening tests, and how each of your answers was marked. Your result is shown as the percentage you see on My applications.',
     ],
     identity: identity[0] ?? null,
     studentProfile: profile[0] ?? null,
@@ -89,6 +116,7 @@ export async function assembleSubjectExport(db: PersistenceDb, subjectUserId: st
     offers,
     privacyRequests: requests,
     applicationMessages: groupConversations(messages),
+    screeningAssessments: screeningAttempts(screenings, screeningQuestions),
     counsellingNotes: {
       shared: sharedNotes.map((row) => ({ institutionName: row.institution_name, title: row.title, note: row.note, createdAt: row.created_at })),
       heldByCollege: heldNotes.map((row) => ({ institutionName: row.institution_name, staffOnlyNotes: row.staff_only_notes })),
@@ -116,4 +144,44 @@ function groupConversations(rows: readonly Record<string, unknown>[]): Record<st
     });
   }
   return [...byThread.values()];
+}
+
+/**
+ * One entry per screening test sent to the subject, with their attempt if they started it. Options and
+ * selections use the keys the candidate saw (their shuffle), not the stored ones, and the stored
+ * mapping itself is not exported.
+ */
+function screeningAttempts(invitations: readonly Record<string, unknown>[], questions: readonly Record<string, unknown>[]): Record<string, unknown>[] {
+  return invitations.map((row) => ({
+    employerName: row.employer_name,
+    roleTitle: row.role_title,
+    title: row.title,
+    invitedAt: row.invited_at,
+    opensAt: row.opens_at,
+    closesAt: row.closes_at,
+    state: row.state,
+    attempt: row.attempt_id == null ? null : {
+      state: row.attempt_state,
+      startedAt: row.started_at,
+      submittedAt: row.submitted_at ?? null,
+      percentage: row.percentage == null ? null : Number(row.percentage),
+      questions: questions.filter((question) => question.attempt_id === row.attempt_id).map((question) => {
+        const optionMap = (question.option_map ?? {}) as Record<string, string>;
+        const optionTexts = (question.option_texts ?? {}) as Record<string, string>;
+        const shownAs = new Map(Object.entries(optionMap).map(([displayKey, storedKey]) => [storedKey, displayKey]));
+        const selected = (question.selected_option_keys as string[] | null) ?? [];
+        return {
+          displayOrder: Number(question.display_order),
+          questionText: question.question_text,
+          options: Object.entries(optionMap)
+            .map(([displayKey, storedKey]) => ({ key: displayKey, text: optionTexts[storedKey] ?? '' }))
+            .sort((left, right) => left.key.localeCompare(right.key)),
+          yourAnswer: {
+            selectedOptionKeys: selected.map((storedKey) => shownAs.get(storedKey)).filter((key): key is string => key !== undefined).sort(),
+            numericResponse: question.numeric_response == null ? null : Number(question.numeric_response),
+          },
+        };
+      }),
+    },
+  }));
 }

@@ -174,7 +174,7 @@ export function assertExportDownloadable(input: {
 export type DeletionCategory =
   | 'IDENTITY' | 'STUDENT_PROFILE' | 'INSTITUTION_ROSTER' | 'DOCUMENTS'
   | 'APPLICATIONS' | 'OFFERS' | 'ASSESSMENT_EVIDENCE' | 'NOTIFICATIONS' | 'AUDIT' | 'SUPPORT_CASES'
-  | 'LEARNING_ACTIVITY' | 'COUNSELLING_NOTES' | 'APPLICATION_MESSAGES';
+  | 'LEARNING_ACTIVITY' | 'COUNSELLING_NOTES' | 'APPLICATION_MESSAGES' | 'EMPLOYER_SCREENING';
 
 export type DeletionDisposition = 'ERASED' | 'ANONYMISED' | 'RETAINED';
 
@@ -216,6 +216,10 @@ export const DELETION_POLICY: readonly DeletionPolicyEntry[] = [
   // whole conversation is about them. The rows stay without text so an employer's pipeline and a
   // trust case's references remain valid (docs/architecture/application-messages-table-design.md).
   { category: 'APPLICATION_MESSAGES', disposition: 'ERASED' },
+  // EMP-12 privacy fix: an employer screening attempt and its stored score are the employer's hiring
+  // record, like the application they belong to; what the candidate selected is erased
+  // (docs/architecture/employer-screening-privacy-design.md).
+  { category: 'EMPLOYER_SCREENING', disposition: 'ANONYMISED', basis: 'Employers retain the record that they sent you a screening test and the score it produced; your answers are erased.' },
   { category: 'AUDIT', disposition: 'RETAINED', basis: 'Security and access audit records are retained under the approved retention schedule.' },
 ];
 

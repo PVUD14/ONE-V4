@@ -519,6 +519,41 @@ export function downloadMyInterviewCalendar(token: string, employerId: string, i
   return downloadCalendar(token, `/api/v1/employers/${encodeURIComponent(employerId)}/my-interviews/${encodeURIComponent(interviewId)}/calendar`);
 }
 
+/** EMP-17: why an owner or admin exports, and which applicants. Mirrors the API's fixed lists. */
+export const employerExportReasons = [
+  ['SHORTLIST_REVIEW', 'Reviewing the shortlist'],
+  ['INTERVIEW_PLANNING', 'Planning interviews'],
+  ['HIRING_COMMITTEE', 'Hiring committee review'],
+  ['OFFER_PREPARATION', 'Preparing offers'],
+  ['RECORD_KEEPING', 'Our own hiring records'],
+] as const;
+export type EmployerExportScope = 'ALL_OPEN' | 'SHORTLISTED_ONWARD';
+
+/**
+ * EMP-17: one job's applicants as a CSV file. A POST, because the server records the export with
+ * its reason before sending it. Errors carry only the code and reference, never upstream text.
+ */
+export async function downloadEmployerApplicantExport(token: string, employerId: string, opportunityId: string,
+  body: { readonly reasonCode: string; readonly scope: EmployerExportScope }): Promise<{ readonly blob: Blob; readonly filename: string }> {
+  const correlationId = crypto.randomUUID();
+  const response = await fetch(`${apiBaseUrl}/api/v1/employers/${encodeURIComponent(employerId)}/opportunities/${encodeURIComponent(opportunityId)}/applicant-export`, {
+    method: 'POST',
+    headers: { Accept: 'text/csv', 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, 'X-Correlation-Id': correlationId },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const failure = await response.json().catch(() => null) as { readonly error?: { readonly code?: string; readonly correlationId?: string } } | null;
+    throw new ApiRequestError({
+      status: response.status,
+      correlationId: failure?.error?.correlationId ?? correlationId,
+      ...(failure?.error?.code ? { code: failure.error.code } : {}),
+    });
+  }
+  const disposition = response.headers?.get('content-disposition') ?? '';
+  const filename = /filename="([A-Za-z0-9._-]+)"/.exec(disposition)?.[1] ?? 'one-applicants.csv';
+  return { blob: await response.blob(), filename };
+}
+
 /** Hand a downloaded file to the browser to save. */
 export function saveDownloadedFile(file: { readonly blob: Blob; readonly filename: string }): void {
   const url = URL.createObjectURL(file.blob);

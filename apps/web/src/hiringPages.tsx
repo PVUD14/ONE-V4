@@ -23,6 +23,7 @@ import { CandidateDetailPanel, SnapshotSummary } from './applicationSnapshotView
 import { StudentConversationCard } from './applicationMessages.js';
 import { venueModeLabels, type StudentCampusDriveDto } from './api/campusDrives.js';
 import { StudentNominationsCard } from './studentNominations.js';
+import { EmployerApplicantExportPanel } from './rolePortal/employerApplicantExport.js';
 import {
   ApiRequestError,
   addOpportunityAudience,
@@ -1476,7 +1477,7 @@ export function EmployerHiringAnalyticsPage({ employerId }: { readonly employerI
 
 type EmployerApplicantStateFilter = 'INTERVIEW' | 'OFFER';
 
-export function EmployerApplicantsPage({ employerId, applicationStateFilter }: { readonly employerId: string; readonly applicationStateFilter?: EmployerApplicantStateFilter }): React.ReactElement {
+export function EmployerApplicantsPage({ employerId, applicationStateFilter, canExport = false }: { readonly employerId: string; readonly applicationStateFilter?: EmployerApplicantStateFilter; readonly canExport?: boolean }): React.ReactElement {
   const [opportunities, setOpportunities] = useState<readonly EmployerOpportunityDto[]>([]);
   const [selectedOpportunity, setSelectedOpportunity] = useState<string>('');
   const [applicants, setApplicants] = useState<readonly EmployerApplicantDto[]>([]);
@@ -1611,6 +1612,8 @@ export function EmployerApplicantsPage({ employerId, applicationStateFilter }: {
           </tr>)}</tbody>
         </table></div>}
     </section>
+    {/* EMP-17: owners and admins export this job's applicants; the server enforces the role. */}
+    {canExport && selectedOpportunity ? <EmployerApplicantExportPanel key={selectedOpportunity} employerId={employerId} opportunityId={selectedOpportunity} /> : null}
     {viewing && visibleApplicants.some((item) => item.id === viewing && item.candidateAccess !== false && !item.consentRevoked)
       ? <CandidateDetailPanel key={viewing} employerId={employerId} applicationId={viewing} onClose={() => setViewing(null)} /> : null}
     {action && !action.applicant.consentRevoked ? <section className="role-card role-wide">

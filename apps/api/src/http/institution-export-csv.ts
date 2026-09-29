@@ -9,6 +9,9 @@
  *
  * The header is checked against ADR-024's forbidden fields before anything is written, so a
  * future column cannot carry offer compensation out in a file.
+ *
+ * EMP-17's employer applicant export reuses `csvCell` and `csvDocument` with its own header rule
+ * (employer-applicant-export.ts), so both portals encode cells the same way.
  */
 import { institutionForbiddenDisclosureFields } from '@planthepath/authorization/src/index.js';
 
@@ -37,6 +40,14 @@ export function isForbiddenExportHeader(header: string): boolean {
 /** A whole CSV document: byte-order mark, header row, data rows, CRLF line ends. */
 export function toCsv(header: readonly string[], rows: readonly (readonly CsvValue[])[]): string {
   if (header.some(isForbiddenExportHeader)) throw new Error('export header names a forbidden disclosure field');
+  return csvDocument(header, rows);
+}
+
+/**
+ * The document assembly alone, for a writer that applies its own forbidden-header rule on top
+ * (EMP-17's employer applicant export). Callers must check their header before calling it.
+ */
+export function csvDocument(header: readonly string[], rows: readonly (readonly CsvValue[])[]): string {
   const lines = [header.map(csvCell).join(',')];
   for (const row of rows) {
     if (row.length !== header.length) throw new Error('export row does not match its header');

@@ -110,7 +110,10 @@ async function applicationFor(employerId: string): Promise<{ applicationId: stri
   await hiring.addAudience(request, employerId, opportunityId, { audienceKind: 'PUBLIC' });
   await hiring.publishOpportunity(request, employerId, opportunityId);
   const applied = await student.apply(trusted(candidateId), { opportunityId, consentGranted: true, institutionVisibilityGranted: false });
-  return { applicationId: (applied.application as { id: string }).id, opportunityId };
+  const applicationId = (applied.application as { id: string }).id;
+  // EMP-12: a test is sent at the ASSESSMENT stage, and a person moves the candidate there.
+  await hiring.transitionApplication(request, employerId, applicationId, { toState: 'ASSESSMENT' });
+  return { applicationId, opportunityId };
 }
 
 const tomorrow = (): string => new Date(Date.now() + 86_400_000).toISOString();
@@ -225,7 +228,7 @@ describe('taking a screening test', () => {
 
   it('never sends the answer key to the candidate', async () => {
     const { invitationId } = await invited();
-    const started = await assessments.start(trusted(candidateId), invitationId);
+    const started = await assessments.start(trusted(candidateId), invitationId, { acknowledged: true });
     const serialised = JSON.stringify(started.attempt);
     expect(serialised).not.toMatch(/isCorrect|is_correct|correctOptionKeys|answerKey/);
     // The options are there — just without any indication of which one is right.
@@ -235,15 +238,15 @@ describe('taking a screening test', () => {
 
   it('returns the same paper on a second start rather than a new one', async () => {
     const { invitationId } = await invited();
-    const first = await assessments.start(trusted(candidateId), invitationId);
-    const second = await assessments.start(trusted(candidateId), invitationId);
+    const first = await assessments.start(trusted(candidateId), invitationId, { acknowledged: true });
+    const second = await assessments.start(trusted(candidateId), invitationId, { acknowledged: true });
     expect((second.attempt as { id: string }).id).toBe((first.attempt as { id: string }).id);
     expect(JSON.stringify(second.attempt)).toBe(JSON.stringify(first.attempt));
   });
 
   it('grades against the real key even though the candidate answered in display keys', async () => {
     const { invitationId } = await invited();
-    const started = await assessments.start(trusted(candidateId), invitationId);
+    const started = await assessments.start(trusted(candidateId), invitationId, { acknowledged: true });
     const attempt = started.attempt as { id: string; questions: { questionId: string; options: { key: string; text: string }[] }[] };
     const question = attempt.questions[0]!;
     const correctDisplayKey = question.options.find((option) => option.text === 'Correct answer')!.key;
@@ -254,7 +257,7 @@ describe('taking a screening test', () => {
 
   it('is idempotent on submit and refuses to be rewritten', async () => {
     const { invitationId } = await invited();
-    const started = await assessments.start(trusted(candidateId), invitationId);
+    const started = await assessments.start(trusted(candidateId), invitationId, { acknowledged: true });
     const attempt = started.attempt as { id: string; questions: { questionId: string; options: { key: string }[] }[] };
     await assessments.submit(trusted(candidateId), attempt.id);
     const again = await assessments.submit(trusted(candidateId), attempt.id);
@@ -268,7 +271,7 @@ describe('taking a screening test', () => {
 
   it('will not let one candidate open another candidate\'s attempt', async () => {
     const { invitationId } = await invited();
-    const started = await assessments.start(trusted(candidateId), invitationId);
+    const started = await assessments.start(trusted(candidateId), invitationId, { acknowledged: true });
     const stranger = await seedUser();
     await expect(assessments.submit(trusted(stranger), (started.attempt as { id: string }).id)).rejects.toThrow();
   });
@@ -289,7 +292,7 @@ describe('a screening result stays out of readiness', () => {
     const stateBefore = (await pool.query('SELECT state FROM applications WHERE id = $1', [applicationId])).rows[0].state;
 
     const invitation = await pool.query('SELECT id FROM employer_assessment_invitations WHERE assessment_id = $1', [assessmentId]);
-    const started = await assessments.start(trusted(candidateId), invitation.rows[0].id as string);
+    const started = await assessments.start(trusted(candidateId), invitation.rows[0].id as string, { acknowledged: true });
     await assessments.submit(trusted(candidateId), (started.attempt as { id: string }).id);
 
     const after = await Promise.all([

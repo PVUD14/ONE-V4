@@ -1837,7 +1837,27 @@ was also replayed by hand on top of itself with no error.
 **Design docs / ADRs:** incident-register-table-design.md covers the chosen design, the clock's basis, the delivery path, and the
 rejected options. No ADR was needed; this builds on ADR-032, OPS-02 dual control and ADR-028.
 
-**Validation:** pending — the full run follows this commit and is recorded in an amendment.
+**Validation (only DATABASE_URL exported; fresh databases, all created in this session):**
+- `db:migrate` twice on fresh `one_ops16x`: the first run applied 67 files including 0081, and the second applied 0. Both passed.
+- `corepack pnpm typecheck`: pass. The first full run failed on one implicit-any in the new spec; this was fixed in 5f0a901.
+- `corepack pnpm -r --no-bail --workspace-concurrency=1 test`: the combined run is not usable. A stopped earlier run was still writing
+  to the same log, and on the shared server it hit "out of shared memory" in teardown. Each package was therefore re-run on its own,
+  and every one passed:
+  - web: 785, including 19 new in incidents.test and the updated privacy-console test
+  - api: 1 069, including 27 new in operations-incidents.integration.spec
+  - persistence: 404 in total. On `one_ops16x`, 403 passed and 1 failed: evidence-stages "0050 columns", because it read
+    information_schema and saw two schemas left behind by the aborted run's teardown. Re-run alone on a fresh `one_ops16y`, that
+    file passed 13/13.
+  - authorization: 332, including 21 new
+  - hiring 192, career-readiness 105, learning-model 72, learning-orchestrator 52, identity 41, placement 31, mastery-bkt 29,
+    review-scheduler 23, privacy 22, ai-orchestration 19, assessments 15, events 14, learner-content 7, automation 7
+  - Total: 3 219 passed, 0 failed.
+- `corepack pnpm build`: pass.
+- CI parity:
+  - `corepack pnpm audit --prod --audit-level=high` exits 0 (2 moderate advisories, none high).
+  - The optional-chain policy grep prints nothing.
+  - No private-key blocks or merge-conflict markers.
+- Android: `./gradlew --no-daemon -q :app:compileDebugKotlin` with the Android Studio JBR exits 0.
 
 **Acceptance criteria:**
 - ✔ A breach incident shows its 72-hour deadline and who was notified when.

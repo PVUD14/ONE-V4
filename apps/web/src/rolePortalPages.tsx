@@ -50,6 +50,7 @@ import { OperationsStaffCapabilitiesPage } from './rolePortal/staffCapabilities.
 import { OperationsApprovalsPanel } from './rolePortal/approvals.js';
 import { OperationsSystemHealthPage } from './rolePortal/systemHealth.js';
 import { OperationsRoleDemandPage } from './rolePortal/roleDemand.js';
+import { OperationsCollegeAccountPanel, OperationsCollegeHealthPanel } from './rolePortal/collegeHealth.js';
 import { OperationsPrivacyConsolePage } from './rolePortal/privacyConsole.js';
 import type { AuthenticatedWorkspaceSummary } from './rolePortal/shared.js';
 import { AuthenticatedNotYetAvailable, AuthenticatedReadOnlyModule, institutionStaffWorkspaceRoles, institutionWorkspaceRoles, InstitutionWorkspaceError, isInstitutionStaffWorkspace, isInstitutionWorkspace } from './rolePortal/shared.js';
@@ -275,7 +276,9 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   const openerRef = useRef<HTMLElement | null>(null);
   const dense = isDenseManagementRoute(portal, route);
   if (!demoMode && portal.key === 'operations-admin' && route.label === 'Organizations') return <OperationsOrganizationsPage portal={portal} />;
-  if (!demoMode && portal.key === 'operations-admin' && route.label === 'Organization Detail') return <OperationsOrganizationsPage portal={portal} />;
+  // OPS-14: Organization Detail adds the college account fields (renewal, contract reference,
+  // AI8HT owner, contacts) beneath the organisation list. Organizations itself is unchanged.
+  if (!demoMode && portal.key === 'operations-admin' && route.label === 'Organization Detail') return <><OperationsOrganizationsPage portal={portal} /><OperationsCollegeAccountPanel /></>;
   // OPS-05: Users and User Detail are the minimised account lookup (masked contacts,
   // audited reads) with invitation tracking kept beneath it (Appendix 1 §4.2).
   if (!demoMode && portal.key === 'operations-admin' && route.label === 'Users') return <><OperationsAccountLookupPage /><OperationsInvitationTrackingPanel /></>;
@@ -308,9 +311,10 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   // OPS-05: Support is the case desk. Only this label's branch changes; Subscriptions,
   // Billing and Analytics keep the not-yet-available state below.
   if (!demoMode && portal.key === 'operations-admin' && route.label === 'Support') return <OperationsSupportDeskPage />;
-  // OPS-11: Analytics is the role demand dashboard. Only this label's branch changes;
-  // Subscriptions and Billing keep the not-yet-available state below (ADR-022).
-  if (!demoMode && portal.key === 'operations-admin' && route.label === 'Analytics') return <OperationsRoleDemandPage />;
+  // OPS-11: Analytics is the role demand dashboard; OPS-14 adds college health beneath it.
+  // Only this label's branch changes; Subscriptions and Billing keep the not-yet-available
+  // state below (ADR-022).
+  if (!demoMode && portal.key === 'operations-admin' && route.label === 'Analytics') return <><OperationsRoleDemandPage /><OperationsCollegeHealthPanel /></>;
   if (!demoMode && portal.key === 'operations-admin' && /subscriptions|billing|analytics|support|settings/i.test(route.label)) return <AuthenticatedNotYetAvailable title={route.label} detail="This Operations module is not yet backed by a Phase 2A persistent workflow." />;
   if (!demoMode && portal.key === 'institution-admin' && ['Students', 'Student Detail'].includes(route.label)) {
     // INST-04: the admin reaches academic verification here, under Students (plan §4.2);

@@ -43,6 +43,7 @@ import {
   type ProtectedHttpRequest,
 } from './api-security.js';
 import { requireActiveEmployer } from './employer-organisation-state.js';
+import { assertEmployerTermsAccepted } from './employer-terms-gate.js';
 import { lockEmployerForWrite } from './interview-scheduling.js';
 import { institutionStaffScopeMemberships, institutionStudentScopeFor, institutionStudentWriteScopeFor } from './institution-student-scope.js';
 import { isoOrNull } from './campus-drives.js';
@@ -437,6 +438,9 @@ export class EmployerCampusDrivesController {
 
     const result = await this.db.transaction(async (tx) => {
       await lockEmployerForWrite(tx, employerId, 'jobs.publish', context.correlationId);
+      // EMP-16: a drive puts the job in front of a college's students, so it waits for an owner to
+      // accept the current employer terms, as publishing does.
+      await assertEmployerTermsAccepted(tx, employerId, context.correlationId);
       const job = await tx.execute(sql`
         SELECT lifecycle_state FROM opportunities WHERE id = ${jobId}::uuid AND employer_id = ${employerId}::uuid FOR SHARE
       `) as QueryResult<{ lifecycle_state: string }>;
@@ -504,7 +508,11 @@ export class EmployerCampusDrivesController {
     const result = await transitionDrive(this.db, this.ids, context, {
       side: 'EMPLOYER', action, driveId: id, ownerSql: sql`employer_id = ${employerId}::uuid`, organizationId: employerId,
       revision, reasonCode, note, ...(proposal ? { proposal } : {}), ...(venueMode !== undefined ? { venueMode } : {}),
-    }, (tx) => lockEmployerForWrite(tx, employerId, 'jobs.publish', context.correlationId));
+    }, async (tx) => {
+      await lockEmployerForWrite(tx, employerId, 'jobs.publish', context.correlationId);
+      // EMP-16: resubmitting asks the college again to put the job before its students.
+      if (action === 'RESUBMIT') await assertEmployerTermsAccepted(tx, employerId, context.correlationId);
+    });
     await sendDriveNotice(this.db, this.ids, result.notice);
     return { drive: result.drive, correlationId: context.correlationId };
   }

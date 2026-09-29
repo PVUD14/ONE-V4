@@ -11,7 +11,7 @@
  *   3. its verification state allows the action:
  *        PENDING, UNDER_REVIEW  company profile, team, draft jobs; no publishing, no candidates
  *        VERIFIED               everything the role allows
- *        REJECTED, SUSPENDED    read their own organisation status only
+ *        REJECTED, SUSPENDED    read their own organisation status and answer trust cases only
  *
  * The check keys on verification_state as well as `active`, because a REJECTED
  * organisation keeps active = true. The same rule, expressed as SQL, guards the student
@@ -35,9 +35,12 @@ const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}
  *  - `jobs.draft`           create drafts, set audiences, build assessments that are not published;
  *  - `jobs.publish`         anything that makes a job or assessment reach students;
  *  - `candidates`           any read or write of candidate data: applicants, interviews,
- *                           offers, feedback, reports, assessment invitations and results.
+ *                           offers, feedback, reports, assessment invitations and results;
+ *  - `trust.cases`          read and answer trust cases about the organisation (EMP-16). Allowed in
+ *                           every state: §5.1 lets a REJECTED or SUSPENDED employer "respond to trust
+ *                           cases", and a suspended employer is the one most likely to need to appeal.
  */
-export type EmployerAction = 'organisation.status' | 'organisation.manage' | 'jobs.draft' | 'jobs.publish' | 'candidates';
+export type EmployerAction = 'organisation.status' | 'organisation.manage' | 'jobs.draft' | 'jobs.publish' | 'candidates' | 'trust.cases';
 
 export type EmployerVerificationState = 'PENDING' | 'UNDER_REVIEW' | 'VERIFIED' | 'REJECTED' | 'SUSPENDED';
 
@@ -51,7 +54,7 @@ export type EmployerStateRefusal = 'EMPLOYER_ORGANISATION_INACTIVE' | 'EMPLOYER_
 
 /** Pure decision for §5.1 step 2 and 3; null means allowed. */
 export function employerStateRefusal(state: EmployerOrganisationState, action: EmployerAction): EmployerStateRefusal | null {
-  if (action === 'organisation.status') return null;
+  if (action === 'organisation.status' || action === 'trust.cases') return null;
   if (!state.active || state.verificationState === 'SUSPENDED' || state.verificationState === 'REJECTED') return 'EMPLOYER_ORGANISATION_INACTIVE';
   if (state.verificationState === 'VERIFIED') return null;
   // PENDING and UNDER_REVIEW: set up the organisation and draft, nothing that reaches students.

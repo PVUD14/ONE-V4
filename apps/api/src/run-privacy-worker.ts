@@ -4,11 +4,14 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import * as schema from '@planthepath/persistence/src/schema.js';
 import { executeDueDeletions } from './http/privacy-deletion.js';
 import { eraseExpiredApplicationMessages, MESSAGE_RETENTION_DAYS_AFTER_GRANT } from '@planthepath/persistence/src/application-messages.js';
+import { revokeExpiredApplicantGrants } from '@planthepath/persistence/src/employer-terms.js';
 import { createLocalDiskStorage } from './storage/file-storage.js';
 
 /**
- * Executes deletions whose 30-day grace period has elapsed, then erases application messages whose
- * retention after the employer's access ended has run out (EMP-10).
+ * Executes deletions whose 30-day grace period has elapsed, revokes applicant-access grants whose
+ * expiry has passed (EMP-16), then erases application messages whose retention after the employer's
+ * access ended has run out (EMP-10). Message erasure skips anything an open trust case or an active
+ * retention hold still needs.
  *
  * Deliberately a one-shot run rather than a loop: a deletion sweep is a daily job,
  * and a long-lived process holding a connection to do nothing most of the time is
@@ -44,6 +47,12 @@ async function main(): Promise<void> {
       // rather than reporting a clean sweep.
       ...(storageRoot ? {} : { warning: 'FILE_STORAGE_ROOT unset; stored document bytes were not removed' }),
     }));
+
+    // EMP-16: grants whose expires_at has passed are revoked on the database clock. The live-grant
+    // predicate already refuses them on every request; this makes the end durable and visible.
+    let expiredGrants = 0;
+    for (let batch = await revokeExpiredApplicantGrants(db); batch > 0; batch = await revokeExpiredApplicantGrants(db)) expiredGrants += batch;
+    console.log(JSON.stringify({ event: 'employer.applicant_access.expiry_sweep', revoked: expiredGrants }));
 
     // EMP-10: message text is kept 180 days after the employer's access ended, then erased — the
     // same daily sweep, because it is the same kind of promise about how long ONE keeps data.

@@ -39,7 +39,8 @@ export async function eraseApplicationMessagesForSubject(db: Executor, subjectUs
  * Retention: erase the text of conversations whose employer access ended more than
  * {@link MESSAGE_RETENTION_DAYS_AFTER_GRANT} days ago — no grant for that employer, job and student
  * is live, and the latest one ended (revoked or expired) before the cut-off. A conversation that is
- * evidence on an open trust case is skipped until the case closes, so waiting cannot defeat a report.
+ * evidence on an open trust case is skipped until the case closes, so waiting cannot defeat a report;
+ * and one whose student is under an active retention hold is skipped until the hold is released (EMP-16).
  */
 export async function eraseExpiredApplicationMessages(db: Executor, retentionDays = MESSAGE_RETENTION_DAYS_AFTER_GRANT): Promise<number> {
   const erased = await db.execute(sql`
@@ -59,6 +60,11 @@ export async function eraseExpiredApplicationMessages(db: Executor, retentionDay
           SELECT 1 FROM trust_case_evidence e JOIN trust_cases c ON c.id = e.case_id
           WHERE e.evidence_kind = 'APPLICATION_MESSAGE_THREAD' AND e.reference_id = t.id::text
             AND c.state NOT IN ('CLOSED', 'DISMISSED'))
+        -- EMP-16: nor while the student is under a retention hold (a legal obligation, an
+        -- investigation, a dispute): a purge never takes what a hold is keeping.
+        AND NOT EXISTS (
+          SELECT 1 FROM data_retention_holds h
+          WHERE h.subject_user_id = t.student_user_id AND h.released_at IS NULL)
       LIMIT 1000
     ), gone AS (
       UPDATE application_messages m SET body = NULL, erased_at = now(), erasure_reason = 'RETENTION_EXPIRED'

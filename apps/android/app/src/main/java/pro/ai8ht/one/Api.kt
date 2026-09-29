@@ -602,6 +602,8 @@ internal fun StudentDto.formerStudentLine(): String? {
     val unreadMessages: Int = 0,
     /** EMP-11: the college whose campus drive this application came through, if any. */
     val campusDrive: CampusDriveRefDto? = null,
+    /** INST-14: made by opting in to this college's placement-office nomination. */
+    val nominatedBy: CampusDriveRefDto? = null,
 )
 @Serializable data class CampusDriveRefDto(val institutionName: String = "")
 
@@ -848,6 +850,8 @@ internal fun StudentDto.formerStudentLine(): String? {
     val offerState: String? = null,
     /** EMP-06: eligibility as frozen at apply — outcome and basis only; null when withheld or no rules. */
     val eligibility: ApplicantEligibilityDto? = null,
+    /** INST-14: PLACEMENT_OFFICE_NOMINATION when the student opted in to their college's nomination. */
+    val source: String = "DIRECT",
     /** Copied from the envelope by [Api.listEmployerApplicants]; not part of the row. */
     val stages: List<SelectionStageDto> = emptyList(),
 )

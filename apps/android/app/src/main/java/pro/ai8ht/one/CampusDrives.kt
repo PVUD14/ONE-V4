@@ -69,6 +69,19 @@ import kotlinx.serialization.Serializable
 suspend fun Api.institutionCampusDrives(context: Context, institutionId: String, state: String? = null): CampusDrivesEnvelope =
     json.decodeFromString(request(context, "GET", "/api/v1/institutions/$institutionId/campus-drives" + (state?.let { "?state=$it" } ?: "")))
 
+/** INST-14: a drive's nomination summary as the college sees it (suppressed under five). */
+@Serializable data class NominationSummaryDto(
+    val nominated: SuppressedCountDto? = null,
+    val optedIn: SuppressedCountDto? = null,
+    val notOptedIn: SuppressedCountDto? = null,
+)
+@Serializable data class DriveNominationsEnvelope(val summary: NominationSummaryDto = NominationSummaryDto())
+
+suspend fun Api.driveNominationSummary(context: Context, institutionId: String, driveId: String): NominationSummaryDto =
+    json.decodeFromString<DriveNominationsEnvelope>(
+        request(context, "GET", "/api/v1/institutions/$institutionId/campus-drives/$driveId/nominations?limit=1"),
+    ).summary
+
 suspend fun Api.employerCampusDrives(context: Context, employerId: String, opportunityId: String): List<CampusDriveDto> =
     json.decodeFromString<CampusDrivesEnvelope>(
         request(context, "GET", "/api/v1/employers/$employerId/campus-drives?opportunityId=$opportunityId"),
@@ -93,7 +106,12 @@ private sealed interface CollegeDrives {
     data object Loading : CollegeDrives
     data object NotForRole : CollegeDrives
     data object Unavailable : CollegeDrives
-    data class Loaded(val waiting: List<CampusDriveDto>, val upcoming: List<CampusDriveDto>) : CollegeDrives
+    data class Loaded(
+        val waiting: List<CampusDriveDto>,
+        val upcoming: List<CampusDriveDto>,
+        /** INST-14: each shown drive's nomination summary; null reads NA. */
+        val nominations: Map<String, NominationSummaryDto?> = emptyMap(),
+    ) : CollegeDrives
 }
 
 /**
@@ -111,7 +129,10 @@ internal fun CollegeCampusDrivesSection(institutionId: String) {
             val scheduled = Api.institutionCampusDrives(context, institutionId, "SCHEDULED").drives
                 .filter { drive -> drive.scheduledStartAt?.let { runCatching { java.time.Instant.parse(it).toEpochMilli() >= now }.getOrDefault(false) } ?: false }
                 .sortedBy { it.scheduledStartAt }
-            CollegeDrives.Loaded(requested, scheduled)
+            val summaries = scheduled.take(4).associate { drive ->
+                drive.id to runCatching { Api.driveNominationSummary(context, institutionId, drive.id) }.getOrNull()
+            }
+            CollegeDrives.Loaded(requested, scheduled, summaries)
         }.getOrElse { if (it is Api.ApiException && it.status == 403) CollegeDrives.NotForRole else CollegeDrives.Unavailable }
     }
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
@@ -148,9 +169,16 @@ internal fun CollegeCampusDrivesSection(institutionId: String) {
                         Text("${drive.scheduledStartAt?.let(::formatWhen) ?: "NA"} · ${drive.employerName} · ${drive.opportunityTitle ?: "Untitled"}" +
                             (drive.category?.let { " · ${it.name}" } ?: ""),
                             style = MaterialTheme.typography.bodySmall)
+                        // INST-14: who opted in to the college's nominations, never who declined; <5 under five.
+                        val summary = current.nominations[drive.id]
+                        Text(
+                            if (summary == null) "Nominations: NA"
+                            else "Nominated ${countText(summary.nominated)} · opted in ${countText(summary.optedIn)} · not opted in ${countText(summary.notOptedIn)}",
+                            style = MaterialTheme.typography.bodySmall, color = muted,
+                        )
                     }
                     Spacer(Modifier.height(10.dp))
-                    Text("Approve, decline or schedule drives, and set your one-offer policy, on the web: the placement officer Dashboard, or Placement and Settings for administrators.",
+                    Text("Approve, decline or schedule drives, nominate students, and set your one-offer policy, on the web: the placement officer Dashboard, or Placement and Settings for administrators.",
                         style = MaterialTheme.typography.bodySmall, color = muted)
                 }
             }

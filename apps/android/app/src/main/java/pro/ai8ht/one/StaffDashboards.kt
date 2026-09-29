@@ -1030,6 +1030,11 @@ private fun EmployerHome(
                             Text(candidateLabel(applicant.candidateName, applicant.consentRevoked, applicant.candidateAccess), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                             Text(prettify(applicant.state), style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            // INST-14: the student opted in to their college's nomination.
+                            if (applicant.source == "PLACEMENT_OFFICE_NOMINATION") {
+                                Text("Nominated by placement office", style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary)
+                            }
                         }
                         StatusChip(prettify(applicant.state), ChipKind.Accent)
                     }

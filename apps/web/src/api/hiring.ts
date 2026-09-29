@@ -598,6 +598,54 @@ export function getEmployerHiringAnalytics(token: string, employerId: string, si
   return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/hiring-analytics`, { token, ...(signal ? { signal } : {}) });
 }
 
+/**
+ * EMP-15: the employer Dashboard's figures, computed by the server. Each is the count of rows the
+ * employer's own lists already show, so they are exact. "This week" is the Asia/Kolkata week the
+ * server counted, returned so a client lists the same window.
+ */
+export interface EmployerSummaryDto {
+  readonly openJobs: number;
+  readonly newApplicantsLast7Days: number;
+  readonly interviewsThisWeek: number;
+  readonly offersPending: number;
+  readonly drivesAwaitingApproval: number;
+  readonly drivesChangesRequested: number;
+  readonly applicationsTotal: number;
+  readonly openApplications: number;
+  readonly hires: number;
+  readonly currentStages: Readonly<Record<string, number>>;
+  readonly week: { readonly startsAt: string; readonly endsAt: string };
+  readonly timeZone: string;
+}
+
+export function getEmployerSummary(token: string, employerId: string, signal?: AbortSignal): Promise<{ readonly summary: EmployerSummaryDto }> {
+  return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/summary`, { token, ...(signal ? { signal } : {}) });
+}
+
+/** A figure about people as a report may carry it: withheld (no value) under 5. */
+export interface ReportCountDto { readonly suppressed: boolean; readonly value: number | null }
+export interface ReportTableDto {
+  /** The whole group is under 5: nothing in it is shown. */
+  readonly suppressed: boolean;
+  readonly total: ReportCountDto;
+  readonly cells: readonly { readonly key: string; readonly count: number | null; readonly suppressed: boolean }[];
+}
+export interface EmployerReportsDto {
+  readonly threshold: number;
+  readonly overall: ReportTableDto;
+  readonly byJob: readonly { readonly opportunityId: string; readonly referenceCode: string | null; readonly title: string | null; readonly lifecycleState: string; readonly table: ReportTableDto }[];
+  readonly byJobTruncated: boolean;
+  readonly byCollege: readonly { readonly collegeName: string | null; readonly table: ReportTableDto }[];
+  readonly byDrive: readonly { readonly driveId: string; readonly opportunityTitle: string | null; readonly institutionName: string; readonly state: string; readonly table: ReportTableDto }[];
+  readonly byDriveTruncated: boolean;
+  readonly timeToStage: readonly { readonly metric: 'SHORTLIST' | 'INTERVIEW' | 'OFFER' | 'HIRE'; readonly applications: ReportCountDto; readonly medianDays: number | null }[];
+  readonly offers: { readonly table: ReportTableDto; readonly acceptanceRate: number | null };
+}
+
+export function getEmployerReports(token: string, employerId: string, signal?: AbortSignal): Promise<{ readonly reports: EmployerReportsDto }> {
+  return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/reports`, { token, ...(signal ? { signal } : {}) });
+}
+
 export function scheduleInterview(token: string, employerId: string, applicationId: string, body: InterviewScheduleInput): Promise<{ readonly interview: { readonly id: string; readonly state: string; readonly roundNumber: number } }> {
   return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/applications/${encodeURIComponent(applicationId)}/interviews`, { token, method: 'POST', body });
 }

@@ -139,7 +139,7 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
     personas: ['employer'],
     title: 'Roles and campus drives',
     keywords: ['role', 'post', 'job', 'drive', 'campus', 'pipeline', 'applications', 'shortlist', 'offer'],
-    body: 'Post roles from the employer portal. To run a campus drive, open the role under Opportunity Detail and ask a college for one: the role reaches the students of that college only after its placement office approves, and the placement rules of the college apply to applications through the drive. Applications, shortlists and offers are tracked per role so the pipeline stays in one view. The Dashboard counts your open roles, new applicants in the last 7 days, this week's interviews, offers awaiting an answer and drives awaiting a college. Reports break applications down by role, college and drive, with time to each stage and offer acceptance; any group of fewer than 5 people reads <5, so no candidate is singled out.',
+    body: 'Post roles from the employer portal. To run a campus drive, open the role under Opportunity Detail and ask a college for one: the role reaches the students of that college only after its placement office approves, and the placement rules of the college apply to applications through the drive. Applications, shortlists and offers are tracked per role so the pipeline stays in one view. The Dashboard counts your open roles, new applicants in the last 7 days, the interviews this week, offers awaiting an answer and drives awaiting a college. Reports break applications down by role, college and drive, with time to each stage and offer acceptance; any group of fewer than 5 people reads <5, so no candidate is singled out.',
   },
   {
     id: 'employer-candidates',

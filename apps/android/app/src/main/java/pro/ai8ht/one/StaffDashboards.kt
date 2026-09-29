@@ -212,6 +212,8 @@ private class InstitutionData(
     val pipeline: ScopedView<PlacementPipelineDto> = ScopedView.NotForRole,
     /** INST-07: the lecturer's class reports; NotForRole when the caller holds no faculty role. */
     val classes: ScopedView<ClassReportsDto> = ScopedView.NotForRole,
+    /** INST-12: season placement statistics; NotForRole for faculty-only callers. */
+    val statistics: ScopedView<PlacementStatisticsDto> = ScopedView.NotForRole,
 )
 
 private sealed interface AnnouncementsState {
@@ -282,6 +284,7 @@ internal fun InstitutionScaffold(
             val department = async { scopedView { Api.departmentOverview(context, organizationId) } }
             val pipeline = async { scopedView { Api.placementPipeline(context, organizationId) } }
             val classes = async { scopedView { Api.classReports(context, organizationId) } }
+            val statistics = async { scopedView { Api.placementStatistics(context, organizationId) } }
             val loadedExams = exams.await()
             val target = loadedExams.firstOrNull { it.lifecycleState == "PUBLISHED" && it.assignedCount > 0 }
             val attention = if (target != null) {
@@ -290,7 +293,7 @@ internal fun InstitutionScaffold(
             } else emptyList()
             data = InstitutionData(loadedExams, subjects.await(), review.await(), inbox.await(), attention, activation.await(),
                 myStudents.await(), verification.await(), calendar.await(), announcements.await(),
-                department.await(), pipeline.await(), classes.await())
+                department.await(), pipeline.await(), classes.await(), statistics.await())
         }
     }
 
@@ -395,7 +398,8 @@ private fun InstitutionHome(organizationId: String, data: InstitutionData, onVer
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             StatCell("$attempts/$assigned", "Attempts", Tone.Violet, Icons.Filled.School, Modifier.weight(1f))
-            StatCell("NA", "Students placed", Tone.Gray, Icons.Filled.School, Modifier.weight(1f))
+            // INST-12: placed as of the last month end, from shared applications; <5 when withheld.
+            StatCell(placedKpi(data.statistics), "Students placed", Tone.Gray, Icons.Filled.School, Modifier.weight(1f))
         }
 
         // Cohort readiness: how many students sit in each band, never an average (ADR-020).
@@ -458,6 +462,9 @@ private fun InstitutionHome(organizationId: String, data: InstitutionData, onVer
         // Placement Pipeline (INST-07): stages of applications students shared with the college,
         // suppressed under five; NA for a caller with no department view.
         PlacementPipelineCard(data.pipeline)
+
+        // INST-12: season statistics by department and batch, read-only (as the web's Placement).
+        PlacementStatisticsSection(data.statistics)
 
         // EMP-11: campus drive requests awaiting the placement office and drives scheduled ahead,
         // read-only; deciding stays on the web (hidden for faculty, who have no placement role).

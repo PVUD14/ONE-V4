@@ -60,7 +60,11 @@ import kotlinx.serialization.Serializable
     val decision: CampusDriveDecisionDto? = null,
     val closeReasonCode: String? = null,
     val applicationCount: Int? = null,
+    /** INST-12: the college's own label for the drive (college side only). */
+    val category: CampusDriveCategoryDto? = null,
 )
+
+@Serializable data class CampusDriveCategoryDto(val id: String = "", val name: String = "", val retired: Boolean = false)
 
 suspend fun Api.institutionCampusDrives(context: Context, institutionId: String, state: String? = null): CampusDrivesEnvelope =
     json.decodeFromString(request(context, "GET", "/api/v1/institutions/$institutionId/campus-drives" + (state?.let { "?state=$it" } ?: "")))
@@ -141,7 +145,8 @@ internal fun CollegeCampusDrivesSection(institutionId: String) {
                         Text("No drive is scheduled yet.", style = MaterialTheme.typography.bodySmall, color = muted)
                     } else current.upcoming.take(4).forEach { drive ->
                         Spacer(Modifier.height(4.dp))
-                        Text("${drive.scheduledStartAt?.let(::formatWhen) ?: "NA"} · ${drive.employerName} · ${drive.opportunityTitle ?: "Untitled"}",
+                        Text("${drive.scheduledStartAt?.let(::formatWhen) ?: "NA"} · ${drive.employerName} · ${drive.opportunityTitle ?: "Untitled"}" +
+                            (drive.category?.let { " · ${it.name}" } ?: ""),
                             style = MaterialTheme.typography.bodySmall)
                     }
                     Spacer(Modifier.height(10.dp))

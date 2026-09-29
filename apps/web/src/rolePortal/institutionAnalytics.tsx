@@ -4,7 +4,7 @@
  * Two panels. On the admin Staff page, "Analytics and exports access" grants and revokes
  * INSTITUTION_ANALYTICS for admins and department heads, each with a reason code (ADR-018).
  * On the admin Reports page and the department head's Reports and Analytics page, "Exports"
- * downloads the four CSV exports. The server decides who may export and over which students;
+ * downloads the CSV exports — INST-08's four and INST-13's accreditation outcomes. The server decides who may export and over which students;
  * nothing is filtered here. The exports panel makes no request until the person acts, so a
  * person without access learns it from their first export, with who can grant it.
  * Design: docs/architecture/institution-exports-design.md.
@@ -50,6 +50,7 @@ const exportKinds: readonly { readonly path: InstitutionExportPath; readonly lab
   { path: 'readiness-bands', label: 'Readiness band distribution', detail: 'Students per readiness band for one month that has ended. Bands only; a band with fewer than 5 students shows <5.' },
   { path: 'assessment-results', label: 'Assessment results', detail: 'The marks for one assessment, one row per attempt, plus assigned students who have not taken it.' },
   { path: 'staff-action-summary', label: 'Staff-action summary', detail: 'Interventions, tasks, notes, verifications and meetings opened in one month that has ended, as counts. No notes or titles leave in the file.' },
+  { path: 'accreditation-outcomes', label: 'Accreditation outcomes', detail: 'Graduates by department, programme and year of graduation, as of the end of last month: placed (applications students shared with the college), higher studies and entrepreneurship (self-reported by graduates who chose to share them), counts only, each under 5 shown as <5. Salary and anything ONE does not hold reads NA. Check the file against the current official template before any submission — ONE does not claim it matches any accreditation format.' },
 ];
 
 const roleLabels: Readonly<Record<string, string>> = { INSTITUTION_ADMIN: 'Institution admin', DEPARTMENT_HEAD: 'Department head' };
@@ -146,7 +147,7 @@ export function AnalyticsAccessPanel({ token, institutionId }: { readonly token:
   </section>;
 }
 
-/** Reports pages: the four CSV exports. Requests nothing until the person acts. */
+/** Reports pages: the CSV exports. Requests nothing until the person acts. */
 export function InstitutionExportsPanel({ institutionId }: { readonly institutionId: string }): React.ReactElement {
   const token = getProtectedAccessToken();
   const latestMonth = latestEndedMonth(new Date().toISOString().slice(0, 10));

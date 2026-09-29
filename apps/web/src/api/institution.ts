@@ -562,7 +562,7 @@ export function revokeInstitutionAnalyticsAccess(token: string, institutionId: s
   return requestJson(`/api/v1/institutions/${encodeURIComponent(institutionId)}/capabilities/${encodeURIComponent(capabilityId)}/revoke`, { token, method: 'POST', body: { reasonCode } });
 }
 
-export type InstitutionExportPath = 'roster' | 'readiness-bands' | 'assessment-results' | 'staff-action-summary';
+export type InstitutionExportPath = 'roster' | 'readiness-bands' | 'assessment-results' | 'staff-action-summary' | 'accreditation-outcomes';
 
 export interface InstitutionExportRequest {
   readonly reasonCode: string;

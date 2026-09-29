@@ -250,7 +250,7 @@ export function OperationsPrivacyConsolePage(): React.ReactElement {
 
     <section className="role-card role-wide"><h2>Breach response and incidents</h2>
       <p>If personal data may have been exposed, follow the breach response runbook in the ONE repository: docs/ops/runbook-breach-response.md. It covers declaring, containing, assessing scope and notifying the Data Protection Board and every affected person.</p>
-      <p><StatusBadge label="Incident register: not built yet" tone="neutral" /> The incident register and breach clocks arrive with a later Security module. Until then, keep the incident log the runbook describes.</p>
+      <p><StatusBadge label="Incident register: below" tone="info" /> Declare the incident in the incident register further down this page. It keeps the timeline the runbook asks for, shows the Board reporting clock for a personal data breach, and records who reported and who was told, and when.</p>
     </section>
 
     <OperationsCareerReadinessPanel />

@@ -1203,6 +1203,10 @@ private fun StaffInboxOverlay(feed: NotificationsEnvelope?, onClose: () -> Unit)
                             fontWeight = if (note.readAt == null) FontWeight.Bold else FontWeight.Normal)
                         Text(note.body, style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        note.statusNoticeSource()?.let { source ->
+                            Text(source, style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outline)
                 }

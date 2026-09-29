@@ -212,10 +212,11 @@ describe('Security: privacy and consent console', () => {
     expect(screen.getByText('Sign-in required')).toBeInTheDocument();
   });
 
-  it('links the breach runbook and says the incident register is not built yet', async () => {
+  it('links the breach runbook and points to the incident register (OPS-16)', async () => {
     render(<OperationsPrivacyConsolePage />);
     expect(await screen.findByText(/docs\/ops\/runbook-breach-response\.md/)).toBeInTheDocument();
-    expect(screen.getByText('Incident register: not built yet')).toBeInTheDocument();
+    expect(screen.getByText('Incident register: below')).toBeInTheDocument();
+    expect(screen.queryByText('Incident register: not built yet')).not.toBeInTheDocument();
   });
 
   it('keeps the Operations navigation labels unchanged', () => {

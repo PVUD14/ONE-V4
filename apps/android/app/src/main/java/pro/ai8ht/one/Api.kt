@@ -451,6 +451,11 @@ internal fun NotificationDto.announcementSource(): String {
     return listOfNotNull(data["from"]?.let { "From $it" }, where.ifBlank { null }).joinToString(" · ").ifBlank { "From your college" }
 }
 
+/** OPS-16: a service status notice comes from AI8HT to an organisation's admins, not from the college. */
+internal fun NotificationDto.statusNoticeSource(): String? =
+    if (kind != "STATUS_NOTICE") null
+    else listOfNotNull("Service status notice from AI8HT", data["organizationName"]?.let { "for $it" }).joinToString(" ")
+
 // --- Cohort announcements (INST-06) ---------------------------------------------
 
 @Serializable data class AnnouncementAudienceDto(val unitId: String? = null, val kind: String = "", val name: String? = null)

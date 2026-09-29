@@ -34,3 +34,4 @@ export * from './api/contentImport.js';
 export * from './api/externalReviews.js';
 export * from './api/goals.js';
 export * from './api/learning.js';
+export * from './api/incidents.js';

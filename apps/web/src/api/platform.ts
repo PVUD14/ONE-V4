@@ -13,7 +13,9 @@ export interface UserNotificationDto {
   readonly kind: 'EXAM_ASSIGNED' | 'EXAM_REOPENED' | 'RESULT_PUBLISHED' | 'SYSTEM' | 'ANNOUNCEMENT'
     // EMP-08: hiring notices (0059). OFFER_RESPONDED reaches employer members; the rest reach students.
     | 'APPLICATION_STAGE_CHANGED' | 'APPLICATION_TERMS_CHANGED' | 'INTERVIEW_SCHEDULED' | 'INTERVIEW_CHANGED'
-    | 'OFFER_EXTENDED' | 'OFFER_WITHDRAWN' | 'OFFER_EXPIRING' | 'OFFER_RESPONDED';
+    | 'OFFER_EXTENDED' | 'OFFER_WITHDRAWN' | 'OFFER_EXPIRING' | 'OFFER_RESPONDED'
+    // OPS-16: a service status notice from AI8HT to the admins of an organisation an incident affects.
+    | 'STATUS_NOTICE';
   readonly title: string;
   readonly body: string;
   readonly data: Record<string, string>;

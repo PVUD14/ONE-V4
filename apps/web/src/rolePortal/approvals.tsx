@@ -21,6 +21,7 @@ import {
   publishBankQuestionRevision,
   publishEditorLessonRevision,
   publishSkillRevision,
+  publishStatusNoticeTemplate,
   releasePrivacyHold,
   requestOperationApproval,
   setFeatureFlagState,
@@ -59,6 +60,8 @@ export function describeApproval(approval: OperationApprovalDto): string {
       return `Publish revision ${summary.questionRevision ?? 'NA'} of the question ${summary.questionKey ?? 'NA'} to the readiness check`;
     case 'CONTENT_LESSON_PUBLISH':
       return `Publish revision ${summary.lessonRevision ?? 'NA'} of the lesson ${summary.lessonKey ?? 'NA'} (${summary.lessonVariant ?? 'NA'})`;
+    case 'COMMS_TEMPLATE_PUBLISH':
+      return `Publish version ${summary.commsTemplateVersion ?? 'NA'} of the status notice template ${summary.commsTemplateKey ?? 'NA'}`;
   }
 }
 
@@ -91,6 +94,8 @@ async function executeApproval(token: string, approval: OperationApprovalDto): P
       await publishBankQuestionRevision(token, String(payload.revisionId), { reasonCode, approvalId }); return;
     case 'CONTENT_LESSON_PUBLISH':
       await publishEditorLessonRevision(token, String(payload.revisionId), { reasonCode, approvalId }); return;
+    case 'COMMS_TEMPLATE_PUBLISH':
+      await publishStatusNoticeTemplate(token, String(payload.templateId), { reasonCode, approvalId }); return;
   }
 }
 

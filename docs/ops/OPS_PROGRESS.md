@@ -1526,7 +1526,26 @@ It changes no existing table or migration.
 
 **Design docs / ADRs:** `access-review-campaigns-table-design.md` records the chosen designs and the rejected alternatives (live-table review, audit-only, one item per membership). No ADR was needed: this builds on ADR-032 and reuses OPS-02's solo pattern.
 
-**Validation:** in progress. Results will be amended below.
+**Validation:** run on a freshly created database, `one_ops15`, with only DATABASE_URL exported. Scripts and logs are in the scratchpad's `OPS-15/` folder.
+- `corepack pnpm db:migrate`, run twice: the first run applied 67 migrations and the second applied 0 (ADR-035 ledger). `0079` was also replayed twice by hand with `psql -v ON_ERROR_STOP=1` over the migrated database, without error.
+- `corepack pnpm typecheck` passed.
+- `corepack pnpm build` passed.
+- `corepack pnpm audit --prod --audit-level=high` exited 0 (2 moderate, none high).
+- Foundation-policy greps (optional chains in `apps/web/src`, conflict markers, private keys): no matches. No frozen file or existing migration is touched.
+- `corepack pnpm -r --no-bail --workspace-concurrency=1 test`: **3199 of 3200 passed.**
+  - Every non-api package passed, including web 779 (13 new) and authorization (13 new).
+  - api: 1063 passed and 1 failed, with 8 files reported failed. All 9 failures were the shared-local-Postgres `out of shared memory` error. In 7 files it hit teardown only (`DROP SCHEMA`). In 1 test (institution-student-scope) it hit mid-run; that test does not touch this change.
+- Each of those 8 files was then re-run alone, per the brief, and all passed:
+  - documents 11/11
+  - employer-organisation-state 14/14
+  - institution-announcements 21/21
+  - institution-placement-visibility 15/15 (the first rerun hit the same teardown error again; the second passed cleanly)
+  - learner-goals 5/5 (same as above)
+  - operations-institution-onboarding 2/2
+  - operations-overview 9/9
+  - institution-student-scope 15/15
+- The new `access-reviews.integration.spec.ts` passed 22/22 in the full run.
+- external-reviews, operations-capabilities and operations-approvals (which cover the refactored revoke paths) passed, 74/74.
 
 **Acceptance criteria:**
 - ✔ **A reviewer cannot attest their own access.** The API refuses it with 403 `ACCESS_REVIEW_OWN_ACCESS`, for KEEP and REVOKE, whenever a second reviewer exists; the trigger refuses it too.

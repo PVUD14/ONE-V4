@@ -74,6 +74,16 @@ export function safeErrorMessage(code: string | undefined): string | undefined {
     case 'TEAM_LAST_OWNER': return 'Your last owner cannot be removed. Add another owner through ONE operations first.';
     case 'TEAM_EMAIL_INVALID': return 'Enter a valid email address.';
     case 'EMPLOYER_ORGANISATION_INACTIVE': return 'Your employer account is suspended or was not approved, so your team cannot be changed.';
+    case 'EMPLOYER_TERMS_NOT_ACCEPTED': return 'An owner of your organisation must accept the current employer terms in Settings before this job can be put in front of students. Jobs already live are not affected.';
+    case 'EMPLOYER_TERMS_VERSION_NOT_CURRENT': return 'These terms have been replaced by a newer version. Reload Settings to see the current terms.';
+    case 'EMPLOYER_TERMS_VERSION_EXISTS': return 'A terms version with that name already exists. Versions cannot be changed once published; choose a new version name.';
+    case 'EMPLOYER_TERMS_FIRST_VERSION_MUST_REQUIRE_ACCEPTANCE': return 'The first terms version must require acceptance.';
+    case 'EMPLOYER_TERMS_LEGAL_REFERENCE_REQUIRED': return 'A legally approved version needs a reference to who approved it.';
+    case 'TRUST_CASE_RESPONSE_NOT_REQUESTED': return 'AI8HT operations is not waiting for a response on this case.';
+    case 'TRUST_CASE_ALREADY_APPEALED': return 'This decision has already been appealed. Each decision can be appealed once.';
+    case 'TRUST_CASE_NOT_APPEALABLE': return 'This case has no decision to appeal.';
+    case 'TRUST_CASE_SUMMARY_REQUIRED': return 'Share a summary of the concern with the employer before asking them to respond.';
+    case 'TRUST_CASE_SUBJECT_NOT_EMPLOYER': return 'This case is not about an employer, so nothing can be shared with one.';
     case 'COMPANY_PROFILE_FIELD_OPERATIONS_CONTROLLED': return 'Your legal name, display name, website, address and contact email are managed by AI8HT operations. Contact operations to change them.';
     case 'COMPANY_PROFILE_CAREERS_URL_OFF_DOMAIN': return 'The careers page must be on your company website, or a subdomain of it.';
     case 'COMPANY_PROFILE_PAYMENT_DEMAND': return 'The description asks students to pay. ONE does not allow asking candidates for fees or deposits.';

@@ -1487,3 +1487,94 @@ It changes no existing table or migration.
 **Android:** no change, and nothing to compile. Faculty content review is a desk task (reading drafts, writing comments), like the operator screens §4.3 keeps web-only. The phone's institution workspace has home, verification and exams, and no Learning Resources screen; adding one would be a new navigation entry. The contract change is additive, as new endpoints only, so nothing the app calls changes.
 
 **Next goal:** OPS-12 (OPS-11 is already complete).
+
+## OPS-15 — Quarterly internal access reviews (Security) — 2026-09-29
+**Result:** Complete. A holder of `SECURITY_ACCESS_REVIEW` opens a review that freezes every standing internal access, keeps or revokes each item with a reason code, and closes it once every item is decided. A revocation takes effect in the same transaction and is audited with the campaign reference. Nobody attests their own access, except a solo operator's KEEP, which is marked SOLO. Each review exports as CSV evidence, and an overdue review is shown on the screen.
+
+**Branch / PR:** `feat/ops-access-reviews`, cut from `onev4/feat/plan-phases-0-to-2` (e472cef). The coordinator merges it. Commits, in order: design (41286e0), acceptance tests (10a4e9f), implementation (0535ae0), this report.
+
+**Files created:**
+- `docs/architecture/access-review-campaigns-table-design.md`, `docs/ops/sop-access-reviews.md`
+- `packages/persistence/drizzle/0079_access_review_campaigns.sql`
+- `packages/authorization/src/access-reviews.ts` (+ `.test.ts`): reviewer, decision and solo rules, the last-super-admin guard, the schedule and overdue rule, and reason codes.
+- `packages/persistence/src/access-reviews.ts`: the snapshot, decisions with revocation, close, export audit, and reads.
+- `apps/api/src/http/operations-access-reviews.controller.ts`, `apps/api/src/http/access-review-csv.ts`, `apps/api/src/http/access-reviews.integration.spec.ts`
+- `apps/web/src/api/accessReviews.ts`, `apps/web/src/rolePortal/accessReviews.tsx` (+ `.test.tsx`)
+
+**Files modified:**
+- `packages/persistence/src/platform-controls.ts`: `revokeInternalCapabilityWithin` factored out of `revokeInternalCapability`. The audit context can now carry `accessReview`. Behaviour is unchanged.
+- `packages/persistence/src/external-reviews.ts`: `revokeExternalReviewerWithin` factored out of `revokeExternalReviewer`, in the same way.
+- `packages/events/src/index.ts`: `access_review.opened`, `access_review.item_decided`, `access_review.closed`.
+- `packages/authorization/src/index.ts` (export) and `apps/api/src/app.module.ts` (controller registration; PG_POOL, like the staff controller).
+- `apps/web/src/api.ts` (export), `apps/web/src/rolePortal/shared.tsx` (safe messages for the new error codes).
+- `apps/web/src/rolePortalPages.tsx`: only the operations **Security** branch. It renders the privacy console and then Access reviews.
+- `docs/ops/sop-staff-capabilities.md` (G2 now points to the SOP) and `docs/uat/ONE_OPERATIONS_UAT_V1.md` (J11 now built).
+
+**Migrations added:** `0079_access_review_campaigns.sql`. It references only tables up to 0066.
+- Two tables:
+  - `access_review_campaigns`: DB-stamped UTC quarter, `opened_at`, and `due_at` = +30 days; one OPEN campaign at a time (partial unique index); closure columns set together.
+  - `access_review_items`: a frozen snapshot of kind, membership, subject, organisation, role, state, capability and grant id, capability set, high-risk flag, grantor, grant time and grant reason; one decision block; `solo`; `revocation_outcome`.
+- Functions `access_review_is_reviewer(uuid)` and `access_review_reviewer_count()`.
+- Guard triggers:
+  - items are inserted only in the transaction that opened the campaign;
+  - snapshot columns never change;
+  - an item is decided once, only while its campaign is OPEN, and only by a reviewer;
+  - a decision on your own item must be a solo KEEP, made while exactly one reviewer exists and at least 15 minutes after opening;
+  - a campaign closes only when no item is undecided;
+  - nothing is ever deleted.
+- The file is idempotent. See Validation.
+
+**Design docs / ADRs:** `access-review-campaigns-table-design.md` records the chosen designs and the rejected alternatives (live-table review, audit-only, one item per membership). No ADR was needed: this builds on ADR-032 and reuses OPS-02's solo pattern.
+
+**Validation:** in progress. Results will be amended below.
+
+**Acceptance criteria:**
+- ✔ **A reviewer cannot attest their own access.** The API refuses it with 403 `ACCESS_REVIEW_OWN_ACCESS`, for KEEP and REVOKE, whenever a second reviewer exists; the trigger refuses it too.
+  - Solo case: the only reviewer may KEEP their own access 15 minutes after opening. Before that the API returns 403 `ACCESS_REVIEW_SOLO_COOLING_OFF`.
+  - The decision is marked SOLO on the item, in the audit row (`mode: SOLO`), in the campaign counts and in the CSV `mode` column.
+  - The exception switches off as soon as a second reviewer exists (tested). Revoking your own access is never allowed.
+- ✔ **Revocations applied from a campaign appear in audit with the campaign reference.** Each revocation writes its own audit row, and every one carries `accessReview {campaignId, itemId, periodLabel, decisionReasonCode}`:
+  - internal grant: `operations.staff_capability.revoked`;
+  - faculty grant: `operations.external_reviewer.revoked`, plus `operations.external_review.revoked` for each closed assignment;
+  - platform role: `operations.staff_membership.suspended`, which lists the grants it revoked.
+
+  Every decision also writes `operations.access_review.item_decided`. The effect is immediate: a reviewer whose grant was revoked gets 403 on the next request.
+- ✔ **The CSV reproduces the campaign exactly.** The spec parses the export and compares every cell of every row with the campaign and items the API returns. The export is audited as `operations.access_review.exported`, with its row count and SHA-256, and the spec checks that the hash matches the file.
+- ✔ **A review lists every standing internal grant, with who granted it and when.**
+  - A role item shows the inviter of the accepted invitation, or NA when there is none.
+  - It excludes suspended memberships, revoked grants and college-granted `INSTITUTION_ANALYTICS`.
+- ✔ **Overdue reviews are visible.** The status tile and alert line show `NEVER_REVIEWED`, `REVIEW_OVERDUE` (3 months after the last close) and `CAMPAIGN_OVERDUE` (more than 30 days open). Each is tested in the API and on the web.
+- ✔ **§6.6 minimums.**
+  - API: 401; 403 for an operations admin without the grant, a college admin and faculty; 200 for security, super and granted operations admins; input 400s; 404; keyset pagination bounds (0/201/bad cursor); audit rows with reason codes; outbox rows; no user ids in responses.
+  - Web: real data, NA, loading, empty, error with reference, forbidden, reason-code dialogs (submit disabled until chosen), Close disabled while items are undecided, and navigation labels unchanged.
+
+**Decisions for Divakar (recommendations adopted):**
+- **Solo self-attestation.** OPS-02's pattern is reused: KEEP only, 15 minutes after the campaign opened, marked SOLO everywhere, and switching itself off. There is no email notice, because the SOLO mark is on the evidence itself.
+- **Revoking a platform role suspends the membership** (the existing registered `organization_membership.suspended` event) rather than ending it, so it can be reversed. The membership's internal grants are revoked with it. The last active super admin is protected (`ACCESS_REVIEW_LAST_SUPER_ADMIN`).
+- **The reviewer applies revocations with `SECURITY_ACCESS_REVIEW` alone**, without `CAPABILITY_ADMIN`. Removal is the safe direction, and the power is limited to an item in an open campaign, never oneself, and never a grant.
+- **Cadence:** 3 calendar months from the last close, with 30 days to finish a campaign. The period is the UTC calendar quarter of opening. More than one campaign per quarter is allowed, but only one can be open at a time.
+- **Scope:**
+  - Included: ACTIVE platform roles, internal grants, and faculty `CONTENT_REVIEW_EXTERNAL` grants (as OPS-10 asked).
+  - Excluded: `INSTITUTION_ANALYTICS`, which is the college's own delegation (the college's analytics screen already offers an `ACCESS_REVIEW` reason); and `operation_approvals`, which are not standing access (24 hours, single use, and already in audit with SOLO marks).
+- **The export carries staff and faculty emails and no student data.** It is audited with a hash. It is not treated as a §5.4 bulk personal-data export, so it has no dual control.
+- **Reason codes:**
+  - open: `QUARTERLY_REVIEW`, `AD_HOC_REVIEW`, `POST_INCIDENT_REVIEW`, `AUDIT_REQUEST`
+  - keep: `STILL_REQUIRED`, `ROLE_REQUIRES_IT`, `TEMPORARY_COVER_CONTINUES`
+  - revoke: `NO_LONGER_REQUIRED`, `LEAVER`, `EXCESSIVE_PRIVILEGE`, `UNRECOGNISED_GRANT`, `SECURITY_INCIDENT`
+  - close: `REVIEW_COMPLETE`
+  - export: `AUDIT_EVIDENCE`, `CERTIFICATION_EVIDENCE`, `INTERNAL_RECORD`
+
+  A revoked grant records `ACCESS_REVIEW_OUTCOME`, which is already in OPS-01's revoke list.
+
+**Limitations / not done:**
+- A suspended staff membership has no reactivation screen. Reactivating one is still a data change by engineering (sop-staff-capabilities G1).
+- The Overview (OPS-03) does not yet count overdue reviews. Overdue status is shown on Security.
+- No reminder is sent when a review falls due, because there is no email sender (HG-7).
+
+**Android:** no change, and nothing to compile. Access reviews are an operator screen, and Appendix 1 §4.3 keeps operator screens web-only. The phone's only operations calls are the read-only GET organizations and GET invitations, which are unchanged. The contract change is additive: new endpoints only.
+
+**Risks / follow-ups:**
+- `access_review_is_reviewer` mirrors the TypeScript baseline for `SECURITY_ACCESS_REVIEW`. An integration test pins the two together, so a baseline change must update both.
+- `docs/security/reviews/OPERATIONS-CONSOLE-SECURITY-REVIEW.md` should record this control when the console review is next updated.
+
+**Next goal:** OPS-16.

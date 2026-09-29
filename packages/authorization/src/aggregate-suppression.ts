@@ -90,6 +90,92 @@ export function suppressAggregateTable<K extends string>(
   };
 }
 
+/**
+ * A sum over some cells of a suppressed table (a funnel value such as "reached shortlist or
+ * further"), published only when it reveals nothing the table withheld: every cell in it is
+ * published, or the total and every cell outside it are (then it was derivable anyway).
+ * Otherwise withheld. Under the threshold it is withheld like any count (INST-12).
+ */
+export function publishedSubtotal<K extends string>(table: SuppressedAggregateTable<K>, keys: readonly K[], threshold: number = aggregateSuppressionThreshold): SuppressedCount {
+  if (table.suppressed) return { suppressed: true, value: null };
+  const inside = table.cells.filter((cell) => keys.includes(cell.key));
+  const outside = table.cells.filter((cell) => !keys.includes(cell.key));
+  let value: number | null = null;
+  if (inside.every((cell) => !cell.suppressed)) value = inside.reduce((sum, cell) => sum + (cell.count ?? 0), 0);
+  else if (!table.total.suppressed && outside.every((cell) => !cell.suppressed)) {
+    value = (table.total.value ?? 0) - outside.reduce((sum, cell) => sum + (cell.count ?? 0), 0);
+  }
+  return value === null ? { suppressed: true, value: null } : suppressSmallCount(value, threshold);
+}
+
+export interface AggregateGroup<G extends string, K extends string> {
+  readonly key: G;
+  /** Every stage, zero counts included; the cells partition the group. */
+  readonly cells: readonly AggregateCell<K>[];
+}
+
+export interface SuppressedGroupedPartition<G extends string, K extends string> {
+  readonly groups: readonly { readonly key: G; readonly table: SuppressedAggregateTable<K> }[];
+  /** The column totals and grand total over every group. */
+  readonly overall: SuppressedAggregateTable<K>;
+}
+
+/**
+ * Suppress a two-way table — groups (rows) by a partition (columns) — with its row totals,
+ * column totals and grand total, every one of which can be subtracted from (INST-12):
+ *
+ *   cells and row totals → each group through `suppressAggregateTable`
+ *   column total         → withheld under the threshold, or when that column's withheld
+ *                           cells across groups hold 1–4 people (subtraction would recover them)
+ *   grand total          → withheld under the threshold, or when the people hidden behind
+ *                           withheld row totals, or behind withheld column totals, number 1–4
+ *
+ * The groups must partition the population and every group must list every column key.
+ * This protects each margin; it is not a full linear audit (see the placement register design).
+ */
+export function suppressGroupedPartition<G extends string, K extends string>(
+  groups: readonly AggregateGroup<G, K>[],
+  keys: readonly K[],
+  threshold: number = aggregateSuppressionThreshold,
+): SuppressedGroupedPartition<G, K> {
+  const risky = (hidden: number) => hidden > 0 && hidden < threshold;
+  const suppressedGroups = groups.map((group) => {
+    const cellKeys = group.cells.map((cell) => cell.key);
+    if (cellKeys.length !== keys.length || keys.some((key) => !cellKeys.includes(key))) throw new RangeError('every group must list every key');
+    return { key: group.key, table: suppressAggregateTable(group.cells, threshold), raw: group.cells };
+  });
+  const columnValue = new Map<K, number>(keys.map((key) => [key, 0]));
+  const columnHidden = new Map<K, number>(keys.map((key) => [key, 0]));
+  let rowHidden = 0;
+  for (const group of suppressedGroups) {
+    let hiddenInRow = 0;
+    for (const cell of group.raw) {
+      columnValue.set(cell.key, (columnValue.get(cell.key) ?? 0) + cell.count);
+      const published = group.table.cells.find((entry) => entry.key === cell.key);
+      if (!published || published.suppressed) {
+        columnHidden.set(cell.key, (columnHidden.get(cell.key) ?? 0) + cell.count);
+        hiddenInRow += cell.count;
+      }
+    }
+    if (group.table.total.suppressed) rowHidden += hiddenInRow;
+  }
+  const total = [...columnValue.values()].reduce((sum, value) => sum + value, 0);
+  const cells = keys.map((key) => {
+    const value = columnValue.get(key) ?? 0;
+    const withheld = value < threshold || risky(columnHidden.get(key) ?? 0);
+    return { key, count: withheld ? null : value, suppressed: withheld };
+  });
+  const hiddenBehindColumns = cells.filter((cell) => cell.suppressed).reduce((sum, cell) => sum + (columnHidden.get(cell.key) ?? 0), 0);
+  const overall: SuppressedAggregateTable<K> = total < threshold
+    ? { suppressed: true, total: { suppressed: true, value: null }, cells: [] }
+    : {
+      suppressed: false,
+      total: risky(rowHidden) || risky(hiddenBehindColumns) ? { suppressed: true, value: null } : { suppressed: false, value: total },
+      cells,
+    };
+  return { groups: suppressedGroups.map(({ key, table }) => ({ key, table })), overall };
+}
+
 const isoDatePattern = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 /**

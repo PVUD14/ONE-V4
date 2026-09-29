@@ -47,6 +47,7 @@ import { lockEmployerForWrite } from './interview-scheduling.js';
 import { institutionStaffScopeMemberships, institutionStudentScopeFor, institutionStudentWriteScopeFor } from './institution-student-scope.js';
 import { isoOrNull } from './campus-drives.js';
 import { recordNotification } from './notify.js';
+import { loadDriveCategories } from './institution-placement-register.controller.js';
 
 type Executor = Pick<PersistenceDb, 'execute'>;
 type QueryResult<T> = { rows: T[] };
@@ -540,8 +541,10 @@ export class InstitutionCampusDrivesController {
     `) as QueryResult<Record<string, unknown>>;
     const page = rows.rows.slice(0, size);
     const last = page.at(-1);
+    // INST-12: the college's own category label, college side only (never shown to employers or students).
+    const categories = await loadDriveCategories(this.db, id, page.map((row) => String(row.id)));
     return {
-      drives: page.map((row) => mapDrive(row, 'INSTITUTION', canDecide)),
+      drives: page.map((row) => ({ ...mapDrive(row, 'INSTITUTION', canDecide), category: categories.get(String(row.id)) ?? null })),
       canDecide,
       nextCursor: rows.rows.length > size && last ? Buffer.from(`${String(last.cursor_at)}|${String(last.id)}`).toString('base64url') : null,
       correlationId: context.correlationId,

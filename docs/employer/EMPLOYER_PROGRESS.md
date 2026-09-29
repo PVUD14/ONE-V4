@@ -634,6 +634,7 @@ Every write:
 - a3e35c6: API
 - 5423057: web and help text
 - 47840df: Android
+- 83ab5f5: typing and help-text fix found by the validation run
 - then this report
 
 **Files created:**
@@ -673,7 +674,24 @@ Every write:
   - reports are audited as `employer.reports.viewed` against the employer.
 - `GET /institutions/:i/campus-drives/:d/results`: the counts now cover only applications the student shared with the college.
 
-**Validation:** fresh database one_emp15, with only DATABASE_URL exported. Results pending; they follow in the amendment below.
+**Validation:** only DATABASE_URL was exported.
+- **Database.** The run used one_emp15b. The first attempt's `DROP DATABASE one_emp15` stalled behind a checkpoint on the shared container, as happened during EMP-SR-01. The first `corepack pnpm db:migrate` applied 64 and created the ledger; the second applied 0.
+- **`corepack pnpm typecheck`:** passed. The first full run failed it on two things, both fixed in 83ab5f5:
+  - the report row types (strict casting);
+  - an unescaped apostrophe in the help article.
+
+  Neither changed behaviour or an assertion.
+- **`corepack pnpm -r --no-bail --workspace-concurrency=1 test`:** every package passed except web.
+  - api: 65 files, 1,035 tests, all passed. This includes employer-reports.integration.spec.ts 5/5, employer-reports.test.ts 9/9 and campus-drives.integration.spec.ts 8/8.
+  - web: 1 of 753 failed. `App.test.tsx › resolves every visible navigation item for every new role without disabled nav` hit its 20 s timeout under load.
+  - Re-runs: App.test.tsx alone passed 97/97, and the whole web package re-run alone passed 64 files, 753/753.
+- **`corepack pnpm build`:** passed.
+- **CI parity:**
+  - `corepack pnpm audit --prod --audit-level=high` exited 0, with 2 moderate advisories and no high or critical ones;
+  - the optional-chain policy grep printed nothing;
+  - the diff has no private-key blocks or merge markers;
+  - no frozen file and no migration was touched.
+- **Android:** `./gradlew --no-daemon -q :app:compileDebugKotlin` with the Android Studio JBR passed.
 
 **Acceptance criteria:**
 - [x] Build 1, the summary: open jobs, new applicants in 7 days, interviews this week, offers pending and drives awaiting approval, computed in SQL. It also carries the current stage counts, open applications, hires, changes-requested drives and the week window. Test: `gives the dashboard summary in SQL, matching the applicant, interview, offer and drive lists`.

@@ -304,7 +304,7 @@ describe('declaring an incident', () => {
     const seen = new Set<string>();
     let cursor: string | null = null;
     for (let page = 0; page < 50; page += 1) {
-      const response = await api().get(base + '?view=ALL&limit=1' + (cursor ? '&cursor=' + cursor : '')).set(auth(security.userId)).expect(200);
+      const response: request.Response = await api().get(base + '?view=ALL&limit=1' + (cursor ? '&cursor=' + cursor : '')).set(auth(security.userId)).expect(200);
       for (const incident of response.body.incidents) { expect(seen.has(incident.id)).toBe(false); seen.add(incident.id); }
       cursor = response.body.nextCursor;
       if (!cursor) break;

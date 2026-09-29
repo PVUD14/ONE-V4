@@ -94,14 +94,61 @@ fun candidateLabel(name: String?, consentRevoked: Boolean, candidateAccess: Bool
     else -> name ?: "Candidate"
 }
 
-@Serializable data class HiringAnalyticsDto(
-    val opportunitiesOpen: Int = 0,
+/**
+ * EMP-15: the Dashboard's figures, computed by the server in one read. Each is a count of rows the
+ * employer's own lists already show, so they are exact; `null` in the app means "could not be
+ * read" and every slot then reads NA.
+ */
+@Serializable data class EmployerSummaryEnvelope(val summary: EmployerSummaryDto)
+@Serializable data class EmployerSummaryDto(
+    val openJobs: Int = 0,
+    val newApplicantsLast7Days: Int = 0,
+    val interviewsThisWeek: Int = 0,
+    val offersPending: Int = 0,
+    val drivesAwaitingApproval: Int = 0,
+    val drivesChangesRequested: Int = 0,
     val applicationsTotal: Int = 0,
-    val shortlisted: Int = 0,
-    val interviewsScheduled: Int = 0,
-    val offersExtended: Int = 0,
-    val offersAccepted: Int = 0,
+    val openApplications: Int = 0,
+    val hires: Int = 0,
+    val currentStages: Map<String, Int> = emptyMap(),
 )
+
+/**
+ * EMP-15 reports. Figures about people arrive already suppressed: a withheld one has no value and
+ * reads "<5"; a withheld total reads "Withheld". The app never adds withheld cells together.
+ */
+@Serializable data class ReportCountDto(val suppressed: Boolean = true, val value: Int? = null)
+@Serializable data class ReportCellDto(val key: String, val count: Int? = null, val suppressed: Boolean = true)
+@Serializable data class ReportTableDto(
+    val suppressed: Boolean = true,
+    val total: ReportCountDto = ReportCountDto(),
+    val cells: List<ReportCellDto> = emptyList(),
+)
+@Serializable data class ReportJobDto(val opportunityId: String, val referenceCode: String? = null, val title: String? = null, val table: ReportTableDto = ReportTableDto())
+@Serializable data class ReportCollegeDto(val collegeName: String? = null, val table: ReportTableDto = ReportTableDto())
+@Serializable data class ReportDriveDto(val driveId: String, val opportunityTitle: String? = null, val institutionName: String = "", val state: String = "", val table: ReportTableDto = ReportTableDto())
+@Serializable data class ReportDurationDto(val metric: String, val applications: ReportCountDto = ReportCountDto(), val medianDays: Double? = null)
+@Serializable data class ReportOffersDto(val table: ReportTableDto = ReportTableDto(), val acceptanceRate: Double? = null)
+@Serializable data class EmployerReportsDto(
+    val threshold: Int = 5,
+    val overall: ReportTableDto = ReportTableDto(),
+    val byJob: List<ReportJobDto> = emptyList(),
+    val byCollege: List<ReportCollegeDto> = emptyList(),
+    val byDrive: List<ReportDriveDto> = emptyList(),
+    val timeToStage: List<ReportDurationDto> = emptyList(),
+    val offers: ReportOffersDto = ReportOffersDto(),
+)
+@Serializable data class EmployerReportsEnvelope(val reports: EmployerReportsDto)
+
+/** A report figure as it is shown: the value, or "<5" when withheld. */
+fun ReportCountDto.label(): String = if (suppressed || value == null) "<5" else value.toString()
+fun ReportTableDto.totalLabel(): String = when {
+    suppressed -> "<5"
+    total.suppressed || total.value == null -> "Withheld"
+    else -> total.value.toString()
+}
+fun ReportTableDto.cellLabel(key: String): String = cells.firstOrNull { it.key == key }
+    ?.let { if (it.suppressed || it.count == null) "<5" else it.count.toString() } ?: "<5"
 
 /**
  * Move an application to the next stage.
@@ -196,5 +243,8 @@ suspend fun Api.withdrawOffer(context: Context, employerId: String, offerId: Str
     )
 }
 
-suspend fun Api.hiringAnalytics(context: Context, employerId: String): HiringAnalyticsDto =
-    json.decodeFromString(request(context, "GET", "/api/v1/employers/$employerId/hiring-analytics"))
+suspend fun Api.employerSummary(context: Context, employerId: String): EmployerSummaryDto =
+    json.decodeFromString<EmployerSummaryEnvelope>(request(context, "GET", "/api/v1/employers/$employerId/summary")).summary
+
+suspend fun Api.employerReports(context: Context, employerId: String): EmployerReportsDto =
+    json.decodeFromString<EmployerReportsEnvelope>(request(context, "GET", "/api/v1/employers/$employerId/reports")).reports

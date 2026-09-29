@@ -760,6 +760,8 @@ internal fun EmployerScaffold(
     var tab by remember { mutableStateOf(0) }
     var roles by remember { mutableStateOf<List<EmployerOpportunityDto>?>(null) }
     var applicants by remember { mutableStateOf<List<EmployerApplicantDto>>(emptyList()) }
+    // EMP-15: the server's summary; null when it could not be read, and every figure reads NA.
+    var summary by remember { mutableStateOf<EmployerSummaryDto?>(null) }
     var inbox by remember { mutableStateOf<NotificationsEnvelope?>(null) }
     var showInboxOv by remember { mutableStateOf(false) }
     var showChatOv by remember { mutableStateOf(false) }
@@ -777,11 +779,13 @@ internal fun EmployerScaffold(
             val s = async { runCatching { Api.employerOrganisationStatus(context, organizationId) }.getOrNull() }
             val r = async { runCatching { Api.listEmployerOpportunities(context, organizationId) }.getOrDefault(emptyList()) }
             val n = async { runCatching { Api.listNotifications(context) }.getOrNull() }
+            val m = async { runCatching { Api.employerSummary(context, organizationId) }.getOrNull() }
             orgStatus = s.await()
             val loadedRoles = r.await()
             val loadedApplicants = loadedRoles.filter { it.applicationCount > 0 }.take(4).flatMap { role ->
                 runCatching { Api.listEmployerApplicants(context, organizationId, role.id) }.getOrDefault(emptyList())
             }
+            summary = m.await()
             roles = loadedRoles; applicants = loadedApplicants; inbox = n.await()
         }
     }
@@ -836,7 +840,7 @@ internal fun EmployerScaffold(
             return
         }
         EmployerOverlay.Analytics -> {
-            SlideIn { HiringAnalyticsPage(organizationId, onClose = { employerOverlay = null }) }
+            SlideIn { EmployerReportsPage(organizationId, onClose = { employerOverlay = null }) }
             return
         }
         EmployerOverlay.Team -> {
@@ -908,6 +912,7 @@ internal fun EmployerScaffold(
                             if (awaitingVerification) EmployerVerificationNotice()
                             EmployerHome(
                                 roles = roles!!,
+                                summary = summary,
                                 applicants = applicants,
                                 onRoles = { tab = 1 },
                                 onOpenOverlay = { employerOverlay = it },
@@ -931,44 +936,54 @@ internal fun EmployerScaffold(
 @Composable
 private fun EmployerHome(
     roles: List<EmployerOpportunityDto>,
+    summary: EmployerSummaryDto?,
     applicants: List<EmployerApplicantDto>,
     onRoles: () -> Unit,
     onOpenOverlay: (EmployerOverlay) -> Unit,
     onOpenApplicant: (EmployerApplicantDto) -> Unit,
 ) {
-    val published = roles.count { it.lifecycleState == "PUBLISHED" }
-    val applications = roles.sumOf { it.applicationCount }
-    val open = roles.sumOf { it.openApplicationCount }
-    fun stage(needle: String) = applicants.count { it.state.contains(needle) }
-    val offers = applicants.count { it.offerState != null }
+    // EMP-15: every figure is the server's summary (the same one the web Dashboard shows), not a
+    // count of the first few roles' applicants; NA in each slot when it could not be read.
+    fun figure(value: Int?): String = if (summary == null || value == null) "NA" else "$value"
+    fun stage(key: String): Int? = summary?.let { it.currentStages[key] ?: 0 }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp)) {
         Spacer(Modifier.height(12.dp))
+        if (summary == null) {
+            Text("Your hiring figures could not be loaded, so they read NA.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(8.dp))
+        }
         // Pilot KPI rows - all real.
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            StatCell("$published", "Open Roles", Tone.Violet, Icons.Filled.WorkOutline, Modifier.weight(1f))
-            StatCell("$applications", "Total Applicants", Tone.Accent, Icons.Filled.School, Modifier.weight(1f))
+            StatCell(figure(summary?.openJobs), "Open Roles", Tone.Violet, Icons.Filled.WorkOutline, Modifier.weight(1f))
+            StatCell(figure(summary?.applicationsTotal), "Total Applicants", Tone.Accent, Icons.Filled.School, Modifier.weight(1f))
         }
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            StatCell("$open", "In Pipeline", Tone.Amber, Icons.Filled.Notifications, Modifier.weight(1f))
-            StatCell("$offers", "Offers", Tone.Green, Icons.Filled.WorkOutline, Modifier.weight(1f))
+            StatCell(figure(summary?.openApplications), "In Pipeline", Tone.Amber, Icons.Filled.Notifications, Modifier.weight(1f))
+            StatCell(figure(summary?.offersPending), "Offers awaiting answer", Tone.Green, Icons.Filled.WorkOutline, Modifier.weight(1f))
+        }
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            StatCell(figure(summary?.newApplicantsLast7Days), "New in 7 days", Tone.Accent, Icons.Filled.School, Modifier.weight(1f))
+            StatCell(figure(summary?.drivesAwaitingApproval), "Drives awaiting colleges", Tone.Violet, Icons.Filled.WorkOutline, Modifier.weight(1f))
         }
 
-        // Pilot: Hiring Funnel - real stage counts.
+        // Pilot: Hiring Funnel - where applications are now.
         SectionTitle("Hiring Funnel")
         PilotCard {
             Column(Modifier.padding(14.dp)) {
-                val max = applications.coerceAtLeast(1)
-                FunnelRow("Applied", applications, max)
-                FunnelRow("Shortlisted", stage("SHORTLIST"), max)
+                val max = (summary?.applicationsTotal ?: 0).coerceAtLeast(1)
+                FunnelRow("Applied", summary?.applicationsTotal, max)
+                FunnelRow("Shortlisted", stage("SHORTLISTED"), max)
                 FunnelRow("Interview", stage("INTERVIEW"), max)
-                FunnelRow("Offer", offers, max)
-                FunnelRow("Hired", stage("HIRED"), max)
+                FunnelRow("Offer", stage("OFFER"), max)
+                FunnelRow("Hired", summary?.hires, max)
             }
         }
 
-        // Pilot: This Week's Interviews - NA until a calendar engine exists.
-        SectionTitle("This Week's Interviews")
+        // Pilot: This Week's Interviews - the server's count for this week (Asia/Kolkata).
+        SectionTitle("This Week's Interviews", trailing = summary?.let { "${it.interviewsThisWeek} this week" } ?: "NA")
         PilotCard {
             Column(Modifier.padding(14.dp)) {
                 Text("Interviews you are on the panel for, with their scorecards.",
@@ -980,7 +995,8 @@ private fun EmployerHome(
                     // EMP-09: every interview, its history and its scorecards, read-only.
                     TextButton(onClick = { onOpenOverlay(EmployerOverlay.Interviews) }) { Text("Interviews") }
                     TextButton(onClick = { onOpenOverlay(EmployerOverlay.Offers) }) { Text("Offers") }
-                    TextButton(onClick = { onOpenOverlay(EmployerOverlay.Analytics) }) { Text("Hiring") }
+                    // EMP-15: the same suppressed reports as the web's Reports.
+                    TextButton(onClick = { onOpenOverlay(EmployerOverlay.Analytics) }) { Text("Reports") }
                 }
             }
         }

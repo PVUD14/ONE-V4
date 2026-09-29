@@ -37,8 +37,11 @@ export type LearningAttemptContext = (typeof learningAttemptContexts)[number];
 export const learningSessionModes = ['LEARN', 'PRACTICE', 'REVIEW', 'ASSESSMENT', 'EXPLORE', 'DIAGNOSTIC'] as const;
 export type LearningSessionMode = (typeof learningSessionModes)[number];
 export type LearningItemSource = 'CAREER_READINESS_QUESTION' | 'INSTITUTION_EXAM_QUESTION';
-/** placement_test (0064): the source of the placement test's DIAGNOSTIC attempts (ENG-14). */
-export type LearningSourceAttemptType = 'assessment_attempt' | 'exam_attempt' | 'placement_test';
+/**
+ * placement_test (0064): the source of the placement test's DIAGNOSTIC attempts (ENG-14).
+ * learning_step (0072): a practice or review step the student takes on a planner decision (ENG-18).
+ */
+export type LearningSourceAttemptType = 'assessment_attempt' | 'exam_attempt' | 'placement_test' | 'learning_step';
 
 /** The assisted rule lives in learning-model (ENG-04); re-exported so existing imports keep working. */
 export { ASSISTED_HINT_LEVEL, MAX_HINT_LEVEL };

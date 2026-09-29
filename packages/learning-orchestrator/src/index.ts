@@ -693,3 +693,6 @@ export function replayDecision(stored: StoredDecision): ReplayResult {
   const { policyVersion: _policy, ...comparable } = recomputed;
   return { status: canonicalJson(comparable) === canonicalJson(stored.decision) ? 'MATCHED' : 'MISMATCHED', recomputed };
 }
+
+// The skip / review / learn grouping of the student's path (ENG-18).
+export * from './path-groups.js';

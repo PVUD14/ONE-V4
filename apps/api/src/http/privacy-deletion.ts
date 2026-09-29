@@ -188,6 +188,8 @@ async function erase(deps: DeletionExecutionDeps, subjectUserId: string): Promis
     await tx.execute(sql`SELECT set_config('one.privacy_erase_subject', ${subjectUserId}, true)`);
     const removed = async (query: ReturnType<typeof sql>): Promise<number> =>
       Number(((await tx.execute(query)) as QueryResult<{ count: number }>).rows[0]?.count ?? 0);
+    // Practice questions served on steps (ENG-18, 0072) reference decisions, sessions and questions: first.
+    const stepItems = await removed(sql`WITH gone AS (DELETE FROM learning_step_items WHERE subject_user_id = ${subjectUserId}::uuid RETURNING 1) SELECT count(*)::int AS count FROM gone`);
     const attempts = await removed(sql`WITH gone AS (DELETE FROM learning_attempt_events WHERE subject_user_id = ${subjectUserId}::uuid RETURNING 1) SELECT count(*)::int AS count FROM gone`);
     // Placement sittings (ENG-14, 0064): served items, then sittings, before the sessions they reference.
     const placementItems = await removed(sql`WITH gone AS (DELETE FROM placement_test_items WHERE subject_user_id = ${subjectUserId}::uuid RETURNING 1) SELECT count(*)::int AS count FROM gone`);
@@ -199,7 +201,7 @@ async function erase(deps: DeletionExecutionDeps, subjectUserId: string): Promis
     // Deletion triggers a rebuild of the skill state projection (ENG-05). With the facts gone the
     // rebuild is the empty set, so every projection row of the subject is removed here.
     const projection = await projectSubjectSkillState(tx, subjectUserId);
-    return attempts + placementItems + placementTests + sessions + activity + decisions + projection.deleted;
+    return stepItems + attempts + placementItems + placementTests + sessions + activity + decisions + projection.deleted;
   });
 
   // Institution roster history survives, with the person removed from it.

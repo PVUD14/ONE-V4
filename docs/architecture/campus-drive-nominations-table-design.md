@@ -80,7 +80,7 @@ commit, best-effort (as EMP-11 does), and carries no student data beyond their o
 | `application_id` | FK `(application_id, opportunity_id)` → `applications(id, opportunity_id)`; set exactly when `ACCEPTED` or `WITHDRAWN`. |
 | `responded_at` | set by the student's first answer and every later one. |
 | `cancelled_by_user_id`, `cancelled_at`, `cancel_reason_code` | set exactly when `CANCELLED` (the college withdraws a nomination the student has not accepted). |
-| `revision` | ≥ 1, bumped on every change; college writes name the revision they read (409 otherwise). |
+| `revision` | ≥ 1, bumped on every **college** change; college writes name the revision they read (409 otherwise). A student's answer does not bump it, so the college cannot read an answer — or a decline — from the revision. |
 | `created_at`, `updated_at` | |
 
 Constraints and triggers:

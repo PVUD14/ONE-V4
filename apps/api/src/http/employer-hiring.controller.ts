@@ -300,7 +300,10 @@ export class EmployerHiringController {
                AND t.acknowledged_at IS NULL AND t.declined_at IS NULL) AS terms_pending,
              ev.eligible AS eligibility_eligible, ev.outcomes AS eligibility_outcomes, ev.flag_count AS eligibility_flag_count,
              ev.self_reported_count AS eligibility_self_reported_count, ev.evaluated_at AS eligibility_evaluated_at,
-             ev.trigger AS eligibility_trigger, ev.version_number AS eligibility_version_number
+             ev.trigger AS eligibility_trigger, ev.version_number AS eligibility_version_number,
+             -- INST-14: the student opted in to their college's nomination. Only the fact of the
+             -- application's source; nothing about nominations the student did not accept.
+             EXISTS (SELECT 1 FROM campus_drive_nominations nom WHERE nom.application_id = a.id) AS nominated
       FROM applications a
       JOIN users u ON u.id = a.student_user_id
       LEFT JOIN institution_student_profiles isp ON isp.student_user_id = a.student_user_id AND isp.status = 'ACTIVE'
@@ -1280,6 +1283,8 @@ function mapApplicantRow(row: Record<string, unknown>): Record<string, unknown> 
     // EMP-05: the job's terms changed after they applied and they have not accepted yet.
     termsAcknowledgementPending: row.terms_pending === true,
     eligibility: mapApplicantEligibility(row),
+    // INST-14: "Nominated by placement office" when the student opted in to a nomination.
+    source: row.nominated === true ? 'PLACEMENT_OFFICE_NOMINATION' : 'DIRECT',
     updatedAt: row.updated_at,
   };
 }

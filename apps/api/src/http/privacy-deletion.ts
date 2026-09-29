@@ -221,6 +221,16 @@ async function erase(deps: DeletionExecutionDeps, subjectUserId: string): Promis
     WITH gone AS (DELETE FROM counselling_case_participants WHERE student_user_id = ${subjectUserId}::uuid RETURNING 1)
     SELECT count(*)::int AS count FROM gone`);
 
+  // Nominations the person never accepted (INST-14, 0080) are only about them: erased. Accepted and
+  // withdrawn ones stay with the application they produced, which is anonymised with APPLICATIONS,
+  // and are counted there. The 0080 guard allows DELETE only inside this transaction-local setting.
+  counts.APPLICATIONS = (counts.APPLICATIONS ?? 0) + await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT set_config('one.privacy_erase_subject', ${subjectUserId}, true)`);
+    const gone = await tx.execute(sql`WITH gone AS (DELETE FROM campus_drive_nominations WHERE student_user_id = ${subjectUserId}::uuid AND application_id IS NULL RETURNING 1)
+      SELECT count(*)::int AS count FROM gone`) as QueryResult<{ count: number }>;
+    return Number(gone.rows[0]?.count ?? 0);
+  });
+
   // Support cases (OPS-05) keep the service record and lose the person: the subject
   // link, the typed summary and every note on those cases.
   counts.SUPPORT_CASES = await detachSupportCasesForDeletedUser(db, subjectUserId);

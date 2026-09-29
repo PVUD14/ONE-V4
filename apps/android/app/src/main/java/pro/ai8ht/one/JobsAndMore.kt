@@ -837,6 +837,8 @@ internal fun ProfilePage(
                     }
                 }
             }
+            // INST-13: tell a college what you did after graduating (counted only, never named).
+            StudentOutcomesSection()
             Spacer(Modifier.height(16.dp))
             Button(onClick = onEdit, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp)) {
                 Text("Edit profile")

@@ -73,8 +73,8 @@ needs an approval ([sop-approvals.md](sop-approvals.md)).
 
 - **G1 — Creating, changing or ending a platform staff membership has no screen or endpoint.**
   Today it is a data change by engineering. `changeMembershipRole` exists in persistence only.
-- **G2 — Quarterly access review** (J11) is OPS-15; not in this slice. Until then, review the
-  *Staff and capabilities* table by hand each quarter and record the outcome as a support case.
+- **G2 — Quarterly access review** (J11) is built by OPS-15: see
+  [sop-access-reviews.md](sop-access-reviews.md).
 - **G3 — Staff sign-in with MFA** is not live; see [sop-staff-access.md](sop-staff-access.md).
 
 ## UAT

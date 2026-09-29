@@ -52,7 +52,7 @@ personas are created once by a seed run by engineering in the UAT environment.
 | J8 | Publish a new version of a role's requirements | **Not in this slice** (OPS-08) | — |
 | J9 | Faculty reviewer approves AI-drafted questions | **Not in this slice** (OPS-10; AI hold) | — |
 | J10 | Turn off all AI features in an incident | **Not in this slice** (OPS-12) | — |
-| J11 | Quarterly access review | **Not in this slice** (OPS-15) | — |
+| J11 | Quarterly access review | Built (OPS-15) | [sop-access-reviews](../ops/sop-access-reviews.md) |
 | J12 | Personal-data breach drill | **Not in this slice** (OPS-16); the runbook exists | [runbook-breach-response](../ops/runbook-breach-response.md) |
 | O-2 | Employer access request decided (supplementary) | In slice | [sop-organizations](../ops/sop-organizations.md) |
 | O-3 | Solo-operator safeguard (supplementary) | In slice | [sop-approvals](../ops/sop-approvals.md) |

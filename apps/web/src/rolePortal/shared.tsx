@@ -110,6 +110,13 @@ export function safeErrorMessage(code: string | undefined): string | undefined {
     // INST-SR-02: permanent record changes need a department (heads) or a teaching assignment (faculty).
     case 'SCOPE_REQUIRED': return 'You can view these records, but confirming or uploading results needs a department or teaching assignment on your account. Ask your institution administrator to assign one.';
     // OPS-02: dual control for high-risk actions.
+    case 'ACCESS_REVIEW_OWN_ACCESS': return 'You cannot attest your own access. Another reviewer must decide this item.';
+    case 'ACCESS_REVIEW_SOLO_COOLING_OFF': return 'As the only reviewer you may keep your own access 15 minutes after the review opened.';
+    case 'ACCESS_REVIEW_LAST_SUPER_ADMIN': return 'This is the last active super admin; a review cannot suspend it.';
+    case 'ACCESS_REVIEW_ALREADY_OPEN': return 'An access review is already open. Finish it before opening another.';
+    case 'ACCESS_REVIEW_ALREADY_DECIDED': return 'This item has already been decided.';
+    case 'ACCESS_REVIEW_NOT_OPEN': return 'This access review is closed.';
+    case 'ACCESS_REVIEW_UNDECIDED_ITEMS': return 'Every item must be decided before the review can close.';
     case 'APPROVAL_REQUIRED': return 'This is a high-risk action: it needs an approval from a second person first.';
     case 'APPROVAL_NOT_APPROVED': return 'This request has not been approved, or its approval was already used.';
     case 'APPROVAL_EXPIRED': return 'This approval has expired. File a new request.';

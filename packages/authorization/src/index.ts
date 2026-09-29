@@ -126,3 +126,4 @@ export * from './institution-exports.js';
 export * from './role-demand.js';
 export * from './placement-status.js';
 export * from './relationship-lifecycle.js';
+export * from './access-reviews.js';

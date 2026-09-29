@@ -400,12 +400,22 @@ async function inCapabilityTransaction<T>(
   }
 }
 
-async function writeCapabilityAuditAndOutbox(
-  client: PoolClient,
-  input: InternalCapabilityChangeInput & {
-    readonly target: PlatformStaffMember; readonly kind: 'granted' | 'revoked'; readonly approval?: Record<string, unknown> | undefined;
-  },
-): Promise<void> {
+/** What the capability audit row and outbox event need; shared with the access review (OPS-15). */
+interface CapabilityAuditInput {
+  readonly membershipId: string;
+  readonly capability: string;
+  readonly actorUserId: string;
+  readonly reasonCode: string;
+  readonly note?: string | undefined;
+  readonly correlationId: string;
+  readonly target: { readonly organizationId: string; readonly userId: string; readonly role: string };
+  readonly kind: 'granted' | 'revoked';
+  readonly approval?: Record<string, unknown> | undefined;
+  /** OPS-15: the campaign and item a revocation was applied from. */
+  readonly accessReview?: Record<string, unknown> | undefined;
+}
+
+async function writeCapabilityAuditAndOutbox(client: PoolClient, input: CapabilityAuditInput): Promise<void> {
   const audit = {
     id: randomUUID(),
     actorUserId: input.actorUserId,
@@ -421,6 +431,7 @@ async function writeCapabilityAuditAndOutbox(
       targetRole: input.target.role,
       ...(input.note ? { note: input.note } : {}),
       ...(input.approval ? { approval: input.approval } : {}),
+      ...(input.accessReview ? { accessReview: input.accessReview } : {}),
     },
   };
   validateAuditWriteInput(audit);
@@ -478,15 +489,25 @@ export async function grantInternalCapability(pool: Pool, input: InternalCapabil
 /** Revoke a live internal grant, recording why, with its audit row and outbox event. */
 export async function revokeInternalCapability(pool: Pool, input: InternalCapabilityChangeInput): Promise<PlatformStaffMember> {
   return inCapabilityTransaction(pool, input, async (client, target) => {
-    const result = await client.query(
-      `UPDATE membership_capabilities SET revoked_by_user_id=$3, revoked_at=now(), revoked_reason_code=$4
-       WHERE membership_id=$1 AND capability=$2 AND revoked_at IS NULL`,
-      [input.membershipId, input.capability, input.actorUserId, input.reasonCode],
-    );
-    if (!result.rowCount) throw new PlatformControlError('CAPABILITY_NOT_GRANTED');
-    await writeCapabilityAuditAndOutbox(client, { ...input, target, kind: 'revoked' });
+    if (!await revokeInternalCapabilityWithin(client, { ...input, target })) throw new PlatformControlError('CAPABILITY_NOT_GRANTED');
     return (await loadStaffMember(client, input.membershipId, false))!;
   });
+}
+
+/**
+ * The revocation itself — the grant row, its audit row and its outbox event — inside a
+ * transaction the caller owns. Shared by the Settings screen and the access review
+ * (OPS-15), so the two cannot drift apart. Returns false when no live grant exists.
+ */
+export async function revokeInternalCapabilityWithin(client: PoolClient, input: Omit<CapabilityAuditInput, 'kind' | 'approval'>): Promise<boolean> {
+  const result = await client.query(
+    `UPDATE membership_capabilities SET revoked_by_user_id=$3, revoked_at=now(), revoked_reason_code=$4
+     WHERE membership_id=$1 AND capability=$2 AND revoked_at IS NULL`,
+    [input.membershipId, input.capability, input.actorUserId, input.reasonCode],
+  );
+  if (!result.rowCount) return false;
+  await writeCapabilityAuditAndOutbox(client, { ...input, kind: 'revoked' });
+  return true;
 }
 
 /**

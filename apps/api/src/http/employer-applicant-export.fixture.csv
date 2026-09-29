@@ -1,0 +1,4 @@
+﻿"Candidate","Email","Phone","Contact details","College","Programme","Department","Expected graduation year","Qualifications","Headline","Summary","Links","Résumé shared","Stage","Applied on","Snapshot"
+"Synthetic Candidate One","one@uat.example.test","'+91 98765 43210","Shown","Synthetic Institute of Technology","BTech","Computer Science",2027,"BTECH BTech Computer Science, Synthetic Institute of Technology, 2023–, verified by the college","Aspiring analyst","I like data, ""clean"" data.","Portfolio: https://portfolio.example.test/one","Yes","Shortlisted","2026-09-01","Shared"
+"'@Synthetic Two","","","Shown from Shortlisted","Synthetic Institute of Technology","BTech","Computer Science",2027,"","'=HYPERLINK(""https://evil.example.test"",""click"")","'+SUM(A1:A9)","https://code.example.test/two","No","Applied","2026-09-03","Shared"
+"","","","","","","","","","","","","","Interview","2026-09-04","Not captured"

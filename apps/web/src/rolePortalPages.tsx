@@ -54,6 +54,8 @@ import { OperationsRoleDemandPage } from './rolePortal/roleDemand.js';
 import { OperationsCollegeAccountPanel, OperationsCollegeHealthPanel } from './rolePortal/collegeHealth.js';
 import { OperationsPrivacyConsolePage } from './rolePortal/privacyConsole.js';
 import { OperationsAccessReviewsPage } from './rolePortal/accessReviews.js';
+import { OperationsIncidentRegisterPage } from './rolePortal/incidents.js';
+import { OperationsCommunicationsPage } from './rolePortal/communications.js';
 import type { AuthenticatedWorkspaceSummary } from './rolePortal/shared.js';
 import { AuthenticatedNotYetAvailable, AuthenticatedReadOnlyModule, institutionStaffWorkspaceRoles, institutionWorkspaceRoles, InstitutionWorkspaceError, isInstitutionStaffWorkspace, isInstitutionWorkspace } from './rolePortal/shared.js';
 import type { RoleFixture, RoleNavItem, RolePortalConfig } from './rolePortalConfig.js';
@@ -300,9 +302,9 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   if (!demoMode && portal.key === 'operations-admin' && route.label === 'System Health') return <OperationsSystemHealthPage />;
   // OPS-06: Security is the privacy and consent console, with the governance status it
   // showed before kept beneath it. Only this label's branch changes; AI Operations keeps
-  // the read-only page below. OPS-15: quarterly access reviews sit beneath the privacy
-  // console, under the same label (Appendix 1 §4.2).
-  if (!demoMode && portal.key === 'operations-admin' && route.label === 'Security') return <><OperationsPrivacyConsolePage /><OperationsAccessReviewsPage /></>;
+  // the read-only page below. OPS-15: quarterly access reviews and OPS-16: the incident register sit
+  // beneath the privacy console, under the same label (Appendix 1 §4.2).
+  if (!demoMode && portal.key === 'operations-admin' && route.label === 'Security') return <><OperationsPrivacyConsolePage /><OperationsAccessReviewsPage /><OperationsIncidentRegisterPage /></>;
   if (!demoMode && portal.key === 'operations-admin' && /system health|security|ai operations/i.test(route.label)) return <OperationsTechnicalReadOnlyPage routeLabel={route.label} />;
   if (!demoMode && portal.key === 'operations-admin' && /verification/i.test(route.label)) return <OperationsOrganizationsPage portal={portal} />;
   if (!demoMode && portal.key === 'operations-admin' && /feature flags/i.test(route.label)) return <OperationsFeatureFlagsPage />;
@@ -310,7 +312,7 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   // OPS-01: Settings holds internal staff and capabilities; OPS-02 adds the approvals
   // queue above it (Appendix 1 §4.2). Only this label's branch changes; the others keep
   // the not-yet-available state below.
-  if (!demoMode && portal.key === 'operations-admin' && route.label === 'Settings') return <><OperationsApprovalsPanel /><OperationsStaffCapabilitiesPage /></>;
+  if (!demoMode && portal.key === 'operations-admin' && route.label === 'Settings') return <><OperationsApprovalsPanel /><OperationsStaffCapabilitiesPage /><OperationsCommunicationsPage /></>;
   // OPS-05: Support is the case desk. Only this label's branch changes; Subscriptions,
   // Billing and Analytics keep the not-yet-available state below.
   if (!demoMode && portal.key === 'operations-admin' && route.label === 'Support') return <OperationsSupportDeskPage />;

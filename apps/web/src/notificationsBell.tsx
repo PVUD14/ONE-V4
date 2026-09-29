@@ -52,7 +52,8 @@ export function StudentNotificationsBell(): React.ReactElement {
         setUnread(feed.value.unreadCount);
         for (const note of feed.value.notifications.slice(0, 20)) {
           merged.push({
-            id: note.id, text: `${note.title} — ${note.body}`, actionable: note.readAt === null,
+            // OPS-16: a service status notice says it comes from AI8HT, not from the college.
+            id: note.id, text: note.kind === 'STATUS_NOTICE' ? `Service status notice from AI8HT: ${note.title} — ${note.body}` : `${note.title} — ${note.body}`, actionable: note.readAt === null,
             ...(note.kind === 'ANNOUNCEMENT' ? { announcement: { title: note.title, body: note.body, from: announcementSource(note.data) } } : {}),
           });
         }

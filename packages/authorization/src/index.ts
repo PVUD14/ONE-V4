@@ -128,3 +128,4 @@ export * from './placement-status.js';
 export * from './relationship-lifecycle.js';
 export * from './access-reviews.js';
 export * from './college-health.js';
+export * from './incidents.js';

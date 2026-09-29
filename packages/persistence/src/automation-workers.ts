@@ -4,6 +4,7 @@ import { ANNOUNCEMENT_DISPATCH_REQUESTED, dispatchInstitutionAnnouncement } from
 import { OPPORTUNITY_DEADLINE_CLOSE_REQUESTED, closeOpportunityAtDeadline } from './opportunity-deadlines.js';
 import { HIRING_NOTIFICATION_EVENT_TYPES, consumeHiringNotificationEvent } from './hiring-notifications.js';
 import { RELATIONSHIP_ENDED, notifyStudentOfRelationshipChange } from './institution-relationship-notices.js';
+import { STATUS_NOTICE_DISPATCH_REQUESTED, dispatchIncidentStatusNotice } from './status-notices.js';
 import type { InvitationMailSink } from './invitation-mail.js';
 import type { Pool } from 'pg';
 import type { IntegrationEventEnvelope } from '@planthepath/events/src/index.js';
@@ -89,6 +90,11 @@ export function createLocalIntegrationEventPublisher(input: { readonly pool: Poo
     // INST-06: sends a due announcement once; with no sink its email is recorded NOT_CONFIGURED.
     [ANNOUNCEMENT_DISPATCH_REQUESTED]: async (event) => {
       await dispatchInstitutionAnnouncement(input.db, event, input.invitationMailSink ? { mailSink: input.invitationMailSink } : {});
+    },
+    // OPS-16: sends an approved status notice once to the affected organisations' administrators;
+    // with no sink its email is recorded NOT_CONFIGURED.
+    [STATUS_NOTICE_DISPATCH_REQUESTED]: async (event) => {
+      await dispatchIncidentStatusNotice(input.db, event, input.invitationMailSink ? { mailSink: input.invitationMailSink } : {});
     },
     // EMP-05: closes a job whose current deadline has passed; a moved deadline makes it a no-op.
     [OPPORTUNITY_DEADLINE_CLOSE_REQUESTED]: async (event) => {

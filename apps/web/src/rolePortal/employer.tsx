@@ -72,7 +72,7 @@ function EmployerManagementRealityPage({ portal, routeLabel }: { readonly portal
   if (routeLabel === 'Talent Pool') return <EmployerTalentPoolPage />;
   if (/applicant|candidate|talent/i.test(routeLabel)) {
     return <StaffPilotWrap title="Applicants" subtitle="Move real candidates through your process; every change is logged.">
-      <EmployerApplicantsPage key={employerId} employerId={employerId} /></StaffPilotWrap>;
+      <EmployerApplicantsPage key={employerId} employerId={employerId} canExport={employerManagesOrganisation(employerMembership.role)} /></StaffPilotWrap>;
   }
 
   // Team and Settings belong to the employer's owner and admins (Appendix 2 §5.1). The role

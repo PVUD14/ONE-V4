@@ -5,7 +5,8 @@ package pro.ai8ht.one
  *
  * Students: "From your lecturer" at the top of the existing Learning tab (no navigation change) — assigned
  * practice sets and lessons with their status, group sessions they are invited to, and a next step a lecturer
- * chose for them with the reason in plain words. Lecturers are named by role and college only.
+ * chose for them with the reason in plain words. Lecturers are named by role and college only. INST-17: a
+ * preparation sprint from the college shows with its end date, and the card reads "From your college" then.
  *
  * Lecturers: a read-only summary on the institution home of what they assigned, planned and set. Assigning,
  * planning sessions and setting a student's next step stay on the web (Learning Resources), where the content
@@ -37,7 +38,11 @@ import kotlinx.serialization.Serializable
 @Serializable data class AssignedWorkDto(
     val id: String = "", val kind: String = "", val title: String = "", val skillName: String = "",
     val institutionName: String = "", val note: String? = null, val assignedAt: String = "", val status: String = "OPEN",
+    /** INST-17: set when the work is a preparation sprint from the college, with the end of its time box. */
+    val sprint: SprintEndDto? = null,
 )
+
+@Serializable data class SprintEndDto(val endsAt: String = "")
 
 @Serializable data class GroupSessionDto(
     val id: String = "", val title: String = "", val institutionName: String = "",
@@ -79,6 +84,11 @@ private fun whenText(value: String): String = runCatching {
         .format(java.time.format.DateTimeFormatter.ofPattern("d MMM, h:mm a"))
 }.getOrDefault("NA")
 
+private fun dayText(value: String): String = runCatching {
+    java.time.OffsetDateTime.parse(value).atZoneSameInstant(java.time.ZoneId.systemDefault())
+        .format(java.time.format.DateTimeFormatter.ofPattern("d MMM"))
+}.getOrDefault("NA")
+
 @Composable
 private fun Quiet(text: String) {
     Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -93,7 +103,9 @@ internal fun FromYourLecturerCard(state: Load<StudentLearningActionsDto>, busy: 
             val open = value?.assignments?.count { it.status == "OPEN" } ?: 0
             val pending = value?.pendingOverride
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("From your lecturer", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                // INST-17: a preparation sprint comes from the college, not a lecturer.
+                val heading = if (value?.assignments?.any { it.sprint != null } == true) "From your college" else "From your lecturer"
+                Text(heading, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 StatusChip(
                     when { value == null -> "NA"; pending != null -> "Next step set"; else -> "$open open" },
                     if (value != null && (open > 0 || pending != null)) ChipKind.Accent else ChipKind.Muted,
@@ -118,7 +130,9 @@ internal fun FromYourLecturerCard(state: Load<StudentLearningActionsDto>, busy: 
                         Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
                                 Text(work.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                                Quiet("${kindWord[work.kind] ?: "Work"} · ${work.skillName} · from your lecturer at ${work.institutionName}" +
+                                Quiet("${kindWord[work.kind] ?: "Work"} · ${work.skillName} · " +
+                                    (work.sprint?.let { "preparation sprint from ${work.institutionName} until ${dayText(it.endsAt)}" }
+                                        ?: "from your lecturer at ${work.institutionName}") +
                                     (work.note?.let { " · “$it”" } ?: ""))
                             }
                             StatusChip(if (work.status == "DONE") "Done" else "To do", if (work.status == "DONE") ChipKind.Positive else ChipKind.Waiting)

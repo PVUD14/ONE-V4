@@ -218,6 +218,8 @@ private class InstitutionData(
     val learning: ScopedView<LearningCohortView> = ScopedView.NotForRole,
     /** INST-16: what the lecturer assigned, planned and set (read-only here); NotForRole for non-faculty callers. */
     val learningActions: ScopedView<FacultyLearningActionsDto> = ScopedView.NotForRole,
+    /** INST-17: readiness by career role and preparation sprints (read-only here); NotForRole for lecturers. */
+    val cohortByRole: ScopedView<CohortByRoleView> = ScopedView.NotForRole,
 )
 
 private sealed interface AnnouncementsState {
@@ -291,6 +293,7 @@ internal fun InstitutionScaffold(
             val statistics = async { scopedView { Api.placementStatistics(context, organizationId) } }
             val learning = async { scopedView { Api.learningCohort(context, organizationId) } }
             val learningActions = async { scopedView { Api.facultyLearningActions(context, organizationId) } }
+            val cohortByRole = async { scopedView { Api.cohortByRole(context, organizationId) } }
             val loadedExams = exams.await()
             val target = loadedExams.firstOrNull { it.lifecycleState == "PUBLISHED" && it.assignedCount > 0 }
             val attention = if (target != null) {
@@ -299,7 +302,7 @@ internal fun InstitutionScaffold(
             } else emptyList()
             data = InstitutionData(loadedExams, subjects.await(), review.await(), inbox.await(), attention, activation.await(),
                 myStudents.await(), verification.await(), calendar.await(), announcements.await(),
-                department.await(), pipeline.await(), classes.await(), statistics.await(), learning.await(), learningActions.await())
+                department.await(), pipeline.await(), classes.await(), statistics.await(), learning.await(), learningActions.await(), cohortByRole.await())
         }
     }
 
@@ -412,6 +415,8 @@ private fun InstitutionHome(organizationId: String, data: InstitutionData, onVer
         // INST-07: last ended month's bands for the reader's scope, from the department
         // overview; a band under five reads <5, and NA when this caller has no such view.
         CohortReadinessCard(data.department)
+        // INST-17: readiness by career role and preparation sprints (web: Career Readiness / Readiness), read-only.
+        CohortByRoleSection(data.cohortByRole)
 
         // INST-07: department overview for heads, admins and placement officers.
         (data.department as? ScopedView.Loaded)?.let { DepartmentOverviewSection(it.value) }

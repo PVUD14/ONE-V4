@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import type { PersistenceDb } from '@planthepath/persistence/src/repositories.js';
+import { assembleCoverageSections } from './privacy-export-sections.js';
 
 type QueryResult<T> = { rows: T[] };
 
@@ -95,6 +96,9 @@ export async function assembleSubjectExport(db: PersistenceDb, subjectUserId: st
             ORDER BY aq.attempt_id, aq.display_order`),
   ]);
 
+  // Every personal table added after OPS-06 (docs/architecture/privacy-export-coverage.md).
+  const coverage = await assembleCoverageSections(one, subjectUserId);
+
   return {
     exportedAt: new Date().toISOString(),
     subjectUserId,
@@ -105,6 +109,13 @@ export async function assembleSubjectExport(db: PersistenceDb, subjectUserId: st
       'Security audit records, which are retained under the approved retention schedule.',
       'Which member of an employer team wrote each application message, and how operations handled any message you reported.',
       'The answer key to employer screening tests, and how each of your answers was marked. Your result is shown as the percentage you see on My applications.',
+      'The text of staff-only actions your college keeps about you (interventions, faculty notes, verifications). How many of each kind each college holds is listed under collegeActions.',
+      'Internal estimates the learning engine keeps about you (mastery likelihoods, review-scheduling parameters, suspected misconception codes) and the inputs the planner weighed. What they led to — your steps, bands, stages and review dates — is included.',
+      'The questions and answer keys of college exams, readiness checks and practice items, which are reused. Your attempts, published results and whether each practice answer was right are included.',
+      'Whether a retention hold is in place on your account, which is placed for an investigation or a legal claim.',
+      'The summary and notes operations wrote on your support cases, and which employer team member downloaded your résumé.',
+      'Trust and safety cases about you, and their investigation material.',
+      'The secret parts of your devices and share links (push tokens, link tokens) and where files are stored.',
     ],
     identity: identity[0] ?? null,
     studentProfile: profile[0] ?? null,
@@ -121,6 +132,7 @@ export async function assembleSubjectExport(db: PersistenceDb, subjectUserId: st
       shared: sharedNotes.map((row) => ({ institutionName: row.institution_name, title: row.title, note: row.note, createdAt: row.created_at })),
       heldByCollege: heldNotes.map((row) => ({ institutionName: row.institution_name, staffOnlyNotes: row.staff_only_notes })),
     },
+    ...coverage,
   };
 }
 

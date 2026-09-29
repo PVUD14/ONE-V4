@@ -238,7 +238,7 @@ describe('EMP-12: tests go to applicants at the ASSESSMENT stage, in a window se
     const opportunityId = await publishedJob(hiring);
     const assessmentId = await publishedAssessment(hiring, opportunityId);
     const early = await applicant(hiring, opportunityId, 'SHORTLISTED');
-    expect((await invite(hiring, assessmentId, [early.applicationId]).expect(400)).body.error.code).toBe('APPLICATION_NOT_INVITABLE');
+    expect((await invite(hiring, assessmentId, [early.applicationId]).expect(400)).body.error.code).toBe('APPLICATION_NOT_AT_ASSESSMENT_STAGE');
 
     await api().post(base(hiring.employerId) + '/applications/' + early.applicationId + '/transition').set(auth(hiring.recruiterId)).send({ toState: 'ASSESSMENT' }).expect(201);
     const sent = await invite(hiring, assessmentId, [early.applicationId]).expect(201);

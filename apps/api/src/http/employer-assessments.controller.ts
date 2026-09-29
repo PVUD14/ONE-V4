@@ -407,18 +407,18 @@ export class EmployerAssessmentsController {
       `) as QueryResult<{ valid: boolean }>;
       if (window.rows[0]?.valid !== true) throw badRequest('INVALID_WINDOW', context.correlationId);
 
-      // Open, consented applications of this employer in the ASSESSMENT stage — and, when the
-      // test names a role, for that role. Held so none closes while the invitations are written.
+      // Open, consented applications of this employer — and, when the test names a role, for
+      // that role. Held so none closes while the invitations are written.
       const eligible = await tx.execute(sql`
-        SELECT a.id FROM applications a
+        SELECT a.id, a.state FROM applications a
         WHERE a.employer_id = ${employerId}::uuid
           AND a.closed_at IS NULL
           AND a.consent_revoked_at IS NULL
-          AND a.state = 'ASSESSMENT'
+          AND a.state NOT IN ('DRAFT','REJECTED','WITHDRAWN','HIRED')
           AND (${assessment.opportunity_id === null} OR a.opportunity_id = ${assessment.opportunity_id}::uuid)
           AND a.id IN (${sql.join(input.applicationIds.map((applicationId) => sql`${applicationId}::uuid`), sql`, `)})
         FOR SHARE OF a
-      `) as QueryResult<{ id: string }>;
+      `) as QueryResult<{ id: string; state: string }>;
       if (eligible.rows.length !== input.applicationIds.length) throw badRequest('APPLICATION_NOT_INVITABLE', context.correlationId);
 
       // EMP-SR-01: an invitation reaches a named person, so every one of them needs a live
@@ -428,6 +428,9 @@ export class EmployerAssessmentsController {
       } catch {
         throw forbidden(context.correlationId);
       }
+      // EMP-12: a test goes to a candidate a person has moved to the ASSESSMENT stage. Checked
+      // after the grant so the EMP-SR-01 order (state rule, then grant) is unchanged.
+      if (eligible.rows.some((row) => row.state !== 'ASSESSMENT')) throw badRequest('APPLICATION_NOT_AT_ASSESSMENT_STAGE', context.correlationId);
       for (const applicationId of input.applicationIds) {
         const invitationId = this.ids.uuid();
         // Re-inviting the same application to the same assessment is a no-op rather than

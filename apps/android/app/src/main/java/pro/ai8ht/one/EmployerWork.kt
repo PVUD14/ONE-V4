@@ -530,47 +530,119 @@ internal fun EmployerOffersPage(employerId: String, onClose: () -> Unit) {
     }
 }
 
+private val reportCellLabels = listOf(
+    "APPLIED" to "Applied", "SCREENING" to "Screening", "SHORTLISTED" to "Shortlisted", "ASSESSMENT" to "Assessment",
+    "INTERVIEW" to "Interview", "OFFER" to "Offer", "HIRED" to "Hired",
+    "LEFT_AT_APPLIED" to "Left at applied", "LEFT_AT_SCREENING" to "Left at screening", "LEFT_AT_SHORTLISTED" to "Left at shortlisted",
+    "LEFT_AT_ASSESSMENT" to "Left at assessment", "LEFT_AT_INTERVIEW" to "Left at interview", "LEFT_AT_OFFER" to "Left at offer",
+)
+private val reportMetricLabels = mapOf(
+    "SHORTLIST" to "Submission to shortlist", "INTERVIEW" to "Submission to interview",
+    "OFFER" to "Submission to first offer", "HIRE" to "Submission to hire",
+)
+private val reportOfferLabels = listOf(
+    "EXTENDED" to "Awaiting an answer", "ACCEPTED" to "Accepted", "DECLINED" to "Declined", "EXPIRED" to "Expired", "WITHDRAWN" to "Withdrawn",
+)
+
+/** One group of a report: its name, total, and each stage as the server sent it. */
 @Composable
-internal fun HiringAnalyticsPage(employerId: String, onClose: () -> Unit) {
+private fun ReportGroupCard(name: String, detail: String?, table: ReportTableDto) {
+    PilotCard(Modifier.fillMaxWidth().padding(bottom = 10.dp)) {
+        Column(Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                    if (detail != null) Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Text(table.totalLabel(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                if (table.suppressed) "Fewer than 5 applications — not broken down."
+                else reportCellLabels.joinToString(" · ") { (key, label) -> "$label ${table.cellLabel(key)}" },
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/**
+ * EMP-15: the employer's hiring reports, read-only — the same suppressed figures as the web's
+ * Reports. No candidate is shown; a group of fewer than 5 people reads "<5".
+ */
+@Composable
+internal fun EmployerReportsPage(employerId: String, onClose: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    var analytics by remember { mutableStateOf<HiringAnalyticsDto?>(null) }
+    var reports by remember { mutableStateOf<EmployerReportsDto?>(null) }
     var failed by remember { mutableStateOf(false) }
 
     LaunchedEffect(employerId) {
-        runCatching { Api.hiringAnalytics(context, employerId) }
-            .onSuccess { analytics = it }
+        runCatching { Api.employerReports(context, employerId) }
+            .onSuccess { reports = it }
             .onFailure { failed = true }
     }
 
-    OverlayScaffold(title = "Hiring", onClose = onClose) {
-        val data = analytics
+    OverlayScaffold(title = "Reports", onClose = onClose) {
+        val data = reports
         when {
             failed -> EmptyState(
-                Icons.Filled.WorkOutline, Tone.Violet, "We could not load your figures",
+                Icons.Filled.WorkOutline, Tone.Violet, "We could not load your reports",
                 "Check your connection and try again.",
             )
             data == null -> LoadingSpinner()
-            else -> Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
+            else -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp)) {
                 Spacer(Modifier.height(12.dp))
-                // The funnel in order, so the drop between stages is the thing you read
-                // rather than six unrelated numbers.
-                listOf(
-                    "Open roles" to data.opportunitiesOpen,
-                    "Applications" to data.applicationsTotal,
-                    "Shortlisted" to data.shortlisted,
-                    "Interviews scheduled" to data.interviewsScheduled,
-                    "Offers extended" to data.offersExtended,
-                    "Offers accepted" to data.offersAccepted,
-                ).forEach { (label, value) ->
-                    PilotCard {
-                        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-                            Text("$value", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text("Every application to your jobs, grouped. Any group of fewer than ${data.threshold} people reads <5, and a total that would reveal one reads Withheld.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+                SectionTitle("Where applications are now")
+                ReportGroupCard("All jobs", null, data.overall)
+
+                SectionTitle("Time to each stage")
+                PilotCard(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(14.dp)) {
+                        data.timeToStage.forEach { row ->
+                            Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                                Text(reportMetricLabels[row.metric] ?: row.metric, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                                Text(row.medianDays?.let { "%.1f days".format(it) } ?: "NA", fontWeight = FontWeight.SemiBold)
+                            }
                         }
+                        Text("Median days from submission, shown only when at least 5 applications reached the step.",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    Spacer(Modifier.height(10.dp))
                 }
-                Spacer(Modifier.height(14.dp))
+
+                SectionTitle("Offer outcomes")
+                PilotCard(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(14.dp)) {
+                        val table = data.offers.table
+                        if (table.suppressed) {
+                            Text("Fewer than 5 applications have an offer — not broken down.", style = MaterialTheme.typography.bodySmall)
+                        } else {
+                            reportOfferLabels.forEach { (key, label) ->
+                                Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                                    Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                                    Text(table.cellLabel(key), fontWeight = FontWeight.SemiBold)
+                                }
+                            }
+                        }
+                        Text("Acceptance: " + (data.offers.acceptanceRate?.let { "${(it * 100).toInt()}%" } ?: "too few answers"),
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+
+                SectionTitle("By job")
+                if (data.byJob.isEmpty()) Text("No published jobs yet.", style = MaterialTheme.typography.bodySmall)
+                data.byJob.forEach { ReportGroupCard(it.title ?: "Untitled", it.referenceCode, it.table) }
+
+                SectionTitle("By college")
+                if (data.byCollege.isEmpty()) Text("No applications yet.", style = MaterialTheme.typography.bodySmall)
+                data.byCollege.forEach { ReportGroupCard(it.collegeName ?: "Other colleges or not stated", null, it.table) }
+
+                SectionTitle("By campus drive")
+                if (data.byDrive.isEmpty()) Text("No campus drives yet.", style = MaterialTheme.typography.bodySmall)
+                data.byDrive.forEach { ReportGroupCard(it.institutionName, "${it.opportunityTitle ?: "Untitled"} · ${prettify(it.state)}", it.table) }
+                Spacer(Modifier.height(20.dp))
             }
         }
     }

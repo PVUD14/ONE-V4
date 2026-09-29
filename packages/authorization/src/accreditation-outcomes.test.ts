@@ -14,8 +14,8 @@ import {
 } from './index.js';
 
 const many = <G extends string>(count: number, graduate: AccreditationGraduate<G>): AccreditationGraduate<G>[] => Array.from({ length: count }, () => graduate);
-const shown = (value: number) => ({ suppressed: false, value });
-const withheld = { suppressed: true, value: null };
+const shown = (value: number) => ({ suppressed: false as const, value });
+const withheld = { suppressed: true as const, value: null };
 
 describe('accreditationOutcomeStage', () => {
   it('counts a graduate once, placed first, then their own self-report', () => {

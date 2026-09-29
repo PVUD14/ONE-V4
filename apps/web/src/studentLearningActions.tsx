@@ -6,7 +6,8 @@
  * Why it exists: faculty actions are constraints the planner honours, so a student must be able to see where a
  * step came from and what is waiting. The lecturer is named by role and college only (ONE stores no staff
  * names). Nothing here is a score or a number about the student; missing data reads NA. The card lives inside
- * the existing Learning page — no navigation change (HG-3).
+ * the existing Learning page — no navigation change (HG-3). INST-17: a preparation sprint from the college shows
+ * with its end date, and the card is headed "From your college" while one is among its items.
  */
 import React from 'react';
 import { BookOpen, ClipboardList, Compass, Users } from 'lucide-react';
@@ -25,6 +26,7 @@ const ACTION_WORD: Readonly<Record<string, string>> = { LEARN: 'Learn', PRACTICE
 const KIND_WORD: Readonly<Record<string, string>> = { PRACTICE: 'Practice set', LESSON: 'Lesson' };
 const muted: React.CSSProperties = { color: 'var(--p-muted)', margin: '4px 0' };
 const when = (value: string): string => new Date(value).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+const day = (value: string): string => new Date(value).toLocaleDateString([], { dateStyle: 'medium' });
 
 /** True when a lecturer has set something the planner will bring up next. */
 export function hasLecturerWork(actions: StudentLearningActionsDto | null): boolean {
@@ -45,9 +47,11 @@ export function FromYourLecturerCard({ actions, status, busy, onStart }: {
   const open = actions ? actions.assignments.filter((assignment) => assignment.status === 'OPEN').length : 0;
   const pending = actions?.pendingOverride ?? null;
   const empty = actions !== null && actions.assignments.length === 0 && actions.sessions.length === 0 && !pending;
+  // INST-17: a preparation sprint comes from the college (the placement office, an admin or a head), not a lecturer.
+  const heading = actions && actions.assignments.some((assignment) => assignment.sprint) ? 'From your college' : 'From your lecturer';
   return <section className="pilot-card" aria-labelledby="lecturer-heading">
     <div className="pilot-card-head">
-      <h2 id="lecturer-heading">From your lecturer</h2>
+      <h2 id="lecturer-heading">{heading}</h2>
       <span className={`pilot-chip ${actions ? (open || pending ? 'purple' : 'slate') : 'slate'}`}>{actions ? (pending ? 'Next step set' : `${open} open`) : 'NA'}</span>
     </div>
     {!actions ? <p style={muted}>{status}</p> : empty ? <p style={muted}>Nothing from your lecturers right now. Work they assign you appears here and comes up as your next step.</p> : <>
@@ -63,7 +67,9 @@ export function FromYourLecturerCard({ actions, status, busy, onStart }: {
           <span className={`pilot-tile ${assignment.kind === 'LESSON' ? 'teal' : 'blue'}`}>{assignment.kind === 'LESSON' ? <BookOpen size={16} /> : <ClipboardList size={16} />}</span>
           <div className="grow">
             <strong>{assignment.title}</strong>
-            <small>{`${KIND_WORD[assignment.kind] ?? 'Work'} · ${assignment.skillName} · from your lecturer at ${assignment.institutionName}`}{assignment.note ? ` · “${assignment.note}”` : ''}</small>
+            <small>{assignment.sprint
+              ? `${KIND_WORD[assignment.kind] ?? 'Work'} · ${assignment.skillName} · preparation sprint from ${assignment.institutionName} until ${day(assignment.sprint.endsAt)}`
+              : `${KIND_WORD[assignment.kind] ?? 'Work'} · ${assignment.skillName} · from your lecturer at ${assignment.institutionName}`}{assignment.note ? ` · “${assignment.note}”` : ''}</small>
           </div>
           <span className={`pilot-chip ${assignment.status === 'DONE' ? 'green' : 'amber'}`}>{assignment.status === 'DONE' ? 'Done' : 'To do'}</span>
         </div>)}

@@ -40,3 +40,4 @@ export * from './api/goals.js';
 export * from './api/learning.js';
 export * from './api/incidents.js';
 export * from './api/learningActions.js';
+export * from './api/cohortReadiness.js';

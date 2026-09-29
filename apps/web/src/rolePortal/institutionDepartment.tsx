@@ -246,7 +246,7 @@ export function DepartmentBatchesPage({ authenticatedWorkspace }: WorkspaceProps
 
 // --- Readiness -------------------------------------------------------------------
 
-export function DepartmentReadinessPage({ authenticatedWorkspace }: WorkspaceProps): React.ReactElement {
+export function DepartmentReadinessPage({ authenticatedWorkspace, children }: WorkspaceProps & { readonly children?: React.ReactNode }): React.ReactElement {
   const overview = useWorkspaceResource(authenticatedWorkspace, getDepartmentOverview, 'Unable to load readiness.');
   const guard = workspaceGuard('Readiness', authenticatedWorkspace);
   if (guard) return guard;
@@ -258,6 +258,8 @@ export function DepartmentReadinessPage({ authenticatedWorkspace }: WorkspacePro
       <ReadinessBands month={overview.data?.readiness.month ?? null} aggregate={overview.data?.readiness.aggregate ?? null} />
     </section>
     <InstitutionReportsPage key={authenticatedWorkspace?.organizationId ?? ''} institutionId={authenticatedWorkspace?.organizationId ?? ''} />
+    {/* INST-17: cohort readiness by career role and preparation sprints for the department. */}
+    {children}
   </div></div></div>;
 }
 

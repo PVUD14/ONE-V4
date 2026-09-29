@@ -88,6 +88,8 @@ export interface StudentLearningActionsDto {
   readonly assignments: readonly {
     readonly id: string; readonly kind: LearningContentKind; readonly title: string; readonly skillName: string;
     readonly institutionName: string; readonly note: string | null; readonly assignedAt: string; readonly status: 'OPEN' | 'DONE';
+    /** INST-17: a preparation sprint from the college, with the end of its time box (absent from older servers). */
+    readonly sprint?: { readonly endsAt: string } | null;
   }[];
   readonly sessions: readonly {
     readonly id: string; readonly title: string; readonly institutionName: string; readonly scheduledStartAt: string; readonly scheduledEndAt: string;

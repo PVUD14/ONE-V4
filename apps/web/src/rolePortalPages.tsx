@@ -29,6 +29,7 @@ import { FacultyContentReviewsPage, OperationsExternalReviewsPage } from './role
 import { InstitutionReportsPage } from './institutionReportsPage.js';
 import { InstitutionExportsPanel } from './rolePortal/institutionAnalytics.js';
 import { OperationsCareerReadinessPanel } from './operationsCareerReadinessPanel.js';
+import { CohortReadinessByRoleSection } from './rolePortal/institutionCohortReadiness.js';
 import { StaffPilotWrap } from './parityWraps.js';
 import { InstitutionInterventionsPage } from './pilotParityPages.js';
 import { FacultyLearningCohortSection } from './rolePortal/institutionLearningCohort.js';
@@ -378,7 +379,9 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
     // the narrower institution-admin predicate would deny the very role this branch
     // exists for.
     return isInstitutionStaffWorkspace(authenticatedWorkspace)
-      ? <InstitutionReportsPage key={authenticatedWorkspace.organizationId} institutionId={authenticatedWorkspace.organizationId} />
+      ? <InstitutionReportsPage key={authenticatedWorkspace.organizationId} institutionId={authenticatedWorkspace.organizationId}>
+          {/* INST-17: cohort readiness by career role and preparation sprints, under the monthly report. */}
+          <CohortReadinessByRoleSection institutionId={authenticatedWorkspace.organizationId} /></InstitutionReportsPage>
       : <InstitutionWorkspaceError title="Readiness" unauthorized={Boolean(authenticatedWorkspace && !institutionStaffWorkspaceRoles.has(authenticatedWorkspace.role))} />;
   }
   if (!demoMode && portal.key === 'placement-officer' && /^departments$|^batches$/i.test(route.label)) {
@@ -401,6 +404,13 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   }
   // INST-09: the admin's Placement label opens consented placement status; only this label's branch changes.
   if (!demoMode && portal.key === 'institution-admin' && route.label === 'Placement') return <InstitutionPlacementPage authenticatedWorkspace={authenticatedWorkspace} />;
+  // INST-17: the admin's Career Readiness label opens cohort readiness by career role; only this label's branch changes.
+  if (!demoMode && portal.key === 'institution-admin' && route.label === 'Career Readiness') {
+    return isInstitutionWorkspace(authenticatedWorkspace)
+      ? <StaffPilotWrap title="Career Readiness" subtitle="Where your students stand against the roles employers hire for, and preparation sprints for the gaps.">
+          <CohortReadinessByRoleSection key={authenticatedWorkspace.organizationId} institutionId={authenticatedWorkspace.organizationId} /></StaffPilotWrap>
+      : <InstitutionWorkspaceError title="Career Readiness" unauthorized={Boolean(authenticatedWorkspace && !institutionWorkspaceRoles.has(authenticatedWorkspace.role))} />;
+  }
   if (!demoMode && portal.key === 'institution-admin' && /career readiness|placement|reports/i.test(route.label)) return <AuthenticatedReadOnlyModule title={route.label} detail="Institution reports and readiness information are read-only in Phase 2A unless a dedicated persistent mutation is available." />;
   // INST-05: the admin's Settings label now opens the college settings; navigation is unchanged.
   if (!demoMode && portal.key === 'institution-admin' && route.label === 'Settings') return <InstitutionSettingsPage authenticatedWorkspace={authenticatedWorkspace} />;
@@ -420,7 +430,10 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   // INST-07: the department head's and the lecturer's remaining items become real screens.
   // Only these labels' branches change; navigation is untouched.
   if (!demoMode && portal.key === 'department-head' && route.label === 'Department Overview') return <DepartmentOverviewPage authenticatedWorkspace={authenticatedWorkspace} basePath={portal.basePath} />;
-  if (!demoMode && portal.key === 'department-head' && route.label === 'Readiness') return <DepartmentReadinessPage authenticatedWorkspace={authenticatedWorkspace} />;
+  if (!demoMode && portal.key === 'department-head' && route.label === 'Readiness') {
+    return <DepartmentReadinessPage authenticatedWorkspace={authenticatedWorkspace}>
+      {authenticatedWorkspace?.organizationId ? <CohortReadinessByRoleSection institutionId={authenticatedWorkspace.organizationId} /> : null}</DepartmentReadinessPage>;
+  }
   if (!demoMode && portal.key === 'department-head' && route.label === 'Batches') return <DepartmentBatchesPage authenticatedWorkspace={authenticatedWorkspace} />;
   if (!demoMode && portal.key === 'department-head' && route.label === 'Placement Pipeline') {
     return <PlacementPipelinePage authenticatedWorkspace={authenticatedWorkspace} basePath={portal.basePath}

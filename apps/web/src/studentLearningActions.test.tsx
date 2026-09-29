@@ -39,6 +39,15 @@ describe('From your lecturer card', () => {
     expect(document.body.textContent ?? '').not.toMatch(/score|readiness|likelihood|%/i);
   });
 
+  it('INST-17: a preparation sprint from the college shows its end date, and the card says it is from the college', () => {
+    render(<FromYourLecturerCard actions={{ ...actions, pendingOverride: null, assignments: [
+      { id: 'a-3', kind: 'PRACTICE', title: 'Log triage', skillName: 'Log triage', institutionName: 'Synthetic College', note: null, assignedAt: '2026-09-28T09:00:00.000Z', status: 'OPEN', sprint: { endsAt: '2026-10-12T09:00:00.000Z' } },
+    ] }} status="" busy={false} onStart={vi.fn()} />);
+    expect(screen.getByRole('heading', { name: 'From your college' })).toBeInTheDocument();
+    expect(screen.getByText(/Practice set · Log triage · preparation sprint from Synthetic College until/)).toBeInTheDocument();
+    expect(document.body.textContent ?? '').not.toMatch(/score|readiness|gap|%/i);
+  });
+
   it('says plainly when there is nothing, and NA when it cannot be loaded', () => {
     render(<FromYourLecturerCard actions={{ assignments: [], sessions: [], pendingOverride: null }} status="" busy={false} onStart={vi.fn()} />);
     expect(screen.getByText(/Nothing from your lecturers right now/)).toBeInTheDocument();

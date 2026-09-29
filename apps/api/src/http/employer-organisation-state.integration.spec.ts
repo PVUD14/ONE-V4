@@ -226,6 +226,12 @@ function employerRoutes(employerId: string) {
     { group: 'candidates', method: 'get', path: base + '/hiring-analytics' },
     { group: 'candidates', method: 'post', path: base + '/assessments/' + any + '/invitations', body: {} },
     { group: 'candidates', method: 'get', path: base + '/assessments/' + any + '/results' },
+    // EMP-12 (and EMP-SR-19 for the three assessment writes that were missing here).
+    { group: 'draft', method: 'post', path: base + '/assessment-questions', body: {} },
+    { group: 'draft', method: 'post', path: base + '/assessment-questions/' + any + '/transition', body: { toState: 'UNDER_REVIEW' } },
+    { group: 'draft', method: 'post', path: base + '/assessments', body: {} },
+    { group: 'publish', method: 'post', path: base + '/assessments/' + any + '/close', body: { reasonCode: 'ROLE_FILLED' } },
+    { group: 'candidates', method: 'get', path: base + '/applications/' + any + '/assessment-results' },
   ] as const;
 }
 type EmployerRoute = ReturnType<typeof employerRoutes>[number];

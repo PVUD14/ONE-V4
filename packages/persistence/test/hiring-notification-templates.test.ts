@@ -106,6 +106,17 @@ describe('hiring notice wording, version 1', () => {
     expect(HIRING_NOTIFICATION_EVENT_TYPES).toContain('application.message.sent');
   });
 
+  it('tells the student what screening test was sent and when it closes, never a score (EMP-12)', () => {
+    const notice = renderHiringNotice({ ...base, kind: 'ASSESSMENT_INVITED', assessment: { title: 'Kinematics screen', closesAt: at } }, 'Asia/Kolkata');
+    expect(notice).toEqual({
+      title: 'Screening test: Robotics engineer',
+      body: `Acme Robotics sent you a screening test, Kinematics screen, for Robotics engineer. Read what it covers and take it under Assessments before ${formatNoticeTime(at, 'Asia/Kolkata')}. The timer starts only when you begin.`,
+    });
+    expect(JSON.stringify(notice)).not.toMatch(/readiness|band|score|mastery|gap|percent/i);
+    expect(hiringTemplateKey('ASSESSMENT_INVITED')).toBe('hiring-assessment-invited');
+    expect(HIRING_NOTIFICATION_EVENT_TYPES).toContain('employer_assessment.invited');
+  });
+
   it('names a stable template per kind, and consumes only registered events', () => {
     expect(hiringTemplateKey('INTERVIEW_SCHEDULED')).toBe('hiring-interview-scheduled');
     for (const eventType of HIRING_NOTIFICATION_EVENT_TYPES) expect(() => schemaForEvent(eventType, 1)).not.toThrow();

@@ -31,6 +31,8 @@ export const HIRING_NOTIFICATION_CONSUMER = 'hiring-notifications';
 export const OFFER_EXPIRY_REMINDER_REQUESTED = 'offer.expiry_reminder.requested';
 /** EMP-10: one message in an application's conversation. */
 export const APPLICATION_MESSAGE_SENT = 'application.message.sent';
+/** EMP-12: an employer sent an applicant a screening test. */
+export const EMPLOYER_ASSESSMENT_INVITED = 'employer_assessment.invited';
 export const HIRING_TEMPLATE_VERSION = 1;
 /** How long before an offer expires the one reminder is sent. */
 export const OFFER_REMINDER_LEAD_HOURS = 24;
@@ -50,12 +52,13 @@ export const HIRING_NOTIFICATION_EVENT_TYPES: readonly string[] = [
   'offer.accepted',
   'offer.declined',
   APPLICATION_MESSAGE_SENT,
+  EMPLOYER_ASSESSMENT_INVITED,
 ];
 
 export type HiringNotificationKind =
   | 'APPLICATION_STAGE_CHANGED' | 'APPLICATION_TERMS_CHANGED' | 'INTERVIEW_SCHEDULED' | 'INTERVIEW_CHANGED'
   | 'OFFER_EXTENDED' | 'OFFER_WITHDRAWN' | 'OFFER_EXPIRING' | 'OFFER_RESPONDED'
-  | 'EMPLOYER_MESSAGE' | 'CANDIDATE_MESSAGE';
+  | 'EMPLOYER_MESSAGE' | 'CANDIDATE_MESSAGE' | 'ASSESSMENT_INVITED';
 
 /** The kinds that are in-app only, for employer members: they never email and use no template. */
 type InAppOnlyKind = 'OFFER_RESPONDED' | 'CANDIDATE_MESSAGE';
@@ -71,6 +74,7 @@ const templateIds: Readonly<Record<EmailedKind, string>> = {
   OFFER_WITHDRAWN: '26000000-0000-4000-8000-000000059006',
   OFFER_EXPIRING: '26000000-0000-4000-8000-000000059007',
   EMPLOYER_MESSAGE: '26000000-0000-4000-8000-000000067001',
+  ASSESSMENT_INVITED: '26000000-0000-4000-8000-000000074001',
 };
 
 export function hiringTemplateKey(kind: HiringNotificationKind): string {
@@ -96,6 +100,8 @@ export interface HiringNoticeFacts {
   /** OFFER_RESPONDED (employer notice). */
   readonly offerResponse?: 'ACCEPTED' | 'DECLINED';
   readonly referenceCode?: string | null;
+  /** ASSESSMENT_INVITED: the employer's test title and when its window closes. */
+  readonly assessment?: { readonly title: string; readonly closesAt: Date };
   /**
    * EMP-09: who reads an INTERVIEW_* notice. The candidate (default) or a member of the interview
    * panel; a panel notice names the job and never the candidate.
@@ -199,6 +205,15 @@ export function renderHiringNotice(facts: HiringNoticeFacts, timeZone?: string |
       title = `Candidate message: ${job}`;
       body = `A candidate replied about ${job}${reference}. Open Messages to read it.`;
       break;
+    // EMP-12: what the test is and when it closes; never a score, and nothing a forwarded email
+    // could use to open the test.
+    case 'ASSESSMENT_INVITED': {
+      const closes = facts.assessment ? formatNoticeTime(facts.assessment.closesAt, timeZone) : 'its closing time';
+      const test = facts.assessment ? `, ${facts.assessment.title},` : '';
+      title = `Screening test: ${job}`;
+      body = `${employer} sent you a screening test${test} for ${job}. Read what it covers and take it under Assessments before ${closes}. The timer starts only when you begin.`;
+      break;
+    }
     case 'OFFER_RESPONDED':
       title = facts.offerResponse === 'ACCEPTED' ? `Offer accepted: ${job}` : `Offer declined: ${job}`;
       body = facts.offerResponse === 'ACCEPTED'
@@ -292,6 +307,7 @@ async function notify(tx: PersistenceDb, event: IntegrationEventEnvelope, sinkCo
   const none = (outcome: HiringNotificationOutcome) => ({ outcome, recipients: 0 });
 
   if (type === APPLICATION_MESSAGE_SENT) return messageNotice(tx, event, sinkConfigured);
+  if (type === EMPLOYER_ASSESSMENT_INVITED) return assessmentInvitationNotice(tx, event, sinkConfigured);
 
   if (type.startsWith('application.') && type !== 'application.terms_change.recorded') {
     const stage = String(event.payload.toState ?? '') as StageState;
@@ -469,6 +485,28 @@ async function messageNotice(tx: PersistenceDb, event: IntegrationEventEnvelope,
 }
 
 /**
+ * EMP-12: an employer sent a screening test. Read at consume time: nothing is sent when the
+ * invitation's window has already closed, when it was already started, or when the application is no
+ * longer shared with the employer (the test could not be taken anyway).
+ */
+async function assessmentInvitationNotice(tx: PersistenceDb, event: IntegrationEventEnvelope, sinkConfigured: boolean): Promise<{ outcome: HiringNotificationOutcome; recipients: number }> {
+  const none = (outcome: HiringNotificationOutcome) => ({ outcome, recipients: 0 });
+  const found = await tx.execute(sql`
+    SELECT ${applicationContextColumns}, s.title AS assessment_title, inv.closes_at, inv.state AS invitation_state,
+           (inv.closes_at > now()) AS still_open, ${applicationHasLiveApplicantGrant('a')} AS grant_live
+    FROM employer_assessment_invitations inv
+    JOIN employer_assessments s ON s.id = inv.assessment_id AND s.employer_id = inv.employer_id
+    JOIN applications a ON a.id = inv.application_id AND a.employer_id = inv.employer_id
+    ${applicationContextJoins}
+    WHERE inv.id = ${payloadUuid(event, 'invitationId')}::uuid AND inv.application_id = ${payloadUuid(event, 'applicationId')}::uuid
+  `) as QueryResult<ApplicationContext & { assessment_title: string; closes_at: Date | string; invitation_state: string; still_open: boolean; grant_live: boolean }>;
+  const row = found.rows[0];
+  if (!row) return none('NOT_FOUND');
+  if (row.invitation_state !== 'INVITED' || row.still_open !== true || row.grant_live !== true) return none('NOT_APPLICABLE');
+  return studentNotice(tx, event, row, { kind: 'ASSESSMENT_INVITED', assessment: { title: row.assessment_title, closesAt: new Date(row.closes_at) } }, sinkConfigured);
+}
+
+/**
  * Who hears that a candidate replied: the active members who have written in the conversation;
  * otherwise the member who started it, if still active; otherwise the employer's active owners and admins.
  */
@@ -518,7 +556,7 @@ async function studentNotice(
   await ensureHiringTemplate(tx, event, kind);
   const written = await writeNotices(tx, {
     eventId: event.eventId, applicationId: context.application_id, kind, recipientKind: 'STUDENT', recipientIds: [context.student_user_id], notice,
-    data: { screen: kind.startsWith('OFFER') ? 'offers' : 'applications', employerName: context.employer_name, opportunityTitle: context.title },
+    data: { screen: kind.startsWith('OFFER') ? 'offers' : kind === 'ASSESSMENT_INVITED' ? 'assessments' : 'applications', employerName: context.employer_name, opportunityTitle: context.title },
     email: true, sinkConfigured,
   });
   return { outcome: written ? 'NOTIFIED' : 'NOT_APPLICABLE', recipients: written };

@@ -19,7 +19,10 @@
 practise next and to show which skills you have shown. If you do not agree, you still get the same
 lessons and practice, in the same order as everyone else. You can turn this off at any time in
 Settings → Privacy; ONE then stops personalising from that moment. What you have already done stays in
-your record.
+your record. [Proposed addition, INST-15, for legal review:] If you study at a college that uses ONE,
+the lecturers who teach your section can see the skills you are stuck on and the skills due for
+review; common mistakes are shown to them only as class totals of five or more students. They never
+see a score.
 
 **AI tutor (optional).** If you agree, when you ask the tutor for help, the question you are working on
 and your answer so far are sent to our AI provider to write a hint. The tutor never gives you the

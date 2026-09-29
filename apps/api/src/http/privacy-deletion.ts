@@ -169,7 +169,10 @@ async function erase(deps: DeletionExecutionDeps, subjectUserId: string): Promis
   counts.STUDENT_PROFILE += await db.transaction(async (tx) => {
     await tx.execute(sql`SELECT set_config('one.privacy_erase_subject', ${subjectUserId}, true)`);
     const gone = await tx.execute(sql`WITH gone AS (DELETE FROM learner_goals WHERE student_user_id = ${subjectUserId}::uuid RETURNING 1) SELECT count(*)::int AS count FROM gone`) as QueryResult<{ count: number }>;
-    return Number(gone.rows[0]?.count ?? 0);
+    // The career roles the person chose (0011) are about them too. Role goals reference these rows, so
+    // they go after the goals above. They were left behind until 2026-09-29 (found by ENG-19).
+    const targets = await tx.execute(sql`WITH gone AS (DELETE FROM student_career_targets WHERE student_user_id = ${subjectUserId}::uuid RETURNING 1) SELECT count(*)::int AS count FROM gone`) as QueryResult<{ count: number }>;
+    return Number(gone.rows[0]?.count ?? 0) + Number(targets.rows[0]?.count ?? 0);
   });
   await db.execute(sql`DELETE FROM student_saved_opportunities WHERE student_user_id = ${subjectUserId}::uuid`);
 

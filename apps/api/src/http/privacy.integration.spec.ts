@@ -326,6 +326,11 @@ describe('deletion execution', () => {
 
   it('erases the person and keeps the employer record once the hold is released', async () => {
     await pool.query(`UPDATE data_retention_holds SET released_at = now(), released_by_user_id = $1 WHERE subject_user_id = $2`, [opsId, subjectId]);
+    // A career role the person chose, and one someone else chose, so the erasure can be told apart.
+    const roleId = randomUUID();
+    await pool.query(`INSERT INTO career_roles (id, code, title, family) VALUES ($1, $2, 'Erasure check role', 'TEST')`, [roleId, 'ERASE_' + roleId.slice(0, 8).toUpperCase().replace(/-/g, '_')]);
+    await pool.query(`INSERT INTO student_career_targets (id, student_user_id, career_role_id) VALUES ($1, $2, $3)`, [randomUUID(), subjectId, roleId]);
+    await pool.query(`INSERT INTO student_career_targets (id, student_user_id, career_role_id) VALUES ($1, $2, $3)`, [randomUUID(), opsId, roleId]);
 
     const summaries = await executeDueDeletions({ db, ids, storage });
     expect(summaries).toHaveLength(1);
@@ -341,6 +346,9 @@ describe('deletion execution', () => {
     // What was only about them is gone.
     expect((await pool.query('SELECT 1 FROM student_profiles WHERE user_id = $1', [subjectId])).rows).toHaveLength(0);
     expect((await pool.query('SELECT 1 FROM student_document_metadata WHERE student_user_id = $1', [subjectId])).rows).toHaveLength(0);
+    // The career role they chose is erased with them; another person's choice is untouched.
+    expect((await pool.query('SELECT 1 FROM student_career_targets WHERE student_user_id = $1', [subjectId])).rows).toHaveLength(0);
+    expect((await pool.query('SELECT 1 FROM student_career_targets WHERE student_user_id = $1', [opsId])).rows).toHaveLength(1);
 
     // Engine behavioural data is erased (ENG-03) -- the subject's only; the other
     // person's attempt log is untouched.

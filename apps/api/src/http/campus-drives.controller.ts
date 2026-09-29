@@ -562,7 +562,8 @@ export class InstitutionCampusDrivesController {
 
   /**
    * Drive results for the college. Counts only once the drive is complete (a count that moves day by
-   * day can be differenced to follow one student), each through the one suppression rule. Named
+   * day can be differenced to follow one student), each through the one suppression rule, and only
+   * over applications the student shared with the college (EMP-15, aligned with INST-12). Named
    * rows only for applications the student shared with the college and has not revoked, of a
    * current student inside the reader's scope — stage and offer existence only, never terms.
    */
@@ -580,6 +581,9 @@ export class InstitutionCampusDrivesController {
              count(*) FILTER (WHERE a.state = 'HIRED' OR EXISTS (SELECT 1 FROM offers f WHERE f.application_id = a.id AND f.state = 'ACCEPTED'))::int AS selected
       FROM campus_drive_applications l JOIN applications a ON a.id = l.application_id
       WHERE l.campus_drive_id = ${drive}::uuid AND a.state <> 'DRAFT'
+        -- EMP-15, as INST-12's register recommends: the college counts only applications the
+        -- student shared with it, the same consent its named rows need.
+        AND a.institution_visibility_granted_at IS NOT NULL AND a.institution_visibility_revoked_at IS NULL
     `) as QueryResult<{ applied: number; offered: number; selected: number }> : null;
     const named = await this.db.execute(sql`
       SELECT sp.full_name, sp.institution_student_id, a.state AS application_state, a.updated_at, latest.state AS offer_state

@@ -21,7 +21,7 @@ import {
   type InstitutionUnitNode,
 } from './institution-scope.js';
 
-export const institutionExportKinds = ['ROSTER', 'READINESS_BANDS', 'ASSESSMENT_RESULTS', 'STAFF_ACTION_SUMMARY'] as const;
+export const institutionExportKinds = ['ROSTER', 'READINESS_BANDS', 'ASSESSMENT_RESULTS', 'STAFF_ACTION_SUMMARY', 'ACCREDITATION_OUTCOMES'] as const;
 export type InstitutionExportKind = (typeof institutionExportKinds)[number];
 
 /** The audit action for each export (Appendix 3 §5.3: "audited as *.exported"). */
@@ -30,6 +30,8 @@ export const institutionExportAuditActions: Readonly<Record<InstitutionExportKin
   READINESS_BANDS: 'institution.readiness_bands.exported',
   ASSESSMENT_RESULTS: 'institution.assessment_results.exported',
   STAFF_ACTION_SUMMARY: 'institution.staff_action_summary.exported',
+  // INST-13: graduate outcomes for accreditation, on the same gate, scope, limits and audit.
+  ACCREDITATION_OUTCOMES: 'institution.accreditation_outcomes.exported',
 };
 
 /** At most this many data rows leave in one file; larger exports are refused, not truncated. */

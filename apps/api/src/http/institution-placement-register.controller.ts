@@ -19,7 +19,7 @@
  * Design: docs/architecture/placement-register-design.md.
  */
 import { BadRequestException, Body, ConflictException, Controller, ForbiddenException, Get, Inject, Param, Post, Req, UseGuards } from '@nestjs/common';
-import { sql, type SQL } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import {
   canAddressInstitutionAudience,
   placementStatistics,
@@ -30,7 +30,6 @@ import {
   type PlacementStatisticsRow,
   type SuppressedCount,
 } from '@planthepath/authorization/src/index.js';
-import { institutionStudentScopeSql } from '@planthepath/persistence/src/institution-scope.js';
 import type { PersistenceDb } from '@planthepath/persistence/src/repositories.js';
 import {
   API_ID_GENERATOR,
@@ -41,6 +40,7 @@ import {
   type ApiIdGenerator,
   type ProtectedHttpRequest,
 } from './api-security.js';
+import { authorisedAt, loadPlacementFacts, placementPeriod, populationCte, sharedBefore } from './placement-facts.js';
 import { describeInstitutionStudentScope, institutionStaffScopeMemberships, institutionStudentScopeFor, institutionStudentWriteScopeFor } from './institution-student-scope.js';
 
 type Executor = Pick<PersistenceDb, 'execute'>;
@@ -55,8 +55,6 @@ const categoryManagerRoles = ['INSTITUTION_OWNER', 'INSTITUTION_ADMIN', 'PLACEME
 export const driveCategoryRetireReasonCodes = ['NO_LONGER_USED', 'RENAMED', 'SET_IN_ERROR'] as const;
 /** Keeps Settings a short list rather than a taxonomy. */
 const maximumActiveCategories = 20;
-/** Application stages at or past the shortlist. */
-const shortlistStages = ['SHORTLISTED', 'ASSESSMENT', 'INTERVIEW', 'OFFER', 'HIRED'];
 /** Drives the college approved: the ones that engage an employer and belong on the calendar. */
 const engagedDriveStates = ['APPROVED', 'SCHEDULED', 'COMPLETED'];
 const trendMonths = 6;
@@ -80,42 +78,6 @@ export async function loadDriveCategories(db: Executor, institutionId: string, d
   const map = new Map<string, DriveCategoryRef>();
   for (const row of rows.rows) if (row.id && row.name) map.set(row.campus_drive_id, { id: row.id, name: row.name, retired: row.state !== 'ACTIVE' });
   return map;
-}
-
-/**
- * True when a relationship with the college authorised activity at `at` — the relationship
- * policy's historical rule (current, or graduated / transferred before `effective_to`).
- */
-function authorisedAt(institutionId: string, student: SQL, at: SQL): SQL {
-  return sql`EXISTS (SELECT 1 FROM institution_relationships ar
-    WHERE ar.institution_id = ${institutionId}::uuid AND ar.student_user_id = ${student}
-      AND (ar.state IN ('VERIFIED', 'ACTIVE') OR (ar.state IN ('TRANSFERRED', 'GRADUATED') AND ar.effective_to IS NOT NULL))
-      AND ar.effective_from <= ${at} AND (ar.effective_to IS NULL OR ar.effective_to > ${at}))`;
-}
-
-/**
- * Eligible students: on the roster in the reader's scope, account active, with a relationship that
- * began before `periodEnd` and is current now or ended in graduation (a season is reported after the
- * batch leaves). Transferred, ended and revoked students are not counted.
- */
-function populationCte(institutionId: string, scope: InstitutionStudentScope, periodEnd: SQL): SQL {
-  return sql`population AS (
-    SELECT sp.student_user_id, sp.department_unit_id, sp.batch_unit_id
-    FROM institution_student_profiles sp JOIN users u ON u.id = sp.student_user_id
-    WHERE sp.institution_id = ${institutionId}::uuid AND u.state = 'ACTIVE'
-      AND ${institutionStudentScopeSql(scope, 'sp')}
-      AND EXISTS (SELECT 1 FROM institution_relationships r
-        WHERE r.institution_id = sp.institution_id AND r.student_user_id = sp.student_user_id AND r.effective_from < ${periodEnd}
-          AND ((r.state IN ('ACTIVE', 'VERIFIED') AND r.effective_from <= now() AND (r.effective_to IS NULL OR r.effective_to > now()))
-            OR (r.state = 'GRADUATED' AND r.effective_to IS NOT NULL)))
-  )`;
-}
-
-/** Applications shared with the college now (consent honoured as of the request), submitted before `periodEnd` inside the relationship. */
-function sharedBefore(institutionId: string, periodEnd: SQL): SQL {
-  return sql`a.state <> 'DRAFT'
-    AND a.institution_visibility_granted_at IS NOT NULL AND a.institution_visibility_revoked_at IS NULL
-    AND a.submitted_at < ${periodEnd} AND ${authorisedAt(institutionId, sql`a.student_user_id`, sql`a.submitted_at`)}`;
 }
 
 function countView(count: SuppressedCount): SuppressedCount {
@@ -154,35 +116,9 @@ export class InstitutionPlacementRegisterController {
     const scope = await institutionStudentScopeFor(this.db, request, id, placementRegisterReaderRoles);
     const period = await this.period();
     const periodEnd = sql`${period.periodEnd}::timestamptz`;
-    const facts = await this.db.execute(sql`
-      WITH ${populationCte(id, scope, periodEnd)}
-      SELECT p.student_user_id, p.department_unit_id, p.batch_unit_id, a.id AS application_id,
-        (EXISTS (SELECT 1 FROM application_state_history h
-            WHERE h.application_id = a.id AND h.to_state = ANY(${`{${shortlistStages.join(',')}}`}::text[])
-              AND h.occurred_at < ${periodEnd} AND ${authorisedAt(id, sql`a.student_user_id`, sql`h.occurred_at`)})
-          OR (a.state = ANY(${`{${shortlistStages.join(',')}}`}::text[]) AND a.updated_at < ${periodEnd}
-              AND ${authorisedAt(id, sql`a.student_user_id`, sql`a.updated_at`)})) AS reached_shortlist,
-        (SELECT count(*) FROM offers f
-          WHERE f.application_id = a.id AND f.employer_id = a.employer_id AND f.state <> 'DRAFT'
-            AND f.extended_at < ${periodEnd} AND ${authorisedAt(id, sql`a.student_user_id`, sql`f.extended_at`)})::int AS offers,
-        (EXISTS (SELECT 1 FROM offers f
-            WHERE f.application_id = a.id AND f.employer_id = a.employer_id AND f.state = 'ACCEPTED'
-              AND f.responded_at < ${periodEnd} AND ${authorisedAt(id, sql`a.student_user_id`, sql`f.responded_at`)})
-          OR (a.state = 'HIRED' AND a.closed_at < ${periodEnd} AND ${authorisedAt(id, sql`a.student_user_id`, sql`a.closed_at`)})) AS placed
-      FROM population p
-      LEFT JOIN applications a ON a.student_user_id = p.student_user_id AND ${sharedBefore(id, periodEnd)}
-    `) as Rows<{ student_user_id: string; department_unit_id: string | null; batch_unit_id: string | null; application_id: string | null; reached_shortlist: boolean | null; offers: number | null; placed: boolean | null }>;
-
-    const groupKey = (row: { department_unit_id: string | null; batch_unit_id: string | null }) => `${row.department_unit_id ?? ''}|${row.batch_unit_id ?? ''}`;
-    const students = new Map<string, { group: string; applications: { reachedShortlist: boolean; offerExtended: boolean; placed: boolean; offers: number }[] }>();
-    for (const row of facts.rows) {
-      const entry = students.get(row.student_user_id) ?? { group: groupKey(row), applications: [] };
-      if (row.application_id) {
-        const offers = Number(row.offers ?? 0);
-        entry.applications.push({ reachedShortlist: row.reached_shortlist === true, offerExtended: offers > 0, placed: row.placed === true, offers });
-      }
-      students.set(row.student_user_id, entry);
-    }
+    const facts = await loadPlacementFacts(this.db, id, scope, period.periodEnd);
+    const groupKey = (row: { departmentUnitId: string | null; batchUnitId: string | null }) => `${row.departmentUnitId ?? ''}|${row.batchUnitId ?? ''}`;
+    const students = new Map([...facts].map(([userId, row]) => [userId, { group: groupKey(row), applications: row.applications }]));
     const groupKeys = [...new Set([...students.values()].map((student) => student.group))];
     const unitIds = [...new Set(groupKeys.flatMap((key) => key.split('|')).filter(Boolean))];
     const units = unitIds.length ? await this.db.execute(sql`
@@ -451,14 +387,7 @@ export class InstitutionPlacementRegisterController {
 
   /** The period: the first instant of the current UTC month, from the database clock. */
   private async period(): Promise<{ periodEnd: string; month: string; lastDay: string }> {
-    const rows = await this.db.execute(sql`
-      SELECT to_char(t AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS period_end,
-             to_char((t - interval '1 day') AT TIME ZONE 'UTC', 'YYYY-MM') AS month,
-             to_char((t - interval '1 day') AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS last_day
-      FROM (SELECT date_trunc('month', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC' AS t) boundary
-    `) as Rows<{ period_end: string; month: string; last_day: string }>;
-    const row = rows.rows[0]!;
-    return { periodEnd: row.period_end, month: row.month, lastDay: row.last_day };
+    return placementPeriod(this.db);
   }
 
   private async audit(tx: Executor, context: Context, institutionId: string, action: string, resourceType: string, resourceId: string, detail: Record<string, unknown>): Promise<void> {

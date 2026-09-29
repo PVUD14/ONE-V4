@@ -649,7 +649,7 @@ internal fun EmployerReportsPage(employerId: String, onClose: () -> Unit) {
 }
 
 /** Employer sub-pages reachable from the dashboard. */
-internal enum class EmployerOverlay { MyInterviews, Interviews, Offers, Analytics, Team, CompanyProfile }
+internal enum class EmployerOverlay { MyInterviews, Interviews, Offers, Analytics, Team, CompanyProfile, TermsTrust }
 
 // ---------------------------------------------------------------------------
 // EMP-12: screening test results for one candidate (read only)

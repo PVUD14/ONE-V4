@@ -863,6 +863,10 @@ internal fun EmployerScaffold(
             SlideIn { EmployerCompanyProfilePage(organizationId, onClose = { employerOverlay = null }) }
             return
         }
+        EmployerOverlay.TermsTrust -> {
+            SlideIn { EmployerTermsTrustPage(organizationId, onClose = { employerOverlay = null }) }
+            return
+        }
         null -> Unit
     }
 
@@ -917,7 +921,13 @@ internal fun EmployerScaffold(
                 when {
                     // Suspended or rejected: Home and Roles show the plain status; More (help,
                     // switch workspace, sign out) stays reachable.
-                    orgStatus?.canDraft == false && tab != 2 -> EmployerOrganisationStatusPanel(orgStatus!!)
+                    // EMP-16: answering a trust case is the one thing such an employer may still do,
+                    // so its cases stay one tap away.
+                    orgStatus?.canDraft == false && tab != 2 -> Column(Modifier.fillMaxSize()) {
+                        Box(Modifier.weight(1f)) { EmployerOrganisationStatusPanel(orgStatus!!) }
+                        TextButton(onClick = { employerOverlay = EmployerOverlay.TermsTrust },
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) { Text("Trust and safety cases") }
+                    }
                     roles == null -> HomeSkeleton()
                     else -> when (tab) {
                         0 -> Column(Modifier.fillMaxSize()) {
@@ -1057,6 +1067,15 @@ private fun EmployerHome(
         PilotCard(Modifier.fillMaxWidth()) {
             Text("What students see about your company on every job, and the details AI8HT operations verified.",
                 Modifier.clickable { onOpenOverlay(EmployerOverlay.CompanyProfile) }.padding(14.dp),
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+
+        // EMP-16: the employer terms, what ONE keeps, and trust cases about the organisation,
+        // read-only; accepting, responding and appealing are done on the web (Settings).
+        SectionTitle("Terms and trust", trailing = "View", onTrailing = { onOpenOverlay(EmployerOverlay.TermsTrust) })
+        PilotCard(Modifier.fillMaxWidth()) {
+            Text("The employer terms and whether they are accepted, what ONE keeps about candidates, and any trust and safety case about your organisation.",
+                Modifier.clickable { onOpenOverlay(EmployerOverlay.TermsTrust) }.padding(14.dp),
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
 

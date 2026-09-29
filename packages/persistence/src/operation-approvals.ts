@@ -191,6 +191,9 @@ export interface OperationApprovalRow {
   readonly lessonKey: string | null;
   readonly lessonVariant: string | null;
   readonly lessonRevision: number | null;
+  /** For a status notice template publish (OPS-16): the template key and version. */
+  readonly commsTemplateKey: string | null;
+  readonly commsTemplateVersion: number | null;
 }
 
 interface ApprovalDbRow {
@@ -204,6 +207,7 @@ interface ApprovalDbRow {
   skill_name: string | null; skill_key: string | null; skill_revision: number | null;
   question_key: string | null; question_revision: number | null;
   lesson_key: string | null; lesson_variant: string | null; lesson_revision: number | null;
+  comms_template_key: string | null; comms_template_version: number | null;
 }
 
 // Microsecond text timestamps for the keyset cursor: a millisecond cursor would repeat
@@ -228,7 +232,8 @@ const approvalSelect = sql`
          CASE WHEN skr.entity_type = 'LESSON' THEN skr.body->>'stableKey' END AS lesson_key,
          CASE WHEN skr.entity_type = 'LESSON' THEN concat_ws('/', COALESCE(skr.body #>> '{variant,language}', 'en'),
            COALESCE(skr.body #>> '{variant,level}', 'STANDARD'), COALESCE(skr.body #>> '{variant,style}', 'EXPLANATION')) END AS lesson_variant,
-         CASE WHEN skr.entity_type = 'LESSON' THEN skr.revision END AS lesson_revision
+         CASE WHEN skr.entity_type = 'LESSON' THEN skr.revision END AS lesson_revision,
+         snt.template_key AS comms_template_key, snt.version AS comms_template_version
   FROM operation_approvals a
   JOIN users ru ON ru.id = a.requested_by_user_id
   LEFT JOIN users du ON du.id = a.decided_by_user_id
@@ -239,7 +244,8 @@ const approvalSelect = sql`
   LEFT JOIN career_requirement_sets crs ON a.extended_target_type = 'career_requirement_set' AND crs.id::text = a.target_id
   LEFT JOIN career_roles cr ON cr.id = crs.career_role_id
   LEFT JOIN content_revisions skr ON a.extended_target_type = 'content_revision' AND skr.id::text = a.target_id
-  LEFT JOIN taxonomy_nodes skn ON skn.id = skr.entity_id`;
+  LEFT JOIN taxonomy_nodes skn ON skn.id = skr.entity_id
+  LEFT JOIN status_notice_templates snt ON a.extended_target_type = 'status_notice_template' AND snt.id::text = a.target_id`;
 
 function mapApproval(row: ApprovalDbRow): OperationApprovalRow {
   const live = row.state === 'PENDING' || row.state === 'APPROVED';
@@ -282,6 +288,8 @@ function mapApproval(row: ApprovalDbRow): OperationApprovalRow {
     lessonKey: row.lesson_key,
     lessonVariant: row.lesson_variant,
     lessonRevision: row.lesson_revision === null ? null : Number(row.lesson_revision),
+    commsTemplateKey: row.comms_template_key,
+    commsTemplateVersion: row.comms_template_version === null ? null : Number(row.comms_template_version),
   };
 }
 

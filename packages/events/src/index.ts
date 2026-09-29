@@ -92,6 +92,8 @@ const operationApprovalActionKeys = [
   'CONTENT_QUESTION_PUBLISH',
   // OPS-09c: extended key as well (0065).
   'CONTENT_LESSON_PUBLISH',
+  // OPS-16: extended key as well (0081).
+  'COMMS_TEMPLATE_PUBLISH',
 ] as const;
 
 // EMP-05: opportunities.lifecycle_state (0007 CHECK).
@@ -769,6 +771,57 @@ export const eventSchemas = {
     dataClassification: 'confidential',
     schemaRef: 'registry://support_case.assigned/1',
     payload: { caseId: { kind: 'uuid' }, assigneeUserId: { kind: 'uuid', required: false } },
+  },
+  // OPS-16: the incident register and status notices. Identifiers and enums only: a title,
+  // summary, note or notice text never leaves the incident tables.
+  incidentDeclaredV1: {
+    eventType: 'incident.declared',
+    eventVersion: 1,
+    producer: 'operations-incidents',
+    aggregateType: 'incident',
+    purpose: 'incident-register',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://incident.declared/1',
+    payload: {
+      incidentId: { kind: 'uuid' },
+      category: { kind: 'enum', values: ['PERSONAL_DATA_BREACH', 'SECURITY', 'SERVICE_OUTAGE', 'DEGRADED_SERVICE', 'DATA_INTEGRITY', 'OTHER'] },
+      severity: { kind: 'enum', values: ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] },
+    },
+  },
+  incidentStateChangedV1: {
+    eventType: 'incident.state_changed',
+    eventVersion: 1,
+    producer: 'operations-incidents',
+    aggregateType: 'incident',
+    purpose: 'incident-register',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://incident.state_changed/1',
+    payload: {
+      incidentId: { kind: 'uuid' },
+      fromState: { kind: 'enum', values: ['OPEN', 'CONTAINED', 'RESOLVED', 'CLOSED'] },
+      toState: { kind: 'enum', values: ['OPEN', 'CONTAINED', 'RESOLVED', 'CLOSED'] },
+    },
+  },
+  statusNoticeTemplatePublishedV1: {
+    eventType: 'status_notice_template.published',
+    eventVersion: 1,
+    producer: 'operations-communications',
+    aggregateType: 'status_notice_template',
+    purpose: 'status-communications',
+    dataClassification: 'internal',
+    schemaRef: 'registry://status_notice_template.published/1',
+    payload: { templateId: { kind: 'uuid' }, notificationTemplateId: { kind: 'uuid' } },
+  },
+  // The worker sends an approved notice once, to the administrators of the affected organisations.
+  incidentStatusNoticeDispatchRequestedV1: {
+    eventType: 'incident.status_notice.dispatch.requested',
+    eventVersion: 1,
+    producer: 'operations-communications',
+    aggregateType: 'incident_status_notice',
+    purpose: 'status-communications',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://incident.status_notice.dispatch.requested/1',
+    payload: { noticeId: { kind: 'uuid' }, incidentId: { kind: 'uuid' } },
   },
   // OPS-08: career requirement sets. No consumer yet; a later worker can recompute the
   // gaps of students targeting the role after a publish. Identifiers and enums only.

@@ -37,6 +37,7 @@ import {
   isHighRiskInternalCapability,
   isInternalCapability,
   refuseApprovalRequest,
+  refuseCommsTemplatePublishRequest,
   refuseInternalCapabilityGrant,
   refuseLessonPublish,
   refuseQuestionPublish,
@@ -49,6 +50,7 @@ import { loadRequirementSetForPublish } from '@planthepath/persistence/src/caree
 import { loadSkillRevisionForPublish } from '@planthepath/persistence/src/skill-map.js';
 import { loadQuestionRevisionForPublish } from '@planthepath/persistence/src/question-bank.js';
 import { loadLessonRevisionForPublish } from '@planthepath/persistence/src/lesson-editor.js';
+import { loadStatusNoticeTemplate } from '@planthepath/persistence/src/status-notices.js';
 import {
   countHighRiskApprovers,
   createOperationApproval,
@@ -299,6 +301,17 @@ export class OperationsApprovalsController {
         if (refusal) throw new ForbiddenException(domainError(refusal, correlationId));
         return { targetId: revisionId, canonical: approvalPayloads.CONTENT_LESSON_PUBLISH({ revisionId, contentHash: revision.contentHash, reasonCode }) };
       }
+      case 'COMMS_TEMPLATE_PUBLISH': {
+        // OPS-16: only a draft status notice template version, and only by its author, so the
+        // approver (never the requester, except under the solo safeguard) is never the author.
+        const templateId = requireUuidField(payload.templateId, correlationId);
+        const template = await loadStatusNoticeTemplate(this.db, templateId);
+        if (!template) throw new OperationApprovalError('APPROVAL_TARGET_NOT_FOUND');
+        const refusal = refuseCommsTemplatePublishRequest({ actorUserId: actor.userId, authorUserId: template.draftedBy.userId, state: template.state });
+        if (refusal === 'COMMS_TEMPLATE_NOT_DRAFT') throw badRequest('APPROVAL_TARGET_STATE_INVALID', correlationId);
+        if (refusal) throw new ForbiddenException(domainError(refusal, correlationId));
+        return { targetId: templateId, canonical: approvalPayloads.COMMS_TEMPLATE_PUBLISH({ templateId, contentHash: template.contentHash, reasonCode }) };
+      }
     }
   }
 }
@@ -314,6 +327,7 @@ const payloadFields: Readonly<Record<HighRiskActionKey, readonly string[]>> = {
   CONTENT_SKILL_PUBLISH: ['revisionId', 'reasonCode'],
   CONTENT_QUESTION_PUBLISH: ['revisionId', 'reasonCode'],
   CONTENT_LESSON_PUBLISH: ['revisionId', 'reasonCode'],
+  COMMS_TEMPLATE_PUBLISH: ['templateId', 'reasonCode'],
 };
 
 /**
@@ -356,6 +370,8 @@ function toApprovalDto(row: OperationApprovalRow, actor: Actor, approverCount: n
       lessonKey: row.lessonKey,
       lessonVariant: row.lessonVariant,
       lessonRevision: row.lessonRevision,
+      commsTemplateKey: row.commsTemplateKey,
+      commsTemplateVersion: row.commsTemplateVersion,
     },
     reasonCode: row.reasonCode,
     note: row.note,

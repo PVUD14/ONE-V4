@@ -12,6 +12,7 @@ import { careerPublishReasons } from './career-catalogue.js';
 import { skillPublishReasons } from './skill-map.js';
 import { questionPublishReasons } from './question-bank.js';
 import { lessonPublishReasons } from './lesson-editor.js';
+import { commsTemplatePublishReasons } from './incidents.js';
 import { hasInternalCapability, internalCapabilityGrantReasons, type InternalCapability, type InternalCapabilityContext } from './internal-capabilities.js';
 
 export const highRiskActionKeys = [
@@ -29,6 +30,9 @@ export const highRiskActionKeys = [
   'CONTENT_QUESTION_PUBLISH',
   // OPS-09c. Extended key too (0065 adds it to operation_approval_extended_target_type).
   'CONTENT_LESSON_PUBLISH',
+  // OPS-16. Extended key too (0081 adds it to operation_approval_extended_target_type): a status
+  // notice template version reaches notification_templates only with a second person's approval.
+  'COMMS_TEMPLATE_PUBLISH',
 ] as const;
 
 /** The keys 0038's CHECK allows in `action_key`; any other key is an extended key (0051). */
@@ -45,7 +49,7 @@ export type HighRiskActionKey = (typeof highRiskActionKeys)[number];
 export interface HighRiskActionDefinition {
   /** Needed both to request the action and to execute it. */
   readonly capability: InternalCapability;
-  readonly targetType: 'organization' | 'feature_flag' | 'outbox_backlog' | 'data_retention_hold' | 'organization_membership' | 'career_requirement_set' | 'content_revision';
+  readonly targetType: 'organization' | 'feature_flag' | 'outbox_backlog' | 'data_retention_hold' | 'organization_membership' | 'career_requirement_set' | 'content_revision' | 'status_notice_template';
   readonly label: string;
 }
 
@@ -59,6 +63,7 @@ export const highRiskActions: Readonly<Record<HighRiskActionKey, HighRiskActionD
   CONTENT_SKILL_PUBLISH: { capability: 'CONTENT_PUBLISH', targetType: 'content_revision', label: 'Publish a skill that changes readiness inputs' },
   CONTENT_QUESTION_PUBLISH: { capability: 'CONTENT_PUBLISH', targetType: 'content_revision', label: 'Publish a readiness-check question' },
   CONTENT_LESSON_PUBLISH: { capability: 'CONTENT_PUBLISH', targetType: 'content_revision', label: 'Publish a lesson that changes readiness inputs' },
+  COMMS_TEMPLATE_PUBLISH: { capability: 'COMMS_TEMPLATES', targetType: 'status_notice_template', label: 'Publish a status notice template version' },
 };
 
 export function isLegacyHighRiskActionKey(key: HighRiskActionKey): boolean {
@@ -83,6 +88,7 @@ export const approvalRequestReasons: Readonly<Record<HighRiskActionKey, readonly
   CONTENT_SKILL_PUBLISH: skillPublishReasons,
   CONTENT_QUESTION_PUBLISH: questionPublishReasons,
   CONTENT_LESSON_PUBLISH: lessonPublishReasons,
+  COMMS_TEMPLATE_PUBLISH: commsTemplatePublishReasons,
 };
 
 /** Hours from request to expiry; one window covers deciding and executing. */

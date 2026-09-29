@@ -216,6 +216,8 @@ private class InstitutionData(
     val statistics: ScopedView<PlacementStatisticsDto> = ScopedView.NotForRole,
     /** INST-15: the lecturer's cohort view over the learning engine; NotForRole for non-faculty callers. */
     val learning: ScopedView<LearningCohortView> = ScopedView.NotForRole,
+    /** INST-16: what the lecturer assigned, planned and set (read-only here); NotForRole for non-faculty callers. */
+    val learningActions: ScopedView<FacultyLearningActionsDto> = ScopedView.NotForRole,
 )
 
 private sealed interface AnnouncementsState {
@@ -288,6 +290,7 @@ internal fun InstitutionScaffold(
             val classes = async { scopedView { Api.classReports(context, organizationId) } }
             val statistics = async { scopedView { Api.placementStatistics(context, organizationId) } }
             val learning = async { scopedView { Api.learningCohort(context, organizationId) } }
+            val learningActions = async { scopedView { Api.facultyLearningActions(context, organizationId) } }
             val loadedExams = exams.await()
             val target = loadedExams.firstOrNull { it.lifecycleState == "PUBLISHED" && it.assignedCount > 0 }
             val attention = if (target != null) {
@@ -296,7 +299,7 @@ internal fun InstitutionScaffold(
             } else emptyList()
             data = InstitutionData(loadedExams, subjects.await(), review.await(), inbox.await(), attention, activation.await(),
                 myStudents.await(), verification.await(), calendar.await(), announcements.await(),
-                department.await(), pipeline.await(), classes.await(), statistics.await(), learning.await())
+                department.await(), pipeline.await(), classes.await(), statistics.await(), learning.await(), learningActions.await())
         }
     }
 
@@ -420,6 +423,8 @@ private fun InstitutionHome(organizationId: String, data: InstitutionData, onVer
         if (data.classes !is ScopedView.NotForRole) ClassReportsSection(data.classes)
         // INST-15: learning across the lecturer's students (web: My Students), read-only.
         LearningCohortSection(data.learning)
+        // INST-16: what the lecturer assigned, planned and set; acting stays on the web (Learning Resources).
+        FacultyLearningActionsSection(data.learningActions)
 
         // Academic calendar (INST-05): the college's current and upcoming terms, examination
         // periods and breaks, as its admins set them on the web Settings screen.

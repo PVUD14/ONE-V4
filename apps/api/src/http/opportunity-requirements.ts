@@ -298,7 +298,11 @@ export async function readEligibilityRecords(db: Executor, studentUserId: string
       LIMIT 20
     `) as Promise<QueryResult<Record<string, unknown>>>,
   ]);
-  const record = institution.rows[0];
+  return mapEligibilityRecords(institution.rows[0], qualifications.rows);
+}
+
+/** The evaluator's input from one student's roster row and qualification rows (shared by the single and batch reads). */
+function mapEligibilityRecords(record: Record<string, unknown> | undefined, qualificationRows: readonly Record<string, unknown>[]): EligibilityRecords {
   return {
     institution: record ? {
       institutionId: String(record.institution_id),
@@ -306,7 +310,7 @@ export async function readEligibilityRecords(db: Executor, studentUserId: string
       programName: record.program_name ? String(record.program_name) : null,
       graduationYear: record.graduation_year == null ? null : Number(record.graduation_year),
     } : null,
-    qualifications: qualifications.rows.map((row): AcademicQualificationRecord => ({
+    qualifications: qualificationRows.map((row): AcademicQualificationRecord => ({
       id: String(row.id),
       institutionId: row.institution_id ? String(row.institution_id) : null,
       completedOn: row.completed_on ? String(row.completed_on) : null,
@@ -321,6 +325,49 @@ export async function readEligibilityRecords(db: Executor, studentUserId: string
       })),
     })),
   };
+}
+
+/**
+ * INST-14: the same records for many students at once, for a college's nomination list. The same
+ * rows as `readEligibilityRecords` per student (latest active roster row; newest 20 qualifications),
+ * in two queries instead of two per student.
+ */
+export async function readEligibilityRecordsFor(db: Executor, studentUserIds: readonly string[]): Promise<Map<string, EligibilityRecords>> {
+  const result = new Map<string, EligibilityRecords>();
+  const ids = [...new Set(studentUserIds)].filter((id) => uuidPattern.test(id));
+  if (ids.length === 0) return result;
+  const idArray = `{${ids.join(',')}}`;
+  const [institutions, qualifications] = await Promise.all([
+    db.execute(sql`
+      SELECT DISTINCT ON (isp.student_user_id) isp.student_user_id, isp.institution_id, dept.name AS department_name, prog.name AS program_name,
+             extract(year FROM isp.expected_graduation_date)::int AS graduation_year
+      FROM institution_student_profiles isp
+      LEFT JOIN institution_units dept ON dept.id = isp.department_unit_id
+      LEFT JOIN institution_units prog ON prog.id = isp.program_unit_id
+      WHERE isp.student_user_id = ANY(${idArray}::uuid[]) AND isp.status = 'ACTIVE'
+      ORDER BY isp.student_user_id, isp.updated_at DESC
+    `) as Promise<QueryResult<Record<string, unknown>>>,
+    db.execute(sql`
+      SELECT * FROM (
+        SELECT q.student_user_id, q.id, q.institution_id, q.completed_on::text AS completed_on, q.verification_state,
+          coalesce((SELECT json_agg(json_build_object('sequence', t.sequence, 'label', t.label, 'resultValue', t.result_value,
+              'resultScale', t.result_scale, 'backlogCount', t.backlog_count, 'verificationState', t.verification_state) ORDER BY t.sequence)
+            FROM student_academic_terms t WHERE t.qualification_id = q.id), '[]'::json) AS terms,
+          row_number() OVER (PARTITION BY q.student_user_id ORDER BY q.started_on DESC NULLS LAST, q.created_at DESC) AS position
+        FROM student_qualifications q
+        WHERE q.student_user_id = ANY(${idArray}::uuid[])
+      ) ranked WHERE position <= 20
+      ORDER BY student_user_id, position
+    `) as Promise<QueryResult<Record<string, unknown>>>,
+  ]);
+  const byStudent = new Map<string, Record<string, unknown>[]>();
+  for (const row of qualifications.rows) {
+    const key = String(row.student_user_id);
+    byStudent.set(key, [...(byStudent.get(key) ?? []), row]);
+  }
+  const rosters = new Map(institutions.rows.map((row) => [String(row.student_user_id), row]));
+  for (const id of ids) result.set(id, mapEligibilityRecords(rosters.get(id), byStudent.get(id) ?? []));
+  return result;
 }
 
 /** Write the frozen evaluation an employer sees: outcomes and basis, never the student's figures. */

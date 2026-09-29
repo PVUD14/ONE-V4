@@ -34,6 +34,7 @@ import { buildSnapshotFor, readResumeOptions, SnapshotResumeUnavailable, writeAp
 import { loadInterviewCalendar } from '@planthepath/persistence/src/interview-calendar-source.js';
 import { sendCalendar } from './interview-scheduling.js';
 import { linkApplicationToCampusDrives, readListedCampusDrives, readStudentCampusDrives, visibleThroughCampusDriveSql } from './campus-drives.js';
+import { markNominationAccepted, markNominationWithdrawn, readOwnNomination, type OpenNomination } from './campus-drive-nominations.controller.js';
 
 type QueryResult<T> = { rows: T[] };
 
@@ -307,7 +308,9 @@ export class StudentHiringController {
                WHERE mt.application_id = a.id AND m.sender_side = 'EMPLOYER' AND m.read_at IS NULL AND m.erased_at IS NULL) AS unread_messages,
              (SELECT inst.legal_name FROM campus_drive_applications l
                JOIN campus_drives cd ON cd.id = l.campus_drive_id JOIN organizations inst ON inst.id = cd.institution_id
-               WHERE l.application_id = a.id ORDER BY l.created_at, cd.id LIMIT 1) AS campus_drive_institution
+               WHERE l.application_id = a.id ORDER BY l.created_at, cd.id LIMIT 1) AS campus_drive_institution,
+             (SELECT inst.legal_name FROM campus_drive_nominations nom JOIN organizations inst ON inst.id = nom.institution_id
+               WHERE nom.application_id = a.id LIMIT 1) AS nominated_by_institution
       FROM applications a
       JOIN opportunities o ON o.id = a.opportunity_id
       JOIN opportunity_versions v ON v.id = a.applied_version_id
@@ -384,8 +387,35 @@ export class StudentHiringController {
   @UseGuards(ProtectedApiAuthenticationGuard)
   async apply(@Req() request: ProtectedHttpRequest, @Body() body: unknown): Promise<Record<string, unknown>> {
     const context = requireTrustedAuthorization(request);
+    return this.submitApplication(context, readApplyInput(body, context.correlationId), null);
+  }
+
+  /**
+   * INST-14: opt in to a placement-office nomination. This is apply — the same eligibility,
+   * placement-policy, snapshot and grant rules, in the same transaction — for the nomination's job,
+   * with two additions: the student must send back the hash of the preview they reviewed (informed
+   * consent to exactly what is shared), and the nomination is re-checked under lock and then points at
+   * the application. Until this succeeds nothing about the student reaches the employer.
+   */
+  @Post('/students/me/nominations/:nominationId/accept')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async acceptNomination(@Req() request: ProtectedHttpRequest, @Param('nominationId') nominationId: string, @Body() body: unknown): Promise<Record<string, unknown>> {
+    const context = requireTrustedAuthorization(request);
     const studentUserId = context.authorization.principal.userId;
-    const input = readApplyInput(body, context.correlationId);
+    const id = requireUuid(nominationId, context.correlationId).toLowerCase();
+    if (typeof body === 'object' && body !== null && 'opportunityId' in body) throw badRequest('UNKNOWN_FIELD', context.correlationId);
+    const nomination = await readOwnNomination(this.db, id, studentUserId);
+    if (!nomination) throw forbidden(context.correlationId);
+    const input = readApplyInput({ ...(typeof body === 'object' && body !== null ? body : {}), opportunityId: nomination.opportunityId }, context.correlationId);
+    if (input.reviewedSnapshotHash === null) throw badRequest('NOMINATION_REVIEW_REQUIRED', context.correlationId);
+    if (nomination.state !== 'INVITED' && nomination.state !== 'DECLINED') throw badRequest('NOMINATION_NOT_OPEN', context.correlationId);
+    if (!nomination.driveLive) throw badRequest('NOMINATION_CLOSED', context.correlationId);
+    const result = await this.submitApplication(context, input, nomination);
+    return { ...result, nomination: { id, state: 'ACCEPTED' } };
+  }
+
+  private async submitApplication(context: ReturnType<typeof requireTrustedAuthorization>, input: ReturnType<typeof readApplyInput>, nomination: OpenNomination | null): Promise<Record<string, unknown>> {
+    const studentUserId = context.authorization.principal.userId;
 
     const opportunityRows = await this.db.execute(sql`
       SELECT o.id, o.employer_id, o.lifecycle_state, o.current_version_id, v.application_deadline
@@ -466,6 +496,14 @@ export class StudentHiringController {
         SELECT 1 FROM opportunities o WHERE o.id = ${input.opportunityId}::uuid AND ${visibleToStudent(studentUserId)}
       `) as QueryResult<Record<string, unknown>>;
       if (stillVisible.rows.length !== 1) throw forbidden(context.correlationId);
+      // INST-14: the nomination again, under lock and after the drive locks: still the student's to
+      // answer, and its drive still one of the live drives this application goes through.
+      const openNomination = nomination ? await readOwnNomination(tx, nomination.id, studentUserId, true) : null;
+      if (nomination) {
+        if (!openNomination || openNomination.opportunityId !== input.opportunityId) throw forbidden(context.correlationId);
+        if (openNomination.state !== 'INVITED' && openNomination.state !== 'DECLINED') throw badRequest('NOMINATION_NOT_OPEN', context.correlationId);
+        if (!drives.some((drive) => drive.id === openNomination.campusDriveId)) throw badRequest('NOMINATION_CLOSED', context.correlationId);
+      }
 
       // The partial unique index on open applications is the real guard against a
       // double submission racing this insert; ON CONFLICT keeps it a clean 200.
@@ -493,6 +531,7 @@ export class StudentHiringController {
         ON CONFLICT (employer_id, student_user_id, opportunity_id) WHERE revoked_at IS NULL DO NOTHING
       `);
       await linkApplicationToCampusDrives(tx, applicationId, input.opportunityId, drives);
+      if (openNomination) await markNominationAccepted(tx, this.ids, { nomination: openNomination, applicationId, studentUserId, correlationId: context.correlationId });
       // What the employer is told about this applicant's eligibility, frozen as it stood now.
       if (evaluation) await recordEligibilityEvaluation(tx, this.ids, { applicationId, versionId, trigger: 'APPLY', evaluation });
       await this.writeAudit(studentUserId, 'application.submitted', 'application', applicationId, context.correlationId, tx);
@@ -672,6 +711,8 @@ export class StudentHiringController {
         AND opportunity_id = ${String(application.opportunity_id)}::uuid
         AND revoked_at IS NULL
     `);
+    // INST-14: an application made by opting in to a nomination withdraws that consent too.
+    await markNominationWithdrawn(this.db, this.ids, { applicationId: id, studentUserId, correlationId: context.correlationId });
     await this.writeAudit(studentUserId, 'application.withdrawn', 'application', id, context.correlationId);
     await this.writeOutbox('application', id, 'application.withdrawn', { applicationId: id }, studentUserId, String(application.employer_id), context.correlationId);
 
@@ -920,6 +961,8 @@ function mapApplication(row: Record<string, unknown>): Record<string, unknown> {
     unreadMessages: Number(row.unread_messages ?? 0),
     // EMP-11: the college whose drive this application came through, if any.
     campusDrive: typeof row.campus_drive_institution === 'string' ? { institutionName: row.campus_drive_institution } : null,
+    // INST-14: made by opting in to this college's nomination.
+    nominatedBy: typeof row.nominated_by_institution === 'string' ? { institutionName: row.nominated_by_institution } : null,
   };
 }
 

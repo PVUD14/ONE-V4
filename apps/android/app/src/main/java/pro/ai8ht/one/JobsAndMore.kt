@@ -92,10 +92,17 @@ internal fun JobsScreen() {
     var termsChange by remember { mutableStateOf<Pair<String, TermsChangeDto>?>(null) }
     // EMP-10: the application whose conversation is open (inside My applications; no new tab).
     var conversationFor by remember { mutableStateOf<ApplicationDto?>(null) }
+    // INST-14: the college's nominations, answered at the top of My applications (no new tab).
+    var nominations by remember { mutableStateOf<List<StudentNominationDto>?>(null) }
+    var nominationsFailed by remember { mutableStateOf(false) }
+    var openNomination by remember { mutableStateOf<StudentNominationDto?>(null) }
 
     LaunchedEffect(reload) {
         opportunities = runCatching { Api.listOpportunities(context) }.getOrNull()
         applications = runCatching { Api.listApplications(context) }.getOrNull()
+        val loadedNominations = runCatching { Api.listMyNominations(context) }
+        nominations = loadedNominations.getOrNull() ?: emptyList()
+        nominationsFailed = loadedNominations.isFailure
         val loaded = runCatching { Api.listStudentInterviews(context) }
         interviews = loaded.getOrNull() ?: emptyList()
         interviewsFailed = loaded.isFailure
@@ -111,6 +118,16 @@ internal fun JobsScreen() {
     }
     androidx.activity.compose.BackHandler(enabled = feedback != null) { feedback = null }
     androidx.activity.compose.BackHandler(enabled = conversationFor != null) { conversationFor = null; reload += 1 }
+    androidx.activity.compose.BackHandler(enabled = openNomination != null) { openNomination = null }
+
+    openNomination?.let { nomination ->
+        SlideIn {
+            NominationReviewPage(nomination, onClose = { openNomination = null }, onAnswered = { message ->
+                openNomination = null; notice = message; reload += 1
+            })
+        }
+        return
+    }
 
     conversationFor?.let { app ->
         SlideIn { StudentConversationPage(app.id, "${app.title} · ${app.employerName}", onClose = { conversationFor = null; reload += 1 }) }
@@ -248,11 +265,15 @@ internal fun JobsScreen() {
         } else {
             when {
                 applications == null -> LoadingSpinner()
-                applications!!.isEmpty() -> EmptyState(
-                    androidx.compose.material.icons.Icons.Filled.WorkOutline, pro.ai8ht.one.ui.Tone.Violet,
-                    "No applications yet",
-                    "Apply to an opportunity and every stage — submitted, shortlisted, offered — is tracked here.")
+                applications!!.isEmpty() -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                    NominationsSection(nominations, nominationsFailed) { openNomination = it }
+                    EmptyState(
+                        androidx.compose.material.icons.Icons.Filled.WorkOutline, pro.ai8ht.one.ui.Tone.Violet,
+                        "No applications yet",
+                        "Apply to an opportunity and every stage — submitted, shortlisted, offered — is tracked here.")
+                }
                 else -> LazyColumn(Modifier.fillMaxSize()) {
+                    item(key = "nominations") { NominationsSection(nominations, nominationsFailed) { openNomination = it } }
                     val upcoming = interviews.orEmpty().filter { it.upcoming }
                     val past = interviews.orEmpty().filter { !it.upcoming }
                     item(key = "interviews-heading") {
@@ -309,6 +330,11 @@ internal fun JobsScreen() {
                                 app.campusDrive?.let {
                                     Spacer(Modifier.height(6.dp))
                                     StatusChip("Campus drive · ${it.institutionName}", ChipKind.Accent)
+                                }
+                                // INST-14: made by opting in to the college's nomination.
+                                app.nominatedBy?.let {
+                                    Spacer(Modifier.height(6.dp))
+                                    StatusChip("Nominated by ${it.institutionName}", ChipKind.Accent)
                                 }
                                 // EMP-05: the employer cannot move this application on until the
                                 // student answers the changed terms.

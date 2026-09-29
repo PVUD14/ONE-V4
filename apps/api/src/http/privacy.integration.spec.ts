@@ -399,6 +399,13 @@ async function seedPersonalRecords(userId: string, applicationId: string, tag: s
     [randomUUID(), applicationId, JSON.stringify({ schemaVersion: 1, candidate: { fullName: `${tag} Person`, phone: '+91 90000 00000' } }), SHA]);
   await q(`INSERT INTO application_state_history (id, application_id, from_state, to_state, actor_role, note) VALUES ($1,$2,'APPLIED','SCREENING','RECRUITER',$3)`,
     [randomUUID(), applicationId, `${tag} internal recruiter note`]);
+  // The employer changed the job's material terms after they applied, and they acknowledged it.
+  const revisedVersionId = randomUUID();
+  await q(`INSERT INTO opportunity_versions (id, opportunity_id, version_number, title, employment_type, work_mode, location_city, material_terms_hash, created_by_user_id)
+    SELECT $1, opportunity_id, 2, 'SOC Analyst Intern (revised)', 'INTERNSHIP', 'ONSITE', 'Bengaluru', $2, $3 FROM applications WHERE id = $4`,
+  [revisedVersionId, 'b'.repeat(64), opsId, applicationId]);
+  await q(`INSERT INTO opportunity_term_change_acknowledgements (id, application_id, from_version_id, to_version_id, notified_at, acknowledged_at)
+    SELECT $1, id, applied_version_id, $2, now(), now() FROM applications WHERE id = $3`, [randomUUID(), revisedVersionId, applicationId]);
   await q(`INSERT INTO interviews (id, application_id, employer_id, round_number, mode, state, scheduled_start, scheduled_end, joining_link, preparation_note, created_by_user_id)
     VALUES ($1,$2,$3,1,'VIDEO','SCHEDULED', now() + interval '3 days', now() + interval '3 days 1 hour', 'https://meet.example.test/room', $4, $5)`,
   [randomUUID(), applicationId, employerId, `${tag} bring your portfolio`, opsId]);
@@ -590,6 +597,9 @@ describe('data export', () => {
     expect(bundle.applicationSnapshots).toEqual([expect.objectContaining({ employerName: 'Aster Mobility', title: 'SOC Analyst Intern', erasedAt: null,
       snapshot: { schemaVersion: 1, candidate: { fullName: 'Subjectmark Person', phone: '+91 90000 00000' } } })]);
     expect(bundle.applicationHistory).toEqual([expect.objectContaining({ employerName: 'Aster Mobility', fromState: 'APPLIED', toState: 'SCREENING' })]);
+    expect(bundle.jobTermChanges).toEqual([expect.objectContaining({ employerName: 'Aster Mobility', title: 'SOC Analyst Intern',
+      newTitle: 'SOC Analyst Intern (revised)', declinedAt: null })]);
+    expect(bundle.jobTermChanges[0].acknowledgedAt).toBeTruthy();
     expect(bundle.interviews).toEqual([expect.objectContaining({ employerName: 'Aster Mobility', roundNumber: 1, mode: 'VIDEO', state: 'SCHEDULED',
       joiningLink: 'https://meet.example.test/room', preparationNote: 'Subjectmark bring your portfolio' })]);
     expect(bundle.feedbackReleased).toEqual([expect.objectContaining({ employerName: 'Aster Mobility', note: 'Subjectmark feedback note',

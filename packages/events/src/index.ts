@@ -728,6 +728,43 @@ export const eventSchemas = {
     schemaRef: 'registry://operation_approval.executed/1',
     payload: { approvalId: { kind: 'uuid' }, actionKey: { kind: 'enum', values: operationApprovalActionKeys } },
   },
+  // OPS-15: quarterly internal access reviews. No consumer yet; the outbox rows are the
+  // durable announcement of the review's lifecycle. Identifiers and enums only.
+  accessReviewOpenedV1: {
+    eventType: 'access_review.opened',
+    eventVersion: 1,
+    producer: 'identity-organization',
+    aggregateType: 'access_review_campaign',
+    purpose: 'internal-access-review',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://access_review.opened/1',
+    payload: { campaignId: { kind: 'uuid' } },
+  },
+  accessReviewItemDecidedV1: {
+    eventType: 'access_review.item_decided',
+    eventVersion: 1,
+    producer: 'identity-organization',
+    aggregateType: 'access_review_campaign',
+    purpose: 'internal-access-review',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://access_review.item_decided/1',
+    payload: {
+      campaignId: { kind: 'uuid' },
+      itemId: { kind: 'uuid' },
+      decision: { kind: 'enum', values: ['KEEP', 'REVOKE'] },
+      mode: { kind: 'enum', values: ['DUAL', 'SOLO'] },
+    },
+  },
+  accessReviewClosedV1: {
+    eventType: 'access_review.closed',
+    eventVersion: 1,
+    producer: 'identity-organization',
+    aggregateType: 'access_review_campaign',
+    purpose: 'internal-access-review',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://access_review.closed/1',
+    payload: { campaignId: { kind: 'uuid' } },
+  },
   // OPS-05: the support desk. No consumer yet; the outbox row is the durable
   // announcement a later notification or the Overview (OPS-03) can follow. Identifiers
   // and enums only: a case summary or note never leaves the support tables.

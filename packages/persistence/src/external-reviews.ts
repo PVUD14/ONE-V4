@@ -263,45 +263,64 @@ export async function revokeExternalReviewer(db: TransactionalRunner, input: {
       const target = await lockReviewerTarget(tx, input.membershipId);
       const refusal = input.decide(target);
       if (refusal) throw new ExternalReviewRefused(refusal);
-      const revoked = await rows<{ id: string }>(tx, sql`
-        UPDATE membership_capabilities SET revoked_by_user_id = ${input.actor.userId}::uuid, revoked_at = now(), revoked_reason_code = ${input.reasonCode}
-        WHERE membership_id = ${input.membershipId}::uuid AND capability = 'CONTENT_REVIEW_EXTERNAL' AND revoked_at IS NULL
-        RETURNING id
-      `);
-      if (!revoked.length) throw new ExternalReviewError('EXTERNAL_REVIEWER_NOT_GRANTED');
-      const closed = await rows<{ id: string; content_revision_id: string }>(tx, sql`
-        UPDATE external_review_assignments
-        SET state = 'REVOKED', revoked_by_user_id = ${input.actor.userId}::uuid, revoked_at = now(), revoked_reason_code = ${externalReviewGrantRevokedReason}
-        WHERE reviewer_membership_id = ${input.membershipId}::uuid AND state = 'ASSIGNED'
-        RETURNING id, content_revision_id
-      `);
-      for (const assignment of closed) {
-        await audit(tx, {
-          actor: input.actor, action: 'operations.external_review.revoked', resourceType: 'external_review_assignment', resourceId: assignment.id,
-          organizationId: target.organizationId, context: { revisionId: assignment.content_revision_id, reasonCode: externalReviewGrantRevokedReason },
-        });
-        await outbox(tx, {
-          actor: input.actor, aggregateType: 'external_review_assignment', aggregateId: assignment.id, eventType: 'external_review.revoked',
-          organizationId: target.organizationId, payload: { assignmentId: assignment.id, revisionId: assignment.content_revision_id },
-        });
-      }
-      await audit(tx, {
-        actor: input.actor, action: 'operations.external_reviewer.revoked', resourceType: 'organization_membership', resourceId: input.membershipId,
-        organizationId: target.organizationId,
-        context: {
-          capability: 'CONTENT_REVIEW_EXTERNAL', reasonCode: input.reasonCode, targetUserId: target.userId, targetRole: target.role,
-          closedAssignments: closed.length, ...(input.note ? { note: input.note } : {}),
-        },
-      });
-      await outbox(tx, {
-        actor: input.actor, aggregateType: 'organization_membership', aggregateId: input.membershipId, eventType: 'organization_membership.capability_revoked',
-        organizationId: target.organizationId, payload: { membershipId: input.membershipId, capability: 'CONTENT_REVIEW_EXTERNAL' },
-      });
-      return { ...await reviewerView(tx, input.membershipId), closedAssignments: closed.length };
+      const closed = await revokeExternalReviewerWithin(tx, { ...input, target });
+      if (closed === null) throw new ExternalReviewError('EXTERNAL_REVIEWER_NOT_GRANTED');
+      return { ...await reviewerView(tx, input.membershipId), closedAssignments: closed };
     });
   } catch (error) {
     rethrow(error);
   }
+}
+
+/**
+ * The revocation itself — the grant, the open assignments it closes, and their audit rows
+ * and outbox events — inside a transaction the caller owns. Shared by Content Management
+ * and the access review (OPS-15), so the two cannot drift apart. Returns the number of
+ * assignments closed, or null when no live grant exists.
+ */
+export async function revokeExternalReviewerWithin(tx: SqlRunner, input: {
+  readonly membershipId: string; readonly reasonCode: string; readonly note: string | null; readonly actor: ExternalReviewActor;
+  readonly target: { readonly userId: string; readonly role: string; readonly organizationId: string };
+  /** OPS-15: the campaign and item a revocation was applied from. */
+  readonly accessReview?: Record<string, unknown>;
+}): Promise<number | null> {
+  const target = input.target;
+  const revoked = await rows<{ id: string }>(tx, sql`
+    UPDATE membership_capabilities SET revoked_by_user_id = ${input.actor.userId}::uuid, revoked_at = now(), revoked_reason_code = ${input.reasonCode}
+    WHERE membership_id = ${input.membershipId}::uuid AND capability = 'CONTENT_REVIEW_EXTERNAL' AND revoked_at IS NULL
+    RETURNING id
+  `);
+  if (!revoked.length) return null;
+  const closed = await rows<{ id: string; content_revision_id: string }>(tx, sql`
+    UPDATE external_review_assignments
+    SET state = 'REVOKED', revoked_by_user_id = ${input.actor.userId}::uuid, revoked_at = now(), revoked_reason_code = ${externalReviewGrantRevokedReason}
+    WHERE reviewer_membership_id = ${input.membershipId}::uuid AND state = 'ASSIGNED'
+    RETURNING id, content_revision_id
+  `);
+  const accessReview = input.accessReview ? { accessReview: input.accessReview } : {};
+  for (const assignment of closed) {
+    await audit(tx, {
+      actor: input.actor, action: 'operations.external_review.revoked', resourceType: 'external_review_assignment', resourceId: assignment.id,
+      organizationId: target.organizationId, context: { revisionId: assignment.content_revision_id, reasonCode: externalReviewGrantRevokedReason, ...accessReview },
+    });
+    await outbox(tx, {
+      actor: input.actor, aggregateType: 'external_review_assignment', aggregateId: assignment.id, eventType: 'external_review.revoked',
+      organizationId: target.organizationId, payload: { assignmentId: assignment.id, revisionId: assignment.content_revision_id },
+    });
+  }
+  await audit(tx, {
+    actor: input.actor, action: 'operations.external_reviewer.revoked', resourceType: 'organization_membership', resourceId: input.membershipId,
+    organizationId: target.organizationId,
+    context: {
+      capability: 'CONTENT_REVIEW_EXTERNAL', reasonCode: input.reasonCode, targetUserId: target.userId, targetRole: target.role,
+      closedAssignments: closed.length, ...(input.note ? { note: input.note } : {}), ...accessReview,
+    },
+  });
+  await outbox(tx, {
+    actor: input.actor, aggregateType: 'organization_membership', aggregateId: input.membershipId, eventType: 'organization_membership.capability_revoked',
+    organizationId: target.organizationId, payload: { membershipId: input.membershipId, capability: 'CONTENT_REVIEW_EXTERNAL' },
+  });
+  return closed.length;
 }
 
 // ---------------------------------------------------------------------------

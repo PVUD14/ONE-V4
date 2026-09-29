@@ -39,6 +39,7 @@ import { FacultyMyStudentsPage, InstitutionFacultyAndStaffPage } from './rolePor
 import { FacultyMessagesPage } from './rolePortal/institutionAnnouncements.js';
 import { InstitutionPlacementPage, PlacementStatusList } from './rolePortal/institutionPlacement.js';
 import { CampusDriveApprovalsSection, PlacementPoliciesSection } from './rolePortal/institutionCampusDrives.js';
+import { PlacementRegisterSection, PlacementStatisticsSection } from './rolePortal/institutionPlacementRegister.js';
 import { DepartmentBatchesPage, DepartmentOverviewPage, DepartmentReadinessPage, DepartmentReportsAnalyticsPage, FacultyAssessmentDetailPage, FacultyClassReportsPage, OpportunitiesAndOffersPage, PlacementPipelinePage } from './rolePortal/institutionDepartment.js';
 import { AcademicVerificationSection, FacultyAcademicVerification } from './rolePortal/institutionAcademicVerification.js';
 import { OperationsAuditLogPage, OperationsContentReadOnlyPage, OperationsFeatureFlagsPage, OperationsOrganizationsPage, OperationsInvitationTrackingPanel, OperationsTechnicalReadOnlyPage } from './rolePortal/operations.js';
@@ -223,7 +224,10 @@ function AuthenticatedDashboardChooser({ portal, routeLabel, onNavigate, authent
     if (portal.key === 'placement-officer') {
       return <><InstitutionDashboardV3 institutionId={authenticatedWorkspace.organizationId} basePath={portal.basePath} />
         <section className="role-module role-module--dense"><CampusDriveApprovalsSection institutionId={authenticatedWorkspace.organizationId} />
-          <PlacementPoliciesSection institutionId={authenticatedWorkspace.organizationId} /></section></>;
+          <PlacementPoliciesSection institutionId={authenticatedWorkspace.organizationId} />
+          {/* INST-12: the placement register and season statistics, also a Dashboard section (no Drives item). */}
+          <div className="pilot pilot-embed"><PlacementStatisticsSection institutionId={authenticatedWorkspace.organizationId} />
+            <PlacementRegisterSection institutionId={authenticatedWorkspace.organizationId} /></div></section></>;
     }
     return <InstitutionDashboardV3 institutionId={authenticatedWorkspace.organizationId} basePath={portal.basePath} />;
   }
@@ -404,7 +408,10 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   if (!demoMode && portal.key === 'department-head' && route.label === 'Department Overview') return <DepartmentOverviewPage authenticatedWorkspace={authenticatedWorkspace} basePath={portal.basePath} />;
   if (!demoMode && portal.key === 'department-head' && route.label === 'Readiness') return <DepartmentReadinessPage authenticatedWorkspace={authenticatedWorkspace} />;
   if (!demoMode && portal.key === 'department-head' && route.label === 'Batches') return <DepartmentBatchesPage authenticatedWorkspace={authenticatedWorkspace} />;
-  if (!demoMode && portal.key === 'department-head' && route.label === 'Placement Pipeline') return <PlacementPipelinePage authenticatedWorkspace={authenticatedWorkspace} basePath={portal.basePath} />;
+  if (!demoMode && portal.key === 'department-head' && route.label === 'Placement Pipeline') {
+    return <PlacementPipelinePage authenticatedWorkspace={authenticatedWorkspace} basePath={portal.basePath}
+      statistics={authenticatedWorkspace?.organizationId ? <PlacementStatisticsSection institutionId={authenticatedWorkspace.organizationId} /> : null} />;
+  }
   if (!demoMode && portal.key === 'department-head' && route.label === 'Opportunities and Offers') return <OpportunitiesAndOffersPage authenticatedWorkspace={authenticatedWorkspace} />;
   // INST-08's exports panel lives inside this page (see DepartmentReportsAnalyticsPage).
   if (!demoMode && portal.key === 'department-head' && route.label === 'Reports and Analytics') return <DepartmentReportsAnalyticsPage authenticatedWorkspace={authenticatedWorkspace} />;

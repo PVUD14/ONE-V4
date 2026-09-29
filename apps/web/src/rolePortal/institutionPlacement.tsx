@@ -11,7 +11,8 @@
  * what an offer is (never an unsent draft) and what a small group shows (<5). Nothing is
  * filtered or counted for security in the browser. A student who shared nothing reads
  * "Nothing shared" — never "not applied", because the college cannot tell the two apart.
- * Pay never appears (ADR-024); readiness is not shown here at all.
+ * Pay never appears (ADR-024); readiness is not shown here at all. INST-12 adds the season
+ * statistics and the placement register to the admin's Placement page.
  */
 import { Briefcase, ClipboardCheck, GraduationCap, Users } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -23,6 +24,7 @@ import { Kpis, PageHead, SuppressedFunnel, applicationStageLabels, loadError, of
 import { StudentApplicationRecords } from './institution.js';
 import type { AuthenticatedWorkspaceSummary } from './shared.js';
 import { CampusDriveApprovalsSection } from './institutionCampusDrives.js';
+import { PlacementRegisterSection, PlacementStatisticsSection } from './institutionPlacementRegister.js';
 
 /** The admin's Placement item: the status distribution, the stage funnel and every student's status. */
 export function InstitutionPlacementPage({ authenticatedWorkspace }: { readonly authenticatedWorkspace?: AuthenticatedWorkspaceSummary | undefined }): React.ReactElement {
@@ -58,6 +60,9 @@ export function InstitutionPlacementPage({ authenticatedWorkspace }: { readonly 
         <div className="pilot-card-head"><h2>Offers by response</h2></div>
         <SuppressedFunnel table={data?.offers ?? null} labels={offerResponseLabels} />
       </section>
+      {/* INST-12: season statistics by department and batch, and the register (employers, drive calendar). */}
+      <PlacementStatisticsSection institutionId={authenticatedWorkspace!.organizationId!} />
+      <PlacementRegisterSection institutionId={authenticatedWorkspace!.organizationId!} />
       <PlacementStatusList key={(authenticatedWorkspace?.organizationId ?? '') + ':' + token} token={token} institutionId={authenticatedWorkspace!.organizationId!} />
       {/* EMP-11: campus drive approvals sit on the admin's existing Placement item. */}
       <CampusDriveApprovalsSection institutionId={authenticatedWorkspace!.organizationId!} />
@@ -72,8 +77,8 @@ export function InstitutionPlacementPage({ authenticatedWorkspace }: { readonly 
           <li>Offer pay and terms are never shown to the college.</li>
         </ul>
       </section>
-      <section className="pilot-card"><div className="pilot-card-head"><h2>Placement register</h2></div>
-        <p style={{ color: 'var(--p-muted)', margin: '4px 0' }}>The placement register and season statistics: NA — not built yet. Campus drives are decided on this page; their policies are under Settings.</p>
+      <section className="pilot-card"><div className="pilot-card-head"><h2>Where things are</h2></div>
+        <p style={{ color: 'var(--p-muted)', margin: '4px 0' }}>Statistics, the register and each student's status are on this page, and campus drives are decided here. Placement policies and drive categories are under Settings.</p>
       </section>
     </aside>
   </div></div>;

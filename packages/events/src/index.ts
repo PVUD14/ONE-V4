@@ -523,6 +523,67 @@ export const eventSchemas = {
     schemaRef: 'registry://application.message.sent/1',
     payload: { applicationId: { kind: 'uuid' }, messageId: { kind: 'uuid' } },
   },
+  // EMP-16: operations published a version of the employer terms (0084). No consumer yet.
+  employerTermsPublishedV1: {
+    eventType: 'employer.terms.published',
+    eventVersion: 1,
+    producer: 'hiring',
+    aggregateType: 'employer_terms_version',
+    purpose: 'employer-terms',
+    dataClassification: 'internal',
+    schemaRef: 'registry://employer.terms.published/1',
+    payload: {
+      version: { kind: 'string', minLength: 1, maxLength: 64, pattern: /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/ },
+      legalReviewState: { kind: 'enum', values: ['DRAFT_FOR_LEGAL_REVIEW', 'LEGAL_APPROVED'] },
+      requiresReacceptance: { kind: 'enum', values: ['YES', 'NO'] },
+    },
+  },
+  // EMP-16: an employer's owner accepted a terms version for the organisation.
+  employerTermsAcceptedV1: {
+    eventType: 'employer.terms.accepted',
+    eventVersion: 1,
+    producer: 'hiring',
+    aggregateType: 'organization',
+    purpose: 'employer-terms',
+    dataClassification: 'internal',
+    schemaRef: 'registry://employer.terms.accepted/1',
+    payload: {
+      employerId: { kind: 'uuid' },
+      version: { kind: 'string', minLength: 1, maxLength: 64, pattern: /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/ },
+    },
+  },
+  // EMP-16: a statement was added to a trust case about an employer — a summary operations shared,
+  // or the employer's response or appeal. Carries no text and nothing about the reporter.
+  trustCaseEmployerStatementRecordedV1: {
+    eventType: 'trust.case.employer_statement.recorded',
+    eventVersion: 1,
+    producer: 'trust-safety',
+    aggregateType: 'trust_case',
+    purpose: 'trust-case-participation',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://trust.case.employer_statement.recorded/1',
+    payload: {
+      caseId: { kind: 'uuid' },
+      employerId: { kind: 'uuid' },
+      kind: { kind: 'enum', values: ['ALLEGATION_SUMMARY', 'DECISION_SUMMARY', 'EMPLOYER_RESPONSE', 'EMPLOYER_APPEAL'] },
+    },
+  },
+  // EMP-16: the daily retention worker ended an applicant-access grant whose expires_at passed.
+  employerApplicantAccessExpiredV1: {
+    eventType: 'employer_applicant_access.expired',
+    eventVersion: 1,
+    producer: 'hiring',
+    aggregateType: 'employer_applicant_access_grant',
+    purpose: 'applicant-access-retention',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://employer_applicant_access.expired/1',
+    payload: {
+      grantId: { kind: 'uuid' },
+      employerId: { kind: 'uuid' },
+      opportunityId: { kind: 'uuid' },
+      reasonCode: { kind: 'enum', values: ['GRANT_EXPIRED'] },
+    },
+  },
   organizationRoleAssignedV1: {
     eventType: 'organization.role.assigned',
     eventVersion: 1,

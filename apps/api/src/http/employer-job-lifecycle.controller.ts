@@ -28,6 +28,7 @@ import { sql } from 'drizzle-orm';
 import type { PersistenceDb } from '@planthepath/persistence/src/repositories.js';
 import { validateOutboxWriteInput } from '@planthepath/persistence/src/repositories.js';
 import { writeOpportunityDeadlineCloseRequested } from '@planthepath/persistence/src/opportunity-deadlines.js';
+import { assertEmployerTermsAccepted } from './employer-terms-gate.js';
 import { detectOpportunitySignals } from '@planthepath/hiring/src/review-signals.js';
 import {
   HiringRuleError,
@@ -407,6 +408,9 @@ export class EmployerJobLifecycleController {
         `) as QueryResult<{ has_audience: boolean; deadline_passed: boolean }>;
         if (!checks.rows[0]?.has_audience) throw badRequest('AUDIENCE_REQUIRED', context.correlationId);
         if (checks.rows[0]?.deadline_passed) throw badRequest('OPPORTUNITY_DEADLINE_PASSED', context.correlationId);
+        // EMP-16: reopening puts the job in front of students again, so it waits for an owner to
+        // accept the current employer terms, as publishing does. Checked under the organisation lock.
+        await assertEmployerTermsAccepted(tx, employerId, context.correlationId);
       }
       const closedAt = action === 'CLOSE' ? sql`greatest(now(), coalesce(published_at, now()))`
         : action === 'WITHDRAW' ? sql`coalesce(closed_at, greatest(now(), coalesce(published_at, now())))`

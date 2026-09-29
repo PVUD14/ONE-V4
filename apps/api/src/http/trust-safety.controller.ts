@@ -7,7 +7,9 @@
  *
  * Restricted to the platform roles that may search the audit record. An employer's
  * right of reply (spec 38's AWAITING_RESPONSE) is a separate, narrower surface and is
- * deliberately not exposed here.
+ * deliberately not exposed here: EMP-16 built it in employer-trust-cases.controller.ts. The
+ * operator side of it is here — sharing a summary with the subject employer and asking it to
+ * respond — and its responses and appeals come back on the case detail's timeline.
  */
 import {
   BadRequestException,
@@ -31,6 +33,8 @@ import {
   listPendingReviewSignals,
   listTrustCases,
   openTrustCase,
+  requestEmployerResponse,
+  shareTrustCaseStatement,
   transitionTrustCase,
   type TrustCaseState,
 } from '@planthepath/persistence/src/trust-safety.js';
@@ -149,6 +153,57 @@ export class TrustSafetyController {
     return { case: await getTrustCase(this.pool, caseId) };
   }
 
+  /**
+   * EMP-16: ask the subject employer to respond. Shares the allegation summary — written by the
+   * operator, shown to the employer verbatim, and never to identify the reporter — and moves the case
+   * to AWAITING_RESPONSE in one transaction.
+   */
+  @Post('/cases/:caseId/request-response')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async requestResponse(
+    @Req() request: ProtectedHttpRequest,
+    @Param('caseId') caseId: string,
+    @Body() body: unknown,
+  ): Promise<Record<string, unknown>> {
+    const actorUserId = await requireTrustOperator(request, this.pool, 'TRUST_SAFETY_INVESTIGATE');
+    const raw = readObject(body);
+    if (Object.keys(raw).some((key) => key !== 'summary' && key !== 'reasonCode')) throw badRequest('INVALID_REQUEST');
+    const summary = readStatementText(raw.summary);
+    if (typeof raw.reasonCode !== 'string' || !reasonCodePattern.test(raw.reasonCode)) throw badRequest('REASON_CODE_REQUIRED');
+    try {
+      await requestEmployerResponse(this.pool, {
+        caseId: requireUuid(caseId), summary, reasonCode: raw.reasonCode, actorUserId,
+        correlationId: request.planThePath?.correlationId ?? 'unknown',
+      });
+    } catch (error) {
+      throw mapTrustError(error);
+    }
+    return { case: await getTrustCase(this.pool, caseId) };
+  }
+
+  /** EMP-16: share an allegation or decision summary with the subject employer. */
+  @Post('/cases/:caseId/employer-statements')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async shareStatement(
+    @Req() request: ProtectedHttpRequest,
+    @Param('caseId') caseId: string,
+    @Body() body: unknown,
+  ): Promise<Record<string, unknown>> {
+    const actorUserId = await requireTrustOperator(request, this.pool, 'TRUST_SAFETY_INVESTIGATE');
+    const raw = readObject(body);
+    if (Object.keys(raw).some((key) => key !== 'kind' && key !== 'body')) throw badRequest('INVALID_REQUEST');
+    if (raw.kind !== 'ALLEGATION_SUMMARY' && raw.kind !== 'DECISION_SUMMARY') throw badRequest('TRUST_CASE_STATEMENT_KIND_INVALID');
+    const text = readStatementText(raw.body);
+    try {
+      await shareTrustCaseStatement(this.pool, {
+        caseId: requireUuid(caseId), kind: raw.kind, body: text, actorUserId, correlationId: request.planThePath?.correlationId ?? 'unknown',
+      });
+    } catch (error) {
+      throw mapTrustError(error);
+    }
+    return { case: await getTrustCase(this.pool, caseId) };
+  }
+
   @Post('/cases/:caseId/actions')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async act(
@@ -208,6 +263,13 @@ function mapTrustError(error: unknown): BadRequestException | NotFoundException 
     return new BadRequestException({ error: { code: error.code } });
   }
   return badRequest('INVALID_REQUEST');
+}
+
+/** EMP-16: text shown to the subject employer, 1–4,000 characters. */
+function readStatementText(value: unknown): string {
+  const text = typeof value === 'string' ? value.trim() : '';
+  if (!text || text.length > 4000) throw badRequest('TRUST_CASE_STATEMENT_INVALID');
+  return text;
 }
 
 function badRequest(code: string): BadRequestException {

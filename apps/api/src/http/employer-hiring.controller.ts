@@ -24,6 +24,8 @@ import {
   type ProtectedHttpRequest,
 } from './api-security.js';
 import { writeOpportunityDeadlineCloseRequested } from '@planthepath/persistence/src/opportunity-deadlines.js';
+import { employerTermsAcceptedSql } from '@planthepath/persistence/src/employer-terms.js';
+import { employerTermsRefusal } from './employer-terms-gate.js';
 import { loadInterviewCalendar } from '@planthepath/persistence/src/interview-calendar-source.js';
 import { interviewCancelReasonCodes, interviewRescheduleReasonCodes, isAcceptableJoiningLink } from '@planthepath/hiring/src/interview-scheduling.js';
 import {
@@ -248,6 +250,8 @@ export class EmployerHiringController {
           AND NOT EXISTS (SELECT 1 FROM opportunity_versions dv WHERE dv.id = opportunities.current_version_id AND dv.application_deadline <= now())
           AND EXISTS (SELECT 1 FROM organizations org WHERE org.id = ${employerId}::uuid AND org.kind = 'EMPLOYER'
             AND org.verification_state = 'VERIFIED' AND org.active FOR SHARE)
+          -- EMP-16: an owner has accepted the current employer terms (always true until terms exist).
+          AND ${employerTermsAcceptedSql(sql`${employerId}::uuid`)}
         RETURNING id, current_version_id
       `) as QueryResult<{ id: string; current_version_id: string }>;
       if (published.rows.length !== 1) throw await this.publishRefusal(tx, employerId, id, context.correlationId);
@@ -265,14 +269,16 @@ export class EmployerHiringController {
   private async publishRefusal(tx: Pick<PersistenceDb, 'execute'>, employerId: string, opportunityId: string, correlationId: string): Promise<Error> {
     const rows = await tx.execute(sql`
       SELECT o.lifecycle_state, (v.application_deadline IS NOT NULL AND v.application_deadline <= now()) AS deadline_passed,
-             EXISTS (SELECT 1 FROM organizations org WHERE org.id = o.employer_id AND org.kind = 'EMPLOYER' AND org.verification_state = 'VERIFIED' AND org.active) AS good_standing
+             EXISTS (SELECT 1 FROM organizations org WHERE org.id = o.employer_id AND org.kind = 'EMPLOYER' AND org.verification_state = 'VERIFIED' AND org.active) AS good_standing,
+             ${employerTermsAcceptedSql(sql`o.employer_id`)} AS terms_accepted
       FROM opportunities o LEFT JOIN opportunity_versions v ON v.id = o.current_version_id
       WHERE o.id = ${opportunityId}::uuid AND o.employer_id = ${employerId}::uuid
-    `) as QueryResult<{ lifecycle_state: string; deadline_passed: boolean; good_standing: boolean }>;
+    `) as QueryResult<{ lifecycle_state: string; deadline_passed: boolean; good_standing: boolean; terms_accepted: boolean }>;
     const [row] = rows.rows;
     if (!row || !row.good_standing) return forbidden(correlationId);
     if (row.lifecycle_state !== 'DRAFT' && row.lifecycle_state !== 'PAUSED') return badRequest('OPPORTUNITY_NOT_PUBLISHABLE', correlationId);
     if (row.deadline_passed) return badRequest('OPPORTUNITY_DEADLINE_PASSED', correlationId);
+    if (row.terms_accepted === false) return employerTermsRefusal(correlationId);
     return forbidden(correlationId);
   }
 

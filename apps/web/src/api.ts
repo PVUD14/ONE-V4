@@ -19,6 +19,7 @@ export * from './api/institution.js';
 export * from './api/hiring.js';
 export * from './api/campusDrives.js';
 export * from './api/placementRegister.js';
+export * from './api/nominations.js';
 export * from './api/assessments.js';
 export * from './api/assistant.js';
 export * from './api/platform.js';

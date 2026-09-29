@@ -22,6 +22,7 @@ import {
 import { CandidateDetailPanel, SnapshotSummary } from './applicationSnapshotView.js';
 import { StudentConversationCard } from './applicationMessages.js';
 import { venueModeLabels, type StudentCampusDriveDto } from './api/campusDrives.js';
+import { StudentNominationsCard } from './studentNominations.js';
 import {
   ApiRequestError,
   addOpportunityAudience,
@@ -522,6 +523,8 @@ export function StudentApplicationsPage(): React.ReactElement {
       <V2Stat icon="📅" tone="purple" value={applications.filter((item) => /interview/i.test(item.state)).length} label="At interview" />
       <V2Stat icon="🏁" tone="amber" value={applications.filter((item) => /offer/i.test(item.state)).length} label="At offer" />
     </div>
+    {/* INST-14: the college's nominations, answered here; opting in adds an application below. */}
+    <StudentNominationsCard onChanged={() => { void reload().catch(() => undefined); }} />
     <section className="card wide-card">
       <h2>Your applications</h2>
       <p>Applications submitted through ONE. External declarations are listed separately below.</p>
@@ -532,7 +535,8 @@ export function StudentApplicationsPage(): React.ReactElement {
           <thead><tr><th>Role</th><th>Company</th><th>Stage</th><th>Applied</th><th>Messages</th><th>Feedback</th><th>Institution sharing</th><th>Action</th></tr></thead>
           <tbody>{applications.map((item) => <tr key={item.id}>
             <td>{item.title}</td>
-            <td>{item.employerName}{item.campusDrive ? <span className="hiring-tag">Campus drive · {item.campusDrive.institutionName}</span> : null}</td>
+            <td>{item.employerName}{item.campusDrive ? <span className="hiring-tag">Campus drive · {item.campusDrive.institutionName}</span> : null}
+              {item.nominatedBy ? <span className="hiring-tag">Nominated by {item.nominatedBy.institutionName}</span> : null}</td>
             <td><span className={`hiring-state state-${item.state.toLowerCase()}`}>{humanise(item.state)}</span>
               {item.termsAcknowledgementPending ? <>
                 <span className="hiring-tag warn">Terms changed</span>
@@ -1582,6 +1586,7 @@ export function EmployerApplicantsPage({ employerId, applicationStateFilter }: {
           <thead><tr><th>Candidate</th><th>Stage</th><th>Eligibility</th><th>Applied</th><th>Interviews</th><th>Offer</th><th>Next step</th></tr></thead>
           <tbody>{visibleApplicants.map((item) => <tr key={item.id}>
             <td><CandidateIdentity item={item} />
+              {item.source === 'PLACEMENT_OFFICE_NOMINATION' ? <div><span className="hiring-tag">Nominated by placement office</span></div> : null}
               {item.candidateAccess !== false && !item.consentRevoked
                 ? <div><a href="#candidate-detail" onClick={(event) => { event.preventDefault(); setViewing(item.id); }}>View candidate</a></div> : null}</td>
             <td><span className={`hiring-state state-${item.state.toLowerCase()}`}>{humanise(item.state)}</span>

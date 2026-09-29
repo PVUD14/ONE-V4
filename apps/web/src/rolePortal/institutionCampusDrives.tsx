@@ -42,6 +42,7 @@ import {
 import { applicationStageLabels, offerResponseLabels } from './institutionDepartment.js';
 import { formatApiError } from './shared.js';
 import { DriveCategoryCell, useActiveDriveCategories } from './institutionPlacementRegister.js';
+import { DriveNominationsPanel } from './institutionNominations.js';
 
 function formatWhen(value: string | null | undefined): string {
   if (!value) return 'NA';
@@ -72,6 +73,8 @@ const actionExplanations: Readonly<Record<CollegeAction, string>> = {
   COMPLETE: 'The drive ends: your students no longer see the job through it, and its results become available.',
   CANCEL: 'Your approval is withdrawn: your students no longer see the job through this drive. Applications already made carry on.',
 };
+/** Drives the college has approved at some point: the ones students can have been nominated for. */
+const nominatedDriveStates: readonly CampusDriveState[] = ['APPROVED', 'SCHEDULED', 'COMPLETED', 'CANCELLED'];
 const filters: readonly (CampusDriveState | '')[] = ['', 'REQUESTED', 'CHANGES_REQUESTED', 'APPROVED', 'SCHEDULED', 'COMPLETED', 'REJECTED', 'CANCELLED'];
 
 /** Drive requests and decisions for one college. */
@@ -220,6 +223,9 @@ export function CampusDriveApprovalsSection({ institutionId }: { readonly instit
         {row.reasonCode ? ` (${reasonLabel(row.reasonCode)})` : ''}{row.note ? ` — ${row.note}` : ''}</li>)}</ol>
       {open.resultsError ? <p className="form-error" role="alert">{open.resultsError}</p> : null}
       {open.results ? <DriveResults results={open.results} /> : null}
+      {/* INST-14: nominations, once the college has approved the drive. */}
+      {nominatedDriveStates.includes(drives.find((drive) => drive.id === open.driveId)?.state ?? 'REQUESTED')
+        ? <DriveNominationsPanel institutionId={institutionId} driveId={open.driveId} /> : null}
     </div> : null}
   </section>;
 }

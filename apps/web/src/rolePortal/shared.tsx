@@ -170,6 +170,12 @@ export function safeErrorMessage(code: string | undefined): string | undefined {
     case 'INSTITUTION_WIDE_SCOPE_REQUIRED': return 'Deciding campus drives and placement policies needs a placement role for the whole college, not one department or campus.';
     case 'PLACEMENT_POLICY_ALREADY_ACTIVE': return 'This policy is already in force. Retire it first to change it.';
     case 'PLACEMENT_POLICY_NOT_ACTIVE': return 'This policy has already been retired.';
+    // INST-14: placement-office nominations.
+    case 'NOMINATION_DRIVE_NOT_LIVE': return 'Students can be nominated only while the drive is approved or scheduled.';
+    case 'NOMINATION_OPPORTUNITY_NOT_OPEN': return 'This job is no longer open for applications, so no one can be nominated for it.';
+    case 'NOMINATION_CHANGED': return 'This nomination changed while you were looking at it. Refresh and try again.';
+    case 'NOMINATION_NOT_CANCELLABLE': return 'The student has already opted in; the application is now theirs, so the nomination cannot be withdrawn.';
+    case 'INVALID_STUDENTS': return 'Choose between 1 and 200 students.';
     case 'INVALID_REASON_CODE': return 'Choose a reason.';
     case 'INVALID_TIMESTAMP': return 'Enter a valid date and time.';
     case 'INVALID_SCHEDULE': return 'Choose an end time after the start.';

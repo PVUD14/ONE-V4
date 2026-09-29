@@ -144,6 +144,8 @@ export interface StudentApplicationDto {
   readonly unreadMessages?: number;
   /** EMP-11: the college whose campus drive this application came through, if any. */
   readonly campusDrive?: { readonly institutionName: string } | null;
+  /** INST-14: made by opting in to this college's placement-office nomination. */
+  readonly nominatedBy?: { readonly institutionName: string } | null;
 }
 
 export interface CandidateFeedbackReasonDto {
@@ -211,6 +213,8 @@ export interface EmployerApplicantDto {
   readonly termsAcknowledgementPending?: boolean;
   /** EMP-06: frozen eligibility flags; null when the job had no rules or the person is withheld. */
   readonly eligibility?: ApplicantEligibilityDto | null;
+  /** INST-14: the student opted in to their college's nomination ("Nominated by placement office"). */
+  readonly source?: 'DIRECT' | 'PLACEMENT_OFFICE_NOMINATION';
   readonly updatedAt: string;
 }
 

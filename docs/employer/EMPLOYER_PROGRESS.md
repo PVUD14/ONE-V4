@@ -908,7 +908,21 @@ Nothing is seeded, following 0028's precedent: until operations publish a versio
   - POST /operations/trust-safety/cases/:caseId/request-response {summary, reasonCode} and …/employer-statements {kind, body} (TRUST_SAFETY_INVESTIGATE).
   - GET …/cases/:caseId now also returns `employerStatements` and `subjectEmployerId`.
 
-**Validation:** pending — the long run follows this commit; the results are amended here.
+**Validation:** fresh database one_emp16, with only DATABASE_URL exported.
+- `corepack pnpm db:migrate` twice: the first run applied 71 and created the ledger; the second applied 0. 0084 was also replayed by hand in psql.
+- `corepack pnpm typecheck`: passed.
+- `corepack pnpm -r --no-bail --workspace-concurrency=1 test` exited 1. Every one of the 3 failures was "error: out of shared memory" in a TRUNCATE setup hook on the shared local Postgres; none touches EMP-16 code:
+  - persistence career-catalogue.integration.test.ts (file setup);
+  - persistence internal-capabilities.integration.test.ts (one case);
+  - api institution-announcements.integration.spec.ts (one case).
+- Totals for that run:
+  - web 70 files / 826 tests pass; api 71 of 72 files, 1,127 of 1,128 tests pass (employer-terms-trust.integration.spec.ts 9/9); persistence 403 of 404 tests pass.
+  - Other packages, all passing: authorization 333, hiring 192, career-readiness 105, learning-model 72, learning-orchestrator 54, identity 41, placement 31, mastery-bkt 29, review-scheduler 23, privacy 22, ai-orchestration 19, assessments 15, events 14, learner-content 7, automation 7.
+- The three failing files were re-run alone and all pass: persistence 2 files / 21 tests, api announcements 1 file / 21 tests.
+- `corepack pnpm build`: passed.
+- CI parity: `corepack pnpm audit --prod --audit-level=high` exits 0 (2 moderate, no high or critical). The optional-chain policy grep prints nothing. There are no private-key blocks or merge markers.
+- Android `./gradlew --no-daemon -q :app:compileDebugKotlin`: passed.
+- The test commit alone was not run against the base: the routes do not exist there, so it cannot pass.
 
 **Acceptance criteria:**
 - [x] *An employer that has not accepted current terms cannot publish.* Tests: `refuses to publish, reopen or request a drive until an owner accepts the current terms` (403 EMPLOYER_TERMS_NOT_ACCEPTED, the job stays DRAFT, no drive row) and `never acts retroactively…`:

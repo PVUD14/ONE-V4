@@ -56,6 +56,7 @@ function messageFor(error: unknown, fallback: string): string {
   if (code === 'ASSESSMENT_HAS_NO_QUESTIONS') return 'Add at least one question before publishing.';
   if (code === 'APPLICATION_NOT_INVITABLE') return 'One of those candidates cannot be sent this test — a test goes only to candidates in the Assessment stage, and they may have withdrawn, been rejected, or revoked consent.';
   if (code === 'ASSESSMENT_NOT_PUBLISHED') return 'This test is not published — publish it first, or build a new test if it was closed.';
+  if (code === 'APPLICATION_NOT_AT_ASSESSMENT_STAGE') return 'A test goes only to candidates in the Assessment stage. Move them there in Applicants first.';
   if (code === 'INVALID_WINDOW') return 'Choose a window that opens now or later and closes within 30 days.';
   if (code === 'REASON_CODE_REQUIRED' || code === 'INVALID_REASONCODE') return 'Choose a reason from the list.';
   return fallback;

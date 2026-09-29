@@ -115,6 +115,10 @@ async function pipeline(): Promise<Pipeline> {
   const applicationId = (applied.application as { id: string }).id;
 
   await hiring.transitionApplication(request(), employerId, applicationId, { toState: 'SHORTLISTED' });
+  // EMP-12: a screening test is sent at the ASSESSMENT stage, so the pipeline passes through it
+  // and the test is sent there, before the interview.
+  await hiring.transitionApplication(request(), employerId, applicationId, { toState: 'ASSESSMENT' });
+  const assessmentId = await sendScreeningTest(employerId, opportunityId, applicationId);
   await hiring.transitionApplication(request(), employerId, applicationId, { toState: 'INTERVIEW' });
   const scheduled = await hiring.scheduleInterview(request(), employerId, applicationId, {
     mode: 'VIDEO', scheduledStart: '2099-01-05T09:00:00.000Z', scheduledEnd: '2099-01-05T10:00:00.000Z',
@@ -122,6 +126,12 @@ async function pipeline(): Promise<Pipeline> {
   });
   const interviewId = (scheduled.interview as { id: string }).id;
 
+  return {
+    employerId, recruiterId: recruiter.id, candidate: { id: candidateUser.id, email: candidateUser.email, name, rollNumber },
+    opportunityId, applicationId, interviewId, assessmentId, request,
+  };
+
+  async function sendScreeningTest(employerId: string, opportunityId: string, applicationId: string): Promise<string> {
   const question = await assessments.createQuestion(trusted(recruiter.id, employerId), employerId, {
     questionText: `Which log shows failed logins? ${randomUUID()}`, questionType: 'SINGLE_CHOICE_MCQ', marks: 2,
     options: [{ key: 'A', text: 'Auth log', isCorrect: true }, { key: 'B', text: 'Print log', isCorrect: false }],
@@ -135,11 +145,8 @@ async function pipeline(): Promise<Pipeline> {
   const assessmentId = (assessment.assessment as { id: string }).id;
   await assessments.publishAssessment(trusted(recruiter.id, employerId), employerId, assessmentId);
   await assessments.invite(trusted(recruiter.id, employerId), employerId, assessmentId, { applicationIds: [applicationId], closesAt: tomorrow() });
-
-  return {
-    employerId, recruiterId: recruiter.id, candidate: { id: candidateUser.id, email: candidateUser.email, name, rollNumber },
-    opportunityId, applicationId, interviewId, assessmentId, request,
-  };
+  return assessmentId;
+  }
 }
 
 const tomorrow = (): string => new Date(Date.now() + 86_400_000).toISOString();

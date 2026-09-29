@@ -1776,3 +1776,168 @@ Before this report:
 **Android:** no change, and nothing to compile. Operator screens are web-only (Appendix 1 §4.3). The app's only operations call is the read-only `GET /operations/overview` (Api.kt:212), which this goal does not change.
 
 **Next goal:** OPS-15, or as scheduled by the coordinator.
+
+## OPS-16 — Incident register, breach clocks and status communications — 2026-09-29
+**Result:** Complete. Security has an incident register with a timeline and, for a personal data breach, a Board reporting clock
+computed on the database clock from `detected_at`. Settings has status-notice templates, published only with a second person's
+approval (OPS-02 dual control), and notices to the admins of affected organisations. A notice is a draft until a person approves
+it; it is rate-limited and sent through the outbox worker.
+
+**Branch / PR:** feat/ops-incidents-comms → feat/plan-phases-0-to-2, based on e472cef. The commits are, in order: design (d354de5),
+acceptance tests (8da95a7), backend implementation (df7228b), web and Android (6cdc85b), and this report. The branch is pushed to
+onev4. No PR was opened because `gh` is not installed, so the merge is left to review.
+
+**Files created:**
+- docs/architecture/incident-register-table-design.md
+- packages/persistence/drizzle/0081_incident_register.sql
+- packages/authorization/src/incidents.ts (+ .test.ts)
+- packages/persistence/src/incidents.ts and packages/persistence/src/status-notices.ts
+- apps/api/src/http/operations-incidents.controller.ts, apps/api/src/http/operations-communications.controller.ts
+- apps/api/src/http/operations-incidents.integration.spec.ts
+- apps/web/src/api/incidents.ts
+- apps/web/src/rolePortal/incidents.tsx, apps/web/src/rolePortal/communications.tsx, apps/web/src/rolePortal/incidents.test.tsx
+
+**Files modified:**
+- packages/authorization/src/{high-risk-actions,index}.ts: a new extended approval key `COMMS_TEMPLATE_PUBLISH` (capability
+  COMMS_TEMPLATES, target `status_notice_template`), and an export.
+- packages/events/src/index.ts: 4 new events (`incident.declared`, `incident.state_changed`, `status_notice_template.published`,
+  `incident.status_notice.dispatch.requested`) and the new key in the approval key list.
+- packages/persistence/src/operation-approvals.ts: the approval summary names the template key and version.
+- packages/persistence/src/automation-workers.ts: the dispatch consumer is registered with the ADR-028 local publisher.
+- apps/api/src/http/{operation-approval-gate,operations-approvals.controller,api-security.module}.ts: the payload shape, request
+  validation (only the draft's author may ask), and registration.
+- apps/web/src/{api.ts,api/operations.ts,api/platform.ts,notificationsBell.tsx}: barrel export, the approval key and summary fields,
+  the `STATUS_NOTICE` notification kind, and a "Service status notice from AI8HT" prefix in the bell.
+- apps/web/src/rolePortal/approvals.tsx: describe and execute the new approval.
+- apps/web/src/rolePortal/privacyConsole.tsx (+ .test.tsx): "Incident register: not built yet" became "Incident register: below".
+  That statement was no longer true, so the test changed with it; it now also asserts the old text is gone.
+- apps/web/src/rolePortalPages.tsx: only the operations `Security` and `Settings` branches (a component appended to each).
+- apps/android/.../Api.kt, StaffDashboards.kt: the staff inbox labels a status notice as from AI8HT (see Android).
+- docs/ops/runbook-breach-response.md: declare in the register, record the Board and user notifications there, and use status
+  notices for colleges. The 72-hour clock is labelled as pending legal confirmation.
+
+**Migrations added:** 0081_incident_register.sql. It references only tables up to 0074 and contains:
+- the tables `incidents`, `incident_events` (append-only), `incident_affected_organizations`, `status_notice_templates`,
+  `incident_status_notices` and `incident_status_notice_recipients`;
+- a guard trigger on each table. The triggers:
+  - stamp every lifecycle time from the database clock;
+  - make declarations, template content and drafts immutable;
+  - enforce the state machine;
+  - refuse closing a breach before the Board and the users are recorded as notified;
+  - refuse reclassifying a notified breach;
+  - refuse a notice on a template that did not pass dual control;
+  - apply the notice rate limit under a lock on the incident;
+  - refuse every DELETE.
+- `operation_approval_extended_target_type()` redefined with every earlier key plus `COMMS_TEMPLATE_PUBLISH`;
+- `user_notifications.kind` gains `STATUS_NOTICE` (the read-and-union pattern of 0059/0067/0074).
+
+The migration was applied twice through `db:migrate` on a fresh `one_ops16` (the second run applied 0 files, per ADR-035). The file
+was also replayed by hand on top of itself with no error.
+
+**Design docs / ADRs:** incident-register-table-design.md covers the chosen design, the clock's basis, the delivery path, and the
+rejected options. No ADR was needed; this builds on ADR-032, OPS-02 dual control and ADR-028.
+
+**Validation:** pending — the full run follows this commit and is recorded in an amendment.
+
+**Acceptance criteria:**
+- ✔ A breach incident shows its 72-hour deadline and who was notified when.
+  - The deadline is `detected_at` + 72 h, computed in SQL on the database clock.
+  - The status is RUNNING, OVERDUE, MET or MET_LATE, and the time remaining comes from the database clock.
+  - The register records who recorded the Board report and when (with an optional acknowledgement reference), and who recorded that
+    the affected users were told, and when.
+  - For each status notice, the incident detail shows who approved it and when, when it was sent, how many admins in how many
+    organisations it reached, and the email outcome counts.
+  - The timeline has every step with actor, time and reason code. Integration specs cover RUNNING, OVERDUE, MET and MET_LATE.
+- ✔ A notice cannot be sent from an unapproved template version.
+  - The API refuses a draft template with `STATUS_NOTICE_TEMPLATE_NOT_APPROVED`, and a notice body has no text field
+    (`INVALID_REQUEST`).
+  - At the database, a notice can reference only a `notification_templates` row. Every row there is approved (NOT NULL
+    `approved_by_user_id`), and the 0081 trigger additionally requires a PUBLISHED `status_notice_templates` row pointing at it.
+    Tested by a direct insert with a rogue template row.
+  - A template version is published only with an executed `COMMS_TEMPLATE_PUBLISH` approval: `APPROVAL_REQUIRED` without one, and
+    `COMMS_TEMPLATE_NOT_AUTHOR` when a non-author asks. The published row carries the approver as `approved_by_user_id`.
+- ✔ The §6.6 minimums:
+  - 401 without a token.
+  - 403 for an institution admin on every route, 403 across the capability split (OPERATIONS_ADMIN on incidents, SECURITY_ADMIN
+    on communications), 403 for a suspended membership, and 200 through an explicit grant.
+  - 400 on invalid input, including an email address or phone number in incident text, and on unknown fields.
+  - Keyset paging, bounded 1–200, with no repeats.
+  - Audit rows carry the reason code, and outbox rows are written.
+  - Recipient lists are never returned; the screens show counts only.
+  - Web tests cover real data, NA, loading, empty, an error with its reference, forbidden, reason-required dialogs, and unchanged
+    navigation labels.
+- ✔ The rules given for this goal:
+  - Every incident change is audited with a reason code.
+  - Clocks use the database clock.
+  - Notices are DRAFT until a person approves them and are sent only through the outbox and the existing mail sink, with sender
+    `mailSender()` = info@ai8ht.pro. Email is recorded NOT_CONFIGURED with no sink.
+  - Nothing contacts the Board or any external party.
+  - Incident titles and summaries refuse contact details.
+  - Operations labels are unchanged (HG-3).
+  - There are no model calls.
+
+**Decisions for Divakar (recommendations adopted):**
+- **The 72-hour period** is the goal text's, labelled everywhere as the plan's period pending legal confirmation. It is not presented
+  as settled law. It is stamped per breach, so a later change, made by a new migration after legal review, never moves a running
+  deadline. No deadline is shown for telling affected users, because the goal states none; ONE records when they were told.
+- **Delivery path.** Notices go through the outbox and the local worker, as an in-app notification plus email through the
+  configured mail sink. They do not use `notification_commands` and n8n: that path selects the workflow by `stable_key`, and the
+  only fitting allow-listed workflow (`security-notification`) is inactive (HG-7) and keyed to OPS-02's solo notice.
+- **Template approval reuses OPS-02 dual control.** It is a new extended action, not a bespoke second-person rule, so the solo
+  safeguard (15-minute cooling-off, marked SOLO) lets a one-person pilot publish. Only the draft's author may ask for approval, so
+  the approver is never the author.
+- **Audience.** Recipients are the ACTIVE owners and admins (institution and employer) of the incident's live affected
+  organisations, resolved when the notice is sent. It never reaches students.
+- **Email preference.** A notice honours an admin's "email off" preference, recorded SKIPPED, like announcements.
+- **Rate limit.** One approved notice per incident per 15 minutes and at most 6 per 24 hours, answered with 429
+  `STATUS_NOTICE_RATE_LIMITED`.
+- **Breach rules.**
+  - A breach cannot close until the Board and the users are recorded as notified.
+  - A notified breach cannot be reclassified.
+  - A false alarm is reclassified first, then closed.
+  - OPEN → CLOSED is allowed only as DUPLICATE or FALSE_ALARM.
+- **Personal data in incident text.** An email address, or a run of 10 or more digits (split at most by single spaces), is refused
+  with `INCIDENT_TEXT_PERSONAL_DATA`. Dates written with dashes pass.
+- **The affected-organisations count** is derived from the live link rows, not stored.
+- **Reason codes:**
+  - declare: `MONITORING_ALERT`, `CUSTOMER_REPORT`, `INTERNAL_DISCOVERY`, `THIRD_PARTY_REPORT`, `SUSPECTED_BREACH`
+  - contain: `ACCESS_PATH_CLOSED`, `CREDENTIAL_ROTATED`, `SERVICE_ISOLATED`, `MITIGATION_APPLIED`
+  - resolve: `ROOT_CAUSE_FIXED`, `SERVICE_RESTORED`, `DATA_RESTORED`, `NO_IMPACT_CONFIRMED`
+  - close: `POST_INCIDENT_REVIEW_DONE`, `DUPLICATE`, `FALSE_ALARM`
+  - reopen: `RECURRENCE`, `CONTAINMENT_FAILED`, `NEW_EVIDENCE`
+  - severity: `ASSESSMENT_UPDATED`, `SCOPE_GREW`, `SCOPE_REDUCED`
+  - category: `ASSESSMENT_UPDATED`, `CONFIRMED_PERSONAL_DATA`, `NO_PERSONAL_DATA_INVOLVED`
+  - note: `TIMELINE_UPDATE`, `EVIDENCE_RECORDED`, `DECISION_RECORDED`
+  - organisations: add `SCOPE_ASSESSED`, `NEW_EVIDENCE`; remove `SCOPE_ASSESSED`, `ENTERED_IN_ERROR`
+  - Board: `BOARD_REPORT_FILED`
+  - users: `USERS_NOTIFIED_BY_EMAIL`, `USERS_NOTIFIED_BY_COLLEGE`, `USERS_NOTIFIED_OTHER_CHANNEL`
+  - templates: draft `NEW_TEMPLATE`, `WORDING_UPDATE`, `CORRECTION`; publish `INCIDENT_COMMUNICATION`, `PLANNED_COMMUNICATION`,
+    `WORDING_CORRECTION`; withdraw `SUPERSEDED`, `ENTERED_IN_ERROR`, `NOT_NEEDED`
+  - notices: draft `INITIAL_NOTICE`, `INCIDENT_UPDATE`, `RESOLUTION_NOTICE`; approve `APPROVED_FOR_SEND`; withdraw `NOT_NEEDED`,
+    `WRONG_TEMPLATE`, `SUPERSEDED`
+
+**Limitations / not done:**
+- No email leaves any environment until a production mail sender exists (HG-7). Until then the screens say "not sent — no mail
+  service configured".
+- Status notices go to organisation admins only. Notices to students and data principals are out of scope, as the goal specifies.
+- The comms screen publishes status-notice templates only. It does not publish the `ops-failure` or `security-notification`
+  templates that OPS-04 and OPS-02 wait on; that is a small follow-up on the same mechanism.
+- Incident titles and summaries are immutable after declaration; updates go in the timeline.
+- The incident list header counts are server-side. The Settings stat tiles count the loaded page only, and are labelled "in this
+  view".
+
+**Risks / follow-ups:**
+- `operation_approval_extended_target_type()` is redefined in full by each migration that adds a key. 0081 lists every key up to
+  0065 plus its own. A parallel branch that adds a key in a migration numbered below 0081 must be re-listed in a later migration.
+  None of 0077 (fix/privacy-employer-screening), 0078 (OPS-14) or 0079 (OPS-15) on onev4 touches it.
+- The rolePortalPages `Security` line is also changed by OPS-15 (access reviews). The merge is a one-line union of both components.
+- The API route parameter for removing an organisation is `affectedOrgId`, not `organizationId`. api-security treats a parameter
+  named `organizationId` as selecting the caller's membership.
+
+**Android:** changed, and compiled with the Android Studio JBR (`:app:compileDebugKotlin`, exit 0). The operator screens stay
+web-only (§4.3). A status notice is a user-facing in-app notification to college and employer admins, and the phone's staff inbox
+already lists every notification. It now labels a `STATUS_NOTICE` "Service status notice from AI8HT for <organisation>" (Api.kt
+`statusNoticeSource`, StaffDashboards.kt `StaffInboxOverlay`), matching the web bell. Students never receive one, so the student
+inbox is unchanged.
+
+**Next goal:** OPS-17 (full).

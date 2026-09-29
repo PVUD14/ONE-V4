@@ -691,3 +691,33 @@ Every write:
 - No employer Assessments list on Android (the read view is on the applicant page; a phone list would be a new navigation entry).
 **Risks / follow-ups:** ADR-039 was the next free ADR number on every onev4 branch when written; a parallel goal could collide on 039. A later migration that re-declares either notification-kind CHECK must keep ASSESSMENT_INVITED (read-and-union, as 0059, 0067 and 0074 do, keeps it).
 **Next goal:** EMP-13 (or as scheduled by the coordinator).
+
+## EMP-12 privacy fix — Employer screening attempts in export and deletion — 2026-09-29
+**Result:** Complete. Closes the gap EMP-12 recorded under "Limitations": a student's employer screening attempts (0036) were in neither their data export nor privacy deletion. Deletion now keeps the attempt and its stored score for the employer, detached from the anonymised person like the application, erases what the candidate selected, and closes a sitting still open as unscored; the export gives the student their own attempts and answers, never the answer key or the per-question marking.
+**Branch / PR:** fix/privacy-employer-screening, cut from onev4/feat/plan-phases-0-to-2 at e472cef, pushed to onev4; merge by review. Commits, in order: e923bc4 (design), 683f248 (failing tests), 3a50c62 (implementation and 0077), then this report and its validation amendment.
+**Files created:**
+- docs/architecture/employer-screening-privacy-design.md
+- packages/persistence/drizzle/0077_employer_screening_privacy.sql
+
+**Files modified:**
+- API: privacy-deletion.ts (EMPLOYER_SCREENING step), privacy-export.ts (`screeningAssessments`, one more `notIncluded` line).
+- Packages: privacy (category `EMPLOYER_SCREENING`, ANONYMISED, with its basis).
+- Tests: privacy.integration.spec.ts, packages/privacy/test/index.test.ts.
+
+**Existing tests touched (stronger, none weakened):** the pinned category count moves from 13 to 14 in both the package test and the integration test, which now also asserts the new category by name, disposition, basis and count. The integration spec's `seedApplication` takes the student and returns the application id so a second candidate can be seeded; every earlier assertion is unchanged.
+**Migrations added:** 0077_employer_screening_privacy.sql (number assigned): widens `privacy_deletion_category_ck` by read-and-union to add EMPLOYER_SCREENING. No table or column added, no guard relaxed (the 0036 tables have no append-only trigger, so no erase setting is needed), no existing migration edited; a replay is a no-op, and 0067's guard (which tests only for APPLICATION_MESSAGES) leaves the widened constraint alone.
+
+**Dispositions (design doc):**
+- `employer_assessment_attempts`: kept with the anonymised user, score, max score and percentage unchanged. An IN_PROGRESS attempt becomes EXPIRED with no score, and its STARTED invitation EXPIRED, so the lazy sweep cannot later grade emptied answers into a stored 0.
+- `employer_assessment_answers`: `selected_option_keys` → `{}`, `numeric_response` → NULL; `is_correct` and `marks_awarded` (the employer's grading) kept, so the marks still sum to the stored score.
+- `employer_assessment_attempt_questions` and invitations: kept (the employer's material and acts).
+- Deletion record: `EMPLOYER_SCREENING`, ANONYMISED, basis "Employers retain the record that they sent you a screening test and the score it produced; your answers are erased.", `record_count` = the person's attempts.
+- Export `screeningAssessments`: per invitation on the subject's applications — employer, role, title, invited/opens/closes, state, and the attempt (state, started, submitted, percentage as the student already sees it), with each served question's text, the options in the candidate's own shuffle, and their selections under the keys they saw. Never selected: option `is_correct`, answer `is_correct` / `marks_awarded`, raw score / max score, seed, option map, anything of another candidate.
+
+**Tests added:** `data export > includes the subject's own screening attempts and answers, never the answer key or another candidate`; the deletion-execution test `erases the person and keeps the employer record once the hold is released` gains the screening assertions (attempt and score kept, selections erased, marking kept, open sitting EXPIRED and unscored with its invitation, another candidate's answers and score untouched); `records what it erased, anonymised and retained` asserts 14 records and the EMPLOYER_SCREENING row; the package test `detaches rather than destroys another party record` asserts the new disposition and basis. The test commit was run alone first: 3 failed for the gap (no export section, answers still present, 13 records), 11 passed.
+
+**Validation:** pending — amended below when the full run finishes.
+
+**Android / web:** no change. Both clients download the export as a file without interpreting its sections (web privacyPanel, Android Api.kt), and neither lists deletion categories. No screen, route, label or navigation item changed.
+**Limitations / not done:** `answered_at` on erased answers is kept (NOT NULL, identifies no one once the response and the person are gone; recorded in the design). The export includes the question text the candidate was shown, which is the employer's material; the design records why (an answer is meaningless without its question) and that it discloses no key.
+**Next goal:** as scheduled by the coordinator.

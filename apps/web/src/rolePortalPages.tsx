@@ -31,6 +31,7 @@ import { InstitutionExportsPanel } from './rolePortal/institutionAnalytics.js';
 import { OperationsCareerReadinessPanel } from './operationsCareerReadinessPanel.js';
 import { StaffPilotWrap } from './parityWraps.js';
 import { InstitutionInterventionsPage } from './pilotParityPages.js';
+import { FacultyLearningCohortSection } from './rolePortal/institutionLearningCohort.js';
 import { CounsellingNotesSection } from './rolePortal/institutionCounselling.js';
 import { EmployerRecruiterRealityPage } from './rolePortal/employer.js';
 import { EmployerOrganisationGate } from './rolePortal/employerOrganisationState.js';
@@ -397,7 +398,11 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   }
   if (!demoMode && portal.key === 'recruiter') return <EmployerOrganisationGate employerId={authenticatedWorkspace?.organizationId} routeLabel={route.label}><EmployerRecruiterRealityPage portal={portal} routeLabel={route.label} /></EmployerOrganisationGate>;
   // INST-03: only these two labels' branches change; navigation is untouched.
-  if (!demoMode && portal.key === 'faculty' && route.label === 'My Students') return <FacultyMyStudentsPage authenticatedWorkspace={authenticatedWorkspace} />;
+  // INST-15: the cohort view over the learning engine is a section of My Students, not a new item (HG-3).
+  if (!demoMode && portal.key === 'faculty' && route.label === 'My Students') {
+    return <FacultyMyStudentsPage authenticatedWorkspace={authenticatedWorkspace}>
+      <FacultyLearningCohortSection authenticatedWorkspace={authenticatedWorkspace} basePath={portal.basePath} /></FacultyMyStudentsPage>;
+  }
   if (!demoMode && portal.key === 'department-head' && route.label === 'Faculty and Staff') return <InstitutionFacultyAndStaffPage authenticatedWorkspace={authenticatedWorkspace} />;
   // INST-07: the department head's and the lecturer's remaining items become real screens.
   // Only these labels' branches change; navigation is untouched.

@@ -722,3 +722,43 @@ export function suppressedCountLabel(count: { readonly suppressed: boolean; read
   const value = count.value !== undefined ? count.value : count.count;
   return count.suppressed || value === null || value === undefined ? '<5' : String(value);
 }
+
+// INST-15: the faculty cohort view over the learning engine. Names, labels and counts only — the
+// server sends no model number, no date and no readiness; misconceptions under 5 students are withheld.
+
+export interface LearningCohortStudentDto {
+  readonly profileId: string;
+  readonly fullName: string;
+  readonly rollNumber: string;
+}
+
+export interface LearningCohortDto {
+  readonly mode: 'ASSIGNMENTS' | 'MEMBERSHIP';
+  /** False until the adaptive-learning consent is published to students (HG-6): every block is then empty. */
+  readonly consent: { readonly offered: boolean };
+  readonly students: number;
+  readonly studentsSharing: { readonly suppressed: boolean; readonly count: number | null };
+  readonly stuckSkills: readonly {
+    readonly skillId: string;
+    readonly skillName: string;
+    readonly studentCount: number;
+    readonly students: readonly LearningCohortStudentDto[];
+  }[];
+  readonly misconceptions: readonly { readonly code: string; readonly title: string; readonly skillName: string; readonly students: number }[];
+  readonly misconceptionsWithheld: boolean;
+}
+
+export interface LearningCohortDueDto {
+  readonly mode: 'ASSIGNMENTS' | 'MEMBERSHIP';
+  readonly students: readonly (LearningCohortStudentDto & { readonly dueSkills: readonly string[] })[];
+  readonly nextCursor: string | null;
+}
+
+export function getLearningCohort(token: string, institutionId: string, signal?: AbortSignal): Promise<LearningCohortDto> {
+  return requestJson(`${institutionPath(institutionId)}/learning-cohort`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function listLearningCohortDueReviews(token: string, institutionId: string, cursor?: string | null, signal?: AbortSignal): Promise<LearningCohortDueDto> {
+  const query = cursor ? `?limit=50&cursor=${encodeURIComponent(cursor)}` : '?limit=50';
+  return requestJson(`${institutionPath(institutionId)}/learning-cohort/due-reviews${query}`, { token, ...(signal ? { signal } : {}) });
+}

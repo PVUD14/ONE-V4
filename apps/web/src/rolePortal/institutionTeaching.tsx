@@ -41,7 +41,8 @@ function loadError(error: unknown, fallback: string): string {
   return formatApiError(error, fallback);
 }
 
-export function FacultyMyStudentsPage({ authenticatedWorkspace }: { readonly authenticatedWorkspace?: AuthenticatedWorkspaceSummary | undefined }): React.ReactElement {
+/** `children` (INST-15: the cohort view over the learning engine) render at the end of the page. */
+export function FacultyMyStudentsPage({ authenticatedWorkspace, children }: { readonly authenticatedWorkspace?: AuthenticatedWorkspaceSummary | undefined; readonly children?: React.ReactNode }): React.ReactElement {
   const token = getProtectedAccessToken();
   const institutionId = authenticatedWorkspace?.organizationId ?? '';
   const [data, setData] = useState<MyStudentsDto | null>(null);
@@ -100,6 +101,7 @@ export function FacultyMyStudentsPage({ authenticatedWorkspace }: { readonly aut
       </tr>)}</tbody></table></div> : null}
     {data && students.length === 0 && !(data.mode === 'ASSIGNMENTS' && data.assignments.length === 0) ? <p className="role-wide">No students are enrolled in your assigned sections yet.</p> : null}
     {data?.nextCursor ? <div className="role-record-actions"><button type="button" className="secondary" onClick={() => void more()}>Load more students</button></div> : null}
+    {children}
   </section>;
 }
 

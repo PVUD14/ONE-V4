@@ -569,7 +569,7 @@ private fun MainScaffold(
                                 data!!.assessments,
                                 onOpenReadiness = { readinessOpen = true },
                             )
-                            Screen.Learning -> LearningScreen(data!!.learner, onChanged = { reloadKey += 1 })
+                            Screen.Learning -> LearningScreen(data!!.learner, onChanged = { reloadKey += 1 }, onOpenCareer = { moreDest = MoreDest.Target })
                             Screen.Jobs -> JobsScreen()
                             Screen.More -> MoreMenuScreen(data!!.student, avatarVersion, onOpen = { moreDest = it }, onSignOut = onSignOut)
                         }
@@ -925,17 +925,34 @@ private fun AssessmentCard(exam: AssessmentDto) {
 // --- Learning -----------------------------------------------------------------
 
 @Composable
-private fun LearningScreen(learner: LearnerStateDto?, onChanged: () -> Unit) {
+private fun LearningScreen(learner: LearnerStateDto?, onChanged: () -> Unit, onOpenCareer: () -> Unit) {
     val context = LocalContext.current
     val palette = pro.ai8ht.one.ui.LocalOnePalette.current
     val scope = rememberCoroutineScope()
     var busyLesson by remember { mutableStateOf<String?>(null) }
     var message by remember { mutableStateOf<String?>(null) }
 
+    // ENG-18: the learning plan (placement test, next step and practice, path, due reviews) comes first,
+    // whether or not any module is published.
     if (learner == null || learner.catalog.modules.isEmpty()) {
-        EmptyState(Icons.Filled.MenuBook, Tone.Green,
-            "No modules yet",
-            "Learning modules appear here once your institution publishes them. Completed lessons build your readiness.")
+        LazyColumn(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
+            item { LearningPlanSection(onOpenCareer) }
+            item {
+                Spacer(Modifier.height(12.dp))
+                PilotCard {
+                    Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        IconBubble(Icons.Filled.MenuBook, pro.ai8ht.one.ui.Tone.Green, size = 44.dp)
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("No modules yet", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                            Text("Learning modules appear here once your institution publishes them. Completed lessons build your readiness.",
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+                Spacer(Modifier.height(18.dp))
+            }
+        }
         return
     }
     val done = learner.progress.filter { it.state == "COMPLETED" }.map { it.lessonVersionId }.toSet()
@@ -943,6 +960,7 @@ private fun LearningScreen(learner: LearnerStateDto?, onChanged: () -> Unit) {
     val doneCount = allLessons.count { done.contains(it.id) }
 
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
+        item { LearningPlanSection(onOpenCareer) }
         item {
             Spacer(Modifier.height(10.dp))
             PilotCard {

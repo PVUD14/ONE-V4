@@ -10,6 +10,7 @@ import { MultiRing, Ring } from '../pilot/pilotComponents.js';
 import { PilotTabs } from '../pilot/pilotOverlay.js';
 import { NaCourseTiles, NaListCard, NaRingRailCard, go } from './naWidgets.js';
 import { PublishedContentCard } from './publishedContent.js';
+import { PracticeBySkillCard } from '../studentLearning.js';
 import { Award, Building2, ClipboardCheck, Code2, FileText, Flame, LineChart, Target, Trophy, Wrench } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -49,7 +50,7 @@ export function StudentPracticePage(): React.ReactElement {
         <NaCourseTiles title="Continue Practicing" labels={['NA', 'NA', 'NA', 'NA', 'NA']} />
         <NaCourseTiles title="Recommended for You" labels={['NA', 'NA', 'NA', 'NA', 'NA']} />
         <PublishedContentCard contentType="PRACTICE" title="Practice resources" />
-        <NaListCard title="Practice by Skill" note="A practice problem bank is not live yet — NA. Your institution's live assessments are under Assessments." />
+        <PracticeBySkillCard />
       </> : null}
     </div>
 

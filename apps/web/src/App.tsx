@@ -54,6 +54,7 @@ import { ScreeningAssessmentsPage } from './screeningAssessmentsPage.js';
 import { V2EmptyState, V2Stat } from './dashboardsV2.js';
 import { StudentDashboardV3 } from './studentDashboardV3.js';
 import { StudentGoalsPanel } from './studentGoals.js';
+import { StudentLearningPlan } from './studentLearning.js';
 import { StudentCareerToolsPage, StudentCompanyPrepPage, StudentPracticePage, StudentResumeBuilderPage, StudentScholarshipsPage } from './pilotParityPages.js';
 import { StudentAssessmentsV3, StudentLearningV3, StudentOpportunitiesV3, StudentProfileV3, StudentRoadmapV3 } from './parityWraps.js';
 
@@ -889,7 +890,7 @@ function AuthenticatedStudentRoute({ route, currentStudent }: { readonly route: 
   if (route === 'readiness') return <CareerReadinessApiPanel route="readiness" />;
   if (route === 'skills') return <CareerReadinessApiPanel route="skills" />;
   if (route === 'assessments') return <StudentAssessmentsV3><ExamAttemptPanel /><ScreeningAssessmentsPage /><CareerReadinessApiPanel route="assessments" /></StudentAssessmentsV3>;
-  if (route === 'learning') return <StudentLearningV3><CareerReadinessApiPanel route="learning" /></StudentLearningV3>;
+  if (route === 'learning') return <StudentLearningV3><StudentLearningPlan /><CareerReadinessApiPanel route="learning" /></StudentLearningV3>;
   if (route === 'settings') return <><CareerReadinessApiPanel route="notifications" /><StudentPrivacyPanel /></>;
   if (route === 'help') return <HelpFaqPanel persona="student" />;
   if (route === 'practice') return <StudentPracticePage />;

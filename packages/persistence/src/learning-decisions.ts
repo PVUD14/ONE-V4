@@ -32,6 +32,7 @@ import {
 } from '@planthepath/learning-orchestrator/src/index.js';
 import { unclearedMisconceptionSignals, type EvidenceStage, type ProjectionAttempt } from '@planthepath/learning-model/src/index.js';
 import { hasConsentPurpose } from './consent-purposes.js';
+import { loadFacultyConstraints, markOverrideApplied } from './faculty-learning-actions.js';
 import { listDueReviews, loadProjectionAttempts } from './learner-skill-state.js';
 import { listPublishedTeachingStrategies } from './misconceptions.js';
 import type { PersistenceDb } from './repositories.js';
@@ -90,8 +91,8 @@ function latestHintLevels(attempts: readonly ProjectionAttempt[]): ReadonlyMap<s
 }
 
 /**
- * Everything planner v1 decides from, for one student, read now. Faculty constraints have no
- * source until INST-16 and are passed as none.
+ * Everything planner v1 decides from, for one student, read now. Faculty constraints (INST-16) are the
+ * student's pending plan override and open assignments; they are honoured with or without consent.
  */
 export async function loadPlannerInput(
   db: PersistenceDb,
@@ -107,7 +108,7 @@ export async function loadPlannerInput(
     applicability: strategy.applicability,
     requiresModel: strategy.requiresModel,
   }));
-  const constraints = { override: null, assignments: [] };
+  const constraints = await loadFacultyConstraints(db, input.subjectUserId);
   if (!adaptive) {
     // The non-adaptive path reads nothing built from the attempt history.
     return { adaptive, sessionMinutes: input.sessionMinutes, careerGap, skillStates: [], dueReviews: [], strategies, constraints };
@@ -159,9 +160,12 @@ export async function planNextLearningStep(
     const raw = await loadPlannerInput(tx, { subjectUserId: input.subjectUserId, sessionMinutes: input.sessionMinutes ?? null });
     const inputs = normalisePlannerInput(raw);
     const decision = planNextStep(inputs);
-    return insertDecision(tx, {
+    const recorded = await insertDecision(tx, {
       subjectUserId: input.subjectUserId, inputs, inputsHash: plannerInputsHash(inputs), decision, correlationId: input.correlationId,
     });
+    // A faculty override decides one step (INST-16): the decision that carries it applies it, in this transaction.
+    if (decision.override && inputs.constraints.override) await markOverrideApplied(tx, inputs.constraints.override.overrideId, recorded.decisionId);
+    return recorded;
   });
 }
 

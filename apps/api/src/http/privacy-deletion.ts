@@ -226,12 +226,18 @@ async function erase(deps: DeletionExecutionDeps, subjectUserId: string): Promis
     const placementTests = await removed(sql`WITH gone AS (DELETE FROM placement_tests WHERE subject_user_id = ${subjectUserId}::uuid RETURNING 1) SELECT count(*)::int AS count FROM gone`);
     const sessions = await removed(sql`WITH gone AS (DELETE FROM learning_sessions WHERE subject_user_id = ${subjectUserId}::uuid RETURNING 1) SELECT count(*)::int AS count FROM gone`);
     const activity = await removed(sql`WITH gone AS (DELETE FROM learner_activity_events WHERE user_id = ${subjectUserId}::uuid RETURNING 1) SELECT count(*)::int AS count FROM gone`);
+    // What lecturers set for the person (INST-16, 0082): their plan overrides (which point at decisions, so
+    // first), the assignments they received and the group sessions they were invited to. The lecturer's own
+    // act (assignment header, meeting, content links) names no student and stays.
+    const facultyActions = await removed(sql`WITH gone AS (DELETE FROM learning_plan_overrides WHERE student_user_id = ${subjectUserId}::uuid RETURNING 1) SELECT count(*)::int AS count FROM gone`)
+      + await removed(sql`WITH gone AS (DELETE FROM learning_assignment_students WHERE student_user_id = ${subjectUserId}::uuid RETURNING 1) SELECT count(*)::int AS count FROM gone`)
+      + await removed(sql`WITH gone AS (DELETE FROM staff_action_attendees WHERE student_user_id = ${subjectUserId}::uuid RETURNING 1) SELECT count(*)::int AS count FROM gone`);
     // The planner's decision audit (ENG-08) holds the inputs each decision was made from.
     const decisions = await removed(sql`WITH gone AS (DELETE FROM learning_decisions WHERE subject_user_id = ${subjectUserId}::uuid RETURNING 1) SELECT count(*)::int AS count FROM gone`);
     // Deletion triggers a rebuild of the skill state projection (ENG-05). With the facts gone the
     // rebuild is the empty set, so every projection row of the subject is removed here.
     const projection = await projectSubjectSkillState(tx, subjectUserId);
-    return stepItems + attempts + placementItems + placementTests + sessions + activity + decisions + projection.deleted;
+    return stepItems + attempts + placementItems + placementTests + sessions + activity + facultyActions + decisions + projection.deleted;
   });
 
   // Institution roster history survives, with the person removed from it.

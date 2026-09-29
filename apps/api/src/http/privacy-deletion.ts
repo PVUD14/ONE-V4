@@ -142,6 +142,33 @@ async function erase(deps: DeletionExecutionDeps, subjectUserId: string): Promis
     `);
   });
 
+  // Employer screening attempts (EMP-12 privacy fix; docs/architecture/employer-screening-privacy-design.md).
+  // The attempt and its stored score stay, detached with the application: they are the employer's
+  // record of what it measured. What the person selected is erased; the employer's per-question
+  // marking stays, so the marks still sum to the stored score. A sitting still open is closed
+  // unscored first, because the next sweep would otherwise grade the emptied answers and store a
+  // score of 0 nobody earned. The employer's access to all of it already ended with the grants above.
+  counts.EMPLOYER_SCREENING = await db.transaction(async (tx) => {
+    const attempts = await tx.execute(sql`
+      SELECT count(*)::int AS count FROM employer_assessment_attempts WHERE candidate_user_id = ${subjectUserId}::uuid
+    `) as QueryResult<{ count: number }>;
+    await tx.execute(sql`
+      WITH closed AS (
+        UPDATE employer_assessment_attempts SET state = 'EXPIRED'
+        WHERE candidate_user_id = ${subjectUserId}::uuid AND state = 'IN_PROGRESS'
+        RETURNING invitation_id
+      )
+      UPDATE employer_assessment_invitations SET state = 'EXPIRED'
+      WHERE id IN (SELECT invitation_id FROM closed) AND state = 'STARTED'
+    `);
+    await tx.execute(sql`
+      UPDATE employer_assessment_answers SET selected_option_keys = '{}', numeric_response = NULL
+      WHERE attempt_id IN (SELECT id FROM employer_assessment_attempts WHERE candidate_user_id = ${subjectUserId}::uuid)
+        AND (cardinality(selected_option_keys) > 0 OR numeric_response IS NOT NULL)
+    `);
+    return Number(attempts.rows[0]?.count ?? 0);
+  });
+
   // EMP-10: the text of every message in the person's application conversations, both sides. The
   // rows stay without text (append-only; 0067) so pipelines and trust-case references stay valid.
   counts.APPLICATION_MESSAGES = await eraseApplicationMessagesForSubject(db, subjectUserId);

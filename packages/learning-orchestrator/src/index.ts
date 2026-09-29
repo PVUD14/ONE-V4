@@ -506,9 +506,19 @@ function supportingReasons(state: PlannerSkillState | undefined): readonly Plann
   return reasons;
 }
 
-/** Tried on more than one day and never succeeded unaided. */
+/**
+ * STUCK: tried on at least this many calendar days and never succeeded unaided. Exported so the faculty
+ * cohort view (INST-15) uses the engine's threshold rather than inventing its own.
+ */
+export const STUCK_MIN_ATTEMPT_DAYS = 2;
+
+/** Tried on more than one day and never succeeded unaided — the planner's STUCK rule. */
+export function isStuckSkillState(state: Pick<PlannerSkillState, 'attemptDayCount' | 'unaidedSuccessCount'>): boolean {
+  return state.attemptDayCount >= STUCK_MIN_ATTEMPT_DAYS && state.unaidedSuccessCount === 0;
+}
+
 function isStuck(state: PlannerSkillState): boolean {
-  return state.attemptDayCount >= 2 && state.unaidedSuccessCount === 0;
+  return isStuckSkillState(state);
 }
 
 const MODE_FOR_ACTION: Readonly<Record<Exclude<PlannerAction, 'NONE'>, LearningMode>> = {

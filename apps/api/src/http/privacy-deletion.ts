@@ -199,7 +199,10 @@ async function erase(deps: DeletionExecutionDeps, subjectUserId: string): Promis
     // The career roles the person chose (0011) are about them too. Role goals reference these rows, so
     // they go after the goals above. They were left behind until 2026-09-29 (found by ENG-19).
     const targets = await tx.execute(sql`WITH gone AS (DELETE FROM student_career_targets WHERE student_user_id = ${subjectUserId}::uuid RETURNING 1) SELECT count(*)::int AS count FROM gone`) as QueryResult<{ count: number }>;
-    return Number(gone.rows[0]?.count ?? 0) + Number(targets.rows[0]?.count ?? 0);
+    // Outcomes the person shared with a college (INST-13, 0083) are about them: erased, withdrawn or not.
+    // The 0083 guard allows DELETE only inside this transaction-local erase setting.
+    const outcomes = await tx.execute(sql`WITH gone AS (DELETE FROM student_outcome_declarations WHERE student_user_id = ${subjectUserId}::uuid RETURNING 1) SELECT count(*)::int AS count FROM gone`) as QueryResult<{ count: number }>;
+    return Number(gone.rows[0]?.count ?? 0) + Number(targets.rows[0]?.count ?? 0) + Number(outcomes.rows[0]?.count ?? 0);
   });
   await db.execute(sql`DELETE FROM student_saved_opportunities WHERE student_user_id = ${subjectUserId}::uuid`);
 

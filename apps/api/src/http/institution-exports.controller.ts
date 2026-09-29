@@ -11,6 +11,11 @@
  *
  * Every export is a POST: it writes an audit row and needs a reason code, which does not
  * belong in a URL.
+ *
+ * INST-13 adds a fifth, the accreditation outcomes file, on the same gate, scope, limits and
+ * audit: graduates by department, programme and year with placed (INST-12's rule), higher studies
+ * and entrepreneurship (self-reported, 0083), suppressed, as of the last month end, NA wherever ONE
+ * holds nothing. Design: docs/architecture/accreditation-outcome-exports-design.md.
  */
 import { randomUUID } from 'node:crypto';
 import { BadRequestException, Body, Controller, ForbiddenException, HttpException, HttpStatus, Inject, NotFoundException, Param, Post, Req, Res, UseGuards } from '@nestjs/common';
@@ -26,7 +31,9 @@ import {
   type InstitutionExportKind,
   type InstitutionStudentScope,
 } from '@planthepath/authorization/src/index.js';
+import { drizzle } from 'drizzle-orm/node-postgres';
 import { generateInstitutionAggregateReport } from '@planthepath/persistence/src/career-readiness.js';
+import * as schema from '@planthepath/persistence/src/schema.js';
 import { loadInstitutionUnitTree } from '@planthepath/persistence/src/institution-scope.js';
 import {
   InstitutionExportError,
@@ -42,6 +49,7 @@ import {
 import { PG_POOL } from '../persistence.provider.js';
 import { ProtectedApiAuthenticationGuard, requireTrustedAuthorization, type ProtectedHttpRequest } from './api-security.js';
 import { toCsv, type CsvValue } from './institution-export-csv.js';
+import { loadAccreditationOutcomes } from './accreditation-outcomes.js';
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const reasonPattern = /^[A-Z0-9_:-]{3,64}$/;
@@ -189,6 +197,36 @@ export class InstitutionExportsController {
   }
 
   /**
+   * Graduate outcomes for accreditation (INST-13): counts only, suppressed, as of the end of the last
+   * ended month, over the whole export scope (no period or unit choice, so no two files can be
+   * differenced). Not an official template, and the file says so first.
+   */
+  @Post('/institutions/:institutionId/exports/accreditation-outcomes')
+  async accreditationOutcomes(@Req() request: ProtectedHttpRequest, @Param('institutionId') institutionId: string, @Body() body: unknown, @Res() response: ExportResponse): Promise<void> {
+    const authority = await this.authorise(request, institutionId, 'ACCREDITATION_OUTCOMES');
+    const input = readBody(body, ['reasonCode'], authority.context.correlationId);
+    const file = await this.record(authority, 'ACCREDITATION_OUTCOMES', input.reasonCode, async (client) => {
+      const outcomes = await loadAccreditationOutcomes(drizzle(client, { schema }), authority.institutionId, authority.scope);
+      const cell = (count: { suppressed: boolean; value: number | null }, total = false): CsvValue => (count.suppressed || count.value === null ? (total ? 'Withheld' : suppressedLabel) : count.value);
+      const notHeld = ['NA', 'NA', 'NA'] as const;
+      const note = (text: string): CsvValue[] => ['Note', null, null, null, null, null, null, null, null, null, null, null, text];
+      const rows: CsvValue[][] = [
+        ...accreditationNotes(today(), outcomes.asOf.lastDay).map(note),
+        ...outcomes.groups.map(({ department, programme, yearOfGraduation, row }) => ['Group', department, programme, yearOfGraduation,
+          cell(row.graduated, true), cell(row.placed), cell(row.higherStudies), cell(row.entrepreneurship), cell(row.noneShared), ...notHeld, null]),
+        ['All graduates in scope', null, null, 'All years', cell(outcomes.overall.graduated, true), cell(outcomes.overall.placed, true),
+          cell(outcomes.overall.higherStudies, true), cell(outcomes.overall.entrepreneurship, true), cell(outcomes.overall.noneShared, true), ...notHeld, null],
+      ];
+      requireWithinLimit(rows.length, authority.context.correlationId);
+      return {
+        file: { filename: `one-accreditation-outcomes-${outcomes.asOf.month}.csv`, header: accreditationHeader, rows },
+        context: { month: outcomes.asOf.month, groups: outcomes.groups.length, rowCount: rows.length },
+      };
+    });
+    send(response, file, authority.context.correlationId);
+  }
+
+  /**
    * 401 comes from the guard. Anyone who is not staff of this institution gets a plain 403;
    * institution staff without an authorising grant get 403 ANALYTICS_CAPABILITY_REQUIRED and
    * a DENIED audit row; a grant holder whose write scope is empty gets 403 SCOPE_REQUIRED.
@@ -262,6 +300,28 @@ export class InstitutionExportsController {
       throw failure(HttpStatus.INTERNAL_SERVER_ERROR, 'EXPORT_FAILED', correlationId);
     }
   }
+}
+
+/** The accreditation file's columns (INST-13). Three are NA in every row: ONE does not hold them. */
+const accreditationHeader = [
+  'Row', 'Department', 'Programme', 'Year of graduation', 'Graduated', 'Placed (applications shared with the college)',
+  'Higher studies (self-reported)', 'Entrepreneurship (self-reported)', 'No outcome shared',
+  'Graduated within normal duration', 'Qualified in national or state examinations', 'Median salary or package', 'Note',
+] as const;
+
+/** The plain statements every accreditation file opens with. */
+function accreditationNotes(preparedOn: string, asOf: string): readonly string[] {
+  return [
+    `Prepared by ONE on ${preparedOn} from records as of ${asOf}.`,
+    'Check every figure against the current official template (NAAC, NBA, NIRF or other) before any submission. ONE does not claim that this file complies with any format.',
+    'Counts only: no student is named. Any count under 5 reads <5. A total reads Withheld when it is under 5 or would reveal a hidden count.',
+    'Graduated: students with a recorded graduation from the college. Year of graduation is the calendar year of the recorded graduation date.',
+    'Placed: graduates with an accepted offer or a hire on an application they chose to share with the college, before graduating — the same rule as the Placement statistics.',
+    'Higher studies and entrepreneurship are self-reported by graduates who chose to share them with the college. Neither ONE nor the college has verified them.',
+    'Each graduate is counted once: placed first, then their own report. No outcome shared means the college has no shared record — it does not mean unplaced.',
+    'Graduated within normal duration and Qualified in national or state examinations: NA — ONE does not hold these records.',
+    'Median salary or package: NA — ONE never gives colleges offer pay, for any student or in aggregate.',
+  ];
 }
 
 function readBody(body: unknown, allowed: readonly string[], correlationId: string): Record<string, unknown> {

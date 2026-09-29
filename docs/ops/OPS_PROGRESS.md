@@ -1567,7 +1567,22 @@ No ADR was needed.
 - **Readiness band movement:** NA, with the reason on screen.
 - No count of people is summed across colleges. The header totals count only colleges and cases.
 
-**Validation (fresh local DB `one_ops14`, only DATABASE_URL exported):** PENDING — the full run is recorded below once it finishes. Before this report:
+**Validation (fresh local DB `one_ops14`, only DATABASE_URL exported):** full run on 9e7a4e1.
+- `db:migrate` ×2: pass (67 applied with the ledger created, then 0 applied / 67 already applied).
+- `corepack pnpm typecheck`: pass.
+- `corepack pnpm build`: pass.
+- `corepack pnpm -r --no-bail --workspace-concurrency=1 test`: 3 189 passed, 2 failed, and 1 file errored.
+  - All 17 other packages passed. The api suite passed 1 055 of 1 057 across 66 files.
+  - The failures were `institution-roster-activation` (1 test) and `operations-audit` (1 test). `employer-organisation-state` errored in teardown.
+  - Each one was Postgres `out of shared memory` on the shared local server, which was holding 3–9.6 thousand locks for other agents' concurrent runs against `max_locks_per_transaction` 64.
+  - This branch touches none of those files.
+- Re-runs, each file alone, as the brief directs:
+  - `operations-audit`: 12/12 pass.
+  - `employer-organisation-state`: first re-run 14/14 with a teardown shared-memory error; second 14/14, exit 0.
+  - `institution-roster-activation`: 12/13 twice, both times on `out of shared memory` in `TRUNCATE`. The third run, once the server's lock count fell to about 1 150, passed 13/13 with exit 0.
+- No test was skipped or changed.
+
+Before this report:
 - `db:migrate` ×2: pass (67 applied, then 0).
 - 0078 replayed twice by hand: pass.
 - `corepack pnpm typecheck`: pass.

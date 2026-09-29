@@ -350,8 +350,10 @@ describe('EMP-11: results come back to the college, named only where the student
 
     await api().post(employerDrives(employerId) + '/' + driveId + '/complete').set(auth(recruiterId)).send({ revision: 2 }).expect(201);
     const done = await api().get(collegeDrives(campus.institutionId) + '/' + driveId + '/results').set(auth(campus.officer)).expect(200);
+    // EMP-15 aligned the counts with INST-12's register: only the 2 applications shared with the
+    // college are counted, so every count is now withheld (fewer than 5).
     expect(done.body.results.counts).toEqual({
-      applied: { suppressed: false, value: 6 },
+      applied: { suppressed: true, value: null },
       offered: { suppressed: true, value: null },
       selected: { suppressed: true, value: null },
     });
@@ -370,6 +372,21 @@ describe('EMP-11: results come back to the college, named only where the student
     expect(audit.rows[0].n).toBe(3);
     // Faculty cannot read drives at all.
     await api().get(collegeDrives(campus.institutionId) + '/' + driveId + '/results').set(auth(campus.faculty)).expect(403);
+  });
+});
+
+describe('EMP-15: drive results count only applications the students shared with the college', () => {
+  it('counts the 5 shared applications of 7 and leaves the 2 unshared ones out of every count', async () => {
+    const campus = await college();
+    const { employerId, recruiterId, opportunityId, driveId } = await approvedDrive(campus);
+    for (let index = 0; index < 7; index += 1) {
+      const id = await student(campus, 'Shared ' + index + ' Synthetic');
+      await applyAs(id, opportunityId, index < 5).expect(201);
+    }
+    await api().post(employerDrives(employerId) + '/' + driveId + '/complete').set(auth(recruiterId)).send({ revision: 2 }).expect(201);
+    const done = await api().get(collegeDrives(campus.institutionId) + '/' + driveId + '/results').set(auth(campus.officer)).expect(200);
+    expect(done.body.results.counts.applied).toEqual({ suppressed: false, value: 5 });
+    expect(done.body.results.named).toHaveLength(5);
   });
 });
 

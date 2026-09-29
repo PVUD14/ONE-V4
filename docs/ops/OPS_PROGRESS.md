@@ -1784,7 +1784,7 @@ approval (OPS-02 dual control), and notices to the admins of affected organisati
 it; it is rate-limited and sent through the outbox worker.
 
 **Branch / PR:** feat/ops-incidents-comms → feat/plan-phases-0-to-2, based on e472cef. The commits are, in order: design (d354de5),
-acceptance tests (8da95a7), backend implementation (df7228b), web and Android (6cdc85b), and this report. The branch is pushed to
+acceptance tests (8da95a7), backend implementation (df7228b), web and Android (6cdc85b), this report (ecacfe7), a spec typing fix (5f0a901) and the validation amendment. The branch is pushed to
 onev4. No PR was opened because `gh` is not installed, so the merge is left to review.
 
 **Files created:**

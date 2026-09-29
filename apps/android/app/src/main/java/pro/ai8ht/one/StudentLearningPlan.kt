@@ -46,6 +46,8 @@ import pro.ai8ht.one.ui.Tone
  * third hint counts as assisted), the path in skip / review / learn groups, and what is due for review. Labels,
  * reasons and counts only — never a readiness value, a score, a likelihood, a due date or any other model
  * number — and NA or a plain sentence wherever something is not available. Works with every AI flag off.
+ * INST-16 adds "From your lecturer" (LearningActions.kt) above the next step: work a lecturer assigned or a next
+ * step they chose is planned even before a target role is chosen.
  */
 
 internal val learningReasonText = mapOf(
@@ -119,17 +121,33 @@ internal fun LearningPlanSection(onOpenCareer: () -> Unit) {
     var reload by remember { mutableIntStateOf(0) }
     var notice by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
+    // INST-16: what the student's lecturers set (assignments, sessions, a chosen next step).
+    var lecturer by remember { mutableStateOf<Load<StudentLearningActionsDto>>(Load.Loading) }
 
     LaunchedEffect(reload) {
+        lecturer = loadOf { Api.myLearningActions(context) }
         val loaded = loadOf { Api.learningPath(context) }
         path = loaded
         // A refresh after acting keeps the step the student is on; only the first load takes the latest one.
         if (step == null && loaded is Load.Ready) step = loaded.value.latestStep
     }
 
+    val planNext: () -> Unit = {
+        busy = true; notice = null
+        scope.launch {
+            runCatching { Api.startNextLearningStep(context) }
+                .onSuccess { step = it; reload += 1 }
+                .onFailure { notice = (it as? Api.ApiException)?.detail ?: "Your next step could not be planned. Try again." }
+            busy = false
+        }
+    }
+    val lecturerWork = (lecturer as? Load.Ready)?.value?.hasLecturerWork() == true
+
     Column {
         Spacer(Modifier.height(10.dp))
         PlacementTestCard()
+        Spacer(Modifier.height(12.dp))
+        FromYourLecturerCard(lecturer, busy, planNext)
         Spacer(Modifier.height(12.dp))
         PilotCard {
             Column(Modifier.padding(16.dp)) {
@@ -139,22 +157,18 @@ internal fun LearningPlanSection(onOpenCareer: () -> Unit) {
                 when (val state = path) {
                     is Load.Loading -> Muted("Loading your plan…")
                     is Load.Failed -> Muted("NA — your learning plan could not be loaded right now.")
-                    is Load.Ready -> if (state.value.target == null) {
+                    is Load.Ready -> if (state.value.target == null && !lecturerWork) {
                         Muted("Choose the job you want first. Your path and next steps are planned against it.")
                         Spacer(Modifier.height(8.dp))
                         Button(onClick = onOpenCareer) { Text("Choose a target role") }
                     } else {
+                        if (state.value.target == null) {
+                            Muted("Your lecturer’s work is planned now. Choose the job you want on Career target to plan the rest of your path.")
+                            Spacer(Modifier.height(6.dp))
+                        }
                         if (current != null) StepBody(current) { next -> step = next; reload += 1 } else Muted("No step planned yet.")
                         Spacer(Modifier.height(10.dp))
-                        Button(enabled = !busy, onClick = {
-                            busy = true; notice = null
-                            scope.launch {
-                                runCatching { Api.startNextLearningStep(context) }
-                                    .onSuccess { step = it; reload += 1 }
-                                    .onFailure { notice = (it as? Api.ApiException)?.detail ?: "Your next step could not be planned. Try again." }
-                                busy = false
-                            }
-                        }) { Text(if (current == null) "Plan my first step" else "Plan my next step") }
+                        Button(enabled = !busy, onClick = planNext) { Text(if (current == null) "Plan my first step" else "Plan my next step") }
                     }
                 }
             }

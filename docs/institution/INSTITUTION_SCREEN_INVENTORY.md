@@ -137,3 +137,13 @@ Dashboard carries them as sections (no Drives item, HG-3); the department head's
 carries the department's statistics; admin Settings gains drive categories; the dashboard placement
 KPIs, pipeline funnel and offers trend read real, suppressed figures. Remaining view-only items:
 admin Career Readiness (INST-17) and faculty Learning Resources (INST-16).
+
+## Update after INST-13 (2026-09-29)
+
+Admin **Reports** and department-head **Reports and Analytics**: the Exports panel gains
+"Accreditation outcomes" — graduates by department, programme and year of graduation with placed
+(shared applications, INST-12's rule), higher studies and entrepreneurship (self-reported), suppressed,
+as of the last month end, NA for anything ONE does not hold, and a plain statement that the file is not
+an official template. Admin Reports now carries both INST-08 and INST-13 exports. Web only (desk task).
+Students record the self-report on their existing **Profile** page ("After college"), on the web and
+on Android. No navigation item added, removed, renamed or reordered.

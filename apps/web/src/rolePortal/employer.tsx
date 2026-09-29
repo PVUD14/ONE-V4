@@ -8,7 +8,7 @@
  */
 import { getProtectedAccessToken, getSecurityContext } from '../api.js';
 import { V2EmptyState } from '../dashboardsV2.js';
-import { EmployerApplicantsPage, EmployerOpportunitiesPage, EmployerInterviewsPage, EmployerOffersPage, EmployerHiringAnalyticsPage, CandidateIdentity, InterviewActionForm } from '../hiringPages.js';
+import { EmployerApplicantsPage, EmployerOpportunitiesPage, EmployerInterviewsPage, EmployerOffersPage, CandidateIdentity, InterviewActionForm } from '../hiringPages.js';
 import { downloadMyInterviewCalendar, getMyInterview, listMyInterviews, submitMyInterviewOutcome, type ParticipantInterviewDto, type InterviewOutcomeInput } from '../api/hiring.js';
 import { AddToCalendarButton, ScorecardTemplatesPanel } from '../interviewScheduling.js';
 import { StaffPilotWrap } from '../parityWraps.js';
@@ -17,6 +17,7 @@ import { EmployerCompanyProfilePage } from './employerCompanyProfile.js';
 import { EmployerOpportunityDetailPage } from './employerOpportunityDetail.js';
 import { EmployerCandidateDetailPage, EmployerTalentPoolPage } from './employerCandidateDetail.js';
 import { EmployerMessagesPage } from '../applicationMessages.js';
+import { EmployerReportsPage } from './employerReports.js';
 import type { RolePortalConfig } from '../rolePortalConfig.js';
 import { RestrictedApiState } from './shared.js';
 import { useEffect, useState } from 'react';
@@ -55,7 +56,8 @@ function EmployerManagementRealityPage({ portal, routeLabel }: { readonly portal
   const employerId = employerMembership.organizationId;
   if (/interview/i.test(routeLabel)) return <EmployerStageWorkspace key={`${employerId}-interviews`} employerId={employerId} stage="INTERVIEW" />;
   if (/offer/i.test(routeLabel)) return <EmployerStageWorkspace key={`${employerId}-offers`} employerId={employerId} stage="OFFER" />;
-  if (/report|analytic/i.test(routeLabel)) return <StaffPilotWrap title="Reports" subtitle="Your employer's hiring funnel."><EmployerHiringAnalyticsPage key={employerId} employerId={employerId} /></StaffPilotWrap>;
+  // EMP-15: suppressed reports by job, college and drive replace the unsuppressed funnel view.
+  if (/report|analytic/i.test(routeLabel)) return <StaffPilotWrap title="Reports" subtitle="Your employer's hiring funnel."><EmployerReportsPage key={employerId} employerId={employerId} /></StaffPilotWrap>;
   // EMP-05: Opportunity Detail is one job — its versions, state and actions. It used to fall
   // through to the list below.
   if (routeLabel === 'Opportunity Detail') return <EmployerOpportunityDetailPage key={employerId} employerId={employerId} />;

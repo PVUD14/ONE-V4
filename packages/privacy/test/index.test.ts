@@ -141,15 +141,18 @@ describe('deletion policy', () => {
     expect(deletionPolicyFor('AUDIT').disposition).toBe('RETAINED');
     // OPS-05: support cases keep the service record and lose the person.
     expect(deletionPolicyFor('SUPPORT_CASES').disposition).toBe('ANONYMISED');
+    // Employer screening attempts keep their score for the employer; the candidate's answers are erased.
+    expect(deletionPolicyFor('EMPLOYER_SCREENING').disposition).toBe('ANONYMISED');
+    expect(deletionPolicyFor('EMPLOYER_SCREENING').basis).toMatch(/answers are erased/i);
   });
 
   it('covers every declared category exactly once', () => {
     const categories = DELETION_POLICY.map((entry) => entry.category);
     expect(new Set(categories).size).toBe(categories.length);
-    // OPS-05 added SUPPORT_CASES, ENG-03 LEARNING_ACTIVITY, INST-11 COUNSELLING_NOTES and EMP-10
-    // APPLICATION_MESSAGES: all must be declared.
-    expect(categories).toHaveLength(13);
-    expect(categories).toEqual(expect.arrayContaining(['SUPPORT_CASES', 'LEARNING_ACTIVITY', 'COUNSELLING_NOTES', 'APPLICATION_MESSAGES']));
+    // OPS-05 added SUPPORT_CASES, ENG-03 LEARNING_ACTIVITY, INST-11 COUNSELLING_NOTES, EMP-10
+    // APPLICATION_MESSAGES and the EMP-12 privacy fix EMPLOYER_SCREENING: all must be declared.
+    expect(categories).toHaveLength(14);
+    expect(categories).toEqual(expect.arrayContaining(['SUPPORT_CASES', 'LEARNING_ACTIVITY', 'COUNSELLING_NOTES', 'APPLICATION_MESSAGES', 'EMPLOYER_SCREENING']));
   });
 
   it('produces a deterministic, non-routable replacement identity', () => {

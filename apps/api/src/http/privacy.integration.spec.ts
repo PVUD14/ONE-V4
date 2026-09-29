@@ -39,6 +39,9 @@ let storage: ReturnType<typeof createLocalDiskStorage>;
 let subjectId: string; let subjectToken: string;
 let opsId: string;
 let employerId: string;
+// EMP-12 screening attempts: the subject's (one submitted, one still in progress) and another candidate's.
+let subjectSubmittedAttemptId: string; let subjectOpenAttemptId: string; let subjectOpenInvitationId: string;
+let otherCandidateId: string; let otherAttemptId: string;
 
 const ids = { uuid: () => randomUUID() };
 
@@ -76,7 +79,15 @@ beforeAll(async () => {
   // Data the subject owns, and an application the employer lawfully holds.
   await pool.query(`INSERT INTO student_profiles (user_id, target_career) VALUES ($1, 'SOC Analyst')`, [subjectId]);
   await pool.query(`INSERT INTO student_document_metadata (id, student_user_id, title, document_type) VALUES ($1, $2, 'My CV', 'RESUME')`, [randomUUID(), subjectId]);
-  await seedApplication();
+  const subjectApplicationId = await seedApplication(subjectId);
+  otherCandidateId = randomUUID();
+  await db.insert(schema.users).values({ id: otherCandidateId, externalSubject: `sub:${randomUUID()}`, email: 'candidate@uat.test', state: 'ACTIVE' });
+  const otherApplicationId = await seedApplication(otherCandidateId);
+  // Employer screening tests (EMP-12) on both applications, so export and deletion can be shown
+  // to reach exactly the subject's attempts.
+  ({ attemptId: subjectSubmittedAttemptId } = await seedScreening(subjectApplicationId, subjectId, 'SUBMITTED'));
+  ({ attemptId: subjectOpenAttemptId, invitationId: subjectOpenInvitationId } = await seedScreening(subjectApplicationId, subjectId, 'IN_PROGRESS'));
+  ({ attemptId: otherAttemptId } = await seedScreening(otherApplicationId, otherCandidateId, 'SUBMITTED'));
   // Engine behavioural data (ENG-03) for the subject and for someone else, so erasure can
   // be shown to remove exactly the subject's rows.
   await seedLearningActivity(subjectId);
@@ -147,10 +158,13 @@ async function seedLearningActivity(userId: string): Promise<void> {
   await pool.query(`INSERT INTO learner_activity_events (id, user_id, event_type) VALUES ($1,$2,'EXAM_ATTEMPT_SUBMITTED')`, [randomUUID(), userId]);
 }
 
-async function seedApplication(): Promise<void> {
+let opportunitySeq = 0;
+async function seedApplication(studentUserId: string): Promise<string> {
   const opportunityId = randomUUID();
   const versionId = randomUUID();
-  await pool.query(`INSERT INTO opportunities (id, employer_id, created_by_user_id, reference_code, lifecycle_state) VALUES ($1,$2,$3,'REF-1','DRAFT')`, [opportunityId, employerId, opsId]);
+  const applicationId = randomUUID();
+  opportunitySeq += 1;
+  await pool.query(`INSERT INTO opportunities (id, employer_id, created_by_user_id, reference_code, lifecycle_state) VALUES ($1,$2,$3,$4,'DRAFT')`, [opportunityId, employerId, opsId, `REF-${opportunitySeq}`]);
   await pool.query(
     `INSERT INTO opportunity_versions (id, opportunity_id, version_number, title, employment_type, work_mode, location_city, material_terms_hash, created_by_user_id)
      VALUES ($1,$2,1,'SOC Analyst Intern','INTERNSHIP','ONSITE','Bengaluru',$3,$4)`,
@@ -160,8 +174,66 @@ async function seedApplication(): Promise<void> {
   await pool.query(
     `INSERT INTO applications (id, opportunity_id, employer_id, applied_version_id, student_user_id, state, consent_granted_at, submitted_at)
      VALUES ($1,$2,$3,$4,$5,'APPLIED',now(),now())`,
-    [randomUUID(), opportunityId, employerId, versionId, subjectId],
+    [applicationId, opportunityId, employerId, versionId, studentUserId],
   );
+  return applicationId;
+}
+
+/**
+ * One published two-question screening test, an invitation on the application, and an attempt with
+ * both questions answered, as the EMP-12 routes write them. The option shuffle swaps A and B, so the
+ * export can be shown to report the keys the candidate saw rather than the stored ones. A submitted
+ * attempt is graded (first answer right, second wrong: 1 of 2, 50%).
+ */
+async function seedScreening(applicationId: string, candidateUserId: string, state: 'SUBMITTED' | 'IN_PROGRESS'): Promise<{ attemptId: string; invitationId: string }> {
+  const assessmentId = randomUUID();
+  const invitationId = randomUUID();
+  const attemptId = randomUUID();
+  const submitted = state === 'SUBMITTED';
+  await pool.query(
+    `INSERT INTO employer_assessments (id, employer_id, title, duration_seconds, total_marks, lifecycle_state, created_by_user_id, published_at)
+     VALUES ($1,$2,$3,1800,2,'PUBLISHED',$4,now())`, [assessmentId, employerId, `Screening ${state}`, opsId],
+  );
+  const questionIds: string[] = [];
+  for (const [index, text] of ['Which port does HTTPS use by default?', 'Which log shows failed SSH logins?'].entries()) {
+    const questionId = randomUUID();
+    questionIds.push(questionId);
+    await pool.query(
+      `INSERT INTO employer_assessment_questions (id, employer_id, question_text, question_type, question_hash, approval_status, created_by_user_id)
+       VALUES ($1,$2,$3,'SINGLE_CHOICE_MCQ',$4,'APPROVED',$5)`, [questionId, employerId, `${text} (${assessmentId.slice(0, 8)})`, `hash-${questionId}`, opsId],
+    );
+    // Stored key A is correct on both questions.
+    await pool.query(
+      `INSERT INTO employer_assessment_question_options (id, question_id, option_key, option_text, is_correct)
+       VALUES ($1,$2,'A','First choice',true), ($3,$2,'B','Second choice',false)`, [randomUUID(), questionId, randomUUID()],
+    );
+    await pool.query(
+      `INSERT INTO employer_assessment_items (id, assessment_id, employer_id, question_id, sequence, marks) VALUES ($1,$2,$3,$4,$5,1)`,
+      [randomUUID(), assessmentId, employerId, questionId, index + 1],
+    );
+  }
+  await pool.query(
+    `INSERT INTO employer_assessment_invitations (id, assessment_id, employer_id, application_id, state, invited_by_user_id, closes_at)
+     VALUES ($1,$2,$3,$4,$5,$6, now() + interval '7 days')`, [invitationId, assessmentId, employerId, applicationId, submitted ? 'SUBMITTED' : 'STARTED', opsId],
+  );
+  await pool.query(
+    `INSERT INTO employer_assessment_attempts (id, invitation_id, candidate_user_id, seed, state, submitted_at, score, max_score, percentage)
+     VALUES ($1,$2,$3,'seed-privacy-test',$4, ${submitted ? 'now(), 1, 2, 50' : 'NULL, NULL, NULL, NULL'})`,
+    [attemptId, invitationId, candidateUserId, state],
+  );
+  for (const [index, questionId] of questionIds.entries()) {
+    await pool.query(
+      `INSERT INTO employer_assessment_attempt_questions (id, attempt_id, question_id, display_order, question_version, marks, option_map)
+       VALUES ($1,$2,$3,$4,1,1,'{"A":"B","B":"A"}'::jsonb)`, [randomUUID(), attemptId, questionId, index + 1],
+    );
+    // Stored A (shown as B) on the first question, stored B (shown as A) on the second.
+    await pool.query(
+      `INSERT INTO employer_assessment_answers (id, attempt_id, question_id, selected_option_keys, is_correct, marks_awarded)
+       VALUES ($1,$2,$3,$4,$5,$6)`,
+      [randomUUID(), attemptId, questionId, [index === 0 ? 'A' : 'B'], submitted ? index === 0 : null, submitted ? (index === 0 ? 1 : 0) : null],
+    );
+  }
+  return { attemptId, invitationId };
 }
 
 afterAll(async () => {
@@ -199,6 +271,36 @@ describe('data export', () => {
     expect(bundle.documents).toHaveLength(1);
     // The bundle says what it does not contain, so silence is not mistaken for absence.
     expect(bundle.notIncluded.join(' ')).toMatch(/scorecards/i);
+  });
+
+  it('includes the subject\'s own screening attempts and answers, never the answer key or another candidate', async () => {
+    const download = await api().get(`/api/v1/students/me/privacy/exports/${exportRequestId}/download`).set(auth()).expect(200);
+    const bundle = download.body as { screeningAssessments: Record<string, any>[]; notIncluded: string[] };
+    expect(bundle.screeningAssessments).toHaveLength(2);
+    const submitted = bundle.screeningAssessments.find((entry) => entry.title === 'Screening SUBMITTED');
+    const open = bundle.screeningAssessments.find((entry) => entry.title === 'Screening IN_PROGRESS');
+    expect(submitted).toMatchObject({ employerName: 'Aster Mobility', roleTitle: 'SOC Analyst Intern', state: 'SUBMITTED' });
+    // The score as the student already sees it: the percentage.
+    expect(submitted?.attempt).toMatchObject({ state: 'SUBMITTED', percentage: 50 });
+    expect(submitted?.attempt.submittedAt).toBeTruthy();
+    expect(open?.attempt).toMatchObject({ state: 'IN_PROGRESS', percentage: null, submittedAt: null });
+    // Their answers, under the keys they saw: stored A is shown as B, and stored B as A.
+    const questions = submitted?.attempt.questions as Record<string, any>[];
+    expect(questions.map((question) => question.displayOrder)).toEqual([1, 2]);
+    expect(questions[0]?.questionText).toMatch(/^Which port does HTTPS use by default\?/);
+    expect(questions[0]?.options).toEqual([{ key: 'A', text: 'Second choice' }, { key: 'B', text: 'First choice' }]);
+    expect(questions[0]?.yourAnswer).toEqual({ selectedOptionKeys: ['B'], numericResponse: null });
+    expect(questions[1]?.yourAnswer).toEqual({ selectedOptionKeys: ['A'], numericResponse: null });
+
+    // Never the answer key, how an answer was marked, the raw score, or the stored shuffle.
+    const text = JSON.stringify(bundle.screeningAssessments);
+    for (const forbidden of ['is_correct', 'isCorrect', 'correct', 'marks_awarded', 'marksAwarded', 'score', 'maxScore', 'max_score', 'seed', 'option_map', 'optionMap']) {
+      expect(text, `export must not carry ${forbidden}`).not.toContain(`"${forbidden}"`);
+    }
+    // Nothing about another candidate: their attempt is absent.
+    expect(text).not.toContain(otherAttemptId);
+    expect(text).not.toContain(otherCandidateId);
+    expect(bundle.notIncluded.join(' ')).toMatch(/answer key to employer screening tests/i);
   });
 
   it('refuses a second open export rather than duplicating work', async () => {
@@ -371,6 +473,29 @@ describe('deletion execution', () => {
     const applications = await pool.query('SELECT state FROM applications WHERE student_user_id = $1', [subjectId]);
     expect(applications.rows).toHaveLength(1);
     expect(applications.rows[0].state).toBe('APPLIED');
+
+    // Employer screening (EMP-12): the attempt and its score survive with the anonymised person;
+    // what they chose is erased, and the employer's per-question marking stays consistent with the score.
+    const attempt = await pool.query('SELECT candidate_user_id, state, score, max_score, percentage, submitted_at FROM employer_assessment_attempts WHERE id = $1', [subjectSubmittedAttemptId]);
+    expect(attempt.rows[0]).toMatchObject({ candidate_user_id: subjectId, state: 'SUBMITTED', score: '1.00', max_score: '2.00', percentage: '50.00' });
+    expect(attempt.rows[0].submitted_at).not.toBeNull();
+    const answers = await pool.query(
+      `SELECT selected_option_keys, numeric_response, is_correct, marks_awarded FROM employer_assessment_answers
+       WHERE attempt_id = $1 ORDER BY marks_awarded DESC`, [subjectSubmittedAttemptId]);
+    expect(answers.rows).toEqual([
+      { selected_option_keys: [], numeric_response: null, is_correct: true, marks_awarded: '1.00' },
+      { selected_option_keys: [], numeric_response: null, is_correct: false, marks_awarded: '0.00' },
+    ]);
+    expect((await pool.query('SELECT count(*)::int AS count FROM employer_assessment_attempt_questions WHERE attempt_id = $1', [subjectSubmittedAttemptId])).rows[0].count).toBe(2);
+    // A sitting still open at deletion ends unscored, rather than being graded later from erased answers.
+    const open = await pool.query('SELECT state, score, submitted_at FROM employer_assessment_attempts WHERE id = $1', [subjectOpenAttemptId]);
+    expect(open.rows[0]).toEqual({ state: 'EXPIRED', score: null, submitted_at: null });
+    expect((await pool.query('SELECT state FROM employer_assessment_invitations WHERE id = $1', [subjectOpenInvitationId])).rows[0].state).toBe('EXPIRED');
+    expect((await pool.query('SELECT count(*)::int AS count FROM employer_assessment_answers WHERE attempt_id = $1 AND cardinality(selected_option_keys) > 0', [subjectOpenAttemptId])).rows[0].count).toBe(0);
+    // Another candidate's attempt is untouched.
+    const other = await pool.query('SELECT selected_option_keys FROM employer_assessment_answers WHERE attempt_id = $1 ORDER BY marks_awarded DESC', [otherAttemptId]);
+    expect(other.rows.map((row) => row.selected_option_keys)).toEqual([['A'], ['B']]);
+    expect((await pool.query('SELECT state, percentage FROM employer_assessment_attempts WHERE id = $1', [otherAttemptId])).rows[0]).toEqual({ state: 'SUBMITTED', percentage: '50.00' });
   });
 
   it('records what it erased, anonymised and retained', async () => {
@@ -378,9 +503,14 @@ describe('deletion execution', () => {
       `SELECT category, disposition, basis, record_count FROM privacy_deletion_records
        WHERE request_id = $1 ORDER BY category`, [dueId],
     );
-    // EMP-10 added APPLICATION_MESSAGES: one record per declared category, 13 in all.
-    expect(records.rows).toHaveLength(13);
+    // EMP-10 added APPLICATION_MESSAGES and the EMP-12 privacy fix EMPLOYER_SCREENING: one record per
+    // declared category, 14 in all.
+    expect(records.rows).toHaveLength(14);
     const byCategory = Object.fromEntries(records.rows.map((r) => [r.category, r]));
+    // The subject's two screening attempts: kept for the employer, detached, answers erased.
+    expect(byCategory.EMPLOYER_SCREENING.disposition).toBe('ANONYMISED');
+    expect(byCategory.EMPLOYER_SCREENING.record_count).toBe(2);
+    expect(byCategory.EMPLOYER_SCREENING.basis).toMatch(/answers are erased/i);
     expect(byCategory.APPLICATION_MESSAGES.disposition).toBe('ERASED');
     // INST-11: counselling notes about the person are erased with them.
     expect(byCategory.COUNSELLING_NOTES.disposition).toBe('ERASED');

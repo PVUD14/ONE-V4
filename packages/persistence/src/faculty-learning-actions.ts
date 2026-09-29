@@ -156,6 +156,15 @@ function assignmentDoneSql(assignment: string, student: SQL): SQL {
     END)`;
 }
 
+/**
+ * SQL: the assignment `a` is a preparation sprint (INST-17, 0085) whose time box has ended. Derived, never stored:
+ * at `ends_at` the sprint's work stops being a planner constraint and leaves the student's open work.
+ */
+function sprintEndedSql(assignment: string): SQL {
+  const a = sql.raw(assignment);
+  return sql`EXISTS (SELECT 1 FROM preparation_sprints ended_ps WHERE ended_ps.assignment_id = ${a}.id AND ended_ps.ends_at <= now())`;
+}
+
 /** SQL: `student` has a current relationship with `institution`. */
 function currentRelationshipSql(institution: SQL, student: SQL): SQL {
   return sql`EXISTS (SELECT 1 FROM institution_relationships ir
@@ -190,6 +199,7 @@ export async function loadFacultyConstraints(db: PersistenceDb, subjectUserId: s
       AND ${currentRelationshipSql(sql`a.institution_id`, sql`s.student_user_id`)}
       AND ${publishedSql(sql`a.content_kind`, sql`a.skill_id`, sql`a.lesson_version_id`)}
       AND NOT ${assignmentDoneSql('a', sql`s.student_user_id`)}
+      AND NOT ${sprintEndedSql('a')}
     ORDER BY a.assigned_at, a.id
     LIMIT ${PLANNER_ASSIGNMENT_LIMIT}
   `);
@@ -421,6 +431,8 @@ export interface StudentLearningActions {
   readonly assignments: readonly {
     readonly id: string; readonly kind: LearningContentKind; readonly title: string; readonly skillName: string;
     readonly institutionName: string; readonly note: string | null; readonly assignedAt: string; readonly status: 'OPEN' | 'DONE';
+    /** INST-17: set when the work is a preparation sprint from the college, with the end of its time box. */
+    readonly sprint: { readonly endsAt: string } | null;
   }[];
   readonly sessions: readonly {
     readonly id: string; readonly title: string; readonly institutionName: string; readonly scheduledStartAt: string; readonly scheduledEndAt: string;
@@ -441,19 +453,23 @@ export async function readStudentLearningActions(db: PersistenceDb, studentUserI
   if (!UUID.test(studentUserId)) throw new Error('studentUserId must be a UUID');
   const assignments = await rows<{
     id: string; content_kind: LearningContentKind; title: string; skill_name: string; institution_name: string; note: string | null; assigned_at: Date | string; done: boolean;
+    sprint_ends_at: Date | string | null;
   }>(db, sql`
     SELECT * FROM (
       SELECT a.id::text AS id, a.content_kind, ${resourceTitleSql(sql`a.content_kind`, sql`a.lesson_version_id`, sql`tn.name`)} AS title,
              tn.name AS skill_name, org.legal_name AS institution_name, a.note, a.assigned_at,
-             ${assignmentDoneSql('a', sql`s.student_user_id`)} AS done
+             ${assignmentDoneSql('a', sql`s.student_user_id`)} AS done, ps.ends_at AS sprint_ends_at
       FROM learning_assignment_students s
       JOIN learning_assignments a ON a.id = s.assignment_id
       JOIN taxonomy_nodes tn ON tn.id = a.skill_id
       JOIN organizations org ON org.id = a.institution_id
+      LEFT JOIN preparation_sprints ps ON ps.assignment_id = a.id
       WHERE s.student_user_id = ${studentUserId}::uuid AND a.withdrawn_at IS NULL
         AND ${currentRelationshipSql(sql`a.institution_id`, sql`s.student_user_id`)}
         AND ${publishedSql(sql`a.content_kind`, sql`a.skill_id`, sql`a.lesson_version_id`)}
     ) x
+    -- A sprint whose time box has ended is no longer open work (INST-17); finished sprint work stays as done.
+    WHERE x.sprint_ends_at IS NULL OR x.sprint_ends_at > now() OR x.done
     ORDER BY x.done, x.assigned_at DESC, x.id
     LIMIT 60
   `);
@@ -482,6 +498,7 @@ export async function readStudentLearningActions(db: PersistenceDb, studentUserI
     assignments: [...open, ...done].map((row) => ({
       id: row.id, kind: row.content_kind, title: row.title, skillName: row.skill_name, institutionName: row.institution_name, note: row.note,
       assignedAt: new Date(row.assigned_at).toISOString(), status: row.done === true ? 'DONE' : 'OPEN',
+      sprint: row.sprint_ends_at ? { endsAt: new Date(row.sprint_ends_at).toISOString() } : null,
     })),
     sessions: sessions.map((row) => ({
       id: row.id, title: row.title, institutionName: row.institution_name,

@@ -157,9 +157,9 @@ describe('EMP-17: the export holds only candidates with a live grant, and only w
     await move(org.employerId, org.recruiterId, a, 'SHORTLISTED');
     await api().post('/api/v1/students/me/applications/' + c + '/withdraw').set(auth(withdrawn.id)).send({}).expect(201);
     // D expired and EMP-16's daily sweep revoked it; E expired a moment ago and the sweep has not run yet.
-    await pool.query("UPDATE employer_applicant_access_grants SET expires_at = now() - interval '1 minute' WHERE student_user_id = $1", [expiredSwept.id]);
+    await pool.query("UPDATE employer_applicant_access_grants SET granted_at = now() - interval '2 days', expires_at = now() - interval '1 minute' WHERE student_user_id = $1", [expiredSwept.id]);
     expect(await revokeExpiredApplicantGrants(db)).toBe(1);
-    await pool.query("UPDATE employer_applicant_access_grants SET expires_at = now() - interval '1 second' WHERE student_user_id = $1", [expiredUnswept.id]);
+    await pool.query("UPDATE employer_applicant_access_grants SET granted_at = now() - interval '2 days', expires_at = now() - interval '1 second' WHERE student_user_id = $1", [expiredUnswept.id]);
     await pool.query(`INSERT INTO privacy_requests (id, subject_user_id, requested_by_user_id, request_type, state, deletion_scheduled_for, correlation_id)
       VALUES ($1, $2, $2, 'DELETION', 'RECEIVED', now() + interval '30 days', 'export-test')`, [randomUUID(), deleting.id]);
 

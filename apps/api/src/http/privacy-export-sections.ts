@@ -32,7 +32,7 @@ export async function assembleCoverageSections(one: Query, subjectUserId: string
 type Subject = ReturnType<typeof sql>;
 
 async function accountSections(one: Query, subject: Subject): Promise<Record<string, unknown>> {
-  const [consents, preferences, notifications, devices, invitations, supportCases] = await Promise.all([
+  const [consents, preferences, notifications, devices, invitations, supportCases, lessonLanguages] = await Promise.all([
     one(sql`SELECT c.consent_key, d.title, c.version, c.action, c.recorded_at
             FROM user_consents c
             LEFT JOIN consent_definitions d ON d.consent_key = c.consent_key AND d.version = c.version
@@ -50,7 +50,10 @@ async function accountSections(one: Query, subject: Subject): Promise<Record<str
     // The service record; the summary an operator typed and the case notes are operations' working notes.
     one(sql`SELECT channel, category, state, opened_at, resolved_at, closed_at FROM support_cases
             WHERE subject_user_id = ${subject} ORDER BY opened_at, id`),
+    // The language the person reads lessons in (ENG-16, 0097).
+    one(sql`SELECT lesson_language, updated_at FROM learner_language_preferences WHERE user_id = ${subject}`),
   ]);
+  const lessonLanguage = lessonLanguages[0];
   const preference = preferences[0];
   return {
     consents: consents.map((row) => ({ consentKey: row.consent_key, title: row.title ?? null, version: row.version, action: row.action, recordedAt: row.recorded_at })),
@@ -59,6 +62,7 @@ async function accountSections(one: Query, subject: Subject): Promise<Record<str
       quietHoursStartMinute: num(preference.quiet_hours_start_minute), quietHoursEndMinute: num(preference.quiet_hours_end_minute),
       dailyCap: num(preference.daily_cap), updatedAt: preference.updated_at,
     } : null,
+    lessonLanguage: lessonLanguage ? { language: lessonLanguage.lesson_language, updatedAt: lessonLanguage.updated_at } : null,
     notifications: notifications.map((row) => ({ kind: row.kind, title: row.title, body: row.body, createdAt: row.created_at, readAt: row.read_at ?? null })),
     devices: devices.map((row) => ({ platform: row.platform, registeredAt: row.created_at, lastSeenAt: row.last_seen_at, revokedAt: row.revoked_at ?? null })),
     invitations: invitations.map((row) => ({

@@ -42,7 +42,17 @@ export const lessonEditorReasons = {
   },
   /** The reviewer's confirmation of the rights the author declared, recorded in rights_reviews. */
   rights: ['OWNERSHIP_VERIFIED', 'LICENCE_VERIFIED'],
+  /**
+   * ENG-16: approving a variant in a language other than English also records who checked the
+   * language — the draft is marked for native-speaker review until then.
+   */
+  languageReview: ['NATIVE_SPEAKER_REVIEWED', 'NATIVE_SPEAKER_CONSULTED'],
 } as const;
+
+/** Whether approving a revision in `language` needs a native-speaker review code (ENG-16). */
+export function lessonNeedsLanguageReview(language: string | null | undefined): boolean {
+  return typeof language === 'string' && language !== '' && language !== 'en';
+}
 
 /** Why a lesson is published; part of the approved payload when an approval is needed. */
 export const lessonPublishReasons = ['NEW_LESSON', 'LESSON_REVISION', 'NEW_VARIANT', 'CORRECTION', 'TRACK_RELEASE'] as const;
@@ -60,7 +70,8 @@ export type LessonEditorRefusal =
   | 'REASON_CODE_INVALID'
   | 'LESSON_SELF_REVIEW_REFUSED'
   | 'LESSON_SELF_PUBLISH_REFUSED'
-  | 'LESSON_APPROVER_PUBLISH_REFUSED';
+  | 'LESSON_APPROVER_PUBLISH_REFUSED'
+  | 'LESSON_LANGUAGE_REVIEW_MISSING';
 
 type Actor = InternalCapabilityContext & { readonly userId: string };
 
@@ -75,6 +86,9 @@ export function refuseLessonTransition(input: {
   readonly to: LessonRevisionState;
   readonly reasonCode: string;
   readonly rightsReasonCode?: string | null;
+  /** ENG-16: the revision's language, and the reviewer's native-speaker review code. */
+  readonly language?: string | null;
+  readonly languageReviewCode?: string | null;
   readonly contributorUserIds: readonly string[];
 }): LessonEditorRefusal | null {
   if (!lessonRevisionTransitions[input.from].includes(input.to)) return 'LESSON_TRANSITION_NOT_ALLOWED';
@@ -82,8 +96,11 @@ export function refuseLessonTransition(input: {
   if (!reasons.includes(input.reasonCode)) return 'REASON_CODE_INVALID';
   if (input.to === 'APPROVED' && !(lessonEditorReasons.rights as readonly string[]).includes(input.rightsReasonCode ?? '')) return 'REASON_CODE_INVALID';
   if (input.to !== 'APPROVED' && input.rightsReasonCode) return 'REASON_CODE_INVALID';
+  const languageReview = input.to === 'APPROVED' && lessonNeedsLanguageReview(input.language);
+  if (input.languageReviewCode && (!languageReview || !(lessonEditorReasons.languageReview as readonly string[]).includes(input.languageReviewCode))) return 'REASON_CODE_INVALID';
   if (!hasInternalCapability(input.actor, lessonTransitionCapability(input.to))) return 'FORBIDDEN';
   if (input.to !== 'IN_REVIEW' && input.contributorUserIds.includes(input.actor.userId)) return 'LESSON_SELF_REVIEW_REFUSED';
+  if (languageReview && !input.languageReviewCode) return 'LESSON_LANGUAGE_REVIEW_MISSING';
   return null;
 }
 

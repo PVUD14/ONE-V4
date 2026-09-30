@@ -254,18 +254,20 @@ export class OperationsLessonsController {
   async transition(@Req() request: ProtectedHttpRequest, @Param('revisionId') revisionId: string, @Body() body: unknown): Promise<Record<string, unknown>> {
     const { correlationId, actor } = await this.requireReader(request);
     const id = requireUuid(revisionId, correlationId);
-    const raw = readObject(body, ['toState', 'reasonCode', 'rightsReasonCode', 'note'], correlationId);
+    const raw = readObject(body, ['toState', 'reasonCode', 'rightsReasonCode', 'languageReviewCode', 'note'], correlationId);
     if (raw.toState !== 'IN_REVIEW' && raw.toState !== 'CHANGES_REQUESTED' && raw.toState !== 'APPROVED') throw badRequest('LESSON_STATE_INVALID', correlationId);
     const toState = raw.toState;
     if (typeof raw.reasonCode !== 'string') throw badRequest('REASON_CODE_INVALID', correlationId);
     const reasonCode = raw.reasonCode;
     const rightsReasonCode = raw.rightsReasonCode === undefined || raw.rightsReasonCode === null ? null : typeof raw.rightsReasonCode === 'string' ? raw.rightsReasonCode : '';
+    // ENG-16: approving a non-English variant also records who checked its language.
+    const languageReviewCode = raw.languageReviewCode === undefined || raw.languageReviewCode === null ? null : typeof raw.languageReviewCode === 'string' ? raw.languageReviewCode : '';
     const note = optionalText(raw.note, noteLimit, 'LESSON_NOTE_INVALID', correlationId);
     if (!hasInternalCapability(actor, lessonTransitionCapability(toState))) throw new ForbiddenException(safeError('FORBIDDEN', correlationId));
     try {
       const moved = await transitionLessonRevision(this.db, {
-        revisionId: id, toState, reasonCode, rightsReasonCode, note, actor: this.lessonActor(actor, lessonTransitionCapability(toState), correlationId),
-        refuse: ({ from, contributorUserIds }) => refuseLessonTransition({ actor, from, to: toState, reasonCode, rightsReasonCode, contributorUserIds }),
+        revisionId: id, toState, reasonCode, rightsReasonCode, languageReviewCode, note, actor: this.lessonActor(actor, lessonTransitionCapability(toState), correlationId),
+        refuse: ({ from, contributorUserIds, language }) => refuseLessonTransition({ actor, from, to: toState, reasonCode, rightsReasonCode, language, languageReviewCode, contributorUserIds }),
       });
       return { lesson: await loadLesson(this.db, moved.lessonId), correlationId };
     } catch (error) {

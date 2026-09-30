@@ -29,6 +29,7 @@ import {
 import { hasConsentPurpose } from './consent-purposes.js';
 import { currentInstitutionOf, drizzleAsPgClient, recordGradedAttemptSession, type LearningAttemptContext, type LearningSessionMode } from './learning-attempts.js';
 import { linkDecisionOutcomeAttempts, planNextLearningStep } from './learning-decisions.js';
+import { learnerLessonLanguage, renderLessonVersions } from './lesson-languages.js';
 import { listDueReviews } from './learner-skill-state.js';
 import { resolveResponseMisconceptionsWith } from './misconceptions.js';
 import type { PersistenceDb } from './repositories.js';
@@ -86,7 +87,8 @@ export interface LearningStepView {
   readonly strategyKind: string | null;
   readonly reasonCodes: readonly string[];
   readonly adaptive: boolean;
-  readonly lessons: readonly { readonly id: string; readonly title: string }[];
+  /** Titled in the learner's lesson language where a published variant exists (ENG-16); `language` says which. */
+  readonly lessons: readonly { readonly id: string; readonly title: string; readonly language: string }[];
   readonly practice: StepPracticeView;
 }
 
@@ -252,8 +254,12 @@ async function questionView(db: PersistenceDb, item: ServedRow): Promise<StepQue
   };
 }
 
-async function lessonsFor(db: PersistenceDb, skillId: string): Promise<{ id: string; title: string }[]> {
-  return rows<{ id: string; title: string }>(db, sql`
+/**
+ * The skill's current lessons, titled in the learner's lesson language where a published variant
+ * exists (ENG-16), else in English. `language` says which.
+ */
+async function lessonsFor(db: PersistenceDb, subjectUserId: string, skillId: string): Promise<{ id: string; title: string; language: string }[]> {
+  const lessons = await rows<{ id: string; title: string }>(db, sql`
     SELECT l.id::text AS id, l.title
     FROM lesson_versions l
     JOIN learning_modules m ON m.id = l.module_id
@@ -261,6 +267,13 @@ async function lessonsFor(db: PersistenceDb, skillId: string): Promise<{ id: str
     WHERE l.topic_id = ${skillId}::uuid AND l.superseded_at IS NULL
     ORDER BY l.stable_key LIMIT 10
   `);
+  const pg = drizzleAsPgClient(db);
+  const language = await learnerLessonLanguage(pg, subjectUserId);
+  const rendered = await renderLessonVersions(pg, lessons.map((lesson) => lesson.id), language);
+  return lessons.map((lesson) => {
+    const words = rendered.get(lesson.id);
+    return { id: lesson.id, title: words?.title ?? lesson.title, language: words?.language ?? 'en' };
+  });
 }
 
 async function stepView(db: PersistenceDb, subjectUserId: string, decisionId: string): Promise<LearningStepView | null> {
@@ -283,7 +296,7 @@ async function stepView(db: PersistenceDb, subjectUserId: string, decisionId: st
     strategyKind: decision.strategy_kind,
     reasonCodes: decision.reason_codes,
     adaptive: decision.adaptive === true,
-    lessons: decision.skill_id ? await lessonsFor(db, decision.skill_id) : [],
+    lessons: decision.skill_id ? await lessonsFor(db, subjectUserId, decision.skill_id) : [],
     practice,
   };
 }

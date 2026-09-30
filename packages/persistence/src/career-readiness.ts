@@ -22,6 +22,7 @@ import {
 import { createIntegrationEventEnvelope } from '@planthepath/events/src/index.js';
 import { attemptOutcomeBand, isAssistedAttempt } from '@planthepath/learning-model/src/index.js';
 import { recordGradedAttemptSession, skillStageAtCapture } from './learning-attempts.js';
+import { learnerLessonLanguageView, renderCatalogForLearner } from './lesson-languages.js';
 import { resolveResponseMisconceptionsWith } from './misconceptions.js';
 
 type QueryResult<T> = { rows: T[]; rowCount: number | null };
@@ -853,8 +854,10 @@ export async function submitAssessmentAttempt(pool: Pool, input: {
 }
 
 export async function getLearnerCareerReadinessState(pool: Pool, subjectUserId: string): Promise<Record<string, unknown>> {
-  const [catalog, progress, attempts, evidence, projections, readiness, readinessHistory, roadmap, notificationPreferences, notifications] = await Promise.all([
+  const [publishedCatalog, lessonLanguage, progress, attempts, evidence, projections, readiness, readinessHistory, roadmap, notificationPreferences, notifications] = await Promise.all([
     getPublishedCareerReadinessCatalog(pool),
+    // ENG-16: the learner's lesson language and the languages they may choose.
+    learnerLessonLanguageView(pool, subjectUserId),
     // Progress is reported against each lesson's current version (OPS-09c): a completion of an
     // earlier version still shows the revised lesson as done, on web and Android alike.
     pool.query(`SELECT COALESCE(cur.id, lp.lesson_version_id) AS "lessonVersionId", lp.state, lp.started_at AS "startedAt", lp.completed_at AS "completedAt"
@@ -892,7 +895,10 @@ export async function getLearnerCareerReadinessState(pool: Pool, subjectUserId: 
       n.created_at AS "createdAt",n.expires_at AS "expiresAt" FROM notification_commands n
       JOIN notification_templates t ON t.id=n.template_id WHERE n.subject_user_id=$1 ORDER BY n.created_at DESC LIMIT 25`, [subjectUserId]),
   ]);
-  return { catalog, progress: progress.rows, attempts: attempts.rows, evidence: evidence.rows,
+  // Lessons in the learner's language where a published variant exists, else English with a notice
+  // (ENG-16). Only the words change; ids, topics and prerequisites are the catalogue's.
+  const catalog = await renderCatalogForLearner(pool, publishedCatalog, lessonLanguage.selected);
+  return { catalog, lessonLanguage, progress: progress.rows, attempts: attempts.rows, evidence: evidence.rows,
     mastery: projections.rows, readiness: readiness.rows[0] ?? null, readinessHistory: readinessHistory.rows, roadmap: roadmap.rows,
     notificationPreferences: notificationPreferences.rows[0] ?? null, notifications: notifications.rows };
 }

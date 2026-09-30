@@ -480,6 +480,7 @@ export * from './skill-map.js';
 export * from './question-bank.js';
 export * from './hint-ladder.js';
 export * from './lesson-editor.js';
+export * from './lesson-language.js';
 export * from './content-import.js';
 export * from './external-review.js';
 export * from './learner-goals.js';

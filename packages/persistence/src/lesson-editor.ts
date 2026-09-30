@@ -877,13 +877,17 @@ async function moveRevision(tx: SqlRunner, input: { readonly revisionId: string;
 export async function transitionLessonRevision(db: TransactionalRunner, input: {
   readonly revisionId: string; readonly toState: 'IN_REVIEW' | 'CHANGES_REQUESTED' | 'APPROVED'; readonly reasonCode: string;
   readonly rightsReasonCode: string | null; readonly note: string | null; readonly actor: LessonActor;
-  readonly refuse: (current: { readonly from: LessonRevisionState; readonly contributorUserIds: readonly string[] }) => LessonEditorRefusal | null;
+  /** ENG-16: who checked the language of a non-English variant; required to approve one. */
+  readonly languageReviewCode?: string | null;
+  readonly refuse: (current: {
+    readonly from: LessonRevisionState; readonly contributorUserIds: readonly string[]; readonly language: string;
+  }) => LessonEditorRefusal | null;
 }): Promise<{ readonly lessonId: string }> {
   try {
     return await db.transaction(async (tx) => {
       const revision = await lockRevision(tx, input.revisionId);
       const contributors = await contributorsOf(tx, revision.id, revision.author_user_id);
-      const refusal = input.refuse({ from: revision.state, contributorUserIds: contributors });
+      const refusal = input.refuse({ from: revision.state, contributorUserIds: contributors, language: revision.identity.variant.language });
       if (refusal) throw new LessonEditorRefused(refusal);
       assertBothLifecycles(revision.state, input.toState, revision.author_user_id, input.actor.userId);
       const fields = readLessonDraftFields(revision.body);
@@ -893,7 +897,9 @@ export async function transitionLessonRevision(db: TransactionalRunner, input: {
       }
       await moveRevision(tx, { revisionId: revision.id, from: revision.state, to: input.toState, action: reviewActionFor[input.toState]!, reasonCode: input.reasonCode, actor: input.actor });
       if (input.toState === 'APPROVED') {
-        await recordRightsReview(tx, { revision, fields, reviewReasonCode: input.reasonCode, rightsReasonCode: input.rightsReasonCode!, actor: input.actor });
+        await recordRightsReview(tx, {
+          revision, fields, reviewReasonCode: input.reasonCode, rightsReasonCode: input.rightsReasonCode!, languageReviewCode: input.languageReviewCode ?? null, actor: input.actor,
+        });
       }
       await audit(tx, {
         actor: input.actor, action: lessonTransitionedAction, revisionId: revision.id,
@@ -901,6 +907,7 @@ export async function transitionLessonRevision(db: TransactionalRunner, input: {
           lessonId: revision.entity_id, stableKey: revision.identity.stableKey, variant: lessonVariantLabel(revision.identity.variant),
           revision: Number(revision.revision), fromState: revision.state, toState: input.toState, reasonCode: input.reasonCode,
           ...(input.rightsReasonCode ? { rightsReasonCode: input.rightsReasonCode } : {}), ...(input.note ? { note: input.note } : {}),
+          ...(input.languageReviewCode ? { languageReviewCode: input.languageReviewCode } : {}),
         },
       });
       await stateChanged(tx, input.actor, revision.id, revision.entity_id, revision.state, input.toState);
@@ -923,7 +930,7 @@ function sourcePath(identity: LessonIdentity, revision: number): string {
  */
 async function recordRightsReview(tx: SqlRunner, input: {
   readonly revision: LockedRevision & { identity: LessonIdentity }; readonly fields: LessonDraftFields;
-  readonly reviewReasonCode: string; readonly rightsReasonCode: string; readonly actor: LessonActor;
+  readonly reviewReasonCode: string; readonly rightsReasonCode: string; readonly languageReviewCode: string | null; readonly actor: LessonActor;
 }): Promise<void> {
   const licence = input.fields.licenceLabel;
   if (!licence) throw new LessonEditorError('LESSON_INVALID', ['LESSON_LICENCE_MISSING']);
@@ -950,7 +957,10 @@ async function recordRightsReview(tx: SqlRunner, input: {
     INSERT INTO source_records (id, package_id, source_entity_type, source_record_id, source_path, source_hash, source_metadata, license_label,
       attribution_required, rights_state, sme_state, quality_state, mapping_state, duplicate_state, release_state, rejection_reason_codes, release_eligible)
     VALUES (${sourceRecordId}::uuid, ${packageId}::uuid, 'LESSON_EDITOR_REVISION', ${input.revision.id}, ${path}, ${input.revision.content_hash},
-            ${JSON.stringify({ attribution: input.fields.attribution, language: input.revision.identity.variant.language })}::jsonb, ${licence}, ${attributionRequired},
+            ${JSON.stringify({
+              attribution: input.fields.attribution, language: input.revision.identity.variant.language,
+              ...(input.languageReviewCode ? { languageReview: input.languageReviewCode } : {}),
+            })}::jsonb, ${licence}, ${attributionRequired},
             'APPROVED', 'APPROVED', 'APPROVED', 'MAPPED', 'UNIQUE', 'ELIGIBLE', '{}'::text[], true)
   `);
   await tx.execute(sql`

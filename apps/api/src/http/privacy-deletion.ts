@@ -257,6 +257,9 @@ async function erase(deps: DeletionExecutionDeps, subjectUserId: string): Promis
     return Number(gone.rows[0]?.count ?? 0) + Number(targets.rows[0]?.count ?? 0) + Number(outcomes.rows[0]?.count ?? 0);
   });
   await db.execute(sql`DELETE FROM student_saved_opportunities WHERE student_user_id = ${subjectUserId}::uuid`);
+  // The language the person chose to read lessons in (ENG-16, 0097) is their own setting.
+  counts.STUDENT_PROFILE += await countOf(sql`WITH gone AS (DELETE FROM learner_language_preferences WHERE user_id = ${subjectUserId}::uuid RETURNING 1)
+    SELECT count(*)::int AS count FROM gone`);
 
   counts.NOTIFICATIONS = await countOf(sql`SELECT count(*)::int AS count FROM notification_commands WHERE subject_user_id = ${subjectUserId}::uuid`);
   await db.execute(sql`DELETE FROM notification_commands WHERE subject_user_id = ${subjectUserId}::uuid`);

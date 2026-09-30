@@ -10,6 +10,7 @@ import {
   Inject,
   Param,
   Post,
+  Put,
   Query,
   Req,
   UseGuards,
@@ -26,6 +27,7 @@ import {
   startAssessmentAttempt,
   submitAssessmentAttempt,
 } from '@planthepath/persistence/src/career-readiness.js';
+import { LessonLanguageNotOffered, setLearnerLessonLanguage } from '@planthepath/persistence/src/lesson-languages.js';
 import { PG_POOL } from '../persistence.provider.js';
 import { ProtectedApiAuthenticationGuard, type ProtectedHttpRequest } from './api-security.js';
 import { resolveInstitutionStudentScope } from '@planthepath/persistence/src/institution-scope.js';
@@ -61,6 +63,29 @@ export class CareerReadinessController {
   @UseGuards(ProtectedApiAuthenticationGuard)
   learnerState(@Req() request: ProtectedHttpRequest): Promise<Record<string, unknown>> {
     return getLearnerCareerReadinessState(this.pool, requireLearnerId(request));
+  }
+
+  /**
+   * ENG-16: the language the learner reads lessons in. Only an offered language (English, Telugu,
+   * or one with a published lesson variant) may be chosen; lessons without a published rendering
+   * in it are served in English with a notice. Returns the choice and the languages offered.
+   */
+  @Put('/career-readiness/me/lesson-language')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async setLessonLanguage(@Req() request: ProtectedHttpRequest, @Body() body: unknown): Promise<Record<string, unknown>> {
+    const learnerId = requireLearnerId(request);
+    const correlationId = requireCorrelationId(request);
+    if (!body || typeof body !== 'object' || Array.isArray(body)) throw safeBadRequest();
+    const raw = body as Record<string, unknown>;
+    if (Object.keys(raw).some((key) => key !== 'language') || typeof raw.language !== 'string') throw safeBadRequest();
+    try {
+      return { lessonLanguage: await setLearnerLessonLanguage(this.pool, { userId: learnerId, language: raw.language, correlationId }) };
+    } catch (error) {
+      if (error instanceof LessonLanguageNotOffered) {
+        throw new BadRequestException({ error: { code: 'LESSON_LANGUAGE_NOT_OFFERED', message: 'Lessons are not offered in that language yet' } });
+      }
+      throw safeBadRequest();
+    }
   }
 
   @Post('/career-readiness/lessons/:lessonVersionId/complete')

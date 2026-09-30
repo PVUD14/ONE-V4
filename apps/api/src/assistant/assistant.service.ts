@@ -53,7 +53,7 @@ export function selectArticles(persona: AssistantPersona, question: string, arti
 export function buildSystemPrompt(persona: AssistantPersona, articles: readonly HelpArticle[]): string {
   const grounding = articles.map((article) => `### ${article.title}\n${article.body}`).join('\n\n');
   return [
-    'You are the ONE Assistant, the in-app help for ONE by Ai8ht (one.ai8ht.pro), a campus-to-career platform.',
+    'You are the ONE Assistant, the in-app help for ONE by Ai8ht (oneby8.com), a campus-to-career platform.',
     `You are currently helping a user in the ${persona} workspace.`,
     'Answer ONLY using the help articles below. They are the complete truth about the product for you.',
     'If the articles do not answer the question, say you do not have that information and point the user to their placement cell or the ONE support contact. Never invent features, buttons, screens, prices, or policies.',

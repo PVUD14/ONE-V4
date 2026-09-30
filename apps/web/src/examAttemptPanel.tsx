@@ -129,7 +129,7 @@ export function ExamAttemptPanel(): React.ReactElement | null {
                   <small>{exam.attemptsUsed} / {exam.attemptsAllowed} attempts used</small>
                   {isMobileDevice() && (exam.openAttemptId || (windowOpen && attemptsLeft > 0)) ? (
                     <span className="exam-chip muted" title="Assessments are taken on a laptop or desktop only.">
-                      {exam.openAttemptId ? 'Attempt in progress — continue on your laptop; the timer keeps running.' : 'Laptop only — open one.ai8ht.pro on a laptop to start.'}
+                      {exam.openAttemptId ? 'Attempt in progress — continue on your laptop; the timer keeps running.' : 'Laptop only — open oneby8.com on a laptop to start.'}
                     </span>
                   ) : exam.openAttemptId ? (
                     <button type="button" disabled={busy} onClick={() => void start(exam.id)}>Resume Attempt</button>

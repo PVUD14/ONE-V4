@@ -1,5 +1,9 @@
 # PlanThePath Next VPS UAT deployment
 
+> **Moving to AWS.** Production moves to `https://oneby8.com` on AWS using this Compose
+> pack (ADR-041). Follow `docs/ops/runbook-move-to-aws.md` for the cut-over; the Caddyfile
+> already serves `oneby8.com` and forwards `www.oneby8.com` and `one.ai8ht.pro` to it.
+
 > **This Compose pack is not what currently runs `https://one.ai8ht.pro`.**
 >
 > The live UAT host uses a release-directory deployment, not Docker Compose:
@@ -60,7 +64,7 @@ docker compose exec api pnpm db:migrate
 cd /srv/planthepath-next/deploy/vps
 docker compose ps
 curl -fsS http://api:3000/health
-curl -fsS https://one.ai8ht.pro/health
+curl -fsS https://oneby8.com/health
 ```
 
 ## Start

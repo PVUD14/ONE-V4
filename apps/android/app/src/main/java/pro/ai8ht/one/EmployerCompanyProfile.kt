@@ -168,7 +168,7 @@ private fun CompanyProfileContent(profile: EmployerCompanyProfileDto) {
         Spacer(Modifier.height(10.dp))
         PilotCard {
             Text(
-                if (profile.canEdit) "Edit the description, industry, size and careers page on the web at one.ai8ht.pro."
+                if (profile.canEdit) "Edit the description, industry, size and careers page on the web at oneby8.com."
                 else "Recruiters see the company profile but do not change it. Ask your owner or admin.",
                 Modifier.padding(14.dp), style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

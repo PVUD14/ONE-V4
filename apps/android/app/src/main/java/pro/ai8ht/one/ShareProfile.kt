@@ -120,7 +120,7 @@ internal fun ShareProfilePage(onClose: () -> Unit) {
                             )
                             freshToken?.let { token ->
                                 Spacer(Modifier.height(10.dp))
-                                Text("one.ai8ht.pro/p/$token", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                Text("oneby8.com/p/$token", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                                 Text(
                                     "Copy this now. We store only a fingerprint of it, so we cannot show it again - if you lose it, create a new link.",
                                     style = MaterialTheme.typography.bodySmall,

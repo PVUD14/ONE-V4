@@ -24,7 +24,9 @@ services:
     environment:
       API_HOST: 0.0.0.0
       API_PORT: 3000
-      API_CORS_ORIGIN: https://one.ai8ht.pro
+      API_CORS_ORIGIN: https://oneby8.com
+      PTP_INVITATION_BASE_URL: https://oneby8.com
+      PTP_MAIL_FROM: info@ai8ht.pro
       DATABASE_URL: postgresql://${POSTGRES_USER:-planthepath_uat}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-planthepath_uat}
       NODE_ENV: ${NODE_ENV:-development}
     depends_on:

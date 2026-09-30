@@ -12,7 +12,7 @@
 set -uo pipefail
 
 ROOT=${PLANTHEPATH_ROOT:-/srv/planthepath-next}
-PUBLIC_URL=${MONITOR_PUBLIC_URL:-https://one.ai8ht.pro}
+PUBLIC_URL=${MONITOR_PUBLIC_URL:-https://oneby8.com}
 LOCAL_API=${MONITOR_LOCAL_API:-http://127.0.0.1:7310}
 BACKUP_DIR=${BACKUP_DIR:-${ROOT}/shared/backups}
 BACKUP_MAX_AGE_HOURS=${BACKUP_MAX_AGE_HOURS:-26}

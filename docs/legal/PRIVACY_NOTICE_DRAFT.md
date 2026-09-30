@@ -6,7 +6,7 @@
 > and confirm DPDP Act, 2023 + DPDP Rules compliance before any real (non-UAT)
 > student is onboarded. Placeholders are marked `[TODO]`.
 
-_Last updated: [TODO date] · Applies to: one.ai8ht.pro_
+_Last updated: [TODO date] · Applies to: oneby8.com_
 
 ## Who we are
 

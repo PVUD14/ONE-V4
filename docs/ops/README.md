@@ -1,6 +1,8 @@
 # ONE — Operations Handbook
 
-How the operational team runs one.ai8ht.pro. Model: **designated operator with an
+How the operational team runs ONE. Production is moving from the VPS (`one.ai8ht.pro`)
+to `oneby8.com` on AWS � see `runbook-move-to-aws.md` and ADR-041; the release steps
+below describe the VPS until that cut-over. Model: **designated operator with an
 automation safety net** — releases stay human-driven from runbooks; backups and
 monitoring run unattended and alert a person when they stop working.
 

@@ -5,19 +5,13 @@ ENV CI=true
 RUN corepack enable
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY apps/api/package.json apps/api/package.json
-COPY apps/web/package.json apps/web/package.json
-COPY packages/authorization/package.json packages/authorization/package.json
-COPY packages/automation/package.json packages/automation/package.json
-COPY packages/career-readiness/package.json packages/career-readiness/package.json
-COPY packages/events/package.json packages/events/package.json
-COPY packages/identity/package.json packages/identity/package.json
-COPY packages/persistence/package.json packages/persistence/package.json
+# Every workspace member, not a hand-kept list: a missing member breaks the
+# frozen install. apps/android is excluded by .dockerignore.
+COPY apps apps
+COPY packages packages
 
 RUN pnpm install --frozen-lockfile
 
-COPY apps/api apps/api
-COPY packages packages
 COPY data data
 COPY tsconfig.base.json ./
 

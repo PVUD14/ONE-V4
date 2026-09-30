@@ -20,7 +20,7 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
     personas: ['all'],
     title: 'Signing in and choosing a workspace',
     keywords: ['login', 'sign in', 'password', 'workspace', 'account', 'locked'],
-    body: 'Sign in at one.ai8ht.pro with the email and password issued to you. After signing in you land in the workspace that matches your role: students in the student portal, institution staff in the institution portal, employers in the employer portal. If your password does not work or your account is locked, contact your placement cell (students) or the ONE operator who issued your account — the assistant cannot reset passwords.',
+    body: 'Sign in at oneby8.com with the email and password issued to you. After signing in you land in the workspace that matches your role: students in the student portal, institution staff in the institution portal, employers in the employer portal. If your password does not work or your account is locked, contact your placement cell (students) or the ONE operator who issued your account — the assistant cannot reset passwords.',
   },
   {
     id: 'navigation',

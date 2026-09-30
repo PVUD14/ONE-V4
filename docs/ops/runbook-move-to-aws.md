@@ -54,8 +54,8 @@ notices to `info@ai8ht.pro`.
 
 ```bash
 docker compose up -d --build
-docker compose exec -w /app api pnpm db:migrate
-docker compose exec -w /app api pnpm db:migrate     # second run: "0 applied"
+docker compose exec -e ALLOW_PRODUCTION_MIGRATIONS=true -w /app api pnpm db:migrate
+docker compose exec -e ALLOW_PRODUCTION_MIGRATIONS=true -w /app api pnpm db:migrate     # second run: "0 applied"
 ```
 
 Caddy fetches the `oneby8.com` certificate on first request; allow a minute.
@@ -86,7 +86,7 @@ sudo docker compose exec postgres sh -c 'dropdb -U "$POSTGRES_USER" --force "$PO
 sudo docker compose cp ~/one.dump postgres:/tmp/one.dump
 sudo docker compose exec postgres sh -c 'pg_restore --no-owner --no-privileges -U "$POSTGRES_USER" -d "$POSTGRES_DB" /tmp/one.dump; rm -f /tmp/one.dump'
 sudo docker compose start api
-sudo docker compose exec -w /app api pnpm db:migrate
+sudo docker compose exec -e ALLOW_PRODUCTION_MIGRATIONS=true -w /app api pnpm db:migrate
 ```
 
 Then delete `one.dump` from all three places: `rm ~/one.dump` on both servers and

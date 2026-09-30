@@ -166,7 +166,8 @@ async function college(name: string): Promise<College> {
   await pool.query("INSERT INTO institution_academic_terms (id,institution_id,name,kind,starts_on,ends_on,created_by_user_id,updated_by_user_id) VALUES ($1,$2,'2026 Odd','TERM','2026-07-01','2026-11-30',$3,$3)", [randomUUID(), institutionId, admin.id]);
 
   // Assessment: subject, syllabus, question, definition, section, pool, assignment, attempt, answer, result.
-  const [subject, unitNode, question, definition, examSection, assignment, attempt] = Array.from({ length: 7 }, () => randomUUID());
+  const subject = randomUUID(); const unitNode = randomUUID(); const question = randomUUID(); const definition = randomUUID();
+  const examSection = randomUUID(); const assignment = randomUUID(); const attempt = randomUUID();
   await pool.query("INSERT INTO exam_subjects (id,institution_id,name,code) VALUES ($1,$2,'Thermodynamics','ME201')", [subject, institutionId]);
   await pool.query("INSERT INTO exam_syllabus_nodes (id,institution_id,subject_id,kind,name) VALUES ($1,$2,$3,'UNIT','Laws')", [unitNode, institutionId, subject]);
   await pool.query(`INSERT INTO exam_questions (id,institution_id,subject_id,unit_node_id,question_type,question_text,question_hash,approval_status,created_by_user_id)
@@ -615,9 +616,18 @@ describe('INST-18: the purge deletes institution-owned records only, with a seco
       'student_roster_imports', 'student_roster_import_rows', 'institution_student_profiles']) {
       expect(deletes[table], table).toBeGreaterThan(0);
     }
-    expect(deletes.staff_actions).toBe(3);
-    expect(deletes.institution_student_profiles).toBe(3);
-    expect(preview.body.preview.keeps).toMatchObject({ institution_units: 4, institution_relationships: 3, student_qualifications: 1, student_academic_terms: 1, organization_memberships: 3 });
+    // The runbook's recorded dry run (docs/institution/sop-college-exit.md): one seeded college, exactly.
+    expect(deletes).toEqual({
+      staff_action_content_links: 1, staff_action_attendees: 1, learning_assignment_students: 1, learning_assignments: 1, learning_plan_overrides: 1,
+      counselling_case_participants: 1, staff_actions: 3, exam_results: 1, exam_screen_events: 1, exam_answers: 1, exam_attempt_questions: 1,
+      exam_attempts: 1, exam_assignments: 1, exam_section_pool: 1, exam_sections: 1, exam_definition_events: 1, exam_definitions: 1,
+      exam_question_reviews: 1, exam_question_versions: 1, exam_question_options: 1, exam_questions: 1, exam_subject_topic_links: 0,
+      faculty_teaching_assignments: 1, exam_syllabus_nodes: 1, exam_subjects: 1, institution_announcement_recipients: 1, institution_announcements: 1,
+      institution_settings: 1, institution_grading_scales: 1, institution_academic_terms: 1, student_roster_import_rows: 1, student_roster_imports: 1,
+      institution_student_profiles: 3, institution_aggregate_reports: 0,
+    });
+    expect(preview.body.preview.keeps).toEqual({ institution_units: 4, institution_relationships: 3, student_qualifications: 1, student_academic_terms: 1,
+      campus_drives: 0, campus_drive_nominations: 0, student_outcome_declarations: 0, organization_memberships: 3 });
     expect(preview.body.preview.studentsUnderHold).toBe(0);
     expect(await count('SELECT count(*)::int AS n FROM staff_actions WHERE institution_id = $1', [gamma.institutionId])).toBe(3);
   });

@@ -3,7 +3,7 @@ import { sql } from 'drizzle-orm';
 import { digestInvitationToken, generateInvitationToken } from '@planthepath/identity/src/invitation-token.js';
 import { validateOutboxWriteInput, type PersistenceDb } from '@planthepath/persistence/src/repositories.js';
 import { institutionStudentScopeSql } from '@planthepath/persistence/src/institution-scope.js';
-import { buildInvitationUrl, type InvitationMailSink } from '@planthepath/persistence/src/invitation-mail.js';
+import { buildInvitationUrl, mailProviderKind, type InvitationMailSink } from '@planthepath/persistence/src/invitation-mail.js';
 import { createStudentInvitation, loadStudentActivations, resendStudentInvitations, revokePendingStudentInvitations, summariseActivations } from '@planthepath/persistence/src/student-invitations.js';
 import { describeInstitutionStudentScope, institutionStudentScopeFor } from './institution-student-scope.js';
 import { readStaffUnitScope, validateStaffUnitScope } from './institution-staff-scope.js';
@@ -760,7 +760,7 @@ export class OperationsInstitutionOnboardingController {
       `);
       await this.db.execute(sql`
         INSERT INTO notification_delivery_attempts (id, command_id, attempt, provider_kind, provider_reference, outcome)
-        VALUES (${this.ids.uuid()}::uuid, ${notificationCommandId}::uuid, 1, 'MAILPIT', ${delivered.providerReference ?? null}, 'SUCCEEDED')
+        VALUES (${this.ids.uuid()}::uuid, ${notificationCommandId}::uuid, 1, ${mailProviderKind(this.invitationMailSink)}, ${delivered.providerReference ?? null}, 'SUCCEEDED')
       `);
     }
     return { id: invitationId, notificationCommandId };

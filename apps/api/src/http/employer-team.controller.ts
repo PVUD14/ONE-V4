@@ -42,7 +42,7 @@ import {
 } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { digestInvitationToken, generateInvitationToken } from '@planthepath/identity/src/invitation-token.js';
-import { buildInvitationUrl, PermanentMailRejection, type InvitationMailSink } from '@planthepath/persistence/src/invitation-mail.js';
+import { buildInvitationUrl, mailProviderKind, PermanentMailRejection, type InvitationMailSink } from '@planthepath/persistence/src/invitation-mail.js';
 import { validateOutboxWriteInput, type PersistenceDb } from '@planthepath/persistence/src/repositories.js';
 import { canAssignRole } from '../application/identity-organization/services.js';
 import {
@@ -382,6 +382,7 @@ export class EmployerTeamController {
    */
   private async deliver(input: { invitationId: string; commandId: string; email: string; role: EmployerTeamRole; token: string; organisationName: string; correlationId: string }): Promise<DeliveryOutcome> {
     if (!this.invitationMailSink) return 'NOT_CONFIGURED';
+    const providerKind = mailProviderKind(this.invitationMailSink);
     const textBody = [
       `${input.organisationName} has invited you to join its hiring team on ONE as ${roleLabels[input.role] === 'admin' ? 'an admin' : `a ${roleLabels[input.role]}`}.`,
       `Open this invitation link and sign in with the identity whose verified email is ${input.email}:`,
@@ -395,7 +396,7 @@ export class EmployerTeamController {
         await tx.execute(sql`UPDATE notification_commands SET state = 'DELIVERED' WHERE id = ${input.commandId}::uuid AND state = 'DISPATCHED'`);
         await tx.execute(sql`
           INSERT INTO notification_delivery_attempts (id, command_id, attempt, provider_kind, provider_reference, outcome)
-          VALUES (${this.ids.uuid()}::uuid, ${input.commandId}::uuid, 1, 'MAILPIT', ${delivered.providerReference ?? null}, 'SUCCEEDED')
+          VALUES (${this.ids.uuid()}::uuid, ${input.commandId}::uuid, 1, ${providerKind}, ${delivered.providerReference ?? null}, 'SUCCEEDED')
         `);
         await tx.execute(sql`
           UPDATE invitations SET delivery_state = 'SENT', send_count = send_count + 1, last_sent_at = now(), updated_at = now()
@@ -410,7 +411,7 @@ export class EmployerTeamController {
         await tx.execute(sql`UPDATE notification_commands SET state = ${bounced ? 'FAILED_TERMINAL' : 'FAILED_RETRYABLE'} WHERE id = ${input.commandId}::uuid AND state = 'DISPATCHED'`);
         await tx.execute(sql`
           INSERT INTO notification_delivery_attempts (id, command_id, attempt, provider_kind, outcome, failure_class)
-          VALUES (${this.ids.uuid()}::uuid, ${input.commandId}::uuid, 1, 'MAILPIT', ${bounced ? 'FAILED_TERMINAL' : 'FAILED_RETRYABLE'}, ${bounced ? 'PERMANENT_REJECTION' : 'SINK_UNAVAILABLE'})
+          VALUES (${this.ids.uuid()}::uuid, ${input.commandId}::uuid, 1, ${providerKind}, ${bounced ? 'FAILED_TERMINAL' : 'FAILED_RETRYABLE'}, ${bounced ? 'PERMANENT_REJECTION' : 'SINK_UNAVAILABLE'})
         `);
         await tx.execute(sql`
           UPDATE invitations SET delivery_state = ${bounced ? 'BOUNCED' : 'FAILED'}, bounced_at = ${bounced ? sql`now()` : sql`bounced_at`}, updated_at = now()

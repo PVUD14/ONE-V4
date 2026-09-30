@@ -134,9 +134,37 @@ address (`97.74.95.205`) and start its service again.
 
 ## Not covered yet
 
-- **Outgoing email** still goes nowhere outside the server: only a loopback Mailpit
-  sender exists (ADR-041, "Known gap"). Invitations and notices are not delivered
-  until authenticated SMTP delivery is built.
+- **Outgoing email is off until you switch it on.** ADR-041's "Known gap" is closed by
+  authenticated, TLS-only SMTP delivery (ADR-042, `docs/ops/runbook-mail-sender.md`;
+  needs a release that contains branch `feat/smtp-delivery`). With the `PTP_SMTP_*`
+  lines blank, nothing is sent and every email is recorded as not configured. To switch
+  it on, on the AWS server:
+
+  ```bash
+  cd /srv/one/deploy/vps
+  sudo nano .env
+  ```
+
+  and set (the password is typed here, on the server, and nowhere else — if it contains
+  a `$`, wrap it in single quotes):
+
+  ```
+  PTP_SMTP_HOST=smtpout.secureserver.net
+  PTP_SMTP_PORT=465
+  PTP_SMTP_SECURITY=TLS
+  PTP_SMTP_USER=info@ai8ht.pro
+  PTP_SMTP_PASSWORD=<the info@ai8ht.pro mailbox password>
+  ```
+
+  then `sudo docker compose up -d` and `sudo docker compose logs --tail 50 api`. If a
+  setting is wrong the API does not start and the log names the variable (never the
+  password). **Send one test invitation:** sign in as an operator, invite an
+  administrator to an organisation you control using an address you own, and check it
+  arrives from `AI8HT ONE <info@ai8ht.pro>` (in Gmail, *Show original*: SPF, DKIM and
+  DMARC should pass). Or send the fixed test message without touching any organisation:
+  `sudo docker compose exec api pnpm --filter @planthepath/persistence mail:send-test -- --to <your address> --confirm-real-send`.
+  Only staff invitations go out this way; student invitations and notices also need
+  the automation worker, which this Compose pack does not run yet.
 - **Cognito.** The API stays in development-mode sign-in until a production user pool
   is provisioned. When it is, register `https://oneby8.com` callback and sign-out URLs
   in the web app client.

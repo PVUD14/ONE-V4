@@ -1,6 +1,6 @@
 /**
  * The Growth portal shell (GROWTH-01, ADR-040): a growth person signs in to their own
- * workspace at /growth with the AI8HT wordmark and the approved navigation (HG-3,
+ * workspace at /growth with the ONE logo and the approved navigation (HG-3,
  * 2026-09-30), every page says plainly what is not built yet, no figure is invented, and
  * the Operations workspace stays closed to them.
  */
@@ -68,7 +68,7 @@ describe('the Growth portal navigation (HG-3 approved 2026-09-30)', () => {
 });
 
 describe('a growth executive signing in', () => {
-  it('lands on the Growth home with the wordmark, their own team, and NA where no source exists', async () => {
+  it('lands on the Growth home with the ONE logo, their own team, and NA where no source exists', async () => {
     signInAs('GROWTH_EXECUTIVE', {
       role: 'GROWTH_EXECUTIVE', staffType: 'CONTRACTOR', correlationId: 'corr-me',
       teams: [{ team: 'COLLEGE_PARTNERSHIPS', joinedAt: '2026-09-30T10:00:00.000Z', manager: { email: 'region.manager@uat.example.test' } }],
@@ -76,7 +76,7 @@ describe('a growth executive signing in', () => {
     render(<App />);
     const sidebar = await screen.findByLabelText('Growth navigation');
     expect(window.location.pathname).toBe('/growth');
-    expect(within(sidebar).getByRole('img', { name: 'AI8HT' })).toBeInTheDocument();
+    expect(within(sidebar).getByRole('img', { name: 'ONE by AI8HT' })).toBeInTheDocument();
     for (const label of ['Home', 'Leads', 'Field', 'Territory', 'Targets', 'Commission']) {
       expect(within(sidebar).getByRole('button', { name: label })).toBeInTheDocument();
     }

@@ -287,6 +287,10 @@ describe('EMP-13: the student sees which of their verified evidence matches the 
     const sharedIds = added.body.evidence.skills.flatMap((skill: { items: { evidenceId: string; shared: boolean }[] }) => skill.items.filter((item) => item.shared).map((item) => item.evidenceId));
     expect(sharedIds.sort()).toEqual([s.good, s.aided, s.exam].sort());
     expect((await panel(s.employerId, s.recruiterId, applicationId).expect(200)).body.evidence.skills[0].items).toHaveLength(2);
+    // The student's list says sharing is on and that this application shares something.
+    const list = await api().get('/api/v1/students/me/applications').set(auth(s.studentId)).expect(200);
+    expect(list.body.evidenceSharingAvailable).toBe(true);
+    expect(list.body.applications.find((entry: { id: string }) => entry.id === applicationId)).toMatchObject({ evidenceShared: true });
 
     // Take the SQL items back: the very next employer read has none for that skill.
     await choose(s.studentId, applicationId, [s.exam]).expect(200);

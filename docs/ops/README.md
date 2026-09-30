@@ -49,6 +49,8 @@ performing one supervised deploy end-to-end (the `aight` half only).
   (ENG-17).
 - [runbook-engine-migration-rollback.md](runbook-engine-migration-rollback.md) — forward-only
   rollback notes for each learning-engine migration (ENG-17).
+- [runbook-mail-sender.md](runbook-mail-sender.md) — switch on real email from info@ai8ht.pro
+  (GoDaddy SMTP), the first test send, and the SPF/DKIM/DMARC records.
 
 ## Weekly checklist (5 minutes, junior operator)
 

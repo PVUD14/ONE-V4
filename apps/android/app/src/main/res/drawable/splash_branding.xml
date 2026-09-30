@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- The full AI8HT wordmark, sized for the splash branding slot. -->
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:width="160dp" android:height="68dp" android:gravity="center">
-        <bitmap android:src="@drawable/ai8ht_wordmark" android:gravity="fill" />
-    </item>
-</layer-list>

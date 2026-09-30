@@ -39,7 +39,9 @@ const db = drizzle(pool, { schema });
 const identities = new Map<string, { readonly email: string }>();
 const sent: { toEmail: string; subject: string; textBody: string; invitationId: string }[] = [];
 let failNextSend = false;
+// Stands in for the real TLS sender, so the ledger must record SMTP rather than MAILPIT (ADR-042).
 const sink: InvitationMailSink = {
+  providerKind: 'SMTP',
   async send(input) {
     if (failNextSend) { failNextSend = false; throw new Error('local sink unavailable'); }
     sent.push({ toEmail: input.toEmail, subject: input.subject, textBody: input.textBody, invitationId: input.invitationId });
@@ -257,8 +259,8 @@ describe('EMP-02 revoke, resend and end are audited', () => {
     expect(events.rows.map((row) => row.event_type)).toEqual(['identity.invitation.created', 'notification.delivery.requested']);
     const invitation = await pool.query('SELECT delivery_state, send_count, last_sent_at FROM invitations WHERE id=$1', [id]);
     expect(invitation.rows[0]).toMatchObject({ delivery_state: 'SENT', send_count: 1 });
-    const command = await pool.query("SELECT c.state, a.outcome FROM notification_commands c JOIN notification_delivery_attempts a ON a.command_id=c.id WHERE c.destination_ref=$1", ['invitation:' + id]);
-    expect(command.rows).toEqual([{ state: 'DELIVERED', outcome: 'SUCCEEDED' }]);
+    const command = await pool.query("SELECT c.state, a.outcome, a.provider_kind FROM notification_commands c JOIN notification_delivery_attempts a ON a.command_id=c.id WHERE c.destination_ref=$1", ['invitation:' + id]);
+    expect(command.rows).toEqual([{ state: 'DELIVERED', outcome: 'SUCCEEDED', provider_kind: 'SMTP' }]);
   });
 
   it('revokes a pending invitation so it can no longer be accepted, once, and audits why', async () => {

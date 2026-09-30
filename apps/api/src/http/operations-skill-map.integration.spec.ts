@@ -509,3 +509,89 @@ describe('database guards (0057)', () => {
       .rejects.toThrow(/moves only to a published revision of that topic/);
   });
 });
+
+describe('archiving a published skill (content-archive-design.md)', () => {
+  const archive = (actor: Member, topicId: string, reasonCode = 'OUT_OF_DATE') =>
+    api().post(`${base}/skills/${topicId}/archive`).set(auth(actor.userId)).send({ reasonCode });
+
+  it('needs CONTENT_PUBLISH and a coded reason, then retires the skill and keeps its publication record', async () => {
+    const { topicId, revisionId } = await approvedSkill('ops-archive-skill');
+    expect((await publishWithApproval(revisionId)).status).toBe(201);
+    expect((await archive(editor, topicId)).status).toBe(403);
+    expect((await archive(reviewer, topicId)).status).toBe(403);
+    const badReason = await archive(publisher, topicId, 'NO_LONGER_WANTED');
+    expect(badReason.status).toBe(400);
+    expect(badReason.body.error.code).toBe('REASON_CODE_INVALID');
+    expect((await api().post(`${base}/skills/${topicId}/archive`).set(auth(publisher.userId)).send({ reasonCode: 'OUT_OF_DATE', note: 'x' })).status).toBe(400);
+
+    // No second person: archiving is a removal.
+    const archived = await archive(publisher, topicId);
+    expect(archived.status, JSON.stringify(archived.body)).toBe(201);
+    expect(archived.body.archivedRevisions).toEqual([1]);
+    expect((archived.body.skill as SkillDto).status).toBe('RETIRED');
+    expect((await pool.query('SELECT active FROM taxonomy_nodes WHERE id=$1', [topicId])).rows[0].active).toBe(false);
+    const revision = (await pool.query('SELECT state, published_at, release_manifest_id FROM content_revisions WHERE id=$1', [revisionId])).rows[0];
+    expect(revision.state).toBe('ARCHIVED');
+    expect(revision.published_at).not.toBeNull();
+    expect(revision.release_manifest_id).not.toBeNull();
+    expect((await pool.query("SELECT action, from_state, to_state, reason_code, actor_user_id FROM content_review_actions WHERE content_revision_id=$1 AND action='ARCHIVE'", [revisionId])).rows)
+      .toEqual([{ action: 'ARCHIVE', from_state: 'PUBLISHED', to_state: 'ARCHIVED', reason_code: 'OUT_OF_DATE', actor_user_id: publisher.userId }]);
+    const auditRow = (await pool.query("SELECT context FROM audit_events WHERE action='operations.content.skill_archived' AND resource_id=$1", [revisionId])).rows;
+    expect(auditRow).toHaveLength(1);
+    expect(auditRow[0].context).toMatchObject({ topicId, stableKey: 'ops-archive-skill', reasonCode: 'OUT_OF_DATE', archivedRevisions: [1] });
+    const events = (await pool.query("SELECT payload FROM outbox_events WHERE aggregate_id=$1 AND event_type='skill_map.revision_state_changed'", [revisionId])).rows;
+    expect(events.map((row: { payload: { toState: string } }) => row.payload.toState)).toContain('ARCHIVED');
+    // Final: not archived twice, never revised again, and listed as retired with the action in its history.
+    expect((await archive(publisher, topicId)).body.error.code).toBe('SKILL_NOT_LIVE');
+    expect((await api().post(`${base}/skills/${topicId}/revisions`).set(auth(editor.userId)).send({ reasonCode: 'CORRECTION' })).body.error.code).toBe('SKILL_RETIRED');
+    const retired = await api().get(`${base}/skills?filter=RETIRED&q=ops-archive-skill`).set(auth(reviewer.userId)).expect(200);
+    expect(retired.body.skills.map((skill: SkillDto) => skill.topicId)).toContain(topicId);
+    const shown = (await detail(topicId)) as SkillDto & { history: { action: string }[] };
+    expect(shown.history.map((entry) => entry.action)).toContain('ARCHIVE');
+  });
+
+  it('refuses while something live depends on the skill, and changes nothing', async () => {
+    const prerequisite = await approvedSkill('ops-archive-needed');
+    expect((await publishWithApproval(prerequisite.revisionId)).status).toBe(201);
+    const dependent = await approvedSkill('ops-archive-dependent', ['ops-archive-needed']);
+    expect((await publishWithApproval(dependent.revisionId)).status).toBe(201);
+    const needed = await archive(publisher, prerequisite.topicId);
+    expect(needed.status).toBe(409);
+    expect(needed.body.error).toMatchObject({ code: 'SKILL_ARCHIVE_BLOCKED', problems: ['SKILL_PREREQUISITE_OF_LIVE_SKILL'] });
+
+    const role = (await pool.query("SELECT id FROM career_roles WHERE catalogue_code='D01'")).rows[0].id;
+    await pool.query("INSERT INTO career_role_requirements (id, career_role_id, topic_id, requirement_level, target_mastery) VALUES ($1,$2,$3,'IMPORTANT',0.6)", [randomUUID(), role, dependent.topicId]);
+    const started = await api().post(`${base}/skills/${dependent.topicId}/revisions`).set(auth(editor.userId)).send({ reasonCode: 'CORRECTION' });
+    expect(started.status).toBe(201);
+    const required = await archive(publisher, dependent.topicId, 'INCIDENT_RESPONSE');
+    expect(required.status).toBe(409);
+    expect(required.body.error.problems).toEqual(['ARCHIVE_OPEN_REVISION', 'SKILL_REQUIRED_BY_ROLE']);
+    for (const topicId of [prerequisite.topicId, dependent.topicId]) {
+      expect((await pool.query('SELECT active FROM taxonomy_nodes WHERE id=$1', [topicId])).rows[0].active).toBe(true);
+      expect((await pool.query("SELECT count(*)::int AS n FROM audit_events WHERE action='operations.content.skill_archived' AND context->>'topicId'=$1", [topicId])).rows[0].n).toBe(0);
+    }
+    expect((await pool.query("SELECT count(*)::int AS n FROM content_revisions WHERE entity_id = ANY($1::uuid[]) AND state='ARCHIVED'", [[prerequisite.topicId, dependent.topicId]])).rows[0].n).toBe(0);
+  });
+});
+
+describe('database guards (0090)', () => {
+  it('a published revision takes one change only, to ARCHIVED with its ARCHIVE action recorded, and an archived one none', async () => {
+    const { revisionId } = await approvedSkill('ops-archive-guarded');
+    expect((await publishWithApproval(revisionId)).status).toBe(201);
+    await expect(pool.query("UPDATE content_revisions SET state='ARCHIVED' WHERE id=$1", [revisionId])).rejects.toThrow(/ARCHIVE review action recorded/);
+    await pool.query(
+      "INSERT INTO content_review_actions (id, content_revision_id, actor_user_id, action, from_state, to_state, reason_code, correlation_id) VALUES ($1,$2,$3,'ARCHIVE','PUBLISHED','ARCHIVED','OUT_OF_DATE','guard-test')",
+      [randomUUID(), revisionId, publisher.userId],
+    );
+    await expect(pool.query("UPDATE content_revisions SET state='ARCHIVED', body='{}'::jsonb WHERE id=$1", [revisionId])).rejects.toThrow(/changes only the state/);
+    await expect(pool.query("UPDATE content_revisions SET state='ARCHIVED', published_at=NULL, release_manifest_id=NULL WHERE id=$1", [revisionId])).rejects.toThrow(/changes only the state/);
+    await pool.query("UPDATE content_revisions SET state='ARCHIVED' WHERE id=$1", [revisionId]);
+    await expect(pool.query("UPDATE content_revisions SET state='PUBLISHED' WHERE id=$1", [revisionId])).rejects.toThrow(/immutable/);
+    await expect(pool.query('DELETE FROM content_revisions WHERE id=$1', [revisionId])).rejects.toThrow(/immutable/);
+    // A revision that was never published cannot be made to look published by archiving it.
+    const draft = await create(editor, 'ops-archive-draft');
+    const manifest = (await pool.query('SELECT release_manifest_id FROM content_revisions WHERE id=$1', [revisionId])).rows[0].release_manifest_id;
+    await expect(pool.query("UPDATE content_revisions SET state='ARCHIVED', published_at=now(), release_manifest_id=$2 WHERE id=$1", [draft.body.skill.current.id, manifest]))
+      .rejects.toThrow(/only a published content revision is archived with its publication/);
+  });
+});

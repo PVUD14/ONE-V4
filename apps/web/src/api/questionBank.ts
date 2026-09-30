@@ -10,7 +10,7 @@
 import { requestJson } from './http.js';
 
 export type BankQuestionRevisionState = 'DRAFT' | 'IN_REVIEW' | 'CHANGES_REQUESTED' | 'APPROVED' | 'PUBLISHED' | 'ARCHIVED';
-export type BankQuestionStatus = 'LIVE' | 'PENDING';
+export type BankQuestionStatus = 'LIVE' | 'PENDING' | 'ARCHIVED';
 export type BankQuestionListFilter = BankQuestionStatus | 'AWAITING_REVIEW' | 'CHANGES_REQUESTED' | 'AWAITING_PUBLISH';
 
 export interface QuestionBankPolicyDto {
@@ -27,6 +27,8 @@ export interface QuestionBankPolicyDto {
     readonly transition: Readonly<Record<string, readonly string[]>>;
     readonly rights: readonly string[];
     readonly publish: readonly string[];
+    /** Why published content is archived (content-archive-design.md). */
+    readonly archive?: readonly string[];
   };
   readonly limits: {
     readonly prompt: number; readonly optionText: number; readonly optionsMin: number; readonly optionsMax: number; readonly explanation: number;
@@ -62,6 +64,7 @@ export interface QuestionBankSummaryDto {
   readonly awaitingReview: number;
   readonly changesRequested: number;
   readonly awaitingPublish: number;
+  readonly archived?: number;
 }
 
 export interface BankQuestionOptionDto {
@@ -161,6 +164,11 @@ export function getBankQuestion(token: string, questionId: string, signal?: Abor
 
 export function createBankQuestion(token: string, body: { readonly stableKey: string; readonly topicKey: string; readonly prompt: string; readonly reasonCode: string }): Promise<QuestionEnvelope> {
   return requestJson(`${base}/questions`, { token, method: 'POST', body });
+}
+
+/** Archive a live question: it leaves the readiness check at once and is never deleted. */
+export function archiveBankQuestion(token: string, questionId: string, body: { readonly reasonCode: string }): Promise<QuestionEnvelope> {
+  return requestJson(`${base}/questions/${encodeURIComponent(questionId)}/archive`, { token, method: 'POST', body });
 }
 
 export function startBankQuestionRevision(token: string, questionId: string, body: { readonly reasonCode: string }): Promise<QuestionEnvelope> {

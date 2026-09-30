@@ -10,7 +10,7 @@
 import { requestJson } from './http.js';
 
 export type LessonRevisionState = 'DRAFT' | 'IN_REVIEW' | 'CHANGES_REQUESTED' | 'APPROVED' | 'PUBLISHED' | 'ARCHIVED';
-export type LessonStatus = 'LIVE' | 'PENDING';
+export type LessonStatus = 'LIVE' | 'PENDING' | 'ARCHIVED';
 export type LessonKind = 'BASE' | 'VARIANT';
 
 export interface LessonVariantDto {
@@ -35,6 +35,8 @@ export interface LessonEditorPolicyDto {
     readonly transition: Readonly<Record<string, readonly string[]>>;
     readonly rights: readonly string[];
     readonly publish: readonly string[];
+    /** Why published content is archived (content-archive-design.md). */
+    readonly archive?: readonly string[];
   };
   readonly limits: {
     readonly title: number; readonly summary: number; readonly practice: number; readonly prerequisites: number;
@@ -73,6 +75,7 @@ export interface LessonEditorSummaryDto {
   readonly awaitingReview: number;
   readonly awaitingPublish: number;
   readonly liveVariants: number;
+  readonly archived?: number;
 }
 
 export interface LessonFieldsDto {
@@ -168,6 +171,11 @@ export function createEditorLessonVariant(token: string, lessonId: string, body:
   readonly language: string; readonly level: string; readonly style: string; readonly title: string; readonly reasonCode: string;
 }): Promise<LessonEnvelope> {
   return requestJson(`${base}/lessons/${encodeURIComponent(lessonId)}/variants`, { token, method: 'POST', body });
+}
+
+/** Archive a live lesson or variant: it leaves the catalogue at once and is never deleted. */
+export function archiveEditorLesson(token: string, lessonId: string, body: { readonly reasonCode: string }): Promise<LessonEnvelope> {
+  return requestJson(`${base}/lessons/${encodeURIComponent(lessonId)}/archive`, { token, method: 'POST', body });
 }
 
 export function startEditorLessonRevision(token: string, lessonId: string, body: { readonly reasonCode: string }): Promise<LessonEnvelope> {

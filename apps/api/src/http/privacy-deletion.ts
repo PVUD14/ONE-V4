@@ -123,6 +123,12 @@ async function erase(deps: DeletionExecutionDeps, subjectUserId: string): Promis
     UPDATE employer_applicant_access_grants SET revoked_at = now(), updated_at = now()
     WHERE student_user_id = ${subjectUserId}::uuid AND revoked_at IS NULL
   `);
+  // EMP-13: every piece of evidence they chose to share is taken back with the grants. The rows stay
+  // as the record of what they consented to, pointing at the anonymised application and evidence.
+  await db.execute(sql`
+    UPDATE application_evidence_shares SET revoked_at = now(), revoked_reason = 'ACCOUNT_DELETION'
+    WHERE student_user_id = ${subjectUserId}::uuid AND revoked_at IS NULL
+  `);
 
   // Retained and anonymised categories are counted before identity changes, so the
   // record reflects what existed at the moment of deletion.

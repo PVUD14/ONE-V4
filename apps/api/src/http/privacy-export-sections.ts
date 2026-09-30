@@ -10,6 +10,7 @@
  * memory, and the ids are not emitted.
  */
 import { sql } from 'drizzle-orm';
+import { evidenceSource } from './skill-evidence.js';
 
 type Row = Record<string, unknown>;
 type Query = (query: ReturnType<typeof sql>) => Promise<Row[]>;
@@ -174,7 +175,7 @@ async function recordSections(one: Query, subject: Subject): Promise<Record<stri
 }
 
 async function hiringSections(one: Query, subject: Subject): Promise<Record<string, unknown>> {
-  const [snapshots, history, termChanges, interviews, releases, reasons, grants, nominations] = await Promise.all([
+  const [snapshots, history, termChanges, interviews, releases, reasons, grants, nominations, evidenceShares] = await Promise.all([
     // The snapshot is what they shared with the employer; it holds no internal identifier (EMP-07).
     one(sql`SELECT org.legal_name AS employer_name, v.title, s.created_at, s.snapshot, s.erased_at
             FROM application_profile_snapshots s
@@ -234,6 +235,17 @@ async function hiringSections(one: Query, subject: Subject): Promise<Record<stri
             JOIN opportunities o ON o.id = n.opportunity_id
             LEFT JOIN opportunity_versions v ON v.id = o.current_version_id
             WHERE n.student_user_id = ${subject} ORDER BY n.created_at, n.id`),
+    // EMP-13: the evidence they chose to share with each employer, and when they took it back. The
+    // topic's name stands in for the skill; no evidence identifier and no marks.
+    one(sql`SELECT org.legal_name AS employer_name, v.title, t.name AS skill_name, e.evidence_type, e.source_aggregate_type, e.occurred_at, e.assisted,
+                   sh.shared_via, sh.shared_at, sh.revoked_at, sh.revoked_reason
+            FROM application_evidence_shares sh
+            JOIN applications a ON a.id = sh.application_id
+            JOIN organizations org ON org.id = a.employer_id
+            JOIN opportunity_versions v ON v.id = a.applied_version_id
+            JOIN evidence_records e ON e.id = sh.evidence_record_id
+            JOIN taxonomy_nodes t ON t.id = e.topic_id
+            WHERE sh.student_user_id = ${subject} ORDER BY sh.shared_at, sh.id`),
   ]);
   return {
     applicationSnapshots: snapshots.map((row) => ({ employerName: row.employer_name, title: row.title, sharedAt: row.created_at, snapshot: row.snapshot, erasedAt: row.erased_at ?? null })),
@@ -254,6 +266,11 @@ async function hiringSections(one: Query, subject: Subject): Promise<Record<stri
     feedbackReleased: releases.map((row) => ({
       employerName: row.employer_name, title: row.title, note: row.note ?? null, releasedAt: row.released_at, supersededAt: row.superseded_at ?? null,
       reasons: reasons.filter((reason) => reason.release_id === row.id).map((reason) => reason.student_label),
+    })),
+    evidenceShares: evidenceShares.map((row) => ({
+      employerName: row.employer_name, title: row.title, skill: row.skill_name, type: row.evidence_type, source: evidenceSource(row.source_aggregate_type),
+      recordedAt: row.occurred_at, unaided: row.assisted !== true, sharedVia: row.shared_via, sharedAt: row.shared_at,
+      revokedAt: row.revoked_at ?? null, revokedReason: row.revoked_reason ?? null,
     })),
     employerAccess: grants.map((row) => ({ employerName: row.employer_name, grantedAt: row.granted_at, expiresAt: row.expires_at ?? null, revokedAt: row.revoked_at ?? null })),
     campusDriveNominations: nominations.map((row) => ({

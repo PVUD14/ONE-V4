@@ -35,6 +35,7 @@ import { loadInterviewCalendar } from '@planthepath/persistence/src/interview-ca
 import { sendCalendar } from './interview-scheduling.js';
 import { linkApplicationToCampusDrives, readListedCampusDrives, readStudentCampusDrives, visibleThroughCampusDriveSql } from './campus-drives.js';
 import { markNominationAccepted, markNominationWithdrawn, readOwnNomination, type OpenNomination } from './campus-drive-nominations.controller.js';
+import { EvidenceShareError, readEvidenceChoices, readEvidenceRecordIds, replaceEvidenceShares, skillEvidenceEnabled } from './skill-evidence.js';
 
 type QueryResult<T> = { rows: T[] };
 
@@ -335,7 +336,7 @@ export class StudentHiringController {
     const studentUserId = context.authorization.principal.userId;
     const input = readSnapshotRequest(body, ['opportunityId', 'resumeDocumentId', 'contactPhone', 'links'], context.correlationId);
     const rows = await this.db.execute(sql`
-      SELECT o.id, org.legal_name AS employer_name FROM opportunities o
+      SELECT o.id, o.current_version_id, org.legal_name AS employer_name FROM opportunities o
       JOIN organizations org ON org.id = o.employer_id
       WHERE o.id = ${input.opportunityId}::uuid AND o.lifecycle_state = 'PUBLISHED'
         AND ${visibleToStudent(studentUserId)}
@@ -344,12 +345,22 @@ export class StudentHiringController {
     const [row] = rows.rows;
     if (!row) throw forbidden(context.correlationId);
     const built = await this.buildSnapshot(this.db, studentUserId, input, context.correlationId);
+    // EMP-13: which of the student's own verified evidence matches this job's skills, to choose from.
+    // Separate from the snapshot (and its hash): evidence stays revocable after applying.
+    const evidenceAvailable = await skillEvidenceEnabled(this.db);
     return {
       preview: {
         employerName: row.employer_name,
         snapshot: built.snapshot,
         snapshotHash: built.hash,
         resumeOptions: await readResumeOptions(this.db, studentUserId),
+        evidence: {
+          available: evidenceAvailable,
+          skills: evidenceAvailable
+            ? (await readEvidenceChoices(this.db, { studentUserId, versionId: String(row.current_version_id), applicationId: null }))
+              .map((skill) => ({ ...skill, items: skill.items.map(({ shared: _shared, sharedAt: _sharedAt, ...item }) => item) }))
+            : [],
+        },
       },
       correlationId: context.correlationId,
     };
@@ -416,6 +427,8 @@ export class StudentHiringController {
 
   private async submitApplication(context: ReturnType<typeof requireTrustedAuthorization>, input: ReturnType<typeof readApplyInput>, nomination: OpenNomination | null): Promise<Record<string, unknown>> {
     const studentUserId = context.authorization.principal.userId;
+    // EMP-13: evidence can be chosen at apply only while the feature is on (HG-4).
+    if (input.evidenceRecordIds.length && !(await skillEvidenceEnabled(this.db))) throw badRequest('EVIDENCE_SHARING_UNAVAILABLE', context.correlationId);
 
     const opportunityRows = await this.db.execute(sql`
       SELECT o.id, o.employer_id, o.lifecycle_state, o.current_version_id, v.application_deadline
@@ -550,6 +563,19 @@ export class StudentHiringController {
         throw new ConflictException(safeHiringError('SNAPSHOT_CHANGED', context.correlationId));
       }
       await writeApplicationSnapshot(tx, { id: this.ids.uuid(), applicationId, versionId, built });
+      // EMP-13: the evidence the student chose for this application, checked against the version it
+      // binds to. Anything not shareable rolls the whole application back, so nothing half-applies.
+      if (input.evidenceRecordIds.length) {
+        try {
+          await replaceEvidenceShares(tx, this.ids, {
+            applicationId, studentUserId, versionId, evidenceIds: input.evidenceRecordIds, via: 'APPLY', allowAdding: true,
+          });
+          await this.writeAudit(studentUserId, 'application.evidence_shared', 'application', applicationId, context.correlationId, tx);
+        } catch (error) {
+          if (error instanceof EvidenceShareError) throw badRequest(error.code, context.correlationId);
+          throw error;
+        }
+      }
       return { application: { id: applicationId, state: 'APPLIED' }, correlationId: context.correlationId };
     });
   }
@@ -1033,11 +1059,11 @@ function readDecision(body: unknown, correlationId: string): 'ACCEPT' | 'DECLINE
   return value;
 }
 
-const applyFields = ['opportunityId', 'consentGranted', 'institutionVisibilityGranted', 'resumeDocumentId', 'contactPhone', 'links', 'reviewedSnapshotHash'];
+const applyFields = ['opportunityId', 'consentGranted', 'institutionVisibilityGranted', 'resumeDocumentId', 'contactPhone', 'links', 'reviewedSnapshotHash', 'evidenceRecordIds'];
 
 function readApplyInput(body: unknown, correlationId: string): {
   opportunityId: string; consentGranted: boolean; institutionVisibilityGranted: boolean;
-  resumeDocumentId: string | null; choices: SnapshotChoices; reviewedSnapshotHash: string | null;
+  resumeDocumentId: string | null; choices: SnapshotChoices; reviewedSnapshotHash: string | null; evidenceRecordIds: string[];
 } {
   const snapshot = readSnapshotRequest(body, applyFields, correlationId);
   const record = body as Record<string, unknown>;
@@ -1049,7 +1075,10 @@ function readApplyInput(body: unknown, correlationId: string): {
     if (typeof record.reviewedSnapshotHash !== 'string' || !/^[0-9a-f]{64}$/.test(record.reviewedSnapshotHash)) throw badRequest('INVALID_SNAPSHOT_HASH', correlationId);
     reviewedSnapshotHash = record.reviewedSnapshotHash;
   }
-  return { ...snapshot, consentGranted: record.consentGranted === true, institutionVisibilityGranted: record.institutionVisibilityGranted === true, reviewedSnapshotHash };
+  // EMP-13: the evidence chosen for this application (validated here; checked against the job in the transaction).
+  const evidenceRecordIds = readEvidenceRecordIds(record.evidenceRecordIds);
+  if (evidenceRecordIds === null) throw badRequest('INVALID_EVIDENCE_SELECTION', correlationId);
+  return { ...snapshot, consentGranted: record.consentGranted === true, institutionVisibilityGranted: record.institutionVisibilityGranted === true, reviewedSnapshotHash, evidenceRecordIds };
 }
 
 /** The opportunity and the student's snapshot choices, shared by preview and apply. Unknown fields are refused. */

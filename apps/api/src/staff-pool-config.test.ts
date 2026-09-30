@@ -55,7 +55,8 @@ describe('staff pool configuration', () => {
       .toThrow('must be a Cognito user pool id');
   });
 
-  it('turns a configured staff pool into a policy over the internal platform roles only', () => {
+  // GROWTH-01 (ADR-040): growth field staff are AI8HT staff, so their roles join the staff-only set.
+  it('turns a configured staff pool into a policy over the internal platform roles and the growth roles', () => {
     const config = loadRuntimeConfig({ ...base, COGNITO_STAFF_USER_POOL_ID: 'ap-south-1_staff', COGNITO_STAFF_CLIENT_ID: 'staff-client' });
     const policy = createRuntimeStaffPoolPolicy(config);
     expect(policy).toEqual({
@@ -64,7 +65,7 @@ describe('staff pool configuration', () => {
         'https://issuer-cognito-idp.ap-south-1.amazonaws.com/ap-south-1_staff',
       ],
       clientId: 'staff-client',
-      staffOnlyRoles: ['PLATFORM_SUPER_ADMIN', 'OPERATIONS_ADMIN', 'SECURITY_ADMIN'],
+      staffOnlyRoles: ['PLATFORM_SUPER_ADMIN', 'OPERATIONS_ADMIN', 'SECURITY_ADMIN', 'GROWTH_EXECUTIVE', 'GROWTH_MANAGER'],
     });
     // The runtime verifier builds for both pools without contacting AWS.
     expect(() => createRuntimeIdentityVerifier(config)).not.toThrow();

@@ -302,7 +302,7 @@ describe('the database never gives a growth role authority', () => {
     await expect(row(ops.membershipId, null, growthAdmin.userId)).rejects.toThrow(/growth membership/);
     await expect(row(executive.membershipId, null, executive.userId)).rejects.toThrow(/own team/);
     await expect(row(executive.membershipId, ops.membershipId, growthAdmin.userId)).rejects.toThrow(/manager must be an ACTIVE GROWTH_MANAGER/);
-    await expect(row(executive.membershipId, executive.membershipId, growthAdmin.userId)).rejects.toThrow(/growth_team_member_not_own_manager_ck/);
+    await expect(row(manager.membershipId, manager.membershipId, growthAdmin.userId)).rejects.toThrow(/growth_team_member_not_own_manager_ck/);
     const live = (await row(executive.membershipId, manager.membershipId, growthAdmin.userId)).rows[0].id as string;
     await expect(row(executive.membershipId, null, growthAdmin.userId)).rejects.toThrow(/growth_team_members_live_uq/);
     await row(executive.membershipId, null, growthAdmin.userId, 'EMPLOYER_PARTNERSHIPS');

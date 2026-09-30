@@ -93,7 +93,7 @@ describe('a growth executive signing in', () => {
     // Every figure slot is NA until its source exists: nothing is invented.
     expect(within(stats).getAllByText('NA')).toHaveLength(4);
     expect(within(stats).queryByText(/\d/)).not.toBeInTheDocument();
-    expect(screen.getByText(/not built yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/Leads, field visits, territory, targets and commission are not built yet/i)).toBeInTheDocument();
   });
 
   it('shows an honest empty state on every other page', async () => {

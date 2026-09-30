@@ -209,7 +209,7 @@ private fun StepPracticeBlock(step: LearningStepDto, onStep: (LearningStepDto) -
 
     feedback?.let { result ->
         StatusChip(
-            (if (result.correct) "Right." else "Not quite.") + (if (result.assisted) " Counted as assisted." else ""),
+            (if (result.correct) "Right." else "Not quite.") + (if (result.assisted) " Counted as assisted: it does not count as solved on your own." else ""),
             if (result.correct) ChipKind.Positive else ChipKind.Waiting,
         )
         Spacer(Modifier.height(6.dp))
@@ -240,7 +240,7 @@ private fun StepPracticeBlock(step: LearningStepDto, onStep: (LearningStepDto) -
                     question.hints.forEachIndexed { index, text ->
                         Spacer(Modifier.height(4.dp))
                         Row(verticalAlignment = Alignment.Top) {
-                            StatusChip("Hint ${index + 1}", ChipKind.Waiting)
+                            StatusChip(hintLabel(index), ChipKind.Waiting)
                             Spacer(Modifier.width(6.dp))
                             Text(text, style = MaterialTheme.typography.bodySmall)
                         }
@@ -270,7 +270,7 @@ private fun StepPracticeBlock(step: LearningStepDto, onStep: (LearningStepDto) -
                                         .onFailure { error = (it as? Api.ApiException)?.detail ?: "The hint could not be shown. Try again." }
                                     busy = false
                                 }
-                            }) { Text("Show hint ${question.hints.size + 1}") }
+                            }) { Text("Show " + hintLabel(question.hints.size).replaceFirst("Hint", "hint")) }
                         }
                     }
                 }
@@ -440,3 +440,8 @@ private fun PlacementTestCard() {
         }
     }
 }
+
+/** The four hint levels by name (ENG-15), as on the web. Levels 3 and 4 make a right answer assisted. */
+private val HINT_LEVEL_NAMES = listOf("Nudge", "Strategy", "Worked step", "Near solution")
+
+private fun hintLabel(index: Int): String = "Hint ${index + 1} · ${HINT_LEVEL_NAMES.getOrElse(index) { "" }}"

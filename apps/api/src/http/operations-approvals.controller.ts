@@ -348,6 +348,7 @@ export class OperationsApprovalsController {
           throw new OperationApprovalError('APPROVAL_NOT_REQUIRED');
         }
         return { targetId: facts.featureKey, canonical: approvalPayloads.AI_FEATURE_LIMITS_RAISE({ featureKey: facts.featureKey, ...next, reasonCode }) };
+      }
       case 'INSTITUTION_DATA_PURGE': {
         // INST-18: only an ended exit whose 90-day retention period has passed (database clock); a
         // request before then would expire unused, and a purge is never early.

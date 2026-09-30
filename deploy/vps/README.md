@@ -46,7 +46,7 @@ Then:
 
 ```bash
 docker compose up -d --build
-docker compose exec api pnpm db:migrate
+docker compose exec -w /app api pnpm db:migrate
 ```
 
 If restoring the synthetic UAT dump:
@@ -55,7 +55,7 @@ If restoring the synthetic UAT dump:
 docker compose cp /path/to/planthepath_uat.dump postgres:/tmp/planthepath_uat.dump
 docker compose exec postgres sh -lc 'pg_restore --clean --if-exists --no-owner --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" /tmp/planthepath_uat.dump'
 docker compose exec postgres rm -f /tmp/planthepath_uat.dump
-docker compose exec api pnpm db:migrate
+docker compose exec -w /app api pnpm db:migrate
 ```
 
 ## Status
@@ -110,7 +110,7 @@ Transfer the new exact clean source tree, then:
 ```bash
 cd /srv/planthepath-next/deploy/vps
 docker compose up -d --build
-docker compose exec api pnpm db:migrate
+docker compose exec -w /app api pnpm db:migrate
 ```
 
 Write the deployed Git SHA to `/srv/planthepath-next/DEPLOYED_SHA`.

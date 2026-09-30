@@ -50,6 +50,7 @@ object Api {
             when (method) {
                 "GET" -> builder.get()
                 "POST" -> builder.post((body ?: "{}").toRequestBody(jsonMedia))
+                "PUT" -> builder.put((body ?: "{}").toRequestBody(jsonMedia))
                 "PATCH" -> builder.patch((body ?: "{}").toRequestBody(jsonMedia))
                 "DELETE" -> builder.delete()
             }
@@ -113,6 +114,10 @@ object Api {
 
     suspend fun listApplications(context: Context): List<ApplicationDto> =
         json.decodeFromString<ApplicationsEnvelope>(request(context, "GET", "/api/v1/students/me/applications")).applications
+
+    /** EMP-13: the same list, with whether sharing skill evidence is on at all. */
+    suspend fun listApplicationsWithEvidence(context: Context): ApplicationsEnvelope =
+        json.decodeFromString<ApplicationsEnvelope>(request(context, "GET", "/api/v1/students/me/applications"))
 
     /** Null when the employer shared nothing, or withdrew it between the list and this read. */
     suspend fun applicationFeedback(context: Context, applicationId: String): ApplicationFeedbackDto? =
@@ -591,7 +596,11 @@ internal fun StudentDto.formerStudentLine(): String? {
     val state: String = "",
     val scheduledStartAt: String? = null,
 )
-@Serializable data class ApplicationsEnvelope(val applications: List<ApplicationDto> = emptyList())
+@Serializable data class ApplicationsEnvelope(
+    val applications: List<ApplicationDto> = emptyList(),
+    /** EMP-13: whether students can share verified skill evidence with employers (off until HG-4). */
+    val evidenceSharingAvailable: Boolean = false,
+)
 @Serializable data class ApplicationDto(
     val id: String,
     val state: String = "",
@@ -616,6 +625,8 @@ internal fun StudentDto.formerStudentLine(): String? {
     val campusDrive: CampusDriveRefDto? = null,
     /** INST-14: made by opting in to this college's placement-office nomination. */
     val nominatedBy: CampusDriveRefDto? = null,
+    /** EMP-13: verified skill evidence is shared with this employer now. */
+    val evidenceShared: Boolean = false,
 )
 @Serializable data class CampusDriveRefDto(val institutionName: String = "")
 

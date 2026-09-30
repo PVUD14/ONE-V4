@@ -260,7 +260,7 @@ export function getVerificationSummary(token: string, institutionId: string, sig
 
 // --- Bulk academic results upload (INST-04) -------------------------------------
 
-export type ResultsImportOutcome = 'CREATE' | 'CONFIRM' | 'UNCHANGED' | 'CONFLICT' | 'INVALID';
+export type ResultsImportOutcome = 'CREATE' | 'CONFIRM' | 'UNCHANGED' | 'CONFLICT' | 'INVALID' | 'SKIPPED';
 
 export interface RecordedResultDto {
   readonly resultValue: string | null; readonly resultScale: string | null; readonly resultLetter: string | null;
@@ -276,7 +276,7 @@ export interface ResultsImportRowDto {
 
 export interface ResultsImportPreviewDto {
   readonly digest: string; readonly rowCount: number;
-  readonly counts: { readonly create: number; readonly confirm: number; readonly unchanged: number; readonly conflict: number; readonly invalid: number; readonly differsFromStudent: number };
+  readonly counts: { readonly create: number; readonly confirm: number; readonly unchanged: number; readonly conflict: number; readonly invalid: number; readonly skipped: number; readonly differsFromStudent: number };
   readonly rows: readonly ResultsImportRowDto[];
 }
 

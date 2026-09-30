@@ -177,6 +177,7 @@ const OUTCOME_LABEL: Readonly<Record<ResultsImportOutcome, string>> = {
   UNCHANGED: 'Already verified — nothing to change',
   CONFLICT: 'Not written — conflicts with an existing record',
   INVALID: 'Fix this row',
+  SKIPPED: 'Skipped — nothing is recorded',
 };
 
 const ISSUE_LABEL: Readonly<Record<string, string>> = {
@@ -193,6 +194,7 @@ const ISSUE_LABEL: Readonly<Record<string, string>> = {
   duplicate_row: 'This student and term appear twice',
   qualification_mismatch: 'Qualification differs from an earlier row for this student',
   declaration_in_institution_record: 'The student entered a different value in your programme record',
+  student_deleted: 'This student deleted their ONE account, so no results are recorded for them',
 };
 
 const uploadReasons = [
@@ -266,7 +268,7 @@ export function AcademicResultsUpload({ institutionId }: { readonly institutionI
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {notice ? <p className="role-api-success" role="status">{notice}</p> : null}
     {preview ? <>
-      <p role="status">{preview.rowCount} rows: {preview.counts.create} to record, {preview.counts.confirm} confirming a student's entry, {preview.counts.unchanged} unchanged, {preview.counts.conflict} in conflict, {preview.counts.invalid} to fix.{preview.counts.differsFromStudent ? ` ${preview.counts.differsFromStudent} differ from what the student entered — both will be kept.` : ''}</p>
+      <p role="status">{preview.rowCount} rows: {preview.counts.create} to record, {preview.counts.confirm} confirming a student's entry, {preview.counts.unchanged} unchanged, {preview.counts.conflict} in conflict, {preview.counts.invalid} to fix{preview.counts.skipped ? `, ${preview.counts.skipped} skipped` : ''}.{preview.counts.differsFromStudent ? ` ${preview.counts.differsFromStudent} differ from what the student entered — both will be kept.` : ''}</p>
       <div className="data-table-wrap"><table>
         <thead><tr><th>Row</th><th>Student</th><th>Term</th><th>Result</th><th>Outcome</th><th>Student entered / existing record</th></tr></thead>
         <tbody>{preview.rows.map((row) => <tr key={row.rowNumber}>

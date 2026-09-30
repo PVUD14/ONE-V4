@@ -54,8 +54,8 @@ notices to `info@ai8ht.pro`.
 
 ```bash
 docker compose up -d --build
-docker compose exec api corepack pnpm db:migrate
-docker compose exec api corepack pnpm db:migrate     # second run: "0 applied"
+docker compose exec -w /app api pnpm db:migrate
+docker compose exec -w /app api pnpm db:migrate     # second run: "0 applied"
 ```
 
 Caddy fetches the `oneby8.com` certificate on first request; allow a minute.
@@ -72,7 +72,7 @@ Choose one:
   docker compose cp one.dump postgres:/tmp/one.dump
   docker compose exec postgres sh -lc 'pg_restore --clean --if-exists --no-owner --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" /tmp/one.dump'
   docker compose exec postgres rm -f /tmp/one.dump
-  docker compose exec api corepack pnpm db:migrate
+  docker compose exec -w /app api pnpm db:migrate
   ```
 
   Delete the dump from both machines and from your laptop afterwards.

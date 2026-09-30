@@ -57,6 +57,7 @@ import { OperationsCollegeAccountPanel, OperationsCollegeHealthPanel } from './r
 import { OperationsPrivacyConsolePage } from './rolePortal/privacyConsole.js';
 import { OperationsAccessReviewsPage } from './rolePortal/accessReviews.js';
 import { OperationsIncidentRegisterPage } from './rolePortal/incidents.js';
+import { OperationsAiOperationsPage } from './rolePortal/aiOperations.js';
 import { OperationsCommunicationsPage } from './rolePortal/communications.js';
 import type { AuthenticatedWorkspaceSummary } from './rolePortal/shared.js';
 import { AuthenticatedNotYetAvailable, AuthenticatedReadOnlyModule, institutionStaffWorkspaceRoles, institutionWorkspaceRoles, InstitutionWorkspaceError, isInstitutionStaffWorkspace, isInstitutionWorkspace } from './rolePortal/shared.js';
@@ -303,10 +304,12 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   if (!demoMode && portal.key === 'operations-admin' && /audit logs/i.test(route.label)) return <OperationsAuditLogPage />;
   if (!demoMode && portal.key === 'operations-admin' && route.label === 'System Health') return <OperationsSystemHealthPage />;
   // OPS-06: Security is the privacy and consent console, with the governance status it
-  // showed before kept beneath it. Only this label's branch changes; AI Operations keeps
-  // the read-only page below. OPS-15: quarterly access reviews and OPS-16: the incident register sit
+  // showed before kept beneath it. Only this label's branch changes; AI Operations has
+  // its own branch below (OPS-12). OPS-15: quarterly access reviews and OPS-16: the incident register sit
   // beneath the privacy console, under the same label (Appendix 1 §4.2).
   if (!demoMode && portal.key === 'operations-admin' && route.label === 'Security') return <><OperationsPrivacyConsolePage /><OperationsAccessReviewsPage /><OperationsIncidentRegisterPage /></>;
+  // OPS-12: AI Operations is the AI console (usage, caps, evaluations, kill switch). Only this label's branch changes.
+  if (!demoMode && portal.key === 'operations-admin' && route.label === 'AI Operations') return <OperationsAiOperationsPage />;
   if (!demoMode && portal.key === 'operations-admin' && /system health|security|ai operations/i.test(route.label)) return <OperationsTechnicalReadOnlyPage routeLabel={route.label} />;
   if (!demoMode && portal.key === 'operations-admin' && /verification/i.test(route.label)) return <OperationsOrganizationsPage portal={portal} />;
   if (!demoMode && portal.key === 'operations-admin' && /feature flags/i.test(route.label)) return <OperationsFeatureFlagsPage />;

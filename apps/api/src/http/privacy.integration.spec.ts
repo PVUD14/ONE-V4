@@ -819,6 +819,35 @@ describe('learning activity is append-only outside deletion', () => {
     const kept = await pool.query('SELECT state FROM assessment_attempts WHERE subject_user_id = $1 ORDER BY state', [subjectId]);
     expect(kept.rows.map((row) => row.state)).toEqual(['IN_PROGRESS', 'SUBMITTED']);
   });
+
+  it('keeps topic bands and readiness snapshots immutable outside the deletion transaction for that person (0004 guard, 0087 exception)', async () => {
+    for (const table of ['readiness_snapshots', 'mastery_projections']) {
+      await expect(pool.query(`UPDATE ${table} SET band = band WHERE subject_user_id = $1`, [subjectId])).rejects.toThrow(/immutable record cannot be changed/);
+      await expect(pool.query(`DELETE FROM ${table} WHERE subject_user_id = $1`, [subjectId])).rejects.toThrow(/immutable record cannot be changed/);
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query("SELECT set_config('one.privacy_erase_subject', $1, true)", [opsId]);
+        await expect(client.query(`DELETE FROM ${table} WHERE subject_user_id = $1`, [subjectId])).rejects.toThrow(/immutable record cannot be changed/);
+      } finally {
+        await client.query('ROLLBACK');
+        client.release();
+      }
+      // Even inside the erase for the subject, a change (as opposed to the erase) is refused.
+      const own = await pool.connect();
+      try {
+        await own.query('BEGIN');
+        await own.query("SELECT set_config('one.privacy_erase_subject', $1, true)", [subjectId]);
+        await expect(own.query(`UPDATE ${table} SET band = band WHERE subject_user_id = $1`, [subjectId])).rejects.toThrow(/immutable record cannot be changed/);
+      } finally {
+        await own.query('ROLLBACK');
+        own.release();
+      }
+      expect((await pool.query(`SELECT count(*)::int AS count FROM ${table} WHERE subject_user_id = $1`, [subjectId])).rows[0].count, table).toBe(1);
+    }
+    // The shared 0004 guard is untouched for the tables the exception does not cover.
+    await expect(pool.query('DELETE FROM evidence_records WHERE subject_user_id = $1', [subjectId])).rejects.toThrow(/immutable record cannot be changed/);
+  });
 });
 
 describe('deletion execution', () => {
@@ -938,7 +967,8 @@ describe('deletion execution', () => {
       WHERE conrelid = 'readiness_snapshots'::regclass AND contype = 'c'`)).rows.map((row) => row.def as string).join(' ');
     expect(readinessChecks).toMatch(/advisory/);
     expect(readinessChecks).toMatch(/NOT employer_visible/);
-    await expect(pool.query(`UPDATE readiness_snapshots SET employer_visible = true WHERE subject_user_id = $1`, [otherCandidateId])).rejects.toThrow(/check constraint/);
+    await expect(pool.query(`INSERT INTO readiness_snapshots (id, subject_user_id, model_version_id, evidence_ids, evidence_set_hash, band, employer_visible, explanation)
+      VALUES ($1,$2,$3,'{}',$4,'DEVELOPING',true,'{}'::jsonb)`, [randomUUID(), otherCandidateId, fixtures.readinessModelId, SHA])).rejects.toThrow(/check constraint/);
 
     // D1: every staff-only college action about the person keeps its skeleton and loses all of its text.
     const staffOnly = await pool.query(`SELECT action_type, state, visibility, title, note, outcome_note, version FROM staff_actions

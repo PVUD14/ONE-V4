@@ -9,6 +9,9 @@ import type { FileStorage } from '../storage/file-storage.js';
 
 type QueryResult<T> = { rows: T[] };
 
+/** What a staff-only college action about a deleted person is titled once its text is erased (NOT NULL column). */
+export const STAFF_ACTION_ERASED_TITLE = 'Erased: the student deleted their account';
+
 export interface DeletionExecutionSummary {
   readonly requestId: string;
   readonly subjectUserId: string;
@@ -283,10 +286,31 @@ async function erase(deps: DeletionExecutionDeps, subjectUserId: string): Promis
       + await removed(sql`WITH gone AS (DELETE FROM staff_action_attendees WHERE student_user_id = ${subjectUserId}::uuid RETURNING 1) SELECT count(*)::int AS count FROM gone`);
     // The planner's decision audit (ENG-08) holds the inputs each decision was made from.
     const decisions = await removed(sql`WITH gone AS (DELETE FROM learning_decisions WHERE subject_user_id = ${subjectUserId}::uuid RETURNING 1) SELECT count(*)::int AS count FROM gone`);
+    // The learning history (Divakar, 2026-09-30; privacy-export-coverage.md D2): lessons, topic bands,
+    // readiness snapshots, the roadmap and readiness checks. Only the person's own screens read these rows;
+    // college and operator aggregates read them per student with EXISTS, so the person simply drops out.
+    // Children before parents. Readiness snapshots are deleted, never altered, so their CHECKs are untouched;
+    // a readiness-check attempt may be deleted only inside this transaction (0087).
+    const history = await removed(sql`WITH gone AS (DELETE FROM readiness_factors WHERE
+        snapshot_id IN (SELECT id FROM readiness_snapshots WHERE subject_user_id = ${subjectUserId}::uuid)
+        OR mastery_projection_id IN (SELECT id FROM mastery_projections WHERE subject_user_id = ${subjectUserId}::uuid) RETURNING 1)
+      SELECT count(*)::int AS count FROM gone`)
+      + await removed(sql`WITH gone AS (DELETE FROM readiness_snapshots WHERE subject_user_id = ${subjectUserId}::uuid RETURNING 1) SELECT count(*)::int AS count FROM gone`)
+      + await removed(sql`WITH gone AS (DELETE FROM mastery_projections WHERE subject_user_id = ${subjectUserId}::uuid RETURNING 1) SELECT count(*)::int AS count FROM gone`)
+      + await removed(sql`WITH gone AS (DELETE FROM roadmap_actions WHERE subject_user_id = ${subjectUserId}::uuid RETURNING 1) SELECT count(*)::int AS count FROM gone`)
+      + await removed(sql`WITH gone AS (DELETE FROM learner_progress WHERE subject_user_id = ${subjectUserId}::uuid RETURNING 1) SELECT count(*)::int AS count FROM gone`)
+      + await removed(sql`WITH gone AS (DELETE FROM assessment_responses WHERE attempt_item_id IN (
+          SELECT i.id FROM assessment_attempt_items i JOIN assessment_attempts a ON a.id = i.attempt_id WHERE a.subject_user_id = ${subjectUserId}::uuid) RETURNING 1)
+        SELECT count(*)::int AS count FROM gone`)
+      + await removed(sql`WITH gone AS (DELETE FROM assessment_attempt_items WHERE attempt_id IN (
+          SELECT id FROM assessment_attempts WHERE subject_user_id = ${subjectUserId}::uuid) RETURNING 1)
+        SELECT count(*)::int AS count FROM gone`)
+      + await removed(sql`WITH gone AS (DELETE FROM assessment_attempts WHERE subject_user_id = ${subjectUserId}::uuid RETURNING 1) SELECT count(*)::int AS count FROM gone`)
+      + await removed(sql`WITH gone AS (DELETE FROM assessment_assignments WHERE subject_user_id = ${subjectUserId}::uuid RETURNING 1) SELECT count(*)::int AS count FROM gone`);
     // Deletion triggers a rebuild of the skill state projection (ENG-05). With the facts gone the
     // rebuild is the empty set, so every projection row of the subject is removed here.
     const projection = await projectSubjectSkillState(tx, subjectUserId);
-    return stepItems + attempts + placementItems + placementTests + sessions + activity + facultyActions + decisions + projection.deleted;
+    return stepItems + attempts + placementItems + placementTests + sessions + activity + facultyActions + decisions + history + projection.deleted;
   });
 
   // Institution roster history survives, with the person removed from it.
@@ -305,6 +329,20 @@ async function erase(deps: DeletionExecutionDeps, subjectUserId: string): Promis
     SELECT count(*)::int AS count FROM gone`) + await countOf(sql`
     WITH gone AS (DELETE FROM counselling_case_participants WHERE student_user_id = ${subjectUserId}::uuid RETURNING 1)
     SELECT count(*)::int AS count FROM gone`);
+
+  // Every other staff-only college action about the person (Divakar, 2026-09-30; privacy-export-coverage.md
+  // D1): interventions, faculty notes, verifications, and tasks or meetings the college kept to itself. All
+  // of the text goes; the row stays, because the college's counts read it and 0082's attendee and content
+  // rows reference it, and nothing left in it identifies the person once the account is anonymised. The
+  // version moves on so an edit form still open elsewhere is refused as stale instead of writing text back.
+  // staff_actions has no guard trigger, so no erase setting is needed.
+  counts.STAFF_ACTIONS = await countOf(sql`
+    WITH erased AS (
+      UPDATE staff_actions SET title = ${STAFF_ACTION_ERASED_TITLE}, note = NULL, outcome_note = NULL,
+        version = version + 1, updated_at = greatest(now(), created_at)
+      WHERE subject_student_user_id = ${subjectUserId}::uuid AND visibility = 'STAFF_ONLY' AND action_type <> 'COUNSELLING_NOTE'
+      RETURNING 1)
+    SELECT count(*)::int AS count FROM erased`);
 
   // Nominations the person never accepted (INST-14, 0080) are only about them: erased. Accepted and
   // withdrawn ones stay with the application they produced, which is anonymised with APPLICATIONS,
@@ -326,6 +364,11 @@ async function erase(deps: DeletionExecutionDeps, subjectUserId: string): Promis
     UPDATE invitations SET email = ${replacement.email}, updated_at = now()
     WHERE (student_user_id = ${subjectUserId}::uuid OR accepted_by_user_id = ${subjectUserId}::uuid) AND email <> ${replacement.email}
   `);
+
+  // Consent grants and withdrawals stay as proof of what the person agreed to (Divakar, 2026-09-30;
+  // privacy-export-coverage.md D3). Nothing in the rows is changed: they already hold only what proof needs,
+  // and the account they point at is anonymised below.
+  counts.CONSENT_RECORDS = await countOf(sql`SELECT count(*)::int AS count FROM user_consents WHERE user_id = ${subjectUserId}::uuid`);
 
   // Identity last: once this lands the person is gone, and every earlier step has
   // already been recorded.

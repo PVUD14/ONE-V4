@@ -70,7 +70,9 @@ export function OperationsStaffCapabilitiesPage(): React.ReactElement {
   const highRisk = new Set(catalogue.filter((entry) => entry.highRisk).map((entry) => entry.capability));
 
   const grantable = (member: StaffMemberDto): readonly string[] => catalogue
-    .filter((entry) => entry.grantableHere && !member.effective.includes(entry.capability))
+    // GROWTH-01: a growth role can be granted nothing, and the growth capabilities go to
+    // operations admins only; the server refuses anything else, so it is not offered.
+    .filter((entry) => entry.grantableHere && (entry.grantableToRoles ?? [member.role]).includes(member.role) && !member.effective.includes(entry.capability))
     .map((entry) => entry.capability);
 
   const completed = (message: string): void => {

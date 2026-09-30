@@ -147,6 +147,13 @@ object Api {
     suspend fun securityContext(context: Context): SecurityContextDto =
         json.decodeFromString(request(context, "GET", "/api/v1/security/context"))
 
+    /**
+     * GROWTH-01 (ADR-040): the signed-in growth person's own role, teams (with manager) and
+     * staff type. The only facts the Growth home has until later growth goals are built.
+     */
+    suspend fun growthMe(context: Context): GrowthMeDto =
+        json.decodeFromString(request(context, "GET", "/api/v1/growth/me"))
+
     suspend fun listInstitutionExams(context: Context, institutionId: String): List<InstitutionExamDto> =
         json.decodeFromString<InstitutionExamsEnvelope>(
             request(context, "GET", "/api/v1/institutions/$institutionId/assessments"),
@@ -692,6 +699,15 @@ internal fun StudentDto.formerStudentLine(): String? {
     val formerStudentRelationships: List<StudentRelationshipDto> = emptyList(),
 )
 @Serializable data class MembershipDto(val organizationId: String = "", val role: String = "")
+
+/** GROWTH-01: `GET /api/v1/growth/me`. No amount, lead or student is part of it. */
+@Serializable data class GrowthMeDto(
+    val role: String = "",
+    val staffType: String? = null,
+    val teams: List<GrowthTeamDto> = emptyList(),
+)
+@Serializable data class GrowthTeamDto(val team: String = "", val joinedAt: String = "", val manager: GrowthManagerDto? = null)
+@Serializable data class GrowthManagerDto(val email: String = "")
 @Serializable data class StudentRelationshipDto(val institutionId: String = "", val state: String = "")
 
 @Serializable data class InstitutionExamsEnvelope(val assessments: List<InstitutionExamDto> = emptyList())

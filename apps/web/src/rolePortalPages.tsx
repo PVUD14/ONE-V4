@@ -59,6 +59,8 @@ import { OperationsAccessReviewsPage } from './rolePortal/accessReviews.js';
 import { OperationsIncidentRegisterPage } from './rolePortal/incidents.js';
 import { OperationsAiOperationsPage } from './rolePortal/aiOperations.js';
 import { OperationsCommunicationsPage } from './rolePortal/communications.js';
+import { GrowthHomePage, GrowthModulePage } from './rolePortal/growth.js';
+import { OperationsGrowthTeamPanel } from './rolePortal/growthTeam.js';
 import type { AuthenticatedWorkspaceSummary } from './rolePortal/shared.js';
 import { AuthenticatedNotYetAvailable, AuthenticatedReadOnlyModule, institutionStaffWorkspaceRoles, institutionWorkspaceRoles, InstitutionWorkspaceError, isInstitutionStaffWorkspace, isInstitutionWorkspace } from './rolePortal/shared.js';
 import type { RoleFixture, RoleNavItem, RolePortalConfig } from './rolePortalConfig.js';
@@ -136,7 +138,7 @@ function RolePortalInner({ portal, apiHealth, authStatus, authNotice, showDevelo
     <ConsentGate>
     <div className={`role-shell role-accent-${portal.accent} ${collapsed ? 'role-sidebar-collapsed' : ''}`}>
       <a className="skip-link" href="#role-main">Skip to content</a>
-      <RoleSidebar portal={portal} activePath={path} collapsed={collapsed} drawerOpen={drawerOpen} onNavigate={navigate} onCollapse={() => setCollapsed((value) => !value)} onClose={() => { setDrawerOpen(false); menuButtonRef.current?.focus(); }} />
+      <RoleSidebar portal={portal} role={authenticatedWorkspace?.role} activePath={path} collapsed={collapsed} drawerOpen={drawerOpen} onNavigate={navigate} onCollapse={() => setCollapsed((value) => !value)} onClose={() => { setDrawerOpen(false); menuButtonRef.current?.focus(); }} />
       {drawerOpen ? <button className="drawer-scrim role-scrim" type="button" aria-label={`Close ${portal.roleName} navigation`} onClick={() => setDrawerOpen(false)} /> : null}
       <div className="role-workspace">
         <RoleTopbar portal={portal} apiHealth={apiHealth} authStatus={authStatus} authNotice={authNotice} showDevelopmentIndicators={showDevelopmentIndicators} menuButtonRef={menuButtonRef} onOpenMenu={() => setDrawerOpen(true)} onMessages={() => { const messagesRoute = portal.nav.find((item) => /messages|communications/i.test(item.label)); if (messagesRoute) navigate(messagesRoute.path); else setTopbarNotice(`${portal.roleName} messaging is backend-dependent and no message route exists for this role.`); }} onNotifications={() => {
@@ -172,22 +174,27 @@ function RolePortalInner({ portal, apiHealth, authStatus, authNotice, showDevelo
         <main id="role-main" className="role-main">
           {demoMode ? <section className="demo-boundary" role="note"><strong>DEMO PREVIEW</strong><span>Fictional data. This route is not authenticated and does not authorize a user.</span></section> : null}
           <PortalModeNotice portal={portal} notice={topbarNotice} demoMode={demoMode} authenticatedWorkspace={authenticatedWorkspace} />
-          {!demoMode && activeRoute?.path === portal.basePath ? <AuthenticatedDashboardChooser portal={portal} routeLabel={activeRoute?.label ?? 'Dashboard'} onNavigate={navigate} authenticatedWorkspace={authenticatedWorkspace} /> : activeRoute?.path === portal.basePath ? <RoleDashboard portal={portal} onNavigate={navigate} /> : <RoleModulePage portal={portal} route={activeRoute ?? portal.nav[0]!} demoMode={demoMode} authenticatedWorkspace={authenticatedWorkspace} />}
+          {/* GROWTH-01: the Growth portal has no demo preview; it renders the same honest pages in every mode. */}
+          {portal.family === 'Growth' ? (activeRoute?.path === portal.basePath ? <GrowthHomePage /> : <GrowthModulePage route={activeRoute ?? portal.nav[0]!} role={authenticatedWorkspace?.role} />)
+            : !demoMode && activeRoute?.path === portal.basePath ? <AuthenticatedDashboardChooser portal={portal} routeLabel={activeRoute?.label ?? 'Dashboard'} onNavigate={navigate} authenticatedWorkspace={authenticatedWorkspace} /> : activeRoute?.path === portal.basePath ? <RoleDashboard portal={portal} onNavigate={navigate} /> : <RoleModulePage portal={portal} route={activeRoute ?? portal.nav[0]!} demoMode={demoMode} authenticatedWorkspace={authenticatedWorkspace} />}
         </main>
       </div>
-      <AssistantWidget persona={portal.family === 'Employer' ? 'employer' : portal.family === 'Institution' ? 'institution' : 'student'} />
+      {/* The assistant has no growth persona; a student answer would mislead field staff (GROWTH-01). */}
+      {portal.family === 'Growth' ? null : <AssistantWidget persona={portal.family === 'Employer' ? 'employer' : portal.family === 'Institution' ? 'institution' : 'student'} />}
     </div>
     </ConsentGate>
   );
 }
 
-function RoleSidebar({ portal, activePath, collapsed, drawerOpen, onNavigate, onCollapse, onClose }: { readonly portal: RolePortalConfig; readonly activePath: string; readonly collapsed: boolean; readonly drawerOpen: boolean; readonly onNavigate: (path: string) => void; readonly onCollapse: () => void; readonly onClose: () => void }): React.ReactElement {
-  const groups = [...new Set(portal.nav.map((item) => item.group))];
+function RoleSidebar({ portal, role, activePath, collapsed, drawerOpen, onNavigate, onCollapse, onClose }: { readonly portal: RolePortalConfig; readonly role?: string | undefined; readonly activePath: string; readonly collapsed: boolean; readonly drawerOpen: boolean; readonly onNavigate: (path: string) => void; readonly onCollapse: () => void; readonly onClose: () => void }): React.ReactElement {
+  // An item limited to some roles (GROWTH-01: Team, for managers) is shown only to them.
+  const items = portal.nav.filter((item) => !item.roles || (role !== undefined && item.roles.includes(role)));
+  const groups = [...new Set(items.map((item) => item.group))];
   return (
     <aside className={`role-sidebar ${drawerOpen ? 'drawer-open' : ''}`} aria-label={`${portal.roleName} navigation`}>
       <div className="role-brand"><BrandWordmark height={28} /><span><strong>ONE</strong><small>{portal.subtitle}</small></span><button className="icon-button sidebar-close" type="button" aria-label={`Close ${portal.roleName} navigation`} onClick={onClose} autoFocus={drawerOpen}><X size={18} /></button></div>
       <nav className="role-nav" aria-label={`Grouped ${portal.roleName} navigation`}>
-        {groups.map((group) => <div className="role-nav-group" key={group}><span>{group}</span>{portal.nav.filter((item) => item.group === group).map((item) => { const Icon = item.icon; const active = activePath === item.path; return <button key={item.path} type="button" className={`role-nav-item ${active ? 'active' : ''}`} aria-current={active ? 'page' : undefined} aria-label={item.label} title={item.label} onClick={() => onNavigate(item.path)}><Icon size={16} aria-hidden="true" /><span>{item.label}</span></button>; })}</div>)}
+        {groups.map((group) => <div className="role-nav-group" key={group}><span>{group}</span>{items.filter((item) => item.group === group).map((item) => { const Icon = item.icon; const active = activePath === item.path; return <button key={item.path} type="button" className={`role-nav-item ${active ? 'active' : ''}`} aria-current={active ? 'page' : undefined} aria-label={item.label} title={item.label} onClick={() => onNavigate(item.path)}><Icon size={16} aria-hidden="true" /><span>{item.label}</span></button>; })}</div>)}
       </nav>
       <button className="role-collapse" type="button" onClick={onCollapse} aria-label={collapsed ? 'Expand navigation' : 'Collapse navigation'} aria-expanded={!collapsed}>
         {collapsed ? <ChevronsRight size={16} aria-hidden="true" /> : <ChevronsLeft size={16} aria-hidden="true" />}
@@ -317,7 +324,8 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   // OPS-01: Settings holds internal staff and capabilities; OPS-02 adds the approvals
   // queue above it (Appendix 1 §4.2). Only this label's branch changes; the others keep
   // the not-yet-available state below.
-  if (!demoMode && portal.key === 'operations-admin' && route.label === 'Settings') return <><OperationsApprovalsPanel /><OperationsStaffCapabilitiesPage /><OperationsCommunicationsPage /></>;
+  // GROWTH-01: the Growth team section sits beneath them, shown only to a GROWTH_ADMIN holder.
+  if (!demoMode && portal.key === 'operations-admin' && route.label === 'Settings') return <><OperationsApprovalsPanel /><OperationsStaffCapabilitiesPage /><OperationsCommunicationsPage /><OperationsGrowthTeamPanel /></>;
   // OPS-05: Support is the case desk. Only this label's branch changes; Subscriptions,
   // Billing and Analytics keep the not-yet-available state below.
   if (!demoMode && portal.key === 'operations-admin' && route.label === 'Support') return <OperationsSupportDeskPage />;

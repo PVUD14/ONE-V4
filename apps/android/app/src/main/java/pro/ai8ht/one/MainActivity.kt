@@ -240,6 +240,13 @@ fun OneApp(
             onSignOut = { Session.clear(context); workspace = null; signedIn = false },
             onSwitchWorkspace = if (multiWorkspace) ({ Session.setWorkspace(context, null); workspace = null }) else null,
         )
+        workspace!!.kind == WorkspaceKind.GROWTH -> GrowthScaffold(
+            role = workspace!!.role,
+            currentTheme = currentTheme,
+            onThemeChange = onThemeChange,
+            onSignOut = { Session.clear(context); workspace = null; signedIn = false },
+            onSwitchWorkspace = if (multiWorkspace) ({ Session.setWorkspace(context, null); workspace = null }) else null,
+        )
         workspace!!.kind == WorkspaceKind.INSTITUTION -> InstitutionScaffold(
             organizationId = workspace!!.organizationId ?: "",
             currentTheme = currentTheme,

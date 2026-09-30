@@ -38,6 +38,10 @@ export const internalCapabilities = [
   'COMMS_TEMPLATES',
   'CAPABILITY_ADMIN',
   'APPROVE_HIGH_RISK',
+  // GROWTH-01 (ADR-040): the operator side of the Growth portal. Growth field staff hold
+  // login roles with no capability at all; these belong to operations admins.
+  'GROWTH_ADMIN',
+  'GROWTH_FINANCE',
 ] as const;
 
 export type InternalCapability = (typeof internalCapabilities)[number];
@@ -50,7 +54,12 @@ export const highRiskInternalCapabilities = [
   'TRUST_SAFETY_ENFORCE',
   'CONTENT_PUBLISH',
   'AI_OPS_CONFIGURE',
+  // GROWTH-01: its holder records the college payments that make commission payable.
+  'GROWTH_FINANCE',
 ] as const satisfies readonly InternalCapability[];
+
+/** GROWTH-01: operator-side growth capabilities, grantable to an operations admin only. */
+export const growthOperatorCapabilities = ['GROWTH_ADMIN', 'GROWTH_FINANCE'] as const satisfies readonly InternalCapability[];
 
 export const platformInternalRoles = ['PLATFORM_SUPER_ADMIN', 'OPERATIONS_ADMIN', 'SECURITY_ADMIN'] as const;
 export type PlatformInternalRole = (typeof platformInternalRoles)[number];
@@ -98,6 +107,7 @@ const superAdminBaseline: readonly InternalCapability[] = [
     ...securityAdminBaseline,
     'CAPABILITY_ADMIN',
     'APPROVE_HIGH_RISK',
+    ...growthOperatorCapabilities,
   ]),
 ];
 
@@ -155,6 +165,10 @@ export function baselineInternalCapabilities(role: string): readonly InternalCap
  */
 export function isInternalCapabilityGrantableToRole(capability: InternalCapability, role: string): boolean {
   if (capability === 'CONTENT_REVIEW_EXTERNAL') return (externalContentReviewerRoles as readonly string[]).includes(role);
+  // GROWTH-01: growth administration and finance are operations work; the super admin
+  // holds both by baseline. Growth login roles are not platform internal roles, so they
+  // can never be granted anything (ADR-040 decision 2).
+  if ((growthOperatorCapabilities as readonly InternalCapability[]).includes(capability)) return role === 'OPERATIONS_ADMIN';
   return isPlatformInternalRole(role);
 }
 
@@ -253,6 +267,9 @@ export function refuseInternalCapabilityGrant(input: InternalCapabilityChangeInp
   // Faculty review is granted from the institution side (OPS-10), never from here.
   if (input.capability === 'CONTENT_REVIEW_EXTERNAL') return 'CAPABILITY_NOT_GRANTABLE_HERE';
   if (input.target.organizationKind !== 'PLATFORM' || !isPlatformInternalRole(input.target.role)) return 'CAPABILITY_ROLE_NOT_ELIGIBLE';
+  // A growth capability is grantable to an operations admin only; the super admin already
+  // holds it, so that case falls through to CAPABILITY_ALREADY_HELD below.
+  if (input.target.role !== 'PLATFORM_SUPER_ADMIN' && !isInternalCapabilityGrantableToRole(input.capability, input.target.role)) return 'CAPABILITY_ROLE_NOT_ELIGIBLE';
   if (input.target.state !== 'ACTIVE') return 'MEMBERSHIP_NOT_ACTIVE';
   if (effectiveInternalCapabilities(input.target.role, input.target.grants).includes(input.capability)) return 'CAPABILITY_ALREADY_HELD';
   // OPS-02: a high-risk grant needs a second person's approval, for everyone —

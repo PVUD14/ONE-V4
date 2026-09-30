@@ -20,6 +20,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Handshake
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Notifications
@@ -59,7 +60,7 @@ import pro.ai8ht.one.ui.Tone
 
 // --- Workspaces ----------------------------------------------------------------
 
-enum class WorkspaceKind { STUDENT, INSTITUTION, EMPLOYER, OPS }
+enum class WorkspaceKind { STUDENT, INSTITUTION, EMPLOYER, OPS, GROWTH }
 
 data class Workspace(val kind: WorkspaceKind, val organizationId: String?, val role: String)
 
@@ -76,7 +77,17 @@ fun classifyWorkspaces(ctx: SecurityContextDto): List<Workspace> {
             role.startsWith("EMPLOYER") || role == "RECRUITER" ->
                 out += Workspace(WorkspaceKind.EMPLOYER, m.organizationId, m.role)
             role == "STUDENT" -> out += Workspace(WorkspaceKind.STUDENT, m.organizationId, m.role)
+            // GROWTH-01 (ADR-040): partnerships field staff. The GROWTH_ prefix matches neither
+            // the INSTITUTION nor the EMPLOYER branch above, and a growth role never opens Operations.
+            role == "GROWTH_EXECUTIVE" || role == "GROWTH_MANAGER" ->
+                out += Workspace(WorkspaceKind.GROWTH, m.organizationId, m.role)
         }
+    }
+    // One Growth entry: a person who is both works as the manager, as on the web.
+    if (out.count { it.kind == WorkspaceKind.GROWTH } > 1) {
+        val keep = out.firstOrNull { it.kind == WorkspaceKind.GROWTH && it.role.uppercase() == "GROWTH_MANAGER" }
+            ?: out.first { it.kind == WorkspaceKind.GROWTH }
+        out.removeAll { it.kind == WorkspaceKind.GROWTH && it !== keep }
     }
     // INST-10: someone who graduated, transferred or left keeps their student workspace.
     val student = ctx.studentRelationships.any { it.state == "ACTIVE" || it.state == "VERIFIED" } || ctx.formerStudentRelationships.isNotEmpty()
@@ -110,12 +121,14 @@ internal fun WorkspaceChooserScreen(options: List<Workspace>, onPick: (Workspace
                                     WorkspaceKind.INSTITUTION -> Icons.Filled.Assignment
                                     WorkspaceKind.EMPLOYER -> Icons.Filled.WorkOutline
                                     WorkspaceKind.OPS -> Icons.Filled.MoreHoriz
+                                    WorkspaceKind.GROWTH -> Icons.Filled.Handshake
                                 },
                                 when (workspace.kind) {
                                     WorkspaceKind.STUDENT -> Tone.Accent
                                     WorkspaceKind.INSTITUTION -> Tone.Green
                                     WorkspaceKind.EMPLOYER -> Tone.Violet
                                     WorkspaceKind.OPS -> Tone.Amber
+                                    WorkspaceKind.GROWTH -> Tone.Green
                                 },
                             )
                             Spacer(Modifier.width(12.dp))
@@ -126,6 +139,7 @@ internal fun WorkspaceChooserScreen(options: List<Workspace>, onPick: (Workspace
                                         WorkspaceKind.INSTITUTION -> "Institution"
                                         WorkspaceKind.EMPLOYER -> "Employer"
                                         WorkspaceKind.OPS -> "Operations"
+                                        WorkspaceKind.GROWTH -> "Growth"
                                     },
                                     style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
                                 )
@@ -155,7 +169,7 @@ internal fun ThemeOverlay(currentTheme: String, onThemeChange: (String) -> Unit,
 // --- Shared staff chrome ---------------------------------------------------------
 
 @Composable
-private fun StaffBandHeader(title: String, subtitle: String, unread: Int, onTheme: () -> Unit, onBell: () -> Unit) {
+internal fun StaffBandHeader(title: String, subtitle: String, unread: Int, onTheme: () -> Unit, onBell: () -> Unit) {
     val palette = LocalOnePalette.current
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         BrandWordmark(height = 17.dp, tint = palette.wordmarkTint)
@@ -1245,7 +1259,7 @@ private fun StaffMore(onSignOut: () -> Unit, onSwitchWorkspace: (() -> Unit)?, w
 }
 
 @Composable
-private fun StaffInboxOverlay(feed: NotificationsEnvelope?, onClose: () -> Unit) {
+internal fun StaffInboxOverlay(feed: NotificationsEnvelope?, onClose: () -> Unit) {
     OverlayScaffold("Notifications", onClose) {
         when {
             feed == null || feed.notifications.isEmpty() ->

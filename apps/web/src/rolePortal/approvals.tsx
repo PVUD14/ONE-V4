@@ -12,7 +12,9 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   ApiRequestError,
+  changeAiFeatureLimits,
   decideOperationApproval,
+  enableAiFeature,
   getApprovalPolicy,
   getProtectedAccessToken,
   grantStaffCapability,
@@ -62,6 +64,10 @@ export function describeApproval(approval: OperationApprovalDto): string {
       return `Publish revision ${summary.lessonRevision ?? 'NA'} of the lesson ${summary.lessonKey ?? 'NA'} (${summary.lessonVariant ?? 'NA'})`;
     case 'COMMS_TEMPLATE_PUBLISH':
       return `Publish version ${summary.commsTemplateVersion ?? 'NA'} of the status notice template ${summary.commsTemplateKey ?? 'NA'}`;
+    case 'AI_FEATURE_ENABLE':
+      return `Switch on the AI feature ${summary.aiFeatureKey ?? 'NA'} (model ${summary.aiModel ?? 'NA'}, prompt ${summary.aiPromptKey ?? 'NA'} v${summary.aiPromptVersion ?? 'NA'})`;
+    case 'AI_FEATURE_LIMITS_RAISE':
+      return `Raise the limits of the AI feature ${summary.aiFeatureKey ?? 'NA'} to ${summary.aiCap ?? 'NA'} per ${summary.aiCapWindow === 'MONTH' ? 'month' : 'day'}, input up to ${summary.aiMaxInputChars ?? 'NA'} characters`;
   }
 }
 
@@ -96,6 +102,12 @@ async function executeApproval(token: string, approval: OperationApprovalDto): P
       await publishEditorLessonRevision(token, String(payload.revisionId), { reasonCode, approvalId }); return;
     case 'COMMS_TEMPLATE_PUBLISH':
       await publishStatusNoticeTemplate(token, String(payload.templateId), { reasonCode, approvalId }); return;
+    case 'AI_FEATURE_ENABLE':
+      await enableAiFeature(token, String(payload.featureKey), { reasonCode, approvalId }); return;
+    case 'AI_FEATURE_LIMITS_RAISE':
+      await changeAiFeatureLimits(token, String(payload.featureKey), {
+        cap: Number(payload.cap), capWindow: payload.capWindow === 'MONTH' ? 'MONTH' : 'DAY', maxInputChars: Number(payload.maxInputChars), reasonCode, approvalId,
+      }); return;
   }
 }
 

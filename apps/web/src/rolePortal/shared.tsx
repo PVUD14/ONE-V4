@@ -196,6 +196,16 @@ export function safeErrorMessage(code: string | undefined): string | undefined {
     case 'INVALID_REASON_CODE': return 'Choose a reason.';
     case 'INVALID_TIMESTAMP': return 'Enter a valid date and time.';
     case 'INVALID_SCHEDULE': return 'Choose an end time after the start.';
+    // OPS-12: the AI Operations console.
+    case 'AI_EVALUATION_REQUIRED': return 'This feature has no passing evaluation for its current model and prompt version. Record one first.';
+    case 'AI_PROMPT_UNDECLARED': return 'This feature does not declare which prompt it runs, so it cannot be evaluated or switched on.';
+    case 'AI_KILL_SWITCH_ENGAGED': return 'The global AI kill switch is engaged. Nothing can be switched on until it is released.';
+    case 'AI_KILL_SWITCH_ALREADY_ENGAGED': return 'The global AI kill switch is already engaged.';
+    case 'AI_FEATURE_ALREADY_DISABLED': return 'This feature is already switched off.';
+    case 'AI_ASSISTANT_ALREADY_OFF': return 'The assistant is already switched off.';
+    case 'AI_LIMITS_UNCHANGED': return 'These are the limits the feature already has.';
+    case 'AI_EVALUATION_PASS_BELOW_THRESHOLD': return 'A PASS must meet every threshold it records. Record a FAIL, or check the numbers.';
+    case 'AI_EVALUATION_METRICS_INVALID': return 'Each metric needs a lower-case name, a value, a threshold and a direction, with no repeated names.';
     default: return undefined;
   }
 }

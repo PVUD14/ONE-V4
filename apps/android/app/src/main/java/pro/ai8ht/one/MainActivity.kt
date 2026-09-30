@@ -11,6 +11,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -84,7 +87,10 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import pro.ai8ht.one.data.valueOrNull
-import pro.ai8ht.one.ui.BrandWordmark
+import pro.ai8ht.one.ui.BrandLogo
+import pro.ai8ht.one.ui.BrandMark
+import pro.ai8ht.one.ui.LogoSurface
+import pro.ai8ht.one.ui.logoSurfaceFor
 import pro.ai8ht.one.ui.OneBlue
 import pro.ai8ht.one.ui.OneBlueDeep
 import pro.ai8ht.one.ui.OneTheme
@@ -280,8 +286,8 @@ fun OneApp(
     }
 }
 
-/** Continues the system splash's look: black brand ground, the original
- *  silver wordmark, the 8 spinning in place while the app loads. */
+/** Continues the system splash's look: black brand ground, the ONE "o" mark
+ *  with its blue centre dot pulsing while the app loads, then the lockup. */
 @Composable
 private fun BrandSplash() {
     Column(
@@ -289,10 +295,16 @@ private fun BrandSplash() {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        BrandWordmark(height = 46.dp, spinEight = true)
-        Spacer(Modifier.height(18.dp))
-        Text("ONE", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color(0xFFD9DCE1))
-        Text("The campus-to-career workspace", style = MaterialTheme.typography.bodySmall, color = Color(0xFF8E939C))
+        BrandMark(size = 112.dp, pulse = true)
+        Spacer(Modifier.height(20.dp))
+        BrandLogo(height = 64.dp, surface = LogoSurface.Dark)
+        Spacer(Modifier.height(14.dp))
+        Image(
+            painter = painterResource(R.drawable.one_tagline_dark),
+            contentDescription = "People, potential, progress",
+            modifier = Modifier.height(10.dp),
+            contentScale = ContentScale.FillHeight,
+        )
     }
 }
 
@@ -304,7 +316,7 @@ private fun DemoAccountScreen(onSignOut: () -> Unit) {
     Column(Modifier.fillMaxSize().background(palette.bandBottom)) {
         BrandBand {
             Spacer(Modifier.height(20.dp))
-            BrandWordmark(height = 24.dp, tint = palette.wordmarkTint)
+            BrandLogo(height = 44.dp, surface = palette.logoOnBand)
             Spacer(Modifier.height(12.dp))
             Text("Demo account", style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold, color = palette.bandInk)
@@ -497,7 +509,7 @@ private fun MainScaffold(
         Column(Modifier.padding(padding).fillMaxSize()) {
         BrandBand {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                BrandWordmark(height = 17.dp, tint = palette.wordmarkTint)
+                BrandLogo(height = 34.dp, surface = palette.logoOnBand)
                 Spacer(Modifier.weight(1f))
                 IconButton(onClick = { showTheme = true }) {
                     Icon(Icons.Filled.Palette, contentDescription = "Theme", tint = palette.bandMuted)
@@ -1160,7 +1172,7 @@ private fun SignInScreen(
         BrandBand {
             Spacer(Modifier.height(34.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                BrandWordmark(height = 40.dp, spinEight = true, tint = signPalette.wordmarkTint)
+                BrandLogo(height = 76.dp, surface = signPalette.logoOnBand)
             }
             Spacer(Modifier.height(12.dp))
             Text(
@@ -1278,7 +1290,7 @@ private fun SignInScreen(
 private fun ConsentUnavailableScreen(onRetry: () -> Unit) {
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(20.dp).verticalScroll(rememberScrollState())) {
         Spacer(Modifier.height(24.dp))
-        BrandWordmark(height = 22.dp)
+        BrandLogo(height = 44.dp, surface = logoSurfaceFor(pro.ai8ht.one.ui.LocalOnePalette.current))
         Spacer(Modifier.height(20.dp))
         Text("We could not confirm your privacy consent", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(6.dp))
@@ -1297,7 +1309,7 @@ private fun ConsentScreen(version: String, onGranted: () -> Unit) {
     var error by remember { mutableStateOf<String?>(null) }
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(20.dp).verticalScroll(rememberScrollState())) {
         Spacer(Modifier.height(24.dp))
-        BrandWordmark(height = 22.dp)
+        BrandLogo(height = 44.dp, surface = logoSurfaceFor(pro.ai8ht.one.ui.LocalOnePalette.current))
         Spacer(Modifier.height(20.dp))
         Text("Your data, your consent", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(6.dp))

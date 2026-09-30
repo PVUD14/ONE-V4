@@ -1,6 +1,7 @@
 # Privacy Export Coverage — Design
 
-**Status:** Adopted (fix `fix/privacy-export-coverage`), recommended options taken per AGENTS.md ("ask once, recommend, carry on")
+**Status:** Adopted (fix `fix/privacy-export-coverage`), recommended options taken per AGENTS.md ("ask once, recommend, carry on").
+Deletion gaps decided by Divakar and implemented in `fix/privacy-deletion-decisions` (migration 0087): see "Deletion decisions".
 **Date:** 2026-09-30
 **Migration:** none. No CHECK has to change: every new export section is a read, and every deletion fix
 below lands in an existing category (`STUDENT_PROFILE`, `NOTIFICATIONS`, `IDENTITY`).
@@ -45,7 +46,7 @@ now includes it and — where it does not — why not. It also checks privacy de
 | Table | Export | Deletion |
 |---|---|---|
 | `users` (0001) | `identity` (existing) | IDENTITY — anonymised |
-| `user_consents` (0014, 0028) | **`consents`** — key, title, version, granted/withdrawn, when | Retained under the anonymised account. **Gap reported, not fixed:** no declared category says so; consent history is the proof a grant existed, so RETAINED with a basis is the likely answer. Needs a category (a CHECK change), so it is a decision for Divakar. |
+| `user_consents` (0014, 0028) | **`consents`** — key, title, version, granted/withdrawn, when | CONSENT_RECORDS — **retained** as proof of consent under the anonymised account, with a stated basis (decision D3 below). Nothing else about the person is kept with them. |
 | `notification_preferences` (0004) | **`notificationPreferences`** | NOTIFICATIONS — erased (existing) |
 | `user_notifications` (0013) | **`notifications`** — kind, title, body, sent, read. The `data` payload is internal references and is left out | **Fixed:** NOTIFICATIONS now erases them. They were left behind; their text names employers, jobs and interview times. |
 | `device_push_tokens` (0013) | **`devices`** — platform, registered, last seen, revoked. Never the token (a credential for the device) | **Fixed:** NOTIFICATIONS now erases them. A device identifier outlived the account. |
@@ -98,7 +99,7 @@ now includes it and — where it does not — why not. It also checks privacy de
 | Table | Export | Deletion |
 |---|---|---|
 | `staff_actions` COUNSELLING_NOTE (0060) | `counsellingNotes` (existing) | COUNSELLING_NOTES — erased |
-| `staff_actions`, other types (0020) | **`collegeActions.shared`** — interventions, tasks, notes and meetings the college made visible to the student (title, note, state, dates). **`collegeActions.heldByCollege`** — how many staff-only actions of each type each college holds, never their text | **Gap reported:** retained, text intact, under the anonymised account. **Fixed:** the evidence-document link is cleared first, because an `ACADEMIC_VERIFICATION` action pointing at a document version made the document step fail. Whether staff-only actions are the college's record (keep) or about the person (erase) is decision 3 for Divakar. |
+| `staff_actions`, other types (0020) | **`collegeActions.shared`** — interventions, tasks, notes and meetings the college made visible to the student (title, note, state, dates). **`collegeActions.heldByCollege`** — how many staff-only actions of each type each college holds, never their text | Staff-only actions about the person: STAFF_ACTIONS — **text erased**, skeleton row kept (decision D1 below). The evidence-document link is cleared first, because an `ACADEMIC_VERIFICATION` action pointing at a document version made the document step fail. Actions the college made visible to the student keep their text (outside the decision; see "Still open"). |
 | `counselling_case_participants` (0060) | Excluded: which staff memberships follow the case names other people | Erased (existing) |
 | `learning_assignment_students` + `learning_assignments` (0082) | **`fromYourLecturers.assignments`** — college, kind, what, skill, note, assigned, withdrawn | LEARNING_ACTIVITY — erased (existing) |
 | `learning_plan_overrides` (0082) | **`fromYourLecturers.nextSteps`** — college, action, what, skill, reason, note, state, applied, withdrawn | LEARNING_ACTIVITY — erased (existing) |
@@ -114,18 +115,18 @@ now includes it and — where it does not — why not. It also checks privacy de
 | `learning_sessions` (0047) | **`learning.sessions`** — mode, language, start, end. Not model/prompt/token/cost columns (internal metering) | LEARNING_ACTIVITY — erased |
 | `learning_attempt_events` (0047, 0052) | **`learning.attempts`** — when, context, skill, answered, correct, assisted, highest hint, response time. Not the item, the selected option or the misconception codes (item + selection + correctness is an answer key) | LEARNING_ACTIVITY — erased |
 | `learner_activity_events` (0015) | **`learning.activity`** | LEARNING_ACTIVITY — erased |
-| `learner_progress` (0004) | **`learning.lessons`** — lesson, state, started, completed | **Gap reported:** retained under the anonymised account, no category |
+| `learner_progress` (0004) | **`learning.lessons`** — lesson, state, started, completed | LEARNING_ACTIVITY — erased (decision D2) |
 | `learning_decisions` (0053) | **`learning.steps`** — when, what the planner chose, skill, reason codes, adaptive or not. Not the recorded inputs (the planner's working numbers) | LEARNING_ACTIVITY — erased |
 | `learning_step_items` (0072) | **`learning.steps[].items`** — position, skill, highest hint shown, when served. Not the question | LEARNING_ACTIVITY — erased |
 | `placement_tests` (0064) | **`learning.placementTests`** — scope, state, times, the level shown to the student, items answered, why it stopped | LEARNING_ACTIVITY — erased |
 | `placement_test_items` (0064) | Excluded: which calibrated items were served, with their difficulty and discrimination — model parameters | LEARNING_ACTIVITY — erased |
 | `learner_skill_state` (0052) | **`learning.skills`** — skill, attempt and success counts, days, last attempt, evidence stage and band, next review date. Not mastery likelihood/uncertainty, review stability/difficulty or misconception codes (rule 4) | LEARNING_ACTIVITY — erased (rebuilt empty) |
 | `evidence_records` (0004, 0050) | **`learning.evidence`** — type, topic, demonstrated of possible, assisted, stage at capture, when | ASSESSMENT_EVIDENCE — anonymised (existing) |
-| `mastery_projections` (0004) | **`learning.topicBands`** — topic, band, when | **Gap reported:** retained, no category |
-| `readiness_snapshots` (0004) | **`learning.readiness`** — the advisory band and when. Never a number; `advisory`/`employer_visible` are constants | **Gap reported:** retained, no category |
-| `roadmap_actions` (0004) | **`learning.roadmap`** — action, topic, reason, state, due, created, completed | **Gap reported:** retained, no category |
-| `assessment_assignments`, `assessment_attempts` (0004) | **`learning.readinessChecks`** — check, state, started, submitted, correct of possible (the score the student is shown on submitting) | **Gap reported:** retained, no category |
-| `assessment_attempt_items`, `assessment_responses` (0004) | Excluded: the readiness check's items are reused; responses carry correctness | Retained |
+| `mastery_projections` (0004) | **`learning.topicBands`** — topic, band, when | LEARNING_ACTIVITY — erased (decision D2) |
+| `readiness_snapshots`, `readiness_factors` (0004) | **`learning.readiness`** — the advisory band and when. Never a number; `advisory`/`employer_visible` are constants | LEARNING_ACTIVITY — erased, factors first (decision D2). A plain DELETE; no CHECK is touched |
+| `roadmap_actions` (0004) | **`learning.roadmap`** — action, topic, reason, state, due, created, completed | LEARNING_ACTIVITY — erased (decision D2) |
+| `assessment_assignments`, `assessment_attempts` (0004) | **`learning.readinessChecks`** — check, state, started, submitted, correct of possible (the score the student is shown on submitting) | LEARNING_ACTIVITY — erased (decision D2). The 0004 guard freezing a submitted attempt gains one exception in 0087: DELETE inside the privacy-erase transaction for that subject |
+| `assessment_attempt_items`, `assessment_responses` (0004) | Excluded: the readiness check's items are reused; responses carry correctness | LEARNING_ACTIVITY — erased with their attempt (they reference it) |
 | `ai_generations` (0033) | Excluded: metering only (feature, model, tokens), no content; AI is held (ADR-030) so the table is empty | Retained |
 
 ### Not about a student
@@ -143,15 +144,134 @@ export is out of scope here: the route is `/students/me/…`.
    history; the college keeps enrolment under INSTITUTION_ROSTER and its marks in its own system. The
    alternative — keep verified terms as the college's record — leaves a `DOCUMENT_BACKED` term pointing
    at an erased document, which the schema forbids, so it would need the evidence rule relaxed. Rejected.
-3. **Staff-only college actions: reported, not changed.** Erasing a college's interventions and faculty
-   notes changes what the college's own history shows and needs a deletion category (a CHECK change).
-   Recommended answer for Divakar: erase their text (as counselling notes) under a new
-   `STAFF_ACTIONS` category, keep the row for the college's counts. Only the document link, which made
-   deletion fail, is cleared now.
+3. **Staff-only college actions** — reported by this fix; **decided by Divakar on 2026-09-30**: erase
+   their text under a new `STAFF_ACTIONS` category (D1 below).
 4. **Engine read models without a category** (`learner_progress`, `mastery_projections`,
-   `readiness_snapshots`, `roadmap_actions`, `assessment_attempts`) — reported. ADR-034 says engine
-   behavioural data is erased; these predate it. Recommended: erase them under LEARNING_ACTIVITY in a
-   follow-up, after checking what the INST-08 aggregates read from them.
+   `readiness_snapshots`, `roadmap_actions`, `assessment_attempts`) — reported; **decided**: erase under
+   LEARNING_ACTIVITY (D2).
+5. **Consent records** — reported; **decided**: retain as proof under `CONSENT_RECORDS` (D3).
+6. **Results imports recreating records** — reported; **decided**: skip a deleted person (D4).
+
+## Deletion decisions (Divakar, 2026-09-30 — branch `fix/privacy-deletion-decisions`, migration 0087)
+
+Written before the code. Divakar decided the four gaps this note reported. Each is implemented as he
+decided it; what follows records what was checked first and what was rejected.
+
+### D1. Staff-only college actions — `STAFF_ACTIONS`, ERASED
+
+**Scope.** Every `staff_actions` row with `subject_student_user_id` = the person and `visibility =
+'STAFF_ONLY'`, of any type except `COUNSELLING_NOTE` (already deleted outright under COUNSELLING_NOTES):
+interventions, faculty notes, academic verifications, and tasks or meetings the college kept to itself.
+Group sessions (0082) carry no subject; the person's invitation to one is already erased under
+LEARNING_ACTIVITY and the session, which is the lecturer's, is untouched.
+
+**What is erased.** All free text. `title` becomes the fixed text `Erased: the student deleted their
+account` (the column is NOT NULL, so it cannot be emptied), `note` and `outcome_note` become NULL. The
+evidence-document link is already cleared. `version` is bumped and `updated_at` set, so an edit form a
+member of staff still has open is refused as stale rather than writing the old text back.
+
+**What survives, and why the row is kept.** The skeleton: institution, type, state, visibility, units,
+dates, the acting and reviewing staff, and the links to the (anonymised) account and relationship. It is
+kept because other things need it:
+- structurally: `staff_action_attendees` and `staff_action_content_links` (0082) reference
+  `staff_actions(id)`, so deleting an action a content link hangs off would fail on the foreign key, and
+  audit rows naming the action's id stay resolvable (AUDIT is retained);
+- as the college's own record of what it did, which its counts read by type, state and date: college
+  health (OPS-14, `college-health.ts`), the department workspace, the teaching-assignment view, the
+  calendar and the institution exports (`institution-exports.ts`). Deleting the rows would rewrite the
+  college's history; erasing the text removes everything about the person from it.
+No surviving column identifies the person: the account is anonymised and the roster name is `Deleted user`.
+
+**Guards.** `staff_actions` has no append-only trigger (0020, 0060, 0082 checked), so the update needs no
+exception. Rejected: deleting the rows (breaks 0082's foreign keys and the college's counts); keeping the
+text (it is about the person and is the one part of the row that identifies them).
+
+### D2. Learning history — LEARNING_ACTIVITY, ERASED
+
+Added to the LEARNING_ACTIVITY transaction (the one that sets `one.privacy_erase_subject`), children
+before parents: `readiness_factors` of the person's snapshots or projections, `readiness_snapshots`,
+`mastery_projections`, `roadmap_actions`, `learner_progress`, `assessment_responses`,
+`assessment_attempt_items`, `assessment_attempts`, `assessment_assignments`. Each row counts toward the
+category's record count. Self-references (`supersedes_*`) stay within one person's rows and go in the same
+statement.
+
+**Who reads these tables, checked first** (every reader found by searching the code for each table name):
+- `learner_progress`: INST-17 cohort readiness and preparation sprints (`cohort-readiness.ts`
+  `sprintStudentFacts`), INST-16's "done" rule (`faculty-learning-actions.ts`), the public profile and
+  career readiness (the person's own). Each is an `EXISTS` per student; the person's lecturer assignments
+  are already erased under LEARNING_ACTIVITY, so they are not in a sprint's population at all.
+- `mastery_projections`: the BKT shadow report (`bkt-shadow-report.ts`, operator), per student and only for
+  holders of the adaptive-learning consent; learning experience (the person's own).
+- `readiness_snapshots`, `readiness_factors`, `roadmap_actions`: only the person's own reads (career
+  readiness, calendar, career targets, the export). No college or operator aggregate reads them. INST-12
+  (placement register) and INST-13 (outcome exports) read applications, placements and outcome
+  declarations; OPS-14 reads staff actions, relationships and invitations; INST-17 reads the skill-state,
+  evidence and progress facts above.
+- `assessment_*`: only the person's own learning-experience reads.
+No reader requires these rows, holds a foreign key to them, or stores a total the deletion would falsify.
+Erasing a person's rows removes them from every future aggregate and breaks none. Reports a college already
+downloaded are its own files and are not touched.
+
+**Guards and CHECKs.** The `readiness_snapshots` CHECKs (`advisory`, `NOT employer_visible`) stay as they
+are; a DELETE touches neither. Of these tables only `assessment_attempts` has a guard: 0004's
+`protect_submitted_attempt` refuses to change or delete a submitted attempt, and for any other attempt a
+DELETE silently did nothing (the function returned NEW, which is NULL on DELETE). 0087 replaces the
+function with exactly that behaviour plus one exception, the 0047 pattern: a DELETE is allowed when the
+transaction-local `one.privacy_erase_subject` names the attempt's subject. Outside that setting nothing
+changes. `evidence_records` stay ANONYMISED (unchanged), so the evidence the aggregates count survives,
+detached.
+
+Rejected: ANONYMISED for these tables (they are derived views of the person's own learning and carry
+nothing another party needs; engine data is erased); a new category (LEARNING_ACTIVITY is the declared
+home of engine behavioural data).
+
+### D3. Consent records — `CONSENT_RECORDS`, RETAINED
+
+`user_consents` rows stay, linked to the anonymised account, and the deletion record says so with the
+basis *"Proof of what you agreed to is kept as a legal obligation: which notice and version, whether you
+granted or withdrew it, and when. It is linked only to the anonymised account; nothing else about you is
+kept with it."* The count is the person's consent rows.
+
+Each column is what proof needs: `consent_key` and `version` (which text, through `consent_definitions`),
+`action` (granted or withdrawn), `recorded_at` (when), `user_id` (to whom, now the anonymised account) and
+`correlation_id` (the request that recorded it, which ties the row to the retained audit trail; a random
+request id, not personal). Nothing else about the person is in the row, and every other personal table
+is erased or anonymised under its own category, so nothing survives alongside the consent beyond the
+anonymised account. The rows are append-only by design (0014) and are not modified.
+Rejected: erasing them (loses the proof that processing was consented to while the account existed);
+cutting the account link (the rows would no longer prove anything about anyone).
+
+### D4. Results imports skip a deleted person
+
+`evaluateResultsImport` reads `users.anonymised_at` with the roster row. A row whose roll number belongs
+to a deleted student gets the new outcome **`SKIPPED`** with the issue code **`student_deleted`**. It is
+never CREATE or CONFIRM, writes nothing on commit, does not block the other rows (unlike INVALID), and is
+counted in `counts.skipped`. It takes precedence over the row's other checks, since nothing will be written
+for that person whatever the row says. Scope still applies first: a deleted student outside the
+uploader's scope reads as `student_not_found`, like any out-of-scope roll number.
+
+The roster import already cannot reattach: a roll number already on the roster is rejected
+(`student_id_already_exists`), a committed row always creates a new account, and the deleted person's
+email is anonymised. Year-end batches (INST-10) only end relationships. No change there.
+
+The web results-upload screen gains the outcome's label, the issue's text and the count in its summary
+line (strings in the existing maps; no layout, route or navigation change). The Android app has no results
+upload.
+
+### Migration 0087
+
+1. The deletion-category CHECK is widened by read-and-union (the 0074/0077 pattern): the live definition is
+   read, every value in it is kept, the full list known today is unioned in, and `STAFF_ACTIONS` and
+   `CONSENT_RECORDS` are added. The constraint is recreated only when a wanted value is missing, so a
+   second run changes nothing.
+2. `protect_submitted_attempt()` is replaced as described in D2 (CREATE OR REPLACE; the 0004 trigger keeps
+   calling it).
+It references only tables from 0085 or earlier.
+
+### Still open (outside the decisions; reported)
+
+- Staff actions the college made **visible to the student** (`SUBJECT_VISIBLE`) keep their text under the
+  anonymised account. They are about the person too, but the decision named staff-only actions.
 
 ## Tests
 

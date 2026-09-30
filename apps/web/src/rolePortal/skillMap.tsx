@@ -21,6 +21,7 @@ import {
   listSkills,
   publishSkillRevision,
   saveSkillDraft,
+  archiveSkill,
   startSkillRevision,
   transitionSkillRevision,
 } from '../api.js';
@@ -158,6 +159,7 @@ export function OperationsSkillMapPage(): React.ReactElement | null {
 
 type Dialog =
   | { readonly kind: 'revise' }
+  | { readonly kind: 'archive' }
   | { readonly kind: 'transition'; readonly revision: SkillRevisionDto; readonly toState: 'IN_REVIEW' | 'CHANGES_REQUESTED' | 'APPROVED' }
   | { readonly kind: 'publish'; readonly revision: SkillRevisionDto }
   | { readonly kind: 'publishWithApproval'; readonly revision: SkillRevisionDto };
@@ -212,6 +214,8 @@ function SkillPanel({ token, topicId, policy, onChanged, onClose }: {
     {skill.current.state === 'PUBLISHED' ? <><h3>Published — revision {skill.current.revision}</h3><RevisionView revision={skill.current} policy={policy} skill={skill} /></> : null}
     {!working && skill.status === 'LIVE' && policy.viewer.edit
       ? <button type="button" className="secondary" onClick={() => setDialog({ kind: 'revise' })}>Start a new revision…</button> : null}
+    {!working && skill.status === 'LIVE' && policy.viewer.publish && policy.reasons.archive
+      ? <button type="button" className="secondary" onClick={() => setDialog({ kind: 'archive' })}>Archive…</button> : null}
 
     {working ? <article className="role-card" aria-label={`Revision ${working.revision}`}>
       <div className="role-section-title"><h3>Revision {working.revision}</h3><StatusBadge label={label(working.state)} tone={stateTone(working.state)} /></div>
@@ -239,6 +243,10 @@ function SkillPanel({ token, topicId, policy, onChanged, onClose }: {
         <td>{label(entry.fromState)} → {label(entry.toState)}</td><td>{entry.reasonCode}</td><td>{entry.actorEmail}</td>
       </tr>)}</tbody></table></div> : <p>No review actions yet.</p>}
 
+    {dialog?.kind === 'archive' ? <ReasonDialog title={`Archive ${skill.stableKey}`}
+      approvalNote="Not required: archiving removes the skill, so no second person approves it, but it is recorded with your reason. The skill is retired at once and is never deleted; evidence already recorded against it stays. It is refused while a role requires it, a live skill needs it first, or a live question or lesson is on it."
+      reasons={policy.reasons.archive ?? []} submitLabel="Archive skill" onCancel={() => setDialog(null)}
+      onSubmit={async (reasonCode) => { apply((await archiveSkill(token, skill.topicId, { reasonCode })).skill, 'Archived: the skill is retired.'); setDialog(null); }} /> : null}
     {dialog?.kind === 'revise' ? <ReasonDialog title={`Start revision of ${skill.stableKey}`} approvalNote="Not required: a new revision changes nothing until it is published."
       reasons={policy.reasons.revise} submitLabel="Start revision" onCancel={() => setDialog(null)}
       onSubmit={async (reasonCode) => { apply((await startSkillRevision(token, skill.topicId, { reasonCode })).skill, 'Revision started.'); setDialog(null); }} /> : null}

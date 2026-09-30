@@ -24,6 +24,8 @@ export interface SkillMapPolicyDto {
     readonly transition: Readonly<Record<string, readonly string[]>>;
     readonly rights: readonly string[];
     readonly publish: readonly string[];
+    /** Why published content is archived (content-archive-design.md). */
+    readonly archive?: readonly string[];
   };
   readonly limits: { readonly name: number; readonly description: number; readonly level: number; readonly prerequisites: number; readonly attribution: number; readonly basis: number; readonly note: number };
   readonly correlationId: string;
@@ -132,6 +134,11 @@ export function getSkill(token: string, topicId: string, signal?: AbortSignal): 
 
 export function createSkill(token: string, body: { readonly stableKey: string; readonly name: string; readonly description: string; readonly reasonCode: string }): Promise<SkillEnvelope> {
   return requestJson(`${base}/skills`, { token, method: 'POST', body });
+}
+
+/** Archive a live skill: CONTENT_PUBLISH and a reason; it is retired, never deleted. */
+export function archiveSkill(token: string, topicId: string, body: { readonly reasonCode: string }): Promise<SkillEnvelope> {
+  return requestJson(`${base}/skills/${encodeURIComponent(topicId)}/archive`, { token, method: 'POST', body });
 }
 
 export function startSkillRevision(token: string, topicId: string, body: { readonly reasonCode: string }): Promise<SkillEnvelope> {

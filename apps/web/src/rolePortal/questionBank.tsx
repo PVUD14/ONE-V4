@@ -16,6 +16,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   ApiRequestError,
+  archiveBankQuestion,
   createBankQuestion,
   getBankQuestion,
   getProtectedAccessToken,
@@ -41,14 +42,14 @@ import { formatApiError } from './shared.js';
 
 const label = (value: string): string => value.split('_').map((word) => word.charAt(0) + word.slice(1).toLowerCase()).join(' ');
 const when = (value: string | null | undefined): string => (value ? new Date(value).toLocaleString() : 'NA');
-const statusText = (status: string): string => (status === 'LIVE' ? 'Live' : status === 'PENDING' ? 'Not yet published' : status === 'RETIRED' ? 'Retired' : 'Unknown');
+const statusText = (status: string): string => (status === 'LIVE' ? 'Live' : status === 'PENDING' ? 'Not yet published' : status === 'RETIRED' ? 'Retired' : status === 'ARCHIVED' ? 'Archived' : 'Unknown');
 const statusTone = (status: string): 'success' | 'warning' | 'neutral' | 'info' => (status === 'LIVE' ? 'success' : status === 'PENDING' ? 'warning' : 'neutral');
 const stateTone = (state: BankQuestionRevisionState): 'success' | 'warning' | 'neutral' | 'info' =>
   state === 'PUBLISHED' ? 'success' : state === 'IN_REVIEW' || state === 'APPROVED' ? 'warning' : state === 'DRAFT' || state === 'CHANGES_REQUESTED' ? 'info' : 'neutral';
 const filters = [
   { value: '', text: 'All questions' }, { value: 'LIVE', text: 'Live' }, { value: 'PENDING', text: 'Not yet published' },
   { value: 'AWAITING_REVIEW', text: 'Awaiting review' }, { value: 'CHANGES_REQUESTED', text: 'Changes requested' },
-  { value: 'AWAITING_PUBLISH', text: 'Approved, awaiting publish' },
+  { value: 'AWAITING_PUBLISH', text: 'Approved, awaiting publish' }, { value: 'ARCHIVED', text: 'Archived' },
 ];
 const keyPattern = /^[a-z0-9][a-z0-9-]{2,79}$/;
 
@@ -169,6 +170,7 @@ export function OperationsQuestionBankPage(): React.ReactElement | null {
 
 type Dialog =
   | { readonly kind: 'revise' }
+  | { readonly kind: 'archive' }
   | { readonly kind: 'transition'; readonly revision: BankQuestionRevisionDto; readonly toState: 'IN_REVIEW' | 'CHANGES_REQUESTED' | 'APPROVED' }
   | { readonly kind: 'publish'; readonly revision: BankQuestionRevisionDto }
   | { readonly kind: 'publishWithApproval'; readonly revision: BankQuestionRevisionDto };
@@ -219,6 +221,8 @@ function QuestionPanel({ token, questionId, policy, onChanged, onClose }: {
     {question.current ? <><h3>Published — revision {question.current.revision}</h3><QuestionView revision={question.current} policy={policy} /></> : null}
     {!working && question.status === 'LIVE' && policy.viewer.edit
       ? <button type="button" className="secondary" onClick={() => setDialog({ kind: 'revise' })}>Start a new revision…</button> : null}
+    {!working && question.status === 'LIVE' && policy.viewer.publish && policy.reasons.archive
+      ? <button type="button" className="secondary" onClick={() => setDialog({ kind: 'archive' })}>Archive…</button> : null}
 
     {working ? <article className="role-card" aria-label={`Revision ${working.revision}`}>
       <div className="role-section-title"><h3>Revision {working.revision}</h3><StatusBadge label={label(working.state)} tone={stateTone(working.state)} /></div>
@@ -246,6 +250,10 @@ function QuestionPanel({ token, questionId, policy, onChanged, onClose }: {
         <td>{label(entry.fromState)} → {label(entry.toState)}</td><td>{entry.reasonCode}</td><td>{entry.actorEmail}</td>
       </tr>)}</tbody></table></div> : <p>No review actions yet.</p>}
 
+    {dialog?.kind === 'archive' ? <ReasonDialog title={`Archive ${question.stableKey}`}
+      approvalNote="Not required: archiving removes the question, so no second person approves it, but it is recorded with your reason. It leaves the readiness check and practice at once; attempts that already hold it keep it, and it is never deleted. If too few questions remain, the readiness check cannot start until more are published."
+      reasons={policy.reasons.archive ?? []} submitLabel="Archive question" onCancel={() => setDialog(null)}
+      onSubmit={async (reasonCode) => { apply((await archiveBankQuestion(token, question.questionId, { reasonCode })).question, 'Archived: no student is served this question any more.'); setDialog(null); }} /> : null}
     {dialog?.kind === 'revise' ? <ReasonDialog title={`Start revision of ${question.stableKey}`} approvalNote="Not required: a new revision changes nothing until it is published."
       reasons={policy.reasons.revise} submitLabel="Start revision" onCancel={() => setDialog(null)}
       onSubmit={async (reasonCode) => { apply((await startBankQuestionRevision(token, question.questionId, { reasonCode })).question, 'Revision started.'); setDialog(null); }} /> : null}

@@ -39,7 +39,7 @@ const policy = (viewer: Record<string, unknown> = {}) => ({
   reasons: {
     create: ['NEW_LESSON', 'TRACK_BUILD'], createVariant: ['NEW_LANGUAGE', 'NEW_LEVEL'], revise: ['CORRECTION', 'CONTENT_UPDATE'], save: ['DRAFT_EDIT'],
     transition: { IN_REVIEW: ['READY_FOR_REVIEW', 'CHANGES_MADE'], CHANGES_REQUESTED: ['CONTENT_INACCURATE', 'TRANSLATION_INACCURATE'], APPROVED: ['REVIEW_PASSED'] },
-    rights: ['OWNERSHIP_VERIFIED', 'LICENCE_VERIFIED'], publish: ['NEW_LESSON', 'LESSON_REVISION', 'NEW_VARIANT'],
+    rights: ['OWNERSHIP_VERIFIED', 'LICENCE_VERIFIED'], publish: ['NEW_LESSON', 'LESSON_REVISION', 'NEW_VARIANT'], archive: ['OUT_OF_DATE', 'RIGHTS_WITHDRAWN'],
   },
   limits: { title: 200, summary: 1000, practice: 2000, prerequisites: 20, attribution: 300, basis: 2000, note: 500 },
   correlationId: 'corr-policy',
@@ -300,6 +300,19 @@ describe('lesson editor', () => {
     expect(within(region).getAllByText('Module')[0]!.nextSibling?.textContent).toBe('NA');
     expect(within(region).getByText('Drafted by').nextSibling?.textContent).toMatch(/^The coding agent \(claude-opus-5-5, eng-16-variants-v1, .+\) — check it against its basis$/);
     expect(within(region).getByText('For the subject expert').nextSibling?.textContent).toBe('A native Telugu speaker must check this translation.');
+  });
+
+  it('archives a live lesson with a reason code, saying it leaves the catalogue and needs no second person', async () => {
+    detailBody = detail({ status: 'LIVE', publishedRevision: 1, openRevision: null, open: null, current: revision({ state: 'PUBLISHED' }) });
+    const region = await openLesson();
+    fireEvent.click(within(region).getByRole('button', { name: 'Archive…' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Archive ops-lesson-follow-up' });
+    expect(within(dialog).getByText(/leaves the catalogue at once/)).toBeInTheDocument();
+    fireEvent.change(within(dialog).getByLabelText(/Reason code/), { target: { value: 'RIGHTS_WITHDRAWN' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Archive lesson' }));
+    await waitFor(() => expect(posts()).toHaveLength(1));
+    expect(String(posts()[0]![0])).toMatch(/\/api\/v1\/operations\/lessons\/lessons\/[0-9a-f-]+\/archive$/);
+    expect(JSON.parse(String(posts()[0]![1].body))).toEqual({ reasonCode: 'RIGHTS_WITHDRAWN' });
   });
 
   it('keeps the Operations navigation labels unchanged', () => {

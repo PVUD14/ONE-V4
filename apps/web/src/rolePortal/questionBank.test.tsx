@@ -42,6 +42,7 @@ const policy = (viewer: Record<string, unknown> = {}) => ({
     create: ['NEW_QUESTION', 'TRACK_BUILD'], revise: ['CORRECTION', 'HINT_CHANGE'], save: ['DRAFT_EDIT'],
     transition: { IN_REVIEW: ['READY_FOR_REVIEW', 'CHANGES_MADE'], CHANGES_REQUESTED: ['ANSWER_KEY_WRONG', 'HINTS_REVEAL_ANSWER'], APPROVED: ['REVIEW_PASSED'] },
     rights: ['OWNERSHIP_VERIFIED', 'LICENCE_VERIFIED'], publish: ['NEW_QUESTION', 'QUESTION_REVISION'],
+    archive: ['CONTENT_INACCURATE', 'OUT_OF_DATE'],
   },
   limits: { prompt: 2000, optionText: 500, optionsMin: 2, optionsMax: 6, explanation: 2000, rationale: 2000, hint: 1000, attribution: 300, basis: 2000, note: 500 },
   correlationId: 'corr-policy',
@@ -258,6 +259,39 @@ describe('question bank', () => {
     await waitFor(() => expect(posts()).toHaveLength(1));
     expect(JSON.parse(String(posts()[0]![1].body))).toEqual({ actionKey: 'CONTENT_QUESTION_PUBLISH', payload: { revisionId, reasonCode: 'NEW_QUESTION' } });
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/publish'))).toBe(false);
+  });
+
+  it('archives a live question with a reason code, saying it leaves the readiness check and needs no second person', async () => {
+    const live = { status: 'LIVE', publishedVersion: 1, openRevision: null, open: null, current: revision({ state: 'PUBLISHED', publishedAt: '2026-09-28T12:00:00.000Z' }) };
+    detailBody = detail(live);
+    const region = await openQuestion();
+    fireEvent.click(within(region).getByRole('button', { name: 'Archive…' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Archive ops-q-followup' });
+    expect(within(dialog).getByText(/no second person approves it/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/leaves the readiness check and practice at once/)).toBeInTheDocument();
+    const confirm = within(dialog).getByRole('button', { name: 'Archive question' });
+    expect(confirm).toBeDisabled();
+    detailBody = detail({ ...live, status: 'ARCHIVED', publishedVersion: null, current: null });
+    fireEvent.change(within(dialog).getByLabelText(/Reason code/), { target: { value: 'CONTENT_INACCURATE' } });
+    fireEvent.click(confirm);
+    await waitFor(() => expect(posts()).toHaveLength(1));
+    expect(String(posts()[0]![0])).toContain(`/api/v1/operations/question-bank/questions/${questionId}/archive`);
+    expect(JSON.parse(String(posts()[0]![1].body))).toEqual({ reasonCode: 'CONTENT_INACCURATE' });
+    expect(await within(region).findByText('Archived: no student is served this question any more.')).toBeInTheDocument();
+    expect(within(region).getAllByText('Archived').length).toBeGreaterThan(0);
+    expect(within(region).queryByRole('button', { name: 'Archive…' })).not.toBeInTheDocument();
+  });
+
+  it('offers archiving only to Content Publish, and never while a revision is open', async () => {
+    policyResponse = () => ok(policy({ publish: false }));
+    detailBody = detail({ status: 'LIVE', publishedVersion: 1, openRevision: null, open: null, current: revision({ state: 'PUBLISHED' }) });
+    const region = await openQuestion();
+    expect(within(region).queryByRole('button', { name: 'Archive…' })).not.toBeInTheDocument();
+    cleanup();
+    policyResponse = () => ok(policy());
+    detailBody = detail({ status: 'LIVE', publishedVersion: 1 });
+    const withOpen = await openQuestion();
+    expect(within(withOpen).queryByRole('button', { name: 'Archive…' })).not.toBeInTheDocument();
   });
 
   it('shows a publisher-only reader the question with the answer key withheld, and NA where nothing is set', async () => {

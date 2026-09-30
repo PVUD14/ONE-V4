@@ -90,9 +90,10 @@ The engine's tables are those listed in Part D.1 of the program plan. Checked ag
   the planner and learning step (published strategies only), the faculty cohort.
 - **Code rollback:** safe; the mirror trigger only follows state changes of the three new entity
   types.
-- **Inert:** only `PUBLISHED` rows reach a student. A published row is immutable; the lifecycle
-  allows `PUBLISHED → ARCHIVED`, but **no route archives engine content** (gap 1) — until one exists,
-  archiving is a reviewed database step by Divakar.
+- **Inert:** only `PUBLISHED` rows reach a student. A published row is immutable. The lifecycle
+  allows `PUBLISHED → ARCHIVED`, but **no route archives engine content** (gap 1, still open for these
+  three types). Until one exists, archiving them is a reviewed database step by Divakar. Skills,
+  questions and lessons now have an Archive action (see 0090).
 - **Data:** kept; nothing is deleted.
 - **Forward fix:** a new revision through draft → review (a different person) → publish.
 - **Check:** `SELECT review_state, count(*) FROM teaching_strategies GROUP BY 1;`
@@ -170,7 +171,9 @@ The engine's tables are those listed in Part D.1 of the program plan. Checked ag
 - **Code rollback:** safe; the guards stay (a question's author still cannot publish it).
 - **Inert:** a question with no published ladder serves `NO_HINTS`; there is no ladder switch.
 - **Data:** kept; ladders of published revisions are immutable.
-- **Forward fix:** a new question version with a new ladder, published with approval.
+- **Forward fix:** a new question version with a new ladder, published with approval. To withdraw a
+  question outright: **Content Management → Question bank → Archive…** (0090). It leaves every pool at
+  once.
 - **Check:** `SELECT count(*) FROM question_hint_ladders;`
 
 ## 0062 — item calibrations (ENG-13)
@@ -211,7 +214,8 @@ The engine's tables are those listed in Part D.1 of the program plan. Checked ag
 - **Code rollback:** safe for reads; the guards stay.
 - **Inert:** unpublished variants never reach students.
 - **Data:** kept.
-- **Forward fix:** a new lesson version, published with approval.
+- **Forward fix:** a new lesson version, published with approval. To withdraw a lesson or a variant
+  outright: **Content Management → Lessons → Archive…** (0090).
 - **Check:** `SELECT count(*) FILTER (WHERE superseded_at IS NULL) FROM lesson_versions;`
 
 ## 0066 — external review assignments (OPS-10; not an engine table)
@@ -266,11 +270,43 @@ internal `CONTENT_REVIEW` and `CONTENT_PUBLISH` holders.
 - **Forward fix:** a new migration.
 - **Check:** `SELECT count(*) FROM learning_plan_overrides;`
 
+## 0090 — notice approval and content archive (fix/ops-runbook-gaps; engine-adjacent)
+
+- **Adds:**
+  - `incident_status_notices.approve_solo`, `status_notice_approver_count()` and the second-person
+    rule in `incident_status_notice_guard`;
+  - a redefinition of `protect_published_content_revision`: a published `TOPIC`, `QUESTION` or
+    `LESSON` revision may move to `ARCHIVED`, changing nothing else, once its `ARCHIVE` review action
+    is recorded;
+  - `content_revision_publication_ck` widened for `ARCHIVED` only, so an archived revision keeps
+    when and by which release it was published.
+- **Written by:** the Archive action of the three content editors, and notice approval.
+  **Read by:** every pool, unchanged. They already read `superseded_at IS NULL` (questions, lessons)
+  and `active` (skills).
+- **Code rollback:** safe. The previous release never archives. It lists an archived question or
+  lesson as not yet published, and an archived skill as retired. It still refuses a drafter's own
+  notice approval (the trigger stays) and cannot mark one SOLO, so in a one-person pilot, notices
+  wait for a second person until the code is forward again.
+- **Inert:** archiving is manual and per item. Nothing archives on its own.
+- **Data:** kept; nothing is deleted, and an archive cannot be undone. Republish the content as a new
+  item with a new key.
+- **Forward fix:** a new migration.
+- **Check:** `SELECT state, count(*) FROM content_revisions WHERE state = 'ARCHIVED' GROUP BY state;`
+  and `SELECT count(*) FILTER (WHERE approve_solo) FROM incident_status_notices;`
+
 ## Gaps
 
-1. **No route to archive published engine content** (misconception codes, teaching strategies,
-   option tags): the lifecycle allows `PUBLISHED → ARCHIVED`, but `transitionEngineContent` has no
-   caller in the API.
+1. **Partly closed (2026-09-30, migration 0090).** Published **skills, questions and lessons (and
+   variants)** now have an audited, reason-coded **Archive…** action in their Content Management editors
+   (`CONTENT_PUBLISH`, no dual control).
+   - Every published revision becomes `ARCHIVED` and keeps its publication record.
+   - The item stops being served at once: `superseded_at` for questions and lessons, `active` for skills.
+   - Nothing is deleted.
+   - Archiving is refused while something live depends on the item.
+
+   The design is in `docs/architecture/content-archive-design.md`. **Still open:** misconception codes,
+   teaching strategies and option tags. 0090 deliberately leaves their 0004 guard unchanged, and
+   `transitionEngineContent` still has no caller in the API.
 2. **No operator switch for the engine as a whole** other than consent-definition retirement, which
    needs a database session or a migration.
 3. **Code-rollback compatibility is by inspection only**: there is no CI job that runs the previous

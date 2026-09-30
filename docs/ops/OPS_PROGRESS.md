@@ -2502,6 +2502,21 @@ read from a real engine table or shows NA/<5; nothing is written and no model is
 **Android:** no change. The app's operations workspace is the view-only Overview (Appendix 1 §4.3: operators work on the
 web). It has no AI Operations or System Health screen, and no student-facing screen or API contract changed.
 
-**Validation:** see below.
+**Validation** (`E:/one-wt/logs/validate.sh E:/one-wt/ops13 one_ops13 ops13 android`, fresh database):
+- Setup and static checks all passed:
+  - install 0;
+  - `db:migrate` run twice: 83 applied, then 0 applied with 83 already applied;
+  - typecheck 0, build 0;
+  - policy grep 0 (optional chains, keys, conflict markers);
+  - `pnpm audit --prod --audit-level=high` 0;
+  - Android `:app:compileDebugKotlin` 0.
+- Tests: every test passed, but the test step exited 1.
+  - Passed: web 946/946 in 84 files, persistence 453/453, api 1330/1330, and every other package.
+  - Four api files failed only in `afterAll` (`DROP SCHEMA`) with "out of shared memory" on the shared Postgres:
+    employer-assessments, institution-roster-activation, institution-settings and skill-evidence. That is why the step
+    exited 1.
+  - Each re-run alone passed: 16/16, 13/13, 24/24 and 13/13.
+- The new tests passed: authorization engine-health 12/12, api operations-engine-health 11/11, web engineHealth 11/11. The
+  existing aiOperations and systemHealth web tests still pass: 22/22.
 
 **Next goal:** OPS-17 (full), or the ENG-12 sandbox panel once ENG-12 lands.

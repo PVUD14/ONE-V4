@@ -2111,3 +2111,109 @@ tests (d885aee), implementation (46f2f07), runbook (1e3de26), this report.
 
 **Android:** no change needed. The sender is server-side only; no API contract, screen or label changed, and the app
 never sends mail.
+
+## OPS-GAPS — Three operator gaps found by the pilot runbooks — 2026-09-30
+**Result:** Complete. Three gaps are closed:
+- the learner skill-state projector is on System Health, and can be given a silence alert;
+- a status notice now needs a second person, with OPS-02's solo safeguard for a one-person pilot;
+- published skills, questions and lessons (and variants) can be archived from their editors, and stop
+  being served at once.
+
+**Branch / PR:** fix/ops-runbook-gaps → feat/plan-phases-0-to-2, based on 09a8d9a. Pushed to onev4, not merged. The commits,
+in order:
+
+| Commit | What |
+| --- | --- |
+| d804c80 | Projector consumer and its test |
+| 862e303 | Design |
+| da6a6c0 | Notice tests |
+| 813b7ae | Notice fix and 0090 |
+| 48d20cd | Archive tests |
+| f14f3ca | Archive backend |
+| 8ad9903 | Web archive action |
+| fc2013b | Runbooks |
+
+This report is a separate commit.
+
+**Files created:**
+- docs/architecture/content-archive-design.md
+- packages/persistence/drizzle/0090_notice_approval_and_content_archive.sql
+- packages/authorization/src/content-archive.ts (+ .test.ts)
+- packages/persistence/src/content-archive.ts
+
+**Files modified:**
+- **Gap 1:** packages/persistence/src/jobs-health.ts (+ jobs-health.integration.test.ts), and .env.example (lists the known
+  consumers).
+- **Gap 2:**
+  - packages/authorization/src/incidents.ts (+ test)
+  - packages/persistence/src/status-notices.ts
+  - apps/api/src/http/operations-communications.controller.ts and operations-incidents.controller.ts (+ integration spec)
+  - apps/web/src/api/incidents.ts, rolePortal/communications.tsx and incidents.tsx (+ test)
+  - docs/architecture/incident-register-table-design.md
+- **Gap 3:**
+  - packages/persistence/src/skill-map.ts, question-bank.ts and lesson-editor.ts
+  - packages/events/src/index.ts: the revision-state enum gains `ARCHIVED`
+  - apps/api/src/http/operations-{skill-map,question-bank,lessons}.controller.ts (+ integration specs)
+  - apps/web/src/api/{skillMap,questionBank,lessons}.ts and rolePortal/{skillMap,questionBank,lessons}.tsx (+ tests)
+- **Runbooks:** docs/ops/runbook-pilot-incident.md, runbook-engine-migration-rollback.md.
+
+**Migrations added:** 0090_notice_approval_and_content_archive.sql. It is idempotent and references only tables up to 0085. It
+adds no approval key, so `operation_approval_extended_target_type()` is untouched.
+
+**Design docs / ADRs:**
+- content-archive-design.md (new)
+- incident-register-table-design.md, new section "Who approves a notice"
+
+**Validation:** see the amendment below.
+
+**Acceptance criteria:**
+- [x] **Gap 1:** `learner-skill-state-projector` is in `knownJobConsumers`, exactly like the others.
+  - It has a Consumers row, and `JOBS_ALERT_CONSUMER_SILENCE_MINUTES` accepts it.
+  - Test: jobs-health.integration.test.ts, "lists the learner skill state projector as a consumer and can alert on its
+    silence". The alert is raised, then cleared.
+- [x] **Gap 2:** the drafter's own approval is refused while anyone else holds `COMMS_TEMPLATES`, with 403
+  `STATUS_NOTICE_SELF_APPROVAL_REFUSED`.
+  - The sole holder may approve after 15 minutes. Before then the answer is 403 `STATUS_NOTICE_SOLO_COOLING_OFF`. The
+    approval is marked SOLO in `approve_solo`, in the audit `mode`, in the API `approveMode` and on the screens.
+  - This reuses OPS-02's requester-is-not-approver rule and its solo safeguard.
+  - The 0090 trigger repeats the rule for other writers.
+  - Tests: operations-incidents.integration.spec.ts, "notice approval by a second person (0090)", covering the refusal, the
+    trigger and the solo path. Plus unit and web tests.
+  - The OPS-16 design doc and the incident runbook are updated.
+- [x] **Gap 3:** `POST …/{skills,questions,lessons}/:id/archive` needs `CONTENT_PUBLISH` and a reason from
+  `contentArchiveReasons`. There is no dual control.
+  - **What is recorded:** an `ARCHIVE` review action per revision, an audit row, and the revision-state event.
+  - **What is withdrawn:** every published revision becomes `ARCHIVED` and keeps `published_at` and its manifest. A question
+    or lesson has its current version superseded. A skill is switched off.
+  - **Nothing is deleted.** The action is refused while something live depends on the item.
+  - **Test that an archived question is no longer served:** a readiness-check seed that drew the question before archiving
+    no longer draws it after. The attempt that already held it keeps it.
+  - **Web:** an Archive… action in the three existing editors. No navigation changes (HG-3); the navigation-labels tests
+    still pass.
+
+**Decisions for Divakar:**
+- **No second person for archiving.** It is a removal and must be quick in an incident. It is recorded instead.
+- **Refuse rather than cascade.** Archiving is refused when live content depends on the item, instead of archiving the
+  dependents too.
+- **Archived is final.** A replacement is new content with a new key.
+- **No extra email for a solo notice approval.** The notice itself is the email. The SOLO mark is on the record.
+- **0090 widens `content_revision_publication_ck`, for `ARCHIVED` only.** An archived revision keeps its publication
+  provenance. The trigger allows that only from a real publication. The reasoning is in content-archive-design.md.
+
+**Limitations / not done:**
+- Engine content (misconception codes, teaching strategies, option tags) still has no archive route. The rollback runbook's
+  gap 1 is marked partly closed.
+- Hints stay available on an item a student already has in a step. Only new draws exclude it.
+
+**Risks / follow-ups:**
+- 0090 redefines `incident_status_notice_guard` and `protect_published_content_revision` in full. A parallel branch that
+  redefines either must be merged with this one.
+- Archiving the last few questions of a skill can take the readiness check below its selection count. The check then
+  refuses to start. The dialog warns about this.
+
+**Android:** no change needed.
+- The operator screens (Content Management, Settings) are web-only (§4.3).
+- An archived question or lesson disappears from the learner endpoints the phone already reads.
+- The phone's display of status notices is unchanged.
+
+**Next goal:** none (targeted fix).

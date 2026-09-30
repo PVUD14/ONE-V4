@@ -182,6 +182,7 @@ The trigger makes the content immutable and, on `PUBLISHED`, checks that the app
 | `state` | `DRAFT` → `QUEUED` → `SENT`; `DRAFT` → `WITHDRAWN`. |
 | `drafted_by_user_id`, `drafted_at`, `draft_reason_code` | |
 | `approved_by_user_id`, `approved_at`, `approve_reason_code` | The person who approved it for sending (`DRAFT` → `QUEUED`). |
+| `approve_solo` | boolean, default false (0090). True only when the drafter approved their own notice under the solo-operator safeguard (see "Who approves a notice"). |
 | `sent_at`, `recipient_count`, `organization_count` | Stamped by the worker. |
 | `withdrawn_at`, `withdrawn_by_user_id`, `withdraw_reason_code` | |
 
@@ -213,7 +214,44 @@ constraint allows and add it).
 | Register, timeline, affected organisations, Board / users notified records | `INCIDENT_MANAGE` (baseline SECURITY_ADMIN; super admin) |
 | Draft a template version, request its publication, publish after approval, withdraw a draft | `COMMS_TEMPLATES` (baseline OPERATIONS_ADMIN; super admin) |
 | Approve publication | `APPROVE_HIGH_RISK` (OPS-02; the solo safeguard applies) |
-| Draft, approve for sending, withdraw a notice | `COMMS_TEMPLATES` |
+| Draft, withdraw a notice | `COMMS_TEMPLATES` |
+| Approve a notice for sending | `COMMS_TEMPLATES`, and a different person from its drafter (0090; the solo safeguard applies) |
+
+### Who approves a notice (amended 2026-09-30, migration 0090)
+
+The first version of this design said "a notice is a draft until a person approves it", and any holder of
+`COMMS_TEMPLATES` could approve, **including the person who drafted it**. The ENG-17 incident runbook confirmed it: the
+drafter's own approval returned 201. A notice goes to the administrators of real colleges and employers, in ONE's name,
+during an incident. Choosing the approved wording and the moment to send it is exactly the decision a second person
+should check. So the approver must now be a different person from the drafter.
+
+This reuses the OPS-02 rule rather than inventing a new one: **the approver is never the requester, except for the
+solo-operator safeguard.** A one-person pilot must still be able to tell a college about an incident. So the drafter may
+approve their own notice only when both of these hold:
+
+- they are the **only** person who can approve notices: exactly one ACTIVE user holds `COMMS_TEMPLATES` on an ACTIVE
+  platform membership (the super admin and operations admin baselines, or a live grant to a security admin). This is
+  `status_notice_approver_count()`, the notice counterpart of 0038's `operation_approval_approver_count()`;
+- at least **15 minutes** have passed since the notice was drafted, on the database clock (OPS-02's cooling-off,
+  `soloCoolingOffMinutes`).
+
+Such an approval is **marked SOLO**. `incident_status_notices.approve_solo` is true, and the audit row and the screens
+both say "solo". The safeguard switches itself off as soon as a second person can
+approve. A drafter's own approval with anyone else able to approve is refused with 403
+`STATUS_NOTICE_SELF_APPROVAL_REFUSED`. A solo approval inside the cooling-off is refused with 403
+`STATUS_NOTICE_SOLO_COOLING_OFF`.
+
+The API applies the rule (`decideStatusNoticeApprover`, packages/authorization) under the incident's lock. The 0090
+version of `incident_status_notice_guard` repeats it for any other writer, and a CHECK keeps `approve_solo` true only
+when the approver is the drafter.
+
+**Rejected: an OPS-02 approval request per notice** (a new extended key, request → approve → execute). It would move
+notice approval to `APPROVE_HIGH_RISK` holders and add a third round-trip to every notice in an incident. The existing
+one-step approval, with the requester-is-not-approver rule and the solo safeguard, gives the same guarantee.
+**Rejected: no solo path.** A pilot with one operator could then never send a status notice.
+**Not done: a separate solo email.** OPS-02 emails platform staff when a high-risk approval is self-approved. For a
+notice, the notice itself is the email. The SOLO mark is on the notice, in the audit row and on the incident's notice list,
+which the security lead reviews.
 
 Every write carries a reason code from the lists in code and writes its timeline row (where it concerns
 an incident), its audit row and — where another system may care — its outbox event in one transaction.
@@ -255,3 +293,6 @@ Outbox events: `incident.declared`, `incident.state_changed`, `status_notice_tem
 2. **Email preference.** Status notices honour an admin's "email off" preference, like announcements.
    If security notices should override it, that is a one-line change and a design note.
 3. **Rate limit** 15 minutes / 6 per day per incident.
+4. **Solo notice approval** (0090): the drafter may approve their own notice only while they are the sole `COMMS_TEMPLATES`
+   holder, after 15 minutes, marked SOLO. Recommended and adopted, as for OPS-02. Once a second operator exists it no longer
+   applies.

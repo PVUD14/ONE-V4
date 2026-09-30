@@ -12,6 +12,7 @@
  * and switching a feature on also needs a passing evaluation for its current model and prompt. The
  * assistant's server switch (ASSISTANT_ENABLED) is shown, never changed here. The server decides
  * every rule; this screen shows what it says. Within the AI hold: nothing here calls a model.
+ * OPS-13 adds the learning engine panels (planner decisions, mastery shadow) from engineHealth.tsx.
  */
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -42,6 +43,7 @@ import { V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { StatusBadge } from '../studentComponents.js';
 import { formatApiError } from './shared.js';
 import { RequestApprovalDialog } from './approvals.js';
+import { EngineBehaviourPanels } from './engineHealth.js';
 
 const noteLimit = 500;
 const number = (value: number | null | undefined): string => (value === null || value === undefined ? 'NA' : value.toLocaleString());
@@ -207,6 +209,8 @@ export function OperationsAiOperationsPage(): React.ReactElement | null {
     </section>
 
     <AiEvaluationsPanel token={token} canRecord={viewer.canConfigure && features.length > 0} reload={reload} onRecord={() => setDialog({ kind: 'evaluation' })} />
+
+    <EngineBehaviourPanels token={token} />
 
     {dialog && policy ? <AiDialogs token={token} dialog={dialog} policy={policy} features={features} onCancel={() => setDialog(null)} onDone={done} onLimitsRaise={(feature, next) => setDialog({ kind: 'limits-raise', feature, next })} /> : null}
   </section>;

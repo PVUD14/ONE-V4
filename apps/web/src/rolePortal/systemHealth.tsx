@@ -6,7 +6,8 @@
  * activity, the automation workflow registry and command states, breach alerts, the
  * failed-event list with inspect and audited replay, and backlog supersede through the
  * OPS-02 approval flow. The Career Readiness governance panel this label showed before
- * is kept below it.
+ * is kept below it. OPS-13 adds the learning engine's calibration job and code sandbox panels
+ * (engineHealth.tsx) above it.
  *
  * Every number comes from one server-side summary computed in bounded SQL. A source
  * that has no data renders NA in its slot. No event payload, failure text or internal
@@ -20,6 +21,7 @@ import { V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { OperationsCareerReadinessPanel } from '../operationsCareerReadinessPanel.js';
 import { StatusBadge } from '../studentComponents.js';
 import { RequestApprovalDialog } from './approvals.js';
+import { EngineJobsPanels } from './engineHealth.js';
 import { formatApiError, RestrictedApiState } from './shared.js';
 
 const NA = 'NA';
@@ -284,6 +286,8 @@ export function OperationsSystemHealthPage(): React.ReactElement {
       {preview ? <p role="status">{formatCapped(preview.pending)} waiting event{preview.pending.value === 1 && !preview.pending.capped ? '' : 's'} occurred before {when(preview.olderThan)}. At most {preview.limit.toLocaleString()} are retired per approval.</p> : null}
       {preview && preview.pending.value > 0 ? <button type="button" onClick={() => setSuperseding(true)}>Request supersede…</button> : null}
     </section>
+
+    <EngineJobsPanels token={token} />
 
     <OperationsCareerReadinessPanel />
 

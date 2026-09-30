@@ -72,14 +72,20 @@ async function accountSections(one: Query, subject: Subject): Promise<Record<str
 }
 
 async function recordSections(one: Query, subject: Subject): Promise<Record<string, unknown>> {
-  const [targets, gaps, goals, outcomes, external, qualifications, terms, subjects, links, photos] = await Promise.all([
+  const [targets, gaps, gapItems, goals, outcomes, external, qualifications, terms, subjects, links, photos] = await Promise.all([
     one(sql`SELECT r.title, t.priority, t.selected_at, t.cleared_at
             FROM student_career_targets t JOIN career_roles r ON r.id = t.career_role_id
             WHERE t.student_user_id = ${subject} ORDER BY t.selected_at, t.id`),
     // Counts of the role's requirements met, unknown and in total: what the gap view shows, not a score.
-    one(sql`SELECT r.title, g.requirements_total, g.requirements_met, g.requirements_unknown, g.computed_at, g.superseded_at
+    one(sql`SELECT g.id, r.title, g.requirements_total, g.requirements_met, g.requirements_unknown, g.computed_at, g.superseded_at
             FROM career_gap_snapshots g JOIN career_roles r ON r.id = g.career_role_id
             WHERE g.student_user_id = ${subject} ORDER BY g.computed_at, g.id`),
+    // Each requirement's level and status as the gap view shows it; not the mastery values it compared.
+    one(sql`SELECT i.snapshot_id, tn.name AS topic_name, i.requirement_level, i.status, i.priority_rank
+            FROM career_gap_items i
+            JOIN career_gap_snapshots g ON g.id = i.snapshot_id
+            JOIN taxonomy_nodes tn ON tn.id = i.topic_id
+            WHERE g.student_user_id = ${subject} ORDER BY i.priority_rank, i.id`),
     one(sql`SELECT g.goal_type, r.title AS role_title, tn.name AS topic_name, cg.title AS catalogue_goal, g.priority, g.status, g.origin,
                    g.discovery_interests, g.discovery_strengths, g.discovery_branch, org.legal_name AS institution_name, g.created_at, g.ended_at
             FROM learner_goals g
@@ -121,6 +127,9 @@ async function recordSections(one: Query, subject: Subject): Promise<Record<stri
     careerGaps: gaps.map((row) => ({
       roleTitle: row.title, requirementsTotal: num(row.requirements_total), requirementsMet: num(row.requirements_met),
       requirementsUnknown: num(row.requirements_unknown), computedAt: row.computed_at, supersededAt: row.superseded_at ?? null,
+      requirements: gapItems.filter((item) => item.snapshot_id === row.id).map((item) => ({
+        topicName: item.topic_name, level: item.requirement_level, status: item.status, priorityRank: num(item.priority_rank),
+      })),
     })),
     goals: goals.map((row) => ({
       goalType: row.goal_type, roleTitle: row.role_title ?? null, topicName: row.topic_name ?? null, catalogueGoal: row.catalogue_goal ?? null,

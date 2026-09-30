@@ -229,6 +229,9 @@ async function erase(deps: DeletionExecutionDeps, subjectUserId: string): Promis
   // chose (0011) are only about them. Both were left behind until 2026-09-30.
   counts.STUDENT_PROFILE += await countOf(sql`WITH gone AS (DELETE FROM external_applications WHERE student_user_id = ${subjectUserId}::uuid RETURNING 1)
     SELECT count(*)::int AS count FROM gone`);
+  counts.STUDENT_PROFILE += await countOf(sql`WITH gone AS (DELETE FROM career_gap_items WHERE snapshot_id IN (
+      SELECT id FROM career_gap_snapshots WHERE student_user_id = ${subjectUserId}::uuid) RETURNING 1)
+    SELECT count(*)::int AS count FROM gone`);
   counts.STUDENT_PROFILE += await countOf(sql`WITH gone AS (DELETE FROM career_gap_snapshots WHERE student_user_id = ${subjectUserId}::uuid RETURNING 1)
     SELECT count(*)::int AS count FROM gone`);
   // Goals and "Not sure yet" survey answers (ENG-19, 0068) are about the person: erased with the profile.

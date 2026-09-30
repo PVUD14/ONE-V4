@@ -29,6 +29,7 @@ import {
   transitionOrganizationVerification,
 } from '../api.js';
 import type { ApprovalPolicyDto, HighRiskActionKey, OperationApprovalDto, OperationApprovalQueueDto } from '../api.js';
+import { purgeInstitutionOffboarding } from '../api/institutionContract.js';
 import { V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { StatusBadge } from '../studentComponents.js';
 import { formatApiError } from './shared.js';
@@ -62,6 +63,8 @@ export function describeApproval(approval: OperationApprovalDto): string {
       return `Publish revision ${summary.lessonRevision ?? 'NA'} of the lesson ${summary.lessonKey ?? 'NA'} (${summary.lessonVariant ?? 'NA'})`;
     case 'COMMS_TEMPLATE_PUBLISH':
       return `Publish version ${summary.commsTemplateVersion ?? 'NA'} of the status notice template ${summary.commsTemplateKey ?? 'NA'}`;
+    case 'INSTITUTION_DATA_PURGE':
+      return `Delete the records of ${summary.organizationName ?? 'NA'}, which has left ONE`;
   }
 }
 
@@ -96,6 +99,8 @@ async function executeApproval(token: string, approval: OperationApprovalDto): P
       await publishEditorLessonRevision(token, String(payload.revisionId), { reasonCode, approvalId }); return;
     case 'COMMS_TEMPLATE_PUBLISH':
       await publishStatusNoticeTemplate(token, String(payload.templateId), { reasonCode, approvalId }); return;
+    case 'INSTITUTION_DATA_PURGE':
+      await purgeInstitutionOffboarding(token, String(payload.offboardingId), { reasonCode, approvalId }); return;
   }
 }
 

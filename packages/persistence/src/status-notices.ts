@@ -6,7 +6,8 @@
  * A template version is drafted, put to an approver through OPS-02 dual control
  * (COMMS_TEMPLATE_PUBLISH) by its author, and published by that author with the executed approval,
  * which copies it into notification_templates with the approver as `approved_by_user_id`. A notice
- * is a DRAFT until a person approves it for sending; approving it writes an outbox event, and the
+ * is a DRAFT until a person other than its drafter approves it for sending (or, when no one else
+ * can, its drafter after OPS-02's cooling-off, marked SOLO: 0090); approving it writes an outbox event, and the
  * ADR-028 local dispatcher hands that event to `dispatchIncidentStatusNotice`, which resolves the
  * administrators at send time, writes each in-app notification and delivery row in one statement,
  * and marks the notice SENT. Email leaves after that commit through the configured mail sink
@@ -18,9 +19,11 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import {
+  decideStatusNoticeApprover,
   refuseStatusNoticeApproval,
   statusNoticeAudienceRoles,
   statusNoticeMinimumSpacingMinutes,
+  statusNoticeSoloCoolingOffMinutes,
   statusNoticeStableKey,
   type IncidentState,
 } from '@planthepath/authorization/src/index.js';
@@ -230,9 +233,15 @@ export interface StatusNoticeRow {
   readonly template: { readonly id: string; readonly templateKey: string; readonly version: number; readonly subject: string; readonly body: string };
   readonly state: 'DRAFT' | 'QUEUED' | 'SENT' | 'WITHDRAWN';
   readonly draftedBy: string;
+  /** Internal: lets the API say whether the viewer drafted it. Never sent to a browser. */
+  readonly draftedByUserId: string;
   readonly draftedAt: string;
+  /** When the drafter could approve it themselves, if they are the sole approver (0090's cooling-off). */
+  readonly soloApprovalAvailableAt: string;
   readonly approvedBy: string | null;
   readonly approvedAt: string | null;
+  /** SOLO when the drafter approved it under the solo-operator safeguard (0090). */
+  readonly approveMode: 'DUAL' | 'SOLO' | null;
   readonly sentAt: string | null;
   readonly recipientCount: number | null;
   readonly organizationCount: number | null;
@@ -242,14 +251,17 @@ export interface StatusNoticeRow {
 
 interface NoticeDbRow {
   id: string; incident_id: string; incident_title: string; incident_state: IncidentState; template_row_id: string; template_key: string; version: number;
-  subject: string; body: string; state: StatusNoticeRow['state']; drafter_email: string; drafted_at: string; approver_email: string | null;
+  subject: string; body: string; state: StatusNoticeRow['state']; drafter_email: string; drafted_by_user_id: string; drafted_at: string;
+  solo_available_at: string; approver_email: string | null; approve_solo: boolean;
   approved_at: string | null; sent_at: string | null; recipient_count: number | null; organization_count: number | null; withdrawn_at: string | null;
   email_sent: number; email_pending: number; email_not_configured: number; email_failed: number; email_bounced: number; email_skipped: number;
 }
 
 const noticeSelect = sql`
   SELECT n.id, n.incident_id, i.title AS incident_title, i.state AS incident_state, t.id AS template_row_id, t.template_key, t.version, t.subject, t.body,
-         n.state, du.email AS drafter_email, ${ts('n.drafted_at')} AS drafted_at, au.email AS approver_email, ${ts('n.approved_at')} AS approved_at,
+         n.state, du.email AS drafter_email, n.drafted_by_user_id, ${ts('n.drafted_at')} AS drafted_at,
+         ${ts(`(n.drafted_at + interval '${statusNoticeSoloCoolingOffMinutes} minutes')`)} AS solo_available_at,
+         au.email AS approver_email, n.approve_solo, ${ts('n.approved_at')} AS approved_at,
          ${ts('n.sent_at')} AS sent_at, n.recipient_count, n.organization_count, ${ts('n.withdrawn_at')} AS withdrawn_at,
          COALESCE(r.sent, 0) AS email_sent, COALESCE(r.pending, 0) AS email_pending, COALESCE(r.not_configured, 0) AS email_not_configured,
          COALESCE(r.failed, 0) AS email_failed, COALESCE(r.bounced, 0) AS email_bounced, COALESCE(r.skipped, 0) AS email_skipped
@@ -273,7 +285,9 @@ function mapNotice(row: NoticeDbRow): StatusNoticeRow {
     id: row.id,
     incident: { id: row.incident_id, reference: incidentReference(row.incident_id), title: row.incident_title, state: row.incident_state },
     template: { id: row.template_row_id, templateKey: row.template_key, version: Number(row.version), subject: row.subject, body: row.body },
-    state: row.state, draftedBy: row.drafter_email, draftedAt: row.drafted_at, approvedBy: row.approver_email, approvedAt: row.approved_at,
+    state: row.state, draftedBy: row.drafter_email, draftedByUserId: row.drafted_by_user_id, draftedAt: row.drafted_at,
+    soloApprovalAvailableAt: row.solo_available_at, approvedBy: row.approver_email, approvedAt: row.approved_at,
+    approveMode: row.approved_at === null ? null : row.approve_solo ? 'SOLO' : 'DUAL',
     sentAt: row.sent_at, recipientCount: row.recipient_count === null ? null : Number(row.recipient_count),
     organizationCount: row.organization_count === null ? null : Number(row.organization_count),
     email: {
@@ -301,6 +315,12 @@ export async function listStatusNotices(runner: SqlRunner, input: {
   const page = result.slice(0, input.limit).map(mapNotice);
   const last = page[page.length - 1];
   return { notices: page, nextCursor: result.length > input.limit && last ? { draftedAt: last.draftedAt, id: last.id } : null };
+}
+
+/** How many people can approve a notice right now (0090's function, one definition). */
+export async function countStatusNoticeApprovers(runner: SqlRunner): Promise<number> {
+  const [row] = await rows<{ count: number }>(runner, sql`SELECT status_notice_approver_count() AS count`);
+  return Number(row?.count ?? 0);
 }
 
 export async function loadStatusNotice(runner: SqlRunner, noticeId: string): Promise<StatusNoticeRow | null> {
@@ -338,8 +358,9 @@ export async function draftStatusNotice(db: TransactionalRunner, input: {
 }
 
 /**
- * A person approves a drafted notice for sending. Under the incident's lock the rate limit and the
- * audience are checked on the database clock (the 0081 trigger checks them again); the notice
+ * A person approves a drafted notice for sending. Under the incident's lock the rate limit, the
+ * audience and the approver (not the drafter, except the solo safeguard) are checked on the
+ * database clock (the 0081/0090 trigger checks them again); the notice
  * becomes QUEUED and the dispatch event is written in the same transaction.
  */
 export async function approveStatusNotice(db: TransactionalRunner, input: {
@@ -353,7 +374,12 @@ export async function approveStatusNotice(db: TransactionalRunner, input: {
     // Serialise approvals for one incident (the 0081 trigger takes the same lock), then read the
     // notice under its own lock and count on the database clock.
     const [incident] = await rows<{ state: IncidentState }>(tx, sql`SELECT state FROM incidents WHERE id = ${notice.incident_id}::uuid FOR UPDATE`);
-    const [locked] = await rows<{ state: string }>(tx, sql`SELECT state FROM incident_status_notices WHERE id = ${input.noticeId}::uuid FOR UPDATE`);
+    const [locked] = await rows<{ state: string; drafted_by_user_id: string; cooling_off_elapsed: boolean; approver_count: number }>(tx, sql`
+      SELECT state, drafted_by_user_id,
+             now() >= drafted_at + make_interval(mins => ${statusNoticeSoloCoolingOffMinutes}::int) AS cooling_off_elapsed,
+             status_notice_approver_count() AS approver_count
+      FROM incident_status_notices WHERE id = ${input.noticeId}::uuid FOR UPDATE
+    `);
     const [facts] = await rows<{ live_orgs: number; recent: number; daily: number }>(tx, sql`
       SELECT (SELECT count(*)::int FROM incident_affected_organizations WHERE incident_id = ${notice.incident_id}::uuid AND removed_at IS NULL) AS live_orgs,
              (SELECT count(*)::int FROM incident_status_notices WHERE incident_id = ${notice.incident_id}::uuid AND id <> ${input.noticeId}::uuid
@@ -366,14 +392,22 @@ export async function approveStatusNotice(db: TransactionalRunner, input: {
       approvedInSpacingWindow: Number(facts!.recent), approvedInLastDay: Number(facts!.daily),
     });
     if (refusal) throw new StatusNoticeError(refusal);
+    // 0090: a second person approves, or the sole approver after the cooling-off (marked SOLO).
+    const approver = decideStatusNoticeApprover({
+      actorUserId: input.actorUserId, draftedByUserId: locked!.drafted_by_user_id,
+      approverCount: Number(locked!.approver_count), coolingOffElapsed: Boolean(locked!.cooling_off_elapsed),
+    });
+    if ('refusal' in approver) throw new StatusNoticeError(approver.refusal);
     await tx.execute(sql`
-      UPDATE incident_status_notices SET state = 'QUEUED', approved_by_user_id = ${input.actorUserId}::uuid, approve_reason_code = ${input.reasonCode}
+      UPDATE incident_status_notices SET state = 'QUEUED', approved_by_user_id = ${input.actorUserId}::uuid, approve_reason_code = ${input.reasonCode},
+             approve_solo = ${approver.solo}
       WHERE id = ${input.noticeId}::uuid AND state = 'DRAFT'
     `);
     await writeIncidentEvent(tx, { incidentId: notice.incident_id, kind: 'NOTICE_QUEUED', noticeId: input.noticeId, reasonCode: input.reasonCode, actorUserId: input.actorUserId, correlationId: input.correlationId });
     await writeIncidentAudit(tx, {
       actorUserId: input.actorUserId, action: 'operations.status_notice.approved', resourceType: 'incident_status_notice', resourceId: input.noticeId,
-      correlationId: input.correlationId, context: { reasonCode: input.reasonCode, incidentId: notice.incident_id },
+      correlationId: input.correlationId,
+      context: { reasonCode: input.reasonCode, incidentId: notice.incident_id, draftedByUserId: locked!.drafted_by_user_id, mode: approver.solo ? 'SOLO' : 'DUAL' },
     });
     const eventId = randomUUID();
     const payload = { noticeId: input.noticeId, incidentId: notice.incident_id };

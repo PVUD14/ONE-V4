@@ -5,8 +5,9 @@
  *  - Templates: draft a new version of a status-notice template; ask a second person to approve it
  *    (Settings → Approvals, OPS-02 dual control, the solo safeguard when only one approver exists);
  *    publish it once approved.
- *  - Notices: draft a notice for an incident from a published version, approve it for sending, or
- *    withdraw it. There is no free text: a notice is only ever an approved template version. It
+ *  - Notices: draft a notice for an incident from a published version, have a person other than its
+ *    drafter approve it for sending (the sole approver may approve their own after the cooling-off,
+ *    marked Solo), or withdraw it. There is no free text: a notice is only ever an approved template version. It
  *    reaches the administrators of the incident's affected organisations — never students — and
  *    email is shown as not sent while no mail service is configured.
  * The server decides every rule, including the rate limit; this screen shows what it says.
@@ -173,12 +174,16 @@ export function OperationsCommunicationsPage(): React.ReactElement | null {
           <td><strong>{item.incident.reference}</strong><br /><small>{item.incident.title}</small></td>
           <td>{item.template.subject}<br /><small>{item.template.templateKey} v{item.template.version}</small></td>
           <td><StatusBadge label={label(item.state)} tone={item.state === 'SENT' ? 'success' : item.state === 'WITHDRAWN' ? 'neutral' : 'warning'} /></td>
-          <td>{item.approvedAt ? `${when(item.approvedAt)} by ${item.approvedBy ?? 'NA'}` : 'NA'}</td>
+          <td>{item.approvedAt ? `${when(item.approvedAt)} by ${item.approvedBy ?? 'NA'}${item.approveMode === 'SOLO' ? ' (solo)' : ''}` : 'NA'}</td>
           <td>{when(item.sentAt)}</td>
           <td>{item.recipientCount === null ? 'NA' : `${item.recipientCount} admins in ${item.organizationCount ?? 0} organisations`}</td>
           <td>{item.state === 'SENT' ? emailSummary(item.email) : 'NA'}</td>
           <td>{item.state === 'DRAFT' ? <>
-            <button type="button" className="secondary" onClick={() => setAction({ kind: 'approveNotice', notice: item })}>Approve for sending…</button>
+            {!item.draftedBySelf
+              ? <button type="button" className="secondary" onClick={() => setAction({ kind: 'approveNotice', notice: item })}>Approve for sending…</button>
+              : policy.noticeSoloSafeguardActive
+                ? <button type="button" className="secondary" onClick={() => setAction({ kind: 'approveNotice', notice: item })}>Approve for sending (solo)…</button>
+                : <small>You drafted this notice, so another person approves it.</small>}
             <button type="button" className="secondary" onClick={() => setAction({ kind: 'withdrawNotice', notice: item })}>Withdraw…</button>
           </> : null}</td>
         </tr>)}</tbody></table></div> : <V2EmptyState icon="📤" title="No notices yet" note="Draft a notice for an open incident below." />}
@@ -238,7 +243,9 @@ function CommunicationsActionDialog({ token, policy, action, onCancel, onDone }:
     : action.kind === 'publish'
       ? `Approved by a second person; publishing uses that approval once.`
       : action.kind === 'approveNotice'
-        ? `This is the approval: the notice is sent by the background worker to the administrators of ${action.notice.incident.reference}'s affected organisations, from the approved wording only.`
+        ? `This is the approval: the notice is sent by the background worker to the administrators of ${action.notice.incident.reference}'s affected organisations, from the approved wording only.${action.notice.draftedBySelf
+          ? ` You drafted it and are the only person who can approve notices, so the solo safeguard applies: it can be approved from ${when(action.notice.soloApprovalAvailableAt)} (${policy.soloCoolingOffMinutes ?? 15}-minute cooling-off) and is marked Solo.`
+          : ''}`
         : 'Not required. Recorded with your reason.';
 
   const submit = async (event: React.FormEvent): Promise<void> => {
@@ -266,7 +273,11 @@ function CommunicationsActionDialog({ token, policy, action, onCancel, onDone }:
     } catch (cause) {
       setError(cause instanceof ApiRequestError && cause.status === 429
         ? `Rate limit: a notice for this incident was approved in the last ${policy.rateLimit.minimumSpacingMinutes} minutes, or ${policy.rateLimit.dailyLimit} in the last day. Reference: ${cause.correlationId}`
-        : formatApiError(cause, 'The change could not be saved.'));
+        : cause instanceof ApiRequestError && cause.code === 'STATUS_NOTICE_SELF_APPROVAL_REFUSED'
+          ? `You drafted this notice and someone else can approve it, so they must. Reference: ${cause.correlationId}`
+          : cause instanceof ApiRequestError && cause.code === 'STATUS_NOTICE_SOLO_COOLING_OFF'
+            ? `The solo cooling-off has not passed: you can approve your own notice from ${when(action.kind === 'approveNotice' ? action.notice.soloApprovalAvailableAt : null)}. Reference: ${cause.correlationId}`
+            : formatApiError(cause, 'The change could not be saved.'));
       setBusy(false);
     }
   };

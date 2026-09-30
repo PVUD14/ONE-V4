@@ -2,8 +2,8 @@
  * ONE · Role portal — Institution — Settings, academic calendar and staff profile (INST-05)
  *
  * The screens behind existing navigation labels that were empty (defect I-6): the admin's
- * Settings (college profile, grading scales, calendar, and honest "Not built yet" sections
- * for placement policies and data-processing terms), the department head's Settings (their
+ * Settings (college profile, grading scales, calendar, placement policies, and — INST-18 — the
+ * data-processing terms and leaving ONE), the department head's Settings (their
  * own profile and notification preferences, and the college settings read-only), the
  * faculty member's Profile and Settings, and the academic calendar above the meetings on the
  * faculty Calendar. No navigation item is added, removed or renamed.
@@ -29,12 +29,13 @@ import {
   updateStaffNotificationPreferences,
 } from '../api.js';
 import type { AcademicTermDto, AcademicTermKind, AcademicTermListDto, InstitutionResultScale, InstitutionSettingsDto, NotificationPreferencesDto, StaffProfileDto } from '../api.js';
-import { V2EmptyState, V2Stat } from '../dashboardsV2.js';
+import { V2Stat } from '../dashboardsV2.js';
 import { StaffPilotWrap } from '../parityWraps.js';
 import { InstitutionWorkspaceError, RestrictedApiState, formatApiError, isInstitutionStaffWorkspace } from './shared.js';
 import type { AuthenticatedWorkspaceSummary } from './shared.js';
 import { PlacementPoliciesSection } from './institutionCampusDrives.js';
 import { DriveCategoriesSection } from './institutionPlacementRegister.js';
+import { InstitutionDataTermsSection, InstitutionExitSection } from './institutionContract.js';
 
 const notProvided = 'Not provided';
 
@@ -118,9 +119,9 @@ export function InstitutionSettingsPage({ authenticatedWorkspace, personal = fal
       <PlacementPoliciesSection key={'policies:' + institutionId} institutionId={institutionId} />
       {/* INST-12: the college's own drive categories (Dream, Core, Mass…), set here and given to drives. */}
       <DriveCategoriesSection key={'categories:' + institutionId} institutionId={institutionId} />
-      <div className="role-wide" aria-label="Data-processing terms"><V2EmptyState icon="📄" title="Data-processing terms — not built yet"
-        note="Versioned data-processing terms, the college data export and exit are not built yet. Nothing has been accepted on your college's behalf."
-        hint="Contact AI8HT operations about your agreement in the meantime." /></div>
+      {/* INST-18: the college's data-processing terms, and leaving ONE with its exit export. */}
+      <InstitutionDataTermsSection key={'terms:' + institutionId} token={token} institutionId={institutionId} />
+      <InstitutionExitSection key={'exit:' + institutionId} token={token} institutionId={institutionId} />
     </> : null}
   </StaffPilotWrap>;
 }

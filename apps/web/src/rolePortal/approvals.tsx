@@ -31,6 +31,7 @@ import {
   transitionOrganizationVerification,
 } from '../api.js';
 import type { ApprovalPolicyDto, HighRiskActionKey, OperationApprovalDto, OperationApprovalQueueDto } from '../api.js';
+import { purgeInstitutionOffboarding } from '../api/institutionContract.js';
 import { V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { StatusBadge } from '../studentComponents.js';
 import { formatApiError } from './shared.js';
@@ -68,6 +69,8 @@ export function describeApproval(approval: OperationApprovalDto): string {
       return `Switch on the AI feature ${summary.aiFeatureKey ?? 'NA'} (model ${summary.aiModel ?? 'NA'}, prompt ${summary.aiPromptKey ?? 'NA'} v${summary.aiPromptVersion ?? 'NA'})`;
     case 'AI_FEATURE_LIMITS_RAISE':
       return `Raise the limits of the AI feature ${summary.aiFeatureKey ?? 'NA'} to ${summary.aiCap ?? 'NA'} per ${summary.aiCapWindow === 'MONTH' ? 'month' : 'day'}, input up to ${summary.aiMaxInputChars ?? 'NA'} characters`;
+    case 'INSTITUTION_DATA_PURGE':
+      return `Delete the records of ${summary.organizationName ?? 'NA'}, which has left ONE`;
   }
 }
 
@@ -108,6 +111,8 @@ async function executeApproval(token: string, approval: OperationApprovalDto): P
       await changeAiFeatureLimits(token, String(payload.featureKey), {
         cap: Number(payload.cap), capWindow: payload.capWindow === 'MONTH' ? 'MONTH' : 'DAY', maxInputChars: Number(payload.maxInputChars), reasonCode, approvalId,
       }); return;
+    case 'INSTITUTION_DATA_PURGE':
+      await purgeInstitutionOffboarding(token, String(payload.offboardingId), { reasonCode, approvalId }); return;
   }
 }
 

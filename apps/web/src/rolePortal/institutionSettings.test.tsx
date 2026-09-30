@@ -58,6 +58,9 @@ function respond({ canEdit = true, role = 'INSTITUTION_ADMIN' }: { canEdit?: boo
     if (url.includes('/calendar')) return Promise.resolve(ok({ entries: [] }));
     // EMP-11: the college's placement policies (none in force yet).
     if (url.includes('/placement-policies')) return Promise.resolve(ok({ policies: [], canManage: canEdit }));
+    // INST-18: no data-processing terms published yet, and no exit.
+    if (url.includes('/data-terms')) return Promise.resolve(ok({ terms: { status: 'NO_TERMS_PUBLISHED', current: null, required: null, latestAcceptance: null, currentVersionAccepted: false }, canAccept: role === 'INSTITUTION_OWNER' }));
+    if (url.endsWith('/exit')) return Promise.resolve(ok({ exit: null, export: { available: false, sections: [], restricted: null, reasons: [], excluded: [] } }));
     return Promise.resolve(ok({ students: [], actions: [] }));
   });
 }
@@ -102,7 +105,10 @@ describe('admin Settings', () => {
     expect(screen.queryByText('Placement policies — not built yet')).not.toBeInTheDocument();
     expect(await screen.findByText('No placement policy is in force. Students may apply through your drives whatever offers they hold.')).toBeInTheDocument();
     expect(screen.getByRole('form', { name: 'Set placement policy' })).toBeInTheDocument();
-    expect(screen.getByText('Data-processing terms — not built yet')).toBeInTheDocument();
+    // INST-18 built the data-processing terms and the exit: real sections, saying plainly that nothing is published or open.
+    expect(screen.queryByText('Data-processing terms — not built yet')).not.toBeInTheDocument();
+    expect(await screen.findByText(/AI8HT has not published data-processing terms yet/)).toBeInTheDocument();
+    expect(await screen.findByText(/Your college is using ONE\. To leave, contact AI8HT operations/)).toBeInTheDocument();
     expect(screen.queryByText('Not built yet')).not.toBeInTheDocument();
     expect(screen.queryByText(programme)).not.toBeInTheDocument();
   });

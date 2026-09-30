@@ -2400,4 +2400,16 @@ unknown kinds. `employer-team.integration.spec.ts`: the delivery attempt records
 - `operations-institution-onboarding` still lets a failed send surface as a request error after the invitation is committed
   (pre-existing behaviour, unlike the employer and Growth team paths, which record FAILED).
 
-**Validation:** pending — see the entry below once run.
+**Validation** (`E:/one-wt/logs/validate.sh E:/one-wt/smtpd one_smtpd smtpd`, fresh database):
+- install 0; `db:migrate` twice: 82 applied, then 0 applied / 82 already applied; typecheck 0; build 0; `pnpm audit --prod
+  --audit-level=high` 0.
+- Tests: every package green except known shared-Postgres flakes. persistence 452/453 with learner-goals failing in teardown
+  ("out of shared memory"); api 1305/1306 with six files failing on "out of shared memory". Each re-run alone passes:
+  learner-goals 10/10, hiring-notifications 16/16, institution-exports 21/21, institution-placement-visibility 15/15,
+  operations-jobs 15/15, placement-test 3/3, student-hiring external 24/24. evidence-stages 0050-columns reads
+  `information_schema` without a schema filter, so it counts the throwaway schemas the crashed files left behind; on a
+  fresh migrated database it passes 13/13. New and changed tests: smtp-mail-sender 37/37, mail-delivery-ledger 2/2,
+  employer-team 27/27.
+- Policy: the run caught an unguarded optional chain in `apps/web/src/rolePortal/aiOperations.tsx` that came with the base
+  (OPS-12). Fixed on this branch (`summary && summary.failureClasses.length`); policy grep now clean, web typecheck 0,
+  aiOperations tests 12/12.

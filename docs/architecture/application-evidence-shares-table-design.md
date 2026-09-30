@@ -50,7 +50,8 @@ with nothing shared: "no evidence shared". For a free-text skill: that evidence 
 
 **Never:** a readiness band or score, a gap status (MET / PARTIAL / MISSING / UNKNOWN), a mastery value,
 the stage, `demonstrated`/`possible` or any ratio, a count or total of evidence, a percentage, a rank, a
-sort by evidence, a "fit" number, an evidence or topic identifier, or anything the student did not tick.
+sort by evidence, a "fit" number, an evidence identifier or a topic identifier on the panel (the topic key is
+only the applicant filter's value, never displayed), or anything the student did not tick.
 The skills are listed in the job's own order; items within a skill newest first.
 
 **The student sees exactly the same fields** for each item they can choose, so what they tick is what the

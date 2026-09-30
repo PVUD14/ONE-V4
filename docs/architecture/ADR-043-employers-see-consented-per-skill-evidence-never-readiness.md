@@ -37,7 +37,8 @@ design for the exact rule.
 An employer **never** sees: a readiness band or score; a gap status (MET, PARTIAL, MISSING, UNKNOWN); a
 mastery value; the stage; the marks behind an item (`demonstrated`/`possible`) or any ratio; a count, total
 or percentage of evidence; a ranking or a sort by evidence; any single "fit" number; any identifier of the
-evidence or the skill; anything the student did not choose.
+evidence, or of a skill on a candidate's panel (the job's catalogue-skill key appears only as the
+applicant filter's value, and is never displayed); anything the student did not choose.
 
 The employer may **filter** (not rank) a job's applicants by "has shared evidence for skill X" (decision
 10.2 #5); the list keeps its own order.

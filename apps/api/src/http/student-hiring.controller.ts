@@ -311,7 +311,9 @@ export class StudentHiringController {
                JOIN campus_drives cd ON cd.id = l.campus_drive_id JOIN organizations inst ON inst.id = cd.institution_id
                WHERE l.application_id = a.id ORDER BY l.created_at, cd.id LIMIT 1) AS campus_drive_institution,
              (SELECT inst.legal_name FROM campus_drive_nominations nom JOIN organizations inst ON inst.id = nom.institution_id
-               WHERE nom.application_id = a.id LIMIT 1) AS nominated_by_institution
+               WHERE nom.application_id = a.id LIMIT 1) AS nominated_by_institution,
+             -- EMP-13: whether any evidence is shared on it now, so it can be taken back even while the feature is off.
+             EXISTS (SELECT 1 FROM application_evidence_shares es WHERE es.application_id = a.id AND es.revoked_at IS NULL) AS evidence_shared
       FROM applications a
       JOIN opportunities o ON o.id = a.opportunity_id
       JOIN opportunity_versions v ON v.id = a.applied_version_id
@@ -320,7 +322,7 @@ export class StudentHiringController {
       ORDER BY a.updated_at DESC
       LIMIT 200
     `) as QueryResult<Record<string, unknown>>;
-    return { applications: rows.rows.map(mapApplication), correlationId: context.correlationId };
+    return { applications: rows.rows.map(mapApplication), evidenceSharingAvailable: await skillEvidenceEnabled(this.db), correlationId: context.correlationId };
   }
 
   /**
@@ -989,6 +991,8 @@ function mapApplication(row: Record<string, unknown>): Record<string, unknown> {
     campusDrive: typeof row.campus_drive_institution === 'string' ? { institutionName: row.campus_drive_institution } : null,
     // INST-14: made by opting in to this college's nomination.
     nominatedBy: typeof row.nominated_by_institution === 'string' ? { institutionName: row.nominated_by_institution } : null,
+    // EMP-13: some verified evidence is shared with this employer now.
+    evidenceShared: row.evidence_shared === true,
   };
 }
 

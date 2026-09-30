@@ -15,7 +15,9 @@ import {
   previewApplication, applyWithSnapshot, type ApplicationPreviewDto, type SnapshotChoicesInput,
   listStudentInterviews, type StudentInterviewDto,
   listScorecardTemplates, downloadStudentInterviewCalendar, interviewRescheduleReasons, interviewCancelReasons, type ScorecardTemplateDto,
+  listEmployerApplicantsWithEvidence, type EvidenceFilterSkillDto,
 } from './api/hiring.js';
+import { ApplyEvidenceSection, StudentApplicationEvidenceCard } from './skillEvidence.js';
 import {
   AddToCalendarButton, CriteriaRatingFields, InterviewHistoryPanel, InterviewScorecardsPanel, interviewReasonLabels, lastChangeText, readCriteriaRatings,
 } from './interviewScheduling.js';
@@ -150,6 +152,8 @@ export function StudentOpportunitiesPage(): React.ReactElement {
   const [resumeChoice, setResumeChoice] = useState('');
   const [phoneChoice, setPhoneChoice] = useState('');
   const [linkChoice, setLinkChoice] = useState('');
+  // EMP-13: the verified evidence the student ticked to share with this application.
+  const [evidenceChoice, setEvidenceChoice] = useState<ReadonlySet<string>>(new Set());
 
   // `message` wins over the computed summary, so a confirmation survives the refresh
   // that follows it instead of being overwritten a moment later.
@@ -171,7 +175,7 @@ export function StudentOpportunitiesPage(): React.ReactElement {
     try {
       setInstitutionVisibilityGranted(false);
       setSelected(await getOpportunity(token, id));
-      setResumeChoice(''); setPhoneChoice(''); setLinkChoice(''); setPreview(null);
+      setResumeChoice(''); setPhoneChoice(''); setLinkChoice(''); setPreview(null); setEvidenceChoice(new Set());
       void loadPreview(id, {});
     } catch (error) {
       setStatus(messageFor(error, 'That opportunity could not be opened.'));
@@ -211,7 +215,9 @@ export function StudentOpportunitiesPage(): React.ReactElement {
     setBusy(true);
     try {
       // EMP-07: apply with exactly the reviewed snapshot; the API refuses if it changed since.
-      if (preview) await applyWithSnapshot(token, id, institutionVisibilityGranted, preview.choices, preview.data.snapshotHash);
+      // EMP-13: only ticked items that the reviewed preview still offers are sent.
+      const offered = new Set((preview?.data.evidence?.skills ?? []).flatMap((skill) => skill.items.map((item) => item.evidenceId)));
+      if (preview) await applyWithSnapshot(token, id, institutionVisibilityGranted, preview.choices, preview.data.snapshotHash, [...evidenceChoice].filter((evidenceId) => offered.has(evidenceId)));
       else await applyToOpportunity(token, id, institutionVisibilityGranted);
       await reload(search, 'Application submitted. You can track it under Applications.');
       await openDetail(id);
@@ -314,6 +320,12 @@ export function StudentOpportunitiesPage(): React.ReactElement {
           {JSON.stringify(currentChoices()) !== JSON.stringify(preview.choices)
             ? <p className="hiring-meta">Press "Update what I share" to include your changes; applying now shares what is shown above.</p> : null}
         </div>}
+        {selected.opportunity.alreadyApplied ? null : <ApplyEvidenceSection evidence={preview.data.evidence} employerName={selected.opportunity.employerName}
+          selected={evidenceChoice} disabled={busy} onToggle={(evidenceId, shared) => setEvidenceChoice((current) => {
+            const next = new Set(current);
+            if (shared) next.add(evidenceId); else next.delete(evidenceId);
+            return next;
+          })} />}
       </> : null}
 
       {/* PRIVACY REVIEW REQUIRED BEFORE SHIPPING: draft notice, not approved copy (ADR-019). */}
@@ -426,6 +438,9 @@ export function StudentApplicationsPage(): React.ReactElement {
   const [termsChange, setTermsChange] = useState<{ readonly applicationId: string; readonly change: StudentTermsChangeDto } | null>(null);
   // EMP-10: the application whose conversation is open.
   const [conversationId, setConversationId] = useState<string | null>(null);
+  // EMP-13: the application whose shared skill evidence is open, and whether sharing is on at all.
+  const [evidenceFor, setEvidenceFor] = useState<StudentApplicationDto | null>(null);
+  const [evidenceSharingAvailable, setEvidenceSharingAvailable] = useState(false);
 
   async function openTermsChange(id: string): Promise<void> {
     const token = getAccessToken();
@@ -486,6 +501,7 @@ export function StudentApplicationsPage(): React.ReactElement {
     if (!token) return setStatus('You are not signed in.');
     const response = await listStudentApplications(token);
     setApplications(response.applications);
+    setEvidenceSharingAvailable(response.evidenceSharingAvailable === true);
     setStatus(message ?? (response.applications.length ? '' : 'You have not applied to anything yet.'));
   };
   useEffect(() => { void reload().catch(() => setStatus('Your applications could not be loaded.')); }, []);
@@ -557,10 +573,16 @@ export function StudentApplicationsPage(): React.ReactElement {
                 aria-label={'Share ' + item.title + ' with my institution'} onClick={() => { void grantVisibility(item.id); }}>Share with institution</button></>}</td>
             <td>{item.closedAt
               ? <span className="hiring-meta">Closed</span>
-              : <button type="button" className="secondary" onClick={() => { void withdraw(item.id); }}>Withdraw</button>}</td>
+              : <button type="button" className="secondary" onClick={() => { void withdraw(item.id); }}>Withdraw</button>}
+              {/* EMP-13: shown while sharing is on, and whenever something is shared so it can be taken back. */}
+              {evidenceSharingAvailable || item.evidenceShared
+                ? <button type="button" className="secondary" aria-label={'Skill evidence for ' + item.title} onClick={() => setEvidenceFor(item)}>
+                  {item.evidenceShared ? 'Skill evidence (shared)' : 'Skill evidence'}</button> : null}</td>
           </tr>)}</tbody>
         </table></div>}
     </section>
+    {evidenceFor ? <StudentApplicationEvidenceCard key={evidenceFor.id} applicationId={evidenceFor.id} title={evidenceFor.title}
+      onClose={() => setEvidenceFor(null)} onChanged={() => { void reload().catch(() => undefined); }} /> : null}
     {conversationId ? <StudentConversationCard key={conversationId} applicationId={conversationId} onClose={() => setConversationId(null)}
       onChanged={() => { void reload().catch(() => undefined); }} /> : null}
     {feedback ? <StudentFeedbackCard feedback={feedback} onClose={() => setFeedback(null)} /> : null}
@@ -1483,6 +1505,9 @@ export function EmployerApplicantsPage({ employerId, applicationStateFilter, can
   const [applicants, setApplicants] = useState<readonly EmployerApplicantDto[]>([]);
   const [stages, setStages] = useState<readonly SelectionStageDto[]>([]);
   const [status, setStatus] = useState('Loading…');
+  // EMP-13 (decision 10.2 #5): narrow to applicants sharing verified evidence for one skill. Never a ranking.
+  const [evidenceSkills, setEvidenceSkills] = useState<readonly EvidenceFilterSkillDto[]>([]);
+  const [evidenceSkill, setEvidenceSkill] = useState('');
 
   useEffect(() => {
     const token = getAccessToken();
@@ -1497,15 +1522,18 @@ export function EmployerApplicantsPage({ employerId, applicationStateFilter, can
       .catch(() => setStatus('Your opportunities could not be loaded.'));
   }, [employerId]);
 
-  const reloadApplicants = async (opportunityId: string): Promise<void> => {
+  const reloadApplicants = async (opportunityId: string, skill = evidenceSkill): Promise<void> => {
     const token = getAccessToken();
     if (!token || !opportunityId) return;
-    const response = await listEmployerApplicants(token, employerId, opportunityId);
+    const response = skill
+      ? await listEmployerApplicantsWithEvidence(token, employerId, opportunityId, skill)
+      : await listEmployerApplicants(token, employerId, opportunityId);
     setApplicants(response.applications);
     setStages(response.stages ?? []);
-    setStatus(response.applications.length ? '' : 'No applications for this opportunity yet.');
+    setEvidenceSkills(response.evidenceSkills ?? []);
+    setStatus(response.applications.length ? '' : skill ? 'No applicant shares evidence for that skill.' : 'No applications for this opportunity yet.');
   };
-  useEffect(() => { void reloadApplicants(selectedOpportunity).catch(() => setStatus('Applicants could not be loaded.')); }, [selectedOpportunity]);
+  useEffect(() => { void reloadApplicants(selectedOpportunity).catch(() => setStatus('Applicants could not be loaded.')); }, [selectedOpportunity, evidenceSkill]);
 
   async function move(applicationId: string, toState: string): Promise<void> {
     const token = getAccessToken();
@@ -1568,11 +1596,18 @@ export function EmployerApplicantsPage({ employerId, applicationStateFilter, can
 
     <section className="role-card role-wide">
       <label className="student-form-field"><span>Opportunity</span>
-        <select value={selectedOpportunity} onChange={(event) => { setAction(null); setViewing(null); setApplicants([]); setStages([]); setSelectedOpportunity(event.target.value); }}>
+        <select value={selectedOpportunity} onChange={(event) => { setAction(null); setViewing(null); setApplicants([]); setStages([]); setEvidenceSkill(''); setEvidenceSkills([]); setSelectedOpportunity(event.target.value); }}>
           <option value="">Select an opportunity</option>
           {opportunities.map((item) => <option key={item.id} value={item.id}>{item.title ?? item.referenceCode} ({item.applicationCount})</option>)}
         </select>
       </label>
+      {evidenceSkills.length ? <label className="student-form-field"><span>Has shared verified evidence for</span>
+        <select value={evidenceSkill} onChange={(event) => { setViewing(null); setAction(null); setEvidenceSkill(event.target.value); }}>
+          <option value="">Any skill (no filter)</option>
+          {evidenceSkills.map((skill) => <option key={skill.topicId} value={skill.topicId}>{skill.name}</option>)}
+        </select>
+      </label> : null}
+      {evidenceSkill ? <p className="hiring-meta">Showing only applicants who chose to share evidence for this skill, in the usual order. This is a filter, not a ranking.</p> : null}
       {applicationStateFilter ? <p className="hiring-meta">Application state filter: <span className={`hiring-state state-${applicationStateFilter.toLowerCase()}`}>{humanise(applicationStateFilter)}</span></p> : null}
       {status ? <p role="status">{status}</p> : null}
       {selectedOpportunity ? <p className="hiring-meta">{stages.length

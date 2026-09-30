@@ -2019,3 +2019,10 @@ inbox is unchanged.
 
 **UI / Android:** no screen, route or navigation change. The only UI change is text in the web results-upload preview (the SKIPPED label, the `student_deleted` explanation and the skipped count), needed so the new outcome is not shown blank. The Android app has no results upload and does not list deletion categories, so it needs no change; nothing Android-side was modified or compiled.
 **Next goal:** as scheduled by the coordinator.
+
+**Validation** (only DATABASE_URL exported; scripts and logs in scratchpad/PRIV-DELETE/):
+- Fresh database one_privdel2: `corepack pnpm db:migrate` twice — 76 applied, then 0 applied / 76 already applied; both exit 0. 0087 also replayed twice by hand on top: exit 0, the category CHECK lists all 16 values, and only the five learning-history tables moved to the new guard function.
+- `corepack pnpm typecheck`: exit 0. `corepack pnpm build`: exit 0.
+- Targeted, after the fix: privacy.integration.spec 17/17 passed; academic-verification.integration.spec 20/21 in the same run, the one failure `out of shared memory` in a `beforeEach` TRUNCATE on the shared Postgres (an unrelated test; the new skip test passed). privacy package 23/23; web 76 files / 883 tests passed (full web suite re-run alone after an `App.test.tsx` 20 s timeout under machine load in the full run).
+- Full `-r test` run: every non-api package passed (web 883 on re-run, persistence and the rest green). **The api suite did not finish**: the shared Postgres was saturated by five agents' suites (each TRUNCATE ~20 s), the session ended mid-run, and on resuming the Docker Desktop engine was returning HTTP 500, so the database was unreachable. The api suite still has to be run in full on a fresh database once Docker is back.
+- CI parity: `corepack pnpm audit --prod --audit-level=high` exit 0 (2 moderate); the optional-chain policy grep printed nothing; no private-key blocks or merge markers in the diff.

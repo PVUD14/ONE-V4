@@ -143,9 +143,15 @@ sink: recorded "not sent — no mail service configured").
 2. **Draft the notice** for the incident: `POST /api/v1/operations/communications/notices` with
    `incidentId`, `templateId` and `INITIAL_NOTICE`, `INCIDENT_UPDATE` or `RESOLUTION_NOTICE`. The
    notice has no free text — only the approved template's wording.
-3. **Approve it for sending**: `POST …/notices/<id>/approve`, reason `APPROVED_FOR_SEND`. It becomes
-   `QUEUED` and the outbox worker sends it. Refusals: `STATUS_NOTICE_NO_AUDIENCE` (add affected
-   organisations first), `STATUS_NOTICE_INCIDENT_CLOSED`, `STATUS_NOTICE_NOT_DRAFT`, and 429
+3. **Have it approved for sending by a second person**: `POST …/notices/<id>/approve`, reason
+   `APPROVED_FOR_SEND`, by a `COMMS_TEMPLATES` holder **other than the drafter**. It becomes
+   `QUEUED` and the outbox worker sends it. The drafter's own approval is refused with 403
+   `STATUS_NOTICE_SELF_APPROVAL_REFUSED`. The exception is when the drafter is the only person who can
+   approve notices (Settings shows the solo safeguard). They may then approve their own notice 15 minutes
+   after drafting it. Before that, the answer is 403 `STATUS_NOTICE_SOLO_COOLING_OFF`. The approval is
+   recorded SOLO. So in a one-person pilot, **draft the notice first**, then do the containment work
+   while the cooling-off runs. Other refusals: `STATUS_NOTICE_NO_AUDIENCE` (add affected organisations
+   first), `STATUS_NOTICE_INCIDENT_CLOSED`, `STATUS_NOTICE_NOT_DRAFT`, and 429
    `STATUS_NOTICE_RATE_LIMITED` (one per incident per 15 minutes, at most 6 per 24 hours).
    Withdraw a draft with `NOT_NEEDED`, `WRONG_TEMPLATE` or `SUPERSEDED`.
 
@@ -176,21 +182,25 @@ in how many organisations it reached, and the email outcome counts.
 
 ## Gaps
 
-Missing operator capabilities found while writing this runbook. None was built here.
+Missing operator capabilities found while writing this runbook. The runbook itself built none of
+them. Gaps 1 and 5 were closed afterwards on `fix/ops-runbook-gaps`.
 
-1. **No engine health on System Health** (OPS-13): the projector consumer is not in
-   `knownJobConsumers`, so it has no Consumers row and cannot be given a silence alert
-   (`JOBS_ALERT_CONSUMER_SILENCE_MINUTES` accepts only known consumers).
+1. **Closed (2026-09-30):** ~~No engine health on System Health.~~ The learner skill-state
+   projector (`learner-skill-state-projector`) is now a known consumer. It has a Consumers row on
+   System Health, and it can be given a silence alert, for example
+   `JOBS_ALERT_CONSUMER_SILENCE_MINUTES=learner-skill-state-projector=1440`. The other engine
+   health signals OPS-13 asks for are still not built.
 2. **No operator lever to pause adaptive behaviour**: §3.1 step 3 needs a database session or a
    migration.
 3. **The automation worker has no unit file in `deploy/`**, so "restart the worker" depends on
    however it is supervised on the server today.
 4. **Engine commands have no route, screen or audit**: replay, rebuild and calibration are shell
    steps for Divakar only, and leave only what the incident note records.
-5. **Notice approval is not dual-controlled**: the template is (OPS-02), but any holder of
-   `COMMS_TEMPLATES`, including the notice's drafter, can approve the notice itself (confirmed
-   locally). This matches the OPS-16 design ("a notice is a draft until a person approves it");
-   listed so nobody assumes a second pair of eyes on each send.
+5. **Closed (2026-09-30, migration 0090):** ~~Notice approval is not dual-controlled.~~ A notice is
+   now approved by a person other than its drafter. The only exception is OPS-02's solo safeguard:
+   when the drafter is the sole `COMMS_TEMPLATES` holder, they may approve after a 15-minute
+   cooling-off, and the approval is marked SOLO. The API and the 0090 trigger both enforce it. The
+   reasoning is in the incident-register design doc, under "Who approves a notice".
 
 ## Verified locally
 
@@ -221,6 +231,9 @@ used a freshly created `one_eng17b` instead.)
 | 13 | §3.1 step 4 import check: `engine:calibration-import --in <export file>` | refused with `CalibrationResultsError: results: unexpected field "responses"`; nothing written |
 
 In an earlier rehearsal run the notice's own drafter approved it (201), which is the basis for gap 5.
+Since 0090 that call returns 403 `STATUS_NOTICE_SELF_APPROVAL_REFUSED` while anyone else can
+approve. `apps/api/src/http/operations-incidents.integration.spec.ts` ("notice approval by a second
+person (0090)") covers the refusal, the solo path and the trigger.
 
 
 **Needs a real environment:** the monitor and alert timers, restarting the worker, `systemctl`,

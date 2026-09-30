@@ -10,7 +10,7 @@
  * Design: docs/architecture/high-risk-approvals-table-design.md
  */
 import { BadRequestException, ConflictException, ForbiddenException, HttpException, NotFoundException } from '@nestjs/common';
-import type { HighRiskActionKey } from '@planthepath/authorization/src/index.js';
+import { aiCapWindows, aiMaxCap, aiMaxInputChars, aiMinInputChars, type HighRiskActionKey } from '@planthepath/authorization/src/index.js';
 import { OperationApprovalError } from '@planthepath/persistence/src/operation-approvals.js';
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -43,6 +43,13 @@ export const approvalPayloads = {
   // OPS-16: a status notice template version is immutable; its content hash binds the exact wording.
   COMMS_TEMPLATE_PUBLISH: (input: { readonly templateId: string; readonly contentHash: string; readonly reasonCode: string }) =>
     ({ templateId: input.templateId.toLowerCase(), contentHash: input.contentHash, reasonCode: input.reasonCode }),
+  // OPS-12: switching an AI feature on is bound to the exact model, prompt version and the passing
+  // evaluation the request relied on; a later FAIL, or a model or prompt change, breaks the binding.
+  AI_FEATURE_ENABLE: (input: { readonly featureKey: string; readonly model: string; readonly promptKey: string; readonly promptVersion: number; readonly evaluationId: string; readonly reasonCode: string }) =>
+    ({ featureKey: input.featureKey, model: input.model, promptKey: input.promptKey, promptVersion: input.promptVersion, evaluationId: input.evaluationId.toLowerCase(), reasonCode: input.reasonCode }),
+  // OPS-12: widening is bound to the exact new limits.
+  AI_FEATURE_LIMITS_RAISE: (input: { readonly featureKey: string; readonly cap: number; readonly capWindow: string; readonly maxInputChars: number; readonly reasonCode: string }) =>
+    ({ featureKey: input.featureKey, cap: input.cap, capWindow: input.capWindow, maxInputChars: input.maxInputChars, reasonCode: input.reasonCode }),
 } satisfies Record<HighRiskActionKey, (input: never) => Record<string, unknown> & { reasonCode: string }>;
 
 function domainError(code: string, correlationId: string): { readonly error: { readonly code: string; readonly message: string; readonly correlationId: string } } {
@@ -82,4 +89,15 @@ export function approvalHttpError(error: unknown, correlationId: string): HttpEx
     default:
       return new ForbiddenException(domainError(error.code, correlationId));
   }
+}
+
+/** OPS-12: new AI limits from a request, within 0033's bounds. */
+export function readAiLimits(payload: Record<string, unknown>, correlationId: string): { readonly cap: number; readonly capWindow: 'DAY' | 'MONTH'; readonly maxInputChars: number } {
+  const { cap, capWindow, maxInputChars } = payload;
+  if (typeof cap !== 'number' || !Number.isInteger(cap) || cap < 1 || cap > aiMaxCap) throw new BadRequestException(domainError('AI_CAP_INVALID', correlationId));
+  if (typeof capWindow !== 'string' || !(aiCapWindows as readonly string[]).includes(capWindow)) throw new BadRequestException(domainError('AI_CAP_WINDOW_INVALID', correlationId));
+  if (typeof maxInputChars !== 'number' || !Number.isInteger(maxInputChars) || maxInputChars < aiMinInputChars || maxInputChars > aiMaxInputChars) {
+    throw new BadRequestException(domainError('AI_INPUT_LIMIT_INVALID', correlationId));
+  }
+  return { cap, capWindow: capWindow as 'DAY' | 'MONTH', maxInputChars };
 }

@@ -4,6 +4,7 @@ import {
   Controller,
   ForbiddenException,
   HttpCode,
+  Inject,
   Logger,
   Post,
   Req,
@@ -30,7 +31,9 @@ import {
   type AssistantChatMessage,
 } from '../assistant/assistant.service.js';
 import type { AssistantPersona } from '../assistant/help-articles.js';
-import { ProtectedApiAuthenticationGuard, type ProtectedHttpRequest } from './api-security.js';
+import { API_PERSISTENCE_DB, ProtectedApiAuthenticationGuard, type ProtectedHttpRequest } from './api-security.js';
+import { aiAssistantSwitchAllows } from '@planthepath/persistence/src/ai-operations.js';
+import type { PersistenceDb } from '@planthepath/persistence/src/repositories.js';
 
 const PERSONAS: readonly AssistantPersona[] = ['student', 'institution', 'employer'];
 const MAX_MESSAGES = 12;
@@ -76,12 +79,27 @@ export class AssistantController {
   private readonly logger = new Logger('assistant');
   private readonly service = new AssistantService();
 
+  constructor(@Inject(API_PERSISTENCE_DB) private readonly db: PersistenceDb) {}
+
+  /**
+   * OPS-12: the console switches (flag ai.assistant, default off, and the global AI kill switch),
+   * read on every request so switching off needs no restart. Fail closed: an unreadable switch is off.
+   */
+  private async consoleAllows(): Promise<boolean> {
+    try {
+      return await aiAssistantSwitchAllows(this.db);
+    } catch {
+      return false;
+    }
+  }
+
   @Post('/chat')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async chat(@Req() request: ProtectedHttpRequest, @Body() body: unknown, @Res() response: StreamableResponse): Promise<void> {
     const { userId, correlationId } = requireContext(request);
     const { persona, messages } = parseChatBody(body, correlationId);
-    if (!this.service.configured) {
+    // Off unless the server switch (ASSISTANT_ENABLED), a key, and the console switches all allow it.
+    if (!this.service.configured || !(await this.consoleAllows())) {
       throw new ServiceUnavailableException(assistantError('ASSISTANT_UNCONFIGURED', correlationId));
     }
     try {

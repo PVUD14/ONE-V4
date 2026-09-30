@@ -94,6 +94,9 @@ const operationApprovalActionKeys = [
   'CONTENT_LESSON_PUBLISH',
   // OPS-16: extended key as well (0081).
   'COMMS_TEMPLATE_PUBLISH',
+  // OPS-12: extended keys as well (0089).
+  'AI_FEATURE_ENABLE',
+  'AI_FEATURE_LIMITS_RAISE',
 ] as const;
 
 // EMP-05: opportunities.lifecycle_state (0007 CHECK).
@@ -910,6 +913,43 @@ export const eventSchemas = {
     dataClassification: 'internal',
     schemaRef: 'registry://status_notice_template.published/1',
     payload: { templateId: { kind: 'uuid' }, notificationTemplateId: { kind: 'uuid' } },
+  },
+  // OPS-12: AI Operations console changes. No consumer yet. Enums and identifiers only: a feature
+  // key is free text chosen by an engineer, so it stays in the audit row, not in the event.
+  aiFeaturePolicyChangedV1: {
+    eventType: 'ai_feature_policy.changed',
+    eventVersion: 1,
+    producer: 'operations-ai',
+    aggregateType: 'ai_operations_change',
+    purpose: 'ai-operations',
+    dataClassification: 'internal',
+    schemaRef: 'registry://ai_feature_policy.changed/1',
+    payload: {
+      change: { kind: 'enum', values: ['ENABLED', 'DISABLED', 'LIMITS_LOWERED', 'LIMITS_RAISED'] },
+      approvalMode: { kind: 'enum', values: ['NONE', 'DUAL', 'SOLO'] },
+    },
+  },
+  aiKillSwitchEngagedV1: {
+    eventType: 'ai_kill_switch.engaged',
+    eventVersion: 1,
+    producer: 'operations-ai',
+    aggregateType: 'ai_operations_change',
+    purpose: 'ai-operations',
+    dataClassification: 'internal',
+    schemaRef: 'registry://ai_kill_switch.engaged/1',
+    payload: {
+      reasonCode: { kind: 'enum', values: ['INCIDENT_MITIGATION', 'HARMFUL_OUTPUT', 'SUSPECTED_KEY_COMPROMISE', 'SPEND_RUNAWAY', 'PRECAUTION'] },
+    },
+  },
+  aiEvaluationRecordedV1: {
+    eventType: 'ai_evaluation.recorded',
+    eventVersion: 1,
+    producer: 'operations-ai',
+    aggregateType: 'ai_evaluation',
+    purpose: 'ai-operations',
+    dataClassification: 'internal',
+    schemaRef: 'registry://ai_evaluation.recorded/1',
+    payload: { evaluationId: { kind: 'uuid' }, decision: { kind: 'enum', values: ['PASS', 'FAIL'] } },
   },
   // The worker sends an approved notice once, to the administrators of the affected organisations.
   incidentStatusNoticeDispatchRequestedV1: {

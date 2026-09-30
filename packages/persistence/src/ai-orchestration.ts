@@ -29,11 +29,16 @@ export async function loadAiFeaturePolicy(
   client: Queryable,
   featureKey: string,
 ): Promise<AiFeaturePolicyRow | undefined> {
+  // OPS-12: while the global kill switch (flag ai.global-kill-switch, 0089) is engaged every
+  // feature reads as disabled, in every process, on the next call. Read directly, never through
+  // overrides: the kill switch is global by definition. An absent flag row means not engaged.
   const result = await client.query<{
     feature_key: string; description: string; enabled: boolean; model: string;
     cap: number; cap_window: 'DAY' | 'MONTH'; max_input_chars: number;
   }>(
-    `SELECT feature_key, description, enabled, model, cap, cap_window, max_input_chars
+    `SELECT feature_key, description,
+            enabled AND NOT COALESCE((SELECT f.enabled FROM feature_flags f WHERE f.key = 'ai.global-kill-switch'), false) AS enabled,
+            model, cap, cap_window, max_input_chars
      FROM ai_feature_policies WHERE feature_key = $1`, [featureKey],
   );
   const row = result.rows[0];
@@ -124,16 +129,24 @@ export async function upsertAiFeaturePolicy(
   input: {
     readonly featureKey: string; readonly description: string; readonly model: string;
     readonly cap: number; readonly window: 'DAY' | 'MONTH'; readonly maxInputChars?: number;
+    /**
+     * OPS-12: the prompt version the feature runs, so the console can require a passing
+     * evaluation for exactly this model and prompt. Changing either on an enabled feature
+     * without a passing evaluation switches it off (0089 trigger).
+     */
+    readonly prompt?: { readonly key: string; readonly version: number };
   },
 ): Promise<void> {
   await pool.query(
-    `INSERT INTO ai_feature_policies (feature_key, description, model, cap, cap_window, max_input_chars)
-     VALUES ($1,$2,$3,$4,$5,$6)
+    `INSERT INTO ai_feature_policies (feature_key, description, model, cap, cap_window, max_input_chars, prompt_key, prompt_version)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
      ON CONFLICT (feature_key) DO UPDATE
        SET description = EXCLUDED.description, model = EXCLUDED.model, cap = EXCLUDED.cap,
            cap_window = EXCLUDED.cap_window, max_input_chars = EXCLUDED.max_input_chars,
+           prompt_key = EXCLUDED.prompt_key, prompt_version = EXCLUDED.prompt_version,
            updated_at = now()`,
-    [input.featureKey, input.description, input.model, input.cap, input.window, input.maxInputChars ?? 16000],
+    [input.featureKey, input.description, input.model, input.cap, input.window, input.maxInputChars ?? 16000,
+      input.prompt?.key ?? null, input.prompt?.version ?? null],
   );
 }
 

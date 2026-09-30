@@ -219,7 +219,7 @@ These are missing operator capabilities found while writing this runbook. None w
 ## Verified locally
 
 Staging does not exist and production is out of bounds, so every step was executed on a local,
-fresh PostgreSQL database `one_eng17` (Docker `planthepath-postgres-dev`), migrated with
+fresh PostgreSQL database `one_eng17b` (Docker `planthepath-postgres-dev`), migrated with
 `corepack pnpm db:migrate` (twice; the second run applied 0) and seeded with the repository's own
 seed scripts (`db:seed:local-users`, `db:seed:career-readiness`, `db:seed:careers`,
 `db:seed:career-catalogue`, `db:import:teaching-strategies-draft`, `db:import:aptitude-bank-draft`,
@@ -228,7 +228,23 @@ test identity verifier (the integration-spec pattern), because local Cognito doe
 The flag and the policy below are **local synthetic rows** created for the rehearsal; nothing like
 them exists in any real environment.
 
-RESULTS_AI_KILL_SWITCH
+Run on 2026-09-30 against base `4fab0c6`. (The goal's database name was `one_eng17`; its
+re-creation stalled for over 40 minutes behind the shared server's checkpoint, so the recorded run
+used a freshly created `one_eng17b` instead.)
+
+| # | Step | Result |
+|---|---|---|
+| 1 | `POST /api/v1/assistant/chat` as a student, `ASSISTANT_ENABLED` unset | **503 `ASSISTANT_UNCONFIGURED`**; no model call |
+| 2 | `GET /api/v1/operations/feature-flags` (OPERATIONS_ADMIN) | 200; `career-catalogue.selectable-roles` off, `employer-access.allow-free-mail` off, neither high-risk: no AI flag exists |
+| 3 | Local synthetic flag `eng17-local.synthetic-ai-feature` (on, `high_risk_direction = 'ENABLE'`): `POST …/feature-flags/<key>/state {"enabled":false,"reasonCode":"INCIDENT_MITIGATION"}` | 201, flag now off: **no approval needed to switch off** |
+| 4 | Same, `enabled: true`, no approval | **403 `APPROVAL_REQUIRED`** |
+| 5 | `POST /api/v1/operations/approvals` `FEATURE_FLAG_HIGH_RISK_CHANGE` `{key, enabled:true, reasonCode:"ROLLBACK"}` | 201, `PENDING` |
+| 6 | Requester (OPERATIONS_ADMIN) decides own request | 403 `FORBIDDEN` |
+| 7 | Super admin `APPROVE` / `INCIDENT_RESPONSE` | 201, `APPROVED` |
+| 8 | Requester executes with `approvalId`; then switches off again | 201; 201 |
+| 9 | `feature_flag_events` for the flag | `DISABLED/INCIDENT_MITIGATION`, `ENABLED/ROLLBACK`, `DISABLED/INCIDENT_MITIGATION` |
+| 10 | Local synthetic policy `eng17-local.synthetic` (created off by `upsertAiFeaturePolicy`), `AiOrchestrator.generate` with the unconfigured provider | `AiFeatureDisabledError`; `ai_generations` gained one `REFUSED / FEATURE_DISABLED` row; `listAiFeaturePolicies` shows `enabled=false used=0 refused7d=1`. No provider was reached |
+
 
 **Needs a real environment:** lever 1's `app.env` edit and `systemctl restart` (a server), lever
 2's `UPDATE` on the production database (Divakar), lever 4's `systemctl` (timer not installed).

@@ -138,13 +138,35 @@ Missing operator capabilities found while writing this runbook. None was built h
 ## Verified locally
 
 Staging does not exist and production is out of bounds, so every step was executed on a local,
-fresh PostgreSQL database `one_eng17`, migrated twice and seeded with the repository's seed
+fresh PostgreSQL database `one_eng17b`, migrated twice and seeded with the repository's seed
 scripts (listed in [runbook-ai-kill-switch.md](runbook-ai-kill-switch.md#verified-locally)), through
 the real controllers with a local test identity verifier. The student, staff and organisations were
 synthetic; so was a **local-only** `adaptive-learning` consent definition used to exercise the
 adaptive path (publishing the real one is HG-6).
 
-RESULTS_SUPPORT
+Run on 2026-09-30 against base `4fab0c6`. (The goal's database name was `one_eng17`; its
+re-creation stalled for over 40 minutes behind the shared server's checkpoint, so the recorded run
+used a freshly created `one_eng17b` instead.)
+
+| # | Step | Result |
+|---|---|---|
+| 1 | `GET /api/v1/operations/support/policy` (OPERATIONS_ADMIN) | 200; open reasons `CUSTOMER_CONTACT, OPERATOR_FOLLOW_UP, INSTITUTION_ESCALATION, MONITORING_ALERT` |
+| 2 | `POST /api/v1/operations/support/cases` (PHONE, HOW_TO, MEDIUM, `CUSTOMER_CONTACT`, `assignToMe`) | 201, `OPEN` |
+| 3 | `GET …/support/accounts?q=<full email>`; `GET …/accounts/<userId>` | 200 (1 result, email masked `e***@college.example.test`); 200 |
+| 4 | Student `GET /api/v1/learning/path`, no live `adaptive-learning` definition | 200, `adaptive: false` |
+| 5 | Student `POST /api/v1/me/consents/adaptive-learning/grant` with no live definition | 400 `CONSENT_VERSION_MISMATCH` |
+| 6 | Same, after inserting the local synthetic definition | 201, granted |
+| 7 | Student readiness check: `GET /api/v1/career-readiness/catalog`, `POST …/assessments/<id>/attempts`, `POST …/attempts/<id>/submit` (seeded pilot assessment) | 200 (1 assessment); 201 (4 questions); 201. The submit wrote 4 `learning_attempt_events` rows and queued `learning.skill_state.projection_requested` |
+| 8 | Student `POST /api/v1/learning/next-step` (no career target set) | 201, action `NONE`, reason **`NO_CAREER_TARGET`**, `adaptive: true`: the "not chosen a target role" row of §3 |
+| 9 | Case note (`INTERNAL_FINDING`), then `IN_PROGRESS`/`WORK_STARTED`, `RESOLVED`/`ANSWERED`, `CLOSED`/`CONFIRMED_WITH_CUSTOMER` | 201 each; final state `CLOSED` |
+| 10 | `engine:rebuild-skill-state` before the walkthrough / after it | `subjects 0, written 0` / **`subjects 1, written 2, deleted 0`** |
+| 11 | `engine:replay-decisions` (all), and with the recorded decision id | `checked 1, matched 1`, all arrays empty, **exit 0** (both) |
+| 12 | `engine:bkt-shadow-report` | `bkt-shadow-report-v1`, `"suppressed": true` |
+| 13 | Student `POST /api/v1/me/consents/adaptive-learning/withdraw` | 201; the student's `learner_skill_state` rows 2 to **0**; `learning_attempt_events` kept (4) |
+
+Also observed: `GET /api/v1/career-targets/catalog` returned no roles to the synthetic student, so
+choosing a target role was not exercised end to end here (its reason code was).
+
 
 **Needs a real environment:** the §4 commands on the server (run here against the local database
 instead), and the web/Android screens themselves (the same routes were exercised directly).

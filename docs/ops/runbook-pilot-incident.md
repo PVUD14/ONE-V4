@@ -195,12 +195,33 @@ Missing operator capabilities found while writing this runbook. None was built h
 ## Verified locally
 
 Staging does not exist and production is out of bounds, so every step was executed on a local,
-fresh PostgreSQL database `one_eng17`, migrated twice and seeded with the repository's seed scripts
+fresh PostgreSQL database `one_eng17b`, migrated twice and seeded with the repository's seed scripts
 (listed in [runbook-ai-kill-switch.md](runbook-ai-kill-switch.md#verified-locally)), through the real
 controllers with a local test identity verifier. People, organisations and the template were
 synthetic.
 
-RESULTS_INCIDENT
+Run on 2026-09-30 against base `4fab0c6`. (The goal's database name was `one_eng17`; its
+re-creation stalled for over 40 minutes behind the shared server's checkpoint, so the recorded run
+used a freshly created `one_eng17b` instead.)
+
+| # | Step | Result |
+|---|---|---|
+| 1 | `GET /api/v1/operations/jobs/summary`; `GET …/jobs/failed` (OPERATIONS_ADMIN) | 200; 200, 0 failed events |
+| 2 | `jobs:alert-check` | `{"event":"jobs.alert.check","raised":[],"cleared":[],"open":0,"ignoredConfig":[]}` |
+| 3 | `POST /api/v1/operations/incidents` as OPERATIONS_ADMIN | **403 `FORBIDDEN`** (no `INCIDENT_MANAGE`) |
+| 4 | Same as SECURITY_ADMIN (`DEGRADED_SERVICE`, `HIGH`, `MONITORING_ALERT`) | 201, `OPEN` |
+| 5 | Note (`TIMELINE_UPDATE`); add the college (`SCOPE_ASSESSED`) | 201; 201 |
+| 6 | Template draft (`NEW_TEMPLATE`), then publish without approval | 201 `DRAFT`, then **403 `APPROVAL_REQUIRED`** |
+| 7 | `COMMS_TEMPLATE_PUBLISH` approval filed by the author, super admin `APPROVE`, publish with `approvalId` | 201, 201, 201 `PUBLISHED` |
+| 8 | Notice draft (`INITIAL_NOTICE`), approve (`APPROVED_FOR_SEND`) | 201 `DRAFT`, 201 `QUEUED` |
+| 9 | `CONTAINED`/`MITIGATION_APPLIED`, `RESOLVED`/`SERVICE_RESTORED`, `CLOSED`/`POST_INCIDENT_REVIEW_DONE` | 201 each |
+| 10 | `GET /api/v1/operations/incidents/<id>` | 200: `incident`, `allowedTransitions`, `timeline` (8 entries), `organizations`, `notices` (1) |
+| 11 | §3.1 step 3 on the local synthetic definition: retire it, read the path, grant again, rebuild | 1 definition retired; `GET /api/v1/learning/path` gives `adaptive: false`; grant gives 400 `CONSENT_VERSION_MISMATCH`; rebuild `subjects 1, written 0` |
+| 12 | §3.1 step 2: `engine:replay-decisions` | `checked 1, matched 1`, exit 0 |
+| 13 | §3.1 step 4 import check: `engine:calibration-import --in <export file>` | refused with `CalibrationResultsError: results: unexpected field "responses"`; nothing written |
+
+In an earlier rehearsal run the notice's own drafter approved it (201), which is the basis for gap 5.
+
 
 **Needs a real environment:** the monitor and alert timers, restarting the worker, `systemctl`,
 email delivery of notices (no mail sink locally: HG-7), and §3.1 on the server.

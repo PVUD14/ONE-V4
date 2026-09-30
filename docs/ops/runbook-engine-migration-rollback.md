@@ -278,6 +278,36 @@ internal `CONTENT_REVIEW` and `CONTENT_PUBLISH` holders.
 
 ## Verified locally
 
-On a local, fresh `one_eng17` (Docker `planthepath-postgres-dev`; never staging or production):
+On a local, fresh `one_eng17b` (Docker `planthepath-postgres-dev`; never staging or production):
 
-RESULTS_MIGRATIONS
+Run on 2026-09-30 against base `4fab0c6`. (The goal's database name was `one_eng17`; its
+re-creation stalled for over 40 minutes behind the shared server's checkpoint, so the recorded run
+used a freshly created `one_eng17b` instead.)
+
+- `corepack pnpm db:migrate` twice: `74 applied, 0 already applied (ledger created)`, then
+  `0 applied, 74 already applied`. `schema_migrations` holds all 14 files listed above.
+- Seeded with `db:seed:local-users`, `db:seed:career-readiness`, `db:seed:careers`,
+  `db:seed:career-catalogue`, `db:import:teaching-strategies-draft`, `db:import:aptitude-bank-draft`,
+  `db:import:career-target-draft`, then the synthetic walkthrough of the three pilot runbooks.
+- Check queries, as written in each note, after the walkthrough:
+
+| Note | Result |
+|---|---|
+| 0047 | 4 attempt rows; triggers `learning_attempt_events_append_only`, `learning_sessions_append_only` present (the `LIKE` also lists 0053's `learning_decisions_append_only`) |
+| 0049 | `teaching_strategies`: 7 `DRAFT` |
+| 0050 | `evidence_records`: `ESTIMATED/f` 1, `RETAINED/f` 1 |
+| 0052 | `engine:rebuild-skill-state` gave `subjects 1, written 2`; after the withdrawal and the definition retirement, 0 rows and a rebuild writes 0 |
+| 0053 | 1 decision; `engine:replay-decisions` gave `checked 1, matched 1`, exit 0 |
+| 0056 | `career_requirement_sets`: `AGENT_DRAFTED/DRAFT` 1 |
+| 0061 | 0 ladders (none published by the seeds) |
+| 0062 | 0 runs; `engine:calibration-export` gave `learners 0, items 0, responses 0` (no model-improvement definition: fails closed) |
+| 0064 | 0 sittings (no calibrated items, so no placement pool) |
+| 0065 | 3 current lesson versions |
+| 0066 | 0 assignments |
+| 0068 | no goal rows (the synthetic student set no target) |
+| 0072 | 0 step items (no practice published for the step) |
+| 0082 | 0 overrides |
+
+Not exercised: a code rollback to a previous release (needs a server and a previous release; gap 3),
+and the `systemctl` steps.
+

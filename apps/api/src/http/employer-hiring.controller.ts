@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, ForbiddenException, Get, Inject, NotFoundException, Param, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, ForbiddenException, Get, Inject, NotFoundException, Param, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { detectOpportunitySignals, OPPORTUNITY_DETECTOR_VERSION } from '@planthepath/hiring/src/review-signals.js';
 import { summarizeHiringAnalytics, type HiringAggregateRow } from '@planthepath/hiring/src/analytics.js';
@@ -44,6 +44,7 @@ import {
 } from './interview-scheduling.js';
 import { selectionStagesOf } from './opportunity-requirements.js';
 import { opportunityHasAudienceSql } from './campus-drives.js';
+import { sharesEvidenceForTopic, skillEvidenceEnabled } from './skill-evidence.js';
 import {
   assertEmployerState,
   employerStateRefusal,
@@ -288,10 +289,21 @@ export class EmployerHiringController {
 
   @Get('/employers/:employerId/opportunities/:opportunityId/applications')
   @UseGuards(ProtectedApiAuthenticationGuard)
-  async listApplicants(@Req() request: ProtectedHttpRequest, @Param('employerId') employerId: string, @Param('opportunityId') opportunityId: string): Promise<Record<string, unknown>> {
+  async listApplicants(@Req() request: ProtectedHttpRequest, @Param('employerId') employerId: string, @Param('opportunityId') opportunityId: string,
+    @Query('evidenceSkill') evidenceSkill?: string): Promise<Record<string, unknown>> {
     const context = await this.requireEmployer(request, employerId, employerInterviewRoles, 'candidates');
     const id = requireUuid(opportunityId, context.correlationId);
     await this.requireOwnedOpportunity(employerId, id, context.correlationId);
+    // EMP-13 (decision 10.2 #5): filter, never rank, by "has shared evidence for this catalogue skill".
+    // Only candidates whose grant is live can match, so a withdrawn applicant is never revealed to have
+    // shared anything; the list keeps its own order. Dark until HG-4 is approved.
+    const evidenceEnabled = await skillEvidenceEnabled(this.db);
+    let evidenceFilter = sql``;
+    if (evidenceSkill !== undefined) {
+      if (typeof evidenceSkill !== 'string' || !uuidPattern.test(evidenceSkill)) throw badRequest('INVALID_EVIDENCE_SKILL', context.correlationId);
+      if (!evidenceEnabled) throw badRequest('EVIDENCE_SHARING_UNAVAILABLE', context.correlationId);
+      evidenceFilter = sql`AND ${applicationHasLiveApplicantGrant('a')} AND ${sharesEvidenceForTopic('a', evidenceSkill)}`;
+    }
 
     // Drafts are never visible. Withdrawn, closed and otherwise ungranted candidates stay
     // listed so the employer knows to stop scheduling, but their identifying fields are
@@ -322,6 +334,7 @@ export class EmployerHiringController {
       WHERE a.opportunity_id = ${id}::uuid
         AND a.employer_id = ${employerId}::uuid
         AND a.state <> 'DRAFT'
+        ${evidenceFilter}
       ORDER BY a.updated_at DESC
       LIMIT 500
     `) as QueryResult<Record<string, unknown>>;
@@ -332,7 +345,21 @@ export class EmployerHiringController {
       LEFT JOIN interview_scorecard_templates t ON t.id = st.scorecard_template_id
       WHERE o.id = ${id}::uuid AND o.employer_id = ${employerId}::uuid ORDER BY st.stage_order
     `) as QueryResult<Record<string, unknown>>;
-    return { applications: rows.rows.map(mapApplicantRow), stages: selectionStagesOf(stages.rows), correlationId: context.correlationId };
+    if (evidenceSkill !== undefined) {
+      await this.writeAudit(context.authorization.principal.userId, 'application.evidence_filter_used', 'opportunity', id, context.correlationId, this.db, employerId);
+    }
+    // The job's catalogue skills to filter by, only while the feature is on. Names only for display.
+    const evidenceSkills = evidenceEnabled ? (await this.db.execute(sql`
+      SELECT s.taxonomy_topic_id, s.skill_name FROM opportunities o
+      JOIN opportunity_skill_requirements s ON s.opportunity_version_id = o.current_version_id AND s.taxonomy_topic_id IS NOT NULL
+      WHERE o.id = ${id}::uuid AND o.employer_id = ${employerId}::uuid
+      ORDER BY s.requirement_level DESC, lower(s.skill_name)
+    `) as QueryResult<{ taxonomy_topic_id: string; skill_name: string }>).rows.map((row) => ({ topicId: row.taxonomy_topic_id, name: row.skill_name })) : null;
+    return {
+      applications: rows.rows.map(mapApplicantRow), stages: selectionStagesOf(stages.rows),
+      ...(evidenceSkills ? { evidenceSkills } : {}),
+      correlationId: context.correlationId,
+    };
   }
 
   @Post('/employers/:employerId/applications/:applicationId/transition')

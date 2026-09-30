@@ -85,6 +85,7 @@ now includes it and — where it does not — why not. It also checks privacy de
 | `application_feedback_releases` (+ reasons) (0035) | **`feedbackReleased`** — employer, job, note, reasons as labelled for the student, when | Retained with the application |
 | `application_eligibility_evaluations` (0054) | Excluded: the employer's screening of the application against its rules, like scorecards | Retained with the application |
 | `employer_applicant_access_grants` (0000) | **`employerAccess`** — which employer, granted, expires, revoked. The person's record of who could see them | Revoked first (existing) |
+| `application_evidence_shares` (0093, EMP-13) | **`evidenceShares`** — employer, job, skill, evidence type and source, recorded, unaided, how and when shared, when and why revoked. No evidence identifier, no marks | Every live share revoked (`ACCOUNT_DELETION`) with the grants; rows retained as the record of consent |
 | `application_resume_download_links` (0058) | Excluded: which employer member downloaded the résumé names another person. Listed in `notIncluded` | Retained (the stored file is deleted) |
 | `application_message_threads`, `application_messages` (0067) | `applicationMessages` (existing) | APPLICATION_MESSAGES — erased |
 | `employer_assessment_*` (0036, 0077) | `screeningAssessments` (existing) | EMPLOYER_SCREENING — anonymised |

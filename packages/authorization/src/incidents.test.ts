@@ -6,13 +6,14 @@
  */
 import { describe, expect, it } from 'vitest';
 import { hasInternalCapability } from './internal-capabilities.js';
-import { approvalRequestReasons, highRiskActions, isLegacyHighRiskActionKey, refuseApprovalRequest } from './high-risk-actions.js';
+import { approvalRequestReasons, highRiskActions, isLegacyHighRiskActionKey, refuseApprovalRequest, soloCoolingOffMinutes } from './high-risk-actions.js';
 import {
   breachBoardClockHours,
   breachClockBasis,
   classifyBreachClock,
   commsTemplatePublishReasons,
   containsContactDetails,
+  decideStatusNoticeApprover,
   incidentStates,
   incidentTransitionReasons,
   incidentTransitions,
@@ -22,6 +23,7 @@ import {
   refuseStatusNoticeApproval,
   statusNoticeAudienceRoles,
   statusNoticeDailyLimit,
+  statusNoticeSoloCoolingOffMinutes,
   statusNoticeStableKey,
 } from './incidents.js';
 
@@ -142,6 +144,22 @@ describe('status notices', () => {
     expect(refuseStatusNoticeApproval({ ...ready, noticeState: 'SENT' })).toBe('STATUS_NOTICE_NOT_DRAFT');
     expect(refuseStatusNoticeApproval({ ...ready, approvedInSpacingWindow: 1 })).toBe('STATUS_NOTICE_RATE_LIMITED');
     expect(refuseStatusNoticeApproval({ ...ready, approvedInLastDay: statusNoticeDailyLimit })).toBe('STATUS_NOTICE_RATE_LIMITED');
+  });
+
+  it('is approved by a person other than its drafter (OPS-02 requester-is-not-approver)', () => {
+    const facts = { actorUserId: 'second', draftedByUserId: 'drafter', approverCount: 3, coolingOffElapsed: false };
+    expect(decideStatusNoticeApprover(facts)).toEqual({ solo: false });
+    expect(decideStatusNoticeApprover({ ...facts, actorUserId: 'drafter' })).toEqual({ refusal: 'STATUS_NOTICE_SELF_APPROVAL_REFUSED' });
+    expect(decideStatusNoticeApprover({ ...facts, actorUserId: 'drafter', coolingOffElapsed: true })).toEqual({ refusal: 'STATUS_NOTICE_SELF_APPROVAL_REFUSED' });
+  });
+
+  it('lets the sole approver approve their own notice only after the cooling-off, marked solo', () => {
+    const solo = { actorUserId: 'drafter', draftedByUserId: 'drafter', approverCount: 1, coolingOffElapsed: false };
+    expect(decideStatusNoticeApprover(solo)).toEqual({ refusal: 'STATUS_NOTICE_SOLO_COOLING_OFF' });
+    expect(decideStatusNoticeApprover({ ...solo, coolingOffElapsed: true })).toEqual({ solo: true });
+    // The safeguard switches itself off once a second approver exists.
+    expect(decideStatusNoticeApprover({ ...solo, coolingOffElapsed: true, approverCount: 2 })).toEqual({ refusal: 'STATUS_NOTICE_SELF_APPROVAL_REFUSED' });
+    expect(statusNoticeSoloCoolingOffMinutes).toBe(soloCoolingOffMinutes);
   });
 
   it('reaches administrators only, never students', () => {

@@ -5,7 +5,8 @@
  * and who recorded notifying the Board and the affected users, and when; a breach cannot close
  * until both are recorded. A status notice cannot be drafted from an unapproved template version —
  * refused by the API, and by the 0081 trigger for any other writer. Template publication goes
- * through OPS-02 dual control; a notice is a draft until a person approves it, is rate-limited,
+ * through OPS-02 dual control; a notice is a draft until a person other than its drafter approves
+ * it (0090: the drafter only as the sole approver, after the cooling-off, marked SOLO), is rate-limited,
  * and is sent by the outbox worker to the administrators of the affected organisations only, with
  * email NOT_CONFIGURED when no mail sink exists. Every write is audited with its reason code.
  *
@@ -505,13 +506,13 @@ describe('status notices', () => {
     expect(draft.body.notice).toMatchObject({ state: 'DRAFT', sentAt: null, recipientCount: null });
     const noticeId = draft.body.notice.id as string;
     // No affected organisation yet: nothing to send to.
-    const noAudience = await api().post(`${comms}/notices/${noticeId}/approve`).set(auth(operations.userId)).send({ reasonCode: 'APPROVED_FOR_SEND' });
+    const noAudience = await api().post(`${comms}/notices/${noticeId}/approve`).set(auth(secondOperations.userId)).send({ reasonCode: 'APPROVED_FOR_SEND' });
     expect(noAudience.status).toBe(409);
     expect(noAudience.body.error.code).toBe('STATUS_NOTICE_NO_AUDIENCE');
     await addCollege(incidentId);
-    const approved = await api().post(`${comms}/notices/${noticeId}/approve`).set(auth(operations.userId)).send({ reasonCode: 'APPROVED_FOR_SEND' });
+    const approved = await api().post(`${comms}/notices/${noticeId}/approve`).set(auth(secondOperations.userId)).send({ reasonCode: 'APPROVED_FOR_SEND' });
     expect(approved.status, JSON.stringify(approved.body)).toBe(201);
-    expect(approved.body.notice).toMatchObject({ state: 'QUEUED', approvedBy: operations.email, sentAt: null });
+    expect(approved.body.notice).toMatchObject({ state: 'QUEUED', approvedBy: secondOperations.email, approveMode: 'DUAL', sentAt: null });
     // Nothing is sent inside the request.
     expect((await pool.query("SELECT count(*)::int AS n FROM user_notifications WHERE kind='STATUS_NOTICE' AND user_id=$1", [collegeAdmin.userId])).rows[0].n).toBe(0);
 
@@ -532,13 +533,13 @@ describe('status notices', () => {
 
     // The incident shows who was notified when.
     const detail = await api().get(`${base}/${incidentId}`).set(auth(security.userId)).expect(200);
-    expect(detail.body.notices[0]).toMatchObject({ state: 'SENT', approvedBy: operations.email, recipientCount: 1, organizationCount: 1 });
+    expect(detail.body.notices[0]).toMatchObject({ state: 'SENT', approvedBy: secondOperations.email, approveMode: 'DUAL', recipientCount: 1, organizationCount: 1 });
     expect(detail.body.timeline.map((entry: { kind: string }) => entry.kind)).toEqual(expect.arrayContaining(['NOTICE_DRAFTED', 'NOTICE_QUEUED', 'NOTICE_SENT']));
-    expect((await auditRows('operations.status_notice.sent', noticeId))[0]).toMatchObject({ actor_user_id: operations.userId, context: { recipientCount: 1, organizationCount: 1, emailConfigured: false } });
+    expect((await auditRows('operations.status_notice.sent', noticeId))[0]).toMatchObject({ actor_user_id: secondOperations.userId, context: { recipientCount: 1, organizationCount: 1, emailConfigured: false } });
 
     // A second notice within 15 minutes is refused.
     const next = await api().post(comms + '/notices').set(auth(operations.userId)).send({ incidentId, templateId, reasonCode: 'INCIDENT_UPDATE' });
-    const limited = await api().post(`${comms}/notices/${next.body.notice.id}/approve`).set(auth(operations.userId)).send({ reasonCode: 'APPROVED_FOR_SEND' });
+    const limited = await api().post(`${comms}/notices/${next.body.notice.id}/approve`).set(auth(secondOperations.userId)).send({ reasonCode: 'APPROVED_FOR_SEND' });
     expect(limited.status).toBe(429);
     expect(limited.body.error.code).toBe('STATUS_NOTICE_RATE_LIMITED');
     // A replayed dispatch sends nothing twice.
@@ -552,7 +553,7 @@ describe('status notices', () => {
     const incidentId = await declared();
     await addCollege(incidentId, otherCollegeId);
     const draft = await api().post(comms + '/notices').set(auth(operations.userId)).send({ incidentId, templateId, reasonCode: 'INITIAL_NOTICE' });
-    await api().post(`${comms}/notices/${draft.body.notice.id}/approve`).set(auth(operations.userId)).send({ reasonCode: 'APPROVED_FOR_SEND' }).expect(201);
+    await api().post(`${comms}/notices/${draft.body.notice.id}/approve`).set(auth(secondOperations.userId)).send({ reasonCode: 'APPROVED_FOR_SEND' }).expect(201);
     delivered.length = 0;
     await drain(captureSink);
     expect(delivered).toHaveLength(1);
@@ -569,13 +570,17 @@ describe('status notices', () => {
     const withdrawn = await api().post(`${comms}/notices/${draft.body.notice.id}/withdraw`).set(auth(operations.userId)).send({ reasonCode: 'WRONG_TEMPLATE' });
     expect(withdrawn.body.notice.state).toBe('WITHDRAWN');
     await addCollege(incidentId);
-    const approve = await api().post(`${comms}/notices/${draft.body.notice.id}/approve`).set(auth(operations.userId)).send({ reasonCode: 'APPROVED_FOR_SEND' });
+    const approve = await api().post(`${comms}/notices/${draft.body.notice.id}/approve`).set(auth(secondOperations.userId)).send({ reasonCode: 'APPROVED_FOR_SEND' });
     expect(approve.status).toBe(409);
     expect(approve.body.error.code).toBe('STATUS_NOTICE_NOT_DRAFT');
-    expect((await api().post(`${comms}/notices/${draft.body.notice.id}/approve`).set(auth(operations.userId)).send({ reasonCode: 'SEND_IT' })).status).toBe(400);
+    expect((await api().post(`${comms}/notices/${draft.body.notice.id}/approve`).set(auth(secondOperations.userId)).send({ reasonCode: 'SEND_IT' })).status).toBe(400);
   });
 
   it('bounds notice and template paging', async () => {
+    const draftedBy = (await api().get(comms + '/notices').set(auth(operations.userId)).expect(200)).body.notices[0];
+    // The drafter is named by email and a flag, never by an internal id.
+    expect(draftedBy).not.toHaveProperty('draftedByUserId');
+    expect(draftedBy.draftedBySelf).toBe(true);
     expect((await api().get(comms + '/notices?limit=201').set(auth(operations.userId))).status).toBe(400);
     expect((await api().get(comms + '/templates?limit=0').set(auth(operations.userId))).status).toBe(400);
     expect((await api().get(comms + '/templates?state=LIVE').set(auth(operations.userId))).status).toBe(400);
@@ -583,5 +588,115 @@ describe('status notices', () => {
     expect(policy.body.rateLimit).toEqual({ minimumSpacingMinutes: 15, dailyLimit: 6 });
     expect(policy.body.incidents.length).toBeGreaterThan(0);
     expect(Object.keys(policy.body.incidents[0]).sort()).toEqual(['affectedOrganizationsCount', 'category', 'id', 'reference', 'state', 'title']);
+  });
+});
+
+/** Backdate a draft past the solo cooling-off; drafted_at is immutable to every writer but a test. */
+async function backdateDraft(noticeId: string, minutes: number): Promise<void> {
+  await pool.query('ALTER TABLE incident_status_notices DISABLE TRIGGER incident_status_notice_guard');
+  try {
+    await pool.query("UPDATE incident_status_notices SET drafted_at = now() - ($2 || ' minutes')::interval WHERE id = $1", [noticeId, String(minutes)]);
+  } finally {
+    await pool.query('ALTER TABLE incident_status_notices ENABLE TRIGGER incident_status_notice_guard');
+  }
+}
+
+describe('notice approval by a second person (0090)', () => {
+  it('refuses the drafter\'s own approval while someone else can approve, and records the second person', async () => {
+    const templateId = await publishedTemplate('second-person-notice');
+    const incidentId = await declared();
+    await addCollege(incidentId);
+    const draft = await api().post(comms + '/notices').set(auth(operations.userId)).send({ incidentId, templateId, reasonCode: 'INITIAL_NOTICE' });
+    expect(draft.status, JSON.stringify(draft.body)).toBe(201);
+    const noticeId = draft.body.notice.id as string;
+    expect(draft.body.notice).toMatchObject({ draftedBySelf: true, approveMode: null });
+    // Long past the cooling-off: that is not what makes a self-approval possible while others can approve.
+    await backdateDraft(noticeId, 60);
+
+    const own = await api().post(`${comms}/notices/${noticeId}/approve`).set(auth(operations.userId)).send({ reasonCode: 'APPROVED_FOR_SEND' });
+    expect(own.status).toBe(403);
+    expect(own.body.error.code).toBe('STATUS_NOTICE_SELF_APPROVAL_REFUSED');
+    expect((await pool.query('SELECT state, approved_by_user_id FROM incident_status_notices WHERE id=$1', [noticeId])).rows[0]).toEqual({ state: 'DRAFT', approved_by_user_id: null });
+    expect(await auditRows('operations.status_notice.approved', noticeId)).toHaveLength(0);
+
+    const listed = (await api().get(`${comms}/notices?incidentId=${incidentId}`).set(auth(secondOperations.userId)).expect(200)).body.notices[0];
+    expect(listed.draftedBySelf).toBe(false);
+    const policy = (await api().get(comms + '/policy').set(auth(operations.userId)).expect(200)).body;
+    expect(policy).toMatchObject({ noticeSoloSafeguardActive: false, soloCoolingOffMinutes: 15 });
+    expect(policy.noticeApproverCount).toBeGreaterThan(1);
+
+    const second = await api().post(`${comms}/notices/${noticeId}/approve`).set(auth(secondOperations.userId)).send({ reasonCode: 'APPROVED_FOR_SEND' });
+    expect(second.status, JSON.stringify(second.body)).toBe(201);
+    expect(second.body.notice).toMatchObject({ state: 'QUEUED', approvedBy: secondOperations.email, approveMode: 'DUAL', draftedBySelf: false });
+    expect((await auditRows('operations.status_notice.approved', noticeId))[0]).toMatchObject({
+      actor_user_id: secondOperations.userId, context: { mode: 'DUAL', draftedByUserId: operations.userId, reasonCode: 'APPROVED_FOR_SEND' },
+    });
+  });
+
+  it('refuses a second writer that self-approves, or marks a second person\'s approval as solo (0090 trigger)', async () => {
+    const templateId = await publishedTemplate('trigger-notice');
+    const incidentId = await declared();
+    await addCollege(incidentId);
+    const draft = await api().post(comms + '/notices').set(auth(operations.userId)).send({ incidentId, templateId, reasonCode: 'INITIAL_NOTICE' });
+    const noticeId = draft.body.notice.id as string;
+    await backdateDraft(noticeId, 60);
+    await expect(pool.query(
+      "UPDATE incident_status_notices SET state='QUEUED', approved_by_user_id=$2, approve_reason_code='APPROVED_FOR_SEND' WHERE id=$1",
+      [noticeId, operations.userId],
+    )).rejects.toThrow(/other than its drafter/);
+    // Solo while other approvers exist.
+    await expect(pool.query(
+      "UPDATE incident_status_notices SET state='QUEUED', approved_by_user_id=$2, approve_reason_code='APPROVED_FOR_SEND', approve_solo=true WHERE id=$1",
+      [noticeId, operations.userId],
+    )).rejects.toThrow(/only while one person can approve/);
+    await expect(pool.query(
+      "UPDATE incident_status_notices SET state='QUEUED', approved_by_user_id=$2, approve_reason_code='APPROVED_FOR_SEND', approve_solo=true WHERE id=$1",
+      [noticeId, secondOperations.userId],
+    )).rejects.toThrow(/solo/);
+  });
+
+  it('lets the sole approver approve their own notice after the cooling-off, marked SOLO', async () => {
+    const templateId = await publishedTemplate('solo-notice');
+    const incidentId = await declared();
+    await addCollege(incidentId);
+    const draft = await api().post(comms + '/notices').set(auth(operations.userId)).send({ incidentId, templateId, reasonCode: 'INITIAL_NOTICE' });
+    expect(draft.status, JSON.stringify(draft.body)).toBe(201);
+    const noticeId = draft.body.notice.id as string;
+    // Make the drafter the only person who can approve notices, as in a one-person pilot.
+    const others = (await pool.query(
+      "UPDATE organization_memberships SET state='SUSPENDED' WHERE organization_id=$1 AND user_id <> $2 AND state='ACTIVE' RETURNING id",
+      [platformId, operations.userId],
+    )).rows.map((row: { id: string }) => row.id);
+    try {
+      const policy = (await api().get(comms + '/policy').set(auth(operations.userId)).expect(200)).body;
+      expect(policy).toMatchObject({ noticeApproverCount: 1, noticeSoloSafeguardActive: true });
+
+      const early = await api().post(`${comms}/notices/${noticeId}/approve`).set(auth(operations.userId)).send({ reasonCode: 'APPROVED_FOR_SEND' });
+      expect(early.status).toBe(403);
+      expect(early.body.error.code).toBe('STATUS_NOTICE_SOLO_COOLING_OFF');
+      expect((await pool.query('SELECT state FROM incident_status_notices WHERE id=$1', [noticeId])).rows[0].state).toBe('DRAFT');
+      // The trigger holds the same line for any other writer.
+      await expect(pool.query(
+        "UPDATE incident_status_notices SET state='QUEUED', approved_by_user_id=$2, approve_reason_code='APPROVED_FOR_SEND', approve_solo=true WHERE id=$1",
+        [noticeId, operations.userId],
+      )).rejects.toThrow(/cooling-off/);
+
+      await backdateDraft(noticeId, 16);
+      const solo = await api().post(`${comms}/notices/${noticeId}/approve`).set(auth(operations.userId)).send({ reasonCode: 'APPROVED_FOR_SEND' });
+      expect(solo.status, JSON.stringify(solo.body)).toBe(201);
+      expect(solo.body.notice).toMatchObject({ state: 'QUEUED', approvedBy: operations.email, approveMode: 'SOLO', draftedBySelf: true });
+      expect((await pool.query('SELECT approve_solo FROM incident_status_notices WHERE id=$1', [noticeId])).rows[0].approve_solo).toBe(true);
+      expect((await auditRows('operations.status_notice.approved', noticeId))[0]).toMatchObject({
+        actor_user_id: operations.userId, context: { mode: 'SOLO', draftedByUserId: operations.userId },
+      });
+      // The approval, SOLO mark included, is immutable once sent.
+      await drain();
+      expect((await pool.query('SELECT state, approve_solo FROM incident_status_notices WHERE id=$1', [noticeId])).rows[0]).toEqual({ state: 'SENT', approve_solo: true });
+      await expect(pool.query('UPDATE incident_status_notices SET approve_solo=false WHERE id=$1', [noticeId])).rejects.toThrow(/only by a transition/);
+    } finally {
+      await pool.query("UPDATE organization_memberships SET state='ACTIVE' WHERE id = ANY($1::uuid[])", [others]);
+    }
+    const detail = await api().get(`${base}/${incidentId}`).set(auth(security.userId)).expect(200);
+    expect(detail.body.notices[0]).toMatchObject({ state: 'SENT', approveMode: 'SOLO' });
   });
 });

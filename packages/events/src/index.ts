@@ -102,8 +102,9 @@ const opportunityLifecycleStates = ['DRAFT', 'PENDING_REVIEW', 'PUBLISHED', 'PAU
 // OPS-08: requirement-set lifecycle states (0051).
 const careerRequirementSetStates = ['DRAFT', 'IN_REVIEW', 'REVIEWED', 'PUBLISHED', 'SUPERSEDED', 'WITHDRAWN'] as const;
 
-// OPS-09a: the 0004 content-revision lifecycle, as a skill revision moves through it.
-const skillRevisionStates = ['DRAFT', 'IN_REVIEW', 'CHANGES_REQUESTED', 'APPROVED', 'PUBLISHED'] as const;
+// OPS-09a: the 0004 content-revision lifecycle, as a skill revision moves through it. ARCHIVED is
+// the last step (0090, content-archive-design.md): an additive value, and these events have no consumer.
+const skillRevisionStates = ['DRAFT', 'IN_REVIEW', 'CHANGES_REQUESTED', 'APPROVED', 'PUBLISHED', 'ARCHIVED'] as const;
 
 // EMP-08: applications.state (0007 CHECK).
 const applicationStates = ['DRAFT', 'APPLIED', 'SCREENING', 'SHORTLISTED', 'ASSESSMENT', 'INTERVIEW', 'OFFER', 'HIRED', 'REJECTED', 'WITHDRAWN'] as const;

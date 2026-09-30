@@ -36,11 +36,13 @@ import {
 } from '@planthepath/career-readiness';
 import { assertLearnerContentReviewTransition } from '@planthepath/learner-content';
 import {
+  lessonArchiveBlockers,
   lessonOpenRevisionStates,
   lessonPublishAltersReadinessInputs,
   type LessonEditorRefusal,
   type LessonRevisionState,
 } from '@planthepath/authorization/src/index.js';
+import { archivePublishedRevisions } from './content-archive.js';
 import { consumeOperationApproval, type ConsumedApproval } from './operation-approvals.js';
 import { validateAuditWriteInput, validateOutboxWriteInput } from './repositories.js';
 import { agentDraftBodyKeys, type AgentDraftProvenance } from './skill-map.js';
@@ -101,6 +103,7 @@ export type LessonEditorErrorCode =
   | 'LESSON_MODULE_UNKNOWN'
   | 'LESSON_PREREQUISITE_NOT_LIVE'
   | 'LESSON_TRANSITION_NOT_ALLOWED'
+  | 'LESSON_ARCHIVE_BLOCKED'
   | 'LESSON_INVALID'
   | 'LESSON_EDITOR_REJECTED';
 
@@ -174,7 +177,8 @@ const contentHashOf = (body: Record<string, unknown>): string => sha256Hex(stabl
 // Reads
 // ---------------------------------------------------------------------------
 
-export type LessonStatus = 'LIVE' | 'PENDING';
+/** ARCHIVED: every published revision archived (content-archive-design.md); the lesson is served nowhere. */
+export type LessonStatus = 'LIVE' | 'PENDING' | 'ARCHIVED';
 export type LessonKind = 'BASE' | 'VARIANT';
 export type LessonListFilter = LessonStatus | 'AWAITING_REVIEW' | 'CHANGES_REQUESTED' | 'AWAITING_PUBLISH' | 'VARIANTS';
 export type TopicStatus = 'LIVE' | 'PENDING' | 'RETIRED';
@@ -261,7 +265,7 @@ function mapSummary(row: LessonDbRow): LessonSummaryRow {
     variant: identity.variant,
     variantOf: identity.variantOf,
     title: fields.title || 'NA',
-    status: row.published_revision === null ? 'PENDING' : 'LIVE',
+    status: row.published_revision !== null ? 'LIVE' : row.latest_state === 'ARCHIVED' ? 'ARCHIVED' : 'PENDING',
     publishedRevision: row.published_revision === null ? null : Number(row.published_revision),
     openRevision: open ? { id: row.latest_id, revision: Number(row.latest_revision), state: row.latest_state } : null,
     topic: variant ? null : topicOf(row),
@@ -280,7 +284,8 @@ function filterSql(filter: LessonListFilter | undefined): SQL {
   switch (filter) {
     case undefined: return sql`TRUE`;
     case 'LIVE': return sql`q.published_revision IS NOT NULL`;
-    case 'PENDING': return sql`q.published_revision IS NULL`;
+    case 'PENDING': return sql`q.published_revision IS NULL AND q.latest_state <> 'ARCHIVED'`;
+    case 'ARCHIVED': return sql`q.published_revision IS NULL AND q.latest_state = 'ARCHIVED'`;
     case 'AWAITING_REVIEW': return sql`q.latest_state = 'IN_REVIEW'`;
     case 'CHANGES_REQUESTED': return sql`q.latest_state = 'CHANGES_REQUESTED'`;
     case 'AWAITING_PUBLISH': return sql`q.latest_state = 'APPROVED'`;
@@ -314,6 +319,7 @@ export interface LessonEditorSummary {
   readonly awaitingReview: number;
   readonly awaitingPublish: number;
   readonly liveVariants: number;
+  readonly archived: number;
 }
 
 /** Counts for the header, in one bounded query (§5.7). */
@@ -321,14 +327,18 @@ export async function summariseLessons(runner: SqlRunner): Promise<LessonEditorS
   const [row] = await rows<Record<string, number>>(runner, sql`
     SELECT
       count(*) FILTER (WHERE q.variant_of IS NULL AND q.published_revision IS NOT NULL)::int AS live,
-      count(*) FILTER (WHERE q.published_revision IS NULL)::int AS pending,
+      count(*) FILTER (WHERE q.published_revision IS NULL AND q.latest_state <> 'ARCHIVED')::int AS pending,
+      count(*) FILTER (WHERE q.published_revision IS NULL AND q.latest_state = 'ARCHIVED')::int AS archived,
       count(*) FILTER (WHERE q.latest_state = 'IN_REVIEW')::int AS awaiting_review,
       count(*) FILTER (WHERE q.latest_state = 'APPROVED')::int AS awaiting_publish,
       count(*) FILTER (WHERE q.variant_of IS NOT NULL AND q.published_revision IS NOT NULL)::int AS live_variants
     FROM (${lessonSelect}) q
   `);
   const value = (key: string): number => Number(row?.[key] ?? 0);
-  return { live: value('live'), pending: value('pending'), awaitingReview: value('awaiting_review'), awaitingPublish: value('awaiting_publish'), liveVariants: value('live_variants') };
+  return {
+    live: value('live'), pending: value('pending'), awaitingReview: value('awaiting_review'), awaitingPublish: value('awaiting_publish'),
+    liveVariants: value('live_variants'), archived: value('archived'),
+  };
 }
 
 /** The published modules a base lesson can belong to (only the pilot's, today). */
@@ -1111,6 +1121,72 @@ export async function publishLessonRevision(db: TransactionalRunner, input: {
         },
       });
       return { lessonId: revision.entity_id, lessonVersionId, releaseManifestId: manifestId, approval };
+    });
+  } catch (error) {
+    rethrow(error);
+  }
+}
+
+/**
+ * Archive a live lesson or variant (docs/architecture/content-archive-design.md): refused while a
+ * revision is open, and for a base lesson while a variant of it is live or a current lesson needs
+ * it first. Otherwise every published revision becomes ARCHIVED (with its ARCHIVE review action),
+ * so no older one becomes "the latest published" a variant reader would serve; for a base lesson
+ * the current lesson version is superseded, the column the catalogue, the learning steps and
+ * faculty actions read. Progress and evidence already pointing at it stay valid; nothing is
+ * deleted, and the lesson cannot be revised again.
+ */
+export async function archiveLesson(db: TransactionalRunner, input: {
+  readonly lessonId: string; readonly reasonCode: string; readonly actor: LessonActor;
+}): Promise<{ readonly lessonId: string; readonly archivedRevisions: readonly number[] }> {
+  try {
+    return await db.transaction(async (tx) => {
+      await lockLesson(tx, input.lessonId);
+      const [exists] = await rows<{ n: number }>(tx, sql`SELECT count(*)::int AS n FROM content_revisions WHERE entity_type = 'LESSON' AND entity_id = ${input.lessonId}::uuid`);
+      if (!Number(exists?.n)) throw new LessonEditorError('LESSON_NOT_FOUND');
+      const [published] = await rows<{ id: string; body: unknown }>(tx, sql`
+        SELECT id, body FROM content_revisions WHERE entity_type = 'LESSON' AND entity_id = ${input.lessonId}::uuid AND state = 'PUBLISHED'
+        ORDER BY revision DESC LIMIT 1
+      `);
+      if (!published) throw new LessonEditorError('LESSON_NOT_LIVE');
+      const identity = readLessonIdentity(published.body);
+      const base = identity.variantOf === null;
+      const [facts] = base
+        ? await rows<{ variants: number; dependents: number }>(tx, sql`
+          SELECT
+            (SELECT count(DISTINCT c.entity_id)::int FROM content_revisions c
+              WHERE c.entity_type = 'LESSON' AND c.state = 'PUBLISHED' AND c.body ->> 'variantOf' = ${input.lessonId}) AS variants,
+            (SELECT count(DISTINCT v.stable_key)::int FROM lesson_versions v
+              JOIN lesson_prerequisites p ON p.lesson_version_id = v.id
+              JOIN lesson_versions pv ON pv.id = p.prerequisite_lesson_version_id
+              WHERE v.superseded_at IS NULL AND pv.stable_key = ${identity.stableKey} AND v.stable_key <> ${identity.stableKey}) AS dependents
+        `)
+        : [{ variants: 0, dependents: 0 }];
+      const blockers = lessonArchiveBlockers({
+        openRevision: (await openRevisionOf(tx, input.lessonId)) !== null,
+        liveVariantCount: Number(facts?.variants ?? 0),
+        liveDependentLessonCount: Number(facts?.dependents ?? 0),
+      });
+      if (blockers.length) throw new LessonEditorError('LESSON_ARCHIVE_BLOCKED', blockers);
+      const archived = await archivePublishedRevisions(tx, {
+        entityType: 'LESSON', entityId: input.lessonId, reasonCode: input.reasonCode, actorUserId: input.actor.userId, correlationId: input.actor.correlationId,
+      });
+      // A base lesson leaves the catalogue at once: every read takes superseded_at IS NULL (the 0065
+      // guard allows this one change). A variant writes no lesson version.
+      const withdrawn = base
+        ? await rows<{ id: string }>(tx, sql`
+          UPDATE lesson_versions SET superseded_at = now() WHERE stable_key = ${identity.stableKey} AND superseded_at IS NULL RETURNING id
+        `)
+        : [];
+      await audit(tx, {
+        actor: input.actor, action: 'operations.content.lesson_archived', revisionId: published.id,
+        context: {
+          lessonId: input.lessonId, stableKey: identity.stableKey, kind: base ? 'BASE' : 'VARIANT', variant: lessonVariantLabel(identity.variant),
+          reasonCode: input.reasonCode, archivedRevisions: archived.map((entry) => entry.revision), lessonVersionIds: withdrawn.map((row) => row.id),
+        },
+      });
+      for (const revision of archived) await stateChanged(tx, input.actor, revision.id, input.lessonId, 'PUBLISHED', 'ARCHIVED');
+      return { lessonId: input.lessonId, archivedRevisions: archived.map((entry) => entry.revision) };
     });
   } catch (error) {
     rethrow(error);

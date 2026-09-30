@@ -32,7 +32,9 @@ import {
 } from '@nestjs/common';
 import {
   canReadSkillMap,
+  contentArchiveReasons,
   hasInternalCapability,
+  refuseContentArchive,
   refuseSkillPublish,
   refuseSkillTransition,
   resolveInternalCapability,
@@ -44,6 +46,7 @@ import {
   type InternalCapabilityContext,
 } from '@planthepath/authorization/src/index.js';
 import {
+  archiveSkill,
   createSkill,
   SKILL_ATTRIBUTION_MAX,
   SKILL_BASIS_MAX,
@@ -103,7 +106,7 @@ export class OperationsSkillMapController {
       levels: SKILL_LEVELS.map((level) => ({ level, meaning: SKILL_LEVEL_MEANINGS[level] })),
       licences: SKILL_LICENCES.map((licence) => ({ licence, attributionRequired: SKILL_LICENCES_REQUIRING_ATTRIBUTION.includes(licence) })),
       transitions: skillRevisionTransitions,
-      reasons: { ...skillMapReasons, publish: skillPublishReasons },
+      reasons: { ...skillMapReasons, publish: skillPublishReasons, archive: contentArchiveReasons },
       limits: {
         name: SKILL_NAME_MAX, description: SKILL_DESCRIPTION_MAX, level: SKILL_LEVEL_MAX, prerequisites: SKILL_PREREQUISITES_MAX,
         attribution: SKILL_ATTRIBUTION_MAX, basis: SKILL_BASIS_MAX, note: noteLimit,
@@ -166,6 +169,29 @@ export class OperationsSkillMapController {
     try {
       await startSkillRevision(this.db, { topicId: id, reasonCode, actor: this.skillActor(actor, 'CONTENT_EDIT', correlationId) });
       return { skill: await loadSkill(this.db, id), correlationId };
+    } catch (error) {
+      throw mapError(error, correlationId);
+    }
+  }
+
+  /**
+   * Archive a live skill (docs/architecture/content-archive-design.md): CONTENT_PUBLISH and a
+   * reason code; a removal, so no second person, but every archived revision is recorded. It stops
+   * being served to students at once and is never deleted.
+   */
+  @Post('/skills/:topicId/archive')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async archive(@Req() request: ProtectedHttpRequest, @Param('topicId') topicId: string, @Body() body: unknown): Promise<Record<string, unknown>> {
+    const { correlationId, actor } = await this.require(request, 'CONTENT_PUBLISH');
+    const id = requireUuid(topicId, correlationId);
+    const raw = readObject(body, ['reasonCode'], correlationId);
+    const reasonCode = typeof raw.reasonCode === 'string' ? raw.reasonCode : '';
+    const refusal = refuseContentArchive({ actor, reasonCode });
+    if (refusal === 'FORBIDDEN') throw new ForbiddenException(safeError('FORBIDDEN', correlationId));
+    if (refusal) throw badRequest(refusal, correlationId);
+    try {
+      const archived = await archiveSkill(this.db, { topicId: id, reasonCode, actor: this.skillActor(actor, 'CONTENT_PUBLISH', correlationId) });
+      return { skill: await loadSkill(this.db, id), archivedRevisions: archived.archivedRevisions, correlationId };
     } catch (error) {
       throw mapError(error, correlationId);
     }
@@ -311,6 +337,7 @@ function mapError(error: unknown, correlationId: string): HttpException {
   if (error instanceof SkillMapError) {
     if (error.code === 'SKILL_NOT_FOUND' || error.code === 'SKILL_REVISION_NOT_FOUND') return new NotFoundException(domainError(error.code, correlationId));
     if (error.code === 'SKILL_INVALID' || error.code === 'SKILL_PREREQUISITE_NOT_LIVE') return new BadRequestException(domainError(error.code, correlationId, error.problems));
+    if (error.code === 'SKILL_ARCHIVE_BLOCKED') return new ConflictException(domainError(error.code, correlationId, error.problems));
     if (error.code === 'SKILL_MAP_REJECTED') return badRequest(error.code, correlationId);
     return new ConflictException(domainError(error.code, correlationId));
   }

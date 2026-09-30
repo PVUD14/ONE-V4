@@ -26,11 +26,13 @@ import {
   type SkillDraftFields,
 } from '@planthepath/career-readiness';
 import {
+  skillArchiveBlockers,
   skillOpenRevisionStates,
   skillPublishAltersReadinessInputs,
   type SkillMapRefusal,
   type SkillRevisionState,
 } from '@planthepath/authorization/src/index.js';
+import { archivePublishedRevisions } from './content-archive.js';
 import { consumeOperationApproval, type ConsumedApproval } from './operation-approvals.js';
 import { validateAuditWriteInput, validateOutboxWriteInput } from './repositories.js';
 
@@ -77,11 +79,12 @@ export type SkillMapErrorCode =
   | 'SKILL_REVISION_NOT_APPROVED'
   | 'SKILL_RIGHTS_NOT_REVIEWED'
   | 'SKILL_PREREQUISITE_NOT_LIVE'
+  | 'SKILL_ARCHIVE_BLOCKED'
   | 'SKILL_INVALID'
   | 'SKILL_MAP_REJECTED';
 
 export class SkillMapError extends Error {
-  /** For SKILL_INVALID: the validator's codes, safe to show (no text from the database). */
+  /** For SKILL_INVALID and SKILL_ARCHIVE_BLOCKED: stable codes, safe to show (no text from the database). */
   constructor(readonly code: SkillMapErrorCode, readonly problems: readonly string[] = []) {
     super(problems.length ? `${code}: ${problems.join(', ')}` : code);
     this.name = 'SkillMapError';
@@ -846,6 +849,53 @@ export async function publishSkillRevision(db: TransactionalRunner, input: {
         payload: { revisionId: revision.id, topicId: revision.entity_id, releaseManifestId: manifestId },
       });
       return { topicId: revision.entity_id, releaseManifestId: manifestId, approval };
+    });
+  } catch (error) {
+    rethrow(error);
+  }
+}
+
+/**
+ * Archive a live skill (docs/architecture/content-archive-design.md): refused while anything live
+ * depends on it; otherwise every published revision becomes ARCHIVED (with its ARCHIVE review
+ * action) and the node is switched off, so the catalogue, the placement pool and the gap engine
+ * stop reading it at once. Nothing is deleted; evidence and history keep pointing at it. The
+ * skill then reads RETIRED, and cannot be revised again.
+ */
+export async function archiveSkill(db: TransactionalRunner, input: {
+  readonly topicId: string; readonly reasonCode: string; readonly actor: SkillActor;
+}): Promise<{ readonly topicId: string; readonly archivedRevisions: readonly number[] }> {
+  try {
+    return await db.transaction(async (tx) => {
+      const node = await lockNode(tx, input.topicId);
+      if (!node.active) throw new SkillMapError('SKILL_NOT_LIVE');
+      const [facts] = await rows<{ open: number; requirements: number; questions: number; lessons: number }>(tx, sql`
+        SELECT
+          (SELECT count(*)::int FROM content_revisions c WHERE c.entity_type = 'TOPIC' AND c.entity_id = ${input.topicId}::uuid AND c.state IN (${openStates})) AS open,
+          (SELECT count(*)::int FROM career_role_requirements q WHERE q.topic_id = ${input.topicId}::uuid) AS requirements,
+          (SELECT count(*)::int FROM question_versions v WHERE v.topic_id = ${input.topicId}::uuid AND v.superseded_at IS NULL) AS questions,
+          (SELECT count(*)::int FROM lesson_versions l WHERE l.topic_id = ${input.topicId}::uuid AND l.superseded_at IS NULL) AS lessons
+      `);
+      const live = await skillGraph(tx, 'published');
+      const dependents = [...live.graph.entries()].filter(([key, requires]) => key !== node.stable_key && requires.includes(node.stable_key)).length;
+      const blockers = skillArchiveBlockers({
+        openRevision: Number(facts?.open ?? 0) > 0,
+        liveRequirementCount: Number(facts?.requirements ?? 0),
+        liveDependentSkillCount: dependents,
+        currentQuestionCount: Number(facts?.questions ?? 0),
+        currentLessonCount: Number(facts?.lessons ?? 0),
+      });
+      if (blockers.length) throw new SkillMapError('SKILL_ARCHIVE_BLOCKED', blockers);
+      const archived = await archivePublishedRevisions(tx, {
+        entityType: 'TOPIC', entityId: input.topicId, reasonCode: input.reasonCode, actorUserId: input.actor.userId, correlationId: input.actor.correlationId,
+      });
+      await tx.execute(sql`UPDATE taxonomy_nodes SET active = false WHERE id = ${input.topicId}::uuid`);
+      await audit(tx, {
+        actor: input.actor, action: 'operations.content.skill_archived', revisionId: node.content_revision_id,
+        context: { topicId: input.topicId, stableKey: node.stable_key, reasonCode: input.reasonCode, archivedRevisions: archived.map((entry) => entry.revision) },
+      });
+      for (const revision of archived) await stateChanged(tx, input.actor, revision.id, input.topicId, 'PUBLISHED', 'ARCHIVED');
+      return { topicId: input.topicId, archivedRevisions: archived.map((entry) => entry.revision) };
     });
   } catch (error) {
     rethrow(error);

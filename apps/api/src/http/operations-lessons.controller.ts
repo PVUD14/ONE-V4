@@ -32,11 +32,13 @@ import {
 } from '@nestjs/common';
 import {
   canReadLessons,
+  contentArchiveReasons,
   hasInternalCapability,
   lessonEditorReasons,
   lessonPublishReasons,
   lessonRevisionTransitions,
   lessonTransitionCapability,
+  refuseContentArchive,
   refuseLessonPublish,
   refuseLessonTransition,
   resolveInternalCapability,
@@ -44,6 +46,7 @@ import {
   type InternalCapabilityContext,
 } from '@planthepath/authorization/src/index.js';
 import {
+  archiveLesson,
   createLesson,
   createLessonVariant,
   LESSON_ATTRIBUTION_MAX,
@@ -91,7 +94,7 @@ const keyPattern = /^[a-z0-9][a-z0-9-]{2,79}$/;
 const defaultLimit = 50;
 const maxLimit = 200;
 const noteLimit = 500;
-const listFilters: readonly LessonListFilter[] = ['LIVE', 'PENDING', 'AWAITING_REVIEW', 'CHANGES_REQUESTED', 'AWAITING_PUBLISH', 'VARIANTS'];
+const listFilters: readonly LessonListFilter[] = ['LIVE', 'PENDING', 'ARCHIVED', 'AWAITING_REVIEW', 'CHANGES_REQUESTED', 'AWAITING_PUBLISH', 'VARIANTS'];
 
 @Controller('/api/v1/operations/lessons')
 export class OperationsLessonsController {
@@ -115,7 +118,7 @@ export class OperationsLessonsController {
       licences: LESSON_LICENCES.map((licence) => ({ licence, attributionRequired: LESSON_LICENCES_REQUIRING_ATTRIBUTION.includes(licence) })),
       modules: await listLessonModules(this.db),
       transitions: lessonRevisionTransitions,
-      reasons: { ...lessonEditorReasons, publish: lessonPublishReasons },
+      reasons: { ...lessonEditorReasons, publish: lessonPublishReasons, archive: contentArchiveReasons },
       limits: {
         title: LESSON_TITLE_MAX, summary: LESSON_SUMMARY_MAX, practice: LESSON_PRACTICE_MAX, prerequisites: LESSON_PREREQUISITES_MAX,
         attribution: LESSON_ATTRIBUTION_MAX, basis: LESSON_BASIS_MAX, note: noteLimit,
@@ -202,6 +205,29 @@ export class OperationsLessonsController {
     try {
       await startLessonRevision(this.db, { lessonId: id, reasonCode, actor: this.lessonActor(actor, 'CONTENT_EDIT', correlationId) });
       return { lesson: await loadLesson(this.db, id), correlationId };
+    } catch (error) {
+      throw mapError(error, correlationId);
+    }
+  }
+
+  /**
+   * Archive a live lesson or variant (docs/architecture/content-archive-design.md): CONTENT_PUBLISH and a
+   * reason code; a removal, so no second person, but every archived revision is recorded. It stops
+   * being served to students at once and is never deleted.
+   */
+  @Post('/lessons/:lessonId/archive')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async archive(@Req() request: ProtectedHttpRequest, @Param('lessonId') lessonId: string, @Body() body: unknown): Promise<Record<string, unknown>> {
+    const { correlationId, actor } = await this.require(request, 'CONTENT_PUBLISH');
+    const id = requireUuid(lessonId, correlationId);
+    const raw = readObject(body, ['reasonCode'], correlationId);
+    const reasonCode = typeof raw.reasonCode === 'string' ? raw.reasonCode : '';
+    const refusal = refuseContentArchive({ actor, reasonCode });
+    if (refusal === 'FORBIDDEN') throw new ForbiddenException(safeError('FORBIDDEN', correlationId));
+    if (refusal) throw badRequest(refusal, correlationId);
+    try {
+      const archived = await archiveLesson(this.db, { lessonId: id, reasonCode, actor: this.lessonActor(actor, 'CONTENT_PUBLISH', correlationId) });
+      return { lesson: await loadLesson(this.db, id), archivedRevisions: archived.archivedRevisions, correlationId };
     } catch (error) {
       throw mapError(error, correlationId);
     }
@@ -345,6 +371,7 @@ function mapError(error: unknown, correlationId: string): HttpException {
   }
   if (error instanceof LessonEditorError) {
     if (notFound.includes(error.code)) return new NotFoundException(domainError(error.code, correlationId));
+    if (error.code === 'LESSON_ARCHIVE_BLOCKED') return new ConflictException(domainError(error.code, correlationId, error.problems));
     if (withProblems.includes(error.code)) return new BadRequestException(domainError(error.code, correlationId, error.problems));
     if (plainBadRequest.includes(error.code)) return badRequest(error.code, correlationId);
     return new ConflictException(domainError(error.code, correlationId));

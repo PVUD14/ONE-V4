@@ -1961,3 +1961,151 @@ already lists every notification. It now labels a `STATUS_NOTICE` "Service statu
 inbox is unchanged.
 
 **Next goal:** OPS-17 (full).
+
+## OPS-12 — AI Operations console — 2026-09-30
+**Result:** Complete. The existing AI Operations item is now the AI console:
+- usage, outcomes, failure classes, tokens, prompt versions and evaluation records, all read from ONE AI Orchestration's own
+  tables (cost NA);
+- per-feature switches and limits;
+- a one-action global AI kill switch;
+- a no-restart off switch for the in-app assistant;
+- an evaluation gate on switching any feature on.
+
+The AI hold is respected: no provider adapter, no model call, no price.
+
+**Branch / PR:** feat/ops-ai-console → feat/plan-phases-0-to-2, based on 09a8d9a. The commits are, in order: design (9565b31),
+acceptance tests (34d1ce8), backend (6182264), web (782c6b4), web tests and runbook (cf503ae), and this report. The branch is
+pushed to onev4. No PR was opened because `gh` is not installed, so the merge is left to the coordinator.
+
+**Files created:**
+- docs/architecture/ai-evaluations-table-design.md
+- packages/persistence/drizzle/0089_ai_operations.sql
+- packages/authorization/src/ai-operations.ts (+ .test.ts)
+- packages/ai-orchestration/src/registry.ts
+- packages/persistence/src/ai-operations.ts and packages/persistence/test/ai-operations.integration.test.ts
+- apps/api/src/http/operations-ai.controller.ts (+ operations-ai.integration.spec.ts)
+- apps/web/src/api/aiOperations.ts
+- apps/web/src/rolePortal/aiOperations.tsx (+ .test.tsx)
+
+**Files modified:**
+- packages/authorization/src/{high-risk-actions,index}.ts: two extended approval keys.
+- packages/events/src/index.ts: 3 events and the 2 approval keys.
+- packages/ai-orchestration/src/index.ts: exports the registry.
+- packages/persistence/src/ai-orchestration.ts: `loadAiFeaturePolicy` reports a feature as disabled while the kill switch is
+  engaged, and `upsertAiFeaturePolicy` takes the prompt.
+- apps/api/src/http/{operation-approval-gate, operations-approvals.controller, api-security.module, assistant.controller}.ts
+- apps/web/src/{api.ts, api/operations.ts, rolePortal/approvals.tsx, rolePortal/shared.tsx}
+- apps/web/src/rolePortalPages.tsx: only the AI Operations branch.
+- docs/ops/runbook-ai-kill-switch.md: a new "Since OPS-12" section.
+
+**Migrations added:** 0089_ai_operations.sql. It references only tables up to 0085, plus the approval function. It contains:
+- `ai_feature_policies.prompt_key` and `prompt_version`, set together or not at all.
+- `ai_evaluations`:
+  - append-only (a trigger refuses UPDATE and DELETE);
+  - `decided_at` is stamped by the database;
+  - metrics are a JSON list of 1–20 `{name, value, threshold, comparator}` entries;
+  - a PASS must meet every threshold it records.
+- `ai_evaluation_passes()`, the single definition of "passing for this model and prompt": the latest record wins, and a tie
+  counts as FAIL.
+- Two flags, inserted only if absent, and `ai_kill_switch_engaged()`:
+  - `ai.global-kill-switch`: high-risk DISABLE, default not engaged;
+  - `ai.assistant`: high-risk ENABLE, default off.
+- A trigger on `ai_feature_policies`:
+  - switching a feature on needs the kill switch released and a passing evaluation;
+  - an enabled feature whose model or prompt changes without an evaluation is switched off;
+  - inserting an enabled feature is refused while the kill switch is engaged.
+- `operation_approval_extended_target_type()` redefined with:
+  - every earlier key (0051, 0057, 0061, 0065, 0081);
+  - `INSTITUTION_DATA_PURGE` from 0088 on feat/inst-contract-lifecycle, because 0089 sorts after it and must not drop it;
+  - the new `AI_FEATURE_ENABLE` and `AI_FEATURE_LIMITS_RAISE`.
+
+The migration was applied twice through `db:migrate` (the second run applied 0) and was replayed by hand with no error.
+
+**Design docs / ADRs:** ai-evaluations-table-design.md covers the decisions, the assistant rationale, the rejected options and
+the open points. No ADR was needed; this builds on ADR-030, ADR-032 and OPS-02.
+
+**Validation:** see the amendment below.
+
+**Acceptance criteria:**
+- ✔ Every figure comes from `ai_generations` or `ai_feature_policies`, or shows NA.
+  - The summary, usage-by-period and usage-by-organisation queries read only those tables, plus `ai_evaluations` and the two
+    flags.
+  - Cost is `null` with basis `NO_PRICE_TABLE` in the API, and NA on every screen.
+  - The code prompt registry is an empty list under the hold, and the screen says so.
+  - An organisation row standing for fewer than 5 people withholds every figure (`suppressSmallCount`) and shows <5.
+- ✔ Switching a feature on without a passing evaluation is blocked:
+  - at the approval request (409 `AI_EVALUATION_REQUIRED`), at execution, and at the database for any writer;
+  - a pass for another model or another prompt version does not count;
+  - a later FAIL overturns an earlier PASS;
+  - the approval is bound to the model, prompt version and evaluation id, so a later model change gives
+    `APPROVAL_PAYLOAD_MISMATCH` and a later FAIL gives `AI_EVALUATION_REQUIRED`.
+- ✔ The kill switch disables all AI features in one action.
+  - One transaction sets the flag and switches off every enabled policy and the assistant flag.
+  - It writes an audit row for each change and for the kill switch itself, plus flag events and one outbox event.
+  - The orchestrator refuses the very next call, with no restart (persistence test).
+  - **Deliberate deviation:** the goal says "one approved action", but the brief says switching off, including the global kill
+    switch, needs no approval and takes effect immediately. Engaging it therefore needs no approval, and releasing it is the
+    dual-controlled direction (§5.4 "AI global kill switch off").
+- ✔ Approvals and audit:
+  - switching off (a feature, the assistant or the kill switch) needs no approval;
+  - switching on and widening need OPS-02 dual control and a reason code;
+  - the solo path (15-minute cooling-off, marked SOLO) is tested on a limits raise;
+  - every change is audited.
+- ✔ The §6.6 minimums:
+  - 401 on every route;
+  - 403 on every route for an institution admin and for a suspended membership, and 200 with the capability;
+  - an OPERATIONS or SECURITY admin without `AI_OPS_CONFIGURE` cannot configure;
+  - 400 on invalid input (unknown fields, reasons, bounds, metrics);
+  - keyset paging, bounded 1–200, with no repeats;
+  - audit rows carry the reason code, and a super admin's use is marked `break_glass: true`.
+  - Web tests cover real data, NA, loading, empty, an error with its reference, forbidden, reason-required dialogs, and
+    unchanged navigation labels.
+
+**Decisions for Divakar (recommendations adopted):**
+- **Assistant switch.**
+  - The console can switch the assistant **off** without a restart. The flag `ai.assistant` is read on every request and
+    fails closed.
+  - Switching it **on** still needs `ASSISTANT_ENABLED=true` and a provider key on the server, and also an approved high-risk
+    flag change.
+  - The flag is **off by default**, so merging this changes nothing: the assistant stays off, as Divakar set it on 2026-09-28.
+  - The console shows only whether the variable and the key are set (true or false), and never changes either.
+- **Who may stop AI:** anyone holding `AI_OPS_CONFIGURE` or `OPS_FLAGS_MANAGE`. The brake must be reachable by whoever is on
+  duty, and only the super admin holds `AI_OPS_CONFIGURE` by baseline. Configuring (switching on, limits, evaluations) needs
+  `AI_OPS_CONFIGURE`.
+- **Kill switch default:** not engaged. Every feature and the assistant are already off by default.
+- **Every feature counts as reaching students.** The evaluation gate applies to all of them; there is no audience column that
+  could be used to get round it.
+- **Evaluation match:** feature + model + prompt key + prompt version, without the provider, because the policy has no provider
+  column. Add the provider when the ADR-030 adapter lands.
+- **A window change** (DAY ↔ MONTH) counts as widening, in either direction.
+- **Flag overrides are ignored** for the two AI flags.
+- **Reason codes:**
+  - disable: `INCIDENT_MITIGATION`, `QUALITY_CONCERN`, `COST_CONTROL`, `ROLLBACK`, `NOT_NEEDED`
+  - kill switch: `INCIDENT_MITIGATION`, `HARMFUL_OUTPUT`, `SUSPECTED_KEY_COMPROMISE`, `SPEND_RUNAWAY`, `PRECAUTION`
+  - assistant off: `INCIDENT_MITIGATION`, `HARMFUL_OUTPUT`, `SUSPECTED_KEY_COMPROMISE`, `POLICY_REQUIREMENT`, `PRECAUTION`
+  - enable: `EVALUATION_COMPLETE`, `PILOT_ROLLOUT`, `INCIDENT_RESOLVED`
+  - lower limits: `COST_CONTROL`, `INCIDENT_MITIGATION`, `CORRECTION`
+  - raise limits: `DEMAND_GROWTH`, `PILOT_EXPANSION`, `CORRECTION`
+  - evaluation: `INITIAL_BENCHMARK`, `MODEL_CHANGE`, `PROMPT_CHANGE`, `PERIODIC_REVIEW`, `INCIDENT_REVIEW`
+
+**Limitations / not done:**
+- No AI feature exists yet because of the AI hold, so on a real database the features table is empty and the screen says so.
+- The database does not refuse inserting an enabled feature while the kill switch is released, because an evaluation cannot
+  exist before its policy row. Registration code never sets `enabled`, and the console never inserts. This gap is recorded in
+  the design doc.
+- The assistant has no prompt-registry version, so the evaluation gate does not apply to it. The recommendation is to bring it
+  back only through ONE AI Orchestration (OPS-SR-02).
+- Engine health panels belong to OPS-13.
+
+**Android:** no change.
+- §4.3 keeps operator screens web-only, and the app has no AI Operations screen.
+- The only effect users can see is the assistant answering 503 while its console switch is off. The app already handles that:
+  `JobsAndMore.kt` shows "The assistant is switched off for now" on a 503.
+- The assistant is off today either way.
+
+**Risks / follow-ups:**
+- A later migration that adds an approval key must re-list all eight extended keys above.
+- The assistant controller now receives the persistence database by injection. Only `Phase1ApiSecurityModule` registers it,
+  and that module provides the database.
+
+**Next goal:** OPS-13 (once the engine tables exist) or OPS-17.

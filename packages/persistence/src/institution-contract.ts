@@ -568,6 +568,8 @@ export const institutionPurgePlan: readonly { readonly table: string; readonly w
   { table: 'staff_action_content_links', where: "staff_action_id IN (SELECT id FROM staff_actions WHERE institution_id = $1 AND action_type = 'MEETING')" },
   { table: 'staff_action_attendees', where: 'institution_id = $1' },
   { table: 'learning_assignment_students', where: 'institution_id = $1' },
+  // A sprint time-boxes one of the college's assignments (0085), so it goes before them (0092).
+  { table: 'preparation_sprints', where: 'institution_id = $1' },
   { table: 'learning_assignments', where: 'institution_id = $1' },
   { table: 'learning_plan_overrides', where: 'institution_id = $1' },
   { table: 'counselling_case_participants', where: 'institution_id = $1' },

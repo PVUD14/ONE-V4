@@ -137,6 +137,7 @@ lecturer; one of every institution-owned record) and pins the dry run exactly:
 | institution_student_profiles | 3 | staff_actions | 3 |
 | student_roster_imports / rows | 1 / 1 | staff_action_attendees / content links | 1 / 1 |
 | counselling_case_participants | 1 | learning_assignments / students / plan overrides | 1 / 1 / 1 |
+| preparation_sprints | 1 | | |
 | exam_subjects, syllabus nodes, questions, options, versions, reviews | 1 each | exam_definitions, events, sections, section pool | 1 each |
 | exam_assignments, attempts, attempt questions, answers, results, screen events | 1 each | faculty_teaching_assignments | 1 |
 | institution_announcements / recipients | 1 / 1 | institution_settings, grading scales, academic terms | 1 each |

@@ -217,6 +217,12 @@ async function college(name: string): Promise<College> {
     `INSERT INTO learning_assignments (id,institution_id,assigned_by_user_id,assigned_by_membership_id,content_kind,skill_id,target_kind)
      VALUES ($1,$2,$3,$4,'PRACTICE',$5,'STUDENTS')`, [learning, institutionId, faculty.id, faculty.membershipId, skill]);
   await pool.query('INSERT INTO learning_assignment_students (assignment_id,student_user_id,institution_id) VALUES ($1,$2,$3)', [learning, active.userId, institutionId]);
+  // A preparation sprint over that assignment (0085), which only the purge may delete (0092).
+  const role = randomUUID();
+  await pool.query("INSERT INTO career_roles (id, code, title, family) VALUES ($1,$2,'Synthetic role','Synthetic')", [role, `INST18_${role.slice(0, 8).toUpperCase()}`]);
+  await seedPast('preparation_sprints', 'preparation_sprints_guard',
+    `INSERT INTO preparation_sprints (id,institution_id,assignment_id,career_role_id,topic_id,include_unknown,created_by_user_id,created_by_membership_id,reason_code,ends_at)
+     VALUES ($1,$2,$3,$4,$5,false,$6,$7,'CAMPUS_DRIVE_PREPARATION',now() + interval '14 days')`, [randomUUID(), institutionId, learning, role, skill, faculty.id, faculty.membershipId]);
   await seedPast('learning_plan_overrides', 'learning_plan_overrides_guard',
     `INSERT INTO learning_plan_overrides (id,institution_id,student_user_id,created_by_user_id,created_by_membership_id,action,content_kind,skill_id,reason_code)
      VALUES ($1,$2,$3,$4,$5,'PRACTICE','PRACTICE',$6,'CATCH_UP')`, [randomUUID(), institutionId, active.userId, faculty.id, faculty.membershipId, skill]);
@@ -602,6 +608,7 @@ describe('INST-18: the purge deletes institution-owned records only, with a seco
     await purge({ reasonCode: 'RETENTION_PERIOD_ENDED', approvalId: randomUUID() }, gamma.owner.id).expect(403);
     // The 0082 delete guards still hold for everyone but the purge.
     await expect(pool.query('DELETE FROM learning_assignments WHERE institution_id = $1', [gamma.institutionId])).rejects.toThrow(/never deleted/);
+    await expect(pool.query('DELETE FROM preparation_sprints WHERE institution_id = $1', [gamma.institutionId])).rejects.toThrow(/never deleted/);
     await expect(pool.query('DELETE FROM staff_action_content_links WHERE staff_action_id IN (SELECT id FROM staff_actions WHERE institution_id = $1)', [gamma.institutionId])).rejects.toThrow();
   });
 
@@ -618,7 +625,7 @@ describe('INST-18: the purge deletes institution-owned records only, with a seco
     }
     // The runbook's recorded dry run (docs/institution/sop-college-exit.md): one seeded college, exactly.
     expect(deletes).toEqual({
-      staff_action_content_links: 1, staff_action_attendees: 1, learning_assignment_students: 1, learning_assignments: 1, learning_plan_overrides: 1,
+      staff_action_content_links: 1, staff_action_attendees: 1, learning_assignment_students: 1, preparation_sprints: 1, learning_assignments: 1, learning_plan_overrides: 1,
       counselling_case_participants: 1, staff_actions: 3, exam_results: 1, exam_screen_events: 1, exam_answers: 1, exam_attempt_questions: 1,
       exam_attempts: 1, exam_assignments: 1, exam_section_pool: 1, exam_sections: 1, exam_definition_events: 1, exam_definitions: 1,
       exam_question_reviews: 1, exam_question_versions: 1, exam_question_options: 1, exam_questions: 1, exam_subject_topic_links: 0,

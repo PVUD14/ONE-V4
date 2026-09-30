@@ -302,6 +302,13 @@ INSERT/UPDATE trigger and a DELETE trigger that calls the **same, unchanged func
 their staff action). The setting is transaction-local and set only inside the purge transaction, after
 the approval has been consumed.
 
+**Added in 0092: preparation sprints.** INST-17 (0085) built `preparation_sprints` alongside this
+work, with a guard that refuses every DELETE. A sprint time-boxes one of the college's learning
+assignments (`assignment_id` NOT NULL), so without an exception a college that ever ran a sprint could
+not be purged: the assignment delete failed on the foreign key. 0092 applies the same split to
+`preparation_sprints_guard`, and the purge deletes sprints just before `learning_assignments`. The
+schema test that holds the purge lists against every `institution_id` table caught it.
+
 **Rejected: rewrite the five guard functions with a new branch.** Copying function bodies into a new
 migration risks drifting from 0082's rules; the split leaves every rule byte-for-byte as 0082 wrote it
 and adds only the one exception. **Rejected: reuse `one.privacy_erase_subject` per student.** It names a

@@ -41,6 +41,14 @@ performing one supervised deploy end-to-end (the `aight` half only).
 - [runbook-backups-monitoring.md](runbook-backups-monitoring.md) — one-time install,
   alert meanings, day-2 checks.
 - [runbook-demo-prep.md](runbook-demo-prep.md) — before and after a client demo.
+- [runbook-pilot-support.md](runbook-pilot-support.md) — pilot support calls, including the
+  learning engine (ENG-17).
+- [runbook-pilot-incident.md](runbook-pilot-incident.md) — a pilot incident from detection to
+  closure (ENG-17).
+- [runbook-ai-kill-switch.md](runbook-ai-kill-switch.md) — switch every AI path off and prove it
+  (ENG-17).
+- [runbook-engine-migration-rollback.md](runbook-engine-migration-rollback.md) — forward-only
+  rollback notes for each learning-engine migration (ENG-17).
 
 ## Weekly checklist (5 minutes, junior operator)
 

@@ -213,12 +213,21 @@ Erasing a person's rows removes them from every future aggregate and breaks none
 downloaded are its own files and are not touched.
 
 **Guards and CHECKs.** The `readiness_snapshots` CHECKs (`advisory`, `NOT employer_visible`) stay as they
-are; a DELETE touches neither. Of these tables only `assessment_attempts` has a guard: 0004's
-`protect_submitted_attempt` refuses to change or delete a submitted attempt, and for any other attempt a
-DELETE silently did nothing (the function returned NEW, which is NULL on DELETE). 0087 replaces the
-function with exactly that behaviour plus one exception, the 0047 pattern: a DELETE is allowed when the
-transaction-local `one.privacy_erase_subject` names the attempt's subject. Outside that setting nothing
-changes. `evidence_records` stay ANONYMISED (unchanged), so the evidence the aggregates count survives,
+are; a DELETE touches neither. Two guards from 0004 stand in the way, and each gains exactly one
+exception, the 0047 pattern (a DELETE inside the transaction whose `one.privacy_erase_subject` names the
+row's own subject):
+- `assessment_attempts`: `protect_submitted_attempt` refuses to change or delete a submitted attempt, and
+  for any other attempt a DELETE silently did nothing (the function returned NEW, which is NULL on
+  DELETE). 0087 replaces the function with that behaviour plus the exception.
+- `mastery_projections`, `readiness_snapshots`, `readiness_factors`, `assessment_attempt_items`,
+  `assessment_responses`: the shared `reject_immutable_row_change` (never change, never delete). The
+  shared function is left alone, because `evidence_records` and the content, review and delivery logs
+  also use it; for these five tables only, the trigger of the same name now calls
+  `reject_immutable_learning_history_change`, identical except for the exception. A child row's subject
+  is read from its parent (a factor's snapshot or projection, an item's attempt, a response's item's
+  attempt), which the executor deletes after its children. An UPDATE is still always refused.
+Outside the setting, and for anyone but the named person, nothing changes. (The first draft of this note
+missed the second guard; the deletion test found it by ending FAILED.) `evidence_records` stay ANONYMISED (unchanged), so the evidence the aggregates count survives,
 detached.
 
 Rejected: ANONYMISED for these tables (they are derived views of the person's own learning and carry
@@ -266,6 +275,8 @@ upload.
    second run changes nothing.
 2. `protect_submitted_attempt()` is replaced as described in D2 (CREATE OR REPLACE; the 0004 trigger keeps
    calling it).
+3. `reject_immutable_learning_history_change()` is created and the five learning-history
+   `*_immutable_guard` triggers are recreated on it (DROP IF EXISTS, then CREATE), as described in D2.
 It references only tables from 0085 or earlier.
 
 ### Still open (outside the decisions; reported)

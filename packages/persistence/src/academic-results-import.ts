@@ -7,6 +7,10 @@
  * else that is shown, never overwritten. The preview stores nothing; commit re-evaluates
  * the same file inside its transaction and refuses unless the result still matches the
  * digest the uploader was shown.
+ *
+ * A roll number that belongs to a student who deleted their account is SKIPPED (`student_deleted`):
+ * the roster keeps the anonymised row, but nothing is ever created or confirmed for that person again
+ * (Divakar, 2026-09-30; docs/architecture/privacy-export-coverage.md, D4).
  */
 import { createHash, randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
@@ -27,7 +31,7 @@ const maxRows = 1_000;
 const maxBytes = 512_000;
 const formulaPrefix = /^[=+\-@]/;
 
-export type ResultsImportOutcome = 'CREATE' | 'CONFIRM' | 'UNCHANGED' | 'CONFLICT' | 'INVALID';
+export type ResultsImportOutcome = 'CREATE' | 'CONFIRM' | 'UNCHANGED' | 'CONFLICT' | 'INVALID' | 'SKIPPED';
 
 interface ParsedRow {
   readonly rowNumber: number;
@@ -81,7 +85,7 @@ interface EvaluatedRow extends ResultsImportRowView {
 export interface ResultsImportEvaluation {
   readonly digest: string;
   readonly rowCount: number;
-  readonly counts: Readonly<Record<'create' | 'confirm' | 'unchanged' | 'conflict' | 'invalid' | 'differsFromStudent', number>>;
+  readonly counts: Readonly<Record<'create' | 'confirm' | 'unchanged' | 'conflict' | 'invalid' | 'skipped' | 'differsFromStudent', number>>;
   readonly rows: readonly ResultsImportRowView[];
 }
 
@@ -148,7 +152,7 @@ function readResult(scale: ResultScale, raw: string): { resultValue: number | nu
   return value >= 0 && value <= max ? { resultValue: value, resultLetter: null } : null;
 }
 
-interface RosterRow { studentUserId: string; rollNumber: string; fullName: string; programmeUnit: string | null; startedOn: string | null }
+interface RosterRow { studentUserId: string; rollNumber: string; fullName: string; programmeUnit: string | null; startedOn: string | null; deleted: boolean }
 interface TermRow {
   id: string; qualificationId: string; studentUserId: string; sequence: number;
   resultValue: string | null; resultScale: ResultScale | null; resultLetter: string | null; backlogCount: number | null;
@@ -181,13 +185,16 @@ export async function evaluateResultsImport(
   const inScope = institutionStudentScopeClause(scope, 'isp', values);
   const roster = (await db.query<RosterRow>(
     `SELECT isp.student_user_id AS "studentUserId", lower(isp.institution_student_id) AS "rollNumber",
-            isp.full_name AS "fullName", pu.name AS "programmeUnit", isp.academic_start_date::text AS "startedOn"
+            isp.full_name AS "fullName", pu.name AS "programmeUnit", isp.academic_start_date::text AS "startedOn",
+            (u.anonymised_at IS NOT NULL) AS "deleted"
      FROM institution_student_profiles isp
+     JOIN users u ON u.id = isp.student_user_id
      LEFT JOIN institution_units pu ON pu.id = isp.program_unit_id
      WHERE isp.institution_id = $1 AND lower(isp.institution_student_id) = ANY($2::text[]) AND ${inScope}`, values,
   )).rows;
   const byRoll = new Map(roster.map((row) => [row.rollNumber, row]));
-  const studentIds = [...new Set(roster.map((row) => row.studentUserId))];
+  // A deleted person's records are never read or written again, so they are not even looked up.
+  const studentIds = [...new Set(roster.filter((row) => !row.deleted).map((row) => row.studentUserId))];
   const terms = studentIds.length === 0 ? [] : (await db.query<TermRow>(
     `SELECT t.id, t.qualification_id AS "qualificationId", q.student_user_id AS "studentUserId", t.sequence,
             t.result_value::text AS "resultValue", t.result_scale AS "resultScale", t.result_letter AS "resultLetter",
@@ -210,7 +217,18 @@ export async function evaluateResultsImport(
   const pendingNewQualification = new Map<string, { qualificationType: string; programmeName: string }>();
   const rows: EvaluatedRow[] = parsed.map((row) => {
     const issues: string[] = [];
-    const student = byRoll.get(row.institutionStudentId.toLowerCase()) ?? null;
+    const found = byRoll.get(row.institutionStudentId.toLowerCase()) ?? null;
+    if (found?.deleted) {
+      // Whatever else the row says, nothing will be written for this person, so there is nothing to fix.
+      return {
+        rowNumber: row.rowNumber, institutionStudentId: row.institutionStudentId, studentName: found.fullName,
+        termSequence: /^\d{1,2}$/.test(row.termSequence) ? Number(row.termSequence) : null, termLabel: row.termLabel,
+        scale: row.scale, result: row.result, backlogs: /^\d{1,3}$/.test(row.backlogs) ? Number(row.backlogs) : null,
+        outcome: 'SKIPPED' as const, issues: ['student_deleted'], studentReported: null, verifiedRecord: null,
+        studentUserId: null, value: null, confirmTermId: null, targetQualificationId: null, newQualification: null,
+      };
+    }
+    const student = found;
     if (!row.institutionStudentId || formulaPrefix.test(row.institutionStudentId) || !student) issues.push('student_not_found');
     const sequence = /^\d{1,2}$/.test(row.termSequence) ? Number(row.termSequence) : NaN;
     if (!(sequence >= 1 && sequence <= 30)) issues.push('term_sequence_invalid');
@@ -284,7 +302,7 @@ export async function evaluateResultsImport(
       rowCount: rows.length,
       counts: {
         create: count('CREATE'), confirm: count('CONFIRM'), unchanged: count('UNCHANGED'), conflict: count('CONFLICT'),
-        invalid: count('INVALID'), differsFromStudent: rows.filter((row) => row.outcome === 'CREATE' && row.studentReported).length,
+        invalid: count('INVALID'), skipped: count('SKIPPED'), differsFromStudent: rows.filter((row) => row.outcome === 'CREATE' && row.studentReported).length,
       },
       rows: rows.map(toView),
     },

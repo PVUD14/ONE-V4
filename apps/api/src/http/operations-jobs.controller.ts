@@ -20,6 +20,7 @@ import {
   readJobsAlertConfig,
   readJobsHealthSummary,
 } from '@planthepath/persistence/src/jobs-health.js';
+import { loadCalibrationHealth, sandboxHealth } from '@planthepath/persistence/src/engine-health.js';
 import type { PersistenceDb } from '@planthepath/persistence/src/repositories.js';
 import { API_PERSISTENCE_DB, ProtectedApiAuthenticationGuard, type ProtectedHttpRequest } from './api-security.js';
 import { requireJobsOperator } from './operations-outbox.controller.js';
@@ -57,6 +58,19 @@ export class OperationsJobsController {
       reasons: { replay: outboxReplayReasons, supersede: approvalRequestReasons.OUTBOX_BACKLOG_SUPERSEDE },
       correlationId: context.correlationId,
     };
+  }
+
+  /**
+   * OPS-13: whether the adaptive engine's jobs and infrastructure run — the last calibration run and
+   * its status (item_calibration_runs, item_calibrations) and the code sandbox, which has no source
+   * until ENG-12 is built and so reports NA. Design: docs/architecture/engine-health-panels-design.md
+   */
+  @Get('/engine-health')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async engineHealth(@Req() request: ProtectedHttpRequest, @Query() query: Record<string, unknown>): Promise<Record<string, unknown>> {
+    const context = await requireJobsOperator(request, this.db);
+    if (Object.keys(query).length) throw badRequest('JOBS_FILTER_UNKNOWN', context.correlationId);
+    return { calibration: await loadCalibrationHealth(this.db), sandbox: sandboxHealth(), correlationId: context.correlationId };
   }
 
   @Get('/failed')

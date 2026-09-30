@@ -56,6 +56,8 @@ import {
   canStopAi,
   canViewAiOperations,
   readAiEvaluationMetrics,
+  readEngineHealthWindowDays,
+  aggregateSuppressionThreshold,
   type AiEvaluationDecision,
   type InternalCapabilityContext,
 } from '@planthepath/authorization/src/index.js';
@@ -74,6 +76,7 @@ import {
   type AiActor,
   type AiPeriod,
 } from '@planthepath/persistence/src/ai-operations.js';
+import { loadMasteryShadowHealth, loadPlannerHealth } from '@planthepath/persistence/src/engine-health.js';
 import type { PersistenceDb } from '@planthepath/persistence/src/repositories.js';
 import { API_PERSISTENCE_DB, ProtectedApiAuthenticationGuard, requireTrustedAuthorization, safeError, type ProtectedHttpRequest } from './api-security.js';
 import { dbCapabilityGrantLoader, loadCallerCapabilityContext } from './internal-capability-guard.js';
@@ -148,6 +151,23 @@ export class OperationsAiController {
       cost: { value: null, basis: aiCostBasis, text: aiCostBasisText },
       correlationId,
     };
+  }
+
+  /**
+   * OPS-13: how the adaptive engine decides — planner decisions per day and the override rate
+   * (learning_decisions), and the mastery shadow comparison (learner_skill_state against the live
+   * bands, adaptive-learning holders only). Aggregates only; groups under five are withheld.
+   * Design: docs/architecture/engine-health-panels-design.md
+   */
+  @Get('/engine-health')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async engineHealth(@Req() request: ProtectedHttpRequest, @Query() query: Record<string, unknown>): Promise<Record<string, unknown>> {
+    const { correlationId } = await this.requireView(request);
+    rejectUnknown(query, ['days'], correlationId);
+    const days = readEngineHealthWindowDays(query.days);
+    if (days === null) throw badRequest('ENGINE_HEALTH_DAYS_INVALID', correlationId);
+    const [planner, masteryShadow] = [await loadPlannerHealth(this.db, days), await loadMasteryShadowHealth(this.db)];
+    return { planner, masteryShadow, suppressionThreshold: aggregateSuppressionThreshold, correlationId };
   }
 
   @Get('/usage')

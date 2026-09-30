@@ -244,8 +244,8 @@ const directions: Maker[] = [
         hints: [
           'Left and right are from the person\'s own point of view.',
           'A right turn is a quarter turn clockwise; a left turn is a quarter turn anticlockwise.',
-          `After the first turn (${turns[0]}) the person faces ${turn(start, turns[0])}.`,
-          `Apply the remaining turns (${turns.slice(1).join(', ')}) one at a time.`,
+          `After the first two turns (${turns[0]}, then ${turns[1]}) the person faces ${turn(turn(start, turns[0]), turns[1])}.`,
+          `Now apply the last turn (${turns[2]}) to ${turn(turn(start, turns[0]), turns[1])}.`,
         ],
       };
     }),

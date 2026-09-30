@@ -36,8 +36,8 @@ const numberProperties: Maker[] = [
     hints: [
       'You need a number that both numbers divide into — the smallest one.',
       'Write each number as a product of primes, or list the multiples of the larger number until the smaller one divides it.',
-      `The multiples of ${Math.max(a!, b!)} are ${[1, 2, 3, 4].map((k) => k * Math.max(a!, b!)).join(', ')}, …`,
-      `Check which of the multiples of ${Math.max(a!, b!)} is the first that ${Math.min(a!, b!)} divides exactly.`,
+      `${Math.min(a!, b!)} does not divide ${Math.max(a!, b!)} exactly, so the LCM is larger than ${Math.max(a!, b!)}.`,
+      `Try ${Math.max(a!, b!)} × 2, then ${Math.max(a!, b!)} × 3, and so on; stop at the first that ${Math.min(a!, b!)} divides exactly.`,
     ],
   })),
   ...[[36, 48], [24, 60], [45, 75], [18, 42]].map(([a, b]) => (i: number): ItemSpec => {
@@ -57,7 +57,7 @@ const numberProperties: Maker[] = [
         'You need the largest number that divides both numbers exactly.',
         'Write both numbers as products of primes and multiply the primes they share.',
         `${smaller} divides both ${a} and ${b}. Is there a larger number that also does?`,
-        `Divide both numbers by ${smaller}: you get ${a! / smaller} and ${b! / smaller}. If these still share a factor, multiply it into ${smaller}.`,
+        `Divide ${a} and ${b} by ${smaller}, look for a factor the two results still share, and multiply it into ${smaller}.`,
       ],
     };
   }),
@@ -146,7 +146,7 @@ const arithmetic: Maker[] = [
       'Ignore the decimal points for a moment and multiply the digits.',
       'The number of decimal places in the product is the total number in the two factors.',
       `${x} has ${x!.split('.')[1]!.length} decimal place(s) and ${y} has ${y!.split('.')[1]!.length}.`,
-      `Multiply the digits, count ${x!.split('.')[1]!.length + y!.split('.')[1]!.length} places from the right, and drop any trailing zeros.`,
+      `The digits give ${Number(x!.replace('.', '')) * Number(y!.replace('.', ''))}; count ${x!.split('.')[1]!.length + y!.split('.')[1]!.length} places from its right for the point, then drop any trailing zeros.`,
     ],
     check: `Answer computed by hand: ${x} × ${y} = ${answer}.`,
   })),
@@ -774,8 +774,8 @@ const dataInterpretation: Maker[] = TABLES.flatMap((table) => {
       hints: [
         '"Absolute" means the change in units, not in percent.',
         'Subtract each year\'s value from the next and compare the differences.',
-        `The increases are ${changes.map((entry) => entry.abs).join(', ')} for ${changes.map((entry) => entry.year).join(', ')}.`,
-        'Pick the year with the biggest of those differences.',
+        `The first increase is ${changes[0]!.year}: ${v[1]} − ${v[0]} = ${changes[0]!.abs}. Work out the other two the same way.`,
+        `The increases are ${changes.map((entry) => `${entry.abs} (${entry.year})`).join(', ')}; which is the biggest?`,
       ],
     }),
     (i) => ({

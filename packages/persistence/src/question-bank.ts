@@ -19,15 +19,19 @@ import { createHash, randomUUID } from 'node:crypto';
 import { sql, type SQL } from 'drizzle-orm';
 import {
   composeQuestionBody,
+  HINT_LADDER_RULES_VERSION,
+  hintLadderFindings,
   publishedQuestionColumns,
   questionMisconceptionTags,
   QUESTION_LICENCES_REQUIRING_ATTRIBUTION,
   readAgentDraftProvenance,
+  readHintLadderProvenance,
   readQuestionDraftFields,
   sha256Hex,
   stableStringify,
   validateQuestionDraft,
   withholdAnswerKey,
+  type HintLadderFinding,
   type QuestionDraftFields,
 } from '@planthepath/career-readiness';
 import {
@@ -336,6 +340,11 @@ export interface QuestionRevisionView {
   /** The tag rows written at submission, with their states; empty when the key is withheld. */
   readonly tags: readonly QuestionTagView[];
   readonly ladder: { readonly source: string; readonly state: string; readonly generatorVersion: string | null; readonly promptVersion: string | null; readonly generatedAt: string | null } | null;
+  /**
+   * What the hint ladder rules find (ENG-15, advisory: submission is never blocked on them). Run on the
+   * fields as this viewer sees them, so without the key only missing and repeated levels are found.
+   */
+  readonly ladderChecks: { readonly rulesVersion: string; readonly findings: readonly HintLadderFinding[] };
   /** Set when an import pack drafted this revision (program B.8); null when a person wrote it. */
   readonly agentDraft: { readonly generatorVersion: string; readonly promptVersion: string; readonly generatedAt: string } | null;
   /** The note for the subject expert an agent draft carries. */
@@ -406,16 +415,18 @@ async function revisionView(runner: SqlRunner, revisionId: string, answerKeys: b
   `);
   const fields = readQuestionDraftFields(row.body);
   const drafted = readAgentDraftProvenance(row.body);
+  const visible = answerKeys ? fields : withholdAnswerKey(fields);
   return {
     id: row.id, revision: Number(row.revision), state: row.state, contentHash: row.content_hash,
     author: { userId: row.author_user_id, email: row.author_email },
     contributors: contributorIds.map((id) => ({ userId: id, email: emails.find((entry) => entry.id === id)?.email ?? 'NA' })),
     createdAt: iso(row.created_at)!, publishedAt: iso(row.published_at),
-    fields: answerKeys ? fields : withholdAnswerKey(fields),
+    fields: visible,
     answerKeyWithheld: !answerKeys,
     topic: await topicById(runner, fields.topicId),
     tags: tags.map((tag) => ({ optionId: tag.option_id, code: tag.code, codeVersion: Number(tag.version), codeTitle: tag.title, codeState: tag.code_state, tagState: tag.tag_state })),
     ladder: ladder ? { source: ladder.source, state: ladder.review_state, generatorVersion: ladder.generator_version, promptVersion: ladder.prompt_version, generatedAt: iso(ladder.generated_at) } : null,
+    ladderChecks: { rulesVersion: HINT_LADDER_RULES_VERSION, findings: hintLadderFindings(visible) },
     agentDraft: drafted ? { generatorVersion: drafted.generatorVersion, promptVersion: drafted.promptVersion, generatedAt: drafted.generatedAt } : null,
     expertCheck: drafted ? drafted.expertCheck : null,
     rightsReview: rights ? { licenceLabel: rights.license_label, reviewerEmail: rights.reviewer_email, reasonCode: rights.reason_code, reviewedAt: iso(rights.reviewed_at)! } : null,
@@ -681,6 +692,15 @@ async function materialiseForReview(tx: SqlRunner, revision: LockedRevision & { 
       expertCheckNotes: (drafted.expertCheck ?? 'Drafted by the coding agent: check every claim against its basis.') as string | null,
     }
     : { source: 'AUTHORED', generatorVersion: null, promptVersion: null, generatedAt: null, expertCheckNotes: null };
+  // The ladder's own provenance when it was revised apart from the item (ENG-15), else the item's.
+  const ladderDrafted = readHintLadderProvenance(revision.body);
+  const ladderAgent = ladderDrafted
+    ? {
+      source: 'AGENT_DRAFTED', generatorVersion: ladderDrafted.generatorVersion as string | null, promptVersion: ladderDrafted.promptVersion as string | null,
+      generatedAt: ladderDrafted.generatedAt as string | null,
+      expertCheckNotes: (ladderDrafted.expertCheck ?? 'Drafted by the coding agent: check every hint against the answer.') as string | null,
+    }
+    : agent;
   if (ladder) {
     await tx.execute(sql`
       UPDATE question_hint_ladders SET hint_1 = ${h1}, hint_2 = ${h2}, hint_3 = ${h3}, hint_4 = ${h4}, updated_at = now() WHERE id = ${ladder.id}::uuid
@@ -689,8 +709,8 @@ async function materialiseForReview(tx: SqlRunner, revision: LockedRevision & { 
     await tx.execute(sql`
       INSERT INTO question_hint_ladders (id, question_revision_id, hint_1, hint_2, hint_3, hint_4, source, generator_version, prompt_version,
                                          generated_at, expert_check_notes, created_by_user_id)
-      VALUES (${randomUUID()}::uuid, ${revision.id}::uuid, ${h1}, ${h2}, ${h3}, ${h4}, ${agent.source}, ${agent.generatorVersion}, ${agent.promptVersion},
-              ${agent.generatedAt}::timestamptz, ${agent.expertCheckNotes}, ${actor.userId}::uuid)
+      VALUES (${randomUUID()}::uuid, ${revision.id}::uuid, ${h1}, ${h2}, ${h3}, ${h4}, ${ladderAgent.source}, ${ladderAgent.generatorVersion}, ${ladderAgent.promptVersion},
+              ${ladderAgent.generatedAt}::timestamptz, ${ladderAgent.expertCheckNotes}, ${actor.userId}::uuid)
     `);
   }
   const basis = `Question bank editor: ${revision.stableKey} revision ${Number(revision.revision)}`;

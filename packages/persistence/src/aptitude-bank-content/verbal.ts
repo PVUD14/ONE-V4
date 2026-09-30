@@ -44,11 +44,11 @@ const ant = (word: string, answer: string, wrong: readonly [WrongOption, WrongOp
   difficulty, prompt: `Choose the word opposite in meaning to ${word}.`, answer, wrong,
   explanation: `${word[0]}${word.slice(1).toLowerCase()} means ${meaning}; its opposite is "${answer.toLowerCase()}".`,
   step: `${word[0]}${word.slice(1).toLowerCase()} means ${meaning}.`,
-  near: 'Rule out the option that means the same, and any that only looks similar; pick the one that means the reverse.',
+  near: `Rule out ${wrong.filter((option) => option.code).map((option) => `"${option.text}"`).join(' and ')}: ${wrong.filter((option) => option.code).length > 1 ? 'one means the same as' : 'it means the same as'} ${word.toLowerCase()}${wrong.filter((option) => option.code).length > 1 ? ' and one only looks like it' : ''}. Which remaining option means the reverse?`,
 });
 const vocabulary = skillItems('apt-v-vocabulary', 'First decide whether the question wants the same meaning or the opposite.', 'Put the word in a simple sentence, then try each option in its place.', [
   syn('ABUNDANT', 'Plentiful', [{ text: 'Scarce', code: OPP }, { text: 'Abandoned', code: LOOK }, { text: 'Heavy' }], 'existing in large quantities'),
-  syn('BRIEF', 'Short', [{ text: 'Lengthy', code: OPP }, { text: 'Brisk', code: LOOK }, { text: 'Simple' }], 'lasting a short time'),
+  syn('BRIEF', 'Short', [{ text: 'Lengthy', code: OPP }, { text: 'Brisk', code: LOOK }, { text: 'Simple' }], 'lasting only a little time'),
   syn('CANDID', 'Frank', [{ text: 'Secretive', code: OPP }, { text: 'Candied', code: LOOK }, { text: 'Careful' }], 'honest and direct', 'INTERMEDIATE'),
   syn('DILIGENT', 'Hardworking', [{ text: 'Lazy', code: OPP }, { text: 'Delicate', code: LOOK }, { text: 'Intelligent' }], 'showing steady, careful effort'),
   syn('OBSOLETE', 'Outdated', [{ text: 'Modern', code: OPP }, { text: 'Absolute', code: LOOK }, { text: 'Hidden' }], 'no longer in use', 'INTERMEDIATE'),
@@ -218,7 +218,7 @@ const idiom = (phrase: string, answer: string, wrong: readonly [WrongOption, Wro
   difficulty, prompt: `What does the idiom "${phrase}" mean?`, answer, wrong,
   explanation: `"${phrase[0]!.toUpperCase()}${phrase.slice(1)}" means ${answer.toLowerCase()}. For example: "${example}"`,
   step: `Picture it in a sentence: "${example}"`,
-  near: 'Rule out the option that reads the words literally; pick the meaning that fits the sentence.',
+  near: `Rule out "${wrong.find((option) => option.code === LIT)?.text ?? wrong[0].text}", the literal picture. Which remaining meaning fits the sentence?`,
 });
 const idioms = skillItems('apt-v-idioms', 'An idiom does not mean what its words say one by one.', 'Think of a sentence where you have heard the idiom, and choose the meaning that fits that sentence.', [
   idiom('a piece of cake', 'Something very easy', [{ text: 'A small dessert', code: LIT }, { text: 'A share of the profit' }, { text: 'Something very difficult', code: OPPOSITE }], 'The first question was a piece of cake; I answered it in a minute.'),

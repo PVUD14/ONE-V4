@@ -459,6 +459,8 @@ export interface AgentDraftProvenance {
   readonly expertCheck: string;
   /** Other pack keys the body should carry (for the aptitude block, `area`). */
   readonly carried?: Readonly<Record<string, string>>;
+  /** A question's hint ladder revised apart from the item (ENG-15): the ladder row takes this provenance. */
+  readonly hintLadder?: { readonly generatorVersion: string; readonly promptVersion: string; readonly generatedAt: string; readonly expertCheck: string };
 }
 
 /** The body keys an agent draft carries; the editors' compose functions keep them on every save. */
@@ -468,6 +470,12 @@ export function agentDraftBodyKeys(draft: AgentDraftProvenance): Record<string, 
     packKey: draft.packKey,
     expertCheck: draft.expertCheck,
     provenance: { source: 'AGENT_DRAFTED', generatorVersion: draft.generatorVersion, promptVersion: draft.promptVersion, generatedAt: new Date(draft.generatedAt).toISOString() },
+    ...(draft.hintLadder ? {
+      hintLadderProvenance: {
+        source: 'AGENT_DRAFTED', generatorVersion: draft.hintLadder.generatorVersion, promptVersion: draft.hintLadder.promptVersion,
+        generatedAt: new Date(draft.hintLadder.generatedAt).toISOString(), expertCheck: draft.hintLadder.expertCheck,
+      },
+    } : {}),
   };
 }
 

@@ -1,5 +1,5 @@
 {
-  "notice": "DRAFT — model-produced content (program Part B.8). Written by the coding agent under ENG-10, by hand, from the public syllabi cited in `sources`, with no model call made by the product. Every item, passage, hint and explanation is original; none is taken or adapted from a question bank. Import only as DRAFT with AGENT_DRAFTED provenance through db:import:aptitude-bank-draft; never publish without a subject expert checking each record's expertCheck note, a second person reviewing it, and a publish approval. Not shown on any student screen. Difficulty bands and levels are the agent's proposal, not measured values. Rationale: docs/career-readiness/aptitude-bank-v1.md.",
+  "notice": "DRAFT — model-produced content (program Part B.8). Written by the coding agent under ENG-10 (hint ladders revised under ENG-15, see `hintLadder`), by hand, from the public syllabi cited in `sources`, with no model call made by the product. Every item, passage, hint and explanation is original; none is taken or adapted from a question bank. Import only as DRAFT with AGENT_DRAFTED provenance through db:import:aptitude-bank-draft; never publish without a subject expert checking each record's expertCheck note, a second person reviewing it, and a publish approval. Not shown on any student screen. Difficulty bands and levels are the agent's proposal, not measured values. Rationale: docs/career-readiness/aptitude-bank-v1.md.",
   "packKey": "aptitude-bank-v1",
   "generatorVersion": "claude-opus-5-5",
   "promptVersion": "eng-10-aptitude-bank-v1",
@@ -1038,8 +1038,8 @@
       "hints": [
         "You need a number that both numbers divide into — the smallest one.",
         "Write each number as a product of primes, or list the multiples of the larger number until the smaller one divides it.",
-        "The multiples of 18 are 18, 36, 54, 72, …",
-        "Check which of the multiples of 18 is the first that 12 divides exactly."
+        "12 does not divide 18 exactly, so the LCM is larger than 18.",
+        "Try 18 × 2, then 18 × 3, and so on; stop at the first that 12 divides exactly."
       ],
       "basis": "SSC CGL Tier-I, Quantitative Aptitude: \"computation of whole numbers … relationships between numbers\"; UPSC GS Paper II \"basic numeracy (numbers and their relations)\"; NCERT Class X, Real Numbers (HCF and LCM by prime factorisation). Item written for this pack in original wording; not taken or adapted from any question bank.",
       "expertCheck": "Check that the marked answer is correct and is the only defensible option, that each tagged distractor really shows the named misconception, and that hints 1-2 do not give the answer away. Check the HCF/LCM scope is right for the aptitude block, and whether remainders and divisibility tests deserve their own skill."
@@ -1082,8 +1082,8 @@
       "hints": [
         "You need a number that both numbers divide into — the smallest one.",
         "Write each number as a product of primes, or list the multiples of the larger number until the smaller one divides it.",
-        "The multiples of 12 are 12, 24, 36, 48, …",
-        "Check which of the multiples of 12 is the first that 8 divides exactly."
+        "8 does not divide 12 exactly, so the LCM is larger than 12.",
+        "Try 12 × 2, then 12 × 3, and so on; stop at the first that 8 divides exactly."
       ],
       "basis": "SSC CGL Tier-I, Quantitative Aptitude: \"computation of whole numbers … relationships between numbers\"; UPSC GS Paper II \"basic numeracy (numbers and their relations)\"; NCERT Class X, Real Numbers (HCF and LCM by prime factorisation). Item written for this pack in original wording; not taken or adapted from any question bank.",
       "expertCheck": "Check that the marked answer is correct and is the only defensible option, that each tagged distractor really shows the named misconception, and that hints 1-2 do not give the answer away. Check the HCF/LCM scope is right for the aptitude block, and whether remainders and divisibility tests deserve their own skill."
@@ -1126,8 +1126,8 @@
       "hints": [
         "You need a number that both numbers divide into — the smallest one.",
         "Write each number as a product of primes, or list the multiples of the larger number until the smaller one divides it.",
-        "The multiples of 20 are 20, 40, 60, 80, …",
-        "Check which of the multiples of 20 is the first that 15 divides exactly."
+        "15 does not divide 20 exactly, so the LCM is larger than 20.",
+        "Try 20 × 2, then 20 × 3, and so on; stop at the first that 15 divides exactly."
       ],
       "basis": "SSC CGL Tier-I, Quantitative Aptitude: \"computation of whole numbers … relationships between numbers\"; UPSC GS Paper II \"basic numeracy (numbers and their relations)\"; NCERT Class X, Real Numbers (HCF and LCM by prime factorisation). Item written for this pack in original wording; not taken or adapted from any question bank.",
       "expertCheck": "Check that the marked answer is correct and is the only defensible option, that each tagged distractor really shows the named misconception, and that hints 1-2 do not give the answer away. Check the HCF/LCM scope is right for the aptitude block, and whether remainders and divisibility tests deserve their own skill."
@@ -1170,8 +1170,8 @@
       "hints": [
         "You need a number that both numbers divide into — the smallest one.",
         "Write each number as a product of primes, or list the multiples of the larger number until the smaller one divides it.",
-        "The multiples of 21 are 21, 42, 63, 84, …",
-        "Check which of the multiples of 21 is the first that 14 divides exactly."
+        "14 does not divide 21 exactly, so the LCM is larger than 21.",
+        "Try 21 × 2, then 21 × 3, and so on; stop at the first that 14 divides exactly."
       ],
       "basis": "SSC CGL Tier-I, Quantitative Aptitude: \"computation of whole numbers … relationships between numbers\"; UPSC GS Paper II \"basic numeracy (numbers and their relations)\"; NCERT Class X, Real Numbers (HCF and LCM by prime factorisation). Item written for this pack in original wording; not taken or adapted from any question bank.",
       "expertCheck": "Check that the marked answer is correct and is the only defensible option, that each tagged distractor really shows the named misconception, and that hints 1-2 do not give the answer away. Check the HCF/LCM scope is right for the aptitude block, and whether remainders and divisibility tests deserve their own skill."
@@ -1215,7 +1215,7 @@
         "You need the largest number that divides both numbers exactly.",
         "Write both numbers as products of primes and multiply the primes they share.",
         "6 divides both 36 and 48. Is there a larger number that also does?",
-        "Divide both numbers by 6: you get 6 and 8. If these still share a factor, multiply it into 6."
+        "Divide 36 and 48 by 6, look for a factor the two results still share, and multiply it into 6."
       ],
       "basis": "SSC CGL Tier-I, Quantitative Aptitude: \"computation of whole numbers … relationships between numbers\"; UPSC GS Paper II \"basic numeracy (numbers and their relations)\"; NCERT Class X, Real Numbers (HCF and LCM by prime factorisation). Item written for this pack in original wording; not taken or adapted from any question bank.",
       "expertCheck": "Check that the marked answer is correct and is the only defensible option, that each tagged distractor really shows the named misconception, and that hints 1-2 do not give the answer away. Check the HCF/LCM scope is right for the aptitude block, and whether remainders and divisibility tests deserve their own skill."
@@ -1259,7 +1259,7 @@
         "You need the largest number that divides both numbers exactly.",
         "Write both numbers as products of primes and multiply the primes they share.",
         "6 divides both 24 and 60. Is there a larger number that also does?",
-        "Divide both numbers by 6: you get 4 and 10. If these still share a factor, multiply it into 6."
+        "Divide 24 and 60 by 6, look for a factor the two results still share, and multiply it into 6."
       ],
       "basis": "SSC CGL Tier-I, Quantitative Aptitude: \"computation of whole numbers … relationships between numbers\"; UPSC GS Paper II \"basic numeracy (numbers and their relations)\"; NCERT Class X, Real Numbers (HCF and LCM by prime factorisation). Item written for this pack in original wording; not taken or adapted from any question bank.",
       "expertCheck": "Check that the marked answer is correct and is the only defensible option, that each tagged distractor really shows the named misconception, and that hints 1-2 do not give the answer away. Check the HCF/LCM scope is right for the aptitude block, and whether remainders and divisibility tests deserve their own skill."
@@ -1303,7 +1303,7 @@
         "You need the largest number that divides both numbers exactly.",
         "Write both numbers as products of primes and multiply the primes they share.",
         "5 divides both 45 and 75. Is there a larger number that also does?",
-        "Divide both numbers by 5: you get 9 and 15. If these still share a factor, multiply it into 5."
+        "Divide 45 and 75 by 5, look for a factor the two results still share, and multiply it into 5."
       ],
       "basis": "SSC CGL Tier-I, Quantitative Aptitude: \"computation of whole numbers … relationships between numbers\"; UPSC GS Paper II \"basic numeracy (numbers and their relations)\"; NCERT Class X, Real Numbers (HCF and LCM by prime factorisation). Item written for this pack in original wording; not taken or adapted from any question bank.",
       "expertCheck": "Check that the marked answer is correct and is the only defensible option, that each tagged distractor really shows the named misconception, and that hints 1-2 do not give the answer away. Check the HCF/LCM scope is right for the aptitude block, and whether remainders and divisibility tests deserve their own skill."
@@ -1347,7 +1347,7 @@
         "You need the largest number that divides both numbers exactly.",
         "Write both numbers as products of primes and multiply the primes they share.",
         "3 divides both 18 and 42. Is there a larger number that also does?",
-        "Divide both numbers by 3: you get 6 and 14. If these still share a factor, multiply it into 3."
+        "Divide 18 and 42 by 3, look for a factor the two results still share, and multiply it into 3."
       ],
       "basis": "SSC CGL Tier-I, Quantitative Aptitude: \"computation of whole numbers … relationships between numbers\"; UPSC GS Paper II \"basic numeracy (numbers and their relations)\"; NCERT Class X, Real Numbers (HCF and LCM by prime factorisation). Item written for this pack in original wording; not taken or adapted from any question bank.",
       "expertCheck": "Check that the marked answer is correct and is the only defensible option, that each tagged distractor really shows the named misconception, and that hints 1-2 do not give the answer away. Check the HCF/LCM scope is right for the aptitude block, and whether remainders and divisibility tests deserve their own skill."
@@ -1895,7 +1895,7 @@
         "Ignore the decimal points for a moment and multiply the digits.",
         "The number of decimal places in the product is the total number in the two factors.",
         "0.4 has 1 decimal place(s) and 0.06 has 2.",
-        "Multiply the digits, count 3 places from the right, and drop any trailing zeros."
+        "The digits give 24; count 3 places from its right for the point, then drop any trailing zeros."
       ],
       "basis": "SSC CGL Tier-I, Quantitative Aptitude: \"computation of whole numbers, decimals, fractions\"; UPSC GS Paper II \"basic numeracy\". Item written for this pack in original wording; not taken or adapted from any question bank.",
       "expertCheck": "Check that the marked answer is correct and is the only defensible option, that each tagged distractor really shows the named misconception, and that hints 1-2 do not give the answer away. Check whether BODMAS/order-of-operations is pitched at the right level for graduates, or should sit as a foundation-only skill. Item: Answer computed by hand: 0.4 × 0.06 = 0.024."
@@ -1939,7 +1939,7 @@
         "Ignore the decimal points for a moment and multiply the digits.",
         "The number of decimal places in the product is the total number in the two factors.",
         "0.3 has 1 decimal place(s) and 0.05 has 2.",
-        "Multiply the digits, count 3 places from the right, and drop any trailing zeros."
+        "The digits give 15; count 3 places from its right for the point, then drop any trailing zeros."
       ],
       "basis": "SSC CGL Tier-I, Quantitative Aptitude: \"computation of whole numbers, decimals, fractions\"; UPSC GS Paper II \"basic numeracy\". Item written for this pack in original wording; not taken or adapted from any question bank.",
       "expertCheck": "Check that the marked answer is correct and is the only defensible option, that each tagged distractor really shows the named misconception, and that hints 1-2 do not give the answer away. Check whether BODMAS/order-of-operations is pitched at the right level for graduates, or should sit as a foundation-only skill. Item: Answer computed by hand: 0.3 × 0.05 = 0.015."
@@ -1983,7 +1983,7 @@
         "Ignore the decimal points for a moment and multiply the digits.",
         "The number of decimal places in the product is the total number in the two factors.",
         "1.2 has 1 decimal place(s) and 0.03 has 2.",
-        "Multiply the digits, count 3 places from the right, and drop any trailing zeros."
+        "The digits give 36; count 3 places from its right for the point, then drop any trailing zeros."
       ],
       "basis": "SSC CGL Tier-I, Quantitative Aptitude: \"computation of whole numbers, decimals, fractions\"; UPSC GS Paper II \"basic numeracy\". Item written for this pack in original wording; not taken or adapted from any question bank.",
       "expertCheck": "Check that the marked answer is correct and is the only defensible option, that each tagged distractor really shows the named misconception, and that hints 1-2 do not give the answer away. Check whether BODMAS/order-of-operations is pitched at the right level for graduates, or should sit as a foundation-only skill. Item: Answer computed by hand: 1.2 × 0.03 = 0.036."
@@ -2027,7 +2027,7 @@
         "Ignore the decimal points for a moment and multiply the digits.",
         "The number of decimal places in the product is the total number in the two factors.",
         "0.25 has 2 decimal place(s) and 0.4 has 1.",
-        "Multiply the digits, count 3 places from the right, and drop any trailing zeros."
+        "The digits give 100; count 3 places from its right for the point, then drop any trailing zeros."
       ],
       "basis": "SSC CGL Tier-I, Quantitative Aptitude: \"computation of whole numbers, decimals, fractions\"; UPSC GS Paper II \"basic numeracy\". Item written for this pack in original wording; not taken or adapted from any question bank.",
       "expertCheck": "Check that the marked answer is correct and is the only defensible option, that each tagged distractor really shows the named misconception, and that hints 1-2 do not give the answer away. Check whether BODMAS/order-of-operations is pitched at the right level for graduates, or should sit as a foundation-only skill. Item: Answer computed by hand: 0.25 × 0.4 = 0.1."
@@ -6650,8 +6650,8 @@
       "hints": [
         "\"Absolute\" means the change in units, not in percent.",
         "Subtract each year's value from the next and compare the differences.",
-        "The increases are 40, 50, 40 for 2022, 2023, 2024.",
-        "Pick the year with the biggest of those differences."
+        "The first increase is 2022: 140 − 100 = 40. Work out the other two the same way.",
+        "The increases are 40 (2022), 50 (2023), 40 (2024); which is the biggest?"
       ],
       "basis": "SSC CGL Tier-I, Quantitative Aptitude: \"data interpretation\"; UPSC GS Paper II \"data interpretation (charts, graphs, tables, data sufficiency etc.) — Class X level\". Item written for this pack in original wording; not taken or adapted from any question bank.",
       "expertCheck": "Check that the marked answer is correct and is the only defensible option, that each tagged distractor really shows the named misconception, and that hints 1-2 do not give the answer away. Tables are written in text; check that is acceptable before charts exist in the item format. All figures are illustrative and describe no real organisation."
@@ -6779,8 +6779,8 @@
       "hints": [
         "\"Absolute\" means the change in units, not in percent.",
         "Subtract each year's value from the next and compare the differences.",
-        "The increases are 100, 180, 220 for 2022, 2023, 2024.",
-        "Pick the year with the biggest of those differences."
+        "The first increase is 2022: 600 − 500 = 100. Work out the other two the same way.",
+        "The increases are 100 (2022), 180 (2023), 220 (2024); which is the biggest?"
       ],
       "basis": "SSC CGL Tier-I, Quantitative Aptitude: \"data interpretation\"; UPSC GS Paper II \"data interpretation (charts, graphs, tables, data sufficiency etc.) — Class X level\". Item written for this pack in original wording; not taken or adapted from any question bank.",
       "expertCheck": "Check that the marked answer is correct and is the only defensible option, that each tagged distractor really shows the named misconception, and that hints 1-2 do not give the answer away. Tables are written in text; check that is acceptable before charts exist in the item format. All figures are illustrative and describe no real organisation."
@@ -6908,8 +6908,8 @@
       "hints": [
         "\"Absolute\" means the change in units, not in percent.",
         "Subtract each year's value from the next and compare the differences.",
-        "The increases are 40, 50, 30 for 2022, 2023, 2024.",
-        "Pick the year with the biggest of those differences."
+        "The first increase is 2022: 120 − 80 = 40. Work out the other two the same way.",
+        "The increases are 40 (2022), 50 (2023), 30 (2024); which is the biggest?"
       ],
       "basis": "SSC CGL Tier-I, Quantitative Aptitude: \"data interpretation\"; UPSC GS Paper II \"data interpretation (charts, graphs, tables, data sufficiency etc.) — Class X level\". Item written for this pack in original wording; not taken or adapted from any question bank.",
       "expertCheck": "Check that the marked answer is correct and is the only defensible option, that each tagged distractor really shows the named misconception, and that hints 1-2 do not give the answer away. Tables are written in text; check that is acceptable before charts exist in the item format. All figures are illustrative and describe no real organisation."
@@ -7037,8 +7037,8 @@
       "hints": [
         "\"Absolute\" means the change in units, not in percent.",
         "Subtract each year's value from the next and compare the differences.",
-        "The increases are 50, 30, 60 for 2022, 2023, 2024.",
-        "Pick the year with the biggest of those differences."
+        "The first increase is 2022: 300 − 250 = 50. Work out the other two the same way.",
+        "The increases are 50 (2022), 30 (2023), 60 (2024); which is the biggest?"
       ],
       "basis": "SSC CGL Tier-I, Quantitative Aptitude: \"data interpretation\"; UPSC GS Paper II \"data interpretation (charts, graphs, tables, data sufficiency etc.) — Class X level\". Item written for this pack in original wording; not taken or adapted from any question bank.",
       "expertCheck": "Check that the marked answer is correct and is the only defensible option, that each tagged distractor really shows the named misconception, and that hints 1-2 do not give the answer away. Tables are written in text; check that is acceptable before charts exist in the item format. All figures are illustrative and describe no real organisation."
@@ -9335,8 +9335,8 @@
       "hints": [
         "Left and right are from the person's own point of view.",
         "A right turn is a quarter turn clockwise; a left turn is a quarter turn anticlockwise.",
-        "After the first turn (right) the person faces east.",
-        "Apply the remaining turns (right, left) one at a time."
+        "After the first two turns (right, then right) the person faces south.",
+        "Now apply the last turn (left) to south."
       ],
       "basis": "SSC CGL Tier-I, General Intelligence and Reasoning: \"direction sense\". Item written for this pack in original wording; not taken or adapted from any question bank.",
       "expertCheck": "Check that the marked answer is correct and is the only defensible option, that each tagged distractor really shows the named misconception, and that hints 1-2 do not give the answer away. Check the distance items stay within the Pythagorean triples a learner can do without a calculator."
@@ -9376,8 +9376,8 @@
       "hints": [
         "Left and right are from the person's own point of view.",
         "A right turn is a quarter turn clockwise; a left turn is a quarter turn anticlockwise.",
-        "After the first turn (left) the person faces north.",
-        "Apply the remaining turns (left, left) one at a time."
+        "After the first two turns (left, then left) the person faces west.",
+        "Now apply the last turn (left) to west."
       ],
       "basis": "SSC CGL Tier-I, General Intelligence and Reasoning: \"direction sense\". Item written for this pack in original wording; not taken or adapted from any question bank.",
       "expertCheck": "Check that the marked answer is correct and is the only defensible option, that each tagged distractor really shows the named misconception, and that hints 1-2 do not give the answer away. Check the distance items stay within the Pythagorean triples a learner can do without a calculator."
@@ -9417,8 +9417,8 @@
       "hints": [
         "Left and right are from the person's own point of view.",
         "A right turn is a quarter turn clockwise; a left turn is a quarter turn anticlockwise.",
-        "After the first turn (right) the person faces west.",
-        "Apply the remaining turns (left, right) one at a time."
+        "After the first two turns (right, then left) the person faces south.",
+        "Now apply the last turn (right) to south."
       ],
       "basis": "SSC CGL Tier-I, General Intelligence and Reasoning: \"direction sense\". Item written for this pack in original wording; not taken or adapted from any question bank.",
       "expertCheck": "Check that the marked answer is correct and is the only defensible option, that each tagged distractor really shows the named misconception, and that hints 1-2 do not give the answer away. Check the distance items stay within the Pythagorean triples a learner can do without a calculator."
@@ -9458,8 +9458,8 @@
       "hints": [
         "Left and right are from the person's own point of view.",
         "A right turn is a quarter turn clockwise; a left turn is a quarter turn anticlockwise.",
-        "After the first turn (left) the person faces south.",
-        "Apply the remaining turns (right, right) one at a time."
+        "After the first two turns (left, then right) the person faces west.",
+        "Now apply the last turn (right) to west."
       ],
       "basis": "SSC CGL Tier-I, General Intelligence and Reasoning: \"direction sense\". Item written for this pack in original wording; not taken or adapted from any question bank.",
       "expertCheck": "Check that the marked answer is correct and is the only defensible option, that each tagged distractor really shows the named misconception, and that hints 1-2 do not give the answer away. Check the distance items stay within the Pythagorean triples a learner can do without a calculator."
@@ -11257,11 +11257,11 @@
         }
       ],
       "correctOptionId": "d",
-      "explanation": "Brief means lasting a short time; \"short\" is closest.",
+      "explanation": "Brief means lasting only a little time; \"short\" is closest.",
       "hints": [
         "First decide whether the question wants the same meaning or the opposite.",
         "Put the word in a simple sentence, then try each option in its place.",
-        "\"Brief\" means lasting a short time.",
+        "\"Brief\" means lasting only a little time.",
         "Two options may be tempting: one means the opposite, one only looks like brief. Rule them out."
       ],
       "basis": "SSC CGL Tier-I, English Comprehension: \"synonyms\", \"antonyms\". Item written for this pack in original wording; not taken or adapted from any question bank.",
@@ -11482,7 +11482,7 @@
         "First decide whether the question wants the same meaning or the opposite.",
         "Put the word in a simple sentence, then try each option in its place.",
         "Expand means to grow larger.",
-        "Rule out the option that means the same, and any that only looks similar; pick the one that means the reverse."
+        "Rule out \"Enlarge\" and \"Expend\": one means the same as expand and one only looks like it. Which remaining option means the reverse?"
       ],
       "basis": "SSC CGL Tier-I, English Comprehension: \"synonyms\", \"antonyms\". Item written for this pack in original wording; not taken or adapted from any question bank.",
       "expertCheck": "Check that the marked answer is correct and is the only defensible option, that each tagged distractor really shows the named misconception, and that hints 1-2 do not give the answer away. Check the words are at the right level and each has one clearly best option."
@@ -11523,7 +11523,7 @@
         "First decide whether the question wants the same meaning or the opposite.",
         "Put the word in a simple sentence, then try each option in its place.",
         "Ancient means very old.",
-        "Rule out the option that means the same, and any that only looks similar; pick the one that means the reverse."
+        "Rule out \"Old\": it means the same as ancient. Which remaining option means the reverse?"
       ],
       "basis": "SSC CGL Tier-I, English Comprehension: \"synonyms\", \"antonyms\". Item written for this pack in original wording; not taken or adapted from any question bank.",
       "expertCheck": "Check that the marked answer is correct and is the only defensible option, that each tagged distractor really shows the named misconception, and that hints 1-2 do not give the answer away. Check the words are at the right level and each has one clearly best option."
@@ -11567,7 +11567,7 @@
         "First decide whether the question wants the same meaning or the opposite.",
         "Put the word in a simple sentence, then try each option in its place.",
         "Generous means ready to give freely.",
-        "Rule out the option that means the same, and any that only looks similar; pick the one that means the reverse."
+        "Rule out \"Kind\" and \"Genuine\": one means the same as generous and one only looks like it. Which remaining option means the reverse?"
       ],
       "basis": "SSC CGL Tier-I, English Comprehension: \"synonyms\", \"antonyms\". Item written for this pack in original wording; not taken or adapted from any question bank.",
       "expertCheck": "Check that the marked answer is correct and is the only defensible option, that each tagged distractor really shows the named misconception, and that hints 1-2 do not give the answer away. Check the words are at the right level and each has one clearly best option."
@@ -11611,7 +11611,7 @@
         "First decide whether the question wants the same meaning or the opposite.",
         "Put the word in a simple sentence, then try each option in its place.",
         "Transparent means letting light through, easy to see through.",
-        "Rule out the option that means the same, and any that only looks similar; pick the one that means the reverse."
+        "Rule out \"Clear\" and \"Transport\": one means the same as transparent and one only looks like it. Which remaining option means the reverse?"
       ],
       "basis": "SSC CGL Tier-I, English Comprehension: \"synonyms\", \"antonyms\". Item written for this pack in original wording; not taken or adapted from any question bank.",
       "expertCheck": "Check that the marked answer is correct and is the only defensible option, that each tagged distractor really shows the named misconception, and that hints 1-2 do not give the answer away. Check the words are at the right level and each has one clearly best option."
@@ -11655,7 +11655,7 @@
         "First decide whether the question wants the same meaning or the opposite.",
         "Put the word in a simple sentence, then try each option in its place.",
         "Humble means modest about oneself.",
-        "Rule out the option that means the same, and any that only looks similar; pick the one that means the reverse."
+        "Rule out \"Modest\" and \"Humid\": one means the same as humble and one only looks like it. Which remaining option means the reverse?"
       ],
       "basis": "SSC CGL Tier-I, English Comprehension: \"synonyms\", \"antonyms\". Item written for this pack in original wording; not taken or adapted from any question bank.",
       "expertCheck": "Check that the marked answer is correct and is the only defensible option, that each tagged distractor really shows the named misconception, and that hints 1-2 do not give the answer away. Check the words are at the right level and each has one clearly best option."
@@ -11699,7 +11699,7 @@
         "First decide whether the question wants the same meaning or the opposite.",
         "Put the word in a simple sentence, then try each option in its place.",
         "Accept means to agree to take or receive.",
-        "Rule out the option that means the same, and any that only looks similar; pick the one that means the reverse."
+        "Rule out \"Receive\" and \"Except\": one means the same as accept and one only looks like it. Which remaining option means the reverse?"
       ],
       "basis": "SSC CGL Tier-I, English Comprehension: \"synonyms\", \"antonyms\". Item written for this pack in original wording; not taken or adapted from any question bank.",
       "expertCheck": "Check that the marked answer is correct and is the only defensible option, that each tagged distractor really shows the named misconception, and that hints 1-2 do not give the answer away. Check the words are at the right level and each has one clearly best option."
@@ -13321,7 +13321,7 @@
         "An idiom does not mean what its words say one by one.",
         "Think of a sentence where you have heard the idiom, and choose the meaning that fits that sentence.",
         "Picture it in a sentence: \"The first question was a piece of cake; I answered it in a minute.\"",
-        "Rule out the option that reads the words literally; pick the meaning that fits the sentence."
+        "Rule out \"A small dessert\", the literal picture. Which remaining meaning fits the sentence?"
       ],
       "basis": "SSC CGL Tier-I, English Comprehension: \"idioms and phrases\". Item written for this pack in original wording; not taken or adapted from any question bank.",
       "expertCheck": "Check that the marked answer is correct and is the only defensible option, that each tagged distractor really shows the named misconception, and that hints 1-2 do not give the answer away. Check the idioms chosen are common in Indian English and the meanings match a standard dictionary."
@@ -13365,7 +13365,7 @@
         "An idiom does not mean what its words say one by one.",
         "Think of a sentence where you have heard the idiom, and choose the meaning that fits that sentence.",
         "Picture it in a sentence: \"She told a joke to break the ice at the start of the meeting.\"",
-        "Rule out the option that reads the words literally; pick the meaning that fits the sentence."
+        "Rule out \"To damage something frozen\", the literal picture. Which remaining meaning fits the sentence?"
       ],
       "basis": "SSC CGL Tier-I, English Comprehension: \"idioms and phrases\". Item written for this pack in original wording; not taken or adapted from any question bank.",
       "expertCheck": "Check that the marked answer is correct and is the only defensible option, that each tagged distractor really shows the named misconception, and that hints 1-2 do not give the answer away. Check the idioms chosen are common in Indian English and the meanings match a standard dictionary."
@@ -13409,7 +13409,7 @@
         "An idiom does not mean what its words say one by one.",
         "Think of a sentence where you have heard the idiom, and choose the meaning that fits that sentence.",
         "Picture it in a sentence: \"We meet once in a blue moon now that we live in different cities.\"",
-        "Rule out the option that reads the words literally; pick the meaning that fits the sentence."
+        "Rule out \"On a clear night\", the literal picture. Which remaining meaning fits the sentence?"
       ],
       "basis": "SSC CGL Tier-I, English Comprehension: \"idioms and phrases\". Item written for this pack in original wording; not taken or adapted from any question bank.",
       "expertCheck": "Check that the marked answer is correct and is the only defensible option, that each tagged distractor really shows the named misconception, and that hints 1-2 do not give the answer away. Check the idioms chosen are common in Indian English and the meanings match a standard dictionary."
@@ -13453,7 +13453,7 @@
         "An idiom does not mean what its words say one by one.",
         "Think of a sentence where you have heard the idiom, and choose the meaning that fits that sentence.",
         "Picture it in a sentence: \"You hit the nail on the head when you said the delay was caused by the missing form.\"",
-        "Rule out the option that reads the words literally; pick the meaning that fits the sentence."
+        "Rule out \"To hurt oneself while working\", the literal picture. Which remaining meaning fits the sentence?"
       ],
       "basis": "SSC CGL Tier-I, English Comprehension: \"idioms and phrases\". Item written for this pack in original wording; not taken or adapted from any question bank.",
       "expertCheck": "Check that the marked answer is correct and is the only defensible option, that each tagged distractor really shows the named misconception, and that hints 1-2 do not give the answer away. Check the idioms chosen are common in Indian English and the meanings match a standard dictionary."
@@ -13497,7 +13497,7 @@
         "An idiom does not mean what its words say one by one.",
         "Think of a sentence where you have heard the idiom, and choose the meaning that fits that sentence.",
         "Picture it in a sentence: \"She burnt the midnight oil before her final examination.\"",
-        "Rule out the option that reads the words literally; pick the meaning that fits the sentence."
+        "Rule out \"To waste fuel\", the literal picture. Which remaining meaning fits the sentence?"
       ],
       "basis": "SSC CGL Tier-I, English Comprehension: \"idioms and phrases\". Item written for this pack in original wording; not taken or adapted from any question bank.",
       "expertCheck": "Check that the marked answer is correct and is the only defensible option, that each tagged distractor really shows the named misconception, and that hints 1-2 do not give the answer away. Check the idioms chosen are common in Indian English and the meanings match a standard dictionary."
@@ -13541,7 +13541,7 @@
         "An idiom does not mean what its words say one by one.",
         "Think of a sentence where you have heard the idiom, and choose the meaning that fits that sentence.",
         "Picture it in a sentence: \"He let the cat out of the bag about the surprise party.\"",
-        "Rule out the option that reads the words literally; pick the meaning that fits the sentence."
+        "Rule out \"To free a trapped animal\", the literal picture. Which remaining meaning fits the sentence?"
       ],
       "basis": "SSC CGL Tier-I, English Comprehension: \"idioms and phrases\". Item written for this pack in original wording; not taken or adapted from any question bank.",
       "expertCheck": "Check that the marked answer is correct and is the only defensible option, that each tagged distractor really shows the named misconception, and that hints 1-2 do not give the answer away. Check the idioms chosen are common in Indian English and the meanings match a standard dictionary."
@@ -13585,7 +13585,7 @@
         "An idiom does not mean what its words say one by one.",
         "Think of a sentence where you have heard the idiom, and choose the meaning that fits that sentence.",
         "Picture it in a sentence: \"That phone cost an arm and a leg.\"",
-        "Rule out the option that reads the words literally; pick the meaning that fits the sentence."
+        "Rule out \"To cause a serious injury\", the literal picture. Which remaining meaning fits the sentence?"
       ],
       "basis": "SSC CGL Tier-I, English Comprehension: \"idioms and phrases\". Item written for this pack in original wording; not taken or adapted from any question bank.",
       "expertCheck": "Check that the marked answer is correct and is the only defensible option, that each tagged distractor really shows the named misconception, and that hints 1-2 do not give the answer away. Check the idioms chosen are common in Indian English and the meanings match a standard dictionary."
@@ -13629,7 +13629,7 @@
         "An idiom does not mean what its words say one by one.",
         "Think of a sentence where you have heard the idiom, and choose the meaning that fits that sentence.",
         "Picture it in a sentence: \"I stayed home because I was feeling under the weather.\"",
-        "Rule out the option that reads the words literally; pick the meaning that fits the sentence."
+        "Rule out \"Outdoors in the rain\", the literal picture. Which remaining meaning fits the sentence?"
       ],
       "basis": "SSC CGL Tier-I, English Comprehension: \"idioms and phrases\". Item written for this pack in original wording; not taken or adapted from any question bank.",
       "expertCheck": "Check that the marked answer is correct and is the only defensible option, that each tagged distractor really shows the named misconception, and that hints 1-2 do not give the answer away. Check the idioms chosen are common in Indian English and the meanings match a standard dictionary."
@@ -13673,7 +13673,7 @@
         "An idiom does not mean what its words say one by one.",
         "Think of a sentence where you have heard the idiom, and choose the meaning that fits that sentence.",
         "Picture it in a sentence: \"Stop beating around the bush and tell me what happened.\"",
-        "Rule out the option that reads the words literally; pick the meaning that fits the sentence."
+        "Rule out \"To search a garden carefully\", the literal picture. Which remaining meaning fits the sentence?"
       ],
       "basis": "SSC CGL Tier-I, English Comprehension: \"idioms and phrases\". Item written for this pack in original wording; not taken or adapted from any question bank.",
       "expertCheck": "Check that the marked answer is correct and is the only defensible option, that each tagged distractor really shows the named misconception, and that hints 1-2 do not give the answer away. Check the idioms chosen are common in Indian English and the meanings match a standard dictionary."
@@ -13714,7 +13714,7 @@
         "An idiom does not mean what its words say one by one.",
         "Think of a sentence where you have heard the idiom, and choose the meaning that fits that sentence.",
         "Picture it in a sentence: \"Someone spilled the beans about the new project before it was announced.\"",
-        "Rule out the option that reads the words literally; pick the meaning that fits the sentence."
+        "Rule out \"To waste food\", the literal picture. Which remaining meaning fits the sentence?"
       ],
       "basis": "SSC CGL Tier-I, English Comprehension: \"idioms and phrases\". Item written for this pack in original wording; not taken or adapted from any question bank.",
       "expertCheck": "Check that the marked answer is correct and is the only defensible option, that each tagged distractor really shows the named misconception, and that hints 1-2 do not give the answer away. Check the idioms chosen are common in Indian English and the meanings match a standard dictionary."
@@ -13758,7 +13758,7 @@
         "An idiom does not mean what its words say one by one.",
         "Think of a sentence where you have heard the idiom, and choose the meaning that fits that sentence.",
         "Picture it in a sentence: \"He got cold feet just before his speech.\"",
-        "Rule out the option that reads the words literally; pick the meaning that fits the sentence."
+        "Rule out \"To feel physically cold\", the literal picture. Which remaining meaning fits the sentence?"
       ],
       "basis": "SSC CGL Tier-I, English Comprehension: \"idioms and phrases\". Item written for this pack in original wording; not taken or adapted from any question bank.",
       "expertCheck": "Check that the marked answer is correct and is the only defensible option, that each tagged distractor really shows the named misconception, and that hints 1-2 do not give the answer away. Check the idioms chosen are common in Indian English and the meanings match a standard dictionary."
@@ -13802,10 +13802,17 @@
         "An idiom does not mean what its words say one by one.",
         "Think of a sentence where you have heard the idiom, and choose the meaning that fits that sentence.",
         "Picture it in a sentence: \"Missing the bus was a blessing in disguise: I met an old friend while waiting.\"",
-        "Rule out the option that reads the words literally; pick the meaning that fits the sentence."
+        "Rule out \"A person wearing a costume\", the literal picture. Which remaining meaning fits the sentence?"
       ],
       "basis": "SSC CGL Tier-I, English Comprehension: \"idioms and phrases\". Item written for this pack in original wording; not taken or adapted from any question bank.",
       "expertCheck": "Check that the marked answer is correct and is the only defensible option, that each tagged distractor really shows the named misconception, and that hints 1-2 do not give the answer away. Check the idioms chosen are common in Indian English and the meanings match a standard dictionary."
     }
-  ]
+  ],
+  "hintLadder": {
+    "generatorVersion": "claude-opus-5-5",
+    "promptVersion": "eng-15-hint-ladders-v1",
+    "generatedAt": "2026-10-01T00:00:00.000Z",
+    "rulesVersion": "hint-ladder-v1",
+    "expertCheck": "Level 1 is a nudge, 2 names the method, 3 does the first step, 4 stops just short of choosing the answer. Confirm that no level before 4 settles the answer, that level 4 still leaves the choice to the learner, and that every step is correct. Levels 3 and 4 make an answer assisted."
+  }
 }

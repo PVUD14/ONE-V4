@@ -81,6 +81,11 @@ distractors tagged, every item at least one (`aptitude:validate` prints the curr
   worked hint step and a near-solution hint of their own.
 - The **hint ladder** follows the question bank's levels: 1 points at the idea, 2 names the method, 3 does the first
   step, 4 does everything short of choosing. Levels 3 and 4 mark an attempt assisted (ENG-04).
+- **ENG-15 revised the ladders** (prompt version `eng-15-hint-ladders-v1`, the pack's `hintLadder` block) so that every
+  ladder passes the `hint-ladder-v1` rules — complete, climbing, never stating the correct option or pointing at its
+  letter — and no worked step or near solution is shared by more than two items. Changed: the LCM, HCF,
+  decimal-product, data-interpretation (absolute increase), turn-direction, antonym and idiom ladders, and one
+  vocabulary meaning. Levels 1–2 stay shared within a skill. See `docs/architecture/hint-ladder-authoring-design.md`.
 
 ## Decisions taken (recommended answers adopted, per AGENTS.md)
 

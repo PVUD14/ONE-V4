@@ -17,6 +17,8 @@ import { randomUUID } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import {
   ENGINE_CONTENT_CODE_PATTERN,
+  HINT_LADDER_RULES_VERSION,
+  hintLadderFindings,
   QUESTION_DIFFICULTIES,
   SKILL_LEVELS,
   SKILL_LICENCES,
@@ -90,6 +92,23 @@ export interface AptitudeItem {
   readonly expertCheck: string;
 }
 
+/**
+ * The hint ladders' own provenance (ENG-15): who revised them, under which prompt version and
+ * which ladder rules. The items keep the pack's provenance; the ladder rows take this one.
+ */
+export interface AptitudeHintLadderProvenance {
+  readonly generatorVersion: string;
+  readonly promptVersion: string;
+  readonly generatedAt: string;
+  /** The `hint-ladder-*` rules every ladder in the pack passes. */
+  readonly rulesVersion: string;
+  /** What a subject expert checks about every ladder, added to the item's own note. */
+  readonly expertCheck: string;
+}
+
+/** A level-3 or level-4 hint used by more items than this is generic, not about the item (ENG-15). */
+export const APTITUDE_HINT_SHARED_LIMIT = 2;
+
 export interface AptitudeBankPack {
   readonly notice: string;
   readonly packKey: string;
@@ -102,6 +121,7 @@ export interface AptitudeBankPack {
   readonly skills: readonly AptitudeSkill[];
   readonly misconceptions: readonly AptitudeMisconception[];
   readonly items: readonly AptitudeItem[];
+  readonly hintLadder: AptitudeHintLadderProvenance;
 }
 
 const STABLE_KEY = /^[a-z0-9][a-z0-9-]{2,79}$/;
@@ -153,6 +173,11 @@ export function validateAptitudeBankPack(pack: AptitudeBankPack): readonly strin
       problems.push(`SOURCE_INCOMPLETE:${source.id}`);
     }
   }
+  const ladder = pack.hintLadder;
+  if (!ladder || !text(ladder.generatorVersion, 1, 128) || !text(ladder.promptVersion, 1, 128)
+      || typeof ladder.generatedAt !== 'string' || Number.isNaN(Date.parse(ladder.generatedAt)) || !text(ladder.expertCheck, 1, 1500)) {
+    problems.push('HINT_LADDER_PROVENANCE_MISSING');
+  } else if (ladder.rulesVersion !== HINT_LADDER_RULES_VERSION) problems.push('HINT_LADDER_RULES_VERSION_INVALID');
   const licence = pack.rights?.licenceLabel;
   if (!(SKILL_LICENCES as readonly string[]).includes(licence)) problems.push('LICENCE_INVALID');
   else if (SKILL_LICENCES_REQUIRING_ATTRIBUTION.includes(licence) && !pack.rights.attribution) problems.push('ATTRIBUTION_MISSING');
@@ -207,6 +232,8 @@ export function validateAptitudeBankPack(pack: AptitudeBankPack): readonly strin
     const texts = item.options.map((option) => option.text.trim().toLowerCase());
     if (new Set(texts).size !== texts.length) problems.push(`ITEM_OPTIONS_NOT_DISTINCT:${key}`);
     if (!Array.isArray(item.hints) || item.hints.length !== 4 || item.hints.some((hint) => !text(hint, 1, 1000))) problems.push(`ITEM_HINTS_INCOMPLETE:${key}`);
+    // ENG-15: the ladder climbs and never names the answer (hint-ladder-v1), blocking for the pack.
+    else for (const finding of hintLadderFindings(item)) problems.push(`ITEM_${finding.code}:${finding.level}:${key}`);
     let tagged = 0;
     for (const option of item.options) {
       if (!option.misconception) continue;
@@ -221,6 +248,15 @@ export function validateAptitudeBankPack(pack: AptitudeBankPack): readonly strin
     if (tagged < 1) problems.push(`ITEM_NO_TAGGED_DISTRACTOR:${key}`);
     if (!text(item.basis, 1, 2000)) problems.push(`ITEM_BASIS_MISSING:${key}`);
     if (!text(item.expertCheck, 1, 4000)) problems.push(`ITEM_EXPERT_CHECK_MISSING:${key}`);
+  }
+  // ENG-15: levels 3 and 4 are about the item — a worked step or near solution shared widely is generic.
+  for (const level of [3, 4] as const) {
+    const users = new Map<string, string[]>();
+    for (const item of pack.items ?? []) {
+      const hint = Array.isArray(item.hints) ? item.hints[level - 1]?.trim().toLowerCase() : undefined;
+      if (hint) users.set(hint, [...(users.get(hint) ?? []), item.stableKey]);
+    }
+    for (const keys of users.values()) if (keys.length > APTITUDE_HINT_SHARED_LIMIT) for (const key of keys) problems.push(`ITEM_HINT_GENERIC:${level}:${key}`);
   }
   for (const code of codes.values()) if (!usedCodes.has(code.code)) problems.push(`CODE_UNUSED:${code.code}`);
   for (const skill of skills.values()) {
@@ -379,7 +415,13 @@ export async function importAptitudeBankPack(db: TransactionalRunner, pack: Apti
       if (used?.used) { itemsSkipped.push(item.stableKey); continue; }
       const created = await createQuestion(runner, {
         stableKey: item.stableKey, topicKey: item.skill, prompt: item.prompt, reasonCode: 'TRACK_BUILD', actor,
-        agentDraft: draftFor(item.expertCheck),
+        agentDraft: {
+          ...draftFor(item.expertCheck),
+          hintLadder: {
+            generatorVersion: pack.hintLadder.generatorVersion, promptVersion: pack.hintLadder.promptVersion,
+            generatedAt: new Date(pack.hintLadder.generatedAt).toISOString(), expertCheck: pack.hintLadder.expertCheck,
+          },
+        },
       });
       const { topicId: _topic, ...fields } = questionDraftFieldsOf(pack, item, topicIdByKey.get(item.skill)!, (code) => codeIdByCode.get(code)!);
       await saveQuestionDraft(runner, { revisionId: created.revisionId, draft: { ...fields, topicKey: item.skill }, actor });

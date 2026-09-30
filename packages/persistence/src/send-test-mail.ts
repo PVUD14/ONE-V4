@@ -20,7 +20,7 @@ async function main(): Promise<number> {
   }
   const sink = createConfiguredInvitationMailSink();
   if (!sink) {
-    console.error('No mail sender is configured (PTP_SMTP_HOST is not set); nothing was sent.');
+    console.error('No mail sender is configured (PTP_SMTP_HOST is empty); nothing was sent.');
     return 1;
   }
   const via = sink instanceof TlsSmtpMailSink ? `${sink.host}:${sink.port} (${sink.security}) as ${sink.user}` : 'the local Mailpit sink';

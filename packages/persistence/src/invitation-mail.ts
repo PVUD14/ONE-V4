@@ -28,8 +28,20 @@ export interface MailMessageInput {
   readonly attachments?: readonly MailAttachment[];
 }
 
+/**
+ * What `notification_delivery_attempts.provider_kind` records for a send through a sink (0094,
+ * ADR-042). A sink that does not say — a test double — is recorded as MAILPIT, the loopback kind it
+ * stands in for.
+ */
+export type MailProviderKind = 'MAILPIT' | 'SMTP';
+
 export interface InvitationMailSink {
+  readonly providerKind?: MailProviderKind;
   send(input: MailMessageInput): Promise<{ readonly providerReference?: string }>;
+}
+
+export function mailProviderKind(sink: InvitationMailSink): MailProviderKind {
+  return sink.providerKind ?? 'MAILPIT';
 }
 
 /** The receiving server refused the message permanently (5xx): retrying cannot help. */
@@ -91,6 +103,8 @@ export function buildMailMessage(input: MailMessageInput, sender: string, now = 
 }
 
 export class LoopbackSmtpInvitationMailSink implements InvitationMailSink {
+  readonly providerKind = 'MAILPIT' as const;
+
   constructor(readonly host = process.env.PTP_LOCAL_MAILPIT_HOST ?? '127.0.0.1', readonly port = Number(process.env.PTP_LOCAL_MAILPIT_SMTP_PORT ?? '1025')) {
     if (!['127.0.0.1', 'localhost'].includes(host) || !Number.isInteger(port) || port < 1 || port > 65_535) {
       throw new Error('local invitation mail sink must be loopback-bound');
@@ -141,6 +155,7 @@ export interface TlsSmtpMailSinkTestOptions {
 const HOST_NAME = /^(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/;
 
 export class TlsSmtpMailSink implements InvitationMailSink {
+  readonly providerKind = 'SMTP' as const;
   readonly host: string;
   readonly port: number;
   readonly security: SmtpSecurity;
@@ -447,10 +462,13 @@ function classifySocketError(error: NodeJS.ErrnoException, inTls: boolean): Mail
 type Environment = Readonly<Record<string, string | undefined>>;
 
 /**
- * Chooses the sink from the environment. PTP_SMTP_HOST selects the real TLS sender, and then every
- * other PTP_SMTP_* setting must be valid or this throws and the API or worker refuses to start — a
- * half-configured sender is worse than none. Without it: the local Mailpit sink when its flag is on,
- * otherwise nothing (every email recorded NOT_CONFIGURED). Errors name variables, never values.
+ * Chooses the sink from the environment — the one factory every sending process uses (the API's
+ * security module, the automation worker and mail:send-test). A non-blank PTP_SMTP_HOST selects the
+ * real TLS sender, and then PTP_SMTP_USER and PTP_SMTP_PASSWORD must be set and every other
+ * PTP_SMTP_* setting valid, or this throws and the API or worker refuses to start — a half-configured
+ * sender is worse than none. A blank host (as docker compose passes an unset variable) is "not
+ * configured": the local Mailpit sink when its flag is on, otherwise nothing (every email recorded
+ * NOT_CONFIGURED). Errors name variables, never values.
  */
 export function createConfiguredInvitationMailSink(env: Environment = process.env): InvitationMailSink | undefined {
   const host = env.PTP_SMTP_HOST?.trim();
@@ -464,15 +482,20 @@ export function createConfiguredInvitationMailSink(env: Environment = process.en
 }
 
 function smtpSettingsFromEnvironment(env: Environment, host: string): SmtpSettings {
-  const security = env.PTP_SMTP_SECURITY?.trim().toLowerCase();
-  if (security !== 'tls' && security !== 'starttls') throw new Error('PTP_SMTP_SECURITY must be tls or starttls when PTP_SMTP_HOST is set');
   const user = env.PTP_SMTP_USER?.trim();
   if (!user) throw new Error('PTP_SMTP_USER must be set when PTP_SMTP_HOST is set');
   const password = env.PTP_SMTP_PASSWORD;
   if (!password) throw new Error('PTP_SMTP_PASSWORD must be set when PTP_SMTP_HOST is set');
   const portText = env.PTP_SMTP_PORT?.trim();
-  const port = portText ? Number(portText) : security === 'tls' ? 465 : 587;
-  if (!Number.isInteger(port) || port < 1 || port > 65_535) throw new Error('PTP_SMTP_PORT must be a port number');
+  const explicitPort = portText ? Number(portText) : undefined;
+  if (explicitPort !== undefined && (!/^\d+$/.test(portText!) || !Number.isInteger(explicitPort) || explicitPort < 1 || explicitPort > 65_535)) {
+    throw new Error('PTP_SMTP_PORT must be a port number');
+  }
+  // TLS (implicit, port 465) or STARTTLS (port 587), in any case. Unset: STARTTLS only for port 587.
+  const securityText = env.PTP_SMTP_SECURITY?.trim().toLowerCase();
+  const security: SmtpSecurity | undefined = securityText ? (securityText === 'tls' || securityText === 'starttls' ? securityText : undefined) : explicitPort === 587 ? 'starttls' : 'tls';
+  if (!security) throw new Error('PTP_SMTP_SECURITY must be TLS or STARTTLS when set');
+  const port = explicitPort ?? (security === 'tls' ? 465 : 587);
   const timeoutText = env.PTP_SMTP_TIMEOUT_MS?.trim();
   const timeoutMs = timeoutText ? Number(timeoutText) : undefined;
   if (timeoutMs !== undefined && (!Number.isInteger(timeoutMs) || timeoutMs < 1_000 || timeoutMs > 120_000)) {

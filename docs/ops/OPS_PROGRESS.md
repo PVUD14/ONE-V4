@@ -2520,3 +2520,87 @@ web). It has no AI Operations or System Health screen, and no student-facing scr
   existing aiOperations and systemHealth web tests still pass: 22/22.
 
 **Next goal:** OPS-17 (full), or the ENG-12 sandbox panel once ENG-12 lands.
+
+## ENG-16 — Lesson variants and second-language drafts — 2026-10-01
+**Result:** Complete for the acceptance; no Telugu text written (see Decisions). A student chooses the language lessons are
+shown in, on the web and on Android; a lesson with a PUBLISHED rendering in that language is shown in it, and every other
+lesson falls back to English with a notice. A non-English variant is marked for native-speaker review and cannot be approved
+without saying who checked the language. No model is called and nothing is translated (AI hold).
+
+**Precondition:** met. OPS-09c (0065) already added variant metadata (language, level, style) to lesson content revisions
+and the editor that drafts, reviews and publishes variants; OPS-09d imports them as DRAFT with provenance; the 0090 archive
+turns a variant's published revisions to ARCHIVED.
+
+**Branch / PR:** feat/eng-16-lesson-variants, from `onev4/feat/plan-phases-0-to-2` (rebased onto 6affb34). Commits: design
+(caf2dfd), acceptance tests (3088a41), backend (0b6c5a3), web (95334e9), Android (e32dc8c), this report. Pushed to onev4;
+not merged (the coordinator merges).
+
+**Files created:**
+- docs/architecture/lesson-language-serving-design.md — where the choice lives, what is served, the native-speaker gate,
+  fonts, and what was rejected.
+- packages/persistence/drizzle/0097_learner_language_preferences.sql — one table (`user_id` PK, `lesson_language` CHECK in
+  the eleven OPS-09c codes, `updated_at`).
+- packages/career-readiness/src/lesson-language.ts (+ test/lesson-language.test.ts) — the pure `lesson-rendering-v1` rule
+  and the offered-language rule.
+- packages/persistence/src/lesson-languages.ts — reads the choice, the published languages, renders lesson versions and
+  the learner's catalogue, and writes the choice with its audit row.
+- apps/api/src/http/lesson-languages.integration.spec.ts
+- apps/web/src/lessonScript.ts; apps/web/public/fonts/NotoSansTelugu-Regular.ttf and NotoSansTelugu-OFL.txt.
+- apps/android/.../LessonLanguage.kt; res/font/noto_sans_telugu_regular.ttf and noto_sans_telugu_bold.ttf.
+
+**Files modified:**
+- packages/authorization/src/lesson-editor.ts (+ test): `languageReview` reason codes, `lessonNeedsLanguageReview`,
+  `LESSON_LANGUAGE_REVIEW_MISSING` in `refuseLessonTransition`.
+- packages/persistence/src/lesson-editor.ts: the refuse callback receives the revision's language; the code is recorded in
+  the transition audit and in `source_records.source_metadata.languageReview`.
+- packages/persistence/src/career-readiness.ts: `getLearnerCareerReadinessState` renders the catalogue in the learner's
+  language and returns `lessonLanguage { selected, offered }`. The public `/catalog` is unchanged (English).
+- packages/persistence/src/learning-experience.ts: learning-step lesson titles follow the choice (`language` added).
+- apps/api: `PUT /api/v1/career-readiness/me/lesson-language`; the lesson transition route accepts `languageReviewCode`;
+  privacy export (`lessonLanguage`) and deletion (counted under STUDENT_PROFILE).
+- apps/web: Learning page language picker and notices, `lang` + Telugu font on lesson text (panel and learning step);
+  lesson editor "Needs native-speaker review" badge and the approval field.
+- apps/android: DTOs, `Api.setLessonLanguage`, Learning screen (language card, summary, notices), next-lesson card and
+  step titles in the Telugu font.
+- Tests adjusted, not weakened: the two OPS-09c integration tests that approve a `te`/`ta` variant now pass
+  `languageReviewCode`, because the rule became stricter.
+
+**Migrations added:** 0097 (the number assigned). Idempotent; `db:migrate` twice (see Validation).
+
+**Design docs / ADRs:** lesson-language-serving-design.md. No ADR: this extends OPS-09c's design and supersedes nothing.
+
+**Acceptance criteria:**
+- [x] **Students can select a language.** `PUT /career-readiness/me/lesson-language` (only English, Telugu or a language
+  with a published variant; others 400 `LESSON_LANGUAGE_NOT_OFFERED`); the picker on the web Learning page and the language
+  card on Android; the choice is stored per person (0097) and audited (`learner.lesson_language.changed`, from/to).
+- [x] **Missing variants fall back to English with a notice.** Each served lesson carries `language` and `languageNotice`
+  (`TRANSLATION_MISSING`: "Not yet available in Telugu. Shown in English."; `TRANSLATION_OUTDATED`: the English was
+  updated after the translation). Integration spec: a Telugu reader with no published Telugu gets every lesson in English
+  with the notice; a draft, an in-review, an approved-but-unpublished and an archived variant are never served.
+- [x] **Variant metadata on content revisions** — already added by OPS-09c (0065); reused unchanged.
+- [~] **Draft second-language variants for the aptitude lessons, marked for native-speaker review.** The marking and the
+  path are built (badge, required native-speaker review code at approval, agent-draft provenance shape for a later ONE AI
+  Orchestration job). No Telugu drafts were written: ENG-10 built aptitude *questions*, and no aptitude *lessons* exist to
+  translate (a variant needs a live base lesson). Agent-written Telugu would also be model text, which the AI hold and the
+  brief rule out.
+
+**Decisions taken on Divakar's behalf (recommended options, recorded in the design):**
+1. Second language: **Telugu** (the recorded default for the Andhra Pradesh pilot); always offered.
+2. A translation written for an older revision of the English lesson is **served with a notice**, not withdrawn
+   (OPS-09c left this to ENG-16). One line in `chooseLessonRendering` to change.
+3. Level and style are not a student choice: among published variants in the chosen language the base's own level and
+   style win, then its level, then STANDARD.
+4. The choice is a separate table, not a `student_profiles` column (learners without a profile row) and not client-only
+   (web and phone must agree).
+5. Approving a non-English variant needs `NATIVE_SPEAKER_REVIEWED` or `NATIVE_SPEAKER_CONSULTED`.
+
+**Android:** changed (Learning screen, home next-lesson card, learning-step titles, DTOs, bundled Telugu font); compiled
+with `:app:compileDebugKotlin`. The operations lesson editor is web-only (Appendix 1 §4.3), so the native-speaker badge and
+approval field have no Android counterpart.
+
+**Validation:** pending — recorded below when the run finishes.
+
+**Limitations / not done:**
+- No Telugu text exists yet; until an operator publishes one, Telugu readers see English with the notice everywhere.
+- The interface itself is not translated; only lesson words are.
+- Fonts: Telugu only. Another script (Hindi, Tamil…) relies on the system font until a face is bundled for it.

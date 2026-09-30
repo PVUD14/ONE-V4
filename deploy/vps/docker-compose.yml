@@ -27,6 +27,12 @@ services:
       API_CORS_ORIGIN: https://oneby8.com
       PTP_INVITATION_BASE_URL: https://oneby8.com
       PTP_MAIL_FROM: info@ai8ht.pro
+      # Sign-in and automation settings come from the server's .env (see .env.example).
+      COGNITO_USER_POOL_ID: ${COGNITO_USER_POOL_ID:-}
+      COGNITO_CLIENT_ID: ${COGNITO_CLIENT_ID:-}
+      COGNITO_STAFF_USER_POOL_ID: ${COGNITO_STAFF_USER_POOL_ID:-}
+      COGNITO_STAFF_CLIENT_ID: ${COGNITO_STAFF_CLIENT_ID:-}
+      AUTOMATION_SIGNING_SECRET: ${AUTOMATION_SIGNING_SECRET:-}
       DATABASE_URL: postgresql://${POSTGRES_USER:-planthepath_uat}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-planthepath_uat}
       NODE_ENV: ${NODE_ENV:-development}
     depends_on:
@@ -41,6 +47,11 @@ services:
     build:
       context: ../..
       dockerfile: deploy/vps/Dockerfile.web
+      args:
+        VITE_API_BASE_URL: https://oneby8.com
+        VITE_COGNITO_DOMAIN: ${VITE_COGNITO_DOMAIN:-}
+        VITE_COGNITO_CLIENT_ID: ${VITE_COGNITO_CLIENT_ID:-}
+        VITE_COGNITO_USER_POOL_ID: ${VITE_COGNITO_USER_POOL_ID:-}
     restart: unless-stopped
     expose:
       - "8080"

@@ -60,22 +60,54 @@ docker compose exec -w /app api pnpm db:migrate     # second run: "0 applied"
 
 Caddy fetches the `oneby8.com` certificate on first request; allow a minute.
 
-## 4. Data
+## 4. Data — carry the VPS database across (decided 2026-09-30)
 
-Choose one:
+On the **old server** (`ssh aight@one.ai8ht.pro`):
 
-- **Fresh start** — nothing further; accounts are created through the app.
-- **Carry the VPS data across** — on the VPS, `pg_dump -Fc` the database; copy the
-  dump to the AWS server; then:
+```bash
+set -a; . /srv/planthepath-next/shared/app.env; set +a
+pg_dump --version                                   # must be 16.x or older
+pg_dump -Fc --no-owner --no-privileges "$DATABASE_URL" -f ~/one.dump
+```
 
-  ```bash
-  docker compose cp one.dump postgres:/tmp/one.dump
-  docker compose exec postgres sh -lc 'pg_restore --clean --if-exists --no-owner --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" /tmp/one.dump'
-  docker compose exec postgres rm -f /tmp/one.dump
-  docker compose exec -w /app api pnpm db:migrate
-  ```
+On **your PC**: copy it down, then up to AWS.
 
-  Delete the dump from both machines and from your laptop afterwards.
+```powershell
+scp aight@one.ai8ht.pro:~/one.dump E:\one-wt\one.dump
+scp -i AWS\ONE-By_AI8HT.pem E:\one-wt\one.dump ubuntu@oneby8.com:~
+```
+
+On the **AWS server**: replace the empty database with the copy, then bring it up to date.
+
+```bash
+cd /srv/one/deploy/vps
+sudo docker compose stop api
+sudo docker compose exec postgres sh -c 'dropdb -U "$POSTGRES_USER" --force "$POSTGRES_DB" && createdb -U "$POSTGRES_USER" "$POSTGRES_DB"'
+sudo docker compose cp ~/one.dump postgres:/tmp/one.dump
+sudo docker compose exec postgres sh -c 'pg_restore --no-owner --no-privileges -U "$POSTGRES_USER" -d "$POSTGRES_DB" /tmp/one.dump; rm -f /tmp/one.dump'
+sudo docker compose start api
+sudo docker compose exec -w /app api pnpm db:migrate
+```
+
+Then delete `one.dump` from all three places: `rm ~/one.dump` on both servers and
+`E:\one-wt\one.dump` on your PC. Uploaded documents live on the old server's disk
+(`FILE_STORAGE_ROOT`) and are not part of the database copy; uploads stay off on AWS
+until a virus scanner is set up there.
+
+### Sign-in settings
+
+From the old server's `/srv/planthepath-next/shared/app.env`, copy these lines into
+`/srv/one/deploy/vps/.env` on AWS (`sudo nano .env`), then rebuild with
+`sudo docker compose up -d --build`:
+
+`COGNITO_USER_POOL_ID`, `COGNITO_CLIENT_ID`, `COGNITO_STAFF_USER_POOL_ID`,
+`COGNITO_STAFF_CLIENT_ID`, `VITE_COGNITO_DOMAIN`, `VITE_COGNITO_CLIENT_ID`,
+`VITE_COGNITO_USER_POOL_ID`, and `AUTOMATION_SIGNING_SECRET` if present.
+
+Do **not** copy `VITE_COGNITO_REDIRECT_URI` or `VITE_COGNITO_LOGOUT_URI`: the app uses
+`https://oneby8.com` for them. In the AWS console (Cognito → the web app client →
+Hosted UI), add `https://oneby8.com/auth/callback` to the allowed callback URLs and
+`https://oneby8.com/login` to the allowed sign-out URLs.
 
 ## 5. Check
 

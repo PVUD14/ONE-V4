@@ -123,6 +123,7 @@ describe('Phase 1 API protected request path', () => {
       .get(`/api/v1/employers/${employerId}/applicant-access/${opportunityId}/${studentUserId}`)
       .expect(401);
     await request(app.getHttpServer()).get('/api/v1/career-readiness/me').expect(401);
+    await request(app.getHttpServer()).put('/api/v1/career-readiness/me/lesson-language').send({ language: 'te' }).expect(401);
     await request(app.getHttpServer()).post(`/api/v1/career-readiness/lessons/${studentUserId}/complete`).expect(401);
     await request(app.getHttpServer()).post(`/api/v1/career-readiness/assessments/${opportunityId}/attempts`).expect(401);
     await request(app.getHttpServer()).post(`/api/v1/career-readiness/attempts/${opportunityId}/submit`).expect(401);

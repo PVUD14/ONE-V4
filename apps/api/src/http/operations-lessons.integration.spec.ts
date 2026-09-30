@@ -190,8 +190,9 @@ function createVariant(actor: Member, lessonId: string, over: Record<string, unk
 function save(actor: Member, revisionId: string, body: Record<string, unknown>) {
   return api().post(`${base}/revisions/${revisionId}/draft`).set(auth(actor.userId)).send(body);
 }
-function transition(actor: Member, revisionId: string, toState: string, reasonCode: string, rightsReasonCode?: string) {
-  return api().post(`${base}/revisions/${revisionId}/transition`).set(auth(actor.userId)).send({ toState, reasonCode, ...(rightsReasonCode ? { rightsReasonCode } : {}) });
+function transition(actor: Member, revisionId: string, toState: string, reasonCode: string, rightsReasonCode?: string, languageReviewCode?: string) {
+  return api().post(`${base}/revisions/${revisionId}/transition`).set(auth(actor.userId))
+    .send({ toState, reasonCode, ...(rightsReasonCode ? { rightsReasonCode } : {}), ...(languageReviewCode ? { languageReviewCode } : {}) });
 }
 function publish(actor: Member, revisionId: string, body: Record<string, unknown>) {
   return api().post(`${base}/revisions/${revisionId}/publish`).set(auth(actor.userId)).send(body);
@@ -209,11 +210,14 @@ async function auditCount(action: string, resourceId: string): Promise<number> {
   return (await pool.query('SELECT count(*)::int AS n FROM audit_events WHERE action=$1 AND resource_id=$2', [action, resourceId])).rows[0].n;
 }
 
-/** Submit and approve an open revision (the editor wrote it; the reviewer approves). */
-async function submitAndApprove(revisionId: string, submitter: Member = editor): Promise<void> {
+/**
+ * Submit and approve an open revision (the editor wrote it; the reviewer approves). A variant in a
+ * language other than English also needs the reviewer's native-speaker review code (ENG-16).
+ */
+async function submitAndApprove(revisionId: string, submitter: Member = editor, languageReviewCode?: string): Promise<void> {
   const submitted = await transition(submitter, revisionId, 'IN_REVIEW', 'READY_FOR_REVIEW');
   expect(submitted.status, JSON.stringify(submitted.body)).toBe(201);
-  const approved = await transition(reviewer, revisionId, 'APPROVED', 'REVIEW_PASSED', 'OWNERSHIP_VERIFIED');
+  const approved = await transition(reviewer, revisionId, 'APPROVED', 'REVIEW_PASSED', 'OWNERSHIP_VERIFIED', languageReviewCode);
   expect(approved.status, JSON.stringify(approved.body)).toBe(201);
 }
 
@@ -539,7 +543,7 @@ describe('variants', () => {
     // A variant carries no module, skill or prerequisites of its own.
     expect((await save(editor, revisionId, { ...variantDraft(), moduleKey })).body.error.problems).toContain('LESSON_VARIANT_STRUCTURE_INVALID');
     expect((await save(editor, revisionId, variantDraft())).status).toBe(201);
-    await submitAndApprove(revisionId);
+    await submitAndApprove(revisionId, editor, 'NATIVE_SPEAKER_REVIEWED');
     const self = await publish(editor, revisionId, { reasonCode: 'NEW_VARIANT' });
     expect(self.status).toBe(403);
     expect((await requestApproval(publisher, { revisionId, reasonCode: 'NEW_VARIANT' })).body.error.code).toBe('APPROVAL_NOT_REQUIRED');
@@ -599,7 +603,7 @@ describe('archiving a published lesson or variant (content-archive-design.md)', 
     const variantId = created.body.lesson.lessonId as string;
     const variantRevision = created.body.lesson.open.id as string;
     expect((await save(editor, variantRevision, variantDraft())).status).toBe(201);
-    await submitAndApprove(variantRevision);
+    await submitAndApprove(variantRevision, editor, 'NATIVE_SPEAKER_REVIEWED');
     expect((await publish(publisher, variantRevision, { reasonCode: 'NEW_VARIANT' })).status).toBe(201);
 
     const blocked = await archive(publisher, secondPilot().id);

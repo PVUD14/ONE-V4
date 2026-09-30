@@ -345,6 +345,8 @@ async function seedPersonalRecords(userId: string, applicationId: string, tag: s
   // Account: consent, notifications, a device, the college's invitation and a support case.
   await q(`INSERT INTO user_consents (id, user_id, consent_key, version, action) VALUES ($1,$2,'privacy-notice','privacy-test-v1','GRANTED')`, [randomUUID(), userId]);
   await q(`INSERT INTO notification_preferences (user_id, email_enabled, timezone) VALUES ($1, false, 'Asia/Kolkata')`, [userId]);
+  // ENG-16 (0097): the language the person reads lessons in.
+  await q(`INSERT INTO learner_language_preferences (user_id, lesson_language) VALUES ($1, 'te')`, [userId]);
   await q(`INSERT INTO user_notifications (id, user_id, kind, title, body, data) VALUES ($1,$2,'SYSTEM',$3,'Your interview moved to Friday.', $4::jsonb)`,
     [randomUUID(), userId, `${tag} notice`, JSON.stringify({ internalRef: 'internal-reference-marker' })]);
   const deviceToken = `device-token-${randomUUID()}`;
@@ -596,6 +598,7 @@ describe('data export', () => {
     // Account.
     expect(bundle.consents).toEqual([expect.objectContaining({ consentKey: 'privacy-notice', title: 'Privacy notice', version: 'privacy-test-v1', action: 'GRANTED' })]);
     expect(bundle.notificationPreferences).toMatchObject({ emailEnabled: false, timezone: 'Asia/Kolkata' });
+    expect(bundle.lessonLanguage).toMatchObject({ language: 'te', updatedAt: expect.anything() });
     expect(bundle.notifications).toEqual([expect.objectContaining({ kind: 'SYSTEM', title: 'Subjectmark notice', body: 'Your interview moved to Friday.', readAt: null })]);
     expect(bundle.devices).toEqual([expect.objectContaining({ platform: 'ANDROID', revokedAt: null })]);
     expect(bundle.invitations).toEqual([expect.objectContaining({ organizationName: 'Privacy Test College', kind: 'STUDENT', sentTo: 'subjectmark.invite@uat.test' })]);
@@ -895,6 +898,9 @@ describe('deletion execution', () => {
 
     // What was only about them is gone.
     expect((await pool.query('SELECT 1 FROM student_profiles WHERE user_id = $1', [subjectId])).rows).toHaveLength(0);
+    // The lesson language they chose (ENG-16, 0097) goes with them; the other candidate's stays.
+    expect((await pool.query('SELECT 1 FROM learner_language_preferences WHERE user_id = $1', [subjectId])).rows).toHaveLength(0);
+    expect((await pool.query('SELECT 1 FROM learner_language_preferences WHERE user_id = $1', [otherCandidateId])).rows).toHaveLength(1);
     expect((await pool.query('SELECT 1 FROM student_document_metadata WHERE student_user_id = $1', [subjectId])).rows).toHaveLength(0);
     // The career role they chose is erased with them; another person's choice is untouched.
     expect((await pool.query('SELECT 1 FROM student_career_targets WHERE student_user_id = $1', [subjectId])).rows).toHaveLength(0);

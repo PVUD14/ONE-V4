@@ -13,6 +13,7 @@ import {
   lessonPublishReasons,
   refuseLessonPublish,
   refuseLessonTransition,
+  lessonNeedsLanguageReview,
   type LessonRevisionState,
 } from './lesson-editor.js';
 
@@ -51,6 +52,36 @@ describe('moving a revision', () => {
     expect(move(editor, 'DRAFT', 'IN_REVIEW', 'BECAUSE')).toBe('REASON_CODE_INVALID');
     expect(move(reviewer, 'DRAFT', 'APPROVED', 'REVIEW_PASSED', ['editor'], 'OWNERSHIP_VERIFIED')).toBe('LESSON_TRANSITION_NOT_ALLOWED');
     expect(move(reviewer, 'APPROVED', 'CHANGES_REQUESTED', 'CONTENT_INACCURATE')).toBe('LESSON_TRANSITION_NOT_ALLOWED');
+  });
+});
+
+describe('a second-language variant is marked for native-speaker review (ENG-16)', () => {
+  const approve = (language: string | null, languageReviewCode: string | null) =>
+    refuseLessonTransition({ actor: reviewer, from: 'IN_REVIEW', to: 'APPROVED', reasonCode: 'REVIEW_PASSED', rightsReasonCode: 'OWNERSHIP_VERIFIED',
+      language, languageReviewCode, contributorUserIds: ['editor'] });
+
+  it('refuses to approve a non-English variant without a native-speaker review code, and accepts either code', () => {
+    expect(approve('te', null)).toBe('LESSON_LANGUAGE_REVIEW_MISSING');
+    expect(approve('hi', null)).toBe('LESSON_LANGUAGE_REVIEW_MISSING');
+    expect(approve('te', 'NATIVE_SPEAKER_REVIEWED')).toBeNull();
+    expect(approve('te', 'NATIVE_SPEAKER_CONSULTED')).toBeNull();
+    expect(lessonNeedsLanguageReview('te')).toBe(true);
+    expect(lessonNeedsLanguageReview('en')).toBe(false);
+  });
+
+  it('needs no code for English, and refuses a code that does not belong', () => {
+    expect(approve('en', null)).toBeNull();
+    expect(approve(null, null)).toBeNull();
+    expect(approve('en', 'NATIVE_SPEAKER_REVIEWED')).toBe('REASON_CODE_INVALID');
+    expect(approve('te', 'LOOKS_FINE')).toBe('REASON_CODE_INVALID');
+    expect(refuseLessonTransition({ actor: editor, from: 'DRAFT', to: 'IN_REVIEW', reasonCode: 'READY_FOR_REVIEW', language: 'te',
+      languageReviewCode: 'NATIVE_SPEAKER_REVIEWED', contributorUserIds: ['editor'] })).toBe('REASON_CODE_INVALID');
+    expect(refuseLessonTransition({ actor: editor, from: 'DRAFT', to: 'IN_REVIEW', reasonCode: 'READY_FOR_REVIEW', language: 'te', contributorUserIds: ['editor'] })).toBeNull();
+  });
+
+  it('keeps self-review refused for a translated variant', () => {
+    expect(refuseLessonTransition({ actor: editorWhoReviews, from: 'IN_REVIEW', to: 'APPROVED', reasonCode: 'REVIEW_PASSED', rightsReasonCode: 'OWNERSHIP_VERIFIED',
+      language: 'te', languageReviewCode: 'NATIVE_SPEAKER_REVIEWED', contributorUserIds: ['editor'] })).toBe('LESSON_SELF_REVIEW_REFUSED');
   });
 });
 

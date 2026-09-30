@@ -68,7 +68,7 @@ const revision = (over: Record<string, unknown> = {}) => ({
   id: revisionId, revision: 1, state: 'DRAFT', contentHash: 'c'.repeat(64), author: { userId: otherId, email: 'author@example.test' },
   contributors: [{ userId: otherId, email: 'author@example.test' }], createdAt: '2026-09-28T10:00:00.000Z', publishedAt: null,
   fields: fields(), answerKeyWithheld: false, topic,
-  tags: [], ladder: null, agentDraft: null, expertCheck: null, rightsReview: null, ...over,
+  tags: [], ladder: null, ladderChecks: { rulesVersion: 'hint-ladder-v1', findings: [] }, agentDraft: null, expertCheck: null, rightsReview: null, ...over,
 });
 const detail = (over: Record<string, unknown> = {}) => ({
   ...summaryRow(), current: null, open: revision(), versions: [],
@@ -319,6 +319,27 @@ describe('question bank', () => {
     const region = await openQuestion();
     expect(within(region).getByText('Drafted by').nextSibling?.textContent).toMatch(/^The coding agent \(claude-opus-5-5, eng-10-aptitude-bank-v1, .+\) — check it against its basis$/);
     expect(within(region).getByText('For the subject expert').nextSibling?.textContent).toBe('Check the answer key and that only one option is correct.');
+  });
+
+  it('shows what the hint ladder checks find, as advice for the author and the reviewer (ENG-15)', async () => {
+    detailBody = detail({ open: revision({
+      state: 'IN_REVIEW',
+      ladderChecks: { rulesVersion: 'hint-ladder-v1', findings: [{ level: 2, code: 'HINT_REPEATS_EARLIER' }, { level: 4, code: 'HINT_NAMES_ANSWER' }] },
+    }) });
+    const region = await openQuestion();
+    const checks = within(region).getByRole('list', { name: 'Hint ladder checks' });
+    expect(within(checks).getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+      'Level 2 says the same as an earlier level.',
+      'Level 4 contains the text of the correct option.',
+    ]);
+    expect(within(region).getByText(/Advice from the ladder checks \(hint-ladder-v1\): the reviewer decides/)).toBeInTheDocument();
+  });
+
+  it('says when the hint ladder checks find nothing, without claiming the ladder is safe (ENG-15)', async () => {
+    detailBody = detail({ open: revision({ state: 'IN_REVIEW' }) });
+    const region = await openQuestion();
+    expect(within(region).queryByRole('list', { name: 'Hint ladder checks' })).not.toBeInTheDocument();
+    expect(within(region).getByText(/The ladder checks \(hint-ladder-v1\) found nothing\. The reviewer still judges whether a hint gives the answer away\./)).toBeInTheDocument();
   });
 
   it('says a person wrote an item that carries no agent provenance', async () => {

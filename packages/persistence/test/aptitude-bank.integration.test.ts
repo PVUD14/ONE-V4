@@ -177,6 +177,8 @@ describe('the imported map stays governed by the editors', () => {
     expect(withKey!.open!.agentDraft).toMatchObject({ generatorVersion: pack.generatorVersion, promptVersion: pack.promptVersion });
     expect(withKey!.open!.expertCheck).toMatch(/only defensible option/);
     expect(withKey!.open!.fields.correctOptionId).toMatch(/^[a-d]$/);
+    // ENG-15: the editor shows what the ladder rules find (nothing, for the pack's ladders).
+    expect(withKey!.open!.ladderChecks).toEqual({ rulesVersion: 'hint-ladder-v1', findings: [] });
     const withheld = await loadQuestion(db, row.entity_id, { answerKeys: false });
     expect(withheld!.open!.answerKeyWithheld).toBe(true);
     expect(withheld!.open!.fields.correctOptionId).toBeNull();
@@ -193,10 +195,14 @@ describe('the imported map stays governed by the editors', () => {
       });
 
     await move(submitter, ['CONTENT_EDIT'], 'IN_REVIEW', 'READY_FOR_REVIEW', null);
-    // Submission writes the ladder and tags — still agent-drafted, with the expert note.
-    const [ladder] = (await pool.query('SELECT source, generator_version, prompt_version, expert_check_notes, review_state FROM question_hint_ladders WHERE question_revision_id = $1', [row.id])).rows;
-    expect(ladder).toMatchObject({ source: 'AGENT_DRAFTED', generator_version: pack.generatorVersion, prompt_version: pack.promptVersion, review_state: 'IN_REVIEW' });
-    expect(ladder.expert_check_notes).toBeTruthy();
+    // Submission writes the ladder and tags — still agent-drafted, with the expert note. The ladder
+    // takes its own provenance (ENG-15 revised the ladders, not the items) and the pack's four hints.
+    const [ladder] = (await pool.query('SELECT source, generator_version, prompt_version, generated_at, expert_check_notes, review_state, hint_1, hint_2, hint_3, hint_4 FROM question_hint_ladders WHERE question_revision_id = $1', [row.id])).rows;
+    expect(ladder).toMatchObject({ source: 'AGENT_DRAFTED', generator_version: pack.hintLadder.generatorVersion, prompt_version: pack.hintLadder.promptVersion, review_state: 'IN_REVIEW' });
+    expect(new Date(ladder.generated_at).toISOString()).toBe(new Date(pack.hintLadder.generatedAt).toISOString());
+    expect([ladder.hint_1, ladder.hint_2, ladder.hint_3, ladder.hint_4]).toEqual(pack.items.find((entry) => entry.stableKey === 'apt-q-averages-005')!.hints);
+    expect(ladder.expert_check_notes).toMatch(/only defensible option/);
+    expect(ladder.expert_check_notes).toContain(`Hint ladder: ${pack.hintLadder.expertCheck}`);
     const tags = (await pool.query('SELECT source, prompt_version, expert_check_notes, review_state FROM question_option_misconceptions WHERE question_revision_id = $1', [row.id])).rows;
     expect(tags.length).toBeGreaterThanOrEqual(1);
     for (const tag of tags) expect(tag).toMatchObject({ source: 'AGENT_DRAFTED', prompt_version: pack.promptVersion, review_state: 'IN_REVIEW' });

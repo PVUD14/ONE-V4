@@ -8,7 +8,8 @@
  * plus practice with the hint ladder (the server's hint level makes a success after hint 3 assisted, C5), the
  * attempt linked to its decision, no answer key / correct option / model number in any response, input and
  * ownership refusals (400 / 404 / 409), an honest empty state when nothing is published, the 0072 guard, and
- * privacy deletion of the new rows.
+ * privacy deletion of the new rows; and ENG-15's boundary: hint 2 leaves a right answer unaided, hint 3 or 4 makes it
+ * assisted, and the skill state counts assisted successes apart from unaided ones.
  */
 import 'reflect-metadata';
 import { createSign, generateKeyPairSync, randomUUID, type JsonWebKey, type KeyObject } from 'node:crypto';
@@ -352,6 +353,49 @@ describe('learning experience routes', () => {
     expect(superseded.status).toBe(409);
     expect(superseded.body.error.code).toBe('STEP_SUPERSEDED');
     expect(await replayLearningDecision(db as unknown as PersistenceDb, next.body.step.decisionId)).toMatchObject({ status: 'MATCHED' });
+  });
+
+  it('ENG-15: a right answer after hint 2 stays unaided; after hint 3 or 4 it is assisted, and the skill state counts it apart', async () => {
+    /** Practises the ladder question after `hints` hints, answering it right; returns the recorded attempt. */
+    const practise = async (hints: number): Promise<{ learner: { id: string }; attempt: { highest_hint_level: number; assisted: boolean; correct: boolean } }> => {
+      const learner = await studentWithTarget({ consent: false });
+      const step = (await api().post('/api/v1/learning/next-step').set(auth(learner.token)).send({})).body.step;
+      expect(step.practice.question.id).toBe(ladderQuestion);
+      const base = `/api/v1/learning/steps/${step.decisionId}`;
+      for (let level = 1; level <= hints; level += 1) {
+        const shown = await api().post(`${base}/hints`).set(auth(learner.token)).send({ questionId: ladderQuestion });
+        expect(shown.status).toBe(201);
+        expect(shown.body.step.practice.question.hints).toHaveLength(level);
+      }
+      const answered = await api().post(`${base}/answers`).set(auth(learner.token)).send({ questionId: ladderQuestion, selectedOptionId: keyOf.get(ladderQuestion) });
+      expect(answered.status).toBe(201);
+      expect(answered.body.feedback).toEqual({ questionId: ladderQuestion, correct: true, assisted: hints >= 3 });
+      const [attempt] = (await pool.query(`SELECT highest_hint_level, assisted, correct FROM learning_attempt_events
+        WHERE source_attempt_type = 'learning_step' AND source_attempt_id = $1 AND item_id = $2`, [step.decisionId, ladderQuestion])).rows;
+      return { learner, attempt };
+    };
+    const skillState = async (learnerId: string) => {
+      // The projection runs for students who hold adaptive-learning; grant it after the practice.
+      await pool.query(`INSERT INTO user_consents (id, user_id, consent_key, version, action, recorded_at)
+        VALUES ($1, $2, 'adaptive-learning', $3, 'GRANTED', now())`, [randomUUID(), learnerId, CONSENT_VERSION]);
+      await projectSubjectSkillState(db as unknown as PersistenceDb, learnerId);
+      return (await pool.query('SELECT unaided_success_count, assisted_success_count, evidence_stage FROM learner_skill_state WHERE subject_user_id = $1 AND skill_id = $2',
+        [learnerId, topicPartial])).rows[0];
+    };
+
+    const two = await practise(2);
+    expect(two.attempt).toEqual({ highest_hint_level: 2, assisted: false, correct: true });
+    expect(await skillState(two.learner.id)).toMatchObject({ unaided_success_count: 1, assisted_success_count: 0 });
+
+    const three = await practise(3);
+    expect(three.attempt).toEqual({ highest_hint_level: 3, assisted: true, correct: true });
+    const threeState = await skillState(three.learner.id);
+    expect(threeState).toMatchObject({ unaided_success_count: 0, assisted_success_count: 1 });
+    expect(threeState.evidence_stage).not.toBe('DEMONSTRATED');
+
+    const four = await practise(4);
+    expect(four.attempt).toEqual({ highest_hint_level: 4, assisted: true, correct: true });
+    expect(await skillState(four.learner.id)).toMatchObject({ unaided_success_count: 0, assisted_success_count: 1 });
   });
 
   it('a step on a skill with nothing published says so and records nothing', async () => {

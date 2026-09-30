@@ -146,6 +146,29 @@ describe('student learning plan', () => {
     expect(calls.find((call) => call.path.endsWith('/answers'))!.body).toEqual({ questionId: 'q-1', selectedOptionId: 'b' });
   });
 
+  it('labels each hint by its level and says when a right answer after hint 3 counts as assisted (ENG-15)', async () => {
+    stub({
+      '/api/v1/learning/path': { body: { path: path() } },
+      '/api/v1/learning/placement-test': notAvailable,
+      '/api/v1/learning/next-step:POST': { status: 201, body: { step: step({ status: 'IN_PROGRESS', questionsAnswered: 0, question: question(['Nudge text', 'Strategy text']) }) } },
+      '/api/v1/learning/steps/d-1/hints:POST': { status: 201, body: { step: step({ status: 'IN_PROGRESS', questionsAnswered: 0, question: question(['Nudge text', 'Strategy text', 'Worked step text']) }) } },
+      '/api/v1/learning/steps/d-1/answers:POST': { status: 201, body: { feedback: { questionId: 'q-1', correct: true, assisted: true }, step: step({ status: 'COMPLETED', questionsAnswered: 1 }) } },
+    });
+    await authenticate();
+    render(<StudentLearningPlan />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Plan my first step' }));
+    const hints = await screen.findByLabelText('Hints shown');
+    expect(within(hints).getByText('Hint 1 · Nudge')).toBeInTheDocument();
+    expect(within(hints).getByText('Hint 2 · Strategy')).toBeInTheDocument();
+    expect(screen.getByText(/an answer after it counts as assisted/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Show hint 3 · Worked step/ }));
+    expect(await screen.findByText('Hint 3 · Worked step')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Show hint 4 · Near solution/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('Option B'));
+    fireEvent.click(screen.getByRole('button', { name: 'Check answer' }));
+    expect(await screen.findByRole('status')).toHaveTextContent('Right. Counted as assisted: it does not count as solved on your own.');
+  });
+
   it('says plainly when nothing is published for the step, and when there is no target', async () => {
     stub({
       '/api/v1/learning/path': { body: { path: path({ latestStep: step({ status: 'NO_PRACTICE' }, { action: 'LEARN' }) }) } },

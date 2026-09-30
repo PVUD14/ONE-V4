@@ -498,6 +498,30 @@ async function seedPersonalRecords(userId: string, applicationId: string, tag: s
   return { deviceToken, tokenDigest, photoKey, documentVersionId, verificationActionId };
 }
 
+/**
+ * Records only Divakar's 2026-09-30 deletion decisions reach, added just before the deletion runs so the
+ * export assertions above keep their counts: a staff-only intervention with an outcome note (D1), a
+ * readiness factor on the person's snapshot, and a served item with its response on their submitted
+ * readiness check (D2).
+ */
+async function seedDecisionRecords(userId: string, tag: string): Promise<void> {
+  const f = fixtures;
+  const relationshipId = (await pool.query('SELECT id FROM institution_relationships WHERE student_user_id = $1 AND institution_id = $2', [userId, f.institutionId])).rows[0].id as string;
+  await pool.query(`INSERT INTO staff_actions (id, institution_id, subject_student_user_id, institution_relationship_id, actor_user_id, actor_membership_id,
+      action_type, state, title, note, outcome_note, visibility, updated_by_user_id)
+    VALUES ($1,$2,$3,$4,$5,$6,'INTERVENTION','OPEN',$7,$8,$9,'STAFF_ONLY',$5)`,
+  [randomUUID(), f.institutionId, userId, relationshipId, f.lecturerId, f.lecturerMembershipId,
+    `${tag} attendance intervention`, `${tag} attendance intervention details`, `${tag} attended twice`]);
+  const snapshotId = (await pool.query('SELECT id FROM readiness_snapshots WHERE subject_user_id = $1', [userId])).rows[0].id as string;
+  const projectionId = (await pool.query('SELECT id FROM mastery_projections WHERE subject_user_id = $1', [userId])).rows[0].id as string;
+  await pool.query(`INSERT INTO readiness_factors (id, snapshot_id, topic_id, mastery_projection_id, reason_code, explanation) VALUES ($1,$2,$3,$4,'LOW_EVIDENCE',$5)`,
+    [randomUUID(), snapshotId, f.topicId, projectionId, `${tag} needs more practice`]);
+  const attemptId = (await pool.query("SELECT id FROM assessment_attempts WHERE subject_user_id = $1 AND state = 'SUBMITTED'", [userId])).rows[0].id as string;
+  const itemId = randomUUID();
+  await pool.query('INSERT INTO assessment_attempt_items (id, attempt_id, question_version_id, position) VALUES ($1,$2,$3,1)', [itemId, attemptId, f.questionId]);
+  await pool.query("INSERT INTO assessment_responses (id, attempt_item_id, selected_option_id, responded_at, is_correct) VALUES ($1,$2,'a',now(),true)", [randomUUID(), itemId]);
+}
+
 afterAll(async () => {
   await app?.close();
   await pool?.end();
@@ -768,6 +792,33 @@ describe('learning activity is append-only outside deletion', () => {
     const kept = await pool.query('SELECT count(*)::int AS count FROM learner_skill_state WHERE subject_user_id = $1', [subjectId]);
     expect(kept.rows[0].count).toBe(1);
   });
+
+  it('keeps a readiness-check attempt out of reach outside the deletion transaction for that person (0004 guard, 0087 exception)', async () => {
+    // An unsubmitted attempt as well as the seeded submitted one; the deletion below must erase both.
+    const assignmentId = (await pool.query('SELECT id FROM assessment_assignments WHERE subject_user_id = $1', [subjectId])).rows[0].id as string;
+    await pool.query(`INSERT INTO assessment_attempts (id, assignment_id, subject_user_id, blueprint_id, selection_seed, state, started_at, expires_at, correlation_id)
+      VALUES ($1,$2,$3,$4,'selection-seed-secret-0002','IN_PROGRESS', now(), now() + interval '30 minutes','privacy-test-open-check')`,
+    [randomUUID(), assignmentId, subjectId, fixtures.blueprintId]);
+    await expect(pool.query("UPDATE assessment_attempts SET score_correct = 5 WHERE subject_user_id = $1 AND state = 'SUBMITTED'", [subjectId]))
+      .rejects.toThrow(/submitted assessment attempts are immutable/);
+    await expect(pool.query('DELETE FROM assessment_attempts WHERE subject_user_id = $1', [subjectId]))
+      .rejects.toThrow(/submitted assessment attempts are immutable/);
+    // An unsubmitted attempt is still not removed outside the erase (the guard's behaviour since 0004).
+    await pool.query("DELETE FROM assessment_attempts WHERE subject_user_id = $1 AND state = 'IN_PROGRESS'", [subjectId]);
+    // The erase setting names one person; it does not open the table for anyone else.
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query("SELECT set_config('one.privacy_erase_subject', $1, true)", [opsId]);
+      await expect(client.query('DELETE FROM assessment_attempts WHERE subject_user_id = $1', [subjectId]))
+        .rejects.toThrow(/submitted assessment attempts are immutable/);
+    } finally {
+      await client.query('ROLLBACK');
+      client.release();
+    }
+    const kept = await pool.query('SELECT state FROM assessment_attempts WHERE subject_user_id = $1 ORDER BY state', [subjectId]);
+    expect(kept.rows.map((row) => row.state)).toEqual(['IN_PROGRESS', 'SUBMITTED']);
+  });
 });
 
 describe('deletion execution', () => {
@@ -798,6 +849,9 @@ describe('deletion execution', () => {
     await pool.query(`INSERT INTO career_roles (id, code, title, family) VALUES ($1, $2, 'Erasure check role', 'TEST')`, [roleId, 'ERASE_' + roleId.slice(0, 8).toUpperCase().replace(/-/g, '_')]);
     await pool.query(`INSERT INTO student_career_targets (id, student_user_id, career_role_id) VALUES ($1, $2, $3)`, [randomUUID(), subjectId, roleId]);
     await pool.query(`INSERT INTO student_career_targets (id, student_user_id, career_role_id) VALUES ($1, $2, $3)`, [randomUUID(), opsId, roleId]);
+    // Divakar's 2026-09-30 decisions: records only they reach, for the subject and for the other candidate.
+    await seedDecisionRecords(subjectId, 'Subjectmark');
+    await seedDecisionRecords(otherCandidateId, 'Othermark');
 
     const summaries = await executeDueDeletions({ db, ids, storage });
     expect(summaries).toHaveLength(1);
@@ -864,6 +918,55 @@ describe('deletion execution', () => {
     expect(await learning('learning_decisions', 'subject_user_id', subjectId)).toBe(0);
     expect(await learning('learning_decisions', 'subject_user_id', opsId)).toBe(1);
 
+    // D2 (Divakar, 2026-09-30): the learning history is erased too — lessons, topic bands, readiness
+    // snapshots, the roadmap and readiness checks — the subject's only; the other candidate's stays whole.
+    for (const table of ['learner_progress', 'mastery_projections', 'readiness_snapshots', 'roadmap_actions', 'assessment_assignments', 'assessment_attempts']) {
+      expect(await learning(table, 'subject_user_id', subjectId), table).toBe(0);
+      expect(await learning(table, 'subject_user_id', otherCandidateId), table).toBe(1);
+    }
+    // The children went first, and only the subject's: one factor, one served item and one response remain, the other's.
+    for (const [table, owner] of [
+      ['readiness_factors', 'SELECT s.subject_user_id FROM readiness_factors x JOIN readiness_snapshots s ON s.id = x.snapshot_id'],
+      ['assessment_attempt_items', 'SELECT a.subject_user_id FROM assessment_attempt_items x JOIN assessment_attempts a ON a.id = x.attempt_id'],
+      ['assessment_responses', 'SELECT a.subject_user_id FROM assessment_responses r JOIN assessment_attempt_items x ON x.id = r.attempt_item_id JOIN assessment_attempts a ON a.id = x.attempt_id'],
+    ] as const) {
+      expect((await pool.query(`SELECT count(*)::int AS count FROM ${table}`)).rows[0].count, table).toBe(1);
+      expect((await pool.query(owner)).rows, table).toEqual([{ subject_user_id: otherCandidateId }]);
+    }
+    // Deleted through the erase path, not around the readiness CHECKs: they are still in force.
+    const readinessChecks = (await pool.query(`SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint
+      WHERE conrelid = 'readiness_snapshots'::regclass AND contype = 'c'`)).rows.map((row) => row.def as string).join(' ');
+    expect(readinessChecks).toMatch(/advisory/);
+    expect(readinessChecks).toMatch(/NOT employer_visible/);
+    await expect(pool.query(`UPDATE readiness_snapshots SET employer_visible = true WHERE subject_user_id = $1`, [otherCandidateId])).rejects.toThrow(/check constraint/);
+
+    // D1: every staff-only college action about the person keeps its skeleton and loses all of its text.
+    const staffOnly = await pool.query(`SELECT action_type, state, visibility, title, note, outcome_note, version FROM staff_actions
+      WHERE subject_student_user_id = $1 AND visibility = 'STAFF_ONLY' ORDER BY action_type`, [subjectId]);
+    expect(staffOnly.rows.map((row) => [row.action_type, row.state, row.title, row.note, row.outcome_note])).toEqual([
+      ['ACADEMIC_VERIFICATION', 'OPEN', 'Erased: the student deleted their account', null, null],
+      ['FACULTY_NOTE', 'OPEN', 'Erased: the student deleted their account', null, null],
+      ['INTERVENTION', 'OPEN', 'Erased: the student deleted their account', null, null],
+    ]);
+    // Bumped, so a stale edit form cannot write the old text back.
+    expect(staffOnly.rows.every((row) => Number(row.version) >= 2)).toBe(true);
+    // The other candidate's actions keep every word.
+    const otherStaffOnly = await pool.query(`SELECT action_type, title, note, outcome_note FROM staff_actions
+      WHERE subject_student_user_id = $1 AND visibility = 'STAFF_ONLY' ORDER BY action_type`, [otherCandidateId]);
+    expect(otherStaffOnly.rows).toEqual([
+      { action_type: 'ACADEMIC_VERIFICATION', title: 'Othermark verify semester 1', note: 'Othermark verify semester 1 details', outcome_note: null },
+      { action_type: 'FACULTY_NOTE', title: 'Othermark staff-only observation', note: 'Othermark staff-only observation details', outcome_note: null },
+      { action_type: 'INTERVENTION', title: 'Othermark attendance intervention', note: 'Othermark attendance intervention details', outcome_note: 'Othermark attended twice' },
+    ]);
+    // No staff-only text about the subject is left anywhere in the table.
+    const staffText = JSON.stringify((await pool.query(`SELECT title, note, outcome_note FROM staff_actions WHERE visibility = 'STAFF_ONLY' AND subject_student_user_id = $1`, [subjectId])).rows);
+    expect(staffText).not.toContain('Subjectmark');
+
+    // D3: consent records stay as proof, on the anonymised account, exactly as recorded.
+    expect((await pool.query('SELECT user_id, consent_key, version, action FROM user_consents WHERE user_id = $1', [subjectId])).rows)
+      .toEqual([{ user_id: subjectId, consent_key: 'privacy-notice', version: 'privacy-test-v1', action: 'GRANTED' }]);
+    expect((await pool.query('SELECT count(*)::int AS count FROM user_consents WHERE user_id = $1', [otherCandidateId])).rows[0].count).toBe(1);
+
     // What the employer lawfully holds survives, detached from the person.
     const applications = await pool.query('SELECT state FROM applications WHERE student_user_id = $1', [subjectId]);
     expect(applications.rows).toHaveLength(1);
@@ -898,9 +1001,9 @@ describe('deletion execution', () => {
       `SELECT category, disposition, basis, record_count FROM privacy_deletion_records
        WHERE request_id = $1 ORDER BY category`, [dueId],
     );
-    // EMP-10 added APPLICATION_MESSAGES and the EMP-12 privacy fix EMPLOYER_SCREENING: one record per
-    // declared category, 14 in all.
-    expect(records.rows).toHaveLength(14);
+    // EMP-10 added APPLICATION_MESSAGES, the EMP-12 privacy fix EMPLOYER_SCREENING, and Divakar's
+    // 2026-09-30 decisions STAFF_ACTIONS and CONSENT_RECORDS: one record per declared category, 16 in all.
+    expect(records.rows).toHaveLength(16);
     const byCategory = Object.fromEntries(records.rows.map((r) => [r.category, r]));
     // The subject's two screening attempts: kept for the employer, detached, answers erased.
     expect(byCategory.EMPLOYER_SCREENING.disposition).toBe('ANONYMISED');
@@ -914,7 +1017,15 @@ describe('deletion execution', () => {
     // The first seed: one attempt, one session, one activity event, one skill state row and one planner
     // decision. The coverage seed adds a practice step (decision, session, served item), a placement
     // sitting (test, session) and three lecturer actions (assignment, next step, session invitation): 13.
-    expect(byCategory.LEARNING_ACTIVITY.record_count).toBe(13);
+    // D2 adds the learning history: a lesson, a topic band, a readiness snapshot and its factor, a roadmap
+    // action, a readiness-check assignment, its two attempts, a served item and its response: 23.
+    expect(byCategory.LEARNING_ACTIVITY.record_count).toBe(23);
+    // D1: the faculty note, the verification and the intervention the college kept to itself.
+    expect(byCategory.STAFF_ACTIONS).toMatchObject({ disposition: 'ERASED', record_count: 3 });
+    // D3: the one consent the person gave, kept as proof with a basis that says so.
+    expect(byCategory.CONSENT_RECORDS).toMatchObject({ disposition: 'RETAINED', record_count: 1 });
+    expect(byCategory.CONSENT_RECORDS.basis).toMatch(/proof/i);
+    expect(byCategory.CONSENT_RECORDS.basis).toMatch(/legal obligation/i);
     expect(byCategory.AUDIT.disposition).toBe('RETAINED');
     expect(byCategory.AUDIT.basis).toBeTruthy();
     expect(byCategory.APPLICATIONS.disposition).toBe('ANONYMISED');

@@ -2026,3 +2026,88 @@ inbox is unchanged.
 - Targeted, after the fix: privacy.integration.spec 17/17 passed; academic-verification.integration.spec 20/21 in the same run, the one failure `out of shared memory` in a `beforeEach` TRUNCATE on the shared Postgres (an unrelated test; the new skip test passed). privacy package 23/23; web 76 files / 883 tests passed (full web suite re-run alone after an `App.test.tsx` 20 s timeout under machine load in the full run).
 - Full `-r test` run: every non-api package passed (web 883 on re-run, persistence and the rest green). **The api suite did not finish**: the shared Postgres was saturated by five agents' suites (each TRUNCATE ~20 s), the session ended mid-run, and on resuming the Docker Desktop engine was returning HTTP 500, so the database was unreachable. The api suite still has to be run in full on a fresh database once Docker is back.
 - CI parity: `corepack pnpm audit --prod --audit-level=high` exit 0 (2 moderate); the optional-chain policy grep printed nothing; no private-key blocks or merge markers in the diff.
+
+## SMTP — Real outgoing-mail sender (info@ai8ht.pro via GoDaddy) — 2026-09-30
+**Result:** Complete, pending validation results below. ONE has a real sender, `TlsSmtpMailSink`, selected when
+`PTP_SMTP_HOST` is set. It speaks authenticated SMTP over implicit TLS (465) or an enforced STARTTLS upgrade (587),
+with certificate verification always on. No email was sent and GoDaddy was never contacted: there are no credentials,
+and the first real send is Divakar's (runbook).
+
+**Branch / PR:** feat/smtp-mail-sender, cut from onev4/feat/plan-phases-0-to-2 @ 09a8d9a. Not merged. Commits, in order:
+tests (d885aee), implementation (46f2f07), runbook (1e3de26), this report.
+
+**Files created:**
+- packages/persistence/test/fixtures/fake-smtp-server.ts: an in-process fake SMTP server (TLS or STARTTLS) that records
+  the dialogue. Its self-signed certificate is generated in memory per run by a small DER encoder, so no key material
+  is committed.
+- packages/persistence/test/smtp-mail-sender.test.ts: 30 tests.
+- packages/persistence/src/send-test-mail.ts: `mail:send-test`, a one-message manual test that sends a REAL email and
+  needs `--confirm-real-send`.
+- docs/ops/runbook-mail-sender.md.
+
+**Files modified:**
+- packages/persistence/src/invitation-mail.ts: adds `TlsSmtpMailSink`, `MailDeliveryFailure`, a shared `buildMailMessage`,
+  and PTP_SMTP_* configuration in `createConfiguredInvitationMailSink(env = process.env)`. `PermanentMailRejection` gains
+  an optional `code`.
+- packages/persistence/package.json: the `mail:send-test` script.
+- .env.example: variable names with placeholders; the password is empty.
+- docs/ops/README.md: links the runbook.
+
+**Migrations added:** none.
+
+**Behaviour:**
+- With no `PTP_SMTP_HOST`, nothing changes: Mailpit when `PTP_LOCAL_INVITATION_MAILPIT_ENABLED=true`, otherwise no sink
+  and every email is recorded NOT_CONFIGURED.
+- With `PTP_SMTP_HOST` set, the security mode (`tls`|`starttls`), user and password must also be set, and the port and
+  timeout must be valid. Otherwise the API and the worker refuse to start, with an error that names the variable.
+  Setting both the host and the Mailpit flag is also refused.
+- The dialogue runs greeting → EHLO → (STARTTLS → EHLO) → AUTH PLAIN, or LOGIN if that is all the server offers
+  → MAIL → RCPT → DATA → body → QUIT.
+  - Every reply code is checked.
+  - The body uses CRLF and is dot-stuffed.
+  - Each step has an idle timeout, and the whole send is bounded by three times it.
+  - It authenticates only once the channel is encrypted, and never falls back to plain text.
+- Both sinks share one message builder:
+  - From: `AI8HT ONE <info@ai8ht.pro>`.
+  - Date and Message-ID are now added.
+  - A non-ASCII subject becomes an RFC 2047 encoded-word, and a non-ASCII body is sent base64.
+  - The multipart `.ics` attachment path is unchanged.
+
+**Decisions taken:**
+- **Which 5xx is a bounce.** A 5xx on RCPT, DATA or after the body → `PermanentMailRejection` (BOUNCED). A 5xx on the
+  greeting, EHLO, STARTTLS, AUTH or MAIL FROM is the sender being refused (e.g. 535 bad password), so it becomes
+  `MailDeliveryFailure` with `retryable=false`, which callers record as FAILED. Reporting it as a bounce would mark every
+  recipient's address as bad because of our own misconfiguration.
+- **4xx, timeouts, refused or dropped connections** → `MailDeliveryFailure` with `retryable=true`. A certificate failure
+  is FAILED with stage TLS.
+- **Protecting the password.** It is kept in a true private field (`#password`), so it is never serialised or inspected
+  with the sink. Errors carry only the stage, the reply code and a fixed text (or a Node error code), never server text.
+  The outbox payloads, audit rows and delivery tables are unchanged, so no new column could hold it.
+- **Test-only options.** `trustedCertificates` adds a CA; `serverNameForTest` changes the name that is checked. Neither
+  disables verification, and the product path passes neither.
+- **EHLO name.** The default is `one.ai8ht.pro` (`PTP_SMTP_HELO_NAME` overrides it).
+
+**Acceptance criteria:**
+- [x] TLS sink on the same `InvitationMailSink` interface; implicit TLS and STARTTLS; verification on.
+- [x] AUTH PLAIN/LOGIN as advertised; credentials only from environment variables.
+- [x] 5xx → `PermanentMailRejection` (on the recipient or message; see the decision above); 4xx → retryable.
+- [x] Dot-stuffing, CRLF, timeouts, multipart attachments, identical From header.
+- [x] `createConfiguredInvitationMailSink` selects TLS on `PTP_SMTP_HOST`, refuses a bad config, and otherwise behaves
+  as before.
+- [x] The password never appears in errors or console output (tested on success and on AUTH, RCPT and MAIL failures);
+  no credential is committed.
+- [x] Fake-server tests: TLS used, AUTH happens, message/From/To/attachments correct, 5xx, 4xx, timeout, untrusted
+  certificate, host-name mismatch, no STARTTLS offered.
+- [x] Runbook: environment variables, the labelled real test send, and SPF/DKIM/DMARC (GoDaddy help pages cited, no
+  invented values).
+
+**Limitations / not done:**
+- Staff-invitation attempts are still written with `provider_kind = 'MAILPIT'` (employer-team controller). The CHECK
+  allows only MAILPIT/SES/N8N; `provider_reference` starts `smtp:` for real sends. Correcting the label needs a
+  migration, which is out of scope here.
+- The automation worker, which sends student invitations, announcements, hiring notices and status notices, is not in
+  the live deployment. Those emails only go out once it runs with the same variables.
+- Bounces that arrive later by email are not read back into ONE.
+
+**Android:** no change needed. The sender is server-side only; no API contract, screen or label changed, and the app
+never sends mail.

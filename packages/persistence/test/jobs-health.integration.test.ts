@@ -197,6 +197,23 @@ describe('breach alerting', () => {
     expect((await evaluateJobsAlerts(db, configured)).cleared).toHaveLength(1);
   });
 
+  it('lists the learner skill state projector as a consumer and can alert on its silence', async () => {
+    // Gap 1 of the ENG-17 incident runbook: the projector had no Consumers row and its name was
+    // refused by JOBS_ALERT_CONSUMER_SILENCE_MINUTES.
+    const configured = config({ JOBS_ALERT_CONSUMER_SILENCE_MINUTES: 'learner-skill-state-projector=60' });
+    expect(configured.ignored).toEqual([]);
+    expect(configured.consumerSilenceMinutes).toEqual({ 'learner-skill-state-projector': 60 });
+    const summary = await readJobsHealthSummary(db, configured);
+    expect(summary.consumers.find((consumer) => consumer.name === 'learner-skill-state-projector'))
+      .toMatchObject({ label: 'Learner skill state projection', lastActivityAt: null, silenceMinutes: 60 });
+    const result = await evaluateJobsAlerts(db, configured);
+    expect(result.raised).toHaveLength(1);
+    expect(result.raised[0]).toMatchObject({ conditionKey: 'CONSUMER_SILENT', subject: 'learner-skill-state-projector' });
+    const eventId = (await failed(1, { eventType: 'learning.skill_state.projection_requested' }))[0]!;
+    await pool.query("INSERT INTO event_consumer_receipts (id, consumer_name, event_id, status, attempts) VALUES ($1,'learner-skill-state-projector',$2,'FAILED',1)", [randomUUID(), eventId]);
+    expect((await evaluateJobsAlerts(db, configured)).cleared).toHaveLength(1);
+  });
+
   it('keeps the alert record immutable and undeletable, and at most one open alert per condition', async () => {
     await failed(3);
     const [alert] = (await evaluateJobsAlerts(db, config())).raised;

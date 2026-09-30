@@ -2413,3 +2413,95 @@ unknown kinds. `employer-team.integration.spec.ts`: the delivery attempt records
 - Policy: the run caught an unguarded optional chain in `apps/web/src/rolePortal/aiOperations.tsx` that came with the base
   (OPS-12). Fixed on this branch (`summary && summary.failureClasses.length`); policy grep now clean, web typecheck 0,
   aiOperations tests 12/12.
+
+## OPS-13 — Adaptive engine health panels — 2026-10-01
+**Result:** Complete — AI Operations shows planner decisions per day, the faculty override rate and the mastery shadow
+comparison; System Health shows the last calibration run and its status and the code sandbox (NA: not built). Every figure is
+read from a real engine table or shows NA/<5; nothing is written and no model is called.
+
+**Precondition:** met. `learning_decisions` (0053), `learner_skill_state` (0052) and the calibration output
+(`item_calibration_runs`, `item_calibrations`, 0062) are all on the base.
+
+**Branch / PR:** feat/ops-13-engine-health, from `stack/batch29` (64dd6a5). Commits: design (4d3a5f8), acceptance tests
+(90523df), backend (5d1377a), web (e64444a), this report. Pushed to onev4; not merged (the coordinator merges).
+
+**Files created:**
+- docs/architecture/engine-health-panels-design.md — names each panel's source table (the goal's first criterion).
+- packages/authorization/src/engine-health.ts (+ .test.ts) — capabilities per screen, the 7/14/30-day window, the calibration
+  status rule, and the planner and shadow suppression.
+- packages/persistence/src/engine-health.ts — the bounded reads.
+- apps/api/src/http/operations-engine-health.integration.spec.ts
+- apps/web/src/api/engineHealth.ts; apps/web/src/rolePortal/engineHealth.tsx (+ .test.tsx)
+
+**Files modified:**
+- packages/authorization/src/index.ts (one export).
+- apps/api/src/http/operations-ai.controller.ts: `GET /api/v1/operations/ai/engine-health` (AI_OPS_VIEW).
+- apps/api/src/http/operations-jobs.controller.ts: `GET /api/v1/operations/jobs/engine-health` (OPS_JOBS_REPLAY).
+- apps/web/src/api.ts (one re-export); apps/web/src/rolePortal/aiOperations.tsx and systemHealth.tsx (one panel each).
+
+**Migrations added:** none.
+
+**Design docs / ADRs:** engine-health-panels-design.md. No ADR: this builds on ADR-023, ADR-032 and ADR-034 and changes none.
+
+**Acceptance criteria:**
+- [x] **Each panel names its source table in its design note.**
+  - Planner: `learning_decisions`.
+  - Mastery shadow: `learner_skill_state` against `mastery_projections`, scoped through the consent registry.
+  - Calibration: `item_calibration_runs` and `item_calibrations`.
+  - Sandbox: none exists (ENG-12 is not built), so both figures are NA and the design note says so.
+  - Each panel also prints its source under it on screen.
+- [x] **No student-level data; suppression rule applies.**
+  - Responses carry counts only. There is no user, topic, institution, item or run id, no e-mail and no per-student
+    timestamp. The integration spec asserts no UUID and no e-mail appear.
+  - Planner: a day is published only when 5 or more distinct students stand behind it (zero included). The window total is
+    withheld while a suppressed day could be recovered by subtraction (the complementary rule). Overrides need 5 or more
+    overridden students, and the rate needs both counts published.
+  - Shadow: the whole panel is withheld under 5 consenting students (ENG-06's rule), and every cell then passes the
+    operations rule (<5, zero included). The panel shows no BKT likelihood, no per-student band, no matrix and no prediction
+    figures.
+  - Calibration: learners read under 5 shows <5, and the responses read are withheld with it.
+  - Tests: authorization `engine-health.test.ts` (12, the D5 helper tests) and the integration spec (11).
+- [x] **Every metric from real tables or NA.** The idle planner, the unoffered or withheld shadow, a job that never ran and
+  the unbuilt sandbox each keep their slot and show NA or <5. Web tests cover each of these.
+- [x] **§6.6 minimums.**
+  - 401 without a token.
+  - 403 for an institution admin and for a suspended operations membership.
+  - 200 for operations and security admins.
+  - 400 on a bad window and on unknown query parameters.
+  - Pagination: not applicable. The only list is the day series, bounded at 30 rows.
+  - Audit: not applicable. These are reads, and no read in the console writes audit rows.
+  - Web: real data, NA, <5, loading, error with reference, forbidden, and navigation labels unchanged.
+  - There is no write, so no confirm dialog is needed.
+
+**Decisions for Divakar (recommendations adopted):**
+- **Shadow counts reach an operations route.** ENG-06's design kept the shadow report offline and rejected an operations
+  read. OPS-13 asks for the panel, so it is built with aggregate counts only, computed by the same pure `buildShadowReport`.
+  The integration test checks the panel against the offline report. BKT values and per-student bands still never leave the
+  server, and readiness is untouched. To reverse this, remove the section; the offline report is unaffected.
+- **Split across two screens, each read with its screen's existing capability.**
+  - Planner and shadow go under AI Operations, with `AI_OPS_VIEW`.
+  - Calibration and sandbox go under System Health, with `OPS_JOBS_REPLAY`.
+  - There is no new capability and no navigation change.
+- **Calibration "overdue" after 8 days:** the weekly timer plus a day's grace. A failed job imports nothing, so a failure
+  shows up as an overdue run; no failure rows are invented.
+- **Override rate** = decisions with a faculty override ÷ all decisions, over a window of 7, 14 (default) or 30 whole UTC
+  days.
+- **Not shown on purpose:**
+  - the time of the last decision, because one timestamp can point at one student;
+  - skill, action, reason or college breakdowns, because each is a small-group cut and no health decision needs it.
+
+**Limitations / not done:**
+- There is nothing to measure for the sandbox until ENG-12 lands with an execution log. When it does, this panel should read
+  that log.
+- The planner panel counts all recorded decisions, adaptive and not. There is no separate "adaptive only" cut.
+
+**Risks / follow-ups:**
+- The shadow read loads the engine rows of every consenting student in one query. That is fine at pilot scale. At V2 scale,
+  move it to a periodic job if it becomes slow.
+
+**Android:** no change. The app's operations workspace is the view-only Overview (Appendix 1 §4.3: operators work on the
+web). It has no AI Operations or System Health screen, and no student-facing screen or API contract changed.
+
+**Validation:** see below.
+
+**Next goal:** OPS-17 (full), or the ENG-12 sandbox panel once ENG-12 lands.

@@ -166,6 +166,31 @@ describe('breach alerting', () => {
     expect(Number((await pool.query('SELECT count(*) FROM notification_commands')).rows[0].count)).toBe(2);
   });
 
+  // GROWTH-01 (ADR-040): growth field staff are ACTIVE memberships of the same platform
+  // organisation, but they are not operators and must never receive a system alert.
+  it('never queues an ops-failure email to a growth membership of the platform organisation', async () => {
+    const staff = await platformStaff(1);
+    const platform = await pool.query('SELECT organization_id FROM organization_memberships WHERE user_id = $1', [staff[0]]);
+    const organizationId = platform.rows[0].organization_id as string;
+    const growth: string[] = [];
+    for (const role of ['GROWTH_EXECUTIVE', 'GROWTH_MANAGER']) {
+      const userId = randomUUID();
+      growth.push(userId);
+      await pool.query("INSERT INTO users (id,email,state) VALUES ($1,$2,'ACTIVE')", [userId, userId + '@example.test']);
+      await pool.query(
+        "INSERT INTO organization_memberships (id,organization_id,user_id,role,state,scope_organization_id) VALUES ($1,$2,$3,$4,'ACTIVE',$2)",
+        [randomUUID(), organizationId, userId, role],
+      );
+    }
+    await enableOpsFailure(staff[0]!);
+    await failed(3);
+    const result = await evaluateJobsAlerts(db, config());
+    expect(result.raised[0]!.notice).toBe('QUEUED');
+    const recipients = (await pool.query('SELECT subject_user_id FROM notification_commands')).rows.map((row) => row.subject_user_id);
+    expect(recipients).toEqual([staff[0]]);
+    for (const userId of growth) expect(recipients).not.toContain(userId);
+  });
+
   it('records NOT_DELIVERED when the workflow is behind its kill switch', async () => {
     const staff = await platformStaff(1);
     await enableOpsFailure(staff[0]!);

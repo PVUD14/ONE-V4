@@ -80,7 +80,8 @@ afterAll(async () => {
 }, 60_000);
 
 interface Member { readonly userId: string; readonly membershipId: string }
-const platformRoles = ['PLATFORM_SUPER_ADMIN', 'OPERATIONS_ADMIN', 'SECURITY_ADMIN'];
+// GROWTH-01: growth staff are platform memberships too, and must never count as operators.
+const platformRoles = ['PLATFORM_SUPER_ADMIN', 'OPERATIONS_ADMIN', 'SECURITY_ADMIN', 'GROWTH_EXECUTIVE', 'GROWTH_MANAGER'];
 
 async function member(role: string, state = 'ACTIVE'): Promise<Member> {
   const userId = randomUUID();
@@ -512,12 +513,20 @@ describe('the solo-operator safeguard', () => {
         "INSERT INTO automation_workflow_registry (id,allowlist_id,version,workflow_hash,operation,destination_class,active,kill_switch) VALUES ($1,'security-notification',1,repeat('b',64),'SEND_EMAIL','EMAIL',true,false)",
         [randomUUID()],
       );
+      // GROWTH-01 (ADR-040): ACTIVE growth memberships of the same platform organisation
+      // are field staff, not operators. They neither count as approvers nor receive the notice.
+      const growthPeople = [await member('GROWTH_EXECUTIVE'), await member('GROWTH_MANAGER')];
+      const stillSolo = await api().get('/api/v1/operations/approvals/policy').set(auth(solo.userId));
+      expect(stillSolo.body).toMatchObject({ approverCount: 1, soloSafeguardActive: true });
       const second = await requestApproval(solo, 'ORGANIZATION_SUSPEND', { organizationId: await verifiedOrganization(), reasonCode: 'POLICY_VIOLATION' });
       await backdate(second.body.approval.id, '16 minutes');
       const queued = await decide(solo, second.body.approval.id, 'APPROVE');
       expect(queued.body.approval.soloNotice).toBe('QUEUED');
-      const commands = await pool.query("SELECT id, state FROM notification_commands WHERE dedupe_key LIKE $1", ['approval-solo:' + second.body.approval.id + ':%']);
-      expect(commands.rows).toEqual([{ id: expect.any(String), state: 'PENDING' }]);
+      const commands = await pool.query("SELECT id, state, subject_user_id FROM notification_commands WHERE dedupe_key LIKE $1", ['approval-solo:' + second.body.approval.id + ':%']);
+      expect(commands.rows).toEqual([{ id: expect.any(String), state: 'PENDING', subject_user_id: solo.userId }]);
+      for (const person of growthPeople) {
+        expect((await pool.query('SELECT 1 FROM notification_commands WHERE subject_user_id = $1', [person.userId])).rowCount).toBe(0);
+      }
       expect((await pool.query("SELECT 1 FROM outbox_events WHERE event_type='notification.delivery.requested' AND aggregate_id=$1", [commands.rows[0].id])).rowCount).toBe(1);
 
       // A second approver switches the safeguard off with no configuration change.

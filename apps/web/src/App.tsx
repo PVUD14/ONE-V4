@@ -128,12 +128,14 @@ export function demoPortalEnabled(env: { readonly DEV: boolean; readonly VITE_EN
   return env.DEV || env.VITE_ENABLE_DEMO_PORTAL === 'true';
 }
 const enableDemoPortal = demoPortalEnabled();
-const protectedPortalRoots = ['/student', '/institution', '/employer', '/operations'] as const;
+const protectedPortalRoots = ['/student', '/institution', '/employer', '/operations', '/growth'] as const;
 const portalChoices = [
   { family: 'Student', path: '/student', label: 'Student', detail: 'Learning, readiness, applications and personal growth.', icon: GraduationCap },
   { family: 'Institution', path: '/institution/admin', label: 'Institution', detail: 'Institution administration and student support.', icon: Building2 },
   { family: 'Employer', path: '/employer/recruiter', label: 'Employer', detail: 'Hiring workflows where backend support exists.', icon: BriefcaseBusiness },
   { family: 'Operations', path: '/operations/admin', label: 'Operations', detail: 'Platform administration and governance.', icon: ShieldCheck },
+  // GROWTH-01 (ADR-040): AI8HT's partnerships field staff. Navigation approved (HG-3, 2026-09-30).
+  { family: 'Growth', path: '/growth', label: 'Growth', detail: 'College and employer partnerships: leads, field visits, territory, targets and commission.', icon: MapPinned },
 ] as const;
 
 type WorkspaceFamily = typeof portalChoices[number]['family'];
@@ -535,6 +537,14 @@ function WorkspaceChooser({ authStatus, authNotice, workspaceResolution, onSignI
 function resolveAuthorizedWorkspaces(context: SecurityContextDto): readonly AuthorizedWorkspace[] {
   const workspaces: AuthorizedWorkspace[] = [];
   const pushUnique = (workspace: AuthorizedWorkspace): void => {
+    if (workspace.family === 'Growth') {
+      // One Growth entry: a person who is both a manager and an executive works as the manager.
+      const existing = workspaces.findIndex((item) => item.family === 'Growth');
+      if (existing >= 0) {
+        if (workspace.role === 'GROWTH_MANAGER') workspaces[existing] = workspace;
+        return;
+      }
+    }
     if (workspace.family === 'Employer') {
       // One employer entry per organisation, as on Android: a person who is both owner and
       // recruiter of the same employer opens one portal, labelled with the broader role.
@@ -603,6 +613,10 @@ function workspaceForMembership(membership: SecurityContextDto['memberships'][nu
   if (membership.role === 'OPERATIONS_ADMIN') return { ...portalChoices[3], role: membership.role, organizationId };
   if (membership.role === 'PLATFORM_SUPER_ADMIN') return { ...portalChoices[3], label: 'Platform Super Admin', detail: 'Platform operations workspace; distinct super-admin UI is not yet implemented.', role: membership.role, organizationId };
   if (membership.role === 'SECURITY_ADMIN') return { ...portalChoices[3], label: 'Security Admin', detail: 'Operations workspace available; dedicated security-admin surface is not yet implemented.', role: membership.role, organizationId };
+  // GROWTH-01: growth roles open the Growth portal only. They hold no internal capability, so
+  // no Operations workspace is offered to them.
+  if (membership.role === 'GROWTH_EXECUTIVE') return { ...portalChoices[4], label: 'Growth Executive', role: membership.role, organizationId };
+  if (membership.role === 'GROWTH_MANAGER') return { ...portalChoices[4], label: 'Growth Manager', role: membership.role, organizationId };
   return null;
 }
 

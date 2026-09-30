@@ -14,6 +14,7 @@ import { sql, type SQL } from 'drizzle-orm';
 import {
   highRiskActions,
   isLegacyHighRiskActionKey,
+  platformInternalRoles,
   refuseApprovalExecution,
   type ApprovalDecision,
   type ApprovalRefusal,
@@ -354,6 +355,14 @@ export interface ApprovalDecisionFacts {
 const soloNoticeTemplateId = '38000000-0000-4000-8000-000000000001';
 
 /**
+ * GROWTH-01 (ADR-040): operator notices go to the internal platform roles only. Growth field
+ * staff are ACTIVE memberships of the same platform organisation, and must never receive them.
+ */
+function operatorRoleList(): SQL {
+  return sql.join(platformInternalRoles.map((role) => sql`${role}`), sql`, `);
+}
+
+/**
  * The solo-approval notice, through the existing notification pipeline (ADR-021) and
  * only when a sender exists: the allow-listed security-notification workflow must be
  * registered active and outside its kill switch. Otherwise nothing is queued — a queued
@@ -382,7 +391,7 @@ async function raiseSoloNotice(runner: SqlRunner, input: {
     SELECT DISTINCT u.id FROM organization_memberships m
     JOIN organizations o ON o.id = m.organization_id AND o.kind = 'PLATFORM'
     JOIN users u ON u.id = m.user_id AND u.state = 'ACTIVE'
-    WHERE m.state = 'ACTIVE'
+    WHERE m.state = 'ACTIVE' AND m.role IN (${operatorRoleList()})
   `);
   for (const recipient of recipients) {
     const commandId = randomUUID();

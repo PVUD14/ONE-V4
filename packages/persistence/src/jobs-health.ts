@@ -16,6 +16,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import { sql, type SQL } from 'drizzle-orm';
+import { platformInternalRoles } from '@planthepath/authorization/src/index.js';
 import { CONTENT_GENERATION_CONSUMER } from './content-generation.js';
 import { STUDENT_INVITATION_CONSUMER, STUDENT_INVITATION_REQUESTED } from './student-invitations.js';
 
@@ -518,6 +519,14 @@ async function observe(runner: JobsSqlRunner, config: JobsAlertConfig): Promise<
   return observations;
 }
 
+/**
+ * GROWTH-01 (ADR-040): operator notices go to the internal platform roles only. Growth field
+ * staff are ACTIVE memberships of the same platform organisation, and must never receive them.
+ */
+function operatorRoleList(): SQL {
+  return sql.join(platformInternalRoles.map((role) => sql`${role}`), sql`, `);
+}
+
 async function queueAlertNotice(tx: JobsSqlRunner, alert: { readonly id: string; readonly conditionKey: ConditionKey; readonly observedValue: number; readonly threshold: number; readonly correlationId: string }): Promise<'QUEUED' | 'NOT_DELIVERED'> {
   const delivery = await alertDelivery(tx);
   if (!delivery.workflowEnabled || !delivery.templateId) return 'NOT_DELIVERED';
@@ -525,7 +534,7 @@ async function queueAlertNotice(tx: JobsSqlRunner, alert: { readonly id: string;
     SELECT DISTINCT u.id FROM organization_memberships m
     JOIN organizations o ON o.id = m.organization_id AND o.kind = 'PLATFORM'
     JOIN users u ON u.id = m.user_id AND u.state = 'ACTIVE'
-    WHERE m.state = 'ACTIVE'
+    WHERE m.state = 'ACTIVE' AND m.role IN (${operatorRoleList()})
   `);
   if (!recipients.length) return 'NOT_DELIVERED';
   for (const recipient of recipients) {

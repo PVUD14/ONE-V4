@@ -75,7 +75,14 @@ const organizationRoles = [
   'EMPLOYER_OWNER',
   'EMPLOYER_ADMIN',
   'RECRUITER',
+  // GROWTH-01 (ADR-040): growth field staff are platform memberships; an access review or the
+  // Growth team section may end or suspend one, and the event must be able to name the role.
+  'GROWTH_EXECUTIVE',
+  'GROWTH_MANAGER',
 ] as const;
+
+const growthTeams = ['COLLEGE_PARTNERSHIPS', 'EMPLOYER_PARTNERSHIPS'] as const;
+const growthStaffTypes = ['EMPLOYEE', 'CONTRACTOR'] as const;
 
 // OPS-02: kept in step with highRiskActionKeys in packages/authorization and the 0038 CHECK.
 const operationApprovalActionKeys = [
@@ -752,6 +759,40 @@ export const eventSchemas = {
     dataClassification: 'confidential',
     schemaRef: 'registry://organization_membership.capability_revoked/1',
     payload: { membershipId: { kind: 'uuid' }, capability: { kind: 'string', minLength: 3, maxLength: 64, pattern: /^[A-Z_]+$/ } },
+  },
+  // GROWTH-01 (ADR-040): a growth person joined or left a field team. No consumer yet; the
+  // outbox row is the durable announcement later growth goals (lead ownership) can follow.
+  growthTeamMemberJoinedV1: {
+    eventType: 'growth.team_member.joined',
+    eventVersion: 1,
+    producer: 'identity-organization',
+    aggregateType: 'growth_team_member',
+    purpose: 'growth-team-administration',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://growth.team_member.joined/1',
+    payload: { membershipId: { kind: 'uuid' }, team: { kind: 'enum', values: growthTeams } },
+  },
+  growthTeamMemberLeftV1: {
+    eventType: 'growth.team_member.left',
+    eventVersion: 1,
+    producer: 'identity-organization',
+    aggregateType: 'growth_team_member',
+    purpose: 'growth-team-administration',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://growth.team_member.left/1',
+    payload: { membershipId: { kind: 'uuid' }, team: { kind: 'enum', values: growthTeams } },
+  },
+  // GROWTH-01 (D13): a growth person's staff type was set, at acceptance or by a change.
+  // Payout batches (GROWTH-12) will read the table; this announces the change.
+  growthStaffTypeSetV1: {
+    eventType: 'growth.staff_type.set',
+    eventVersion: 1,
+    producer: 'identity-organization',
+    aggregateType: 'growth_staff_type',
+    purpose: 'growth-team-administration',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://growth.staff_type.set/1',
+    payload: { membershipId: { kind: 'uuid' }, staffType: { kind: 'enum', values: growthStaffTypes } },
   },
   // OPS-02: dual control for high-risk operator actions. No consumer yet; like the
   // capability events above, the outbox row is the durable announcement an access review

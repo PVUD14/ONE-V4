@@ -34,6 +34,8 @@ import {
   internalCapabilityRevokeReasons,
   isHighRiskInternalCapability,
   isInternalCapability,
+  isInternalCapabilityGrantableToRole,
+  platformInternalRoles,
   refuseInternalCapabilityGrant,
   refuseInternalCapabilityRevoke,
   type InternalCapability,
@@ -79,6 +81,9 @@ export class OperationsStaffController {
         capability,
         highRisk: isHighRiskInternalCapability(capability),
         grantableHere: capability !== 'CONTENT_REVIEW_EXTERNAL',
+        // GROWTH-01: GROWTH_ADMIN and GROWTH_FINANCE go to operations admins only, and a
+        // growth role can be granted nothing, so the screen offers a grant only where it can land.
+        grantableToRoles: platformInternalRoles.filter((role) => isInternalCapabilityGrantableToRole(capability, role)),
       })),
       grantReasons: internalCapabilityGrantReasons,
       revokeReasons: internalCapabilityRevokeReasons,

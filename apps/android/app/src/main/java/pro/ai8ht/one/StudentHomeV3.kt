@@ -165,7 +165,8 @@ internal fun PilotHomeScreen(
                     Column(Modifier.weight(1f)) {
                         Text(modules.firstOrNull()?.title ?: "NA", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                         Text(nextLesson?.title ?: if (lessons.isNotEmpty()) "All lessons completed" else "No lessons assigned yet",
-                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontFamily = pro.ai8ht.one.ui.lessonFontFamily(nextLesson?.language))
                     }
                     Text("$lessonPercent%", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                 }

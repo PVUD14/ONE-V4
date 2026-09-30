@@ -1002,6 +1002,12 @@ private fun LearningScreen(learner: LearnerStateDto?, onChanged: () -> Unit, onO
                 }
             }
         }
+        learner.lessonLanguage?.let { choice ->
+            item {
+                Spacer(Modifier.height(10.dp))
+                LessonLanguageCard(choice, onChanged)
+            }
+        }
         message?.let { text ->
             item {
                 Spacer(Modifier.height(10.dp))
@@ -1042,7 +1048,8 @@ private fun LearningScreen(learner: LearnerStateDto?, onChanged: () -> Unit, onO
                                 modifier = Modifier.size(20.dp),
                             )
                             Spacer(Modifier.width(10.dp))
-                            Text(lesson.title, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                            // ENG-16: in the chosen language where published, else English with a notice.
+                            LessonWords(lesson, learner.lessonLanguage, Modifier.weight(1f))
                             if (!isDone) {
                                 TextButton(
                                     enabled = busyLesson == null,

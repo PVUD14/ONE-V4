@@ -98,8 +98,8 @@ private fun bandKind(band: String): ChipKind = when (band) {
 }
 
 @Composable
-private fun Muted(text: String) {
-    Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun Muted(text: String, fontFamily: androidx.compose.ui.text.font.FontFamily? = null) {
+    Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, fontFamily = fontFamily)
 }
 
 @Composable
@@ -191,7 +191,8 @@ private fun StepBody(step: LearningStepDto, onStep: (LearningStepDto) -> Unit) {
     if (step.lessons.isNotEmpty()) {
         Spacer(Modifier.height(8.dp))
         Text("Lessons on this skill", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
-        step.lessons.forEach { lesson -> Muted("• ${lesson.title} (listed with your modules below)") }
+        // ENG-16: titled in the chosen lesson language where a published version exists.
+        step.lessons.forEach { lesson -> Muted("• ${lesson.title} (listed with your modules below)", pro.ai8ht.one.ui.lessonFontFamily(lesson.language)) }
     }
     Spacer(Modifier.height(10.dp))
     StepPracticeBlock(step, onStep)

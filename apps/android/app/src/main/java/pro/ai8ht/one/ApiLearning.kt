@@ -57,7 +57,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable data class StepSkillDto(val id: String = "", val name: String = "")
 
-@Serializable data class StepLessonDto(val id: String = "", val title: String = "")
+@Serializable data class StepLessonDto(val id: String = "", val title: String = "", val language: String = "en")
 
 @Serializable data class LearningStepDto(
     val decisionId: String = "",

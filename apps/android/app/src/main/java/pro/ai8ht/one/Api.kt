@@ -105,6 +105,12 @@ object Api {
     suspend fun learnerState(context: Context): LearnerStateDto =
         json.decodeFromString(request(context, "GET", "/api/v1/career-readiness/me"))
 
+    /** ENG-16: choose the language lessons are shown in; the server accepts only an offered one. */
+    suspend fun setLessonLanguage(context: Context, language: String): LessonLanguageDto =
+        json.decodeFromString<LessonLanguageEnvelope>(
+            request(context, "PUT", "/api/v1/career-readiness/me/lesson-language", "{\"language\":${quoted(language)}}"),
+        ).lessonLanguage
+
     suspend fun completeLesson(context: Context, lessonVersionId: String) {
         request(context, "POST", "/api/v1/career-readiness/lessons/$lessonVersionId/complete")
     }
@@ -547,7 +553,15 @@ internal fun StudentDto.formerStudentLine(): String? {
     // The server has always returned these; the app never read them, and drew five
     // hardcoded NA rings over the top of real per-topic bands.
     val mastery: List<MasteryDto> = emptyList(),
+    // ENG-16: the language the learner reads lessons in, and the languages they may choose.
+    val lessonLanguage: LessonLanguageDto? = null,
 )
+@Serializable data class LessonLanguageDto(
+    val selected: String = "en",
+    val offered: List<LessonLanguageOptionDto> = emptyList(),
+)
+@Serializable data class LessonLanguageOptionDto(val language: String, val name: String = "", val nativeName: String = "")
+@Serializable data class LessonLanguageEnvelope(val lessonLanguage: LessonLanguageDto = LessonLanguageDto())
 @Serializable data class MasteryDto(val topicId: String = "", val band: String = "")
 @Serializable data class TopicDto(val id: String, val name: String = "")
 @Serializable data class CatalogDto(
@@ -564,7 +578,13 @@ internal fun StudentDto.formerStudentLine(): String? {
     val id: String,
     val title: String = "",
     val prerequisiteLessonIds: List<String> = emptyList(),
+    val body: LessonBodyDto = LessonBodyDto(),
+    // ENG-16: the language the words are in, and why it is not the chosen one
+    // (TRANSLATION_MISSING: shown in English; TRANSLATION_OUTDATED: the English changed since).
+    val language: String = "en",
+    val languageNotice: String? = null,
 )
+@Serializable data class LessonBodyDto(val summary: String? = null, val practice: String? = null)
 @Serializable data class ProgressDto(val lessonVersionId: String, val state: String = "")
 @Serializable data class ReadinessDto(val band: String = "")
 @Serializable data class RoadmapDto(

@@ -203,7 +203,9 @@ describe('GET /operations/staff', () => {
     expect(byId.has(faculty.membershipId)).toBe(false);
     const self = byId.get(admin.membershipId)!;
     expect(self.isSelf).toBe(true);
-    expect(self.baseline).toHaveLength(19);
+    // 19 before GROWTH-01, plus GROWTH_ADMIN and GROWTH_FINANCE (ADR-040: super-admin baseline).
+    expect(self.baseline).toHaveLength(21);
+    expect(self.baseline).toEqual(expect.arrayContaining(['GROWTH_ADMIN', 'GROWTH_FINANCE']));
     const row = byId.get(security.membershipId)!;
     expect(Object.keys(row).sort()).toEqual(['baseline', 'effective', 'email', 'grants', 'isSelf', 'membershipId', 'role', 'state']);
     expect(row.baseline).toContain('OPS_FLAGS_MANAGE');

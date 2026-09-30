@@ -128,9 +128,18 @@ describe('deletion policy', () => {
   });
 
   it('erases what is only about the person', () => {
-    for (const category of ['STUDENT_PROFILE', 'DOCUMENTS', 'NOTIFICATIONS', 'LEARNING_ACTIVITY', 'COUNSELLING_NOTES', 'APPLICATION_MESSAGES'] as const) {
+    for (const category of ['STUDENT_PROFILE', 'DOCUMENTS', 'NOTIFICATIONS', 'LEARNING_ACTIVITY', 'COUNSELLING_NOTES', 'APPLICATION_MESSAGES', 'STAFF_ACTIONS'] as const) {
       expect(deletionPolicyFor(category).disposition).toBe('ERASED');
     }
+  });
+
+  it('keeps consent records only as proof, and says so', () => {
+    // Divakar, 2026-09-30: what the person agreed to is kept as proof, linked to the anonymised account.
+    const consent = deletionPolicyFor('CONSENT_RECORDS');
+    expect(consent.disposition).toBe('RETAINED');
+    expect(consent.basis).toMatch(/proof/i);
+    expect(consent.basis).toMatch(/legal obligation/i);
+    expect(consent.basis).toMatch(/nothing else about you/i);
   });
 
   it('detaches rather than destroys another party record', () => {
@@ -150,9 +159,11 @@ describe('deletion policy', () => {
     const categories = DELETION_POLICY.map((entry) => entry.category);
     expect(new Set(categories).size).toBe(categories.length);
     // OPS-05 added SUPPORT_CASES, ENG-03 LEARNING_ACTIVITY, INST-11 COUNSELLING_NOTES, EMP-10
-    // APPLICATION_MESSAGES and the EMP-12 privacy fix EMPLOYER_SCREENING: all must be declared.
-    expect(categories).toHaveLength(14);
-    expect(categories).toEqual(expect.arrayContaining(['SUPPORT_CASES', 'LEARNING_ACTIVITY', 'COUNSELLING_NOTES', 'APPLICATION_MESSAGES', 'EMPLOYER_SCREENING']));
+    // APPLICATION_MESSAGES, the EMP-12 privacy fix EMPLOYER_SCREENING, and Divakar's 2026-09-30 deletion
+    // decisions STAFF_ACTIONS and CONSENT_RECORDS: all must be declared.
+    expect(categories).toHaveLength(16);
+    expect(categories).toEqual(expect.arrayContaining(['SUPPORT_CASES', 'LEARNING_ACTIVITY', 'COUNSELLING_NOTES', 'APPLICATION_MESSAGES', 'EMPLOYER_SCREENING',
+      'STAFF_ACTIONS', 'CONSENT_RECORDS']));
   });
 
   it('produces a deterministic, non-routable replacement identity', () => {

@@ -25,6 +25,7 @@
     "engine:calibration-export": "tsx src/run-calibration-export.ts",
     "engine:calibration-import": "tsx src/run-calibration-import.ts",
     "jobs:alert-check": "tsx src/run-jobs-alert-check.ts",
+    "mail:send-test": "tsx src/send-test-mail.ts",
     "test": "vitest run --fileParallelism=false",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "worker:automation": "tsx src/run-automation-worker.ts",

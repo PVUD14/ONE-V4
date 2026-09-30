@@ -237,6 +237,8 @@ export interface StaffCapabilityCatalogueEntryDto {
   readonly capability: string;
   readonly highRisk: boolean;
   readonly grantableHere: boolean;
+  /** GROWTH-01: the platform roles a grant of this capability can land on. */
+  readonly grantableToRoles?: readonly string[];
 }
 
 export interface StaffDirectoryDto {

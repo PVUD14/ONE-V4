@@ -1,4 +1,4 @@
-import { platformInternalRoles } from '@planthepath/authorization/src/index.js';
+import { platformStaffOnlyRoles } from '@planthepath/authorization/src/index.js';
 import { createCognitoTokenVerifier, type IdentityTokenVerifier } from '@planthepath/identity/src/cognito.js';
 import { createStaffPoolPolicy, type StaffPoolPolicy } from '@planthepath/identity/src/staff-pool.js';
 import type { RuntimeConfig } from './config.js';
@@ -33,6 +33,8 @@ export function createRuntimeStaffPoolPolicy(config: RuntimeConfig): StaffPoolPo
   return createStaffPoolPolicy({
     userPoolId: staffPool.userPoolId,
     clientId: staffPool.clientId,
-    staffOnlyRoles: platformInternalRoles,
+    // GROWTH-01 (ADR-040 "Staff identity"): growth field staff are AI8HT staff too, so their
+    // roles count only from the staff pool once it is configured.
+    staffOnlyRoles: platformStaffOnlyRoles,
   });
 }

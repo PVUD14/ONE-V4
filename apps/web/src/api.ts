@@ -42,3 +42,4 @@ export * from './api/incidents.js';
 export * from './api/aiOperations.js';
 export * from './api/learningActions.js';
 export * from './api/cohortReadiness.js';
+export * from './api/growth.js';

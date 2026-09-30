@@ -1,6 +1,6 @@
-import { BarChart3, BriefcaseBusiness, Building2, CalendarDays, ClipboardCheck, FileText, Flag, Gauge, Home, LayoutDashboard, MessageSquare, PieChart, Search, Settings, ShieldCheck, Target, Users, type LucideIcon } from 'lucide-react';
+import { BarChart3, BriefcaseBusiness, Building2, CalendarDays, ClipboardCheck, FileText, Flag, Gauge, Handshake, Home, IndianRupee, LayoutDashboard, MapPinned, MessageSquare, PieChart, Search, Settings, ShieldCheck, Target, Users, type LucideIcon } from 'lucide-react';
 
-export type PortalFamily = 'Student' | 'Institution' | 'Employer' | 'Operations';
+export type PortalFamily = 'Student' | 'Institution' | 'Employer' | 'Operations' | 'Growth';
 export type EnforcementStatus = 'Backend enforced' | 'Partially backend enforced' | 'Domain-model only' | 'UI preview only';
 export type RolePortalKey =
   | 'student'
@@ -13,7 +13,8 @@ export type RolePortalKey =
   | 'recruiter'
   | 'hiring-manager'
   | 'interviewer'
-  | 'operations-admin';
+  | 'operations-admin'
+  | 'growth';
 
 export interface RoleNavItem {
   readonly key: string;
@@ -21,6 +22,8 @@ export interface RoleNavItem {
   readonly group: string;
   readonly path: string;
   readonly icon: LucideIcon;
+  /** Shown only to these authenticated roles; every role when absent (GROWTH-01: Team). */
+  readonly roles?: readonly string[];
 }
 
 export interface RoleFixture {
@@ -174,6 +177,29 @@ export const rolePortals: readonly RolePortalConfig[] = [
   },
 ];
 
+/**
+ * GROWTH-01 (ADR-040): the Growth portal for AI8HT's partnerships field staff. Its navigation
+ * is new and approved by Divakar (HG-3, 2026-09-30) for this portal only (design §16.1).
+ * It is kept out of `rolePortals`, the demo-preview registry: it has no preview people or
+ * figures, and every page shows real rows or says plainly that it is not built yet.
+ */
+export const growthPortal: RolePortalConfig = {
+  key: 'growth', family: 'Growth', roleName: 'Growth', backendRole: 'GROWTH_EXECUTIVE / GROWTH_MANAGER', enforcementStatus: 'Backend enforced',
+  basePath: '/growth', subtitle: 'Growth Portal', organization: 'AI8HT partnerships', previewUser: '', initials: '', accent: 'teal',
+  dashboardTitle: 'Growth', dashboardSummary: 'College and employer partnerships: leads, field visits, territory, targets and commission.',
+  allowedOperations: [], readOnlyData: [], forbiddenOperations: ['Verify or approve organisations', 'See student data', 'Set rates or record payments'],
+  nav: [
+    { key: 'home', label: 'Home', group: 'Home', path: '/growth', icon: Home },
+    { key: 'leads', label: 'Leads', group: 'Pipeline', path: '/growth/leads', icon: Handshake },
+    { key: 'field', label: 'Field', group: 'Pipeline', path: '/growth/field', icon: CalendarDays },
+    { key: 'territory', label: 'Territory', group: 'Pipeline', path: '/growth/territory', icon: MapPinned },
+    { key: 'targets', label: 'Targets', group: 'Performance', path: '/growth/targets', icon: Target },
+    { key: 'commission', label: 'Commission', group: 'Performance', path: '/growth/commission', icon: IndianRupee },
+    { key: 'team', label: 'Team', group: 'Performance', path: '/growth/team', icon: Users, roles: ['GROWTH_MANAGER'] },
+  ],
+  kpis: [], records: [],
+};
+
 export const activeRolePortals = rolePortals.filter((portal) => portal.key !== 'student' && portal.key !== 'placement-officer');
 
 export function rolePortalFromPath(path: string): RolePortalConfig | undefined {
@@ -187,6 +213,7 @@ export function rolePortalFromPath(path: string): RolePortalConfig | undefined {
   if (normalized === '/institution') return activeRolePortals.find((portal) => portal.key === 'institution-admin');
   if (normalized === '/employer') return activeRolePortals.find((portal) => portal.key === 'recruiter');
   if (normalized === '/operations') return activeRolePortals.find((portal) => portal.key === 'operations-admin');
+  if (normalized === growthPortal.basePath || normalized.startsWith(`${growthPortal.basePath}/`)) return growthPortal;
   return activeRolePortals.find((portal) => normalized === portal.basePath || normalized.startsWith(`${portal.basePath}/`));
 }
 
@@ -195,6 +222,7 @@ export const portalFamilyIcons: Record<PortalFamily, LucideIcon> = {
   Institution: Building2,
   Employer: BriefcaseBusiness,
   Operations: ShieldCheck,
+  Growth: MapPinned,
 };
 
 export const moduleIcons = { Gauge, PieChart, Search, Flag, LayoutDashboard };

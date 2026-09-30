@@ -53,7 +53,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
-import pro.ai8ht.one.ui.BrandWordmark
+import pro.ai8ht.one.ui.BrandLogo
 import pro.ai8ht.one.ui.LocalOnePalette
 import pro.ai8ht.one.ui.Tone
 
@@ -93,7 +93,7 @@ internal fun WorkspaceChooserScreen(options: List<Workspace>, onPick: (Workspace
     Column(Modifier.fillMaxSize().background(palette.bandBottom)) {
         BrandBand {
             Spacer(Modifier.height(20.dp))
-            BrandWordmark(height = 24.dp, tint = palette.wordmarkTint)
+            BrandLogo(height = 44.dp, surface = palette.logoOnBand)
             Spacer(Modifier.height(12.dp))
             Text("Choose your workspace", style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold, color = palette.bandInk)
@@ -158,7 +158,7 @@ internal fun ThemeOverlay(currentTheme: String, onThemeChange: (String) -> Unit,
 private fun StaffBandHeader(title: String, subtitle: String, unread: Int, onTheme: () -> Unit, onBell: () -> Unit) {
     val palette = LocalOnePalette.current
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        BrandWordmark(height = 17.dp, tint = palette.wordmarkTint)
+        BrandLogo(height = 34.dp, surface = palette.logoOnBand)
         Spacer(Modifier.weight(1f))
         IconButton(onClick = onTheme) {
             Icon(Icons.Filled.Palette, contentDescription = "Theme", tint = palette.bandMuted)

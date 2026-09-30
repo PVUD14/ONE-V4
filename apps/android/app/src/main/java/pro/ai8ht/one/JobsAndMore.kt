@@ -69,7 +69,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
-import pro.ai8ht.one.ui.BrandWordmark
+import pro.ai8ht.one.ui.BrandLogo
+import pro.ai8ht.one.ui.logoSurfaceFor
 
 // --- Jobs: opportunities + my applications ------------------------------------
 
@@ -1036,7 +1037,7 @@ internal fun SettingsPage(currentTheme: String, onThemeChange: (String) -> Unit,
             Spacer(Modifier.height(12.dp))
             PilotCard {
                 Column(Modifier.padding(18.dp)) {
-                    BrandWordmark(height = 22.dp, tint = if (pro.ai8ht.one.ui.LocalOnePalette.current.dark) null else pro.ai8ht.one.ui.LocalOnePalette.current.ink)
+                    BrandLogo(height = 44.dp, surface = logoSurfaceFor(pro.ai8ht.one.ui.LocalOnePalette.current))
                     Spacer(Modifier.height(8.dp))
                     Text("ONE by AI8HT", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                     Text("Version ${BuildConfig.VERSION_NAME} · one.ai8ht.pro",

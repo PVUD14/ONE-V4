@@ -25,6 +25,7 @@ import {
   listEditorLessons,
   publishEditorLessonRevision,
   saveEditorLessonDraft,
+  archiveEditorLesson,
   startEditorLessonRevision,
   transitionEditorLessonRevision,
 } from '../api.js';
@@ -44,14 +45,14 @@ import { formatApiError } from './shared.js';
 
 const label = (value: string): string => value.split('_').map((word) => word.charAt(0) + word.slice(1).toLowerCase()).join(' ');
 const when = (value: string | null | undefined): string => (value ? new Date(value).toLocaleString() : 'NA');
-const statusText = (status: string): string => (status === 'LIVE' ? 'Live' : status === 'PENDING' ? 'Not yet published' : status === 'RETIRED' ? 'Retired' : 'Unknown');
+const statusText = (status: string): string => (status === 'LIVE' ? 'Live' : status === 'PENDING' ? 'Not yet published' : status === 'RETIRED' ? 'Retired' : status === 'ARCHIVED' ? 'Archived' : 'Unknown');
 const statusTone = (status: string): 'success' | 'warning' | 'neutral' | 'info' => (status === 'LIVE' ? 'success' : status === 'PENDING' ? 'warning' : 'neutral');
 const stateTone = (state: LessonRevisionState): 'success' | 'warning' | 'neutral' | 'info' =>
   state === 'PUBLISHED' ? 'success' : state === 'IN_REVIEW' || state === 'APPROVED' ? 'warning' : state === 'DRAFT' || state === 'CHANGES_REQUESTED' ? 'info' : 'neutral';
 const filters = [
   { value: '', text: 'All lessons and variants' }, { value: 'LIVE', text: 'Live' }, { value: 'PENDING', text: 'Not yet published' },
   { value: 'AWAITING_REVIEW', text: 'Awaiting review' }, { value: 'CHANGES_REQUESTED', text: 'Changes requested' },
-  { value: 'AWAITING_PUBLISH', text: 'Approved, awaiting publish' }, { value: 'VARIANTS', text: 'Variants only' },
+  { value: 'AWAITING_PUBLISH', text: 'Approved, awaiting publish' }, { value: 'VARIANTS', text: 'Variants only' }, { value: 'ARCHIVED', text: 'Archived' },
 ];
 const keyPattern = /^[a-z0-9][a-z0-9-]{2,79}$/;
 
@@ -180,6 +181,7 @@ export function OperationsLessonsPage(): React.ReactElement | null {
 
 type Dialog =
   | { readonly kind: 'revise' }
+  | { readonly kind: 'archive' }
   | { readonly kind: 'variant' }
   | { readonly kind: 'transition'; readonly revision: LessonRevisionDto; readonly toState: 'IN_REVIEW' | 'CHANGES_REQUESTED' | 'APPROVED' }
   | { readonly kind: 'publish'; readonly revision: LessonRevisionDto }
@@ -259,6 +261,8 @@ function LessonPanel({ token, lessonId, policy, onOpen, onChanged, onClose }: {
     {lesson.current ? <><h3>Published — revision {lesson.current.revision}</h3><LessonView revision={lesson.current} policy={policy} /></> : null}
     {!working && lesson.status === 'LIVE' && policy.viewer.edit
       ? <button type="button" className="secondary" onClick={() => setDialog({ kind: 'revise' })}>Start a new revision…</button> : null}
+    {!working && lesson.status === 'LIVE' && policy.viewer.publish && policy.reasons.archive
+      ? <button type="button" className="secondary" onClick={() => setDialog({ kind: 'archive' })}>Archive…</button> : null}
 
     {working ? <article className="role-card" aria-label={`Revision ${working.revision}`}>
       <div className="role-section-title"><h3>Revision {working.revision}</h3><StatusBadge label={label(working.state)} tone={stateTone(working.state)} /></div>
@@ -287,6 +291,12 @@ function LessonPanel({ token, lessonId, policy, onOpen, onChanged, onClose }: {
         <td>{label(entry.fromState)} → {label(entry.toState)}</td><td>{entry.reasonCode}</td><td>{entry.actorEmail}</td>
       </tr>)}</tbody></table></div> : <p>No review actions yet.</p>}
 
+    {dialog?.kind === 'archive' ? <ReasonDialog title={`Archive ${name}`}
+      approvalNote={isVariant
+        ? 'Not required: archiving removes this variant, so no second person approves it, but it is recorded with your reason. It is never served again and never deleted; the lesson it renders is unchanged.'
+        : 'Not required: archiving removes the lesson, so no second person approves it, but it is recorded with your reason. It leaves the catalogue at once; completions already recorded stay, and it is never deleted. It is refused while a variant of it is live or a live lesson needs it first.'}
+      reasons={policy.reasons.archive ?? []} submitLabel={isVariant ? 'Archive variant' : 'Archive lesson'} onCancel={() => setDialog(null)}
+      onSubmit={async (reasonCode) => { apply((await archiveEditorLesson(token, lesson.lessonId, { reasonCode })).lesson, 'Archived: no student is served it any more.'); setDialog(null); }} /> : null}
     {dialog?.kind === 'revise' ? <ReasonDialog title={`Start revision of ${name}`} approvalNote="Not required: a new revision changes nothing until it is published."
       reasons={policy.reasons.revise} submitLabel="Start revision" onCancel={() => setDialog(null)}
       onSubmit={async (reasonCode) => { apply((await startEditorLessonRevision(token, lesson.lessonId, { reasonCode })).lesson, 'Revision started.'); setDialog(null); }} /> : null}

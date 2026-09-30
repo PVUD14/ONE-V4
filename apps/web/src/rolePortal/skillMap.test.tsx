@@ -33,7 +33,7 @@ const policy = (viewer: Record<string, unknown> = {}) => ({
   reasons: {
     create: ['NEW_SKILL', 'TRACK_BUILD'], revise: ['LEVEL_DESCRIPTORS', 'CORRECTION'], save: ['DRAFT_EDIT'],
     transition: { IN_REVIEW: ['READY_FOR_REVIEW', 'CHANGES_MADE'], CHANGES_REQUESTED: ['LEVELS_UNCLEAR', 'RIGHTS_NOT_CLEARED'], APPROVED: ['REVIEW_PASSED'] },
-    rights: ['OWNERSHIP_VERIFIED', 'LICENCE_VERIFIED'], publish: ['NEW_SKILL', 'SKILL_REVISION'],
+    rights: ['OWNERSHIP_VERIFIED', 'LICENCE_VERIFIED'], publish: ['NEW_SKILL', 'SKILL_REVISION'], archive: ['OUT_OF_DATE', 'DUPLICATE'],
   },
   limits: { name: 160, description: 1000, level: 500, prerequisites: 20, attribution: 300, basis: 2000, note: 500 },
   correlationId: 'corr-policy',
@@ -241,6 +241,20 @@ describe('skill map', () => {
     expect(within(region).getByText('Licence').nextSibling?.textContent).toBe('NA');
     expect(within(region).getByText('Basis').nextSibling?.textContent).toBe('NA');
     expect(within(region).getByText('Knows what an alert is')).toBeInTheDocument();
+  });
+
+  it('archives a live skill with a reason code, saying what blocks it and that no second person approves', async () => {
+    detailBody = detail({ status: 'LIVE', publishedRevision: 1, current: revision({ state: 'PUBLISHED', publishedAt: '2026-09-25T10:00:00.000Z' }) });
+    const region = await openSkill();
+    fireEvent.click(within(region).getByRole('button', { name: 'Archive…' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Archive soc-alert-triage' });
+    expect(within(dialog).getByText(/no second person approves it/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/refused while a role requires it/)).toBeInTheDocument();
+    fireEvent.change(within(dialog).getByLabelText(/Reason code/), { target: { value: 'DUPLICATE' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Archive skill' }));
+    await waitFor(() => expect(posts()).toHaveLength(1));
+    expect(String(posts()[0]![0])).toContain(`/api/v1/operations/skill-map/skills/${topicId}/archive`);
+    expect(JSON.parse(String(posts()[0]![1].body))).toEqual({ reasonCode: 'DUPLICATE' });
   });
 
   it('keeps the Operations navigation labels unchanged', () => {

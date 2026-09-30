@@ -34,7 +34,7 @@ Paths below are shortened to `StaffDashboards.kt` and `AcademicVerification.kt`.
 | 8 | Career Readiness | **View-only** | `AuthenticatedReadOnlyModule` (`rolePortalPages.tsx:339`) | INST-17 | Home "Cohort readiness", NA (`StaffDashboards.kt:399`) |
 | 9 | Placement | Working (INST-09, INST-12) — consented placement status, season statistics by department and batch, the register (employers engaged, drive calendar with outcomes and categories), drive approvals, placement-office nominations with student opt-in in each approved drive's details (INST-14) | `InstitutionPlacementPage` (`rolePortal/institutionPlacement.tsx`, `institutionPlacementRegister.tsx`) | INST-09, INST-12, EMP-11 built | Home pipeline and Placement statistics cards; per-student list and register web only |
 | 10 | Reports | Partial — readiness band report only | `InstitutionReportsPage` (`rolePortalPages.tsx:334-338`; `institutionReportsPage.tsx:31`) | INST-08, INST-13 (reports, exports, accreditation packs) | Web only |
-| 11 | Settings | Partial — profile, grading scales, calendar, placement policies (EMP-11) and drive categories (INST-12) working; data-processing terms "not built yet" | `InstitutionSettingsPage` (`institutionSettings.tsx`) | INST-05, EMP-11, INST-12 built; INST-18 (data terms) | Academic calendar read-only; rest web only |
+| 11 | Settings | Working — profile, grading scales, calendar, placement policies (EMP-11), drive categories (INST-12), data-processing terms and Leaving ONE with the exit export (INST-18) | `InstitutionSettingsPage` (`institutionSettings.tsx`; `rolePortal/institutionContract.tsx`) | INST-05, EMP-11, INST-12, INST-18 built | Academic calendar read-only; rest web only (desk tasks) |
 | 12 | Help & FAQ | Working | `HelpFaqPanel` (`rolePortalPages.tsx:291`) | Pre-plan | More → Help (`StaffDashboards.kt:1096`, `:1332`) |
 
 ## Placement officer (`/institution/placement-officer`)
@@ -170,3 +170,14 @@ department head's **Readiness**. Students see a sprint in the existing Learning 
 college" with its end date (web and Android). Android shows the sprints and one role's view read-only on the
 institution home. No navigation item added, removed, renamed or reordered. **No view-only navigation item
 remains** for the institution roles.
+
+## Update after INST-18 (2026-09-30)
+
+Admin **Settings** is complete for its §4.2 module: the "Data-processing terms — not built yet" state is
+replaced by the college's data-processing terms (status, the text labelled "Draft — pending legal review"
+until reviewed, Accept for owners) and **Leaving ONE** (the college's exit and, while a notice is open,
+the owner's exit export, with counselling notes apart behind a confirmation and a listed reason).
+Operations **Organizations** gains "Institution data-processing terms" and "College exits" sections; the
+deletion runs through **Settings → Approvals**. No navigation item added, removed, renamed or reordered.
+Android: none for staff (desk tasks); a student whose college leaves gets the exit notice in the
+notifications list the app already shows, and the existing "Left <college> on <date>" line.

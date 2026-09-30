@@ -51,6 +51,9 @@ CE-2A.
 | J10 | Faculty assigns a practice set | Built in INST-16 (Learning Resources → Assign; the student's next step on Learning) — to be walked in the next UAT round | — |
 | J11 | Preparation sprint by role | Built (INST-17) — script below | [design](../architecture/preparation-sprints-table-design.md) |
 | J12 | College offboarding | **Not in this slice** — INST-18 | — |
+
+| J11 | Preparation sprint by role | **Not in this slice** — INST-17 | — |
+| J12 | College offboarding | Built in INST-18 (Settings → Data-processing terms and Leaving ONE; Organizations → College exits; deletion through Approvals) — to be walked in the next UAT round; the runbook's dry run is pinned by the integration spec | [college exit](../institution/sop-college-exit.md) |
 | I-S | Settings, grading scales and calendar (supplementary) | In slice | [settings](../institution/sop-settings-and-calendar.md) |
 | I-C | Student meets the consent gate (supplementary, ENG-01) | In slice (engine purposes unpublished, HG-6) | — |
 

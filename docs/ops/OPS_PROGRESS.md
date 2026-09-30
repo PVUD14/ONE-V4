@@ -2362,3 +2362,42 @@ the open points. No ADR was needed; this builds on ADR-030, ADR-032 and OPS-02.
   and that module provides the database.
 
 **Next goal:** OPS-13 (once the engine tables exist) or OPS-17.
+
+## SMTP-DELIVERY — Outgoing email actually leaves the server — 2026-09-30
+
+**Branch:** `feat/smtp-delivery` (from `stack/batch28`). Runbook companion: `feat/smtp-delivery-aws-runbook`
+(from `feat/oneby8-domain`, the only line that has `docs/ops/runbook-move-to-aws.md`).
+
+**What was built.** The TLS sender from the earlier SMTP goal (`TlsSmtpMailSink`, `invitation-mail.ts`) was already on
+this base. This goal closed what stood between it and a real server:
+- **Configuration from compose.** `deploy/vps/docker-compose.yml` passes `PTP_SMTP_HOST/PORT/SECURITY/USER/PASSWORD` to the
+  API from the server's `.env`, blank by default; `deploy/vps/.env.example` has blank entries and says the password is typed
+  on the server only. A blank host means "not configured"; a host without user or password stops start-up naming the variable.
+- **`PTP_SMTP_SECURITY` optional**, `TLS` or `STARTTLS` in any case; unset means STARTTLS for port 587, TLS otherwise.
+- **Truthful ledger (migration 0094).** `notification_delivery_attempts.provider_kind` allowed only MAILPIT/SES/N8N, so the
+  API would have recorded GoDaddy deliveries as MAILPIT. Each sink now carries `providerKind` (`MAILPIT`/`SMTP`);
+  the three in-request senders (institution onboarding, employer team, Growth team) record it; 0094 widens the CHECK by
+  `SMTP` alone, idempotently (drops any provider_kind CHECK, re-adds the named one).
+- **One factory.** Every sending path already goes through `createConfiguredInvitationMailSink()`: the API security module,
+  the automation worker (`local-dispatcher`) and `mail:send-test`. The n8n workflows carry their own credential inside n8n and
+  are not deployed; unaffected.
+- **ADR-042** records the design and the rejected options (a vendor email API, nodemailer, plaintext fallback, disabling
+  verification, silently starting half-configured). ADR-041 and ADR-021 are not edited.
+- `docs/ops/runbook-mail-sender.md`: compose switch-on steps, one test invitation, the `$`-in-password quoting trap.
+
+**Tests added.** `smtp-mail-sender.test.ts`: plaintext-only server refused (no handshake, credentials or mail);
+`PTP_MAIL_FROM` decides envelope and From; security optional/case-insensitive/defaulted from port; blank compose values mean
+not configured; half-configured host refused naming exactly the variable; sinks labelled with their provider kind.
+`mail-delivery-ledger.integration.test.ts`: one provider_kind CHECK allowing MAILPIT/SES/N8N/SMTP, replay-safe, still refuses
+unknown kinds. `employer-team.integration.spec.ts`: the delivery attempt records the sink's kind (`SMTP`).
+
+**Android:** no change. The work is server-only (transport, configuration, ledger); no API contract or screen changed.
+
+**Not done / follow-ups.**
+- The automation worker is not in the compose pack, so only staff invitations leave the server; student invitations,
+  announcements and hiring notifications need the worker (and its n8n secrets) deployed.
+- No real server was contacted and no password exists anywhere in the repository; switching on is Divakar's step.
+- `operations-institution-onboarding` still lets a failed send surface as a request error after the invitation is committed
+  (pre-existing behaviour, unlike the employer and Growth team paths, which record FAILED).
+
+**Validation:** pending — see the entry below once run.

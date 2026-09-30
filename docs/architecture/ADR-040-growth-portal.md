@@ -8,6 +8,9 @@
 
 **Status:** Accepted (Divakar, 2026-09-30). Rates, thresholds and the items listed under "Open
 decisions" are not decided; see the design document §17.
+**Amended:** 2026-09-30, later the same day — Divakar answered most open decisions, redefining the
+active student and putting employer commission on hold. See "Decisions taken 2026-09-30" at the end.
+The sections above it are kept as first written.
 **Decision date:** 2026-09-30
 **Scope:** How AI8HT's college-partnerships and employer-partnerships field teams work inside ONE,
 how they are credited, and how their commission is recorded
@@ -193,3 +196,72 @@ Rejected:
   review; publishing it is HG-6), retention and erasure (design §13).
 - **Rates, thresholds and several policies are Divakar's to decide.** The design lists each with a
   recommendation. Until he decides, the screens show NA and "not decided", and nothing is paid.
+
+## Decisions taken 2026-09-30
+
+Later on 2026-09-30 Divakar answered the open decisions of design §17. The sections above are kept
+as they were first written; this section records what changed and why, and where it amends an
+earlier decision it says so. The design document (`growth-portal-design.md`) is updated to match
+and marks each open decision it closes.
+
+### Recorded verbatim
+
+- **(2) Active student.** "Active student is when the college management makes the payment for the
+  student. The commission doesn't depend on whether the student uses the portal or not."
+- **(6) Payment condition.** "Every commission will start only after the college payment cheque is
+  cleared."
+- **(7) Employer commission.** "Commission for the employer is not decided yet. Keep this on hold;
+  operations will come back with rates like college rates."
+- **(8) Lead contact retention:** 24 months (not 12).
+- **(10) Staff types.** "There will be 2 types of staff."
+- **Recommended answers accepted for the rest:** rates set later by operations (NA until set, every
+  change logged, dual control); a college earns commission for its salesperson for 24 months after
+  handoff; alumni do not count; a leaver is paid what becomes payable within 90 days of leaving;
+  location kept 180 days, visit proof only, never for attendance or pay; and the other smaller
+  recommended answers in design §17.
+
+### What changed, and why
+
+1. **The active student is a paid student (amends decisions 6 and 8(a)).** The first design defined
+   an active student by learning activity: activated, then active on at least N distinct days in a
+   30-day window. That rule is withdrawn entirely. A student qualifies for commission when the
+   college has paid for that student: the student is covered by a college payment that operations
+   recorded and that has cleared. Usage of ONE plays no part. Why: Divakar pays commission for the
+   business the salesperson brought in, and the business is the college's payment; whether a
+   student later logs in is the college's and the product's concern, not the salesperson's. It also
+   removes the part of the design that read students' learning activity for a commercial purpose,
+   so the ledger no longer touches `learner_activity_events` or `learning_attempt_events` at all.
+   The active-student rule versions, the 30-day window and the qualification-by-activity table are
+   dropped from the design.
+2. **A payment now says how many students it covers (narrows the OPS-14 "no amount" line further).**
+   To know which students a payment is for, the payment record gains a count of students paid for
+   and its coverage period. The covered students are fixed by a recorded, deterministic allocation
+   against the college's roster, written as pseudonymous references (design §11.3). This is a fact
+   about money received, not an entitlement: nothing a college or a student can do in ONE is gated on
+   it, and ADR-022 (billing deferred) still stands. The exact way a payment identifies its students
+   is a remaining open decision (design O-26), with the count-and-allocation model built as the
+   recommendation.
+3. **Nothing accrues before the cheque clears (decision 8(b), made stricter).** A student's
+   commission is created only when a cleared payment covers them, and clearance stays
+   dual-controlled (OPS-02). A bounced payment accrues nothing. A payment refunded or voided after
+   clearance lapses the entries it created that are not yet paid; paid entries are not clawed back.
+   The ledger loses its `ELIGIBLE` and `REVERSED` states for this reason.
+4. **Employer commission is on hold (suspends the employer half of decision 6).** No employer
+   commission is computed, accrued or shown as owed until Divakar decides its rules. The rate table
+   can still hold an `EMPLOYER_VERIFIED` rate, because operations will bring employer rates like
+   the college rates, but a stored employer rate produces nothing. The employer pipeline, referral
+   links and attribution are still built: who brought an employer in must be recorded when it
+   happens, whatever the later rule. Rejected: dropping `EMPLOYER_VERIFIED` from the rate vocabulary
+   (it would need a migration to put back, and operations are expected to record rates soon), and
+   accruing employer entries silently at NA (a row that looks owed is exactly what "on hold" forbids).
+5. **Two kinds of growth staff.** A growth person is either an `EMPLOYEE` or a `CONTRACTOR`,
+   recorded as data on the person with its history, shown on statements and carried in the payout
+   export. ONE records amounts only and computes no tax; TDS and payroll treatment are for Divakar's
+   accountant. Rejected: two more login roles for the two types, since the type changes nothing
+   anyone may do.
+6. **Open decisions.** These decisions close design O-3 to O-6, O-8 to O-17, O-19, O-20 and O-22 to
+   O-25, and give O-21 its interim rule (only the three contact bases, until legal review). O-1, O-2
+   and O-18 are withdrawn by change 1, and O-7 is replaced by the on-hold employer rules. Change 1
+   raises three sub-choices, each built with a recommendation and listed as open in design §17: how
+   a payment identifies its students (O-26), whether a student paid for again in a later year earns
+   again (O-27), and which date anchors the 24-month tail (O-28).

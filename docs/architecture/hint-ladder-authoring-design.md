@@ -51,7 +51,9 @@ review of ENG-10's 1,200 hints found that
 
 "Not already in the prompt" is what keeps the check honest on short answers: a name, year or number the question
 itself states ("Who sits in the middle?" → "Qadir") cannot be leaked by repeating it, while a meaning or a result the
-learner has to find can. Matching is on whole words and phrases, so "Son" is not found inside "person".
+learner has to find can. Matching is on whole words and phrases, so "Son" is not found inside "person". A one- or
+two-letter word answer ("in", "an") is not matched at all: it occurs in ordinary sentences, so only the reviewer can
+judge it. Short numbers are still matched.
 
 The function needs the answer key, so it runs only where the key is visible: the pack validator, and the question bank
 editor for `CONTENT_EDIT` / `CONTENT_REVIEW` holders (for a reader without the key it sees no key and reports only

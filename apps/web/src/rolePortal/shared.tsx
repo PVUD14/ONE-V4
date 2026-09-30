@@ -74,6 +74,15 @@ export function safeErrorMessage(code: string | undefined): string | undefined {
     case 'TEAM_LAST_OWNER': return 'Your last owner cannot be removed. Add another owner through ONE operations first.';
     case 'TEAM_EMAIL_INVALID': return 'Enter a valid email address.';
     case 'EMPLOYER_ORGANISATION_INACTIVE': return 'Your employer account is suspended or was not approved, so your team cannot be changed.';
+    // INST-18: a college's data terms and exit.
+    case 'INSTITUTION_DATA_TERMS_NOT_ACCEPTED': return 'An owner of your college must accept the current data-processing terms in Settings before more students are added. Students already on ONE are not affected.';
+    case 'INSTITUTION_OFFBOARDING_IN_PROGRESS': return 'Your college is leaving ONE, so no more students can be added. Contact AI8HT operations if this is a mistake.';
+    case 'INSTITUTION_DATA_TERMS_VERSION_NOT_CURRENT': return 'A newer version of the terms has been published. Review it before accepting.';
+    case 'OFFBOARDING_ALREADY_OPEN': return 'This college already has an open exit.';
+    case 'OFFBOARDING_RETENTION_ENDED': return 'The retention period has passed, so this exit can no longer be reversed.';
+    case 'OFFBOARDING_RETENTION_RUNNING': return 'The college’s records can be deleted only after the retention period ends.';
+    case 'OFFBOARDING_PURGE_HELD': return 'A legal hold covers a student of this college, so its records cannot be deleted until the hold is released.';
+    case 'OFFBOARDING_NOT_IN_NOTICE': return 'Only an exit with an open notice can be ended.';
     case 'EMPLOYER_TERMS_NOT_ACCEPTED': return 'An owner of your organisation must accept the current employer terms in Settings before this job can be put in front of students. Jobs already live are not affected.';
     case 'EMPLOYER_TERMS_VERSION_NOT_CURRENT': return 'These terms have been replaced by a newer version. Reload Settings to see the current terms.';
     case 'EMPLOYER_TERMS_VERSION_EXISTS': return 'A terms version with that name already exists. Versions cannot be changed once published; choose a new version name.';

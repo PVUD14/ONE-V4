@@ -11,6 +11,7 @@ import {
   createConfiguredInvitationMailSink,
   LoopbackSmtpInvitationMailSink,
   MailDeliveryFailure,
+  mailProviderKind,
   PermanentMailRejection,
   TlsSmtpMailSink,
   type SmtpSettings,
@@ -117,6 +118,32 @@ describe('TlsSmtpMailSink over implicit TLS (port 465 style)', () => {
     expect(error).toBeInstanceOf(MailDeliveryFailure);
     expect((error as MailDeliveryFailure).stage).toBe('TLS');
     expect(server.sessions.flatMap((session) => session.lines)).toEqual([]);
+  });
+  it('refuses a plaintext-only server: no TLS handshake, no credentials, no mail', async () => {
+    // A server that only speaks plain SMTP (and offers no STARTTLS) on the port configured for TLS.
+    const server = await fakeServer({ mode: 'starttls', advertiseStartTls: false });
+    const error = await rejectionOf(sinkFor(server, 'tls').send(message));
+    expect(error).toBeInstanceOf(MailDeliveryFailure);
+    expect(error).not.toBeInstanceOf(PermanentMailRejection);
+    expect((error as MailDeliveryFailure).stage).toBe('TLS');
+    for (const session of server.sessions) {
+      expect(session.auth).toBeUndefined();
+      expect(session.mailFrom).toBeUndefined();
+      expect(session.lines.map((entry) => entry.line)).not.toContainEqual(expect.stringMatching(/^(EHLO|AUTH|MAIL)/));
+    }
+    expectNoPassword(error);
+  });
+
+  it('sends from mailSender(), so PTP_MAIL_FROM decides the envelope and the From header', async () => {
+    const server = await fakeServer({ mode: 'tls' });
+    vi.stubEnv('PTP_MAIL_FROM', 'noreply@ai8ht.pro');
+    try {
+      await sinkFor(server, 'tls').send(message);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+    expect(server.sessions[0]!.mailFrom).toBe('MAIL FROM:<noreply@ai8ht.pro>');
+    expect(server.sessions[0]!.message).toContain('From: AI8HT ONE <noreply@ai8ht.pro>');
   });
 });
 
@@ -295,6 +322,31 @@ describe('createConfiguredInvitationMailSink', () => {
     expect((createConfiguredInvitationMailSink({ ...base, PTP_SMTP_PORT: '2465' }) as TlsSmtpMailSink).port).toBe(2465);
   });
 
+  it('accepts PTP_SMTP_SECURITY as TLS or STARTTLS in any case, and defaults it from the port when unset', () => {
+    const upper = createConfiguredInvitationMailSink({ ...base, PTP_SMTP_SECURITY: 'STARTTLS' }) as TlsSmtpMailSink;
+    expect(upper.security).toBe('starttls');
+    expect((createConfiguredInvitationMailSink({ ...base, PTP_SMTP_SECURITY: 'TLS' }) as TlsSmtpMailSink).security).toBe('tls');
+    const unset = createConfiguredInvitationMailSink({ ...base, PTP_SMTP_SECURITY: undefined }) as TlsSmtpMailSink;
+    expect([unset.security, unset.port]).toEqual(['tls', 465]);
+    const submission = createConfiguredInvitationMailSink({ ...base, PTP_SMTP_SECURITY: undefined, PTP_SMTP_PORT: '587' }) as TlsSmtpMailSink;
+    expect([submission.security, submission.port]).toEqual(['starttls', 587]);
+    const blank = createConfiguredInvitationMailSink({ ...base, PTP_SMTP_SECURITY: '' }) as TlsSmtpMailSink;
+    expect([blank.security, blank.port]).toEqual(['tls', 465]);
+  });
+
+  it('treats an empty PTP_SMTP_HOST as "not configured", so compose can pass blank values through', () => {
+    expect(createConfiguredInvitationMailSink({ PTP_SMTP_HOST: '', PTP_SMTP_PORT: '', PTP_SMTP_USER: '', PTP_SMTP_PASSWORD: '', PTP_SMTP_SECURITY: '' })).toBeUndefined();
+    expect(createConfiguredInvitationMailSink({ PTP_SMTP_HOST: '  ', PTP_SMTP_USER: 'info@ai8ht.pro' })).toBeUndefined();
+  });
+
+  it('labels each sink with the provider kind the delivery ledger records', () => {
+    expect(createConfiguredInvitationMailSink(base)!.providerKind).toBe('SMTP');
+    expect(createConfiguredInvitationMailSink({ PTP_LOCAL_INVITATION_MAILPIT_ENABLED: 'true' })!.providerKind).toBe('MAILPIT');
+    expect(mailProviderKind(createConfiguredInvitationMailSink(base)!)).toBe('SMTP');
+    // A sink that does not say (a test double) is recorded as the loopback kind it stands in for.
+    expect(mailProviderKind({ send: async () => ({}) })).toBe('MAILPIT');
+  });
+
   it('does not expose the password through the sink object', () => {
     const sink = createConfiguredInvitationMailSink(base)!;
     expect(JSON.stringify(sink)).not.toContain(PASSWORD);
@@ -304,7 +356,8 @@ describe('createConfiguredInvitationMailSink', () => {
   it.each([
     ['the user is missing', { ...base, PTP_SMTP_USER: '' }],
     ['the password is missing', { ...base, PTP_SMTP_PASSWORD: undefined }],
-    ['the security mode is missing', { ...base, PTP_SMTP_SECURITY: undefined }],
+    ['the host is set but the user and password are blank', { PTP_SMTP_HOST: 'smtpout.secureserver.net', PTP_SMTP_USER: '', PTP_SMTP_PASSWORD: '' }],
+    ['the password is an empty string', { ...base, PTP_SMTP_PASSWORD: '' }],
     ['the security mode is not tls or starttls', { ...base, PTP_SMTP_SECURITY: 'none' }],
     ['the port is not a port', { ...base, PTP_SMTP_PORT: '99999' }],
     ['the host is not a host name', { ...base, PTP_SMTP_HOST: 'smtp://smtpout.secureserver.net' }],
@@ -317,7 +370,22 @@ describe('createConfiguredInvitationMailSink', () => {
       thrown = error;
     }
     expect(thrown).toBeInstanceOf(Error);
-    expect((thrown as Error).message).toMatch(/PTP_SMTP|PTP_LOCAL_INVITATION_MAILPIT_ENABLED/);
+    expect((thrown as Error).message).toMatch(/PTP_SMTP_[A-Z]+|PTP_LOCAL_INVITATION_MAILPIT_ENABLED/);
     expectNoPassword(thrown as Error);
+  });
+
+  it('names exactly the variable that is wrong', () => {
+    const messageFor = (env: Record<string, string | undefined>) => {
+      try {
+        createConfiguredInvitationMailSink(env);
+      } catch (error) {
+        return (error as Error).message;
+      }
+      return 'no error';
+    };
+    expect(messageFor({ ...base, PTP_SMTP_PASSWORD: '' })).toContain('PTP_SMTP_PASSWORD');
+    expect(messageFor({ ...base, PTP_SMTP_USER: ' ' })).toContain('PTP_SMTP_USER');
+    expect(messageFor({ ...base, PTP_SMTP_PORT: 'abc' })).toContain('PTP_SMTP_PORT');
+    expect(messageFor({ ...base, PTP_SMTP_SECURITY: 'ssl' })).toContain('PTP_SMTP_SECURITY');
   });
 });

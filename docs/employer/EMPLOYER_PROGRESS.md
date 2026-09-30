@@ -1153,7 +1153,19 @@ Calendar invites remain EMP-09's. No calendar provider is integrated.
   - One live share per item.
 - **Privacy.** Deletion revokes every share (`ACCOUNT_DELETION`) together with the grants. The export gains `evidenceShares`.
 
-**Validation:** (commands and counts are appended below once the full run finishes)
+**Validation:**
+- Full run: `E:/one-wt/logs/validate.sh E:/one-wt/emp13 one_emp13 emp13 android`, on a fresh `one_emp13` database.
+  - install 0.
+  - Migrations: `migrate1` applied 82 and `migrate2` applied 0 (82 already applied).
+  - typecheck 0, build 0, policy 0, audit 0, Android `compileDebugKotlin` 0.
+- Tests: every package passed.
+  - Web passed 931/931.
+  - API passed 1318 of 1319 tests, in 73 of 82 files, including `skill-evidence.integration.spec.ts` at 13/13.
+- The 9 remaining files hit the known "out of shared memory" error in teardown, while another agent's suites loaded the shared Postgres:
+  - assessments, employer-company-profile, employer-eligibility-stages, hiring, institution-accreditation-exports, institution-settings, institution-teaching-assignments, staff-actions and staff-pool-access.
+  - In staff-actions, one test also failed: "checks current time bounds…". Every test in that file was taking 17–22 seconds under the load at the time.
+- Each of the 9 was re-run alone and all passed: staff-actions 107/107, assessments 16/16, employer-company-profile 20/20, employer-eligibility-stages 10/10, hiring 22/22, institution-accreditation-exports 11/11, institution-settings 24/24, institution-teaching-assignments 35/35, staff-pool-access 7/7.
+- Earlier targeted runs:
 - `skill-evidence.integration.spec.ts`: 13/13 passed.
 - `skillEvidence.test.tsx`: 7/7 passed.
 - The adjacent web suites passed: applicationSnapshotView, hiringPages, applicationMessages.

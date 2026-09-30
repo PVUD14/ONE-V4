@@ -33,6 +33,7 @@ import {
 } from './api.js';
 import { FromYourLecturerCard, hasLecturerWork, isStudentLearningActions } from './studentLearningActions.js';
 import { go } from './pilotParity/naWidgets.js';
+import { lessonTextProps } from './lessonScript.js';
 
 /** Plain words for every reason code the planner and the path grouping can give. */
 export const REASON_TEXT: Readonly<Record<string, string>> = {
@@ -187,7 +188,7 @@ function StepCard({ step, onStep }: { readonly step: LearningStepDto; readonly o
     {step.lessons.length ? <div style={{ marginBottom: 10 }}>
       <strong style={{ fontSize: 12 }}>Lessons on this skill</strong>
       <div className="pilot-list">{step.lessons.map((lesson) => <div key={lesson.id} className="pilot-list-row">
-        <span className="pilot-tile teal"><BookOpen size={16} /></span><div className="grow"><strong>{lesson.title}</strong><small>Listed with your modules below</small></div>
+        <span className="pilot-tile teal"><BookOpen size={16} /></span><div className="grow"><strong {...lessonTextProps(lesson.language)}>{lesson.title}</strong><small>Listed with your modules below</small></div>
       </div>)}</div>
     </div> : null}
     <StepPractice key={step.decisionId} step={step} onStep={onStep} />

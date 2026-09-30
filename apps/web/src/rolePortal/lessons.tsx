@@ -56,6 +56,17 @@ const filters = [
 ];
 const keyPattern = /^[a-z0-9][a-z0-9-]{2,79}$/;
 
+/**
+ * ENG-16: a variant in a language other than English is marked for native-speaker review until it
+ * is approved; approving it asks who checked the language.
+ */
+const needsNativeSpeakerReview = (kind: string, variant: LessonVariantDto, state: LessonRevisionState | null | undefined): boolean =>
+  kind === 'VARIANT' && variant.language !== 'en' && (state === 'DRAFT' || state === 'IN_REVIEW' || state === 'CHANGES_REQUESTED');
+const languageReviewText: Readonly<Record<string, string>> = {
+  NATIVE_SPEAKER_REVIEWED: 'I read this language natively and checked it against the English',
+  NATIVE_SPEAKER_CONSULTED: 'A native speaker reviewed it and I checked their review',
+};
+
 function languageName(policy: LessonEditorPolicyDto | null, code: string): string {
   const found = policy ? policy.languages.find((entry) => entry.language === code) : undefined;
   return found ? found.name : code;
@@ -165,7 +176,8 @@ export function OperationsLessonsPage(): React.ReactElement | null {
           <td>{variantText(policy, lesson.variant)}</td>
           <td><StatusBadge label={statusText(lesson.status)} tone={statusTone(lesson.status)} /></td>
           <td>{lesson.publishedRevision ? `Revision ${lesson.publishedRevision}` : 'NA'}</td>
-          <td>{lesson.openRevision ? `Revision ${lesson.openRevision.revision} · ${label(lesson.openRevision.state)}` : 'None'}</td>
+          <td>{lesson.openRevision ? `Revision ${lesson.openRevision.revision} · ${label(lesson.openRevision.state)}` : 'None'}
+            {needsNativeSpeakerReview(lesson.kind, lesson.variant, lesson.openRevision ? lesson.openRevision.state : null) ? <> <StatusBadge label="Needs native-speaker review" tone="warning" /></> : null}</td>
           <td>{lesson.kind === 'VARIANT' ? 'As its lesson' : lesson.topic ? lesson.topic.stableKey : 'NA'}</td>
           <td><button type="button" className="secondary" aria-label={`Open ${lesson.stableKey}${lesson.kind === 'VARIANT' ? ` (${lesson.variant.language}/${lesson.variant.level}/${lesson.variant.style})` : ''}`}
             onClick={() => setSelectedId(lesson.lessonId)}>Open</button></td>
@@ -265,7 +277,10 @@ function LessonPanel({ token, lessonId, policy, onOpen, onChanged, onClose }: {
       ? <button type="button" className="secondary" onClick={() => setDialog({ kind: 'archive' })}>Archive…</button> : null}
 
     {working ? <article className="role-card" aria-label={`Revision ${working.revision}`}>
-      <div className="role-section-title"><h3>Revision {working.revision}</h3><StatusBadge label={label(working.state)} tone={stateTone(working.state)} /></div>
+      <div className="role-section-title"><h3>Revision {working.revision}</h3><StatusBadge label={label(working.state)} tone={stateTone(working.state)} />
+        {needsNativeSpeakerReview(lesson.kind, lesson.variant, working.state) ? <StatusBadge label="Needs native-speaker review" tone="warning" /> : null}</div>
+      {needsNativeSpeakerReview(lesson.kind, lesson.variant, working.state)
+        ? <p><small>Students never see this {languageName(policy, lesson.variant.language)} text until someone who reads the language natively (or who checked a native speaker&apos;s review) approves it and it is published.</small></p> : null}
       <p><small>Author {working.author.email} · started {when(working.createdAt)}{working.contributors.length > 1 ? ` · also written or submitted by ${working.contributors.filter((entry) => entry.userId !== working.author.userId).map((entry) => entry.email).join(', ')}` : ''}{working.approver ? ` · approved by ${working.approver.email}` : ''}</small></p>
       {editable && policy.viewer.edit
         ? <LessonEditor token={token} revision={working} isVariant={isVariant} policy={policy} onSaved={(updated) => apply(updated, 'Draft saved.')} />
@@ -308,10 +323,12 @@ function LessonPanel({ token, lessonId, policy, onOpen, onChanged, onClose }: {
         : 'Not required: recorded with your reason.'}
       reasons={policy.reasons.transition[dialog.toState] ?? []}
       rightsReasons={dialog.toState === 'APPROVED' ? policy.reasons.rights : null}
+      languageReviews={dialog.toState === 'APPROVED' && isVariant && lesson.variant.language !== 'en' ? policy.reasons.languageReview ?? [] : null}
       submitLabel={transitionTitle(dialog.toState, dialog.revision.revision)} withNote onCancel={() => setDialog(null)}
-      onSubmit={async (reasonCode, note, rightsReasonCode) => {
+      onSubmit={async (reasonCode, note, rightsReasonCode, languageReviewCode) => {
         apply((await transitionEditorLessonRevision(token, dialog.revision.id, {
-          toState: dialog.toState, reasonCode, ...(rightsReasonCode ? { rightsReasonCode } : {}), ...(note ? { note } : {}),
+          toState: dialog.toState, reasonCode, ...(rightsReasonCode ? { rightsReasonCode } : {}),
+          ...(languageReviewCode ? { languageReviewCode } : {}), ...(note ? { note } : {}),
         })).lesson, `Revision ${dialog.revision.revision}: ${label(dialog.toState)}.`);
         setDialog(null);
       }} /> : null}
@@ -528,26 +545,35 @@ function CreateVariantDialog({ token, policy, lesson, onCancel, onCreated }: {
   </div>;
 }
 
-/** The confirm dialog for lesson writes: a reason code is required; approving also asks for the rights reason. */
-function ReasonDialog({ title, approvalNote, reasons, rightsReasons = null, submitLabel, withNote = false, onCancel, onSubmit }: {
+/**
+ * The confirm dialog for lesson writes: a reason code is required; approving also asks for the rights
+ * reason, and approving a non-English variant for who checked its language (ENG-16).
+ */
+function ReasonDialog({ title, approvalNote, reasons, rightsReasons = null, languageReviews = null, submitLabel, withNote = false, onCancel, onSubmit }: {
   readonly title: string; readonly approvalNote: string; readonly reasons: readonly string[]; readonly rightsReasons?: readonly string[] | null;
+  readonly languageReviews?: readonly string[] | null;
   readonly submitLabel: string; readonly withNote?: boolean;
-  readonly onCancel: () => void; readonly onSubmit: (reasonCode: string, note: string | null, rightsReasonCode: string | null) => Promise<void>;
+  readonly onCancel: () => void;
+  readonly onSubmit: (reasonCode: string, note: string | null, rightsReasonCode: string | null, languageReviewCode: string | null) => Promise<void>;
 }): React.ReactElement {
   const [reasonCode, setReasonCode] = useState('');
   const [rightsReasonCode, setRightsReasonCode] = useState('');
+  const [languageReviewCode, setLanguageReviewCode] = useState('');
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const firstFieldRef = useRef<HTMLSelectElement | null>(null);
   useEffect(() => { firstFieldRef.current?.focus(); }, []);
-  const ready = Boolean(reasonCode) && (!rightsReasons || Boolean(rightsReasonCode));
+  const ready = Boolean(reasonCode) && (!rightsReasons || Boolean(rightsReasonCode)) && (!languageReviews || Boolean(languageReviewCode));
   const submit = async (event: React.FormEvent): Promise<void> => {
     event.preventDefault();
-    if (!ready) { setError(rightsReasons ? 'Choose a reason code and a rights reason.' : 'Choose a reason code.'); return; }
+    if (!ready) {
+      setError(languageReviews ? 'Choose a reason code, a rights reason and who checked the language.' : rightsReasons ? 'Choose a reason code and a rights reason.' : 'Choose a reason code.');
+      return;
+    }
     setBusy(true);
     try {
-      await onSubmit(reasonCode, note.trim() ? note.trim() : null, rightsReasons ? rightsReasonCode : null);
+      await onSubmit(reasonCode, note.trim() ? note.trim() : null, rightsReasons ? rightsReasonCode : null, languageReviews ? languageReviewCode : null);
     } catch (cause) {
       setError(formatApiError(cause, 'The change could not be saved.'));
       setBusy(false);
@@ -567,6 +593,11 @@ function ReasonDialog({ title, approvalNote, reasons, rightsReasons = null, subm
           <select aria-label="Rights reason" value={rightsReasonCode} onChange={(event) => setRightsReasonCode(event.target.value)} required>
             <option value="">Choose a rights reason…</option>
             {rightsReasons.map((reason) => <option key={reason} value={reason}>{reason}</option>)}
+          </select></label> : null}
+        {languageReviews ? <label><span>Native-speaker review <em>required</em> — who checked the language</span>
+          <select aria-label="Native-speaker review" value={languageReviewCode} onChange={(event) => setLanguageReviewCode(event.target.value)} required>
+            <option value="">Choose who checked it…</option>
+            {languageReviews.map((code) => <option key={code} value={code}>{languageReviewText[code] ?? code}</option>)}
           </select></label> : null}
         {withNote ? <label><span>Note (optional, 500 characters) — do not include personal data</span>
           <textarea value={note} maxLength={500} onChange={(event) => setNote(event.target.value)} /></label> : null}

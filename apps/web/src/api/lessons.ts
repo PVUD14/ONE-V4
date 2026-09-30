@@ -34,6 +34,8 @@ export interface LessonEditorPolicyDto {
     readonly save: readonly string[];
     readonly transition: Readonly<Record<string, readonly string[]>>;
     readonly rights: readonly string[];
+    /** ENG-16: who checked the language of a non-English variant; asked for when approving one. */
+    readonly languageReview?: readonly string[];
     readonly publish: readonly string[];
     /** Why published content is archived (content-archive-design.md). */
     readonly archive?: readonly string[];
@@ -187,7 +189,8 @@ export function saveEditorLessonDraft(token: string, revisionId: string, body: L
 }
 
 export function transitionEditorLessonRevision(token: string, revisionId: string, body: {
-  readonly toState: 'IN_REVIEW' | 'CHANGES_REQUESTED' | 'APPROVED'; readonly reasonCode: string; readonly rightsReasonCode?: string; readonly note?: string;
+  readonly toState: 'IN_REVIEW' | 'CHANGES_REQUESTED' | 'APPROVED'; readonly reasonCode: string; readonly rightsReasonCode?: string;
+  readonly languageReviewCode?: string; readonly note?: string;
 }): Promise<LessonEnvelope> {
   return requestJson(`${base}/revisions/${encodeURIComponent(revisionId)}/transition`, { token, method: 'POST', body });
 }

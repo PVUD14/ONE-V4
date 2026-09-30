@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { completeHostedLoginFromLocation } from './auth.js';
 import { CareerReadinessApiPanel } from './careerReadinessApiPanel.js';
@@ -29,6 +29,43 @@ describe('API-backed Career Readiness surfaces', () => {
     expect(await screen.findByRole('heading', { name: 'Assessment-due' })).toBeInTheDocument();
     expect(screen.getByText(/Destinations stay server-side/)).toBeInTheDocument();
     expect(document.body.textContent).not.toContain('@');
+  });
+
+  it('lets a student choose the lesson language; a lesson with no published version in it is shown in English with a notice (ENG-16)', async () => {
+    const lesson = (id: string, over: Record<string, unknown>) => ({ id, stableKey: id, version: 1, topicId: 'topic-1', prerequisiteLessonIds: [], ...over });
+    const telugu = {
+      ...catalog,
+      modules: [{ id: 'module-1', stableKey: 'module-1', version: 1, title: 'Synthetic module', description: '', lessons: [
+        lesson('lesson-te', { title: 'సింథటిక్ పాఠం', body: { summary: 'సింథటిక్ సారాంశం' }, language: 'te', languageNotice: null }),
+        lesson('lesson-en', { title: 'Synthetic English lesson', body: { summary: 'Synthetic English summary' }, language: 'en', languageNotice: 'TRANSLATION_MISSING' }),
+        lesson('lesson-old', { title: 'పాత సింథటిక్ పాఠం', body: { summary: 'సారాంశం' }, language: 'te', languageNotice: 'TRANSLATION_OUTDATED' }),
+      ] }],
+    };
+    const offered = [{ language: 'en', name: 'English', nativeName: 'English' }, { language: 'te', name: 'Telugu', nativeName: 'తెలుగు' }];
+    const state = { ...learner, catalog: telugu, lessonLanguage: { selected: 'te', offered } };
+    const fetchMock = vi.fn(async (url: string, init?: { method?: string; body?: string }) => ({ ok: true, json: async () => {
+      if (url.endsWith('/oauth2/token')) return { access_token: 'test-access-token' };
+      if (url.endsWith('/catalog')) return catalog;
+      if (url.endsWith('/me/lesson-language')) return { lessonLanguage: { selected: JSON.parse(String(init?.body)).language, offered } };
+      return state;
+    } }));
+    vi.stubGlobal('fetch', fetchMock);
+    await authenticateThroughHostedUiCallback();
+    render(<CareerReadinessApiPanel route="learning" />);
+    const picker = await screen.findByLabelText('Lesson language');
+    expect(picker).toHaveValue('te');
+    expect(within(picker).getByRole('option', { name: 'తెలుగు · Telugu' })).toBeInTheDocument();
+    const teluguTitle = screen.getByRole('heading', { name: 'సింథటిక్ పాఠం' });
+    expect(teluguTitle).toHaveAttribute('lang', 'te');
+    expect(teluguTitle.style.fontFamily).toContain('ONE Telugu');
+    expect(screen.getByRole('heading', { name: 'Synthetic English lesson' })).toHaveAttribute('lang', 'en');
+    expect(screen.getByText('Not yet available in Telugu. Shown in English.')).toBeInTheDocument();
+    expect(screen.getByText(/The English lesson was updated after this Telugu version was written/)).toBeInTheDocument();
+    fireEvent.change(picker, { target: { value: 'en' } });
+    await waitFor(() => expect(fetchMock.mock.calls.some(([url, init]) => String(url).endsWith('/career-readiness/me/lesson-language') && init?.method === 'PUT')).toBe(true));
+    const put = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/me/lesson-language'))!;
+    expect(JSON.parse(String(put[1]!.body))).toEqual({ language: 'en' });
+    expect(await screen.findByText('Lessons are shown in English.')).toBeInTheDocument();
   });
 
   it('renders the restricted operations governance and automation summary from real APIs', async () => {

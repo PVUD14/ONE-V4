@@ -45,7 +45,8 @@ export interface LearningStepDto {
   readonly strategyKind: string | null;
   readonly reasonCodes: readonly string[];
   readonly adaptive: boolean;
-  readonly lessons: readonly { readonly id: string; readonly title: string }[];
+  /** Titled in the learner's lesson language where a published version exists (ENG-16); `language` says which. */
+  readonly lessons: readonly { readonly id: string; readonly title: string; readonly language?: string }[];
   readonly practice: StepPracticeDto;
 }
 

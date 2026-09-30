@@ -15,11 +15,21 @@ export interface CareerReadinessCatalog {
   readonly modules: readonly {
     readonly id: string; readonly stableKey: string; readonly version: number; readonly title: string; readonly description: string;
     readonly lessons: readonly { readonly id: string; readonly stableKey: string; readonly version: number; readonly title: string;
-      readonly body: { readonly summary?: string; readonly practice?: string }; readonly topicId: string; readonly prerequisiteLessonIds: readonly string[] }[];
+      readonly body: { readonly summary?: string; readonly practice?: string }; readonly topicId: string; readonly prerequisiteLessonIds: readonly string[];
+      /** ENG-16, signed-in learner state only: the language the words are in, and why it is not the chosen one. */
+      readonly language?: string; readonly languageNotice?: LessonLanguageNotice | null }[];
   }[];
   readonly assessments: readonly { readonly id: string; readonly stableKey: string; readonly title: string;
     readonly blueprintId: string; readonly selectionCount: number; readonly timeLimitSeconds: number }[];
 }
+
+/** ENG-16: why a lesson is not in the language the learner chose, or was written for an earlier version. */
+export type LessonLanguageNotice = 'TRANSLATION_MISSING' | 'TRANSLATION_OUTDATED';
+
+export interface LessonLanguageOption { readonly language: string; readonly name: string; readonly nativeName: string }
+
+/** ENG-16: the language the learner reads lessons in, and the languages they may choose. */
+export interface LearnerLessonLanguage { readonly selected: string; readonly offered: readonly LessonLanguageOption[] }
 
 export interface ReadinessHistoryEntry {
   readonly id: string;
@@ -30,6 +40,8 @@ export interface ReadinessHistoryEntry {
 
 export interface LearnerCareerReadinessState {
   readonly catalog: CareerReadinessCatalog;
+  /** Optional for older responses. */
+  readonly lessonLanguage?: LearnerLessonLanguage;
   readonly progress: readonly { readonly lessonVersionId: string; readonly state: string; readonly startedAt?: string | null; readonly completedAt?: string | null }[];
   readonly attempts: readonly { readonly id: string; readonly state: string; readonly startedAt?: string; readonly submittedAt?: string | null;
     readonly scoreCorrect?: number; readonly scorePossible?: number; readonly assessmentDefinitionId?: string }[];
@@ -76,6 +88,11 @@ export function getCareerReadinessCatalog(signal?: AbortSignal): Promise<CareerR
 
 export function getLearnerCareerReadinessState(token: string, signal?: AbortSignal): Promise<LearnerCareerReadinessState> {
   return requestJson('/api/v1/career-readiness/me', { token, ...(signal ? { signal } : {}) });
+}
+
+/** ENG-16: choose the language lessons are shown in; only an offered language is accepted. */
+export function setLearnerLessonLanguage(token: string, language: string): Promise<{ readonly lessonLanguage: LearnerLessonLanguage }> {
+  return requestJson('/api/v1/career-readiness/me/lesson-language', { token, method: 'PUT', body: { language } });
 }
 
 export function completeCareerReadinessLesson(token: string, lessonVersionId: string): Promise<Record<string, unknown>> {

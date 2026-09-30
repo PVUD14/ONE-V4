@@ -39,7 +39,7 @@ const policy = (viewer: Record<string, unknown> = {}) => ({
   reasons: {
     create: ['NEW_LESSON', 'TRACK_BUILD'], createVariant: ['NEW_LANGUAGE', 'NEW_LEVEL'], revise: ['CORRECTION', 'CONTENT_UPDATE'], save: ['DRAFT_EDIT'],
     transition: { IN_REVIEW: ['READY_FOR_REVIEW', 'CHANGES_MADE'], CHANGES_REQUESTED: ['CONTENT_INACCURATE', 'TRANSLATION_INACCURATE'], APPROVED: ['REVIEW_PASSED'] },
-    rights: ['OWNERSHIP_VERIFIED', 'LICENCE_VERIFIED'], publish: ['NEW_LESSON', 'LESSON_REVISION', 'NEW_VARIANT'], archive: ['OUT_OF_DATE', 'RIGHTS_WITHDRAWN'],
+    rights: ['OWNERSHIP_VERIFIED', 'LICENCE_VERIFIED'], languageReview: ['NATIVE_SPEAKER_REVIEWED', 'NATIVE_SPEAKER_CONSULTED'], publish: ['NEW_LESSON', 'LESSON_REVISION', 'NEW_VARIANT'], archive: ['OUT_OF_DATE', 'RIGHTS_WITHDRAWN'],
   },
   limits: { title: 200, summary: 1000, practice: 2000, prerequisites: 20, attribution: 300, basis: 2000, note: 500 },
   correlationId: 'corr-policy',
@@ -202,6 +202,8 @@ describe('lesson editor', () => {
     fireEvent.change(within(dialog).getByLabelText(/Reason code/), { target: { value: 'REVIEW_PASSED' } });
     expect(submit).toBeDisabled();
     fireEvent.change(within(dialog).getByLabelText('Rights reason'), { target: { value: 'OWNERSHIP_VERIFIED' } });
+    // An English lesson is not asked who checked its language (ENG-16).
+    expect(within(dialog).queryByLabelText('Native-speaker review')).not.toBeInTheDocument();
     fireEvent.click(submit);
     await waitFor(() => expect(posts()).toHaveLength(1));
     expect(JSON.parse(String(posts()[0]![1].body))).toEqual({ toState: 'APPROVED', reasonCode: 'REVIEW_PASSED', rightsReasonCode: 'OWNERSHIP_VERIFIED' });
@@ -269,6 +271,39 @@ describe('lesson editor', () => {
     await waitFor(() => expect(posts()).toHaveLength(1));
     expect(String(posts()[0]![0])).toContain(`/revisions/${revisionId}/publish`);
     expect(JSON.parse(String(posts()[0]![1].body))).toEqual({ reasonCode: 'NEW_VARIANT' });
+  });
+
+  it('marks a Telugu variant for native-speaker review, and approving it asks who checked the language (ENG-16)', async () => {
+    const variantRevision = revision({
+      state: 'IN_REVIEW', identity: { stableKey: 'ops-lesson-follow-up', variantOf: lessonId, variant: teluguVariant, basedOnRevision: 1 },
+      fields: fields({ moduleKey: null, topicId: null, prerequisites: [], title: 'Telugu title' }), topic: null,
+    });
+    listResponse = () => ok(list([summaryRow({
+      lessonId: variantId, kind: 'VARIANT', variant: teluguVariant, variantOf: lessonId, title: 'Telugu title', topic: null, moduleKey: null,
+      openRevision: { id: revisionId, revision: 1, state: 'IN_REVIEW' }, basedOnRevision: 1, baseRevision: 1,
+    })]));
+    detailBody = detail({
+      ...summaryRow({ lessonId: variantId, kind: 'VARIANT', variant: teluguVariant, variantOf: lessonId, title: 'Telugu title', topic: null, moduleKey: null, basedOnRevision: 1, baseRevision: 1 }),
+      open: variantRevision, base: summaryRow({ status: 'LIVE', publishedRevision: 1, openRevision: null }), publishNeedsApproval: false,
+    });
+    render(<OperationsLessonsPage />);
+    expect(await screen.findByText('Needs native-speaker review')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Open ops-lesson-follow-up (te/STANDARD/EXPLANATION)' }));
+    const region = await screen.findByRole('region', { name: 'Lesson ops-lesson-follow-up (Telugu · Standard · Explanation)' });
+    expect(within(region).getByText('Needs native-speaker review')).toBeInTheDocument();
+    expect(region).toHaveTextContent('Students never see this Telugu text until');
+    fireEvent.click(within(region).getByRole('button', { name: 'Approve, with rights review…' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Approve revision 1' });
+    const submit = within(dialog).getByRole('button', { name: 'Approve revision 1' });
+    fireEvent.change(within(dialog).getByLabelText(/Reason code/), { target: { value: 'REVIEW_PASSED' } });
+    fireEvent.change(within(dialog).getByLabelText('Rights reason'), { target: { value: 'OWNERSHIP_VERIFIED' } });
+    expect(submit).toBeDisabled();
+    fireEvent.change(within(dialog).getByLabelText('Native-speaker review'), { target: { value: 'NATIVE_SPEAKER_REVIEWED' } });
+    fireEvent.click(submit);
+    await waitFor(() => expect(posts()).toHaveLength(1));
+    expect(JSON.parse(String(posts()[0]![1].body))).toEqual({
+      toState: 'APPROVED', reasonCode: 'REVIEW_PASSED', rightsReasonCode: 'OWNERSHIP_VERIFIED', languageReviewCode: 'NATIVE_SPEAKER_REVIEWED',
+    });
   });
 
   it('creates a variant of a live lesson with a language, a title and a reason code', async () => {

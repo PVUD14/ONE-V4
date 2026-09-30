@@ -50,6 +50,9 @@ export const approvalPayloads = {
   // OPS-12: widening is bound to the exact new limits.
   AI_FEATURE_LIMITS_RAISE: (input: { readonly featureKey: string; readonly cap: number; readonly capWindow: string; readonly maxInputChars: number; readonly reasonCode: string }) =>
     ({ featureKey: input.featureKey, cap: input.cap, capWindow: input.capWindow, maxInputChars: input.maxInputChars, reasonCode: input.reasonCode }),
+  // INST-18: an exit's institution-owned records are deleted once; the exit id binds which college.
+  INSTITUTION_DATA_PURGE: (input: { readonly offboardingId: string; readonly reasonCode: string }) =>
+    ({ offboardingId: input.offboardingId.toLowerCase(), reasonCode: input.reasonCode }),
 } satisfies Record<HighRiskActionKey, (input: never) => Record<string, unknown> & { reasonCode: string }>;
 
 function domainError(code: string, correlationId: string): { readonly error: { readonly code: string; readonly message: string; readonly correlationId: string } } {

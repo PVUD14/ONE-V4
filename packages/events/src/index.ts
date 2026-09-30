@@ -97,6 +97,8 @@ const operationApprovalActionKeys = [
   // OPS-12: extended keys as well (0089).
   'AI_FEATURE_ENABLE',
   'AI_FEATURE_LIMITS_RAISE',
+  // INST-18: extended key as well (0088) — deleting a departed college's records.
+  'INSTITUTION_DATA_PURGE',
 ] as const;
 
 // EMP-05: opportunities.lifecycle_state (0007 CHECK).
@@ -1250,6 +1252,77 @@ export const eventSchemas = {
       reviewState: { kind: 'enum', values: ['DRAFT'] },
       source: { kind: 'enum', values: ['SEEDED'] },
     },
+  },
+  // INST-18: operations published a version of the college data-processing terms (0088). No consumer.
+  institutionDataTermsPublishedV1: {
+    eventType: 'institution.data_terms.published',
+    eventVersion: 1,
+    producer: 'identity-organization',
+    aggregateType: 'institution_data_terms_version',
+    purpose: 'institution-data-terms',
+    dataClassification: 'internal',
+    schemaRef: 'registry://institution.data_terms.published/1',
+    payload: {
+      version: { kind: 'string', minLength: 1, maxLength: 64, pattern: /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/ },
+      legalReviewState: { kind: 'enum', values: ['DRAFT_FOR_LEGAL_REVIEW', 'LEGAL_APPROVED'] },
+      requiresReacceptance: { kind: 'enum', values: ['YES', 'NO'] },
+    },
+  },
+  // INST-18: a college's owner accepted a data-processing terms version for the college.
+  institutionDataTermsAcceptedV1: {
+    eventType: 'institution.data_terms.accepted',
+    eventVersion: 1,
+    producer: 'identity-organization',
+    aggregateType: 'organization',
+    purpose: 'institution-data-terms',
+    dataClassification: 'internal',
+    schemaRef: 'registry://institution.data_terms.accepted/1',
+    payload: {
+      institutionId: { kind: 'uuid' },
+      version: { kind: 'string', minLength: 1, maxLength: 64, pattern: /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/ },
+    },
+  },
+  // INST-18: a step of a college's exit — notice recorded, ended, cancelled, or its records purged.
+  // Identifiers and enums only; the counts live on the offboarding row and its audit rows.
+  institutionOffboardingNoticeRecordedV1: {
+    eventType: 'institution.offboarding.notice_recorded',
+    eventVersion: 1,
+    producer: 'identity-organization',
+    aggregateType: 'institution_offboarding',
+    purpose: 'institution-offboarding',
+    dataClassification: 'internal',
+    schemaRef: 'registry://institution.offboarding.notice_recorded/1',
+    payload: { offboardingId: { kind: 'uuid' }, institutionId: { kind: 'uuid' } },
+  },
+  institutionOffboardingEndedV1: {
+    eventType: 'institution.offboarding.ended',
+    eventVersion: 1,
+    producer: 'identity-organization',
+    aggregateType: 'institution_offboarding',
+    purpose: 'institution-offboarding',
+    dataClassification: 'internal',
+    schemaRef: 'registry://institution.offboarding.ended/1',
+    payload: { offboardingId: { kind: 'uuid' }, institutionId: { kind: 'uuid' } },
+  },
+  institutionOffboardingCancelledV1: {
+    eventType: 'institution.offboarding.cancelled',
+    eventVersion: 1,
+    producer: 'identity-organization',
+    aggregateType: 'institution_offboarding',
+    purpose: 'institution-offboarding',
+    dataClassification: 'internal',
+    schemaRef: 'registry://institution.offboarding.cancelled/1',
+    payload: { offboardingId: { kind: 'uuid' }, institutionId: { kind: 'uuid' }, fromState: { kind: 'enum', values: ['NOTICE', 'ENDED'] } },
+  },
+  institutionOffboardingPurgedV1: {
+    eventType: 'institution.offboarding.purged',
+    eventVersion: 1,
+    producer: 'identity-organization',
+    aggregateType: 'institution_offboarding',
+    purpose: 'institution-offboarding',
+    dataClassification: 'internal',
+    schemaRef: 'registry://institution.offboarding.purged/1',
+    payload: { offboardingId: { kind: 'uuid' }, institutionId: { kind: 'uuid' }, approvalId: { kind: 'uuid' } },
   },
 } as const satisfies Record<string, EventSchemaDefinition>;
 

@@ -35,6 +35,13 @@ services:
       AUTOMATION_SIGNING_SECRET: ${AUTOMATION_SIGNING_SECRET:-}
       DATABASE_URL: postgresql://${POSTGRES_USER:-planthepath_uat}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-planthepath_uat}
       NODE_ENV: ${NODE_ENV:-development}
+      # Outgoing mail (ADR-042, docs/ops/runbook-mail-sender.md). Blank = no mail is sent. The
+      # password is typed into this server's .env only; it is never committed.
+      PTP_SMTP_HOST: ${PTP_SMTP_HOST:-}
+      PTP_SMTP_PORT: ${PTP_SMTP_PORT:-}
+      PTP_SMTP_SECURITY: ${PTP_SMTP_SECURITY:-}
+      PTP_SMTP_USER: ${PTP_SMTP_USER:-}
+      PTP_SMTP_PASSWORD: ${PTP_SMTP_PASSWORD:-}
     depends_on:
       postgres:
         condition: service_healthy

@@ -49,8 +49,8 @@ record, not a second pair of eyes. Every archive writes:
   code, the actor, the correlation id). The 0004 table already allows `ARCHIVE`;
 - an audit row per item (`operations.content.{skill,question,lesson}_archived`) with the reason code, the item, the
   revisions archived and `break_glass` when it applies;
-- the editor's existing `*.revision_state_changed` outbox event per revision (`toState = ARCHIVED`), which already has
-  `ARCHIVED` in its enum. No new event type is needed.
+- the editor's existing `*.revision_state_changed` outbox event per revision (`toState = ARCHIVED`). Its state enum
+  gains `ARCHIVED`, an additive value on events that have no consumer yet. No new event type is needed.
 
 **Rejected: an OPS-02 approval key for archiving.** It would put a 15-minute cooling-off in front of pulling a wrong
 question during an incident while Divakar is the only approver. It would also make removal harder than the

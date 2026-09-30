@@ -32,11 +32,13 @@ import {
 } from '@planthepath/career-readiness';
 import {
   currentReadinessPool,
+  questionArchiveBlockers,
   questionOpenRevisionStates,
   questionPublishAltersReadinessInputs,
   type QuestionBankRefusal,
   type QuestionRevisionState,
 } from '@planthepath/authorization/src/index.js';
+import { archivePublishedRevisions } from './content-archive.js';
 import { consumeOperationApproval, type ConsumedApproval } from './operation-approvals.js';
 import { validateAuditWriteInput, validateOutboxWriteInput } from './repositories.js';
 import { agentDraftBodyKeys, type AgentDraftProvenance } from './skill-map.js';
@@ -92,6 +94,7 @@ export type QuestionBankErrorCode =
   | 'QUESTION_TOPIC_NOT_LIVE'
   | 'QUESTION_MISCONCEPTION_UNKNOWN'
   | 'QUESTION_MISCONCEPTION_NOT_PUBLISHED'
+  | 'QUESTION_ARCHIVE_BLOCKED'
   | 'QUESTION_INVALID'
   | 'QUESTION_BANK_REJECTED';
 
@@ -165,7 +168,8 @@ const contentHashOf = (body: Record<string, unknown>): string => sha256Hex(stabl
 // Reads
 // ---------------------------------------------------------------------------
 
-export type QuestionStatus = 'LIVE' | 'PENDING';
+/** ARCHIVED: every published revision archived (content-archive-design.md); the question is served nowhere. */
+export type QuestionStatus = 'LIVE' | 'PENDING' | 'ARCHIVED';
 export type QuestionListFilter = QuestionStatus | 'AWAITING_REVIEW' | 'CHANGES_REQUESTED' | 'AWAITING_PUBLISH';
 export type TopicStatus = 'LIVE' | 'PENDING' | 'RETIRED';
 
@@ -232,7 +236,7 @@ function mapSummary(row: QuestionDbRow): QuestionSummaryRow {
     questionId: row.question_id,
     stableKey: typeof body.stableKey === 'string' ? body.stableKey : 'NA',
     topic: topicOf(row),
-    status: row.published_version === null ? 'PENDING' : 'LIVE',
+    status: row.published_version !== null ? 'LIVE' : row.latest_state === 'ARCHIVED' ? 'ARCHIVED' : 'PENDING',
     publishedVersion: row.published_version === null ? null : Number(row.published_version),
     openRevision: open ? { id: row.latest_id, revision: Number(row.latest_revision), state: row.latest_state } : null,
     difficulty: fields.difficulty,
@@ -251,7 +255,8 @@ function filterSql(filter: QuestionListFilter | undefined): SQL {
   switch (filter) {
     case undefined: return sql`TRUE`;
     case 'LIVE': return sql`q.published_version IS NOT NULL`;
-    case 'PENDING': return sql`q.published_version IS NULL`;
+    case 'PENDING': return sql`q.published_version IS NULL AND q.latest_state <> 'ARCHIVED'`;
+    case 'ARCHIVED': return sql`q.published_version IS NULL AND q.latest_state = 'ARCHIVED'`;
     case 'AWAITING_REVIEW': return sql`q.latest_state = 'IN_REVIEW'`;
     case 'CHANGES_REQUESTED': return sql`q.latest_state = 'CHANGES_REQUESTED'`;
     case 'AWAITING_PUBLISH': return sql`q.latest_state = 'APPROVED'`;
@@ -284,6 +289,7 @@ export interface QuestionBankSummary {
   readonly awaitingReview: number;
   readonly changesRequested: number;
   readonly awaitingPublish: number;
+  readonly archived: number;
 }
 
 /** Counts for the header, in one bounded query (§5.7). */
@@ -291,14 +297,18 @@ export async function summariseQuestionBank(runner: SqlRunner): Promise<Question
   const [row] = await rows<Record<string, number>>(runner, sql`
     SELECT
       count(*) FILTER (WHERE q.published_version IS NOT NULL)::int AS live,
-      count(*) FILTER (WHERE q.published_version IS NULL)::int AS pending,
+      count(*) FILTER (WHERE q.published_version IS NULL AND q.latest_state <> 'ARCHIVED')::int AS pending,
       count(*) FILTER (WHERE q.latest_state = 'IN_REVIEW')::int AS awaiting_review,
       count(*) FILTER (WHERE q.latest_state = 'CHANGES_REQUESTED')::int AS changes_requested,
-      count(*) FILTER (WHERE q.latest_state = 'APPROVED')::int AS awaiting_publish
+      count(*) FILTER (WHERE q.latest_state = 'APPROVED')::int AS awaiting_publish,
+      count(*) FILTER (WHERE q.published_version IS NULL AND q.latest_state = 'ARCHIVED')::int AS archived
     FROM (${questionSelect}) q
   `);
   const value = (key: string): number => Number(row?.[key] ?? 0);
-  return { live: value('live'), pending: value('pending'), awaitingReview: value('awaiting_review'), changesRequested: value('changes_requested'), awaitingPublish: value('awaiting_publish') };
+  return {
+    live: value('live'), pending: value('pending'), awaitingReview: value('awaiting_review'), changesRequested: value('changes_requested'),
+    awaitingPublish: value('awaiting_publish'), archived: value('archived'),
+  };
 }
 
 export interface QuestionTagView {
@@ -978,6 +988,51 @@ export async function publishQuestionRevision(db: TransactionalRunner, input: {
         payload: { revisionId: revision.id, questionId: revision.entity_id, questionVersionId, releaseManifestId: manifestId },
       });
       return { questionId: revision.entity_id, questionVersionId, releaseManifestId: manifestId, approval };
+    });
+  } catch (error) {
+    rethrow(error);
+  }
+}
+
+/**
+ * Archive a live question (docs/architecture/content-archive-design.md): refused while a revision
+ * is open; otherwise every published revision becomes ARCHIVED (with its ARCHIVE review action;
+ * the hint ladder follows through 0061's mirror) and the current version is superseded, which is
+ * the column the readiness check, the learning steps, the placement pool and faculty actions all
+ * read — so no student is served it again. The version row stays: attempts already holding it
+ * still grade against it. Nothing is deleted, and the question cannot be revised again.
+ */
+export async function archiveQuestion(db: TransactionalRunner, input: {
+  readonly questionId: string; readonly reasonCode: string; readonly actor: QuestionActor;
+}): Promise<{ readonly questionId: string; readonly archivedRevisions: readonly number[] }> {
+  try {
+    return await db.transaction(async (tx) => {
+      await lockQuestion(tx, input.questionId);
+      const [exists] = await rows<{ n: number }>(tx, sql`SELECT count(*)::int AS n FROM content_revisions WHERE entity_type = 'QUESTION' AND entity_id = ${input.questionId}::uuid`);
+      if (!Number(exists?.n)) throw new QuestionBankError('QUESTION_NOT_FOUND');
+      const current = await rows<{ id: string; stable_key: string; content_revision_id: string }>(tx, sql`
+        SELECT v.id, v.stable_key, v.content_revision_id FROM question_versions v JOIN content_revisions r ON r.id = v.content_revision_id
+        WHERE r.entity_type = 'QUESTION' AND r.entity_id = ${input.questionId}::uuid AND v.superseded_at IS NULL
+        ORDER BY v.version DESC
+      `);
+      const newest = current[0];
+      if (!newest) throw new QuestionBankError('QUESTION_NOT_LIVE');
+      const blockers = questionArchiveBlockers({ openRevision: (await openRevisionOf(tx, input.questionId)) !== null });
+      if (blockers.length) throw new QuestionBankError('QUESTION_ARCHIVE_BLOCKED', blockers);
+      const archived = await archivePublishedRevisions(tx, {
+        entityType: 'QUESTION', entityId: input.questionId, reasonCode: input.reasonCode, actorUserId: input.actor.userId, correlationId: input.actor.correlationId,
+      });
+      // Out of every pool at once: each reads superseded_at IS NULL (the 0061 guard allows this one change).
+      for (const version of current) await tx.execute(sql`UPDATE question_versions SET superseded_at = now() WHERE id = ${version.id}::uuid`);
+      await audit(tx, {
+        actor: input.actor, action: 'operations.content.question_archived', revisionId: newest.content_revision_id,
+        context: {
+          questionId: input.questionId, stableKey: newest.stable_key, questionVersionId: newest.id, reasonCode: input.reasonCode,
+          archivedRevisions: archived.map((entry) => entry.revision),
+        },
+      });
+      for (const revision of archived) await stateChanged(tx, input.actor, revision.id, input.questionId, 'PUBLISHED', 'ARCHIVED');
+      return { questionId: input.questionId, archivedRevisions: archived.map((entry) => entry.revision) };
     });
   } catch (error) {
     rethrow(error);

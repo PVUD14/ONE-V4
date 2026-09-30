@@ -34,7 +34,9 @@ import {
 import {
   canReadQuestionBank,
   canSeeAnswerKeys,
+  contentArchiveReasons,
   hasInternalCapability,
+  refuseContentArchive,
   questionBankReasons,
   questionPublishReasons,
   questionRevisionTransitions,
@@ -46,6 +48,7 @@ import {
   type InternalCapabilityContext,
 } from '@planthepath/authorization/src/index.js';
 import {
+  archiveQuestion,
   createQuestion,
   HINT_LEVELS,
   listQuestions,
@@ -91,7 +94,7 @@ const topicKeyPattern = /^[a-z0-9][a-z0-9-]{2,79}$/;
 const defaultLimit = 50;
 const maxLimit = 200;
 const noteLimit = 500;
-const listFilters: readonly QuestionListFilter[] = ['LIVE', 'PENDING', 'AWAITING_REVIEW', 'CHANGES_REQUESTED', 'AWAITING_PUBLISH'];
+const listFilters: readonly QuestionListFilter[] = ['LIVE', 'PENDING', 'ARCHIVED', 'AWAITING_REVIEW', 'CHANGES_REQUESTED', 'AWAITING_PUBLISH'];
 
 @Controller('/api/v1/operations/question-bank')
 export class OperationsQuestionBankController {
@@ -115,7 +118,7 @@ export class OperationsQuestionBankController {
       hintLevels: HINT_LEVELS,
       licences: QUESTION_LICENCES.map((licence) => ({ licence, attributionRequired: QUESTION_LICENCES_REQUIRING_ATTRIBUTION.includes(licence) })),
       transitions: questionRevisionTransitions,
-      reasons: { ...questionBankReasons, publish: questionPublishReasons },
+      reasons: { ...questionBankReasons, publish: questionPublishReasons, archive: contentArchiveReasons },
       limits: {
         prompt: QUESTION_PROMPT_MAX, optionText: QUESTION_OPTION_TEXT_MAX, optionsMin: QUESTION_OPTIONS_MIN, optionsMax: QUESTION_OPTIONS_MAX,
         explanation: QUESTION_EXPLANATION_MAX, rationale: QUESTION_RATIONALE_MAX, hint: QUESTION_HINT_MAX,
@@ -179,6 +182,29 @@ export class OperationsQuestionBankController {
     try {
       await startQuestionRevision(this.db, { questionId: id, reasonCode, actor: this.questionActor(actor, 'CONTENT_EDIT', correlationId) });
       return { question: await loadQuestion(this.db, id, { answerKeys: true }), correlationId };
+    } catch (error) {
+      throw mapError(error, correlationId);
+    }
+  }
+
+  /**
+   * Archive a live question (docs/architecture/content-archive-design.md): CONTENT_PUBLISH and a
+   * reason code; a removal, so no second person, but every archived revision is recorded. It stops
+   * being served to students at once and is never deleted.
+   */
+  @Post('/questions/:questionId/archive')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async archive(@Req() request: ProtectedHttpRequest, @Param('questionId') questionId: string, @Body() body: unknown): Promise<Record<string, unknown>> {
+    const { correlationId, actor } = await this.require(request, 'CONTENT_PUBLISH');
+    const id = requireUuid(questionId, correlationId);
+    const raw = readObject(body, ['reasonCode'], correlationId);
+    const reasonCode = typeof raw.reasonCode === 'string' ? raw.reasonCode : '';
+    const refusal = refuseContentArchive({ actor, reasonCode });
+    if (refusal === 'FORBIDDEN') throw new ForbiddenException(safeError('FORBIDDEN', correlationId));
+    if (refusal) throw badRequest(refusal, correlationId);
+    try {
+      const archived = await archiveQuestion(this.db, { questionId: id, reasonCode, actor: this.questionActor(actor, 'CONTENT_PUBLISH', correlationId) });
+      return { question: await loadQuestion(this.db, id, { answerKeys: canSeeAnswerKeys(actor) }), archivedRevisions: archived.archivedRevisions, correlationId };
     } catch (error) {
       throw mapError(error, correlationId);
     }
@@ -337,6 +363,7 @@ function mapError(error: unknown, correlationId: string): HttpException {
       return new BadRequestException(domainError(error.code, correlationId, error.problems));
     }
     if (error.code === 'QUESTION_BANK_REJECTED') return badRequest(error.code, correlationId);
+    if (error.code === 'QUESTION_ARCHIVE_BLOCKED') return new ConflictException(domainError(error.code, correlationId, error.problems));
     return new ConflictException(domainError(error.code, correlationId));
   }
   // Never forward database or driver text to the browser.

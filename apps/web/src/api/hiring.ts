@@ -146,6 +146,8 @@ export interface StudentApplicationDto {
   readonly campusDrive?: { readonly institutionName: string } | null;
   /** INST-14: made by opting in to this college's placement-office nomination. */
   readonly nominatedBy?: { readonly institutionName: string } | null;
+  /** EMP-13: verified evidence is shared with this employer now. Absent from older API responses. */
+  readonly evidenceShared?: boolean;
 }
 
 export interface CandidateFeedbackReasonDto {
@@ -287,7 +289,7 @@ export function getOpportunity(token: string, opportunityId: string, signal?: Ab
   return requestJson(`/api/v1/opportunities/${encodeURIComponent(opportunityId)}`, { token, ...(signal ? { signal } : {}) });
 }
 
-export function listStudentApplications(token: string, signal?: AbortSignal): Promise<{ readonly applications: readonly StudentApplicationDto[] }> {
+export function listStudentApplications(token: string, signal?: AbortSignal): Promise<{ readonly applications: readonly StudentApplicationDto[]; readonly evidenceSharingAvailable?: boolean }> {
   return requestJson('/api/v1/students/me/applications', { token, ...(signal ? { signal } : {}) });
 }
 
@@ -367,8 +369,16 @@ export function publishOpportunity(token: string, employerId: string, opportunit
   return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/opportunities/${encodeURIComponent(opportunityId)}/publish`, { token, method: 'POST' });
 }
 
-export function listEmployerApplicants(token: string, employerId: string, opportunityId: string, signal?: AbortSignal): Promise<{ readonly applications: readonly EmployerApplicantDto[]; readonly stages?: readonly SelectionStageDto[] }> {
+export function listEmployerApplicants(token: string, employerId: string, opportunityId: string, signal?: AbortSignal): Promise<{ readonly applications: readonly EmployerApplicantDto[]; readonly stages?: readonly SelectionStageDto[]; readonly evidenceSkills?: readonly EvidenceFilterSkillDto[] }> {
   return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/opportunities/${encodeURIComponent(opportunityId)}/applications`, { token, ...(signal ? { signal } : {}) });
+}
+
+/** EMP-13: a job's catalogue skill an employer may filter applicants by. `topicId` is a filter value, never shown. */
+export interface EvidenceFilterSkillDto { readonly topicId: string; readonly name: string }
+
+/** EMP-13 (decision 10.2 #5): only applicants who share verified evidence for one skill. Narrows; never re-orders. */
+export function listEmployerApplicantsWithEvidence(token: string, employerId: string, opportunityId: string, evidenceSkill: string, signal?: AbortSignal): Promise<{ readonly applications: readonly EmployerApplicantDto[]; readonly stages?: readonly SelectionStageDto[]; readonly evidenceSkills?: readonly EvidenceFilterSkillDto[] }> {
+  return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/opportunities/${encodeURIComponent(opportunityId)}/applications?evidenceSkill=${encodeURIComponent(evidenceSkill)}`, { token, ...(signal ? { signal } : {}) });
 }
 
 export function listEmployerInterviews(token: string, employerId: string, signal?: AbortSignal): Promise<{ readonly interviews: readonly EmployerInterviewDto[] }> {
@@ -1012,6 +1022,57 @@ export interface ApplicationPreviewDto {
   readonly snapshot: ApplicationSnapshotDto;
   readonly snapshotHash: string;
   readonly resumeOptions: readonly ResumeOptionDto[];
+  /** EMP-13: the student's verified evidence per job skill, to choose from. Absent from older API responses. */
+  readonly evidence?: { readonly available: boolean; readonly skills: readonly EvidenceSkillDto<EvidenceChoiceDto>[] };
+}
+
+// ---------------------------------------------------------------------------
+// EMP-13: consented, per-skill verified evidence (ADR-043)
+// ---------------------------------------------------------------------------
+
+/** One evidence item: exactly what the employer is shown. Never marks, a stage or a score. */
+export interface EvidenceItemDto {
+  readonly type: string;
+  /** ONE_SKILL_CHECK, INSTITUTION_EXAM or ONE_RECORD. */
+  readonly source: string;
+  readonly occurredAt: string;
+  readonly unaided: boolean;
+}
+/** The student's own item, with the id they choose it by and whether it is shared now. */
+export interface EvidenceChoiceDto extends EvidenceItemDto {
+  readonly evidenceId: string;
+  readonly shared?: boolean;
+  readonly sharedAt?: string | null;
+}
+export interface EvidenceSkillDto<T> {
+  readonly name: string;
+  readonly level: string;
+  /** False for a free-text skill: evidence cannot be matched to it. */
+  readonly catalogue: boolean;
+  readonly items: readonly T[];
+}
+export interface StudentApplicationEvidenceDto {
+  readonly available: boolean;
+  readonly canShare: boolean;
+  readonly employerName: string;
+  readonly skills: readonly EvidenceSkillDto<EvidenceChoiceDto>[];
+}
+export interface EmployerCandidateEvidenceDto {
+  readonly available: boolean;
+  readonly skills: readonly EvidenceSkillDto<EvidenceItemDto & { readonly sharedAt: string }>[];
+}
+
+export function getMyApplicationEvidence(token: string, applicationId: string, signal?: AbortSignal): Promise<{ readonly evidence: StudentApplicationEvidenceDto }> {
+  return requestJson(`/api/v1/students/me/applications/${encodeURIComponent(applicationId)}/evidence`, { token, ...(signal ? { signal } : {}) });
+}
+
+/** Replaces what is shared on the application: anything left out is taken back at once. */
+export function setMyApplicationEvidence(token: string, applicationId: string, evidenceRecordIds: readonly string[]): Promise<{ readonly evidence: StudentApplicationEvidenceDto }> {
+  return requestJson(`/api/v1/students/me/applications/${encodeURIComponent(applicationId)}/evidence`, { token, method: 'PUT', body: { evidenceRecordIds } });
+}
+
+export function getEmployerCandidateEvidence(token: string, employerId: string, applicationId: string, signal?: AbortSignal): Promise<{ readonly evidence?: EmployerCandidateEvidenceDto }> {
+  return requestJson(`/api/v1/employers/${encodeURIComponent(employerId)}/applications/${encodeURIComponent(applicationId)}/evidence`, { token, ...(signal ? { signal } : {}) });
 }
 
 /** The student's choices for one application. Every field is optional. */
@@ -1026,8 +1087,11 @@ export function previewApplication(token: string, opportunityId: string, choices
 }
 
 /** Applying with the reviewed snapshot: the API refuses (SNAPSHOT_CHANGED) if what would be shared changed since. */
-export function applyWithSnapshot(token: string, opportunityId: string, institutionVisibilityGranted: boolean, choices: SnapshotChoicesInput, reviewedSnapshotHash: string): Promise<{ readonly application: { readonly id: string; readonly state: string } }> {
-  return requestJson('/api/v1/students/me/applications', { token, method: 'POST', body: { opportunityId, consentGranted: true, institutionVisibilityGranted, ...choices, reviewedSnapshotHash } });
+export function applyWithSnapshot(token: string, opportunityId: string, institutionVisibilityGranted: boolean, choices: SnapshotChoicesInput, reviewedSnapshotHash: string,
+  evidenceRecordIds: readonly string[] = []): Promise<{ readonly application: { readonly id: string; readonly state: string } }> {
+  // EMP-13: evidence chosen for this application is sent only when there is some.
+  return requestJson('/api/v1/students/me/applications', { token, method: 'POST', body: { opportunityId, consentGranted: true, institutionVisibilityGranted, ...choices, reviewedSnapshotHash,
+    ...(evidenceRecordIds.length ? { evidenceRecordIds } : {}) } });
 }
 
 export function getMyApplicationSnapshot(token: string, applicationId: string, signal?: AbortSignal): Promise<{ readonly snapshot: { readonly content: ApplicationSnapshotDto; readonly snapshotHash: string; readonly sharedAt: string } | null }> {

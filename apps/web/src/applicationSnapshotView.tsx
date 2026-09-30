@@ -14,6 +14,7 @@ import { V2Stat } from './dashboardsV2.js';
 import { basisLabels, describeEligibilityRule } from './hiringEligibility.js';
 import { ApiRequestError } from './api.js';
 import { downloadCandidateResume, getEmployerCandidate, type ApplicationSnapshotDto, type CandidateDetailDto } from './api/hiring.js';
+import { EmployerEvidencePanel } from './skillEvidence.js';
 
 const verificationLabels: Readonly<Record<string, string>> = {
   VERIFIED: 'verified by the college', SELF_REPORTED: 'self-reported', PENDING_VERIFICATION: 'awaiting the college',
@@ -178,6 +179,9 @@ export function CandidateDetailPanel({ employerId, applicationId, onClose }: { r
       {candidate.offer
         ? <p>{humanise(candidate.offer.state)} · joining {formatDate(candidate.offer.joiningDate)} · expires {formatDate(candidate.offer.expiresAt, true)}</p>
         : <p className="hiring-meta">No offer yet.</p>}
+
+      {/* EMP-13: the verified evidence the candidate chose to share, per job skill (renders nothing while the feature is off). */}
+      <EmployerEvidencePanel employerId={employerId} applicationId={applicationId} />
     </> : null}
   </section>;
 }

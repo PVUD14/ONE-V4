@@ -10,7 +10,7 @@
 import { ApiRequestError, apiBaseUrl } from './core.js';
 
 export async function requestJson<T>(path: string, input: {
-  readonly token?: string; readonly method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'; readonly body?: unknown;
+  readonly token?: string; readonly method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; readonly body?: unknown;
   readonly idempotencyKey?: string; readonly signal?: AbortSignal;
 } = {}): Promise<T> {
   const correlationId = crypto.randomUUID();

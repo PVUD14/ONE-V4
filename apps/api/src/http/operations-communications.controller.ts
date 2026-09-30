@@ -6,7 +6,8 @@
  * (existing notification_templates versioning), have a second person approve it through OPS-02
  * dual control (COMMS_TEMPLATE_PUBLISH, requested by the author), then publish it with that
  * approval. Notices: draft a notice for an incident from a published version, approve it for
- * sending (rate-limited on the database clock), or withdraw it. Sending happens in the outbox
+ * sending (rate-limited on the database clock; by a person other than its drafter, or by the sole
+ * approver after OPS-02's cooling-off, marked SOLO — 0090), or withdraw it. Sending happens in the outbox
  * worker, to the administrators of the incident's affected organisations, never to students and
  * never as free text; email is NOT_CONFIGURED until a mail service exists.
  *
@@ -37,12 +38,14 @@ import {
   statusNoticeDailyLimit,
   statusNoticeDraftReasons,
   statusNoticeMinimumSpacingMinutes,
+  statusNoticeSoloCoolingOffMinutes,
   statusNoticeTemplateKeyPattern,
   statusNoticeWithdrawReasons,
   type InternalCapabilityContext,
 } from '@planthepath/authorization/src/index.js';
 import {
   approveStatusNotice,
+  countStatusNoticeApprovers,
   draftStatusNotice,
   draftStatusNoticeTemplate,
   listNoticeableIncidents,
@@ -54,6 +57,7 @@ import {
   StatusNoticeError,
   withdrawStatusNotice,
   withdrawStatusNoticeTemplate,
+  type StatusNoticeRow,
   type StatusNoticeTemplateRow,
 } from '@planthepath/persistence/src/status-notices.js';
 import { countHighRiskApprovers } from '@planthepath/persistence/src/operation-approvals.js';
@@ -79,6 +83,7 @@ export class OperationsCommunicationsController {
   async policy(@Req() request: ProtectedHttpRequest): Promise<Record<string, unknown>> {
     const { correlationId } = await this.require(request);
     const approverCount = await countHighRiskApprovers(this.db);
+    const noticeApproverCount = await countStatusNoticeApprovers(this.db);
     return {
       reasons: {
         templateDraft: commsTemplateDraftReasons,
@@ -91,6 +96,11 @@ export class OperationsCommunicationsController {
       rateLimit: { minimumSpacingMinutes: statusNoticeMinimumSpacingMinutes, dailyLimit: statusNoticeDailyLimit },
       approverCount,
       soloSafeguardActive: approverCount === 1,
+      // 0090: who can approve a notice for sending (COMMS_TEMPLATES holders); while only one person
+      // can, they may approve their own notice after the cooling-off, marked SOLO.
+      noticeApproverCount,
+      noticeSoloSafeguardActive: noticeApproverCount === 1,
+      soloCoolingOffMinutes: statusNoticeSoloCoolingOffMinutes,
       incidents: await listNoticeableIncidents(this.db),
       correlationId,
     };
@@ -179,14 +189,14 @@ export class OperationsCommunicationsController {
   @Get('/notices')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async notices(@Req() request: ProtectedHttpRequest, @Query() query: Record<string, unknown>): Promise<Record<string, unknown>> {
-    const { correlationId } = await this.require(request);
+    const { correlationId, actor } = await this.require(request);
     rejectUnknown(query, ['incidentId', 'limit', 'cursor'], correlationId);
     const incidentId = query.incidentId === undefined || query.incidentId === '' ? undefined : requireUuid(query.incidentId, correlationId);
     const limit = readLimit(query.limit, correlationId);
     const cursor = decodeCursor(query.cursor, correlationId);
     const page = await listStatusNotices(this.db, { ...(incidentId ? { incidentId } : {}), limit, ...(cursor ? { cursor: { draftedAt: cursor.at, id: cursor.id } } : {}) });
     return {
-      notices: page.notices,
+      notices: page.notices.map((notice) => noticeDto(notice, actor)),
       nextCursor: page.nextCursor ? encodeCursor(page.nextCursor.draftedAt, page.nextCursor.id) : null,
       correlationId,
     };
@@ -203,13 +213,16 @@ export class OperationsCommunicationsController {
     const reasonCode = requireEnum(raw.reasonCode, statusNoticeDraftReasons, 'REASON_CODE_INVALID', correlationId);
     try {
       const { id } = await draftStatusNotice(this.db, { incidentId, templateId, reasonCode, actorUserId: actor.userId, correlationId });
-      return { notice: await loadStatusNotice(this.db, id), correlationId };
+      return { notice: noticeDto(await loadStatusNotice(this.db, id), actor), correlationId };
     } catch (error) {
       throw mapError(error, correlationId);
     }
   }
 
-  /** A person approves a drafted notice for sending; the outbox worker sends it. */
+  /**
+   * A person other than its drafter approves a drafted notice for sending (the sole approver may
+   * approve their own after the cooling-off, marked SOLO); the outbox worker sends it.
+   */
   @Post('/notices/:noticeId/approve')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async approveNotice(@Req() request: ProtectedHttpRequest, @Param('noticeId') noticeId: string, @Body() body: unknown): Promise<Record<string, unknown>> {
@@ -219,7 +232,7 @@ export class OperationsCommunicationsController {
     const reasonCode = requireEnum(raw.reasonCode, statusNoticeApproveReasons, 'REASON_CODE_INVALID', correlationId);
     try {
       await approveStatusNotice(this.db, { noticeId: id, reasonCode, actorUserId: actor.userId, correlationId });
-      return { notice: await loadStatusNotice(this.db, id), correlationId };
+      return { notice: noticeDto(await loadStatusNotice(this.db, id), actor), correlationId };
     } catch (error) {
       throw mapError(error, correlationId);
     }
@@ -234,7 +247,7 @@ export class OperationsCommunicationsController {
     const reasonCode = requireEnum(raw.reasonCode, statusNoticeWithdrawReasons, 'REASON_CODE_INVALID', correlationId);
     try {
       await withdrawStatusNotice(this.db, { noticeId: id, reasonCode, actorUserId: actor.userId, correlationId });
-      return { notice: await loadStatusNotice(this.db, id), correlationId };
+      return { notice: noticeDto(await loadStatusNotice(this.db, id), actor), correlationId };
     } catch (error) {
       throw mapError(error, correlationId);
     }
@@ -264,6 +277,16 @@ function templateDto(row: StatusNoticeTemplateRow, actor: Actor): Record<string,
   };
 }
 
+/**
+ * A notice as the screen needs it: whether the viewer drafted it (so the screen can say someone
+ * else approves), never the drafter's id.
+ */
+function noticeDto(row: StatusNoticeRow | null, actor: Actor): Record<string, unknown> | null {
+  if (!row) return null;
+  const { draftedByUserId, ...rest } = row;
+  return { ...rest, draftedBySelf: draftedByUserId === actor.userId };
+}
+
 // ---------------------------------------------------------------------------
 // Input and errors
 // ---------------------------------------------------------------------------
@@ -284,6 +307,10 @@ function mapError(error: unknown, correlationId: string): HttpException {
     if (error.code === 'APPROVAL_REQUIRED') return approvalRequired(correlationId);
     if (error.code.endsWith('_NOT_FOUND')) return new NotFoundException(domainError(error.code, correlationId));
     if (error.code === 'STATUS_NOTICE_RATE_LIMITED') return new HttpException(domainError(error.code, correlationId), 429);
+    // 0090: the drafter approving their own notice while someone else could, or before the cooling-off.
+    if (error.code === 'STATUS_NOTICE_SELF_APPROVAL_REFUSED' || error.code === 'STATUS_NOTICE_SOLO_COOLING_OFF') {
+      return new ForbiddenException(domainError(error.code, correlationId));
+    }
     if (['COMMS_TEMPLATE_NOT_DRAFT', 'STATUS_NOTICE_NOT_DRAFT', 'STATUS_NOTICE_INCIDENT_CLOSED', 'STATUS_NOTICE_NO_AUDIENCE'].includes(error.code)) {
       return new ConflictException(domainError(error.code, correlationId));
     }

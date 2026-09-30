@@ -264,7 +264,7 @@ function IncidentPanel({ token, incidentId, policy, onChanged, onClose }: {
       <tbody>{detail.notices.map((notice) => <tr key={notice.id}>
         <td>{notice.subject}<br /><small>{notice.templateKey} v{notice.templateVersion}</small></td>
         <td><StatusBadge label={label(notice.state)} tone={notice.state === 'SENT' ? 'success' : notice.state === 'WITHDRAWN' ? 'neutral' : 'warning'} /></td>
-        <td>{notice.approvedAt ? `${when(notice.approvedAt)} by ${notice.approvedBy ?? 'NA'}` : 'NA'}</td>
+        <td>{notice.approvedAt ? `${when(notice.approvedAt)} by ${notice.approvedBy ?? 'NA'}${notice.approveMode === 'SOLO' ? ' (solo)' : ''}` : 'NA'}</td>
         <td>{when(notice.sentAt)}</td>
         <td>{notice.recipientCount === null ? 'NA' : `${notice.recipientCount} admins in ${notice.organizationCount ?? 0} organisations`}</td>
         <td>{notice.state === 'SENT' ? emailSummary(notice.email) : 'NA'}</td>

@@ -1097,3 +1097,121 @@ Calendar invites remain EMP-09's. No calendar provider is integrated.
 - There is no operator screen for exports beyond the existing audit views.
 
 **Next goal:** EMP-18.
+
+## EMP-13 — Consented verified skill evidence per application — 2026-09-30
+
+**Result:** Complete, built dark. Hard gate **HG-4 is still PENDING**, so everything sits behind the flag `employer.skill-evidence`. The flag is off by default, and switching it on needs a second person. Approving HG-4 means switching that flag on; nothing else changes.
+
+**Branch / PR:** `feat/emp-13-skill-evidence`, from `stack/batch28` (24489e0). Pushed to `onev4`. Not merged; the coordinator reviews it.
+
+**Files created:**
+- `docs/architecture/application-evidence-shares-table-design.md`
+- `docs/architecture/ADR-043-employers-see-consented-per-skill-evidence-never-readiness.md` (Proposed, awaiting HG-4)
+- `packages/persistence/drizzle/0093_application_evidence_shares.sql`
+- `apps/api/src/http/skill-evidence.ts`, `skill-evidence.controller.ts`, `skill-evidence.integration.spec.ts`
+- `apps/web/src/skillEvidence.tsx`, `skillEvidence.test.tsx`
+- `apps/android/app/src/main/java/pro/ai8ht/one/SkillEvidence.kt`
+
+**Files modified:**
+- API: `student-hiring.controller.ts` (preview offers evidence; apply accepts `evidenceRecordIds`; the list reports `evidenceShared` and `evidenceSharingAvailable`), `employer-hiring.controller.ts` (the `?evidenceSkill=` filter and `evidenceSkills`), `privacy-export-sections.ts`, `privacy-deletion.ts`, `api-security.module.ts`
+- Web: `api/hiring.ts`, `api/http.ts` (PUT), `hiringPages.tsx`, `applicationSnapshotView.tsx`, and `rolePortal/aiOperations.tsx` (a separate fix to a policy violation already on the base)
+- Android: `Api.kt` (PUT, list fields), `CandidateSnapshot.kt`, `StudentHiring.kt`, `JobsAndMore.kt`, `EmployerWork.kt`
+- Docs: `privacy-export-coverage.md`
+
+**Migrations added:** `0093_application_evidence_shares.sql` (the number assigned). It is idempotent: the migrate-twice check is in Validation below.
+
+**Design docs / ADRs:**
+- The table design was written and committed before the migration (8f2a6aa).
+- ADR-043 states exactly what is shown and what is not, and why a per-skill list was chosen over any score.
+- ADR-043 is marked Proposed, because it is the decision HG-4 gates.
+
+**What was built:**
+- **Verified evidence.** An `evidence_records` row the student owns that is:
+  - an assessment outcome or topic demonstration (never a lesson completion);
+  - recorded at stage DEMONSTRATED or TRANSFERRED;
+  - one where something was answered correctly;
+  - not superseded;
+  - for a catalogue skill of the job version the application is bound to.
+- **Student, at apply.** The preview lists that evidence per job skill. The student ticks items, and apply stores exactly those in the same transaction. If any ticked item is not shareable, the whole application rolls back.
+- **Student, after applying.** `GET|PUT /students/me/applications/:id/evidence` replaces the shared set.
+  - Revoking is always allowed.
+  - Adding needs the flag, an open application and a live grant.
+  - The control shows on web and Android while sharing is on, and whenever something is still shared.
+- **Employer panel.** `GET /employers/:e/applications/:a/evidence`:
+  - applies the EMP-03 guard, then checks the application belongs to this employer, then the live grant (EMP-SR-01), then the flag;
+  - is audited as `application.evidence_viewed`;
+  - returns, per job skill in the job's order: type, source, date, unaided and when it was shared, or nothing. Free-text skills are marked as not matchable.
+  - It is shown on Candidate Detail and on the Applicants candidate panel (web), and on the applicant page (Android).
+- **Filter.** `GET …/opportunities/:o/applications?evidenceSkill=<topic>`:
+  - narrows the list to applicants with a live grant who share qualifying evidence for that skill;
+  - keeps the list's own order;
+  - is audited as `application.evidence_filter_used`;
+  - appears on the web Applicants page.
+- **Database guards on the table (0093):**
+  - It refuses another person's evidence or application.
+  - It refuses deletion, and any rewrite except a single revocation.
+  - One live share per item.
+- **Privacy.** Deletion revokes every share (`ACCOUNT_DELETION`) together with the grants. The export gains `evidenceShares`.
+
+**Validation:** (commands and counts are appended below once the full run finishes)
+- `skill-evidence.integration.spec.ts`: 13/13 passed.
+- `skillEvidence.test.tsx`: 7/7 passed.
+- The adjacent web suites passed: applicationSnapshotView, hiringPages, applicationMessages.
+- API and web `tsc --noEmit` passed.
+- Android `:app:compileDebugKotlin` with the Studio JBR exited 0.
+
+**Acceptance criteria:**
+- [x] **Nothing is shared without the student's per-application choice.**
+  - Rows exist only from apply's `evidenceRecordIds` or the student's PUT. Test: `shares exactly what was chosen at apply, and nothing when nothing was chosen`.
+  - The table trigger refuses anyone else's evidence or application. Test: `refuses another person's evidence…`.
+  - While the flag is off, nothing is offered or accepted. Test: `offers, accepts and shows nothing while the flag is off…`.
+- [x] **Revocation takes effect on the next request.**
+  - Every read checks `revoked_at IS NULL` and the grant in SQL, with no cache.
+  - Test: `lets the student add and take back evidence…`: the next panel read has no items, and the filter drops the applicant.
+  - Withdrawal and deletion end access too. Tests: `after withdrawal…` and the privacy test.
+- [x] **No aggregate or ranking in the employer UI or API.**
+  - The panel lists items only, with no count, total, percentage, score, stage or sort by evidence.
+  - The filter narrows but never re-orders. Test: `…in the list's own order`.
+  - Web assertions confirm no readiness, score, band, stage or % text on the panel.
+- [x] **Build 5: contract tests.** Test: `keeps readiness out of every employer response that now carries evidence`.
+  - It walks every key and value of the panel and the filtered list. It checks for no band, score, mastery, gap status, stage, `demonstrated`/`possible`, count or rank key, and for no band or stage value.
+  - It checks that no evidence, topic or student id appears.
+  - It checks the candidate view for readiness words and ids.
+- [x] **Build 1: the ADR.** ADR-043. It is Proposed until HG-4.
+- [x] **§6.3 minimum tests:**
+  - 401 without a token.
+  - 403 for another employer, an ended membership, a suspended organisation, and an expired or deleting grant.
+  - Validation 400s: unknown field, malformed or duplicate ids, more than 60, a bad filter value.
+  - Audit rows for view, filter, share and revoke.
+  - Web: real data, empty, off and forbidden states.
+  - No navigation change.
+
+**Decisions for Divakar (recommendations taken):**
+1. **HG-4.** Recommended: approve, exactly as ADR-043 states. Until then the flag stays off.
+   - The student still sees and can take back anything shared while it was on.
+   - Turning it on is a high-risk flag change, so it needs a second person.
+2. **Qualifying rule.**
+   - DEMONSTRATED or TRANSFERRED at capture, something correct, not superseded, never a lesson.
+   - Requiring TRANSFERRED only would show nothing today (ENG-04: TRANSFERRED is not yet reachable).
+3. **Aided evidence is shareable and labelled "aided".** Restricting sharing to unaided evidence is a one-line change.
+4. **Limits.** At most 60 live shares per application, and 20 choices offered per skill. Everything already shared is always listed.
+5. **Evidence is not part of the EMP-07 snapshot hash.** It stays revocable after applying; the frozen snapshot does not.
+6. **Placement-office nominations.** Accepting a nomination takes `evidenceRecordIds` through the same apply path, but the nomination screens offer no checklist. The student adds evidence from Applications afterwards.
+
+**Android:**
+- The student chooses evidence at apply (`ApplyEvidenceCard`), and changes or takes it back from My applications (`ApplicationEvidencePage`).
+- The recruiter sees `CandidateEvidenceSection` on the applicant page.
+- The skill filter was not added: the app has no per-job applicant list to filter (the employer dashboard shows a sample), so it stays on the web.
+- Compiled with the Studio JBR.
+
+**Limitations / not done:**
+- There is no operator screen for evidence shares beyond audit.
+- The nomination-accept screens have no evidence checklist (decision 6).
+- The web student list gains a button in the existing Action cell, not a new column.
+
+**Risks / follow-ups:**
+- When HG-4 is approved, only the flag changes, and ADR-043 moves to Accepted.
+- EMP-14 (talent pool) must reuse `qualifyingEvidence` from `skill-evidence.ts`, not a second rule.
+- A pre-existing optional-chain policy violation in `rolePortal/aiOperations.tsx` (from the base) was fixed in its own commit, because CI would otherwise fail.
+
+**Next goal:** EMP-14 (depends on EMP-13 and on HG-4).

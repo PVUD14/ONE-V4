@@ -7,6 +7,23 @@
 > freshly seeded database (see [Verified locally](#verified-locally)); nothing here was run against
 > staging (none exists) or production. Written 2026-09-30.
 
+## Since OPS-12 (2026-09-30): one action in the console
+
+**Operations → AI Operations** now closes gaps 1–3 below. Anyone holding `AI_OPS_CONFIGURE` or
+`OPS_FLAGS_MANAGE` can, with a reason code and no approval:
+
+- **Engage kill switch…** — sets flag `ai.global-kill-switch` on and, in one transaction, switches every
+  `ai_feature_policies` row and the `ai.assistant` flag off. The orchestrator reads every feature as
+  disabled while it is engaged (no restart). Audited as `operations.ai.kill_switch.engaged`.
+- **Switch off…** one feature (`operations.ai.feature.disabled`).
+- **Switch assistant off…** — flag `ai.assistant`, read on every chat request, so no restart
+  (`operations.ai.assistant.disabled`). The assistant now answers only when `ASSISTANT_ENABLED=true`, a
+  key is set, `ai.assistant` is on (default **off**) and the kill switch is released.
+
+Releasing the kill switch and switching the assistant on are high-risk flag changes (Settings →
+Approvals); switching a feature on also needs a passing evaluation for its current model and prompt
+version. Levers 1–3 below remain valid as the fallback when the console is unreachable.
+
 ## First: what AI actually runs today
 
 The AI hold (ADR-030) is in force. On base `4fab0c6` the complete list of places that could reach

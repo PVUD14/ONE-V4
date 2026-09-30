@@ -82,7 +82,7 @@ function PlacementOfficerPortalInner({ apiHealth, authStatus, authNotice, onSign
   const route = staffNavItems.find((item) => item.path === path)?.route ?? 'dashboard';
 
   useEffect(() => {
-    document.title = route === 'dashboard' ? 'Placement Dashboard | ONE' : `${staffRouteTitle[route]} - Placement Officer | ONE`;
+    document.title = route === 'dashboard' ? 'Placement Dashboard | ONE by AI8HT' : `${staffRouteTitle[route]} - Placement Officer | ONE by AI8HT`;
   }, [route]);
 
   useEffect(() => {

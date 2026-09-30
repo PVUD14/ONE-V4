@@ -478,7 +478,7 @@ export function PilotLearn(): React.ReactElement {
                 <button type="button" className="pilot-btn ghost small" onClick={(event) => {
                   event.stopPropagation();
                   downloadCsv(`${certificate.id}.csv`, [
-                    ['ONE by Ai8ht — Course Completion Certificate (sample)'],
+                    ['ONE by AI8HT — Course Completion Certificate (sample)'],
                     ['Certificate ID', certificate.id],
                     ['Awarded to', 'Arjun Reddy'],
                     ['Course', certificate.title],

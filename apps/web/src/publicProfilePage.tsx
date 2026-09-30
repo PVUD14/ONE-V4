@@ -15,7 +15,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { readPublicProfile, type PublicProfileDto } from './api.js';
-import { BrandWordmark } from './brand.js';
+import { BrandLogo } from './brand.js';
 
 const COVERS: Readonly<Record<string, string>> = {
   MIDNIGHT: 'linear-gradient(112deg,#16233a 0%,#1f3a6b 52%,#24306b 100%)',
@@ -49,7 +49,7 @@ export function PublicProfilePage({ token }: { readonly token: string }): React.
   const [state, setState] = useState<ViewState>({ phase: 'loading' });
 
   useEffect(() => {
-    document.title = 'Verified profile | ONE';
+    document.title = 'Verified profile | ONE by AI8HT';
     const abort = new AbortController();
     readPublicProfile(token, abort.signal)
       .then((response) => setState({ phase: 'ready', profile: response.profile }))
@@ -69,7 +69,7 @@ export function PublicProfilePage({ token }: { readonly token: string }): React.
     return <div className="pilot pilot-embed"><div className="pilot-page" style={{ gridTemplateColumns: '1fr' }}>
       <div className="pilot-content">
         <section className="pilot-card" style={{ maxWidth: 560 }}>
-          <BrandWordmark height={20} />
+          <BrandLogo height={40} />
           <h2 style={{ marginTop: 14 }}>This profile link is no longer live</h2>
           <p style={muted}>
             The person who shared it may have switched it off, or it may have expired.
@@ -85,9 +85,9 @@ export function PublicProfilePage({ token }: { readonly token: string }): React.
   return <div className="pilot pilot-embed"><div className="pilot-page" style={{ gridTemplateColumns: '1fr' }}>
     <div className="pilot-content">
 
-      {/* Brand band. The wordmark is the brand on every surface, including this one. */}
+      {/* Brand band. The ONE logo is the brand on every surface, including this one. */}
       <div style={{ background: '#0b0d10', borderRadius: '12px 12px 0 0', padding: '13px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <BrandWordmark height={18} />
+        <BrandLogo height={30} surface="dark" />
         <span style={{ color: '#99a2b0', fontSize: 11.5 }}>Verified career profile</span>
       </div>
 

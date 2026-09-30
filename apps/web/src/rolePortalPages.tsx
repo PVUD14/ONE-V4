@@ -12,7 +12,7 @@ import { getProtectedAccessToken, listExamQuestions, listInstitutionExams, listM
 import { AssistantWidget } from './assistantWidget.js';
 import type { AuthStatus } from './auth.js';
 import { AuthControls } from './authControls.js';
-import { BrandWordmark } from './brand.js';
+import { BrandLogo } from './brand.js';
 import { ConsentGate } from './consentGate.js';
 import { OperationsDashboardV2 } from './dashboardsV2.js';
 import { InstitutionExamEnginePage } from './examManagerPage.js';
@@ -74,7 +74,7 @@ import { useEffect, useRef, useState } from 'react';
 export function DemoPortalLauncher({ onNavigate }: { readonly onNavigate: (path: string) => void }): React.ReactElement {
   const groups = ['Student', 'Institution', 'Employer', 'Operations'] as const;
   useEffect(() => {
-    document.title = 'Demo previews | ONE';
+    document.title = 'Demo previews | ONE by AI8HT';
   }, []);
   return (
     <main className="demo-launcher">
@@ -105,7 +105,7 @@ function RolePortalInner({ portal, apiHealth, authStatus, authNotice, showDevelo
 
   useEffect(() => {
     const label = activeRoute?.label ?? (portal.nav[0]?.label ?? 'Dashboard');
-    document.title = label === 'Dashboard' || label === 'Overview' ? `${portal.dashboardTitle} | ONE` : `${label} - ${portal.roleName} | ONE`;
+    document.title = label === 'Dashboard' || label === 'Overview' ? `${portal.dashboardTitle} | ONE by AI8HT` : `${label} - ${portal.roleName} | ONE by AI8HT`;
   }, [activeRoute, portal]);
 
   useEffect(() => {
@@ -192,7 +192,7 @@ function RoleSidebar({ portal, role, activePath, collapsed, drawerOpen, onNaviga
   const groups = [...new Set(items.map((item) => item.group))];
   return (
     <aside className={`role-sidebar ${drawerOpen ? 'drawer-open' : ''}`} aria-label={`${portal.roleName} navigation`}>
-      <div className="role-brand"><BrandWordmark height={28} /><span><strong>ONE</strong><small>{portal.subtitle}</small></span><button className="icon-button sidebar-close" type="button" aria-label={`Close ${portal.roleName} navigation`} onClick={onClose} autoFocus={drawerOpen}><X size={18} /></button></div>
+      <div className="role-brand"><BrandLogo height={collapsed ? 34 : 46} compact={collapsed} /><span><small>{portal.subtitle}</small></span><button className="icon-button sidebar-close" type="button" aria-label={`Close ${portal.roleName} navigation`} onClick={onClose} autoFocus={drawerOpen}><X size={18} /></button></div>
       <nav className="role-nav" aria-label={`Grouped ${portal.roleName} navigation`}>
         {groups.map((group) => <div className="role-nav-group" key={group}><span>{group}</span>{items.filter((item) => item.group === group).map((item) => { const Icon = item.icon; const active = activePath === item.path; return <button key={item.path} type="button" className={`role-nav-item ${active ? 'active' : ''}`} aria-current={active ? 'page' : undefined} aria-label={item.label} title={item.label} onClick={() => onNavigate(item.path)}><Icon size={16} aria-hidden="true" /><span>{item.label}</span></button>; })}</div>)}
       </nav>

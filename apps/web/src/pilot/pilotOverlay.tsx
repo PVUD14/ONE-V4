@@ -392,7 +392,7 @@ export function usePilotClickFallback(config: PilotShellConfig): (event: React.M
     if ('download' in result) {
       const filename = `${context.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-sample.csv`;
       downloadCsv(filename, [
-        ['ONE by Ai8ht — sample export', ''],
+        ['ONE by AI8HT — sample export', ''],
         ['Context', context],
         ['Generated from', 'Pilot preview (sample data only)'],
       ]);

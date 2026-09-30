@@ -558,3 +558,65 @@ describe('variants', () => {
     expect(summary.body.summary.liveVariants).toBeGreaterThanOrEqual(1);
   });
 });
+
+describe('archiving a published lesson or variant (content-archive-design.md)', () => {
+  const archive = (actor: Member, lessonId: string, reasonCode = 'OUT_OF_DATE') =>
+    api().post(`${base}/lessons/${lessonId}/archive`).set(auth(actor.userId)).send({ reasonCode });
+
+  it('takes a base lesson out of the catalogue at once, keeps its record, and is final', async () => {
+    const { lessonId, revisionId } = await approvedLesson('ops-archive-lesson');
+    const approvalId = await approvedPublish(revisionId);
+    expect((await publish(publisher, revisionId, { reasonCode: 'NEW_LESSON', approvalId })).status).toBe(201);
+    expect((await catalogLessons()).map((lesson) => lesson.stableKey)).toContain('ops-archive-lesson');
+
+    expect((await archive(editor, lessonId)).status).toBe(403);
+    expect((await archive(publisher, lessonId, 'SEND_IT')).body.error.code).toBe('REASON_CODE_INVALID');
+    const archived = await archive(publisher, lessonId);
+    expect(archived.status, JSON.stringify(archived.body)).toBe(201);
+    expect(archived.body.archivedRevisions).toEqual([1]);
+    expect(archived.body.lesson).toMatchObject({ status: 'ARCHIVED', publishedRevision: null });
+
+    expect((await catalogLessons()).map((lesson) => lesson.stableKey)).not.toContain('ops-archive-lesson');
+    const version = (await pool.query("SELECT superseded_at FROM lesson_versions WHERE stable_key='ops-archive-lesson'")).rows;
+    expect(version).toHaveLength(1);
+    expect(version[0].superseded_at).not.toBeNull();
+    expect((await pool.query('SELECT state, published_at FROM content_revisions WHERE id=$1', [revisionId])).rows[0]).toMatchObject({ state: 'ARCHIVED', published_at: expect.any(Date) });
+    const auditRow = (await pool.query("SELECT context FROM audit_events WHERE action='operations.content.lesson_archived' AND resource_id=$1", [revisionId])).rows;
+    expect(auditRow).toHaveLength(1);
+    expect(auditRow[0].context).toMatchObject({ lessonId, stableKey: 'ops-archive-lesson', kind: 'BASE', reasonCode: 'OUT_OF_DATE', archivedRevisions: [1] });
+
+    expect((await archive(publisher, lessonId)).body.error.code).toBe('LESSON_NOT_LIVE');
+    expect((await revise(editor, lessonId)).body.error.code).toBe('LESSON_NOT_LIVE');
+    expect((await createVariant(editor, lessonId)).body.error.code).toBe('LESSON_BASE_NOT_LIVE');
+    const listed = await api().get(`${base}/lessons`).query({ filter: 'ARCHIVED', q: 'ops-archive-lesson' }).set(auth(editor.userId)).expect(200);
+    expect(listed.body.lessons.map((lesson: { lessonId: string }) => lesson.lessonId)).toEqual([lessonId]);
+    expect(listed.body.summary.archived).toBeGreaterThanOrEqual(1);
+  });
+
+  it('refuses a base lesson with a live variant, archives the variant without touching the base, then no longer blocks on it', async () => {
+    const created = await createVariant(editor, secondPilot().id, { language: 'ta', level: 'STANDARD', style: 'EXPLANATION' });
+    expect(created.status, JSON.stringify(created.body)).toBe(201);
+    const variantId = created.body.lesson.lessonId as string;
+    const variantRevision = created.body.lesson.open.id as string;
+    expect((await save(editor, variantRevision, variantDraft())).status).toBe(201);
+    await submitAndApprove(variantRevision);
+    expect((await publish(publisher, variantRevision, { reasonCode: 'NEW_VARIANT' })).status).toBe(201);
+
+    const blocked = await archive(publisher, secondPilot().id);
+    expect(blocked.status).toBe(409);
+    expect(blocked.body.error.code).toBe('LESSON_ARCHIVE_BLOCKED');
+    expect(blocked.body.error.problems).toContain('LESSON_HAS_LIVE_VARIANTS');
+    const lessonsBefore = await catalogLessons();
+
+    const variant = await archive(publisher, variantId, 'RIGHTS_WITHDRAWN');
+    expect(variant.status, JSON.stringify(variant.body)).toBe(201);
+    expect(variant.body.lesson).toMatchObject({ status: 'ARCHIVED', kind: 'VARIANT' });
+    expect((await pool.query("SELECT count(*)::int AS n FROM content_revisions WHERE entity_type='LESSON' AND entity_id=$1 AND state='PUBLISHED'", [variantId])).rows[0].n).toBe(0);
+    // The base lesson and every lesson version are untouched.
+    expect(await catalogLessons()).toEqual(lessonsBefore);
+    // With its only variant archived and nothing else needing it, the base lesson archives too.
+    const again = await archive(publisher, secondPilot().id);
+    expect(again.status, JSON.stringify(again.body)).toBe(201);
+    expect((await catalogLessons()).map((lesson) => lesson.stableKey)).not.toContain(secondPilot().stableKey);
+  });
+});

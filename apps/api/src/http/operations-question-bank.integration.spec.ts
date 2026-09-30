@@ -511,3 +511,80 @@ describe('answer keys', () => {
     expect(pool6).toBe(fixture.assessment.questions.length);
   });
 });
+
+describe('archiving a published question (content-archive-design.md)', () => {
+  const archive = (actor: Member, questionId: string, reasonCode = 'CONTENT_INACCURATE') =>
+    api().post(`${base}/questions/${questionId}/archive`).set(auth(actor.userId)).send({ reasonCode });
+  const readinessPool = async (): Promise<string[]> => (await pool.query(
+    `SELECT q.id FROM question_versions q JOIN release_manifests rm ON rm.id = q.release_manifest_id AND rm.status = 'PUBLISHED'
+     WHERE q.superseded_at IS NULL`,
+  )).rows.map((row: { id: string }) => row.id);
+  /** The readiness check's deterministic draw (selectQuestionsDeterministically), to find a seed that picks a given item. */
+  const draw = (ids: readonly string[], seed: string): string[] => ids
+    .map((id) => ({ id, key: createHash('sha256').update(`${seed}:${id}`).digest('hex') }))
+    .sort((left, right) => left.key.localeCompare(right.key) || left.id.localeCompare(right.id))
+    .slice(0, fixture.assessment.selectionCount).map((entry) => entry.id);
+  const attemptIds = async (seed: string): Promise<string[]> => {
+    const attempt = await startAssessmentAttempt(pool, {
+      subjectUserId: await user(), assessmentDefinitionId: fixture.assessment.id, correlationId: 'ops-archive-attempt-' + randomUUID().slice(0, 8), selectionSeed: seed,
+    });
+    return (attempt.questions as { id: string }[]).map((question) => question.id);
+  };
+
+  it('stops serving an archived question at once, keeps it for attempts that hold it, and records why', async () => {
+    const { questionId, revisionId } = await approvedQuestion('ops-archive-q1');
+    const approvalId = await approvedPublish(revisionId);
+    expect((await publish(publisher, revisionId, { reasonCode: 'NEW_QUESTION', approvalId })).status).toBe(201);
+    const versionId = (await pool.query("SELECT id FROM question_versions WHERE stable_key='ops-archive-q1'")).rows[0].id as string;
+    const before = await readinessPool();
+    let seed = '';
+    for (let index = 0; index < 1000 && !seed; index += 1) if (draw(before, `ops-archive-seed-${index}`).includes(versionId)) seed = `ops-archive-seed-${index}`;
+    expect(seed).not.toBe('');
+    // Served before: a learner who starts the check with this seed is asked it.
+    expect(await attemptIds(seed)).toContain(versionId);
+
+    expect((await archive(editor, questionId)).status).toBe(403);
+    expect((await archive(reviewer, questionId)).status).toBe(403);
+    expect((await archive(publisher, questionId, 'SEND_IT')).body.error.code).toBe('REASON_CODE_INVALID');
+    const archived = await archive(publisher, questionId);
+    expect(archived.status, JSON.stringify(archived.body)).toBe(201);
+    expect(archived.body.archivedRevisions).toEqual([1]);
+    expect(archived.body.question).toMatchObject({ status: 'ARCHIVED', publishedVersion: null });
+
+    // Not served after: the same seed draws from a pool without it, at once.
+    expect(await readinessPool()).not.toContain(versionId);
+    const after = await attemptIds(seed);
+    expect(after).not.toContain(versionId);
+    expect(after).toHaveLength(fixture.assessment.selectionCount);
+    // Kept, not deleted: the version row and the attempt that already holds it stay; the hint ladder follows the revision.
+    const version = (await pool.query('SELECT superseded_at FROM question_versions WHERE id=$1', [versionId])).rows[0];
+    expect(version.superseded_at).not.toBeNull();
+    expect((await pool.query('SELECT count(*)::int AS n FROM assessment_attempt_items WHERE question_version_id=$1', [versionId])).rows[0].n).toBe(1);
+    expect((await pool.query('SELECT state FROM content_revisions WHERE id=$1', [revisionId])).rows[0].state).toBe('ARCHIVED');
+    expect((await pool.query('SELECT review_state FROM question_hint_ladders WHERE question_revision_id=$1', [revisionId])).rows[0].review_state).toBe('ARCHIVED');
+    expect((await pool.query("SELECT reason_code, actor_user_id FROM content_review_actions WHERE content_revision_id=$1 AND action='ARCHIVE'", [revisionId])).rows)
+      .toEqual([{ reason_code: 'CONTENT_INACCURATE', actor_user_id: publisher.userId }]);
+    const auditRow = (await pool.query("SELECT context FROM audit_events WHERE action='operations.content.question_archived' AND resource_id=$1", [revisionId])).rows;
+    expect(auditRow).toHaveLength(1);
+    expect(auditRow[0].context).toMatchObject({ questionId, stableKey: 'ops-archive-q1', questionVersionId: versionId, reasonCode: 'CONTENT_INACCURATE', archivedRevisions: [1] });
+
+    // Final, and listed as archived rather than pending.
+    expect((await archive(publisher, questionId)).body.error.code).toBe('QUESTION_NOT_LIVE');
+    expect((await api().post(`${base}/questions/${questionId}/revisions`).set(auth(editor.userId)).send({ reasonCode: 'HINT_CHANGE' })).body.error.code).toBe('QUESTION_NOT_LIVE');
+    const listed = await api().get(`${base}/questions?filter=ARCHIVED&q=ops-archive-q1`).set(auth(reviewer.userId)).expect(200);
+    expect(listed.body.questions.map((question: { questionId: string }) => question.questionId)).toEqual([questionId]);
+    expect(listed.body.summary.archived).toBeGreaterThanOrEqual(1);
+    const pending = await api().get(`${base}/questions?filter=PENDING&q=ops-archive-q1`).set(auth(reviewer.userId)).expect(200);
+    expect(pending.body.questions).toHaveLength(0);
+  });
+
+  it('refuses while a revision is open, and leaves the question in the readiness check', async () => {
+    const pilotQuestion = fixture.assessment.questions[1]!;
+    expect((await api().post(`${base}/questions/${pilotQuestion.id}/revisions`).set(auth(editor.userId)).send({ reasonCode: 'HINT_CHANGE' })).status).toBe(201);
+    const blocked = await archive(publisher, pilotQuestion.id, 'OUT_OF_DATE');
+    expect(blocked.status).toBe(409);
+    expect(blocked.body.error).toMatchObject({ code: 'QUESTION_ARCHIVE_BLOCKED', problems: ['ARCHIVE_OPEN_REVISION'] });
+    expect((await pool.query('SELECT superseded_at FROM question_versions WHERE id=$1', [pilotQuestion.id])).rows[0].superseded_at).toBeNull();
+    expect(await readinessPool()).toContain(pilotQuestion.id);
+  });
+});

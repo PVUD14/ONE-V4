@@ -194,6 +194,11 @@ function StepCard({ step, onStep }: { readonly step: LearningStepDto; readonly o
   </div>;
 }
 
+/** The four hint levels by name (ENG-15). Levels 3 and 4 make a right answer assisted. */
+const HINT_LEVEL_NAMES = ['Nudge', 'Strategy', 'Worked step', 'Near solution'] as const;
+const hintLabel = (index: number): string => `Hint ${index + 1} · ${HINT_LEVEL_NAMES[index] ?? ''}`;
+const ASSISTED_NOTE = ' Counted as assisted: it does not count as solved on your own.';
+
 function StepPractice({ step, onStep }: { readonly step: LearningStepDto; readonly onStep: (step: LearningStepDto) => void }): React.ReactElement | null {
   const [choice, setChoice] = useState('');
   const [feedback, setFeedback] = useState<StepAnswerDto['feedback'] | null>(null);
@@ -207,7 +212,7 @@ function StepPractice({ step, onStep }: { readonly step: LearningStepDto; readon
   }
   if (practice.status === 'COMPLETED') {
     return <div>
-      {feedback ? <p role="status" className={`pilot-chip ${feedback.correct ? 'green' : 'amber'}`} style={{ display: 'inline-block' }}>{feedback.correct ? 'Right.' : 'Not quite.'}{feedback.assisted ? ' Counted as assisted.' : ''}</p> : null}
+      {feedback ? <p role="status" className={`pilot-chip ${feedback.correct ? 'green' : 'amber'}`} style={{ display: 'inline-block' }}>{feedback.correct ? 'Right.' : 'Not quite.'}{feedback.assisted ? ASSISTED_NOTE : ''}</p> : null}
       <p style={muted}>Step finished: you answered {practice.questionsAnswered} {practice.questionsAnswered === 1 ? 'question' : 'questions'}. Plan your next step when you are ready.</p>
     </div>;
   }
@@ -237,7 +242,7 @@ function StepPractice({ step, onStep }: { readonly step: LearningStepDto; readon
 
   return <div className="pilot-card" style={{ margin: 0 }} aria-label="Practice question">
     <div className="pilot-card-head"><h3 style={{ margin: 0, fontSize: 13 }}>Question {question.position}</h3><span className="pilot-chip slate">{practice.questionsAnswered} answered</span></div>
-    {feedback ? <p role="status" className={`pilot-chip ${feedback.correct ? 'green' : 'amber'}`} style={{ display: 'inline-block' }}>{feedback.correct ? 'Right.' : 'Not quite.'}{feedback.assisted ? ' Counted as assisted.' : ''}</p> : null}
+    {feedback ? <p role="status" className={`pilot-chip ${feedback.correct ? 'green' : 'amber'}`} style={{ display: 'inline-block' }}>{feedback.correct ? 'Right.' : 'Not quite.'}{feedback.assisted ? ASSISTED_NOTE : ''}</p> : null}
     <p style={{ margin: '6px 0 10px' }}>{question.prompt}</p>
     <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
       <legend className="sr-only" style={{ position: 'absolute', left: -9999 }}>Choose an answer</legend>
@@ -247,7 +252,7 @@ function StepPractice({ step, onStep }: { readonly step: LearningStepDto; readon
       </label>)}
     </fieldset>
     {question.hints.length ? <div style={{ marginTop: 8 }} aria-label="Hints shown">
-      {question.hints.map((text, index) => <p key={index} style={{ margin: '4px 0' }}><span className="pilot-chip amber">Hint {index + 1}</span> {text}</p>)}
+      {question.hints.map((text, index) => <p key={index} style={{ margin: '4px 0' }}><span className="pilot-chip amber">{hintLabel(index)}</span> {text}</p>)}
     </div> : null}
     {!question.hintsAvailable ? <p style={muted}>No hints for this question.</p>
       : question.hints.length < 4 && nextHintAssists ? <p style={muted}>The next hint shows a worked step: an answer after it counts as assisted, not as your own.</p> : null}
@@ -255,7 +260,7 @@ function StepPractice({ step, onStep }: { readonly step: LearningStepDto; readon
     <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
       <button type="button" className="pilot-btn small" disabled={busy || !choice} onClick={() => void answer()}>Check answer</button>
       {question.hintsAvailable && question.hints.length < 4
-        ? <button type="button" className="pilot-btn ghost small" disabled={busy} onClick={() => void hint()}><Lightbulb size={14} /> Show hint {question.hints.length + 1}</button> : null}
+        ? <button type="button" className="pilot-btn ghost small" disabled={busy} onClick={() => void hint()}><Lightbulb size={14} /> Show {hintLabel(question.hints.length).replace('Hint', 'hint')}</button> : null}
     </div>
   </div>;
 }

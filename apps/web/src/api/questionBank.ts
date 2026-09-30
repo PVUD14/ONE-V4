@@ -101,6 +101,8 @@ export interface BankQuestionRevisionDto {
   readonly topic: BankQuestionTopicDto | null;
   readonly tags: readonly { readonly optionId: string; readonly code: string; readonly codeVersion: number; readonly codeTitle: string; readonly codeState: string; readonly tagState: string }[];
   readonly ladder: { readonly source: string; readonly state: string; readonly generatorVersion: string | null; readonly promptVersion: string | null; readonly generatedAt: string | null } | null;
+  /** What the hint ladder rules find (ENG-15). Advice only: submission is never blocked on it. */
+  readonly ladderChecks: { readonly rulesVersion: string; readonly findings: readonly { readonly level: number; readonly code: string }[] };
   /** Set when an import pack drafted the revision (program B.8); null when a person wrote it. */
   readonly agentDraft: { readonly generatorVersion: string; readonly promptVersion: string; readonly generatedAt: string } | null;
   /** The agent draft's note for the subject expert. */

@@ -335,6 +335,28 @@ function QuestionView({ revision, policy }: { readonly revision: BankQuestionRev
     <p><small>Hint ladder record: {revision.ladder
       ? `${revision.ladder.source === 'AGENT_DRAFTED' ? `drafted by the coding agent (${revision.ladder.generatorVersion ?? 'NA'}, ${revision.ladder.promptVersion ?? 'NA'})` : 'written by a person'} · ${label(revision.ladder.state)}`
       : 'written on submission'}</small></p>
+    <LadderChecks checks={revision.ladderChecks} />
+  </div>;
+}
+
+/** ENG-15: what the hint ladder rules find, in plain words. Advice only — the reviewer decides. */
+const LADDER_FINDING_TEXT: Readonly<Record<string, string>> = {
+  HINT_MISSING: 'has no text',
+  HINT_REPEATS_EARLIER: 'says the same as an earlier level',
+  HINT_NAMES_ANSWER: 'contains the text of the correct option',
+  HINT_NAMES_OPTION: 'points at the correct option by its letter',
+};
+
+function LadderChecks({ checks }: { readonly checks: BankQuestionRevisionDto['ladderChecks'] | undefined }): React.ReactElement | null {
+  if (!checks) return null;
+  if (checks.findings.length === 0) {
+    return <p><small>The ladder checks ({checks.rulesVersion}) found nothing. The reviewer still judges whether a hint gives the answer away.</small></p>;
+  }
+  return <div>
+    <p><small>Advice from the ladder checks ({checks.rulesVersion}): the reviewer decides, and can send it back with Hints reveal answer.</small></p>
+    <ul aria-label="Hint ladder checks">
+      {checks.findings.map((finding) => <li key={`${finding.level}-${finding.code}`}>Level {finding.level} {LADDER_FINDING_TEXT[finding.code] ?? 'needs a look'}.</li>)}
+    </ul>
   </div>;
 }
 

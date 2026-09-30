@@ -155,6 +155,10 @@ BEGIN
     RAISE EXCEPTION 'published content revisions are immutable';
   END IF;
   IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+  -- The widened CHECK below lets an ARCHIVED row keep a publication; only a real one.
+  IF NEW.state = 'ARCHIVED' AND NEW.published_at IS NOT NULL AND NEW.release_manifest_id IS NOT NULL THEN
+    RAISE EXCEPTION 'only a published content revision is archived with its publication';
+  END IF;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;

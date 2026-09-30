@@ -93,6 +93,9 @@ internal fun JobsScreen() {
     var termsChange by remember { mutableStateOf<Pair<String, TermsChangeDto>?>(null) }
     // EMP-10: the application whose conversation is open (inside My applications; no new tab).
     var conversationFor by remember { mutableStateOf<ApplicationDto?>(null) }
+    // EMP-13: the application whose shared skill evidence is open, and whether sharing is on at all.
+    var evidenceFor by remember { mutableStateOf<ApplicationDto?>(null) }
+    var evidenceSharingAvailable by remember { mutableStateOf(false) }
     // INST-14: the college's nominations, answered at the top of My applications (no new tab).
     var nominations by remember { mutableStateOf<List<StudentNominationDto>?>(null) }
     var nominationsFailed by remember { mutableStateOf(false) }
@@ -100,7 +103,9 @@ internal fun JobsScreen() {
 
     LaunchedEffect(reload) {
         opportunities = runCatching { Api.listOpportunities(context) }.getOrNull()
-        applications = runCatching { Api.listApplications(context) }.getOrNull()
+        val listed = runCatching { Api.listApplicationsWithEvidence(context) }.getOrNull()
+        applications = listed?.applications
+        evidenceSharingAvailable = listed?.evidenceSharingAvailable == true
         val loadedNominations = runCatching { Api.listMyNominations(context) }
         nominations = loadedNominations.getOrNull() ?: emptyList()
         nominationsFailed = loadedNominations.isFailure
@@ -119,6 +124,7 @@ internal fun JobsScreen() {
     }
     androidx.activity.compose.BackHandler(enabled = feedback != null) { feedback = null }
     androidx.activity.compose.BackHandler(enabled = conversationFor != null) { conversationFor = null; reload += 1 }
+    androidx.activity.compose.BackHandler(enabled = evidenceFor != null) { evidenceFor = null; reload += 1 }
     androidx.activity.compose.BackHandler(enabled = openNomination != null) { openNomination = null }
 
     openNomination?.let { nomination ->
@@ -132,6 +138,11 @@ internal fun JobsScreen() {
 
     conversationFor?.let { app ->
         SlideIn { StudentConversationPage(app.id, "${app.title} · ${app.employerName}", onClose = { conversationFor = null; reload += 1 }) }
+        return
+    }
+
+    evidenceFor?.let { app ->
+        SlideIn { ApplicationEvidencePage(app.id, "${app.title} · ${app.employerName}", onClose = { evidenceFor = null; reload += 1 }) }
         return
     }
 
@@ -353,6 +364,14 @@ internal fun JobsScreen() {
                                                     .onFailure { notice = (it as? Api.ApiException)?.detail ?: "Could not load the changed terms." }
                                             }
                                         }) { Text("Review new terms") }
+                                    }
+                                }
+                                // EMP-13: shown while sharing is on, and whenever something is shared so it can be taken back.
+                                if (evidenceSharingAvailable || app.evidenceShared) {
+                                    Spacer(Modifier.height(8.dp))
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        if (app.evidenceShared) StatusChip("Skill evidence shared", ChipKind.Positive)
+                                        TextButton(onClick = { evidenceFor = app }) { Text("Skill evidence") }
                                     }
                                 }
                                 // EMP-10: the conversation the employer started, with unread messages counted.

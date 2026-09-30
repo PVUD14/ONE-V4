@@ -118,6 +118,8 @@ internal fun ApplicantActionsPage(
             }
             // EMP-07: what the applicant chose to share, read-only, while their grant is live.
             CandidateSharedCards(employerId, applicationId, shared)
+            // EMP-13: the verified evidence they chose to share, per job skill (nothing while the feature is off).
+            CandidateEvidenceSection(employerId, applicationId, shared)
             // EMP-12: their results on this employer's own screening tests, while they share their details.
             CandidateScreeningSection(employerId, applicationId, shared)
             // EMP-10: the conversation with this candidate, while they share their details.

@@ -70,6 +70,8 @@ internal fun OpportunityDetailPage(
     // EMP-07: the snapshot the student reviewed, and the choices it was built from.
     var reviewed by remember { mutableStateOf<Pair<ApplicationPreviewDto, SnapshotChoices>?>(null) }
     var reviewReload by remember { mutableIntStateOf(0) }
+    // EMP-13: the verified evidence the student ticked to share with this application.
+    var evidenceChoice by remember { mutableStateOf(emptySet<String>()) }
 
     LaunchedEffect(opportunityId) {
         runCatching { Api.opportunityDetail(context, opportunityId) }
@@ -193,6 +195,9 @@ internal fun OpportunityDetailPage(
                                     onPreview = { preview, choices -> reviewed = preview?.let { it to choices } },
                                     reload = reviewReload,
                                 )
+                                ApplyEvidenceCard(reviewed?.first?.evidence, record.employerName, evidenceChoice, !busy) { id, on ->
+                                    evidenceChoice = if (on) evidenceChoice + id else evidenceChoice - id
+                                }
                                 Spacer(Modifier.height(10.dp))
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Checkbox(checked = shareWithInstitution, onCheckedChange = { shareWithInstitution = it })
@@ -215,7 +220,10 @@ internal fun OpportunityDetailPage(
                                             val review = reviewed
                                             runCatching {
                                                 // EMP-07: apply with exactly the reviewed snapshot; the server refuses if it changed.
-                                                if (review != null) Api.applyWithSnapshot(context, opportunityId, shareWithInstitution, review.second, review.first.snapshotHash)
+                                                // EMP-13: only ticked items the reviewed preview still offers are sent.
+                                                val offered = review?.first?.evidence?.skills.orEmpty().flatMap { skill -> skill.items.mapNotNull { it.evidenceId } }.toSet()
+                                                if (review != null) Api.applyWithSnapshot(context, opportunityId, shareWithInstitution, review.second, review.first.snapshotHash,
+                                                    evidenceChoice.filter { it in offered })
                                                 else Api.applyToOpportunity(context, opportunityId, shareWithInstitution)
                                             }
                                                 .onSuccess { onApplied(); onClose() }
@@ -227,6 +235,8 @@ internal fun OpportunityDetailPage(
                                                         "ELIGIBILITY_UNKNOWN" -> "ONE cannot confirm a rule this employer requires, because that information is not on your record yet."
                                                         "SNAPSHOT_CHANGED" -> "Something you would share changed after you reviewed it. Check what the employer will see again, then apply."
                                                         "PLACEMENT_POLICY_ONE_OFFER" -> "Your college allows one accepted offer per student, and you already hold one, so you cannot apply through its campus drive."
+                                                        "EVIDENCE_NOT_SHAREABLE" -> "One piece of evidence you ticked can no longer be shared. Check the list again, then apply."
+                                                        "EVIDENCE_SHARING_UNAVAILABLE" -> "Sharing skill evidence is not available right now. Untick it to apply without it."
                                                         else -> (it as? Api.ApiException)?.detail ?: "Could not apply just now. Try again."
                                                     }
                                                     if (code == "SNAPSHOT_CHANGED") reviewReload++

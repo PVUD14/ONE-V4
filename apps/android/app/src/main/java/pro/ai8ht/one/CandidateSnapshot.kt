@@ -77,6 +77,8 @@ import kotlinx.serialization.encodeToString
     val snapshot: ApplicationSnapshotDto,
     val snapshotHash: String,
     val resumeOptions: List<ResumeOptionDto> = emptyList(),
+    /** EMP-13: the student's verified evidence per job skill, to choose from; empty while the feature is off. */
+    val evidence: EvidenceOffer = EvidenceOffer(),
 )
 @Serializable data class ApplicationPreviewEnvelope(val preview: ApplicationPreviewDto)
 
@@ -101,6 +103,8 @@ import kotlinx.serialization.encodeToString
     val contactPhone: String? = null,
     val links: List<SnapshotLinkInput>? = null,
     val reviewedSnapshotHash: String,
+    /** EMP-13: left out of the request when nothing is chosen. */
+    val evidenceRecordIds: List<String>? = null,
 )
 
 suspend fun Api.previewApplication(context: Context, opportunityId: String, choices: SnapshotChoices): ApplicationPreviewDto =
@@ -110,10 +114,12 @@ suspend fun Api.previewApplication(context: Context, opportunityId: String, choi
     )).preview
 
 /** Applies with exactly the reviewed snapshot; a change since the review is refused as SNAPSHOT_CHANGED. */
-suspend fun Api.applyWithSnapshot(context: Context, opportunityId: String, institutionVisibility: Boolean, choices: SnapshotChoices, reviewedHash: String) {
+suspend fun Api.applyWithSnapshot(context: Context, opportunityId: String, institutionVisibility: Boolean, choices: SnapshotChoices, reviewedHash: String,
+    evidenceIds: List<String> = emptyList()) {
     request(
         context, "POST", "/api/v1/students/me/applications",
-        json.encodeToString(ApplyRequest(opportunityId, true, institutionVisibility, choices.resumeDocumentId, choices.contactPhone, choices.links, reviewedHash)),
+        json.encodeToString(ApplyRequest(opportunityId, true, institutionVisibility, choices.resumeDocumentId, choices.contactPhone, choices.links, reviewedHash,
+            evidenceIds.takeIf { it.isNotEmpty() })),
     )
 }
 

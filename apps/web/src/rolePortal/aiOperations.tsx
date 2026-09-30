@@ -185,7 +185,7 @@ export function OperationsAiOperationsPage(): React.ReactElement | null {
 
     <section className="role-card role-wide"><h2>Refusals and failures by class</h2>
       {summary && !summary.failureClasses.length ? <p>No refusals or failures this {windowLabel(period)}.</p> : null}
-      {summary?.failureClasses.length ? <table className="role-record-table"><thead><tr><th>Feature</th><th>Outcome</th><th>Class</th><th>Count</th></tr></thead>
+      {summary?.failureClasses?.length ? <table className="role-record-table"><thead><tr><th>Feature</th><th>Outcome</th><th>Class</th><th>Count</th></tr></thead>
         <tbody>{summary.failureClasses.map((row) => <tr key={`${row.featureKey}-${row.outcome}-${row.failureClass}`}><td>{row.featureKey}</td><td>{row.outcome}</td><td>{row.failureClass}</td><td>{number(row.count)}</td></tr>)}</tbody></table> : null}
     </section>
 

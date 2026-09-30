@@ -564,7 +564,8 @@ export async function cancelInstitutionOffboarding(db: PersistenceDb, input: Ste
  * that finds the college's rows. `$1` is the institution. The preview counts exactly these.
  */
 export const institutionPurgePlan: readonly { readonly table: string; readonly where: string }[] = [
-  { table: 'staff_action_content_links', where: 'staff_action_id IN (SELECT id FROM staff_actions WHERE institution_id = $1)' },
+  // Content links exist only on meetings (0082's guard), so the purge names that type.
+  { table: 'staff_action_content_links', where: "staff_action_id IN (SELECT id FROM staff_actions WHERE institution_id = $1 AND action_type = 'MEETING')" },
   { table: 'staff_action_attendees', where: 'institution_id = $1' },
   { table: 'learning_assignment_students', where: 'institution_id = $1' },
   { table: 'learning_assignments', where: 'institution_id = $1' },

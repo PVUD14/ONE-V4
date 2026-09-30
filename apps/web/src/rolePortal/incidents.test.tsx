@@ -83,11 +83,15 @@ const failure = (status: number, code: string, correlationId: string) => Promise
 let listResponse: () => Promise<unknown> = () => ok(list([incident()]));
 let templatesResponse: () => Promise<unknown> = () => ok({ templates: [template()], nextCursor: null });
 let noticeApproveResponse: () => Promise<unknown> = () => ok({ notice: statusNotice({ state: 'QUEUED' }) });
+let noticesResponse: () => Promise<unknown> = () => ok({ notices: [statusNotice()], nextCursor: null });
+let commsPolicyResponse: () => Promise<unknown> = () => ok(commsPolicy);
 
 beforeEach(() => {
   listResponse = () => ok(list([incident()]));
   templatesResponse = () => ok({ templates: [template(), template({ id: crypto.randomUUID(), templateKey: 'outage-update', state: 'PUBLISHED', approvedBy: 'super@example.test', publishMode: 'SOLO', canRequestApproval: false })], nextCursor: null });
   noticeApproveResponse = () => ok({ notice: statusNotice({ state: 'QUEUED' }) });
+  noticesResponse = () => ok({ notices: [statusNotice()], nextCursor: null });
+  commsPolicyResponse = () => ok(commsPolicy);
   vi.mocked(getProtectedAccessToken).mockReturnValue(crypto.randomUUID());
   fetchMock.mockReset().mockImplementation((url: string, init?: { method?: string }) => {
     const path = String(url);
@@ -101,9 +105,9 @@ beforeEach(() => {
     if (path.includes('/incidents/policy')) return ok(policy);
     if (path.includes('/incidents/') && !path.includes('organization-options')) return ok(detail());
     if (path.includes('/operations/incidents')) return listResponse();
-    if (path.includes('/communications/policy')) return ok(commsPolicy);
+    if (path.includes('/communications/policy')) return commsPolicyResponse();
     if (path.includes('/communications/templates')) return templatesResponse();
-    if (path.includes('/communications/notices')) return ok({ notices: [statusNotice()], nextCursor: null });
+    if (path.includes('/communications/notices')) return noticesResponse();
     return ok({});
   });
   vi.stubGlobal('fetch', fetchMock);
@@ -276,6 +280,34 @@ describe('status communications', () => {
     fireEvent.change(within(dialog).getByLabelText(/Reason code/), { target: { value: 'APPROVED_FOR_SEND' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Confirm' }));
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('Rate limit: a notice for this incident was approved in the last 15 minutes, or 6 in the last day. Reference: corr-limit-3');
+  });
+
+  it('leaves a notice the viewer drafted to another person, and marks a solo approval', async () => {
+    noticesResponse = () => ok({ notices: [
+      statusNotice({ draftedBySelf: true }),
+      statusNotice({ id: crypto.randomUUID(), state: 'QUEUED', approvedBy: 'ops.lead@example.test', approvedAt: '2026-09-29T10:00:00.000000Z', approveMode: 'SOLO' }),
+    ], nextCursor: null });
+    commsPolicyResponse = () => ok({ ...commsPolicy, noticeApproverCount: 2, noticeSoloSafeguardActive: false, soloCoolingOffMinutes: 15 });
+    render(<OperationsCommunicationsPage />);
+    expect(await screen.findByText('You drafted this notice, so another person approves it.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Approve for sending/ })).toBeNull();
+    // The drafter can still withdraw it (the template row has its own Withdraw button too).
+    expect(screen.getAllByRole('button', { name: 'Withdraw…' }).length).toBeGreaterThan(1);
+    expect(screen.getByText(/by ops\.lead@example\.test \(solo\)/)).toBeInTheDocument();
+  });
+
+  it('lets the sole approver approve their own notice under the solo safeguard, and explains the cooling-off', async () => {
+    noticesResponse = () => ok({ notices: [statusNotice({ draftedBySelf: true, soloApprovalAvailableAt: '2026-09-29T09:55:00.000000Z' })], nextCursor: null });
+    commsPolicyResponse = () => ok({ ...commsPolicy, noticeApproverCount: 1, noticeSoloSafeguardActive: true, soloCoolingOffMinutes: 15 });
+    noticeApproveResponse = () => failure(403, 'STATUS_NOTICE_SOLO_COOLING_OFF', 'corr-cool-1');
+    render(<OperationsCommunicationsPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Approve for sending (solo)…' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/the solo safeguard applies/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/15-minute cooling-off\) and is marked Solo/)).toBeInTheDocument();
+    fireEvent.change(within(dialog).getByLabelText(/Reason code/), { target: { value: 'APPROVED_FOR_SEND' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Confirm' }));
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(/The solo cooling-off has not passed: you can approve your own notice from .+\. Reference: corr-cool-1/);
   });
 
   it('shows empty states plainly', async () => {

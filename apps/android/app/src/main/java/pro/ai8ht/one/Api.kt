@@ -321,7 +321,7 @@ object Api {
                     continuation.resumeWith(Result.failure(SignInException("Multi-factor sign-in is not supported in the app yet - sign in on the web.")))
                 }
                 override fun authenticationChallenge(challenge: com.amazonaws.mobileconnectors.cognitoidentityprovider.continuations.ChallengeContinuation?) {
-                    continuation.resumeWith(Result.failure(SignInException("Your password must be changed first - sign in once on the web at one.ai8ht.pro, then try again.")))
+                    continuation.resumeWith(Result.failure(SignInException("Your password must be changed first - sign in once on the web at oneby8.com, then try again.")))
                 }
                 override fun onFailure(exception: Exception) {
                     val name = exception.javaClass.simpleName

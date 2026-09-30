@@ -13,7 +13,8 @@ day, and they stay.
 
 ## Never do these
 
-- Deploy, release or publish anything to `one.ai8ht.pro` (production).
+- Deploy, release or publish anything to production: `oneby8.com`, its AWS server,
+  or the retired `one.ai8ht.pro` host.
 - Connect to the production server: no SSH, no database client, no file copy.
 - Read, copy, restore or derive from production data.
 - Commit a key, token, password, connection string or private key — anywhere,

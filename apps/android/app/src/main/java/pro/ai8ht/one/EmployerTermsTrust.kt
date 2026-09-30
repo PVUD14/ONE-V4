@@ -223,7 +223,7 @@ private fun TermsAndRetention(settings: EmployerSettingsDto) {
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 if (terms.canAccept) {
-                    Text("Accept the terms on the web at one.ai8ht.pro, under Settings.", style = MaterialTheme.typography.bodySmall,
+                    Text("Accept the terms on the web at oneby8.com, under Settings.", style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.primary)
                 }
             }
@@ -320,7 +320,7 @@ private fun TrustCaseDetail(detail: EmployerTrustCaseDto) {
     )
     if (detail.canRespond || detail.canAppeal) {
         Text(
-            if (detail.canRespond) "Respond on the web at one.ai8ht.pro, under Settings." else "You can appeal this decision once, on the web at one.ai8ht.pro, under Settings.",
+            if (detail.canRespond) "Respond on the web at oneby8.com, under Settings." else "You can appeal this decision once, on the web at oneby8.com, under Settings.",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary,
         )
     }

@@ -142,7 +142,7 @@ private fun TeamContent(team: EmployerTeamDto) {
             PilotCard {
                 Text(
                     "Invite admins and recruiters, resend or revoke invitations and end memberships on the web at " +
-                        "one.ai8ht.pro. Interviewers join as recruiters and see only the interviews they are assigned to.",
+                        "oneby8.com. Interviewers join as recruiters and see only the interviews they are assigned to.",
                     Modifier.padding(14.dp), style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

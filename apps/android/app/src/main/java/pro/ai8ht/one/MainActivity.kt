@@ -310,7 +310,7 @@ private fun DemoAccountScreen(onSignOut: () -> Unit) {
                 Text("This account showcases the web pilot", style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
                 Spacer(Modifier.height(6.dp))
-                Text("Demo accounts present a guided, fictional walkthrough at one.ai8ht.pro on the web. " +
+                Text("Demo accounts present a guided, fictional walkthrough at oneby8.com on the web. " +
                     "The app shows real accounts with real data — sign in with your own account instead.",
                     style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center)
@@ -832,7 +832,7 @@ private fun AssessmentsScreen(items: List<AssessmentDto>, onOpenReadiness: () ->
                 Spacer(Modifier.height(10.dp))
                 val (warnBg, warnFg) = bannerPalette.soft(Tone.Amber)
                 Surface(color = warnBg, contentColor = warnFg, shape = RoundedCornerShape(12.dp)) {
-                    Text("You have an attempt in progress. Exams are laptop-only — continue right away at one.ai8ht.pro on a laptop; the timer keeps running.",
+                    Text("You have an attempt in progress. Exams are laptop-only — continue right away at oneby8.com on a laptop; the timer keeps running.",
                         Modifier.padding(12.dp), style = MaterialTheme.typography.labelMedium)
                 }
             }
@@ -910,12 +910,12 @@ private fun AssessmentCard(exam: AssessmentDto) {
                 Spacer(Modifier.height(8.dp))
                 val (warnBg, warnFg) = palette.soft(Tone.Amber)
                 Surface(color = warnBg, contentColor = warnFg, shape = RoundedCornerShape(10.dp)) {
-                    Text("Attempt in progress — continue now on your LAPTOP at one.ai8ht.pro. The timer keeps running; exams cannot be taken on mobile.",
+                    Text("Attempt in progress — continue now on your LAPTOP at oneby8.com. The timer keeps running; exams cannot be taken on mobile.",
                         Modifier.padding(10.dp), style = MaterialTheme.typography.labelMedium)
                 }
             } else if (ends != null && now.isBefore(ends)) {
                 Spacer(Modifier.height(6.dp))
-                Text("Open until ${formatWhen(exam.endsAt)} · exams are taken on a laptop at one.ai8ht.pro",
+                Text("Open until ${formatWhen(exam.endsAt)} · exams are taken on a laptop at oneby8.com",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }

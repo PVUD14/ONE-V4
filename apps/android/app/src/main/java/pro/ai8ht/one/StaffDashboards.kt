@@ -378,7 +378,7 @@ internal fun InstitutionScaffold(
                         0 -> InstitutionHome(organizationId, data!!, onVerify = { showVerifyOv = true }) { tab = 1 }
                         1 -> InstitutionExams(data!!.exams) { resultsFor = it }
                         else -> StaffMore(onSignOut, onSwitchWorkspace,
-                            "Question authoring, exam building, publishing and reopening stay on the web at one.ai8ht.pro.",
+                            "Question authoring, exam building, publishing and reopening stay on the web at oneby8.com.",
                             onHelp = { showHelpOv = true })
                     }
                 }
@@ -509,7 +509,7 @@ private fun InstitutionHome(organizationId: String, data: InstitutionData, onVer
         SectionTitle("Recent assessments", trailing = "View all", onTrailing = onExams)
         if (data.exams.isEmpty()) {
             PilotCard {
-                Text("No assessments yet. Create question banks and exams on the web at one.ai8ht.pro.",
+                Text("No assessments yet. Create question banks and exams on the web at oneby8.com.",
                     Modifier.padding(16.dp), style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -956,7 +956,7 @@ internal fun EmployerScaffold(
                             EmployerRoles(organizationId, roles!!)
                         }
                         else -> StaffMore(onSignOut, onSwitchWorkspace,
-                            "Posting roles, publishing and candidate review stay on the web at one.ai8ht.pro.",
+                            "Posting roles, publishing and candidate review stay on the web at oneby8.com.",
                             onHelp = { showHelpOv = true })
                     }
                 }
@@ -1092,7 +1092,7 @@ private fun EmployerHome(
         SectionTitle("Recent roles", trailing = "View all", onTrailing = onRoles)
         if (roles.isEmpty()) {
             PilotCard {
-                Text("No roles yet. Post opportunities on the web at one.ai8ht.pro; applications track here.",
+                Text("No roles yet. Post opportunities on the web at oneby8.com; applications track here.",
                     Modifier.padding(16.dp), style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -1345,7 +1345,7 @@ internal fun OpsScaffold(
                     tab == 0 && overview == null -> HomeSkeleton()
                     tab == 0 -> OpsOverview(overview!!)
                     else -> StaffMore(onSignOut, onSwitchWorkspace,
-                        "This workspace is view-only in the app by policy. All changes - onboarding, invitations, configuration - happen on the web at one.ai8ht.pro.",
+                        "This workspace is view-only in the app by policy. All changes - onboarding, invitations, configuration - happen on the web at oneby8.com.",
                         onHelp = { showHelpOv = true })
                 }
             }

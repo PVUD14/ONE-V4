@@ -1,12 +1,12 @@
 # Runbook — Client demo: before and after
 
-The pilot at one.ai8ht.pro/demo uses shared demo accounts with a common password.
+The pilot at oneby8.com/demo uses shared demo accounts with a common password.
 That password is a *demo prop*, not a secret — it is typed on screens, pasted into
 chats, and seen by every audience. The control that keeps this safe is rotation.
 
 ## Before the demo (day before, 10 minutes)
 
-1. `curl -fsS https://one.ai8ht.pro/health` → `{"status":"ok"}`, and no deploy is
+1. `curl -fsS https://oneby8.com/health` → `{"status":"ok"}`, and no deploy is
    scheduled during the demo window. If one is in flight, finish or postpone it.
 2. Sign in as one demo account per persona (student, institution, employer) and
    click through the flow you plan to show. The pilot resets on reload by design —

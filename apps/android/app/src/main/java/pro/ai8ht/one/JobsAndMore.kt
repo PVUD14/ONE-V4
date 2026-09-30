@@ -859,7 +859,7 @@ internal fun DocumentsPage(onClose: () -> Unit) {
     OverlayScaffold("Documents", onClose) {
         when {
             documents == null -> LoadingSpinner()
-            documents!!.isEmpty() -> CenteredNote("No documents yet. Upload résumés and certificates from the web app at one.ai8ht.pro.")
+            documents!!.isEmpty() -> CenteredNote("No documents yet. Upload résumés and certificates from the web app at oneby8.com.")
             else -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp)) {
                 PilotCard {
                     Column(Modifier.padding(vertical = 4.dp)) {
@@ -1039,7 +1039,7 @@ internal fun SettingsPage(currentTheme: String, onThemeChange: (String) -> Unit,
                     BrandWordmark(height = 22.dp, tint = if (pro.ai8ht.one.ui.LocalOnePalette.current.dark) null else pro.ai8ht.one.ui.LocalOnePalette.current.ink)
                     Spacer(Modifier.height(8.dp))
                     Text("ONE by AI8HT", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                    Text("Version ${BuildConfig.VERSION_NAME} · one.ai8ht.pro",
+                    Text("Version ${BuildConfig.VERSION_NAME} · oneby8.com",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
@@ -1048,7 +1048,7 @@ internal fun SettingsPage(currentTheme: String, onThemeChange: (String) -> Unit,
                 Column(Modifier.padding(16.dp)) {
                     Text("On the web, not yet in the app", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(6.dp))
-                    Text("Exam taking (with its timer and integrity checks), document upload, data-copy download and account erasure live at one.ai8ht.pro. Push notifications arrive in the next version.",
+                    Text("Exam taking (with its timer and integrity checks), document upload, data-copy download and account erasure live at oneby8.com. Push notifications arrive in the next version.",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }

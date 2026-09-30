@@ -42,7 +42,8 @@ consistency in them is the product, not because someone else owns them.
     apps/web/src/pilot/pilot.css
     apps/web/src/brand.tsx
     apps/web/src/pilot/pilotComponents.tsx
-    apps/web/public/assets/ai8ht-*.png
+    apps/web/public/assets/one-*.png
+    scripts/brand/make_brand_assets.py   (regenerates the assets above; change it, not the PNGs)
 
 `deploy/**`, `infra/**` and `.github/workflows/**` are editable, but nothing in them
 reaches production without Divakar running the release by hand. Infrastructure that
@@ -52,8 +53,12 @@ needs an AWS account is out of reach until he provides access.
 
 - Use the existing pilot design tokens, classes and components. No new stylesheets,
   no inline restyling of shared components.
-- The AI8HT wordmark is the brand everywhere, in every client. Never substitute text,
-  initials, a placeholder icon or another logo. Render it with `BrandWordmark`.
+- The ONE logo is the application's brand everywhere, in every client (Divakar's
+  instruction, 2026-09-30: "ONE is the application name, AI8HT is the organization
+  name"). Never substitute text, initials, a placeholder icon or another logo. Render
+  it with `BrandLogo` on the web and `BrandLogo`/`BrandMark` on Android; the master is
+  `docs/design/brand/source/one-logo.png`. AI8HT is the organisation: keep it where
+  the organisation is meant ("by AI8HT", "(c) AI8HT", "AI8HT operations").
 - The pilot's design system is the canonical UI for the web app and the mobile app —
   its composition and density, not only its tokens.
 - Never invent data. If a data source does not exist, render `NA` or `0` in the same

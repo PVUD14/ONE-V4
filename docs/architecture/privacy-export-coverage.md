@@ -61,7 +61,7 @@ now includes it and — where it does not — why not. It also checks privacy de
 |---|---|---|
 | `student_profiles` (0006) | `studentProfile` (existing) | STUDENT_PROFILE — erased |
 | `student_career_targets` (0011) | **`careerTargets`** — role, priority, chosen, cleared | STUDENT_PROFILE — erased (existing since ENG-19) |
-| `career_gap_snapshots` (0011) | **`careerGaps`** — role, requirements total/met/unknown, computed, superseded (counts, not a score) | **Fixed:** STUDENT_PROFILE now erases them with the targets they were computed for. |
+| `career_gap_snapshots`, `career_gap_items` (0011) | **`careerGaps`** — role, requirements total/met/unknown, computed, superseded, and each requirement's topic, level, status and rank from `career_gap_items` (counts and statuses, not the mastery values compared) | **Fixed:** STUDENT_PROFILE now erases them (items first) with the targets they were computed for. |
 | `learner_goals` (0068) | **`goals`** — type, role/topic/catalogue goal, priority, status, origin, discovery answers, college, started, ended | STUDENT_PROFILE — erased (existing) |
 | `student_outcome_declarations` (0083) | **`outcomeDeclarations`** — college, outcome, declared, withdrawn | STUDENT_PROFILE — erased (existing) |
 | `external_applications` (0019) | **`externalApplications`** — every field the student typed, the college-sharing grant/revoke times | **Fixed:** STUDENT_PROFILE now erases them. They are only the student's own declarations and were left behind entirely. |

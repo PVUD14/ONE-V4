@@ -358,8 +358,11 @@ async function seedPersonalRecords(userId: string, applicationId: string, tag: s
   // Profile and records.
   // SECONDARY: the deletion test later gives the subject a PRIMARY target of its own.
   await q(`INSERT INTO student_career_targets (id, student_user_id, career_role_id, priority) VALUES ($1,$2,$3,'SECONDARY')`, [randomUUID(), userId, f.roleId]);
+  const gapId = randomUUID();
   await q(`INSERT INTO career_gap_snapshots (id, student_user_id, career_role_id, model_version, requirements_total, requirements_met, requirements_unknown)
-    VALUES ($1,$2,$3,'career-gap-v1',7,3,2)`, [randomUUID(), userId, f.roleId]);
+    VALUES ($1,$2,$3,'career-gap-v1',7,3,2)`, [gapId, userId, f.roleId]);
+  await q(`INSERT INTO career_gap_items (id, snapshot_id, topic_id, requirement_level, target_mastery, observed_mastery, status, priority_rank)
+    VALUES ($1,$2,$3,'ESSENTIAL',0.8,0.5173,'PARTIAL',1)`, [randomUUID(), gapId, f.topicId]);
   await q(`INSERT INTO learner_goals (id, student_user_id, institution_id, goal_type, topic_id, origin) VALUES ($1,$2,$3,'TOPIC',$4,'GOALS')`,
     [randomUUID(), userId, f.institutionId, f.topicId]);
   await q(`INSERT INTO student_outcome_declarations (id, student_user_id, institution_id, outcome) VALUES ($1,$2,$3,'HIGHER_STUDIES')`, [randomUUID(), userId, f.institutionId]);
@@ -576,7 +579,8 @@ describe('data export', () => {
 
     // Profile and records.
     expect(bundle.careerTargets).toEqual([expect.objectContaining({ roleTitle: 'Privacy check analyst', priority: 'SECONDARY', clearedAt: null })]);
-    expect(bundle.careerGaps).toEqual([expect.objectContaining({ roleTitle: 'Privacy check analyst', requirementsTotal: 7, requirementsMet: 3, requirementsUnknown: 2 })]);
+    expect(bundle.careerGaps).toEqual([expect.objectContaining({ roleTitle: 'Privacy check analyst', requirementsTotal: 7, requirementsMet: 3, requirementsUnknown: 2,
+      requirements: [{ topicName: 'Synthetic topic', level: 'ESSENTIAL', status: 'PARTIAL', priorityRank: 1 }] })]);
     expect(bundle.goals).toEqual(expect.arrayContaining([
       expect.objectContaining({ goalType: 'ROLE', roleTitle: 'Privacy check analyst', origin: 'CAREER_TARGET', status: 'ACTIVE' }),
       expect.objectContaining({ goalType: 'TOPIC', topicName: 'Synthetic topic', origin: 'GOALS', institutionName: 'Privacy Test College' }),
@@ -652,7 +656,7 @@ describe('data export', () => {
       // Staff-only text, operators' notes and employers' own notes, and who wrote any of it.
       'staff-only observation', 'verify semester 1', 'asked how to share a CV', 'internal recruiter note', fixtures.lecturerId, opsId,
       // Engine estimates, planner inputs, seeds and internal references.
-      'plannerSecretEstimate', '0.4137', 'modelWeight', 'mastery_likelihood', 'masteryLikelihood', 'reviewStability', 'difficulty', 'discrimination',
+      'plannerSecretEstimate', '0.4137', '0.5173', 'modelWeight', 'mastery_likelihood', 'masteryLikelihood', 'reviewStability', 'difficulty', 'discrimination',
       'paper-seed-secret', 'selection-seed-secret', 'internal-reference-marker', fixtures.questionId,
     ]) {
       expect(text, `export must not carry ${forbidden}`).not.toContain(forbidden);
@@ -821,6 +825,7 @@ describe('deletion execution', () => {
       'SELECT 1 FROM device_push_tokens WHERE user_id = $1',
       'SELECT 1 FROM external_applications WHERE student_user_id = $1',
       'SELECT 1 FROM career_gap_snapshots WHERE student_user_id = $1',
+      'SELECT 1 FROM career_gap_items i JOIN career_gap_snapshots g ON g.id = i.snapshot_id WHERE g.student_user_id = $1',
       'SELECT 1 FROM student_qualifications WHERE student_user_id = $1',
       'SELECT 1 FROM student_academic_terms t JOIN student_qualifications q ON q.id = t.qualification_id WHERE q.student_user_id = $1',
       'SELECT 1 FROM public_profile_links WHERE student_user_id = $1',

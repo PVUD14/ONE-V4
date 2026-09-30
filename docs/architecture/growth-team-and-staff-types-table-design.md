@@ -75,8 +75,10 @@ make commission payable. `GROWTH_ADMIN` is not: it moves no money.
   whom on a date" is answerable.
 - **A membership that ends ends its team rows** in the same statement (trigger on
   `organization_memberships`, reason `MEMBERSHIP_ENDED`), whichever path ended it: the Growth team
-  screen, an OPS-15 access-review revocation, or any later writer. A SUSPENDED membership keeps its rows;
-  suspension is reversible and the growth scope rules (GROWTH-02) will read ACTIVE memberships only.
+  screen or any later writer. A SUSPENDED membership keeps its rows — an OPS-15 access-review
+  revocation suspends — because suspension is reversible, access stops at once anyway (memberships are
+  read per request and only ACTIVE ones count), and the growth scope rules (GROWTH-02) will read ACTIVE
+  memberships only.
 - A growth membership's role cannot change while it has live team rows (trigger), so a row can never
   point at a membership that is no longer a growth role.
 

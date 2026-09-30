@@ -21,6 +21,7 @@ import { findIdentityByExternalSubject, loadActiveMembershipsForUser } from '@pl
 import { Phase1ApiSecurityModule } from './api-security.module.js';
 import { AcademicRecordsController } from './academic-records.controller.js';
 import { PG_POOL } from '../persistence.provider.js';
+import { executeDueDeletions } from './privacy-deletion.js';
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) throw new Error('DATABASE_URL is required for academic verification tests');
@@ -407,6 +408,44 @@ describe('bulk results upload', () => {
     const commitRefused = await commit(head, csv, digest).expect(403);
     expect(commitRefused.body.error.code).toBe('SCOPE_REQUIRED');
     expect(await count('student_academic_terms')).toBe(0);
+  });
+
+  it('skips a roll number that belongs to a deleted student, writes nothing for them, and still records the rest', async () => {
+    // Student A Two had a declared term, then deleted their account; the deletion ran, so the roster keeps
+    // the roll number with the name replaced, and their academic records are gone.
+    await declaredTerm(studentA2.userId, { sequence: 5, value: 7.5 });
+    await pool.query(`INSERT INTO privacy_requests (id, subject_user_id, requested_by_user_id, request_type, requested_at, deletion_scheduled_for)
+      VALUES ($1,$2,$2,'DELETION', now() - interval '31 days', now() - interval '1 day')`, [randomUUID(), studentA2.userId]);
+    expect(await executeDueDeletions({ db, ids: { uuid: () => randomUUID() } })).toEqual([expect.objectContaining({ outcome: 'COMPLETED' })]);
+    expect(await count('student_academic_terms')).toBe(0);
+
+    // One matching row, one that would otherwise be CREATE and one that is also malformed: the deleted
+    // person's rows are skipped whatever they say, because nothing will ever be written for them.
+    const csv = csvOf('A-001,4,Semester 4,CGPA_10,8.4,0,BTECH,', 'A-002,4,Semester 4,CGPA_10,8.1,0,BTECH,', 'a-002,5,Semester 5,CGPA_10,11.9,0,BTECH,');
+    const shown = (await preview(admin, csv).expect(201)).body.preview;
+    expect(shown.rows.map((row: { outcome: string; issues: string[]; studentName: string | null }) => [row.outcome, row.issues, row.studentName])).toEqual([
+      ['CREATE', [], 'Student A One'],
+      ['SKIPPED', ['student_deleted'], 'Deleted user'],
+      ['SKIPPED', ['student_deleted'], 'Deleted user'],
+    ]);
+    expect(shown.counts).toMatchObject({ create: 1, confirm: 0, invalid: 0, skipped: 2 });
+    expect(JSON.stringify(shown)).not.toContain(studentA2.userId);
+
+    // Skipped rows do not block the rest, and nothing is created or reattached for the deleted person.
+    const committed = (await commit(admin, csv, shown.digest).expect(201)).body.import;
+    expect(committed).toMatchObject({ created: 1, confirmed: 0, counts: { skipped: 2 } });
+    expect((await pool.query('SELECT count(*)::int AS n FROM student_qualifications WHERE student_user_id = $1', [studentA2.userId])).rows[0].n).toBe(0);
+    expect((await pool.query(`SELECT count(*)::int AS n FROM student_academic_terms t JOIN student_qualifications q ON q.id = t.qualification_id
+      WHERE q.student_user_id = $1`, [studentA2.userId])).rows[0].n).toBe(0);
+    expect((await pool.query(`SELECT count(*)::int AS n FROM student_academic_terms t JOIN student_qualifications q ON q.id = t.qualification_id
+      WHERE q.student_user_id = $1`, [studentA.userId])).rows[0].n).toBe(1);
+    const summary = (await auditActions()).find((entry) => entry.action === 'institution.academic_results.imported');
+    expect(summary?.context).toMatchObject({ created: 1, counts: { skipped: 2 } });
+
+    // Scope still comes first: to a head of another department the roll number reads as any unknown one.
+    const head = await staff('DEPARTMENT_HEAD', departmentB);
+    const outside = (await preview(head, csvOf('A-002,4,Semester 4,CGPA_10,8.1,0,BTECH,')).expect(201)).body.preview;
+    expect(outside.rows[0]).toMatchObject({ outcome: 'INVALID', issues: ['student_not_found'], studentName: null });
   });
 
   it('asks for the programme type when the student has no institution record yet', async () => {

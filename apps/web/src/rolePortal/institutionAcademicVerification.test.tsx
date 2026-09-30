@@ -29,7 +29,7 @@ const row = (overrides: Record<string, unknown>) => ({
   rowNumber: 2, institutionStudentId: 'CSE-001', studentName: 'Local Student', termSequence: 4, termLabel: 'Semester 4', scale: 'CGPA_10',
   result: '8.4', backlogs: 0, outcome: 'CREATE', issues: [], studentReported: null, verifiedRecord: null, ...overrides,
 });
-const counts = (overrides: Record<string, number> = {}) => ({ create: 1, confirm: 0, unchanged: 0, conflict: 0, invalid: 0, differsFromStudent: 0, ...overrides });
+const counts = (overrides: Record<string, number> = {}) => ({ create: 1, confirm: 0, unchanged: 0, conflict: 0, invalid: 0, skipped: 0, differsFromStudent: 0, ...overrides });
 const fetchMock = vi.fn();
 /** INST-SR-02: the API's answer to an unscoped head, or faculty without a teaching assignment. */
 const scopeRequired = Symbol('SCOPE_REQUIRED');
@@ -124,6 +124,19 @@ describe('results upload', () => {
     expect(await screen.findByText('No student with this ID on the roster you manage')).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent(/Nothing is recorded while any row is invalid/);
     expect(screen.queryByRole('button', { name: /^Record / })).not.toBeInTheDocument();
+  });
+
+  it("says plainly that a deleted student's row is skipped, and still lets the rest be recorded", async () => {
+    routes({ [previewPath]: { preview: { digest: 'c'.repeat(64), rowCount: 2, counts: counts({ skipped: 1 }), rows: [
+      row({}), row({ rowNumber: 3, institutionStudentId: 'CSE-002', studentName: 'Deleted user', outcome: 'SKIPPED', issues: ['student_deleted'] }),
+    ] } } });
+    render(<AcademicResultsUpload institutionId={institutionId} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Validate results' }));
+    const table = await screen.findByRole('table');
+    expect(within(table).getByText('Skipped — nothing is recorded')).toBeInTheDocument();
+    expect(within(table).getByText('This student deleted their ONE account, so no results are recorded for them')).toBeInTheDocument();
+    expect(screen.getByText(/1 skipped/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Record 1 verified result' })).toBeInTheDocument();
   });
 
   it('explains SCOPE_REQUIRED when an upload needs a department', async () => {

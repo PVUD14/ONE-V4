@@ -100,7 +100,7 @@ describe('0050 columns', () => {
   it('adds assisted and stage_at_capture to evidence with conservative defaults', async () => {
     const columns = await pool.query<{ column_name: string; column_default: string; is_nullable: string }>(
       `SELECT column_name, column_default, is_nullable FROM information_schema.columns
-       WHERE table_name='evidence_records' AND column_name IN ('assisted','stage_at_capture') ORDER BY column_name`);
+       WHERE table_schema = current_schema() AND table_name='evidence_records' AND column_name IN ('assisted','stage_at_capture') ORDER BY column_name`);
     expect(columns.rows).toEqual([
       { column_name: 'assisted', column_default: 'false', is_nullable: 'NO' },
       { column_name: 'stage_at_capture', column_default: "'ESTIMATED'::text", is_nullable: 'NO' },

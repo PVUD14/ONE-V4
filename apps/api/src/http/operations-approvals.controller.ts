@@ -348,6 +348,18 @@ export class OperationsApprovalsController {
           throw new OperationApprovalError('APPROVAL_NOT_REQUIRED');
         }
         return { targetId: facts.featureKey, canonical: approvalPayloads.AI_FEATURE_LIMITS_RAISE({ featureKey: facts.featureKey, ...next, reasonCode }) };
+      case 'INSTITUTION_DATA_PURGE': {
+        // INST-18: only an ended exit whose 90-day retention period has passed (database clock); a
+        // request before then would expire unused, and a purge is never early.
+        const offboardingId = requireUuidField(payload.offboardingId, correlationId);
+        const found = await this.db.execute(sql`
+          SELECT state, (retention_ends_at IS NOT NULL AND now() >= retention_ends_at) AS retention_elapsed
+          FROM institution_offboardings WHERE id = ${offboardingId}::uuid
+        `) as QueryResult<{ state: string; retention_elapsed: boolean }>;
+        const offboarding = found.rows[0];
+        if (!offboarding) throw new OperationApprovalError('APPROVAL_TARGET_NOT_FOUND');
+        if (offboarding.state !== 'ENDED' || !offboarding.retention_elapsed) throw badRequest('APPROVAL_TARGET_STATE_INVALID', correlationId);
+        return { targetId: offboardingId, canonical: approvalPayloads.INSTITUTION_DATA_PURGE({ offboardingId, reasonCode }) };
       }
     }
   }
@@ -367,6 +379,7 @@ const payloadFields: Readonly<Record<HighRiskActionKey, readonly string[]>> = {
   COMMS_TEMPLATE_PUBLISH: ['templateId', 'reasonCode'],
   AI_FEATURE_ENABLE: ['featureKey', 'reasonCode'],
   AI_FEATURE_LIMITS_RAISE: ['featureKey', 'cap', 'capWindow', 'maxInputChars', 'reasonCode'],
+  INSTITUTION_DATA_PURGE: ['offboardingId', 'reasonCode'],
 };
 
 /**

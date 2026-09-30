@@ -1964,7 +1964,7 @@ inbox is unchanged.
 
 ## Privacy export coverage fix — every personal record in the data export, and deletion reaching them — 2026-09-30
 **Result:** Complete. The student's data export (DPDP right of access) now carries every personal table added since OPS-06, under the export's existing rules, and `notIncluded` names each deliberate omission. Privacy deletion had two outright failures (a document-backed academic term, or a verification action pointing at a document, made the whole deletion end FAILED) and left several records behind; those are fixed. The remaining deletion gaps that need a policy decision are reported, not changed.
-**Branch / PR:** fix/privacy-export-coverage, cut from onev4/stack/batch24 at 4fab0c6, pushed to onev4; merge by review. Commits, in order: b903407 (design), 7e73b41 (failing tests), fd230ab (implementation), then this report and its validation amendment.
+**Branch / PR:** fix/privacy-export-coverage, cut from onev4/stack/batch24 at 4fab0c6, pushed to onev4; merge by review. Commits, in order: b903407 (design), 7e73b41 (failing tests), fd230ab (implementation), 06a94a9 (this report), 984ca6c (gap requirement rows, found by the full run), then the validation amendment.
 **Files created:**
 - docs/architecture/privacy-export-coverage.md (the audit: every table holding student data, included or excluded with the reason, and deletion's disposition)
 - apps/api/src/http/privacy-export-sections.ts
@@ -1975,12 +1975,12 @@ inbox is unchanged.
 
 **Deletion fixes (no new category, so no migration; 0087 unused):**
 - Verification actions' evidence-document link is cleared before the document step; academic records (subjects, terms, qualifications) are erased first under STUDENT_PROFILE. Either link made the deletion FAIL before.
-- STUDENT_PROFILE also erases external applications, career gap snapshots, public profile links, and the profile photo with its bytes (the public photo route does not check the account state, so a live link kept serving a deleted person's photo).
+- STUDENT_PROFILE also erases external applications, career gap snapshots with their requirement rows (the rows reference the snapshot, so they go first — the full run's learning-experience deletion test caught this), public profile links, and the profile photo with its bytes (the public photo route does not check the account state, so a live link kept serving a deleted person's photo).
 - NOTIFICATIONS also erases in-app notifications and push device tokens.
 - The college's invitations addressed to or accepted by the person get the anonymised address.
 
 **Existing tests touched (stronger, none weakened):** the seed now adds more rows for the subject, so two pinned counts rise with a comment saying why — the subject's planner decisions kept outside the erase transaction (1 → 2) and the LEARNING_ACTIVITY record count (5 → 13). The first seed keeps the subject's CV document's id so the new evidence version can hang off it (`documents` stays one row).
-**Tests added:** `data export > includes every personal record added since the export was written, and only the subject's` (every section asserted for the subject; the other candidate's tag, ids, device token and link digest absent; tokens, storage keys, staff-only text, operator and recruiter notes, staff user ids, planner inputs, model estimates, item ids, paper and selection seeds absent; three new `notIncluded` lines checked). The deletion test gains: notifications, devices, external applications, gap snapshots, qualifications, terms, subjects, public links and photos gone for the subject and kept for the other candidate; photo bytes deleted for the subject only; the invitation address anonymised for the subject only; the verification action kept with its document link cleared. Before the fix, the test commit alone failed 5 (no export sections, deletion FAILED and the three tests after it), 10 passed.
+**Tests added:** `data export > includes every personal record added since the export was written, and only the subject's` (every section asserted for the subject; the other candidate's tag, ids, device token and link digest absent; tokens, storage keys, staff-only text, operator and recruiter notes, staff user ids, planner inputs, model estimates, item ids, paper and selection seeds absent; three new `notIncluded` lines checked). The deletion test gains: notifications, devices, external applications, gap snapshots, qualifications, terms, subjects, public links and photos gone for the subject and kept for the other candidate; photo bytes deleted for the subject only; the invitation address anonymised for the subject only; the verification action kept with its document link cleared. Before the fix, the test commit alone failed 4 (no export sections; deletion FAILED, and the two deletion tests after it), 11 passed. The `jobTermChanges` seed and assertion and the gap-requirement rows were added with the fixes (fd230ab, 984ca6c).
 
 **Reported, not fixed (decisions for Divakar, recommendations in the design):**
 - Staff-only college actions (interventions, faculty notes, verifications) keep their text under the anonymised account. Recommended: erase their text under a new `STAFF_ACTIONS` category and keep the row for college counts (needs 0087 to widen the category CHECK).
@@ -1990,3 +1990,10 @@ inbox is unchanged.
 
 **Android / web:** no change. Both clients request the export and download the bundle as a file without interpreting its sections (web api/privacy.ts, Android Api.kt), and neither lists deletion categories. No screen, route, label or navigation item changed.
 **Next goal:** as scheduled by the coordinator.
+
+**Validation** (fresh database one_privexport, only DATABASE_URL exported, scripts in scratchpad/PRIV-EXPORT/):
+- `corepack pnpm db:migrate` twice: 74 applied, then 0 applied / 74 already applied. Both exit 0.
+- `corepack pnpm typecheck`: exit 0.
+- `corepack pnpm -r --no-bail --workspace-concurrency=1 test` (at fd230ab): web 74 files / 865 tests passed; persistence 36 / 404; every other package passed; api 68 of 75 files passed, 1,183 of 1,186 tests. Of the 7 failing api files, 6 failed only with `out of shared memory` on the shared local Postgres (academic-verification, employer-interview-scheduling, institution-learning-actions, institution-placement-register, institution-settings, privacy), and each passed re-run alone (20/20, 14/14, 19/19, 6/6, 24/24, 15/15). The seventh, learning-experience `privacy deletion erases the served step items…`, was a real regression (gap requirement rows); fixed in 984ca6c, after which learning-experience passed 8/8 and privacy 15/15 alone, and the api typecheck passed.
+- `corepack pnpm build`: exit 0.
+- CI parity: `corepack pnpm audit --prod --audit-level=high` exit 0; the optional-chain policy grep printed nothing; no private-key blocks or merge markers in the diff.

@@ -65,8 +65,7 @@ describe('Growth team section', () => {
     const person = screen.getByRole('article', { name: 'field.person@example.test' });
     expect(within(person).getByText('Growth executive')).toBeInTheDocument();
     expect(within(person).getByText('Employee')).toBeInTheDocument();
-    expect(within(person).getByText(/College partnerships/)).toBeInTheDocument();
-    expect(within(person).getByText(/region\.manager@example\.test/)).toBeInTheDocument();
+    expect(within(person).getByText(/College partnerships — manager region\.manager@example\.test/)).toBeInTheDocument();
     const manager = screen.getByRole('article', { name: 'region.manager@example.test' });
     expect(within(manager).getByText('Staff type not set')).toBeInTheDocument();
     expect(screen.getByText('pending.person@example.test')).toBeInTheDocument();

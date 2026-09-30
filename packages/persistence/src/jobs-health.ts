@@ -17,6 +17,7 @@
 import { randomUUID } from 'node:crypto';
 import { sql, type SQL } from 'drizzle-orm';
 import { CONTENT_GENERATION_CONSUMER } from './content-generation.js';
+import { LEARNER_SKILL_STATE_CONSUMER, LEARNER_SKILL_STATE_PROJECTION_REQUESTED } from './learner-skill-state.js';
 import { STUDENT_INVITATION_CONSUMER, STUDENT_INVITATION_REQUESTED } from './student-invitations.js';
 
 /** A drizzle database or transaction. */
@@ -64,6 +65,9 @@ export interface JobConsumer {
 export const knownJobConsumers: readonly JobConsumer[] = [
   { name: STUDENT_INVITATION_CONSUMER, label: 'Student invitation delivery', eventType: STUDENT_INVITATION_REQUESTED },
   { name: CONTENT_GENERATION_CONSUMER, label: 'Content generation (seeded drafts)', eventType: 'content.generation.requested' },
+  // The engine's projector: without a row here an engine that has stopped projecting is invisible
+  // on System Health and cannot be given a silence alert (found by the ENG-17 incident runbook).
+  { name: LEARNER_SKILL_STATE_CONSUMER, label: 'Learner skill state projection', eventType: LEARNER_SKILL_STATE_PROJECTION_REQUESTED },
 ];
 
 // ---------------------------------------------------------------------------

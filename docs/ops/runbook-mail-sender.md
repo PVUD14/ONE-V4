@@ -10,8 +10,8 @@
 
 ## What the sender does
 
-- Connects to `PTP_SMTP_HOST` with **TLS from the first byte** (`PTP_SMTP_SECURITY=tls`, port 465) or
-  with a **mandatory STARTTLS upgrade** (`starttls`, port 587). If the server does not offer
+- Connects to `PTP_SMTP_HOST` with **TLS from the first byte** (`PTP_SMTP_SECURITY=TLS`, port 465) or
+  with a **mandatory STARTTLS upgrade** (`STARTTLS`, port 587). If the server does not offer
   STARTTLS, nothing is sent — it never falls back to plain text.
 - Verifies the server certificate and host name against the system trust store. There is no switch
   to turn verification off.
@@ -40,16 +40,16 @@ is never committed, pasted into a ticket, or shared with an agent.
 | Variable | Value for info@ai8ht.pro | Notes |
 |---|---|---|
 | `PTP_SMTP_HOST` | `smtpout.secureserver.net` | Setting it switches the real sender on. Leave empty to send nothing. |
-| `PTP_SMTP_SECURITY` | `tls` | Or `starttls` with port 587. Anything else refuses to start. |
-| `PTP_SMTP_PORT` | `465` | Defaults to 465 for `tls`, 587 for `starttls`. |
+| `PTP_SMTP_SECURITY` | `TLS` | Optional. `TLS` or `STARTTLS` (any case); unset means `STARTTLS` for port 587 and `TLS` otherwise. Anything else refuses to start. |
+| `PTP_SMTP_PORT` | `465` | Optional. Defaults to 465 for `TLS`, 587 for `STARTTLS`. |
 | `PTP_SMTP_USER` | `info@ai8ht.pro` | The full mailbox address. |
 | `PTP_SMTP_PASSWORD` | *(the mailbox password — Divakar only)* | Required when the host is set. |
 | `PTP_MAIL_FROM` | `info@ai8ht.pro` | Must be the same mailbox, or GoDaddy will refuse or rewrite the sender. |
 | `PTP_SMTP_HELO_NAME` | *(optional)* | Name sent in EHLO; default `one.ai8ht.pro`. |
 | `PTP_SMTP_TIMEOUT_MS` | *(optional)* | Per-step timeout, 1000–120000; default 20000. The whole send is bounded by three times it. |
 
-Rules the code enforces at start-up: if `PTP_SMTP_HOST` is set but the user, password or security
-mode is missing or wrong, **the API and the automation worker refuse to start** with an error naming
+Rules the code enforces at start-up: an empty `PTP_SMTP_HOST` means no mail is sent. If it is set but
+the user or password is missing, or the port or security mode is wrong, **the API and the automation worker refuse to start** with an error naming
 the variable (never its value). `PTP_SMTP_HOST` and `PTP_LOCAL_INVITATION_MAILPIT_ENABLED=true`
 together are also refused.
 
@@ -68,7 +68,41 @@ After changing the environment file, restart the service (`sudo systemctl restar
 planthepath-api.service`) so it reads the new values, then check it started (`systemctl status`,
 `journalctl -u planthepath-api.service -n 50`). A configuration error shows there by variable name.
 
-## First test send — SENDS A REAL EMAIL (Divakar only)
+## Switching it on with docker compose (the AWS server, `deploy/vps`)
+
+The compose file passes the five `PTP_SMTP_*` variables from the server's `.env` to the API
+container, blank by default. On the server, in the directory holding `docker-compose.yml`:
+
+1. `sudo nano .env` and fill in:
+
+   ```
+   PTP_SMTP_HOST=smtpout.secureserver.net
+   PTP_SMTP_PORT=465
+   PTP_SMTP_SECURITY=TLS
+   PTP_SMTP_USER=info@ai8ht.pro
+   PTP_SMTP_PASSWORD=<type the mailbox password here, on the server only>
+   ```
+
+   If the password contains a `$`, wrap it in single quotes (`PTP_SMTP_PASSWORD='...'`) so compose
+   does not treat it as a variable. Save, and keep the file `chmod 600`.
+2. `sudo docker compose up -d` — compose recreates the API container with the new values.
+3. `sudo docker compose logs --tail 50 api` — a configuration error shows here by variable name, and
+   the API does not start until it is fixed. Nothing prints the password.
+
+To prove it, either send the fixed test message below from inside the container:
+
+```bash
+sudo docker compose exec api pnpm --filter @planthepath/persistence mail:send-test -- --to <your-address> --confirm-real-send
+```
+
+or send **one test invitation** through the product: sign in as an operator, open an organisation
+you control in Operations → institution onboarding, and invite an administrator using an address you
+own. The invitation is recorded as delivered and the email arrives from
+`AI8HT ONE <info@ai8ht.pro>` with the invitation link. The delivery is recorded in
+`notification_delivery_attempts` with `provider_kind = 'SMTP'` and a `provider_reference` starting
+`smtp:`. Revoke the test invitation afterwards if you do not intend to accept it.
+
+## First test send on the older systemd host — SENDS A REAL EMAIL (Divakar only)
 
 > **This sends one real email through GoDaddy.** Run it only yourself, only to an address you
 > choose and control, and only after the variables above are set. No agent or test runs it.
@@ -129,9 +163,11 @@ recording every email as NOT_CONFIGURED; nothing is lost from the database.
 
 ## Known limits
 
-- Staff-invitation delivery attempts are labelled `MAILPIT` in `notification_delivery_attempts.provider_kind`
-  whichever sink sent them (the column's CHECK allows only `MAILPIT`, `SES`, `N8N`). The
-  `provider_reference` starts with `smtp:` for real sends. Correcting the label needs a new migration.
+- Staff-invitation delivery attempts record the sink that sent them: `SMTP` for the real sender,
+  `MAILPIT` for the local capture (migration 0094 added `SMTP`; ADR-042).
+- The compose deployment runs only the API, so only staff invitations (institution administrators,
+  employer team, Growth team) leave the server. Student invitations, announcements and hiring
+  notifications need the automation worker, which is not deployed yet.
 - GoDaddy limits how many messages a mailbox may send per day. A large student import can exceed it;
   failed sends are recorded FAILED, not lost silently. Check the limit for this plan in GoDaddy's
   email settings before a bulk invitation.

@@ -28,3 +28,6 @@ id_ed25519
 
 # Local emulator screen recordings — large binaries, not source
 .recordings/
+
+# Python bytecode (scripts/brand is run locally)
+__pycache__/

@@ -19,6 +19,7 @@ import {
 import { callerHasInternalCapability, dbCapabilityGrantLoader } from './internal-capability-guard.js';
 import { isHighRiskVerificationTransition } from '@planthepath/authorization/src/index.js';
 import { consumeOperationApproval } from '@planthepath/persistence/src/operation-approvals.js';
+import { InstitutionContractError, assertInstitutionRosterIntakeAllowed } from '@planthepath/persistence/src/institution-contract.js';
 import { approvalHttpError, approvalNotRequired, approvalPayloads, approvalRequired, readApprovalId } from './operation-approval-gate.js';
 
 type QueryResult<T> = { rows: T[] };
@@ -466,6 +467,8 @@ export class OperationsInstitutionOnboardingController {
     const profileId = this.ids.uuid();
     const relationshipId = this.ids.uuid();
     await this.db.transaction(async (tx) => {
+      // INST-18: rostering is refused while the college is leaving, or until it accepts current data terms.
+      await requireRosterIntake(tx, id, context.correlationId);
       const existing = await tx.execute(sql`SELECT id FROM users WHERE lower(email)=lower(${input.email}) FOR UPDATE`) as QueryResult<{ id: string }>;
       if (existing.rows[0]) throw conflict('STUDENT_EMAIL_ALREADY_EXISTS', context.correlationId, 'email');
       const existingStudentId = await tx.execute(sql`SELECT id FROM institution_student_profiles WHERE institution_id=${id}::uuid AND lower(institution_student_id)=lower(${input.institutionStudentId}) FOR UPDATE`) as QueryResult<{ id: string }>;
@@ -804,6 +807,7 @@ export class OperationsInstitutionOnboardingController {
     const importId = requireUuid(importIdParam, context.correlationId);
     let committed = 0;
     await this.db.transaction(async (tx) => {
+      await requireRosterIntake(tx, id, context.correlationId);
       const importRows = await tx.execute(sql`
         SELECT row_number, institution_student_id, full_name, email, department_unit_id, program_unit_id, batch_unit_id, section_unit_id
         FROM student_roster_import_rows r
@@ -871,6 +875,16 @@ function requireInstitutionRole(request: ProtectedHttpRequest, institutionId: st
     && roles.includes(membership.role)
   ))) throw forbidden(context.correlationId);
   return context;
+}
+
+/** INST-18's gate on bringing students in, as this controller's error shape (403, a plain code). */
+async function requireRosterIntake(tx: PersistenceDb, institutionId: string, correlationId: string): Promise<void> {
+  try {
+    await assertInstitutionRosterIntakeAllowed(tx, institutionId);
+  } catch (error) {
+    if (error instanceof InstitutionContractError) throw new ForbiddenException(safeOperationError(error.code, correlationId));
+    throw error;
+  }
 }
 
 function forbidden(correlationId: string): ForbiddenException {

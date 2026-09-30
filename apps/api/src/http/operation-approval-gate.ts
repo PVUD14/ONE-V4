@@ -43,6 +43,9 @@ export const approvalPayloads = {
   // OPS-16: a status notice template version is immutable; its content hash binds the exact wording.
   COMMS_TEMPLATE_PUBLISH: (input: { readonly templateId: string; readonly contentHash: string; readonly reasonCode: string }) =>
     ({ templateId: input.templateId.toLowerCase(), contentHash: input.contentHash, reasonCode: input.reasonCode }),
+  // INST-18: an exit's institution-owned records are deleted once; the exit id binds which college.
+  INSTITUTION_DATA_PURGE: (input: { readonly offboardingId: string; readonly reasonCode: string }) =>
+    ({ offboardingId: input.offboardingId.toLowerCase(), reasonCode: input.reasonCode }),
 } satisfies Record<HighRiskActionKey, (input: never) => Record<string, unknown> & { reasonCode: string }>;
 
 function domainError(code: string, correlationId: string): { readonly error: { readonly code: string; readonly message: string; readonly correlationId: string } } {

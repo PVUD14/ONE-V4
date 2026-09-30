@@ -352,7 +352,7 @@ export class OperationsIncidentsController {
       // Notices sent about this incident: counts per state only, never a recipient list.
       notices: notices.notices.map((notice) => ({
         id: notice.id, state: notice.state, templateKey: notice.template.templateKey, templateVersion: notice.template.version,
-        subject: notice.template.subject, approvedBy: notice.approvedBy, approvedAt: notice.approvedAt, sentAt: notice.sentAt,
+        subject: notice.template.subject, approvedBy: notice.approvedBy, approvedAt: notice.approvedAt, approveMode: notice.approveMode, sentAt: notice.sentAt,
         recipientCount: notice.recipientCount, organizationCount: notice.organizationCount, email: notice.email,
       })),
     };

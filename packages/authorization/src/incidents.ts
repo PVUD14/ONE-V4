@@ -178,6 +178,34 @@ export function refuseStatusNoticeApproval(input: {
   return null;
 }
 
+/**
+ * OPS-02's solo cooling-off (`soloCoolingOffMinutes`), repeated here because high-risk-actions.ts
+ * imports this module; incidents.test.ts asserts the two agree.
+ */
+export const statusNoticeSoloCoolingOffMinutes = 15;
+
+export type StatusNoticeApproverRefusal = 'STATUS_NOTICE_SELF_APPROVAL_REFUSED' | 'STATUS_NOTICE_SOLO_COOLING_OFF';
+
+/**
+ * Who may approve a notice for sending (0090): OPS-02's rule that the approver is never the
+ * requester — here, the drafter — except the solo-operator safeguard: the sole person who can
+ * approve notices (`approverCount` live COMMS_TEMPLATES holders, 0090's
+ * status_notice_approver_count()) may approve their own after the cooling-off, marked solo. The
+ * safeguard switches itself off once a second approver exists.
+ */
+export function decideStatusNoticeApprover(input: {
+  readonly actorUserId: string;
+  readonly draftedByUserId: string;
+  readonly approverCount: number;
+  /** Whether the database clock is at least 15 minutes past `drafted_at`. */
+  readonly coolingOffElapsed: boolean;
+}): { readonly refusal: StatusNoticeApproverRefusal } | { readonly solo: boolean } {
+  if (input.actorUserId !== input.draftedByUserId) return { solo: false };
+  if (input.approverCount !== 1) return { refusal: 'STATUS_NOTICE_SELF_APPROVAL_REFUSED' };
+  if (!input.coolingOffElapsed) return { refusal: 'STATUS_NOTICE_SOLO_COOLING_OFF' };
+  return { solo: true };
+}
+
 /** Only a template version's author may put it to an approver, so the approver is never its author. */
 export function refuseCommsTemplatePublishRequest(input: {
   readonly actorUserId: string;

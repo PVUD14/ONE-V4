@@ -92,7 +92,7 @@ export interface IncidentDetailDto {
   readonly organizations: readonly { readonly organizationId: string; readonly name: string; readonly kind: string; readonly addedAt: string; readonly removedAt: string | null }[];
   readonly notices: readonly {
     readonly id: string; readonly state: StatusNoticeState; readonly templateKey: string; readonly templateVersion: number; readonly subject: string;
-    readonly approvedBy: string | null; readonly approvedAt: string | null; readonly sentAt: string | null;
+    readonly approvedBy: string | null; readonly approvedAt: string | null; readonly approveMode?: 'DUAL' | 'SOLO' | null; readonly sentAt: string | null;
     readonly recipientCount: number | null; readonly organizationCount: number | null; readonly email: NoticeEmailCountsDto;
   }[];
   readonly correlationId: string;
@@ -176,6 +176,10 @@ export interface CommunicationsPolicyDto {
   readonly rateLimit: { readonly minimumSpacingMinutes: number; readonly dailyLimit: number };
   readonly approverCount: number;
   readonly soloSafeguardActive: boolean;
+  /** 0090: how many people can approve a notice for sending; while only one can, they may approve their own after the cooling-off. */
+  readonly noticeApproverCount?: number;
+  readonly noticeSoloSafeguardActive?: boolean;
+  readonly soloCoolingOffMinutes?: number;
   readonly incidents: readonly { readonly id: string; readonly reference: string; readonly title: string; readonly state: IncidentState; readonly category: string; readonly affectedOrganizationsCount: number }[];
   readonly correlationId: string;
 }
@@ -205,9 +209,14 @@ export interface StatusNoticeDto {
   readonly template: { readonly id: string; readonly templateKey: string; readonly version: number; readonly subject: string; readonly body: string };
   readonly state: StatusNoticeState;
   readonly draftedBy: string;
+  /** Whether the viewer drafted it: a notice is approved by someone else (0090). */
+  readonly draftedBySelf?: boolean;
   readonly draftedAt: string;
+  /** When the drafter may approve it themselves, if they are the sole approver. */
+  readonly soloApprovalAvailableAt?: string;
   readonly approvedBy: string | null;
   readonly approvedAt: string | null;
+  readonly approveMode?: 'DUAL' | 'SOLO' | null;
   readonly sentAt: string | null;
   readonly recipientCount: number | null;
   readonly organizationCount: number | null;

@@ -90,7 +90,21 @@ a migrated database without error.
 - `apps/web/src/growthPortal.test.tsx` (5) and `apps/web/src/rolePortal/growthTeam.test.tsx` (6).
 - Pins updated deliberately: super-admin baseline 19 → 21; staff-pool staff-only roles gain the growth roles.
 
-**Validation:** see the amendment below (run after this report was committed, per the agent brief).
+**Validation** (fresh database `one_growth01` on the local Docker Postgres, only `DATABASE_URL` exported):
+- `corepack pnpm db:migrate` twice — pass (76 applied, then 0 applied / 76 already applied); 0091 also re-run
+  by hand on the migrated database — pass.
+- `corepack pnpm typecheck` — pass. `corepack pnpm build` — pass.
+- `corepack pnpm -r --no-bail --workspace-concurrency=1 test` — 3 561 of 3 563 tests passed across 18
+  test-bearing packages (api 1 253, web 892/893, persistence 405, authorization 381, others). Two failures,
+  both environmental and both passing when re-run alone:
+  - web `App.test.tsx` › "resolves every visible navigation item for every new role without disabled nav" —
+    a 20 s timeout under full-suite load (it renders every demo portal; the Growth portal is not among
+    them). Re-run alone: 97/97 passed.
+  - api `institution-accreditation-exports.integration.spec.ts` — teardown-only "out of shared memory" on
+    DROP SCHEMA; all its tests had passed. Re-run alone: 11/11 passed.
+- Android: `./gradlew --no-daemon -q :app:compileDebugKotlin` with the Android Studio JBR — pass, no errors.
+- CI parity: optional-chain policy grep — nothing found; private-key and conflict-marker greps — nothing found;
+  `corepack pnpm audit --prod --audit-level=high` — exit 0 (2 moderate, pre-existing).
 
 **Acceptance criteria**
 - [x] A growth executive gets 403 on every `/api/v1/operations/*` route (one spec enumerates them) — also a

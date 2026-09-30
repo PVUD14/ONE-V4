@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { Bell, BookOpen, Briefcase, Building2, CalendarDays, ClipboardCheck, FileText, GraduationCap, Home, MapPinned, MessageSquare, Route, Search, User, Users, Video, Wrench } from 'lucide-react';
 import './pilot.css';
-import { BrandWordmark } from '../brand.js';
+import { BrandLogo } from '../brand.js';
 import { AssistantWidget } from '../assistantWidget.js';
 import { pilotCompanies, pilotPersona, pilotPopularCourses } from './pilotData.js';
 import { pilotApplicants, pilotEmployerPersona, pilotEmployerRoles, pilotInstitutionPersona, pilotRoster } from './pilotStaffData.js';
@@ -159,8 +159,8 @@ function PilotShell({ identity, nav, page, onNavigate, onSignOut, email, notific
     <PilotOverlayProvider>
       <aside className="pilot-sidebar" aria-label="Pilot navigation">
         <div className="pilot-brand">
-          <BrandWordmark height={30} />
-          <span><strong>ONE</strong><small>LEARN | PREPARE | BUILD | GROW</small></span>
+          <BrandLogo height={46} />
+          <span><small>LEARN | PREPARE | BUILD | GROW</small></span>
         </div>
         {nav.map((item) => {
           const Icon = item.icon;
@@ -172,7 +172,7 @@ function PilotShell({ identity, nav, page, onNavigate, onSignOut, email, notific
           );
         })}
         <div className="pilot-side-note">
-          <strong>ONE by Ai8ht</strong>
+          <strong>ONE by AI8HT</strong>
           <p>Pilot preview environment.</p>
         </div>
       </aside>

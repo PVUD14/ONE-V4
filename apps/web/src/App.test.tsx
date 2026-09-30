@@ -94,6 +94,8 @@ describe('All-role portal registry and preview workflows', () => {
       window.history.pushState(null, '', path);
       render(<App />);
       expect(screen.getByText('ONE PLATFORM')).toBeInTheDocument();
+      expect(screen.getByRole('img', { name: 'ONE by AI8HT' })).toHaveAttribute('src', '/assets/one-logo-light.png');
+      expect(document.title).toBe('Sign in | ONE by AI8HT');
       expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
       expect(screen.getByText('LEARN | PREPARE | BUILD | GROW')).toBeInTheDocument();
       expect(screen.getByLabelText('Email')).toHaveAttribute('autocomplete', 'username');
@@ -112,7 +114,8 @@ describe('All-role portal registry and preview workflows', () => {
     fireEvent.click(screen.getByRole('link', { name: 'Request employer access' }));
     expect(window.location.pathname).toBe('/employer-access');
     expect(screen.getByRole('heading', { name: 'Request employer access' })).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: 'AI8HT' })).toBeInTheDocument();
+    const logo = screen.getByRole('img', { name: 'ONE by AI8HT' });
+    expect(logo).toHaveAttribute('src', '/assets/one-logo-light.png');
     expect(screen.getByLabelText('Work email')).toBeInTheDocument();
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/employer-access-requests'))).toBe(false);
   });
@@ -181,7 +184,7 @@ describe('All-role portal registry and preview workflows', () => {
       expect(screen.getByLabelText(`${portal.roleName} navigation`)).toBeInTheDocument();
       expect(screen.getByText(portal.previewUser)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: portal.nav[0]!.label })).toHaveAttribute('aria-current', 'page');
-      expect(document.title).toBe(`${portal.dashboardTitle} | ONE`);
+      expect(document.title).toBe(`${portal.dashboardTitle} | ONE by AI8HT`);
     }
   });
 
@@ -690,7 +693,7 @@ describe('Student portal completion', () => {
     fetchMock.mockResolvedValue({ ok: true });
     window.history.pushState(null, '', '/demo/student/learning');
     render(<App />);
-    await waitFor(() => expect(document.title).toBe('Learning - Student | ONE'));
+    await waitFor(() => expect(document.title).toBe('Learning - Student | ONE by AI8HT'));
   });
   it('edits Student-owned target career with validation and session-local feedback', () => {
     fetchMock.mockResolvedValue({ ok: true });
@@ -911,13 +914,13 @@ describe('Institution placement officer portal foundation', () => {
     expect(screen.getByLabelText('Placement Officer identity')).toHaveTextContent('Anita Sharma');
     await waitFor(() => expect(screen.getByText('API Online')).toBeInTheDocument());
     expect(screen.queryByText(/127\.0\.0\.1:3000/i)).not.toBeInTheDocument();
-    expect(document.title).toBe('Placement Dashboard | ONE');
+    expect(document.title).toBe('Placement Dashboard | ONE by AI8HT');
   });
 
   it.each([
-    ['/demo/institution/placement-officer/students', 'Students - Placement Officer | ONE'],
-    ['/demo/institution/placement-officer/assessments', 'Assessments - Placement Officer | ONE'],
-    ['/demo/institution/placement-officer/reports', 'Reports - Placement Officer | ONE'],
+    ['/demo/institution/placement-officer/students', 'Students - Placement Officer | ONE by AI8HT'],
+    ['/demo/institution/placement-officer/assessments', 'Assessments - Placement Officer | ONE by AI8HT'],
+    ['/demo/institution/placement-officer/reports', 'Reports - Placement Officer | ONE by AI8HT'],
   ])('sets staff document title for %s', (path, title) => {
     window.history.pushState(null, '', path);
     render(<App />);

@@ -9,14 +9,14 @@
  * The API answers the same way whatever already exists on ONE, so the confirmation here never
  * says whether a company or address is known. Rate limits and the work-email rule are the
  * server's; this page only reports their answers. It renders without a session, so it is
- * routed before any signed-in check in App.tsx. Branding is the AI8HT wordmark via
- * BrandWordmark, like the sign-in page it sits beside.
+ * routed before any signed-in check in App.tsx. Branding is the ONE logo via
+ * BrandLogo, like the sign-in page it sits beside.
  */
 import { useEffect, useState, type FormEvent } from 'react';
 import { ApiRequestError, submitEmployerAccessRequest } from './api.js';
-import { BrandWordmark } from './brand.js';
+import { BrandLogo } from './brand.js';
 
-const productName = 'ONE';
+const productName = 'ONE by AI8HT';
 
 function messageFor(error: unknown): string {
   if (!(error instanceof ApiRequestError)) return 'Your request could not be sent. Check your connection and try again.';
@@ -57,7 +57,7 @@ export function PublicEmployerAccessPage({ onNavigate }: { readonly onNavigate: 
 
   return <main className="login-shell">
     <section className="login-card" aria-labelledby="one-employer-access-title">
-      <BrandWordmark className="login-logo" height={44} />
+      <BrandLogo className="login-logo" height={72} />
       <p className="auth-eyebrow">ONE FOR EMPLOYERS</p>
       <h1 id="one-employer-access-title">Request employer access</h1>
       {sent ? <>

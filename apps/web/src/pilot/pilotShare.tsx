@@ -170,7 +170,7 @@ export function ReportFormatBody({ filenameBase, title, rows }: {
       table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
       td { border-bottom: 1px solid #e5eaf2; padding: 8px 10px; text-align: left; }
       tr:first-child td { font-weight: 700; }
-    </style><h1>${title}</h1><p>ONE by Ai8ht · sample data · use your browser's dialog to save as PDF</p><table>${bodyRows}</table>`);
+    </style><h1>${title}</h1><p>ONE by AI8HT · sample data · use your browser's dialog to save as PDF</p><table>${bodyRows}</table>`);
     printable.document.close();
     printable.focus();
     printable.print();

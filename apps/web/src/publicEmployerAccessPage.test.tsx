@@ -57,9 +57,9 @@ describe('EMP-04 public employer access request page', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Send request' }));
   }
 
-  it('carries the AI8HT wordmark, sends the four fields without a session, and promises nothing', async () => {
+  it('carries the ONE logo, sends the four fields without a session, and promises nothing', async () => {
     render(<PublicEmployerAccessPage onNavigate={() => undefined} />);
-    expect(screen.getByRole('img', { name: 'AI8HT' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'ONE by AI8HT' })).toHaveAttribute('src', '/assets/one-logo-light.png');
     fill();
     expect(await screen.findByText('Thank you. Your request has been received.')).toBeInTheDocument();
     expect(screen.getByText(/No account has been created and nothing has been published/)).toBeInTheDocument();

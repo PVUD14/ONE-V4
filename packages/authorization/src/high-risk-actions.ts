@@ -13,6 +13,7 @@ import { skillPublishReasons } from './skill-map.js';
 import { questionPublishReasons } from './question-bank.js';
 import { lessonPublishReasons } from './lesson-editor.js';
 import { commsTemplatePublishReasons } from './incidents.js';
+import { aiFeatureEnableReasons, aiLimitsRaiseReasons } from './ai-operations.js';
 import { hasInternalCapability, internalCapabilityGrantReasons, type InternalCapability, type InternalCapabilityContext } from './internal-capabilities.js';
 
 export const highRiskActionKeys = [
@@ -33,6 +34,10 @@ export const highRiskActionKeys = [
   // OPS-16. Extended key too (0081 adds it to operation_approval_extended_target_type): a status
   // notice template version reaches notification_templates only with a second person's approval.
   'COMMS_TEMPLATE_PUBLISH',
+  // OPS-12. Extended keys too (0089 adds them to operation_approval_extended_target_type): switching
+  // an AI feature on, and widening its cap, window or input limit.
+  'AI_FEATURE_ENABLE',
+  'AI_FEATURE_LIMITS_RAISE',
 ] as const;
 
 /** The keys 0038's CHECK allows in `action_key`; any other key is an extended key (0051). */
@@ -49,7 +54,7 @@ export type HighRiskActionKey = (typeof highRiskActionKeys)[number];
 export interface HighRiskActionDefinition {
   /** Needed both to request the action and to execute it. */
   readonly capability: InternalCapability;
-  readonly targetType: 'organization' | 'feature_flag' | 'outbox_backlog' | 'data_retention_hold' | 'organization_membership' | 'career_requirement_set' | 'content_revision' | 'status_notice_template';
+  readonly targetType: 'organization' | 'feature_flag' | 'outbox_backlog' | 'data_retention_hold' | 'organization_membership' | 'career_requirement_set' | 'content_revision' | 'status_notice_template' | 'ai_feature_policy';
   readonly label: string;
 }
 
@@ -64,6 +69,8 @@ export const highRiskActions: Readonly<Record<HighRiskActionKey, HighRiskActionD
   CONTENT_QUESTION_PUBLISH: { capability: 'CONTENT_PUBLISH', targetType: 'content_revision', label: 'Publish a readiness-check question' },
   CONTENT_LESSON_PUBLISH: { capability: 'CONTENT_PUBLISH', targetType: 'content_revision', label: 'Publish a lesson that changes readiness inputs' },
   COMMS_TEMPLATE_PUBLISH: { capability: 'COMMS_TEMPLATES', targetType: 'status_notice_template', label: 'Publish a status notice template version' },
+  AI_FEATURE_ENABLE: { capability: 'AI_OPS_CONFIGURE', targetType: 'ai_feature_policy', label: 'Switch an AI feature on' },
+  AI_FEATURE_LIMITS_RAISE: { capability: 'AI_OPS_CONFIGURE', targetType: 'ai_feature_policy', label: 'Raise an AI feature cap or limit' },
 };
 
 export function isLegacyHighRiskActionKey(key: HighRiskActionKey): boolean {
@@ -89,6 +96,8 @@ export const approvalRequestReasons: Readonly<Record<HighRiskActionKey, readonly
   CONTENT_QUESTION_PUBLISH: questionPublishReasons,
   CONTENT_LESSON_PUBLISH: lessonPublishReasons,
   COMMS_TEMPLATE_PUBLISH: commsTemplatePublishReasons,
+  AI_FEATURE_ENABLE: aiFeatureEnableReasons,
+  AI_FEATURE_LIMITS_RAISE: aiLimitsRaiseReasons,
 };
 
 /** Hours from request to expiry; one window covers deciding and executing. */

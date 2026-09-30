@@ -29,6 +29,8 @@ export {
   type PromptVersion,
 } from './prompts.js';
 
+export { onePromptRegistry, registeredPrompts } from './registry.js';
+
 export {
   AiCapExceededError,
   AiFeatureDisabledError,

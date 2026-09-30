@@ -130,3 +130,4 @@ export * from './relationship-lifecycle.js';
 export * from './access-reviews.js';
 export * from './college-health.js';
 export * from './incidents.js';
+export * from './ai-operations.js';

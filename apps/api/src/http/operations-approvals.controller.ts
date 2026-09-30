@@ -12,6 +12,7 @@
 import {
   BadRequestException,
   Body,
+  ConflictException,
   Controller,
   ForbiddenException,
   Get,
@@ -25,6 +26,8 @@ import {
 } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import {
+  classifyAiLimitsChange,
+  refuseAiFeatureEnable,
   approvalDecisionReasons,
   careerReleaseLabels,
   approvalRequestReasons,
@@ -51,6 +54,7 @@ import { loadSkillRevisionForPublish } from '@planthepath/persistence/src/skill-
 import { loadQuestionRevisionForPublish } from '@planthepath/persistence/src/question-bank.js';
 import { loadLessonRevisionForPublish } from '@planthepath/persistence/src/lesson-editor.js';
 import { loadStatusNoticeTemplate } from '@planthepath/persistence/src/status-notices.js';
+import { loadAiPolicyFacts } from '@planthepath/persistence/src/ai-operations.js';
 import {
   countHighRiskApprovers,
   createOperationApproval,
@@ -64,13 +68,14 @@ import {
 import type { PersistenceDb } from '@planthepath/persistence/src/repositories.js';
 import { API_PERSISTENCE_DB, ProtectedApiAuthenticationGuard, requireTrustedAuthorization, safeError, type ProtectedHttpRequest } from './api-security.js';
 import { dbCapabilityGrantLoader, loadCallerCapabilityContext } from './internal-capability-guard.js';
-import { approvalHttpError, approvalPayloads } from './operation-approval-gate.js';
+import { approvalHttpError, approvalPayloads, readAiLimits } from './operation-approval-gate.js';
 
 type Actor = InternalCapabilityContext & { readonly userId: string };
 type QueryResult<T> = { rows: T[] };
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const flagKeyPattern = /^[a-z0-9][a-z0-9._-]{2,63}$/;
+const aiFeatureKeyPattern = /^[a-z0-9][a-z0-9._-]{2,63}$/;
 const listStates: readonly ApprovalListState[] = ['PENDING', 'APPROVED', 'REJECTED', 'EXECUTED', 'EXPIRED'];
 const defaultLimit = 50;
 const maxLimit = 200;
@@ -312,6 +317,38 @@ export class OperationsApprovalsController {
         if (refusal) throw new ForbiddenException(domainError(refusal, correlationId));
         return { targetId: templateId, canonical: approvalPayloads.COMMS_TEMPLATE_PUBLISH({ templateId, contentHash: template.contentHash, reasonCode }) };
       }
+      case 'AI_FEATURE_ENABLE': {
+        // OPS-12: only a feature that could be switched on the moment it is approved — kill switch
+        // released, prompt declared, passing evaluation for its current model and prompt. The server
+        // binds the model, prompt version and evaluation from the database, not from the request.
+        if (typeof payload.featureKey !== 'string' || !aiFeatureKeyPattern.test(payload.featureKey)) throw badRequest('AI_FEATURE_KEY_INVALID', correlationId);
+        const facts = await loadAiPolicyFacts(this.db, payload.featureKey);
+        if (!facts) throw new OperationApprovalError('APPROVAL_TARGET_NOT_FOUND');
+        const refusal = refuseAiFeatureEnable({
+          enabled: facts.enabled, killSwitchEngaged: facts.killSwitchEngaged,
+          promptDeclared: facts.promptKey !== null && facts.promptVersion !== null, evaluationPasses: facts.passingEvaluationId !== null,
+        });
+        if (refusal === 'AI_FEATURE_ALREADY_ENABLED') throw new OperationApprovalError('APPROVAL_NOT_REQUIRED');
+        if (refusal) throw new ConflictException(domainError(refusal, correlationId));
+        return {
+          targetId: facts.featureKey,
+          canonical: approvalPayloads.AI_FEATURE_ENABLE({
+            featureKey: facts.featureKey, model: facts.model, promptKey: facts.promptKey!, promptVersion: facts.promptVersion!,
+            evaluationId: facts.passingEvaluationId!, reasonCode,
+          }),
+        };
+      }
+      case 'AI_FEATURE_LIMITS_RAISE': {
+        // OPS-12: only a change that actually widens (any increase, or a window change).
+        if (typeof payload.featureKey !== 'string' || !aiFeatureKeyPattern.test(payload.featureKey)) throw badRequest('AI_FEATURE_KEY_INVALID', correlationId);
+        const next = readAiLimits(payload, correlationId);
+        const facts = await loadAiPolicyFacts(this.db, payload.featureKey);
+        if (!facts) throw new OperationApprovalError('APPROVAL_TARGET_NOT_FOUND');
+        if (classifyAiLimitsChange({ cap: facts.cap, capWindow: facts.capWindow, maxInputChars: facts.maxInputChars }, next) !== 'RAISE') {
+          throw new OperationApprovalError('APPROVAL_NOT_REQUIRED');
+        }
+        return { targetId: facts.featureKey, canonical: approvalPayloads.AI_FEATURE_LIMITS_RAISE({ featureKey: facts.featureKey, ...next, reasonCode }) };
+      }
     }
   }
 }
@@ -328,6 +365,8 @@ const payloadFields: Readonly<Record<HighRiskActionKey, readonly string[]>> = {
   CONTENT_QUESTION_PUBLISH: ['revisionId', 'reasonCode'],
   CONTENT_LESSON_PUBLISH: ['revisionId', 'reasonCode'],
   COMMS_TEMPLATE_PUBLISH: ['templateId', 'reasonCode'],
+  AI_FEATURE_ENABLE: ['featureKey', 'reasonCode'],
+  AI_FEATURE_LIMITS_RAISE: ['featureKey', 'cap', 'capWindow', 'maxInputChars', 'reasonCode'],
 };
 
 /**
@@ -372,6 +411,14 @@ function toApprovalDto(row: OperationApprovalRow, actor: Actor, approverCount: n
       lessonRevision: row.lessonRevision,
       commsTemplateKey: row.commsTemplateKey,
       commsTemplateVersion: row.commsTemplateVersion,
+      // OPS-12: the AI feature and what the approval binds (no identifiers beyond the feature key).
+      aiFeatureKey: row.actionKey === 'AI_FEATURE_ENABLE' || row.actionKey === 'AI_FEATURE_LIMITS_RAISE' ? payload.featureKey ?? null : null,
+      aiModel: row.actionKey === 'AI_FEATURE_ENABLE' ? payload.model ?? null : null,
+      aiPromptKey: row.actionKey === 'AI_FEATURE_ENABLE' ? payload.promptKey ?? null : null,
+      aiPromptVersion: row.actionKey === 'AI_FEATURE_ENABLE' ? payload.promptVersion ?? null : null,
+      aiCap: row.actionKey === 'AI_FEATURE_LIMITS_RAISE' ? payload.cap ?? null : null,
+      aiCapWindow: row.actionKey === 'AI_FEATURE_LIMITS_RAISE' ? payload.capWindow ?? null : null,
+      aiMaxInputChars: row.actionKey === 'AI_FEATURE_LIMITS_RAISE' ? payload.maxInputChars ?? null : null,
     },
     reasonCode: row.reasonCode,
     note: row.note,

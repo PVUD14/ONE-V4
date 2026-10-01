@@ -10,6 +10,7 @@ import { App } from './App.js';
 import { growthPortal } from './rolePortalConfig.js';
 
 const fetchMock = vi.fn();
+let territoryResponse: Record<string, unknown> | null = null;
 
 function jwtWithEmail(email: string): string {
   const payload = window.btoa(JSON.stringify({ email })).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
@@ -30,6 +31,9 @@ function signInAs(role: 'GROWTH_EXECUTIVE' | 'GROWTH_MANAGER', me: Record<string
     if (url.endsWith('/api/v1/security/context')) {
       return { ok: true, json: async () => ({ userId: 'growth-user', memberships: [{ organizationId: 'platform-1', role, scope: { organizationId: 'platform-1' } }] }) };
     }
+    if (url.endsWith('/api/v1/growth/territory')) {
+      return { ok: true, json: async () => (territoryResponse ?? { role, regions: [], correlationId: 'corr-territory' }) };
+    }
     if (url.endsWith('/api/v1/growth/me')) {
       return { ok: true, json: async () => (me ?? { role, staffType: 'EMPLOYEE', teams: [], correlationId: 'corr-me' }) };
     }
@@ -38,6 +42,7 @@ function signInAs(role: 'GROWTH_EXECUTIVE' | 'GROWTH_MANAGER', me: Record<string
 }
 
 beforeEach(() => {
+  territoryResponse = null;
   fetchMock.mockReset();
   vi.stubGlobal('fetch', fetchMock);
 });
@@ -93,14 +98,14 @@ describe('a growth executive signing in', () => {
     // Every figure slot is NA until its source exists: nothing is invented.
     expect(within(stats).getAllByText('NA')).toHaveLength(4);
     expect(within(stats).queryByText(/\d/)).not.toBeInTheDocument();
-    expect(screen.getByText(/Leads, field visits, territory, targets and commission are not built yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/Leads, field visits, targets and commission are not built yet/i)).toBeInTheDocument();
   });
 
   it('shows an honest empty state on every other page', async () => {
     signInAs('GROWTH_EXECUTIVE');
     render(<App />);
     const sidebar = await screen.findByLabelText('Growth navigation');
-    for (const label of ['Leads', 'Field', 'Territory', 'Targets', 'Commission']) {
+    for (const label of ['Leads', 'Field', 'Targets', 'Commission']) {
       fireEvent.click(within(sidebar).getByRole('button', { name: label }));
       expect(await screen.findByRole('heading', { name: label })).toBeInTheDocument();
       expect(screen.getByText(/is not built yet/i)).toBeInTheDocument();
@@ -134,5 +139,47 @@ describe('a growth manager signing in', () => {
     // A manager with no team rows yet is told so, not shown someone else's team.
     fireEvent.click(within(sidebar).getByRole('button', { name: 'Home' }));
     expect(await screen.findByText(/not on a team yet/i)).toBeInTheDocument();
+  });
+});
+
+describe('Growth → Territory (GROWTH-02)', () => {
+  const since = new Date(Date.now() - 86_400_000).toISOString();
+
+  it('shows an executive the regions they work, the areas, and the region managers, with unowned leads NA', async () => {
+    territoryResponse = {
+      role: 'GROWTH_EXECUTIVE', correlationId: 'corr-territory',
+      regions: [{
+        id: 'region-1', name: 'South-1', myRole: 'EXECUTIVE', since,
+        areas: [{ stateCode: 'IN-KA', stateName: 'Karnataka', districtCode: null, districtName: null }, { stateCode: 'IN-TN', stateName: 'Tamil Nadu', districtCode: 603, districtName: 'Chennai' }],
+        people: [{ email: 'region.manager@uat.example.test', role: 'MANAGER', since }],
+      }],
+    };
+    signInAs('GROWTH_EXECUTIVE');
+    render(<App />);
+    const sidebar = await screen.findByLabelText('Growth navigation');
+    fireEvent.click(within(sidebar).getByRole('button', { name: 'Territory' }));
+    const region = await screen.findByLabelText('Region South-1');
+    expect(within(region).getByText('Karnataka (whole state)')).toBeInTheDocument();
+    expect(within(region).getByText('Chennai, Tamil Nadu')).toBeInTheDocument();
+    expect(within(region).getByText('region.manager@uat.example.test')).toBeInTheDocument();
+    expect(within(region).getByText('You work this region')).toBeInTheDocument();
+    const stats = screen.getByLabelText('Territory summary');
+    expect(within(stats).getAllByText('1')).toHaveLength(2); // one region, one manager
+    expect(within(stats).getByText('2')).toBeInTheDocument(); // two areas
+    // The unowned-lead count has no source yet: NA in its slot, never a number.
+    expect(within(stats).getAllByText('NA')).toHaveLength(1);
+    expect(within(stats).getByText('Unowned leads')).toBeInTheDocument();
+    expect(screen.queryByText(/Territory is not built yet/i)).not.toBeInTheDocument();
+  });
+
+  it('tells a person with no region so plainly, and invents none', async () => {
+    signInAs('GROWTH_MANAGER');
+    render(<App />);
+    const sidebar = await screen.findByLabelText('Growth navigation');
+    fireEvent.click(within(sidebar).getByRole('button', { name: 'Territory' }));
+    expect(await screen.findByText('No region assigned')).toBeInTheDocument();
+    const stats = screen.getByLabelText('Territory summary');
+    expect(within(stats).getAllByText('0')).toHaveLength(3);
+    expect(screen.queryByLabelText(/^Region /)).not.toBeInTheDocument();
   });
 });

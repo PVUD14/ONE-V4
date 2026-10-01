@@ -51,6 +51,7 @@ import { CalendarPage } from './calendarPage.js';
 import { PublicProfilePage } from './publicProfilePage.js';
 import { PublicEmployerAccessPage } from './publicEmployerAccessPage.js';
 import { ShareProfilePanel } from './shareProfilePanel.js';
+import { StudentTalentPoolCard } from './talentPool.js';
 import { ScreeningAssessmentsPage } from './screeningAssessmentsPage.js';
 import { V2EmptyState, V2Stat } from './dashboardsV2.js';
 import { StudentDashboardV3 } from './studentDashboardV3.js';
@@ -897,7 +898,7 @@ function RouteScreen({ route, authenticated, currentStudent }: { readonly route:
 
 function AuthenticatedStudentRoute({ route, currentStudent }: { readonly route: RouteKey; readonly currentStudent: CurrentStudentState }): React.ReactElement {
   if (route === 'dashboard') return <AuthenticatedStudentDashboard currentStudent={currentStudent} />;
-  if (route === 'profile') return <StudentProfileV3><AuthenticatedStudentProfile /><ShareProfilePanel /><StudentOutcomesCard /></StudentProfileV3>;
+  if (route === 'profile') return <StudentProfileV3><AuthenticatedStudentProfile /><ShareProfilePanel /><StudentTalentPoolCard /><StudentOutcomesCard /></StudentProfileV3>;
   if (route === 'documents') return <AuthenticatedStudentDocuments />;
   if (route === 'opportunities') return <StudentOpportunitiesV3><StudentOpportunitiesPage /><AuthenticatedStudentSavedOpportunities /></StudentOpportunitiesV3>;
   if (route === 'applications') return <StudentApplicationsPage />;
@@ -950,7 +951,9 @@ function AuthenticatedStudentProfile(): React.ReactElement {
       profileSummary: String(form.get('profileSummary') ?? '').trim(),
       portfolioUrl: String(form.get('portfolioUrl') ?? '').trim(),
       visibilityState: String(form.get('visibilityState') ?? 'PRIVATE'),
-      employerDiscoveryEnabled: form.get('employerDiscoveryEnabled') === 'on',
+      // EMP-14: being found by employers is joined and left only through the Talent pool card below,
+      // which also records the consent; this form keeps whatever that set.
+      employerDiscoveryEnabled: profile?.employerDiscoveryEnabled ?? false,
       careerInterests: String(form.get('careerInterests') ?? '').split(',').map((item) => item.trim()).filter(Boolean),
     };
     try {
@@ -969,8 +972,7 @@ function AuthenticatedStudentProfile(): React.ReactElement {
       <label className="student-form-field"><span>Career interests, comma separated</span><input name="careerInterests" defaultValue={(profile?.careerInterests ?? []).join(', ')} /></label>
       <label className="student-form-field"><span>Portfolio URL</span><input name="portfolioUrl" defaultValue={profile?.portfolioUrl ?? ''} placeholder="https://..." /></label>
       <label className="student-form-field"><span>Summary</span><textarea name="profileSummary" defaultValue={profile?.profileSummary ?? ''} maxLength={2000} /></label>
-      <label className="student-form-field"><span>Visibility</span><select name="visibilityState" defaultValue={profile?.visibilityState ?? 'PRIVATE'}><option>PRIVATE</option><option>INSTITUTION_VISIBLE</option><option>EMPLOYER_DISCOVERY</option></select></label>
-      <label className="setting-row preference-row"><span>Employer discovery</span><input name="employerDiscoveryEnabled" type="checkbox" defaultChecked={profile?.employerDiscoveryEnabled ?? false} /></label>
+      <label className="student-form-field"><span>Visibility</span><select key={profile?.visibilityState ?? 'PRIVATE'} name="visibilityState" defaultValue={profile?.visibilityState ?? 'PRIVATE'}><option>PRIVATE</option><option>INSTITUTION_VISIBLE</option>{profile?.visibilityState === 'EMPLOYER_DISCOVERY' ? <option>EMPLOYER_DISCOVERY</option> : null}</select></label>
       <button type="submit">Save profile</button>
     </form>
   </div>;

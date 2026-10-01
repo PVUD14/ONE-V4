@@ -213,10 +213,13 @@ describe('EMP-07 employer: Candidate Detail', () => {
     expect(await screen.findByRole('region', { name: 'Candidate detail' })).toBeInTheDocument();
   });
 
-  it('keeps Talent Pool honest until consented discovery exists', () => {
-    render(<EmployerTalentPoolPage />);
+  it('keeps Talent Pool honest while consented discovery is switched off (EMP-14, HG-4 pending)', async () => {
+    await authenticate();
+    routes = { [`/api/v1/employers/${employerId}/talent-pool`]: () => ({ body: { talentPool: { available: false } } }) };
+    render(<EmployerTalentPoolPage employerId={employerId} />);
+    expect(await screen.findByRole('heading', { name: 'Not available yet' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Talent Pool' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Not available yet' })).toBeInTheDocument();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Search the talent pool' })).not.toBeInTheDocument();
   });
 });

@@ -36,6 +36,8 @@ export interface OpportunitySummaryDto {
   readonly company?: OpportunityCompanyDto;
   /** EMP-11: live campus drives at the student's college through which this job reaches them. */
   readonly campusDrives?: readonly { readonly institutionName: string; readonly state: CampusDriveState; readonly scheduledStartAt: string | null }[];
+  /** EMP-14: listed because an employer invited the student from the talent pool (invite-only job). */
+  readonly invitedFromTalentPool?: boolean;
 }
 
 /** What a student sees about the company behind a job (EMP-04). Unfilled fields are null. */

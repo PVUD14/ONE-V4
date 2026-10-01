@@ -44,3 +44,4 @@ export * from './api/engineHealth.js';
 export * from './api/learningActions.js';
 export * from './api/cohortReadiness.js';
 export * from './api/growth.js';
+export * from './api/talentPool.js';

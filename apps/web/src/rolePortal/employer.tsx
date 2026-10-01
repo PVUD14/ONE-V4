@@ -69,7 +69,8 @@ function EmployerManagementRealityPage({ portal, routeLabel }: { readonly portal
   // EMP-07: Candidate Detail shows one applicant as they chose to be seen, and Talent Pool says it
   // is not available yet (EMP-14). Both used to fall through to the applicants list below.
   if (routeLabel === 'Candidate Detail') return <EmployerCandidateDetailPage key={employerId} employerId={employerId} />;
-  if (routeLabel === 'Talent Pool') return <EmployerTalentPoolPage />;
+  // EMP-14: consented discovery, behind its flag; while off the page keeps saying it is not available.
+  if (routeLabel === 'Talent Pool') return <EmployerTalentPoolPage key={employerId} employerId={employerId} />;
   if (/applicant|candidate|talent/i.test(routeLabel)) {
     return <StaffPilotWrap title="Applicants" subtitle="Move real candidates through your process; every change is logged.">
       <EmployerApplicantsPage key={employerId} employerId={employerId} canExport={employerManagesOrganisation(employerMembership.role)} /></StaffPilotWrap>;

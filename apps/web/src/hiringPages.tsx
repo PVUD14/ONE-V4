@@ -167,7 +167,12 @@ export function StudentOpportunitiesPage(): React.ReactElement {
       : 'No opportunities are open to you right now.'));
   };
 
-  useEffect(() => { void reload().catch(() => setStatus('Opportunities could not be loaded.')); }, []);
+  useEffect(() => {
+    void reload().catch(() => setStatus('Opportunities could not be loaded.'));
+    // EMP-14: a talent-pool invitation links here with ?opportunity=<id>, so the invited job opens directly.
+    const linked = new URLSearchParams(window.location.search).get('opportunity');
+    if (linked && /^[0-9a-f-]{36}$/i.test(linked)) void openDetail(linked);
+  }, []);
 
   async function openDetail(id: string): Promise<void> {
     const token = getAccessToken();
@@ -266,6 +271,7 @@ export function StudentOpportunitiesPage(): React.ReactElement {
             </div>
             <div className="hiring-actions">
               {(item.campusDrives ?? []).map((drive) => <span key={drive.institutionName} className="hiring-tag">Campus drive · {drive.institutionName}</span>)}
+              {item.invitedFromTalentPool ? <span className="hiring-tag">Invited from the talent pool</span> : null}
               {item.alreadyApplied ? <span className="hiring-tag">Applied</span> : null}
               <button type="button" className="secondary" onClick={() => { void openDetail(item.id); }}>View details</button>
             </div>

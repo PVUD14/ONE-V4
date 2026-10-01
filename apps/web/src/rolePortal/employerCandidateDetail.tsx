@@ -6,9 +6,9 @@
  * pick a job and an applicant whose details are still shared, and the consented snapshot, résumé,
  * eligibility flags, timeline, interviews and offer appear (CandidateDetailPanel), with the EMP-10
  * conversation beneath them (EmployerConversationPanel), and the employer's own screening-test
- * results for that application (EMP-12, EmployerCandidateAssessmentsPanel). Talent Pool says
- * plainly that it is not available yet — consented discovery is EMP-14 — instead of borrowing the
- * applicants list to look populated. No navigation item is added, removed, renamed or moved.
+ * results for that application (EMP-12, EmployerCandidateAssessmentsPanel). Talent Pool is consented
+ * discovery (EMP-14, talentPool.tsx); while it is switched off it says plainly that it is not
+ * available, instead of borrowing the applicants list to look populated. No navigation item is added, removed, renamed or moved.
  */
 import { useEffect, useState } from 'react';
 import { getAccessToken } from '../auth.js';
@@ -18,6 +18,7 @@ import { listEmployerApplicants, listEmployerOpportunities, type EmployerApplica
 import { CandidateDetailPanel } from '../applicationSnapshotView.js';
 import { EmployerConversationPanel } from '../applicationMessages.js';
 import { EmployerCandidateAssessmentsPanel } from '../employerAssessmentsPage.js';
+import { EmployerTalentPoolWorkspace } from '../talentPool.js';
 
 function humanise(value: string): string {
   return value.replace(/_/g, ' ').toLowerCase().replace(/^./, (c) => c.toUpperCase());
@@ -94,16 +95,10 @@ export function EmployerCandidateDetailPage({ employerId }: { readonly employerI
   </StaffPilotWrap>;
 }
 
-/** Talent Pool, honestly: consented discovery (EMP-14) does not exist yet. */
-export function EmployerTalentPoolPage(): React.ReactElement {
-  return <section className="role-module role-module--dense">
-    <div className="role-page-heading"><div>
-      <span className="eyebrow">Not available yet</span>
-      <h1>Talent Pool</h1>
-      <p>You can see people who applied to your jobs under Applicants and Candidate Detail.</p>
-    </div></div>
-    <div className="role-wide"><V2EmptyState icon="🧭" title="Not available yet"
-      note="Talent Pool will list students who have chosen to be discoverable by employers. That choice does not exist in ONE yet, so nobody is listed here."
-      hint="Nothing is hidden: students appear only after they opt in." /></div>
-  </section>;
+/**
+ * Talent Pool: consented discovery (EMP-14, ADR-044). While the feature is off (HG-4 pending) the API
+ * answers `available: false` and the page keeps the honest not-available state from EMP-07.
+ */
+export function EmployerTalentPoolPage({ employerId }: { readonly employerId: string }): React.ReactElement {
+  return <EmployerTalentPoolWorkspace employerId={employerId} />;
 }

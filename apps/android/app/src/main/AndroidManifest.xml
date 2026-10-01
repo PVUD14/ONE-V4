@@ -3,6 +3,11 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- GROWTH-06: the offline field queue is sent when a network appears. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- GROWTH-06 (design 14.3): approximate location, asked for only when a growth person taps
+         "Attach my location" on a visit, and read only then. Never fine, never background. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
     <application
         android:label="@string/app_name"
@@ -29,5 +34,10 @@
                 <data android:scheme="one.ai8ht.pro" android:host="signin" />
             </intent-filter>
         </activity>
+
+        <!-- GROWTH-06: the morning reminder for a growth follow-up, scheduled on the phone. -->
+        <receiver
+            android:name=".GrowthReminderReceiver"
+            android:exported="false" />
     </application>
 </manifest>

@@ -249,6 +249,48 @@ object Api {
     suspend fun recordGrowthContactNotice(context: Context, leadId: String, contactId: String): GrowthLeadDetailDto =
         json.decodeFromString<GrowthLeadEnvelope>(request(context, "POST", "/api/v1/growth/leads/$leadId/contacts/$contactId/notice")).lead
 
+    // GROWTH-06: field work. Reads return the raw body too, so the screens can keep a copy for
+    // offline use; every write goes through GrowthQueue with an Idempotency-Key.
+    suspend fun growthFieldRaw(context: Context, view: String): String = request(context, "GET", "/api/v1/growth/field?view=$view")
+
+    suspend fun growthLeadFieldRaw(context: Context, leadId: String): String = request(context, "GET", "/api/v1/growth/leads/$leadId/field")
+
+    suspend fun removeGrowthActivityLocation(context: Context, activityId: String): GrowthActivityDto =
+        json.decodeFromString<GrowthActivityEnvelope>(request(context, "POST", "/api/v1/growth/activities/$activityId/remove-location")).activity
+
+    internal fun growthActivityBody(kind: String, outcome: String?, contactId: String?, notes: String?, occurredAtIso: String, location: CoarseFix?): String =
+        kotlinx.serialization.json.buildJsonObject {
+            put("kind", kotlinx.serialization.json.JsonPrimitive(kind))
+            if (outcome != null) put("outcome", kotlinx.serialization.json.JsonPrimitive(outcome))
+            if (contactId != null) put("contactId", kotlinx.serialization.json.JsonPrimitive(contactId))
+            if (notes != null) put("notes", kotlinx.serialization.json.JsonPrimitive(notes))
+            put("occurredAt", kotlinx.serialization.json.JsonPrimitive(occurredAtIso))
+            if (location != null) put("location", kotlinx.serialization.json.buildJsonObject {
+                put("latitude", kotlinx.serialization.json.JsonPrimitive(location.latitude))
+                put("longitude", kotlinx.serialization.json.JsonPrimitive(location.longitude))
+                put("accuracyM", kotlinx.serialization.json.JsonPrimitive(location.accuracyM))
+            })
+        }.toString()
+
+    fun growthFollowUpBody(title: String, dueOn: String): String = kotlinx.serialization.json.buildJsonObject {
+        put("title", kotlinx.serialization.json.JsonPrimitive(title))
+        put("dueOn", kotlinx.serialization.json.JsonPrimitive(dueOn))
+    }.toString()
+
+    fun growthCancelBody(reasonCode: String): String = kotlinx.serialization.json.buildJsonObject {
+        put("reasonCode", kotlinx.serialization.json.JsonPrimitive(reasonCode))
+    }.toString()
+
+    fun growthLeadBody(kind: String, name: String, city: String?, aisheCode: String?, websiteDomain: String?, source: String): String =
+        kotlinx.serialization.json.buildJsonObject {
+            put("kind", kotlinx.serialization.json.JsonPrimitive(kind))
+            put("name", kotlinx.serialization.json.JsonPrimitive(name))
+            put("city", kotlinx.serialization.json.JsonPrimitive(city))
+            put("aisheCode", kotlinx.serialization.json.JsonPrimitive(aisheCode))
+            put("websiteDomain", kotlinx.serialization.json.JsonPrimitive(websiteDomain))
+            put("source", kotlinx.serialization.json.JsonPrimitive(source))
+        }.toString()
+
     suspend fun listInstitutionExams(context: Context, institutionId: String): List<InstitutionExamDto> =
         json.decodeFromString<InstitutionExamsEnvelope>(
             request(context, "GET", "/api/v1/institutions/$institutionId/assessments"),
@@ -821,6 +863,9 @@ internal fun StudentDto.formerStudentLine(): String? {
 @Serializable data class GrowthMeDto(
     /** GROWTH-03: open leads the person owns; null from an older server. */
     val openLeads: Int? = null,
+    /** GROWTH-06: the person's visits this IST month, and open follow-ups due today or earlier; null from an older server. */
+    val visitsThisMonth: Int? = null,
+    val followUpsDue: Int? = null,
     val role: String = "",
     val staffType: String? = null,
     val teams: List<GrowthTeamDto> = emptyList(),
@@ -897,6 +942,70 @@ internal fun StudentDto.formerStudentLine(): String? {
     val permissionBasis: String = "",
     val source: String = "",
     val notice: GrowthContactNoticeDto? = null,
+)
+/** GROWTH-06: field work. `location` is present only for the author and their manager. */
+@Serializable data class GrowthActivityContactDto(val id: String = "", val role: String? = null, val fullName: String? = null)
+@Serializable data class GrowthLocationDto(val latitude: Double = 0.0, val longitude: Double = 0.0, val accuracyM: Int = 0)
+@Serializable data class GrowthLocationRemovedDto(val at: String? = null, val reasonCode: String = "")
+@Serializable data class GrowthPersonRefDto(val email: String = "", val isMe: Boolean = false)
+@Serializable data class GrowthActivityDto(
+    val id: String = "",
+    val leadId: String = "",
+    val leadName: String = "",
+    val kind: String = "",
+    val outcome: String? = null,
+    val contact: GrowthActivityContactDto? = null,
+    val notes: String? = null,
+    val notesErased: Boolean = false,
+    val author: GrowthPersonRefDto = GrowthPersonRefDto(),
+    val occurredAt: String? = null,
+    val receivedAt: String? = null,
+    val location: GrowthLocationDto? = null,
+    val locationRemoved: GrowthLocationRemovedDto? = null,
+)
+@Serializable data class GrowthActivityEnvelope(val activity: GrowthActivityDto = GrowthActivityDto())
+@Serializable data class GrowthFollowUpDto(
+    val id: String = "",
+    val leadId: String = "",
+    val leadName: String = "",
+    val title: String? = null,
+    val titleErased: Boolean = false,
+    val dueOn: String = "",
+    val state: String = "",
+    val overdue: Boolean = false,
+    val dueToday: Boolean = false,
+    val assignee: GrowthPersonRefDto = GrowthPersonRefDto(),
+)
+@Serializable data class GrowthLocationNoticeDto(val version: String = "", val status: String = "", val text: List<String> = emptyList())
+@Serializable data class GrowthFieldVocabularyDto(
+    val kinds: List<String> = emptyList(),
+    val outcomes: List<String> = emptyList(),
+    val cancelReasons: List<String> = emptyList(),
+    val notesMax: Int = 2000,
+    val titleMax: Int = 280,
+    val reportMaxAgeDays: Int = 7,
+    val locationRetentionDays: Int = 180,
+    val locationNotice: GrowthLocationNoticeDto = GrowthLocationNoticeDto(),
+)
+@Serializable data class GrowthFieldCountsDto(
+    val visitsThisMonth: Int = 0, val activitiesThisMonth: Int = 0, val metThisMonth: Int = 0,
+    val followUpsOverdue: Int = 0, val followUpsDueToday: Int = 0, val followUpsOpen: Int = 0,
+)
+@Serializable data class GrowthFieldDto(
+    val view: String = "MINE",
+    val canSeeTeam: Boolean = false,
+    val today: String = "",
+    val counts: GrowthFieldCountsDto? = null,
+    val followUps: List<GrowthFollowUpDto> = emptyList(),
+    val activities: List<GrowthActivityDto> = emptyList(),
+    val vocabulary: GrowthFieldVocabularyDto = GrowthFieldVocabularyDto(),
+)
+@Serializable data class GrowthLeadFieldDto(
+    val leadId: String = "",
+    val canLog: Boolean = false,
+    val activities: List<GrowthActivityDto> = emptyList(),
+    val followUps: List<GrowthFollowUpDto> = emptyList(),
+    val vocabulary: GrowthFieldVocabularyDto = GrowthFieldVocabularyDto(),
 )
 @Serializable data class GrowthRegionPersonDto(val email: String = "", val role: String = "", val since: String = "")
 @Serializable data class StudentRelationshipDto(val institutionId: String = "", val state: String = "")

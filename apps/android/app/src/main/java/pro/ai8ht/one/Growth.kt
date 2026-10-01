@@ -11,6 +11,11 @@ package pro.ai8ht.one
 // set-up is desk work for operators and stays off the phone (design §14.1).
 //
 // GROWTH-03: a Leads tab (GrowthLeads.kt) and real counts in the Open leads and Unowned slots.
+//
+// GROWTH-06: a Field tab (GrowthField.kt) — follow-ups due, recent work, and what is still waiting
+// to be sent — real "Visits this month" and a Today card on Home, the offline queue sent whenever
+// the network returns, and a sign-out that warns about unsent work and then clears the cache, the
+// queue and the reminders from the phone.
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -35,7 +40,10 @@ import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.WorkOutline
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
+import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.filled.EventNote
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarDefaults
@@ -45,7 +53,9 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,6 +66,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
+import pro.ai8ht.one.data.Store
 import pro.ai8ht.one.ui.LocalOnePalette
 import pro.ai8ht.one.ui.Tone
 
@@ -96,6 +108,19 @@ internal fun GrowthScaffold(
     var inbox by remember { mutableStateOf<NotificationsEnvelope?>(null) }
     var showInboxOv by remember { mutableStateOf(false) }
     var showThemeOv by remember { mutableStateOf(false) }
+    var openLead by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+
+    // GROWTH-06: load the offline queue and send it now, and again whenever a network appears.
+    LaunchedEffect(Unit) { GrowthQueue.load(context); GrowthQueue.flush(context) }
+    DisposableEffect(Unit) {
+        val connectivity = context.getSystemService(android.net.ConnectivityManager::class.java)
+        val callback = object : android.net.ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: android.net.Network) { scope.launch { GrowthQueue.flush(context) } }
+        }
+        val registered = runCatching { connectivity?.registerDefaultNetworkCallback(callback) }.isSuccess
+        onDispose { if (registered) runCatching { connectivity?.unregisterNetworkCallback(callback) } }
+    }
 
     LaunchedEffect(Unit) {
         coroutineScope {
@@ -128,6 +153,8 @@ internal fun GrowthScaffold(
                     icon = { Icon(Icons.Filled.Home, null) }, label = { Text("Home") }, colors = colors)
                 NavigationBarItem(selected = tab == 1, onClick = { tab = 1 },
                     icon = { Icon(Icons.Filled.Handshake, null) }, label = { Text("Leads") }, colors = colors)
+                NavigationBarItem(selected = tab == 4, onClick = { tab = 4 },
+                    icon = { Icon(Icons.Filled.EventNote, null) }, label = { Text("Field") }, colors = colors)
                 NavigationBarItem(selected = tab == 2, onClick = { tab = 2 },
                     icon = { Icon(Icons.Filled.Map, null) }, label = { Text("Territory") }, colors = colors)
                 NavigationBarItem(selected = tab == 3, onClick = { tab = 3 },
@@ -138,10 +165,11 @@ internal fun GrowthScaffold(
         Column(Modifier.padding(padding).fillMaxSize()) {
             BrandBand {
                 StaffBandHeader(
-                    title = when (tab) { 0 -> "Growth"; 1 -> "Leads"; 2 -> "My territory"; else -> "More" },
+                    title = when (tab) { 0 -> "Growth"; 1 -> "Leads"; 2 -> "My territory"; 4 -> "Field"; else -> "More" },
                     subtitle = when (tab) {
                         0 -> "${growthRoleLabel(me?.role ?: role)} · partnerships"
                         1 -> "Your leads and your regions' unowned leads"
+                        4 -> "Follow-ups due and your recent field work"
                         2 -> "Regions set by operations"
                         else -> "Workspace and app settings"
                     },
@@ -153,11 +181,12 @@ internal fun GrowthScaffold(
             BandSheet {
                 when {
                     tab == 3 -> GrowthMore(onSignOut, onSwitchWorkspace)
+                    tab == 4 -> GrowthFieldTab(onOpenLead = { id -> openLead = id; tab = 1 })
                     tab == 2 -> GrowthTerritory()
-                    tab == 1 -> GrowthLeadsTab()
+                    tab == 1 -> GrowthLeadsTab(initialLead = openLead, onInitialLeadShown = { openLead = null })
                     meFailed -> CenteredNote("Your growth details could not be loaded. Nothing is shown until they load. Try again shortly.")
                     me == null -> HomeSkeleton()
-                    else -> GrowthHome(me!!)
+                    else -> GrowthHome(me!!, onOpenField = { tab = 4 })
                 }
             }
         }
@@ -165,7 +194,7 @@ internal fun GrowthScaffold(
 }
 
 @Composable
-private fun GrowthHome(me: GrowthMeDto) {
+private fun GrowthHome(me: GrowthMeDto, onOpenField: () -> Unit) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp)) {
         Spacer(Modifier.height(10.dp))
         PilotCard(glow = true) {
@@ -182,13 +211,17 @@ private fun GrowthHome(me: GrowthMeDto) {
         // Every figure reads NA until its source exists: nothing here is invented.
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             StatCell(me.openLeads?.toString() ?: GROWTH_NA, "Open leads", Tone.Accent, Icons.Filled.Handshake, Modifier.weight(1f))
-            StatCell(GROWTH_NA, "Visits this month", Tone.Green, Icons.Filled.CalendarMonth, Modifier.weight(1f))
+            StatCell(me.visitsThisMonth?.toString() ?: GROWTH_NA, "Visits this month", Tone.Green, Icons.Filled.CalendarMonth, Modifier.weight(1f))
         }
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             StatCell(GROWTH_NA, "Target progress", Tone.Amber, Icons.Filled.Flag, Modifier.weight(1f))
             StatCell(GROWTH_NA, "Commission this month", Tone.Violet, Icons.Filled.CurrencyRupee, Modifier.weight(1f))
         }
+        Spacer(Modifier.height(12.dp))
+        GrowthTodayCard(me.followUpsDue, onOpenField)
+        Spacer(Modifier.height(10.dp))
+        GrowthQueueCard()
         SectionTitle("Your teams")
         if (me.teams.isEmpty()) {
             PilotCard {
@@ -218,7 +251,7 @@ private fun GrowthHome(me: GrowthMeDto) {
             Column(Modifier.padding(16.dp)) {
                 Text("Not built yet", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(6.dp))
-                Text("Field visits, targets and commission are not built yet. Each appears here when it is, and every figure above reads NA until it has a real source. Commission rates have not been set, so no amount is shown.",
+                Text("Targets and commission are not built yet. Each appears here when it is, and every figure above reads NA until it has a real source. Commission rates have not been set, so no amount is shown.",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
@@ -228,21 +261,45 @@ private fun GrowthHome(me: GrowthMeDto) {
 
 @Composable
 private fun GrowthMore(onSignOut: () -> Unit, onSwitchWorkspace: (() -> Unit)?) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+    var confirming by remember { mutableStateOf(false) }
+    // GROWTH-06 (design §14.2): a shared or lost phone must not keep contacts or unsent work, so
+    // sign-out clears the cache, the queue and the reminders — after saying what would be lost.
+    fun signOut() {
+        scope.launch {
+            GrowthQueue.clear(context)
+            Store(context.applicationContext).clear()
+            GrowthReminders.clearForSignOut(context)
+            onSignOut()
+        }
+    }
+    if (confirming) {
+        val unsent = GrowthQueue.unsentCount()
+        AlertDialog(
+            onDismissRequest = { confirming = false },
+            title = { Text("Unsent work will be deleted") },
+            text = { Text("$unsent item${if (unsent == 1) " has" else "s have"} not been sent yet. Signing out deletes ${if (unsent == 1) "it" else "them"} from this phone. Stay signed in and send them when you have a signal, or sign out anyway.") },
+            confirmButton = { TextButton(onClick = { confirming = false; signOut() }) { Text("Sign out and delete") } },
+            dismissButton = { TextButton(onClick = { confirming = false }) { Text("Stay signed in") } },
+        )
+    }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp)) {
         PilotCard {
             Column(Modifier.padding(16.dp)) {
                 Text("Growth on the phone", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(6.dp))
-                Text("Your team, manager and staff type are set by AI8HT operations. Field visits and leads arrive in this app as they are built.",
+                Text("Your team, manager and staff type are set by AI8HT operations. Work you log here is kept on this phone, encrypted, until it is sent; signing out deletes it, and the saved copies of your leads, from the phone.",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         Spacer(Modifier.height(12.dp))
+        GrowthQueueCard()
         if (onSwitchWorkspace != null) {
             OutlinedButton(onClick = onSwitchWorkspace) { Text("Switch workspace") }
             Spacer(Modifier.height(8.dp))
         }
-        OutlinedButton(onClick = onSignOut) { Text("Sign out") }
+        OutlinedButton(onClick = { if (GrowthQueue.unsentCount() > 0) confirming = true else signOut() }) { Text("Sign out") }
     }
 }
 

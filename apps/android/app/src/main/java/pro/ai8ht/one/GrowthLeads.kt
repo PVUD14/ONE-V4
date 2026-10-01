@@ -6,6 +6,11 @@ package pro.ai8ht.one
 // emailing a contact go through the phone's own dialler and mail app; ONE records no calls.
 // Contacts arrive in full only on the person's own leads (the server masks every other), so the
 // app never holds anyone else's contacts. The notice text is shown with its DRAFT label.
+//
+// GROWTH-06: a new lead goes through the offline queue (GrowthQueue), so one made without a signal
+// is kept and sent once; the lists, the vocabulary and the person's own leads keep a saved copy for
+// offline reading (other leads are never saved); the lead detail carries its field work — log a
+// visit, call, meeting or note (with an optional location on a tap), and add a follow-up.
 
 import android.content.Intent
 import android.net.Uri
@@ -83,7 +88,7 @@ private fun ChoiceRow(options: List<Pair<String, String>>, selected: String, onS
 }
 
 @Composable
-internal fun GrowthLeadsTab() {
+internal fun GrowthLeadsTab(initialLead: String? = null, onInitialLeadShown: () -> Unit = {}) {
     val context = LocalContext.current
     var kind by remember { mutableStateOf("COLLEGE") }
     var view by remember { mutableStateOf("MINE") }
@@ -94,11 +99,19 @@ internal fun GrowthLeadsTab() {
     var creating by remember { mutableStateOf(false) }
     var reload by remember { mutableStateOf(0) }
 
-    LaunchedEffect(Unit) { vocabulary = runCatching { Api.growthLeadVocabulary(context) }.getOrNull() }
+    var stale by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        vocabulary = runCatching { growthCachedRead(context, "growth:leads:vocabulary") { Api.request(context, "GET", "/api/v1/growth/leads/vocabulary") }.first }
+            .getOrNull()?.let { runCatching { Api.json.decodeFromString<GrowthLeadVocabularyDto>(it) }.getOrNull() }
+    }
+    LaunchedEffect(initialLead) { if (initialLead != null) { selected = initialLead; onInitialLeadShown() } }
     LaunchedEffect(kind, view, reload) {
         page = null
-        val result = runCatching { Api.growthLeads(context, kind, view) }
-        page = result.getOrNull(); failed = result.isFailure
+        val result = runCatching { growthCachedRead(context, "growth:leads:$kind:$view") { Api.request(context, "GET", "/api/v1/growth/leads?kind=$kind&view=$view") } }
+        val (body, fromCache) = result.getOrNull() ?: (null to false)
+        page = body?.let { runCatching { Api.json.decodeFromString<GrowthLeadPageDto>(it) }.getOrNull() }
+        stale = fromCache
+        failed = page == null
     }
 
     androidx.activity.compose.BackHandler(enabled = selected != null || creating) { selected = null; creating = false }
@@ -118,6 +131,7 @@ internal fun GrowthLeadsTab() {
         ChoiceRow(listOf("MINE" to "Mine", "UNOWNED" to "Unowned in my regions", "ALL" to "All I can see"), view) { view = it }
         Spacer(Modifier.height(10.dp))
         Button(onClick = { creating = true }, enabled = vocabulary != null) { Text("New lead") }
+        if (stale) StatusChip("Offline — showing what was saved on this phone", ChipKind.Waiting)
         SectionTitle(if (kind == "COLLEGE") "Colleges" else "Employers")
         when {
             failed -> CenteredNote("Leads could not be loaded. Nothing is shown until they load. Try again shortly.")
@@ -164,9 +178,11 @@ private fun NewLeadScreen(vocabulary: GrowthLeadVocabularyDto, defaultKind: Stri
     var identifier by remember { mutableStateOf("") }
     var source by remember { mutableStateOf("FIELD_VISIT") }
     var error by remember { mutableStateOf<String?>(null) }
+    var queuedNote by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp)) {
         TextButton(onClick = onClose) { Text("Back to leads") }
+        queuedNote?.let { Text(it, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold) }
         Text("New lead", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         Text("You become its owner. A lead another team member already registered is refused.",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -181,14 +197,19 @@ private fun NewLeadScreen(vocabulary: GrowthLeadVocabularyDto, defaultKind: Stri
         ChoiceRow(vocabulary.sources.map { it to leadLabel(it) }, source) { source = it }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
         Spacer(Modifier.height(10.dp))
-        Button(enabled = name.isNotBlank() && !busy, onClick = {
+        Button(enabled = name.isNotBlank() && !busy && queuedNote == null, onClick = {
             busy = true
             scope.launch {
-                runCatching {
-                    Api.createGrowthLead(context, kind, name.trim(), null, city.trim().ifBlank { null },
-                        if (kind == "COLLEGE") identifier.trim().ifBlank { null } else null,
-                        if (kind == "EMPLOYER") identifier.trim().ifBlank { null } else null, source)
-                }.onSuccess { onCreated(it.id) }.onFailure { error = leadErrorText(it, "The lead could not be created.") }
+                // GROWTH-06: through the offline queue, so a lead made without a signal lands once.
+                val body = Api.growthLeadBody(kind, name.trim(), city.trim().ifBlank { null },
+                    if (kind == "COLLEGE") identifier.trim().ifBlank { null } else null,
+                    if (kind == "EMPLOYER") identifier.trim().ifBlank { null } else null, source)
+                when (val result = queueGrowthWrite(context, "LEAD_CREATE", "/api/v1/growth/leads", body, "New lead · ${name.trim()}")) {
+                    is QueuedOutcome.Sent -> runCatching { Api.json.decodeFromString<GrowthLeadEnvelope>(result.body).lead.id }
+                        .onSuccess { onCreated(it) }.onFailure { onClose() }
+                    QueuedOutcome.Waiting -> { error = null; queuedNote = "Saved on this phone. The lead is sent when you are back online; log visits on it once it has synced." }
+                    is QueuedOutcome.Refused -> error = result.message
+                }
                 busy = false
             }
         }) { Text("Create lead") }
@@ -205,8 +226,36 @@ private fun LeadDetailScreen(leadId: String, vocabulary: GrowthLeadVocabularyDto
     var error by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
     var adding by remember { mutableStateOf(false) }
+    var logging by remember { mutableStateOf<GrowthFieldVocabularyDto?>(null) }
+    var addingFollowUp by remember { mutableStateOf(false) }
+    var fieldNote by remember { mutableStateOf<String?>(null) }
+    var fieldReload by remember { mutableStateOf(0) }
     LaunchedEffect(leadId) {
-        runCatching { Api.growthLead(context, leadId) }.onSuccess { lead = it }.onFailure { error = leadErrorText(it, "The lead could not be loaded.") }
+        // Only the person's own leads are kept on the phone: the server masks every other lead's
+        // contacts, and a lead someone else owns has no business in this phone's storage.
+        val store = pro.ai8ht.one.data.Store(context.applicationContext)
+        val key = "growth:lead:$leadId"
+        runCatching { Api.request(context, "GET", "/api/v1/growth/leads/$leadId") }
+            .onSuccess { body ->
+                val parsed = Api.json.decodeFromString<GrowthLeadEnvelope>(body).lead
+                lead = parsed
+                if (parsed.owner?.isMe == true) store.write(key, body)
+            }
+            .onFailure { failure ->
+                val saved = if (failure is java.io.IOException) store.read(key) else null
+                val parsed = saved?.let { runCatching { Api.json.decodeFromString<GrowthLeadEnvelope>(it).lead }.getOrNull() }
+                if (parsed != null) lead = parsed else error = leadErrorText(failure, "The lead could not be loaded.")
+            }
+    }
+    androidx.activity.compose.BackHandler(enabled = logging != null || addingFollowUp) { logging = null; addingFollowUp = false }
+    val loaded = lead
+    if (logging != null && loaded != null) {
+        LogActivityScreen(loaded.id, loaded.name, loaded.contacts, logging!!) { note -> logging = null; fieldNote = note; fieldReload++ }
+        return
+    }
+    if (addingFollowUp && loaded != null) {
+        AddFollowUpScreen(loaded.id, loaded.name, 280) { note -> addingFollowUp = false; fieldNote = note; fieldReload++ }
+        return
     }
     fun act(block: suspend () -> GrowthLeadDetailDto, fallback: String) {
         busy = true
@@ -289,6 +338,8 @@ private fun LeadDetailScreen(leadId: String, vocabulary: GrowthLeadVocabularyDto
                 }
             }
         }
+        fieldNote?.let { Text(it, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp)) }
+        LeadFieldSection(current.id, current.name, onLog = { logging = it }, onFollowUp = { addingFollowUp = true }, reloadKey = fieldReload)
         SectionTitle("Contact notice", trailing = "Draft for legal review")
         PilotCard {
             Column(Modifier.padding(14.dp)) {

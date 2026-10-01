@@ -240,6 +240,7 @@ internal fun JobsScreen() {
                                         Text(opp.employerName, style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
+                                    if (opp.invitedFromTalentPool && !opp.alreadyApplied) StatusChip("Invited", ChipKind.Waiting)
                                     if (opp.alreadyApplied) StatusChip("Applied", ChipKind.Positive)
                                 }
                                 Spacer(Modifier.height(8.dp))
@@ -765,7 +766,14 @@ internal fun ProfilePage(
 ) {
     val context = LocalContext.current
     var profile by remember { mutableStateOf<ProfileDto?>(null) }
-    LaunchedEffect(Unit) { profile = runCatching { Api.getProfile(context) }.getOrNull() }
+    // EMP-14: joining or leaving the talent pool changes the visibility shown below, so it reloads.
+    var profileReload by remember { mutableStateOf(0) }
+    LaunchedEffect(profileReload) { profile = runCatching { Api.getProfile(context) }.getOrNull() }
+    var talentPoolEditor by remember { mutableStateOf(false) }
+    if (talentPoolEditor) {
+        SlideIn { TalentPoolPage(onClose = { talentPoolEditor = false; profileReload += 1 }) }
+        return
+    }
 
     val scope = rememberCoroutineScope()
     var photoNotice by remember { mutableStateOf<String?>(null) }
@@ -857,6 +865,8 @@ internal fun ProfilePage(
                     }
                 }
             }
+            // EMP-14: the consented talent pool; shows nothing while it is switched off (HG-4).
+            StudentTalentPoolSection(onOpenEditor = { talentPoolEditor = true })
             // INST-13: tell a college what you did after graduating (counted only, never named).
             StudentOutcomesSection()
             Spacer(Modifier.height(16.dp))

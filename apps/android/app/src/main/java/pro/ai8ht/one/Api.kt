@@ -610,6 +610,8 @@ internal fun StudentDto.formerStudentLine(): String? {
     val alreadyApplied: Boolean = false,
     /** EMP-11: live campus drives at the student's college through which this job reaches them. */
     val campusDrives: List<ListedCampusDriveDto> = emptyList(),
+    /** EMP-14: listed because an employer invited the student from the talent pool (invite-only job). */
+    val invitedFromTalentPool: Boolean = false,
 )
 @Serializable data class ListedCampusDriveDto(
     val institutionName: String = "",

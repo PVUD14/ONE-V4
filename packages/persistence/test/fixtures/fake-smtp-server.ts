@@ -50,7 +50,10 @@ export function selfSignedCertificate(commonName = 'one-test-smtp.local'): { rea
   const name = sequence(set(sequence(objectIdentifier('2.5.4.3'), der(0x0c, Buffer.from(commonName, 'utf8')))));
   const now = Date.now();
   const serial = randomBytes(12);
-  serial[0] = serial[0]! & 0x7f;
+  // A DER INTEGER must be positive and minimally encoded: the top bit clear (else it reads as
+  // negative) and the first byte non-zero (a leading 0x00 before a byte below 0x80 is "illegal
+  // padding", which OpenSSL rejects). Forcing 0x40 keeps both true for every random serial.
+  serial[0] = 0x40 | (serial[0]! & 0x3f);
   const subjectAltName = sequence(
     der(0x82, Buffer.from('localhost', 'ascii')), // dNSName
     der(0x87, Buffer.from([127, 0, 0, 1])), // iPAddress

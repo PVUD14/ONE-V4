@@ -18,6 +18,8 @@ const appsRoot = fileURLToPath(new URL('../../', import.meta.url));
 /** Anything that would let a handler make, or be wired to make, an inference call. */
 const forbidden: readonly [string, RegExp][] = [
   ['the worker orchestrator module', /persistence\/src\/ai-workers(\.js)?['"]/],
+  // ENG-23: the content factory's worker runs model calls; only its request and read module is the API's.
+  ['the content factory worker', /persistence\/src\/(content-factory-worker|run-content-factory-worker)(\.js)?['"]/],
   ['the test fake endpoint', /ai-orchestration\/src\/testing\//],
   ['the inference adapter', /\bOpenAICompatibleProvider\b/],
   ['the environment adapter factory', /\binferenceProviderFromEnvironment\b/],
@@ -60,6 +62,9 @@ describe('the inference boundary', () => {
       'the worker orchestrator module',
       'the worker orchestrator factory',
     ]);
+    expect(forbidden.filter(([, pattern]) => pattern.test("import { runContentFactoryOnce } from '@planthepath/persistence/src/content-factory-worker.js';")).map(([what]) => what))
+      .toEqual(['the content factory worker']);
+    expect(forbidden.some(([, pattern]) => pattern.test("import { requestContentDraft } from '@planthepath/persistence/src/content-factory.js';"))).toBe(false);
     expect(forbidden.some(([, pattern]) => pattern.test('const key = process.env.ONE_AI_API_KEY;'))).toBe(true);
     expect(forbidden.some(([, pattern]) => pattern.test("const url = env['ONE_AI_BASE_URL'];"))).toBe(true);
   });

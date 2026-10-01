@@ -171,14 +171,16 @@ describe('the harness', () => {
 });
 
 describe('registering the features', () => {
-  it('inserts the three features switched off, and leaves an existing row alone', async () => {
+  it('inserts the declared features switched off, and leaves an existing row alone', async () => {
     const before = (await client.query('SELECT feature_key FROM ai_feature_policies WHERE feature_key = ANY($1)', [oneAiFeatures.map((feature) => feature.featureKey)])).rows;
     const first = await registerOneAiFeatures(db);
-    expect([...first.registered, ...first.existing.map((entry) => entry.featureKey)].sort()).toEqual(['content.answer-check', 'content.lesson-draft', 'tutor.hint']);
+    // ENG-23 added content.item-draft, declared off like the rest (no evaluation covers it yet).
+    expect([...first.registered, ...first.existing.map((entry) => entry.featureKey)].sort()).toEqual(['content.answer-check', 'content.item-draft', 'content.lesson-draft', 'tutor.hint']);
     const rows = (await client.query('SELECT feature_key, enabled, model, prompt_key, prompt_version FROM ai_feature_policies WHERE feature_key = ANY($1) ORDER BY feature_key', [oneAiFeatures.map((feature) => feature.featureKey)])).rows;
     if (!before.length) {
       expect(rows).toEqual([
         { feature_key: 'content.answer-check', enabled: false, model, prompt_key: 'content-answer-check', prompt_version: 1 },
+        { feature_key: 'content.item-draft', enabled: false, model, prompt_key: 'content-item-draft', prompt_version: 1 },
         { feature_key: 'content.lesson-draft', enabled: false, model, prompt_key: 'content-lesson-draft', prompt_version: 1 },
         { feature_key: 'tutor.hint', enabled: false, model, prompt_key: 'tutor-hint', prompt_version: 1 },
       ]);

@@ -11,7 +11,12 @@ import {
   publishedQuestionColumns,
   questionMisconceptionTags,
   readAgentDraftProvenance,
+  readAiDraftProvenance,
   readQuestionDraftFields,
+  composeLessonBody,
+  readLessonIdentity,
+  readLessonDraftFields,
+  publishedLessonBody,
   toLearnerQuestionDto,
   validateQuestionDraft,
   withholdAnswerKey,
@@ -171,5 +176,35 @@ describe('readAgentDraftProvenance (ENG-10)', () => {
     const body = composeQuestionBody({ provenance, expertCheck: 'Check it.', packKey: 'aptitude-bank-v1' }, 'apt-q-x-001', complete());
     expect(readAgentDraftProvenance(body)).toMatchObject({ promptVersion: 'eng-10-aptitude-bank-v1', expertCheck: 'Check it.' });
     expect(body.packKey).toBe('aptitude-bank-v1');
+  });
+});
+
+describe('readAiDraftProvenance (ENG-23)', () => {
+  const jobId = '0b7f4a52-7a7e-4c6c-9a59-2d8b1c3e4f50';
+  const provenance = {
+    source: 'AI_GENERATED', generatorVersion: 'one-ai-orchestration-v1+openai-compatible-v1', promptVersion: 'content-lesson-draft@1',
+    model: 'qwen2.5-14b-instruct', generatedAt: '2026-10-02T00:00:00.000Z', jobId,
+  };
+
+  it('reads a complete AI-draft record, and only that', () => {
+    expect(readAiDraftProvenance({ provenance, expertCheck: ' Check every fact. ' })).toEqual({
+      generatorVersion: 'one-ai-orchestration-v1+openai-compatible-v1', promptVersion: 'content-lesson-draft@1', model: 'qwen2.5-14b-instruct',
+      generatedAt: '2026-10-02T00:00:00.000Z', jobId, expertCheck: 'Check every fact.',
+    });
+    expect(readAiDraftProvenance({ provenance: { ...provenance, source: 'AGENT_DRAFTED' } })).toBeNull();
+    expect(readAgentDraftProvenance({ provenance })).toBeNull();
+    for (const broken of [{ model: '' }, { jobId: 'not-a-uuid' }, { generatedAt: 'later' }, { promptVersion: 'x'.repeat(129) }]) {
+      expect(readAiDraftProvenance({ provenance: { ...provenance, ...broken } })).toBeNull();
+    }
+  });
+
+  it('survives editor saves of a question and a lesson, and never reaches what learners are given', () => {
+    const question = composeQuestionBody({ provenance, expertCheck: 'Check it.', aiDraft: { guard: 'content-guard-v1' } }, 'ai-q-001', complete());
+    expect(readAiDraftProvenance(question)?.jobId).toBe(jobId);
+    expect(JSON.stringify(publishedQuestionColumns(readQuestionDraftFields(question)))).not.toContain('AI_GENERATED');
+    const previous = { provenance, aiDraft: { sections: {}, fitted: false } };
+    const lesson = composeLessonBody(previous, readLessonIdentity({ stableKey: 'ai-lesson' }), { ...readLessonDraftFields({ title: 'T', body: { summary: 'S' } }) });
+    expect(readAiDraftProvenance(lesson)?.promptVersion).toBe('content-lesson-draft@1');
+    expect(publishedLessonBody(readLessonDraftFields(lesson))).toEqual({ summary: 'S' });
   });
 });

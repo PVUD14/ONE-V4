@@ -322,6 +322,8 @@ describe('reading: every figure has a source, or NA', () => {
       { key: 'tutor-hint', version: 1, purpose: expect.any(String) },
       { key: 'content-lesson-draft', version: 1, purpose: expect.any(String) },
       { key: 'content-answer-check', version: 1, purpose: expect.any(String) },
+      // ENG-23: the content factory's item draft.
+      { key: 'content-item-draft', version: 1, purpose: expect.any(String) },
     ]);
     expect(JSON.stringify(response.body.prompts.registered)).not.toContain('never reveal');
     expect(response.body.prompts.inUse).toEqual(expect.arrayContaining([

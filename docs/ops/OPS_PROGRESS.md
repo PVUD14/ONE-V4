@@ -2730,3 +2730,81 @@ probe is not scheduled on the server (the runbook gives the cron line); the in-a
 directly and stays off (OPS-SR-02, out of scope); cost stays NA (no price table).
 
 **Validation:** running — results to follow in this entry.
+
+## ENG-21 — Evaluation set and model bake-off — 2026-10-01
+**Result:** Built; the comparison itself is the coordinator's to run on the pod. ONE has a versioned
+200-case evaluation set (`one-ai-bakeoff` v1: 80 English STEM and cybersecurity, 60 Telugu/Hindi, 30 grading, 30
+abuse) built from the real aptitude bank, its ENG-15 ladders and the SOC Analyst L1 target; a stdlib-Python
+harness that runs it on the pod against the served model(s); scoring by the repository's own code (ENG-15's leak
+rule reused, script detection, refusal, unsafe content, correctness, latency, cost per student); a human review
+sheet and rubric; and an operator command that records one `ai_evaluations` row per feature through OPS-12's
+`recordAiEvaluation`. No feature is switched on; no model is called from ONE; nothing reaches a student (HG-6).
+
+**Branch / PR:** `feat/eng-21-bake-off`, from `onev4/feat/eng-20-inference-adapter` (f1c1769) — ENG-20 is not merged
+yet; rebase onto `feat/plan-phases-0-to-2` when it is. Commits: design (6f431dc), tests (c6d51a9),
+implementation (0ff0208), pod and review docs (a4fcff7), this report. Pushed to onev4; not merged.
+
+**Files created:**
+- `docs/architecture/ai-bake-off-design.md` — the set, scoring, thresholds and why, human review, cost model,
+  harness/importer split, candidates, rejected options (promptfoo, model-as-judge, scoring on the pod).
+- `packages/ai-evaluation/` (new package, pure apart from reading `data/engine`): `set-format.ts`, `cases.ts`
+  (hand-written student messages, abuse cases, author notes), `build-set.ts`, `checks.ts`, `thresholds.ts`,
+  `results.ts`, `score.ts`, `cost.ts`, `review.ts`, `report.ts`, `repository.ts`; CLIs `bake-off:build-set`,
+  `bake-off:report`, `bake-off:review-sheet`; `src/testing/simulated-replies.ts` (tests only).
+- `packages/ai-orchestration/src/first-features.ts` — prompts `tutor-hint` v1, `content-lesson-draft` v1,
+  `content-answer-check` v1 and the three feature declarations (`tutor.hint`, `content.lesson-draft`,
+  `content.answer-check`), registered in `registry.ts`.
+- `packages/persistence/src/ai-bake-off.ts` (`registerOneAiFeatures`, `importBakeOffResults`),
+  `run-ai-register-features.ts` (`ai:register-features`), `run-ai-bake-off-import.ts` (`ai:bake-off-import`).
+- `deploy/ai-pod/bake-off/run_bakeoff.py`, `eval-set-v1.json` (generated), `README.md`, `tests/test_run_bakeoff.py`.
+- `docs/ai/bake-off-human-review-rubric.md` — the review template.
+- Tests: `packages/ai-evaluation/test/{eval-set,checks,scoring}.test.ts`,
+  `packages/persistence/test/ai-bake-off.integration.test.ts` (spawns the real Python harness against
+  ENG-20's local fake endpoint), `deploy/ai-pod/bake-off/tests/test_run_bakeoff.py` (14 unittest cases).
+
+**Files modified:** `packages/career-readiness/src/hint-ladder.ts` (`hintLeakFinding` factored out of
+`hintLadderFindings`, behaviour unchanged — its 15 tests pass unmodified); `packages/ai-orchestration/src/{index,registry}.ts`;
+`packages/persistence/package.json`; `deploy/ai-pod/setup-pod.sh` (`MODEL_REPO` decides the model directory;
+`VLLM_EXTRA_ARGS`, `MAX_MODEL_LEN`, `GPU_MEMORY_UTILIZATION` overridable) and `README.md`;
+`.github/workflows/phase1-ci.yml` (job `bake-off-harness`: the Python tests); `.gitignore` (pod results);
+`apps/api/src/http/operations-ai.integration.spec.ts` (the registry now lists three prompts — the assertion
+changed from "empty" to the three, plus "no prompt text leaves").
+
+**Migrations added:** none; 0106 released unused. Every row goes to `ai_evaluations` / `ai_feature_policies`.
+
+**Acceptance criteria:**
+- [x] **A 200-prompt evaluation set (80 / 60 / 30 / 30).** `eval-set.test.ts` pins the composition, that every
+  SOC skill and every aptitude skill is covered, every hint level and abuse category, and that the committed file
+  is byte-for-byte the builder's output.
+- [x] **Scoring for correctness, answer-leak rate, teaching quality, language quality, latency and cost.**
+  Correctness and leak rate, language match, refusal, over-refusal, format, unsafe content, error rate and p95
+  latency are automatic; teaching and language quality come from the human sheet; cost per student from the pod
+  price ($0.57/h) and measured seconds per request, with labelled assumptions.
+- [~] **promptfoo configuration.** Not adopted, by decision (design, Rejected): a second scorer would drift from
+  ENG-15's rule and add a Node dependency tree; the set is plain JSON promptfoo could read later.
+- [x] **Results recorded in ai_evaluations (OPS-12).** `ai:bake-off-import` writes one row per feature (metrics with
+  thresholds and comparators, set key/version, prompt key/version, provider `openai-compatible`, note with the
+  results SHA-256 and cost assumptions), each with its audit row and `ai_evaluation.recorded` outbox event, in one
+  transaction; refuses malformed / mismatched / partial / already-recorded results, an unauthorised recorder, an
+  unregistered feature, and a would-be PASS without a review sheet.
+- [ ] **A bake-off report exists for each candidate model and is recorded.** The tooling is built and tested on
+  simulated replies; the reports and records need the coordinator's run on the pod and a person's review sheet.
+- [x] **No model reaches students without a passing record.** Unchanged 0089 gate, now fed: the integration test
+  shows a leaky run's FAIL leaves the feature unable to switch on and a recorded PASS lets 0089 accept it.
+- [x] C6 is encoded as `answer_leak_rate` ≤ 0.0099 and `language_match_rate` ≥ 0.98 on `tutor.hint`.
+
+**Decisions taken (recorded in the design):** the three prompts are registered now, as the features' v1; features
+are registered switched off by an explicit command; scoring stays in TypeScript; a PASS on a feature people read
+needs a human sheet; thresholds per feature in code; cost assumptions 100 hints/student-month, 0.30 utilisation,
+Rs 85/USD (open point 1); candidates Qwen2.5-7B-Instruct, Qwen2.5-32B-Instruct-AWQ, optionally Qwen3-14B with
+thinking off (all Apache-2.0, fit 48 GB).
+
+**Android:** no change. Nothing user-visible changed: no feature is switched on and no screen shows AI output.
+
+**Not done / for the coordinator:** run the harness on the pod for each candidate (commands in
+`deploy/ai-pod/bake-off/README.md`), hand back the results files; a person fills the review sheets; then the reports
+go to `docs/ai/bake-off/` and `ai:bake-off-import` records them. A native-speaker read of the Telugu and Hindi cases
+is recommended before the first recorded PASS (open point 2). If Qwen3 wins, the ENG-20 adapter must send the same
+`chat_template_kwargs`.
+
+**Validation:** running — results to follow in this entry.

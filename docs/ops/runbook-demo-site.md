@@ -42,6 +42,29 @@ do not work around it - the release is wrong; tell the developer.
 If Caddy was already running and does not pick up the new site, restart it:
 `sudo docker compose restart reverse-proxy`.
 
+## 2a. Who may open the demo (a login per person)
+
+demo.oneby8.com asks for a username and password before showing anything. The list of
+people lives only on the server, in `/srv/one/deploy/vps/demo-access/users.caddy`, one
+person per line. It is never committed, and nobody's password is stored in plain text.
+With no list the demo is locked to everyone; oneby8.com is never affected.
+
+Add a person (on the server):
+
+```bash
+cd /srv/one/deploy/vps
+sudo docker compose exec reverse-proxy caddy hash-password      # type their password twice
+sudo nano demo-access/users.caddy                               # add:  priya <the hash it printed>
+sudo docker compose exec reverse-proxy caddy reload --config /etc/caddy/Caddyfile
+```
+
+Remove a person: delete their line, then run the same `caddy reload`. Give each person
+their own username so one can be removed without changing everyone's password, and
+share passwords one to one, never in a group chat.
+
+The first time this release is installed, recreate the front door so it picks up the new
+settings and the access folder: `sudo docker compose up -d --force-recreate reverse-proxy`.
+
 ## 3. Check
 
 - [ ] `https://demo.oneby8.com` shows the ONE logo, "LEARN | PREPARE | BUILD | GROW",

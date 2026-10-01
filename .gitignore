@@ -31,3 +31,4 @@ id_ed25519
 
 # Python bytecode (scripts/brand is run locally)
 __pycache__/
+deploy/vps/demo-access/*.caddy

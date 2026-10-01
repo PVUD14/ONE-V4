@@ -43,6 +43,15 @@ demo.oneby8.com {
 		-Server
 	}
 
+	# Only the people Divakar lists may open the demo. The list lives on the server, in
+	# deploy/vps/demo-access/users.caddy (one "username bcrypt-hash" per line; any *.caddy file there counts), never in
+	# the repository; see docs/ops/runbook-demo-site.md. Each person gets their own line,
+	# so access is granted and removed per person. With no file the demo stays locked
+	# to everyone, and oneby8.com keeps running.
+	basic_auth {
+		import /etc/caddy/demo-access/*.caddy
+	}
+
 	handle /api/* {
 		respond "Not available on the demo site" 404
 	}

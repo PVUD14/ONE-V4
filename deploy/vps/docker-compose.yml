@@ -94,6 +94,8 @@ services:
       - "443:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # A directory, not a single file, so replacing users.caddy reaches the running container.
+      - ./demo-access:/etc/caddy/demo-access:ro
       - caddy-data:/data
       - caddy-config:/config
     networks:

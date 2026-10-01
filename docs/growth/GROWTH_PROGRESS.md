@@ -372,8 +372,8 @@ Replayed twice by hand on a migrated database without error.
 **Result:** Complete — field staff log visits, calls, meetings and notes and keep follow-ups on the phone and the web;
 every field write lands once however often it is resent; a visit's location is optional, coarse, private to the
 person and their manager, kept 180 days, exported and erasable; and the phone keeps working without a signal.
-**Branch / PR:** feat/growth-field (cut from feat/growth-leads, the GROWTH-03 tip) → feat/plan-phases-0-to-2 (pushed; not merged)
-**Commits:** 14af860 (design) · b61b3ce, e7ee90b (tests) · 0165c71, 99ef7dd, 31d095b, 2fb8d71 (implementation) · 684aba1 (coverage doc) · this report
+**Branch / PR:** feat/growth-field (rebased onto feat/plan-phases-0-to-2 at af4e181, GROWTH-02/03 merged) → feat/plan-phases-0-to-2 (pushed; not merged)
+**Commits:** a426647 (design) · 9b4b92b, 5f40d86 (tests) · 1cd036d, ab946ce, 3836419, fb61249 (implementation) · ef09213 (coverage doc) · 8ef5445 (report) · this validation record
 **Files created:**
 - `docs/architecture/growth-field-work-table-design.md` (written and committed before the migration)
 - `docs/legal/growth-field-location-notice-DRAFT-for-legal-review.md` (DRAFT throughout; publishing is HG-6)
@@ -486,6 +486,19 @@ Cognito; the cleartext allowance for 10.0.2.2 was a temporary debug-only overlay
 - Operations (`GROWTH_ADMIN`) has no field-log view: the design limits location to the person and their manager.
 - No real-device location fix observed; the location notice is a draft (HG-6).
 
-**Validation:** recorded below once the full run completes.
+**Validation** (`E:/one-wt/logs/validate.sh` on a fresh database `one_growth06`, only `DATABASE_URL` exported, on base af4e181):
+- `corepack pnpm db:migrate` twice — pass (88 applied, then 0 applied / 88 already applied); 0103 also replayed by hand — pass.
+- `corepack pnpm typecheck` — pass. `corepack pnpm build` — pass.
+- `corepack pnpm -r --no-bail --workspace-concurrency=1 test` — **4 026 of 4 026 tests passed** (api 1 426, web 998,
+  persistence 482, authorization 464, others). The run exits 1 only because 8 API files hit the known teardown-only
+  "out of shared memory" on `DROP SCHEMA` after all their tests had passed (employer-applicant-access,
+  employer-applicant-export, employer-eligibility-stages, institution-settings, institution-student-scope,
+  operations-analytics, operations-institution-onboarding, staff-pool-access). Each re-run alone: pass (7, 9, 10, 24,
+  15, 10, 2, 7 tests). None of them is a growth file.
+- Android `./gradlew --no-daemon -q :app:compileDebugKotlin` (Android Studio JBR) — pass; `assembleDebug` built and ran on
+  the emulator as recorded above.
+- CI parity: optional-chain, private-key and conflict-marker greps — clean; `corepack pnpm audit --prod --audit-level=high` — exit 0.
+- An earlier run on the pre-rebase base was abandoned when the base moved (and a leftover process from it was stopped
+  before this run started on a fresh database).
 
 **Next goal:** GROWTH-04 — College pipeline and the operations handoff.

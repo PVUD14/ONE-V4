@@ -126,6 +126,21 @@ Hosted UI), add `https://oneby8.com/auth/callback` to the allowed callback URLs 
 - [ ] Check `https://one.ai8ht.pro/login` lands on `https://oneby8.com/login`.
 - [ ] Take a final backup of the VPS database, keep it offline, then shut the VPS down.
 
+## 7. The demo site — demo.oneby8.com
+
+The sales demo runs on this same server, from the same Compose pack, as its own
+container with sample data only and no route to the API (ADR-045). Full steps and
+checks: `docs/ops/runbook-demo-site.md`. In short:
+
+- [ ] **DNS:** at the oneby8.com DNS provider add `A  demo → <server IP>` (the same
+      Elastic IP as `oneby8.com`). Check: `nslookup demo.oneby8.com 8.8.8.8`.
+- [ ] **Install:** with a release that contains `feat/demo-site`,
+      `cd /srv/one/deploy/vps && sudo docker compose up -d --build`. That one command
+      builds `web-demo` and gives Caddy the `demo.oneby8.com` site. No `.env` change.
+- [ ] **Check:** `https://demo.oneby8.com` shows the ONE logo, "LEARN | PREPARE |
+      BUILD | GROW", "Demo — sample data" and seven roles;
+      `https://demo.oneby8.com/api/me` answers 404; `https://oneby8.com` is unchanged.
+
 ## Rollback
 
 Until step 6, the VPS is untouched: point `oneby8.com` nowhere (or at the VPS) and

@@ -21,6 +21,11 @@
 > The Compose pack below remains valid for standing up an independent environment
 > from scratch; keep the two in step if the live host is ever migrated onto it.
 
+> **Demo site.** The pack also serves `https://demo.oneby8.com` from a separate
+> `web-demo` container: the sales demo, sample data only, no API route, no database
+> (ADR-045, `docs/ops/runbook-demo-site.md`). Both web images refuse to build if the
+> production image contains demo data or the demo image contains the real app.
+
 ## Security posture
 
 - Reverse proxy publishes only `80/tcp` and `443/tcp`.

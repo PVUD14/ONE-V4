@@ -52,6 +52,16 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+      # oneby8.com must ship no demo or pilot sample data; demo.oneby8.com must ship no
+      # real application (apps/web/scripts/check-demo-boundary.mjs). Same check the web
+      # image build runs.
+      - name: Demo boundary (production and demo-site builds)
+        shell: bash
+        run: |
+          set -euo pipefail
+          node apps/web/scripts/check-demo-boundary.mjs apps/web/dist production
+          VITE_DEMO_SITE=true pnpm --filter @planthepath/web exec vite build --outDir "$RUNNER_TEMP/web-demo" --emptyOutDir
+          node apps/web/scripts/check-demo-boundary.mjs "$RUNNER_TEMP/web-demo" demo
       - name: Production preflight cases (synthetic app.env only)
         run: bash deploy/scripts/test-preflight-production.sh
       - run: pnpm db:migrate

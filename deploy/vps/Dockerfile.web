@@ -23,8 +23,16 @@ ARG VITE_COGNITO_CLIENT_ID=
 ARG VITE_COGNITO_USER_POOL_ID=
 ARG VITE_COGNITO_REDIRECT_URI=
 ARG VITE_COGNITO_LOGOUT_URI=
+# "true" builds the demo site for demo.oneby8.com instead of the real application
+# (docker-compose.yml service web-demo). Left blank for oneby8.com.
+ARG VITE_DEMO_SITE=
 
 RUN pnpm --filter @planthepath/web build
+
+# Fails the image build if the boundary between the two sites is crossed: the real
+# application must ship no demo or pilot sample data, and the demo site must ship no
+# real sign-in or application code (apps/web/scripts/check-demo-boundary.mjs).
+RUN if [ "$VITE_DEMO_SITE" = "true" ]; then variant=demo; else variant=production; fi;     node apps/web/scripts/check-demo-boundary.mjs apps/web/dist "$variant"
 
 FROM caddy:2.8-alpine AS runtime
 COPY deploy/vps/web.Caddyfile /etc/caddy/Caddyfile

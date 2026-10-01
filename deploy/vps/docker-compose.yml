@@ -65,12 +65,30 @@ services:
     networks:
       - internal
 
+  # demo.oneby8.com: the demo site for colleges and employers (docs/ops/runbook-demo-site.md).
+  # A separate build of the same web app with VITE_DEMO_SITE=true. It is entirely
+  # in-browser sample data: no sign-in settings, no API address, no database, and Caddy
+  # sends it no /api traffic - it can never reach the production API or production data.
+  web-demo:
+    build:
+      context: ../..
+      dockerfile: deploy/vps/Dockerfile.web
+      args:
+        VITE_DEMO_SITE: "true"
+        VITE_API_BASE_URL: ""
+    restart: unless-stopped
+    expose:
+      - "8080"
+    networks:
+      - internal
+
   reverse-proxy:
     image: caddy:2.8-alpine
     restart: unless-stopped
     depends_on:
       - api
       - web
+      - web-demo
     ports:
       - "80:80"
       - "443:443"

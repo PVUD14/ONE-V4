@@ -27,6 +27,35 @@ oneby8.com {
 	}
 }
 
+# The demo site (docs/ops/runbook-demo-site.md): sample data only, served from its own
+# container. It gets the same security headers as oneby8.com, is kept out of search
+# engines, and has no route to the API - a request for /api or /health here is refused
+# rather than ever reaching production.
+demo.oneby8.com {
+	encode zstd gzip
+
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+		X-Frame-Options DENY
+		X-Robots-Tag "noindex, nofollow"
+		-Server
+	}
+
+	handle /api/* {
+		respond "Not available on the demo site" 404
+	}
+
+	handle /health {
+		respond "Not available on the demo site" 404
+	}
+
+	handle {
+		reverse_proxy web-demo:8080
+	}
+}
+
 # One address only: www and the retired one.ai8ht.pro forward permanently to
 # oneby8.com, keeping the path so old links and shared profile URLs still land.
 # one.ai8ht.pro gets its certificate once its DNS record points at this server.

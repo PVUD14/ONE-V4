@@ -354,6 +354,16 @@ Replayed twice by hand on a migrated database without error.
   bracketed placeholder.
 - Android was compiled, not run on a device.
 
-**Validation:** recorded below once the full run completes.
+**Validation** (`E:/one-wt/logs/validate.sh` on a fresh database `one_growth03`, only `DATABASE_URL` exported, on base
+`fe3b311` with GROWTH-02 beneath it):
+- `corepack pnpm db:migrate` twice — pass (87 applied, then 0 applied / 87 already applied); 0100 also applied twice by
+  hand on a migrated database — pass.
+- `corepack pnpm typecheck` — pass. `corepack pnpm build` — pass.
+- `corepack pnpm -r --no-bail --workspace-concurrency=1 test` — all 3 975 tests passed (api 1 401, web 989,
+  persistence 464, authorization 465, others). Two api files failed only in teardown with the shared Postgres's "out of
+  shared memory" on DROP SCHEMA after every test had passed (`institution-learning-cohort`, `institution-student-scope`);
+  re-run alone: 15/15 and 15/15 passed.
+- Android `./gradlew --no-daemon -q :app:compileDebugKotlin` (Android Studio JBR) — pass.
+- CI parity: optional-chain, private-key and conflict-marker greps — clean; `corepack pnpm audit --prod --audit-level=high` — exit 0.
 
 **Next goal:** GROWTH-04 — College pipeline and the operations handoff.

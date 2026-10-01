@@ -2,7 +2,8 @@
 
 > What this is: employer-facing help for the company profile students see on every job, and for
 > a new company asking for employer access, with the matching operator steps. Why it exists:
-> Appendix 2 EMP-18 (EM1 slice). Built by EMP-04. Written 2026-09-26 against base `6864332`.
+> Appendix 2 EMP-18 (EM1 slice). Built by EMP-04. Written 2026-09-26 against base `6864332`;
+> updated 2026-10-01 against base `719eb34`.
 
 ## For employers — company profile
 
@@ -49,13 +50,16 @@ company* and *Verified details*.
 ## Gaps
 
 - **Logo:** not built (needs the file store).
-- **HG-7:** requesters get no confirmation email; the queue marks every request's email as
-  unconfirmed.
+- **Email:** requesters get no confirmation email (the sender is not switched on in production);
+  the queue marks every request's email as unconfirmed.
+- The careers-page check accepts a user-info part and widens a `www.` website to its whole apex
+  (EMP-SR-09, open); the about-text payment check is a keyword heuristic and does not signal
+  phone numbers or links to Operations (EMP-SR-10, open).
 - **Retention** of declined and spam requests (proposed 180 days) is not yet in the privacy
   worker.
 - No notification tells Operations a request has arrived; check the queue or the Overview tile.
-- Employer Help & FAQ articles have not been updated for these modules in this slice (EMP-18
-  item 4 is application content).
+- Employer Help & FAQ has no article on the company profile or on requesting access (EMP-18
+  item 4 is application content and is still open; see the security review §9).
 
 ## UAT
 

@@ -3,7 +3,7 @@
 > What this is: employer-facing help for managing the team (invite, resend, revoke, end a
 > membership), with the matching operator steps. Why it exists: Appendix 2 EMP-18 (EM1 slice);
 > journey J1 ("the owner invites an admin and two recruiters"). Built by EMP-02. Written
-> 2026-09-26 against base `6864332`.
+> 2026-09-26 against base `6864332`; updated 2026-10-01 against base `719eb34`.
 
 ## For employers
 
@@ -64,8 +64,14 @@ audit record. They are not removed from interviews already scheduled but can no 
 
 ## Gaps
 
-- **HG-7:** with no production sender, team invitations are recorded as not emailed and
-  cannot reach anyone in production.
+- **Email:** the email sender is built but not switched on in production and the sender
+  mailbox is still to be set up, so team invitations are recorded as not emailed there.
+- Ending a membership does not revoke the invitations that person sent; revoke them yourself
+  from *Invitations*, especially after `SECURITY_CONCERN` (EMP-SR-04, open).
+- Invite and resend have no rate limit yet (EMP-SR-05, open; must be fixed before production
+  email is switched on).
+- Interviewers are recruiters; the separate INTERVIEWER role cannot be given to anyone today
+  ([sop-employer-interviews.md](sop-employer-interviews.md)).
 - Changing a role in place is not built (end and re-invite).
 - Replacing a departed last owner has no operator path.
 - The Android app shows the team read-only; changes are made on the web.

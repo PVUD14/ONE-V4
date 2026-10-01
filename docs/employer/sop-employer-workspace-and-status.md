@@ -4,7 +4,7 @@
 > the organisation's verification status, with the matching operator steps. Why it exists:
 > Appendix 2 EMP-18 (EM1 slice) requires an SOP per shipped module. Covers EMP-01 (owners and
 > admins land in the employer portal) and EMP-03 (organisation state enforced everywhere).
-> Written 2026-09-26 against base `6864332`.
+> Written 2026-09-26 against base `6864332`; updated 2026-10-01 against base `719eb34`.
 
 ## For employers
 
@@ -26,7 +26,7 @@ person Operations invites for a new employer is its **Owner**.
 |---|---|---|
 | Awaiting verification (PENDING, UNDER_REVIEW) | Set up the company profile, your team and draft jobs | Publish jobs, see applicants or any candidate data |
 | Verified | Everything your role allows | — |
-| Suspended or Rejected | Read your organisation's status | Everything else, including reading your team or profile |
+| Suspended or Rejected | Read your organisation's status, and read and answer trust cases about it | Everything else, including reading your team or profile |
 
 - While awaiting verification the portal shows **"Available once your organisation is
   verified"** on candidate screens.
@@ -38,8 +38,30 @@ person Operations invites for a new employer is its **Owner**.
 
 ### Getting help
 
-Contact ONE support with the reference shown. Responding to a trust case from the status page
-is not built yet (EMP-16) and the page says so.
+Contact ONE support with the reference shown. If ONE Operations has asked you to respond to a
+trust case, the status page lists it; owners and admins answer it from **Settings**, which stays
+open to trust cases even while you are suspended
+([sop-employer-terms-and-trust.md](sop-employer-terms-and-trust.md)).
+
+### Everything else in the portal
+
+| Module | SOP |
+|---|---|
+| Team and interviewers | [sop-employer-team.md](sop-employer-team.md) |
+| Company profile, access requests | [sop-employer-company-profile.md](sop-employer-company-profile.md) |
+| Jobs: publish, edit, pause, close | [sop-employer-job-lifecycle.md](sop-employer-job-lifecycle.md) |
+| Eligibility, skills, stages | [sop-employer-eligibility-and-stages.md](sop-employer-eligibility-and-stages.md) |
+| Applicants, Candidate Detail, offers | [sop-employer-candidates-and-offers.md](sop-employer-candidates-and-offers.md) |
+| What students are told | [sop-employer-hiring-notifications.md](sop-employer-hiring-notifications.md) |
+| Interviews and scorecards | [sop-employer-interviews.md](sop-employer-interviews.md) |
+| Messages | [sop-employer-messages.md](sop-employer-messages.md) |
+| Campus drives | [sop-employer-campus-drives.md](sop-employer-campus-drives.md) |
+| Screening tests | [sop-employer-assessments.md](sop-employer-assessments.md) |
+| Skill evidence (switched off) | [sop-employer-skill-evidence.md](sop-employer-skill-evidence.md) |
+| Talent pool (switched off) | [sop-employer-talent-pool.md](sop-employer-talent-pool.md) |
+| Dashboard and Reports | [sop-employer-dashboard-and-reports.md](sop-employer-dashboard-and-reports.md) |
+| Settings, terms, trust cases | [sop-employer-terms-and-trust.md](sop-employer-terms-and-trust.md) |
+| Exports | [sop-employer-exports.md](sop-employer-exports.md) |
 
 ## Matching operator steps
 
@@ -56,14 +78,16 @@ is not built yet (EMP-16) and the page says so.
 
 ## Gaps
 
-- **HG-7:** no production sender, so the owner's invitation is not emailed in production.
-- The employer web page resolves the caller's membership as the first employer membership in the
-  session. A person who is both recruiter and owner of one employer may see the recruiter view
-  on owner-only screens; the server still acts with the broader role (EMP-02 limitation; see the
-  employer security review).
-- Students who already hold a screening-assessment invitation from a suspended employer can
-  still attempt it; the employer cannot read the results (EMP-03 limitation).
+- **Email:** the email sender is built but not switched on in production, and the sender
+  mailbox is still to be set up, so the owner's invitation is recorded as not emailed there.
+- The employer web pages (and the Dashboard) resolve the caller's membership as the first
+  employer membership in the session, not the workspace they chose (EMP-SR-03, open). A person in
+  two employers who picks the second still reads and writes the first on those screens, under the
+  second one's status gate; a person who is both recruiter and owner of one employer may see the
+  recruiter view on owner-only screens. Only the Assessments screen uses the chosen workspace.
+- Fixed since the first version of this SOP: a suspended employer's screening tests now close to
+  students (EMP-12, `ASSESSMENT_UNAVAILABLE`).
 
 ## UAT
 
-[ONE_EMPLOYER_UAT_V1.md](../uat/ONE_EMPLOYER_UAT_V1.md) — J1, J2.
+[ONE_EMPLOYER_UAT_V1.md](../uat/ONE_EMPLOYER_UAT_V1.md) — J1, J2, E-S.

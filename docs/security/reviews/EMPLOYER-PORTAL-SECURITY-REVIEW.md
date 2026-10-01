@@ -1,547 +1,675 @@
-# Employer Portal Security Review (EMP-18, EM1 slice)
+# Employer Portal Security Review (EMP-18, full)
 
-> This is the EMP-18 security review of what Wave 1 built for employers: the owner/admin
-> workspace (EMP-01), organisation-state enforcement (EMP-03), team management (EMP-02), and the
-> company profile and public access request (EMP-04). It maps each EMP-18 threat to the controls
-> in code and the tests that prove them, and lists every problem found as an open finding to be
-> fixed. It exists because EMP-18 acceptance requires every threat to map to a test or a
-> documented residual risk. Programme rule B.2 says a residual risk is recorded only after its fix
-> has merged, so this document records none.
+> This is the EMP-18 security review of every employer module shipped so far (EMP-01 to EMP-17,
+> with EMP-13 and EMP-14 built behind flags that are off). It maps each EMP-18 threat to the
+> controls in code and the tests that prove them, re-checks every finding from the first (EM1)
+> version of this review, opens new findings, and records what is knowingly left in place as a
+> documented residual risk. It exists because EMP-18 acceptance requires every threat to map to a
+> test or a documented residual risk. The first version (2026-09-26, base `6864332`) covered
+> EMP-01 to EMP-04 only and recorded no residual risks; this version supersedes it.
 
 | | |
 |---|---|
-| Review target | `6864332` (branch `docs/wave1-sops-uat-security`, the programme base for Wave 1 documents) |
-| Date | 2026-09-26 |
-| Scope | EM1 slice: EMP-01, EMP-02, EMP-03 and EMP-04 as merged. Because every employer route now goes through the §5.1 helper, all existing employer hiring and assessment routes are included **for the organisation-state and tenant checks only**. |
-| Out of scope (later goals) | Job edit, pause and close lifecycle (EMP-05); eligibility, skills and stages (EMP-06); application snapshot, candidate view and résumé download (EMP-07); pipeline reason codes (EMP-08); interview invitations (EMP-09); offers rework (EMP-10); placement-office policies and drives (EMP-11); screening-assessment gap filling (EMP-12); evidence sharing (EMP-13); talent discovery and search (EMP-14); messaging (EMP-15); trust cases and settings (EMP-16); exports and reports (EMP-17); the EM3 full review (EMP-18). |
-| Method | Code reading of the files listed in §3. Every control is cited as `path:line` at the review target. Tests were found by searching the spec files and are cited as `spec › test name`; where no test exists the document says so. The progress log, baseline and design note were used only to find code; each claim was checked against the code. No code was run for this review. |
-| Normative source | ONE Program Goal, Appendix 2 §5 (§5.1 authorisation, §5.2 candidate data, §5.3 evidence not readiness, §5.4 fairness, §5.7 audit, §5.8 fraud, §5.9 errors), §6.1 API conventions, §6.3 minimum tests, EMP-18. |
+| Review target | `719eb34` (branch `docs/doc-2`, base `onev4/feat/plan-phases-0-to-2`) |
+| Date | 2026-10-01 |
+| Scope | EMP-01 workspace, EMP-02 team, EMP-03 organisation state, EMP-04 company profile and access request, EMP-SR-01/02 grant fix, EMP-05 job lifecycle, EMP-06 eligibility and stages, EMP-07 snapshot, candidate view and résumé, EMP-08 notifications, EMP-09 interviews and scorecards, EMP-10 messages, EMP-11 campus drives (employer and college sides), EMP-12 assessments, EMP-13 skill evidence (flag `employer.skill-evidence`, off), EMP-14 talent pool (flag `employer.talent-pool`, off), EMP-15 dashboard and reports, EMP-16 terms, settings and trust cases, EMP-17 exports. Student-side routes are included where they decide what an employer can see. |
+| Out of scope | Operations-console internals (reviewed in `OPERATIONS-CONSOLE-SECURITY-REVIEW.md`), the institution portal beyond campus drives (`INSTITUTION-PORTAL-SECURITY-REVIEW.md`), infrastructure and production configuration (production is `https://oneby8.com` on AWS, ADR-041; only Divakar touches it). |
+| Method | Code reading at the review target. Controls are cited as `path:line`. Tests are cited as `spec › test name`, found by searching the spec files; where no test exists the document says so. The progress log (`docs/employer/EMPLOYER_PROGRESS.md`), design notes and ADRs were used to find code; every claim was checked against the code, and where they disagree the code wins (§12). No code or test was run for this review. |
+| Normative source | ONE Program Goal, Appendix 2 §5 (§5.1 authorisation, §5.2 candidate data, §5.3 evidence not readiness, §5.4 fairness, §5.7 audit, §5.8 fraud, §5.9 errors), §6.3 minimum tests, §10.1 risks, EMP-18. |
+
+Paths are under `apps/api/src/http/` unless they start with `apps/`, `packages/` or `docs/`.
+
+## 1. What this means for Divakar
+
+- The serious problem from the first review is fixed. An employer now sees a candidate only while
+  the student's sharing (the applicant-access grant) is live; withdrawing, being rejected or
+  hired, or asking for deletion stops the next request on every screen, the résumé link,
+  messages, scorecards, assessment results and exports.
+- No employer screen or file shows readiness. Several modules now have tests that walk every
+  field of their responses to prove it, but there is still no single test across all employer
+  screens.
+- Four new problems are open. Two matter most: a job that asks students to pay a fee is only
+  flagged, not refused, when it is first published; and a job aimed directly at a college
+  reaches its students without the placement office approving a campus drive.
+- Several earlier problems are still open, mostly small. The one most likely to cause confusion
+  is that a person who belongs to two employers works in the first one on most web screens even
+  after choosing the second.
+- Thirteen risks are recorded as accepted-but-unfixed (§10), each with you as the owner and a
+  decision pending unless one was already taken.
 
 ## 2. Conclusion
 
-The EM1 slice is broadly sound. The §5.1 helper is applied to every employer route. REJECTED is
-refused even though it keeps `active = true`. Team and profile writes run in one transaction with
-their audit row, re-read the organisation's state under a row lock, and use reason codes from
-fixed lists. The public access request creates nothing and cannot be used to enumerate employers.
+The employer portal is sound on its core promises: every employer route goes through the §5.1
+helper; candidate data flows only through the live grant predicate
+(`packages/persistence/src/employer-authentication.ts:18-44`); nothing an employer reads carries
+readiness; exports neutralise formulas and contain only live-grant candidates; the talent pool
+and skill evidence stay dark behind their flags.
 
-The largest problem pre-dates the slice, but it sits in the path of the EMP-18 threat model. The
-applicant-access grant is never consulted when an employer reads or acts on candidate data. It is
-checked only by one standalone probe route, so revoking a grant stops nothing. Three problems are
-new in this slice: the web employer page acts on the first employer membership rather than the
-chosen workspace, pending team invitations outlive the person who sent them, and team invitations
-have no rate limits.
+| Severity | Open | Fixed since the EM1 review | Opened in this review |
+|---|---|---|---|
+| Critical | 0 | 0 | 0 |
+| High | 0 | 1 (EMP-SR-01) | 0 |
+| Medium | 8 | 1 (EMP-SR-02) | 2 (EMP-SR-21, EMP-SR-22) |
+| Low | 8 | 5 (EMP-SR-14, 16, 17, 18, 19) | 2 (EMP-SR-20, EMP-SR-23) |
+| **Total** | **16** | **7** | **4** |
 
-| Severity | Open findings |
-|---|---|
-| Critical | 0 |
-| High | 1 |
-| Medium | 7 |
-| Low | 11 |
-| **Total** | **19** |
+EMP-SR-08 (Medium) and EMP-SR-15 (Low) are counted as open but are partly fixed: what remains is
+confined to the pre-existing pipeline-move, offer, feedback and audience routes.
 
 ## 3. Files reviewed
 
-API and persistence
-- `apps/api/src/http/employer-organisation-state.ts`
-- `apps/api/src/http/employer-hiring.controller.ts`
-- `apps/api/src/http/employer-assessments.controller.ts`
-- `apps/api/src/http/student-hiring.controller.ts`
-- `apps/api/src/http/calendar.controller.ts`
-- `apps/api/src/http/employer-team.controller.ts`
-- `apps/api/src/http/employer-company-profile.controller.ts`
-- `apps/api/src/http/employer-access-requests.controller.ts`
-- `apps/api/src/http/operations-institution-onboarding.controller.ts` (verification, suspension pause, initial invitation, URL normaliser)
-- `apps/api/src/http/api-security.ts`, `apps/api/src/http/phase1-security.controller.ts` (applicant-access probe, security context)
-- `apps/api/src/application/identity-organization/services.ts` (`canAssignRole`)
-- `packages/persistence/src/employer-authentication.ts`
-- `packages/persistence/src/identity-authentication.ts` (membership loading, invitation acceptance)
-- `packages/persistence/src/repositories.ts` (`assertActiveEmployerGrantForMutation`)
-- `packages/persistence/drizzle/0041_employer_company_profile_and_access_requests.sql`
-- `packages/hiring/src/review-signals.ts` (payment-demand detector)
+API controllers and helpers: `employer-organisation-state.ts`, `employer-hiring.controller.ts`,
+`employer-job-lifecycle.controller.ts`, `opportunity-requirements.ts`,
+`employer-skill-catalogue.controller.ts`, `employer-candidate-view.controller.ts`,
+`interview-scheduling.ts`, `employer-scorecard-templates.controller.ts`,
+`application-messages.controller.ts`, `campus-drives.controller.ts`, `campus-drives.ts`,
+`campus-drive-nominations.controller.ts`, `employer-assessments.controller.ts`,
+`skill-evidence.ts`, `skill-evidence.controller.ts`, `talent-pool.ts`, `talent-pool.controller.ts`,
+`employer-reports.ts`, `employer-reports.controller.ts`, `employer-settings.controller.ts`,
+`employer-trust-cases.controller.ts`, `operations-employer-terms.controller.ts`,
+`employer-terms-gate.ts`, `trust-safety.controller.ts`, `employer-applicant-export.ts`,
+`employer-applicant-export.controller.ts`, `institution-export-csv.ts`, `student-hiring.controller.ts`,
+`privacy-deletion.ts`, `employer-team.controller.ts`, `employer-company-profile.controller.ts`,
+`employer-access-requests.controller.ts`, `operations-institution-onboarding.controller.ts`,
+`apps/api/src/run-privacy-worker.ts`, `apps/api/src/assistant/help-articles.ts`.
 
-Web
-- `apps/web/src/App.tsx` (`workspaceForMembership`)
-- `apps/web/src/rolePortalPages.tsx`
-- `apps/web/src/rolePortal/employer.tsx`, `employerTeam.tsx`, `employerCompanyProfile.tsx`, `employerOrganisationState.tsx`, `operationsEmployerAccessRequests.tsx`
-- `apps/web/src/publicEmployerAccessPage.tsx`, `apps/web/src/hiringPages.tsx`, `apps/web/src/api/hiring.ts`
+Packages: `packages/persistence/src/employer-authentication.ts`, `repositories.ts`,
+`hiring-notifications.ts`, `application-messages.ts`, `employer-terms.ts`; `packages/hiring/src/`
+(`eligibility.ts`, `opportunity-requirements.ts`, `interview-scheduling.ts`,
+`application-messages.ts`, `campus-drives.ts`, `review-signals.ts`).
 
-Android (only to confirm that they show server data and no readiness)
-- `apps/android/app/src/main/java/pro/ai8ht/one/EmployerTeam.kt`, `EmployerCompanyProfile.kt`, `EmployerOrganisationState.kt`, `StudentHiring.kt` (company block), `StaffDashboards.kt` (workspace mapping)
+Web: `apps/web/src/rolePortal/employer.tsx`, `rolePortalPages.tsx`, `rolePortalConfig.ts`,
+`staffDashboardsV3.tsx`, `hiringPages.tsx`, `helpFaqPanel.tsx`, and the employer pages for each
+module. Android: read only to confirm that employer screens are keyed by the chosen workspace and
+carry no readiness.
 
-Tests searched
-- `apps/api/src/http/employer-organisation-state.integration.spec.ts`, `employer-team.integration.spec.ts`, `employer-company-profile.integration.spec.ts`, `hiring.integration.spec.ts`, `employer-assessments.integration.spec.ts`, `api-security.integration.spec.ts`, `employer-hiring.controller.test.ts`
-- `packages/persistence/test/employer-authentication.integration.test.ts`
-- `apps/web/src/employerWorkspace.test.tsx`, `employerOrganisationState.test.tsx`, `publicEmployerAccessPage.test.tsx`, `hiringPages.test.tsx`, `rolePortal/employerTeam.test.tsx`, `rolePortal/employerCompanyProfile.test.tsx`
-
-Documents used to locate code: `docs/employer/EMPLOYER_PROGRESS.md`, `docs/employer/EMPLOYER_BASELINE.md`, `docs/architecture/employer-access-requests-table-design.md`.
+Tests searched: every `*.spec.ts` and `*.test.ts` under `apps/api/src/http/` whose name starts
+with `employer-`, `hiring`, `talent-pool`, `skill-evidence`, `campus-drive`, `application-messages`
+or `student-hiring`, plus `packages/persistence/test/employer-authentication.integration.test.ts`
+and the web tests named in §4.
 
 ## 4. Threats
 
 ### 4.1 Cross-employer data access
 
-**Verified controls**
-- The helper `requireActiveEmployer` is §5.1 in order. Step 1 is an ACTIVE membership whose organisation and employer scope both equal the path's `employerId`, in a role the route allows (`apps/api/src/http/employer-organisation-state.ts:85-97`). Steps 2 and 3 are the organisation's `active` flag and its verification state (`:100-105`, `:53-59`). A malformed id gets 403, not 400 (`:87`).
-- Memberships are loaded from the database with `state = 'ACTIVE'` on every request (`packages/persistence/src/identity-authentication.ts:46-82`), so an ended membership loses access on the next request.
-- Every lookup of a resource also filters on the employer: opportunity `employer-hiring.controller.ts:819-827`; application `:829-841`; interview `:595`, `:628`; offer `:720`; assessments `employer-assessments.controller.ts:243`, `:271`, `:328`; team invitation `employer-team.controller.ts:347-352`; team membership `:297-302`.
-- Interview participants must be ACTIVE members of the same employer, locked while the interview is written (`employer-hiring.controller.ts:540-548`).
-- Team and profile routes use `requireEmployerMembership` + `assertEmployerState`, which are the two halves of the same helper (`employer-team.controller.ts:319-328`, `:105`; `employer-company-profile.controller.ts:91-92`, `:101-104`).
-- On Android, each employer screen is keyed by the chosen workspace's `organizationId` (`StaffDashboards.kt:69-85`).
+**Controls**
+- §5.1 helper: `requireActiveEmployer` = an ACTIVE membership whose organisation and employer
+  scope equal the path id, in an allowed role, then the organisation's state
+  (`employer-organisation-state.ts:71-86`, refusal rules `:56-63`). Split form
+  `requireEmployerMembership` + `assertEmployerState` (`:88-108`) is used by team, profile,
+  settings, trust cases, lifecycle edits and export.
+- Every new module's queries filter on the employer: candidate view and résumé
+  (`employer-candidate-view.controller.ts:158-162`, `:196-199`), messages
+  (`application-messages.controller.ts:74-230`), drives (`campus-drives.controller.ts:396-520`),
+  assessments, reports (`employer-reports.controller.ts:78-274`), export
+  (`employer-applicant-export.controller.ts:60-110`), talent pool (`talent-pool.controller.ts:361-530`).
+- Talent-pool cards are addressed per employer: `md5(listing id : employer id)`
+  (`talent-pool.ts:127-130`), so two employers cannot correlate a card.
+- Reports count only the caller's applications.
 
-Tests: `employer-team.integration.spec.ts › refuses another employer, an ended membership and a suspended membership`; `employer-company-profile.integration.spec.ts › refuses another employer, ended and suspended memberships, and answers 401 without a token`; `hiring.integration.spec.ts › does not let a rival employer touch the opportunity`, `› shows the applicant to the owning employer only`, `› does not let a rival employer list employer interview or offer records`; `employer-hiring.controller.test.ts › scopes the applications, offers and opportunities to the caller employer and returns no identity columns`; `employer-team.integration.spec.ts › ends a membership: access stops on the next request, past actions stay in audit, and the end is audited`.
+**Tests:** `employer-candidate-view.integration.spec.ts › refuses without a token, for another
+employer, an ended membership, a suspended or unverified organisation, and a malformed id`;
+`application-messages.integration.spec.ts › keeps each conversation to its own student and its own
+employer`; `employer-reports.integration.spec.ts › refuses another employer's recruiter and never
+counts another employer's applications`; `employer-applicant-export.integration.spec.ts › refuses a
+recruiter, another employer, an ended membership, a missing token and another employer's job`;
+`talent-pool.integration.spec.ts › requires a signed-in, active member of a verified, active
+employer`; `employer-terms-trust.integration.spec.ts › shows an employer only the cases about
+itself, with its own job evidence`; `campus-drives.integration.spec.ts › refuses callers without a
+token, from another organisation, and employers not in good standing`;
+`employer-assessments-emp12.integration.spec.ts › keeps each bank to its owner at the API and in
+the schema`; `employer-interview-scheduling.integration.spec.ts › needs a token, refuses another
+employer, and refuses a suspended employer on every route`; plus the EM1 tests
+(`employer-team.integration.spec.ts › refuses another employer, an ended membership and a suspended
+membership`; `hiring.integration.spec.ts › does not let a rival employer touch the opportunity`).
 
-**Open findings**
-- EMP-SR-03 (Medium): the web employer page acts on the first employer membership, not the chosen workspace.
+**Open findings:** EMP-SR-03 (web acts on the first employer membership).
 
 ### 4.2 Insecure direct object references on applications and résumés
 
-**Verified controls**
-- Every application route resolves the application through `requireOwnedApplication`, which matches `a.id` **and** `a.employer_id` and excludes DRAFT (`employer-hiring.controller.ts:829-841`). The route then writes with `employer_id` in the WHERE clause again (`:295`). Routes covered: transition `:270`, feedback `:349`, schedule interview `:515` (re-locked `:535-539`), extend offer `:683`.
-- The applicant list checks that the opportunity belongs to the employer (`:239`) and filters on `a.employer_id` (`:252`).
-- Offers and interviews are matched by employer (`:720`, `:595`, `:628`).
-- Assessment invitations accept only applications of this employer that are open, consented and live (`employer-assessments.controller.ts:280-289`).
-- **Résumés:** no employer route serves a résumé or any stored document today. A search of every employer controller and `apps/api/src/http/*.controller.ts` for résumé routes found none. Signed, grant-bound résumé download is EMP-07 and is not in this slice.
+**Controls**
+- Application routes resolve the application by id **and** employer
+  (`employer-hiring.controller.ts` `requireOwnedApplication`), then the live grant.
+- **Résumés** (EMP-07): a link is issued only under the live grant (share-locked) and only for a
+  readable, un-erased snapshot file of this employer's application
+  (`employer-candidate-view.controller.ts:148-180`). The token is 32 random bytes, stored only as
+  a SHA-256 digest, lives 60 seconds (database clock), and is consumed in one UPDATE that also
+  matches the application, the employer and the **issuing user** (`:196-203`). The grant is
+  checked again at redemption (`:206`). The file is sent as an attachment with `nosniff` and
+  `no-store`, and the filename is reduced to ASCII (`:220-226`, `:252-254`).
+- Message threads, assessment results and evidence are read by application id under the caller's
+  employer and the grant.
 
-Tests: `hiring.integration.spec.ts › shows the applicant to the owning employer only`, `› does not let a rival employer touch the opportunity`. No test calls an application-id route with another employer's application id under the caller's own `employerId` path.
+**Tests:** `employer-candidate-view.integration.spec.ts › issues a 60-second link, serves the bytes
+once as an attachment to the recruiter who asked, and audits both`, `› refuses an expired link, a
+forged token, a link after the grant ends, and a résumé-less application`, and the case in `›
+refuses without a token…` that calls the caller's own employer path with another employer's
+application id (`:313`); `application-messages.integration.spec.ts:212-213` (same pattern);
+`employer-assessments-emp12.integration.spec.ts:458`; `skill-evidence.integration.spec.ts ›
+refuses without a token, another employer, an ended membership, an inactive employer, a malformed
+id and an expired or deleting grant`.
 
-**Open findings**
-- EMP-SR-01 (High): the employer id is enforced, but the applicant-access grant is not (see 4.3).
-- EMP-SR-16 (Low): the employer-side interview outcome route skips the consent and closed checks.
+**Residual risks:** R-04 (résumé token in the URL query string).
 
 ### 4.3 Grant bypass (`employer_applicant_access_grants`)
 
-**Verified controls**
-- A grant is created in the apply transaction, scoped to employer + student + opportunity (`student-hiring.controller.ts:341-345`).
-- It is revoked on withdrawal (`:473-480`, together with `consent_revoked_at` at `:465`) and when the employer closes the application as HIRED or REJECTED (`employer-hiring.controller.ts:302-310`).
-- The persistence check `assertEmployerApplicantAccessForAuthenticatedPrincipal` requires all of the following:
-  - an ACTIVE membership in an employer role with matching scope (`packages/persistence/src/employer-authentication.ts:25-31`);
-  - a VERIFIED and active employer organisation (`:34-38`, EMP-03);
-  - `revoked_at IS NULL` and an `expires_at` that is either null or in the future (`:42-43`);
-  - a lock option for mutations (`:20`).
+**Controls**
+- One predicate, `liveApplicantGrantCondition` (`packages/persistence/src/employer-authentication.ts:18-30`):
+  not revoked, not expired, and no open deletion request for the student. Used by
+  `applicationHasLiveApplicantGrant` (`:38-44`) in every list, and `assertEmployerApplicationAccess`
+  in every write (lock option for mutations).
+- Created only in the student's apply transaction (`student-hiring.controller.ts:546`); revoked on
+  withdrawal (`:743`), on terms decline, when the employer rejects or hires
+  (`employer-hiring.controller.ts:410-417`), and on executed deletion (`privacy-deletion.ts:124`).
+- Lists withhold the person per row (`candidateAccess: false`); writes refuse 403. Exempt by
+  design: cancelling an interview, withdrawing an offer, releasing feedback to a rejected
+  candidate, counts-only reads.
+- Every module after EMP-SR-01 reuses the predicate: candidate view and résumé, messages (both
+  sides), scorecards, assessment invites and results, evidence panel and filter, export (inside
+  the audit transaction, `employer-applicant-export.controller.ts:100`, `:108`).
+- Paths that do **not** create a grant: campus drives (a drive gives the employer nothing,
+  ADR-038), nominations (the grant appears only when the student accepts and applies), talent
+  pool (identity only through apply). Grant expiry sweep: `revokeExpiredApplicantGrants`
+  (`packages/persistence/src/employer-terms.ts:229`), run daily by `run-privacy-worker.ts:54`.
 
-Tests: `packages/persistence/test/employer-authentication.integration.test.ts › requires an active employer membership and active applicant grant for the same employer`, `› denies suspended employer memberships and revoked or expired grants`, plus the SUSPENDED/REJECTED/PENDING/UNDER_REVIEW cases from EMP-03 (progress log). Also `hiring.integration.spec.ts › accepts an application with consent and grants scoped employer access`, `› closes employer access once the application is closed`, `› revokes employer access when a student withdraws`.
+**Tests:** `employer-applicant-access.integration.spec.ts › serves the candidate to every route
+while the grant is live`, `› withholds the person from every read and refuses every write on the
+next request after the grant is revoked`, `› withholds the person once the employer rejects them,
+and still lets the employer release feedback`, `› treats an expired grant as no grant`, `›
+withholds the person while a deletion request is open, and restores the view if the student
+cancels it`, `› revokes every grant when the deletion is executed`;
+`employer-terms-trust.integration.spec.ts › removes candidate access the moment a grant expires,
+and the daily job makes it durable`; `campus-drive-nominations.integration.spec.ts › nominates
+eligible students, shows each who nominated them and what would be shared, and gives the employer
+only those who opt in`, `› withdrawing the application withdraws the consent and ends the
+employer's access`; `talent-pool.integration.spec.ts › invites through the card to an invite-only
+job; the employer learns who it was only when the student applies`;
+`application-messages.integration.spec.ts › refuses both sides when the grant is revoked, expired,
+or the student asks to be deleted`; persistence `employer-authentication.integration.test.ts ›
+denies suspended employer memberships and revoked or expired grants`.
 
-**Open findings**
-- EMP-SR-01 (High): no candidate read or write consults the grant. The only caller of the grant check is the standalone probe `GET /employers/:employerId/applicant-access/...` (`api-security.ts:327-351`, `phase1-security.controller.ts:45`). The tests above for "closes access" check that the grant row was revoked, not that data stops flowing.
-- EMP-SR-02 (Medium): the grant lifecycle is incomplete. There is no expiry and no revocation on account deletion.
+**Open findings:** none. EMP-SR-01 and EMP-SR-02 are fixed (§5).
+**Residual risks:** R-09 (sends an offer and some reads check the grant without a row lock).
 
 ### 4.4 Readiness leakage
 
-**Verified controls**
-- A search of every employer controller for `readiness`, `mastery`, `gap`, `band` and `fit` finds only comments and the company-size band (`employer-company-profile.controller.ts:48`). The mappers that shape employer responses (`employer-hiring.controller.ts:930-1034`, `employer-assessments.controller.ts:334-345`, `employer-team.controller.ts:132-165`, `employer-company-profile.controller.ts:170-192`, `employer-hiring.controller.ts:117-126`) contain no readiness band, readiness score, gap status or mastery field.
-- `score`, `maxScore` and `percentage` on assessment results come from the employer's own screening test and never touch readiness (`employer-assessments.controller.ts:14-15`, `:545`).
-- Android employer screens render only server DTOs, with no readiness fields (`EmployerTeam.kt:75`, `EmployerCompanyProfile.kt:64`, `EmployerOrganisationState.kt:43`).
+**Controls**
+- No employer controller selects a readiness, mastery or gap column; the mentions of readiness in
+  employer code are comments that say so (`employer-assessments.controller.ts:16-17`,
+  `employer-candidate-view.controller.ts:13`, `talent-pool.ts:12`, `skill-evidence.ts:10`).
+- Evidence (EMP-13) and talent-pool cards (EMP-14) are lists of items — type, source, date,
+  unaided — never a band, score, count, percentage, stage or rank (ADR-043, ADR-044).
+- Eligibility shows outcome and basis, never figures. Screening scores are the employer's own
+  test and never touch readiness. Exports refuse a header naming a forbidden field
+  (`employer-applicant-export.ts:44-53`, `:120`). Reports refuse unknown query parameters
+  (`employer-reports.controller.ts:268`).
 
-Tests: `employer-team.integration.spec.ts › carries no readiness, score or internal error text in any team response`; `employer-company-profile.integration.spec.ts › lets an owner and an admin edit the student-facing fields, audited, and a recruiter only read them` (key regex at `:123`, `:139`); `employer-assessments.integration.spec.ts › shows the employer no readiness band alongside the score`, `› writes nothing to evidence, mastery or readiness, and moves no application`.
+**Tests:** `skill-evidence.integration.spec.ts › keeps readiness out of every employer response that
+now carries evidence (contract)`; `talent-pool.integration.spec.ts › shows a minimal card with no
+name, contact, college, identifier, readiness, stage or count; addresses it per employer; audits
+search and view`; `employer-applicant-export.integration.spec.ts › writes no readiness, no
+identifier, no roll number and no protected attribute`; `employer-applicant-export.test.ts ›
+refuses to build a document whose header names a forbidden field`;
+`employer-candidate-view.integration.spec.ts › previews what will be shared — name, education,
+qualifications without figures, links, the chosen résumé — and nothing readiness-related`;
+`employer-job-lifecycle.integration.spec.ts › returns no readiness, score or gap field in the detail
+response`; `employer-assessments-emp12.integration.spec.ts › shows one candidate's results with a
+per-question breakdown, audited, and nothing about readiness`; `employer-assessments.integration.spec.ts
+› shows the employer no readiness band alongside the score`, `› writes nothing to evidence, mastery
+or readiness, and moves no application`; `employer-eligibility-stages.integration.spec.ts › uses a
+self-reported record where nothing is verified, and flags it to the employer without the figure`;
+`campus-drives.integration.spec.ts` (`noReadiness` helper, `:134`); plus the EM1 team and profile
+tests.
 
-**Open findings**
-- EMP-SR-07 (Medium): no single contract test covers every employer response (§5.3, §6.3).
+**Open findings:** EMP-SR-07 (no single all-routes contract test).
 
-### 4.5 Scraping through search or exports
+### 4.5 Scraping through search or exports (including the talent pool)
 
-**Verified controls**
-- There is no employer-side search over students, no talent pool, and no export route. No employer controller or employer web page contains `csv`, `export` or download code.
-- The only search is the student's job search. It is authenticated, parameterised, capped at 80 characters and 100 rows, and limited to verified employers (`student-hiring.controller.ts:175-196`).
-- Employer lists are bounded: 200 opportunities (`employer-hiring.controller.ts:173`), 500 applicants, interviews and offers (`:255`, `:505`, `:673`), and a team page of at most 200 (`employer-team.controller.ts:76-77`, `:482-487`).
+**Controls**
+- **Exports** (EMP-17): owners and admins only; one job per file; live-grant candidates only;
+  snapshot fields only; contact details only from Shortlisted; 5,000 rows; 20 exports per person
+  per employer per 24 hours under an advisory lock (`employer-applicant-export.controller.ts:84-104`);
+  a fixed reason list; every export audited with the application ids and SHA-256 before the
+  bytes leave.
+- **Talent pool** (EMP-14, flag off): at least one filter; only the listed filter keys
+  (`talent-pool.ts:224-225`); up to 5 skills; 25 a page, 8 pages, no total; a neutral order per
+  employer; per-employer pseudonymous cards with no identity; every search and card view audited
+  (`talent-pool.controller.ts:432`, `:463`); with the flag off nothing is read
+  (`talent-pool.ts:42`).
+- **Evidence filter**: narrows the employer's own applicant list, never re-orders, audited
+  (`employer-hiring.controller.ts:349`).
+- **Reports**: suppressed below 5 (`employer-reports.ts:6-7`), no candidate rows.
+- **Lists**: messages inbox keyset-paginated (max 200); hiring lists still fixed `LIMIT 500`.
 
-Not in this slice: talent discovery (EMP-14), exports and keyset pagination of hiring lists (EMP-17).
+**Tests:** `employer-applicant-export.integration.spec.ts › allows 20 exports per person per
+employer in 24 hours and refuses the next without writing anything`, `› writes the live-grant
+candidates exactly as the fixture, and leaves out withdrawn, expired and deleting students`, `›
+exports only Shortlisted onward when asked, and an admin may export as well as the owner`;
+`talent-pool.integration.spec.ts › keeps one neutral order per employer, unrelated to evidence or
+recency, and pages without a total`, `› refuses anything that is not a filter — so no protected
+attribute — and a search with no filter`, `› offers nothing, reads nothing and shows nothing while
+the flag is off; leaving stays possible`; `skill-evidence.integration.spec.ts › narrows to live
+applicants who share qualifying evidence for the skill, in the list's own order, and audits the
+use`; `employer-reports.test.ts › withholds a whole group under 5 and never returns a raw small
+count`; `application-messages.integration.spec.ts › pages the conversation and the inbox with
+bounded, keyset cursors`.
 
-**Open findings**
-- None specific to this slice. The unpaginated 500-row hiring lists are noted in §6.
+**Open findings:** EMP-SR-20 (unsuppressed `hiring-analytics` still reachable).
+**Residual risks:** R-03 (talent-pool search has no rate limit), R-08 (report suppression is per
+table), R-13 (hiring lists unpaginated at 500).
 
 ### 4.6 Messaging abuse
 
-Not built. No messaging route or table serves employers, and the web Messages label shows the unbuilt empty state. Messaging is EMP-15 and not in this slice. The only employer-originated outbound message today is the team invitation email (see 4.9).
+**Controls**
+- Employers start a conversation only from SHORTLISTED while the application is open
+  (`packages/hiring/src/application-messages.ts:12-13`); both sides need the live grant.
+- Text only, ≤ 2,000 characters, no attachments; links flagged and never rendered as links
+  (`application-messages.controller.ts:500`); a "never pay a fee" warning for students.
+- Limits (`packages/hiring/src/application-messages.ts:31-39`): 10 per side per thread per hour
+  (thread row locked), three employer messages in a row without a reply, 200 per employer per hour,
+  50 new threads per employer per day, 60 per student per hour.
+- Students mute and report; a report opens or joins one trust case per conversation, HIGH for a
+  payment request, with the thread as evidence; the employer is told nothing. Notices never carry
+  the text. Retention 180 days after the grant ends, held while a case or hold needs it.
+- Append-only messages (trigger), erased on deletion.
 
-**Open findings:** none in this slice.
+**Tests:** `application-messages.integration.spec.ts › lets the team start it from SHORTLISTED
+onward…`, `› stops an employer after three unanswered messages and a student after ten in an hour
+in one conversation`, `› flags a message that carries a link, for both sides to see`, `› refuses
+unknown fields, empty or overlong text and attachments, and writes nothing`, `› opens one case per
+conversation, keeps adding to it, and tells the employer nothing`, `› lets a student report after
+the employer lost access, and never lets a message be rewritten or deleted`, `› erases text 180 days
+after the grant ended, but not while a report on it is open`; `employer-terms-trust.integration.spec.ts
+› never erases message text a retention hold still needs`.
+
+**Residual risks:** R-01 (employer messages are not scanned for payment demands), R-05
+(per-employer limits counted without a global lock). No test covers the per-employer hourly and
+new-thread limits; they are recorded in R-05.
 
 ### 4.7 Fake employers
 
-**Verified controls**
+**Controls**
+- Verification before reach: unverified employers draft only; suspended and rejected do nothing
+  but read status and trust cases (`employer-organisation-state.ts:56-63`). Students see only jobs
+  of employers in good standing (`student-hiring.controller.ts:909`); suspension pauses every
+  published job. Public access request creates nothing and cannot enumerate (EM1, unchanged).
+- Payment demand: recorded as a review signal on create and publish
+  (`employer-hiring.controller.ts:177`, `:237`, `:1164-1188`); **refused** on an edit to a live job
+  (`employer-job-lifecycle.controller.ts:249`, `:718`) and in company "About" text
+  (`employer-company-profile.controller.ts:219-223`).
+- Terms gate (EMP-16): publish, reopen and drive request/resubmit refused until an owner accepts
+  the current terms, once terms are published (`employer-terms-gate.ts:20-21`;
+  `employer-job-lifecycle.controller.ts:413`; `campus-drives.controller.ts:443`, `:514`).
+- Drives need the college's approval; only institution-wide placement staff decide
+  (`campus-drives.controller.ts:777`). Talent-pool invitations only from a verified employer, to its
+  own invite-only job, 20 a day (`talent-pool.controller.ts:491-516`); students can block.
+- Trust cases: students report messages; employers respond and appeal once; operators decide.
 
-The public access request (`employer-access-requests.controller.ts:106-159`):
-- It creates only an attempts row, a PENDING request and an outbox event with no actor. It never reads `organizations` (`:116-157`). Nothing in the table can express "verified" (0041 `:62-95`, state check `:85`, organisation-link checks `:93-94`, `:104-123`).
-- It answers every well-formed submission with the same `202 {received:true}` (`:107`, `:158`), including repeats, which only bump a count (`:136-143`).
-- Unknown fields are refused (`:311-312`). Lengths and formats are checked in code and again in the database (0041 `:79-84`).
-- Rate limits are 5 per address per hour, 10 per email domain per day and 200 per hour overall (`:62`, `:120-131`). They are serialised by an advisory lock (`:118`), and attempts older than 2 days are pruned (`:119`).
-- X-Forwarded-For is trusted only when the socket peer is loopback or a private address, and then only the right-most entry is used (`:266-281`).
-- Public webmail is refused unless the flag `employer-access.allow-free-mail` is on, and is then flagged (`:112-113`, `:255-258`; 0041 `:141-145`, default off).
+**Tests:** `employer-hiring.controller.integration.spec.ts › records payment and cross-employer
+duplicate signals before publishing, with no penalty`; `employer-job-lifecycle.integration.spec.ts
+› refuses stale, malformed, past-dated and payment-demanding edits, and edits to a withdrawn job`;
+`employer-terms-trust.integration.spec.ts › refuses to publish, reopen or request a drive until an
+owner accepts the current terms`, `› puts the employer response and appeal on the operator case
+timeline, and never names the reporter`; `campus-drives.integration.spec.ts › gives the employer no
+way to make a drive live, and lets the college reject or ask for changes with a reason`;
+`talent-pool.integration.spec.ts › allows at most 20 invitations per employer in any 24 hours`, `› a
+blocked employer neither finds nor invites the student…`; EM1 access-request tests (unchanged).
 
-Operator decisions:
-- Queue and decision need `OPS_ORG_MANAGE` (`:247-253`).
-- A decision is locked FOR UPDATE, must come from PENDING, uses fixed reason codes, links only EMPLOYER organisations and is audited in the same transaction (`:209-245`, `:78-82`, `:329-342`).
-- ONBOARDED never changes verification state. Verification needs `OPS_VERIFY` (`operations-institution-onboarding.controller.ts:196`). Suspension is dual-controlled (`:201-214`).
-
-Tests: `employer-company-profile.integration.spec.ts › records a pending request and creates nothing else — no user, organisation, membership or invitation`, `› answers identically for a repeat and for a company already on ONE, so it cannot be used to enumerate`, `› refuses a public webmail address unless Operations allows it, then flags it`, `› rate-limits by network address and by email domain, without saying anything about records`, `› validates the form and refuses unknown fields`, `› shows requests as pending to Operations only, with possible matches, and records a decision without verifying anything`, `› paginates the queue with a bounded page size and validates the query`; web `publicEmployerAccessPage.test.tsx › links a request to an employer only with a reason, and offers only employers to link`.
-
-Limitations, not defects:
-- The requester's email is never confirmed (HG-7; the queue says so at `:390-391`).
-- The free-mail list (`:66-72`) is a signal, not a proof: any cheap domain passes.
-
-**Open findings**
-- EMP-SR-06 (Medium): the access-request limits can be turned against genuine requesters.
-- EMP-SR-11 (Low): `emailMatchesWebsite` accepts a parent domain.
-- EMP-SR-12 (Low): the rate-limit digest is an unsalted hash of the address.
-- EMP-SR-13 (Low): the Operations "initial" invitation mints an owner for any state, on every call (EMP-01 limitation).
+**Open findings:** EMP-SR-22 (payment demand flagged, not refused, at create and publish),
+EMP-SR-21 (direct college audience bypasses approval), EMP-SR-06, EMP-SR-09, EMP-SR-10,
+EMP-SR-11, EMP-SR-12, EMP-SR-13.
+**Residual risks:** R-06 (terms are a legal draft; no dual control on publishing them), R-12
+(self-reported eligibility values).
 
 ### 4.8 CSV injection
 
-**Verified controls**
-- No employer surface imports or exports CSV today.
-- Some hiring fields refuse a leading `=`, `+`, `-` or `@` at input (`employer-hiring.controller.ts:37`, `:1066-1070`).
+**Controls**
+- Output neutralisation: `csvCell` prefixes an apostrophe to any cell starting with `=`, `+`, `-`,
+  `@`, tab or CR, and quotes every cell (`institution-export-csv.ts:20-31`); the employer export
+  reuses it (`employer-applicant-export.ts`, `csvDocument`). The file is sent with BOM, CRLF,
+  `attachment`, `no-store`, `nosniff`.
+- Input-side refusal of a leading `=+-@` on some hiring fields remains (harmless).
 
-Not in this slice: exports with output neutralisation (EMP-17, whose acceptance requires it).
+**Tests:** `employer-applicant-export.test.ts › builds exactly the committed fixture, neutralising
+formula-leading cells, with the hash of the exact bytes`;
+`employer-applicant-export.integration.spec.ts › writes the live-grant candidates exactly as the
+fixture…` (name starting `@`, headline `=HYPERLINK`, summary `-2+3`, phone `+…`);
+`hiring-notifications.integration.spec.ts › refuses a preparation note that could run as a
+spreadsheet formula`.
 
-**Open findings**
-- EMP-SR-18 (Low): neutralisation is input-side, partial, and absent from the EM1 fields.
+**Open findings:** none. EMP-SR-18 is fixed.
 
-### 4.9 Notification spoofing (team invitation emails)
+### 4.9 Notification spoofing
 
-**Verified controls**
-- Who can trigger an invitation: an ACTIVE owner or admin of that employer (`employer-team.controller.ts:64`, `:319-328`), within `canAssignRole` (`:176`; `services.ts:702-719`). The employer must not be SUSPENDED or REJECTED, and this is re-checked under a row lock (`:175`, `:182`, `:336-344`).
-- To whom: one validated address with no CR or LF (`:75`, `:466-470`). Current members are refused (`:183-189`). Only one invitation may be pending per address (`:196-199`, plus a unique index mapped at `:446`).
-- Content: the subject is a constant (`:80`). The body is plain text built from the Operations-held legal name, a role label from a fixed map, the invitee's own address and the link (`:385-390`). The employer cannot set any free text in the email. The link token is stored only as a digest (`:204`), and a resend replaces it (`:261`).
-- Acceptance: the token must match, the recipient's verified email must match, and the invitation must be PENDING, unexpired and unrevoked, all under FOR UPDATE (`identity-authentication.ts:117-126`, consumed at `:177-188`). A different bound identity is refused (`:152-157`). The membership is created with the invitation's scope (`:199-213`).
-- Delivery is honest. With no sink the invitation is recorded NOT_CONFIGURED. A failure records FAILED or BOUNCED, and nothing claims a send (`:205`, `:383-422`).
+**Controls**
+- Team invitations (EM1, unchanged): constant subject, Operations-held legal name, fixed role
+  labels, no employer free text.
+- Hiring notices are rendered by one function (`packages/persistence/src/hiring-notifications.ts:127-224`),
+  from the verified legal name (`:292`), the job title, stage and, for tests, the test title;
+  never the employer's notes, reason codes, joining link or message text; titles truncated to
+  160 and bodies to 500 characters. Sent by the outbox consumer after commit, once per event
+  (replays write nothing). Talent-pool and drive notices are fixed sentences with the employer's
+  verified name and the job title (`talent-pool.controller.ts:531-532`,
+  `campus-drives.controller.ts:348-363`).
+- Email is recorded `NOT_CONFIGURED` while no sender is configured; nothing claims a send.
 
-Tests: `employer-team.integration.spec.ts › lets an owner invite an admin and a recruiter, but not another owner`, `› lets an admin invite a recruiter only`, `› refuses a recruiter every team route`, `› refuses acceptance by an identity whose verified email is not the invited one`, `› resends with a new link: the old link stops working, the new one accepts, and it is audited`, `› refuses to invite a current member or a second pending invitation, and replaces an expired one`, `› records NOT_CONFIGURED when no mail sink exists (HG-7) and never claims a send`, `› keeps the invitation and records FAILED when the sink cannot send`, `› refuses a SUSPENDED employer every team route, so it cannot invite anyone` (the it.each covers SUSPENDED and REJECTED).
+**Tests:** `hiring-notifications.integration.spec.ts › writes one in-app notice and one email per
+event, and a replayed event writes nothing more`, `› tells a rejected student plainly, without the
+private reason code or note`, `› records the email NOT_CONFIGURED when no sender exists, and SKIPPED
+when the student turned email off`; `application-messages.integration.spec.ts › tells the student
+once per unread run, never with the text…`; `employer-interview-scheduling.integration.spec.ts ›
+tells nobody about a completed interview, and records NOT_CONFIGURED for every recipient when no
+sender exists`; `employer-assessments-emp12.integration.spec.ts › writes one in-app notice naming
+the employer, role and test, with no score or identifier`; EM1 team-invitation tests.
 
-**Open findings**
-- EMP-SR-05 (Medium): invite and resend have no rate limits.
-- EMP-SR-04 (Medium): pending invitations survive the removal of the person who sent them.
+**Open findings:** EMP-SR-05 (no rate limit on team invitations), EMP-SR-04.
+**Residual risks:** R-02 (employer-written job and test titles appear in notice titles).
 
-### 4.10 Role-matrix enforcement
+### 4.10 Role matrix, organisation state, locks, mass assignment, audit, surfaces
 
-**Verified controls**
-- Owner → admin or recruiter; admin → recruiter; recruiter → nothing (`services.ts:712-715`; `employer-team.controller.ts:64`, `:176`). Nobody can invite an owner through the team routes.
-- Ending a membership follows `canAssignRole`, and an owner may also end another owner (`:86-88`, `:305`). So an admin cannot end an admin or an owner, and cannot revoke or resend an admin invitation (`:355`). An admin cannot remove themselves (`mayEndMembership('EMPLOYER_ADMIN','EMPLOYER_ADMIN')` is false). An owner can remove themselves only if they are not the last owner.
-- Last-owner protection and concurrency: all ACTIVE owners are locked in id order before the target (`:291-302`), and the count excludes the target (`:307`).
-- A person holding two roles acts with the broader one (`:321-326`).
-- Company profile: owners and admins write, recruiters read (`employer-company-profile.controller.ts:58`, `:91`, `:101`). Hiring routes allow owner, admin and recruiter (`employer-hiring.controller.ts:40`, `employer-assessments.controller.ts:53`), which matches §5.1. The interview-participant guard also requires assignment (`employer-hiring.controller.ts:56-89`).
+These EM1 sections still hold as written in the first version, with these changes:
+- **Role matrix.** Exports, terms acceptance and trust-case answers are owner/admin or owner only
+  (`employer-applicant-export.controller.ts:44`, `employer-settings.controller.ts:33`,
+  `employer-trust-cases.controller.ts:34`). The INTERVIEWER and HIRING_MANAGER roles are still not
+  provisionable (`employer-hiring.controller.ts:65-69`); panellists are recruiters.
+- **Organisation state.** New action group `trust.cases`, allowed in every state
+  (`employer-organisation-state.ts:39`, `:57`). The state matrix now covers the assessment routes
+  (`employer-organisation-state.integration.spec.ts:230-234`); every newer module tests SUSPENDED
+  and PENDING in its own spec.
+- **Locks.** Lifecycle, assessments, interviews, scorecard templates and drives lock the
+  organisation row FOR SHARE in the write (`interview-scheduling.ts:45`); see EMP-SR-15 for what
+  remains.
+- **Mass assignment.** Every route added since EM1 refuses unknown fields; the pre-existing
+  transition, offer and audience bodies still ignore them (EMP-SR-08).
+- **Surfaces.** The web employer pages still pick the first employer membership (EMP-SR-03);
+  Android keys each screen by the chosen workspace.
 
-Tests: `employer-team.integration.spec.ts › does not let an admin end an admin or an owner`, `› does not let an admin revoke or resend an admin invitation`, `› refuses to end the only owner, including by themselves`, `› lets one of two owners end the other, then keeps the remaining owner`, `› never lets two owners end each other at the same time and leave nobody`; web `employerTeam.test.tsx › offers an admin recruiters only`, `› tells a recruiter Team is managed by the owner or admin and never calls the team API`.
-
-**Open findings:** EMP-SR-03 (display role taken from the wrong membership), EMP-SR-04.
-
-### 4.11 Organisation-state enforcement (including REJECTED with active = true)
-
-**Verified controls**
-- `employerStateRefusal` refuses everything except `organisation.status` when the organisation is inactive, SUSPENDED or REJECTED. The check keys on the state, not only on `active` (`employer-organisation-state.ts:53-59`). PENDING and UNDER_REVIEW organisations may use `organisation.manage` and `jobs.draft` only.
-- The student side uses the same rule as SQL (`:120-124`) on the job list, detail and apply (`student-hiring.controller.ts:193`, `:224`, `:299`, `:599`). It is also applied in the interviewer calendar (`calendar.controller.ts:191-192`), in the participant assignment predicate (`employer-hiring.controller.ts:85-88`) and in the grant check (`employer-authentication.ts:34-38`).
-- Suspension sets `active=false` and pauses every published job in the same transaction, with an audit row and outbox event per job (`operations-institution-onboarding.controller.ts:215`, `:222`, `:235-245`). Reinstatement does not republish. REJECTED can only be reached from UNDER_REVIEW (`:996-1003`), so a rejected employer never has published jobs.
-
-Tests: `employer-organisation-state.integration.spec.ts › refuses every employer route to a SUSPENDED organisation, and says why` and the REJECTED case (it.each over `[['SUSPENDED', false], ['REJECTED', true]]`), `› lets a PENDING organisation draft but not publish or reach candidates` and the UNDER_REVIEW case, `› lets every member read their own organisation status in every state`, `› pauses on suspension, hides the job and its applicants, and keeps it paused on reinstatement`, `› hides and refuses a published job whose employer is rejected, unverified or inactive, even without a pause`, `› refuses to publish for a recruiter whose organisation operations suspended`; web `employerOrganisationState.test.tsx › shows a rejected employer the plain status page on the dashboard too`, `› keeps every navigation label for a suspended employer`.
-
-**Open findings**
-- EMP-SR-14 (Low): students can still start and submit a suspended employer's screening tests (EMP-03 limitation).
-- EMP-SR-19 (Low): the state-matrix test omits four guarded routes.
-
-### 4.12 TOCTOU on publish and invite (row locks)
-
-**Verified controls**
-- Opportunity publish re-checks the state inside the UPDATE, under `FOR SHARE` on the organisation row (`employer-hiring.controller.ts:217-224`).
-- Team invite and resend lock the organisation `FOR NO KEY UPDATE` and re-check its state (`employer-team.controller.ts:182`, `:257`, `:336-344`). The invitation row is locked (`:346-358`).
-- Company-profile write locks the organisation and profile rows and re-checks the state (`employer-company-profile.controller.ts:109-121`).
-- Suspension locks the organisation FOR UPDATE (`operations-institution-onboarding.controller.ts:208`).
-
-Tests: `employer-team.integration.spec.ts › never lets two owners end each other at the same time and leave nobody`. No test races a suspension against publish, invite or profile write.
-
-**Open findings**
-- EMP-SR-15 (Low): candidate writes and assessment publish have no lock and no in-statement state re-check.
-
-### 4.13 Mass assignment
-
-**Verified controls**
-- Team routes reject unknown body and query keys (`employer-team.controller.ts:450-459`, `:102`).
-- The company profile refuses Operations-controlled fields by name, with 403 `COMPANY_PROFILE_FIELD_OPERATIONS_CONTROLLED` (`employer-company-profile.controller.ts:54-57`, `:202-204`). Any other unknown key gets 400 (`:205`). Column names come from a fixed map before `sql.raw` (`:59-61`, `:127`).
-- The Operations PATCH writes only its own columns (progress log; test below).
-- The access request and the decision reject unknown keys (`employer-access-requests.controller.ts:312`, `:332`, `:171`).
-
-Tests: `employer-company-profile.integration.spec.ts › refuses a legal-name change, and every other field Operations verifies, from the employer side`, `› survives an Operations edit: the employer fields are not wiped by the Operations profile update`; `employer-team.integration.spec.ts › rejects malformed input with 400 before touching anything`.
-
-**Open findings**
-- EMP-SR-08 (Medium): the pre-existing hiring routes ignore unknown fields instead of rejecting them, among other gaps.
-
-### 4.14 Audit, reason codes and errors
-
-**Verified controls**
-
-Audit and reason codes in the EM1 slice:
-- Team invite, revoke, resend and end each write their audit and outbox rows in the same transaction. Each row carries actor, organisation, correlation id and a reason code from a fixed list (`employer-team.controller.ts:68-72`, `:208-211`, `:236-239`, `:269-270`, `:309-312`, `:477-480`).
-- A company-profile write is audited with the changed field names, in its transaction (`employer-company-profile.controller.ts:133-145`).
-- An access-request decision is audited in its transaction (`employer-access-requests.controller.ts:234-238`).
-- Verification changes and pauses are audited (`operations-institution-onboarding.controller.ts:216-222`, `:242-243`). The reason code must match `^[A-Z0-9_:-]{3,64}$` (`:200`; DB check for access requests, 0041 `:87`).
-
-Errors:
-- State refusals return a fixed code, `Access denied` and the correlation id (`employer-organisation-state.ts:104`).
-- Team, profile and access-request errors pass through `domainError` / `mapWriteError`, which map database errors to fixed codes and never echo upstream text (`employer-team.controller.ts:430-448`, `employer-company-profile.controller.ts:258-270`, `employer-access-requests.controller.ts:154-157`, `:240-243`).
-
-Tests: `employer-team.integration.spec.ts › audits the invitation and records its delivery`, `› revokes a pending invitation so it can no longer be accepted, once, and audits why`; web `employerTeam.test.tsx › explains a refusal plainly with its reference and never shows upstream text`, `employerCompanyProfile.test.tsx › reports a refused change plainly, with its reference`.
-
-**Open findings**
-- EMP-SR-08 (Medium): pre-existing hiring and assessment writes fall short of §5.7 and §6.1.
-
-### 4.15 Web and Android surfaces
-
-**Verified controls**
-- Workspace mapping sends owner, admin and recruiter to the employer portal, one entry per organisation, broadest role first (`apps/web/src/App.tsx:579-600`).
-- The state gate uses the chosen workspace's organisation (`rolePortalPages.tsx:198`, `:345`, `:347`).
-- Company text is rendered as React text, never as HTML: the about text at `hiringPages.tsx:240`, and the list line at `:176`. No `dangerouslySetInnerHTML` appears in any employer, hiring or access-request page. The website and careers links are `https:` only in both API and database, and open with `rel="noopener noreferrer"` (`:241-245`; 0041 `:37`; Operations normaliser `operations-institution-onboarding.controller.ts:1236-1246`).
-- The Operations queue renders submitted URLs and emails as plain text, not links (`operationsEmployerAccessRequests.tsx:127-128`).
-- Android shows the company about text and links as plain text, not tappable (`StudentHiring.kt:264-267`, `EmployerCompanyProfile.kt:156-159`).
-
-Tests: `employerWorkspace.test.tsx › lands an EMPLOYER_OWNER in the employer workspace` (it.each), `› offers both workspaces to an employer admin who also administers an institution`, `› opens one employer workspace for an owner who is also a recruiter of the same employer`; `hiringPages.test.tsx › shows the verified company profile on the job, list and detail`, `› says a description is missing instead of inventing one`; `employer-company-profile.integration.spec.ts › carries the company block in the listing and the detail of a published job`.
-
-**Open findings**
-- EMP-SR-03 (Medium): the page acts on the first employer membership.
-- EMP-SR-09 (Low): gaps in the careers-page host check.
-- EMP-SR-10 (Low): the about-text payment detector is easily evaded.
+Tests: `employer-job-lifecycle.integration.spec.ts › refuses a reopen that was waiting on a
+suspension that then committed`; `employer-organisation-state.integration.spec.ts › refuses every
+employer route to a %s organisation, and says why`; the EM1 tests listed in the first version.
 
 ## 5. Findings in detail
 
-Each finding is open. None has a proving test yet; the "Proving test" line names the test that
-should close it.
+### Fixed since the EM1 review (re-verified on `719eb34`)
 
-**EMP-SR-01 — High — Candidate data is served without a live applicant-access grant**
-- Where: `apps/api/src/http/employer-hiring.controller.ts:243-256` (applicant list returns name, email and institution student id), `:488-506` (interviews), `:656-674` (offers), `:829-841` (`requireOwnedApplication`, used by transition, feedback, interview and offer writes); `apps/api/src/http/employer-assessments.controller.ts:316-331` (results return email and name). The only caller of the grant check is `api-security.ts:327-351`. The baseline already flagged this (EMPLOYER_BASELINE.md, "Other corrections").
-- Why it matters: §5.2 says "No grant, no data". The grant is revoked when an application closes (`employer-hiring.controller.ts:302-310`) and on withdrawal. Withdrawal also masks identity through `consent_revoked_at`, but an application the employer REJECTED or HIRED keeps the candidate's name, email and roll number visible indefinitely. The same applies when a grant is revoked by any future path, such as sharing revocation or account deletion. So revoking a grant has no effect on what the employer sees.
-- Fix: in every candidate read, join a live grant (`revoked_at IS NULL AND (expires_at IS NULL OR expires_at > now())`, the predicate in `employer-authentication.ts:39-43`). Where there is no live grant, withhold the identity fields exactly as `mapApplicantRow` does for revoked consent (`:946-963`). Keep the application id and state so the pipeline and feedback release (which needs a REJECTED application, `:352`) still work. For candidate writes, use `assertActiveEmployerGrantForMutation` (`packages/persistence/src/repositories.ts:141-160`) in the write transaction, with an explicit exception for feedback release.
-- Proving test: a new API spec in which, after REJECTED and after a revoked grant, the applicant, interview, offer and assessment-result responses carry no name, email or institution student id; and a write that needs a grant returns 403.
+**EMP-SR-01 — High — FIXED.** Candidate data served without a live grant. Fixed in `7a3e27d`
+(tests) and `715e486` (fix): one predicate (`employer-authentication.ts:18-44`) in every candidate
+read and write. Proved by `employer-applicant-access.integration.spec.ts` (7 cases, §4.3).
 
-**EMP-SR-02 — Medium — The grant lifecycle has no expiry and no revocation on account deletion**
-- Where: apply inserts the grant without `expires_at` (`student-hiring.controller.ts:341-345`). Nothing else sets it. The column exists from 0001 (`0001_identity_organization_persistence.sql:122`, `:126`). A search of `packages/privacy` found no reference to `employer_applicant_access_grants` or `consent_revoked_at`.
-- Why it matters: §5.2 requires expiry after close (proposed 180 days, decision 10.2 #7) and revocation on account deletion. Once EMP-SR-01 is fixed, the grant becomes the control, so it must end when it should.
-- Fix (EMP-07): set `expires_at` when an application closes, and revoke grants in the account-deletion path.
-- Proving test: persistence or API tests for "closed + 180 days → refused" and "deleted account → refused".
+**EMP-SR-02 — Medium — FIXED.** No expiry, no revocation on deletion. Deletion: an open request
+withholds, execution revokes (`privacy-deletion.ts:124`; `› revokes every grant when the deletion
+is executed`). Expiry: the predicate honours `expires_at`, the daily sweep revokes
+(`employer-terms.ts:229`, `run-privacy-worker.ts:54`; `› removes candidate access the moment a
+grant expires…`). Nothing sets `expires_at` today because closing revokes at once — a stricter
+choice recorded in EMP-07 and EMP-16.
 
-**EMP-SR-03 — Medium — The web employer page acts on the first employer membership, not the chosen workspace**
-- Where: `apps/web/src/rolePortal/employer.tsx:41` picks `context.memberships.find(...)` for Opportunities, Applicants, Interviews, Offers, Reports, Team and Company Profile. The gate around it uses `authenticatedWorkspace.organizationId` (`apps/web/src/rolePortalPages.tsx:347`). This is recorded in the progress log as an EMP-02 limitation for the role label only.
-- Why it matters: a person who belongs to two employers and selects employer B sees B's state gate, but the page reads and writes employer A. Drafting, publishing, moving applicants, inviting team members and editing the company profile all land in the wrong organisation. The server allows this because the person really is a member of A, so it is an integrity problem rather than an authorisation bypass. The page also shows A's candidate data under B's heading. The label issue the log records (a person who is both recruiter and owner sees the recruiter message) comes from the same line.
-- Fix: pass `authenticatedWorkspace.organizationId` into `EmployerRecruiterRealityPage`, and take the role as the broadest ACTIVE employer role **for that organisation**, as `employer-team.controller.ts:321-326` does on the server.
-- Proving test: a web test with two employer memberships that selects the second and asserts that every API call uses the second employer's id.
+**EMP-SR-14 — Low — FIXED** in `6cced5b` (EMP-12): every student screening query requires the
+employer in good standing (`employer-assessments.controller.ts:101`); `› marks the invitation
+unavailable and refuses start, answer and submit`.
 
-**EMP-SR-04 — Medium — Pending team invitations survive the removal of the person who sent them**
-- Where: ending a membership changes only the membership row (`employer-team.controller.ts:287-314`). Acceptance checks the token, the email and the invitation state, not whether the inviter still belongs to the employer (`packages/persistence/src/identity-authentication.ts:117-126`, `:177-188`).
-- Why it matters: an admin who is ended with reason `SECURITY_CONCERN` may have invited a second address they control. That invitation stays acceptable for up to 14 days and becomes a fresh ACTIVE membership. The owner can see and revoke it only if they notice it.
-- Fix: in the end transaction, revoke the PENDING invitations for this employer whose `invited_by_user_id` is the ended user, with audit, at least when the reason is `SECURITY_CONCERN`. Alternatively, refuse acceptance when the inviter no longer holds an ACTIVE membership that could grant the role.
-- Proving test: an admin invites a recruiter, the owner ends the admin, and acceptance of the recruiter invitation is refused.
+**EMP-SR-16 — Low — FIXED.** The employer-side outcome route now locks the organisation and
+requires the live grant (`employer-hiring.controller.ts:921-925`), which is revoked on withdrawal
+and on close. Proved by `employer-applicant-access.integration.spec.ts › withholds the person from
+every read and refuses every write…`, which covers `POST interviews/:id/outcome`.
 
-**EMP-SR-05 — Medium — Team invite and resend have no rate limits**
-- Where: `employer-team.controller.ts:168-217` (invite) and `:244-277` (resend, which mints a new link and sends again on every call). There is no count, cooldown or cap per employer, actor or invitation. `send_count` is recorded (`:401`) but never checked.
-- Why it matters: any owner or admin, including one from an unverified (PENDING) employer, can make ONE send ONE-branded mail naming their organisation to any number of addresses. They can also resend repeatedly to one address. That damages sender reputation and can be used for harassment. Today the risk is latent because production has no mail sink (HG-7), and it becomes live when HG-7 is decided.
-- Fix: cap invitations per employer per day (lower for unverified employers), add a resend cooldown and a maximum `send_count` per invitation, and return a 429 with a fixed code.
-- Proving test: an API spec showing that invitations over the cap and a resend inside the cooldown are refused and send nothing.
+**EMP-SR-17 — Low — FIXED** in `6cced5b`: results ordered by invitation
+(`employer-assessments.controller.ts:493`, `:547`); `› lists results in invitation order, never by
+score, a page at a time, and audits each read`.
 
-**EMP-SR-06 — Medium — The access-request limits can be turned against genuine requesters**
-- Where: `employer-access-requests.controller.ts:62`, `:114`, `:120-131`, `:266-273`.
-- Why it matters:
-  - The per-domain limit is keyed on the domain the anonymous submitter types, so ten submissions naming `@company.example` from two addresses block that company's genuine request for a day.
-  - The per-address key is the full client address, so one IPv6 host can rotate through its /64 and exhaust the overall cap of 200 per hour, which closes the form for everyone.
-  - The response for a blocked request is the same 429 in both cases, so the genuine requester has no recourse.
-- Fix: key IPv6 addresses on their /64. Count a domain only for new pending requests, not for repeats or refused ones, or let the domain limit mark requests for review instead of refusing them. Treat the overall cap as an alert rather than a hard refusal, or raise it and add per-/24 and per-/64 limits.
-- Proving test: an API spec showing that submissions naming another domain from other addresses do not stop a later genuine submission being recorded (as PENDING, and flagged if needed), and that several addresses in one /64 share one per-address count.
+**EMP-SR-18 — Low — FIXED** in `33b12c2` (EMP-17): output neutralisation (§4.8).
 
-**EMP-SR-07 — Medium — No contract test that every employer response is free of readiness fields**
-- Where: only per-feature checks exist, at `employer-team.integration.spec.ts:484-488`, `employer-company-profile.integration.spec.ts:123`, `:139` and `employer-assessments.integration.spec.ts:307-313`. Applicants, interviews, offers, analytics, opportunities, organisation status, participant options and my-interviews are not asserted.
-- Why it matters: §5.3 and §6.3 require the absence to be asserted "from every employer response". The code has no such field today (4.4), but nothing catches a future join that adds one.
-- Fix: one spec that seeds a verified employer with an applicant who has readiness, mastery and gap data, then calls every GET in the route inventory (§6). It asserts that no key matches `/readiness|band|mastery|gap|fit/i` and that no value contains the readiness band vocabulary. Assessment `score`, `maxScore` and `percentage` are allowlisted explicitly as the employer's own test.
-- Proving test: that spec.
+**EMP-SR-19 — Low — FIXED** for the three assessment writes, now in the state matrix
+(`employer-organisation-state.integration.spec.ts:230-234`). The fourth route, the standalone
+`applicant-access` probe, is tested only at the persistence layer; recorded as R-10.
 
-**EMP-SR-08 — Medium — Pre-existing hiring and assessment writes fall short of §5.7 audit and §6.1 input rules**
-- Where:
-  - `writeAudit` omits `organization_id` (`employer-hiring.controller.ts:863-868`).
-  - Create, audience, publish, transition, interview state, employer outcome, offer and withdraw use separate statements rather than one transaction with their audit and outbox rows (for example `:143-156`, `:188-193`, `:217-226`, `:289-312`, `:606-612`, `:633-644`, `:702-711`, `:730-734`).
-  - The rejection `reasonCode` is free text of up to 64 characters, not from a fixed list, and is optional for REJECTED (`:266`, `:293`).
-  - Assessment publish and invitations write no audit at all (`employer-assessments.controller.ts:251-255`, `:292-307`).
-  - Hiring bodies ignore unknown fields rather than rejecting them (`employer-hiring.controller.ts:897-928`).
-- Why it matters: a failure between statements can leave a state change with no audit row, or an audit row with no change. Audit rows cannot be filtered by organisation, and rejections are not comparable. §5.4 requires every rejection to carry a reason code.
-- Fix: EMP-05 (job lifecycle), EMP-07 and EMP-08 (pipeline and reason codes), EMP-12 (assessments). Wrap each write with its audit and outbox rows in one transaction, pass `organization_id`, use fixed reason-code lists and reject unknown fields.
-- Proving test: per goal, "audit row written in the same transaction with organisation and reason code", plus "unknown field → 400".
+### Still open from the EM1 review
 
-**EMP-SR-09 — Low — Gaps in the careers-page host check**
-- Where: `employer-company-profile.controller.ts:122-125`, `:232`, `:237-256`.
-- Why it matters:
-  - User-info is accepted (`https://jobs@careers.example.com/...`), whereas the Operations normaliser refuses it (`operations-institution-onboarding.controller.ts:1244`).
-  - Stripping a leading `www.` widens the match to the whole apex of a shared host, for example every tenant of a hosting provider's domain.
-  - The check runs only when the employer edits the careers URL, so if Operations later changes the website, a now off-domain careers link stays live.
-  - Students see it as a clickable "Careers page" link (`hiringPages.tsx:244`), which makes it a phishing vector if any of these gaps are used.
-- Fix: parse and re-serialise with the Operations normaliser (refuse user-info, credentials and fragments). Match against a registrable-domain (public-suffix) comparison rather than a raw `www.` strip. Re-validate or clear `careers_page_url` whenever Operations changes `website_url`.
-- Proving test: API cases for user-info, a shared-host apex, and a website change that invalidates an existing careers URL.
+**EMP-SR-03 — Medium — OPEN, wider than before.** `apps/web/src/rolePortal/employer.tsx:47` and
+`apps/web/src/staffDashboardsV3.tsx:287` take the first employer membership in the session, while
+the gate uses the chosen workspace (`rolePortalPages.tsx:249`). Every page added since EM1 inherits
+it: applicants, export (`canExport` is decided from that membership's role), messages, drives,
+reports, talent pool, settings. Only Assessments uses the chosen workspace (`rolePortalPages.tsx:431`).
+Fix and proving test as in the first version.
 
-**EMP-SR-10 — Low — The about-text payment detector is easily evaded, and the text can carry off-platform contact**
-- Where: `employer-company-profile.controller.ts:219-224`, using `packages/hiring/src/review-signals.ts:19-26`.
-- Why it matters: the detector is an English keyword heuristic. Phrasing without its verbs and nouns ("caution money collected at joining"), other languages, and currency symbols with no verb all pass. The about text can also carry URLs, phone numbers or messaging handles that invite students to pay off-platform. Rendering is plain text, so there is no XSS risk (`hiringPages.tsx:240`).
-- Fix: record a review signal for profile edits, as job publish does (`employer-hiring.controller.ts:771-812`), so Operations sees them. Add URL and phone detection as signals, not refusals, and let students report the company (EMP-16).
-- Proving test: a profile edit containing a phone number or URL records a signal that is visible to Operations.
+**EMP-SR-04 — Medium — OPEN.** Ending a membership leaves that person's pending invitations
+acceptable (`employer-team.controller.ts:279-314`).
 
-**EMP-SR-11 — Low — `emailMatchesWebsite` accepts a parent domain without public-suffix awareness**
-- Where: `employer-access-requests.controller.ts:293-298` (`base.endsWith('.' + emailDomain)`).
-- Why it matters: a requester whose website is a subdomain of a shared host and whose email is at the host's domain is shown to Operations as "email matches website". This is a false trust signal in the queue.
-- Fix: compare registrable domains using a public-suffix list, or drop the parent branch.
-- Proving test: a unit test on `emailMatchesWebsite` with a shared-host case.
+**EMP-SR-05 — Medium — OPEN.** No rate limit on team invite and resend
+(`employer-team.controller.ts:168-217`, `:244-277`). Must be fixed before production email is
+switched on.
 
-**EMP-SR-12 — Low — The rate-limit digest is an unsalted SHA-256 of the address**
-- Where: `employer-access-requests.controller.ts:114`; 0041 `:130`; design note (`employer-access-requests-table-design.md:149`, `:197`).
-- Why it matters: the whole IPv4 space can be hashed in minutes, so the stored `client_key` is pseudonymous, not anonymous. The design's privacy claim is overstated for anyone with database access.
-- Fix: use an HMAC with a server-held key that rotates at least as often as the 2-day pruning, and amend the design note.
-- Proving test: a unit test that the key is not `sha256('employer-access-request:' + address)`.
+**EMP-SR-06 — Medium — OPEN.** Access-request limits can block genuine requesters
+(`employer-access-requests.controller.ts:62`, `:114`, `:120-131`).
 
-**EMP-SR-13 — Low — The Operations "initial" invitation mints an owner in any state, on every call**
-- Where: `operations-institution-onboarding.controller.ts:247-272`. The organisation read at `:253` fetches only `kind`, and `role` is always `EMPLOYER_OWNER` for employers (`:258`).
-- Why it matters: EMP-01 recorded that the invitation does not check verification state. In addition, repeated calls create more owners even when active owners exist, which bypasses the employer's own team control. There is also no reason code. The action needs `OPS_ORG_MANAGE`, so the risk is operator error or misuse, not external attack.
-- Fix: refuse for REJECTED and SUSPENDED employers. When an ACTIVE owner exists, refuse, or require a fixed reason code and mark the audit row.
-- Proving test: API cases for a REJECTED employer and for an employer that already has an owner.
+**EMP-SR-07 — Medium — OPEN, narrowed.** Per-module contract tests now exist (§4.4), but no one
+spec calls every employer GET. Fix: one spec over the §6 inventory.
 
-**EMP-SR-14 — Low — Students can still take a suspended or rejected employer's screening tests**
-- Where: `employer-assessments.controller.ts:352-380` (list, which shows the employer's legal name), `:382-452` (start), `:454` (answer), `:488` (submit). None applies `employerInGoodStandingSql`. This is recorded as an EMP-03 limitation.
-- Why it matters: a student can spend time on a test from an employer that operations has suspended, and the answers become readable if the employer is reinstated. This contradicts "students no longer see or reach them".
-- Fix: add `employerInGoodStandingSql(sql\`v.employer_id\`)` to these four queries, and state plainly on the list that the employer is unavailable.
-- Proving test: an API case in which, after suspension, the invitation is absent or marked unavailable and start returns 403.
+**EMP-SR-08 — Medium — PARTLY FIXED.** Fixed for lifecycle, assessments, interviews, drives,
+messages, export and terms. Remaining: the pipeline move writes its audit without the
+organisation and takes a free-text rejection reason (`employer-hiring.controller.ts:371`, `:402`,
+`:420`); sending an offer is not transactional and its audit has no organisation (`:993-1003`);
+offer withdrawal, feedback release, audience and create audits have no organisation (`:1030`,
+`:492`, `:216`, `:179`); these bodies ignore unknown fields. Proving test: per route, "audit row
+with organisation and reason in the same transaction" and "unknown field → 400".
 
-**EMP-SR-15 — Low — Candidate writes and assessment publish have no lock and no in-statement state re-check**
-- Where: the guard runs before the write, and nothing holds the organisation row: transition `employer-hiring.controller.ts:263`→`:289`, extend offer `:681`→`:702`, schedule interview `:513`→`:534`, assessment publish `employer-assessments.controller.ts:239`→`:251`.
-- Why it matters: a suspension that commits between the guard and the write lets one candidate write through. For assessment publish, it makes a test live for a just-suspended employer, which the suspension transaction does not reverse because it pauses only opportunities (`operations-institution-onboarding.controller.ts:235-245`).
-- Fix: fold the good-standing predicate with `FOR SHARE` into each write, as opportunity publish does (`employer-hiring.controller.ts:217-224`), and have suspension also close published assessments or their open invitations.
-- Proving test: a concurrency test that holds the suspension transaction open and asserts the write is refused.
+**EMP-SR-09 — Low — OPEN.** Careers URL host check (`employer-company-profile.controller.ts:231-256`).
+**EMP-SR-10 — Low — OPEN.** About-text payment detector evadable; no signal for phone or link
+(`:219-223`).
+**EMP-SR-11 — Low — OPEN.** `emailMatchesWebsite` parent-domain match
+(`employer-access-requests.controller.ts:297`).
+**EMP-SR-12 — Low — OPEN.** Unsalted SHA-256 rate-limit digest (`:114`).
+**EMP-SR-13 — Low — OPEN.** Operations initial invitation mints an owner in any state, on every call
+(`operations-institution-onboarding.controller.ts:248-273`).
 
-**EMP-SR-16 — Low — The employer-side interview outcome route skips the consent and closed checks**
-- Where: `employer-hiring.controller.ts:616-646`. Compare the participant route, which locks and requires `consent_revoked_at IS NULL AND closed_at IS NULL` (`:419-433`).
-- Why it matters: a recruiter can record or overwrite a scorecard about a candidate who has withdrawn consent or whose application is closed.
-- Fix: apply the same locked predicate to this route.
-- Proving test: an outcome write after withdrawal returns 403.
+**EMP-SR-15 — Low — PARTLY FIXED.** Lifecycle, assessments, interviews, scorecard templates and
+drives now lock the organisation in the write. Remaining without the organisation lock: the
+pipeline move (grant share-locked, `employer-hiring.controller.ts:396`), sending an offer (no
+transaction), offer withdrawal, feedback, audiences.
 
-**EMP-SR-17 — Low — Screening results are returned ranked by score**
-- Where: `employer-assessments.controller.ts:330` (`ORDER BY t.percentage DESC`).
-- Why it matters: §5.4 says ONE never ranks candidates automatically, and a server-imposed score order is a ranking.
-- Fix (EMP-12): order by invitation time and leave any sorting to an explicit employer action in the client.
-- Proving test: a results-order test.
+### Opened in this review
 
-**EMP-SR-18 — Low — CSV neutralisation is input-side, partial, and missing from the EM1 fields**
-- Where: `employer-hiring.controller.ts:37` and `:1066-1070` apply it to some hiring fields only. Summary, responsibilities and joining conditions use `readOptionalText` (`:913-925`). Company about text, team invitation emails and access-request names and company names accept a leading `=`, `+`, `-` or `@`.
-- Why it matters: there is no export today, so nothing is exposed. EMP-17 must not rely on input refusal. Refusing at input also rejects legitimate text such as "- bullet" lists.
-- Fix (EMP-17): neutralise at output for every export. Consider dropping the input-side refusal once output neutralisation exists.
-- Proving test: EMP-17's CSV fixture test covering these fields.
+**EMP-SR-20 — Low — The unsuppressed `hiring-analytics` route and page are still reachable.**
+- Where: `employer-hiring.controller.ts:1040`; `apps/web/src/hiringPages.tsx:1466`
+  (`EmployerHiringAnalyticsPage`). EMP-15 recorded this as a limitation; no screen links to them.
+- Why it matters: it returns per-employer counts without suppression, the opposite of EMP-15's
+  rule for the same figures, and a route nobody uses is a route nobody watches.
+- Fix: retire the route and page. Proving test: the route answers 404.
 
-**EMP-SR-19 — Low — The state-matrix test omits four guarded routes**
-- Where: `employer-organisation-state.integration.spec.ts:199-231` lacks `POST /assessment-questions`, `POST /assessment-questions/:id/transition`, `POST /assessments` and `GET /applicant-access/...`. The code guards all four (`employer-assessments.controller.ts:101`, `:137`, `:201`; `employer-authentication.ts:34-38`).
-- Why it matters: a later edit that drops the guard from one of these routes would go unnoticed.
-- Fix: add them to `employerRoutes()`, with `applicant-access` expected to return 403 `FORBIDDEN` for non-verified employers.
-- Proving test: the extended it.each.
+**EMP-SR-21 — Medium — A direct college audience reaches a college's students without its
+placement office.**
+- Where: the audience route accepts `INSTITUTION` and `INSTITUTION_UNIT`
+  (`employer-hiring.controller.ts:76`, `:201-218`); students see such jobs with no drive
+  (`student-hiring.controller.ts:911-930`); the one-offer policy applies only where a live drive
+  exists (`:500-510`). Recorded as open point 1 of `docs/architecture/campus-drives-table-design.md`.
+- Why it matters: ADR-038 makes the placement office the gate to its students. Any verified
+  employer can bypass it and the college's placement policy by naming the college as the
+  audience. This is the path a fake or unwelcome employer would use (§10.1).
+- Fix: refuse new INSTITUTION and INSTITUTION_UNIT audiences, or treat them as a drive request.
+  Proving test: an audience naming a college is refused, or the job stays hidden from that
+  college's students until a drive is approved.
+
+**EMP-SR-22 — Medium — A job that demands payment is flagged, not refused, when it is created or
+first published.**
+- Where: create and publish only record review signals (`employer-hiring.controller.ts:177`,
+  `:237`, `:1164-1188`); the same wording is refused on an edit to a live job
+  (`employer-job-lifecycle.controller.ts:249`) and in company text.
+- Why it matters: §5.8 and the §10.1 mitigation ask for a payment-demand refusal. Today the job
+  reaches students as soon as it is published, until an operator acts on the signal. The
+  inconsistency also means an employer can avoid the edit-time refusal by publishing a new job.
+- Fix: refuse `APPLICANT_PAYMENT_DEMAND` at publish (keep the signal for other codes). Proving
+  test: publishing a job with a fee demand returns 400 `OPPORTUNITY_PAYMENT_DEMAND` and the job
+  stays DRAFT. Changing `› records payment … signals before publishing, with no penalty` needs
+  Divakar's decision, since it pins today's behaviour.
+
+**EMP-SR-23 — Low — The one-offer check at apply is not serialised with a concurrent offer
+acceptance.**
+- Where: `student-hiring.controller.ts:500-510` locks the drives, not the student's offers.
+  Recorded as an EMP-11 limitation.
+- Why it matters: an acceptance committing during an apply lets that one application through.
+- Fix: take an advisory lock per student in both apply and offer acceptance. Proving test: a
+  concurrency test holding an acceptance open.
 
 ## 6. Route inventory
 
-Group is the §5.1 action group passed to the helper. "Roles" means O = owner, A = admin, R = recruiter; "+I" adds HIRING_MANAGER and INTERVIEWER, which the membership trigger cannot provision today (`employer-hiring.controller.ts:41-46`). "Matrix test" means the route is in `employerRoutes()` of the state spec.
+O = owner, A = admin, R = recruiter. "Group" is the §5.1 action group. Lines are the route
+decorators. Every route is also covered by a 401-without-token test in its module spec.
 
-| Method and path (`/api/v1`) | Guard / action group | Roles | Code | Matrix test |
+| Method and path (`/api/v1`) | Group / extra checks | Roles | Code | Proving test (spec) |
 |---|---|---|---|---|
-| GET `/employers/:employerId/organisation-status` | requireActiveEmployer / organisation.status | O A R +I | `employer-hiring.controller.ts:109`, `:114` | separate test |
-| POST `/employers/:employerId/opportunities` | requireActiveEmployer / jobs.draft | O A R | `:133`, `:136` | yes |
-| GET `/employers/:employerId/opportunities` | requireActiveEmployer / jobs.draft | O A R +I | `:160`, `:163` | yes |
-| POST `/employers/:employerId/opportunities/:opportunityId/audiences` | requireActiveEmployer / jobs.draft | O A R | `:178`, `:181` | yes |
-| POST `/employers/:employerId/opportunities/:opportunityId/publish` | requireActiveEmployer / jobs.publish + locked re-check `:217-224` | O A R | `:197`, `:200` | yes |
-| GET `/employers/:employerId/opportunities/:opportunityId/applications` | requireActiveEmployer / candidates | O A R +I | `:234`, `:237` | yes |
-| POST `/employers/:employerId/applications/:applicationId/transition` | requireActiveEmployer / candidates | O A R | `:260`, `:263` | yes |
-| GET `/employers/:employerId/candidate-feedback-reasons` | requireActiveEmployer / candidates | O A R | `:326`, `:329` | yes |
-| POST `/employers/:employerId/applications/:applicationId/feedback` | requireActiveEmployer / candidates | O A R | `:340`, `:343` | yes |
-| GET `/employers/:employerId/my-interviews` | requireActiveEmployer / candidates + assignment predicate | O A R +I | `:392`, `:395` | yes |
-| GET `/employers/:employerId/my-interviews/:interviewId` | participant guard (membership + assertEmployerState / candidates + assignment) | any ACTIVE member | `:400`, `:403`; guard `:56-76` | yes |
-| POST `/employers/:employerId/my-interviews/:interviewId/outcome` | participant guard + locked predicate `:422-433` | any ACTIVE member | `:409`, `:412` | yes |
-| GET `/employers/:employerId/interview-participant-options` | requireActiveEmployer / candidates | O A R | `:453`, `:456` | yes |
-| GET `/employers/:employerId/interviews` | requireActiveEmployer / candidates | O A R +I | `:484`, `:487` | yes |
-| POST `/employers/:employerId/applications/:applicationId/interviews` | requireActiveEmployer / candidates | O A R | `:510`, `:513` | yes |
-| POST `/employers/:employerId/interviews/:interviewId/state` | requireEmployerMembership → input → assertEmployerState / candidates | O A R | `:579`, `:584`, `:592` | yes |
-| POST `/employers/:employerId/interviews/:interviewId/outcome` | requireActiveEmployer / candidates | O A R +I | `:616`, `:619` | yes |
-| GET `/employers/:employerId/offers` | requireActiveEmployer / candidates | O A R | `:652`, `:655` | yes |
-| POST `/employers/:employerId/applications/:applicationId/offers` | requireActiveEmployer / candidates | O A R | `:678`, `:681` | yes |
-| POST `/employers/:employerId/offers/:offerId/withdraw` | requireActiveEmployer / candidates | O A R | `:715`, `:718` | yes |
-| GET `/employers/:employerId/hiring-analytics` | requireActiveEmployer / candidates | O A R | `:742`, `:745` | yes |
-| GET `/employers/:employerId/assessment-questions` | requireActiveEmployer / jobs.draft | O A R | `employer-assessments.controller.ts:75`, `:78` | yes |
-| POST `/employers/:employerId/assessment-questions` | requireActiveEmployer / jobs.draft | O A R | `:98`, `:101` | **no** (EMP-SR-19) |
-| POST `/employers/:employerId/assessment-questions/:questionId/transition` | requireActiveEmployer / jobs.draft | O A R | `:134`, `:137` | **no** |
-| GET `/employers/:employerId/assessments` | requireActiveEmployer / jobs.draft | O A R | `:173`, `:176` | yes |
-| POST `/employers/:employerId/assessments` | requireActiveEmployer / jobs.draft | O A R | `:198`, `:201` | **no** |
-| POST `/employers/:employerId/assessments/:assessmentId/publish` | requireActiveEmployer / jobs.publish (no lock, EMP-SR-15) | O A R | `:236`, `:239` | yes |
-| POST `/employers/:employerId/assessments/:assessmentId/invitations` | requireActiveEmployer / candidates | O A R | `:262`, `:265` | yes |
-| GET `/employers/:employerId/assessments/:assessmentId/results` | requireActiveEmployer / candidates | O A R | `:311`, `:314` | yes |
-| GET `/employers/:employerId/team` | requireEmployerMembership → input → assertEmployerState / organisation.manage | O A | `employer-team.controller.ts:98`, `:101`, `:105` | team spec |
-| POST `/employers/:employerId/team-invitations` | same + locked re-check `:182` | O A (canAssignRole) | `:168`, `:171`, `:175` | team spec |
-| POST `/employers/:employerId/team-invitations/:invitationId/revoke` | same (no organisation lock) | O A (canAssignRole on the invitation's role) | `:219`, `:222`, `:226` | team spec |
-| POST `/employers/:employerId/team-invitations/:invitationId/resend` | same + locked re-check `:257` | O A (canAssignRole) | `:244`, `:247`, `:251` | team spec |
-| POST `/employers/:employerId/team/:membershipId/end` | same + owner locks `:291-302` | O A (mayEndMembership) | `:279`, `:282`, `:286` | team spec |
-| GET `/employers/:employerId/company-profile` | requireEmployerMembership + assertEmployerState / organisation.manage | O A R | `employer-company-profile.controller.ts:88`, `:91-92` | profile spec |
-| POST `/employers/:employerId/company-profile` | same + locked re-check `:109-115` | O A | `:98`, `:101`, `:104` | profile spec |
-| GET `/employers/:employerId/applicant-access/:opportunityId/:studentUserId` | selectedMembership check + grant SQL (membership, VERIFIED+active, live grant) | O A R | `phase1-security.controller.ts:45`; `api-security.ts:327-351`; `employer-authentication.ts:22-45` | **no** (persistence tests only) |
-| POST `/employer-access-requests` | public; rate limits; no organisation reads | anonymous | `employer-access-requests.controller.ts:106-159` | profile spec |
-| GET `/operations/employer-access-requests` | OPS_ORG_MANAGE | operations | `:165`, `:168` | profile spec |
-| POST `/operations/employer-access-requests/:requestId/decision` | OPS_ORG_MANAGE | operations | `:209`, `:212` | profile spec |
-| POST `/operations/organizations/:targetOrganizationId/initial-admin-invitations` | OPS_ORG_MANAGE (no state check, EMP-SR-13) | operations | `operations-institution-onboarding.controller.ts:247-272` | `api-security.integration.spec.ts › invites the first user of an employer as its owner and leaves existing admin invitations alone` |
+| GET `/employers/:e/organisation-status` | organisation.status | O A R | `employer-hiring.controller.ts:132` | organisation-state |
+| POST, GET `/employers/:e/opportunities` | jobs.draft | O A R | `:156`, `:183` | organisation-state, hiring |
+| POST `…/opportunities/:o/audiences` | jobs.draft (EMP-SR-21) | O A R | `:201` | organisation-state |
+| POST `…/opportunities/:o/publish` | jobs.publish, locked, terms gate | O A R | `:220` | terms-trust, lifecycle |
+| GET `…/opportunities/:o/applications` | candidates, grant per row, `?evidenceSkill` | O A R | `:290` | applicant-access, skill-evidence |
+| POST `…/applications/:a/transition` | candidates, grant locked | O A R | `:365` | applicant-access |
+| GET `…/candidate-feedback-reasons`, POST `…/applications/:a/feedback` | candidates; feedback only on REJECTED | O A R | `:436`, `:450` | hiring.controller.integration |
+| GET `…/my-interviews`, `…/:i`, `…/:i/calendar`; POST `…/:i/outcome` | participant guard + grant | any ACTIVE member | `:506`, `:514`, `:531`, `:541` | hiring.controller.integration, interview-scheduling |
+| GET `…/interview-participant-options`, `…/interviews` | candidates | O A R | `:583`, `:617` | organisation-state |
+| POST `…/applications/:a/interviews` | candidates, org lock, grant | O A R | `:650` | interview-scheduling |
+| POST `…/interviews/:i/state` | candidates, org lock, reason codes, grant (except cancel) | O A R | `:742` | interview-scheduling, applicant-access |
+| GET `…/interviews/:i/history`, `…/scorecards` | candidates; scorecards need grant, audited | O A R | `:835`, `:869` | interview-scheduling |
+| POST `…/interviews/:i/outcome` | candidates, org lock, grant | O A R | `:905` | applicant-access |
+| GET `…/offers`; POST `…/applications/:a/offers`; POST `…/offers/:id/withdraw` | candidates; grant on extend | O A R | `:940`, `:967`, `:1007` | applicant-access, hiring |
+| GET `…/hiring-analytics` | candidates (EMP-SR-20) | O A R | `:1040` | hiring.controller.integration |
+| GET `…/opportunities/:o`; POST `…/versions`, `…/pause`, `…/close`, `…/reopen`, `…/withdraw` | jobs.draft / jobs.publish, org lock, reason codes, terms gate on reopen | O A R | `employer-job-lifecycle.controller.ts:136-372` | job-lifecycle |
+| GET `…/skill-catalogue` | jobs.draft | O A R | `employer-skill-catalogue.controller.ts:31` | eligibility-stages |
+| GET `…/applications/:a`, `…/resume`, `…/resume/file` | candidates, grant, single-use token | O A R | `employer-candidate-view.controller.ts:50`, `:148`, `:184` | candidate-view |
+| GET, POST `…/scorecard-templates`; POST `…/:t/retire` | jobs.draft, org lock | O A R | `employer-scorecard-templates.controller.ts:43-88` | interview-scheduling |
+| GET `…/message-threads`; GET, POST `…/applications/:a/messages` | candidates, grant, limits | O A R | `application-messages.controller.ts:74`, `:130`, `:182` | application-messages |
+| GET `…/campus-drive-institutions`, `…/campus-drives`, `…/:d/history`; POST `…/opportunities/:o/campus-drives`, `…/:d/{resubmit,cancel,complete}` | jobs.draft / jobs.publish, org lock, terms gate | O A R | `campus-drives.controller.ts:396-490` | campus-drives, terms-trust |
+| Assessment routes (questions, tests, publish, close, invitations, results, per-candidate results) | jobs.draft / jobs.publish / candidates, org lock, grant | O A R | `employer-assessments.controller.ts:123-526` | assessments-emp12, organisation-state |
+| GET `…/summary`, `…/reports` | candidates, unknown params refused, reports audited | O A R | `employer-reports.controller.ts:78`, `:130` | reports |
+| GET `…/settings`; POST `…/terms/accept`; POST `…/settings/notification-preferences` | organisation.manage; accept owner only | O A R / O | `employer-settings.controller.ts:57`, `:64`, `:98` | terms-trust |
+| GET `…/trust-cases`, `…/:c`; POST `…/:c/response`, `…/:c/appeal` | trust.cases (every state) | O A | `employer-trust-cases.controller.ts:45-65` | terms-trust |
+| POST `…/opportunities/:o/applicant-export` | candidates, owner/admin, grant, limits | O A | `employer-applicant-export.controller.ts:60` | applicant-export |
+| GET `…/applications/:a/evidence` | candidates, grant, flag | O A R | `skill-evidence.controller.ts:111` | skill-evidence |
+| GET `…/talent-pool`, `…/search`, `…/cards/:ref`; POST `…/invitations` | candidates, flag, limits | O A R | `talent-pool.controller.ts:361-476` | talent-pool |
+| Team, company profile, access request, applicant-access probe, initial invitation | unchanged from the EM1 inventory | — | `employer-team.controller.ts:98-279`, `employer-company-profile.controller.ts:88-98`, `employer-access-requests.controller.ts:106-209` | team, company-profile |
+| Operations: GET, POST `/operations/employer-terms`; POST `/operations/trust-safety/cases/:c/request-response`, `…/employer-statements`; GET `…/message-threads` | OPS_ORG_MANAGE / TRUST_SAFETY_INVESTIGATE | operations | `operations-employer-terms.controller.ts:36-42`, `trust-safety.controller.ts:84`, `:161`, `:185` | terms-trust, application-messages |
+| College: drive decisions, results, placement policies | institution-wide write scope for decisions | college staff | `campus-drives.controller.ts:533-709` | campus-drives |
 
-Student-side reads that depend on employer state:
-
-| Path | Good-standing check | Code |
-|---|---|---|
-| GET `/opportunities`, GET `/opportunities/:id`, POST `/students/me/applications` | `employerInGoodStandingSql` | `student-hiring.controller.ts:193`, `:224`, `:299` |
-| GET `/me/calendar` (interviewer entries) | inline VERIFIED + active join | `calendar.controller.ts:191-192` |
-| GET `/students/me/screening-assessments`, POST `.../start`, `/screening-attempts/:id/answers`, `.../submit` | **none** (EMP-SR-14) | `employer-assessments.controller.ts:352`, `:382`, `:454`, `:488` |
+Student routes that decide what an employer may see: apply (grant, snapshot, evidence, drive
+policy, invitation), withdraw (`student-hiring.controller.ts:401`, `:708`), terms change
+(`employer-job-lifecycle.controller.ts:475-510`), messages (`application-messages.controller.ts:240-364`),
+evidence (`skill-evidence.controller.ts:51-66`), talent pool (`talent-pool.controller.ts:93-287`).
 
 ## 7. Cross-cutting checklist
 
 | Control | Status | Reference |
 |---|---|---|
-| Authorisation (§5.1 helper on every employer route) | Met | §6 inventory; `employer-organisation-state.ts:68-105` |
-| Scope / tenant | Met in the API. Not met in the web page (wrong employer chosen) | 4.1; EMP-SR-03 |
-| Consent / grant | **Not met** for candidate reads and writes | EMP-SR-01, EMP-SR-02 |
-| Audit in the same transaction | Met for EM1 routes. Not met for pre-existing hiring and assessment writes | 4.14; EMP-SR-08 |
-| Reason codes from fixed lists | Met for team, access-request decisions and verification. Not met for application rejection | 4.14; EMP-SR-08 |
-| Data minimisation | Partial. The company block omits the Operations contact email (`student-hiring.controller.ts:643-665`) and the access-request queue shows no raw address. Applicant rows expose the institution student id without a student-chosen snapshot (EMP-07) | 4.3; EMP-SR-01 |
-| Suppression below 5 | Not applicable. No employer surface shows aggregates about students beyond the employer's own applicants, whom it already sees by name. `hiring-analytics` counts only this employer's applications (`employer-hiring.controller.ts:746-767`). This must be revisited for EMP-17 reports and any cross-employer benchmark | — |
-| No numeric readiness; no readiness-driven rules | Met in code (no readiness field or rule on any employer path). No all-routes contract test | 4.4; EMP-SR-07 |
-| Compensation | Only what the employer discloses on a job or offer. No rule ranks or filters by it | `employer-hiring.controller.ts:904-908`, `:687-692` |
-| Error handling (safe codes, correlation id, no upstream text) | Met | 4.14 |
-| Input validation / unknown fields rejected | Met for EM1 routes. Not met for pre-existing hiring bodies | 4.13; EMP-SR-08 |
-| Keyset pagination (§5.9, 50/200) | Met for team and access-request queue. Not met for hiring lists (fixed LIMIT 200/500, no cursor) | `employer-team.controller.ts:482-493`; `employer-access-requests.controller.ts:351-374`; `employer-hiring.controller.ts:173`, `:255` |
-| CSV safety | No CSV in or out today. Output neutralisation is still needed for EMP-17 | EMP-SR-18 |
-| Rate limiting | Public access request limited (but abusable). Team invitations not limited | EMP-SR-05, EMP-SR-06 |
+| §5.1 helper on every employer route | Met | §6 |
+| Scope / tenant | Met in the API; not met in the web (first membership) | EMP-SR-03 |
+| Consent / grant | **Met** on every candidate read and write | §4.3 |
+| Audit in the same transaction, with organisation | Met for every module since EM1; not met for pipeline move, offers, audiences | EMP-SR-08 |
+| Reason codes from fixed lists | Met except the pipeline rejection reason | EMP-SR-08 |
+| Data minimisation | Snapshot only, contact from Shortlisted, card without identity | §4.2, §4.5 |
+| Suppression below 5 | Met for reports and college drive results; `hiring-analytics` unsuppressed | EMP-SR-20 |
+| No numeric readiness | Met; per-module contract tests, no all-routes test | EMP-SR-07 |
+| Error handling (fixed codes, correlation id, no upstream text) | Met | module specs |
+| Unknown fields rejected | Met since EM1 except pre-existing hiring bodies | EMP-SR-08 |
+| Keyset pagination | Met for team, access requests, messages, drives, assessments results; hiring lists fixed 500 | R-13 |
+| CSV safety | Met | §4.8 |
+| Rate limiting | Exports, messages, talent-pool invitations, access requests; not team invitations or talent-pool search | EMP-SR-05, R-03 |
+| Flags off by default for EMP-13/14, high-risk to enable | Met | `skill-evidence.integration.spec.ts › ships the flag off and marks switching it on as needing a second person`; `talent-pool.integration.spec.ts › migration 0098 is replay-safe and never flips a live switch` |
 
-## 8. Open findings register
+## 8. Findings register
 
-| ID | Severity | Title | Location | Target goal |
-|---|---|---|---|---|
-| EMP-SR-01 | High | Candidate data served without a live applicant-access grant | `apps/api/src/http/employer-hiring.controller.ts:243-256`, `:488-506`, `:656-674`, `:829-841`; `employer-assessments.controller.ts:316-331` | EMP-07 (fix before any new candidate surface) |
-| EMP-SR-02 | Medium | Grant never expires; no revocation on account deletion | `apps/api/src/http/student-hiring.controller.ts:341-345` | EMP-07 |
-| EMP-SR-03 | Medium | Web employer page acts on the first employer membership, not the chosen workspace | `apps/web/src/rolePortal/employer.tsx:41` (vs `rolePortalPages.tsx:347`) | EMP-02 follow-up |
-| EMP-SR-04 | Medium | Pending invitations survive the removal of the person who sent them | `apps/api/src/http/employer-team.controller.ts:287-314`; `packages/persistence/src/identity-authentication.ts:117-126` | EMP-02 follow-up |
-| EMP-SR-05 | Medium | No rate limits on team invite and resend | `apps/api/src/http/employer-team.controller.ts:168-217`, `:244-277` | EMP-02 follow-up (before HG-7 sink) |
-| EMP-SR-06 | Medium | Access-request limits can block genuine requesters (domain keyed on input; full-IPv6 key; global cap) | `apps/api/src/http/employer-access-requests.controller.ts:62`, `:114`, `:120-131`, `:266-273` | EMP-04 follow-up |
-| EMP-SR-07 | Medium | No all-routes contract test for readiness absence | `apps/api/src/http/employer-*.integration.spec.ts` (per-feature only) | EMP-18 (this slice) |
-| EMP-SR-08 | Medium | Pre-existing hiring and assessment writes: audit not transactional, no organisation id, free-text rejection reason, no audit on assessment publish and invite, unknown fields ignored | `apps/api/src/http/employer-hiring.controller.ts:863-868`, `:266`, `:289-312`, `:897-928`; `employer-assessments.controller.ts:251-255`, `:292-307` | EMP-05, EMP-07, EMP-08, EMP-12 |
-| EMP-SR-09 | Low | Careers URL: user-info allowed, `www.` strip widens match, not re-checked on website change | `apps/api/src/http/employer-company-profile.controller.ts:122-125`, `:232`, `:250-256` | EMP-04 follow-up |
-| EMP-SR-10 | Low | About-text payment detector easily evaded; off-platform contact not signalled | `apps/api/src/http/employer-company-profile.controller.ts:219-224` | EMP-04 follow-up / EMP-16 |
-| EMP-SR-11 | Low | `emailMatchesWebsite` parent-domain match without public-suffix awareness | `apps/api/src/http/employer-access-requests.controller.ts:293-298` | EMP-04 follow-up |
-| EMP-SR-12 | Low | Rate-limit digest is an unsalted SHA-256 of the address | `apps/api/src/http/employer-access-requests.controller.ts:114` | EMP-04 follow-up |
-| EMP-SR-13 | Low | Operations initial invitation mints an owner in any state and on every call | `apps/api/src/http/operations-institution-onboarding.controller.ts:247-272` | EMP-01 follow-up |
-| EMP-SR-14 | Low | Students can still take a suspended or rejected employer's screening tests | `apps/api/src/http/employer-assessments.controller.ts:352-380`, `:382-452`, `:454`, `:488` | EMP-03 follow-up / EMP-12 |
-| EMP-SR-15 | Low | Candidate writes and assessment publish not locked against a concurrent suspension | `apps/api/src/http/employer-hiring.controller.ts:263`, `:513`, `:681`; `employer-assessments.controller.ts:239-255` | EMP-05, EMP-07, EMP-12 |
-| EMP-SR-16 | Low | Employer-side interview outcome skips the consent and closed checks | `apps/api/src/http/employer-hiring.controller.ts:616-646` | EMP-09 |
-| EMP-SR-17 | Low | Screening results ranked by score | `apps/api/src/http/employer-assessments.controller.ts:330` | EMP-12 |
-| EMP-SR-18 | Low | CSV neutralisation input-side and partial | `apps/api/src/http/employer-hiring.controller.ts:37`, `:1066-1070`, `:913-925` | EMP-17 |
-| EMP-SR-19 | Low | State-matrix test omits four guarded routes | `apps/api/src/http/employer-organisation-state.integration.spec.ts:199-231` | EMP-18 (this slice) |
+| ID | Severity | Status on `719eb34` | Title | Location | Target |
+|---|---|---|---|---|---|
+| EMP-SR-01 | High | **Fixed** (`715e486`) | Candidate data without a live grant | `packages/persistence/src/employer-authentication.ts:18-44` | — |
+| EMP-SR-02 | Medium | **Fixed** (`715e486`, `1cfeebe`) | Grant expiry and deletion revocation | `privacy-deletion.ts:124`; `employer-terms.ts:229` | — |
+| EMP-SR-03 | Medium | Open (wider) | Web acts on the first employer membership | `apps/web/src/rolePortal/employer.tsx:47`; `staffDashboardsV3.tsx:287` | EMP-02 follow-up |
+| EMP-SR-04 | Medium | Open | Invitations survive the inviter's removal | `employer-team.controller.ts:279-314` | EMP-02 follow-up |
+| EMP-SR-05 | Medium | Open | No rate limit on team invite and resend | `employer-team.controller.ts:168-277` | before production email |
+| EMP-SR-06 | Medium | Open | Access-request limits abusable | `employer-access-requests.controller.ts:62-131` | EMP-04 follow-up |
+| EMP-SR-07 | Medium | Open (narrowed) | No all-routes readiness contract test | API specs | follow-up |
+| EMP-SR-08 | Medium | Partly fixed | Pipeline move, offers, audiences: audit without organisation, not transactional, free-text reason, unknown fields ignored | `employer-hiring.controller.ts:179`, `:216`, `:371-420`, `:492`, `:993-1030` | follow-up |
+| EMP-SR-09 | Low | Open | Careers URL host check gaps | `employer-company-profile.controller.ts:231-256` | EMP-04 follow-up |
+| EMP-SR-10 | Low | Open | About-text detector evadable; no signal | `employer-company-profile.controller.ts:219-223` | EMP-04 / EMP-16 follow-up |
+| EMP-SR-11 | Low | Open | `emailMatchesWebsite` parent-domain match | `employer-access-requests.controller.ts:297` | EMP-04 follow-up |
+| EMP-SR-12 | Low | Open | Unsalted rate-limit digest | `employer-access-requests.controller.ts:114` | EMP-04 follow-up |
+| EMP-SR-13 | Low | Open | Initial invitation mints owners in any state | `operations-institution-onboarding.controller.ts:248-273` | EMP-01 follow-up |
+| EMP-SR-14 | Low | **Fixed** (`6cced5b`) | Suspended employer's tests reachable | `employer-assessments.controller.ts:101` | — |
+| EMP-SR-15 | Low | Partly fixed | Candidate writes without the organisation lock | `employer-hiring.controller.ts:396`, `:967-1030`, `:201`, `:450` | follow-up |
+| EMP-SR-16 | Low | **Fixed** (`715e486`, `27fe7dd`) | Employer outcome skipped consent and close | `employer-hiring.controller.ts:921-925` | — |
+| EMP-SR-17 | Low | **Fixed** (`6cced5b`) | Results ranked by score | `employer-assessments.controller.ts:493` | — |
+| EMP-SR-18 | Low | **Fixed** (`33b12c2`) | CSV neutralisation | `institution-export-csv.ts:20-31` | — |
+| EMP-SR-19 | Low | **Fixed** (`6cced5b`); probe → R-10 | State matrix gaps | `employer-organisation-state.integration.spec.ts:230-234` | — |
+| EMP-SR-20 | Low | **New**, open | Unsuppressed `hiring-analytics` still reachable | `employer-hiring.controller.ts:1040`; `apps/web/src/hiringPages.tsx:1466` | EMP-15 follow-up |
+| EMP-SR-21 | Medium | **New**, open | Direct college audience bypasses drive approval and policy | `employer-hiring.controller.ts:76`, `:201-218`; `student-hiring.controller.ts:911-930` | EMP-11 follow-up |
+| EMP-SR-22 | Medium | **New**, open | Payment demand flagged, not refused, at create and publish | `employer-hiring.controller.ts:177`, `:237`, `:1164-1188` | needs Divakar's decision |
+| EMP-SR-23 | Low | **New**, open | One-offer check not serialised with acceptance | `student-hiring.controller.ts:500-510` | EMP-11 follow-up |
 
-## 9. Known open items from the progress log
+## 9. Known open items (not findings)
 
-These were recorded in `docs/employer/EMPLOYER_PROGRESS.md` and confirmed against code. They are
-limitations of what was built, not findings above.
-
-- **HG-7, no production mail sender.** Team invitations and the first-owner invitation cannot reach anyone in production. Without a sink they are recorded NOT_CONFIGURED, and the screen and API say so (`employer-team.controller.ts:205`, `:384`). Access-request emails are never confirmed (`employer-access-requests.controller.ts:390-391`). EMP-SR-05 must be fixed before a sink is enabled.
-- **Company logo** is not built. It needs the file store and malware scanner, so no column exists yet (0041 adds none).
-- **Retention of declined and spam access requests** (proposed 180 days) is not in the privacy worker. The design note records the rule (`employer-access-requests-table-design.md:204-218`). Attempts rows are pruned after 2 days (`employer-access-requests.controller.ts:119`).
-- **No notifier consumes `employer_access_request.submitted`.** The outbox event is written (`employer-access-requests.controller.ts:145-153`), but Operations learns of new requests only by opening the queue.
-- **Help & FAQ employer content** was not updated in this slice (EMP-18 item 4 remains).
-- Also recorded:
-  - The Operations Organizations Edit prompt sends a partial profile and can null address fields. This is pre-existing and unchanged.
-  - Ending a membership does not remove the person from interviews already scheduled. Access still stops at once, because the participant predicate requires an ACTIVE membership (`employer-hiring.controller.ts:85-88`).
-  - Changing a role in place is not built.
+- **Email and workers.** The SMTP sender is built (ADR-042) but not switched on in production, and
+  the sender mailbox is still to be set up; every hiring email is recorded `NOT_CONFIGURED`. The
+  automation worker that delivers notices and closes jobs at their deadline is not deployed on
+  AWS, and the daily privacy timer has not been adapted to the AWS layout
+  (`docs/ops/runbook-move-to-aws.md`, `deploy/systemd`). Request-time checks do not depend on them.
+- **Uploads** are off on AWS until a virus scanner exists, so production applications carry no
+  résumé.
+- **Hard gates.** HG-4 approved 2026-10-01 (ADR-043, ADR-044 accepted); both flags still off.
+  HG-6 pending: employer terms and the discovery consent are legal drafts.
+- **Help & FAQ (EMP-18 item 4) — not done.** The employer persona has three articles
+  (`apps/api/src/assistant/help-articles.ts:138-157`: roles and drives, meeting candidates,
+  screening tests) plus the shared ones. Missing: team and invitations, company profile and
+  access requests, organisation status and suspension, job edits and versions and new-terms
+  acceptance, eligibility and stages, Candidate Detail and résumés, interviews and scorecards,
+  messages, offers, terms and Settings and trust cases, exports, skill evidence, talent pool.
+  Wrong or stale: *Meeting candidates* (`:145-150`) says employers meet candidates through
+  profile links or QR codes the student presents and speaks of "readiness scores"; candidates are
+  met through the consented application snapshot under the grant, and readiness is a band never
+  shown. *Finding your way around* (`:26-31`) says Messages is "an empty inbox by design … once
+  messaging launches"; EMP-10 shipped it. *Notifications* (`:33-38`) says nothing about hiring
+  notices. *The ONE mobile app* (`:159-164`) describes employer staff as seeing only "live
+  monitoring dashboards". The panel (`apps/web/src/helpFaqPanel.tsx`) has no link from an article
+  to its SOP, and the article type has no field for one.
 
 ## 10. Residual risks
 
-None recorded in this slice. Programme rule B.2: a residual risk is recorded only after the fixes
-for the open findings above have merged, and only for what those fixes knowingly leave in place.
+Each is accepted for now, not fixed. Owner: Divakar. "Decision pending" means nobody has decided
+to keep it.
+
+| ID | Threat | Risk left in place | Why it is tolerable today | Status |
+|---|---|---|---|---|
+| R-01 | Messaging abuse, fake employers | Employer messages are not scanned for payment demands (`docs/architecture/application-messages-table-design.md:102`) | Students see a fee warning, links are flagged, reports open a HIGH case | Documented residual risk, owner Divakar, decision pending |
+| R-02 | Notification spoofing | Employer-written job and test titles appear in notice titles | Verified employers only; text only; truncated; employer name is the verified legal name | Documented residual risk, owner Divakar, decision pending |
+| R-03 | Scraping (talent pool) | Search has no rate limit; many filter combinations can be paged | Flag off; cards carry no identity and differ per employer; every search and view audited | Documented residual risk, owner Divakar, decision pending (EMP-14 decision 9 taken on his behalf) |
+| R-04 | IDOR on résumés | The résumé token travels in the URL query, so it can reach proxy logs | 60 s, single use, bound to the issuing user and the live grant | Documented residual risk, owner Divakar, decision pending |
+| R-05 | Messaging abuse | Per-employer and per-student limits are counted without a global lock and have no test | Per-thread limits are exact; the rest are brakes, not quotas | Documented residual risk, owner Divakar, decision pending |
+| R-06 | Fake employers | Terms text is a legal draft (HG-6); publishing terms has no dual control | Nothing is seeded; publishing behaves as before until terms exist | Pending HG-6; dual control decision pending |
+| R-07 | Grant lifecycle | Nothing sets `expires_at`, so the 180-day ceiling never applies | Closing revokes at once, which is stricter | Decided (EMP-07, EMP-16 recommendations) |
+| R-08 | Scraping (reports) | Suppression is per table, not across tables | Only facts the employer already holds could be derived | Documented residual risk, owner Divakar, decision pending |
+| R-09 | Grant bypass (race) | Sending an offer and the list reads check the grant without a row lock | A withdrawal racing one request can let that one request through | Documented residual risk, owner Divakar, decision pending |
+| R-10 | Organisation state | The applicant-access probe route is not in the API state matrix | Persistence tests cover its state checks | Documented residual risk, owner Divakar, decision pending |
+| R-11 | Notification spoofing | Notices are not delivered in production (no worker, no email) | Nothing is sent, so nothing can be spoofed; in-app rows are recorded | Operational; resolves with the AWS worker and email set-up |
+| R-12 | Fake or gamed eligibility | Self-reported marks count for eligibility | Flagged to the employer as self-reported; verified records preferred | Decided (EMP-06 decision 1) |
+| R-13 | Scraping (lists) | Hiring lists are a fixed `LIMIT 500` with no cursor | Employer's own applicants only, grant-filtered | Documented residual risk, owner Divakar, decision pending |
+
+## 11. Threat-to-proof map
+
+| EMP-18 threat | Proved by tests (§4) | Open findings | Residual risks |
+|---|---|---|---|
+| Cross-employer data access | §4.1 | EMP-SR-03 | — |
+| IDOR on applications and résumés | §4.2 | — | R-04 |
+| Grant bypass | §4.3 | — | R-07, R-09 |
+| Readiness leakage | §4.4 | EMP-SR-07 | — |
+| Scraping through search or exports, including the talent pool | §4.5 | EMP-SR-20 | R-03, R-08, R-13 |
+| Messaging abuse | §4.6 | — | R-01, R-05 |
+| Fake employers | §4.7 | EMP-SR-06, 09–13, 21, 22 | R-06, R-12 |
+| CSV injection | §4.8 | — | — |
+| Notification spoofing | §4.9 | EMP-SR-04, EMP-SR-05 | R-02, R-11 |
+| Role matrix, state, locks, mass assignment, audit | §4.10 | EMP-SR-08, EMP-SR-15, EMP-SR-23 | R-10 |
+
+## 12. Where the progress log and the code disagree
+
+- Commit hashes in `EMPLOYER_PROGRESS.md` are from the goal branches; on this base the same work
+  carries different hashes (for example EMP-SR-01 is `7a3e27d`/`715e486` here, `bb9ddc6`/`170bc70`
+  in the log). This review cites the hashes on `719eb34`.
+- The EMP-13 entry says HG-4 is pending and ADR-043 Proposed; ADR-043 on this base says Accepted
+  (2026-10-01). The later EMP-14 entry is right.
+- The EMP-15 entry says the Dashboard reads the summary; it does, but for the first employer
+  membership, not the chosen workspace (EMP-SR-03).
+- The EMP-05 entry's "payment-demand refusal" applies to edits of a live job only; creating and
+  publishing record a signal (EMP-SR-22).

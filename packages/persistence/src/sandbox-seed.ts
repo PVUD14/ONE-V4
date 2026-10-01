@@ -230,6 +230,7 @@ export async function seedSandbox(pool: Pool, options: SeedSandboxOptions): Prom
   await inTransaction(pool, (client) => seedAcademicRecordsAndEvidence(client, correlationId));
   await seedCareerTargets(pool);
   await inTransaction(pool, (client) => seedHiring(client));
+  await inTransaction(pool, (client) => seedGrowthTerritory(client));
   await pool.query(
     `INSERT INTO audit_events (id, actor_user_id, action, resource_type, resource_id, organization_id, outcome, correlation_id, context)
      VALUES ($1,$2,$3,'sandbox',$4,$5,'SUCCESS',$6,$7::jsonb)`,
@@ -310,7 +311,7 @@ async function seedPeopleAndOrganisations(client: PoolClient): Promise<void> {
 
   // AI8HT's side: the platform organisation, operations and growth.
   await client.query(`INSERT INTO organizations (id, kind, legal_name, verification_state, active) VALUES ($1,'PLATFORM','AI8HT','VERIFIED',true)`, [ORG.platform]);
-  const operations = await membership(client, 'operations', { organizationId: ORG.platform, userId: personaId('operations'), role: 'OPERATIONS_ADMIN' });
+  await membership(client, 'operations', { organizationId: ORG.platform, userId: personaId('operations'), role: 'OPERATIONS_ADMIN' });
   for (const [key, staff] of [['author', STAFF.author], ['reviewer', STAFF.reviewer], ['publisher', STAFF.publisher]] as const) {
     await membership(client, `content-${key}`, { organizationId: ORG.platform, userId: staff.id, role: 'OPERATIONS_ADMIN' });
   }
@@ -328,7 +329,6 @@ async function seedPeopleAndOrganisations(client: PoolClient): Promise<void> {
        ($3,$4,'COLLEGE_PARTNERSHIPS',$2,$5,'NEW_MEMBER')`,
     [sid('growth-team:manager'), manager, sid('growth-team:executive'), executive, personaId('operations')],
   );
-  void operations;
 
   // The college.
   await client.query(`INSERT INTO organizations (id, kind, legal_name, verification_state, active) VALUES ($1,'INSTITUTION','Lakeview Institute of Technology','VERIFIED',true)`, [ORG.lakeview]);
@@ -782,6 +782,85 @@ async function seedHiring(client: PoolClient): Promise<void> {
         [sid(`offer:${applicationId}`), applicationId, ORG.corvane, accepted ? 'ACCEPTED' : 'EXTENDED',
           application.job === 'data-intern' ? 25000 : 800000, application.job === 'data-intern' ? 'MONTH' : 'YEAR',
           accepted ? new Date(Date.now() - 2 * 86_400_000) : null, recruiter],
+      );
+    }
+  }
+}
+
+// --- Growth: a territory and a pipeline of prospective colleges (GROWTH-02/03 tables) ---
+
+/** Fictional prospects. None is a real institution or company. */
+const GROWTH_LEADS: readonly {
+  readonly key: string; readonly kind: 'COLLEGE' | 'EMPLOYER'; readonly name: string; readonly city: string;
+  readonly domain: string | null; readonly stages: readonly string[]; readonly owned: boolean;
+  readonly source: 'FIELD_VISIT' | 'EVENT' | 'INTRODUCTION' | 'PUBLIC_DIRECTORY';
+  readonly contact: { readonly role: string; readonly name: string; readonly email: string } | null;
+}[] = [
+  { key: 'riverbend', kind: 'COLLEGE', name: 'Riverbend College of Engineering', city: 'Mandya', domain: null,
+    stages: ['IDENTIFIED', 'CONTACTED', 'MEETING_SCHEDULED', 'MET'], owned: true, source: 'FIELD_VISIT',
+    contact: { role: 'PLACEMENT_OFFICER', name: 'Prof. Anil Shenoy', email: 'placement@riverbend.example' } },
+  { key: 'hillcrest', kind: 'COLLEGE', name: 'Hillcrest Institute of Management', city: 'Hassan', domain: null,
+    stages: ['IDENTIFIED', 'CONTACTED', 'MEETING_SCHEDULED'], owned: true, source: 'EVENT',
+    contact: { role: 'DIRECTOR', name: 'Dr. Rekha Murthy', email: 'director@hillcrest.example' } },
+  { key: 'sunvale', kind: 'COLLEGE', name: 'Sunvale Polytechnic', city: 'Tumakuru', domain: null,
+    stages: ['IDENTIFIED', 'CONTACTED'], owned: true, source: 'INTRODUCTION', contact: null },
+  { key: 'mangrove', kind: 'COLLEGE', name: 'Mangrove Arts and Science College', city: 'Udupi', domain: null,
+    stages: ['IDENTIFIED'], owned: false, source: 'PUBLIC_DIRECTORY', contact: null },
+  { key: 'tessaro', kind: 'EMPLOYER', name: 'Tessaro Systems', city: 'Bengaluru', domain: 'tessaro.example',
+    stages: ['IDENTIFIED'], owned: false, source: 'EVENT', contact: null },
+];
+
+async function seedGrowthTerritory(client: PoolClient): Promise<void> {
+  const operations = personaId('operations');
+  const regionId = sid('growth-region:karnataka');
+  // The region, its area and who works it, as Operations sets them up (a growth person may
+  // not assign their own territory, so Operations does).
+  await client.query(
+    `INSERT INTO growth_regions (id, name, created_by_user_id, reason_code) VALUES ($1,'Karnataka',$2,'NEW_REGION')`,
+    [regionId, operations],
+  );
+  await client.query(
+    `INSERT INTO growth_region_areas (id, region_id, state_code, district_code, added_by_user_id, reason_code) VALUES ($1,$2,'IN-KA',NULL,$3,'NEW_COVERAGE')`,
+    [sid('growth-area:karnataka'), regionId, operations],
+  );
+  const executive = sid('membership:growth');
+  await client.query(
+    `INSERT INTO growth_territory_assignments (id, region_id, membership_id, assignment_role, assigned_by_user_id, reason_code) VALUES
+       ($1,$3,$4,'EXECUTIVE',$6,'NEW_ASSIGNMENT'),
+       ($2,$3,$5,'MANAGER',$6,'NEW_ASSIGNMENT')`,
+    [sid('growth-assignment:executive'), sid('growth-assignment:manager'), regionId, executive, sid('membership:growth-manager'), operations],
+  );
+
+  // Leads, created the way the growth leads service creates them, then moved along.
+  const executiveUser = personaId('growth');
+  for (const lead of GROWTH_LEADS) {
+    const id = sid(`growth-lead:${lead.key}`);
+    const owner = lead.owned ? executive : null;
+    await client.query(
+      `INSERT INTO growth_leads (id, kind, name, state_code, district_code, city, aishe_code, website_domain, owner_membership_id, source, possible_duplicate, created_by_user_id)
+       VALUES ($1,$2,$3,'IN-KA',NULL,$4,NULL,$5,$6,$7,false,$8)`,
+      [id, lead.kind, lead.name, lead.city, lead.domain, owner, lead.source, executiveUser],
+    );
+    // An unowned lead has no owner change to record (the history check refuses NULL to NULL).
+    if (owner) {
+      await client.query(
+        `INSERT INTO growth_lead_owner_history (id, lead_id, from_membership_id, to_membership_id, reason_code, actor_user_id) VALUES ($1,$2,NULL,$3,'CREATED',$4)`,
+        [sid(`growth-lead-owner:${lead.key}`), id, owner, executiveUser],
+      );
+    }
+    for (const [index, stage] of lead.stages.entries()) {
+      await client.query(
+        `INSERT INTO growth_lead_stage_history (id, lead_id, from_stage, to_stage, reason_code, actor_user_id) VALUES ($1,$2,$3,$4,NULL,$5)`,
+        [sid(`growth-lead-stage:${lead.key}:${index}`), id, index === 0 ? null : lead.stages[index - 1], stage, executiveUser],
+      );
+    }
+    const stage = lead.stages[lead.stages.length - 1]!;
+    if (stage !== 'IDENTIFIED') await client.query(`UPDATE growth_leads SET stage=$2, last_activity_at=now() WHERE id=$1`, [id, stage]);
+    if (lead.contact) {
+      await client.query(
+        `INSERT INTO growth_lead_contacts (id, lead_id, contact_role, full_name, email, phone, permission_basis, source, added_by_user_id)
+         VALUES ($1,$2,$3,$4,$5,NULL,'PROVIDED_BY_PERSON','MEETING',$6)`,
+        [sid(`growth-lead-contact:${lead.key}`), id, lead.contact.role, lead.contact.name, lead.contact.email, executiveUser],
       );
     }
   }

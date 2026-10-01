@@ -160,6 +160,11 @@ describe('sandbox seed: one demo account, one workspace', () => {
     await api().get('/api/v1/operations/overview').set(as('operations')).expect(200);
     const growth = JSON.stringify((await api().get('/api/v1/growth/me').set(as('growth')).expect(200)).body);
     expect(growth).toContain('COLLEGE_PARTNERSHIPS');
+    const territory = JSON.stringify((await api().get('/api/v1/growth/territory').set(as('growth')).expect(200)).body);
+    expect(territory).toContain('Karnataka');
+    const leads = JSON.stringify((await api().get('/api/v1/growth/leads').set(as('growth')).expect(200)).body);
+    expect(leads).toContain('Riverbend College of Engineering');
+    expect(leads).toContain('Sunvale Polytechnic');
     expect((await api().get('/api/v1/operations/overview').set(as('growth'))).status).toBe(403);
     expect((await api().get('/api/v1/growth/me').set(as('operations'))).status).toBe(403);
   });

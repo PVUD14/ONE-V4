@@ -54,7 +54,8 @@ demo wants to see the product, not a picture of it.
 5. **A sandbox seed and a nightly reset.** `db:seed:sandbox` loads the fictional Lakeview
    Institute of Technology, ~30 students with verified academic records and evidence, two
    graduates, Corvane Labs with three published jobs, applications at every stage, an
-   interview, offers, an approved campus drive and a growth team. Content goes through the
+   interview, offers, an approved campus drive, a growth team with a Karnataka territory and
+a pipeline of fictional prospective colleges (GROWTH-02/03 tables). Content goes through the
    real publishing code (the career-readiness pilot, the career catalogue, the aptitude bank
    as drafts, learner cards through review) and readiness bands are computed by the
    readiness engine from evidence, never typed in. `db:reset:sandbox` drops the database,

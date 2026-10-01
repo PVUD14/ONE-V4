@@ -169,8 +169,12 @@ people) and the support desk. **Not live yet:** outgoing email for invitations.
 
 **Sign in as:** `growth@demo.oneby8.com` (Vikram). Use with partners or investors, not
 usually with colleges. **Home** shows his role, team (College partnerships) and manager.
-**Leads, Field, Territory, Targets and Commission are not built yet** — the pages say so
-plainly. Present Growth as a preview of the plan, never as working.
+**Territory** shows his region, Karnataka. **Leads** shows his pipeline of fictional
+prospective colleges (Riverbend College of Engineering at *Met*, Hillcrest Institute of
+Management at *Meeting scheduled*, Sunvale Polytechnic at *Contacted*) plus unowned
+prospects in his region he can claim; open one to see its stage history and contact.
+Add a lead live if you like. **Field, Targets and Commission are not built yet** — the
+pages say so plainly; never present them as working.
 
 ---
 

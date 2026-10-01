@@ -508,3 +508,102 @@ Cognito; the cleartext allowance for 10.0.2.2 was a temporary debug-only overlay
   typecheck pass; `sandbox-seed` 12/12 (it seeds growth leads with 0103/0104 present), `growth-field` 25/25 — pass.
 
 **Next goal:** GROWTH-04 — College pipeline and the operations handoff.
+
+## GROWTH-04 — College pipeline and the operations handoff — 2026-10-01
+**Result:** Complete — a growth person moves a college lead through one stage machine, hands a signed college to
+operations as a request, and follows its onboarding through milestones read from Operations' own records; only an
+operator with `OPS_ORG_MANAGE` links the request to the college they created, which records the owner at that moment
+and moves the handed-over contacts to the college's account.
+**Branch / PR:** feat/growth-college-pipeline (stacked on feat/growth-field, both rebased onto feat/plan-phases-0-to-2 at
+af4e181) → feat/plan-phases-0-to-2 (pushed; not merged)
+**Commits:** a1e4b43 (design) · ab4eb64, 98bcc63 (tests) · 5db9cfe, 46e3d02, 7c7e5de (implementation) · 6045b00 (GROWTH-03
+fixture updated to the new rule) · this report
+**Files created:**
+- `docs/architecture/growth-college-pipeline-table-design.md` (written and committed before the migration)
+- `packages/persistence/drizzle/0104_growth_college_pipeline.sql`
+- `packages/authorization/src/growth-pipeline.ts`, `growth-pipeline.test.ts`
+- `apps/api/src/http/growth-pipeline-service.ts`, `growth-pipeline.controller.ts` (growth routes and the Operations
+  queue), `growth-pipeline.integration.spec.ts`
+- `apps/web/src/rolePortal/growthPipeline.tsx`, `growthPipeline.test.tsx`
+- Android `GrowthPipeline.kt`
+**Files modified:** `packages/authorization/src/index.ts`; `packages/events/src/index.ts` (four events);
+`apps/api/src/http/api-security.module.ts`, `growth-leads.integration.spec.ts` (fixture); web `api/growth.ts`,
+`rolePortal/growthLeads.tsx`, `rolePortal/operations.tsx` (one section, no navigation change); Android `Api.kt`,
+`GrowthLeads.kt`, `GrowthQueue.kt`.
+**Migrations added:** `0104_growth_college_pipeline.sql` (the number assigned). No earlier migration edited; no earlier
+function redefined (the pipeline rule is a second trigger on `growth_leads` beside GROWTH-03's guard); no capability
+CHECK, grant trigger or scope trigger touched. Applied twice by the migrator and replayed by hand without error.
+
+**What was built**
+1. *Stage machine* (`growth-pipeline.ts`, design §6.1): forward moves free (skips allowed), backward moves reason-coded,
+   `ON_HOLD` reason-coded and resumed to the stage held before (read from the stage history), `LOST` reason-coded and
+   terminal, a do-not-contact lead may only be lost, `HANDOFF_REQUESTED` only through the handoff route. A move carries
+   `fromStage`; a stale (offline) move is refused `409 GROWTH_STAGE_CHANGED`. Owner or their region's manager only.
+   Moves accept an `Idempotency-Key` (GROWTH-06's helper).
+2. *Schema (0104).* `growth_handoff_requests` (REQUESTED → LINKED | DECLINED once; required reported contract reference in
+   OPS-14's reference shape; one open and one linked request per lead; one linked request per organisation; on LINKED
+   the organisation, the operator, **the lead's owner at link** and the contact counts) and
+   `growth_handoff_request_contacts` (insert-only; live contacts of the same lead). `growth_lead_pipeline_guard`: a lost
+   or handed-off lead's stage never changes; `HANDOFF_REQUESTED` is entered only with an open request and left only when
+   it is decided; **a college lead names an organisation only through a LINKED request for that organisation**.
+3. *Handoff request* (growth): from `AGREEMENT_SIGNED_REPORTED`, with the reference and the contacts to hand over; the
+   stage moves to `HANDOFF_REQUESTED` in the same transaction.
+4. *Operations → Organizations → Growth handoffs* (`OPS_ORG_MANAGE`; a section of the existing screen): open requests
+   with area, AISHE code, the reported reference and the marked contacts **masked**. **Link** (to an `INSTITUTION` the
+   operator created with the unchanged Add Organization): request LINKED with the owner at link, lead's organisation
+   set, marked contacts copied into OPS-14's `institution_account_contacts` with reason `ONBOARDING` (roles mapped,
+   OPS-14's limit respected) with OPS-14's own audit action, and **every** lead contact erased `HANDED_OVER`; audit and
+   `growth.lead.handed_off`. **Decline** with a reason returns the lead to `NEGOTIATION`. No organisation, verification,
+   account field or account owner is written.
+5. *Derived milestones* (design §6.1), computed on every read, never stored: `HANDED_OFF`, `CONTRACT_RECORDED` (reached or
+   not; the reference is not shown to growth), `VERIFIED` (first verification time), `ADMIN_JOINED`,
+   `DATA_TERMS_ACCEPTED` (INST-18, merged; **NA** while no terms version is published), `FIRST_ROSTER`,
+   `STUDENTS_ACTIVATING` (**suppressed below 5**), `FIRST_PAYMENT_CLEARED` (**NA** until GROWTH-10), `EXITED` (INST-18).
+6. *Web:* the lead detail gains a Pipeline panel (stage, moves with reasons, the handoff form, requests, milestones).
+7. *Android:* the same on the lead detail, with moves and the handoff request through the offline queue and refusal
+   texts for a stale move.
+
+**Tests added**
+- `packages/authorization/src/growth-pipeline.test.ts` (12): vocabulary pinned to 0100/0104; forward, backward, hold,
+  resume, lost, do-not-contact, other kind's stages; next-stage lists; who moves; handoff preconditions; role mapping.
+- `apps/api/src/http/growth-pipeline.integration.spec.ts` (16): stage moves with history and events; stale move 409;
+  resend lands once; hold/resume; LOST terminal (API and database); owner/manager only; HANDOFF_REQUESTED only by the route
+  (API and database); handoff preconditions, one open request (index); growth routes write no organisation or account;
+  **link refused to growth staff and a security admin, and the database refuses an organisation without a linked
+  request**; masked queue; **link records the owner, carries contacts with ONBOARDING, erases every lead copy**, refuses
+  an employer or an already-linked organisation; decline to NEGOTIATION and a new request; **milestones re-read after
+  each source changes** (account reference, verification, admin invitation, terms published then accepted, roster,
+  four then five activations, the INST-18 exit), with no student id, roll number or contract reference in the answer.
+- `apps/web/src/rolePortal/growthPipeline.test.tsx` (6).
+- `growth-leads.integration.spec.ts`: the retention fixture now hands its lead off through a linked request (0104 refuses
+  the direct update it used); its assertion is unchanged.
+
+**Acceptance criteria**
+- [x] Only an operator with `OPS_ORG_MANAGE` can link a handoff — route check (growth executive, manager and security admin
+  get 403 on queue, link and decline) and the database rule on `growth_leads.organization_id`.
+- [x] Derived milestones match their source tables in a spec that changes each source — one spec changes all eight sources
+  in turn and reads the milestones after each.
+- [x] The student-activation count is suppressed below 5 — `suppressSmallCount`; four activations read `<5`, five read 5.
+- [x] Do not: no growth route creates or verifies an organisation (asserted: organisation and account counts unchanged by
+  growth routes); derived milestones are not stored.
+
+**Decisions for Divakar** (recommended answers taken, recorded in the table design)
+- Forward moves free with skips; backward moves need a reason; hold reasons `ORGANISATION_PAUSED`, `BUDGET_CYCLE`,
+  `LEADERSHIP_CHANGE`, `OTHER`.
+- A handoff request needs `AGREEMENT_SIGNED_REPORTED` and a reported reference in OPS-14's shape (no amounts or names).
+- At link every lead contact is erased; only marked ones are carried (PRINCIPAL and PLACEMENT_OFFICER keep their role,
+  others become OTHER), within OPS-14's limit; carried contacts are recorded with `ONBOARDING`, a reason written only by
+  the link and not offered in OPS-14's manual form.
+- `DATA_TERMS_ACCEPTED` is NA while no terms are published; `FIRST_PAYMENT_CLEARED` is NA until GROWTH-10.
+- The requester cannot withdraw a request; an operator declines it.
+- The same stage route serves employer leads' own working stages; employer milestones and handoff remain GROWTH-05's.
+
+**Limitations / not done**
+- Attribution rows are not written: `growth_attributions` is GROWTH-07's table. The owner at link is recorded on the
+  request so GROWTH-07 can write `LEAD_OWNER_AT_HANDOFF` from it without guessing.
+- The self-dealing guard on linking (§8.6) needs attribution, so it is GROWTH-07's.
+- No "stale request" alert for operations; the queue is ordered oldest first.
+
+**Validation:** recorded below once the full run completes.
+
+**Next goal:** GROWTH-05 — Employer pipeline, referral links and the EMP-04 handoff (or GROWTH-07, as the coordinator decides).

@@ -344,7 +344,13 @@ function TutorPoll({ decisionId, onStep }: { readonly decisionId: string; readon
     const tick = (): void => {
       rounds += 1;
       getLearningStep(token, decisionId, controller.signal)
-        .then((loaded) => { if (!controller.signal.aborted && loaded?.step) onStep(loaded.step); })
+        // Hand the step back only once nothing is being written, so the page is not reloaded every two seconds.
+        .then((loaded) => {
+          const next = loaded?.step;
+          if (controller.signal.aborted || !next) return;
+          const still = next.practice.status === 'IN_PROGRESS' && hintEntries(next.practice.question).some((entry) => entry.state === 'PENDING');
+          if (!still) { rounds = POLL_LIMIT; onStep(next); }
+        })
         .catch(() => undefined)
         .finally(() => { if (!controller.signal.aborted && rounds < POLL_LIMIT) timer = setTimeout(tick, POLL_MS); });
     };

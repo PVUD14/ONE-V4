@@ -254,10 +254,11 @@ private fun StepPracticeBlock(step: LearningStepDto, onStep: (LearningStepDto) -
                             repeat(TUTOR_POLL_LIMIT) {
                                 delay(TUTOR_POLL_MS)
                                 val next = runCatching { Api.learningStep(context, step.decisionId) }.getOrNull()
-                                if (next != null) {
+                                // Hand the step back only once nothing is being written (no reload every two seconds).
+                                val stillPending = next?.practice?.question?.hintDetails?.any { it.state == "PENDING" } == true
+                                if (next != null && !stillPending) {
                                     onStep(next)
-                                    val stillPending = next.practice.question?.hintDetails?.any { it.state == "PENDING" } == true
-                                    if (!stillPending) return@LaunchedEffect
+                                    return@LaunchedEffect
                                 }
                             }
                         }

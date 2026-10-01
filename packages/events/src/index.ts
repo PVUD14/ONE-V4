@@ -934,6 +934,51 @@ export const eventSchemas = {
     schemaRef: 'registry://growth.lead_contact.removed/1',
     payload: { leadId: { kind: 'uuid' }, contactId: { kind: 'uuid' }, reasonCode: { kind: 'string', maxLength: 64, minLength: 3, pattern: /^[A-Z0-9_]{3,64}$/ } },
   },
+  // GROWTH-04: the college pipeline and the operations handoff. Identifiers, stages and reason codes
+  // only — never a contract reference, an organisation's name or a contact.
+  growthLeadStageMovedV1: {
+    eventType: 'growth.lead.stage_moved',
+    eventVersion: 1,
+    producer: 'identity-organization',
+    aggregateType: 'growth_lead',
+    purpose: 'growth-lead-register',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://growth.lead.stage_moved/1',
+    payload: { leadId: { kind: 'uuid' }, toStage: { kind: 'string', maxLength: 40, minLength: 3, pattern: /^[A-Z_]{3,40}$/ } },
+  },
+  growthHandoffRequestedV1: {
+    eventType: 'growth.handoff.requested',
+    eventVersion: 1,
+    producer: 'identity-organization',
+    aggregateType: 'growth_handoff_request',
+    purpose: 'growth-college-handoff',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://growth.handoff.requested/1',
+    payload: { requestId: { kind: 'uuid' }, leadId: { kind: 'uuid' } },
+  },
+  growthLeadHandedOffV1: {
+    eventType: 'growth.lead.handed_off',
+    eventVersion: 1,
+    producer: 'identity-organization',
+    aggregateType: 'growth_lead',
+    purpose: 'growth-college-handoff',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://growth.lead.handed_off/1',
+    payload: { leadId: { kind: 'uuid' }, organizationId: { kind: 'uuid' } },
+  },
+  growthHandoffDeclinedV1: {
+    eventType: 'growth.handoff.declined',
+    eventVersion: 1,
+    producer: 'identity-organization',
+    aggregateType: 'growth_handoff_request',
+    purpose: 'growth-college-handoff',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://growth.handoff.declined/1',
+    payload: {
+      requestId: { kind: 'uuid' }, leadId: { kind: 'uuid' },
+      reasonCode: { kind: 'enum', values: ['NOT_A_REAL_COLLEGE', 'DUPLICATE_OF_EXISTING', 'INCOMPLETE', 'CONTRACT_NOT_CONFIRMED'] },
+    },
+  },
   // GROWTH-06: field work. Identifiers, kinds and states only — never notes, a follow-up's title or
   // a location (the audit row records whether a location was attached, never where).
   growthActivityLoggedV1: {

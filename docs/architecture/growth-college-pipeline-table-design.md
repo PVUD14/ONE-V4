@@ -139,6 +139,6 @@ move server-side into the account, where OPS-14's audited reveal applies.
 - A handoff request needs the stage `AGREEMENT_SIGNED_REPORTED` and a reported contract reference.
 - At link every lead contact is erased; only the marked ones are carried, with role mapping to OPS-14's roles and
   OPS-14's live-contact limit (extras are erased, not carried, and the count is reported).
-- `ONBOARDING` joins OPS-14's contact-add reasons, used only by the link.
+- Carried contacts are recorded with the reason `ONBOARDING`, written only by the link (it is not offered in OPS-14's manual contact form, whose reasons are unchanged).
 - `DATA_TERMS_ACCEPTED` reads NA while no terms version is published; `FIRST_PAYMENT_CLEARED` reads NA until GROWTH-10.
 - A request cannot be withdrawn by the requester (an operator declines it); a declined lead returns to `NEGOTIATION`.

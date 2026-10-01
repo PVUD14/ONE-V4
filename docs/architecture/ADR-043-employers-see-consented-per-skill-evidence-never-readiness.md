@@ -1,9 +1,8 @@
 # ADR-043 — Employers May See Consented, Per-Skill Verified Evidence; Never Readiness
 
-**Status:** Proposed — awaiting Divakar's hard-gate approval **HG-4** (program decision 10.2 #5, whose
-recommended answer is "yes"). The feature is built and ships **dark**: the flag `employer.skill-evidence`
-is off by default and switching it on needs a second person. Approving HG-4 means switching the flag on
-through Operations → Feature flags; nothing else changes.
+**Status:** Accepted — Divakar approved hard gate **HG-4** on 2026-10-01 ("HG-4: YES"). The feature
+still ships off: the flag `employer.skill-evidence` is off by default and is switched on through
+Operations → Feature flags, with a second person (or the solo-operator cool-off) confirming it.
 **Date:** 2026-09-30
 **Goal:** EMP-13 (Appendix 2)
 **Relates to:** ADR-020 (readiness is an advisory band, never shown to an employer), ADR-034 (evidence is

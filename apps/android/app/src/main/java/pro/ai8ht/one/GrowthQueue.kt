@@ -218,5 +218,12 @@ internal fun growthRefusalText(code: String?): String = when (code) {
     "GROWTH_ORGANIZATION_ALREADY_ON_ONE" -> "This employer is already on ONE."
     "GROWTH_TEAM_MISMATCH" -> "You are not on the team that works this kind of lead."
     "IDEMPOTENCY_KEY_REUSED" -> "This item changed after it was first sent, so it was not recorded twice."
+    // GROWTH-04: stage moves and the handoff request.
+    "GROWTH_STAGE_CHANGED" -> "The lead's stage changed before this arrived, so this move was not applied. Open the lead and choose again."
+    "GROWTH_STAGE_REASON_REQUIRED" -> "This move needs a reason."
+    "GROWTH_STAGE_IN_HANDOFF" -> "The lead is with operations for onboarding; its stage moves only when they decide."
+    "GROWTH_HANDOFF_NEEDS_AGREEMENT" -> "Report the agreement signed before asking for the handoff."
+    "GROWTH_CONTRACT_REFERENCE_INVALID" -> "The agreement reference was not in the expected form (letters, digits and / _ . : - only)."
+    "GROWTH_HANDOFF_ALREADY_OPEN" -> "A handoff request for this lead is already open."
     else -> "The server did not accept it."
 }

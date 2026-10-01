@@ -272,6 +272,20 @@ object Api {
             })
         }.toString()
 
+    // GROWTH-04: the college pipeline. Reads keep a saved copy; moves and the handoff go through GrowthQueue.
+    suspend fun growthLeadPipelineRaw(context: Context, leadId: String): String = request(context, "GET", "/api/v1/growth/leads/$leadId/pipeline")
+
+    fun growthStageBody(fromStage: String, toStage: String, reasonCode: String?): String = kotlinx.serialization.json.buildJsonObject {
+        put("fromStage", kotlinx.serialization.json.JsonPrimitive(fromStage))
+        put("toStage", kotlinx.serialization.json.JsonPrimitive(toStage))
+        if (reasonCode != null) put("reasonCode", kotlinx.serialization.json.JsonPrimitive(reasonCode))
+    }.toString()
+
+    fun growthHandoffBody(contractReference: String, contactIds: List<String>): String = kotlinx.serialization.json.buildJsonObject {
+        put("contractReference", kotlinx.serialization.json.JsonPrimitive(contractReference))
+        put("contactIds", kotlinx.serialization.json.JsonArray(contactIds.map { kotlinx.serialization.json.JsonPrimitive(it) }))
+    }.toString()
+
     fun growthFollowUpBody(title: String, dueOn: String): String = kotlinx.serialization.json.buildJsonObject {
         put("title", kotlinx.serialization.json.JsonPrimitive(title))
         put("dueOn", kotlinx.serialization.json.JsonPrimitive(dueOn))
@@ -1006,6 +1020,27 @@ internal fun StudentDto.formerStudentLine(): String? {
     val activities: List<GrowthActivityDto> = emptyList(),
     val followUps: List<GrowthFollowUpDto> = emptyList(),
     val vocabulary: GrowthFieldVocabularyDto = GrowthFieldVocabularyDto(),
+)
+/** GROWTH-04: `GET /api/v1/growth/leads/{id}/pipeline`. Milestones are null until operations links the college. */
+@Serializable data class GrowthSuppressedCountDto(val suppressed: Boolean = true, val value: Int? = null)
+@Serializable data class GrowthMilestoneDto(val code: String = "", val state: String = "NA", val at: String? = null, val note: String? = null, val count: GrowthSuppressedCountDto? = null)
+@Serializable data class GrowthHandoffRequestDto(
+    val id: String = "", val state: String = "", val requestedAt: String? = null, val contractReferenceReported: String = "",
+    val decidedAt: String? = null, val declineReasonCode: String? = null, val contactsCarried: Int? = null,
+)
+@Serializable data class GrowthStageReasonsDto(val backward: List<String> = emptyList(), val hold: List<String> = emptyList(), val lost: List<String> = emptyList())
+@Serializable data class GrowthPipelineVocabularyDto(val reasons: GrowthStageReasonsDto = GrowthStageReasonsDto())
+@Serializable data class GrowthLeadPipelineDto(
+    val leadId: String = "",
+    val kind: String = "",
+    val stage: String = "",
+    val lostReasonCode: String? = null,
+    val canMove: Boolean = false,
+    val nextStages: List<String> = emptyList(),
+    val canRequestHandoff: Boolean = false,
+    val handoffRequests: List<GrowthHandoffRequestDto> = emptyList(),
+    val milestones: List<GrowthMilestoneDto>? = null,
+    val vocabulary: GrowthPipelineVocabularyDto = GrowthPipelineVocabularyDto(),
 )
 @Serializable data class GrowthRegionPersonDto(val email: String = "", val role: String = "", val since: String = "")
 @Serializable data class StudentRelationshipDto(val institutionId: String = "", val state: String = "")

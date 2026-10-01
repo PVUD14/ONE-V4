@@ -339,6 +339,8 @@ private fun LeadDetailScreen(leadId: String, vocabulary: GrowthLeadVocabularyDto
             }
         }
         fieldNote?.let { Text(it, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp)) }
+        // GROWTH-04: the pipeline — stage, moves, the handoff to operations and onboarding milestones.
+        LeadPipelineSection(current.id, current.name, current.contacts, reloadKey = fieldReload) { fieldReload++ }
         LeadFieldSection(current.id, current.name, onLog = { logging = it }, onFollowUp = { addingFollowUp = true }, reloadKey = fieldReload)
         SectionTitle("Contact notice", trailing = "Draft for legal review")
         PilotCard {

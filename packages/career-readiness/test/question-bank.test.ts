@@ -17,6 +17,7 @@ import {
   readLessonIdentity,
   readLessonDraftFields,
   publishedLessonBody,
+  chooseLessonRendering,
   toLearnerQuestionDto,
   validateQuestionDraft,
   withholdAnswerKey,
@@ -206,5 +207,19 @@ describe('readAiDraftProvenance (ENG-23)', () => {
     const lesson = composeLessonBody(previous, readLessonIdentity({ stableKey: 'ai-lesson' }), { ...readLessonDraftFields({ title: 'T', body: { summary: 'S' } }) });
     expect(readAiDraftProvenance(lesson)?.promptVersion).toBe('content-lesson-draft@1');
     expect(publishedLessonBody(readLessonDraftFields(lesson))).toEqual({ summary: 'S' });
+  });
+
+  it('a published AI-drafted translation reaches a student as its words only', () => {
+    const variantBody = {
+      provenance, expertCheck: 'Check it.', aiDraft: { sections: { Explanation: 'unreviewed full text' }, fitted: true },
+      stableKey: 'ai-lesson', variantOf: jobId, variant: { language: 'te', level: 'STANDARD', style: 'EXPLANATION' }, basedOnRevision: 1,
+      title: 'తెలుగు', body: { summary: 'సారాంశం', practice: null },
+    };
+    const rendering = chooseLessonRendering({
+      base: { version: 1, title: 'English', body: { summary: 'English summary' }, variant: { language: 'en', level: 'STANDARD', style: 'EXPLANATION' } },
+      language: 'te', variants: [{ revision: 1, body: variantBody }],
+    });
+    expect(rendering).toEqual({ language: 'te', title: 'తెలుగు', body: { summary: 'సారాంశం' }, languageNotice: null });
+    expect(JSON.stringify(rendering)).not.toMatch(/AI_GENERATED|unreviewed|aiDraft/);
   });
 });

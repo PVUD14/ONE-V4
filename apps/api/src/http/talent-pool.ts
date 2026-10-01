@@ -19,7 +19,7 @@ import { evidenceSource, qualifyingEvidence, type EvidenceSource } from './skill
 type Db = Pick<PersistenceDb, 'execute'>;
 type QueryResult<T> = { rows: T[] };
 
-/** Dark until Divakar approves HG-4 (and HG-6 for the consent wording): default off, a second person to switch on (0098). */
+/** Ships off (HG-4 approved 2026-10-01; the consent wording awaits HG-6): default off, a second person to switch on (0098). */
 export const TALENT_POOL_FLAG = 'employer.talent-pool';
 /** The consent the plan requires, seeded by 0098 at a draft version. */
 export const DISCOVERY_CONSENT_KEY = 'employer-discovery';

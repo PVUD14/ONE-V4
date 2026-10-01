@@ -42,7 +42,7 @@ import kotlinx.serialization.encodeToString
  * A student joins only by agreeing to the employer-discovery notice, ticks exactly what their card shows
  * (verified evidence per skill, branch, graduation year, preferred cities), answers invitations to apply,
  * blocks employers and can leave at any time — leaving takes effect on the employer's next request.
- * Nothing shows while the feature is off (HG-4 pending) unless the student joined while it was on, in
+ * Nothing shows while the feature is switched off unless the student joined while it was on, in
  * which case they can still leave. The employer's search lives on the web only: the app has no Talent
  * Pool screen for recruiters, and adding one would be a navigation change. No name, contact, college,
  * score, stage or count is in these types or on these screens.

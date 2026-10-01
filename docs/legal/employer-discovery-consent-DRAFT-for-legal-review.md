@@ -2,7 +2,8 @@
 
 > Proposed consent text for the talent pool (EMP-14, ADR-044). It is stored as the `employer-discovery`
 > consent at version `2026-10-draft`, but no student is shown it until Divakar switches the
-> `employer.talent-pool` flag on, which needs hard gates HG-4 (the feature) and HG-6 (this wording).
+> `employer.talent-pool` flag on. Hard gate HG-4 (the feature) was approved on 2026-10-01; this wording still
+> needs HG-6 before the flag is switched on.
 > Wording and retention must be confirmed by legal review; an approved text is published as a new version.
 
 ## Consent definition

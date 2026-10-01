@@ -1,9 +1,10 @@
 # Consented Talent Pool (Employer Discovery) — Table Design
 
 **Status:** Adopted for build (EMP-14), recommended options taken per AGENTS.md ("ask once, recommend, carry on").
-**Built dark:** everything sits behind the feature flag `employer.talent-pool`, **default off, turning it on
-needs a second person**, because the program's hard gate HG-4 (employers seeing per-skill evidence, including
-through discovery) is still PENDING. See ADR-044.
+**Ships off:** everything sits behind the feature flag `employer.talent-pool`, **default off, turning it on
+needs a second person** (or the solo-operator cool-off). Hard gate HG-4 (employers seeing per-skill evidence,
+including through discovery) was approved by Divakar on 2026-10-01; the consent wording still awaits HG-6.
+See ADR-044 (Accepted).
 **Date:** 2026-10-01
 **Migration:** `0098_talent_pool.sql`
 **Rule:** Written before the migration, per the migrations rule in `AGENTS.md`
@@ -227,7 +228,7 @@ rank and identifier keys and values.
 
 ## Decisions for Divakar (recommended answers taken)
 
-1. **HG-4 for discovery** — recommended: approve as above. Until then the flag stays off.
+1. **HG-4 for discovery** — approved by Divakar on 2026-10-01. The flag stays off until operations switches it on.
 2. **The consent wording** is a draft for legal review (HG-6). Do not switch the flag on before it is approved.
 3. **Card fields**: evidence per skill, branch, graduation year, preferred cities — each only if ticked. No
    college name (with branch and year it narrows a person down too far). Recommended as built.

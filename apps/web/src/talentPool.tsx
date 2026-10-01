@@ -7,7 +7,7 @@
  * employers, and leave at any time. The employer's Talent Pool page: filter (never rank) by skills,
  * branch, year and city, open one card, invite it to apply to an invite-only job, and follow its own
  * invitations. No name, contact, college, score, stage or count anywhere; nothing renders for the
- * student while the feature is off (HG-4 pending), and the employer page keeps its honest
+ * student while the feature is switched off, and the employer page keeps its honest
  * not-available state.
  *
  * Built only from existing pilot and hiring classes; no new styles.
@@ -104,7 +104,7 @@ export function StudentTalentPoolCard(): React.ReactElement | null {
   }
 
   if (!pool) return status ? <section className="card wide-card" aria-label="Talent pool"><h2>Talent pool</h2><p role="status">{status}</p></section> : null;
-  // Dark (HG-4): nothing is offered. Someone who joined while it was on can still leave.
+  // Switched off: nothing is offered. Someone who joined while it was on can still leave.
   if (!pool.available) {
     if (!pool.optedIn) return null;
     return <section className="card wide-card" aria-label="Talent pool">

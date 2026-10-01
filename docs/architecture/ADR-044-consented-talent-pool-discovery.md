@@ -1,9 +1,9 @@
 # ADR-044 — A Consented Talent Pool: Employers May Find Students Who Opted In; Never by Score, Never by Name
 
-**Status:** Proposed — awaiting Divakar's hard-gate approval **HG-4** (which covers EMP-13 and EMP-14), and the
-discovery consent wording awaits **HG-6** (legal review). The feature is built and ships **dark**: the flag
-`employer.talent-pool` is off by default and switching it on needs a second person. Approving means switching
-the flag on through Operations → Feature flags once the wording is approved; nothing else changes.
+**Status:** Accepted — Divakar approved hard gate **HG-4** on 2026-10-01 ("HG-4: YES"), which covers EMP-13 and
+EMP-14. The feature still ships off: the flag `employer.talent-pool` is off by default and is switched on through
+Operations → Feature flags, with a second person (or the solo-operator cool-off) confirming it. The discovery
+consent wording is still a draft for legal review (**HG-6**); publish the approved wording before switching on.
 **Date:** 2026-10-01
 **Goal:** EMP-14 (Appendix 2)
 **Relates to:** ADR-043 (consented per-skill evidence, never readiness), ADR-020 (readiness never reaches an
@@ -60,5 +60,5 @@ invitation is audited; invitations are limited per employer per day.
   Profile (web) and Android.
 - Invite-only jobs become visible to a student holding a live invitation (and only while the flag is on).
 - Privacy deletion ends the listing first and erases it; the export gains `talentPool`.
-- Until HG-4 (and HG-6 for the wording) the flag stays off: no student is offered the opt-in, no employer can
+- Until the flag is switched on (after the wording clears HG-6) no student is offered the opt-in, no employer can
   search, and nothing is read or audited.

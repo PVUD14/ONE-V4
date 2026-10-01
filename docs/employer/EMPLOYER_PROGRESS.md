@@ -1230,7 +1230,7 @@ Calendar invites remain EMP-09's. No calendar provider is integrated.
 
 ## EMP-14 — Consented talent pool (discovery) — 2026-10-01
 
-**Result:** Complete, built dark. Hard gate **HG-4 is still PENDING** (it covers EMP-13 and EMP-14), so everything sits behind its own flag `employer.talent-pool`: off by default, switching it on needs a second person. The discovery consent wording is a draft for legal review (**HG-6**). Turning the feature on needs both approvals and then only the flag; ADR-044 stays Proposed until then.
+**Result:** Complete. Hard gate **HG-4 was approved by Divakar on 2026-10-01** (it covers EMP-13 and EMP-14), so ADR-044 is Accepted. The feature still ships off behind its own flag `employer.talent-pool`: off by default, switched on in Operations with a second person (or the solo cool-off). The discovery consent wording is a draft for legal review (**HG-6**): publish the approved wording before switching the flag on.
 
 **Branch / PR:** `feat/emp-14-talent-pool`, from `onev4/feat/plan-phases-0-to-2` (19cbee0). Pushed to `onev4`. Not merged; the coordinator reviews it.
 
@@ -1293,7 +1293,7 @@ Calendar invites remain EMP-09's. No calendar provider is integrated.
 - [x] **Dark until HG-4:** `offers nothing, reads nothing and shows nothing while the flag is off; leaving stays possible`; a replay never flips the flag.
 
 **Decisions taken on Divakar's behalf (recommendations; see the design's "Decisions for Divakar"):**
-1. Its own flag `employer.talent-pool` (not shared with EMP-13), high-risk to enable.
+1. Its own flag `employer.talent-pool` (not shared with EMP-13), high-risk to enable. (HG-4 itself was approved by Divakar on 2026-10-01; the flag still ships off.)
 2. The consent definition is seeded as `2026-10-draft` and hidden while the flag is off; switching on also needs HG-6 for the wording.
 3. Card fields: evidence per skill, branch, year and cities — each only if ticked. No college name.
 4. Limits: 20 invitations per employer per 24 hours, one per card per job, 14-day invitations, 5 skills per search, 25 per page, 8 pages.
@@ -1313,5 +1313,5 @@ Calendar invites remain EMP-09's. No calendar provider is integrated.
 - No email for invitations (in-app only).
 
 **Risks / follow-ups:**
-- When HG-4 and HG-6 are approved: publish the approved consent wording (a new version retiring the draft, if it changes), switch the flag on, and move ADR-044 to Accepted.
+- When HG-6 clears the wording: publish the approved consent wording (a new version retiring the draft, if it changes), then switch the flag on.
 - `md5` card references are pseudonyms, not secrets; listing ids never leave the server.

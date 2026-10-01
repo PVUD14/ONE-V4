@@ -316,8 +316,14 @@ describe('reading: every figure has a source, or NA', () => {
       { featureKey: key, outcome: 'FAILED', failureClass: 'PROVIDER_FAILED', count: 1 },
     ]));
     expect(response.body.cost).toMatchObject({ value: null, basis: 'NO_PRICE_TABLE' });
-    // The code registry is empty under the AI hold; prompts in use come from ai_generations.
-    expect(response.body.prompts.registered).toEqual([]);
+    // The code registry lists the prompts ONE's features run (ENG-21 registered the first three), with
+    // their purpose and never their text; prompts in use come from ai_generations.
+    expect(response.body.prompts.registered).toEqual([
+      { key: 'tutor-hint', version: 1, purpose: expect.any(String) },
+      { key: 'content-lesson-draft', version: 1, purpose: expect.any(String) },
+      { key: 'content-answer-check', version: 1, purpose: expect.any(String) },
+    ]);
+    expect(JSON.stringify(response.body.prompts.registered)).not.toContain('never reveal');
     expect(response.body.prompts.inUse).toEqual(expect.arrayContaining([
       expect.objectContaining({ key: 'ops12.other', version: 3, generations: 1, registered: false }),
     ]));

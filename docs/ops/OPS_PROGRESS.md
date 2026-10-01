@@ -2995,3 +2995,217 @@ failures: api `employer-assessments-emp12` and `operations-analytics` (whole-fil
 item…" (20 s timeout) and one `institutionDepartment.test.tsx` case under load (api 1417/1418 and web 1000/1002 in the
 run). Re-run alone: 16/16, 10/10, 21/21, and the two web files 113/113. None touches ENG-23 code; no test was skipped
 or changed to pass. Android not touched, so not compiled.
+
+## ENG-22 — Tutoring brief, hint policy and guard — 2026-10-02
+**Result:** Built. A student stuck on a practice question on a learning step can press "Ask the AI tutor for
+hint N", on the web and on Android. The request does only database work: it raises the step's hint level by one,
+exactly as "Show hint" does, records a `tutor_hints` row (PENDING, DRAFT) and enqueues `tutor.hint.requested`,
+then answers 202. The local outbox worker then:
+- re-checks the request;
+- builds a content-only brief (question, options, key, the published hints up to the level, the level and the
+  language — nothing about the student and no readiness);
+- calls ONE AI Orchestration (kill switch, feature switch, cap, size and metering — ENG-20);
+- runs the guard.
+
+The guard is ENG-21's bake-off checks, imported rather than copied, plus stricter runtime checks. A shown hint
+carries an "AI hint" label and the words "Written by the AI tutor and checked by ONE's rules — not reviewed by a
+person". A refused, late or failed hint shows the written hint for that level and says why. AI Operations gains a
+Tutor hints panel for staff sampling and verdicts.
+
+It is off by default, and it serves only a deployment that declares itself the sandbox
+(`ONE_SANDBOX=true` + `ONE_AI_TUTOR_AUDIENCE=sandbox`, never `NODE_ENV=production`), in the API and again in the
+worker. Switching it on goes only through the existing 0089 evaluation gate and OPS-02 approval. Nothing was
+switched on, no model was called (tests use ENG-20's local fake endpoint), and the pod was not touched.
+
+**Branch / PR:** `feat/eng-22-tutor-hints`, from `onev4/feat/plan-phases-0-to-2` (837da63). Commits:
+- design (b4efb94)
+- acceptance tests (f374e57)
+- implementation (48d1bc2)
+- Android (759c736)
+- runbook and doc updates (a10e25c)
+- this report
+
+Pushed to onev4; not merged.
+
+**Files created:**
+- `docs/architecture/tutor-hints-table-design.md` — Decisions 1–8, the table, privacy, events, the sandbox path,
+  the migration number, open points.
+- `packages/tutoring/` (new, pure):
+  - `policy.ts` — `tutor-hint-policy-v1`, `tutorAudienceFromEnvironment`;
+  - `brief.ts` — `buildTutorBrief`, `tutorPromptParameters`;
+  - `guard.ts` — `tutor-guard-v1`;
+  - `arithmetic.ts` — maths checked by code, no `eval`;
+  - tests: policy, brief (including byte-parity with the evaluation set), guard, arithmetic.
+- `packages/persistence/drizzle/0107_tutor_hints.sql`.
+- `packages/persistence/src/`:
+  - `tutor-hints.ts` — request recording, the step view's hint entries and tutor availability, staff list and
+    review;
+  - `tutor-hint-worker.ts` — the outbox consumer, worker-only;
+  - `tutor-sandbox.ts` and `run-tutor-sandbox-consent.ts` — the `ai:tutor-sandbox-consent` command.
+- `apps/web/src/rolePortal/tutorHintReview.tsx` — the Tutor hints panel on the existing AI Operations page.
+- `docs/ops/runbook-tutor-hints-sandbox.md`.
+- Tests:
+  - `apps/api/src/http/tutor-hints.integration.spec.ts`
+  - `packages/persistence/test/tutor-evidence-boundary.test.ts`
+  - `packages/persistence/test/tutor-hints.test.ts`
+  - `apps/web/src/studentLearningTutor.test.tsx`
+  - `apps/web/src/rolePortal/tutorHintReview.test.tsx`
+
+**Files modified:**
+- `packages/persistence/src/learning-experience.ts`:
+  - `StepQuestionView` gains `hintDetails` (the source, LADDER or AI_TUTOR, and the state, SHOWN, PENDING or
+    FALLBACK) and `tutor` (available, reason, remaining today);
+  - `hints` keeps its contract for older clients;
+  - new `requestStepTutorHint`.
+- `automation-workers.ts` — the consumer is routed in the local dispatcher.
+- `run-automation-worker.ts` — new `local-outbox` mode: the outbox drained with no n8n, for the sandbox.
+- `jobs-health.ts` — `tutor-hint-generator` is a known consumer.
+- `institution-contract.ts` — `tutor_hints` is out of purge scope as the student's own learning record.
+- `packages/events/src/index.ts` — `tutor.hint.requested` v1.
+- `apps/api/src/http/learning-experience.controller.ts` — `POST /api/v1/learning/steps/:decisionId/tutor-hints`
+  answers 202, and refusals are 409 `TUTOR_<REASON>` with a plain sentence.
+- `operations-ai.controller.ts` — `GET /operations/ai/tutor-hints` (AI_OPS_VIEW) and `POST …/:id/review`
+  (AI_OPS_CONFIGURE).
+- `privacy-export*.ts` — `learning.steps[].aiTutorHints`, plus one `notIncluded` line.
+- `privacy-deletion.ts` — tutor hints are erased with the learning activity.
+- `inference-boundary.spec.ts` — the tutor worker module is added to the forbidden imports.
+- Web: `apps/web/src/api/learning.ts` (`requestTutorHint`, `getLearningStep`), `studentLearning.tsx` (the AI
+  button, the label, the pending state and its two-second poll, the fallback text), `api/aiOperations.ts`,
+  `rolePortal/aiOperations.tsx` (renders the panel).
+- Android: `ApiLearning.kt`, `StudentLearningPlan.kt`.
+- Docs: `privacy-export-coverage.md`, `runbook-ai-kill-switch.md` (path D).
+
+**Migrations added:** `0107_tutor_hints.sql`. The register assigns 0105 to ENG-22, but ENG-20 already merged
+`0105_inference_adapter.sql`, so this uses the next unheld number. The coordinator may renumber it; nothing refers
+to the number. What it contains:
+- one row per AI hint request, with `source` (always `AI_GENERATED`), `generator_version`, `prompt_version`,
+  `prompt_fingerprint`, `model`, `policy_version`, `guard_version`, `review_state` (DRAFT by default),
+  `generated_at`, the guard's findings and repairs, the outcome, and the staff review;
+- CHECKs on every vocabulary and on outcome consistency;
+- an insert trigger: the row is born PENDING and DRAFT, and only at the level the step item records, on an
+  unanswered question;
+- a change trigger:
+  - the request is immutable;
+  - status moves forward only;
+  - the generation is written once;
+  - a review happens once;
+  - a row is deleted only by privacy deletion.
+
+Applied twice on a fresh database (89 applied, then 0 applied / 89 already applied).
+
+**Acceptance criteria:**
+- [x] **A structured tutoring brief with no personal data.** `buildTutorBrief` takes content only, and a test pins
+  its keys. In v1 the student's message is one of ENG-21's evaluated phrasings, chosen by level, never free text.
+  The API test inspects the request the fake endpoint received: no user id, email, decision id or band value.
+  Readiness is never read.
+- [x] **The four-step hint ladder policy.** An AI hint is the next ladder level, one at a time, at most four. The
+  0107 trigger ties the row to the level the step item records.
+- [x] **Tutor off in assessment mode.** The policy refuses outside LEARN, PRACTICE and REVIEW, and the route exists
+  only on learning steps (the placement test, readiness checks and exams have none).
+- [x] **Answer-leak check.** ENG-15's `hintLeakFinding` (through `tutorLeaks`) and the runtime "the answer is…"
+  and answer-number checks. A leaking reply is never in any student response (API test).
+- [x] **Grounding in approved content.** The tutor is offered only on a question with a PUBLISHED ladder. The
+  prompt carries the approved hints up to the level, and that same ladder is the fallback.
+- [x] **Maths checked by code.** `arithmeticFindings` evaluates every pure arithmetic statement, and a false one
+  is refused.
+- [~] **Code claims checked in the sandbox.** The isolated sandbox is not provisioned (HG-7), and practice items
+  are multiple-choice aptitude questions. A reply containing code is refused (`CODE_UNVERIFIED`) and the written
+  hint is shown. The guard gains a sandbox check when code items reach practice.
+- [x] **No write access to mastery or evidence.**
+  - A static test refuses any write by tutor code to the evidence, mastery, skill-state, attempt, readiness or
+    planner tables, and any read of readiness.
+  - The API test shows a full request and job leave `evidence_records`, `mastery_projections`,
+    `learning_attempt_events`, `learner_skill_state` and `readiness_snapshots` unchanged.
+- [x] **All generation as outbox jobs.**
+  - The request makes no model call: the fake endpoint has seen nothing after the 202.
+  - The worker module is forbidden in `apps/` by `inference-boundary.spec.ts`.
+  - The model call runs outside any transaction, with a deadline inside the 45-second pending window.
+- [~] **C6 on the evaluation set.**
+  - The runtime brief renders byte-for-byte what the bake-off sends (parity test over the en, te and hi cases).
+  - The guard runs the very checks that compute `answer_leak_rate` and `language_match_rate`, so `tutor.hint`'s
+    PASS thresholds (≤ 0.0099 leaks, ≥ 0.98 language match) describe production output, and production
+    additionally refuses every leak the checks detect.
+  - The measured C6 needs the coordinator's bake-off run on the pod (ENG-21, not done yet).
+- [x] **The tutor cannot write evidence (test).** See above.
+- [x] **Product rules:**
+  - labelled as AI;
+  - counts as assisted exactly like the ladder (API test: level 2 is unaided, level 3 is assisted);
+  - off by default;
+  - sandbox-only;
+  - the switch-on path needs a passing `ai_evaluations` record (API test: 0089 refuses before the PASS);
+  - refused output falls back to the human ladder;
+  - 20 AI hints per student per day (API test: the 21st is refused and the written hints still work);
+  - everything audited: `tutor.hint.requested`, `tutor.hint.completed` and `tutor.hint.reviewed`, never the
+    text.
+
+**The DRAFT rule (Decision 1):**
+
+**Chosen: B — live hints with human review moved to the model and prompt, a code guard on every reply, and staff
+sampling after the fact.** A human decision stands behind everything a student reads, and every output is
+recorded:
+1. A person approves the model and prompt pair. 0089 needs a PASS for the exact model and `tutor-hint@1`; that
+   PASS needs a human review sheet, and switching on is dual control.
+2. The model only rephrases a ladder a person published, and the guard checks every reply.
+3. Every hint is stored as DRAFT with provenance, and staff mark sampled hints PUBLISHED or REJECTED. The student
+   is told plainly that the hint is not reviewed by a person.
+
+**Rejected:**
+- **A — pre-generated AI ladders reviewed before use.** Not a tutor; that is ENG-23's content factory.
+- **C — every live hint held for approval.** The student waits hours; this is useless for someone stuck now.
+- **D — live hints with no stored text.** It breaks provenance.
+
+**Other decisions taken (recorded in the design):**
+- No free-text questions in v1.
+- The tutor is unavailable in languages the evaluation did not cover (it serves en, te and hi; others are told
+  plainly).
+- The guard repairs form only and never content.
+- A REDIRECT reply is not shown.
+- Polling every 2 s, with a 45 s window after which the written hint is shown.
+- The per-student cap is a code constant (20).
+- The audit actor of the worker's row is the requesting student, with `by: tutor-hint-generator`.
+- The `local-outbox` worker mode is for the n8n-less sandbox.
+- A sandbox-only `ai-tutoring` definition and grants come from a locked command, because the real definition is
+  HG-6.
+
+**How the coordinator switches it on in the sandbox** (`docs/ops/runbook-tutor-hints-sandbox.md`), once ADR-046's
+sandbox stack is installed and the bake-off PASS for the served model exists:
+1. Add `ONE_SANDBOX=true` and `ONE_AI_TUTOR_AUDIENCE=sandbox` to `api-demo`.
+2. Add `worker-demo` with `AUTOMATION_WORKER_MODE=local-outbox`, the same two variables and the `ONE_AI_*`
+   endpoint variables. The runbook has the compose snippet; the sandbox compose lives on `feat/demo-sandbox`,
+   which is not merged.
+3. Run `ai:register-features` against the sandbox database.
+4. Run `ai:bake-off-import --feature tutor.hint` into the sandbox database. This is the existing gate.
+5. Run `ai:tutor-sandbox-consent`.
+6. Switch `tutor.hint` on in AI Operations with reason PILOT_ROLLOUT, which needs an approval.
+
+The nightly reset undoes steps 3–6.
+
+**Android:** changed (759c736): the same AI control, label, pending state with a two-second re-read, and fallback
+text in the practice view. It compiles: `JAVA_HOME=… ./gradlew --no-daemon -q :app:compileDebugKotlin`, exit 0.
+The AI Operations panel is web-only (operator console).
+
+**Not done / for the coordinator:**
+- The C6 measurement (the bake-off on the pod).
+- The sandbox compose entries: the snippet is in the runbook, because the compose file lives on the unmerged
+  `feat/demo-sandbox`.
+- Unify `tutor-sandbox.ts`'s lock with that branch's `sandbox-guard.ts` when both are merged.
+- Migration number 0107 rather than 0105, as explained above.
+- The open points in the design:
+  - fold the runtime-only checks into `bake-off-checks-v2`;
+  - add free-text questions with their own evaluation cases;
+  - a dedicated tutor worker for ENG-25;
+  - a per-college daily cap.
+
+**Validation:** running — results to follow in this entry. Before the full run, on the fresh database `one_eng22`:
+- typecheck 0;
+- tutoring 35/35;
+- ai-evaluation 33/33;
+- persistence 46/46 — the tutor unit tests and boundary, jobs-health, ai-bake-off and ai-workers;
+- API:
+  - tutor-hints 17/17 (twice);
+  - inference-boundary 2/2;
+  - institution-contract-lifecycle passed;
+  - learning-experience, operations-ai and privacy failed with "out of shared memory" when run together with
+    other files; each passed alone: 9/9, 22/22 and 17/17;
+- web: studentLearning 8/8, studentLearningTutor 4/4, tutorHintReview 4/4, aiOperations 15/15;
+- Android compile 0.

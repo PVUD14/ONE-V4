@@ -367,3 +367,125 @@ Replayed twice by hand on a migrated database without error.
 - CI parity: optional-chain, private-key and conflict-marker greps — clean; `corepack pnpm audit --prod --audit-level=high` — exit 0.
 
 **Next goal:** GROWTH-04 — College pipeline and the operations handoff.
+
+## GROWTH-06 — Field work on the phone: visits, follow-ups, location, offline — 2026-10-01
+**Result:** Complete — field staff log visits, calls, meetings and notes and keep follow-ups on the phone and the web;
+every field write lands once however often it is resent; a visit's location is optional, coarse, private to the
+person and their manager, kept 180 days, exported and erasable; and the phone keeps working without a signal.
+**Branch / PR:** feat/growth-field (cut from feat/growth-leads, the GROWTH-03 tip) → feat/plan-phases-0-to-2 (pushed; not merged)
+**Commits:** 14af860 (design) · b61b3ce, e7ee90b (tests) · 0165c71, 99ef7dd, 31d095b, 2fb8d71 (implementation) · 684aba1 (coverage doc) · this report
+**Files created:**
+- `docs/architecture/growth-field-work-table-design.md` (written and committed before the migration)
+- `docs/legal/growth-field-location-notice-DRAFT-for-legal-review.md` (DRAFT throughout; publishing is HG-6)
+- `packages/persistence/drizzle/0103_growth_field_work.sql`
+- `packages/authorization/src/growth-field.ts`, `growth-field.test.ts`
+- `packages/persistence/src/growth-field.ts` (location and text sweeps, account-erasure step)
+- `apps/api/src/http/growth-idempotency.ts`, `growth-field-service.ts`, `growth-field.controller.ts`, `growth-field.integration.spec.ts`
+- `apps/web/src/rolePortal/growthField.tsx`, `growthField.test.tsx`
+- Android `GrowthQueue.kt` (encrypted offline queue), `GrowthDevice.kt` (reminders, coarse location), `GrowthField.kt`
+**Files modified:** `packages/authorization/src/index.ts`; `packages/events/src/index.ts` (four events);
+`apps/api/src/http/api-security.module.ts`, `growth-leads.controller.ts` (optional Idempotency-Key on create),
+`growth-workspace.controller.ts` (`visitsThisMonth`, `followUpsDue` on `/me`), `privacy-export-sections.ts`
+(`fieldActivities`, `followUps`), `privacy-deletion.ts` (locations erased with the account), `run-privacy-worker.ts`
+(two sweeps); `docs/architecture/privacy-export-coverage.md`; web `api/growth.ts`, `rolePortal/growth.tsx`,
+`rolePortal/growthLeads.tsx`, `growthPortal.test.tsx`; Android `Api.kt`, `Growth.kt`, `GrowthLeads.kt`, `AndroidManifest.xml`.
+**Migrations added:** `0103_growth_field_work.sql` (the number assigned). No earlier migration edited; no capability
+CHECK, grant trigger or scope trigger redefined (two new tables and two new guard functions only). Applied twice by
+the migrator and replayed by hand on a migrated database without error.
+
+**What was built**
+1. *Schema (0103).* `growth_activities` (VISIT/CALL/MEETING/NOTE; outcome required except for notes; the contact met
+   must be a contact of the same lead; `occurred_at` as the device reported it beside `received_at = now()`;
+   **refused on the database clock when more than 7 days old or more than 5 minutes ahead**; location as
+   `numeric(6,3)` / `numeric(7,3)` with the reported accuracy, only on visits and meetings, **never added or changed
+   after insert, erased once** with a reason; notes erased once; never deleted; refused on a do-not-contact lead).
+   `growth_follow_ups` (due date a week back to a year ahead in IST; OPEN → DONE | CANCELLED once, cancellation
+   reason-coded; title erased once; never deleted).
+2. *Idempotency.* Every field write requires an `Idempotency-Key` (activities, follow-ups, complete, cancel; optional
+   on lead create, for offline new leads), recorded in the existing `idempotency_records` inside the write's
+   transaction, scoped by user and route and hashed with the body: a resend replays the first answer
+   (`idempotentReplay: true`), concurrent copies block and replay, a reused key with another body is 422, and a
+   refusal leaves no record so a resend is refused the same way.
+3. *Rules.* The owner, or a manager who could reassign the lead, logs work; an executive claims first. Activities and
+   follow-ups are visible to anyone who sees the lead; **a location only to its author and their manager** (the key is
+   absent for everyone else, including another manager of the same region and growth admins). Only the author removes
+   a location. A follow-up is closed by its assignee or their manager.
+4. *Retention, export, erasure.* The privacy worker erases locations 180 days after the visit, and the notes and
+   follow-up titles of leads quiet for 24 months (with their contacts, design §13.4), bounded and idempotent. The
+   export gains the person's own field log with locations while held. Account erasure erases every location they
+   logged. Audit rows and events say whether a location was attached, never where.
+5. *Web.* Growth → Field (hero, four real counts, follow-ups by overdue / today / upcoming with Done and Cancel, recent
+   work, team view for managers, the DRAFT location notice); each lead's detail gains its field work with forms to log
+   work and add a follow-up. Home's "Visits this month" and a follow-ups-due card now read the field log.
+6. *Android (primary client).* A Field tab; Home's real visits and a Today card; on a lead, Log work (kind, outcome,
+   contact met, when, notes, **Attach my location** on a tap: the DRAFT notice first, then the foreground
+   approximate-location prompt; declining leaves the visit whole) and Add follow-up. **One queue for every field
+   write** (and new leads), encrypted with AES-256-GCM under an Android Keystore key in no-backup storage, bound to
+   the signed-in person, sent in order on open, on "Send now" and whenever a network appears; a refusal is kept with
+   its reason until dismissed. Saved copies of the lists, the field page and the person's own leads for offline
+   reading. Local 09:00 reminders on the due date (AlarmManager, no push). **Sign-out warns about unsent items, then
+   clears the queue, the cache and the reminders.** The manifest adds only `ACCESS_COARSE_LOCATION`,
+   `ACCESS_NETWORK_STATE` and a non-exported reminder receiver — no fine or background location.
+
+**Tests added**
+- `packages/authorization/src/growth-field.test.ts` (17): vocabulary pinned to 0103, column precision, notice text
+  identical to the legal draft, outcome/location by kind, report-time rule, rounding, due-date window in IST, who logs,
+  who sees a location, who removes it and closes a follow-up.
+- `apps/api/src/http/growth-field.integration.spec.ts` (25): access; logging with audit/outbox/idempotency record;
+  **3-decimal storage (API and column)**; **a visit without a location is complete and counted**; kinds and location
+  (API and CHECK); contact of the same lead; **a write retried five times lands once — sequentially and five at once**,
+  also for a follow-up, its completion and an offline lead; key missing, malformed, reused, per-person; a refusal leaves
+  no record; **reports older than 7 days or in the future refused (API and database clock)**; claim before logging;
+  **location seen by author and manager only**; never added after the fact, erased once, author-only removal;
+  do-not-contact; follow-up window and closing; Field page and `/me` counts; both sweeps (idempotent); export; erasure.
+- `apps/web/src/rolePortal/growthField.test.tsx` (8) and a Field case in `growthPortal.test.tsx`; two GROWTH-01 web
+  assertions updated on purpose (Field is no longer "not built yet").
+
+**Manual run on the emulator** (Android Studio emulator, API 36 image; the app built from this branch; the API module
+served locally against a local database with a test token verifier, as the integration specs do — no production, no
+Cognito; the cleartext allowance for 10.0.2.2 was a temporary debug-only overlay, removed and never committed):
+- Signed in as a seeded growth executive; Home showed Open leads 1, Visits this month 0, Today "Nothing is due".
+- **Logged a visit offline:** Wi-Fi and data off, Log work → Met → Save showed "Saved on this phone. It will be sent
+  when you are back online."; the server held **0** activities; the queue file in no-backup storage (437 bytes)
+  contained no readable lead name, kind or path (encrypted).
+- **Synced:** network back on → the connectivity callback sent it; the server held **exactly 1** activity (VISIT, MET,
+  no location) and **1** SUCCEEDED idempotency record; the queue file was gone.
+- **Location:** "Attach my location" showed the DRAFT notice, then the system prompt offering **approximate location
+  only**. This emulator image delivered no fix to a coarse-only request (the console fix was accepted, the request
+  recorded zero locations), so the app showed "No location could be read. The visit logs without one." — the no-fix
+  path, working. A real coordinate from a phone was **not** observed; the provider fallback (fused → network → GPS on
+  Android 12+) was added after this run.
+- **Sign-out:** with one item queued offline, Sign out warned "1 item has not been sent yet. Signing out deletes it…";
+  confirming removed the queue file, all 10 cached responses and the token; the server still held 1 activity.
+
+**Acceptance criteria**
+- [x] A write retried five times lands once — sequential and concurrent specs (one row, one audit row, one event);
+  shown end to end on the emulator.
+- [x] A report older than 7 days or in the future is refused — API and the database trigger on its own clock (5 minutes
+  of phone-clock skew tolerated, recorded as a decision).
+- [x] Location is stored at 3 decimal places — rounded on the phone, by the API and by the column type (spec).
+- [x] Declining location permission leaves logging intact — spec and emulator.
+- [x] The app compiles, and a manual run on an emulator logs a visit offline and syncs it — above.
+- [x] Do not: no background or fine location requested; location read only on the tap; no refused offline write
+  dropped silently.
+
+**Decisions for Divakar** (recommended answers taken, recorded in the table design)
+- An executive logs work only on a lead they own (claim first); a manager may log on any lead they could reassign.
+- Activities and follow-ups are visible to anyone who sees the lead; the location only to its author and their manager.
+- Up to 5 minutes ahead of the server is phone-clock skew, accepted; more is "in the future".
+- Location only on visits and meetings, never calls or notes, and never attached after the fact.
+- Follow-ups due a week back to a year ahead; reminders at 09:00 local showing the organisation's name only.
+- The 24-month sweep also erases activity notes and follow-up titles of the same leads.
+- Location erasure on account deletion is a step of the deletion run, not a new deletion category.
+- After a session expires (not an explicit sign-out) the queue stays encrypted for the same person, and is discarded
+  unread if someone else signs in.
+
+**Limitations / not done**
+- A visit to a lead created offline can be logged only after that lead has synced (its id comes from the server).
+- Claiming, adding a contact and recording a notice still need a signal (not in the design's queue list).
+- Operations (`GROWTH_ADMIN`) has no field-log view: the design limits location to the person and their manager.
+- No real-device location fix observed; the location notice is a draft (HG-6).
+
+**Validation:** recorded below once the full run completes.
+
+**Next goal:** GROWTH-04 — College pipeline and the operations handoff.

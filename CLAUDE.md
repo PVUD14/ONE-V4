@@ -73,14 +73,13 @@ needs an AWS account is out of reach until he provides access.
 
 ## AI
 
-**Held.** Inference will run on AWS through managed inference, once Divakar provides AWS
-access (ADR-030, superseding ADR-029). The RunPod GPU pod was abandoned on cost. Until
-that access exists, do not integrate a provider, write model-dependent code, or stand up
-a serving stack — and do not propose self-hosting again without the measured cost case
-ADR-010 asks for.
-
-The hold does not cover `packages/ai-orchestration`, which is provider-agnostic and
-built. When access arrives the remaining work is one adapter.
+**Approved (HG-2, 2026-10-01).** Inference runs on a RunPod GPU pod that Divakar created
+(ADR-047, superseding ADR-030 on *where* inference runs): an OpenAI-compatible endpoint
+reached only through `packages/ai-orchestration`, with its address and key in the server's
+environment, never in the repository. Provider adapters, model-dependent code, the
+bake-off, tutoring logic and the content factory may now be built. No AI reaches a student
+until the privacy notice names the pod's US processing (HG-6); until then AI runs on sample
+data and staff-only paths. The pod bills while running; nothing in ONE starts or scales it.
 
 These rules survive whatever the model is and wherever it runs:
 

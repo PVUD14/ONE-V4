@@ -146,29 +146,40 @@ internal object GrowthLocation {
     suspend fun current(context: Context): CoarseFix? {
         if (!permitted(context)) return null
         val manager = context.getSystemService(LocationManager::class.java) ?: return null
-        // Coarse permission only: the network (and on API 31+ the fused) provider. GPS needs fine
-        // location, which this app never asks for.
-        val candidates = if (Build.VERSION.SDK_INT >= 31) listOf(LocationManager.FUSED_PROVIDER, LocationManager.NETWORK_PROVIDER) else listOf(LocationManager.NETWORK_PROVIDER)
-        val provider = candidates.firstOrNull { runCatching { manager.isProviderEnabled(it) }.getOrDefault(false) } ?: return null
-        val location: Location? = runCatching { withTimeoutOrNull(20_000) {
-            suspendCancellableCoroutine { continuation ->
-                if (Build.VERSION.SDK_INT >= 30) {
-                    val cancel = CancellationSignal()
-                    continuation.invokeOnCancellation { cancel.cancel() }
-                    manager.getCurrentLocation(provider, cancel, context.mainExecutor) { fix -> if (continuation.isActive) continuation.resume(fix) }
-                } else {
-                    val listener = object : android.location.LocationListener {
-                        override fun onLocationChanged(fix: Location) { if (continuation.isActive) continuation.resume(fix) }
-                        @Deprecated("Required on API < 29") override fun onStatusChanged(p: String?, s: Int, b: android.os.Bundle?) {}
-                        override fun onProviderEnabled(p: String) {}
-                        override fun onProviderDisabled(p: String) {}
-                    }
-                    continuation.invokeOnCancellation { manager.removeUpdates(listener) }
-                    @Suppress("DEPRECATION")
-                    manager.requestSingleUpdate(provider, listener, Looper.getMainLooper())
-                }
-            }
-        } }.getOrNull()
+        // Coarse permission only. Up to Android 11 that means the network provider (GPS needs fine
+        // location, which this app never asks for). From Android 12 the system itself coarsens every
+        // provider for an app holding only approximate permission, so fused, network and then GPS are
+        // tried in turn — a phone without Google location services still gets an approximate fix.
+        val candidates = if (Build.VERSION.SDK_INT >= 31) {
+            listOf(LocationManager.FUSED_PROVIDER, LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER)
+        } else {
+            listOf(LocationManager.NETWORK_PROVIDER)
+        }
+        val enabled = candidates.filter { runCatching { manager.isProviderEnabled(it) }.getOrDefault(false) }
+        var location: Location? = null
+        for (provider in enabled) {
+            location = runCatching { withTimeoutOrNull(10_000) { oneFix(context, manager, provider) } }.getOrNull()
+            if (location != null) break
+        }
         return location?.let { CoarseFix(round3(it.latitude), round3(it.longitude), it.accuracy.roundToInt().coerceIn(0, 50_000)) }
+    }
+
+    @SuppressLint("MissingPermission")
+    private suspend fun oneFix(context: Context, manager: LocationManager, provider: String): Location? = suspendCancellableCoroutine { continuation ->
+        if (Build.VERSION.SDK_INT >= 30) {
+            val cancel = CancellationSignal()
+            continuation.invokeOnCancellation { cancel.cancel() }
+            manager.getCurrentLocation(provider, cancel, context.mainExecutor) { fix -> if (continuation.isActive) continuation.resume(fix) }
+        } else {
+            val listener = object : android.location.LocationListener {
+                override fun onLocationChanged(fix: Location) { if (continuation.isActive) continuation.resume(fix) }
+                @Deprecated("Required on API < 29") override fun onStatusChanged(p: String?, s: Int, b: android.os.Bundle?) {}
+                override fun onProviderEnabled(p: String) {}
+                override fun onProviderDisabled(p: String) {}
+            }
+            continuation.invokeOnCancellation { manager.removeUpdates(listener) }
+            @Suppress("DEPRECATION")
+            manager.requestSingleUpdate(provider, listener, Looper.getMainLooper())
+        }
     }
 }

@@ -15,6 +15,7 @@
     "@nestjs/common": "^11.1.6",
     "@nestjs/core": "^11.1.6",
     "@nestjs/platform-express": "^11.1.6",
+    "@planthepath/assessments": "workspace:*",
     "@planthepath/authorization": "workspace:*",
     "@planthepath/automation": "workspace:*",
     "@planthepath/hiring": "workspace:*",
@@ -23,15 +24,16 @@
     "@planthepath/persistence": "workspace:*",
     "@planthepath/privacy": "workspace:*",
     "drizzle-orm": "^0.45.2",
+    "pdfkit": "^0.20.2",
     "pg": "^8.16.0",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.2",
-    "@planthepath/assessments": "workspace:*"
+    "rxjs": "^7.8.2"
   },
   "devDependencies": {
     "@planthepath/ai-orchestration": "workspace:*",
     "@nestjs/testing": "^11.1.6",
     "@types/node": "^22.13.0",
+    "@types/pdfkit": "^0.17.6",
     "@types/pg": "^8.15.0",
     "@types/supertest": "^6.0.3",
     "supertest": "^7.0.0",

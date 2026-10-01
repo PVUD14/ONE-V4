@@ -32,7 +32,7 @@ deterministic layout of the student's own records and their own words.
    the sign-in email), the summary, projects (title, description, optional https link), self-declared skills
    and languages. These are typed by the student and are labelled *self-declared* wherever a label applies.
 3. **The template.** One of three: `CLASSIC` (single column, centred header, rules between sections), `MODERN`
-   (coloured header band, accent headings), `COMPACT` (smaller type, denser lists, fits more on one page).
+   (coloured header strip, accent headings), `COMPACT` (smaller type, denser lists, fits more on one page).
 4. **The title** of the saved résumé ("Campus drives", "Data roles").
 
 ## What ONE fills in, and how it is labelled

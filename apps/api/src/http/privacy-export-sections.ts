@@ -19,7 +19,7 @@ const num = (value: unknown): number | null => (value == null ? null : Number(va
 
 export async function assembleCoverageSections(one: Query, subjectUserId: string): Promise<Record<string, unknown>> {
   const subject = sql`${subjectUserId}::uuid`;
-  const [account, records, hiring, college, learning, talentPool, growthWork] = await Promise.all([
+  const [account, records, hiring, college, learning, talentPool, growthWork, resumes] = await Promise.all([
     accountSections(one, subject),
     recordSections(one, subject),
     hiringSections(one, subject),
@@ -27,8 +27,9 @@ export async function assembleCoverageSections(one: Query, subjectUserId: string
     learningSections(one, subject),
     talentPoolSection(one, subject),
     growthWorkSection(one, subject),
+    resumeSection(one, subject),
   ]);
-  return { ...account, ...records, ...hiring, ...college, learning, talentPool, growthWork };
+  return { ...account, ...records, ...hiring, ...college, learning, talentPool, growthWork, resumes };
 }
 
 type Subject = ReturnType<typeof sql>;
@@ -292,6 +293,24 @@ async function hiringSections(one: Query, subject: Subject): Promise<Record<stri
  * blocked, the invitations they received, and the employers who opened their card (from the audit rows,
  * by employer name only — never the member who looked).
  */
+/**
+ * RESUME-GEN (0101): each résumé the person generated, with every saved version's words and labels as they
+ * were drawn. Not the selections (they are record identifiers) and not the hash.
+ */
+async function resumeSection(one: Query, subject: Subject): Promise<Record<string, unknown>[]> {
+  const [resumes, versions] = await Promise.all([
+    one(sql`SELECT id, title, created_at, updated_at FROM student_resumes WHERE student_user_id = ${subject} ORDER BY created_at, id`),
+    one(sql`SELECT resume_id, version_number, template_key, content, created_at FROM student_resume_versions
+            WHERE student_user_id = ${subject} ORDER BY version_number, id`),
+  ]);
+  return resumes.map((resume) => ({
+    title: resume.title, createdAt: resume.created_at, updatedAt: resume.updated_at,
+    versions: versions.filter((version) => version.resume_id === resume.id).map((version) => ({
+      versionNumber: num(version.version_number), template: version.template_key, savedAt: version.created_at, content: version.content,
+    })),
+  }));
+}
+
 async function talentPoolSection(one: Query, subject: Subject): Promise<Record<string, unknown>> {
   const [listings, evidence, blocks, invitations, views] = await Promise.all([
     one(sql`SELECT l.id, l.opted_in_at, l.ended_at, l.end_reason, l.show_branch, l.show_graduation_year, l.preferred_cities, l.consent_version

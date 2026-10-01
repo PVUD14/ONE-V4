@@ -3,8 +3,8 @@
 Records where ONE's sales demo is served from, and what that changes for the
 production site.
 
-- **Status:** Proposed (branch `feat/demo-site`; Divakar asked for "the demo site" on
-  2026-10-01 and accepts it by merging and installing it)
+- **Status:** Accepted — Divakar asked for the demo site on 2026-10-01 ("build the demosite");
+  it takes effect on the server when he installs the release that carries it
 - **Supersedes:** the arrangement in `docs/ops/runbook-demo-prep.md` where the pilot ran
   inside production for Cognito accounts named `demo.*` and the shared demo password was
   rotated after every demo. ADR-041 (production on `oneby8.com`) is unaffected.

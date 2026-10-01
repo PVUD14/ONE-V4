@@ -492,3 +492,82 @@ export function cancelGrowthFollowUp(token: string, followUpId: string, body: { 
 export function removeGrowthActivityLocation(token: string, activityId: string): Promise<{ readonly activity: GrowthActivityDto }> {
   return requestJson(`/api/v1/growth/activities/${encodeURIComponent(activityId)}/remove-location`, { token, method: 'POST', body: {} });
 }
+
+// ---------------------------------------------------------------------------
+// GROWTH-04: the college pipeline and the operations handoff. Stage moves carry the stage the
+// person saw, so a move made against a stage that has since changed is refused, not applied.
+// ---------------------------------------------------------------------------
+
+export interface GrowthMilestoneDto {
+  readonly code: string;
+  readonly state: 'REACHED' | 'NOT_REACHED' | 'NA';
+  readonly at: string | null;
+  readonly note?: string;
+  /** STUDENTS_ACTIVATING only: a suppressed count (fewer than 5 is never a number). */
+  readonly count?: { readonly suppressed: boolean; readonly value: number | null };
+}
+
+export interface GrowthHandoffRequestDto {
+  readonly id: string;
+  readonly state: 'REQUESTED' | 'LINKED' | 'DECLINED';
+  readonly requestedAt: string | null;
+  readonly requestedBy: string | null;
+  readonly contractReferenceReported: string;
+  readonly contactsMarked: number;
+  readonly decidedAt: string | null;
+  readonly declineReasonCode: string | null;
+  readonly contactsCarried: number | null;
+  readonly contactsErased: number | null;
+}
+
+export interface GrowthLeadPipelineDto {
+  readonly leadId: string;
+  readonly kind: GrowthLeadKindDto;
+  readonly stage: string;
+  readonly lostReasonCode: string | null;
+  readonly canMove: boolean;
+  readonly nextStages: readonly string[];
+  readonly canRequestHandoff: boolean;
+  readonly handoffRequests: readonly GrowthHandoffRequestDto[];
+  readonly milestones: readonly GrowthMilestoneDto[] | null;
+  readonly vocabulary: {
+    readonly reasons: { readonly backward: readonly string[]; readonly hold: readonly string[]; readonly lost: readonly string[] };
+    readonly declineReasons: readonly string[];
+    readonly milestones: readonly string[];
+  };
+}
+
+export function getGrowthLeadPipeline(token: string, leadId: string, signal?: AbortSignal): Promise<GrowthLeadPipelineDto> {
+  return requestJson(`${leadsPath}/${encodeURIComponent(leadId)}/pipeline`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function moveGrowthLeadStage(token: string, leadId: string, body: { readonly fromStage: string; readonly toStage: string; readonly reasonCode?: string }, idempotencyKey: string): Promise<GrowthLeadPipelineDto> {
+  return requestJson(`${leadsPath}/${encodeURIComponent(leadId)}/stage`, { token, method: 'POST', body, idempotencyKey });
+}
+
+export function requestGrowthHandoff(token: string, leadId: string, body: { readonly contractReference: string; readonly contactIds: readonly string[] }, idempotencyKey: string): Promise<GrowthLeadPipelineDto> {
+  return requestJson(`${leadsPath}/${encodeURIComponent(leadId)}/handoff`, { token, method: 'POST', body, idempotencyKey });
+}
+
+export interface GrowthHandoffQueueItemDto extends GrowthHandoffRequestDto {
+  readonly leadId: string;
+  readonly leadName: string;
+  readonly owner: string | null;
+  readonly area: { readonly city: string | null; readonly stateName: string | null; readonly districtName: string | null };
+  readonly aisheCode: string | null;
+  readonly contacts: readonly { readonly id: string; readonly role: string; readonly accountRole: string; readonly fullName: string; readonly email: string | null; readonly phone: string | null }[];
+}
+
+const handoffsPath = '/api/v1/operations/growth-handoffs';
+
+export function listGrowthHandoffs(token: string, signal?: AbortSignal): Promise<{ readonly requests: readonly GrowthHandoffQueueItemDto[]; readonly declineReasons: readonly string[] }> {
+  return requestJson(handoffsPath, { token, ...(signal ? { signal } : {}) });
+}
+
+export function linkGrowthHandoff(token: string, leadId: string, body: { readonly organizationId: string }): Promise<{ readonly linked: { readonly contactsCarried: number; readonly contactsErased: number; readonly contactsOverLimit: number } }> {
+  return requestJson(`${handoffsPath}/${encodeURIComponent(leadId)}/link`, { token, method: 'POST', body });
+}
+
+export function declineGrowthHandoff(token: string, leadId: string, body: { readonly reasonCode: string }): Promise<unknown> {
+  return requestJson(`${handoffsPath}/${encodeURIComponent(leadId)}/decline`, { token, method: 'POST', body });
+}

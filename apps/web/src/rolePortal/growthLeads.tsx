@@ -37,6 +37,7 @@ import {
 import { V2Chip, V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { formatApiError } from './shared.js';
 import { LeadFieldPanel } from './growthField.js';
+import { LeadPipelinePanel } from './growthPipeline.js';
 
 const NA = 'NA';
 
@@ -367,6 +368,7 @@ export function LeadDetailPanel({ leadId, vocabulary, token, mode, manager, onCh
         onClick={() => void act(() => setGrowthLeadDoNotContact(token, lead.id, { reasonCode: reasons.dnc }, operations), 'Marked do not contact. This cannot be undone.')}>Mark do not contact</button>
     </div> : null}
 
+    {!operations ? <LeadPipelinePanel leadId={lead.id} token={token} contacts={lead.contacts} onChanged={onChanged} /> : null}
     {!operations ? <LeadFieldPanel leadId={lead.id} token={token} contacts={lead.contacts} /> : null}
 
     <h3>Owner history</h3>

@@ -9,6 +9,7 @@
  */
 import { ApiRequestError, createOperationsOrganization, getOperationsOrganizationOnboardingStatus, getProtectedAccessToken, inviteInitialOrganizationAdmin, listFeatureFlags, listOperationsInvitations, listOperationsOrganizations, searchAuditEvents, setFeatureFlagState, transitionOrganizationVerification, updateOperationsOrganization } from '../api.js';
 import { EmployerAccessRequestsSection } from './operationsEmployerAccessRequests.js';
+import { GrowthHandoffsSection } from './growthPipeline.js';
 import { EmployerTermsSection } from './operationsEmployerTerms.js';
 import { CollegeExitsSection, InstitutionDataTermsOperationsSection } from './operationsInstitutionExits.js';
 import type { AuditEventDto, AuditSearchFilters, FeatureFlagDto, OperationsInvitationDto, OrganizationManagementDto } from '../api.js';
@@ -105,6 +106,8 @@ export function OperationsOrganizationsPage({ portal }: { readonly portal: RoleP
     {notice ? <p className="role-api-success" role="status">{notice}</p> : null}{error ? <p className="form-error" role="alert">{error}</p> : null}
     <div className="role-record-table-wrap"><table className="role-record-table"><caption className="sr-only">{portal.roleName} real organizations</caption><thead><tr><th>Organization</th><th>Kind</th><th>Location</th><th>Contact</th><th>Verification</th><th>Initial Admin</th><th>Updated</th><th>Actions</th></tr></thead><tbody>{organizations.map((org) => <tr key={org.id} className="role-record-row"><th scope="row"><strong>{org.profile.displayName || org.legalName}</strong><span>{org.legalName}</span><small>{org.profile.websiteUrl ?? 'No website'}</small></th><td>{org.kind}</td><td>{[org.profile.city, org.profile.stateOrProvince, org.profile.countryCode, org.profile.postalCode].filter(Boolean).join(', ') || 'Not set'}</td><td>{org.profile.primaryContactEmail ?? 'Not set'}</td><td><StatusBadge label={org.verificationState} tone="info" /></td><td>{org.initialAdminInvitation?.email ?? 'Not invited'}</td><td>{new Date(org.updatedAt).toLocaleDateString()}</td><td><div className="role-record-actions"><button type="button" className="secondary" onClick={() => void edit(org)}>Edit details</button><button type="button" className="secondary" onClick={() => void onboarding(org.id)}>Onboarding</button>{org.verificationState === 'PENDING' ? <button type="button" onClick={() => void transition(org.id, 'UNDER_REVIEW')}>Begin review</button> : null}{org.verificationState === 'UNDER_REVIEW' ? <><button type="button" onClick={() => void transition(org.id, 'VERIFIED')}>Verify</button><button type="button" className="secondary" onClick={() => void transition(org.id, 'REJECTED')}>Reject</button></> : null}{org.verificationState === 'VERIFIED' ? <button type="button" className="secondary" onClick={() => setSuspending(org)}>Suspend…</button> : null}<button type="button" className="secondary" onClick={() => void invite(org.id)}>Invite admin</button></div></td></tr>)}</tbody></table></div>
     <EmployerAccessRequestsSection organizations={organizations} />
+    {/* GROWTH-04: colleges growth reports as signed, linked here to the college operations created. */}
+    <GrowthHandoffsSection organizations={organizations} />
     <EmployerTermsSection />
     {/* INST-18: college data-processing terms and the college exit runbook. */}
     <InstitutionDataTermsOperationsSection />

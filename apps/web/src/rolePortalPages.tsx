@@ -61,6 +61,7 @@ import { OperationsAiOperationsPage } from './rolePortal/aiOperations.js';
 import { OperationsCommunicationsPage } from './rolePortal/communications.js';
 import { GrowthHomePage, GrowthModulePage } from './rolePortal/growth.js';
 import { OperationsGrowthTeamPanel } from './rolePortal/growthTeam.js';
+import { OperationsGrowthSetupPanel } from './rolePortal/growthSetup.js';
 import type { AuthenticatedWorkspaceSummary } from './rolePortal/shared.js';
 import { AuthenticatedNotYetAvailable, AuthenticatedReadOnlyModule, institutionStaffWorkspaceRoles, institutionWorkspaceRoles, InstitutionWorkspaceError, isInstitutionStaffWorkspace, isInstitutionWorkspace } from './rolePortal/shared.js';
 import type { RoleFixture, RoleNavItem, RolePortalConfig } from './rolePortalConfig.js';
@@ -325,7 +326,7 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   // queue above it (Appendix 1 §4.2). Only this label's branch changes; the others keep
   // the not-yet-available state below.
   // GROWTH-01: the Growth team section sits beneath them, shown only to a GROWTH_ADMIN holder.
-  if (!demoMode && portal.key === 'operations-admin' && route.label === 'Settings') return <><OperationsApprovalsPanel /><OperationsStaffCapabilitiesPage /><OperationsCommunicationsPage /><OperationsGrowthTeamPanel /></>;
+  if (!demoMode && portal.key === 'operations-admin' && route.label === 'Settings') return <><OperationsApprovalsPanel /><OperationsStaffCapabilitiesPage /><OperationsCommunicationsPage /><OperationsGrowthTeamPanel /><OperationsGrowthSetupPanel /></>;
   // OPS-05: Support is the case desk. Only this label's branch changes; Subscriptions,
   // Billing and Analytics keep the not-yet-available state below.
   if (!demoMode && portal.key === 'operations-admin' && route.label === 'Support') return <OperationsSupportDeskPage />;

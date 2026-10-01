@@ -5,6 +5,10 @@ package pro.ai8ht.one
 // wordmark on the brand band, the person's own role, teams and staff type from
 // GET /api/v1/growth/me, and NA in every figure slot whose source is not built yet. Nothing is
 // invented: no lead, visit, target or amount appears until a later growth goal builds its source.
+//
+// GROWTH-02: a read-only "My territory" tab — the regions the person works today, as operations
+// set them, with their states or districts and people (GET /api/v1/growth/territory). Territory
+// set-up is desk work for operators and stays off the phone (design §14.1).
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -23,6 +27,9 @@ import androidx.compose.material.icons.filled.CurrencyRupee
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Handshake
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.WorkOutline
@@ -118,6 +125,8 @@ internal fun GrowthScaffold(
                 NavigationBarItem(selected = tab == 0, onClick = { tab = 0 },
                     icon = { Icon(Icons.Filled.Home, null) }, label = { Text("Home") }, colors = colors)
                 NavigationBarItem(selected = tab == 1, onClick = { tab = 1 },
+                    icon = { Icon(Icons.Filled.Map, null) }, label = { Text("Territory") }, colors = colors)
+                NavigationBarItem(selected = tab == 2, onClick = { tab = 2 },
                     icon = { Icon(Icons.Filled.MoreHoriz, null) }, label = { Text("More") }, colors = colors)
             }
         },
@@ -125,8 +134,12 @@ internal fun GrowthScaffold(
         Column(Modifier.padding(padding).fillMaxSize()) {
             BrandBand {
                 StaffBandHeader(
-                    title = if (tab == 0) "Growth" else "More",
-                    subtitle = if (tab == 0) "${growthRoleLabel(me?.role ?: role)} · partnerships" else "Workspace and app settings",
+                    title = when (tab) { 0 -> "Growth"; 1 -> "My territory"; else -> "More" },
+                    subtitle = when (tab) {
+                        0 -> "${growthRoleLabel(me?.role ?: role)} · partnerships"
+                        1 -> "Regions set by operations"
+                        else -> "Workspace and app settings"
+                    },
                     unread = inbox?.unreadCount ?: 0,
                     onTheme = { showThemeOv = true },
                     onBell = { showInboxOv = true },
@@ -134,7 +147,8 @@ internal fun GrowthScaffold(
             }
             BandSheet {
                 when {
-                    tab == 1 -> GrowthMore(onSignOut, onSwitchWorkspace)
+                    tab == 2 -> GrowthMore(onSignOut, onSwitchWorkspace)
+                    tab == 1 -> GrowthTerritory()
                     meFailed -> CenteredNote("Your growth details could not be loaded. Nothing is shown until they load. Try again shortly.")
                     me == null -> HomeSkeleton()
                     else -> GrowthHome(me!!)
@@ -198,7 +212,7 @@ private fun GrowthHome(me: GrowthMeDto) {
             Column(Modifier.padding(16.dp)) {
                 Text("Not built yet", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(6.dp))
-                Text("Leads, field visits, territory, targets and commission are not built yet. Each appears here when it is, and every figure above reads NA until it has a real source. Commission rates have not been set, so no amount is shown.",
+                Text("Leads, field visits, targets and commission are not built yet. Each appears here when it is, and every figure above reads NA until it has a real source. Commission rates have not been set, so no amount is shown.",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
@@ -223,5 +237,84 @@ private fun GrowthMore(onSignOut: () -> Unit, onSwitchWorkspace: (() -> Unit)?) 
             Spacer(Modifier.height(8.dp))
         }
         OutlinedButton(onClick = onSignOut) { Text("Sign out") }
+    }
+}
+
+private fun growthAreaLabel(area: GrowthAreaDto): String =
+    if (area.districtName != null) "${area.districtName}, ${area.stateName}" else "${area.stateName} (whole state)"
+
+/** GROWTH-02: "My territory", read-only. Unowned leads read NA until the lead register exists. */
+@Composable
+private fun GrowthTerritory() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var territory by remember { mutableStateOf<GrowthTerritoryDto?>(null) }
+    var failed by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        val result = runCatching { Api.growthTerritory(context) }
+        territory = result.getOrNull(); failed = result.isFailure
+    }
+    when {
+        failed -> { CenteredNote("Your territory could not be loaded. Nothing is shown until it loads. Try again shortly."); return }
+        territory == null -> { HomeSkeleton(); return }
+    }
+    val data = territory!!
+    val managing = data.regions.any { it.myRole == "MANAGER" }
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp)) {
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            StatCell(data.regions.size.toString(), "Regions you work", Tone.Accent, Icons.Filled.Map, Modifier.weight(1f))
+            StatCell(data.regions.sumOf { it.areas.size }.toString(), "Areas covered", Tone.Green, Icons.Filled.Place, Modifier.weight(1f))
+        }
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            StatCell(data.regions.flatMap { r -> r.people.map { it.email } }.toSet().size.toString(),
+                if (managing) "People in your regions" else "Managers in your regions", Tone.Amber, Icons.Filled.Groups, Modifier.weight(1f))
+            // No source until the lead register is built: NA in its slot, never a number.
+            StatCell(GROWTH_NA, "Unowned leads", Tone.Violet, Icons.Filled.Handshake, Modifier.weight(1f))
+        }
+        if (data.regions.isEmpty()) {
+            SectionTitle("Your regions")
+            PilotCard {
+                Text("You are not assigned to a region yet. Operations assigns regions. You always see your own leads; unowned leads appear once you have a region.",
+                    Modifier.padding(16.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        data.regions.forEach { region ->
+            SectionTitle(region.name, trailing = if (region.myRole == "MANAGER") "You manage" else "You work")
+            PilotCard(Modifier.fillMaxWidth().padding(bottom = 10.dp)) {
+                Column(Modifier.padding(14.dp)) {
+                    Text("Areas", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(6.dp))
+                    if (region.areas.isEmpty()) {
+                        Text("No areas yet — operations has not added a state or district.", style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    } else {
+                        region.areas.forEach { area ->
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 2.dp)) {
+                                IconBubble(Icons.Filled.Place, Tone.Green, size = 24.dp)
+                                Spacer(Modifier.width(8.dp))
+                                Text(growthAreaLabel(area), style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    Text(if (region.myRole == "MANAGER") "People" else "Managers", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(6.dp))
+                    if (region.people.isEmpty()) {
+                        Text(if (region.myRole == "MANAGER") "Nobody else is assigned to this region." else "No manager is assigned to this region yet.",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    } else {
+                        region.people.forEach { person ->
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 2.dp)) {
+                                StatusChip(if (person.role == "MANAGER") "Manager" else "Executive", if (person.role == "MANAGER") ChipKind.Accent else ChipKind.Muted)
+                                Spacer(Modifier.width(8.dp))
+                                Text(person.email, style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(20.dp))
     }
 }

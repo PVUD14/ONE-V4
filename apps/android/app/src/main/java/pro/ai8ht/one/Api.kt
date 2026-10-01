@@ -165,6 +165,13 @@ object Api {
     suspend fun growthMe(context: Context): GrowthMeDto =
         json.decodeFromString(request(context, "GET", "/api/v1/growth/me"))
 
+    /**
+     * GROWTH-02: the regions the signed-in growth person works today, with their areas and people
+     * (a manager sees everyone assigned; an executive sees the region's managers). Read-only.
+     */
+    suspend fun growthTerritory(context: Context): GrowthTerritoryDto =
+        json.decodeFromString(request(context, "GET", "/api/v1/growth/territory"))
+
     suspend fun listInstitutionExams(context: Context, institutionId: String): List<InstitutionExamDto> =
         json.decodeFromString<InstitutionExamsEnvelope>(
             request(context, "GET", "/api/v1/institutions/$institutionId/assessments"),
@@ -741,6 +748,18 @@ internal fun StudentDto.formerStudentLine(): String? {
 )
 @Serializable data class GrowthTeamDto(val team: String = "", val joinedAt: String = "", val manager: GrowthManagerDto? = null)
 @Serializable data class GrowthManagerDto(val email: String = "")
+/** GROWTH-02: `GET /api/v1/growth/territory`. Regions, areas and work emails only. */
+@Serializable data class GrowthTerritoryDto(val role: String = "", val regions: List<GrowthRegionDto> = emptyList())
+@Serializable data class GrowthRegionDto(
+    val id: String = "",
+    val name: String = "",
+    val myRole: String = "EXECUTIVE",
+    val since: String? = null,
+    val areas: List<GrowthAreaDto> = emptyList(),
+    val people: List<GrowthRegionPersonDto> = emptyList(),
+)
+@Serializable data class GrowthAreaDto(val stateCode: String = "", val stateName: String = "", val districtCode: Int? = null, val districtName: String? = null)
+@Serializable data class GrowthRegionPersonDto(val email: String = "", val role: String = "", val since: String = "")
 @Serializable data class StudentRelationshipDto(val institutionId: String = "", val state: String = "")
 
 @Serializable data class InstitutionExamsEnvelope(val assessments: List<InstitutionExamDto> = emptyList())

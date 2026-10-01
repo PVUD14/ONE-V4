@@ -26,8 +26,9 @@ deterministic layout of the student's own records and their own words.
 ## What the student controls
 
 1. **Which items.** Every section and every item is chosen by the student: each qualification, each term
-   result, each evidenced skill, each certificate document, each career role. Nothing is included by default
-   that the student did not see and tick.
+   result, each evidenced skill, each certificate document, each career role, each shown with a tick box and
+   its label. A new draft starts with education, evidenced skills and certificates ticked and term results and
+   career objective unticked; nothing is saved that the student has not seen in the preview.
 2. **Their own words.** The header (name, headline, phone, location, up to five https links, whether to show
    the sign-in email), the summary, projects (title, description, optional https link), self-declared skills
    and languages. These are typed by the student and are labelled *self-declared* wherever a label applies.

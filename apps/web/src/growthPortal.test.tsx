@@ -98,14 +98,14 @@ describe('a growth executive signing in', () => {
     // Every figure slot is NA until its source exists: nothing is invented.
     expect(within(stats).getAllByText('NA')).toHaveLength(4);
     expect(within(stats).queryByText(/\d/)).not.toBeInTheDocument();
-    expect(screen.getByText(/Leads, field visits, targets and commission are not built yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/Field visits, targets and commission are not built yet/i)).toBeInTheDocument();
   });
 
   it('shows an honest empty state on every other page', async () => {
     signInAs('GROWTH_EXECUTIVE');
     render(<App />);
     const sidebar = await screen.findByLabelText('Growth navigation');
-    for (const label of ['Leads', 'Field', 'Targets', 'Commission']) {
+    for (const label of ['Field', 'Targets', 'Commission']) {
       fireEvent.click(within(sidebar).getByRole('button', { name: label }));
       expect(await screen.findByRole('heading', { name: label })).toBeInTheDocument();
       expect(screen.getByText(/is not built yet/i)).toBeInTheDocument();
@@ -172,6 +172,23 @@ describe('Growth → Territory (GROWTH-02)', () => {
     expect(screen.queryByText(/Territory is not built yet/i)).not.toBeInTheDocument();
   });
 
+  it('counts the unowned leads of each region once the lead register reports them (GROWTH-03)', async () => {
+    territoryResponse = {
+      role: 'GROWTH_EXECUTIVE', correlationId: 'corr-territory',
+      regions: [
+        { id: 'region-1', name: 'South-1', myRole: 'EXECUTIVE', since, areas: [], people: [], unownedLeads: 4 },
+        { id: 'region-2', name: 'South-2', myRole: 'EXECUTIVE', since, areas: [], people: [], unownedLeads: 1 },
+      ],
+    };
+    signInAs('GROWTH_EXECUTIVE');
+    render(<App />);
+    const sidebar = await screen.findByLabelText('Growth navigation');
+    fireEvent.click(within(sidebar).getByRole('button', { name: 'Territory' }));
+    expect(within(await screen.findByLabelText('Region South-1')).getByText('4 unowned leads')).toBeInTheDocument();
+    expect(within(screen.getByLabelText('Region South-2')).getByText('1 unowned lead')).toBeInTheDocument();
+    expect(within(screen.getByLabelText('Territory summary')).getByText('Unowned leads').parentElement).toHaveTextContent('5');
+  });
+
   it('tells a person with no region so plainly, and invents none', async () => {
     signInAs('GROWTH_MANAGER');
     render(<App />);
@@ -179,7 +196,8 @@ describe('Growth → Territory (GROWTH-02)', () => {
     fireEvent.click(within(sidebar).getByRole('button', { name: 'Territory' }));
     expect(await screen.findByText('No region assigned')).toBeInTheDocument();
     const stats = screen.getByLabelText('Territory summary');
-    expect(within(stats).getAllByText('0')).toHaveLength(3);
+    // GROWTH-03: with no region there are truly no unowned leads to see, so that slot is 0 too.
+    expect(within(stats).getAllByText('0')).toHaveLength(4);
     expect(screen.queryByLabelText(/^Region /)).not.toBeInTheDocument();
   });
 });

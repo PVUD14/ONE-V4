@@ -2,16 +2,20 @@
  * ONE · Pilot-parity — Stream D — Learner
  *
  * Practice, Company Prep, Career Tools, Scholarships and Resume Builder: the five
- * pilot-exact shells. Real data is used wherever it exists; every other slot is NA.
+ * pilot-exact pages. Real data is used wherever it exists; every other slot is NA. The Resume
+ * Builder generates résumés from the student's own record (RESUME-GEN).
  */
-import { getProtectedAccessToken, getStudentActivity, listStudentDocuments } from '../api.js';
-import type { StudentDocumentDto } from '../api.js';
-import { MultiRing, Ring } from '../pilot/pilotComponents.js';
+import { deleteResume, getProtectedAccessToken, getResume, getResumeSources, getStudentActivity, listResumes, listStudentDocuments, previewResume } from '../api.js';
+import type {
+  ResumeCheckDto, ResumeContentDto, ResumeDraftDto, ResumeSourcesDto, ResumeSummaryDto, ResumeTemplateDto, ResumeTemplateKey, StudentDocumentDto,
+} from '../api.js';
+import { MultiRing } from '../pilot/pilotComponents.js';
+import { ResumeBuilder, ResumeChecksList, ResumePaper, defaultResumeDraft, downloadVersion } from '../studentResumes.js';
 import { PilotTabs } from '../pilot/pilotOverlay.js';
 import { NaCourseTiles, NaListCard, NaRingRailCard, go } from './naWidgets.js';
 import { PublishedContentCard } from './publishedContent.js';
 import { PracticeBySkillCard } from '../studentLearning.js';
-import { Award, Building2, ClipboardCheck, Code2, FileText, Flame, LineChart, Target, Trophy, Wrench } from 'lucide-react';
+import { Award, Building2, ClipboardCheck, Code2, Download, FileText, Flame, LineChart, Target, Trash2, Trophy, Wrench } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 export const PRACTICE_TABS = ['Overview', 'Coding', 'Aptitude', 'Projects', 'Contests'] as const;
@@ -168,84 +172,211 @@ export function StudentScholarshipsPage(): React.ReactElement {
 }
 
 // --- Resume Builder ----------------------------------------------------------
+// RESUME-GEN: the student generates a résumé from their own ONE record (studentResumes.tsx). My Resumes lists
+// the generated ones and the uploaded résumé documents; Templates shows the three real templates; Examples
+// shows the student's own record in each template (never an invented person); Resume Score is a checklist of
+// objective completeness checks — ONE does not score résumés, so there is no number anywhere on this page.
+
+type ResumeLoad = { readonly sources: ResumeSourcesDto; readonly templates: readonly ResumeTemplateDto[] };
 
 export function StudentResumeBuilderPage(): React.ReactElement {
   const token = getProtectedAccessToken();
   const [tab, setTab] = useState(0);
   const [documents, setDocuments] = useState<readonly StudentDocumentDto[] | null>(null);
+  const [load, setLoad] = useState<ResumeLoad | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [resumes, setResumes] = useState<readonly ResumeSummaryDto[] | null>(null);
+  const [example, setExample] = useState<{ readonly content: ResumeContentDto; readonly checks: readonly ResumeCheckDto[] } | null>(null);
+  const [builder, setBuilder] = useState<{ readonly resumeId: string | null; readonly initial: ResumeDraftDto } | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+  const [reload, setReload] = useState(0);
+
   useEffect(() => {
     if (!token) return undefined;
     const controller = new AbortController();
     void listStudentDocuments(token, controller.signal).then((response) => setDocuments(response.documents)).catch(() => setDocuments(null));
+    void getResumeSources(token, controller.signal).then((result) => { setLoad(result); setLoadFailed(false); })
+      .catch(() => { if (!controller.signal.aborted) setLoadFailed(true); });
     return () => controller.abort();
   }, [token]);
-  const resumes = (documents ?? []).filter((doc) => doc.documentType === 'RESUME' && !doc.archivedAt);
 
-  return <div className="pilot pilot-embed"><div className="pilot-page" style={tab === 0 || tab === 1 ? undefined : { gridTemplateColumns: '1fr' }}>
+  useEffect(() => {
+    if (!token) return undefined;
+    const controller = new AbortController();
+    void listResumes(token, controller.signal).then((result) => setResumes(result.resumes)).catch(() => { if (!controller.signal.aborted) setResumes(null); });
+    return () => controller.abort();
+  }, [token, reload]);
+
+  // The student's own record laid out once: the Templates, Examples and checks views read it.
+  useEffect(() => {
+    if (!token || !load) return undefined;
+    const controller = new AbortController();
+    void previewResume(token, defaultResumeDraft(load.sources), controller.signal).then(setExample).catch(() => { if (!controller.signal.aborted) setExample(null); });
+    return () => controller.abort();
+  }, [token, load]);
+
+  const uploaded = (documents ?? []).filter((doc) => doc.documentType === 'RESUME' && !doc.archivedAt);
+  const generated = resumes ?? [];
+
+  function startNew(template: ResumeTemplateKey = 'CLASSIC'): void {
+    if (!load) return;
+    setStatus(null);
+    setBuilder({ resumeId: null, initial: defaultResumeDraft(load.sources, template) });
+    setTab(0);
+  }
+
+  async function startEdit(resumeId: string): Promise<void> {
+    if (!token) return;
+    setStatus(null);
+    try {
+      const { resume } = await getResume(token, resumeId);
+      if (resume.latest) setBuilder({ resumeId, initial: resume.latest.selections });
+    } catch {
+      setStatus('That résumé could not be opened. Try again.');
+    }
+  }
+
+  async function remove(resume: ResumeSummaryDto): Promise<void> {
+    if (!token || !window.confirm(`Delete "${resume.title}" and every saved version of it? This cannot be undone.`)) return;
+    try {
+      await deleteResume(token, resume.id);
+      setStatus('Résumé deleted.');
+      setReload((value) => value + 1);
+    } catch {
+      setStatus('The résumé could not be deleted. Try again.');
+    }
+  }
+
+  async function download(resume: ResumeSummaryDto): Promise<void> {
+    if (!token) return;
+    setStatus('Preparing the PDF…');
+    setStatus(await downloadVersion(token, resume.id, resume.latestVersion));
+  }
+
+  const wide = tab > 1 || builder !== null;
+  const checks = example?.checks ?? null;
+
+  return <div className="pilot pilot-embed"><div className="pilot-page" style={wide ? { gridTemplateColumns: '1fr' } : undefined}>
     <div className="pilot-content">
       <div className="pilot-page-head">
         <div><h1>Resume Builder</h1><p>Create professional resumes that showcase your skills and land your dream job.</p></div>
-        <button type="button" className="pilot-btn" onClick={() => go('/student/documents')}><FileText size={15} /> Create New Resume</button>
+        <button type="button" className="pilot-btn" disabled={!load} onClick={() => startNew()}><FileText size={15} /> Create New Resume</button>
       </div>
-      <PilotTabs labels={['My Resumes', 'Templates', 'Examples', 'Resume Score']} active={tab} onChange={setTab} />
+      <PilotTabs labels={['My Resumes', 'Templates', 'Examples', 'Resume Score']} active={tab} onChange={(index) => { setTab(index); setBuilder(null); }} />
+      {status ? <p role="status" style={{ margin: '0 0 10px', fontSize: 12.5 }}>{status}</p> : null}
+      {loadFailed ? <NaListCard title="Your record" note="Your record could not be loaded, so a résumé cannot be generated just now. Try again shortly." /> : null}
 
-      {tab === 0 ? (
+      {builder && token && load ? (
+        <ResumeBuilder key={builder.resumeId ?? 'new'} token={token} sources={load.sources} templates={load.templates} initial={builder.initial} resumeId={builder.resumeId}
+          onSaved={() => { setBuilder(null); setReload((value) => value + 1); setStatus('Résumé saved. Download the PDF from My Resumes.'); }}
+          onCancel={() => setBuilder(null)} />
+      ) : null}
+
+      {!builder && tab === 0 ? <>
         <section className="pilot-card">
-          <div className="pilot-card-head"><h2>My Resumes</h2><span className="pilot-chip blue">{resumes.length} real</span></div>
+          <div className="pilot-card-head"><h2>My Resumes</h2><span className="pilot-chip blue">{generated.length} generated</span></div>
           <div className="pilot-list">
-            {resumes.length ? resumes.map((doc) => (
+            {generated.length ? generated.map((resume) => (
+              <div key={resume.id} className="pilot-list-row">
+                <span className="pilot-tile blue" style={{ width: 34, height: 34 }}><FileText size={15} /></span>
+                <div className="grow"><strong style={{ fontSize: 12.5 }}>{resume.title}</strong><small>{templateName(load, resume.template)} · version {resume.latestVersion} · saved {formatDay(resume.latestSavedAt)}</small></div>
+                <button type="button" className="pilot-btn soft small" onClick={() => void download(resume)}><Download size={13} /> PDF</button>
+                <button type="button" className="pilot-btn ghost small" disabled={!load} onClick={() => void startEdit(resume.id)}>Edit</button>
+                <button type="button" className="pilot-btn ghost small" aria-label={`Delete ${resume.title}`} onClick={() => void remove(resume)}><Trash2 size={13} /></button>
+              </div>
+            )) : <p style={{ color: 'var(--p-muted)', margin: '8px 0' }}>{resumes === null ? 'Loading…' : 'No generated résumés yet. Create one from your ONE record.'}</p>}
+          </div>
+        </section>
+        <section className="pilot-card">
+          <div className="pilot-card-head"><h2>Uploaded résumés</h2><span className="pilot-chip slate">{uploaded.length}</span></div>
+          <div className="pilot-list">
+            {uploaded.length ? uploaded.map((doc) => (
               <div key={doc.id} className="pilot-list-row">
                 <span className="pilot-tile teal" style={{ width: 34, height: 34 }}><FileText size={15} /></span>
                 <div className="grow"><strong style={{ fontSize: 12.5 }}>{doc.title}</strong><small>{doc.file ? doc.file.filename : 'No file attached yet'} · {doc.verificationState.replaceAll('_', ' ').toLowerCase()}</small></div>
                 <button type="button" className="pilot-btn ghost small" onClick={() => go('/student/documents')}>Open</button>
               </div>
-            )) : <p style={{ color: 'var(--p-muted)', margin: '8px 0' }}>No resume documents yet. Add one under Documents — it appears here.</p>}
+            )) : <p style={{ color: 'var(--p-muted)', margin: '8px 0' }}>No uploaded résumé documents. Uploads live under Documents.</p>}
           </div>
         </section>
-      ) : null}
-      {tab === 1 ? <>
-        <PublishedContentCard contentType="RESUME_BUILDER" title="Resume guidance" />
-        <NaListCard title="Templates" note="Guided resume templates are not live yet — NA." />
       </> : null}
-      {tab === 2 ? <NaListCard title="Examples" note="Role-specific resume examples are not live yet — NA." /> : null}
-      {tab === 3 ? (
-        <section className="pilot-card" style={{ maxWidth: 640 }}>
-          <div className="pilot-card-head"><h2>Resume Score</h2><span className="pilot-chip slate">NA</span></div>
-          <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
-            <Ring value={0} size={104} stroke={11} tone="blue"><span style={{ fontSize: 16, color: 'var(--p-muted)' }}>NA</span></Ring>
-            <div className="pilot-legend" style={{ flex: 1 }}>
-              {['Content', 'Format', 'Skills', 'Impact'].map((label) => <div key={label}><i style={{ background: '#e5eaf2' }} /> {label} <span className="num">NA/100</span></div>)}
-            </div>
-          </div>
-          <p style={{ color: 'var(--p-muted)', marginTop: 12 }}>Automated resume scoring is not live yet — NA.</p>
+
+      {!builder && tab === 1 ? <>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
+          {(load?.templates ?? []).map((template) => (
+            <section key={template.key} className="pilot-card">
+              <div className="pilot-card-head"><h2>{template.name}</h2></div>
+              <p style={{ color: 'var(--p-muted)', marginTop: 0, fontSize: 12.5 }}>{template.description}</p>
+              {example ? <div style={{ maxHeight: 260, overflow: 'hidden', marginBottom: 10 }}><ResumePaper content={example.content} template={template.key} compact /></div> : null}
+              <button type="button" className="pilot-btn small" onClick={() => startNew(template.key)}>Use {template.name}</button>
+            </section>
+          ))}
+        </div>
+        {!load && !loadFailed ? <p style={{ color: 'var(--p-muted)' }}>Loading templates…</p> : null}
+        <PublishedContentCard contentType="RESUME_BUILDER" title="Resume guidance" />
+      </> : null}
+
+      {!builder && tab === 2 ? <>
+        <section className="pilot-card">
+          <div className="pilot-card-head"><h2>Examples</h2><span className="pilot-chip blue">Your own record</span></div>
+          <p style={{ color: 'var(--p-muted)', marginTop: 0 }}>Each template filled with your own record as it stands — never a made-up person. Term results and career objective stay out until you tick them in the builder.</p>
+        </section>
+        {example ? <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 14 }}>
+          {(load?.templates ?? []).map((template) => <div key={template.key}><h3 style={{ fontSize: 13, margin: '0 0 6px' }}>{template.name}</h3><ResumePaper content={example.content} template={template.key} compact /></div>)}
+        </div> : <p style={{ color: 'var(--p-muted)' }}>{loadFailed ? 'NA — your record could not be loaded.' : 'Preparing examples…'}</p>}
+      </> : null}
+
+      {!builder && tab === 3 ? (
+        <section className="pilot-card" style={{ maxWidth: 720 }}>
+          <div className="pilot-card-head"><h2>Resume checks</h2><span className="pilot-chip slate">Checklist</span></div>
+          <p style={{ color: 'var(--p-muted)', marginTop: 0 }}>ONE does not give résumés a number. These are plain checks on your record as a first résumé would show it; each says what to add.</p>
+          {checks ? <ResumeChecksList checks={checks} /> : <p style={{ color: 'var(--p-muted)' }}>{loadFailed ? 'NA — your record could not be loaded.' : 'Checking…'}</p>}
         </section>
       ) : null}
     </div>
-    {tab === 0 || tab === 1 ? <aside className="pilot-rail">
+    {!wide ? <aside className="pilot-rail">
       <section className="pilot-card">
-        <div className="pilot-card-head"><h2>Resume Overview</h2><span className="pilot-chip slate">NA</span></div>
-        <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-          <Ring value={0} size={88} stroke={10} tone="blue"><span style={{ fontSize: 14, color: 'var(--p-muted)' }}>NA</span></Ring>
-          <div className="pilot-legend" style={{ flex: 1 }}>
-            {['Content', 'Format', 'Skills', 'Impact'].map((label) => <div key={label}><i style={{ background: '#e5eaf2' }} /> {label} <span className="num">NA/100</span></div>)}
-          </div>
+        <div className="pilot-card-head"><h2>Resume Overview</h2><span className="pilot-chip blue">Live</span></div>
+        <div className="pilot-detail-rows">
+          <div><small>Generated</small><strong>{resumes === null ? 'NA' : generated.length}</strong></div>
+          <div><small>Saved versions</small><strong>{resumes === null ? 'NA' : generated.reduce((sum, resume) => sum + resume.versionCount, 0)}</strong></div>
+          <div><small>Uploaded</small><strong>{documents === null ? 'NA' : uploaded.length}</strong></div>
+          <div><small>Verified education</small><strong>{load ? load.sources.qualifications.filter((q) => q.verified).length : 'NA'}</strong></div>
         </div>
-        <small style={{ display: 'block', marginTop: 10, color: 'var(--p-muted)' }}>Automated resume scoring is not live yet — NA.</small>
+        <small style={{ display: 'block', marginTop: 10, color: 'var(--p-muted)' }}>Counts of your own records. ONE does not grade résumés.</small>
       </section>
       <section className="pilot-card">
-        <div className="pilot-card-head"><h2>Recent Resumes</h2><span className="pilot-chip blue">{resumes.length} real</span></div>
+        <div className="pilot-card-head"><h2>Recent Resumes</h2><span className="pilot-chip blue">{generated.length + uploaded.length}</span></div>
         <div className="pilot-list">
-          {resumes.length ? resumes.slice(0, 3).map((doc) => (
-            <div key={doc.id} className="pilot-list-row">
+          {generated.length || uploaded.length ? [
+            ...generated.map((resume) => ({ id: resume.id, title: resume.title, note: `generated · version ${resume.latestVersion}` })),
+            ...uploaded.map((doc) => ({ id: doc.id, title: doc.title, note: `uploaded · ${doc.verificationState.replaceAll('_', ' ').toLowerCase()}` })),
+          ].slice(0, 3).map((row) => (
+            <div key={row.id} className="pilot-list-row">
               <span className="pilot-tile blue" style={{ width: 34, height: 34 }}><FileText size={15} /></span>
-              <div className="grow"><strong style={{ fontSize: 12.5 }}>{doc.title}</strong><small>{doc.verificationState.replaceAll('_', ' ').toLowerCase()}</small></div>
+              <div className="grow"><strong style={{ fontSize: 12.5 }}>{row.title}</strong><small>{row.note}</small></div>
             </div>
           )) : <p style={{ color: 'var(--p-muted)', margin: '8px 0' }}>None yet.</p>}
         </div>
       </section>
+      <section className="pilot-card">
+        <div className="pilot-card-head"><h2>Still to add</h2><span className="pilot-chip slate">Checklist</span></div>
+        {checks ? (checks.some((check) => !check.passed)
+          ? <ResumeChecksList checks={checks.filter((check) => !check.passed).slice(0, 4)} />
+          : <p style={{ margin: 0 }}>Every check passes.</p>) : <p style={{ color: 'var(--p-muted)', margin: 0 }}>NA</p>}
+      </section>
       <NaListCard title="Resume Tips" note="Curated resume tips are not live yet — NA." />
     </aside> : null}
   </div></div>;
+}
+
+function templateName(load: ResumeLoad | null, key: ResumeTemplateKey): string {
+  return (load?.templates ?? []).find((template) => template.key === key)?.name ?? key.charAt(0) + key.slice(1).toLowerCase();
+}
+
+function formatDay(value: string): string {
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : value;
 }
 
 // --- Institution Interventions ----------------------------------------------

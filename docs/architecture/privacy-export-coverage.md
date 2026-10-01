@@ -122,6 +122,7 @@ now includes it and — where it does not — why not. It also checks privacy de
 | `learner_progress` (0004) | **`learning.lessons`** — lesson, state, started, completed | LEARNING_ACTIVITY — erased (decision D2) |
 | `learning_decisions` (0053) | **`learning.steps`** — when, what the planner chose, skill, reason codes, adaptive or not. Not the recorded inputs (the planner's working numbers) | LEARNING_ACTIVITY — erased |
 | `learning_step_items` (0072) | **`learning.steps[].items`** — position, skill, highest hint shown, when served. Not the question | LEARNING_ACTIVITY — erased |
+| `tutor_hints` (0107, ENG-22) | **`learning.steps[].aiTutorHints`** — level, language, outcome, the AI hint text when it was shown, model and prompt version, review state, times. A refused reply and the guard's findings are staff working notes, listed in `notIncluded` | LEARNING_ACTIVITY — erased (before the step items) |
 | `placement_tests` (0064) | **`learning.placementTests`** — scope, state, times, the level shown to the student, items answered, why it stopped | LEARNING_ACTIVITY — erased |
 | `placement_test_items` (0064) | Excluded: which calibrated items were served, with their difficulty and discrimination — model parameters | LEARNING_ACTIVITY — erased |
 | `learner_skill_state` (0052) | **`learning.skills`** — skill, attempt and success counts, days, last attempt, evidence stage and band, next review date. Not mastery likelihood/uncertainty, review stability/difficulty or misconception codes (rule 4) | LEARNING_ACTIVITY — erased (rebuilt empty) |

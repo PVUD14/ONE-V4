@@ -187,6 +187,10 @@ Answering the question while a hint is pending is allowed; the worker then recor
 
 *Rejected: server-sent events or push.* Polling a read the screen already makes is enough for a 2–10 s
 wait and needs nothing new on either client.
+The worker is the existing local outbox dispatcher. A deployment with no n8n — the sandbox — runs it in a
+new `local-outbox` mode (`AUTOMATION_WORKER_MODE=local-outbox`): the same in-process drain, without the
+workflow-service dispatch the `local-dispatcher` mode also performs.
+
 *Rejected: a dedicated tutor worker process.* Right at scale (a slow model call holds up other outbox
 events in the single dispatcher), not needed for the sandbox. Recorded as a follow-up for ENG-25.
 
@@ -297,8 +301,8 @@ Constraints and triggers:
 - **Event:** `tutor.hint.requested` v1, payload `{tutorHintId}`, data classification confidential,
   registered in `packages/events`. The consumer is `tutor-hint-generator`, listed in `knownJobConsumers`
   so System Health shows it and it can have a silence alert.
-- **Audit:** `tutor.hint.requested` (actor: the student), `tutor.hint.completed` (actor: none, the
-  worker; context: outcome, reason, findings — never text), `tutor.hint.reviewed` (actor: the reviewer).
+- **Audit:** `tutor.hint.requested` (actor: the student), `tutor.hint.completed` (actor: the student whose
+  request the job carried out — audit rows always name one; context: the worker, outcome, findings — never text), `tutor.hint.reviewed` (actor: the reviewer).
 
 ## How it is switched on in the sandbox
 

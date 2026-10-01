@@ -13,6 +13,7 @@ export * from './set-format.js';
 export * from './cases.js';
 export * from './build-set.js';
 export * from './checks.js';
+export * from './content-guard.js';
 export * from './thresholds.js';
 export * from './results.js';
 export * from './cost.js';

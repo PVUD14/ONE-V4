@@ -52,6 +52,8 @@ export interface GenerationRecord {
   readonly generatorVersion: string;
   readonly promptVersion: string;
   readonly promptFingerprint: string;
+  /** The model that produced it, as the endpoint reported it (ENG-23 records it as provenance). */
+  readonly model: string;
   /** Always DRAFT. The type is wider only because the stored row's state changes. */
   readonly reviewState: Extract<ReviewState, 'DRAFT'>;
   readonly generatedAt: string;
@@ -222,6 +224,7 @@ export class AiOrchestrator {
       generatorVersion: this.options.generatorVersion,
       promptVersion: `${prompt.key}@${prompt.version}`,
       promptFingerprint: promptFingerprint(prompt),
+      model: result.model,
       reviewState: 'DRAFT',
       generatedAt: (this.options.now?.() ?? new Date()).toISOString(),
       usage: result.usage,

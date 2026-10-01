@@ -46,6 +46,7 @@ import { archivePublishedRevisions } from './content-archive.js';
 import { consumeOperationApproval, type ConsumedApproval } from './operation-approvals.js';
 import { validateAuditWriteInput, validateOutboxWriteInput } from './repositories.js';
 import { agentDraftBodyKeys, type AgentDraftProvenance } from './skill-map.js';
+import { aiDraftBodyKeys, readAiDraftView, type AiDraftBody, type AiDraftView } from './ai-draft-provenance.js';
 
 // The content rules, for callers (the API) that do not depend on packages/career-readiness directly.
 export {
@@ -209,6 +210,8 @@ export interface LessonSummaryRow {
   /** For a variant: the base revision it renders, and the base's current published revision. */
   readonly basedOnRevision: number | null;
   readonly baseRevision: number | null;
+  /** ENG-23: the latest revision was drafted by ONE's AI (labelled "AI draft" in the editor). */
+  readonly aiDrafted: boolean;
 }
 
 interface LessonDbRow {
@@ -273,6 +276,7 @@ function mapSummary(row: LessonDbRow): LessonSummaryRow {
     variantCount: variant ? 0 : Number(row.variant_count ?? 0),
     basedOnRevision: variant ? identity.basedOnRevision : null,
     baseRevision: variant && row.base_published_revision !== null ? Number(row.base_published_revision) : null,
+    aiDrafted: readAiDraftView(row.latest_body) !== null,
   };
 }
 
@@ -367,6 +371,8 @@ export interface LessonRevisionView {
   readonly topic: LessonTopic | null;
   /** Set when an import pack drafted this revision (program B.8); null when a person wrote it. */
   readonly agentDraft: { readonly generatorVersion: string; readonly promptVersion: string; readonly generatedAt: string } | null;
+  /** ENG-23: set when ONE's AI drafted this revision (the content factory); null otherwise. */
+  readonly aiDraft: AiDraftView | null;
   readonly expertCheck: string | null;
   readonly rightsReview: { readonly licenceLabel: string; readonly reviewerEmail: string; readonly reasonCode: string; readonly reviewedAt: string } | null;
 }
@@ -440,6 +446,7 @@ async function revisionView(runner: SqlRunner, revisionId: string): Promise<Less
   const identity = readLessonIdentity(row.body);
   const fields = readLessonDraftFields(row.body);
   const drafted = readAgentDraftProvenance(row.body);
+  const aiDraft = readAiDraftView(row.body);
   return {
     id: row.id, revision: Number(row.revision), state: row.state, contentHash: row.content_hash,
     author: { userId: row.author_user_id, email: row.author_email },
@@ -449,7 +456,8 @@ async function revisionView(runner: SqlRunner, revisionId: string): Promise<Less
     identity, fields,
     topic: identity.variantOf === null ? await topicById(runner, fields.topicId) : null,
     agentDraft: drafted ? { generatorVersion: drafted.generatorVersion, promptVersion: drafted.promptVersion, generatedAt: drafted.generatedAt } : null,
-    expertCheck: drafted ? drafted.expertCheck : null,
+    aiDraft,
+    expertCheck: drafted ? drafted.expertCheck : aiDraft ? aiDraft.expertCheck : null,
     rightsReview: rights ? { licenceLabel: rights.license_label, reviewerEmail: rights.reviewer_email, reasonCode: rights.reason_code, reviewedAt: iso(rights.reviewed_at)! } : null,
   };
 }
@@ -631,6 +639,20 @@ async function insertRevision(tx: SqlRunner, input: { readonly revisionId: strin
   `);
 }
 
+/** The provenance keys a new body starts with: an import pack's (B.8), the content factory's (ENG-23), or none. */
+function draftBodyKeys(input: { readonly agentDraft?: AgentDraftProvenance | undefined; readonly aiDraft?: AiDraftBody | undefined }): Record<string, unknown> {
+  if (input.agentDraft && input.aiDraft) throw new LessonEditorError('LESSON_EDITOR_REJECTED');
+  if (input.agentDraft) return agentDraftBodyKeys(input.agentDraft);
+  if (input.aiDraft) return aiDraftBodyKeys(input.aiDraft);
+  return {};
+}
+
+function draftAuditContext(input: { readonly agentDraft?: AgentDraftProvenance | undefined; readonly aiDraft?: AiDraftBody | undefined }): Record<string, unknown> {
+  if (input.agentDraft) return { source: 'AGENT_DRAFTED', packKey: input.agentDraft.packKey };
+  if (input.aiDraft) return { source: 'AI_GENERATED', jobId: input.aiDraft.jobId };
+  return {};
+}
+
 const emptyFields = (title: string): LessonDraftFields => ({
   title, summary: '', practice: null, moduleKey: null, topicId: null, prerequisites: [], licenceLabel: null, attribution: null, basis: null,
 });
@@ -642,6 +664,8 @@ const emptyFields = (title: string): LessonDraftFields => ({
 export async function createLesson(db: TransactionalRunner, input: {
   readonly stableKey: string; readonly title: string; readonly level: LessonVariantMetadata['level']; readonly style: LessonVariantMetadata['style'];
   readonly reasonCode: string; readonly actor: LessonActor; readonly agentDraft?: AgentDraftProvenance;
+  /** ENG-23: given only by the content factory's worker; the body then carries the AI-draft block. */
+  readonly aiDraft?: AiDraftBody;
 }): Promise<{ readonly lessonId: string; readonly revisionId: string }> {
   const lessonId = randomUUID();
   const revisionId = randomUUID();
@@ -653,13 +677,13 @@ export async function createLesson(db: TransactionalRunner, input: {
       const fields = emptyFields(input.title);
       const problems = validateLessonDraft(identity, fields, false);
       if (problems.length) throw new LessonEditorError('LESSON_INVALID', problems);
-      const body = composeLessonBody(input.agentDraft ? agentDraftBodyKeys(input.agentDraft) : {}, identity, fields);
+      const body = composeLessonBody(draftBodyKeys(input), identity, fields);
       await insertRevision(tx, { revisionId, lessonId, revision: 1, actor: input.actor, body });
       await audit(tx, {
         actor: input.actor, action: 'operations.content.lesson_created', revisionId,
         context: {
           lessonId, stableKey: input.stableKey, revision: 1, variant: lessonVariantLabel(identity.variant), reasonCode: input.reasonCode,
-          ...(input.agentDraft ? { source: 'AGENT_DRAFTED', packKey: input.agentDraft.packKey } : {}),
+          ...draftAuditContext(input),
         },
       });
     });
@@ -677,6 +701,8 @@ export async function createLesson(db: TransactionalRunner, input: {
 export async function createLessonVariant(db: TransactionalRunner, input: {
   readonly baseLessonId: string; readonly variant: LessonVariantMetadata; readonly title: string;
   readonly reasonCode: string; readonly actor: LessonActor; readonly agentDraft?: AgentDraftProvenance;
+  /** ENG-23: given only by the content factory's worker; the body then carries the AI-draft block. */
+  readonly aiDraft?: AiDraftBody;
 }): Promise<{ readonly lessonId: string; readonly revisionId: string }> {
   const lessonId = randomUUID();
   const revisionId = randomUUID();
@@ -704,14 +730,14 @@ export async function createLessonVariant(db: TransactionalRunner, input: {
       const fields = emptyFields(input.title);
       const problems = validateLessonDraft(identity, fields, false);
       if (problems.length) throw new LessonEditorError('LESSON_INVALID', problems);
-      const body = composeLessonBody(input.agentDraft ? agentDraftBodyKeys(input.agentDraft) : {}, identity, fields);
+      const body = composeLessonBody(draftBodyKeys(input), identity, fields);
       await insertRevision(tx, { revisionId, lessonId, revision: 1, actor: input.actor, body });
       await audit(tx, {
         actor: input.actor, action: 'operations.content.lesson_variant_created', revisionId,
         context: {
           lessonId, baseLessonId: input.baseLessonId, stableKey: identity.stableKey, revision: 1, variant: lessonVariantLabel(input.variant),
           basedOnRevision: identity.basedOnRevision, reasonCode: input.reasonCode,
-          ...(input.agentDraft ? { source: 'AGENT_DRAFTED', packKey: input.agentDraft.packKey } : {}),
+          ...draftAuditContext(input),
         },
       });
     });

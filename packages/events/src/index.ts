@@ -1353,6 +1353,39 @@ export const eventSchemas = {
       language: { kind: 'enum', values: ['en', 'hi', 'te', 'ta', 'kn', 'ml', 'mr', 'bn', 'gu', 'pa', 'or'] },
     },
   },
+  // ENG-23: the content factory. A job asking ONE's AI for a draft or an answer check, and how it
+  // ended. No consumer: the content factory worker runs the job from its own row, never from this
+  // event. Identifiers and enums only — never the note, the prompt or anything the model wrote.
+  contentFactoryDraftRequestedV1: {
+    eventType: 'content_factory.draft_requested',
+    eventVersion: 1,
+    producer: 'operations-content',
+    aggregateType: 'ai_content_draft',
+    purpose: 'content-authoring',
+    dataClassification: 'internal',
+    schemaRef: 'registry://content_factory.draft_requested/1',
+    payload: {
+      jobId: { kind: 'uuid' },
+      kind: { kind: 'enum', values: ['LESSON', 'LESSON_VARIANT', 'QUESTION', 'ANSWER_CHECK'] },
+      featureKey: { kind: 'enum', values: ['content.lesson-draft', 'content.item-draft', 'content.answer-check'] },
+    },
+  },
+  contentFactoryDraftFinishedV1: {
+    eventType: 'content_factory.draft_finished',
+    eventVersion: 1,
+    producer: 'operations-content',
+    aggregateType: 'ai_content_draft',
+    purpose: 'content-authoring',
+    dataClassification: 'internal',
+    schemaRef: 'registry://content_factory.draft_finished/1',
+    payload: {
+      jobId: { kind: 'uuid' },
+      kind: { kind: 'enum', values: ['LESSON', 'LESSON_VARIANT', 'QUESTION', 'ANSWER_CHECK'] },
+      state: { kind: 'enum', values: ['SUCCEEDED', 'REFUSED', 'REJECTED', 'FAILED'] },
+      // Present only when a draft landed: the DRAFT revision a person now reviews.
+      producedRevisionId: { kind: 'uuid', required: false },
+    },
+  },
   // OPS-10 (ADR-037): external faculty review assignments. No consumer yet; identifiers and
   // enums only — never the draft, the comment or the reviewer's identity.
   externalReviewAssignedV1: {

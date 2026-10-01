@@ -25,6 +25,7 @@ import {
   questionMisconceptionTags,
   QUESTION_LICENCES_REQUIRING_ATTRIBUTION,
   readAgentDraftProvenance,
+  readAiDraftProvenance,
   readHintLadderProvenance,
   readQuestionDraftFields,
   sha256Hex,
@@ -46,6 +47,7 @@ import { archivePublishedRevisions } from './content-archive.js';
 import { consumeOperationApproval, type ConsumedApproval } from './operation-approvals.js';
 import { validateAuditWriteInput, validateOutboxWriteInput } from './repositories.js';
 import { agentDraftBodyKeys, type AgentDraftProvenance } from './skill-map.js';
+import { aiDraftBodyKeys, readAiDraftView, type AiDraftBody, type AiDraftView } from './ai-draft-provenance.js';
 
 // The content rules, for callers (the API) that do not depend on packages/career-readiness directly.
 export {
@@ -197,6 +199,8 @@ export interface QuestionSummaryRow {
   readonly optionCount: number;
   readonly taggedOptionCount: number;
   readonly hintsComplete: boolean;
+  /** ENG-23: the latest revision was drafted by ONE's AI (labelled "AI draft" in the editor). */
+  readonly aiDrafted: boolean;
 }
 
 interface QuestionDbRow {
@@ -248,6 +252,7 @@ function mapSummary(row: QuestionDbRow): QuestionSummaryRow {
     optionCount: fields.options.length,
     taggedOptionCount: fields.options.filter((option) => option.misconception).length,
     hintsComplete: fields.hints.every((hint) => hint.length > 0),
+    aiDrafted: readAiDraftView(row.latest_body) !== null,
   };
 }
 
@@ -347,7 +352,9 @@ export interface QuestionRevisionView {
   readonly ladderChecks: { readonly rulesVersion: string; readonly findings: readonly HintLadderFinding[] };
   /** Set when an import pack drafted this revision (program B.8); null when a person wrote it. */
   readonly agentDraft: { readonly generatorVersion: string; readonly promptVersion: string; readonly generatedAt: string } | null;
-  /** The note for the subject expert an agent draft carries. */
+  /** ENG-23: set when ONE's AI drafted this revision (the content factory); null otherwise. */
+  readonly aiDraft: AiDraftView | null;
+  /** The note for the subject expert an agent draft (or an AI draft) carries. */
   readonly expertCheck: string | null;
   readonly rightsReview: { readonly licenceLabel: string; readonly reviewerEmail: string; readonly reasonCode: string; readonly reviewedAt: string } | null;
 }
@@ -415,6 +422,7 @@ async function revisionView(runner: SqlRunner, revisionId: string, answerKeys: b
   `);
   const fields = readQuestionDraftFields(row.body);
   const drafted = readAgentDraftProvenance(row.body);
+  const aiDraft = readAiDraftView(row.body);
   const visible = answerKeys ? fields : withholdAnswerKey(fields);
   return {
     id: row.id, revision: Number(row.revision), state: row.state, contentHash: row.content_hash,
@@ -428,7 +436,8 @@ async function revisionView(runner: SqlRunner, revisionId: string, answerKeys: b
     ladder: ladder ? { source: ladder.source, state: ladder.review_state, generatorVersion: ladder.generator_version, promptVersion: ladder.prompt_version, generatedAt: iso(ladder.generated_at) } : null,
     ladderChecks: { rulesVersion: HINT_LADDER_RULES_VERSION, findings: hintLadderFindings(visible) },
     agentDraft: drafted ? { generatorVersion: drafted.generatorVersion, promptVersion: drafted.promptVersion, generatedAt: drafted.generatedAt } : null,
-    expertCheck: drafted ? drafted.expertCheck : null,
+    aiDraft,
+    expertCheck: drafted ? drafted.expertCheck : aiDraft ? aiDraft.expertCheck : null,
     rightsReview: rights ? { licenceLabel: rights.license_label, reviewerEmail: rights.reviewer_email, reasonCode: rights.reason_code, reviewedAt: iso(rights.reviewed_at)! } : null,
   };
 }
@@ -533,6 +542,8 @@ async function keyInUse(tx: SqlRunner, stableKey: string): Promise<boolean> {
 export async function createQuestion(db: TransactionalRunner, input: {
   readonly stableKey: string; readonly topicKey: string; readonly prompt: string; readonly reasonCode: string; readonly actor: QuestionActor;
   readonly agentDraft?: AgentDraftProvenance;
+  /** ENG-23: given only by the content factory's worker; the body then carries the AI-draft block. */
+  readonly aiDraft?: AiDraftBody;
 }): Promise<{ readonly questionId: string; readonly revisionId: string }> {
   const questionId = randomUUID();
   const revisionId = randomUUID();
@@ -547,7 +558,8 @@ export async function createQuestion(db: TransactionalRunner, input: {
       };
       const problems = validateQuestionDraft(input.stableKey, fields, false);
       if (problems.length) throw new QuestionBankError('QUESTION_INVALID', problems);
-      const body = composeQuestionBody(input.agentDraft ? agentDraftBodyKeys(input.agentDraft) : {}, input.stableKey, fields);
+      if (input.agentDraft && input.aiDraft) throw new QuestionBankError('QUESTION_BANK_REJECTED');
+      const body = composeQuestionBody(input.agentDraft ? agentDraftBodyKeys(input.agentDraft) : input.aiDraft ? aiDraftBodyKeys(input.aiDraft) : {}, input.stableKey, fields);
       await tx.execute(sql`
         INSERT INTO content_revisions (id, entity_type, entity_id, revision, author_user_id, state, content_hash, body)
         VALUES (${revisionId}::uuid, 'QUESTION', ${questionId}::uuid, 1, ${input.actor.userId}::uuid, 'DRAFT', ${contentHashOf(body)}, ${JSON.stringify(body)}::jsonb)
@@ -557,6 +569,7 @@ export async function createQuestion(db: TransactionalRunner, input: {
         context: {
           questionId, stableKey: input.stableKey, topicId: topic.id, revision: 1, reasonCode: input.reasonCode,
           ...(input.agentDraft ? { source: 'AGENT_DRAFTED', packKey: input.agentDraft.packKey } : {}),
+          ...(input.aiDraft ? { source: 'AI_GENERATED', jobId: input.aiDraft.jobId } : {}),
         },
       });
     });
@@ -693,8 +706,17 @@ async function materialiseForReview(tx: SqlRunner, revision: LockedRevision & { 
     }
     : { source: 'AUTHORED', generatorVersion: null, promptVersion: null, generatedAt: null, expertCheckNotes: null };
   // The ladder's own provenance when it was revised apart from the item (ENG-15), else the item's.
+  // ENG-23: an item ONE's AI drafted gives an AI_GENERATED ladder (0106). Its tags stay AUTHORED:
+  // the model writes no tag, so any tag on it is a person's.
+  const aiDrafted = readAiDraftProvenance(revision.body);
   const ladderDrafted = readHintLadderProvenance(revision.body);
-  const ladderAgent = ladderDrafted
+  const ladderAgent = aiDrafted && !drafted
+    ? {
+      source: 'AI_GENERATED', generatorVersion: aiDrafted.generatorVersion as string | null, promptVersion: aiDrafted.promptVersion as string | null,
+      generatedAt: aiDrafted.generatedAt as string | null,
+      expertCheckNotes: (aiDrafted.expertCheck ?? 'Drafted by ONE AI: check every hint against the answer.') as string | null,
+    }
+    : ladderDrafted
     ? {
       source: 'AGENT_DRAFTED', generatorVersion: ladderDrafted.generatorVersion as string | null, promptVersion: ladderDrafted.promptVersion as string | null,
       generatedAt: ladderDrafted.generatedAt as string | null,

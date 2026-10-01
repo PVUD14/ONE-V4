@@ -56,6 +56,7 @@ export { onePromptRegistry, registeredPrompts } from './registry.js';
 
 export {
   contentAnswerCheckPromptV1,
+  contentItemDraftPromptV1,
   contentLessonDraftPromptV1,
   firstFeaturePrompts,
   hintLevelMeanings,

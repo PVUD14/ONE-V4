@@ -217,6 +217,47 @@ export function withholdAnswerKey(fields: QuestionDraftFields): QuestionDraftFie
   };
 }
 
+/**
+ * Where an AI-drafted body came from (ENG-23): a generation by ONE AI Orchestration, run by the
+ * content factory's worker. A third source beside a person (AUTHORED) and a coding agent writing
+ * into the repository (AGENT_DRAFTED); the editors label it "AI draft".
+ */
+export interface AiDraftBodyProvenance {
+  readonly generatorVersion: string;
+  /** `<prompt key>@<version>`, e.g. `content-lesson-draft@1`. */
+  readonly promptVersion: string;
+  readonly model: string;
+  /** ISO timestamp. */
+  readonly generatedAt: string;
+  /** The content factory job that produced it. */
+  readonly jobId: string;
+  /** What the reviewer must check; null when the body carries no note. */
+  readonly expertCheck: string | null;
+}
+
+/**
+ * The AI-draft provenance a lesson or question body carries under `provenance`, or null. Only a
+ * complete record counts: source AI_GENERATED, generator, prompt version and model of 1–128
+ * characters, a parseable timestamp and the job's id.
+ */
+export function readAiDraftProvenance(body: unknown): AiDraftBodyProvenance | null {
+  const raw = asRecord(body);
+  const provenance = asRecord(raw.provenance);
+  if (provenance.source !== 'AI_GENERATED') return null;
+  const generatorVersion = clean(provenance.generatorVersion);
+  const promptVersion = clean(provenance.promptVersion);
+  const model = clean(provenance.model);
+  const generatedAt = clean(provenance.generatedAt);
+  const jobId = clean(provenance.jobId);
+  if (!generatorVersion || generatorVersion.length > 128 || !promptVersion || promptVersion.length > 128 || !model || model.length > 128) return null;
+  if (!generatedAt || Number.isNaN(Date.parse(generatedAt)) || !UUID_PATTERN.test(jobId)) return null;
+  const expertCheck = cleanBlock(raw.expertCheck);
+  return {
+    generatorVersion, promptVersion, model, generatedAt: new Date(generatedAt).toISOString(), jobId: jobId.toLowerCase(),
+    expertCheck: expertCheck ? expertCheck.slice(0, 4000) : null,
+  };
+}
+
 /** Where an agent-drafted body came from (program B.8), as an import pack recorded it. */
 export interface AgentDraftBodyProvenance {
   readonly generatorVersion: string;

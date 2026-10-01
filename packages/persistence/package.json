@@ -10,6 +10,7 @@
     "ai:probe": "tsx src/run-ai-probe.ts",
     "ai:register-features": "tsx src/run-ai-register-features.ts",
     "ai:bake-off-import": "tsx src/run-ai-bake-off-import.ts",
+    "ai:content-factory": "tsx src/run-content-factory-worker.ts",
     "db:migrate": "tsx src/migrate.ts",
     "db:register:n8n": "tsx src/register-n8n-workflows.ts",
     "db:seed:career-readiness": "tsx src/seed-career-readiness-pilot.ts",

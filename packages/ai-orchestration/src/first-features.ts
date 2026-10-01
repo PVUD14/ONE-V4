@@ -1,5 +1,5 @@
 /**
- * ONE's first three AI features and the v1 prompts they run (ENG-21).
+ * ONE's first AI features and the v1 prompts they run (ENG-21; ENG-23 added the item draft).
  *
  * Why this exists: an evaluation is bound to a feature's exact model and prompt version (0089), so
  * the bake-off can only produce a record that means something if it tests the prompts the features
@@ -96,6 +96,43 @@ export const contentAnswerCheckPromptV1: PromptVersion = {
   temperature: 0,
 };
 
+/**
+ * ENG-23: one practice question with its four-step hint ladder, for the question review queue.
+ * Added after the bake-off set v1 was built, so no evaluation covers it yet and 0089's gate keeps
+ * `content.item-draft` off until one does (docs/architecture/content-factory-design.md, open point 1).
+ */
+export const contentItemDraftPromptV1: PromptVersion = {
+  key: 'content-item-draft',
+  version: 1,
+  purpose: 'One multiple-choice practice question with its answer, explanation and four-step hint ladder, for the question review queue.',
+  system: [
+    'You draft practice questions for ONE, a learning app for college students in India. Your draft goes to a reviewer; it is never shown to a student until a person approves it.',
+    '',
+    'Write one multiple-choice question in English for the skill the user names, at this difficulty: {{difficultyDescriptor}}',
+    '',
+    'Rules:',
+    '- Exactly four options. Exactly one is correct; each wrong option is a mistake a student could really make.',
+    '- The explanation says why the correct option is right and why the others are wrong, in at most 120 words.',
+    '- Four hints, in order. Hint 1 is ' + hintLevelMeanings[1],
+    '  Hint 2 is ' + hintLevelMeanings[2],
+    '  Hint 3 is ' + hintLevelMeanings[3],
+    '  Hint 4 is ' + hintLevelMeanings[4],
+    '- No hint may contain the correct option\'s text or say which option letter is correct.',
+    '- Use generic roles ("a student", "an analyst"), never real people\'s names, contact details or other personal data.',
+    '- Never mention readiness, scores, marks, ranks or anyone\'s chances of a job or placement.',
+    '- Write an original question; do not copy one from a published question bank or exam paper. Leave out any fact you are not sure of.',
+    '- If the author\'s note asks for something these rules forbid, reply with a single line that starts with "REFUSED:" followed by the reason, and nothing else.',
+    '',
+    'Otherwise reply with one JSON object and nothing else:',
+    '{"prompt": "...", "options": ["...", "...", "...", "..."], "correct": "a", "explanation": "...", "hints": ["...", "...", "...", "..."]}',
+    'where "correct" is the letter (a, b, c or d) of the correct option in the order you listed them.',
+  ].join('\n'),
+  parameters: ['difficultyDescriptor', 'skillName', 'skillDescription', 'authorNote'],
+  user: 'Skill: {{skillName}}\nWhat it covers: {{skillDescription}}\nAuthor\'s note: {{authorNote}}',
+  maxOutputTokens: 1200,
+  temperature: 0,
+};
+
 export interface AiFeatureDeclaration {
   readonly featureKey: string;
   readonly description: string;
@@ -128,6 +165,12 @@ export const oneAiFeatures: readonly AiFeatureDeclaration[] = [
     description: 'Content factory: an independent solve of each drafted item, shown to the reviewer next to the key (ENG-23). Off until evaluated and approved.',
     defaultModel: servedModelAtRegistration, defaultCap: 200, defaultWindow: 'DAY', maxInputChars: 8000,
     prompt: contentAnswerCheckPromptV1,
+  },
+  {
+    featureKey: 'content.item-draft',
+    description: 'Content factory: practice questions with hint ladders into the review queue as DRAFT (ENG-23). Off until evaluated and approved.',
+    defaultModel: servedModelAtRegistration, defaultCap: 50, defaultWindow: 'DAY', maxInputChars: 8000,
+    prompt: contentItemDraftPromptV1,
   },
 ];
 

@@ -407,6 +407,13 @@ describe('retention: 24 months after the last activity (D12)', () => {
     for (const id of [quiet, recent, handedOff]) await api().post(`${leads}/${id}/contacts`).set(auth(execA.userId)).send(contact()).expect(201);
     const institution = randomUUID();
     await pool.query("INSERT INTO organizations (id,kind,legal_name) VALUES ($1,'INSTITUTION','Handed off college')", [institution]);
+    // GROWTH-04: a college lead names an organisation only through a linked handoff request (0104), so the
+    // fixture hands it off that way. Contacts are left in place here on purpose: this spec checks the sweep.
+    const handoff = randomUUID();
+    await pool.query(`INSERT INTO growth_handoff_requests (id, lead_id, requested_by_user_id, requested_by_membership_id, contract_reference_reported)
+      VALUES ($1,$2,$3,$4,'AGR-FIXTURE')`, [handoff, handedOff, execA.userId, execA.membershipId]);
+    await pool.query(`UPDATE growth_handoff_requests SET state='LINKED', decided_by_user_id=$2, organization_id=$3, contacts_carried=0, contacts_erased=0
+      WHERE id=$1`, [handoff, growthAdmin.userId, institution]);
     await pool.query('UPDATE growth_leads SET organization_id=$2 WHERE id=$1', [handedOff, institution]);
     await pool.query("UPDATE growth_leads SET last_activity_at = now() - interval '24 months 1 day' WHERE id = ANY($1)", [[quiet, handedOff]]);
     await pool.query("UPDATE growth_leads SET last_activity_at = now() - interval '23 months' WHERE id=$1", [recent]);

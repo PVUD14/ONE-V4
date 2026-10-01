@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm';
 import type { PersistenceDb } from '@planthepath/persistence/src/repositories.js';
 import { clearLearnerSkillStateForWithdrawal, requestSkillStateProjection } from '@planthepath/persistence/src/learner-skill-state.js';
 import { drizzleAsPgClient } from '@planthepath/persistence/src/learning-attempts.js';
+import { consentKeyOffered } from './talent-pool.js';
 import {
   API_ID_GENERATOR,
   API_PERSISTENCE_DB,
@@ -151,6 +152,8 @@ export class ConsentsController {
     action: 'GRANTED',
   ): Promise<Record<string, unknown>> {
     const { userId, correlationId } = requireContext(request);
+    // EMP-14: a consent that gates a dark feature is not offered until the feature is switched on.
+    if (!(await consentKeyOffered(this.db, consentKey))) throw new BadRequestException(apiError('CONSENT_NOT_AVAILABLE', correlationId));
     const current = await this.db.execute(sql`
       SELECT version FROM consent_definitions
       WHERE consent_key = ${consentKey} AND retired_at IS NULL
@@ -189,7 +192,10 @@ export class ConsentsController {
       WHERE d.retired_at IS NULL
       ORDER BY d.consent_key
     `) as unknown as QueryResult<ConsentRow>;
-    return result.rows;
+    // EMP-14: hidden while its feature is off, unless the user holds it — then it stays listed so it
+    // can be withdrawn, which is never gated.
+    const offered = await Promise.all(result.rows.map(async (row) => row.granted_action === 'GRANTED' || consentKeyOffered(this.db, row.consent_key)));
+    return result.rows.filter((_row, index) => offered[index]);
   }
 }
 

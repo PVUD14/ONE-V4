@@ -19,14 +19,15 @@ const num = (value: unknown): number | null => (value == null ? null : Number(va
 
 export async function assembleCoverageSections(one: Query, subjectUserId: string): Promise<Record<string, unknown>> {
   const subject = sql`${subjectUserId}::uuid`;
-  const [account, records, hiring, college, learning] = await Promise.all([
+  const [account, records, hiring, college, learning, talentPool] = await Promise.all([
     accountSections(one, subject),
     recordSections(one, subject),
     hiringSections(one, subject),
     collegeSections(one, subject),
     learningSections(one, subject),
+    talentPoolSection(one, subject),
   ]);
-  return { ...account, ...records, ...hiring, ...college, learning };
+  return { ...account, ...records, ...hiring, ...college, learning, talentPool };
 }
 
 type Subject = ReturnType<typeof sql>;
@@ -282,6 +283,55 @@ async function hiringSections(one: Query, subject: Subject): Promise<Record<stri
       nominatedByRole: row.nominated_by_role, reasonCode: row.reason_code, note: row.note ?? null, state: row.state,
       nominatedAt: row.created_at, respondedAt: row.responded_at ?? null, cancelledAt: row.cancelled_at ?? null, cancelReasonCode: row.cancel_reason_code ?? null,
     })),
+  };
+}
+
+/**
+ * EMP-14: the talent pool — every time they joined and left, what each card showed, the employers they
+ * blocked, the invitations they received, and the employers who opened their card (from the audit rows,
+ * by employer name only — never the member who looked).
+ */
+async function talentPoolSection(one: Query, subject: Subject): Promise<Record<string, unknown>> {
+  const [listings, evidence, blocks, invitations, views] = await Promise.all([
+    one(sql`SELECT l.id, l.opted_in_at, l.ended_at, l.end_reason, l.show_branch, l.show_graduation_year, l.preferred_cities, l.consent_version
+            FROM talent_pool_listings l WHERE l.student_user_id = ${subject} ORDER BY l.opted_in_at, l.id`),
+    one(sql`SELECT le.listing_id, t.name AS skill_name, e.evidence_type, e.source_aggregate_type, e.occurred_at, e.assisted, le.shown_at, le.removed_at, le.removed_reason
+            FROM talent_pool_listing_evidence le
+            JOIN evidence_records e ON e.id = le.evidence_record_id
+            JOIN taxonomy_nodes t ON t.id = e.topic_id
+            WHERE le.student_user_id = ${subject} ORDER BY le.shown_at, le.id`),
+    one(sql`SELECT org.legal_name AS employer_name, b.blocked_at, b.unblocked_at
+            FROM talent_pool_blocks b JOIN organizations org ON org.id = b.employer_id
+            WHERE b.student_user_id = ${subject} ORDER BY b.blocked_at, b.id`),
+    one(sql`SELECT org.legal_name AS employer_name, v.title, i.state, (i.state = 'SENT' AND i.expires_at <= now()) AS expired,
+                   i.created_at, i.expires_at, i.responded_at
+            FROM talent_pool_invitations i
+            JOIN organizations org ON org.id = i.employer_id
+            JOIN opportunities o ON o.id = i.opportunity_id
+            LEFT JOIN opportunity_versions v ON v.id = o.current_version_id
+            WHERE i.student_user_id = ${subject} ORDER BY i.created_at, i.id`),
+    one(sql`SELECT org.legal_name AS employer_name, ae.occurred_at
+            FROM audit_events ae
+            JOIN talent_pool_listings l ON ae.resource_id = l.id::text AND l.student_user_id = ${subject}
+            JOIN organizations org ON org.id = ae.organization_id
+            WHERE ae.action = 'talent_pool.card_viewed' AND ae.resource_type = 'talent_pool_listing'
+            ORDER BY ae.occurred_at, ae.id`),
+  ]);
+  return {
+    listings: listings.map((row) => ({
+      optedInAt: row.opted_in_at, endedAt: row.ended_at ?? null, endReason: row.end_reason ?? null, consentVersion: row.consent_version,
+      showBranch: row.show_branch === true, showGraduationYear: row.show_graduation_year === true, preferredCities: row.preferred_cities ?? [],
+      evidence: evidence.filter((item) => item.listing_id === row.id).map((item) => ({
+        skill: item.skill_name, type: item.evidence_type, source: evidenceSource(item.source_aggregate_type), recordedAt: item.occurred_at,
+        unaided: item.assisted !== true, shownAt: item.shown_at, removedAt: item.removed_at ?? null, removedReason: item.removed_reason ?? null,
+      })),
+    })),
+    blockedEmployers: blocks.map((row) => ({ employerName: row.employer_name, blockedAt: row.blocked_at, unblockedAt: row.unblocked_at ?? null })),
+    invitations: invitations.map((row) => ({
+      employerName: row.employer_name, title: row.title ?? null, state: row.expired === true ? 'EXPIRED' : row.state,
+      sentAt: row.created_at, expiresAt: row.expires_at, respondedAt: row.responded_at ?? null,
+    })),
+    cardViews: views.map((row) => ({ employerName: row.employer_name, viewedAt: row.occurred_at })),
   };
 }
 

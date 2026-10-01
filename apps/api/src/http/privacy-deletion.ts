@@ -6,6 +6,7 @@ import { eraseApplicationMessagesForSubject } from '@planthepath/persistence/src
 import { projectSubjectSkillState } from '@planthepath/persistence/src/learner-skill-state.js';
 import { ERASED_SNAPSHOT, snapshotHash } from '@planthepath/hiring/src/application-snapshot.js';
 import type { FileStorage } from '../storage/file-storage.js';
+import { endLiveListing } from './talent-pool.js';
 
 type QueryResult<T> = { rows: T[] };
 
@@ -129,6 +130,10 @@ async function erase(deps: DeletionExecutionDeps, subjectUserId: string): Promis
     UPDATE application_evidence_shares SET revoked_at = now(), revoked_reason = 'ACCOUNT_DELETION'
     WHERE student_user_id = ${subjectUserId}::uuid AND revoked_at IS NULL
   `);
+
+  // EMP-14: discovery ends with employer access, before anything else can fail: the live talent-pool
+  // listing is ended (its rows are erased with the profile below).
+  await db.transaction(async (tx) => { await endLiveListing(tx, subjectUserId, 'ACCOUNT_DELETION'); });
 
   // Retained and anonymised categories are counted before identity changes, so the
   // record reflects what existed at the moment of deletion.
@@ -257,6 +262,24 @@ async function erase(deps: DeletionExecutionDeps, subjectUserId: string): Promis
     return Number(gone.rows[0]?.count ?? 0) + Number(targets.rows[0]?.count ?? 0) + Number(outcomes.rows[0]?.count ?? 0);
   });
   await db.execute(sql`DELETE FROM student_saved_opportunities WHERE student_user_id = ${subjectUserId}::uuid`);
+  // EMP-14: the talent pool (0098) — what the person's cards showed, the cards themselves and the employers
+  // they blocked are about them: erased. Invitations that never became an application go too; those that did
+  // stay with the anonymised application and are counted under APPLICATIONS. The 0098 guards allow DELETE
+  // only inside this transaction-local erase setting.
+  counts.STUDENT_PROFILE += await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT set_config('one.privacy_erase_subject', ${subjectUserId}, true)`);
+    const removed = async (query: ReturnType<typeof sql>): Promise<number> =>
+      Number(((await tx.execute(query)) as QueryResult<{ count: number }>).rows[0]?.count ?? 0);
+    const invitations = await removed(sql`WITH gone AS (DELETE FROM talent_pool_invitations WHERE student_user_id = ${subjectUserId}::uuid AND application_id IS NULL RETURNING 1) SELECT count(*)::int AS count FROM gone`);
+    const evidence = await removed(sql`WITH gone AS (DELETE FROM talent_pool_listing_evidence WHERE student_user_id = ${subjectUserId}::uuid RETURNING 1) SELECT count(*)::int AS count FROM gone`);
+    const blocks = await removed(sql`WITH gone AS (DELETE FROM talent_pool_blocks WHERE student_user_id = ${subjectUserId}::uuid RETURNING 1) SELECT count(*)::int AS count FROM gone`);
+    // A listing that an answered invitation points at stays (ended, emptied), so the anonymised application keeps its reference.
+    await tx.execute(sql`UPDATE talent_pool_listings SET preferred_cities = '{}', show_branch = false, show_graduation_year = false
+      WHERE student_user_id = ${subjectUserId}::uuid AND (cardinality(preferred_cities) > 0 OR show_branch OR show_graduation_year)`);
+    const listings = await removed(sql`WITH gone AS (DELETE FROM talent_pool_listings l WHERE l.student_user_id = ${subjectUserId}::uuid
+        AND NOT EXISTS (SELECT 1 FROM talent_pool_invitations i WHERE i.listing_id = l.id) RETURNING 1) SELECT count(*)::int AS count FROM gone`);
+    return invitations + evidence + blocks + listings;
+  });
   // The language the person chose to read lessons in (ENG-16, 0097) is their own setting.
   counts.STUDENT_PROFILE += await countOf(sql`WITH gone AS (DELETE FROM learner_language_preferences WHERE user_id = ${subjectUserId}::uuid RETURNING 1)
     SELECT count(*)::int AS count FROM gone`);

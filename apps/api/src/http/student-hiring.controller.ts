@@ -36,6 +36,7 @@ import { sendCalendar } from './interview-scheduling.js';
 import { linkApplicationToCampusDrives, readListedCampusDrives, readStudentCampusDrives, visibleThroughCampusDriveSql } from './campus-drives.js';
 import { markNominationAccepted, markNominationWithdrawn, readOwnNomination, type OpenNomination } from './campus-drive-nominations.controller.js';
 import { EvidenceShareError, readEvidenceChoices, readEvidenceRecordIds, replaceEvidenceShares, skillEvidenceEnabled } from './skill-evidence.js';
+import { invitedToOpportunity } from './talent-pool.js';
 
 type QueryResult<T> = { rows: T[] };
 
@@ -195,7 +196,8 @@ export class StudentHiringController {
              v.compensation_min, v.compensation_max, v.compensation_period,
              v.duration_months, v.application_deadline,
              (SELECT count(*) FROM applications a
-               WHERE a.opportunity_id = o.id AND a.student_user_id = ${studentUserId}::uuid AND a.closed_at IS NULL) AS already_applied
+               WHERE a.opportunity_id = o.id AND a.student_user_id = ${studentUserId}::uuid AND a.closed_at IS NULL) AS already_applied,
+             ${invitedToOpportunity(studentUserId, sql`o.id`)} AS talent_pool_invited
       FROM opportunities o
       JOIN opportunity_versions v ON v.id = o.current_version_id
       JOIN organizations org ON org.id = o.employer_id
@@ -546,6 +548,12 @@ export class StudentHiringController {
         ON CONFLICT (employer_id, student_user_id, opportunity_id) WHERE revoked_at IS NULL DO NOTHING
       `);
       await linkApplicationToCampusDrives(tx, applicationId, input.opportunityId, drives);
+      // EMP-14: applying answers any live talent-pool invitation to this job. This application is the
+      // first thing that tells the employer who the invited card was.
+      await tx.execute(sql`
+        UPDATE talent_pool_invitations SET state = 'APPLIED', application_id = ${applicationId}::uuid, responded_at = greatest(now(), created_at)
+        WHERE opportunity_id = ${input.opportunityId}::uuid AND student_user_id = ${studentUserId}::uuid AND state = 'SENT' AND expires_at > now()
+      `);
       if (openNomination) await markNominationAccepted(tx, this.ids, { nomination: openNomination, applicationId, studentUserId, correlationId: context.correlationId });
       // What the employer is told about this applicant's eligibility, frozen as it stood now.
       if (evaluation) await recordEligibilityEvaluation(tx, this.ids, { applicationId, versionId, trigger: 'APPLY', evaluation });
@@ -902,6 +910,7 @@ const employerInGoodStanding = employerInGoodStandingSql(sql`o.employer_id`);
 
 function visibleToStudent(studentUserId: string) {
   // EMP-11: or through a campus drive the student's college has approved (ADR-038).
+  // EMP-14: or, for an INVITE_ONLY job, through a live talent-pool invitation to this student (ADR-044).
   return sql`(${visibleThroughCampusDriveSql(studentUserId)} OR EXISTS (
     SELECT 1 FROM opportunity_audiences oa
     WHERE oa.opportunity_id = o.id
@@ -917,6 +926,7 @@ function visibleToStudent(studentUserId: string) {
               SELECT unnest(ARRAY[isp.department_unit_id, isp.program_unit_id, isp.batch_unit_id, isp.section_unit_id])
               FROM institution_student_profiles isp
               WHERE isp.student_user_id = ${studentUserId}::uuid AND isp.status = 'ACTIVE'))
+        OR (oa.audience_kind = 'INVITE_ONLY' AND ${invitedToOpportunity(studentUserId, sql`o.id`)})
       )
   ))`;
 }
@@ -938,6 +948,8 @@ function mapOpportunitySummary(row: Record<string, unknown>): Record<string, unk
       ? { currency: row.compensation_currency, min: row.compensation_min, max: row.compensation_max, period: row.compensation_period }
       : null,
     alreadyApplied: row.already_applied == null ? undefined : Number(row.already_applied) > 0,
+    // EMP-14: listed because an employer invited the student from the talent pool.
+    invitedFromTalentPool: row.talent_pool_invited == null ? undefined : row.talent_pool_invited === true,
     company: mapCompany(row),
   };
 }

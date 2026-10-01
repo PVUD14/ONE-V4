@@ -77,7 +77,7 @@ read except the policy row. The request is refused, with a typed code and no row
 The request-time check is a courtesy (an operator should not wait for a job that will refuse). The worker checks
 again, through the orchestrator, at the moment of the call — the only check that counts.
 
-**Worker (`ai:content-factory`, persistence).** Claims one `QUEUED` job (or a `RUNNING` one whose lease expired)
+**Worker (`corepack pnpm --filter @planthepath/persistence ai:content-factory [--once]`, `content-factory-worker.ts`).** Claims one `QUEUED` job (or a `RUNNING` one whose lease expired)
 with `FOR UPDATE SKIP LOCKED`, marks it `RUNNING` with a 10-minute lease, then — outside any transaction — calls
 `orchestrator.generate`, guards the reply (Decision 4), and in one transaction writes the draft through the
 editors' own functions, finishes the job, audits and emits `content_factory.draft_finished`. A job is attempted at
@@ -150,7 +150,8 @@ is what is enforced. A reply that fails lands nothing; the job ends `REJECTED` w
 | `TRUNCATED` | output stopped at the token limit | same | same |
 | `LANGUAGE_MISMATCH` | script share (ENG-21 rule) for the requested language | English | — |
 | `PERSONAL_DATA` | e-mail address or Indian mobile number | same | same |
-| `READINESS_OR_SCORE` | a readiness / score / marks / rank figure (`\d+ %` near those words) | same | — |
+| `READINESS_FIGURE` | "readiness" next to a number, or a percentage "ready" — narrow on purpose: marks, scores and percentages are aptitude subject matter | same | — |
+| `PLACEMENT_CHANCE` | someone's chances of a job, placement or offer ("your chances of…", "placement odds") | same | — |
 | `OUTCOME_PROMISE` | a guaranteed job, placement, offer | same | — |
 | `QUOTES_ASSESSMENT_ITEM` | the lesson repeats the prompt of a question in the bank for that skill (any state) | — | — |
 | `HINT_NAMES_ANSWER`, `HINT_NAMES_OPTION`, … | — | ENG-15's `hintLadderFindings` on the ladder against the drafted key | — |

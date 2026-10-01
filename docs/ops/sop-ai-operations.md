@@ -11,9 +11,9 @@
 
 See what AI is configured and what it has done, and keep the brake within reach of whoever is on
 duty. The AI hold was lifted on 2026-10-01 (HG-2, ADR-047): inference runs on an OpenAI-compatible
-endpoint on a RunPod pod, reached only by background jobs through ONE AI Orchestration (ENG-20). **No
-feature is registered yet**, so no model runs, and the assistant is off; the features table shows its
-empty state. The **Inference endpoint** panel shows whether the server has an endpoint configured,
+endpoint on a RunPod pod, reached only by background jobs through ONE AI Orchestration (ENG-20). The first
+features (ENG-21's tutor hint and ENG-23's content factory) are registered **switched off**; each runs
+only after its evaluation and an approved switch-on (C, F), and the assistant is off. The **Inference endpoint** panel shows whether the server has an endpoint configured,
 its host and model, whether a key is set (never the key), and the latest reachability probe —
 [runbook-inference-endpoint.md](runbook-inference-endpoint.md) says how to point ONE at the pod.
 
@@ -110,6 +110,36 @@ The calibration and code-sandbox panels are on **System Health** ([sop-system-he
   A day with fewer than 5 students is withheld. The shadow panel is withheld under 5 consenting
   students. Each panel prints its source table.
 
+## F. The content factory (ENG-23): switching it on, running its worker
+
+The content factory runs three features: `content.lesson-draft` (lessons and translations),
+`content.item-draft` (practice questions) and `content.answer-check`. Its output is staff-only: it
+lands as a DRAFT in Content Management and reaches students only when people publish it
+([sop-content-authoring.md](sop-content-authoring.md) A2). Design:
+[content-factory-design.md](../architecture/content-factory-design.md).
+
+**Switch it on — first in the demo sandbox, then anywhere else, in this order:**
+
+1. The server has the endpoint (`ONE_AI_BASE_URL`, `ONE_AI_API_KEY`, `ONE_AI_MODEL`) in its own
+   environment ([runbook-inference-endpoint.md](runbook-inference-endpoint.md)); the sandbox uses its
+   own stack and database, never production's.
+2. Migrations are applied (0106), then `corepack pnpm --filter @planthepath/persistence ai:register-features`
+   registers any feature not yet there, switched off.
+3. A bake-off is recorded for the feature's exact model and prompt
+   ([deploy/ai-pod/bake-off/README.md](../../deploy/ai-pod/bake-off/README.md), `ai:bake-off-import`).
+   `content.item-draft` has no bake-off cases yet, so it cannot be switched on.
+4. Here: release the kill switch if engaged (B), then **Switch on…** `content.lesson-draft` and, if
+   wanted, `content.answer-check` (C). A second person approves. Lower the cap to what the demo needs.
+5. Start the worker where the endpoint variables are set, against the same database:
+   `corepack pnpm --filter @planthepath/persistence ai:content-factory` (polls; `--once` drains the
+   queue and exits, for a timer). It logs counts and codes only.
+6. Check: **Content Management → Lessons and variants → AI drafts** shows **On** and today's use;
+   ask for a lesson; the worker logs `content-factory.job.finished`; the draft opens marked AI draft.
+
+**Stop it**: switch the feature off or engage the kill switch (A) — the next job is refused without a
+call, even one already queued — then stop the worker. Every refused, rejected and failed job keeps
+its reason on the AI drafts card; the generation attempts are in the panels above.
+
 ## Never do
 
 - Never switch on a feature that reaches students before the privacy notice names the pod's US
@@ -119,8 +149,9 @@ The calibration and code-sandbox panels are on **System Health** ([sop-system-he
 
 ## Gaps
 
-- No AI feature is registered yet (the first is ENG-23's content factory), so nothing can be
-  switched on today.
+- ENG-23's content factory features are registered switched off; each needs its bake-off record
+  before it can be switched on, and `content.item-draft` has no bake-off cases yet.
+- The content factory worker is a separate process; nothing in the deployment pack starts it yet.
 - The assistant has no prompt-registry version, so the evaluation gate does not apply to it.
 - Usage by organisation has no complementary suppression against the screen's totals (security
   review OPS-SR-32).

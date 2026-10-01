@@ -33,6 +33,32 @@ export interface AiFeatureDto {
   readonly updatedAt: string;
   readonly outcomes: { readonly succeeded: number; readonly refused: number; readonly failed: number };
   readonly tokens: { readonly input: number; readonly output: number };
+  /** ENG-20: mean provider wall time of this period's successes; null = NA. */
+  readonly averageLatencyMs: number | null;
+}
+
+/**
+ * ENG-20: the inference endpoint — configured, host, model, whether a key is set (never the key),
+ * and the latest recorded probe. The server never contacts the endpoint to answer this.
+ */
+export interface AiInferenceStatusDto {
+  readonly configured: boolean;
+  readonly reason: 'BASE_URL_MISSING' | 'BASE_URL_INVALID' | 'BASE_URL_INSECURE' | 'KEY_MISSING' | 'MODEL_MISSING' | null;
+  readonly providerKey: string;
+  readonly endpointHost: string | null;
+  readonly model: string | null;
+  readonly keyConfigured: boolean;
+  readonly lastProbe: {
+    readonly configured: boolean;
+    readonly endpointHost: string | null;
+    readonly model: string | null;
+    readonly reachable: boolean;
+    readonly modelServed: boolean | null;
+    readonly failureClass: string | null;
+    readonly latencyMs: number | null;
+    readonly probedAt: string;
+    readonly matchesConfiguration: boolean;
+  } | null;
 }
 
 export interface AiAssistantStateDto {
@@ -49,6 +75,7 @@ export interface AiOperationsSummaryDto {
   readonly killSwitch: AiSwitchStateDto | null;
   readonly assistantFlag: AiSwitchStateDto | null;
   readonly assistant: AiAssistantStateDto;
+  readonly inference: AiInferenceStatusDto;
   readonly features: readonly AiFeatureDto[];
   readonly failureClasses: readonly { readonly featureKey: string; readonly outcome: 'REFUSED' | 'FAILED'; readonly failureClass: string; readonly count: number }[];
   readonly totals: { readonly succeeded: number; readonly refused: number; readonly failed: number; readonly inputTokens: number; readonly outputTokens: number };

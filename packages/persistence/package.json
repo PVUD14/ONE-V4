@@ -7,6 +7,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "ai:probe": "tsx src/run-ai-probe.ts",
     "db:migrate": "tsx src/migrate.ts",
     "db:register:n8n": "tsx src/register-n8n-workflows.ts",
     "db:seed:career-readiness": "tsx src/seed-career-readiness-pilot.ts",

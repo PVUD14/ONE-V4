@@ -10,7 +10,9 @@
  * with its reason code. Releasing the kill switch and switching the assistant on are high-risk flag
  * changes through the existing feature-flag endpoint and its approval.
  *
- * Within the AI hold (ADR-030): nothing here calls a model. The assistant's server switch
+ * Nothing here calls a model or the inference endpoint (CLAUDE.md: no request handler does). ENG-20
+ * adds the endpoint's status to the summary — configured, host, model, key set or not (never the
+ * key), and reachability from the latest `ai:probe` row. The assistant's server switch
  * (ASSISTANT_ENABLED) is shown, never changed.
  *
  * Design: docs/architecture/ai-evaluations-table-design.md
@@ -71,6 +73,7 @@ import {
   listAiEvaluations,
   listAiUsageByOrganization,
   listAiUsageSeries,
+  loadAiInferenceStatus,
   loadAiOperationsSummary,
   recordAiEvaluation,
   type AiActor,
@@ -148,6 +151,7 @@ export class OperationsAiController {
         killSwitchEngaged: killEngaged,
         answering: server.serverSwitch && server.providerKeyConfigured && consoleSwitch && !killEngaged,
       },
+      inference: await loadAiInferenceStatus(this.db),
       cost: { value: null, basis: aiCostBasis, text: aiCostBasisText },
       correlationId,
     };

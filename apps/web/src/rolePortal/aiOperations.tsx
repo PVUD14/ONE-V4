@@ -11,7 +11,8 @@
  * and needs only a reason. Switching on and widening a limit file an approval (Settings → Approvals)
  * and switching a feature on also needs a passing evaluation for its current model and prompt. The
  * assistant's server switch (ASSISTANT_ENABLED) is shown, never changed here. The server decides
- * every rule; this screen shows what it says. Within the AI hold: nothing here calls a model.
+ * every rule; this screen shows what it says. Nothing here calls a model or the inference endpoint:
+ * ENG-20's endpoint panel shows the server's configuration and the latest probe it recorded.
  * OPS-13 adds the learning engine panels (planner decisions, mastery shadow) from engineHealth.tsx.
  */
 import { useEffect, useRef, useState } from 'react';
@@ -33,6 +34,7 @@ import type {
   AiEvaluationDto,
   AiEvaluationMetricDto,
   AiFeatureDto,
+  AiInferenceStatusDto,
   AiOperationsPolicyDto,
   AiOperationsSummaryDto,
   AiOrganizationUsageDto,
@@ -49,6 +51,13 @@ const noteLimit = 500;
 const number = (value: number | null | undefined): string => (value === null || value === undefined ? 'NA' : value.toLocaleString());
 const when = (value: string | null | undefined): string => (value ? new Date(value).toLocaleString() : 'NA');
 const windowLabel = (window: AiPeriod): string => (window === 'DAY' ? 'day' : 'month');
+const unconfiguredText: Record<NonNullable<AiInferenceStatusDto['reason']>, string> = {
+  BASE_URL_MISSING: 'no endpoint address is set',
+  BASE_URL_INVALID: 'the endpoint address is not a usable URL',
+  BASE_URL_INSECURE: 'the endpoint address is not https',
+  KEY_MISSING: 'no key is set',
+  MODEL_MISSING: 'no model is set',
+};
 
 /** Lowering is ordinary; any increase, or a window change, needs an approval (the server decides the same). */
 export function classifyLimits(current: { cap: number; capWindow: AiPeriod; maxInputChars: number }, next: { cap: number; capWindow: AiPeriod; maxInputChars: number }): 'UNCHANGED' | 'LOWER' | 'RAISE' {
@@ -105,7 +114,7 @@ export function OperationsAiOperationsPage(): React.ReactElement | null {
   if (!token) return null;
 
   const heading = <div className="role-page-heading"><div><span className="eyebrow">Platform operations</span><h1>AI Operations</h1>
-    <p>Every AI feature, its switch, cap and usage, and the evaluations that let it reach students — read from ONE AI Orchestration&apos;s own records. The AI hold is in force: no model provider is connected and nothing here runs a model. Stopping AI is immediate; switching anything on needs a second person&apos;s approval.</p></div></div>;
+    <p>Every AI feature, its switch, cap and usage, and the evaluations that let it reach students — read from ONE AI Orchestration&apos;s own records. AI runs only in background jobs, against the inference endpoint set on the server — never from this screen — and no AI feature reaches students yet. Stopping AI is immediate; switching anything on needs a second person&apos;s approval.</p></div></div>;
 
   if (forbiddenReference) {
     return <section className="role-module role-module--dense">{heading}
@@ -154,13 +163,15 @@ export function OperationsAiOperationsPage(): React.ReactElement | null {
       </div> : null}
     </section>
 
+    <InferenceEndpointPanel inference={summary?.inference ?? null} loaded={Boolean(summary)} />
+
     <section className="role-card role-wide"><h2>AI features</h2>
       <label className="role-local-search"><span>Usage period</span>
         <select aria-label="Usage period" value={period} onChange={(event) => setPeriod(event.target.value === 'MONTH' ? 'MONTH' : 'DAY')}>
           <option value="DAY">Today</option><option value="MONTH">This month</option>
         </select></label>
       {summary && !features.length ? <V2EmptyState icon="🤖" title="No AI feature is registered"
-        note="The AI hold is in force (ADR-030): no feature has been built on ONE AI Orchestration yet. Each one appears here when it is registered — switched off, with its own cap." /> : null}
+        note="No feature has been built on ONE AI Orchestration yet. Each one appears here when it is registered — switched off, with its own cap." /> : null}
       {features.length ? <div className="role-record-table-wrap"><table className="role-record-table">
         <thead><tr><th>Feature</th><th>State</th><th>Model and prompt</th><th>Cap</th><th>Evaluation</th><th>Outcomes</th><th>Tokens in / out</th><th>Cost</th><th>Actions</th></tr></thead>
         <tbody>{features.map((feature) => <tr key={feature.featureKey}>
@@ -170,7 +181,8 @@ export function OperationsAiOperationsPage(): React.ReactElement | null {
           <td>{number(feature.usedInWindow)} of {number(feature.cap)} this {windowLabel(feature.capWindow)}<br /><small>Input up to {number(feature.maxInputChars)} characters</small></td>
           <td><StatusBadge label={feature.evaluation.state === 'NONE' ? 'None recorded' : feature.evaluation.state} tone={feature.evaluation.state === 'PASS' ? 'success' : feature.evaluation.state === 'FAIL' ? 'danger' : 'neutral'} />
             <br /><small>{when(feature.evaluation.decidedAt)}</small></td>
-          <td>{number(feature.outcomes.succeeded)} succeeded<br />{number(feature.outcomes.refused)} refused · {number(feature.outcomes.failed)} failed</td>
+          <td>{number(feature.outcomes.succeeded)} succeeded<br />{number(feature.outcomes.refused)} refused · {number(feature.outcomes.failed)} failed
+            <br /><small>Average latency {feature.averageLatencyMs === null || feature.averageLatencyMs === undefined ? 'NA' : `${number(feature.averageLatencyMs)} ms`}</small></td>
           <td>{number(feature.tokens.input)} / {number(feature.tokens.output)}</td>
           <td>NA</td>
           <td><div className="role-actions">
@@ -197,7 +209,7 @@ export function OperationsAiOperationsPage(): React.ReactElement | null {
     <section className="role-card role-wide"><h2>Prompt versions</h2>
       <p>Prompts live in code and are never edited in place. A feature is evaluated, and switched on, for one exact prompt version.</p>
       <h3>Registered in code</h3>
-      {summary && !summary.prompts.registered.length ? <p>None yet — no feature has a prompt while the AI hold is in force.</p> : null}
+      {summary && !summary.prompts.registered.length ? <p>None yet — no AI feature has been registered.</p> : null}
       {summary?.prompts.registered.length ? <ul>{summary.prompts.registered.map((prompt) => <li key={`${prompt.key}@${prompt.version}`}>{prompt.key} v{prompt.version} — {prompt.purpose}</li>)}</ul> : null}
       <h3>Declared by features</h3>
       {summary && !summary.prompts.declared.length ? <p>No feature declares a prompt.</p> : null}
@@ -445,7 +457,31 @@ function EvaluationDialog({ token, features, policy, onCancel, onDone }: {
   </div>;
 }
 
-function AiUsagePanel({ token, features }: { readonly token: string; readonly features: readonly AiFeatureDto[] }): React.ReactElement {
+/**
+ * ENG-20: the inference endpoint as the server reports it. Configured, host and model come from the
+ * server's environment (the key only as set or not); reachability is the latest recorded probe.
+ */
+function InferenceEndpointPanel({ inference, loaded }: { readonly inference: AiInferenceStatusDto | null; readonly loaded: boolean }): React.ReactElement {
+  const probe = inference?.lastProbe ?? null;
+  const reachable = !probe ? { label: 'Not probed yet', tone: 'neutral' as const }
+    : probe.reachable ? { label: 'Reachable', tone: 'success' as const } : { label: 'Unreachable', tone: 'danger' as const };
+  return <section className="role-card role-wide"><h2>Inference endpoint</h2>
+    <p>AI features run in background jobs against the endpoint set on the server (ONE_AI_BASE_URL, ONE_AI_API_KEY and ONE_AI_MODEL). The key is never shown. Reachability is the latest check recorded by the server&apos;s probe job; this screen never contacts the endpoint.</p>
+    {loaded && !inference ? <p>NA</p> : null}
+    {inference ? <dl>
+      <div><dt>Configured</dt><dd>{inference.configured ? 'Yes' : `No — ${inference.reason ? unconfiguredText[inference.reason] : 'NA'}`}</dd></div>
+      <div><dt>Endpoint host</dt><dd>{inference.endpointHost ?? 'NA'}</dd></div>
+      <div><dt>Model</dt><dd>{inference.model ?? 'NA'}</dd></div>
+      <div><dt>Key set on the server</dt><dd>{inference.keyConfigured ? 'Yes' : 'No'}</dd></div>
+      <div><dt>Reachable (last probe)</dt><dd><StatusBadge label={reachable.label} tone={reachable.tone} />{' '}
+        <small>Probed {when(probe?.probedAt)}{probe && probe.latencyMs !== null ? ` · ${number(probe.latencyMs)} ms` : ''}{probe?.failureClass ? ` · ${probe.failureClass}` : ''}</small></dd></div>
+      <div><dt>Model served (last probe)</dt><dd>{!probe || probe.modelServed === null ? 'NA' : probe.modelServed ? 'Yes' : 'No'}</dd></div>
+    </dl> : null}
+    {probe && !probe.matchesConfiguration ? <p role="note">The last probe was for a different endpoint or model than the one configured now. Run the probe again before relying on it.</p> : null}
+  </section>;
+}
+
+function AiUsagePanel({ token, features }:{ readonly token: string; readonly features: readonly AiFeatureDto[] }): React.ReactElement {
   const [granularity, setGranularity] = useState<AiPeriod>('DAY');
   const [featureKey, setFeatureKey] = useState('');
   const [points, setPoints] = useState<readonly AiUsagePointDto[] | null>(null);

@@ -5,8 +5,9 @@
  * invalidates the provenance of every generation that cites its version). The AI Operations
  * console (OPS-12) reads this list to show which prompt versions exist.
  *
- * Empty on purpose: the AI hold (ADR-030) means no feature has a prompt yet. A feature's first
- * prompt is added here, as a new immutable entry, in the same change that registers its policy.
+ * Empty on purpose: ENG-20 built the inference adapter but registers no feature, so no feature has
+ * a prompt yet. A feature's first prompt is added here, as a new immutable entry, in the same change
+ * that registers its policy.
  */
 import { PromptRegistry, type PromptVersion } from './prompts.js';
 

@@ -7,7 +7,7 @@
  * one transaction with its audit row, and an outbox event. Switching on and widening consume an
  * OPS-02 approval inside the same transaction. The 0089 trigger repeats the enabling rules.
  *
- * Within the AI hold (ADR-030): nothing here calls a model or prices one. Cost is NA.
+ * Nothing here calls a model or prices one (ENG-20's adapter runs only in workers). Cost is NA.
  *
  * Design: docs/architecture/ai-evaluations-table-design.md
  */
@@ -26,7 +26,7 @@ import {
   type AiEvaluationMetric,
   type AiLimits,
 } from '@planthepath/authorization/src/index.js';
-import { registeredPrompts } from '@planthepath/ai-orchestration/src/index.js';
+import { describeInferenceConfiguration, registeredPrompts, type InferenceConfigurationView } from '@planthepath/ai-orchestration/src/index.js';
 import { consumeOperationApproval, type ConsumedApproval } from './operation-approvals.js';
 import { validateAuditWriteInput, validateOutboxWriteInput } from './repositories.js';
 
@@ -152,6 +152,8 @@ export interface AiFeatureView {
   readonly updatedAt: string;
   readonly outcomes: { readonly succeeded: number; readonly refused: number; readonly failed: number };
   readonly tokens: { readonly input: number; readonly output: number };
+  /** ENG-20: mean provider wall time of this period's successes that recorded one; null = NA. */
+  readonly averageLatencyMs: number | null;
 }
 
 export interface AiOperationsSummary {
@@ -197,9 +199,13 @@ export async function loadAiOperationsSummary(runner: SqlRunner, input: { readon
       ORDER BY e.decided_at DESC, (e.decision = 'FAIL') DESC, e.id DESC LIMIT 1) e ON true
     ORDER BY p.feature_key
   `);
-  const grouped = await rows<{ feature_key: string; outcome: 'SUCCEEDED' | 'REFUSED' | 'FAILED'; failure_class: string | null; count: number; input_tokens: string; output_tokens: string }>(runner, sql`
+  const grouped = await rows<{
+    feature_key: string; outcome: 'SUCCEEDED' | 'REFUSED' | 'FAILED'; failure_class: string | null; count: number; input_tokens: string; output_tokens: string;
+    latency_sum: string; latency_count: number;
+  }>(runner, sql`
     SELECT feature_key, outcome, failure_class, count(*)::int AS count,
-           COALESCE(sum(input_tokens), 0)::text AS input_tokens, COALESCE(sum(output_tokens), 0)::text AS output_tokens
+           COALESCE(sum(input_tokens), 0)::text AS input_tokens, COALESCE(sum(output_tokens), 0)::text AS output_tokens,
+           COALESCE(sum(latency_ms), 0)::text AS latency_sum, count(latency_ms)::int AS latency_count
     FROM ai_generations WHERE occurred_at >= date_trunc(${unit}, now())
     GROUP BY feature_key, outcome, failure_class
     ORDER BY feature_key, outcome, failure_class
@@ -211,13 +217,17 @@ export async function loadAiOperationsSummary(runner: SqlRunner, input: { readon
   `);
 
   const killEngaged = killSwitch?.enabled ?? false;
-  const perFeature = new Map<string, { succeeded: number; refused: number; failed: number; input: number; output: number }>();
+  const perFeature = new Map<string, { succeeded: number; refused: number; failed: number; input: number; output: number; latencySum: number; latencyCount: number }>();
   const totals = { succeeded: 0, refused: 0, failed: 0, inputTokens: 0, outputTokens: 0 };
   const failureClasses: { featureKey: string; outcome: 'REFUSED' | 'FAILED'; failureClass: string; count: number }[] = [];
   for (const row of grouped) {
-    const entry = perFeature.get(row.feature_key) ?? { succeeded: 0, refused: 0, failed: 0, input: 0, output: 0 };
+    const entry = perFeature.get(row.feature_key) ?? { succeeded: 0, refused: 0, failed: 0, input: 0, output: 0, latencySum: 0, latencyCount: 0 };
     const count = Number(row.count);
-    if (row.outcome === 'SUCCEEDED') entry.succeeded += count;
+    if (row.outcome === 'SUCCEEDED') {
+      entry.succeeded += count;
+      entry.latencySum += Number(row.latency_sum);
+      entry.latencyCount += Number(row.latency_count);
+    }
     else if (row.outcome === 'REFUSED') entry.refused += count;
     else entry.failed += count;
     entry.input += Number(row.input_tokens);
@@ -236,7 +246,7 @@ export async function loadAiOperationsSummary(runner: SqlRunner, input: { readon
     killSwitch,
     assistantFlag,
     features: features.map((row) => {
-      const usage = perFeature.get(row.feature_key) ?? { succeeded: 0, refused: 0, failed: 0, input: 0, output: 0 };
+      const usage = perFeature.get(row.feature_key) ?? { succeeded: 0, refused: 0, failed: 0, input: 0, output: 0, latencySum: 0, latencyCount: 0 };
       return {
         featureKey: row.feature_key,
         description: row.description,
@@ -256,6 +266,7 @@ export async function loadAiOperationsSummary(runner: SqlRunner, input: { readon
         updatedAt: new Date(row.updated_at).toISOString(),
         outcomes: { succeeded: usage.succeeded, refused: usage.refused, failed: usage.failed },
         tokens: { input: usage.input, output: usage.output },
+        averageLatencyMs: usage.latencyCount ? Math.round(usage.latencySum / usage.latencyCount) : null,
       };
     }),
     failureClasses,
@@ -270,6 +281,52 @@ export async function loadAiOperationsSummary(runner: SqlRunner, input: { readon
         lastUsedAt: new Date(row.last_used_at).toISOString(), registered: isRegistered(row.prompt_key, Number(row.prompt_version)),
       })),
     },
+  };
+}
+
+/**
+ * ENG-20: the inference endpoint as AI Operations sees it — "configured / reachable / model id".
+ *
+ * Configured and model come from this process's environment (only whether the key is set, never
+ * the key; the endpoint as its host only). Reachable comes from the latest `ai:probe` row, because
+ * a request handler never calls the endpoint. A probe taken for a different host or model than the
+ * one configured now is flagged, so an old "reachable" never vouches for a new endpoint.
+ */
+export interface AiInferenceStatus extends InferenceConfigurationView {
+  readonly lastProbe: {
+    readonly configured: boolean;
+    readonly endpointHost: string | null;
+    readonly model: string | null;
+    readonly reachable: boolean;
+    readonly modelServed: boolean | null;
+    readonly failureClass: string | null;
+    readonly latencyMs: number | null;
+    readonly probedAt: string;
+    readonly matchesConfiguration: boolean;
+  } | null;
+}
+
+export async function loadAiInferenceStatus(runner: SqlRunner, env: Readonly<Record<string, string | undefined>> = process.env): Promise<AiInferenceStatus> {
+  const view = describeInferenceConfiguration(env);
+  const latest = (await rows<{
+    configured: boolean; endpoint_host: string | null; configured_model: string | null; reachable: boolean; model_served: boolean | null;
+    failure_class: string | null; latency_ms: number | null; probed_at: Date;
+  }>(runner, sql`
+    SELECT configured, endpoint_host, configured_model, reachable, model_served, failure_class, latency_ms, probed_at
+    FROM ai_provider_probes ORDER BY probed_at DESC, id DESC LIMIT 1`))[0];
+  return {
+    ...view,
+    lastProbe: latest ? {
+      configured: latest.configured,
+      endpointHost: latest.endpoint_host,
+      model: latest.configured_model,
+      reachable: latest.reachable,
+      modelServed: latest.model_served,
+      failureClass: latest.failure_class,
+      latencyMs: latest.latency_ms === null ? null : Number(latest.latency_ms),
+      probedAt: new Date(latest.probed_at).toISOString(),
+      matchesConfiguration: latest.configured === view.configured && latest.endpoint_host === view.endpointHost && latest.configured_model === view.model,
+    } : null,
   };
 }
 

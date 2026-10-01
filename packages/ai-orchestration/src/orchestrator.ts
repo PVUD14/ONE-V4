@@ -14,8 +14,7 @@
  *    a plausible substitute in front of a student is the outcome to avoid.
  */
 import {
-  InferenceRateLimitedError,
-  InferenceUnconfiguredError,
+  InferenceProviderError,
   type InferenceProvider,
   type InferenceUsage,
 } from './provider.js';
@@ -58,12 +57,26 @@ export interface GenerationRecord {
   readonly generatedAt: string;
   readonly usage: InferenceUsage;
   readonly truncated: boolean;
+  /** Wall time of the provider call, retries included; null when the provider does not measure it. */
+  readonly latencyMs: number | null;
 }
 
 export class AiFeatureDisabledError extends Error {
   constructor(featureKey: string) {
     super(`AI feature ${featureKey} is disabled`);
     this.name = 'AiFeatureDisabledError';
+  }
+}
+
+/**
+ * The global kill switch is engaged. A kind of "disabled", so code that already handles a
+ * disabled feature handles this too; the metered reason says which.
+ */
+export class AiKillSwitchEngagedError extends AiFeatureDisabledError {
+  constructor(featureKey: string) {
+    super(featureKey);
+    this.message = `AI is stopped by the global kill switch (${featureKey})`;
+    this.name = 'AiKillSwitchEngagedError';
   }
 }
 
@@ -95,6 +108,10 @@ export interface UsageCounter {
     readonly correlationId: string;
     readonly outcome: 'SUCCEEDED' | 'REFUSED' | 'FAILED';
     readonly failureClass?: string;
+    /** Provider wall time, retries included. Absent when no call was made. */
+    readonly latencyMs?: number | undefined;
+    /** HTTP attempts made. Absent when no call was made. */
+    readonly attempts?: number | undefined;
   }): Promise<void>;
 }
 
@@ -104,6 +121,12 @@ export interface OrchestratorOptions {
   readonly usage: UsageCounter;
   /** Resolves a feature's flag and cap. Absent feature means disabled, never enabled. */
   readonly policy: (featureKey: string) => Promise<AiFeaturePolicy | undefined>;
+  /**
+   * Whether the global kill switch is engaged (OPS-12). Checked before the feature's own switch
+   * on every call, so the refusal says why. Absent means "no kill switch to consult", which only
+   * tests should rely on — the worker factory always supplies it.
+   */
+  readonly killSwitchEngaged?: () => Promise<boolean>;
   /** Stamped on every row so a change of serving stack is visible in the data. */
   readonly generatorVersion: string;
   readonly now?: () => Date;
@@ -115,7 +138,7 @@ export class AiOrchestrator {
   /**
    * Produce one draft.
    *
-   * Order matters: flag, then cap, then size, then the call. Each refusal is metered
+   * Order matters: kill switch, flag, then cap, then size, then the call. Each refusal is metered
    * too — a feature that is refusing constantly is a thing to know about, and a refusal
    * that leaves no trace looks identical to nobody using it.
    */
@@ -131,6 +154,10 @@ export class AiOrchestrator {
     // record of a feature that has never existed and has no cap. An unknown key is a
     // programming error, and it surfaces as this exception rather than as usage data.
     if (!policy) throw new AiFeatureDisabledError(request.featureKey);
+    if (this.options.killSwitchEngaged && await this.options.killSwitchEngaged()) {
+      await this.meter(request, policy, 'REFUSED', 'KILL_SWITCH_ENGAGED');
+      throw new AiKillSwitchEngagedError(request.featureKey);
+    }
     if (!policy.enabled) {
       // A configured-but-off feature is different: somebody turned it off deliberately,
       // and calls still arriving is a thing to know.
@@ -164,11 +191,13 @@ export class AiOrchestrator {
         ...(request.signal ? { signal: request.signal } : {}),
       });
     } catch (error) {
-      const failureClass = error instanceof InferenceUnconfiguredError ? 'PROVIDER_UNCONFIGURED'
-        : error instanceof InferenceRateLimitedError ? 'PROVIDER_RATE_LIMITED'
-          : 'PROVIDER_FAILED';
-      await this.meter(request, policy, 'FAILED', failureClass);
-      // Rethrown, never swallowed: there is no acceptable substitute output here.
+      const known = error instanceof InferenceProviderError ? error : undefined;
+      await this.meter(request, policy, 'FAILED', known?.failureClass ?? 'PROVIDER_FAILED', {
+        latencyMs: known?.latencyMs,
+        attempts: known?.attempts,
+      });
+      // Rethrown, never swallowed: there is no acceptable substitute output here. The typed
+      // provider errors carry fixed messages only — never the upstream body or the key.
       throw error;
     }
 
@@ -182,6 +211,8 @@ export class AiOrchestrator {
       usage: result.usage,
       correlationId: request.correlationId,
       outcome: 'SUCCEEDED',
+      latencyMs: result.latencyMs,
+      attempts: result.attempts,
     });
 
     return {
@@ -197,6 +228,7 @@ export class AiOrchestrator {
       // A truncated draft is still a draft, but the reviewer should be told it stopped
       // because it ran out of room rather than because it had finished.
       truncated: result.stopReason === 'MAX_TOKENS',
+      latencyMs: result.latencyMs ?? null,
     };
   }
 
@@ -205,6 +237,7 @@ export class AiOrchestrator {
     policy: AiFeaturePolicy,
     outcome: 'REFUSED' | 'FAILED',
     failureClass: string,
+    timing: { readonly latencyMs?: number | undefined; readonly attempts?: number | undefined } = {},
   ): Promise<void> {
     await this.options.usage.record({
       featureKey: request.featureKey,
@@ -217,6 +250,8 @@ export class AiOrchestrator {
       correlationId: request.correlationId,
       outcome,
       failureClass,
+      ...(timing.latencyMs === undefined ? {} : { latencyMs: timing.latencyMs }),
+      ...(timing.attempts === undefined ? {} : { attempts: timing.attempts }),
     });
   }
 }

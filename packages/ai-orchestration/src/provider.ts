@@ -1,16 +1,18 @@
 /**
  * The boundary between ONE and whatever is actually doing inference.
  *
- * ADR-029 puts inference on ONE's own GPU pod, and the pod is not serving yet. The
- * point of this interface is that "not serving yet" costs one adapter rather than a
- * rewrite: every feature is written against `InferenceProvider`, and the venue is a
- * constructor argument.
+ * Every feature is written against `InferenceProvider`, and the venue is a constructor
+ * argument. ADR-047 puts inference on an OpenAI-compatible endpoint (vLLM on a RunPod pod,
+ * behind a bearer key); a later move to AWS (Bedrock exposes the same chat-completions
+ * shape) is configuration, not a rewrite.
  *
- * Two adapters ship here. `OpenAICompatibleProvider` is the one the pod will use —
- * vLLM, TGI, Ollama and llama.cpp all expose the same `/v1/chat/completions` shape, so
- * a self-hosted model needs a base URL and nothing else. `AnthropicProvider` exists
- * because the in-app assistant already calls that API directly today, and moving it
- * behind this interface is what stops a second provider call site appearing.
+ * `OpenAICompatibleProvider` is the adapter ENG-20 builds: one non-streaming chat-completions
+ * call with a per-attempt timeout and bounded retries. `AnthropicProvider` predates it and is
+ * kept so the in-app assistant can move behind this interface rather than keep its own call
+ * site. Design: docs/architecture/inference-adapter-design.md.
+ *
+ * The rule every error here keeps: no message carries the upstream body, its status text or
+ * the key. The body can echo the prompt, which can carry student data.
  */
 
 export interface InferenceMessage {
@@ -38,130 +40,384 @@ export interface InferenceResult {
   /** What actually answered, which is not always what was asked for. */
   readonly model: string;
   readonly stopReason: 'END' | 'MAX_TOKENS' | 'OTHER';
+  /** Wall time of the call, retries and backoff included. Absent when the provider does not measure it. */
+  readonly latencyMs?: number;
+  /** HTTP attempts made. */
+  readonly attempts?: number;
+}
+
+/** What AI Operations is told about the endpoint. Never carries the key or an upstream body. */
+export interface InferenceProbe {
+  readonly reachable: boolean;
+  /** Whether the configured model is listed by the endpoint; null when it could not be asked. */
+  readonly modelServed: boolean | null;
+  readonly failureClass: InferenceFailureClass | null;
+  readonly latencyMs: number | null;
 }
 
 export interface InferenceProvider {
-  /** Stable identifier recorded against every generation, e.g. `runpod-vllm`. */
+  /** Stable identifier recorded against every generation, e.g. `openai-compatible`. */
   readonly providerKey: string;
   complete(request: InferenceRequest): Promise<InferenceResult>;
+  /** A cheap reachability check (model listing). Never throws. */
+  probe?(): Promise<InferenceProbe>;
 }
 
-export class InferenceUnconfiguredError extends Error {
+export type InferenceFailureClass =
+  | 'PROVIDER_UNCONFIGURED'
+  | 'PROVIDER_MODEL_MISMATCH'
+  | 'PROVIDER_TIMEOUT'
+  | 'PROVIDER_UNREACHABLE'
+  | 'PROVIDER_AUTH_FAILED'
+  | 'PROVIDER_NOT_FOUND'
+  | 'PROVIDER_RATE_LIMITED'
+  | 'PROVIDER_SERVER_ERROR'
+  | 'PROVIDER_REJECTED'
+  | 'PROVIDER_MALFORMED_RESPONSE'
+  | 'PROVIDER_CANCELLED';
+
+/**
+ * Every adapter failure. `failureClass` is what gets metered; `attempts` and `latencyMs` are
+ * filled in by the adapter so a failure is accounted for as well as a success.
+ */
+export class InferenceProviderError extends Error {
+  attempts: number | undefined;
+  latencyMs: number | undefined;
+
+  constructor(readonly failureClass: InferenceFailureClass, message: string) {
+    super(message);
+    this.name = 'InferenceProviderError';
+  }
+}
+
+export class InferenceUnconfiguredError extends InferenceProviderError {
   constructor(detail: string) {
-    super(detail);
+    super('PROVIDER_UNCONFIGURED', detail);
     this.name = 'InferenceUnconfiguredError';
   }
 }
 
-export class InferenceUpstreamError extends Error {
-  constructor(readonly status: number, detail: string) {
-    super(detail);
+export class InferenceModelMismatchError extends InferenceProviderError {
+  constructor() {
+    super('PROVIDER_MODEL_MISMATCH', 'the feature names a model the inference endpoint is not configured to serve');
+    this.name = 'InferenceModelMismatchError';
+  }
+}
+
+export class InferenceUpstreamError extends InferenceProviderError {
+  constructor(readonly status: number, detail = 'inference provider returned an error') {
+    super(classifyStatus(status), detail);
     this.name = 'InferenceUpstreamError';
   }
 }
 
-export class InferenceRateLimitedError extends Error {
+export class InferenceAuthError extends InferenceUpstreamError {
+  constructor(status: number) {
+    super(status, 'inference provider refused the credentials');
+    this.name = 'InferenceAuthError';
+  }
+}
+
+export class InferenceRateLimitedError extends InferenceUpstreamError {
   constructor() {
-    super('inference provider rate limited');
+    super(429, 'inference provider rate limited');
     this.name = 'InferenceRateLimitedError';
   }
+}
+
+export class InferenceTimeoutError extends InferenceProviderError {
+  constructor() {
+    super('PROVIDER_TIMEOUT', 'inference provider did not answer in time');
+    this.name = 'InferenceTimeoutError';
+  }
+}
+
+export class InferenceUnreachableError extends InferenceProviderError {
+  constructor() {
+    super('PROVIDER_UNREACHABLE', 'inference provider could not be reached');
+    this.name = 'InferenceUnreachableError';
+  }
+}
+
+export class InferenceMalformedResponseError extends InferenceProviderError {
+  constructor() {
+    super('PROVIDER_MALFORMED_RESPONSE', 'inference provider returned a response that could not be used');
+    this.name = 'InferenceMalformedResponseError';
+  }
+}
+
+export class InferenceCancelledError extends InferenceProviderError {
+  constructor() {
+    super('PROVIDER_CANCELLED', 'inference call was cancelled');
+    this.name = 'InferenceCancelledError';
+  }
+}
+
+function classifyStatus(status: number): InferenceFailureClass {
+  if (status === 401 || status === 403) return 'PROVIDER_AUTH_FAILED';
+  if (status === 404) return 'PROVIDER_NOT_FOUND';
+  if (status === 429) return 'PROVIDER_RATE_LIMITED';
+  if (status >= 500) return 'PROVIDER_SERVER_ERROR';
+  if (status >= 200 && status < 300) return 'PROVIDER_MALFORMED_RESPONSE';
+  return 'PROVIDER_REJECTED';
 }
 
 /**
  * A provider that refuses every call, with a message that says why.
  *
- * This is the default until the pod serves. It exists so that AI features can be built,
- * wired, flagged and tested now: with the flag off nothing calls inference at all, and
- * with the flag on and no pod the failure is a clear, typed, logged refusal rather than
- * a crash or — worse — a silent fallback that puts something invented in front of a
- * student.
+ * This is what ONE runs whenever ONE_AI_BASE_URL, ONE_AI_API_KEY or ONE_AI_MODEL is blank.
+ * With the flag off nothing calls inference at all; with the flag on and no endpoint the
+ * failure is a clear, typed, metered refusal rather than a crash or — worse — a silent
+ * fallback that puts something invented in front of a student.
  */
 export class UnconfiguredInferenceProvider implements InferenceProvider {
   readonly providerKey = 'unconfigured';
 
+  constructor(private readonly reason = 'BASE_URL_MISSING') {}
+
   async complete(): Promise<InferenceResult> {
-    throw new InferenceUnconfiguredError(
-      'no inference provider is configured; set PTP_INFERENCE_BASE_URL for the GPU pod',
-    );
+    throw new InferenceUnconfiguredError(`no inference endpoint is configured (${this.reason}); set ONE_AI_BASE_URL, ONE_AI_API_KEY and ONE_AI_MODEL on the server`);
+  }
+
+  async probe(): Promise<InferenceProbe> {
+    return { reachable: false, modelServed: null, failureClass: 'PROVIDER_UNCONFIGURED', latencyMs: null };
   }
 }
 
-interface FetchLike {
-  (input: string, init: { method: string; headers: Record<string, string>; body: string; signal?: AbortSignal }): Promise<{
-    ok: boolean;
-    status: number;
-    text(): Promise<string>;
-    json(): Promise<unknown>;
-  }>;
+interface FetchResponseLike {
+  readonly ok: boolean;
+  readonly status: number;
+  text(): Promise<string>;
 }
 
+export interface FetchLike {
+  (input: string, init: { method: string; headers: Record<string, string>; body?: string; signal?: AbortSignal }): Promise<FetchResponseLike>;
+}
+
+export interface OpenAICompatibleOptions {
+  /** The OpenAI base URL, including its version path: `https://<pod-id>-8888.proxy.runpod.net/v1`. */
+  readonly baseUrl: string;
+  /** Sent as a bearer token, never logged and never placed in an error. */
+  readonly apiKey?: string | undefined;
+  /** The model the endpoint serves. When set, a request for any other model is refused before a call. */
+  readonly model?: string | undefined;
+  readonly providerKey?: string;
+  /** Per attempt, body read included. Default 60 s. */
+  readonly timeoutMs?: number;
+  /** Total attempts for a retryable answer. Default 3, at most 10. */
+  readonly maxAttempts?: number;
+  /** First backoff; doubles each retry. Default 500 ms. */
+  readonly backoffMs?: number;
+  /** For the reachability probe. Default 10 s. */
+  readonly probeTimeoutMs?: number;
+  readonly fetchImpl?: FetchLike;
+  readonly sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
+  readonly clock?: () => number;
+}
+
+/** The status codes that mean "try again". Everything else fails at once. */
+const retryableStatuses = new Set([429, 500, 502, 503, 504]);
+
 /**
- * The OpenAI chat-completions shape, which is the lingua franca of self-hosted serving.
+ * The OpenAI chat-completions shape: vLLM, TGI, Ollama, llama.cpp and Bedrock's OpenAI-compatible
+ * endpoint all speak it, so changing venue is a base URL, a key and a model id.
  *
- * `apiKey` is optional on purpose: a pod on a private network commonly has no auth, and
- * requiring a placeholder key would be ceremony. When one is set it is sent as a bearer
- * token and never logged.
+ * Not streamed: generation is a background job whose output lands as a DRAFT for a human, so
+ * nobody is waiting on the first token. A timed-out attempt is not retried — the model may still
+ * be generating and billing, and a retry doubles both.
  */
 export class OpenAICompatibleProvider implements InferenceProvider {
   readonly providerKey: string;
+  private readonly baseUrl: string;
+  private readonly timeoutMs: number;
+  private readonly maxAttempts: number;
+  private readonly backoffMs: number;
+  private readonly probeTimeoutMs: number;
 
-  constructor(
-    private readonly options: {
-      readonly baseUrl: string;
-      readonly apiKey?: string | undefined;
-      readonly providerKey?: string;
-      readonly fetchImpl?: FetchLike;
-    },
-  ) {
+  constructor(private readonly options: OpenAICompatibleOptions) {
     if (!/^https?:\/\//.test(options.baseUrl)) throw new InferenceUnconfiguredError('inference base URL must be http(s)');
+    this.baseUrl = options.baseUrl.replace(/\/+$/, '');
     this.providerKey = options.providerKey ?? 'openai-compatible';
+    this.timeoutMs = bounded(options.timeoutMs, 60_000, 50, 600_000);
+    this.maxAttempts = bounded(options.maxAttempts, 3, 1, 10);
+    this.backoffMs = bounded(options.backoffMs, 500, 0, 60_000);
+    this.probeTimeoutMs = bounded(options.probeTimeoutMs, 10_000, 50, 120_000);
   }
 
   async complete(request: InferenceRequest): Promise<InferenceResult> {
-    const fetchImpl = (this.options.fetchImpl ?? (globalThis.fetch as unknown as FetchLike));
-    const url = `${this.options.baseUrl.replace(/\/$/, '')}/v1/chat/completions`;
-    const response = await fetchImpl(url, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        ...(this.options.apiKey ? { authorization: `Bearer ${this.options.apiKey}` } : {}),
-      },
-      body: JSON.stringify({
-        model: request.model,
-        messages: request.messages,
-        max_tokens: request.maxOutputTokens,
-        temperature: request.temperature ?? 0,
-        stream: false,
-      }),
-      ...(request.signal ? { signal: request.signal } : {}),
+    // Before the network: a feature evaluated on one model never silently runs on another.
+    if (this.options.model && request.model !== this.options.model) throw new InferenceModelMismatchError();
+
+    const clock = this.options.clock ?? (() => performance.now());
+    const started = clock();
+    const body = JSON.stringify({
+      model: request.model,
+      messages: request.messages,
+      max_tokens: request.maxOutputTokens,
+      temperature: request.temperature ?? 0,
+      stream: false,
     });
 
-    if (response.status === 429) throw new InferenceRateLimitedError();
-    if (!response.ok) {
-      // The upstream body may echo the prompt, which can carry student data, so the
-      // status is recorded and the body is not.
-      throw new InferenceUpstreamError(response.status, 'inference provider returned an error');
+    let attempts = 0;
+    for (;;) {
+      attempts += 1;
+      try {
+        const answer = await this.send('POST', '/chat/completions', body, this.timeoutMs, request.signal);
+        if (!answer.ok) {
+          const failure = answer.status === 401 || answer.status === 403 ? new InferenceAuthError(answer.status)
+            : answer.status === 429 ? new InferenceRateLimitedError()
+              : new InferenceUpstreamError(answer.status);
+          if (retryableStatuses.has(answer.status) && attempts < this.maxAttempts) {
+            await this.backoff(attempts, request.signal);
+            continue;
+          }
+          throw failure;
+        }
+        const parsed = parseCompletion(answer.text, request.model);
+        return { ...parsed, latencyMs: elapsed(clock, started), attempts };
+      } catch (error) {
+        const failure = error instanceof InferenceProviderError ? error : new InferenceUnreachableError();
+        if (failure instanceof InferenceUnreachableError && attempts < this.maxAttempts) {
+          try {
+            await this.backoff(attempts, request.signal);
+            continue;
+          } catch (cancelled) {
+            throw stamp(cancelled instanceof InferenceProviderError ? cancelled : new InferenceCancelledError(), attempts, elapsed(clock, started));
+          }
+        }
+        throw stamp(failure, attempts, elapsed(clock, started));
+      }
     }
-
-    const body = await response.json() as {
-      choices?: readonly { message?: { content?: unknown }; finish_reason?: unknown }[];
-      usage?: { prompt_tokens?: unknown; completion_tokens?: unknown };
-      model?: unknown;
-    };
-    const choice = body.choices?.[0];
-    const text = typeof choice?.message?.content === 'string' ? choice.message.content : '';
-    if (!text) throw new InferenceUpstreamError(200, 'inference provider returned no content');
-
-    return {
-      text,
-      usage: {
-        inputTokens: asCount(body.usage?.prompt_tokens),
-        outputTokens: asCount(body.usage?.completion_tokens),
-      },
-      model: typeof body.model === 'string' ? body.model : request.model,
-      stopReason: choice?.finish_reason === 'length' ? 'MAX_TOKENS' : choice?.finish_reason === 'stop' ? 'END' : 'OTHER',
-    };
   }
+
+  async probe(): Promise<InferenceProbe> {
+    const clock = this.options.clock ?? (() => performance.now());
+    const started = clock();
+    try {
+      const answer = await this.send('GET', '/models', undefined, this.probeTimeoutMs);
+      const latencyMs = elapsed(clock, started);
+      if (!answer.ok) {
+        return { reachable: false, modelServed: null, failureClass: new InferenceUpstreamError(answer.status).failureClass, latencyMs };
+      }
+      let listed: unknown;
+      try { listed = JSON.parse(answer.text); } catch { listed = undefined; }
+      const data = listed && typeof listed === 'object' ? (listed as { data?: unknown }).data : undefined;
+      if (!Array.isArray(data)) return { reachable: true, modelServed: null, failureClass: 'PROVIDER_MALFORMED_RESPONSE', latencyMs };
+      const ids = data
+        .map((entry) => (entry && typeof entry === 'object' ? (entry as { id?: unknown }).id : undefined))
+        .filter((id): id is string => typeof id === 'string');
+      return { reachable: true, modelServed: this.options.model ? ids.includes(this.options.model) : null, failureClass: null, latencyMs };
+    } catch (error) {
+      const failureClass = error instanceof InferenceProviderError ? error.failureClass : 'PROVIDER_UNREACHABLE';
+      return { reachable: false, modelServed: null, failureClass, latencyMs: elapsed(clock, started) };
+    }
+  }
+
+  /**
+   * One HTTP exchange, body read included, under its own timeout. Throws only typed errors:
+   * timeout, cancellation, or unreachable — never the underlying network error, whose message
+   * can name the host and port.
+   */
+  private async send(method: 'GET' | 'POST', path: string, body: string | undefined, timeoutMs: number, signal?: AbortSignal): Promise<{ ok: boolean; status: number; text: string }> {
+    if (signal?.aborted) throw new InferenceCancelledError();
+    const fetchImpl = this.options.fetchImpl ?? (globalThis.fetch as unknown as FetchLike);
+    const controller = new AbortController();
+    let timedOut = false;
+    const timer = setTimeout(() => { timedOut = true; controller.abort(); }, timeoutMs);
+    const relay = (): void => controller.abort();
+    signal?.addEventListener('abort', relay, { once: true });
+    try {
+      const response = await fetchImpl(`${this.baseUrl}${path}`, {
+        method,
+        headers: {
+          accept: 'application/json',
+          ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+          ...(this.options.apiKey ? { authorization: `Bearer ${this.options.apiKey}` } : {}),
+        },
+        ...(body === undefined ? {} : { body }),
+        signal: controller.signal,
+      });
+      // The body is read even for an error so the connection is released; it is then discarded.
+      const text = await response.text();
+      return { ok: response.ok, status: response.status, text };
+    } catch {
+      if (timedOut) throw new InferenceTimeoutError();
+      if (signal?.aborted) throw new InferenceCancelledError();
+      throw new InferenceUnreachableError();
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', relay);
+    }
+  }
+
+  private async backoff(attempt: number, signal?: AbortSignal): Promise<void> {
+    const wait = this.backoffMs * 2 ** (attempt - 1);
+    const sleep = this.options.sleep ?? defaultSleep;
+    await sleep(wait, signal);
+    if (signal?.aborted) throw new InferenceCancelledError();
+  }
+}
+
+function parseCompletion(text: string, requestedModel: string): Omit<InferenceResult, 'latencyMs' | 'attempts'> {
+  let body: {
+    choices?: readonly { message?: { content?: unknown }; finish_reason?: unknown }[];
+    usage?: { prompt_tokens?: unknown; completion_tokens?: unknown };
+    model?: unknown;
+  } | null;
+  try {
+    body = JSON.parse(text) as typeof body;
+  } catch {
+    throw new InferenceMalformedResponseError();
+  }
+  if (!body || typeof body !== 'object' || !Array.isArray(body.choices)) throw new InferenceMalformedResponseError();
+  const choice = body.choices[0];
+  const content = choice?.message?.content;
+  if (typeof content !== 'string' || !content.trim()) throw new InferenceMalformedResponseError();
+  return {
+    text: content,
+    usage: {
+      inputTokens: asCount(body.usage?.prompt_tokens),
+      outputTokens: asCount(body.usage?.completion_tokens),
+    },
+    model: typeof body.model === 'string' && body.model ? body.model : requestedModel,
+    stopReason: choice?.finish_reason === 'length' ? 'MAX_TOKENS' : choice?.finish_reason === 'stop' ? 'END' : 'OTHER',
+  };
+}
+
+function stamp(error: InferenceProviderError, attempts: number, latencyMs: number): InferenceProviderError {
+  error.attempts = attempts;
+  error.latencyMs = latencyMs;
+  return error;
+}
+
+function elapsed(clock: () => number, started: number): number {
+  return Math.max(0, Math.round(clock() - started));
+}
+
+function bounded(value: number | undefined, fallback: number, min: number, max: number): number {
+  if (value === undefined || !Number.isFinite(value)) return fallback;
+  return Math.min(max, Math.max(min, Math.floor(value)));
+}
+
+function defaultSleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    if (signal?.aborted || ms <= 0) { resolve(); return; }
+    const timer = setTimeout(done, ms);
+    function done(): void {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', done);
+      resolve();
+    }
+    signal?.addEventListener('abort', done, { once: true });
+  });
+}
+
+interface AnthropicFetchLike {
+  (input: string, init: { method: string; headers: Record<string, string>; body: string; signal?: AbortSignal }): Promise<{
+    ok: boolean;
+    status: number;
+    json(): Promise<unknown>;
+  }>;
 }
 
 /**
@@ -177,7 +433,7 @@ export class AnthropicProvider implements InferenceProvider {
   constructor(
     private readonly options: {
       readonly apiKey: string;
-      readonly fetchImpl?: FetchLike;
+      readonly fetchImpl?: AnthropicFetchLike;
       readonly baseUrl?: string;
     },
   ) {
@@ -185,7 +441,7 @@ export class AnthropicProvider implements InferenceProvider {
   }
 
   async complete(request: InferenceRequest): Promise<InferenceResult> {
-    const fetchImpl = (this.options.fetchImpl ?? (globalThis.fetch as unknown as FetchLike));
+    const fetchImpl = this.options.fetchImpl ?? (globalThis.fetch as unknown as AnthropicFetchLike);
     // Anthropic takes the system prompt as its own field rather than a message.
     const system = request.messages.filter((message) => message.role === 'system').map((message) => message.content).join('\n\n');
     const messages = request.messages.filter((message) => message.role !== 'system');
@@ -208,7 +464,7 @@ export class AnthropicProvider implements InferenceProvider {
     });
 
     if (response.status === 429) throw new InferenceRateLimitedError();
-    if (!response.ok) throw new InferenceUpstreamError(response.status, 'inference provider returned an error');
+    if (!response.ok) throw new InferenceUpstreamError(response.status);
 
     const body = await response.json() as {
       content?: readonly { type?: unknown; text?: unknown }[];
@@ -220,7 +476,7 @@ export class AnthropicProvider implements InferenceProvider {
       .filter((block) => block.type === 'text' && typeof block.text === 'string')
       .map((block) => block.text as string)
       .join('');
-    if (!text) throw new InferenceUpstreamError(200, 'inference provider returned no content');
+    if (!text) throw new InferenceMalformedResponseError();
 
     return {
       text,

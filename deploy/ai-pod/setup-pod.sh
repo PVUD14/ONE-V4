@@ -10,7 +10,8 @@
 # What it does, in order:
 #   1. a virtualenv with the versions known to work on this pod (driver 570 / CUDA 12.8):
 #      vllm==0.11.0, torch 2.8.0+cu128, transformers>=4.56,<4.58;
-#   2. the model, Qwen/Qwen2.5-14B-Instruct (Apache-2.0), via huggingface_hub.snapshot_download;
+#   2. the model (default Qwen/Qwen2.5-14B-Instruct, Apache-2.0; MODEL_REPO switches it), via
+#      huggingface_hub.snapshot_download;
 #   3. the API key file, created only if missing (umask 077) — its value is never printed;
 #   4. stops whatever listens on port 8888 (RunPod's JupyterLab), by PID;
 #   5. starts `vllm serve` on 0.0.0.0:8888 under nohup, waits for /health;
@@ -23,15 +24,19 @@ set -euo pipefail
 
 ONE_AI_HOME="${ONE_AI_HOME:-/root/one-ai}"
 VENV="$ONE_AI_HOME/venv"
+# The served model. To switch (the ENG-21 bake-off), set MODEL_REPO and SERVED_MODEL_NAME (and, for
+# a quantised or otherwise special model, VLLM_EXTRA_ARGS) and run the script again: a different
+# model on port 8888 is stopped and this one started. See deploy/ai-pod/bake-off/README.md.
 MODEL_REPO="${MODEL_REPO:-Qwen/Qwen2.5-14B-Instruct}"
-MODEL_DIR="$ONE_AI_HOME/models/Qwen2.5-14B-Instruct"
+MODEL_DIR="$ONE_AI_HOME/models/${MODEL_REPO##*/}"
 SERVED_MODEL_NAME="${SERVED_MODEL_NAME:-qwen2.5-14b-instruct}"
+VLLM_EXTRA_ARGS="${VLLM_EXTRA_ARGS:-}"
 KEY_FILE="$ONE_AI_HOME/api-key"
 LOG_FILE="$ONE_AI_HOME/vllm.log"
 PID_FILE="$ONE_AI_HOME/vllm.pid"
 PORT=8888
-MAX_MODEL_LEN=16384
-GPU_MEMORY_UTILIZATION=0.90
+MAX_MODEL_LEN="${MAX_MODEL_LEN:-16384}"
+GPU_MEMORY_UTILIZATION="${GPU_MEMORY_UTILIZATION:-0.90}"
 HEALTH_WAIT_SECONDS="${HEALTH_WAIT_SECONDS:-1200}"
 
 VLLM_VERSION="0.11.0"
@@ -157,10 +162,12 @@ else
     --host 0.0.0.0 --port "$PORT" \
     --max-model-len "$MAX_MODEL_LEN" \
     --gpu-memory-utilization "$GPU_MEMORY_UTILIZATION" \
+    $VLLM_EXTRA_ARGS \
     > "$LOG_FILE" 2>&1 &
+  # VLLM_EXTRA_ARGS is unquoted on purpose: it is a list of flags (e.g. "--quantization awq_marlin").
   echo $! > "$PID_FILE"
 
-  say "waiting up to ${HEALTH_WAIT_SECONDS}s for /health (loading a 14B model takes minutes)"
+  say "waiting up to ${HEALTH_WAIT_SECONDS}s for /health (loading a model takes minutes)"
   waited=0
   until curl -fsS -m 5 "http://127.0.0.1:${PORT}/health" >/dev/null 2>&1; do
     kill -0 "$(cat "$PID_FILE")" 2>/dev/null || fail "vLLM exited; see the last lines of $LOG_FILE"

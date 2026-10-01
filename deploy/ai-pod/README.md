@@ -112,6 +112,17 @@ The script keeps an existing key file.
 On the pod: `rm /root/one-ai/api-key`, stop vLLM (`kill $(cat /root/one-ai/vllm.pid)`), run
 `bash setup-pod.sh` again, then repeat step 4. The old key stops working as soon as vLLM restarts.
 
+### 7. Switching the served model, and the bake-off (ENG-21)
+
+`setup-pod.sh` serves `Qwen/Qwen2.5-14B-Instruct` unless told otherwise. `MODEL_REPO`,
+`SERVED_MODEL_NAME` and, for quantised models, `VLLM_EXTRA_ARGS` (e.g. `--quantization awq_marlin`)
+switch it; `MAX_MODEL_LEN` and `GPU_MEMORY_UTILIZATION` can be overridden too. Running the script with
+a different model stops the one on port 8888 and starts the new one. ONE's server must then be given
+the new `ONE_AI_MODEL`, and no feature runs on it until it has its own passing evaluation.
+
+How to compare candidates with ONE's evaluation set, and record the result:
+`deploy/ai-pod/bake-off/README.md`.
+
 ## What the script does not do
 
 - It does not open any port other than 8888, does not expose JupyterLab (it stops it), and does not

@@ -2598,7 +2598,17 @@ not merged (the coordinator merges).
 with `:app:compileDebugKotlin`. The operations lesson editor is web-only (Appendix 1 §4.3), so the native-speaker badge and
 approval field have no Android counterpart.
 
-**Validation:** pending — recorded below when the run finishes.
+**Validation** (`E:/one-wt/logs/validate.sh E:/one-wt/eng16 one_eng16 eng16 android`, fresh database):
+- install 0; `db:migrate` twice: 84 applied, then 0 applied with 84 already applied; typecheck 0; build 0; policy grep 0;
+  `pnpm audit --prod --audit-level=high` 0; Android `:app:compileDebugKotlin` 0.
+- Tests: web 951/951, persistence 460/460, every other package passed; api 1337/1342. The test step exited 1 because of
+  one file, `hiring.integration.spec.ts` (5 tests in "hiring lifecycle"), which also fails when re-run alone. It is not
+  caused by this branch (no hiring file changed): its fixture offer has `offerExpiresAt: '2026-10-01T00:00:00.000Z'`, and
+  the database clock passed that date today, so accepting the offer is refused as expired. Fixing it means moving that
+  fixture date; left to the coordinator so parallel branches do not collide on it.
+- The new and changed tests all pass: career-readiness lesson-language 9/9, authorization lesson-editor (3 new cases),
+  api lesson-languages 11/11, operations-lessons 19/19, privacy 37 and api-security, web lessons 18/18 and
+  careerReadinessApiPanel 3/3.
 
 **Limitations / not done:**
 - No Telugu text exists yet; until an operator publishes one, Telugu readers see English with the notice everywhere.

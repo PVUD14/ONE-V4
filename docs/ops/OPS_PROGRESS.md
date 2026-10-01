@@ -2879,3 +2879,112 @@ institution-placement-visibility 15/15; persistence misconceptions 15/15; web Ap
 rolePortal/employerReports 5/5. operations-career-catalogue and skill-evidence first passed every test and then hit
 "out of shared memory" at teardown; their second solo run was clean. This goal's own tests: api student-resumes 7/7,
 resume-content 24/24, privacy 17/17, growth-foundation 19/19; web studentResumes 2/2.
+
+## ENG-23 — Content factory (AI drafts to review) — 2026-10-02
+**Result:** Built and tested against ENG-20's local fake endpoint; switched off everywhere. Operations presses
+**Draft with AI** in the lesson editor or the question bank; the API only queues a job (row, audit, outbox event); a
+worker runs it through ONE AI Orchestration (kill switch → feature switch → cap → size → call); a code guard built
+from the bake-off's own checks decides whether anything lands; what passes lands in the existing editor as a
+`DRAFT`, labelled **AI draft** with full provenance, authored by the requester — so the existing rules (0004, 0061,
+0065, the learner-content lifecycle) keep them from approving or publishing it, and it publishes only through the
+same review and second-person approval as human content. No model call in any request handler; nothing reaches a
+student until people publish it, and then only the learner text.
+
+**Branch / PR:** `feat/eng-23-content-factory`, from `onev4/feat/plan-phases-0-to-2` (837da63). Commits: design
+(de23bc4), tests (c4c1302), backend (3c4fb05), web tests (1365c24), web (9fb2f56), SOPs (e3318e2), student-rendering
+test (e522ed8), this report. Pushed to onev4; not merged.
+
+**Files created:**
+- `docs/architecture/content-factory-design.md` — kinds and features, request/worker split (and why not the outbox
+  dispatcher), author = requester, provenance in the body, lesson mapping, the guard, caps, the table design.
+- `packages/persistence/drizzle/0106_content_factory.sql` — `ai_content_drafts` (+ guard trigger, CHECKs, indexes);
+  `question_hint_ladders` accepts `AI_GENERATED` under the same provenance rule as `AGENT_DRAFTED`.
+- `packages/ai-evaluation/src/content-guard.ts` (`content-guard-v1`): lesson / item / answer-check guards, script
+  check for all eleven lesson languages, lesson fitting into summary + practice.
+- `packages/authorization/src/content-factory.ts` — kinds, features, reason codes, who may ask, who sees checks.
+- `packages/persistence/src/content-factory.ts` (requests, status, reads — the API's),
+  `content-factory-worker.ts` (claim, run, guard, land — workers only), `ai-draft-provenance.ts`,
+  `run-content-factory-worker.ts` (`ai:content-factory [--once]`).
+- `apps/api/src/http/operations-content-factory.controller.ts` — `GET /status`, `GET /drafts`, `GET /drafts/:id`,
+  `POST /drafts` under `/api/v1/operations/content-factory`.
+- `apps/web/src/api/contentFactory.ts`, `apps/web/src/rolePortal/contentFactory.tsx` — AI drafts card, Draft with AI
+  and translation dialogs, AI-draft provenance block, answer-key check.
+- Tests: `packages/ai-evaluation/test/content-guard.test.ts` (14), `packages/authorization/src/content-factory.test.ts`
+  (4), `packages/persistence/test/content-factory.integration.test.ts` (9),
+  `apps/api/src/http/operations-content-factory.integration.spec.ts` (13), `apps/web/src/rolePortal/contentFactory.test.tsx` (10).
+
+**Files modified:** `ai-orchestration` (`content-item-draft` v1 prompt and the `content.item-draft` feature, declared
+off; `GenerationRecord.model`); `ai-evaluation/checks.ts` (shared patterns exported, behaviour unchanged);
+`career-readiness/question-bank.ts` (`readAiDraftProvenance`); `persistence` lesson editor and question bank (create
+with an AI-draft block, `aiDraft` / `aiDrafted` in views, AI ladders at submission); `events` (two event types);
+API module; web lessons and question bank pages and DTOs; `inference-boundary.spec.ts` (the worker module is now
+forbidden to apps too); `ai-bake-off.integration.test.ts` and `operations-ai.integration.spec.ts` (the registry now
+declares four features/prompts — assertions extended, not loosened); `career-readiness/test/question-bank.test.ts`;
+SOPs `sop-content-authoring.md` (A2) and `sop-ai-operations.md` (F).
+
+**Migrations added:** 0106 (assigned). No approval key added, so `operation_approval_extended_target_type()` is
+not redefined.
+
+**Acceptance criteria:**
+- [x] **Outbox jobs that draft items, hints and variants into the review queue as DRAFT with full provenance.** A
+  request writes the job, its audit and `content_factory.draft_requested`; the worker writes the draft through the
+  editors' own create/save functions and `content_factory.draft_finished`. Lessons, variants in any lesson language,
+  practice questions with four-step ladders, and answer checks. The body carries `provenance`
+  (`source: AI_GENERATED`, generator, prompt version, fingerprint, model, generated time, job) and the revision's
+  `state` is `DRAFT`; the job row carries the same plus the outcome.
+- [x] **Per-feature caps.** Each kind runs one feature with its own cap (lesson 50/day, item 50/day, check 200/day).
+- [x] **C13 — nothing publishes without an approver.** No code path in the factory writes a review action or a state
+  change; the API spec proves the draft has none, a DRAFT cannot be published, the requester (holding review and
+  publish capabilities) is refused approval by the API (`LESSON_SELF_REVIEW_REFUSED`) and by the database (0004), is
+  refused publishing, and a first publish needs a second person's approval; students then get only the learner text.
+- [x] **C13 — the cap stops calls with a typed error.** Request time: `429 AI_CAP_REACHED` (successes plus queued work
+  reach the cap). Call time: the orchestrator's `AiCapExceededError` → job `REFUSED / CAP_EXCEEDED`, metered
+  `REFUSED / CAP_EXCEEDED`, and the fake endpoint received no request. The kill switch and a switched-off feature
+  likewise (`409 AI_KILL_SWITCH_ENGAGED` / `AI_FEATURE_DISABLED`; job `REFUSED / KILL_SWITCH_ENGAGED`, no request).
+  C13's *per-college* cap belongs to the tutor (ENG-25): content drafts are platform content, not a college's.
+- [x] **Guard output.** Refuses wrong shape, cut-off replies, wrong script, personal data, readiness figures,
+  placement chances, promised outcomes, a lesson copying a bank item on its skill, duplicate options, and hints that
+  name the answer or its letter (ENG-15's rule); a model `REFUSED:` lands nothing. Aptitude subject matter (marks,
+  percentages, probability of selection) is not mistaken for a readiness claim (test).
+- [x] **Audited, kill switch honoured, no synchronous model call in a request handler.** Two audit actions per job;
+  `inference-boundary.spec.ts` forbids the worker module in apps.
+- [x] **An AI draft cannot be approved by the person who requested it.** The requester is the author (above).
+- [x] **Web.** AI drafts card (state, today's use against the cap, jobs and outcomes in words), Draft with AI, Draft a
+  translation with AI, AI-draft badge in both lists, provenance and the model's full text for reviewers, answer-key
+  check for key holders only. No navigation item added, removed, renamed or reordered.
+- [~] **First switched on in the demo sandbox.** Built so it can be; switching it on needs the pod and a bake-off
+  record (coordinator steps below). Nothing was switched on by this goal.
+
+**Decisions taken (recorded in the design):** the requester is the author; provenance lives in the revision body (no
+new column on `content_revisions`); the job row, not the outbox dispatcher, is the work queue (the dispatcher's 60 s
+lease cannot hold a model call); one feature for lessons and variants (one prompt); a new `content-item-draft` v1
+prompt registered off (no evaluation covers it yet); the v1 lesson's five sections map onto summary + practice, cut at
+a sentence when too long and flagged, the full text kept beside the draft; rejected replies are not stored; answer
+checks are advice, shown only with answer keys; 3 jobs in flight per person; retries only for 429/5xx/unreachable,
+never a timeout (ENG-20); requests need `CONTENT_EDIT` (checks `CONTENT_REVIEW`).
+
+**Android:** no change. Operations is view-only on Android and has no content editors. A lesson or question that
+started as an AI draft reaches the app only after people publish it, through the same `lesson_versions` /
+`question_versions` rows and ENG-16's variant rendering, which carry only the learner text — it looks like any other
+content to students (tests: career-readiness "reaches students as its words only", API "students get the learner
+text only").
+
+**How the coordinator switches it on in the demo sandbox** (also `sop-ai-operations.md` F): (1) put
+`ONE_AI_BASE_URL` / `ONE_AI_API_KEY` / `ONE_AI_MODEL` in the sandbox server's environment, never in the repo;
+(2) migrate the sandbox database (0106) and run `corepack pnpm --filter @planthepath/persistence ai:register-features`;
+(3) run the ENG-21 bake-off for `content.lesson-draft` (and `content.answer-check`) on the pod and record it with
+`ai:bake-off-import` into the sandbox database; (4) in AI Operations, release the kill switch if engaged, lower the
+cap to the demo's need, and **Switch on…** the feature (a second person approves); (5) start
+`corepack pnpm --filter @planthepath/persistence ai:content-factory` in the sandbox API container (same environment
+and `DATABASE_URL`); (6) Content Management → Lessons and variants → AI drafts shows **On**; ask for a lesson; the
+draft opens marked AI draft. To stop: switch the feature off or engage the kill switch, then stop the worker.
+
+**Not done / for the coordinator:** `content.item-draft` cannot be switched on until ENG-21's set gains item-drafting
+cases (design open point 1); the worker is not added to any Compose pack or systemd unit (the sandbox stack lives on
+`feat/demo-sandbox`, unmerged); no model was called and the pod was not touched; cost stays NA.
+
+**Validation:** typecheck 0; touched suites on a fresh database (`one_eng23_fresh`, migrated twice: 89 applied, then 0
+applied / 89 already applied): ai-evaluation 47/47, ai-orchestration 62/62, authorization (content factory, lesson
+editor, question bank) 22/22, career-readiness 132/132, events 14/14, persistence AI and content suites 64/64, API
+(content factory, lessons, question bank, lesson languages, AI operations, inference boundary) 83/83, web (content
+factory, lessons, question bank) 48/48. Full run: to follow in this entry.

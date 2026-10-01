@@ -1452,6 +1452,18 @@ export const eventSchemas = {
     schemaRef: 'registry://learning.skill_state.projection_requested/1',
     payload: { subjectUserId: { kind: 'uuid' }, reason: { kind: 'enum', values: ['ATTEMPTS_RECORDED', 'CONSENT_GRANTED'] } },
   },
+  // ENG-22: a student asked the AI tutor for a hint; the worker writes it (no model call in the request).
+  // Carries only the request's id: the worker reads the question, the ladder and the consent itself.
+  tutorHintRequestedV1: {
+    eventType: 'tutor.hint.requested',
+    eventVersion: 1,
+    producer: 'learning-engine',
+    aggregateType: 'tutor_hint',
+    purpose: 'ai-tutoring',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://tutor.hint.requested/1',
+    payload: { tutorHintId: { kind: 'uuid' } },
+  },
   assessmentAttemptStartedV1: {
     eventType: 'assessment.attempt.started',
     eventVersion: 1,

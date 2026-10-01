@@ -33,6 +33,16 @@ import { learnerLessonLanguage, renderLessonVersions } from './lesson-languages.
 import { listDueReviews } from './learner-skill-state.js';
 import { resolveResponseMisconceptionsWith } from './misconceptions.js';
 import type { PersistenceDb } from './repositories.js';
+import {
+  TutorHintRequestError,
+  composeHintEntries,
+  decideTutorHintFromStore,
+  loadTutorHintRows,
+  recordTutorHintRequest,
+  tutorAvailability,
+  type StepHintView,
+  type TutorAvailabilityView,
+} from './tutor-hints.js';
 
 /** Questions served per step (`learning-step-items-v1`); the 0072 CHECK allows positions 1–5. */
 export const STEP_ITEM_LIMIT = 5;
@@ -71,6 +81,13 @@ export interface StepQuestionView {
   readonly hintsAvailable: boolean;
   /** Hints shown so far, in ladder order (level 1 first). Their count is the level shown. */
   readonly hints: readonly string[];
+  /**
+   * ENG-22: the same levels with where each came from — the human ladder or the AI tutor (labelled as AI
+   * on every screen) — and whether an AI hint is shown, still being written, or replaced by the human hint.
+   */
+  readonly hintDetails: readonly StepHintView[];
+  /** ENG-22: whether the student may ask the AI tutor for the next level now, and if not why. */
+  readonly tutor: TutorAvailabilityView;
 }
 
 export type StepPracticeView =
@@ -241,17 +258,28 @@ async function publishedLadder(db: PersistenceDb, questionId: string): Promise<r
   return ladder ? [ladder.hint_1, ladder.hint_2, ladder.hint_3, ladder.hint_4] : null;
 }
 
-async function questionView(db: PersistenceDb, item: ServedRow): Promise<StepQuestionView> {
+async function questionView(db: PersistenceDb, decision: DecisionRow, item: ServedRow): Promise<StepQuestionView> {
   const [question] = await rows<{ prompt: string; options: unknown }>(db, sql`SELECT prompt, options FROM question_versions WHERE id = ${item.item_id}::uuid`);
   const ladder = await publishedLadder(db, item.item_id);
+  const { entries, hints } = composeHintEntries(ladder, item.hint_level, await loadTutorHintRows(db, decision.id, item.item_id));
   return {
     id: item.item_id,
     prompt: question?.prompt ?? '',
     options: optionsOf(question?.options),
     position: item.position,
     hintsAvailable: ladder !== null,
-    hints: ladder ? ladder.slice(0, item.hint_level) : [],
+    hints,
+    hintDetails: entries,
+    tutor: await tutorAvailability(db, {
+      subjectUserId: decision.subject_user_id, decisionId: decision.id, itemId: item.item_id, sessionMode: sessionModeOf(decision),
+      ladderPublished: ladder !== null, currentLevel: item.hint_level,
+    }),
   };
+}
+
+/** The learning session mode a step's questions are served in; NONE has none (and no questions). */
+function sessionModeOf(decision: DecisionRow): string {
+  return decision.action === 'NONE' ? 'NONE' : SESSION_FOR_ACTION[decision.action].mode;
 }
 
 /**
@@ -286,7 +314,7 @@ async function stepView(db: PersistenceDb, subjectUserId: string, decisionId: st
   const practice: StepPracticeView = decision.skill_id === null
     ? { status: 'NO_SKILL' }
     : current
-      ? { status: 'IN_PROGRESS', question: await questionView(db, current), questionsAnswered: answered }
+      ? { status: 'IN_PROGRESS', question: await questionView(db, decision, current), questionsAnswered: answered }
       : served.length > 0 ? { status: 'COMPLETED', questionsAnswered: answered } : { status: 'NO_PRACTICE' };
   return {
     decisionId: decision.id,
@@ -436,6 +464,43 @@ export async function revealStepHint(db: PersistenceDb, input: {
       UPDATE learning_step_items SET hint_level = hint_level + 1
       WHERE decision_id = ${decision.id}::uuid AND item_id = ${questionId}::uuid
     `);
+    return (await stepView(runner, input.subjectUserId, decision.id))!;
+  });
+}
+
+/**
+ * ENG-22: asks the AI tutor for the next hint level of the question being answered. Plain database work
+ * in the step's transaction — the policy over stored data, the hint level raised by one exactly as
+ * "Show hint" raises it (so hint 3+ makes the answer assisted, 0047), the request row, its outbox job
+ * and the audit row. The model is called later by the outbox worker; the screen polls the step.
+ */
+export async function requestStepTutorHint(db: PersistenceDb, input: {
+  readonly subjectUserId: string; readonly decisionId: string; readonly questionId: string; readonly correlationId: string;
+  readonly env?: Readonly<Record<string, string | undefined>>;
+}): Promise<LearningStepView> {
+  assertUuid(input.subjectUserId);
+  if (!UUID.test(input.decisionId) || !UUID.test(input.questionId)) throw new LearningStepError('INVALID_INPUT');
+  const questionId = input.questionId.toLowerCase();
+  return db.transaction(async (tx) => {
+    const runner = tx as unknown as PersistenceDb;
+    await lockStudent(runner, input.subjectUserId);
+    const decision = await actionableDecision(runner, input.subjectUserId, input.decisionId);
+    const current = (await servedItems(runner, decision.id)).find((item) => !item.answered);
+    if (!current || current.item_id !== questionId || decision.action === 'NONE') throw new LearningStepError('NOT_CURRENT_QUESTION');
+    const ladder = await publishedLadder(runner, questionId);
+    const { decision: verdict } = await decideTutorHintFromStore(runner, {
+      subjectUserId: input.subjectUserId, decisionId: decision.id, itemId: questionId, sessionMode: sessionModeOf(decision),
+      ladderPublished: ladder !== null, currentLevel: current.hint_level, ...(input.env ? { env: input.env } : {}),
+    });
+    if (!verdict.allowed) throw new TutorHintRequestError(verdict.reason);
+    await runner.execute(sql`
+      UPDATE learning_step_items SET hint_level = hint_level + 1
+      WHERE decision_id = ${decision.id}::uuid AND item_id = ${questionId}::uuid
+    `);
+    await recordTutorHintRequest(runner, {
+      subjectUserId: input.subjectUserId, institutionId: decision.institution_id, decisionId: decision.id, itemId: questionId,
+      level: verdict.level, language: verdict.language, correlationId: input.correlationId,
+    });
     return (await stepView(runner, input.subjectUserId, decision.id))!;
   });
 }

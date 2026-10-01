@@ -218,3 +218,39 @@ export function engageAiKillSwitch(token: string, body: { readonly reasonCode: s
 export function disableAiAssistant(token: string, body: { readonly reasonCode: string }): Promise<AiOperationsWriteDto> {
   return requestJson(`${base}/assistant/disable`, { token, method: 'POST', body });
 }
+
+/** ENG-22: one tutor hint as staff review it — the question and the hint, never who the student was. */
+export interface TutorHintReviewDto {
+  readonly id: string;
+  readonly requestedAt: string;
+  readonly level: number;
+  readonly language: string;
+  readonly status: string;
+  readonly fallbackReason: string | null;
+  readonly guardFindings: readonly string[];
+  readonly generatedText: string | null;
+  readonly questionPrompt: string;
+  readonly model: string | null;
+  readonly promptVersion: string;
+  readonly guardVersion: string | null;
+  readonly reviewState: string;
+  readonly reviewReasonCode: string | null;
+}
+
+export type TutorHintReviewView = 'sample' | 'refused' | 'reviewed';
+
+export interface TutorHintReviewListDto {
+  readonly view: TutorHintReviewView;
+  readonly hints: readonly TutorHintReviewDto[];
+  readonly counts: { readonly shown7d: number; readonly fallback7d: number; readonly published: number; readonly rejected: number };
+  readonly reasons: { readonly approve: readonly string[]; readonly reject: readonly string[] };
+  readonly viewer: { readonly canReview: boolean };
+}
+
+export function listTutorHintsForReview(token: string, view: TutorHintReviewView, signal?: AbortSignal): Promise<TutorHintReviewListDto> {
+  return requestJson(`/api/v1/operations/ai/tutor-hints?view=${encodeURIComponent(view)}`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function reviewTutorHint(token: string, tutorHintId: string, body: { readonly verdict: 'APPROVE' | 'REJECT'; readonly reasonCode: string }): Promise<{ readonly tutorHint: { readonly id: string; readonly reviewState: string } }> {
+  return requestJson(`/api/v1/operations/ai/tutor-hints/${encodeURIComponent(tutorHintId)}/review`, { token, method: 'POST', body });
+}

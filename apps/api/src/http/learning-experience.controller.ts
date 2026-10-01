@@ -9,19 +9,22 @@
  * Responses never carry an answer key, the correct option, an explanation, a model number or a readiness
  * value; errors carry a code, a plain sentence and the correlation id, nothing internal.
  */
-import { BadRequestException, Body, ConflictException, Controller, ForbiddenException, Get, Inject, NotFoundException, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, ConflictException, Controller, ForbiddenException, Get, HttpCode, Inject, NotFoundException, Param, Post, Req, UseGuards } from '@nestjs/common';
 import type { PersistenceDb } from '@planthepath/persistence/src/repositories.js';
 import {
   LearningStepError,
   answerStepQuestion,
   readLearningPath,
   readLearningStep,
+  requestStepTutorHint,
   revealStepHint,
   startNextLearningStep,
   type LearningPathView,
   type LearningStepView,
   type StepAnswerView,
 } from '@planthepath/persistence/src/learning-experience.js';
+import { TutorHintRequestError } from '@planthepath/persistence/src/tutor-hints.js';
+import type { TutorRefusalReason } from '@planthepath/tutoring/src/index.js';
 import { API_PERSISTENCE_DB, ProtectedApiAuthenticationGuard, type ProtectedHttpRequest } from './api-security.js';
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -65,7 +68,22 @@ function readAnswer(body: unknown, correlationId: string): { questionId: string;
   return { questionId, selectedOptionId };
 }
 
+/** ENG-22: why the AI tutor cannot give a hint right now, in plain words. Never anything internal. */
+const TUTOR_REFUSAL_MESSAGES: Readonly<Record<TutorRefusalReason, string>> = {
+  ASSESSMENT_MODE: 'The AI tutor is not available here.',
+  OFF: 'The AI tutor is not switched on.',
+  NO_CONSENT: 'The AI tutor needs your agreement first.',
+  LANGUAGE_NOT_SUPPORTED: 'The AI tutor does not write in your language yet. The written hints still work.',
+  NO_LADDER: 'This question has no hints.',
+  HINTS_USED: 'You have seen every hint for this question.',
+  PENDING: 'The AI tutor is still writing your last hint.',
+  DAILY_LIMIT: 'You have used today’s AI hints. The written hints still work.',
+};
+
 function mapError(error: unknown, correlationId: string): Error {
+  if (error instanceof TutorHintRequestError) {
+    return new ConflictException({ error: { code: `TUTOR_${error.reason}`, message: TUTOR_REFUSAL_MESSAGES[error.reason], correlationId } });
+  }
   if (!(error instanceof LearningStepError)) return error instanceof Error ? error : new Error('learning step failed');
   switch (error.code) {
     case 'INVALID_INPUT':
@@ -140,6 +158,30 @@ export class LearningExperienceController {
     const questionId = readQuestion(body, correlationId);
     try {
       return { step: await revealStepHint(this.db, { subjectUserId: userId, decisionId, questionId }), correlationId };
+    } catch (error) {
+      throw mapError(error, correlationId);
+    }
+  }
+
+  /**
+   * ENG-22: asks the AI tutor for the next hint level of the question being answered. Records the request
+   * and its outbox job and returns at once (202) with the level shown as pending; the outbox worker writes
+   * the hint (no model call here), and the screen polls GET /steps/:decisionId. The level counts exactly
+   * like "Show hint": an answer after level 3 is assisted.
+   */
+  @Post('/steps/:decisionId/tutor-hints')
+  @HttpCode(202)
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async tutorHint(
+    @Req() request: ProtectedHttpRequest,
+    @Param('decisionId') decisionId: string,
+    @Body() body: unknown,
+  ): Promise<{ step: LearningStepView; correlationId: string }> {
+    const { userId, correlationId } = requireContext(request);
+    if (!uuidPattern.test(decisionId)) throw badRequest(correlationId);
+    const questionId = readQuestion(body, correlationId);
+    try {
+      return { step: await requestStepTutorHint(this.db, { subjectUserId: userId, decisionId, questionId, correlationId }), correlationId };
     } catch (error) {
       throw mapError(error, correlationId);
     }

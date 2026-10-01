@@ -46,6 +46,7 @@ import { StatusBadge } from '../studentComponents.js';
 import { formatApiError } from './shared.js';
 import { RequestApprovalDialog } from './approvals.js';
 import { EngineBehaviourPanels } from './engineHealth.js';
+import { TutorHintsPanel } from './tutorHintReview.js';
 
 const noteLimit = 500;
 const number = (value: number | null | undefined): string => (value === null || value === undefined ? 'NA' : value.toLocaleString());
@@ -221,6 +222,8 @@ export function OperationsAiOperationsPage(): React.ReactElement | null {
     </section>
 
     <AiEvaluationsPanel token={token} canRecord={viewer.canConfigure && features.length > 0} reload={reload} onRecord={() => setDialog({ kind: 'evaluation' })} />
+
+    <TutorHintsPanel token={token} />
 
     <EngineBehaviourPanels token={token} />
 

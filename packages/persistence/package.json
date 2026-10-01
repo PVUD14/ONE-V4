@@ -9,6 +9,7 @@
     "build": "tsc -p tsconfig.json",
     "ai:probe": "tsx src/run-ai-probe.ts",
     "ai:register-features": "tsx src/run-ai-register-features.ts",
+    "ai:tutor-sandbox-consent": "tsx src/run-tutor-sandbox-consent.ts",
     "ai:bake-off-import": "tsx src/run-ai-bake-off-import.ts",
     "ai:content-factory": "tsx src/run-content-factory-worker.ts",
     "db:migrate": "tsx src/migrate.ts",
@@ -53,7 +54,8 @@
     "drizzle-orm": "^0.45.2",
     "pg": "^8.16.0",
     "@planthepath/ai-orchestration": "workspace:*",
-    "@planthepath/ai-evaluation": "workspace:*"
+    "@planthepath/ai-evaluation": "workspace:*",
+    "@planthepath/tutoring": "workspace:*"
   },
   "devDependencies": {
     "@types/pg": "^8.15.0",

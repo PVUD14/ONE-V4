@@ -80,6 +80,15 @@ import {
   type AiPeriod,
 } from '@planthepath/persistence/src/ai-operations.js';
 import { loadMasteryShadowHealth, loadPlannerHealth } from '@planthepath/persistence/src/engine-health.js';
+import {
+  TUTOR_REVIEW_APPROVE_REASONS,
+  TUTOR_REVIEW_REJECT_REASONS,
+  TUTOR_REVIEW_VIEWS,
+  TutorHintReviewError,
+  listTutorHintsForReview,
+  reviewTutorHint,
+  type TutorReviewListView,
+} from '@planthepath/persistence/src/tutor-hints.js';
 import type { PersistenceDb } from '@planthepath/persistence/src/repositories.js';
 import { API_PERSISTENCE_DB, ProtectedApiAuthenticationGuard, requireTrustedAuthorization, safeError, type ProtectedHttpRequest } from './api-security.js';
 import { dbCapabilityGrantLoader, loadCallerCapabilityContext } from './internal-capability-guard.js';
@@ -323,6 +332,51 @@ export class OperationsAiController {
       throw mapError(error, correlationId);
     }
     return this.afterWrite(correlationId);
+  }
+
+  /**
+   * ENG-22: tutor hints for staff review — a daily random sample of DRAFT hints, the refused ones with the
+   * guard's findings, or recent verdicts. The question and the hint, never who the student was.
+   * Design: docs/architecture/tutor-hints-table-design.md (Decision 8).
+   */
+  @Get('/tutor-hints')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async tutorHints(@Req() request: ProtectedHttpRequest, @Query() query: Record<string, unknown>): Promise<Record<string, unknown>> {
+    const { correlationId, actor } = await this.requireView(request);
+    rejectUnknown(query, ['view', 'limit'], correlationId);
+    const view = (query.view ?? 'sample') as string;
+    if (!(TUTOR_REVIEW_VIEWS as readonly string[]).includes(view)) throw badRequest('TUTOR_REVIEW_VIEW_INVALID', correlationId);
+    const limit = readLimit(query.limit, correlationId);
+    const listed = await listTutorHintsForReview(this.db, { view: view as TutorReviewListView, limit });
+    return {
+      view, ...listed,
+      reasons: { approve: TUTOR_REVIEW_APPROVE_REASONS, reject: TUTOR_REVIEW_REJECT_REASONS },
+      viewer: { canReview: canConfigureAi(actor) },
+      correlationId,
+    };
+  }
+
+  /** ENG-22: a staff verdict on one tutor hint — DRAFT to PUBLISHED (approve) or REJECTED, once, with a reason. */
+  @Post('/tutor-hints/:tutorHintId/review')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async reviewTutorHint(@Req() request: ProtectedHttpRequest, @Param('tutorHintId') tutorHintId: string, @Body() body: unknown): Promise<Record<string, unknown>> {
+    const { correlationId, actor } = await this.requireConfigure(request);
+    if (!uuidPattern.test(tutorHintId)) throw badRequest('INVALID_REQUEST', correlationId);
+    const raw = readObject(body, ['verdict', 'reasonCode'], correlationId);
+    if (raw.verdict !== 'APPROVE' && raw.verdict !== 'REJECT') throw badRequest('TUTOR_REVIEW_VERDICT_INVALID', correlationId);
+    const reasons: readonly string[] = raw.verdict === 'APPROVE' ? TUTOR_REVIEW_APPROVE_REASONS : TUTOR_REVIEW_REJECT_REASONS;
+    const reasonCode = readReason(raw.reasonCode, reasons, correlationId);
+    try {
+      const reviewed = await reviewTutorHint(this.db, this.aiActor(actor, correlationId, 'CONFIGURE'), { tutorHintId, verdict: raw.verdict, reasonCode });
+      return { tutorHint: reviewed, correlationId };
+    } catch (error) {
+      if (error instanceof TutorHintReviewError) {
+        if (error.code === 'NOT_FOUND') throw new NotFoundException(domainError('TUTOR_HINT_NOT_FOUND', correlationId));
+        if (error.code === 'INVALID_REASON') throw badRequest('REASON_CODE_INVALID', correlationId);
+        throw new ConflictException(domainError(error.code === 'ALREADY_REVIEWED' ? 'TUTOR_HINT_ALREADY_REVIEWED' : 'TUTOR_HINT_NOT_REVIEWABLE', correlationId));
+      }
+      throw mapError(error, correlationId);
+    }
   }
 
   private async afterWrite(correlationId: string): Promise<Record<string, unknown>> {

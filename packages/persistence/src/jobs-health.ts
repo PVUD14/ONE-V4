@@ -20,6 +20,7 @@ import { platformInternalRoles } from '@planthepath/authorization/src/index.js';
 import { CONTENT_GENERATION_CONSUMER } from './content-generation.js';
 import { LEARNER_SKILL_STATE_CONSUMER, LEARNER_SKILL_STATE_PROJECTION_REQUESTED } from './learner-skill-state.js';
 import { STUDENT_INVITATION_CONSUMER, STUDENT_INVITATION_REQUESTED } from './student-invitations.js';
+import { TUTOR_HINT_CONSUMER, TUTOR_HINT_REQUESTED } from './tutor-hints.js';
 
 /** A drizzle database or transaction. */
 export interface JobsSqlRunner {
@@ -69,6 +70,8 @@ export const knownJobConsumers: readonly JobConsumer[] = [
   // The engine's projector: without a row here an engine that has stopped projecting is invisible
   // on System Health and cannot be given a silence alert (found by the ENG-17 incident runbook).
   { name: LEARNER_SKILL_STATE_CONSUMER, label: 'Learner skill state projection', eventType: LEARNER_SKILL_STATE_PROJECTION_REQUESTED },
+  // ENG-22: the AI tutor's job; listed so a stopped tutor shows on System Health and can have a silence alert.
+  { name: TUTOR_HINT_CONSUMER, label: 'Tutor hints (AI)', eventType: TUTOR_HINT_REQUESTED },
 ];
 
 // ---------------------------------------------------------------------------

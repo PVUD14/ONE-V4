@@ -22,6 +22,19 @@ export interface PathEntryDto {
   readonly reasonCodes: readonly string[];
 }
 
+/** ENG-22: why the AI tutor cannot give the next hint now. OFF / NO_CONSENT / ASSESSMENT_MODE: no AI control is shown. */
+export type TutorReason = 'ASSESSMENT_MODE' | 'OFF' | 'NO_CONSENT' | 'LANGUAGE_NOT_SUPPORTED' | 'NO_LADDER' | 'HINTS_USED' | 'PENDING' | 'DAILY_LIMIT';
+
+/** ENG-22: one shown hint level — from the written ladder or the AI tutor (always labelled as AI). */
+export interface StepHintDto {
+  readonly level: number;
+  readonly source: 'LADDER' | 'AI_TUTOR';
+  /** PENDING: the AI tutor is still writing it. FALLBACK: `text` is the written hint for the level. */
+  readonly state: 'SHOWN' | 'PENDING' | 'FALLBACK';
+  readonly text: string | null;
+  readonly fallback: 'CHECKS_FAILED' | 'UNAVAILABLE' | 'TIMED_OUT' | 'NOT_A_HINT' | null;
+}
+
 export interface StepQuestionDto {
   readonly id: string;
   readonly prompt: string;
@@ -29,6 +42,10 @@ export interface StepQuestionDto {
   readonly position: number;
   readonly hintsAvailable: boolean;
   readonly hints: readonly string[];
+  /** ENG-22 (absent from an older API): the same levels with their source and state. */
+  readonly hintDetails?: readonly StepHintDto[];
+  /** ENG-22 (absent from an older API): whether the AI tutor can give the next level now. */
+  readonly tutor?: { readonly available: boolean; readonly reason: TutorReason | null; readonly remainingToday: number | null };
 }
 
 export type StepPracticeDto =
@@ -89,6 +106,16 @@ export function startNextLearningStep(token: string, sessionMinutes: number | nu
 
 export function revealStepHint(token: string, decisionId: string, questionId: string): Promise<{ readonly step: LearningStepDto }> {
   return requestJson<{ readonly step: LearningStepDto }>(`${base}/steps/${encodeURIComponent(decisionId)}/hints`, { token, method: 'POST', body: { questionId } });
+}
+
+/** One step as it stands (the screen polls this while an AI hint is being written). */
+export function getLearningStep(token: string, decisionId: string, signal?: AbortSignal): Promise<{ readonly step: LearningStepDto }> {
+  return requestJson<{ readonly step: LearningStepDto }>(`${base}/steps/${encodeURIComponent(decisionId)}`, opts(token, signal));
+}
+
+/** ENG-22: asks the AI tutor for the next hint level. Answers at once with the level pending; the hint is written by a job. */
+export function requestTutorHint(token: string, decisionId: string, questionId: string): Promise<{ readonly step: LearningStepDto }> {
+  return requestJson<{ readonly step: LearningStepDto }>(`${base}/steps/${encodeURIComponent(decisionId)}/tutor-hints`, { token, method: 'POST', body: { questionId } });
 }
 
 export function answerStepQuestion(token: string, decisionId: string, questionId: string, selectedOptionId: string): Promise<StepAnswerDto> {

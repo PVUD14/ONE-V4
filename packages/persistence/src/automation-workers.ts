@@ -34,6 +34,8 @@ import {
 } from './automation-runtime.js';
 import { consumeSeededContentGenerationRequested } from './content-generation.js';
 import { LEARNER_SKILL_STATE_PROJECTION_REQUESTED, consumeSkillStateProjectionRequested } from './learner-skill-state.js';
+import { TUTOR_HINT_REQUESTED } from './tutor-hints.js';
+import { consumeTutorHintRequested } from './tutor-hint-worker.js';
 
 export async function publishOutboxOnce(input: {
   readonly db: PersistenceDb; readonly publisher: IntegrationEventPublisher; readonly leaseOwner: string; readonly now: Date;
@@ -107,6 +109,10 @@ export function createLocalIntegrationEventPublisher(input: { readonly pool: Poo
     // ENG-05: recompute one student's learner_skill_state from facts (consent checked there).
     [LEARNER_SKILL_STATE_PROJECTION_REQUESTED]: async (event) => {
       await consumeSkillStateProjectionRequested(input.db, event);
+    },
+    // ENG-22: writes one AI tutor hint through ONE AI Orchestration (worker-only; sandbox audience only).
+    [TUTOR_HINT_REQUESTED]: async (event) => {
+      await consumeTutorHintRequested({ db: input.db }, event);
     },
     // EMP-08: stage changes, interviews and offers reach the student (and offer answers the
     // employer) in-app; with no sink configured the student's email is recorded NOT_CONFIGURED.

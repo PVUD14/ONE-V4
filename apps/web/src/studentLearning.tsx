@@ -10,14 +10,16 @@
  * states plainly what is not available rather than inventing it. Everything works with every AI flag off.
  */
 import React, { useEffect, useState } from 'react';
-import { BookOpen, ClipboardCheck, Lightbulb, RotateCcw, SkipForward, Target } from 'lucide-react';
+import { BookOpen, ClipboardCheck, Lightbulb, RotateCcw, SkipForward, Sparkles, Target } from 'lucide-react';
 import { getAccessToken } from './auth.js';
 import {
   answerPlacementQuestion,
   answerStepQuestion,
   getLearningPath,
+  getLearningStep,
   getMyLearningActions,
   getPlacementTest,
+  requestTutorHint,
   revealStepHint,
   startNextLearningStep,
   startPlacementTest,
@@ -29,6 +31,8 @@ import {
   type PlacementLevel,
   type StepAction,
   type StepAnswerDto,
+  type StepHintDto,
+  type StepQuestionDto,
   type StudentLearningActionsDto,
 } from './api.js';
 import { FromYourLecturerCard, hasLecturerWork, isStudentLearningActions } from './studentLearningActions.js';
@@ -200,6 +204,47 @@ const HINT_LEVEL_NAMES = ['Nudge', 'Strategy', 'Worked step', 'Near solution'] a
 const hintLabel = (index: number): string => `Hint ${index + 1} · ${HINT_LEVEL_NAMES[index] ?? ''}`;
 const ASSISTED_NOTE = ' Counted as assisted: it does not count as solved on your own.';
 
+// --- The AI tutor (ENG-22) ---------------------------------------------------------
+/** What an AI hint is, said wherever one is shown. */
+export const AI_HINT_NOTE = 'Written by the AI tutor and checked by ONE’s rules — not reviewed by a person.';
+const AI_FALLBACK_TEXT: Readonly<Record<NonNullable<StepHintDto['fallback']>, string>> = {
+  CHECKS_FAILED: 'The AI hint did not pass ONE’s checks, so this is the written hint for this level.',
+  UNAVAILABLE: 'The AI tutor could not answer, so this is the written hint for this level.',
+  TIMED_OUT: 'The AI tutor took too long, so this is the written hint for this level.',
+  NOT_A_HINT: 'The AI tutor did not give a hint, so this is the written hint for this level.',
+};
+/** Reasons the student is told about; for OFF, NO_CONSENT and ASSESSMENT_MODE no AI control is shown at all. */
+const TUTOR_REASON_TEXT: Readonly<Record<string, string>> = {
+  LANGUAGE_NOT_SUPPORTED: 'The AI tutor does not write in your language yet. The written hints still work.',
+  DAILY_LIMIT: 'You have used today’s AI hints. The written hints still work.',
+  PENDING: 'The AI tutor is writing your hint…',
+};
+const POLL_MS = 2_000;
+const POLL_LIMIT = 30;
+
+/** The shown hints as entries; an older API without `hintDetails` gives written hints. */
+function hintEntries(question: StepQuestionDto): readonly StepHintDto[] {
+  return question.hintDetails ?? question.hints.map((text, index) => ({ level: index + 1, source: 'LADDER' as const, state: 'SHOWN' as const, text, fallback: null }));
+}
+
+function HintEntry({ entry }: { readonly entry: StepHintDto }): React.ReactElement {
+  const label = <span className="pilot-chip amber">{hintLabel(entry.level - 1)}</span>;
+  if (entry.source === 'LADDER') return <p style={{ margin: '4px 0' }}>{label} {entry.text}</p>;
+  if (entry.state === 'PENDING') {
+    return <p role="status" style={{ margin: '4px 0' }}>{label} <span className="pilot-chip purple"><Sparkles size={12} /> AI hint</span> <span style={muted}>The AI tutor is writing this hint…</span></p>;
+  }
+  if (entry.state === 'SHOWN') {
+    return <div style={{ margin: '4px 0' }} aria-label={`AI hint ${entry.level}`}>
+      <p style={{ margin: 0 }}>{label} <span className="pilot-chip purple"><Sparkles size={12} /> AI hint</span> {entry.text}</p>
+      <small style={muted}>{AI_HINT_NOTE}</small>
+    </div>;
+  }
+  return <div style={{ margin: '4px 0' }}>
+    <p style={{ margin: 0 }}>{label} {entry.text}</p>
+    <small style={muted}>{AI_FALLBACK_TEXT[entry.fallback ?? 'UNAVAILABLE']}</small>
+  </div>;
+}
+
 function StepPractice({ step, onStep }: { readonly step: LearningStepDto; readonly onStep: (step: LearningStepDto) => void }): React.ReactElement | null {
   const [choice, setChoice] = useState('');
   const [feedback, setFeedback] = useState<StepAnswerDto['feedback'] | null>(null);
@@ -219,12 +264,24 @@ function StepPractice({ step, onStep }: { readonly step: LearningStepDto; readon
   }
   const question = practice.question;
   const nextHintAssists = question.hints.length >= 2;
+  const entries = hintEntries(question);
+  const pending = entries.some((entry) => entry.state === 'PENDING');
+  const tutor = question.tutor;
+  // The AI control appears only where the tutor is the student's to use; OFF / NO_CONSENT / ASSESSMENT_MODE hide it.
+  const showTutor = tutor !== undefined && (tutor.available || tutor.reason === 'DAILY_LIMIT' || tutor.reason === 'LANGUAGE_NOT_SUPPORTED' || tutor.reason === 'PENDING');
 
   async function hint(): Promise<void> {
     const token = getAccessToken();
     if (!token) return;
     setBusy(true); setError('');
     try { onStep((await revealStepHint(token, step.decisionId, question.id)).step); } catch (failure) { setError(errorText(failure, 'The hint could not be shown. Try again.')); } finally { setBusy(false); }
+  }
+
+  async function askTutor(): Promise<void> {
+    const token = getAccessToken();
+    if (!token) return;
+    setBusy(true); setError('');
+    try { onStep((await requestTutorHint(token, step.decisionId, question.id)).step); } catch (failure) { setError(errorText(failure, 'The AI tutor could not be asked. Try again.')); } finally { setBusy(false); }
   }
 
   async function answer(): Promise<void> {
@@ -252,8 +309,8 @@ function StepPractice({ step, onStep }: { readonly step: LearningStepDto; readon
         <span className="grow">{option.text}</span>
       </label>)}
     </fieldset>
-    {question.hints.length ? <div style={{ marginTop: 8 }} aria-label="Hints shown">
-      {question.hints.map((text, index) => <p key={index} style={{ margin: '4px 0' }}><span className="pilot-chip amber">{hintLabel(index)}</span> {text}</p>)}
+    {entries.length ? <div style={{ marginTop: 8 }} aria-label="Hints shown">
+      {entries.map((entry) => <HintEntry key={entry.level} entry={entry} />)}
     </div> : null}
     {!question.hintsAvailable ? <p style={muted}>No hints for this question.</p>
       : question.hints.length < 4 && nextHintAssists ? <p style={muted}>The next hint shows a worked step: an answer after it counts as assisted, not as your own.</p> : null}
@@ -261,9 +318,40 @@ function StepPractice({ step, onStep }: { readonly step: LearningStepDto; readon
     <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
       <button type="button" className="pilot-btn small" disabled={busy || !choice} onClick={() => void answer()}>Check answer</button>
       {question.hintsAvailable && question.hints.length < 4
-        ? <button type="button" className="pilot-btn ghost small" disabled={busy} onClick={() => void hint()}><Lightbulb size={14} /> Show {hintLabel(question.hints.length).replace('Hint', 'hint')}</button> : null}
+        ? <button type="button" className="pilot-btn ghost small" disabled={busy || pending} onClick={() => void hint()}><Lightbulb size={14} /> Show {hintLabel(question.hints.length).replace('Hint', 'hint')}</button> : null}
+      {showTutor && question.hints.length < 4
+        ? <button type="button" className="pilot-btn soft small" disabled={busy || pending || !tutor.available} onClick={() => void askTutor()}>
+          <Sparkles size={14} /> Ask the AI tutor for {hintLabel(question.hints.length).replace('Hint', 'hint')}
+        </button> : null}
     </div>
+    {showTutor ? <p style={muted}>
+      <span className="pilot-chip purple">AI</span>{' '}
+      {tutor.reason && TUTOR_REASON_TEXT[tutor.reason] ? TUTOR_REASON_TEXT[tutor.reason] : 'The AI tutor gives a hint at the next level, never the answer. It counts like a written hint.'}
+      {tutor.remainingToday !== null ? ` AI hints left today: ${tutor.remainingToday}.` : ''}
+    </p> : null}
+    {pending ? <TutorPoll decisionId={step.decisionId} onStep={onStep} /> : null}
   </div>;
+}
+
+/** While an AI hint is being written, re-reads the step every two seconds (the hint is written by a job). */
+function TutorPoll({ decisionId, onStep }: { readonly decisionId: string; readonly onStep: (step: LearningStepDto) => void }): null {
+  useEffect(() => {
+    const token = getAccessToken();
+    if (!token) return undefined;
+    const controller = new AbortController();
+    let rounds = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const tick = (): void => {
+      rounds += 1;
+      getLearningStep(token, decisionId, controller.signal)
+        .then((loaded) => { if (!controller.signal.aborted && loaded?.step) onStep(loaded.step); })
+        .catch(() => undefined)
+        .finally(() => { if (!controller.signal.aborted && rounds < POLL_LIMIT) timer = setTimeout(tick, POLL_MS); });
+    };
+    timer = setTimeout(tick, POLL_MS);
+    return () => { controller.abort(); if (timer) clearTimeout(timer); };
+  }, [decisionId]);
+  return null;
 }
 
 // --- The path -----------------------------------------------------------------

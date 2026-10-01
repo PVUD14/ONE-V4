@@ -46,6 +46,9 @@ importers:
       '@planthepath/privacy':
         specifier: workspace:*
         version: link:../../packages/privacy
+      '@planthepath/tutoring':
+        specifier: workspace:*
+        version: link:../../packages/tutoring
       drizzle-orm:
         specifier: ^0.45.2
         version: 0.45.2(@types/pg@8.23.1)(pg@8.23.0)
@@ -359,6 +362,9 @@ importers:
       '@planthepath/review-scheduler':
         specifier: workspace:*
         version: link:../review-scheduler
+      '@planthepath/tutoring':
+        specifier: workspace:*
+        version: link:../tutoring
       drizzle-orm:
         specifier: ^0.45.2
         version: 0.45.2(@types/pg@8.23.1)(pg@8.23.0)
@@ -414,6 +420,25 @@ importers:
       ts-fsrs:
         specifier: 5.4.2
         version: 5.4.2
+    devDependencies:
+      '@types/node':
+        specifier: ^22.13.0
+        version: 22.20.1
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@22.20.1)(jsdom@26.1.0)(tsx@4.23.12)
+
+  packages/tutoring:
+    dependencies:
+      '@planthepath/ai-evaluation':
+        specifier: workspace:*
+        version: link:../ai-evaluation
+      '@planthepath/ai-orchestration':
+        specifier: workspace:*
+        version: link:../ai-orchestration
     devDependencies:
       '@types/node':
         specifier: ^22.13.0

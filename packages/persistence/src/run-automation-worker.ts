@@ -13,7 +13,7 @@ import { survivePoolErrors } from './pool-errors.js';
  * broker-shaped modes below it are kept and still work — they are the escape hatch
  * for the day the worker has to run somewhere other than beside the database.
  */
-type WorkerMode = 'local-dispatcher' | 'outbox-publisher' | 'notification-consumer' | 'automation-dispatcher';
+type WorkerMode = 'local-dispatcher' | 'local-outbox' | 'outbox-publisher' | 'notification-consumer' | 'automation-dispatcher';
 
 async function main(): Promise<void> {
   const mode = requireMode(process.env.AUTOMATION_WORKER_MODE);
@@ -40,6 +40,17 @@ async function main(): Promise<void> {
         // a backlog drains at full speed rather than one batch per second.
         if (!drained.claimed && !dispatched.claimed) await delay(1_000);
       }
+    } else if (mode === 'local-outbox') {
+      // ENG-22: the outbox drained in-process with no workflow service — for a deployment that has no
+      // n8n (the demo sandbox, ADR-046), so its jobs (the tutor's among them) still run on the pipeline.
+      const db = drizzle(pool, { schema });
+      const invitationMailSink = createConfiguredInvitationMailSink();
+      const local = createLocalIntegrationEventPublisher({ pool, db, ...(invitationMailSink ? { invitationMailSink } : {}) });
+      while (!stopping) {
+        const drained = await publishOutboxOnce({ db, publisher: local.publisher, leaseOwner, now: new Date() });
+        log(mode, { outbox: drained, routing: local.counts() });
+        if (!drained.claimed) await delay(1_000);
+      }
     } else if (mode === 'outbox-publisher') {
       const db = drizzle(pool, { schema });
       const publisher = createEventBridgePublisher(requireValue('PTP_EVENT_BUS_NAME'));
@@ -65,7 +76,7 @@ async function main(): Promise<void> {
 }
 
 function requireMode(value: string | undefined): WorkerMode {
-  if (value === 'local-dispatcher' || value === 'outbox-publisher' || value === 'notification-consumer' || value === 'automation-dispatcher') return value;
+  if (value === 'local-dispatcher' || value === 'local-outbox' || value === 'outbox-publisher' || value === 'notification-consumer' || value === 'automation-dispatcher') return value;
   throw new Error('AUTOMATION_WORKER_MODE must select a supported worker');
 }
 

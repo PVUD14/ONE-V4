@@ -442,7 +442,7 @@ async function collegeSections(one: Query, subject: Subject): Promise<Record<str
 }
 
 async function learningSections(one: Query, subject: Subject): Promise<Record<string, unknown>> {
-  const [sessions, attempts, activity, lessons, steps, stepItems, placements, skills, evidence, bands, readiness, roadmap, checks] = await Promise.all([
+  const [sessions, attempts, activity, lessons, steps, stepItems, tutorHints, placements, skills, evidence, bands, readiness, roadmap, checks] = await Promise.all([
     // Model, prompt, token and cost columns are internal metering, not about the person.
     one(sql`SELECT mode, language, started_at, ended_at FROM learning_sessions WHERE subject_user_id = ${subject} ORDER BY started_at, id`),
     // Not the item or the option chosen: with correctness, those would be the answer key.
@@ -460,6 +460,11 @@ async function learningSections(one: Query, subject: Subject): Promise<Record<st
     one(sql`SELECT i.decision_id, i.position, tn.name AS skill_name, i.hint_level, i.served_at
             FROM learning_step_items i JOIN taxonomy_nodes tn ON tn.id = i.skill_id
             WHERE i.subject_user_id = ${subject} ORDER BY i.position, i.id`),
+    // ENG-22: the AI tutor's hints, as the student saw them — the AI text when it was shown. A refused
+    // reply and the guard's findings are staff working notes (notIncluded says so).
+    one(sql`SELECT h.decision_id, h.hint_level, h.language, h.status, h.fallback_reason, h.requested_at, h.completed_at, h.review_state,
+                   CASE WHEN h.status = 'SHOWN' THEN h.generated_text END AS shown_text, h.model, h.prompt_version
+            FROM tutor_hints h WHERE h.subject_user_id = ${subject} ORDER BY h.requested_at, h.id`),
     // The level the sitting ended on, as shown to them; the calibrated items served are model parameters.
     one(sql`SELECT scope, state, started_at, deadline_at, completed_at, placement_level, items_answered, stop_reason
             FROM placement_tests WHERE subject_user_id = ${subject} ORDER BY started_at, id`),
@@ -498,6 +503,13 @@ async function learningSections(one: Query, subject: Subject): Promise<Record<st
       decidedAt: row.decided_at, action: row.action, skillName: row.skill_name ?? null, reasonCodes: row.reason_codes, adaptive: row.adaptive,
       items: stepItems.filter((item) => item.decision_id === row.id).map((item) => ({
         position: num(item.position), skillName: item.skill_name, highestHintShown: num(item.hint_level), servedAt: item.served_at,
+      })),
+      aiTutorHints: tutorHints.filter((hint) => hint.decision_id === row.id).map((hint) => ({
+        level: num(hint.hint_level), language: hint.language,
+        // SHOWN: the AI hint below. Otherwise you were shown the written hint for that level.
+        outcome: hint.status === 'SHOWN' ? 'AI_HINT_SHOWN' : hint.status === 'FALLBACK' ? 'WRITTEN_HINT_SHOWN' : 'NOT_FINISHED',
+        aiHintShown: hint.shown_text ?? null, model: hint.model ?? null, promptVersion: hint.prompt_version,
+        reviewState: hint.review_state, requestedAt: hint.requested_at, completedAt: hint.completed_at ?? null,
       })),
     })),
     placementTests: placements.map((row) => ({

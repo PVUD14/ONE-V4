@@ -38,6 +38,7 @@ import type {
 import { V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { StatusBadge } from '../studentComponents.js';
 import { RequestApprovalDialog } from './approvals.js';
+import { AiDraftProvenance, AiDraftsCard, AnswerKeyCheck } from './contentFactory.js';
 import { formatApiError } from './shared.js';
 
 const label = (value: string): string => value.split('_').map((word) => word.charAt(0) + word.slice(1).toLowerCase()).join(' ');
@@ -148,7 +149,7 @@ export function OperationsQuestionBankPage(): React.ReactElement | null {
       {questions.length ? <div className="role-record-table-wrap"><table className="role-record-table">
         <thead><tr><th>Key</th><th>Question</th><th>Skill</th><th>Status</th><th>Current version</th><th>Revision on its way</th><th>Difficulty</th><th>Tagged options</th><th>Hints</th><th>Actions</th></tr></thead>
         <tbody>{questions.map((question) => <tr key={question.questionId}>
-          <td><strong>{question.stableKey}</strong></td>
+          <td><strong>{question.stableKey}</strong>{question.aiDrafted ? <><br /><StatusBadge label="AI draft" tone="warning" /></> : null}</td>
           <td>{question.promptExcerpt || 'NA'}</td>
           <td>{question.topic ? question.topic.stableKey : 'NA'}</td>
           <td><StatusBadge label={statusText(question.status)} tone={statusTone(question.status)} /></td>
@@ -161,6 +162,7 @@ export function OperationsQuestionBankPage(): React.ReactElement | null {
         </tr>)}</tbody></table></div> : null}
       {nextCursor ? <button type="button" className="secondary" onClick={() => void loadMore()}>Load more</button> : null}
     </section>
+    {policy ? <AiDraftsCard token={token} scope="QUESTIONS" onOpenQuestion={setSelectedId} reload={reload} /> : null}
     {selectedId && policy ? <QuestionPanel token={token} questionId={selectedId} policy={policy}
       onChanged={() => setReload((value) => value + 1)} onClose={() => setSelectedId('')} /> : null}
     {creating && policy ? <CreateQuestionDialog token={token} policy={policy} onCancel={() => setCreating(false)}
@@ -226,6 +228,7 @@ function QuestionPanel({ token, questionId, policy, onChanged, onClose }: {
 
     {working ? <article className="role-card" aria-label={`Revision ${working.revision}`}>
       <div className="role-section-title"><h3>Revision {working.revision}</h3><StatusBadge label={label(working.state)} tone={stateTone(working.state)} /></div>
+      {working.aiDraft ? <AiDraftProvenance aiDraft={working.aiDraft} author={working.author.email} /> : null}
       <p><small>Author {working.author.email} · started {when(working.createdAt)}{working.contributors.length > 1 ? ` · also written or submitted by ${working.contributors.filter((entry) => entry.userId !== working.author.userId).map((entry) => entry.email).join(', ')}` : ''}</small></p>
       {editable && policy.viewer.edit
         ? <QuestionEditor token={token} revision={working} question={question} policy={policy} onSaved={(updated) => apply(updated, 'Draft saved.')} />
@@ -240,6 +243,7 @@ function QuestionPanel({ token, questionId, policy, onChanged, onClose }: {
             {question.publishNeedsApproval ? 'Request publish…' : 'Publish…'}</button> : null}
         {wroteIt && (working.state === 'IN_REVIEW' || working.state === 'APPROVED') ? <small>You wrote, edited or submitted this revision, so someone else reviews and publishes it.</small> : null}
       </div>
+      {!working.answerKeyWithheld ? <AnswerKeyCheck token={token} revisionId={working.id} editable={working.state !== 'PUBLISHED' && working.state !== 'ARCHIVED'} /> : null}
     </article> : null}
 
     <h3>History</h3>
@@ -320,7 +324,9 @@ function QuestionView({ revision, policy }: { readonly revision: BankQuestionRev
       <div><dt>Basis</dt><dd>{fields.basis ?? 'NA'}</dd></div>
       <div><dt>Drafted by</dt><dd>{revision.agentDraft
         ? `The coding agent (${revision.agentDraft.generatorVersion}, ${revision.agentDraft.promptVersion}, ${when(revision.agentDraft.generatedAt)}) — check it against its basis`
-        : 'A person'}</dd></div>
+        : revision.aiDraft
+          ? `ONE's AI (${revision.aiDraft.model}, ${revision.aiDraft.promptVersion}, ${when(revision.aiDraft.generatedAt)}) at the request of ${revision.author.email} — AI draft`
+          : 'A person'}</dd></div>
       {revision.expertCheck ? <div><dt>For the subject expert</dt><dd>{revision.expertCheck}</dd></div> : null}
       <div><dt>Rights review</dt><dd>{revision.rightsReview
         ? `${revision.rightsReview.licenceLabel} confirmed by ${revision.rightsReview.reviewerEmail} (${revision.rightsReview.reasonCode}) · ${when(revision.rightsReview.reviewedAt)}`
@@ -333,7 +339,8 @@ function QuestionView({ revision, policy }: { readonly revision: BankQuestionRev
       </tr>)}</tbody>
     </table></div>
     <p><small>Hint ladder record: {revision.ladder
-      ? `${revision.ladder.source === 'AGENT_DRAFTED' ? `drafted by the coding agent (${revision.ladder.generatorVersion ?? 'NA'}, ${revision.ladder.promptVersion ?? 'NA'})` : 'written by a person'} · ${label(revision.ladder.state)}`
+      ? `${revision.ladder.source === 'AGENT_DRAFTED' ? `drafted by the coding agent (${revision.ladder.generatorVersion ?? 'NA'}, ${revision.ladder.promptVersion ?? 'NA'})`
+        : revision.ladder.source === 'AI_GENERATED' ? `drafted by ONE's AI (${revision.ladder.promptVersion ?? 'NA'}) — AI draft` : 'written by a person'} · ${label(revision.ladder.state)}`
       : 'written on submission'}</small></p>
     <LadderChecks checks={revision.ladderChecks} />
   </div>;

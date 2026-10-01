@@ -8,6 +8,7 @@
  * Content Edit or Content Review; this client never asks for them separately.
  */
 import { requestJson } from './http.js';
+import type { AiDraftDto } from './contentFactory.js';
 
 export type BankQuestionRevisionState = 'DRAFT' | 'IN_REVIEW' | 'CHANGES_REQUESTED' | 'APPROVED' | 'PUBLISHED' | 'ARCHIVED';
 export type BankQuestionStatus = 'LIVE' | 'PENDING' | 'ARCHIVED';
@@ -56,6 +57,8 @@ export interface BankQuestionSummaryDto {
   readonly optionCount: number;
   readonly taggedOptionCount: number;
   readonly hintsComplete: boolean;
+  /** ENG-23: the latest revision was drafted by ONE's AI. */
+  readonly aiDrafted?: boolean;
 }
 
 export interface QuestionBankSummaryDto {
@@ -105,6 +108,8 @@ export interface BankQuestionRevisionDto {
   readonly ladderChecks: { readonly rulesVersion: string; readonly findings: readonly { readonly level: number; readonly code: string }[] };
   /** Set when an import pack drafted the revision (program B.8); null when a person wrote it. */
   readonly agentDraft: { readonly generatorVersion: string; readonly promptVersion: string; readonly generatedAt: string } | null;
+  /** ENG-23: set when ONE's AI drafted the revision (the content factory). */
+  readonly aiDraft?: AiDraftDto | null;
   /** The agent draft's note for the subject expert. */
   readonly expertCheck: string | null;
   readonly rightsReview: { readonly licenceLabel: string; readonly reviewerEmail: string; readonly reasonCode: string; readonly reviewedAt: string } | null;

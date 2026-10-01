@@ -8,6 +8,7 @@
  * and a variant publish directly.
  */
 import { requestJson } from './http.js';
+import type { AiDraftDto } from './contentFactory.js';
 
 export type LessonRevisionState = 'DRAFT' | 'IN_REVIEW' | 'CHANGES_REQUESTED' | 'APPROVED' | 'PUBLISHED' | 'ARCHIVED';
 export type LessonStatus = 'LIVE' | 'PENDING' | 'ARCHIVED';
@@ -69,6 +70,8 @@ export interface LessonSummaryDto {
   readonly variantCount: number;
   readonly basedOnRevision: number | null;
   readonly baseRevision: number | null;
+  /** ENG-23: the latest revision was drafted by ONE's AI. */
+  readonly aiDrafted?: boolean;
 }
 
 export interface LessonEditorSummaryDto {
@@ -107,6 +110,8 @@ export interface LessonRevisionDto {
   readonly topic: LessonTopicDto | null;
   /** Set when an import pack drafted the revision (program B.8); null when a person wrote it. */
   readonly agentDraft: { readonly generatorVersion: string; readonly promptVersion: string; readonly generatedAt: string } | null;
+  /** ENG-23: set when ONE's AI drafted the revision (the content factory). */
+  readonly aiDraft?: AiDraftDto | null;
   readonly expertCheck: string | null;
   readonly rightsReview: { readonly licenceLabel: string; readonly reviewerEmail: string; readonly reasonCode: string; readonly reviewedAt: string } | null;
 }

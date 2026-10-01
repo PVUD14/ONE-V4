@@ -41,6 +41,7 @@ import type {
 import { V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { StatusBadge } from '../studentComponents.js';
 import { RequestApprovalDialog } from './approvals.js';
+import { AiDraftProvenance, AiDraftsCard, TranslateWithAiDialog } from './contentFactory.js';
 import { formatApiError } from './shared.js';
 
 const label = (value: string): string => value.split('_').map((word) => word.charAt(0) + word.slice(1).toLowerCase()).join(' ');
@@ -170,7 +171,7 @@ export function OperationsLessonsPage(): React.ReactElement | null {
       {lessons.length ? <div className="role-record-table-wrap"><table className="role-record-table">
         <thead><tr><th>Key</th><th>Title</th><th>Kind</th><th>Language, level, style</th><th>Status</th><th>Current revision</th><th>Revision on its way</th><th>Skill</th><th>Actions</th></tr></thead>
         <tbody>{lessons.map((lesson) => <tr key={lesson.lessonId}>
-          <td><strong>{lesson.stableKey}</strong></td>
+          <td><strong>{lesson.stableKey}</strong>{lesson.aiDrafted ? <><br /><StatusBadge label="AI draft" tone="warning" /></> : null}</td>
           <td>{lesson.title}</td>
           <td>{lesson.kind === 'VARIANT' ? 'Variant' : `Lesson${lesson.variantCount ? ` · ${lesson.variantCount} variant${lesson.variantCount === 1 ? '' : 's'}` : ''}`}</td>
           <td>{variantText(policy, lesson.variant)}</td>
@@ -184,6 +185,7 @@ export function OperationsLessonsPage(): React.ReactElement | null {
         </tr>)}</tbody></table></div> : null}
       {nextCursor ? <button type="button" className="secondary" onClick={() => void loadMore()}>Load more</button> : null}
     </section>
+    {policy ? <AiDraftsCard token={token} scope="LESSONS" vocabulary={policy} onOpenLesson={setSelectedId} reload={reload} /> : null}
     {selectedId && policy ? <LessonPanel token={token} lessonId={selectedId} policy={policy} onOpen={setSelectedId}
       onChanged={() => setReload((value) => value + 1)} onClose={() => setSelectedId('')} /> : null}
     {creating && policy ? <CreateLessonDialog token={token} policy={policy} onCancel={() => setCreating(false)}
@@ -195,6 +197,7 @@ type Dialog =
   | { readonly kind: 'revise' }
   | { readonly kind: 'archive' }
   | { readonly kind: 'variant' }
+  | { readonly kind: 'aiVariant' }
   | { readonly kind: 'transition'; readonly revision: LessonRevisionDto; readonly toState: 'IN_REVIEW' | 'CHANGES_REQUESTED' | 'APPROVED' }
   | { readonly kind: 'publish'; readonly revision: LessonRevisionDto }
   | { readonly kind: 'publishWithApproval'; readonly revision: LessonRevisionDto };
@@ -266,7 +269,9 @@ function LessonPanel({ token, lessonId, policy, onOpen, onChanged, onClose }: {
           <td>{variant.basedOnRevision ?? 'NA'}</td>
           <td><button type="button" className="secondary" onClick={() => onOpen(variant.lessonId)}>Open variant</button></td>
         </tr>)}</tbody></table></div> : <p>No variants yet.</p>}
-      {lesson.status === 'LIVE' && policy.viewer.edit ? <button type="button" className="secondary" onClick={() => setDialog({ kind: 'variant' })}>New variant…</button>
+      {lesson.status === 'LIVE' && policy.viewer.edit ? <>
+        <button type="button" className="secondary" onClick={() => setDialog({ kind: 'variant' })}>New variant…</button>{' '}
+        <button type="button" className="secondary" onClick={() => setDialog({ kind: 'aiVariant' })}>Draft a translation with AI…</button></>
         : lesson.status !== 'LIVE' ? <p><small>Variants can be made once this lesson is published.</small></p> : null}
     </> : null}
 
@@ -281,6 +286,7 @@ function LessonPanel({ token, lessonId, policy, onOpen, onChanged, onClose }: {
         {needsNativeSpeakerReview(lesson.kind, lesson.variant, working.state) ? <StatusBadge label="Needs native-speaker review" tone="warning" /> : null}</div>
       {needsNativeSpeakerReview(lesson.kind, lesson.variant, working.state)
         ? <p><small>Students never see this {languageName(policy, lesson.variant.language)} text until someone who reads the language natively (or who checked a native speaker&apos;s review) approves it and it is published.</small></p> : null}
+      {working.aiDraft ? <AiDraftProvenance aiDraft={working.aiDraft} author={working.author.email} /> : null}
       <p><small>Author {working.author.email} · started {when(working.createdAt)}{working.contributors.length > 1 ? ` · also written or submitted by ${working.contributors.filter((entry) => entry.userId !== working.author.userId).map((entry) => entry.email).join(', ')}` : ''}{working.approver ? ` · approved by ${working.approver.email}` : ''}</small></p>
       {editable && policy.viewer.edit
         ? <LessonEditor token={token} revision={working} isVariant={isVariant} policy={policy} onSaved={(updated) => apply(updated, 'Draft saved.')} />
@@ -315,6 +321,9 @@ function LessonPanel({ token, lessonId, policy, onOpen, onChanged, onClose }: {
     {dialog?.kind === 'revise' ? <ReasonDialog title={`Start revision of ${name}`} approvalNote="Not required: a new revision changes nothing until it is published."
       reasons={policy.reasons.revise} submitLabel="Start revision" onCancel={() => setDialog(null)}
       onSubmit={async (reasonCode) => { apply((await startEditorLessonRevision(token, lesson.lessonId, { reasonCode })).lesson, 'Revision started.'); setDialog(null); }} /> : null}
+    {dialog?.kind === 'aiVariant' ? <TranslateWithAiDialog token={token} lessonId={lesson.lessonId} lessonKey={lesson.stableKey} vocabulary={policy}
+      current={{ level: lesson.variant.level, style: lesson.variant.style }} onCancel={() => setDialog(null)}
+      onQueued={() => { setDialog(null); setNotice('Asked. The translation appears under AI drafts when the worker has written it.'); onChanged(); }} /> : null}
     {dialog?.kind === 'variant' ? <CreateVariantDialog token={token} policy={policy} lesson={lesson} onCancel={() => setDialog(null)}
       onCreated={(created) => { setDialog(null); onChanged(); onOpen(created.lessonId); }} /> : null}
     {dialog?.kind === 'transition' ? <ReasonDialog title={transitionTitle(dialog.toState, dialog.revision.revision)}
@@ -372,7 +381,9 @@ function LessonView({ revision, policy }: { readonly revision: LessonRevisionDto
       <div><dt>Basis</dt><dd>{fields.basis ?? 'NA'}</dd></div>
       <div><dt>Drafted by</dt><dd>{revision.agentDraft
         ? `The coding agent (${revision.agentDraft.generatorVersion}, ${revision.agentDraft.promptVersion}, ${when(revision.agentDraft.generatedAt)}) — check it against its basis`
-        : 'A person'}</dd></div>
+        : revision.aiDraft
+          ? `ONE's AI (${revision.aiDraft.model}, ${revision.aiDraft.promptVersion}, ${when(revision.aiDraft.generatedAt)}) at the request of ${revision.author.email} — AI draft`
+          : 'A person'}</dd></div>
       {revision.expertCheck ? <div><dt>For the subject expert</dt><dd>{revision.expertCheck}</dd></div> : null}
       <div><dt>Rights review</dt><dd>{revision.rightsReview
         ? `${revision.rightsReview.licenceLabel} confirmed by ${revision.rightsReview.reviewerEmail} (${revision.rightsReview.reasonCode}) · ${when(revision.rightsReview.reviewedAt)}`

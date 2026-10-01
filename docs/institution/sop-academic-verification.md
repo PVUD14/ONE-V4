@@ -3,7 +3,7 @@
 > What this is: the procedure college staff follow to confirm or reject the academic results
 > students ask the college to verify, and to upload a term's results in bulk. Why it exists:
 > Appendix 3 INST-19 (IM1 slice); journey J4. Built by INST-04. Written 2026-09-26 against base
-> `6864332`.
+> `6864332`; brought up to date 2026-10-01 against base `719eb34` (the SEC-INST write-scope rule).
 
 ## Who and where
 
@@ -13,6 +13,11 @@
 | Upload a term's results | Owner, administrator, department head (own department) | The same section → **Upload results** |
 
 You see only requests from students in your scope.
+
+**Deciding and uploading need a writing scope.** A department head with no department, or a
+lecturer without an active teaching assignment, can read the queue but every decision and upload is
+refused ("…confirming or uploading results needs a department or teaching assignment on your
+account…"). Ask an administrator to set the department or assign the classes ([staff SOP](sop-staff-scope-and-teaching.md)).
 
 ## A. Decide a request
 
@@ -53,6 +58,7 @@ Imported terms are *Verified by the institution*; nothing a student reported is 
 ## Gaps
 
 - **Evidence cannot be opened** (ADR-027 per-version consent not built).
+- Verification is permanent: a mistaken confirmation cannot be undone on screen.
 - The rejection reason is not shown to the student; students are not notified of decisions.
 - An already-verified term cannot be corrected; conflicts are reported only.
 - Placement officers have no web screen for the queue.

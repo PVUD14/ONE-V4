@@ -4,7 +4,8 @@
 > staff, set which students each person may see, and assign faculty to sections and batches.
 > Why it exists: Appendix 3 INST-19 (IM1 slice); journeys J2 and J3. Built by INST-02 (one scope
 > rule on every student read) and INST-03 (teaching assignments, scoped invitations). Written
-> 2026-09-26 against base `6864332`.
+> 2026-09-26 against base `6864332`; brought up to date 2026-10-01 against base `719eb34`
+> (SEC-INST's write scope, INST-08's analytics access).
 
 ## Who sees which students
 
@@ -19,8 +20,12 @@ Every screen — roster, student detail, verification queue, readiness report, a
 staff actions, My Students — uses this one rule. A link to a student outside your scope is
 refused.
 
-**Important:** a placement officer, department head or faculty member with **no** scope set
-sees the whole college (a deliberate transition rule). Set a scope for every such person.
+**Reading and writing differ.** For **reading**, a placement officer or department head with **no**
+scope set still sees the whole college (a transition rule awaiting Divakar's decision). For
+**writing** — verifying results, uploading results, assigning assessments, exporting, sprints,
+counselling notes, learning actions — a department head with no department, and a lecturer without
+an active teaching assignment, are refused (`SCOPE_REQUIRED`). Set a scope for every such person.
+(Staff actions — interventions, tasks, notes, meetings — still follow the read rule.)
 
 ## A. Invite staff with a scope (administrator)
 
@@ -66,11 +71,13 @@ active teaching assignment yet*, ask your administrator or department head.
 
 ## Gaps
 
-- **Unscoped staff fail open** (see above). The recommended change — department heads without
-  a department see nobody — is not applied yet (decision for Divakar; institution security review).
+- **Unscoped staff still read the whole college** (see above). The recommended change — department
+  heads without a department see nobody — is not applied for reads (decision for Divakar; security
+  review INST-SR-02).
 - A pending invitation re-sent with a different scope keeps its original scope; revoke and
   re-invite instead.
-- Assessment **assignment** (a write) is not yet scope-checked (INST-02 limitation).
+- Revoking, resending or ending a staff membership is not available on the Staff page yet.
+- Analytics and exports access is granted on the same page ([exports SOP](sop-analytics-and-exports.md)).
 - Faculty *Student Detail* still shows the faculty-notes list, not a profile.
 - The Android app shows *My students*; assigning is web-only.
 

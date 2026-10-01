@@ -2,8 +2,9 @@
 
 > What this is: the procedure college administrators follow to keep the college profile, each
 > programme's grading scale and the academic calendar, and how other staff use their own
-> settings. Why it exists: Appendix 3 INST-19 (IM1 slice). Built by INST-05. Written 2026-09-26
-> against base `6864332`.
+> settings. Why it exists: Appendix 3 INST-19 (IM1 slice); supplementary UAT script I-S. Built by
+> INST-05. Written 2026-09-26 against base `6864332`; brought up to date 2026-10-01 against base
+> `719eb34` (Settings now also carries EMP-11, INST-12 and INST-18 sections).
 
 ## Who and where
 
@@ -39,6 +40,14 @@
 **Settings → Notification preferences → Save preferences**. ONE sends staff no reminder emails
 yet; the screen says so.
 
+## E. Other sections of Settings (administrator)
+
+| Section | Built by | SOP |
+|---|---|---|
+| Placement policies | EMP-11 | [campus drives](sop-campus-drives.md) |
+| Drive categories | INST-12 | [campus drives](sop-campus-drives.md) |
+| Data-processing terms; Leaving ONE | INST-18 | [college exit](sop-college-exit.md) |
+
 ## Never do
 
 - Never set a scale "to make numbers appear"; an NA is honest.
@@ -46,8 +55,6 @@ yet; the screen says so.
 ## Gaps
 
 - No logo (needs the file store).
-- *Placement policies* and *Data-processing terms* are shown as "not built yet" (EMP-11/INST-12,
-  INST-18).
 - Students do not see the academic calendar yet; teaching assignments use a free-text term, not
   the calendar.
 

@@ -3,7 +3,8 @@
 > What this is: the procedure AI8HT operations and a college's owner follow for the college's
 > data-processing terms and for the college leaving ONE — notice, exit export, end, reversal, and the
 > deletion of the college's records after the retention period. Why it exists: Appendix 3 INST-18
-> ("offboarding runbook and job") and UAT J12. Built by INST-18. Written 2026-09-30.
+> ("offboarding runbook and job") and UAT J12. Built by INST-18. Written 2026-09-30; checked
+> 2026-10-01 against base `719eb34` (the purge also reaches preparation sprints, 1d26286).
 > Design: `docs/architecture/institution-contract-lifecycle-design.md`.
 
 **Legal text.** The only data-processing terms in the repository are
@@ -53,7 +54,8 @@ No navigation item was added for any of this; every screen is a section of an ex
   **exit export**;
 - the college can no longer add students.
 
-Tell the owner (outside ONE — no email sender is configured, HG-7) to take the exit export.
+Tell the owner (outside ONE — outgoing email is not switched on in production) to take the exit
+export.
 
 ### B3. The owner takes the exit export
 

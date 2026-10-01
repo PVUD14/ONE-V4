@@ -2,7 +2,8 @@
 
 > What this is: the procedure college staff follow to announce something to the students in
 > their scope, in the app and by email, and to cancel one. Why it exists: Appendix 3 INST-19
-> (IM1 slice); journey J5. Built by INST-06. Written 2026-09-26 against base `6864332`.
+> (IM1 slice); journey J5. Built by INST-06. Written 2026-09-26 against base `6864332`; brought up
+> to date 2026-10-01 against base `719eb34` (email state).
 
 ## Who can address whom
 
@@ -43,8 +44,10 @@ inbox*. **Other roles have no Messages item yet** (Gap, HG-3).
 - **HG-3 — navigation:** owners, administrators, placement officers and department heads can send
   through the API but have no screen, because they have no Messages item. Adding one is a
   navigation decision for Divakar.
-- **HG-7 — no production sender:** email is recorded "not sent: no sender is set up yet"; in-app
-  delivery works.
+- **Outgoing email is not switched on in production** (the SMTP sender is built, ADR-042; the sender
+  mailbox is still to be set up): email is recorded as not sent; in-app delivery works.
+- The *skipped* count mixes students not yet activated with students who turned email off; in a
+  small section it can hint at one student's choice (security review INST-SR-12).
 - Students cannot reply; no per-student read receipts.
 - Android: students see announcements in their inbox; staff see sent and scheduled ones; composing
   is web-only.

@@ -3,7 +3,8 @@
 > What this is: the procedure college staff follow to put students on the roster, invite them
 > and see who has activated. Why it exists: Appendix 3 INST-19 (IM1 slice) requires an SOP per
 > shipped module, written for college staff; journey J1 ("admin imports 200 students; students
-> activate") runs through it. Built by INST-01. Written 2026-09-26 against base `6864332`.
+> activate") runs through it. Built by INST-01. Written 2026-09-26 against base `6864332`; brought
+> up to date 2026-10-01 against base `719eb34` (the INST-18 terms gate, year-end actions, email state).
 
 ## Who
 
@@ -18,6 +19,10 @@
 
 ## Before you start
 
+- An **owner** must have accepted the college's current **data-processing terms** (**Settings**).
+  Until then adding a student and committing an import are refused ("An owner of your college must
+  accept…"). While the college is leaving ONE, no students can be added at all
+  ([college exit SOP](sop-college-exit.md)).
 - Build the **Academic Structure** first (departments, programmes, batches, sections). The
   import matches unit names to it and refuses unknown names.
 - Each student needs a unique college **institution student ID** and their **own** email.
@@ -53,8 +58,10 @@
 
 ## D. When a student leaves
 
-**Transfer**, **Graduate** or **End relationship** on their row. Any pending invitation is
-revoked at once. Graduated and transferred students keep their history up to that date.
+**Transfer**, **Graduate** or **End relationship** on their row, or for a whole batch at once
+**Year-end actions** ([year-end SOP](sop-year-end-actions.md)). Any pending invitation is
+revoked at once. Graduated and transferred students keep their account and their history up to that
+date.
 
 ## Escalation
 
@@ -71,14 +78,18 @@ revoked at once. Graduated and transferred students keep their history up to tha
 
 ## Gaps (need engineering or a decision)
 
-- **HG-7 — no production email sender.** Invitations are created and shown as "Email not sent:
-  no sender is set up yet"; resend once a sender exists. Until then students cannot be
-  activated in production without engineering.
+- **Outgoing email is not switched on in production.** The SMTP sender is built (ADR-042) but the
+  sender mailbox is still to be set up, and the automation worker that sends invitations is not yet
+  deployed on AWS. Until both are done, invitations are created and shown as not sent; resend once
+  email works. Students cannot be activated in production before then without engineering.
 - Student sign-in needs the student pool's tokens to carry a verified email claim — a Cognito
   configuration step for Divakar.
 - An existing ONE account cannot yet be linked to a roster record (needs its own consent step).
-- The roster list returns at most 500 students per view and is not paged (see the institution
-  security review).
+- The roster list returns at most 500 students per view and is not paged (security review
+  INST-SR-09).
+- Resending has no cooldown: do not press it repeatedly (security review INST-SR-07).
+- Ending one student's relationship from their row takes no reason code (INST-SR-06); year-end
+  actions do.
 - The Android app shows the activation counts; resending is web-only.
 
 ## UAT

@@ -2633,3 +2633,100 @@ Operations Help item needs HG-3); operations and employer Help & FAQ articles, a
 a second placement-test screen; recording ENG-25's comparison groups; an AI price record. Open security
 findings are listed per portal in `docs/security/reviews/`, each awaiting Divakar's decision. No UAT script
 has been run: there is no pilot data yet.
+
+## ENG-20 — Inference provider adapter — 2026-10-01
+**Result:** Complete. ONE AI Orchestration can reach an OpenAI-compatible endpoint (ADR-047: vLLM on the RunPod
+pod, bearer key) from worker processes only, configured by `ONE_AI_BASE_URL`, `ONE_AI_API_KEY` and `ONE_AI_MODEL`
+in the server environment. Blank means AI is unavailable (metered `PROVIDER_UNCONFIGURED`), never a crash. Kill
+switch, feature switch, cap and size are checked before any call; tokens, latency and attempts are recorded; every
+failure is a class with a fixed message. AI Operations shows configured / host / model / key set / last probe. No
+AI feature is registered and nothing reaches a student (HG-6). The plan was written for AWS managed inference;
+ADR-047 replaced the venue, and the adapter keeps Bedrock (its `/openai/v1` endpoint) a configuration change.
+
+**Branch / PR:** `feat/eng-20-inference-adapter`, from `onev4/feat/plan-phases-0-to-2` (8b7ec65). Commits: design
+(7907f38), acceptance tests (d6d65fd), implementation (b48357d), pod setup and runbooks (6d57b9a), this report.
+Pushed to onev4; not merged (the coordinator merges).
+
+**Files created:**
+- `docs/architecture/inference-adapter-design.md` — configuration, retry and timeout policy, failure classes, order
+  of checks, the 0105 columns and probe table, and what was rejected.
+- `packages/ai-orchestration/src/configuration.ts` — reads the three variables (all or nothing; https except
+  loopback; no credentials or query in the URL); `inferenceProviderFromEnvironment`; `describeInferenceConfiguration`
+  (host, model, key set — never the key).
+- `packages/ai-orchestration/src/testing/fake-openai-server.ts` — a local fake vLLM-shaped server for tests
+  (127.0.0.1, ephemeral port; not exported from the package index).
+- `packages/persistence/drizzle/0105_inference_adapter.sql`; `packages/persistence/src/ai-workers.ts`
+  (`createWorkerAiOrchestrator`, `runAiProviderProbe`); `packages/persistence/src/run-ai-probe.ts` (`ai:probe`).
+- `deploy/ai-pod/setup-pod.sh` and `README.md` (coordinator request): an idempotent pod rebuild — pinned venv
+  (vllm 0.11.0, torch 2.8.0+cu128, transformers >=4.56,<4.58), the model via `snapshot_download`, the key file created
+  only if missing (umask 077, never printed, passed to vLLM by environment and to curl by header file), the port-8888
+  listener stopped by PID from the socket table, `vllm serve` under nohup, a `/health` wait, and a self-test
+  (401 without the key, 200 with it). Divakar's steps: stop when idle (about $0.57/h), run after each start, copy
+  the key to the server `.env`.
+- `docs/ops/runbook-inference-endpoint.md` — connect, probe, read failure classes, disconnect, rotate, move to AWS.
+- Tests: `packages/ai-orchestration/test/openai-compatible.test.ts`,
+  `packages/persistence/test/ai-workers.integration.test.ts`, `apps/api/src/inference-boundary.spec.ts`.
+
+**Files modified:**
+- `packages/ai-orchestration/src/provider.ts` — `OpenAICompatibleProvider` rebuilt: `POST {base}/chat/completions`
+  (the base ends in `/v1`), not streamed, a per-attempt timeout (60 s, body read included, not retried), up to 3
+  attempts with backoff 0.5 s doubling for 429/500/502/503/504 and dropped connections, a model-mismatch refusal
+  before the network, `probe()` (`GET {base}/models`), and typed `InferenceProviderError` subclasses carrying
+  `failureClass`, `attempts` and `latencyMs`. `orchestrator.ts`: `killSwitchEngaged` is checked first
+  (`KILL_SWITCH_ENGAGED`; `AiKillSwitchEngagedError` extends `AiFeatureDisabledError`); the failure class comes from
+  the error; latency and attempts are metered. `index.ts`, `registry.ts` (comment).
+- `packages/persistence/src/ai-orchestration.ts` (latency and attempts in `recordAiGeneration`,
+  `loadAiKillSwitchEngaged`, probe record/load/prune); `ai-operations.ts` (`averageLatencyMs` per feature,
+  `loadAiInferenceStatus`); `package.json` (`ai:probe`).
+- `apps/api/src/http/operations-ai.controller.ts` — the summary gains `inference` (environment plus latest probe; no
+  network). `apps/api/package.json` — `@planthepath/ai-orchestration` as a devDependency (tests only).
+- `apps/web/src/api/aiOperations.ts`, `apps/web/src/rolePortal/aiOperations.tsx` — an Inference endpoint panel (NA
+  where unknown), average latency per feature, and the AI-hold wording updated. No navigation change.
+- `deploy/vps/docker-compose.yml` (the three variables, blank defaults), `deploy/vps/.env.example`, `.env.example`,
+  `docs/ops/sop-ai-operations.md`, `docs/ops/runbook-ai-kill-switch.md`.
+
+**Migrations added:** `0105_inference_adapter.sql` (the number assigned). `ai_generations.latency_ms` and
+`provider_attempts`: nullable, CHECK-bounded, and a REFUSED row carries neither. `ai_provider_probes`: host only (never
+the URL path or the key), a shape CHECK, immutable, deletable only after 90 days, `probed_at` stamped by the
+database. Idempotent; references nothing from 0101–0104.
+
+**Design docs / ADRs:** `inference-adapter-design.md`. No new ADR: ADR-047 took the decision; this records how.
+
+**Acceptance criteria:**
+- [x] **The adapter, configured by environment variables (names only in code).** No value is in the repository;
+  `.env.example` and compose carry blank defaults.
+- [x] **Behind per-feature flags defaulting off, with caps and metering already in the package.** Unchanged and
+  exercised: flag off means no request (`FEATURE_DISABLED`); kill switch means no request (`KILL_SWITCH_ENGAGED`); cap
+  and size still refuse before the call. Success rows carry tokens, latency and attempts.
+- [x] **Contract tests against a recorded fixture.** The fake server answers with vLLM's chat-completion and
+  model-list shapes (the `completion()` fixture). It is not a capture from the live pod: this goal was not to
+  connect to it. Cases: success with token accounting, timeout, 401, 5xx retried then failed, 5xx then success,
+  429, 404, four malformed bodies, a dropped connection, cancellation, model mismatch, blank configuration, and the
+  probe (served, not served, 401, dead, unconfigured).
+- [x] **No request handler calls it directly.** `inference-boundary.spec.ts` fails if any non-test file in
+  `apps/api/src` or `apps/web/src` imports the adapter, the worker factory, `AiOrchestrator` or the fake server,
+  reads `ONE_AI_API_KEY` or `ONE_AI_BASE_URL`, or names `/chat/completions`. AI Operations' "reachable" is the latest
+  `ai:probe` row, never a live call.
+- [x] **No response surfaced to users contains upstream error text or the key.** Package tests search every error's
+  message, stack and JSON for an upstream sentinel and the key. The API spec drives a real failing generation and a
+  probe through the worker path, then checks the summary, usage, usage-by-organisation, evaluations and policy
+  responses.
+
+**Decisions taken (recorded in the design):**
+1. All three variables are required; a key is required even though vLLM can run without one (the pod is on a
+   public proxy).
+2. `http://` only for loopback; the base URL includes `/v1` (the OpenAI convention, and Bedrock's).
+3. A timeout is not retried; 429, 5xx and dropped connections are, twice.
+4. The served model must equal the feature's evaluated model (`PROVIDER_MODEL_MISMATCH`, no call).
+5. No streaming: generation is a background job producing a DRAFT.
+6. Reachability comes from a probe command, not from the API process.
+7. The provider key is recorded as `openai-compatible` (the venue is configuration; evaluations also bind the model).
+
+**Android:** no change. AI Operations is a web-only operations console with no Android counterpart, and no AI
+feature reaches students or any app screen.
+
+**Not done / for the coordinator:** no feature, prompt or outbox consumer is registered (ENG-23 is the first); the
+probe is not scheduled on the server (the runbook gives the cron line); the in-app assistant still calls Anthropic
+directly and stays off (OPS-SR-02, out of scope); cost stays NA (no price table).
+
+**Validation:** running — results to follow in this entry.

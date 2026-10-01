@@ -372,8 +372,8 @@ Replayed twice by hand on a migrated database without error.
 **Result:** Complete — field staff log visits, calls, meetings and notes and keep follow-ups on the phone and the web;
 every field write lands once however often it is resent; a visit's location is optional, coarse, private to the
 person and their manager, kept 180 days, exported and erasable; and the phone keeps working without a signal.
-**Branch / PR:** feat/growth-field (rebased onto feat/plan-phases-0-to-2 at af4e181, GROWTH-02/03 merged) → feat/plan-phases-0-to-2 (pushed; not merged)
-**Commits:** a426647 (design) · 9b4b92b, 5f40d86 (tests) · 1cd036d, ab946ce, 3836419, fb61249 (implementation) · ef09213 (coverage doc) · 8ef5445 (report) · this validation record
+**Branch / PR:** feat/growth-field (rebased onto feat/plan-phases-0-to-2 at f501905) → feat/plan-phases-0-to-2 (pushed; not merged)
+**Commits:** 6cc8129 (design) · 12986f8, 4f657bc (tests) · 66276dc, 26838fd, 54582d0, 730697d (implementation) · 0563ea8 (coverage doc) · c0bc53f (report) · 658a7ef (validation record) · this SHA update
 **Files created:**
 - `docs/architecture/growth-field-work-table-design.md` (written and committed before the migration)
 - `docs/legal/growth-field-location-notice-DRAFT-for-legal-review.md` (DRAFT throughout; publishing is HG-6)
@@ -500,5 +500,7 @@ Cognito; the cleartext allowance for 10.0.2.2 was a temporary debug-only overlay
 - CI parity: optional-chain, private-key and conflict-marker greps — clean; `corepack pnpm audit --prod --audit-level=high` — exit 0.
 - An earlier run on the pre-rebase base was abandoned when the base moved (and a leftover process from it was stopped
   before this run started on a fresh database).
+- After the rebase onto f501905 (clean, no conflicts): `corepack pnpm typecheck` — pass (run on the GROWTH-04 tip, which
+  contains this branch); `growth-foundation.integration.spec.ts` re-run alone on a fresh database — 19/19 pass.
 
 **Next goal:** GROWTH-04 — College pipeline and the operations handoff.

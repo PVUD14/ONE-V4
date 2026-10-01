@@ -78,6 +78,35 @@ object Api {
             text
         }
 
+    /**
+     * A binary response (a résumé PDF): the same headers, token refresh and error envelope as [request],
+     * with the body kept as bytes.
+     */
+    internal suspend fun requestBytes(context: Context, path: String): ByteArray =
+        withContext(Dispatchers.IO) {
+            val token = Session.token(context) ?: throw ApiException(401, "NO_TOKEN")
+            val builder = Request.Builder()
+                .url(baseUrl(context) + path)
+                .header("Accept", "application/pdf, application/json")
+                .header("X-Correlation-Id", "and-" + UUID.randomUUID())
+                .header("X-Client", "one-android/" + BuildConfig.VERSION_NAME)
+                .get()
+            fun run(tokenValue: String): Triple<Int, ByteArray, String> {
+                val request = builder.header("Authorization", "Bearer " + tokenValue).build()
+                http.newCall(request).execute().use { response ->
+                    val bytes = response.body?.bytes() ?: ByteArray(0)
+                    return Triple(response.code, bytes, if (response.isSuccessful) "" else bytes.toString(Charsets.UTF_8))
+                }
+            }
+            var result = run(token)
+            if (result.first == 401) refreshSession(context)?.let { result = run(it) }
+            if (result.first !in 200..299) {
+                val parsed = runCatching { json.decodeFromString<ErrorEnvelope>(result.third).error }.getOrNull()
+                throw ApiException(result.first, parsed?.code, parsed?.message)
+            }
+            result.second
+        }
+
     suspend fun listAssessments(context: Context): List<AssessmentDto> =
         json.decodeFromString<AssessmentsEnvelope>(request(context, "GET", "/api/v1/student/assessments")).assessments
 

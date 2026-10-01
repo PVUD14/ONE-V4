@@ -885,12 +885,20 @@ internal fun ProfilePage(
 internal fun DocumentsPage(onClose: () -> Unit) {
     val context = LocalContext.current
     var documents by remember { mutableStateOf<List<DocumentDto>?>(null) }
+    // RESUME-GEN: the résumé builder opens from here rather than from a new menu item.
+    var resumeBuilder by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { documents = runCatching { Api.listDocuments(context) }.getOrDefault(emptyList()) }
+    if (resumeBuilder) { ResumeBuilderPage(onClose = { resumeBuilder = false }); return }
     OverlayScaffold("Documents", onClose) {
         when {
             documents == null -> LoadingSpinner()
-            documents!!.isEmpty() -> CenteredNote("No documents yet. Upload résumés and certificates from the web app at oneby8.com.")
+            documents!!.isEmpty() -> Column(Modifier.fillMaxSize().padding(18.dp)) {
+                ResumeBuilderEntryCard(onOpen = { resumeBuilder = true })
+                CenteredNote("No documents yet. Upload résumés and certificates from the web app at oneby8.com.")
+            }
             else -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp)) {
+                ResumeBuilderEntryCard(onOpen = { resumeBuilder = true })
+                Spacer(Modifier.height(12.dp))
                 PilotCard {
                     Column(Modifier.padding(vertical = 4.dp)) {
                         documents!!.forEachIndexed { index, doc ->

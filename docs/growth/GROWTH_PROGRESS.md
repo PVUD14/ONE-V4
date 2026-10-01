@@ -515,9 +515,9 @@ operations as a request, and follows its onboarding through milestones read from
 operator with `OPS_ORG_MANAGE` links the request to the college they created, which records the owner at that moment
 and moves the handed-over contacts to the college's account.
 **Branch / PR:** feat/growth-college-pipeline (stacked on feat/growth-field, both rebased onto feat/plan-phases-0-to-2 at
-af4e181) → feat/plan-phases-0-to-2 (pushed; not merged)
-**Commits:** a1e4b43 (design) · ab4eb64, 98bcc63 (tests) · 5db9cfe, 46e3d02, 7c7e5de (implementation) · 6045b00 (GROWTH-03
-fixture updated to the new rule) · this report
+f501905) → feat/plan-phases-0-to-2 (pushed; not merged)
+**Commits:** 46ff08e (design) · 67a9041, a427d2b (tests) · 0ac5f99, 97754bb, 746a412 (implementation) · 36effc8 (GROWTH-03
+fixture updated to the new rule) · 1390b4c (report) · this validation record
 **Files created:**
 - `docs/architecture/growth-college-pipeline-table-design.md` (written and committed before the migration)
 - `packages/persistence/drizzle/0104_growth_college_pipeline.sql`
@@ -604,6 +604,22 @@ CHECK, grant trigger or scope trigger touched. Applied twice by the migrator and
 - The self-dealing guard on linking (§8.6) needs attribution, so it is GROWTH-07's.
 - No "stale request" alert for operations; the queue is ordered oldest first.
 
-**Validation:** recorded below once the full run completes.
+**Validation** (`E:/one-wt/logs/validate.sh` on a fresh database `one_growth04`, only `DATABASE_URL` exported, on base af4e181
+with GROWTH-06 beneath; then rebased onto f501905):
+- `corepack pnpm db:migrate` twice — pass (89 applied, then 0 / 89 already applied); 0104 also replayed by hand — pass.
+- `corepack pnpm typecheck` — pass (again after the rebase onto f501905). `corepack pnpm build` — pass.
+- `corepack pnpm -r --no-bail --workspace-concurrency=1 test` — every growth spec passed; overall api 1 439 of 1 442, web
+  1 002 of 1 004, every other package fully green (persistence 494, authorization 464, …). The run exits 1 for failures
+  that are environmental, none in a growth file:
+  - 12 API files hit "out of shared memory" on the shared Postgres (mostly teardown `DROP SCHEMA`). At the
+    coordinator's request the listed ones were re-run alone, sequentially, on a fresh database after the rebase:
+    growth-foundation 19/19, institution-exports 21/21, learner-goals 5/5, operations-lessons 19/19,
+    institution-placement-visibility 15/15, institution-teaching-assignments 35/35 — pass.
+    institution-learning-actions: two alone runs each failed one *different* test with "out of shared memory" (18/19);
+    the third alone run passed 19/19, with the server otherwise idle. It touches no growth table.
+  - web `App.test.tsx` › "resolves every visible navigation item…" — the known 20 s timeout under full-suite load.
+  - web `employerReports.test.tsx` — one lookup missed under load; re-run alone 5/5 pass.
+- Android `./gradlew --no-daemon -q :app:compileDebugKotlin` (Android Studio JBR) — pass.
+- CI parity: optional-chain, private-key and conflict-marker greps — clean; `corepack pnpm audit --prod --audit-level=high` — exit 0.
 
 **Next goal:** GROWTH-05 — Employer pipeline, referral links and the EMP-04 handoff (or GROWTH-07, as the coordinator decides).

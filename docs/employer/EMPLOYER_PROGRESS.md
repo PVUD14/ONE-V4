@@ -1227,3 +1227,91 @@ Calendar invites remain EMP-09's. No calendar provider is integrated.
 - A pre-existing optional-chain policy violation in `rolePortal/aiOperations.tsx` (from the base) was fixed in its own commit, because CI would otherwise fail.
 
 **Next goal:** EMP-14 (depends on EMP-13 and on HG-4).
+
+## EMP-14 — Consented talent pool (discovery) — 2026-10-01
+
+**Result:** Complete, built dark. Hard gate **HG-4 is still PENDING** (it covers EMP-13 and EMP-14), so everything sits behind its own flag `employer.talent-pool`: off by default, switching it on needs a second person. The discovery consent wording is a draft for legal review (**HG-6**). Turning the feature on needs both approvals and then only the flag; ADR-044 stays Proposed until then.
+
+**Branch / PR:** `feat/emp-14-talent-pool`, from `onev4/feat/plan-phases-0-to-2` (19cbee0). Pushed to `onev4`. Not merged; the coordinator reviews it.
+
+**Files created:**
+- `docs/architecture/talent-pool-table-design.md`, `docs/architecture/ADR-044-consented-talent-pool-discovery.md` (Proposed), `docs/legal/employer-discovery-consent-DRAFT-for-legal-review.md`
+- `packages/persistence/drizzle/0098_talent_pool.sql`
+- `apps/api/src/http/talent-pool.ts`, `talent-pool.controller.ts`, `talent-pool.integration.spec.ts`
+- `apps/web/src/talentPool.tsx`, `talentPool.test.tsx`, `apps/web/src/api/talentPool.ts`
+- `apps/android/app/src/main/java/pro/ai8ht/one/TalentPool.kt`
+
+**Files modified:**
+- API: `student-hiring.controller.ts` (an invite-only job is visible to a student holding a live invitation; applying answers it; the list marks `invitedFromTalentPool`), `consents.controller.ts` (the discovery consent is neither listed nor grantable while the flag is off; withdrawal is never gated), `privacy-export-sections.ts`, `privacy-deletion.ts`, `api-security.module.ts`
+- Web: `App.tsx` (Profile gains the talent pool card; the generic profile form no longer offers an "Employer discovery" switch), `hiringPages.tsx` (invited tag, `?opportunity=` deep link), `api/hiring.ts`, `api.ts`, `rolePortal/employer.tsx`, `rolePortal/employerCandidateDetail.tsx`, `applicationSnapshotView.test.tsx` (the existing Talent Pool test now waits for the server's `available: false`)
+- Android: `Api.kt`, `JobsAndMore.kt` (Profile section and editor; an "Invited" chip in Jobs)
+- Docs: `privacy-export-coverage.md`
+
+**Migrations added:** `0098_talent_pool.sql` (the number assigned). Idempotent; migrated twice on a fresh database (85 applied, then 0 applied and 85 already applied).
+
+**Design docs / ADRs:** the table design, ADR-044 and the draft consent text were committed first (b32730e).
+
+**What was built:**
+- **Who appears.** Checked in SQL on every request, nothing cached:
+  - the flag is on;
+  - the student has a live listing;
+  - their latest `employer-discovery` consent row is GRANTED at the current version;
+  - profile visibility is `EMPLOYER_DISCOVERY`;
+  - the account is ACTIVE and not anonymised, with no open deletion request;
+  - they have not blocked this employer;
+  - the employer is verified and active, and the reader is an active owner, admin or recruiter (EMP-03).
+- **Student (web Profile card; Android Profile section and editor).**
+  - Joining is explicit: `PUT /students/me/talent-pool` with the current `consentVersion` records the consent, sets the visibility and creates the listing.
+  - The student ticks what the card shows: verified evidence items per catalogue skill (EMP-13's `qualifyingEvidence`, re-checked on every read), branch and graduation year from the college roster, up to five cities. A preview shows the card as employers see it.
+  - Changing the card needs no new agreement. Leaving (`DELETE`) is always allowed, even with the flag off: the listing ends, a WITHDRAWN consent row is written and visibility narrows to `INSTITUTION_VISIBLE`.
+  - Invitations: open the job and apply, or decline (the employer is not told).
+  - Blocks: find a verified employer by name, block or unblock. Blocking cancels that employer's open invitations.
+- **Employer (web Talent Pool page, behind the existing nav item).**
+  - `GET …/talent-pool/search`: filters only — up to 5 catalogue skills (all must have shown evidence), branch, graduation year, city. Any other parameter is `400 UNKNOWN_FILTER`, so no protected attribute can become a filter. At least one filter is required. 25 a page, 8 pages, `hasMore` only. The order is a hash of the card, never evidence or recency.
+  - Cards: a per-employer pseudonym (`md5(listing:employer)`, new on every opt-in), skill names, and branch, year and cities only if shown. Opening a card lists the items per skill: type, source, date, unaided.
+  - `POST …/talent-pool/invitations`: only to the employer's own published job with an `INVITE_ONLY` audience and an open deadline; lasts 14 days or until the deadline; one per card per job; 20 per employer per rolling 24 hours (advisory lock). The student gets an in-app notice after the commit.
+  - The employer sees its invitations as PENDING, APPLIED or CLOSED. A decline or a block looks like no answer until expiry.
+  - Identity reaches the employer only through the normal apply (snapshot, grant), which marks the invitation APPLIED in the same transaction.
+- **Audit (same transaction):** `talent_pool.searched` (filters, cards returned), `talent_pool.card_viewed` (resource = the listing), `talent_pool.invitation_sent`; on the student side `opted_in`, `listing_updated`, `opted_out`, `employer_blocked`, `employer_unblocked`, `invitation_declined`.
+- **Database guards (0098):** nobody can show another person's evidence or add to an ended listing; an invitation goes only into the employer's own job and onto the invited student's listing; history is never rewritten (a single removal, answer or unblock; an ended listing is frozen); `DELETE` only inside the privacy-erase transaction.
+- **Privacy.** The export gains `talentPool` (listings and what each showed, blocks, invitations, and the employers who opened the card). Deletion ends the live listing first, then erases listings, shown evidence, blocks and unanswered invitations; an invitation that became an application stays with it, its listing ended and emptied; consent rows are retained (CONSENT_RECORDS).
+- **Dark launch.** With the flag off: the student is offered nothing (the card does not render, `PUT` is refused, the consent is not listed and cannot be granted); employer routes answer `available: false` without reading student data or writing audit rows; invitations are refused; invited jobs are no longer visible.
+
+**Validation (targeted, before the full run):**
+- `talent-pool.integration.spec.ts`: 19/19.
+- Adjacent API specs, each run alone: skill-evidence 13/13, privacy 17/17, hiring 22/22, campus-drive-nominations 9/9, operations-privacy 30/30, employer-candidate-view 12/12, assessments 16/16, campus-drives 8/8. Run together first, six files hit the shared Postgres "out of shared memory" error; all passed alone.
+- Web: full suite 958/958 (85 files), including `talentPool.test.tsx` 7/7.
+- API and web `tsc --noEmit`; the optional-chain policy grep is clean; Android `:app:compileDebugKotlin` exited 0.
+
+**Acceptance criteria:**
+- [x] **Students without both consent and visibility never appear.** Tests: `finds an opted-in student, and loses them on the next request when visibility or consent goes`; `never shows a student who only set visibility, or who has a listing row without the consent`; `withholds a student whose account is being deleted, and one whose consent is for a superseded version`; `leaving takes effect on the next request…`.
+- [x] **No identity is revealed before the student applies.** Tests: `shows a minimal card with no name, contact, college, identifier, readiness, stage or count…` (walks every key and value of the search and card responses); `invites through the card to an invite-only job; the employer learns who it was only when the student applies` (the applicant list is empty until the apply). The web test asserts no name, email or college on screen.
+- [x] **Build 1:** the consent definition is seeded (draft version), and both consent and visibility are required.
+- [x] **Build 2:** search by skills with shown evidence, branch, graduation year and location preference; never by protected attributes; minimal card.
+- [x] **Build 3:** invitation to apply to an INVITE_ONLY job; identity and snapshot only on apply.
+- [x] **Build 4:** 20 invitations per employer per day (`allows at most 20…`); searches audited; students block employers (`a blocked employer neither finds nor invites…`).
+- [x] **Dark until HG-4:** `offers nothing, reads nothing and shows nothing while the flag is off; leaving stays possible`; a replay never flips the flag.
+
+**Decisions taken on Divakar's behalf (recommendations; see the design's "Decisions for Divakar"):**
+1. Its own flag `employer.talent-pool` (not shared with EMP-13), high-risk to enable.
+2. The consent definition is seeded as `2026-10-draft` and hidden while the flag is off; switching on also needs HG-6 for the wording.
+3. Card fields: evidence per skill, branch, year and cities — each only if ticked. No college name.
+4. Limits: 20 invitations per employer per 24 hours, one per card per job, 14-day invitations, 5 skills per search, 25 per page, 8 pages.
+5. A decline or a block looks like no answer to the employer.
+6. Leaving keeps received invitations answerable until they expire; blocking cancels that employer's.
+7. Notices are in-app only (kind SYSTEM, like INST-14 nominations).
+8. The generic Profile form no longer offers an "Employer discovery" switch or the `EMPLOYER_DISCOVERY` option (unless it is the stored value): being found is joined and left only through the talent pool card.
+9. Search has no rate limit beyond auditing (the plan asks only for invitation limits).
+
+**Android:** the student control (join with the notice, card choices with a preview, invitations with decline, blocks, leave) is on Profile; invited jobs show an "Invited" chip in Jobs. Recruiter discovery is web only: the app has no Talent Pool screen for employers, and adding one would be a navigation change (HG-3). Compiled with the Studio JBR.
+
+**Navigation:** unchanged. The employer Talent Pool item already existed (the EMP-07 empty state); the student control sits inside Profile.
+
+**Limitations / not done:**
+- No operator screen for the talent pool beyond audit rows.
+- Card views are shown to the student only in the data export, not on screen.
+- No email for invitations (in-app only).
+
+**Risks / follow-ups:**
+- When HG-4 and HG-6 are approved: publish the approved consent wording (a new version retiring the draft, if it changes), switch the flag on, and move ADR-044 to Accepted.
+- `md5` card references are pseudonyms, not secrets; listing ids never leave the server.

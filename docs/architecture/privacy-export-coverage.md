@@ -139,6 +139,14 @@ Staff-side tables that carry a user id for the actor (`*_by_user_id`), operation
 `external_review_assignments`, `faculty_teaching_assignments`) and content tables. A staff member's own
 export is out of scope here: the route is `/students/me/…`.
 
+### Growth (GROWTH-03, `growth-leads-table-design.md` §6)
+
+| Table | Export | Deletion |
+|---|---|---|
+| `growth_staff_types`, `growth_team_members` (0091), `growth_territory_assignments` (0099), `growth_leads` (0100) | **`growthWork`** — a growth staff member's own staff type, teams, territory assignments and the leads they created or own (organisation, kind, stage, source, dates). Empty for everyone else. Never a lead contact's details | Retained: work records about organisations; the reference to an erased user then names nobody (the `users` row is anonymised by IDENTITY) |
+| `growth_lead_contacts` (0100) | **Not in any user's export:** the people in it are not ONE users. Their access request is answered from **Operations → Privacy → Growth lead contacts** (lookup by email or phone, audited by reference and key hash), which returns everything held about them | Erased on request from the same console (`PRIVACY_REQUEST`, fields nulled by CHECK), by the owner or manager, and by the daily retention sweep 24 months after the lead's last activity (`RETENTION_EXPIRED`, D12) |
+| `growth_lead_owner_history`, `growth_lead_stage_history`, `growth_district_imports`, `growth_regions`, `growth_region_areas`, `growth_states`, `growth_districts` | Not personal data (organisations, regions, staff actions by id) | Retained |
+
 ## Decisions
 
 1. **One export, extended in place; no new route, no UI change.** Both clients already download the

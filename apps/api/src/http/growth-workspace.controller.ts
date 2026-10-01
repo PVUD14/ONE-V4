@@ -12,11 +12,14 @@
  * GROWTH-02: `GET /api/v1/growth/territory` — the regions the person works today, from the one
  * scope function (`growthScopeFor`), each with its areas and its people: a manager sees everyone
  * assigned to their regions; an executive sees the region's managers, so they know whom to ask.
+ *
+ * GROWTH-03: `/me` carries the count of open leads the person owns and `/territory` the count of
+ * open, unowned, contactable leads in each region (from the lead register, in scope).
  */
 import { Controller, ForbiddenException, Get, Inject, Req, UseGuards } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { growthWorkspaceRole, isGrowthRole } from '@planthepath/authorization/src/index.js';
-import { loadGrowthScope } from '@planthepath/persistence/src/growth-territories.js';
+import { leadCounts, loadGrowthLeadCaller } from './growth-leads-service.js';
 import type { PersistenceDb } from '@planthepath/persistence/src/repositories.js';
 import { API_PERSISTENCE_DB, ProtectedApiAuthenticationGuard, requireTrustedAuthorization, safeError, type ProtectedHttpRequest } from './api-security.js';
 
@@ -49,9 +52,11 @@ export class GrowthWorkspaceController {
     const staffType = await this.db.execute(sql`
       SELECT staff_type FROM growth_staff_types WHERE membership_id = ${workingId}::uuid AND ended_at IS NULL
     `) as QueryResult<{ staff_type: string }>;
+    const counts = await leadCounts(this.db, await loadGrowthLeadCaller(this.db, { userId: context.authorization.principal.userId, growthAdmin: false }));
     return {
       role,
       staffType: staffType.rows[0]?.staff_type ?? null,
+      openLeads: counts.ownedOpen,
       teams: teams.rows.map((row) => ({
         team: row.team,
         joinedAt: new Date(row.joined_at).toISOString(),
@@ -67,8 +72,10 @@ export class GrowthWorkspaceController {
     const context = requireTrustedAuthorization(request);
     const role = growthWorkspaceRole(context.authorization.memberships);
     if (!role) throw new ForbiddenException(safeError('FORBIDDEN', context.correlationId));
-    const scope = await loadGrowthScope(this.db, { userId: context.authorization.principal.userId, growthAdmin: false });
+    const caller = await loadGrowthLeadCaller(this.db, { userId: context.authorization.principal.userId, growthAdmin: false });
+    const scope = caller.scope;
     const regionIds = scope.kind === 'PERSON' ? scope.workingRegionIds : [];
+    const counts = await leadCounts(this.db, caller);
     if (!regionIds.length) return { role, regions: [], correlationId: context.correlationId };
     const idList = sql.join(regionIds.map((id) => sql`${id}::uuid`), sql`, `);
     const regions = await this.db.execute(sql`SELECT id, name FROM growth_regions WHERE id IN (${idList}) ORDER BY lower(name), id`) as QueryResult<{ id: string; name: string }>;
@@ -103,6 +110,7 @@ export class GrowthWorkspaceController {
             districtCode: area.district_code === null ? null : Number(area.district_code), districtName: area.district_name,
           })),
           people: visiblePeople.map((row) => ({ email: row.email, role: row.assignment_role, since: new Date(row.starts_at).toISOString() })),
+          unownedLeads: counts.unownedByRegion[region.id] ?? 0,
         };
       }),
       correlationId: context.correlationId,

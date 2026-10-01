@@ -19,15 +19,16 @@ const num = (value: unknown): number | null => (value == null ? null : Number(va
 
 export async function assembleCoverageSections(one: Query, subjectUserId: string): Promise<Record<string, unknown>> {
   const subject = sql`${subjectUserId}::uuid`;
-  const [account, records, hiring, college, learning, talentPool] = await Promise.all([
+  const [account, records, hiring, college, learning, talentPool, growthWork] = await Promise.all([
     accountSections(one, subject),
     recordSections(one, subject),
     hiringSections(one, subject),
     collegeSections(one, subject),
     learningSections(one, subject),
     talentPoolSection(one, subject),
+    growthWorkSection(one, subject),
   ]);
-  return { ...account, ...records, ...hiring, ...college, learning, talentPool };
+  return { ...account, ...records, ...hiring, ...college, learning, talentPool, growthWork };
 }
 
 type Subject = ReturnType<typeof sql>;
@@ -504,5 +505,38 @@ async function learningSections(one: Query, subject: Subject): Promise<Record<st
       title: row.title, state: row.state, startedAt: row.started_at, expiresAt: row.expires_at, submittedAt: row.submitted_at ?? null,
       scoreCorrect: num(row.score_correct), scorePossible: num(row.score_possible),
     })),
+  };
+}
+
+/**
+ * GROWTH-03 (design §13.5): a growth staff member's own work records — their staff type, teams,
+ * territory assignments and the leads they created or own (organisation, kind, stage, dates).
+ * Never the lead contacts' personal data: those people are third parties, not the subject. For
+ * anyone who is not growth staff every list is empty.
+ */
+async function growthWorkSection(one: Query, subject: Subject): Promise<Record<string, unknown>> {
+  const [staffTypes, teams, assignments, leads] = await Promise.all([
+    one(sql`SELECT t.staff_type, t.reason_code, t.effective_from, t.ended_at
+            FROM growth_staff_types t JOIN organization_memberships m ON m.id = t.membership_id
+            WHERE m.user_id = ${subject} ORDER BY t.effective_from, t.id`),
+    one(sql`SELECT t.team, t.joined_at, t.reason_code, t.left_at, t.left_reason_code
+            FROM growth_team_members t JOIN organization_memberships m ON m.id = t.membership_id
+            WHERE m.user_id = ${subject} ORDER BY t.joined_at, t.id`),
+    one(sql`SELECT r.name AS region_name, a.assignment_role, a.starts_at, a.reason_code, a.ended_at, a.ended_reason_code
+            FROM growth_territory_assignments a JOIN growth_regions r ON r.id = a.region_id
+            JOIN organization_memberships m ON m.id = a.membership_id
+            WHERE m.user_id = ${subject} ORDER BY a.starts_at, a.id`),
+    one(sql`SELECT l.name, l.kind, l.stage, l.source, l.created_at, l.last_activity_at,
+                   (l.created_by_user_id = ${subject}) AS created_by_me,
+                   (l.owner_membership_id IN (SELECT id FROM organization_memberships WHERE user_id = ${subject})) AS owned_by_me
+            FROM growth_leads l
+            WHERE l.created_by_user_id = ${subject} OR l.owner_membership_id IN (SELECT id FROM organization_memberships WHERE user_id = ${subject})
+            ORDER BY l.created_at, l.id LIMIT 5000`),
+  ]);
+  return {
+    staffTypes: staffTypes.map((row) => ({ staffType: row.staff_type, reasonCode: row.reason_code, from: row.effective_from, to: row.ended_at })),
+    teams: teams.map((row) => ({ team: row.team, joinedAt: row.joined_at, reasonCode: row.reason_code, leftAt: row.left_at, leftReasonCode: row.left_reason_code })),
+    territory: assignments.map((row) => ({ region: row.region_name, role: row.assignment_role, from: row.starts_at, reasonCode: row.reason_code, to: row.ended_at, endedReasonCode: row.ended_reason_code })),
+    leads: leads.map((row) => ({ organisation: row.name, kind: row.kind, stage: row.stage, source: row.source, createdAt: row.created_at, lastActivityAt: row.last_activity_at, createdByMe: Boolean(row.created_by_me), ownedByMe: Boolean(row.owned_by_me) })),
   };
 }

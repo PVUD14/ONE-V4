@@ -5,13 +5,16 @@ import * as schema from '@planthepath/persistence/src/schema.js';
 import { executeDueDeletions } from './http/privacy-deletion.js';
 import { eraseExpiredApplicationMessages, MESSAGE_RETENTION_DAYS_AFTER_GRANT } from '@planthepath/persistence/src/application-messages.js';
 import { revokeExpiredApplicantGrants } from '@planthepath/persistence/src/employer-terms.js';
+import { sweepGrowthLeadContactRetention } from '@planthepath/persistence/src/growth-leads.js';
+import { GROWTH_CONTACT_RETENTION_MONTHS } from '@planthepath/authorization/src/index.js';
 import { createLocalDiskStorage } from './storage/file-storage.js';
 
 /**
  * Executes deletions whose 30-day grace period has elapsed, revokes applicant-access grants whose
  * expiry has passed (EMP-16), then erases application messages whose retention after the employer's
  * access ended has run out (EMP-10). Message erasure skips anything an open trust case or an active
- * retention hold still needs.
+ * retention hold still needs. GROWTH-03: erases the contacts of growth leads with no activity for
+ * 24 months (D12) — people who are not ONE users and never agreed to be kept.
  *
  * Deliberately a one-shot run rather than a loop: a deletion sweep is a daily job,
  * and a long-lived process holding a connection to do nothing most of the time is
@@ -58,6 +61,16 @@ async function main(): Promise<void> {
     // same daily sweep, because it is the same kind of promise about how long ONE keeps data.
     const erasedMessages = await eraseExpiredApplicationMessages(db);
     console.log(JSON.stringify({ event: 'application.messages.retention_sweep', retentionDays: MESSAGE_RETENTION_DAYS_AFTER_GRANT, erased: erasedMessages }));
+
+    // GROWTH-03 (D12): lead contacts are kept 24 months after the lead's last activity, then their
+    // name, email and phone are erased; the organisation-level lead stays.
+    let growthLeads = 0;
+    let growthContacts = 0;
+    for (let batch = await sweepGrowthLeadContactRetention(db); batch.contacts > 0; batch = await sweepGrowthLeadContactRetention(db)) {
+      growthLeads += batch.leads;
+      growthContacts += batch.contacts;
+    }
+    console.log(JSON.stringify({ event: 'growth.lead_contacts.retention_sweep', retentionMonths: GROWTH_CONTACT_RETENTION_MONTHS, leads: growthLeads, erased: growthContacts }));
 
     for (const failure of failed) {
       console.error(JSON.stringify({ event: 'privacy.deletion.failed', requestId: failure.requestId, detail: failure.detail }));

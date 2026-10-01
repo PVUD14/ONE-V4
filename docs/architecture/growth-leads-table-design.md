@@ -135,8 +135,10 @@ can be cached).
 A **daily sweep in the privacy worker** (`run-privacy-worker.ts`, beside the deletion run) erases every live contact of
 every lead whose `last_activity_at` is more than 24 months ago and which has not been handed off — which covers both
 "`LOST`" and "no activity" in design §13.4, because losing a lead is its last activity. The sweep removes with
-`RETENTION_EXPIRED` (fields erased by the same statement), writes one `audit_events` row per lead it touched
-(`growth.lead_contacts.retention_erased`, counts only), is bounded per run and idempotent (a second run finds nothing).
+`RETENTION_EXPIRED` (fields erased by the same statement; the row keeps the reason and the time), logs one summary
+line per run (`growth.lead_contacts.retention_sweep`: leads and contacts erased) like the message-retention sweep,
+is bounded per batch and idempotent (a second run finds nothing). It writes no `audit_events` row: that table requires a
+human actor, and the removed row itself is the record (the EMP-10 message sweep made the same choice).
 The organisation-level lead stays. Handed-off leads are excluded because operations erases their copies at handoff
 (`HANDED_OVER`, GROWTH-04).
 

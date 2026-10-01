@@ -249,9 +249,11 @@ export async function createLead(tx: Runner, ctx: WriteContext, caller: GrowthLe
       if (found.do_not_contact_at) throw conflict('GROWTH_LEAD_DO_NOT_CONTACT', ctx.correlationId);
       const regionIds = await regionsForArea(tx, found.state_code, found.district_code === null ? null : Number(found.district_code));
       const named = growthDuplicateDisclosure(caller.scope, { ownerMembershipId: found.owner_membership_id, regionIds }) === 'NAMED';
+      const anonymous = 'Already registered by another team member — ask your manager.';
       throw conflict('GROWTH_LEAD_DUPLICATE', ctx.correlationId, named
-        ? { existing: { leadId: found.id, owner: found.owner_email ? { email: found.owner_email } : null } }
-        : { existing: null, detail: 'Already registered by another team member — ask your manager.' });
+        ? { existing: { leadId: found.id, owner: found.owner_email ? { email: found.owner_email } : null },
+            message: found.owner_email ? `This organisation is already a lead, owned by ${found.owner_email}.` : 'This organisation is already a lead, currently unowned.' }
+        : { existing: null, detail: anonymous, message: anonymous });
     }
   }
   if (input.kind === 'EMPLOYER' && input.websiteDomain) {

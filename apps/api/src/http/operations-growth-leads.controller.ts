@@ -203,6 +203,14 @@ export class OperationsGrowthContactsPrivacyController {
     @Inject(API_ID_GENERATOR) private readonly ids: ApiIdGenerator,
   ) {}
 
+  /** What the console needs to draw the section; 403 for anyone without PRIVACY_REQUESTS. */
+  @Get('/policy')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async policy(@Req() request: ProtectedHttpRequest): Promise<Record<string, unknown>> {
+    const { correlationId } = await this.require(request);
+    return { keys: ['email', 'phone'], referencePattern: referencePattern.source, retentionMonths: 24, correlationId };
+  }
+
   @Post('/lookup')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async lookup(@Req() request: ProtectedHttpRequest, @Body() body: unknown): Promise<Record<string, unknown>> {

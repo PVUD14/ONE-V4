@@ -62,6 +62,7 @@ import { OperationsCommunicationsPage } from './rolePortal/communications.js';
 import { GrowthHomePage, GrowthModulePage } from './rolePortal/growth.js';
 import { OperationsGrowthTeamPanel } from './rolePortal/growthTeam.js';
 import { OperationsGrowthSetupPanel } from './rolePortal/growthSetup.js';
+import { OperationsGrowthContactsPrivacyPanel, OperationsGrowthLeadsPanel } from './rolePortal/growthLeadsAdmin.js';
 import type { AuthenticatedWorkspaceSummary } from './rolePortal/shared.js';
 import { AuthenticatedNotYetAvailable, AuthenticatedReadOnlyModule, institutionStaffWorkspaceRoles, institutionWorkspaceRoles, InstitutionWorkspaceError, isInstitutionStaffWorkspace, isInstitutionWorkspace } from './rolePortal/shared.js';
 import type { RoleFixture, RoleNavItem, RolePortalConfig } from './rolePortalConfig.js';
@@ -315,7 +316,7 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   // showed before kept beneath it. Only this label's branch changes; AI Operations has
   // its own branch below (OPS-12). OPS-15: quarterly access reviews and OPS-16: the incident register sit
   // beneath the privacy console, under the same label (Appendix 1 §4.2).
-  if (!demoMode && portal.key === 'operations-admin' && route.label === 'Security') return <><OperationsPrivacyConsolePage /><OperationsAccessReviewsPage /><OperationsIncidentRegisterPage /></>;
+  if (!demoMode && portal.key === 'operations-admin' && route.label === 'Security') return <><OperationsPrivacyConsolePage /><OperationsGrowthContactsPrivacyPanel /><OperationsAccessReviewsPage /><OperationsIncidentRegisterPage /></>;
   // OPS-12: AI Operations is the AI console (usage, caps, evaluations, kill switch). Only this label's branch changes.
   if (!demoMode && portal.key === 'operations-admin' && route.label === 'AI Operations') return <OperationsAiOperationsPage />;
   if (!demoMode && portal.key === 'operations-admin' && /system health|security|ai operations/i.test(route.label)) return <OperationsTechnicalReadOnlyPage routeLabel={route.label} />;
@@ -326,7 +327,7 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   // queue above it (Appendix 1 §4.2). Only this label's branch changes; the others keep
   // the not-yet-available state below.
   // GROWTH-01: the Growth team section sits beneath them, shown only to a GROWTH_ADMIN holder.
-  if (!demoMode && portal.key === 'operations-admin' && route.label === 'Settings') return <><OperationsApprovalsPanel /><OperationsStaffCapabilitiesPage /><OperationsCommunicationsPage /><OperationsGrowthTeamPanel /><OperationsGrowthSetupPanel /></>;
+  if (!demoMode && portal.key === 'operations-admin' && route.label === 'Settings') return <><OperationsApprovalsPanel /><OperationsStaffCapabilitiesPage /><OperationsCommunicationsPage /><OperationsGrowthTeamPanel /><OperationsGrowthSetupPanel /><OperationsGrowthLeadsPanel /></>;
   // OPS-05: Support is the case desk. Only this label's branch changes; Subscriptions,
   // Billing and Analytics keep the not-yet-available state below.
   if (!demoMode && portal.key === 'operations-admin' && route.label === 'Support') return <OperationsSupportDeskPage />;

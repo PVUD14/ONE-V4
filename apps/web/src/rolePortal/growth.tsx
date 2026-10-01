@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react';
 import { ApiRequestError, getGrowthMe, getGrowthTerritory, getProtectedAccessToken, type GrowthMeDto, type GrowthTerritoryDto } from '../api.js';
 import { V2Chip, V2EmptyState, V2Ring, V2Stat } from '../dashboardsV2.js';
 import type { RoleNavItem } from '../rolePortalConfig.js';
+import { GrowthLeadsPage } from './growthLeads.js';
 import { AuthenticatedNotYetAvailable } from './shared.js';
 
 const NA = 'NA';
@@ -24,7 +25,6 @@ const roleLabels: Readonly<Record<string, string>> = { GROWTH_EXECUTIVE: 'Growth
 
 /** What each page will hold once built, said plainly (design §16.1). */
 const notBuilt: Readonly<Record<string, string>> = {
-  Leads: 'Leads is not built yet. When it is, your college and employer leads, their stages and their contacts will be here.',
   Field: 'Field is not built yet. When it is, you will log visits, calls and follow-ups here and on the ONE app.',
   Targets: 'Targets is not built yet. When it is, your targets for the month and quarter, and progress counted from real records, will be here.',
   Commission: 'Commission is not built yet. Commission rates have not been set by operations, so no amount is shown anywhere.',
@@ -83,7 +83,7 @@ export function GrowthHomePage(): React.ReactElement {
         </div>
 
         <div className="v2-row v2-cols-4" role="region" aria-label="Growth summary">
-          <V2Stat icon="🤝" tone="blue" value={NA} label="Open leads" />
+          <V2Stat icon="🤝" tone="blue" value={typeof me?.openLeads === 'number' ? me.openLeads : NA} label="Open leads" />
           <V2Stat icon="📍" tone="teal" value={NA} label="Visits this month" />
           <V2Stat icon="🎯" tone="amber" value={NA} label="Target progress" />
           <V2Stat icon="₹" tone="purple" value={NA} label="Commission this month" />
@@ -111,7 +111,7 @@ export function GrowthHomePage(): React.ReactElement {
       <div className="v2-rail">
         <section className="v2-card">
           <div className="v2-card-head"><h2>Coming next</h2><V2Chip tone="slate">Not built yet</V2Chip></div>
-          <p className="v2-empty">Leads, field visits, targets and commission are not built yet. Each page says so until it is, and every figure above reads NA until it has a real source.</p>
+          <p className="v2-empty">Field visits, targets and commission are not built yet. Each page says so until it is, and every figure above reads NA until it has a real source.</p>
         </section>
         <section className="v2-card">
           <div className="v2-card-head"><h2>Protected boundaries</h2></div>
@@ -128,6 +128,7 @@ export function GrowthModulePage({ route, role }: { readonly route: RoleNavItem;
     return <V2EmptyState icon="🔐" title={`${route.label} is for regional managers`} note="This page is not part of your role. Your access has not changed." />;
   }
   if (route.label === 'Territory') return <GrowthTerritoryPage />;
+  if (route.label === 'Leads') return <GrowthLeadsPage role={role} />;
   return <AuthenticatedNotYetAvailable title={route.label} detail={notBuilt[route.label] ?? `${route.label} is not built yet.`} />;
 }
 
@@ -143,8 +144,8 @@ function areaLabel(area: { readonly stateName: string; readonly districtName: st
 /**
  * GROWTH-02: Growth → Territory. The regions the person works today (set by operations), each with
  * the states or districts it covers and the people in it: a manager sees everyone assigned to their
- * regions; an executive sees the region's managers. Unowned leads read NA until the lead register
- * (GROWTH-03) exists.
+ * regions; an executive sees the region's managers. GROWTH-03: each region carries its count of open,
+ * unowned, contactable leads.
  */
 export function GrowthTerritoryPage(): React.ReactElement {
   const token = getProtectedAccessToken();
@@ -194,7 +195,7 @@ export function GrowthTerritoryPage(): React.ReactElement {
           <V2Stat icon="🗺️" tone="blue" value={territory ? regions.length : NA} label="Regions you work" />
           <V2Stat icon="📍" tone="teal" value={territory ? areaCount : NA} label="Areas covered" />
           <V2Stat icon="👥" tone="amber" value={territory ? peopleCount : NA} label={managing ? 'People in your regions' : 'Managers in your regions'} />
-          <V2Stat icon="🤝" tone="purple" value={NA} label="Unowned leads" />
+          <V2Stat icon="🤝" tone="purple" value={territory && regions.every((region) => typeof region.unownedLeads === 'number') ? regions.reduce((total, region) => total + (region.unownedLeads ?? 0), 0) : NA} label="Unowned leads" />
         </div>
 
         {state.kind === 'loading' ? <section className="v2-card"><p className="v2-empty">Loading…</p></section> : null}
@@ -203,7 +204,8 @@ export function GrowthTerritoryPage(): React.ReactElement {
         {regions.map((region) => (
           <section key={region.id} className="v2-card" aria-label={`Region ${region.name}`}>
             <div className="v2-card-head"><h2>{region.name}</h2>
-              <V2Chip tone={region.myRole === 'MANAGER' ? 'purple' : 'teal'}>{region.myRole === 'MANAGER' ? 'You manage this region' : 'You work this region'}</V2Chip></div>
+              <V2Chip tone={region.myRole === 'MANAGER' ? 'purple' : 'teal'}>{region.myRole === 'MANAGER' ? 'You manage this region' : 'You work this region'}</V2Chip>
+              <V2Chip tone="amber">{typeof region.unownedLeads === 'number' ? `${region.unownedLeads} unowned lead${region.unownedLeads === 1 ? '' : 's'}` : `${NA} unowned leads`}</V2Chip></div>
             <p className="v2-empty">{region.since ? `Since ${new Date(region.since).toLocaleDateString()}` : NA}</p>
             <div className="v2-hero-chips" aria-label={`Areas of ${region.name}`}>
               {region.areas.length ? region.areas.map((area) => <V2Chip key={`${area.stateCode}-${area.districtCode ?? 'all'}`} tone="slate">{areaLabel(area)}</V2Chip>)
@@ -227,8 +229,8 @@ export function GrowthTerritoryPage(): React.ReactElement {
           <p className="v2-empty">You always see the leads you own, wherever they are. Unowned leads are shown to the people working the region that covers them{managing ? ', and you see every lead in the regions you manage' : ''}. When operations moves you off a region, its unowned leads leave your view at once.</p>
         </section>
         <section className="v2-card">
-          <div className="v2-card-head"><h2>Unowned leads</h2><V2Chip tone="slate">Not built yet</V2Chip></div>
-          <p className="v2-empty">The lead register is not built yet, so the count of unowned leads in your regions reads NA.</p>
+          <div className="v2-card-head"><h2>Unowned leads</h2></div>
+          <p className="v2-empty">Each region shows how many open leads in it have no owner and may be contacted. Claim them from Leads → Unowned in my regions.</p>
         </section>
       </div>
     </div>

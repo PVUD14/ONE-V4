@@ -13,6 +13,8 @@ export type GrowthStaffTypeDto = 'EMPLOYEE' | 'CONTRACTOR';
 export interface GrowthMeDto {
   readonly role: GrowthRoleDto;
   readonly staffType: GrowthStaffTypeDto | null;
+  /** GROWTH-03: open leads the person owns. */
+  readonly openLeads?: number;
   readonly teams: readonly { readonly team: string; readonly joinedAt: string; readonly manager: { readonly email: string } | null }[];
   readonly correlationId: string;
 }
@@ -118,6 +120,8 @@ export interface GrowthTerritoryDto {
     readonly since: string | null;
     readonly areas: readonly GrowthTerritoryAreaDto[];
     readonly people: readonly { readonly email: string; readonly role: 'EXECUTIVE' | 'MANAGER'; readonly since: string }[];
+    /** GROWTH-03: open, unowned, contactable leads in the region. */
+    readonly unownedLeads?: number;
   }[];
   readonly correlationId: string;
 }
@@ -213,4 +217,163 @@ export function assignGrowthTerritory(token: string, regionId: string, body: { r
 
 export function endGrowthTerritoryAssignment(token: string, regionId: string, assignmentId: string, body: { readonly reasonCode: string }): Promise<unknown> {
   return requestJson(`${territoryPath}/regions/${encodeURIComponent(regionId)}/assignments/${encodeURIComponent(assignmentId)}/end`, { token, method: 'POST', body });
+}
+
+// ---------------------------------------------------------------------------
+// GROWTH-03: the lead register, contacts and the privacy paths
+// ---------------------------------------------------------------------------
+
+export type GrowthLeadKindDto = 'COLLEGE' | 'EMPLOYER';
+export type GrowthLeadViewDto = 'ALL' | 'MINE' | 'UNOWNED' | 'NEEDS_OWNER';
+
+export interface GrowthLeadSummaryDto {
+  readonly id: string;
+  readonly kind: GrowthLeadKindDto;
+  readonly name: string;
+  readonly area: { readonly stateCode: string | null; readonly stateName: string | null; readonly districtCode: number | null; readonly districtName: string | null; readonly city: string | null };
+  readonly aisheCode: string | null;
+  readonly websiteDomain: string | null;
+  readonly owner: { readonly email: string | null; readonly isMe: boolean } | null;
+  readonly needsNewOwner: boolean;
+  readonly stage: string;
+  readonly lostReasonCode: string | null;
+  readonly source: string;
+  readonly possibleDuplicate: boolean;
+  readonly doNotContact: { readonly at: string | null; readonly reasonCode: string | null } | null;
+  readonly handedOff: boolean;
+  readonly liveContacts: number;
+  readonly createdAt: string | null;
+  readonly lastActivityAt: string | null;
+  readonly stale: boolean;
+  readonly version: number;
+}
+
+export interface GrowthLeadContactDto {
+  readonly id: string;
+  readonly role: string;
+  readonly fullName: string;
+  readonly email: string | null;
+  readonly phone: string | null;
+  readonly masked: boolean;
+  readonly permissionBasis: string;
+  readonly source: string;
+  readonly notice: { readonly givenAt: string | null; readonly version: string | null } | null;
+  readonly addedAt: string | null;
+}
+
+export interface GrowthLeadDetailDto extends GrowthLeadSummaryDto {
+  readonly contactsShownInFull: boolean;
+  readonly contacts: readonly GrowthLeadContactDto[];
+  readonly removedContacts: number;
+  readonly ownerHistory: readonly { readonly reasonCode: string; readonly at: string | null; readonly from: string | null; readonly to: string | null }[];
+  readonly stageHistory: readonly { readonly from: string | null; readonly to: string; readonly reasonCode: string | null; readonly at: string | null }[];
+}
+
+export interface GrowthLeadVocabularyDto {
+  readonly kinds: readonly GrowthLeadKindDto[];
+  readonly stages: Readonly<Record<GrowthLeadKindDto, readonly string[]>>;
+  readonly sources: readonly string[];
+  readonly contactRoles: readonly string[];
+  readonly contactSourcesByBasis: Readonly<Record<string, readonly string[]>>;
+  readonly reasons: Readonly<Record<'reassign' | 'adminReassign' | 'removeContact' | 'adminRemoveContact' | 'revealContact' | 'doNotContact', readonly string[]>>;
+  readonly contactLimit: number;
+  readonly purpose: string;
+  readonly notice: { readonly version: string; readonly status: string; readonly text: readonly string[] };
+}
+
+export interface GrowthLeadPageDto { readonly leads: readonly GrowthLeadSummaryDto[]; readonly nextCursor: string | null }
+
+export interface GrowthLeadQuery { readonly kind?: GrowthLeadKindDto; readonly view?: GrowthLeadViewDto; readonly q?: string; readonly cursor?: string }
+
+function leadQueryString(query: GrowthLeadQuery): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) if (value) params.set(key, String(value));
+  const text = params.toString();
+  return text ? `?${text}` : '';
+}
+
+const leadsPath = '/api/v1/growth/leads';
+const opsLeadsPath = '/api/v1/operations/growth-leads';
+
+export function getGrowthLeadVocabulary(token: string, signal?: AbortSignal): Promise<GrowthLeadVocabularyDto> {
+  return requestJson(`${leadsPath}/vocabulary`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function listGrowthLeads(token: string, query: GrowthLeadQuery, signal?: AbortSignal): Promise<GrowthLeadPageDto> {
+  return requestJson(`${leadsPath}${leadQueryString(query)}`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function getGrowthLead(token: string, leadId: string, signal?: AbortSignal): Promise<{ readonly lead: GrowthLeadDetailDto }> {
+  return requestJson(`${leadsPath}/${encodeURIComponent(leadId)}`, { token, ...(signal ? { signal } : {}) });
+}
+
+export interface NewGrowthLeadBody {
+  readonly kind: GrowthLeadKindDto; readonly name: string; readonly stateCode?: string | null; readonly districtCode?: number | null;
+  readonly city?: string | null; readonly aisheCode?: string | null; readonly websiteDomain?: string | null; readonly source: string;
+}
+
+export function createGrowthLead(token: string, body: NewGrowthLeadBody): Promise<{ readonly lead: GrowthLeadDetailDto }> {
+  return requestJson(leadsPath, { token, method: 'POST', body });
+}
+
+export function claimGrowthLead(token: string, leadId: string): Promise<{ readonly lead: GrowthLeadDetailDto }> {
+  return requestJson(`${leadsPath}/${encodeURIComponent(leadId)}/claim`, { token, method: 'POST', body: {} });
+}
+
+export function getGrowthLeadReassignOptions(token: string, leadId: string, operations = false): Promise<{ readonly options: readonly { readonly membershipId: string; readonly email: string; readonly role: string }[] }> {
+  return requestJson(`${operations ? opsLeadsPath : leadsPath}/${encodeURIComponent(leadId)}/reassign-options`, { token });
+}
+
+export function reassignGrowthLead(token: string, leadId: string, body: { readonly toMembershipId: string | null; readonly reasonCode: string }, operations = false): Promise<{ readonly lead: GrowthLeadDetailDto }> {
+  return requestJson(`${operations ? opsLeadsPath : leadsPath}/${encodeURIComponent(leadId)}/reassign`, { token, method: 'POST', body });
+}
+
+export interface NewGrowthContactBody {
+  readonly role: string; readonly fullName: string; readonly email: string | null; readonly phone: string | null;
+  readonly permissionBasis: string; readonly source: string; readonly noticeGiven: boolean;
+}
+
+export function addGrowthLeadContact(token: string, leadId: string, body: NewGrowthContactBody): Promise<{ readonly lead: GrowthLeadDetailDto }> {
+  return requestJson(`${leadsPath}/${encodeURIComponent(leadId)}/contacts`, { token, method: 'POST', body });
+}
+
+export function recordGrowthContactNotice(token: string, leadId: string, contactId: string): Promise<{ readonly lead: GrowthLeadDetailDto }> {
+  return requestJson(`${leadsPath}/${encodeURIComponent(leadId)}/contacts/${encodeURIComponent(contactId)}/notice`, { token, method: 'POST', body: {} });
+}
+
+export function removeGrowthLeadContact(token: string, leadId: string, contactId: string, body: { readonly reasonCode: string }, operations = false): Promise<{ readonly lead: GrowthLeadDetailDto }> {
+  return requestJson(`${operations ? opsLeadsPath : leadsPath}/${encodeURIComponent(leadId)}/contacts/${encodeURIComponent(contactId)}/remove`, { token, method: 'POST', body });
+}
+
+export function revealGrowthLeadContact(token: string, leadId: string, contactId: string, body: { readonly reasonCode: string }, operations = false): Promise<{ readonly contact: { readonly fullName: string; readonly email: string | null; readonly phone: string | null } }> {
+  return requestJson(`${operations ? opsLeadsPath : leadsPath}/${encodeURIComponent(leadId)}/contacts/${encodeURIComponent(contactId)}/reveal`, { token, method: 'POST', body });
+}
+
+export function setGrowthLeadDoNotContact(token: string, leadId: string, body: { readonly reasonCode: string }, operations = false): Promise<{ readonly lead: GrowthLeadDetailDto }> {
+  return requestJson(`${operations ? opsLeadsPath : leadsPath}/${encodeURIComponent(leadId)}/do-not-contact`, { token, method: 'POST', body });
+}
+
+export function listOperationsGrowthLeads(token: string, query: GrowthLeadQuery, signal?: AbortSignal): Promise<GrowthLeadPageDto & { readonly vocabulary: GrowthLeadVocabularyDto }> {
+  return requestJson(`${opsLeadsPath}${leadQueryString(query)}`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function getOperationsGrowthLead(token: string, leadId: string, signal?: AbortSignal): Promise<{ readonly lead: GrowthLeadDetailDto }> {
+  return requestJson(`${opsLeadsPath}/${encodeURIComponent(leadId)}`, { token, ...(signal ? { signal } : {}) });
+}
+
+export interface GrowthContactLookupMatchDto {
+  readonly contactId: string; readonly leadId: string; readonly organisation: string; readonly kind: string; readonly contactRole: string;
+  readonly fullName: string | null; readonly email: string | null; readonly phone: string | null; readonly permissionBasis: string; readonly source: string;
+  readonly noticeGivenAt: string | null; readonly noticeVersion: string | null; readonly addedAt: string; readonly removedAt: string | null;
+  readonly removedReasonCode: string | null; readonly leadDoNotContact: boolean;
+}
+
+const privacyContactsPath = '/api/v1/operations/privacy/growth-contacts';
+
+export function lookupGrowthContacts(token: string, body: { readonly email?: string; readonly phone?: string; readonly reference: string }): Promise<{ readonly matches: readonly GrowthContactLookupMatchDto[] }> {
+  return requestJson(`${privacyContactsPath}/lookup`, { token, method: 'POST', body });
+}
+
+export function eraseGrowthContacts(token: string, body: { readonly email?: string; readonly phone?: string; readonly reference: string; readonly doNotContact: boolean }): Promise<{ readonly removed: number; readonly doNotContactLeads: number }> {
+  return requestJson(`${privacyContactsPath}/erase`, { token, method: 'POST', body });
 }

@@ -145,3 +145,96 @@ a migrated database without error.
 - GROWTH-16 should add a UAT step for an access review with growth staff in it (design §15).
 
 **Next goal:** GROWTH-02 — Territories and regions.
+
+## GROWTH-02 — Territories and regions — 2026-10-01
+**Result:** Complete — India is modelled as state → district, operations draws regions and assigns
+people to them, and one scope rule decides which region (and later which leads) each growth person sees.
+**Branch / PR:** feat/growth-territories → feat/plan-phases-0-to-2 (pushed; not merged — the coordinator merges)
+**Commits:** 28d1c61 (design) · 09cc04f, 2d2827d, 50690e0 (tests) · da65940, 2b264b4 (implementation) · this report
+**Files created:**
+- `docs/architecture/growth-territories-table-design.md` (written and committed before the migration)
+- `packages/persistence/drizzle/0099_growth_territories.sql`
+- `packages/authorization/src/growth-scope.ts`, `growth-scope.test.ts`
+- `packages/persistence/src/growth-territories.ts`, `packages/persistence/test/growth-territories.test.ts`
+- `apps/api/src/http/growth-http.ts` (shared growth request helpers), `operations-growth-territories.controller.ts`,
+  `growth-territories.integration.spec.ts`
+- `apps/web/src/rolePortal/growthSetup.tsx`, `growthSetup.test.tsx`
+**Files modified:** `packages/authorization/src/index.ts`; `packages/events/src/index.ts` (seven events);
+`apps/api/src/http/growth-workspace.controller.ts` (`GET /api/v1/growth/territory`), `api-security.module.ts`;
+`apps/web/src/api/growth.ts`, `rolePortal/growth.tsx` (Territory page), `rolePortalPages.tsx` (Settings section),
+`growthPortal.test.tsx`; Android `Api.kt`, `Growth.kt`.
+**Migrations added:** `0099_growth_territories.sql` (the number assigned). No earlier migration edited and no earlier
+function redefined (the membership triggers are new functions beside 0091's), so no capability CHECK, grant trigger or
+scope trigger is touched.
+
+**What was built**
+1. *Schema (0099).* `growth_states` seeded with the 36 ISO 3166-2:IN subdivisions (28 states, 8 union territories) as
+   amended to 2023-11-23 (`IN-OD`, `IN-CG`, `IN-TS`, `IN-UK`), source cited in the migration; never deleted.
+   `growth_districts` keyed by LGD code, **not seeded**, filled only by the audited import; never deleted, never moves
+   state, renamed only by an import. `growth_district_imports` (append-only log). `growth_regions` (live name unique
+   case-insensitively; retired once, only when no live area or assignment remains). `growth_region_areas` (append-only,
+   removal once). `growth_territory_assignments` (EXECUTIVE or MANAGER matching the membership role; never self-assigned;
+   ended by the database with `MEMBERSHIP_ENDED` when the membership ends; a role change is refused while one is live).
+2. *The area rules in the database.* Two partial unique indexes (one live region per whole state, one per district) and
+   a trigger that refuses a whole-state and a district area of the same state living apart, after taking a transaction
+   advisory lock on the state so a concurrent pair cannot both pass.
+3. *`growthScopeFor`* (`packages/authorization/src/growth-scope.ts`), the single rule: executive — own leads plus unowned
+   leads in their regions; manager — every lead in their regions plus their reports' and their own; `GROWTH_ADMIN` — all;
+   anyone else or a suspended person — none. Its inputs are loaded from today's rows (`loadGrowthScope`) and its SQL form
+   (`growthScopePredicate`) is what GROWTH-03 composes every lead read from.
+4. *District import.* Preview (row-level report, digest, nothing written) then commit of exactly that preview, all rows
+   or none, under a table lock, with an import row, an audit row listing every rename old → new, and an outbox event.
+   The LGD download is accepted as it is (headers and state names matched loosely; a state that matches nothing is a row
+   error, never a guess).
+5. *Operations → Settings → Growth set-up* (`GROWTH_ADMIN`; a section of the existing Settings page, no navigation
+   item): stat tiles, the import, regions (create, retire), areas (state or district, remove), assignments (assign, end),
+   every change with a reason code.
+6. *Growth → Territory* (web, approved navigation) and *Android "My territory"* (a read-only tab in the Growth app): the
+   regions worked today, their areas, and the people (a manager sees everyone assigned; an executive sees the region's
+   managers). Unowned leads read NA until GROWTH-03.
+
+**Tests added**
+- `packages/authorization/src/growth-scope.test.ts` (27): the vocabulary pinned to the migration's seed (36, 28 + 8, the
+  2023 codes in, retired codes out); region names; `GROWTH_ADMIN` admission; `regionsCoveringArea` for district,
+  state-only and no area; the three area refusals; `growthScopeFor` for every role and membership state, ended
+  assignments, mismatched assignment roles, reporting lines and a person holding both roles; visibility, case by case.
+- `packages/persistence/test/growth-territories.test.ts` (4): the LGD file as downloaded (BOM, quoted names, historic
+  state names), row errors, file-level refusals.
+- `apps/api/src/http/growth-territories.integration.spec.ts` (17): 403 for growth staff, an operations admin without the
+  capability and a security admin; 36 states, undeletable; import preview writes nothing, an invalid file is refused
+  whole, a stale digest is 409, renames audited, no district moves state or is deleted; regions; **one area in one live
+  region (API and database), whole state vs district in different regions refused either way (API and database), a
+  concurrent race leaves exactly one region**, redundant areas refused; **every assignment change audited with its
+  reason**, self-assignment refused (API and database), mismatched and inactive people refused, membership end ends
+  assignments; **visibility follows today's assignment** (the read empties at once when the assignment ends; a suspended
+  person gets 403) and the SQL predicate agrees row for row with the pure function.
+- `apps/web/src/rolePortal/growthSetup.test.tsx` (4) and two new cases in `apps/web/src/growthPortal.test.tsx`.
+- `growthPortal.test.tsx`'s GROWTH-01 cases were updated deliberately: Territory is no longer "not built yet".
+
+**Acceptance criteria**
+- [x] One area in at most one live region — partial unique indexes (state, district), refused by the API with
+  `GROWTH_AREA_TAKEN` and by the database.
+- [x] A whole-state and a district area of the same state cannot be in different regions — trigger with an advisory lock,
+  API `GROWTH_AREA_CONFLICT`, both directions, and a concurrent race.
+- [x] Visibility follows today's assignment — `growthScopeFor` reads live rows of ACTIVE memberships only; the Territory
+  read and the SQL predicate change the moment an assignment ends.
+- [x] Every assignment change is audited with its reason — `growth.territory_assignment.started|ended` audit rows and
+  outbox events carry the reason, which is also on the row; the database's own end is `MEMBERSHIP_ENDED`.
+- [x] Built per §18: states seeded with source, districts by audited dry-run import, `growth-scope.ts` with exhaustive
+  tests, Operations → Settings "Growth set-up", Growth → Territory, Android "My territory".
+
+**Decisions for Divakar** (recommended answers taken, recorded in the table design)
+- A whole-state and a district area of the same state are refused in the *same* region too (redundant).
+- A lead with a state but no district falls only in a region covering the whole state.
+- Districts are never deleted by an import; renames are allowed and audited.
+- A region in use cannot be retired; a rename is retire plus create (rates and targets will key on the id).
+- Assignments start the day they are made; no future-dated assignments.
+
+**Limitations / not done**
+- No lead exists yet, so the unowned-lead count reads NA (GROWTH-03 fills it).
+- The LGD list itself is not shipped: operations must download and import it. Until then regions can cover whole states.
+- The Android tab was compiled, not run on a device.
+
+**Validation:** recorded below once the full run completes.
+
+**Next goal:** GROWTH-03 — Lead register, contacts and the contact notice.

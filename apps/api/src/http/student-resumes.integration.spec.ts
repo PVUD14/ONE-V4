@@ -1,7 +1,7 @@
 /**
  * The résumé generator over HTTP (RESUME-GEN): 401 on every route; 403 on another student's résumé; another
  * student's records never appear, even when their ids are sent; unverified records are never labelled
- * verified (a certificate the student marked VERIFIED included); no readiness, band, score, mastery or stage
+ * verified (a certificate row in state VERIFIED included); no readiness, band, score, mastery or stage
  * in any response (contract test); saved versions are immutable and versioned; the PDF is a PDF; the save and
  * render limits answer 429; the student's export carries the résumés and account deletion erases them.
  *
@@ -147,9 +147,14 @@ async function student(label: string): Promise<Person> {
   await evidence(id, hiddenSkill, 'ESTIMATED');
 
   const certificate = randomUUID();
-  // The student's own document route lets them set VERIFIED; the résumé must not believe it.
-  await pool.query(`INSERT INTO student_document_metadata (id,student_user_id,title,document_type,description,verification_state)
-    VALUES ($1,$2,$3,'CERTIFICATE','Online course','VERIFIED')`, [certificate, id, `${label} Cloud certificate`]);
+  // A student can no longer mark their own document VERIFIED (0107), so the fixture records a real
+  // institution verifier. The résumé still labels every certificate self-declared: a document's
+  // verification state is not one of its sources, so nothing a document row says can earn a badge.
+  await pool.query(`INSERT INTO organization_memberships (id,organization_id,user_id,role,state,scope_organization_id,scope_institution_id)
+    VALUES ($1,$2,$3,'INSTITUTION_ADMIN','ACTIVE',$2,$2)`, [randomUUID(), institutionId, staff]);
+  await pool.query(`INSERT INTO student_document_metadata (id,student_user_id,title,document_type,description,verification_state,
+      verified_by_user_id,verified_at,verification_institution_id)
+    VALUES ($1,$2,$3,'CERTIFICATE','Online course','VERIFIED',$4, now() - interval '2 days',$5)`, [certificate, id, `${label} Cloud certificate`, staff, institutionId]);
   const roleId = randomUUID();
   await pool.query("INSERT INTO career_roles (id,code,title,family) VALUES ($1,$2,$3,'Data')", [roleId, 'RESUME_' + roleId.slice(0, 8).toUpperCase(), `${label} Data Analyst`]);
   const target = randomUUID();

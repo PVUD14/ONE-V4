@@ -1283,6 +1283,11 @@ Calendar invites remain EMP-09's. No calendar provider is integrated.
 - Web: full suite 958/958 (85 files), including `talentPool.test.tsx` 7/7.
 - API and web `tsc --noEmit`; the optional-chain policy grep is clean; Android `:app:compileDebugKotlin` exited 0.
 
+**Validation (full run):** `E:/one-wt/logs/validate.sh E:/one-wt/emp14 one_emp14 emp14 android`, on a fresh `one_emp14` database:
+- install 0; migrate1 85 applied, migrate2 0 applied (85 already applied); typecheck 0; test 0; build 0; policy 0; audit 0; Android `compileDebugKotlin` 0.
+- Every package passed: API 1361/1361 (including `talent-pool.integration.spec.ts` 19/19), web 958/958, and every other package suite. No "out of shared memory" failures on this run.
+- After rebasing onto `da353ad` (the tagline fix and ADR-043 accepted): typecheck 0, web 958/958, talent-pool spec 19/19, Android compile 0, policy grep clean.
+
 **Acceptance criteria:**
 - [x] **Students without both consent and visibility never appear.** Tests: `finds an opted-in student, and loses them on the next request when visibility or consent goes`; `never shows a student who only set visibility, or who has a listing row without the consent`; `withholds a student whose account is being deleted, and one whose consent is for a superseded version`; `leaving takes effect on the next request…`.
 - [x] **No identity is revealed before the student applies.** Tests: `shows a minimal card with no name, contact, college, identifier, readiness, stage or count…` (walks every key and value of the search and card responses); `invites through the card to an invite-only job; the employer learns who it was only when the student applies` (the applicant list is empty until the apply). The web test asserts no name, email or college on screen.

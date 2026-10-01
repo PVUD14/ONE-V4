@@ -2817,3 +2817,53 @@ load (`App.test.tsx` "resolves every visible navigation item…"). Each re-run a
 27/27, 18/18, 18/18, and the web test 1/1. No test was skipped or changed to pass. New tests: ai-evaluation 33/33,
 persistence `ai-bake-off.integration.test.ts` 11/11 (spawns the Python harness), harness unittest 14/14,
 career-readiness 129/129 (hint-ladder 15 unchanged), ai-orchestration 62/62.
+
+## RESUME-GEN — Résumés generated from the student's own ONE record — 2026-10-01
+
+Branch `feat/resume-generator` (from `db3ad06`). Design: `docs/architecture/student-resumes-table-design.md`.
+Migration `0101_student_resumes.sql`. No model call: generation is pdfkit laying out text in the request.
+
+**What was built**
+- **API** (`StudentResumesController`, `apps/api/src/resume/`): `GET /students/me/resume-sources` (the student's
+  roster name, email, headline, summary, portfolio; qualifications and term results with their label; skills that pass
+  EMP-13's `qualifyingEvidence` rule, grouped by topic with where and when they were shown; certificate documents;
+  live career targets; the three templates), `POST /students/me/resumes/preview`, list/create/get, `POST
+  …/:id/versions`, `GET …/:id/versions/:n/pdf`, `DELETE …/:id`. Saved versions are frozen (an `UPDATE` trigger refuses
+  rewrites), versioned (≤ 50 each, ≤ 20 résumés), and limited to 30 saves and 60 PDFs per student per hour (429).
+- **Labels:** "Verified by <institution>" only for a `VERIFIED` record with an issuing ONE organisation; pending →
+  "Self-declared · verification pending"; otherwise "Self-declared". `REJECTED` records are never offered. Certificates
+  are always self-declared (finding below). Typed sections (projects, self-declared skills, languages) are headed
+  "self-declared". The client sends record ids and words; a label cannot be sent.
+- **PDF:** A4, three templates (Classic, Modern, Compact), Inter + Noto Sans Telugu bundled (OFL) and embedded as
+  subsets; text is split into script runs so Telugu is shaped. One-line legend footer, no ONE branding.
+- **Privacy:** `resumes` in the student's export (words and labels of every version; not the selections or hash);
+  account deletion erases résumés and versions (STUDENT_PROFILE). `privacy-export-coverage.md` updated.
+- **Web:** Résumé Builder page — My Resumes (generated with PDF/Edit/Delete, plus uploaded résumé documents),
+  Templates (the three real templates, previewed with the student's own record), Examples (the student's own record
+  in each template — never an invented person), Resume Score → a checklist of objective checks with no number; rail
+  cards show counts of the student's own records. Builder with live server preview.
+- **Android:** a "Résumé builder" entry card on Documents (not a new menu item — HG-3) opens the same builder: tick,
+  write, template chips, preview of the resolved sections and checks, save a version, save the PDF through the system
+  file picker and share it. Compiled with `:app:compileDebugKotlin`.
+
+**Tests added:** `apps/api/src/resume/resume-content.test.ts` (draft validation, labels, other ids ignored, checks carry
+no digit, contract over every string drawn in the PDF and its metadata, Telugu runs, multi-page);
+`apps/api/src/http/student-resumes.integration.spec.ts` (401 on all 8 routes; only own records offered; another
+student's ids ignored; unverified never "Verified"; no readiness/band/score/mastery/stage in any response; 403 on
+another student's résumé for get/save/PDF/delete; immutable versions and the content/owner constraints; 429 limits;
+export and deletion); `apps/web/src/studentResumes.test.tsx` (builder labels, draft carries no label, save and PDF
+download, templates/examples from own record, checklist without a number).
+
+**Decisions taken on Divakar's behalf** (in the design): generated résumés are **not attachable to applications** yet —
+the EMP-07 path pins a scanned stored file and AWS has no file store or scanner; a follow-up should add a generated-résumé
+pointer to the snapshot. Certificates always self-declared. Term results and career objective off unless ticked. No
+ONE branding on the résumé. No DOCX (would need another dependency). `pdfkit` 0.20.x added to the API (audit clean:
+only the pre-existing moderate `qs` findings).
+
+**Finding (not fixed here):** `student_document_metadata.verification_state` is set by the student's own
+`POST/PATCH /students/me/documents` (it accepts `VERIFIED`) and nothing records a verifier, so a document's "Verified"
+on the Documents screens (web and Android) is self-asserted. Recommended: take `VERIFIED` away from the student route.
+
+**Not done:** DOCX; attaching a generated résumé to an application; fonts for scripts other than Latin and Telugu.
+
+**Validation:** recorded below once run.

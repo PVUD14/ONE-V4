@@ -13,7 +13,7 @@ export const pilotPersona = {
   firstName: 'Arjun',
   initials: 'AR',
   programme: 'B.Tech CSE | 2027',
-  institution: 'Vellore Institute of Technology, Chennai',
+  institution: 'Lakeview Institute of Technology, Chennai',
   location: 'Chennai, India',
   email: 'arjun.demo@one.example',
   phone: '+91 98XXX XX210',
@@ -23,8 +23,9 @@ export const pilotPersona = {
 
 /** Canonical figures every page derives from. */
 export const pilotCanon = {
-  readiness: 72,
-  readinessLabel: 'Nearly Job Ready',
+  // Readiness is an advisory band, never a number (CLAUDE.md; readiness_snapshots CHECK).
+  // The four labels are the real application's bands.
+  readinessBand: 'Progressing',
   streakDays: 7,
   points: 2500,
   coursesCompleted: 15,

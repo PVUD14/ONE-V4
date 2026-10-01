@@ -26,6 +26,9 @@ import {
 // Dashboard
 // ---------------------------------------------------------------------------
 
+/** The real application's advisory bands, lowest first. Readiness is never a number. */
+const READINESS_LADDER: readonly string[] = ['Not enough evidence', 'Developing', 'Progressing', 'Ready for next step'];
+
 export function PilotDashboard(): React.ReactElement {
   const canon = pilotCanon;
   const overlay = useOverlay();
@@ -67,14 +70,16 @@ export function PilotDashboard(): React.ReactElement {
 
       <div className="pilot-row" style={{ gridTemplateColumns: 'minmax(0, 2.4fr) repeat(5, minmax(0, 1fr))' }}>
         <section className="pilot-card">
-          <h2>Career Readiness Score</h2>
-          <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'nowrap' }}>
-            <div style={{ minWidth: 0 }}>
-              <span style={{ fontSize: 32, fontWeight: 800, lineHeight: 1 }}>{canon.readiness}<span style={{ fontSize: 14, color: 'var(--p-muted)', fontWeight: 600 }}>/100</span></span>
-              <div style={{ marginTop: 7 }}><span className="pilot-chip green">{canon.readinessLabel}</span></div>
-              <div style={{ marginTop: 11 }}><button type="button" className="pilot-btn soft small">View Full Report</button></div>
+          <h2>Career Readiness</h2>
+          <div style={{ minWidth: 0 }}>
+            <span style={{ fontSize: 24, fontWeight: 800, lineHeight: 1.1 }}>{canon.readinessBand}</span>
+            <small style={{ display: 'block', color: 'var(--p-muted)', marginTop: 3 }}>Advisory band · never a score · never shown to employers</small>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4, marginTop: 9 }} role="img" aria-label={`Readiness band ladder: ${canon.readinessBand}`}>
+              {READINESS_LADDER.map((band) => (
+                <span key={band} title={band} style={{ height: 7, borderRadius: 999, background: READINESS_LADDER.indexOf(band) <= READINESS_LADDER.indexOf(canon.readinessBand) ? 'var(--p-blue)' : '#edf1f7' }} />
+              ))}
             </div>
-            <Ring value={canon.readiness} size={66} stroke={8} tone="blue"><span style={{ fontSize: 18 }}>{canon.readiness}</span></Ring>
+            <div style={{ marginTop: 11 }}><button type="button" className="pilot-btn soft small">View Full Report</button></div>
           </div>
         </section>
         {pilotScores.map((score) => (
@@ -825,7 +830,7 @@ export function PilotOpportunities(): React.ReactElement {
       subtitle: `${company} · Sample application`,
       body: <OverlayForm
         fields={[
-          { label: 'Applying as', value: 'Arjun Reddy · VIT Chennai' },
+          { label: 'Applying as', value: 'Arjun Reddy · Lakeview Institute' },
           { label: 'Resume', type: 'select', value: 'Software Engineer Resume (score 78)', options: ['Software Engineer Resume (score 78)', 'Internship Resume (score 72)', 'Campus Placement Resume (score 68)'] },
           { label: 'Cover note', type: 'textarea', placeholder: 'A short note to the recruiter (optional)' },
         ]}
@@ -1032,6 +1037,40 @@ function ProfileRecordList({ title, rows, action }: { readonly title: string; re
           {action ? <button type="button" className="pilot-btn ghost small">{action}</button> : null}
         </div>
       ))}
+    </div>
+  </section>;
+}
+
+/**
+ * The student decides who sees what. Mirrors the real application's consent model:
+ * evidence goes to an employer only for an application the student made, and the
+ * readiness band never leaves ONE's student and college views.
+ */
+function ConsentCard(): React.ReactElement {
+  const overlay = useOverlay();
+  const [choices, setChoices] = useState<Readonly<Record<string, boolean>>>({
+    'Share verified skill evidence with employers I apply to': true,
+    'Let my placement cell nominate me for campus drives': true,
+    'Show my public profile link to anyone I send it to': false,
+  });
+  return <section className="pilot-card">
+    <h2>Privacy &amp; Consent</h2>
+    <div className="pilot-list">
+      {Object.entries(choices).map(([label, on]) => (
+        <div key={label} className="pilot-list-row" style={{ padding: '8px 2px' }}>
+          <div className="grow"><small style={{ color: 'var(--p-ink-2)' }}>{label}</small></div>
+          <button type="button" className={`pilot-btn small ${on ? '' : 'ghost'}`} aria-pressed={on}
+            onClick={(event) => {
+              event.stopPropagation();
+              setChoices((previous) => ({ ...previous, [label]: !on }));
+              overlay.toast(`${on ? 'Turned off' : 'Turned on'}: ${label.toLowerCase()} (sample).`);
+            }}>{on ? 'On' : 'Off'}</button>
+        </div>
+      ))}
+      <div className="pilot-list-row" style={{ padding: '8px 2px' }}>
+        <div className="grow"><small style={{ color: 'var(--p-ink-2)' }}>Readiness band visible to employers</small></div>
+        <span className="pilot-chip slate">Never</span>
+      </div>
     </div>
   </section>;
 }
@@ -1254,6 +1293,7 @@ export function PilotProfile(): React.ReactElement {
           ))}
         </div>
       </section>
+      <ConsentCard />
       <section className="pilot-card">
         <h2>Quick Actions</h2>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

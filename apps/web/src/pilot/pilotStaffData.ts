@@ -1,10 +1,10 @@
-import { pilotCanon, pilotCompanies, pilotPersona, type PilotCompany } from './pilotData.js';
+import { pilotCompanies, pilotPersona, type PilotCompany } from './pilotData.js';
 
 /**
  * Institution and employer pilot datasets.
  *
  * Coherence across portals is the point: the student the client just saw as Arjun
- * appears in the placement officer's roster with the same readiness figure, and in
+ * appears in the placement officer's roster in the same readiness band, and in
  * Zenvia Labs' applicant pipeline at the stage the story implies. Numbers roll up:
  * cohort counts include him, company pipelines include him, nothing contradicts the
  * student screens.
@@ -25,15 +25,17 @@ export const pilotCohort = {
   placementEligible: 412,
   placedSoFar: 86,
   offersThisSeason: 103,
-  averageReadiness: 64,
   atRisk: 57,
 } as const;
+
+/** The real application's four advisory bands; readiness is never shown as a number. */
+export type PilotReadinessBand = 'Ready for next step' | 'Progressing' | 'Developing' | 'Not enough evidence';
 
 export const pilotReadinessBands = [
   { label: 'Ready for next step', value: 118, color: '#0d6b4f' },
   { label: 'Progressing', value: 171, color: '#1f55e5' },
   { label: 'Developing', value: 84, color: '#b45309' },
-  { label: 'Needs intervention', value: 39, color: '#a81f4d' },
+  { label: 'Not enough evidence', value: 39, color: '#64748b' },
 ] as const;
 
 export interface PilotRosterStudent {
@@ -42,27 +44,26 @@ export interface PilotRosterStudent {
   readonly registration: string;
   readonly department: string;
   readonly batch: string;
-  readonly readiness: number;
-  readonly band: 'Ready' | 'Progressing' | 'Developing' | 'At risk';
+  readonly band: PilotReadinessBand;
   readonly status: string;
 }
 
 export const pilotRoster: readonly PilotRosterStudent[] = [
-  // The same Arjun the client just met, with the same readiness number.
-  { name: pilotPersona.name, initials: pilotPersona.initials, registration: 'VIT2027-0412', department: 'CSE', batch: '2027', readiness: pilotCanon.readiness, band: 'Progressing', status: `Shortlisted · Zenvia Labs` },
-  { name: 'Priya Sharma', initials: 'PS', registration: 'VIT2027-0388', department: 'CSE', batch: '2027', readiness: 81, band: 'Ready', status: 'Offer · Kortex Systems' },
-  { name: 'Karthik Menon', initials: 'KM', registration: 'VIT2027-0521', department: 'ECE', batch: '2027', readiness: 58, band: 'Developing', status: 'Applied · 3 roles' },
-  { name: 'Sneha Iyer', initials: 'SI', registration: 'VIT2027-0176', department: 'IT', batch: '2027', readiness: 74, band: 'Progressing', status: 'Interview · BlueRiver' },
-  { name: 'Aditya Rao', initials: 'ADR', registration: 'VIT2027-0644', department: 'MECH', batch: '2027', readiness: 39, band: 'At risk', status: 'No applications yet' },
-  { name: 'Fatima Khan', initials: 'FK', registration: 'VIT2027-0233', department: 'CSE', batch: '2027', readiness: 86, band: 'Ready', status: 'Offer accepted · Veridian' },
-  { name: 'Rohit Verma', initials: 'RV', registration: 'VIT2027-0590', department: 'EEE', batch: '2027', readiness: 47, band: 'At risk', status: 'Intervention assigned' },
+  // The same Arjun the client just met, in the same readiness band.
+  { name: pilotPersona.name, initials: pilotPersona.initials, registration: 'LIT2027-0412', department: 'CSE', batch: '2027', band: 'Progressing', status: `Shortlisted · Zenvia Labs` },
+  { name: 'Priya Sharma', initials: 'PS', registration: 'LIT2027-0388', department: 'CSE', batch: '2027', band: 'Ready for next step', status: 'Offer · Kortex Systems' },
+  { name: 'Karthik Menon', initials: 'KM', registration: 'LIT2027-0521', department: 'ECE', batch: '2027', band: 'Developing', status: 'Applied · 3 roles' },
+  { name: 'Sneha Iyer', initials: 'SI', registration: 'LIT2027-0176', department: 'IT', batch: '2027', band: 'Progressing', status: 'Interview · BlueRiver' },
+  { name: 'Aditya Rao', initials: 'ADR', registration: 'LIT2027-0644', department: 'MECH', batch: '2027', band: 'Developing', status: 'No applications yet' },
+  { name: 'Fatima Khan', initials: 'FK', registration: 'LIT2027-0233', department: 'CSE', batch: '2027', band: 'Ready for next step', status: 'Offer accepted · Veridian' },
+  { name: 'Rohit Verma', initials: 'RV', registration: 'LIT2027-0590', department: 'EEE', batch: '2027', band: 'Not enough evidence', status: 'Intervention assigned' },
 ];
 
 /** Placed alumni from the previous batch, so the batch filter has real data. */
 export const pilotRosterAlumni: readonly PilotRosterStudent[] = [
-  { name: 'Deepak Raju', initials: 'DR', registration: 'VIT2026-0218', department: 'CSE', batch: '2026', readiness: 88, band: 'Ready', status: 'Placed · Kortex Systems' },
-  { name: 'Lakshmi Priya', initials: 'LP', registration: 'VIT2026-0341', department: 'IT', batch: '2026', readiness: 84, band: 'Ready', status: 'Placed · BlueRiver Analytics' },
-  { name: 'Mohammed Irfan', initials: 'MI', registration: 'VIT2026-0455', department: 'ECE', batch: '2026', readiness: 79, band: 'Ready', status: 'Placed · Veridian Tech' },
+  { name: 'Deepak Raju', initials: 'DR', registration: 'LIT2026-0218', department: 'CSE', batch: '2026', band: 'Ready for next step', status: 'Placed · Kortex Systems' },
+  { name: 'Lakshmi Priya', initials: 'LP', registration: 'LIT2026-0341', department: 'IT', batch: '2026', band: 'Ready for next step', status: 'Placed · BlueRiver Analytics' },
+  { name: 'Mohammed Irfan', initials: 'MI', registration: 'LIT2026-0455', department: 'ECE', batch: '2026', band: 'Ready for next step', status: 'Placed · Veridian Tech' },
 ];
 
 export const pilotInterventions = [
@@ -96,9 +97,13 @@ export const pilotPipelineFunnel = [
   { label: 'Offers', value: 103 },
 ] as const;
 
+/** Placement-eligible students per department in each band (sums to the cohort bands). */
 export const pilotDepartmentReadiness = [
-  { label: 'CSE', value: 71 }, { label: 'IT', value: 68 }, { label: 'ECE', value: 61 },
-  { label: 'EEE', value: 55 }, { label: 'MECH', value: 49 },
+  { label: 'CSE', ready: 52, progressing: 61, developing: 18, notEnough: 7 },
+  { label: 'IT', ready: 31, progressing: 42, developing: 15, notEnough: 6 },
+  { label: 'ECE', ready: 20, progressing: 33, developing: 19, notEnough: 8 },
+  { label: 'EEE', ready: 9, progressing: 21, developing: 16, notEnough: 9 },
+  { label: 'MECH', ready: 6, progressing: 14, developing: 16, notEnough: 9 },
 ] as const;
 
 export const pilotOffersTrend = [12, 19, 26, 41, 58, 74, 86, 103] as const;
@@ -152,13 +157,46 @@ export interface PilotApplicant {
 
 export const pilotApplicants: readonly PilotApplicant[] = [
   // The cross-portal moment: the student from the first demo, on the employer's side.
-  { name: pilotPersona.name, initials: pilotPersona.initials, college: 'VIT Chennai', roleApplied: 'Graduate Software Engineer', stage: 'Shortlisted', appliedWhen: 'Applied 6d ago', highlight: 'Strong aptitude and Python scores' },
-  { name: 'Priya Sharma', initials: 'PS', college: 'VIT Chennai', roleApplied: 'Graduate Software Engineer', stage: 'Interview', appliedWhen: 'Applied 2w ago', highlight: 'Hackathon finalist' },
-  { name: 'Devika Pillai', initials: 'DP', college: 'NIT Trichy', roleApplied: 'Software Engineer', stage: 'Screening', appliedWhen: 'Applied 4d ago' },
-  { name: 'Arnav Gupta', initials: 'AG', college: 'SRM Chennai', roleApplied: 'SDE Intern', stage: 'Assessment', appliedWhen: 'Applied 1w ago' },
-  { name: 'Sana Sheikh', initials: 'SS', college: 'Anna University', roleApplied: 'Graduate Software Engineer', stage: 'Offer', appliedWhen: 'Applied 3w ago', highlight: 'Offer sent · awaiting response' },
-  { name: 'Vikram Nair', initials: 'VN', college: 'VIT Chennai', roleApplied: 'QA Engineer', stage: 'Applied', appliedWhen: 'Applied 2d ago' },
+  { name: pilotPersona.name, initials: pilotPersona.initials, college: 'Lakeview Institute', roleApplied: 'Graduate Software Engineer', stage: 'Shortlisted', appliedWhen: 'Applied 6d ago', highlight: 'Strong aptitude and Python scores' },
+  { name: 'Priya Sharma', initials: 'PS', college: 'Lakeview Institute', roleApplied: 'Graduate Software Engineer', stage: 'Interview', appliedWhen: 'Applied 2w ago', highlight: 'Hackathon finalist' },
+  { name: 'Devika Pillai', initials: 'DP', college: 'Riverside College of Engineering', roleApplied: 'Software Engineer', stage: 'Screening', appliedWhen: 'Applied 4d ago' },
+  { name: 'Arnav Gupta', initials: 'AG', college: 'Coastal Engineering College', roleApplied: 'SDE Intern', stage: 'Assessment', appliedWhen: 'Applied 1w ago' },
+  { name: 'Sana Sheikh', initials: 'SS', college: 'Hillcrest University', roleApplied: 'Graduate Software Engineer', stage: 'Offer', appliedWhen: 'Applied 3w ago', highlight: 'Offer sent · awaiting response' },
+  { name: 'Vikram Nair', initials: 'VN', college: 'Lakeview Institute', roleApplied: 'QA Engineer', stage: 'Applied', appliedWhen: 'Applied 2d ago' },
 ];
+
+/**
+ * What each applicant chose to share with this employer when applying. Evidence an
+ * employer sees is consented per application and names who verified it; the readiness
+ * band is never part of it (CLAUDE.md: readiness is never exposed to an employer).
+ */
+export interface PilotSharedEvidence {
+  readonly item: string;
+  readonly verifiedBy: string;
+}
+
+const DEFAULT_SHARED_EVIDENCE: readonly PilotSharedEvidence[] = [
+  { item: 'Degree programme and expected year of completion', verifiedBy: 'College records' },
+  { item: 'Resume submitted with this application', verifiedBy: 'Self-declared' },
+];
+
+export const pilotApplicantEvidence: Readonly<Record<string, readonly PilotSharedEvidence[]>> = {
+  [pilotPersona.name]: [
+    { item: 'B.Tech CSE, Lakeview Institute of Technology · Class of 2027 · CGPA 8.2', verifiedBy: 'Verified by Lakeview Institute (academic records)' },
+    { item: 'Python — college assessment, Apr 2026', verifiedBy: 'Verified by Lakeview Institute (proctored assessment)' },
+    { item: 'Project: Placement Portal Mini-Project (React, Node.js) · hackathon runner-up', verifiedBy: 'Verified by Prof. Suresh Raman (faculty review)' },
+    { item: 'Internship: Web Development Intern, Nimbus Digital · May – Jul 2025', verifiedBy: 'Document checked by Lakeview Placement Cell' },
+  ],
+  'Priya Sharma': [
+    { item: 'B.Tech CSE, Lakeview Institute of Technology · Class of 2027', verifiedBy: 'Verified by Lakeview Institute (academic records)' },
+    { item: 'Hackathon finalist — State Smart Campus Challenge 2026', verifiedBy: 'Certificate checked by Lakeview Placement Cell' },
+    { item: 'Data Structures — college assessment, Mar 2026', verifiedBy: 'Verified by Lakeview Institute (proctored assessment)' },
+  ],
+};
+
+export function sharedEvidenceFor(name: string): readonly PilotSharedEvidence[] {
+  return pilotApplicantEvidence[name] ?? DEFAULT_SHARED_EVIDENCE;
+}
 
 export const pilotEmployerInterviews = [
   { candidate: 'Priya Sharma', role: 'Graduate Software Engineer', when: 'Tomorrow, 10:30 AM', round: 'Technical Round 2', mode: 'Video' },
@@ -175,7 +213,7 @@ export const pilotEmployerFunnel = [
 ] as const;
 
 export const pilotCampusDrives = [
-  { institution: 'VIT Chennai', date: 'MAY 22', role: 'GET + SE', registered: 154 },
-  { institution: 'NIT Trichy', date: 'MAY 29', role: 'SE', registered: 96 },
-  { institution: 'Anna University', date: 'JUN 03', role: 'SDE Intern', registered: 72 },
+  { institution: 'Lakeview Institute', date: 'MAY 22', role: 'GET + SE', registered: 154 },
+  { institution: 'Riverside College of Engineering', date: 'MAY 29', role: 'SE', registered: 96 },
+  { institution: 'Hillcrest University', date: 'JUN 03', role: 'SDE Intern', registered: 72 },
 ] as const;

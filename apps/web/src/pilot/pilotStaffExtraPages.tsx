@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AlertTriangle, Building2, CalendarDays, CheckCircle2, ClipboardCheck, Download, FileText, MapPin, PenTool, Plus, TrendingUp, Users } from 'lucide-react';
+import { AlertTriangle, Building2, CalendarDays, CheckCircle2, ClipboardCheck, Download, FileText, MapPin, PenTool, Plus, ShieldCheck, TrendingUp, Users } from 'lucide-react';
 import { Ring } from './pilotComponents.js';
 import { DetailRows, OverlayForm, useOverlay } from './pilotOverlay.js';
 import { usePilotSession } from './pilotSession.js';
@@ -135,11 +135,11 @@ export function InstitutionAssessments(): React.ReactElement {
 // --- Institution: Interventions -----------------------------------------------
 
 const INTERVENTION_ROWS = [
-  { student: 'Aditya Rao', registration: 'VIT2027-0644', initials: 'ADR', action: 'Career counselling session', owner: 'Prof. Meera Nair', due: '28 May', status: 'Open', tone: 'rose' },
-  { student: 'Rohit Verma', registration: 'VIT2027-0590', initials: 'RV', action: 'Aptitude improvement plan', owner: 'Prof. S. Raman', due: '30 May', status: 'Open', tone: 'amber' },
-  { student: 'Karthik Menon', registration: 'VIT2027-0521', initials: 'KM', action: 'Resume review with faculty', owner: 'Prof. Meera Nair', due: '2 Jun', status: 'In progress', tone: 'blue' },
-  { student: 'Divya Krishnan', registration: 'VIT2027-0307', initials: 'DK', action: 'Communication coaching', owner: 'Dr. L. Thomas', due: '5 Jun', status: 'In progress', tone: 'purple' },
-  { student: 'Suresh Babu', registration: 'VIT2027-0688', initials: 'SB', action: 'Mock interview practice', owner: 'Prof. S. Raman', due: 'Completed 12 May', status: 'Completed', tone: 'green' },
+  { student: 'Aditya Rao', registration: 'LIT2027-0644', initials: 'ADR', action: 'Career counselling session', owner: 'Prof. Meera Nair', due: '28 May', status: 'Open', tone: 'rose' },
+  { student: 'Rohit Verma', registration: 'LIT2027-0590', initials: 'RV', action: 'Aptitude improvement plan', owner: 'Prof. S. Raman', due: '30 May', status: 'Open', tone: 'amber' },
+  { student: 'Karthik Menon', registration: 'LIT2027-0521', initials: 'KM', action: 'Resume review with faculty', owner: 'Prof. Meera Nair', due: '2 Jun', status: 'In progress', tone: 'blue' },
+  { student: 'Divya Krishnan', registration: 'LIT2027-0307', initials: 'DK', action: 'Communication coaching', owner: 'Dr. L. Thomas', due: '5 Jun', status: 'In progress', tone: 'purple' },
+  { student: 'Suresh Babu', registration: 'LIT2027-0688', initials: 'SB', action: 'Mock interview practice', owner: 'Prof. S. Raman', due: 'Completed 12 May', status: 'Completed', tone: 'green' },
 ] as const;
 
 export function InstitutionInterventions(): React.ReactElement {
@@ -173,7 +173,7 @@ export function InstitutionInterventions(): React.ReactElement {
           ['Due', row.due],
           ['Status', row.status],
         ]} />
-        <p className="pilot-modal-text" style={{ marginTop: 12 }}>The full review adds session notes, readiness movement since assignment and a completion checklist.</p>
+        <p className="pilot-modal-text" style={{ marginTop: 12 }}>The full review adds session notes, readiness band movement since assignment and a completion checklist.</p>
         <div className="pilot-modal-actions">
           <button type="button" className="pilot-btn ghost" onClick={() => { overlay.closeModal(); overlay.toast(`${row.student}: follow-up reminder sent (sample).`); }}>Send Reminder</button>
           <button type="button" className="pilot-btn" onClick={overlay.closeModal}>Done</button>
@@ -240,7 +240,7 @@ export function InstitutionInterventions(): React.ReactElement {
         <h2>Why Interventions Work</h2>
         <div className="pilot-list">
           {[
-            '14 of 18 completed interventions lifted readiness above 55.',
+            '14 of 18 completed interventions moved the student up at least one readiness band.',
             'Aptitude plans show results within three weeks on average.',
             'Counselling first, then a concrete practice plan with a due date.',
           ].map((note) => (
@@ -263,11 +263,11 @@ export function InstitutionInterventions(): React.ReactElement {
 // --- Employer: Offers ---------------------------------------------------------
 
 const OFFER_ROWS = [
-  { candidate: 'Sana Sheikh', initials: 'SS', college: 'Anna University', role: 'Graduate Software Engineer', sent: '18 May', expires: '1 Jun', status: 'Awaiting response', tone: 'amber' },
-  { candidate: 'Nikhil Joshi', initials: 'NJ', college: 'NIT Trichy', role: 'Software Engineer', sent: '12 May', expires: 'Accepted 16 May', status: 'Accepted', tone: 'green' },
-  { candidate: 'Ananya Das', initials: 'AD', college: 'VIT Chennai', role: 'SDE Intern', sent: '10 May', expires: 'Accepted 14 May', status: 'Accepted', tone: 'green' },
-  { candidate: 'Harish Kumar', initials: 'HK', college: 'SRM Chennai', role: 'QA Engineer', sent: '8 May', expires: 'Declined 12 May', status: 'Declined', tone: 'rose' },
-  { candidate: 'Meghna Rao', initials: 'MR', college: 'Anna University', role: 'Graduate Software Engineer', sent: 'Draft', expires: '—', status: 'Draft', tone: 'slate' },
+  { candidate: 'Sana Sheikh', initials: 'SS', college: 'Hillcrest University', role: 'Graduate Software Engineer', sent: '18 May', expires: '1 Jun', status: 'Awaiting response', tone: 'amber' },
+  { candidate: 'Nikhil Joshi', initials: 'NJ', college: 'Riverside College of Engineering', role: 'Software Engineer', sent: '12 May', expires: 'Accepted 16 May', status: 'Accepted', tone: 'green' },
+  { candidate: 'Ananya Das', initials: 'AD', college: 'Lakeview Institute', role: 'SDE Intern', sent: '10 May', expires: 'Accepted 14 May', status: 'Accepted', tone: 'green' },
+  { candidate: 'Harish Kumar', initials: 'HK', college: 'Coastal Engineering College', role: 'QA Engineer', sent: '8 May', expires: 'Declined 12 May', status: 'Declined', tone: 'rose' },
+  { candidate: 'Meghna Rao', initials: 'MR', college: 'Hillcrest University', role: 'Graduate Software Engineer', sent: 'Draft', expires: '—', status: 'Draft', tone: 'slate' },
 ] as const;
 
 interface ExtendedOffer {
@@ -343,7 +343,7 @@ export function EmployerOffers(): React.ReactElement {
                   <span className="pilot-avatar">{offer.candidate.split(' ').map((word) => word[0]).join('').slice(0, 2).toUpperCase()}</span>
                   <span><strong>{offer.candidate}</strong><small>Joining proposed {offer.joining}</small></span>
                 </div></td>
-                <td>VIT Chennai</td>
+                <td>Lakeview Institute</td>
                 <td>{offer.role}</td>
                 <td><small>Just now</small></td>
                 <td><span className="pilot-chip purple">Sent</span></td>
@@ -458,6 +458,22 @@ export function EmployerCompany(): React.ReactElement {
     </div>
 
     <aside className="pilot-rail">
+      <section className="pilot-card">
+        <div className="pilot-card-head"><h2>Organisation Verification</h2><span className="pilot-chip green"><ShieldCheck size={11} /> Verified</span></div>
+        <div className="pilot-list">
+          {[
+            ['Access requested', 'Work email on the company domain · 2 Mar 2026'],
+            ['Company checks', 'Domain, registration (CIN) and website reviewed by ONE Operations'],
+            ['Verified', '4 Mar 2026 · roles can be published to colleges'],
+          ].map(([step, detail]) => (
+            <div key={step} className="pilot-list-row" style={{ padding: '8px 2px' }}>
+              <CheckCircle2 size={15} color="#0d6b4f" style={{ flexShrink: 0 }} />
+              <div className="grow"><strong style={{ fontSize: 12.5 }}>{step}</strong><small>{detail}</small></div>
+            </div>
+          ))}
+        </div>
+        <small style={{ display: 'block', marginTop: 8, color: 'var(--p-muted)' }}>Until an employer is verified, it cannot publish roles, see applicants or request campus drives.</small>
+      </section>
       <section className="pilot-card" style={{ textAlign: 'center' }}>
         <h2 style={{ textAlign: 'left' }}>Profile Completeness</h2>
         <Ring value={90} size={104} stroke={11} tone="blue" />
@@ -467,9 +483,9 @@ export function EmployerCompany(): React.ReactElement {
         <h2>Campus Presence</h2>
         <div className="pilot-list">
           {[
-            ['VIT Chennai', 'Drive on 22 May · 154 registered'],
-            ['NIT Trichy', 'Drive on 29 May · 96 registered'],
-            ['Anna University', 'Drive on 3 Jun · 72 registered'],
+            ['Lakeview Institute', 'Drive on 22 May · 154 registered'],
+            ['Riverside College of Engineering', 'Drive on 29 May · 96 registered'],
+            ['Hillcrest University', 'Drive on 3 Jun · 72 registered'],
           ].map(([campus, detail]) => (
             <div key={campus} className="pilot-list-row" style={{ padding: '8px 2px' }}>
               <span className="pilot-tile blue" style={{ width: 32, height: 32 }}><Building2 size={14} /></span>

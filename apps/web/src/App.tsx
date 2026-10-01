@@ -128,7 +128,11 @@ const showDevelopmentIndicators = import.meta.env.DEV;
 export function demoPortalEnabled(env: { readonly DEV: boolean; readonly VITE_ENABLE_DEMO_PORTAL?: string } = import.meta.env): boolean {
   return env.DEV || env.VITE_ENABLE_DEMO_PORTAL === 'true';
 }
-const enableDemoPortal = demoPortalEnabled();
+// Written out rather than calling demoPortalEnabled() so the bundler sees a build-time
+// literal: with the flag off, every branch guarded by it - and the pilot's fictional
+// dataset it would pull in - is dropped from the production bundle, not merely hidden.
+// deploy/vps/Dockerfile.web proves this on every image build (scripts/check-demo-boundary.mjs).
+const enableDemoPortal = import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEMO_PORTAL === 'true';
 const protectedPortalRoots = ['/student', '/institution', '/employer', '/operations', '/growth'] as const;
 const portalChoices = [
   { family: 'Student', path: '/student', label: 'Student', detail: 'Learning, readiness, applications and personal growth.', icon: GraduationCap },
@@ -306,7 +310,9 @@ export function App(): React.ReactElement {
 
   // Demo identities render the pilot experience and nothing else; every other
   // signed-in user falls through to the real application untouched.
-  if (authenticated && isPilotIdentity(authenticatedEmail)) {
+  // Only in a build with the demo flag on (local development, or the demo host): the
+  // production build of oneby8.com carries no pilot at all - demos live on demo.oneby8.com.
+  if (enableDemoPortal && authenticated && isPilotIdentity(authenticatedEmail)) {
     return <PilotApp email={authenticatedEmail ?? ''} onSignOut={handleSignOut} />;
   }
 

@@ -293,7 +293,7 @@ function modalForAction(label: string, context: string): ModalState | { readonly
     return {
       title: `Apply — ${context}`, subtitle: 'Sample application', body: <OverlayForm
         fields={[
-          { label: 'Applying as', value: 'Arjun Reddy · VIT Chennai' },
+          { label: 'Applying as', value: 'Arjun Reddy · Lakeview Institute' },
           { label: 'Resume', type: 'select', value: 'Software Engineer Resume (score 78)', options: ['Software Engineer Resume (score 78)', 'Internship Resume (score 72)', 'Campus Placement Resume (score 68)'] },
           { label: 'Cover note', type: 'textarea', placeholder: 'A short note to the recruiter (optional)' },
         ]}
@@ -304,7 +304,7 @@ function modalForAction(label: string, context: string): ModalState | { readonly
     return {
       title: `Register — ${context}`, subtitle: 'Sample registration', body: <OverlayForm
         fields={[
-          { label: 'Registering as', value: 'Arjun Reddy · VIT2027-0412' },
+          { label: 'Registering as', value: 'Arjun Reddy · LIT2027-0412' },
           { label: 'Confirmation email', type: 'email', value: 'demo.student@uat.example.test' },
         ]}
         submitLabel="Confirm Registration" success={`Registered for ${context} (sample).`} />,

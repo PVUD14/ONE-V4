@@ -76,7 +76,7 @@ function ShareProfileBody(): React.ReactElement {
         {['Name & photo', 'Institution (verified)', 'Education', 'Projects', 'Certificates', 'Skills'].map((item) => (
           <span key={item} className="pilot-chip blue"><CheckCircle2 size={11} /> {item}</span>
         ))}
-        <span className="pilot-chip slate"><EyeOff size={11} /> Readiness scores — never public</span>
+        <span className="pilot-chip slate"><EyeOff size={11} /> Readiness band — never public</span>
       </div>
     </div>
     <div className="pilot-modal-actions">

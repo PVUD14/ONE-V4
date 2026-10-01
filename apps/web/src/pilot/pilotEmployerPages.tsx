@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { ArrowRight, Briefcase, Building2, CalendarDays, ClipboardCheck, Plus, TrendingUp, Users, Video } from 'lucide-react';
+import { ArrowRight, Briefcase, Building2, CalendarDays, CheckCircle2, ClipboardCheck, EyeOff, Plus, TrendingUp, Users, Video } from 'lucide-react';
 import { MultiRing } from './pilotComponents.js';
 import { DetailRows, OverlayForm, listModal, useOverlay } from './pilotOverlay.js';
 import { usePilotSession } from './pilotSession.js';
 import {
   pilotApplicants, pilotCampusDrives, pilotEmployerFunnel, pilotEmployerInterviews,
-  pilotEmployerPersona, pilotEmployerRoles, pilotEmployerStats, type PilotApplicant,
+  pilotEmployerPersona, pilotEmployerRoles, pilotEmployerStats, sharedEvidenceFor, type PilotApplicant,
 } from './pilotStaffData.js';
 
 /** Employer pilot pages: the talent lead's view at Zenvia Labs. */
@@ -146,7 +146,7 @@ export function EmployerDashboard(): React.ReactElement {
           ))}
         </div>
       </section>
-      <div className="pilot-banner blue"><TrendingUp size={17} /> Applications up 32% since the VIT drive was announced.</div>
+      <div className="pilot-banner blue"><TrendingUp size={17} /> Applications up 32% since the Lakeview drive was announced.</div>
     </aside>
   </div>;
 }
@@ -223,7 +223,16 @@ export function EmployerApplicants(): React.ReactElement {
           ['Role', applicant.roleApplied],
         ]} />
         {applicant.highlight ? <p className="pilot-modal-text" style={{ marginTop: 12 }}><strong>Recruiter note:</strong> {applicant.highlight}</p> : null}
-        <p className="pilot-modal-text" style={{ marginTop: 8 }}>The full profile includes the resume, assessment scores and interview feedback.</p>
+        <h3 style={{ fontSize: 13, margin: '14px 0 6px' }}>Skill evidence shared with consent</h3>
+        <div className="pilot-list">
+          {sharedEvidenceFor(applicant.name).map((evidence) => (
+            <div key={evidence.item} className="pilot-list-row" style={{ padding: '7px 2px' }}>
+              <CheckCircle2 size={15} color="#0d6b4f" style={{ flexShrink: 0 }} />
+              <div className="grow"><strong style={{ fontSize: 12.5 }}>{evidence.item}</strong><small>{evidence.verifiedBy}</small></div>
+            </div>
+          ))}
+        </div>
+        <p className="pilot-modal-text" style={{ marginTop: 10 }}><EyeOff size={13} style={{ verticalAlign: '-2px' }} /> {applicant.name.split(' ')[0]} chose what to share when applying. Readiness bands, marks they did not share and counselling notes are never visible to employers.</p>
       </div>,
     });
   };

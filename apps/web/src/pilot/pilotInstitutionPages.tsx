@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AlertTriangle, ArrowRight, Building2, CalendarDays, ClipboardCheck, Download, TrendingUp, Users } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Building2, CalendarDays, CheckCircle2, ClipboardCheck, Download, TrendingUp, Upload, Users } from 'lucide-react';
 import { MultiRing, Ring, Spark } from './pilotComponents.js';
 import { DetailRows, OverlayForm, downloadCsv, useOverlay } from './pilotOverlay.js';
 import { ReportFormatBody } from './pilotShare.js';
@@ -13,8 +13,27 @@ import {
 /** Institution pilot pages: the placement officer's view of Arjun's college. */
 
 const BAND_TONE: Readonly<Record<string, string>> = {
-  Ready: 'green', Progressing: 'blue', Developing: 'amber', 'At risk': 'rose',
+  'Ready for next step': 'green', Progressing: 'blue', Developing: 'amber', 'Not enough evidence': 'slate',
 };
+
+/**
+ * One department's placement-eligible students split across the four advisory bands.
+ * Readiness is a band, never a number, so departments compare by band counts.
+ */
+function DepartmentBands({ department }: { readonly department: typeof pilotDepartmentReadiness[number] }): React.ReactElement {
+  const parts = [department.ready, department.progressing, department.developing, department.notEnough];
+  const total = parts.reduce((sum, value) => sum + value, 0) || 1;
+  return <div className="pilot-skill">
+    <header><b>{department.label}</b><span>{department.ready} of {total} ready for next step</span></header>
+    <div className="pilot-bar" style={{ display: 'flex' }} role="img" aria-label={`${department.label}: ${pilotReadinessBands.map((band, index) => `${parts[index]} ${band.label}`).join(', ')}`}>
+      {pilotReadinessBands.map((band, index) => <i key={band.label} style={{ width: `${((parts[index] ?? 0) / total) * 100}%`, background: band.color, borderRadius: 0 }} />)}
+    </div>
+  </div>;
+}
+
+function departmentBandRows(): string[][] {
+  return pilotDepartmentReadiness.map((department) => [`${department.label} · ready / progressing / developing / not enough evidence`, `${department.ready} / ${department.progressing} / ${department.developing} / ${department.notEnough}`]);
+}
 
 function Funnel({ rows }: { readonly rows: readonly { readonly label: string; readonly value: number }[] }): React.ReactElement {
   const max = Math.max(...rows.map((row) => row.value), 1);
@@ -43,9 +62,9 @@ export function InstitutionDashboard(): React.ReactElement {
           ['Placement eligible', String(pilotCohort.placementEligible)],
           ['Offers this season', String(pilotCohort.offersThisSeason)],
           ['Students placed', String(pilotCohort.placedSoFar)],
-          ['Average readiness', String(pilotCohort.averageReadiness)],
+          ...pilotReadinessBands.map((band) => [`Band · ${band.label}`, String(band.value)]),
           ['Need intervention', String(pilotCohort.atRisk)],
-          ...pilotDepartmentReadiness.map((department) => [`${department.label} average readiness`, `${department.value}%`]),
+          ...departmentBandRows(),
         ]} />,
     });
   };
@@ -95,7 +114,7 @@ export function InstitutionDashboard(): React.ReactElement {
           <div className="pilot-card-head"><h2>Cohort Readiness</h2><small style={{ color: 'var(--p-muted)' }}>{bandTotal} placement-eligible</small></div>
           <div style={{ display: 'flex', gap: 18, alignItems: 'center' }}>
             <MultiRing segments={pilotReadinessBands.map((band) => ({ value: band.value, color: band.color }))}>
-              {pilotCohort.averageReadiness}<div style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--p-muted)' }}>Avg readiness</div>
+              {bandTotal}<div style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--p-muted)' }}>students</div>
             </MultiRing>
             <div className="pilot-legend" style={{ flex: 1 }}>
               {pilotReadinessBands.map((band) => (
@@ -152,27 +171,81 @@ export function InstitutionDashboard(): React.ReactElement {
         </div>
       </section>
       <section className="pilot-card">
-        <h2>Department Readiness</h2>
-        {pilotDepartmentReadiness.map((department) => (
-          <div key={department.label} className="pilot-skill">
-            <header><b>{department.label}</b><span>{department.value}%</span></header>
-            <div className="pilot-bar thin"><i style={{ width: `${department.value}%` }} /></div>
-          </div>
-        ))}
+        <h2>Department Readiness Bands</h2>
+        {pilotDepartmentReadiness.map((department) => <DepartmentBands key={department.label} department={department} />)}
       </section>
     </aside>
+  </div>;
+}
+
+const ROSTER_ISSUES = [
+  ['Row 14', 'Duplicate email - already used on row 9'],
+  ['Row 51', 'Registration number missing'],
+  ['Row 88', 'This email already has a ONE account - invite skipped, student can link it instead'],
+] as const;
+
+/**
+ * Roster upload as the real application does it: a template, a validation preview
+ * that names the rows with problems, then an import that creates invitations.
+ * Nothing leaves the browser here; the "file" is a built-in sample.
+ */
+function RosterUploadBody({ onImported }: { readonly onImported: (count: number) => void }): React.ReactElement {
+  const overlay = useOverlay();
+  const [stage, setStage] = useState<'choose' | 'preview' | 'done'>('choose');
+  if (stage === 'choose') {
+    return <div>
+      <p className="pilot-modal-text">Upload a CSV with one row per student. ONE checks every row before anything is created, then sends each valid student an invitation to activate their account.</p>
+      <DetailRows rows={[['Columns', 'name, email, registration, department, batch'], ['Limit', 'Up to 2,000 rows per file']]} />
+      <div className="pilot-modal-actions" style={{ justifyContent: 'flex-start' }}>
+        <button type="button" className="pilot-btn ghost" onClick={() => {
+          downloadCsv('roster-template.csv', [['name', 'email', 'registration', 'department', 'batch'], ['Sample Student', 'sample.student@college.example', 'LIT2028-0001', 'CSE', '2028']]);
+          overlay.toast('roster-template.csv downloaded.');
+        }}><Download size={14} /> Download Template</button>
+        <button type="button" className="pilot-btn" onClick={() => setStage('preview')}><Upload size={14} /> Use sample file: batch-2028-cse.csv</button>
+      </div>
+    </div>;
+  }
+  if (stage === 'preview') {
+    return <div>
+      <div className="pilot-row cols-3" style={{ marginBottom: 12 }}>
+        {[['Rows read', '120', 'blue'], ['Ready to import', '117', 'green'], ['Need attention', '3', 'amber']].map(([label, value, tone]) => (
+          <div key={label} className="pilot-stat" style={{ border: '1px solid var(--p-line)', borderRadius: 12, padding: '9px 11px' }}>
+            <span className={`pilot-tile ${tone}`} style={{ width: 30, height: 30 }}><Users size={14} /></span>
+            <div><b>{value}</b><small>{label}</small></div>
+          </div>
+        ))}
+      </div>
+      <div className="pilot-list">
+        {ROSTER_ISSUES.map(([row, issue]) => (
+          <div key={row} className="pilot-list-row" style={{ padding: '7px 2px' }}>
+            <AlertTriangle size={15} color="#92400e" style={{ flexShrink: 0 }} />
+            <div className="grow"><strong style={{ fontSize: 12.5 }}>{row}</strong><small>{issue}</small></div>
+          </div>
+        ))}
+      </div>
+      <div className="pilot-modal-actions">
+        <button type="button" className="pilot-btn ghost" onClick={() => setStage('choose')}>Back</button>
+        <button type="button" className="pilot-btn" onClick={() => { setStage('done'); onImported(117); }}>Import 117 &amp; Send Invitations</button>
+      </div>
+    </div>;
+  }
+  return <div>
+    <div className="pilot-banner"><CheckCircle2 size={17} /> 117 students added to Batch 2028 · CSE. Invitations are on their way.</div>
+    <p className="pilot-modal-text" style={{ marginTop: 12 }}>Each student appears as <strong>Invited</strong> until they open the link and activate their account. Fix the 3 flagged rows and upload them again whenever you are ready.</p>
+    <div className="pilot-modal-actions"><button type="button" className="pilot-btn" onClick={overlay.closeModal}>Done</button></div>
   </div>;
 }
 
 export function InstitutionStudents(): React.ReactElement {
   const overlay = useOverlay();
   const [batch, setBatch] = useState<'All' | '2027' | '2026'>('2027');
+  const [invited, setInvited] = useState(0);
   const allStudents = [...pilotRoster, ...pilotRosterAlumni];
   const visible = batch === 'All' ? allStudents : allStudents.filter((student) => student.batch === batch);
   const exportStudents = (): void => {
     downloadCsv(`students-batch-${batch.toLowerCase()}.csv`, [
-      ['Student', 'Registration', 'Department', 'Batch', 'Readiness', 'Band', 'Placement status'],
-      ...visible.map((student) => [student.name, student.registration, student.department, student.batch, String(student.readiness), student.band, student.status]),
+      ['Student', 'Registration', 'Department', 'Batch', 'Readiness band', 'Placement status'],
+      ...visible.map((student) => [student.name, student.registration, student.department, student.batch, student.band, student.status]),
     ]);
     overlay.toast(`students-batch-${batch.toLowerCase()}.csv downloaded (${visible.length} students, sample data).`);
   };
@@ -180,8 +253,7 @@ export function InstitutionStudents(): React.ReactElement {
     overlay.openModal({
       title: student.name, subtitle: `${student.registration} · ${student.department} · Batch ${student.batch}`, body: <div>
         <DetailRows rows={[
-          ['Readiness', `${student.readiness} / 100`],
-          ['Band', student.band],
+          ['Readiness band', student.band],
           ['Placement status', student.status],
           ['Department', student.department],
         ]} />
@@ -192,7 +264,7 @@ export function InstitutionStudents(): React.ReactElement {
   return <div className="pilot-page" style={{ gridTemplateColumns: '1fr' }}>
     <div className="pilot-content">
       <div className="pilot-page-head">
-        <div><h1>Students</h1><p>Placement-eligible students with readiness and current placement activity.</p></div>
+        <div><h1>Students</h1><p>Placement-eligible students with their advisory readiness band and current placement activity.</p></div>
         <div style={{ display: 'flex', gap: 9, alignItems: 'center' }}>
           <label className="pilot-inline-filter">
             <span>Batch</span>
@@ -203,11 +275,16 @@ export function InstitutionStudents(): React.ReactElement {
             </select>
           </label>
           <button type="button" className="pilot-btn ghost" onClick={(event) => { event.stopPropagation(); exportStudents(); }}><Download size={15} /> Export</button>
+          <button type="button" className="pilot-btn" onClick={(event) => {
+            event.stopPropagation();
+            overlay.openModal({ title: 'Upload Roster', subtitle: 'Add a batch of students from a CSV file', body: <RosterUploadBody onImported={setInvited} /> });
+          }}><Upload size={15} /> Upload Roster</button>
         </div>
       </div>
+      {invited > 0 ? <div className="pilot-banner blue"><Users size={17} /> Batch 2028 · CSE: {invited} students invited, 0 activated so far. They join this list as they activate.</div> : null}
       <section className="pilot-card">
         <div className="pilot-table-wrap"><table className="pilot-table">
-          <thead><tr><th>Student</th><th>Department</th><th>Readiness</th><th>Band</th><th>Placement Status</th><th></th></tr></thead>
+          <thead><tr><th>Student</th><th>Department</th><th>Readiness Band</th><th>Placement Status</th><th></th></tr></thead>
           <tbody>
             {visible.map((student) => (
               <tr key={student.registration}>
@@ -216,12 +293,6 @@ export function InstitutionStudents(): React.ReactElement {
                   <span><strong>{student.name}</strong><small>{student.registration} · Batch {student.batch}</small></span>
                 </div></td>
                 <td>{student.department}</td>
-                <td style={{ minWidth: 140 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div className="pilot-bar thin" style={{ flex: 1 }}><i style={{ width: `${student.readiness}%` }} /></div>
-                    <b>{student.readiness}</b>
-                  </div>
-                </td>
                 <td><span className={`pilot-chip ${BAND_TONE[student.band]}`}>{student.band}</span></td>
                 <td><small style={{ color: 'var(--p-ink-2)' }}>{student.status}</small></td>
                 <td><button type="button" className="pilot-btn ghost small" onClick={(event) => { event.stopPropagation(); viewStudent(student); }}>View</button></td>
@@ -338,7 +409,7 @@ export function InstitutionReports(): React.ReactElement {
         rows={[
           ['Metric', 'Value'],
           ...pilotPipelineFunnel.map((row) => [`Pipeline · ${row.label}`, String(row.value)]),
-          ...pilotDepartmentReadiness.map((department) => [`${department.label} average readiness`, `${department.value}%`]),
+          ...departmentBandRows(),
           ['Placement rate', `${Math.round((pilotCohort.placedSoFar / pilotCohort.placementEligible) * 100)}%`],
           ['Offers this season', String(pilotCohort.offersThisSeason)],
         ]} />,
@@ -361,14 +432,12 @@ export function InstitutionReports(): React.ReactElement {
         </section>
       </div>
       <section className="pilot-card">
-        <h2>Readiness by Department</h2>
+        <div className="pilot-card-head"><h2>Readiness Bands by Department</h2><small style={{ color: 'var(--p-muted)' }}>Advisory bands · never a score</small></div>
         <div className="pilot-two">
-          {pilotDepartmentReadiness.map((department) => (
-            <div key={department.label} className="pilot-skill">
-              <header><b>{department.label}</b><span>{department.value}% average readiness</span></header>
-              <div className="pilot-bar"><i style={{ width: `${department.value}%` }} /></div>
-            </div>
-          ))}
+          {pilotDepartmentReadiness.map((department) => <DepartmentBands key={department.label} department={department} />)}
+        </div>
+        <div className="pilot-legend" style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginTop: 10 }}>
+          {pilotReadinessBands.map((band) => <div key={band.label}><i style={{ background: band.color }} /> {band.label}</div>)}
         </div>
       </section>
     </div>
@@ -383,7 +452,7 @@ export function InstitutionReports(): React.ReactElement {
         <div className="pilot-list">
           {[
             'Offers up 24% on last season',
-            'CSE readiness crossed 70% average',
+            '52 CSE students now ready for next step',
             '4 new companies visiting this season',
           ].map((highlight) => (
             <div key={highlight} className="pilot-list-row" style={{ padding: '8px 2px' }}>

@@ -15,6 +15,9 @@ export interface GrowthMeDto {
   readonly staffType: GrowthStaffTypeDto | null;
   /** GROWTH-03: open leads the person owns. */
   readonly openLeads?: number;
+  /** GROWTH-06: the person's visits this IST month, and open follow-ups due today or earlier. */
+  readonly visitsThisMonth?: number;
+  readonly followUpsDue?: number;
   readonly teams: readonly { readonly team: string; readonly joinedAt: string; readonly manager: { readonly email: string } | null }[];
   readonly correlationId: string;
 }
@@ -376,4 +379,116 @@ export function lookupGrowthContacts(token: string, body: { readonly email?: str
 
 export function eraseGrowthContacts(token: string, body: { readonly email?: string; readonly phone?: string; readonly reference: string; readonly doNotContact: boolean }): Promise<{ readonly removed: number; readonly doNotContactLeads: number }> {
   return requestJson(`${privacyContactsPath}/erase`, { token, method: 'POST', body });
+}
+
+// ---------------------------------------------------------------------------
+// GROWTH-06: field work. Every write carries an Idempotency-Key, so a retried click or a resend
+// lands once; the server answers a replay with what the first send produced.
+// ---------------------------------------------------------------------------
+
+export type GrowthActivityKindDto = 'VISIT' | 'CALL' | 'MEETING' | 'NOTE';
+
+export interface GrowthActivityDto {
+  readonly id: string;
+  readonly leadId: string;
+  readonly leadName: string;
+  readonly leadKind: GrowthLeadKindDto;
+  readonly kind: GrowthActivityKindDto;
+  readonly outcome: string | null;
+  readonly contact: { readonly id: string; readonly role: string | null; readonly fullName: string | null } | null;
+  readonly notes: string | null;
+  readonly notesErased: boolean;
+  readonly author: { readonly email: string; readonly isMe: boolean };
+  readonly occurredAt: string | null;
+  readonly receivedAt: string | null;
+  /** Present only for the author and their manager (design §14.3); absent for everyone else. */
+  readonly location?: { readonly latitude: number; readonly longitude: number; readonly accuracyM: number } | null;
+  readonly locationRemoved?: { readonly at: string | null; readonly reasonCode: string } | null;
+}
+
+export interface GrowthFollowUpDto {
+  readonly id: string;
+  readonly leadId: string;
+  readonly leadName: string;
+  readonly leadKind: GrowthLeadKindDto;
+  readonly title: string | null;
+  readonly titleErased: boolean;
+  readonly dueOn: string;
+  readonly state: 'OPEN' | 'DONE' | 'CANCELLED';
+  readonly overdue: boolean;
+  readonly dueToday: boolean;
+  readonly assignee: { readonly email: string; readonly isMe: boolean };
+  readonly activityId: string | null;
+  readonly createdAt: string | null;
+  readonly closedAt: string | null;
+  readonly cancelReasonCode: string | null;
+}
+
+export interface GrowthFieldVocabularyDto {
+  readonly kinds: readonly GrowthActivityKindDto[];
+  readonly outcomes: readonly string[];
+  readonly cancelReasons: readonly string[];
+  readonly notesMax: number;
+  readonly titleMax: number;
+  readonly reportMaxAgeDays: number;
+  readonly locationRetentionDays: number;
+  readonly listLimit: number;
+  readonly locationNotice: { readonly version: string; readonly status: string; readonly text: readonly string[] };
+}
+
+export interface GrowthFieldDto {
+  readonly view: 'MINE' | 'TEAM';
+  readonly canSeeTeam: boolean;
+  readonly today: string;
+  readonly counts: {
+    readonly visitsThisMonth: number; readonly activitiesThisMonth: number; readonly metThisMonth: number;
+    readonly followUpsOverdue: number; readonly followUpsDueToday: number; readonly followUpsOpen: number;
+  };
+  readonly followUps: readonly GrowthFollowUpDto[];
+  readonly activities: readonly GrowthActivityDto[];
+  readonly vocabulary: GrowthFieldVocabularyDto;
+}
+
+export interface GrowthLeadFieldDto {
+  readonly leadId: string;
+  readonly canLog: boolean;
+  readonly activities: readonly GrowthActivityDto[];
+  readonly followUps: readonly GrowthFollowUpDto[];
+  readonly vocabulary: GrowthFieldVocabularyDto;
+}
+
+export interface NewGrowthActivityBody {
+  readonly kind: GrowthActivityKindDto;
+  readonly outcome?: string | null;
+  readonly contactId?: string | null;
+  readonly notes?: string | null;
+  readonly occurredAt: string;
+}
+
+export function getGrowthField(token: string, view: 'MINE' | 'TEAM', signal?: AbortSignal): Promise<GrowthFieldDto> {
+  return requestJson(`/api/v1/growth/field?view=${view}`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function getGrowthLeadField(token: string, leadId: string, signal?: AbortSignal): Promise<GrowthLeadFieldDto> {
+  return requestJson(`${leadsPath}/${encodeURIComponent(leadId)}/field`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function logGrowthActivity(token: string, leadId: string, body: NewGrowthActivityBody, idempotencyKey: string): Promise<{ readonly activity: GrowthActivityDto; readonly idempotentReplay: boolean }> {
+  return requestJson(`${leadsPath}/${encodeURIComponent(leadId)}/activities`, { token, method: 'POST', body, idempotencyKey });
+}
+
+export function addGrowthFollowUp(token: string, leadId: string, body: { readonly title: string; readonly dueOn: string; readonly activityId?: string | null }, idempotencyKey: string): Promise<{ readonly followUp: GrowthFollowUpDto }> {
+  return requestJson(`${leadsPath}/${encodeURIComponent(leadId)}/follow-ups`, { token, method: 'POST', body, idempotencyKey });
+}
+
+export function completeGrowthFollowUp(token: string, followUpId: string, idempotencyKey: string): Promise<{ readonly followUp: GrowthFollowUpDto }> {
+  return requestJson(`/api/v1/growth/follow-ups/${encodeURIComponent(followUpId)}/complete`, { token, method: 'POST', body: {}, idempotencyKey });
+}
+
+export function cancelGrowthFollowUp(token: string, followUpId: string, body: { readonly reasonCode: string }, idempotencyKey: string): Promise<{ readonly followUp: GrowthFollowUpDto }> {
+  return requestJson(`/api/v1/growth/follow-ups/${encodeURIComponent(followUpId)}/cancel`, { token, method: 'POST', body, idempotencyKey });
+}
+
+export function removeGrowthActivityLocation(token: string, activityId: string): Promise<{ readonly activity: GrowthActivityDto }> {
+  return requestJson(`/api/v1/growth/activities/${encodeURIComponent(activityId)}/remove-location`, { token, method: 'POST', body: {} });
 }

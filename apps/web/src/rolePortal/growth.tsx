@@ -6,12 +6,16 @@
  * person's own role, teams, manager and staff type (`GET /api/v1/growth/me`). Every figure
  * whose source is not built yet shows NA in its slot, and every other page says plainly that
  * it is not built yet. No lead, visit, target or amount is invented, in any state.
+ *
+ * GROWTH-06: Field is built (growthField.tsx); Home's "Visits this month" and the follow-ups-due
+ * card come from the field log.
  */
 import { useEffect, useState } from 'react';
 import { ApiRequestError, getGrowthMe, getGrowthTerritory, getProtectedAccessToken, type GrowthMeDto, type GrowthTerritoryDto } from '../api.js';
 import { V2Chip, V2EmptyState, V2Ring, V2Stat } from '../dashboardsV2.js';
 import type { RoleNavItem } from '../rolePortalConfig.js';
 import { GrowthLeadsPage } from './growthLeads.js';
+import { GrowthFieldPage } from './growthField.js';
 import { AuthenticatedNotYetAvailable } from './shared.js';
 
 const NA = 'NA';
@@ -25,7 +29,6 @@ const roleLabels: Readonly<Record<string, string>> = { GROWTH_EXECUTIVE: 'Growth
 
 /** What each page will hold once built, said plainly (design §16.1). */
 const notBuilt: Readonly<Record<string, string>> = {
-  Field: 'Field is not built yet. When it is, you will log visits, calls and follow-ups here and on the ONE app.',
   Targets: 'Targets is not built yet. When it is, your targets for the month and quarter, and progress counted from real records, will be here.',
   Commission: 'Commission is not built yet. Commission rates have not been set by operations, so no amount is shown anywhere.',
   Team: 'Team is not built yet. When it is, your team members, their workload and stale leads will be here.',
@@ -84,7 +87,7 @@ export function GrowthHomePage(): React.ReactElement {
 
         <div className="v2-row v2-cols-4" role="region" aria-label="Growth summary">
           <V2Stat icon="🤝" tone="blue" value={typeof me?.openLeads === 'number' ? me.openLeads : NA} label="Open leads" />
-          <V2Stat icon="📍" tone="teal" value={NA} label="Visits this month" />
+          <V2Stat icon="📍" tone="teal" value={typeof me?.visitsThisMonth === 'number' ? me.visitsThisMonth : NA} label="Visits this month" />
           <V2Stat icon="🎯" tone="amber" value={NA} label="Target progress" />
           <V2Stat icon="₹" tone="purple" value={NA} label="Commission this month" />
         </div>
@@ -109,9 +112,15 @@ export function GrowthHomePage(): React.ReactElement {
       </div>
 
       <div className="v2-rail">
+        <section className="v2-card" aria-label="Follow-ups due">
+          <div className="v2-card-head"><h2>Follow-ups due</h2><V2Chip tone="amber">Today or earlier</V2Chip></div>
+          <p className="v2-empty">{typeof me?.followUpsDue === 'number'
+            ? (me.followUpsDue ? `${me.followUpsDue} follow-up${me.followUpsDue === 1 ? ' is' : 's are'} due today or overdue. Open Field to work through them.` : 'Nothing is due today. New follow-ups appear in Field.')
+            : `${NA} — follow-ups could not be counted.`}</p>
+        </section>
         <section className="v2-card">
           <div className="v2-card-head"><h2>Coming next</h2><V2Chip tone="slate">Not built yet</V2Chip></div>
-          <p className="v2-empty">Field visits, targets and commission are not built yet. Each page says so until it is, and every figure above reads NA until it has a real source.</p>
+          <p className="v2-empty">Targets and commission are not built yet. Each page says so until it is, and every figure above reads NA until it has a real source.</p>
         </section>
         <section className="v2-card">
           <div className="v2-card-head"><h2>Protected boundaries</h2></div>
@@ -129,6 +138,7 @@ export function GrowthModulePage({ route, role }: { readonly route: RoleNavItem;
   }
   if (route.label === 'Territory') return <GrowthTerritoryPage />;
   if (route.label === 'Leads') return <GrowthLeadsPage role={role} />;
+  if (route.label === 'Field') return <GrowthFieldPage role={role} />;
   return <AuthenticatedNotYetAvailable title={route.label} detail={notBuilt[route.label] ?? `${route.label} is not built yet.`} />;
 }
 

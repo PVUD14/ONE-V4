@@ -36,6 +36,7 @@ import {
 } from '../api.js';
 import { V2Chip, V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { formatApiError } from './shared.js';
+import { LeadFieldPanel } from './growthField.js';
 
 const NA = 'NA';
 
@@ -365,6 +366,8 @@ export function LeadDetailPanel({ leadId, vocabulary, token, mode, manager, onCh
       <button type="button" className="pilot-btn" disabled={!reasons.dnc || busy}
         onClick={() => void act(() => setGrowthLeadDoNotContact(token, lead.id, { reasonCode: reasons.dnc }, operations), 'Marked do not contact. This cannot be undone.')}>Mark do not contact</button>
     </div> : null}
+
+    {!operations ? <LeadFieldPanel leadId={lead.id} token={token} contacts={lead.contacts} /> : null}
 
     <h3>Owner history</h3>
     <ul>{lead.ownerHistory.map((entry, index) => <li key={`${entry.at ?? ''}-${index}`}>{entry.at ? new Date(entry.at).toLocaleDateString() : NA}: {growthCodeLabel(entry.reasonCode)} — {entry.from ?? 'nobody'} → {entry.to ?? 'nobody'}</li>)}</ul>

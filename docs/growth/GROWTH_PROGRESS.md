@@ -235,6 +235,16 @@ scope trigger is touched.
 - The LGD list itself is not shipped: operations must download and import it. Until then regions can cover whole states.
 - The Android tab was compiled, not run on a device.
 
-**Validation:** recorded below once the full run completes.
+**Validation** (`E:/one-wt/logs/validate.sh` on a fresh database `one_growth02`, only `DATABASE_URL` exported, after
+rebasing on `da353ad`):
+- `corepack pnpm db:migrate` twice — pass (86 applied, then 0 applied / 86 already applied); 0099 also re-run by hand on
+  a migrated database — pass.
+- `corepack pnpm typecheck` — pass. `corepack pnpm build` — pass.
+- `corepack pnpm -r --no-bail --workspace-concurrency=1 test` — 3 911 of 3 912 passed (api 1 378, web 963/964,
+  persistence 464, authorization 450, others). The one failure is the known environmental timeout: web `App.test.tsx` ›
+  "resolves every visible navigation item for every new role without disabled nav" (20 s under full-suite load). Re-run
+  alone: 97/97 passed.
+- Android `./gradlew --no-daemon -q :app:compileDebugKotlin` (Android Studio JBR) — pass.
+- CI parity: optional-chain, private-key and conflict-marker greps — clean; `corepack pnpm audit --prod --audit-level=high` — exit 0.
 
 **Next goal:** GROWTH-03 — Lead register, contacts and the contact notice.

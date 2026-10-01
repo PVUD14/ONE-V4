@@ -27,10 +27,10 @@ oneby8.com {
 	}
 }
 
-# The demo site (docs/ops/runbook-demo-site.md): sample data only, served from its own
-# container. It gets the same security headers as oneby8.com, is kept out of search
-# engines, and has no route to the API - a request for /api or /health here is refused
-# rather than ever reaching production.
+# The sandbox (ADR-046, docs/ops/runbook-demo-site.md): the real application over its own
+# database of fictional sample data, served by api-demo and web-sandbox. It gets the same
+# security headers as oneby8.com and is kept out of search engines. Nothing here can
+# reach the production API or database: those containers are on another network.
 demo.oneby8.com {
 	encode zstd gzip
 
@@ -43,25 +43,30 @@ demo.oneby8.com {
 		-Server
 	}
 
-	# Only the people Divakar lists may open the demo. The list lives on the server, in
-	# deploy/vps/demo-access/users.caddy (one "username bcrypt-hash" per line; any *.caddy file there counts), never in
-	# the repository; see docs/ops/runbook-demo-site.md. Each person gets their own line,
-	# so access is granted and removed per person. With no file the demo stays locked
-	# to everyone, and oneby8.com keeps running.
+	# Outer lock: only the people Divakar lists may open the sandbox at all - every page,
+	# every API call. The list lives on the server, in deploy/vps/demo-access/users.caddy
+	# (one "username bcrypt-hash" per line; any *.caddy file there counts), never in the
+	# repository. With no file the sandbox stays locked to everyone, and oneby8.com keeps
+	# running. Inside, each person still signs in to a demo account (the sandbox's own
+	# Cognito pool), which decides the one workspace they see.
 	basic_auth {
 		import /etc/caddy/demo-access/*.caddy
 	}
 
-	handle /api/* {
-		respond "Not available on the demo site" 404
-	}
-
-	handle /health {
-		respond "Not available on the demo site" 404
+	# The browser keeps sending this lock's credentials in the Authorization header, so the
+	# sandbox build of the web app sends its sign-in token as X-One-Authorization instead
+	# (apps/web/src/api/http.ts). Here it becomes the API's Authorization header again, and
+	# the lock's credentials never reach the API.
+	@api path /api/* /health
+	handle @api {
+		reverse_proxy api-demo:3000 {
+			header_up Authorization {http.request.header.X-One-Authorization}
+			header_up -X-One-Authorization
+		}
 	}
 
 	handle {
-		reverse_proxy web-demo:8080
+		reverse_proxy web-sandbox:8080
 	}
 }
 

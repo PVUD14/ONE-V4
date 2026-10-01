@@ -8,6 +8,7 @@ import { revokeExpiredApplicantGrants } from '@planthepath/persistence/src/emplo
 import { sweepGrowthLeadContactRetention } from '@planthepath/persistence/src/growth-leads.js';
 import { GROWTH_CONTACT_RETENTION_MONTHS } from '@planthepath/authorization/src/index.js';
 import { createLocalDiskStorage } from './storage/file-storage.js';
+import { survivePoolErrors } from '@planthepath/persistence/src/pool-errors.js';
 
 /**
  * Executes deletions whose 30-day grace period has elapsed, revokes applicant-access grants whose
@@ -25,7 +26,7 @@ import { createLocalDiskStorage } from './storage/file-storage.js';
  * reporting success while people's deletions silently did not happen.
  */
 async function main(): Promise<void> {
-  const pool = new Pool({ connectionString: requireValue('DATABASE_URL') });
+  const pool = survivePoolErrors(new Pool({ connectionString: requireValue('DATABASE_URL') }), 'privacy-worker');
   const storageRoot = process.env.FILE_STORAGE_ROOT?.trim();
   const db = drizzle(pool, { schema });
 

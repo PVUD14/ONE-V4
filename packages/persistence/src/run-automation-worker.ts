@@ -5,6 +5,7 @@ import * as schema from './schema.js';
 import { N8nAutomationAdapter } from '@planthepath/automation/src/index.js';
 import { createConfiguredInvitationMailSink } from './invitation-mail.js';
 import { createEventBridgePublisher, createLocalIntegrationEventPublisher, createNotificationEventConsumer, dispatchAutomationOnce, publishOutboxOnce } from './automation-workers.js';
+import { survivePoolErrors } from './pool-errors.js';
 
 /**
  * `local-dispatcher` is the mode ADR-028 deploys: it drains the outbox in-process and
@@ -16,7 +17,7 @@ type WorkerMode = 'local-dispatcher' | 'outbox-publisher' | 'notification-consum
 
 async function main(): Promise<void> {
   const mode = requireMode(process.env.AUTOMATION_WORKER_MODE);
-  const pool = new Pool({ connectionString: requireValue('DATABASE_URL') });
+  const pool = survivePoolErrors(new Pool({ connectionString: requireValue('DATABASE_URL') }), 'automation-worker');
   const leaseOwner = `${mode}:${process.pid}`;
   let stopping = false;
   process.once('SIGTERM', () => { stopping = true; });

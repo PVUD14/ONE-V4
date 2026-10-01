@@ -227,7 +227,7 @@ describe('hiring lifecycle', () => {
       compensationCurrency: 'INR',
       compensationAmount: 28000,
       compensationPeriod: 'MONTH',
-      offerExpiresAt: '2026-10-01T00:00:00.000Z',
+      offerExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     }).expect(201);
     offerId = extended.body.offer.id;
     expect(extended.body.offer.state).toBe('EXTENDED');

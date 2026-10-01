@@ -606,9 +606,9 @@ describe('EMP-14: privacy', () => {
     const bundle = await assembleSubjectExport(db, p.student.id) as Record<string, unknown>;
     const exported = bundle.talentPool as Record<string, unknown[]>;
     expect(exported.listings).toEqual([expect.objectContaining({ endedAt: null, preferredCities: ['Chennai', 'Hyderabad'], consentVersion: CONSENT_VERSION })]);
-    expect((exported.listings[0] as { evidence: unknown[] }).evidence).toHaveLength(3);
+    expect((exported.listings![0] as { evidence: unknown[] }).evidence).toHaveLength(3);
     expect(exported.blockedEmployers).toEqual([expect.objectContaining({ employerName: 'Blocked by subject' })]);
-    expect(exported.invitations.map((row) => (row as { state: string }).state).sort()).toEqual(['APPLIED', 'SENT']);
+    expect(exported.invitations!.map((row) => (row as { state: string }).state).sort()).toEqual(['APPLIED', 'SENT']);
     expect(exported.cardViews).toEqual([expect.objectContaining({ employerName: 'Pool employer' })]);
     expect(JSON.stringify(exported)).not.toContain(p.good);
 

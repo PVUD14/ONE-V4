@@ -12,7 +12,7 @@
  * blue orange and the highlights into shadows.
  *
  * `compact` shows the "o" mark alone, for collapsed navigation rails. The
- * tagline (PEOPLE | POTENTIAL | PROGRESS) appears only on the sign-in backdrop
+ * tagline (LEARN | PREPARE | BUILD | GROW) is drawn onto the sign-in backdrop
  * (/assets/login-background.png), which the same script builds.
  */
 export type BrandSurface = 'light' | 'dark';

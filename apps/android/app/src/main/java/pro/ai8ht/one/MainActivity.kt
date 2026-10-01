@@ -301,7 +301,7 @@ private fun BrandSplash() {
         Spacer(Modifier.height(14.dp))
         Image(
             painter = painterResource(R.drawable.one_tagline_dark),
-            contentDescription = "People, potential, progress",
+            contentDescription = "Learn, prepare, build, grow",
             modifier = Modifier.height(10.dp),
             contentScale = ContentScale.FillHeight,
         )

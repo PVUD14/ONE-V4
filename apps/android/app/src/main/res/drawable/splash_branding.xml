@@ -2,7 +2,7 @@
 <!-- Android 12+ splash branding slot (bottom): the ONE tagline, the one place
      besides sign-in where it appears. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:width="200dp" android:height="11dp" android:gravity="center">
+    <item android:width="200dp" android:height="8dp" android:gravity="center">
         <bitmap android:src="@drawable/one_tagline_dark" android:gravity="fill" />
     </item>
 </layer-list>

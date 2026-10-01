@@ -44,7 +44,7 @@ import os
 import sys
 
 import numpy as np
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 SOURCE = os.path.join(ROOT, 'docs', 'design', 'brand', 'source', 'one-logo.png')
@@ -56,7 +56,14 @@ DESIGN_OUT = os.path.join(ROOT, 'docs', 'design', 'brand')
 # Regions of the 1254x1254 master (x0, y0, x1, y1), found by inspection.
 REGION_WORD = (140, 350, 1130, 850)     # "one" + "by ai8ht"
 REGION_MARK = (140, 350, 548, 760)       # the "o" ring with its dot
-REGION_TAGLINE = (230, 870, 1030, 930)   # PEOPLE | POTENTIAL | PROGRESS
+# The master art carries the line PEOPLE | POTENTIAL | PROGRESS under the lockup. ONE's
+# tagline is LEARN | PREPARE | BUILD | GROW (Divakar, 2026-10-01), so the tagline image is
+# drawn, not cropped: Inter (the app's typeface, OFL, already shipped in the Android app),
+# tracked capitals in the art's silver with its blue dividers.
+TAGLINE_WORDS = ('LEARN', 'PREPARE', 'BUILD', 'GROW')
+TAGLINE_FONT = os.path.join(ROOT, 'apps', 'android', 'app', 'src', 'main', 'res', 'font', 'inter_medium.ttf')
+TAGLINE_SILVER = (204, 208, 214, 255)
+TAGLINE_BLUE = (70, 132, 226, 255)
 
 NOISE_FLOOR = 14.0   # ground grain rises about this far above the model
 SOLID_LEVEL = 96.0   # at or above this rise a pixel is treated as solid paint
@@ -158,6 +165,42 @@ def separate_mark(rgba: np.ndarray) -> np.ndarray:
     return out
 
 
+def render_tagline() -> Image.Image:
+    """LEARN | PREPARE | BUILD | GROW, drawn large and trimmed; callers scale it down.
+
+    Each word is drawn on its own and cropped to its ink, then the words are laid out with
+    equal gaps and a thin blue bar centred in each gap, matching the master art's spacing.
+    (Typed "|" glyphs and letter side bearings would sit the dividers off-centre.)"""
+    size = 120
+    font = ImageFont.truetype(TAGLINE_FONT, size)
+    tracking = round(size * 0.42)
+    gap = round(size * 1.05)
+    bar = max(2, round(size * 0.05))
+    _, cap_top, _, cap_bottom = font.getbbox('E')
+    words = []
+    for word in TAGLINE_WORDS:
+        tile = Image.new('RGBA', (size * len(word) * 2, size * 2), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(tile)
+        x = 0
+        for ch in word:
+            draw.text((x, 0), ch, font=font, fill=TAGLINE_SILVER)
+            x += round(font.getlength(ch)) + tracking
+        left, _, right, _ = tile.getbbox()
+        words.append(tile.crop((left, 0, right, tile.height)))
+    total = sum(w.width for w in words) + (2 * gap + bar) * (len(words) - 1)
+    canvas = Image.new('RGBA', (total + 40, size * 2), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(canvas)
+    x = 20
+    for index, word in enumerate(words):
+        if index:
+            x += gap
+            draw.rectangle((x, cap_top - round(size * 0.12), x + bar - 1, cap_bottom + round(size * 0.12)), fill=TAGLINE_BLUE)
+            x += bar + gap
+        canvas.alpha_composite(word, (x, 0))
+        x += word.width
+    return trim(canvas, 4)
+
+
 def to_image(rgba: np.ndarray) -> Image.Image:
     out = np.dstack([rgba[..., :3], rgba[..., 3] * 255.0])
     return Image.fromarray(np.clip(out + 0.5, 0, 255).astype(np.uint8), 'RGBA')
@@ -236,7 +279,7 @@ def main() -> int:
     word_dark = trim(to_image(crop(keyed, REGION_WORD)), 6)
     mark_arr = separate_mark(crop(keyed, REGION_MARK))
     mark_dark = trim(to_image(mark_arr), 6)
-    tag_dark = trim(to_image(crop(keyed, REGION_TAGLINE)), 4)
+    tag_dark = render_tagline()
 
     word_light = trim(to_image(graphite(crop(keyed, REGION_WORD))), 6)
     mark_light = trim(to_image(graphite(mark_arr)), 6)

@@ -621,5 +621,10 @@ with GROWTH-06 beneath; then rebased onto f501905):
   - web `employerReports.test.tsx` — one lookup missed under load; re-run alone 5/5 pass.
 - Android `./gradlew --no-daemon -q :app:compileDebugKotlin` (Android Studio JBR) — pass.
 - CI parity: optional-chain, private-key and conflict-marker greps — clean; `corepack pnpm audit --prod --audit-level=high` — exit 0.
+- Final rebase onto 98f64d6: one conflict, the controller list in `api-security.module.ts`, resolved by keeping the
+  base's list and appending this goal's two controllers. Commit SHAs above are from the f501905 rebase; `git log` on the
+  branch is authoritative. On a fresh database: typecheck pass; Android compile pass; `sandbox-seed` 12/12 (its growth
+  leads stop at MET and set no organisation, which 0104 allows), `growth-pipeline` 16/16, `growth-field` 25/25,
+  `growth-leads` 23/23, `growth-foundation` 19/19 — pass.
 
 **Next goal:** GROWTH-05 — Employer pipeline, referral links and the EMP-04 handoff (or GROWTH-07, as the coordinator decides).

@@ -135,3 +135,4 @@ export * from './ai-operations.js';
 export * from './engine-health.js';
 export * from './institution-contract.js';
 export * from './growth-roles.js';
+export * from './growth-scope.js';

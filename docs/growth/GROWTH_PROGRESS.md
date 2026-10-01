@@ -502,5 +502,9 @@ Cognito; the cleartext allowance for 10.0.2.2 was a temporary debug-only overlay
   before this run started on a fresh database).
 - After the rebase onto f501905 (clean, no conflicts): `corepack pnpm typecheck` — pass (run on the GROWTH-04 tip, which
   contains this branch); `growth-foundation.integration.spec.ts` re-run alone on a fresh database — 19/19 pass.
+- Final rebase onto 98f64d6 (the base moved again: résumés 0101, inference 0105, sandbox seed): one conflict, the
+  controller list in `api-security.module.ts`, resolved by keeping the base's list and appending this goal's controller.
+  Commit SHAs above are from the f501905 rebase; `git log` on the branch is authoritative. On a fresh database:
+  typecheck pass; `sandbox-seed` 12/12 (it seeds growth leads with 0103/0104 present), `growth-field` 25/25 — pass.
 
 **Next goal:** GROWTH-04 — College pipeline and the operations handoff.

@@ -531,10 +531,11 @@ async function learningSections(one: Query, subject: Subject): Promise<Record<st
  * GROWTH-03 (design §13.5): a growth staff member's own work records — their staff type, teams,
  * territory assignments and the leads they created or own (organisation, kind, stage, dates).
  * Never the lead contacts' personal data: those people are third parties, not the subject. For
- * anyone who is not growth staff every list is empty.
+ * anyone who is not growth staff every list is empty. GROWTH-06: their field log and follow-ups,
+ * with each visit's location while it is still held.
  */
 async function growthWorkSection(one: Query, subject: Subject): Promise<Record<string, unknown>> {
-  const [staffTypes, teams, assignments, leads] = await Promise.all([
+  const [staffTypes, teams, assignments, leads, activities, followUps] = await Promise.all([
     one(sql`SELECT t.staff_type, t.reason_code, t.effective_from, t.ended_at
             FROM growth_staff_types t JOIN organization_memberships m ON m.id = t.membership_id
             WHERE m.user_id = ${subject} ORDER BY t.effective_from, t.id`),
@@ -551,11 +552,32 @@ async function growthWorkSection(one: Query, subject: Subject): Promise<Record<s
             FROM growth_leads l
             WHERE l.created_by_user_id = ${subject} OR l.owner_membership_id IN (SELECT id FROM organization_memberships WHERE user_id = ${subject})
             ORDER BY l.created_at, l.id LIMIT 5000`),
+    // GROWTH-06 (design §13.5): the person's own field log, with each visit's location while it is
+    // still held (it is theirs). The contact met is shown by role only: that person is a third party.
+    one(sql`SELECT a.kind, a.outcome, l.name AS lead_name, c.contact_role, a.notes, a.notes_erased_at, a.occurred_at, a.received_at,
+                   a.location_latitude, a.location_longitude, a.location_accuracy_m, a.location_erased_at, a.location_erased_reason
+            FROM growth_activities a JOIN growth_leads l ON l.id = a.lead_id LEFT JOIN growth_lead_contacts c ON c.id = a.contact_id
+            WHERE a.author_user_id = ${subject} ORDER BY a.received_at, a.id LIMIT 10000`),
+    one(sql`SELECT l.name AS lead_name, to_char(f.due_on, 'YYYY-MM-DD') AS due_on, f.title, f.title_erased_at, f.state, f.created_at, f.closed_at, f.cancel_reason_code
+            FROM growth_follow_ups f JOIN growth_leads l ON l.id = f.lead_id
+            WHERE f.created_by_user_id = ${subject} OR f.assignee_membership_id IN (SELECT id FROM organization_memberships WHERE user_id = ${subject})
+            ORDER BY f.created_at, f.id LIMIT 10000`),
   ]);
   return {
     staffTypes: staffTypes.map((row) => ({ staffType: row.staff_type, reasonCode: row.reason_code, from: row.effective_from, to: row.ended_at })),
     teams: teams.map((row) => ({ team: row.team, joinedAt: row.joined_at, reasonCode: row.reason_code, leftAt: row.left_at, leftReasonCode: row.left_reason_code })),
     territory: assignments.map((row) => ({ region: row.region_name, role: row.assignment_role, from: row.starts_at, reasonCode: row.reason_code, to: row.ended_at, endedReasonCode: row.ended_reason_code })),
     leads: leads.map((row) => ({ organisation: row.name, kind: row.kind, stage: row.stage, source: row.source, createdAt: row.created_at, lastActivityAt: row.last_activity_at, createdByMe: Boolean(row.created_by_me), ownedByMe: Boolean(row.owned_by_me) })),
+    fieldActivities: activities.map((row) => ({
+      organisation: row.lead_name, kind: row.kind, outcome: row.outcome, contactRole: row.contact_role ?? null,
+      notes: row.notes ?? null, notesErasedAt: row.notes_erased_at ?? null, occurredAt: row.occurred_at, receivedAt: row.received_at,
+      location: row.location_latitude === null || row.location_latitude === undefined ? null
+        : { latitude: Number(row.location_latitude), longitude: Number(row.location_longitude), accuracyM: Number(row.location_accuracy_m) },
+      locationErasedAt: row.location_erased_at ?? null, locationErasedReason: row.location_erased_reason ?? null,
+    })),
+    followUps: followUps.map((row) => ({
+      organisation: row.lead_name, dueOn: row.due_on, title: row.title ?? null, titleErasedAt: row.title_erased_at ?? null,
+      state: row.state, createdAt: row.created_at, closedAt: row.closed_at ?? null, cancelReasonCode: row.cancel_reason_code ?? null,
+    })),
   };
 }

@@ -6,7 +6,8 @@ import { executeDueDeletions } from './http/privacy-deletion.js';
 import { eraseExpiredApplicationMessages, MESSAGE_RETENTION_DAYS_AFTER_GRANT } from '@planthepath/persistence/src/application-messages.js';
 import { revokeExpiredApplicantGrants } from '@planthepath/persistence/src/employer-terms.js';
 import { sweepGrowthLeadContactRetention } from '@planthepath/persistence/src/growth-leads.js';
-import { GROWTH_CONTACT_RETENTION_MONTHS } from '@planthepath/authorization/src/index.js';
+import { sweepGrowthActivityLocations, sweepGrowthFieldText } from '@planthepath/persistence/src/growth-field.js';
+import { GROWTH_CONTACT_RETENTION_MONTHS, GROWTH_LOCATION_RETENTION_DAYS } from '@planthepath/authorization/src/index.js';
 import { createLocalDiskStorage } from './storage/file-storage.js';
 import { survivePoolErrors } from '@planthepath/persistence/src/pool-errors.js';
 
@@ -15,7 +16,9 @@ import { survivePoolErrors } from '@planthepath/persistence/src/pool-errors.js';
  * expiry has passed (EMP-16), then erases application messages whose retention after the employer's
  * access ended has run out (EMP-10). Message erasure skips anything an open trust case or an active
  * retention hold still needs. GROWTH-03: erases the contacts of growth leads with no activity for
- * 24 months (D12) — people who are not ONE users and never agreed to be kept.
+ * 24 months (D12) — people who are not ONE users and never agreed to be kept. GROWTH-06: erases visit
+ * locations 180 days after the visit (O-23), and the visit notes and follow-up titles of the same
+ * expired leads as the contacts.
  *
  * Deliberately a one-shot run rather than a loop: a deletion sweep is a daily job,
  * and a long-lived process holding a connection to do nothing most of the time is
@@ -72,6 +75,19 @@ async function main(): Promise<void> {
       growthContacts += batch.contacts;
     }
     console.log(JSON.stringify({ event: 'growth.lead_contacts.retention_sweep', retentionMonths: GROWTH_CONTACT_RETENTION_MONTHS, leads: growthLeads, erased: growthContacts }));
+
+    // GROWTH-06 (O-23): a visit's location is kept 180 days, then erased; the visit stays. The
+    // notes and follow-up titles of leads past the 24-month period go with their contacts (§13.4).
+    let locations = 0;
+    for (let batch = await sweepGrowthActivityLocations(db); batch > 0; batch = await sweepGrowthActivityLocations(db)) locations += batch;
+    console.log(JSON.stringify({ event: 'growth.activity_locations.retention_sweep', retentionDays: GROWTH_LOCATION_RETENTION_DAYS, erased: locations }));
+    let notes = 0;
+    let titles = 0;
+    for (let batch = await sweepGrowthFieldText(db); batch.notes + batch.titles > 0; batch = await sweepGrowthFieldText(db)) {
+      notes += batch.notes;
+      titles += batch.titles;
+    }
+    console.log(JSON.stringify({ event: 'growth.field_text.retention_sweep', retentionMonths: GROWTH_CONTACT_RETENTION_MONTHS, notes, followUpTitles: titles }));
 
     for (const failure of failed) {
       console.error(JSON.stringify({ event: 'privacy.deletion.failed', requestId: failure.requestId, detail: failure.detail }));

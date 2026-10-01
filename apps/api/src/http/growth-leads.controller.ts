@@ -64,6 +64,7 @@ import {
   type WriteContext,
 } from './growth-leads-service.js';
 import { readContactInput, readLeadInput, readLeadQuery } from './growth-leads-input.js';
+import { readGrowthIdempotencyKey, runGrowthIdempotent } from './growth-idempotency.js';
 
 const refusalStatus: Readonly<Record<GrowthLeadRefusal, 'NOT_FOUND' | 'CONFLICT' | 'FORBIDDEN'>> = {
   GROWTH_LEAD_NOT_FOUND: 'NOT_FOUND',
@@ -158,11 +159,16 @@ export class GrowthLeadsController {
   @UseGuards(ProtectedApiAuthenticationGuard)
   async create(@Req() request: ProtectedHttpRequest, @Body() body: unknown): Promise<Record<string, unknown>> {
     const { correlationId, caller, ctx } = await this.requireWrite(request);
+    // GROWTH-06: a lead made offline on the phone carries an Idempotency-Key, so a resend lands once
+    // and answers with the lead the first send created. Optional here, so the web form is unchanged.
+    const key = readGrowthIdempotencyKey(request.headers['idempotency-key'], correlationId, false);
     const input = readLeadInput(body, correlationId);
-    const id = await this.db.transaction((tx) => createLead(tx, ctx, caller, input))
+    const result = await this.db.transaction((tx) => runGrowthIdempotent(tx, {
+      userId: ctx.actorUserId, route: 'lead.create', target: '', key, body, recordId: this.ids.uuid(), correlationId,
+    }, 'growth_lead', () => createLead(tx, ctx, caller, input)))
       .catch((error: unknown) => { throw mapGrowthWriteError(error, correlationId, { unique: 'GROWTH_LEAD_DUPLICATE', messages: leadTriggerMessages }); });
-    const loaded = (await loadLead(this.db, id))!;
-    return { lead: await leadDetailDto(this.db, loaded, caller, new Date()), correlationId };
+    const loaded = (await loadLead(this.db, result.resourceId))!;
+    return { lead: await leadDetailDto(this.db, loaded, caller, new Date()), idempotentReplay: result.replay, correlationId };
   }
 
   @Post('/:leadId/claim')

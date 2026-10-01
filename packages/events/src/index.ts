@@ -934,6 +934,48 @@ export const eventSchemas = {
     schemaRef: 'registry://growth.lead_contact.removed/1',
     payload: { leadId: { kind: 'uuid' }, contactId: { kind: 'uuid' }, reasonCode: { kind: 'string', maxLength: 64, minLength: 3, pattern: /^[A-Z0-9_]{3,64}$/ } },
   },
+  // GROWTH-06: field work. Identifiers, kinds and states only — never notes, a follow-up's title or
+  // a location (the audit row records whether a location was attached, never where).
+  growthActivityLoggedV1: {
+    eventType: 'growth.activity.logged',
+    eventVersion: 1,
+    producer: 'identity-organization',
+    aggregateType: 'growth_activity',
+    purpose: 'growth-field-work',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://growth.activity.logged/1',
+    payload: { activityId: { kind: 'uuid' }, leadId: { kind: 'uuid' }, kind: { kind: 'enum', values: ['VISIT', 'CALL', 'MEETING', 'NOTE'] } },
+  },
+  growthActivityLocationRemovedV1: {
+    eventType: 'growth.activity.location_removed',
+    eventVersion: 1,
+    producer: 'identity-organization',
+    aggregateType: 'growth_activity',
+    purpose: 'growth-field-work',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://growth.activity.location_removed/1',
+    payload: { activityId: { kind: 'uuid' }, reasonCode: { kind: 'enum', values: ['AUTHOR_REMOVED'] } },
+  },
+  growthFollowUpCreatedV1: {
+    eventType: 'growth.follow_up.created',
+    eventVersion: 1,
+    producer: 'identity-organization',
+    aggregateType: 'growth_follow_up',
+    purpose: 'growth-field-work',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://growth.follow_up.created/1',
+    payload: { followUpId: { kind: 'uuid' }, leadId: { kind: 'uuid' } },
+  },
+  growthFollowUpClosedV1: {
+    eventType: 'growth.follow_up.closed',
+    eventVersion: 1,
+    producer: 'identity-organization',
+    aggregateType: 'growth_follow_up',
+    purpose: 'growth-field-work',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://growth.follow_up.closed/1',
+    payload: { followUpId: { kind: 'uuid' }, leadId: { kind: 'uuid' }, state: { kind: 'enum', values: ['DONE', 'CANCELLED'] } },
+  },
   // OPS-02: dual control for high-risk operator actions. No consumer yet; like the
   // capability events above, the outbox row is the durable announcement an access review
   // (OPS-15) can follow. Identifiers and enums only.

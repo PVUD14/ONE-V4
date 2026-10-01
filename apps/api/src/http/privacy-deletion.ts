@@ -4,6 +4,7 @@ import { DELETION_POLICY, anonymisedIdentity, isDeletionDue, type DeletionCatego
 import { detachSupportCasesForDeletedUser } from '@planthepath/persistence/src/support-cases.js';
 import { eraseApplicationMessagesForSubject } from '@planthepath/persistence/src/application-messages.js';
 import { projectSubjectSkillState } from '@planthepath/persistence/src/learner-skill-state.js';
+import { eraseGrowthLocationsForUser } from '@planthepath/persistence/src/growth-field.js';
 import { ERASED_SNAPSHOT, snapshotHash } from '@planthepath/hiring/src/application-snapshot.js';
 import type { FileStorage } from '../storage/file-storage.js';
 import { endLiveListing } from './talent-pool.js';
@@ -406,6 +407,12 @@ async function erase(deps: DeletionExecutionDeps, subjectUserId: string): Promis
   // privacy-export-coverage.md D3). Nothing in the rows is changed: they already hold only what proof needs,
   // and the account they point at is anonymised below.
   counts.CONSENT_RECORDS = await countOf(sql`SELECT count(*)::int AS count FROM user_consents WHERE user_id = ${subjectUserId}::uuid`);
+
+  // GROWTH-06 (O-23): a growth staff member's visit locations are their personal data and go with
+  // their account, whatever their age. The visits stay — they are AI8HT's record of work on an
+  // organisation — and the author reference names nobody once the account is anonymised below.
+  // No deletion category of its own (growth-field-work-table-design.md §6.1).
+  await eraseGrowthLocationsForUser(db, subjectUserId);
 
   // Identity last: once this lands the person is gone, and every earlier step has
   // already been recorded.

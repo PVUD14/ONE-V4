@@ -15,11 +15,15 @@
  *
  * GROWTH-03: `/me` carries the count of open leads the person owns and `/territory` the count of
  * open, unowned, contactable leads in each region (from the lead register, in scope).
+ *
+ * GROWTH-06: `/me` carries the person's visits this IST month and their follow-ups due today or
+ * earlier (from the field log).
  */
 import { Controller, ForbiddenException, Get, Inject, Req, UseGuards } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { growthWorkspaceRole, isGrowthRole } from '@planthepath/authorization/src/index.js';
 import { leadCounts, loadGrowthLeadCaller } from './growth-leads-service.js';
+import { myFieldCounts } from './growth-field-service.js';
 import type { PersistenceDb } from '@planthepath/persistence/src/repositories.js';
 import { API_PERSISTENCE_DB, ProtectedApiAuthenticationGuard, requireTrustedAuthorization, safeError, type ProtectedHttpRequest } from './api-security.js';
 
@@ -53,10 +57,14 @@ export class GrowthWorkspaceController {
       SELECT staff_type FROM growth_staff_types WHERE membership_id = ${workingId}::uuid AND ended_at IS NULL
     `) as QueryResult<{ staff_type: string }>;
     const counts = await leadCounts(this.db, await loadGrowthLeadCaller(this.db, { userId: context.authorization.principal.userId, growthAdmin: false }));
+    const field = await myFieldCounts(this.db, growthIds);
     return {
       role,
       staffType: staffType.rows[0]?.staff_type ?? null,
       openLeads: counts.ownedOpen,
+      // GROWTH-06: the person's own visits this IST month, and open follow-ups due today or earlier.
+      visitsThisMonth: field.visitsThisMonth,
+      followUpsDue: field.followUpsDue,
       teams: teams.rows.map((row) => ({
         team: row.team,
         joinedAt: new Date(row.joined_at).toISOString(),

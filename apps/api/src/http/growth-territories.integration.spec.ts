@@ -92,7 +92,7 @@ afterAll(async () => {
   await adminPool.end();
 }, 60_000);
 
-async function member(role: string, state = 'ACTIVE', userId = randomUUID()): Promise<Person> {
+async function member(role: string, state = 'ACTIVE', userId: string = randomUUID()): Promise<Person> {
   const membershipId = randomUUID();
   const email = 'person-' + userId.slice(0, 8) + '@example.test';
   if (!identities.has(userId)) {
@@ -457,7 +457,7 @@ describe('visibility follows today\'s assignment', () => {
       [5, peer.membershipId, 'IN-TN', 610], [6, report.membershipId, 'IN-KA', 555], [7, null, 'IN-TN', null], [8, null, null, null],
       [9, executive.membershipId, null, null], [10, null, 'IN-TN', 611],
     ] as const;
-    for (const record of records) await pool.query(`INSERT INTO ${table} VALUES ($1,$2,$3,$4)`, record);
+    for (const record of records) await pool.query(`INSERT INTO ${table} VALUES ($1,$2,$3,$4)`, [...record]);
     const areas = (await pool.query('SELECT region_id, state_code, district_code FROM growth_region_areas WHERE removed_at IS NULL')).rows
       .map((row): GrowthRegionArea => ({ regionId: row.region_id, stateCode: row.state_code, districtCode: row.district_code }));
 

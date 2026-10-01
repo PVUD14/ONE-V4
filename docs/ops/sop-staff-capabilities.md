@@ -3,7 +3,8 @@
 > What this is: the operator procedure for seeing platform staff and granting or revoking
 > internal capabilities. Why it exists: Appendix 1 OPS-17 (M1 slice); journey J7 ("grant a new
 > staff member the support capability"). Built by OPS-01 (ADR-032) with OPS-02's approval path
-> for high-risk grants. Written 2026-09-26 against base `6864332`.
+> for high-risk grants. Written 2026-09-26 against base `6864332`; updated 2026-10-01 against base
+> `719eb34` (content, AI and growth capabilities; faculty review built).
 
 ## Purpose
 
@@ -29,6 +30,18 @@ needs an approval ([sop-approvals.md](sop-approvals.md)).
 - Changing a person's role revokes their explicit grants automatically (`ROLE_CHANGED`).
 - Nobody can change capabilities on their own membership, in either direction.
 - Navigation does not grant anything; every screen's server checks the capability.
+
+## Capabilities nobody holds by baseline
+
+No role holds `CATALOGUE_MANAGE`, `CONTENT_EDIT`, `CONTENT_REVIEW`, `CONTENT_PUBLISH` or
+`AI_OPS_CONFIGURE`. The super admin reaches them only as break-glass, and each use is audited
+`break_glass: true`.
+
+- Grant them to the people who will actually author, review and publish.
+- Content work needs **at least two people**, an author and a different reviewer, because review
+  has no solo path.
+- `GROWTH_ADMIN` and `GROWTH_FINANCE` can be granted to an OPERATIONS_ADMIN only
+  ([sop-growth-team.md](sop-growth-team.md)).
 
 ## A. Add a new staff member (J7)
 
@@ -66,8 +79,10 @@ needs an approval ([sop-approvals.md](sop-approvals.md)).
 
 - Never grant a capability "to be safe"; baselines already cover the pilot's routine tasks.
 - Never share a staff account.
-- Never grant `CONTENT_REVIEW_EXTERNAL` from here; it belongs to the faculty-reviewer flow
-  (OPS-10, not built).
+- Never try to grant `CONTENT_REVIEW_EXTERNAL` from here; the screen refuses it. It is granted to
+  college faculty from Content Management → Faculty review ([sop-external-reviewers.md](sop-external-reviewers.md)).
+- Never revoke the second `APPROVE_HIGH_RISK` holder to get your own request approved. Doing so
+  re-opens the solo path (security review OPS-SR-04).
 
 ## Gaps (need engineering or AWS)
 
@@ -79,4 +94,4 @@ needs an approval ([sop-approvals.md](sop-approvals.md)).
 
 ## UAT
 
-[ONE_OPERATIONS_UAT_V1.md](../uat/ONE_OPERATIONS_UAT_V1.md) — J7.
+[ONE_OPERATIONS_UAT_V1.md](../uat/ONE_OPERATIONS_UAT_V1.md): J7 and J11.

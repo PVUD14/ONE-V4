@@ -3,7 +3,9 @@
 > What this is: the operator procedure for logging and working support cases and for looking
 > up an account with masked contacts. Why it exists: Appendix 1 OPS-17 (M1 slice) requires an
 > SOP for every shipped module; journey J2 ("a TPO phones about a student who cannot sign in")
-> runs through it. Built by OPS-05. Written 2026-09-26 against base `6864332`.
+> runs through it. Built by OPS-05. Written 2026-09-26 against base `6864332`; re-checked
+> 2026-10-01 against base `719eb34` (the support code is unchanged; the known findings are noted
+> under Gaps).
 
 ## Purpose
 
@@ -116,6 +118,14 @@ into a note to "keep context".
   the user uses the sign-in recovery flow. A locked-out staff account needs Divakar in AWS
   (see [runbook-staff-pool.md](runbook-staff-pool.md) for staff).
 
+- **Known findings still open (security review):**
+  - The case queue returns summaries without an audit record (OPS-SR-05). This is one more reason
+    to keep summaries free of personal data.
+  - A 3-character search can page through every account (OPS-SR-08). Search for the person you
+    need, not a common fragment.
+  - A case can be opened about an erased person (OPS-SR-09). Check the account state first.
+  - A reveal can quote a case about someone else (OPS-SR-10). Quote the case about this person.
+
 ## UAT
 
-[ONE_OPERATIONS_UAT_V1.md](../uat/ONE_OPERATIONS_UAT_V1.md) — J2.
+[ONE_OPERATIONS_UAT_V1.md](../uat/ONE_OPERATIONS_UAT_V1.md): J2.

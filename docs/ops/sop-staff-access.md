@@ -4,7 +4,7 @@
 > may and may not be done now. Why it exists: Appendix 1 OPS-17 (M1 slice) needs an SOP for
 > every shipped module; OPS-07 shipped code that is off by default plus a runbook for AWS work.
 > The runbook itself is [runbook-staff-pool.md](runbook-staff-pool.md); this SOP does not repeat
-> it. Written 2026-09-26 against base `6864332`.
+> it. Written 2026-09-26 against base `6864332`; re-checked 2026-10-01 against base `719eb34`.
 
 ## Purpose
 
@@ -16,9 +16,14 @@ A student-pool token keeps the person's other access and loses only the internal
 
 **Divakar only.** Every step changes AWS or production.
 
-## Current state (base `6864332`)
+## Current state (re-checked on base `719eb34`)
 
-- The staff pool is **not configured**. Nothing has changed for anyone.
+- The staff pool is **not configured**. Nothing has changed for anyone. Production now runs on
+  AWS at `oneby8.com` (ADR-041). Configuring the pool there is Divakar's step.
+- Since GROWTH-01 the staff-pool rule also covers the two growth login roles (`GROWTH_EXECUTIVE`,
+  `GROWTH_MANAGER`), so they will need the staff pool too once enforcement is on.
+- College faculty who review content (`CONTENT_REVIEW_EXTERNAL`) sign in through the ordinary pool.
+  This is a recorded decision ([sop-external-reviewers.md](sop-external-reviewers.md)).
 - The runbook's Parts A–C (create and verify the UAT staff pool without the app) can be done now.
 - **Parts E (re-bind staff) and F (turn enforcement on) must wait** for the staff sign-in entry
   (ADR-025 step 3), which is not built in web or Android. Turning enforcement on before then

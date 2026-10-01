@@ -3,7 +3,7 @@
 > What this is: the standard operating procedure for starting an operations day from the
 > Overview screen. Why it exists: Appendix 1 (OPS-17, M1 slice) requires an SOP for every
 > shipped module so one person can run the pilot without engineering help. Built by OPS-03.
-> Written 2026-09-26 against base `6864332`.
+> Written 2026-09-26 against base `6864332`; updated 2026-10-01 against base `719eb34` (OPS-17 full).
 
 ## Purpose
 
@@ -47,7 +47,10 @@ A tile you are not allowed to see shows **NA** — that is expected, not a fault
       [sop-organizations.md](sop-organizations.md).
    6. **Invitations** — pending over 72 hours and not delivered. Open **Users** and follow the
       invitation part of [sop-organizations.md](sop-organizations.md).
-   7. **Trust and safety** — see "Not in this slice" below.
+   7. **Trust and safety** — open **Trust and Safety** and follow
+      [sop-trust-safety.md](sop-trust-safety.md) (enforcement is not usable from the console yet).
+   8. Then the screens that have no tile (see "Not on the Overview" below): **Security → Incident
+      register** and **Access reviews**, **Content Management** review queues, **AI Operations**.
 3. A count shown as **10,000+** is capped on purpose; open the linked screen to work the list.
 4. If the whole Overview shows an error, note the reference shown on screen and see
    Escalation.
@@ -72,11 +75,21 @@ A tile you are not allowed to see shows **NA** — that is expected, not a fault
 - Never treat NA as zero, or zero as "all clear", for a tile you cannot see.
 - Never copy personal data from any screen into chat, email or a ticket outside ONE.
 
-## Not in this slice
+## Not on the Overview
 
-- **Trust and Safety** is the pre-existing screen; its evidence and enforcement workflow is a
-  later OPS goal. Journey J5 is not in this slice.
-- **Analytics**, **Subscriptions**, **Billing** and **AI Operations** are not built and say so.
+The Overview's eleven tiles are unchanged since OPS-03 (`packages/authorization/src/operations-overview.ts:24-36`).
+Later modules have **no tile**, so check them on their own screens:
+
+- open incidents and breach clocks — **Security → Incident register**
+  ([sop-incidents-and-status-notices.md](sop-incidents-and-status-notices.md));
+- an overdue access review — **Security → Access reviews** ([sop-access-reviews.md](sop-access-reviews.md));
+- content waiting for review or publish — **Content Management**
+  ([sop-content-authoring.md](sop-content-authoring.md), [sop-role-catalogue.md](sop-role-catalogue.md),
+  [sop-external-reviewers.md](sop-external-reviewers.md));
+- AI state and the kill switch — **AI Operations** ([sop-ai-operations.md](sop-ai-operations.md));
+- **Analytics** (role demand, college health) — [sop-analytics.md](sop-analytics.md).
+
+**Subscriptions** and **Billing** are not built and say so (ADR-022).
 
 ## UAT
 

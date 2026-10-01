@@ -5,7 +5,8 @@
 > invitations and working the employer access request queue. Why it exists: Appendix 1
 > OPS-17 (M1 slice) and Appendix 2 EMP-18 ("the matching operator steps") need one procedure
 > a single operator can follow. Covers what EMP-01, EMP-03, EMP-04, OPS-01 and OPS-02 built.
-> Written 2026-09-26 against base `6864332`.
+> Written 2026-09-26 against base `6864332`; updated 2026-10-01 against base `719eb34` (OPS-17
+> full: employer terms, college data terms and exits, the college account panel).
 
 ## Purpose
 
@@ -103,8 +104,9 @@ A company can ask for access at `/employer-access` (linked from sign-in). The re
 
 ## Escalation
 
-- Suspected fraud or misuse by a verified organisation: suspend (B) and open a support case;
-  Trust and Safety enforcement is not in this slice.
+- Suspected fraud or misuse by a verified organisation: open or find the Trust and Safety case
+  ([sop-trust-safety.md](sop-trust-safety.md)), then suspend (B) quoting the case, and open a
+  support case. Trust and Safety enforcement actions do not suspend anything by themselves.
 - A request refused with `APPROVAL_REQUIRED`, `APPROVAL_EXPIRED` or
   `APPROVAL_PAYLOAD_MISMATCH`: file a fresh request; do not try to work around it.
 
@@ -120,18 +122,33 @@ A company can ask for access at `/employer-access` (linked from sign-in). The re
 
 ## Gaps (need engineering or not built)
 
-- **G1 — No production email sender (HG-7).** Invitations are recorded and can be resent, but
-  in production nothing is emailed until Divakar decides the sender. The delivery state says
-  "not sent". Until then, first-administrator onboarding cannot complete in production
-  without engineering.
+- **G1 — Outgoing email is not switched on in production.** The SMTP sender is built (ADR-042,
+  migration 0094) but not switched on, and the sender mailbox is still to be set up
+  ([runbook-mail-sender.md](runbook-mail-sender.md)). Until it is, invitations are recorded and the
+  delivery state says "not sent"; first-administrator onboarding in production needs the link to
+  reach the person another way.
 - **G2 — No operator-chosen reason on verification transitions.** The screen records a fixed
   code for Begin review / Verify / Reject / reinstate. Write your reasoning in a support case
   until this is fixed (finding in the operations security review).
-- **G3 — Feature enablement for one college** (journey J6) has no organisation-override API;
-  not in this slice.
+- **G3 — Feature enablement for one college** (journey J6) has no organisation-override API; not
+  built ([sop-feature-flags.md](sop-feature-flags.md)).
 - **G4 — Changing an organisation's role for a person** has no screen: end and re-invite.
+
+## E. Terms, college exits and the account panel (sections below the table)
+
+- **Employer terms** → **Manage employer terms** → **Publish employer terms** (`OPS_ORG_MANAGE`):
+  version, title, body, legal-review state, whether it needs re-acceptance, change summary →
+  **Publish version**. The legal text is a **draft for legal review** (HG-6): publish as
+  `DRAFT_FOR_LEGAL_REVIEW` (shown everywhere as "Draft — pending legal review"), and as
+  `LEGAL_APPROVED` only with the legal reviewer's reference. A material version blocks every
+  employer's next publish until an owner accepts it, and one operator can publish it — read it
+  twice (security review OPS-SR-38). Versions can never be edited.
+- **Institution data-processing terms** and **College exits** — follow
+  [../institution/sop-college-exit.md](../institution/sop-college-exit.md). The purge after the
+  90-day retention needs an `INSTITUTION_DATA_PURGE` approval ([sop-approvals.md](sop-approvals.md)).
+- **College account** fields and contacts (Organization Detail) — [sop-college-accounts.md](sop-college-accounts.md).
 
 ## UAT
 
 [ONE_OPERATIONS_UAT_V1.md](../uat/ONE_OPERATIONS_UAT_V1.md) — J1 (onboard a college),
-O-2 (employer access request); [ONE_EMPLOYER_UAT_V1.md](../uat/ONE_EMPLOYER_UAT_V1.md) — J1, J2.
+O-2 (employer access request), O-18 (employer terms); [ONE_EMPLOYER_UAT_V1.md](../uat/ONE_EMPLOYER_UAT_V1.md) — J1, J2.

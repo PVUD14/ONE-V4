@@ -3,7 +3,8 @@
 > What this is: the operator procedure for finding, inspecting and replaying failed background
 > events, reading worker and consumer health, and asking for a backlog supersede. Why it
 > exists: Appendix 1 OPS-17 (M1 slice); journey J3 ("a background event fails overnight").
-> Built by OPS-04. Written 2026-09-26 against base `6864332`.
+> Built by OPS-04. Written 2026-09-26 against base `6864332`; updated 2026-10-01 against base
+> `719eb34` (OPS-13 engine panels, the skill-state projector consumer, the mail sender).
 
 ## Purpose
 
@@ -17,8 +18,25 @@ needs an approval from someone with `APPROVE_HIGH_RISK`.
 
 ## Where
 
-**Operations → System Health**. Sections: Worker, Alerts, Failed events, Consumers,
-Automation workflows and commands, and the Career Readiness governance panel kept below.
+**Operations → System Health**. Its sections are:
+
+- Worker;
+- Alerts;
+- Failed events;
+- Consumers (since 2026-09-30 including `learner-skill-state-projector`);
+- Automation workflows and commands;
+- **Item calibration job** and **Code sandbox** (OPS-13);
+- the Career Readiness governance panel, kept below.
+
+## A2. Engine job panels (OPS-13)
+
+- **Item calibration job** shows the last run and its status: current, **OVERDUE** after 8 days
+  (the weekly timer plus a day's grace), or no run.
+  - A failed job imports nothing, so it shows as an overdue run.
+  - If fewer than 5 learners were read, the learner and response figures show <5.
+- **Code sandbox** always shows NA, because ENG-12 is not built.
+- These panels only read. An overdue calibration is an engineering task for Divakar on the server
+  ([runbook-pilot-incident.md](runbook-pilot-incident.md) §3.1). Log it as a support case.
 
 ## A. Read the state (every day, and on any alert)
 
@@ -81,9 +99,11 @@ backlog) or incident clean-up.
 
 ## Gaps (need engineering or server access)
 
-- **Alert delivery (HG-7).** Alerts are recorded, but they are emailed only when the
-  `ops-failure` workflow is active and an approved `ops-failure` template exists. Neither is
-  true today, so alerts show "not emailed": **check this screen daily**; nothing will page you.
+- **Alert delivery.** Alerts are recorded, but they are emailed only when the `ops-failure`
+  workflow is active and an approved `ops-failure` template exists. The SMTP sender is built
+  (ADR-042) but not switched on in production, the workflow is not active, and the automation
+  worker is not yet deployed on AWS. Alerts therefore show "not emailed". **Check this screen
+  daily; nothing will page you.**
 - **The five-minute alert checker** (systemd timer `planthepath-jobs-alerts`) reaches a server
   only when Divakar installs it at a release.
 - **Thresholds** (`JOBS_ALERT_*`) are changed in the server's environment file, not on screen —

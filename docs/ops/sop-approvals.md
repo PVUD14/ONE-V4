@@ -4,7 +4,9 @@
 > under dual control, including the solo-operator safeguard. Why it exists: Appendix 1 §5.4 and
 > OPS-17 (M1 slice) — every high-risk action needs a second person or the documented solo
 > safeguard, and the operator must know exactly how. Built by OPS-02. Written 2026-09-26
-> against base `6864332`.
+> against base `6864332`; updated 2026-10-01 against base `719eb34` with the eight approval
+> actions added since (OPS-08, OPS-09a/b/c, OPS-12, OPS-16, INST-18) and the flags now marked
+> high-risk.
 
 ## Purpose
 
@@ -20,11 +22,46 @@ retire a backlog, flip a high-risk flag or hand out a high-risk capability.
 | Supersede the event backlog (`OUTBOX_BACKLOG_SUPERSEDE`) | System Health → **Request supersede…** | `PRE_DISPATCHER_BACKLOG`, `INCIDENT_CLEANUP` |
 | Release a legal hold (`PRIVACY_HOLD_RELEASE`) | Security → **Request release…** | `OBLIGATION_ENDED`, `CASE_CLOSED`, `ENTERED_IN_ERROR` |
 | Grant a high-risk capability (`CAPABILITY_GRANT_HIGH_RISK`) | Settings → **Grant…** | `NEW_RESPONSIBILITY`, `TEMPORARY_COVER`, `ACCESS_REVIEW_OUTCOME`, `CORRECTION` |
+| Publish a role requirement set (`CAREER_REQUIREMENT_SET_PUBLISH`) | Content Management → Job-role catalogue → **Request publish…** | see [sop-role-catalogue.md](sop-role-catalogue.md) |
+| Publish a skill that changes readiness inputs (`CONTENT_SKILL_PUBLISH`) | Content Management → Skill map → **Request publish…** | see [sop-content-authoring.md](sop-content-authoring.md) |
+| Publish a question (`CONTENT_QUESTION_PUBLISH`) | Content Management → Question bank → **Request publish…** | see [sop-content-authoring.md](sop-content-authoring.md) |
+| Publish a base lesson, or change its topic or prerequisites (`CONTENT_LESSON_PUBLISH`) | Content Management → Lessons and variants → **Request publish…** | see [sop-content-authoring.md](sop-content-authoring.md) |
+| Switch an AI feature on (`AI_FEATURE_ENABLE`) | AI Operations → **Switch on…** | `EVALUATION_COMPLETE`, `PILOT_ROLLOUT`, `INCIDENT_RESOLVED` |
+| Raise an AI feature's limits (`AI_FEATURE_LIMITS_RAISE`) | AI Operations → **Change limits…** | `DEMAND_GROWTH`, `PILOT_EXPANSION`, `CORRECTION` |
+| Publish a status-notice template (`COMMS_TEMPLATE_PUBLISH`) | Settings → Status communications → **Ask for approval…** (the draft's author only) | `INCIDENT_COMMUNICATION`, `PLANNED_COMMUNICATION`, `WORDING_CORRECTION` |
+| Delete a departed college's records (`INSTITUTION_DATA_PURGE`) | Organizations → College exits → **Request deletion…** | `RETENTION_PERIOD_ENDED` (see [../institution/sop-college-exit.md](../institution/sop-college-exit.md)) |
 
-High-risk capabilities: `APPROVE_HIGH_RISK`, `CAPABILITY_ADMIN`, `PRIVACY_HOLDS`,
-`TRUST_SAFETY_ENFORCE`, `CONTENT_PUBLISH`, `AI_OPS_CONFIGURE`. A flag is high-risk only when
-it is marked so, and only in the marked direction (enable for AI features, disable for safety
-controls and kill switches). **No flag is marked yet.**
+You always carry out an approved request from **Settings → Approvals → Execute**, or from the
+module's own button, which replays it.
+
+High-risk capabilities are `APPROVE_HIGH_RISK`, `CAPABILITY_ADMIN`, `PRIVACY_HOLDS`,
+`TRUST_SAFETY_ENFORCE`, `CONTENT_PUBLISH`, `AI_OPS_CONFIGURE` and `GROWTH_FINANCE`.
+
+A flag is high-risk only when it is marked so, and only in the marked direction. These are marked today:
+
+| Flag | High-risk direction | Default |
+|---|---|---|
+| `ai.global-kill-switch` | DISABLE (releasing it) | off (not engaged) |
+| `ai.assistant` | ENABLE | off |
+| `employer.skill-evidence` (EMP-13) | ENABLE | off |
+| `employer.talent-pool` (EMP-14) | ENABLE | off |
+
+`employer-access.allow-free-mail` and `career-catalogue.selectable-roles` are not marked, so a
+change in either direction is an ordinary change.
+
+**Some actions are deliberately not dual-controlled.** Each is recorded and audited instead:
+
+- archiving content;
+- engaging the AI kill switch or switching AI off;
+- access-review decisions;
+- granting faculty review access;
+- college account changes;
+- incident changes;
+- publishing employer and college terms;
+- a college's exit notice, end and cancel.
+
+Sending a notice has its own second-person rule (see
+[sop-incidents-and-status-notices.md](sop-incidents-and-status-notices.md)).
 
 ## Who
 
@@ -65,11 +102,17 @@ controls and kill switches). **No flag is marked yet.**
 1. File the request as above.
 2. Wait **15 minutes** (the server refuses earlier with `APPROVAL_SOLO_COOLING_OFF`). Use the
    time to re-read the request as if someone else had filed it.
-3. Approve it yourself; it is recorded as **SOLO** in audit. The screen shows whether the SOLO
-   email notice was delivered — today it is **not delivered** (HG-7).
+3. Approve it yourself. It is recorded as **SOLO** in audit. The screen shows whether the SOLO
+   email notice was delivered. Today it is **not delivered**: the SMTP sender is built but not
+   switched on, and the `security-notification` workflow is not active.
 4. Execute.
 
 The safeguard switches off by itself as soon as a second person holds `APPROVE_HIGH_RISK`.
+
+**Watch for this:** the server counts approvers at the moment of the decision. Revoking the second
+approver's `APPROVE_HIGH_RISK` (on Settings, or as an access-review decision) re-opens the solo
+path at once. That includes a request filed while two approvers existed (security review
+OPS-SR-04). Never revoke the other approver while you have a request pending.
 
 ## Escalation
 
@@ -85,14 +128,17 @@ The safeguard switches off by itself as soon as a second person holds `APPROVE_H
 
 ## Gaps
 
-- **SOLO email notice (HG-7)** is recorded NOT_DELIVERED until a production sender and the
-  `security-notification` workflow exist.
-- **Not yet gated because no endpoint exists:** raising a flag's cap, publishing a role
-  requirement set (OPS-08), bulk personal-data exports. Each will be added when built.
+- **SOLO email notice:** it is recorded NOT_DELIVERED until the sender is switched on and the
+  `security-notification` workflow is active.
+- **Not yet gated, because no endpoint exists:** raising a flag's cap (there is no cap API) and bulk
+  personal-data exports.
+- **Not gated although the endpoint exists:** Trust and Safety enforcement actions exist in the API
+  but need **no** approval (security review OPS-SR-28).
 - The "Requests in this view" figure counts the loaded page only (up to 50); the Overview's
   Approvals tile is the server-side count.
 
 ## UAT
 
 [ONE_OPERATIONS_UAT_V1.md](../uat/ONE_OPERATIONS_UAT_V1.md) — J7 (high-risk grant), O-3 (solo
-safeguard); also used in J1 (suspension variant), J3 (supersede) and O-4 (hold release).
+safeguard). Also used in J1 (suspension variant), J3 (supersede), O-4 (hold release), J8, J10,
+J12, O-8, O-9, O-10 and O-19.

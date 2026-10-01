@@ -2807,4 +2807,13 @@ go to `docs/ai/bake-off/` and `ai:bake-off-import` records them. A native-speake
 is recommended before the first recorded PASS (open point 2). If Qwen3 wins, the ENG-20 adapter must send the same
 `chat_template_kwargs`.
 
-**Validation:** running — results to follow in this entry.
+**Validation** (`E:/one-wt/logs/validate.sh E:/one-wt/eng21 one_eng21 eng21`, fresh database `one_eng21`):
+install 0; migrate twice (88 applied, then 0 applied / 88 already applied); typecheck 0; build 0; policy 0;
+`pnpm audit --prod --audit-level=high` 0. Tests in the full run: every package passed except shared-Postgres
+load failures — `out of shared memory` in `persistence` `content-generation` and `internal-capabilities`, and in
+`api` `access-reviews`, `employer-assessments-emp12`, `employer-team`, `external-reviews`,
+`institution-batch-lifecycle` (whole-file failures at setup/teardown), plus one web test timing out at 20 s under
+load (`App.test.tsx` "resolves every visible navigation item…"). Each re-run alone passed: 2/2, 15/15, 22/22, 16/16,
+27/27, 18/18, 18/18, and the web test 1/1. No test was skipped or changed to pass. New tests: ai-evaluation 33/33,
+persistence `ai-bake-off.integration.test.ts` 11/11 (spawns the Python harness), harness unittest 14/14,
+career-readiness 129/129 (hint-ladder 15 unchanged), ai-orchestration 62/62.

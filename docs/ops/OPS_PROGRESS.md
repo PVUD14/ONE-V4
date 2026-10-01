@@ -2866,4 +2866,16 @@ on the Documents screens (web and Android) is self-asserted. Recommended: take `
 
 **Not done:** DOCX; attaching a generated résumé to an application; fonts for scripts other than Latin and Telugu.
 
-**Validation:** recorded below once run.
+**Validation** (`E:/one-wt/logs/validate.sh E:/one-wt/resume one_resume resume android`, fresh database, on the
+branch rebased onto `af4e181`): install 0; `db:migrate` twice: 88 applied, then 0 applied with 88 already applied;
+typecheck 0; build 0; policy 0; `pnpm audit --prod --audit-level=high` 0; Android `:app:compileDebugKotlin` 0. The test
+step exited 1 on a machine shared with other agents: api 1417 passed / 15 skipped, web 989/991, persistence 449 passed
+/ 15 skipped, every other package passed. Every failing file failed on "out of shared memory" from the shared Postgres
+(setup or teardown) or on load-related timing, none touches this branch. After rebasing again onto `f501905`
+(typecheck 0), each was re-run alone on a fresh database and passed: api institution-student-scope 15/15,
+learner-goals 5/5, lesson-languages 11/11, operations-career-catalogue 14/14, operations-lessons 19/19,
+operations-question-bank 16/16, skill-evidence 13/13, employer-hiring.controller 23/23, employer-team 27/27,
+institution-placement-visibility 15/15; persistence misconceptions 15/15; web App.test.tsx 97/97 and
+rolePortal/employerReports 5/5. operations-career-catalogue and skill-evidence first passed every test and then hit
+"out of shared memory" at teardown; their second solo run was clean. This goal's own tests: api student-resumes 7/7,
+resume-content 24/24, privacy 17/17, growth-foundation 19/19; web studentResumes 2/2.

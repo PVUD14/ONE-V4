@@ -55,6 +55,18 @@ export {
 export { onePromptRegistry, registeredPrompts } from './registry.js';
 
 export {
+  contentAnswerCheckPromptV1,
+  contentLessonDraftPromptV1,
+  firstFeaturePrompts,
+  hintLevelMeanings,
+  lessonDraftHeadings,
+  oneAiFeatures,
+  servedModelAtRegistration,
+  tutorHintPromptV1,
+  type AiFeatureDeclaration,
+} from './first-features.js';
+
+export {
   AiCapExceededError,
   AiFeatureDisabledError,
   AiInputTooLargeError,

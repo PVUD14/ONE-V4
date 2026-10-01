@@ -60,16 +60,33 @@ function namesOptionLetter(hint: string, optionId: string): boolean {
     || new RegExp(`\\banswer\\s*(?:is\\s*)?\\(${id}\\)`, 'u').test(lower);
 }
 
+export interface HintLeakInput {
+  readonly prompt: string;
+  readonly options: readonly { readonly id: string; readonly text: string }[];
+  readonly correctOptionId: string;
+}
+
+/**
+ * Whether one piece of help text gives the answer away, by the same rules the ladder uses:
+ * the correct option's text as a whole phrase (unless the prompt already states it, or it is a
+ * one- or two-letter word), else a pointer at the correct option's letter. Null when neither.
+ * Shared with the AI bake-off (ENG-21), which applies it to a model's hint, so the rule a human
+ * ladder is held to and the rule a model is held to cannot drift apart.
+ */
+export function hintLeakFinding(input: HintLeakInput & { readonly hint: string }): Extract<HintLadderFindingCode, 'HINT_NAMES_ANSWER' | 'HINT_NAMES_OPTION'> | null {
+  const correct = input.options.find((option) => option.id === input.correctOptionId);
+  if (!correct) return null;
+  const answer = normalise(correct.text);
+  const answerIsInPrompt = answer.length > 0 && containsPhrase(normalise(input.prompt), answer);
+  const answerTooShortToMatch = /^\p{L}{1,2}$/u.test(answer);
+  if (answer && !answerIsInPrompt && !answerTooShortToMatch && containsPhrase(normalise(input.hint), answer)) return 'HINT_NAMES_ANSWER';
+  if (namesOptionLetter(input.hint, correct.id)) return 'HINT_NAMES_OPTION';
+  return null;
+}
+
 /** Findings for a ladder, in level order. Empty means the rules found nothing. Deterministic. */
 export function hintLadderFindings(input: HintLadderInput): readonly HintLadderFinding[] {
   const findings: HintLadderFinding[] = [];
-  const prompt = normalise(input.prompt);
-  const correct = input.correctOptionId === null ? undefined : input.options.find((option) => option.id === input.correctOptionId);
-  const answer = correct ? normalise(correct.text) : '';
-  // Text the prompt already states is not leaked by repeating it (a name or year the question gives).
-  const answerIsInPrompt = answer.length > 0 && containsPhrase(prompt, answer);
-  // A one- or two-letter word answer ("in", "an") occurs in ordinary sentences; only the reviewer can judge it.
-  const answerTooShortToMatch = /^\p{L}{1,2}$/u.test(answer);
   const earlier: string[] = [];
   for (let index = 0; index < 4; index += 1) {
     const level = (index + 1) as HintLadderFinding['level'];
@@ -77,8 +94,10 @@ export function hintLadderFindings(input: HintLadderInput): readonly HintLadderF
     const hint = normalise(raw);
     if (!hint) { findings.push({ level, code: 'HINT_MISSING' }); continue; }
     if (earlier.includes(hint)) findings.push({ level, code: 'HINT_REPEATS_EARLIER' });
-    else if (correct && answer && !answerIsInPrompt && !answerTooShortToMatch && containsPhrase(hint, answer)) findings.push({ level, code: 'HINT_NAMES_ANSWER' });
-    else if (correct && namesOptionLetter(raw, correct.id)) findings.push({ level, code: 'HINT_NAMES_OPTION' });
+    else if (input.correctOptionId !== null) {
+      const leak = hintLeakFinding({ prompt: input.prompt, options: input.options, correctOptionId: input.correctOptionId, hint: raw });
+      if (leak) findings.push({ level, code: leak });
+    }
     earlier.push(hint);
   }
   return findings;

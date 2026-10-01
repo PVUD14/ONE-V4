@@ -78,6 +78,16 @@ jobs:
       - name: Scan production dependencies
         run: pnpm audit --prod --audit-level=high
 
+  # ENG-21: the bake-off harness that runs on the inference pod (Python, standard library only), against
+  # a local fake endpoint. No dependencies to install and no network beyond 127.0.0.1.
+  bake-off-harness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Harness tests
+        shell: bash
+        run: python3 -m unittest discover -s deploy/ai-pod/bake-off/tests -v
+
   # ENG-13: the offline calibration job (Python, jobs/calibration). Uses the runner's own
   # python3 so no further action needs pinning; dependencies are pinned in requirements.txt.
   calibration-job:

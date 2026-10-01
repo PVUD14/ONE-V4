@@ -8,6 +8,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "ai:probe": "tsx src/run-ai-probe.ts",
+    "ai:register-features": "tsx src/run-ai-register-features.ts",
+    "ai:bake-off-import": "tsx src/run-ai-bake-off-import.ts",
     "db:migrate": "tsx src/migrate.ts",
     "db:register:n8n": "tsx src/register-n8n-workflows.ts",
     "db:seed:career-readiness": "tsx src/seed-career-readiness-pilot.ts",
@@ -47,7 +49,8 @@
     "@planthepath/review-scheduler": "workspace:*",
     "drizzle-orm": "^0.45.2",
     "pg": "^8.16.0",
-    "@planthepath/ai-orchestration": "workspace:*"
+    "@planthepath/ai-orchestration": "workspace:*",
+    "@planthepath/ai-evaluation": "workspace:*"
   },
   "devDependencies": {
     "@types/pg": "^8.15.0",

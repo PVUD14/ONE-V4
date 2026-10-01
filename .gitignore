@@ -32,3 +32,7 @@ id_ed25519
 # Python bytecode (scripts/brand is run locally)
 __pycache__/
 deploy/vps/demo-access/*.caddy
+
+# Bake-off results written on the inference pod (ENG-21); carried over by hand, never committed raw.
+deploy/ai-pod/bake-off/results/
+__pycache__/

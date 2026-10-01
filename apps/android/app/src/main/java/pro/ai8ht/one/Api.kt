@@ -172,6 +172,54 @@ object Api {
     suspend fun growthTerritory(context: Context): GrowthTerritoryDto =
         json.decodeFromString(request(context, "GET", "/api/v1/growth/territory"))
 
+    // GROWTH-03: the lead register. The server decides scope and masking: contacts arrive in full
+    // only on the person's own leads, so nothing else can be cached on the phone.
+    suspend fun growthLeadVocabulary(context: Context): GrowthLeadVocabularyDto =
+        json.decodeFromString(request(context, "GET", "/api/v1/growth/leads/vocabulary"))
+
+    suspend fun growthLeads(context: Context, kind: String, view: String): GrowthLeadPageDto =
+        json.decodeFromString(request(context, "GET", "/api/v1/growth/leads?kind=$kind&view=$view"))
+
+    suspend fun growthLead(context: Context, leadId: String): GrowthLeadDetailDto =
+        json.decodeFromString<GrowthLeadEnvelope>(request(context, "GET", "/api/v1/growth/leads/$leadId")).lead
+
+    suspend fun createGrowthLead(
+        context: Context, kind: String, name: String, stateCode: String?, city: String?, aisheCode: String?, websiteDomain: String?, source: String,
+    ): GrowthLeadDetailDto {
+        val body = kotlinx.serialization.json.buildJsonObject {
+            put("kind", kotlinx.serialization.json.JsonPrimitive(kind))
+            put("name", kotlinx.serialization.json.JsonPrimitive(name))
+            put("stateCode", kotlinx.serialization.json.JsonPrimitive(stateCode))
+            put("city", kotlinx.serialization.json.JsonPrimitive(city))
+            put("aisheCode", kotlinx.serialization.json.JsonPrimitive(aisheCode))
+            put("websiteDomain", kotlinx.serialization.json.JsonPrimitive(websiteDomain))
+            put("source", kotlinx.serialization.json.JsonPrimitive(source))
+        }.toString()
+        return json.decodeFromString<GrowthLeadEnvelope>(request(context, "POST", "/api/v1/growth/leads", body)).lead
+    }
+
+    suspend fun claimGrowthLead(context: Context, leadId: String): GrowthLeadDetailDto =
+        json.decodeFromString<GrowthLeadEnvelope>(request(context, "POST", "/api/v1/growth/leads/$leadId/claim")).lead
+
+    suspend fun addGrowthContact(
+        context: Context, leadId: String, role: String, fullName: String, email: String?, phone: String?,
+        permissionBasis: String, source: String, noticeGiven: Boolean,
+    ): GrowthLeadDetailDto {
+        val body = kotlinx.serialization.json.buildJsonObject {
+            put("role", kotlinx.serialization.json.JsonPrimitive(role))
+            put("fullName", kotlinx.serialization.json.JsonPrimitive(fullName))
+            put("email", kotlinx.serialization.json.JsonPrimitive(email))
+            put("phone", kotlinx.serialization.json.JsonPrimitive(phone))
+            put("permissionBasis", kotlinx.serialization.json.JsonPrimitive(permissionBasis))
+            put("source", kotlinx.serialization.json.JsonPrimitive(source))
+            put("noticeGiven", kotlinx.serialization.json.JsonPrimitive(noticeGiven))
+        }.toString()
+        return json.decodeFromString<GrowthLeadEnvelope>(request(context, "POST", "/api/v1/growth/leads/$leadId/contacts", body)).lead
+    }
+
+    suspend fun recordGrowthContactNotice(context: Context, leadId: String, contactId: String): GrowthLeadDetailDto =
+        json.decodeFromString<GrowthLeadEnvelope>(request(context, "POST", "/api/v1/growth/leads/$leadId/contacts/$contactId/notice")).lead
+
     suspend fun listInstitutionExams(context: Context, institutionId: String): List<InstitutionExamDto> =
         json.decodeFromString<InstitutionExamsEnvelope>(
             request(context, "GET", "/api/v1/institutions/$institutionId/assessments"),
@@ -742,6 +790,8 @@ internal fun StudentDto.formerStudentLine(): String? {
 
 /** GROWTH-01: `GET /api/v1/growth/me`. No amount, lead or student is part of it. */
 @Serializable data class GrowthMeDto(
+    /** GROWTH-03: open leads the person owns; null from an older server. */
+    val openLeads: Int? = null,
     val role: String = "",
     val staffType: String? = null,
     val teams: List<GrowthTeamDto> = emptyList(),
@@ -751,6 +801,8 @@ internal fun StudentDto.formerStudentLine(): String? {
 /** GROWTH-02: `GET /api/v1/growth/territory`. Regions, areas and work emails only. */
 @Serializable data class GrowthTerritoryDto(val role: String = "", val regions: List<GrowthRegionDto> = emptyList())
 @Serializable data class GrowthRegionDto(
+    /** GROWTH-03: open, unowned, contactable leads in the region; null from an older server. */
+    val unownedLeads: Int? = null,
     val id: String = "",
     val name: String = "",
     val myRole: String = "EXECUTIVE",
@@ -759,6 +811,64 @@ internal fun StudentDto.formerStudentLine(): String? {
     val people: List<GrowthRegionPersonDto> = emptyList(),
 )
 @Serializable data class GrowthAreaDto(val stateCode: String = "", val stateName: String = "", val districtCode: Int? = null, val districtName: String? = null)
+/** GROWTH-03: the lead register. Contacts are masked by the server unless the person owns the lead. */
+@Serializable data class GrowthLeadVocabularyDto(
+    val sources: List<String> = emptyList(),
+    val contactRoles: List<String> = emptyList(),
+    val contactSourcesByBasis: Map<String, List<String>> = emptyMap(),
+    val contactLimit: Int = 10,
+    val purpose: String = "",
+    val notice: GrowthNoticeDto = GrowthNoticeDto(),
+)
+@Serializable data class GrowthNoticeDto(val version: String = "", val status: String = "", val text: List<String> = emptyList())
+@Serializable data class GrowthLeadPageDto(val leads: List<GrowthLeadSummaryDto> = emptyList(), val nextCursor: String? = null)
+@Serializable data class GrowthLeadAreaDto(val stateCode: String? = null, val stateName: String? = null, val districtName: String? = null, val city: String? = null)
+@Serializable data class GrowthLeadOwnerDto(val email: String? = null, val isMe: Boolean = false)
+@Serializable data class GrowthDoNotContactDto(val at: String? = null, val reasonCode: String? = null)
+@Serializable data class GrowthLeadSummaryDto(
+    val id: String = "",
+    val kind: String = "",
+    val name: String = "",
+    val area: GrowthLeadAreaDto = GrowthLeadAreaDto(),
+    val owner: GrowthLeadOwnerDto? = null,
+    val needsNewOwner: Boolean = false,
+    val stage: String = "",
+    val doNotContact: GrowthDoNotContactDto? = null,
+    val handedOff: Boolean = false,
+    val liveContacts: Int = 0,
+    val stale: Boolean = false,
+)
+@Serializable data class GrowthLeadEnvelope(val lead: GrowthLeadDetailDto = GrowthLeadDetailDto())
+@Serializable data class GrowthLeadDetailDto(
+    val id: String = "",
+    val kind: String = "",
+    val name: String = "",
+    val area: GrowthLeadAreaDto = GrowthLeadAreaDto(),
+    val aisheCode: String? = null,
+    val websiteDomain: String? = null,
+    val owner: GrowthLeadOwnerDto? = null,
+    val needsNewOwner: Boolean = false,
+    val stage: String = "",
+    val source: String = "",
+    val possibleDuplicate: Boolean = false,
+    val doNotContact: GrowthDoNotContactDto? = null,
+    val handedOff: Boolean = false,
+    val stale: Boolean = false,
+    val contacts: List<GrowthContactDto> = emptyList(),
+    val removedContacts: Int = 0,
+)
+@Serializable data class GrowthContactNoticeDto(val givenAt: String? = null, val version: String? = null)
+@Serializable data class GrowthContactDto(
+    val id: String = "",
+    val role: String = "",
+    val fullName: String = "",
+    val email: String? = null,
+    val phone: String? = null,
+    val masked: Boolean = true,
+    val permissionBasis: String = "",
+    val source: String = "",
+    val notice: GrowthContactNoticeDto? = null,
+)
 @Serializable data class GrowthRegionPersonDto(val email: String = "", val role: String = "", val since: String = "")
 @Serializable data class StudentRelationshipDto(val institutionId: String = "", val state: String = "")
 

@@ -9,6 +9,8 @@ package pro.ai8ht.one
 // GROWTH-02: a read-only "My territory" tab — the regions the person works today, as operations
 // set them, with their states or districts and people (GET /api/v1/growth/territory). Territory
 // set-up is desk work for operators and stays off the phone (design §14.1).
+//
+// GROWTH-03: a Leads tab (GrowthLeads.kt) and real counts in the Open leads and Unowned slots.
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -125,8 +127,10 @@ internal fun GrowthScaffold(
                 NavigationBarItem(selected = tab == 0, onClick = { tab = 0 },
                     icon = { Icon(Icons.Filled.Home, null) }, label = { Text("Home") }, colors = colors)
                 NavigationBarItem(selected = tab == 1, onClick = { tab = 1 },
-                    icon = { Icon(Icons.Filled.Map, null) }, label = { Text("Territory") }, colors = colors)
+                    icon = { Icon(Icons.Filled.Handshake, null) }, label = { Text("Leads") }, colors = colors)
                 NavigationBarItem(selected = tab == 2, onClick = { tab = 2 },
+                    icon = { Icon(Icons.Filled.Map, null) }, label = { Text("Territory") }, colors = colors)
+                NavigationBarItem(selected = tab == 3, onClick = { tab = 3 },
                     icon = { Icon(Icons.Filled.MoreHoriz, null) }, label = { Text("More") }, colors = colors)
             }
         },
@@ -134,10 +138,11 @@ internal fun GrowthScaffold(
         Column(Modifier.padding(padding).fillMaxSize()) {
             BrandBand {
                 StaffBandHeader(
-                    title = when (tab) { 0 -> "Growth"; 1 -> "My territory"; else -> "More" },
+                    title = when (tab) { 0 -> "Growth"; 1 -> "Leads"; 2 -> "My territory"; else -> "More" },
                     subtitle = when (tab) {
                         0 -> "${growthRoleLabel(me?.role ?: role)} · partnerships"
-                        1 -> "Regions set by operations"
+                        1 -> "Your leads and your regions' unowned leads"
+                        2 -> "Regions set by operations"
                         else -> "Workspace and app settings"
                     },
                     unread = inbox?.unreadCount ?: 0,
@@ -147,8 +152,9 @@ internal fun GrowthScaffold(
             }
             BandSheet {
                 when {
-                    tab == 2 -> GrowthMore(onSignOut, onSwitchWorkspace)
-                    tab == 1 -> GrowthTerritory()
+                    tab == 3 -> GrowthMore(onSignOut, onSwitchWorkspace)
+                    tab == 2 -> GrowthTerritory()
+                    tab == 1 -> GrowthLeadsTab()
                     meFailed -> CenteredNote("Your growth details could not be loaded. Nothing is shown until they load. Try again shortly.")
                     me == null -> HomeSkeleton()
                     else -> GrowthHome(me!!)
@@ -175,7 +181,7 @@ private fun GrowthHome(me: GrowthMeDto) {
         Spacer(Modifier.height(12.dp))
         // Every figure reads NA until its source exists: nothing here is invented.
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            StatCell(GROWTH_NA, "Open leads", Tone.Accent, Icons.Filled.Handshake, Modifier.weight(1f))
+            StatCell(me.openLeads?.toString() ?: GROWTH_NA, "Open leads", Tone.Accent, Icons.Filled.Handshake, Modifier.weight(1f))
             StatCell(GROWTH_NA, "Visits this month", Tone.Green, Icons.Filled.CalendarMonth, Modifier.weight(1f))
         }
         Spacer(Modifier.height(10.dp))
@@ -212,7 +218,7 @@ private fun GrowthHome(me: GrowthMeDto) {
             Column(Modifier.padding(16.dp)) {
                 Text("Not built yet", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(6.dp))
-                Text("Leads, field visits, targets and commission are not built yet. Each appears here when it is, and every figure above reads NA until it has a real source. Commission rates have not been set, so no amount is shown.",
+                Text("Field visits, targets and commission are not built yet. Each appears here when it is, and every figure above reads NA until it has a real source. Commission rates have not been set, so no amount is shown.",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
@@ -269,8 +275,9 @@ private fun GrowthTerritory() {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             StatCell(data.regions.flatMap { r -> r.people.map { it.email } }.toSet().size.toString(),
                 if (managing) "People in your regions" else "Managers in your regions", Tone.Amber, Icons.Filled.Groups, Modifier.weight(1f))
-            // No source until the lead register is built: NA in its slot, never a number.
-            StatCell(GROWTH_NA, "Unowned leads", Tone.Violet, Icons.Filled.Handshake, Modifier.weight(1f))
+            // GROWTH-03: open, unowned, contactable leads in the regions worked; NA from a server that does not say.
+            val unowned = if (data.regions.all { it.unownedLeads != null }) data.regions.sumOf { it.unownedLeads ?: 0 }.toString() else GROWTH_NA
+            StatCell(unowned, "Unowned leads", Tone.Violet, Icons.Filled.Handshake, Modifier.weight(1f))
         }
         if (data.regions.isEmpty()) {
             SectionTitle("Your regions")
@@ -280,7 +287,8 @@ private fun GrowthTerritory() {
             }
         }
         data.regions.forEach { region ->
-            SectionTitle(region.name, trailing = if (region.myRole == "MANAGER") "You manage" else "You work")
+            SectionTitle(region.name, trailing = (if (region.myRole == "MANAGER") "You manage" else "You work") +
+                (region.unownedLeads?.let { " · $it unowned" } ?: ""))
             PilotCard(Modifier.fillMaxWidth().padding(bottom = 10.dp)) {
                 Column(Modifier.padding(14.dp)) {
                     Text("Areas", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)

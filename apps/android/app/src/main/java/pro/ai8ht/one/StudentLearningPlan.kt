@@ -34,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import pro.ai8ht.one.ui.Tone
 
@@ -238,12 +239,27 @@ private fun StepPracticeBlock(step: LearningStepDto, onStep: (LearningStepDto) -
                             Text(option.text, style = MaterialTheme.typography.bodyMedium)
                         }
                     }
-                    question.hints.forEachIndexed { index, text ->
+                    val entries = hintEntries(question)
+                    val pending = entries.any { it.state == "PENDING" }
+                    val tutor = question.tutor
+                    // The AI control appears only where the tutor is the student's to use (as on the web).
+                    val showTutor = tutor != null && (tutor.available || tutor.reason in setOf("DAILY_LIMIT", "LANGUAGE_NOT_SUPPORTED", "PENDING"))
+                    entries.forEach { entry ->
                         Spacer(Modifier.height(4.dp))
-                        Row(verticalAlignment = Alignment.Top) {
-                            StatusChip(hintLabel(index), ChipKind.Waiting)
-                            Spacer(Modifier.width(6.dp))
-                            Text(text, style = MaterialTheme.typography.bodySmall)
+                        HintEntryRow(entry)
+                    }
+                    if (pending) {
+                        // The hint is written by a job: re-read the step every two seconds, for up to a minute.
+                        LaunchedEffect(step.decisionId, entries.size) {
+                            repeat(TUTOR_POLL_LIMIT) {
+                                delay(TUTOR_POLL_MS)
+                                val next = runCatching { Api.learningStep(context, step.decisionId) }.getOrNull()
+                                if (next != null) {
+                                    onStep(next)
+                                    val stillPending = next.practice.question?.hintDetails?.any { it.state == "PENDING" } == true
+                                    if (!stillPending) return@LaunchedEffect
+                                }
+                            }
                         }
                     }
                     Spacer(Modifier.height(6.dp))
@@ -263,7 +279,7 @@ private fun StepPracticeBlock(step: LearningStepDto, onStep: (LearningStepDto) -
                             }
                         }) { Text("Check answer") }
                         if (question.hintsAvailable && question.hints.size < 4) {
-                            OutlinedButton(enabled = !busy, onClick = {
+                            OutlinedButton(enabled = !busy && !pending, onClick = {
                                 busy = true; error = null
                                 scope.launch {
                                     runCatching { Api.revealStepHint(context, step.decisionId, question.id) }
@@ -272,6 +288,28 @@ private fun StepPracticeBlock(step: LearningStepDto, onStep: (LearningStepDto) -
                                     busy = false
                                 }
                             }) { Text("Show " + hintLabel(question.hints.size).replaceFirst("Hint", "hint")) }
+                        }
+                    }
+                    if (showTutor && tutor != null && question.hints.size < 4) {
+                        Spacer(Modifier.height(6.dp))
+                        OutlinedButton(enabled = !busy && !pending && tutor.available, onClick = {
+                            busy = true; error = null
+                            scope.launch {
+                                runCatching { Api.requestTutorHint(context, step.decisionId, question.id) }
+                                    .onSuccess { onStep(it) }
+                                    .onFailure { error = (it as? Api.ApiException)?.detail ?: "The AI tutor could not be asked. Try again." }
+                                busy = false
+                            }
+                        }) { Text("Ask the AI tutor for " + hintLabel(question.hints.size).replaceFirst("Hint", "hint")) }
+                    }
+                    if (showTutor && tutor != null) {
+                        Spacer(Modifier.height(4.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            StatusChip("AI", ChipKind.Accent)
+                            Spacer(Modifier.width(6.dp))
+                            val sentence = TUTOR_REASON_TEXT[tutor.reason]
+                                ?: "The AI tutor gives a hint at the next level, never the answer. It counts like a written hint."
+                            Muted(sentence + (tutor.remainingToday?.let { " AI hints left today: $it." } ?: ""))
                         }
                     }
                 }
@@ -438,6 +476,49 @@ private fun PlacementTestCard() {
                 }
             }
             error?.let { Spacer(Modifier.height(6.dp)); Muted(it) }
+        }
+    }
+}
+
+/** ENG-22: what an AI hint is, said wherever one is shown (the same words as the web). */
+internal const val AI_HINT_NOTE = "Written by the AI tutor and checked by ONE’s rules — not reviewed by a person."
+private val AI_FALLBACK_TEXT = mapOf(
+    "CHECKS_FAILED" to "The AI hint did not pass ONE’s checks, so this is the written hint for this level.",
+    "UNAVAILABLE" to "The AI tutor could not answer, so this is the written hint for this level.",
+    "TIMED_OUT" to "The AI tutor took too long, so this is the written hint for this level.",
+    "NOT_A_HINT" to "The AI tutor did not give a hint, so this is the written hint for this level.",
+)
+private val TUTOR_REASON_TEXT = mapOf(
+    "LANGUAGE_NOT_SUPPORTED" to "The AI tutor does not write in your language yet. The written hints still work.",
+    "DAILY_LIMIT" to "You have used today’s AI hints. The written hints still work.",
+    "PENDING" to "The AI tutor is writing your hint…",
+)
+private const val TUTOR_POLL_MS = 2_000L
+private const val TUTOR_POLL_LIMIT = 30
+
+/** The shown hints as entries; an older API without `hintDetails` gives written hints. */
+private fun hintEntries(question: StepQuestionDto): List<StepHintDto> =
+    question.hintDetails ?: question.hints.mapIndexed { index, text -> StepHintDto(level = index + 1, source = "LADDER", state = "SHOWN", text = text) }
+
+/** One shown hint level, the AI tutor's labelled as AI (ENG-22). */
+@Composable
+private fun HintEntryRow(entry: StepHintDto) {
+    Column {
+        Row(verticalAlignment = Alignment.Top) {
+            StatusChip(hintLabel(entry.level - 1), ChipKind.Waiting)
+            if (entry.source == "AI_TUTOR" && entry.state != "FALLBACK") {
+                Spacer(Modifier.width(6.dp))
+                StatusChip("AI hint", ChipKind.Accent)
+            }
+            Spacer(Modifier.width(6.dp))
+            Text(
+                if (entry.state == "PENDING") "The AI tutor is writing this hint…" else entry.text.orEmpty(),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        when {
+            entry.source == "AI_TUTOR" && entry.state == "SHOWN" -> Muted(AI_HINT_NOTE)
+            entry.source == "AI_TUTOR" && entry.state == "FALLBACK" -> Muted(AI_FALLBACK_TEXT[entry.fallback] ?: AI_FALLBACK_TEXT.getValue("UNAVAILABLE"))
         }
     }
 }

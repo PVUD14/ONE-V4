@@ -39,6 +39,26 @@ import kotlinx.serialization.Serializable
 
 @Serializable data class ChoiceDto(val id: String = "", val text: String = "")
 
+/**
+ * ENG-22: one shown hint level — from the written ladder (LADDER) or the AI tutor (AI_TUTOR, always labelled
+ * as AI). state SHOWN: show `text`; PENDING: the AI tutor is still writing it; FALLBACK: `text` is the written
+ * hint for the level and `fallback` says why (CHECKS_FAILED, UNAVAILABLE, TIMED_OUT, NOT_A_HINT).
+ */
+@Serializable data class StepHintDto(
+    val level: Int = 1,
+    val source: String = "LADDER",
+    val state: String = "SHOWN",
+    val text: String? = null,
+    val fallback: String? = null,
+)
+
+/** ENG-22: whether the AI tutor can give the next level now. OFF / NO_CONSENT / ASSESSMENT_MODE: no AI control. */
+@Serializable data class TutorAvailabilityDto(
+    val available: Boolean = false,
+    val reason: String? = null,
+    val remainingToday: Int? = null,
+)
+
 @Serializable data class StepQuestionDto(
     val id: String = "",
     val prompt: String = "",
@@ -46,6 +66,8 @@ import kotlinx.serialization.Serializable
     val position: Int = 1,
     val hintsAvailable: Boolean = false,
     val hints: List<String> = emptyList(),
+    val hintDetails: List<StepHintDto>? = null,
+    val tutor: TutorAvailabilityDto? = null,
 )
 
 /** NO_SKILL, NO_PRACTICE, IN_PROGRESS (with a question) or COMPLETED. */
@@ -120,6 +142,16 @@ suspend fun Api.startNextLearningStep(context: Context): LearningStepDto =
 suspend fun Api.revealStepHint(context: Context, decisionId: String, questionId: String): LearningStepDto =
     json.decodeFromString<LearningStepEnvelope>(
         request(context, "POST", "/api/v1/learning/steps/$decisionId/hints", buildJson("questionId" to quoted(questionId))),
+    ).step
+
+/** One step as it stands; the practice view re-reads it while an AI hint is being written. */
+suspend fun Api.learningStep(context: Context, decisionId: String): LearningStepDto =
+    json.decodeFromString<LearningStepEnvelope>(request(context, "GET", "/api/v1/learning/steps/$decisionId")).step
+
+/** ENG-22: asks the AI tutor for the next hint level; the hint is written by a job, so the level comes back pending. */
+suspend fun Api.requestTutorHint(context: Context, decisionId: String, questionId: String): LearningStepDto =
+    json.decodeFromString<LearningStepEnvelope>(
+        request(context, "POST", "/api/v1/learning/steps/$decisionId/tutor-hints", buildJson("questionId" to quoted(questionId))),
     ).step
 
 suspend fun Api.answerStepQuestion(context: Context, decisionId: String, questionId: String, optionId: String): StepAnswerDto =

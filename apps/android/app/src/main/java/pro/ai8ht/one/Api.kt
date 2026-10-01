@@ -860,7 +860,20 @@ internal fun StudentDto.formerStudentLine(): String? {
     val title: String = "",
     val documentType: String = "",
     val verificationState: String = "",
+    /** When an institution decided; null unless a recorded verifier exists (0107). */
+    val verifiedAt: String? = null,
 )
+
+/**
+ * What a document's verification chip says. "Verified" needs a real institution decision (VERIFIED
+ * with a decision time); a student can only self-report or ask, so anything else reads self-reported.
+ */
+internal fun documentVerificationLabel(doc: DocumentDto): String = when {
+    doc.verificationState == "VERIFIED" && !doc.verifiedAt.isNullOrBlank() -> "Verified"
+    doc.verificationState == "REJECTED" && !doc.verifiedAt.isNullOrBlank() -> "Not verified"
+    doc.verificationState == "PENDING_VERIFICATION" -> "Verification requested"
+    else -> "Self-reported"
+}
 
 // --- Security context & staff -------------------------------------------------
 

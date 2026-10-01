@@ -9,6 +9,8 @@ import {
   ApiRequestError,
   archiveStudentDocument,
   createStudentDocument,
+  documentVerificationLabel,
+  isDocumentVerified,
   downloadDocumentFile,
   uploadDocumentFile,
   getApiHealth,
@@ -1015,7 +1017,7 @@ function AuthenticatedStudentDocuments(): React.ReactElement {
       setStatus('Document metadata save failed.');
     }
   }
-  const verifiedCount = documents.filter((doc) => /verified/i.test(doc.verificationState ?? '')).length;
+  const verifiedCount = documents.filter(isDocumentVerified).length;
   const withFileCount = documents.filter((doc) => doc.file).length;
   return <div className="workspace-grid">
     <section className="card wide-card"><span className="eyebrow">Your documents</span><h2>Documents</h2><p role="status">{status}</p>
@@ -1100,7 +1102,7 @@ function StudentDocumentRow({ document: doc, onChanged, onStatus }: {
     <td>{doc.file
       ? <><strong>{doc.file.filename}</strong><br /><span className="hiring-meta">v{doc.file.versionNumber} · {Math.round(doc.file.byteSize / 1024)} KB · scanned clean</span></>
       : <span className="hiring-meta">No file attached</span>}</td>
-    <td>{doc.verificationState}</td>
+    <td>{documentVerificationLabel(doc)}</td>
     <td><div className="hiring-actions">
       <input ref={inputRef} type="file" accept={ACCEPTED_DOCUMENT_TYPES} className="visually-hidden-file"
         aria-label={`Attach a file to ${doc.title}`} disabled={busy || Boolean(doc.archivedAt)}

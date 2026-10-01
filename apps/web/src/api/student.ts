@@ -54,11 +54,29 @@ export interface StudentDocumentDto {
   readonly documentType: string;
   readonly description: string | null;
   readonly verificationState: string;
+  /** When an institution decided on the document; null unless a recorded verifier exists (0107). */
+  readonly verifiedAt?: string | null;
   readonly archivedAt: string | null;
   readonly createdAt: string;
   readonly updatedAt: string;
   /** Present only when a scanned, clean file is attached. */
   readonly file: StudentDocumentFileDto | null;
+}
+
+/**
+ * What a document's verification chip says. "Verified" needs a real institution decision (a state of
+ * VERIFIED with a decision time); a student can only ever self-report or ask, so anything else reads
+ * as self-reported rather than checked.
+ */
+export function documentVerificationLabel(doc: Pick<StudentDocumentDto, 'verificationState' | 'verifiedAt'>): string {
+  if (doc.verificationState === 'VERIFIED' && doc.verifiedAt) return 'Verified';
+  if (doc.verificationState === 'REJECTED' && doc.verifiedAt) return 'Not verified';
+  if (doc.verificationState === 'PENDING_VERIFICATION') return 'Verification requested';
+  return 'Self-reported';
+}
+
+export function isDocumentVerified(doc: Pick<StudentDocumentDto, 'verificationState' | 'verifiedAt'>): boolean {
+  return documentVerificationLabel(doc) === 'Verified';
 }
 
 /** File types the API accepts; the same allowlist the database enforces. */

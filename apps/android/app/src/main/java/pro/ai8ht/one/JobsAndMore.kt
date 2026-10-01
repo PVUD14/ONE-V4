@@ -911,15 +911,19 @@ internal fun DocumentsPage(onClose: () -> Unit) {
                                     Text(prettify(doc.documentType), style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
-                                StatusChip(prettify(doc.verificationState),
-                                    if (doc.verificationState == "VERIFIED") ChipKind.Positive else ChipKind.Muted)
+                                val label = documentVerificationLabel(doc)
+                                StatusChip(label, when (label) {
+                                    "Verified" -> ChipKind.Positive
+                                    "Verification requested" -> ChipKind.Waiting
+                                    else -> ChipKind.Muted
+                                })
                             }
                             if (index != documents!!.lastIndex) HorizontalDivider(color = MaterialTheme.colorScheme.outline)
                         }
                     }
                 }
                 Spacer(Modifier.height(10.dp))
-                Text("Uploads happen on the web app; verified documents strengthen your profile.",
+                Text("Uploads happen on the web app. A document shows as verified only once your college has checked it.",
                     style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }

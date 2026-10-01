@@ -5,7 +5,7 @@
  * pilot-exact pages. Real data is used wherever it exists; every other slot is NA. The Resume
  * Builder generates résumés from the student's own record (RESUME-GEN).
  */
-import { deleteResume, getProtectedAccessToken, getResume, getResumeSources, getStudentActivity, listResumes, listStudentDocuments, previewResume } from '../api.js';
+import { deleteResume, documentVerificationLabel, getProtectedAccessToken, getResume, getResumeSources, getStudentActivity, listResumes, listStudentDocuments, previewResume } from '../api.js';
 import type {
   ResumeCheckDto, ResumeContentDto, ResumeDraftDto, ResumeSourcesDto, ResumeSummaryDto, ResumeTemplateDto, ResumeTemplateKey, StudentDocumentDto,
 } from '../api.js';
@@ -293,7 +293,7 @@ export function StudentResumeBuilderPage(): React.ReactElement {
             {uploaded.length ? uploaded.map((doc) => (
               <div key={doc.id} className="pilot-list-row">
                 <span className="pilot-tile teal" style={{ width: 34, height: 34 }}><FileText size={15} /></span>
-                <div className="grow"><strong style={{ fontSize: 12.5 }}>{doc.title}</strong><small>{doc.file ? doc.file.filename : 'No file attached yet'} · {doc.verificationState.replaceAll('_', ' ').toLowerCase()}</small></div>
+                <div className="grow"><strong style={{ fontSize: 12.5 }}>{doc.title}</strong><small>{doc.file ? doc.file.filename : 'No file attached yet'} · {documentVerificationLabel(doc).toLowerCase()}</small></div>
                 <button type="button" className="pilot-btn ghost small" onClick={() => go('/student/documents')}>Open</button>
               </div>
             )) : <p style={{ color: 'var(--p-muted)', margin: '8px 0' }}>No uploaded résumé documents. Uploads live under Documents.</p>}
@@ -350,7 +350,7 @@ export function StudentResumeBuilderPage(): React.ReactElement {
         <div className="pilot-list">
           {generated.length || uploaded.length ? [
             ...generated.map((resume) => ({ id: resume.id, title: resume.title, note: `generated · version ${resume.latestVersion}` })),
-            ...uploaded.map((doc) => ({ id: doc.id, title: doc.title, note: `uploaded · ${doc.verificationState.replaceAll('_', ' ').toLowerCase()}` })),
+            ...uploaded.map((doc) => ({ id: doc.id, title: doc.title, note: `uploaded · ${documentVerificationLabel(doc).toLowerCase()}` })),
           ].slice(0, 3).map((row) => (
             <div key={row.id} className="pilot-list-row">
               <span className="pilot-tile blue" style={{ width: 34, height: 34 }}><FileText size={15} /></span>

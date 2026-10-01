@@ -2614,3 +2614,22 @@ approval field have no Android counterpart.
 - No Telugu text exists yet; until an operator publishes one, Telugu readers see English with the notice everywhere.
 - The interface itself is not translated; only lesson words are.
 - Fonts: Telugu only. Another script (Hindi, Tamil…) relies on the system font until a face is bundled for it.
+
+## DOC-2 — Final SOPs, UAT scripts, screen inventory and security reviews — 2026-10-01
+
+Docs only, checked against `719eb34`.
+
+- **ENG-28** — `docs/uat/ONE_PILOT_EVALUATION_TEMPLATE.md`: five measures, each with its tables, a
+  ready-to-run query (run on a freshly migrated local database, never on data) and empty result slots.
+- **OPS-17** — eleven new operations SOPs, the Wave 1 SOPs brought up to date, `ONE_OPERATIONS_UAT_V1.md`
+  with J1–J12, and the operations security review in full (threat-to-evidence matrix, residual risks).
+- **EMP-18** — thirteen employer module SOPs, `ONE_EMPLOYER_UAT_V1.md` in full, and the employer security
+  review in full.
+- **INST-19** — thirteen new institution SOPs and six updated, `ONE_INSTITUTION_UAT_V1.md` with J1–J12 in
+  order, the screen inventory re-read (D3 met, one partial), and the institution security review in full.
+
+**Needs code — reported, not built:** in-app Help links from each operations module to its SOP (an
+Operations Help item needs HG-3); operations and employer Help & FAQ articles, and the stale ones corrected;
+a second placement-test screen; recording ENG-25's comparison groups; an AI price record. Open security
+findings are listed per portal in `docs/security/reviews/`, each awaiting Divakar's decision. No UAT script
+has been run: there is no pilot data yet.

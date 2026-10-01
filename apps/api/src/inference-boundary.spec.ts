@@ -20,6 +20,8 @@ const forbidden: readonly [string, RegExp][] = [
   ['the worker orchestrator module', /persistence\/src\/ai-workers(\.js)?['"]/],
   // ENG-23: the content factory's worker runs model calls; only its request and read module is the API's.
   ['the content factory worker', /persistence\/src\/(content-factory-worker|run-content-factory-worker)(\.js)?['"]/],
+  // ENG-22: the tutor's job calls the model; only the outbox worker may load it.
+  ['the tutor hint worker module', /persistence\/src\/tutor-hint-worker(\.js)?['"]/],
   ['the test fake endpoint', /ai-orchestration\/src\/testing\//],
   ['the inference adapter', /\bOpenAICompatibleProvider\b/],
   ['the environment adapter factory', /\binferenceProviderFromEnvironment\b/],

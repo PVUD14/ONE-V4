@@ -42,6 +42,13 @@ services:
       PTP_SMTP_SECURITY: ${PTP_SMTP_SECURITY:-}
       PTP_SMTP_USER: ${PTP_SMTP_USER:-}
       PTP_SMTP_PASSWORD: ${PTP_SMTP_PASSWORD:-}
+      # AI inference endpoint (ADR-047, docs/ops/runbook-inference-endpoint.md). All blank = AI
+      # unavailable: every AI job fails PROVIDER_UNCONFIGURED and nothing crashes. The key is typed
+      # into this server's .env only; it is never committed. Used by AI jobs and `ai:probe` run in
+      # this container; the API itself only reports whether they are set.
+      ONE_AI_BASE_URL: ${ONE_AI_BASE_URL:-}
+      ONE_AI_API_KEY: ${ONE_AI_API_KEY:-}
+      ONE_AI_MODEL: ${ONE_AI_MODEL:-}
     depends_on:
       postgres:
         condition: service_healthy

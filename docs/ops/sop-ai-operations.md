@@ -10,8 +10,12 @@
 ## Purpose
 
 See what AI is configured and what it has done, and keep the brake within reach of whoever is on
-duty. **Today no model runs anywhere.** The AI hold (ADR-030) stands, no feature is registered, and
-the assistant is off. The features table therefore shows its empty state.
+duty. The AI hold was lifted on 2026-10-01 (HG-2, ADR-047): inference runs on an OpenAI-compatible
+endpoint on a RunPod pod, reached only by background jobs through ONE AI Orchestration (ENG-20). **No
+feature is registered yet**, so no model runs, and the assistant is off; the features table shows its
+empty state. The **Inference endpoint** panel shows whether the server has an endpoint configured,
+its host and model, whether a key is set (never the key), and the latest reachability probe —
+[runbook-inference-endpoint.md](runbook-inference-endpoint.md) says how to point ONE at the pod.
 
 ## Who and what capability
 
@@ -108,13 +112,15 @@ The calibration and code-sandbox panels are on **System Health** ([sop-system-he
 
 ## Never do
 
-- Never switch on, raise or release anything while the AI hold stands, unless Divakar has lifted it.
+- Never switch on a feature that reaches students before the privacy notice names the pod's US
+  processing (HG-6); until then AI runs on sample data and staff-only paths.
 - Never record an evaluation you did not run. A PASS opens a feature to students.
 - Never work around the kill switch by editing `ai_feature_policies` or the flags in the database.
 
 ## Gaps
 
-- No AI feature is registered (AI hold), so nothing can be switched on today.
+- No AI feature is registered yet (the first is ENG-23's content factory), so nothing can be
+  switched on today.
 - The assistant has no prompt-registry version, so the evaluation gate does not apply to it.
 - Usage by organisation has no complementary suppression against the screen's totals (security
   review OPS-SR-32).

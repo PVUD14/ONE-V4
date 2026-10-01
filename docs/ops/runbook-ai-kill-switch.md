@@ -24,6 +24,15 @@ Releasing the kill switch and switching the assistant on are high-risk flag chan
 Approvals); switching a feature on also needs a passing evaluation for its current model and prompt
 version. Levers 1–3 below remain valid as the fallback when the console is unreachable.
 
+## Since ENG-20 (2026-10-01): the inference endpoint
+
+ONE AI Orchestration can now reach the RunPod endpoint (ADR-047) when `ONE_AI_BASE_URL`,
+`ONE_AI_API_KEY` and `ONE_AI_MODEL` are set on the server. The kill switch is read before every call,
+ahead of the feature's own switch, and a refused call is metered `REFUSED / KILL_SWITCH_ENGAGED`.
+Blanking `ONE_AI_BASE_URL` and recreating the API container is a further, slower lever; stopping the
+pod is the last one ([runbook-inference-endpoint.md](runbook-inference-endpoint.md)). No feature is
+registered yet, so the table below still describes what runs.
+
 ## First: what AI actually runs today
 
 The AI hold (ADR-030) is in force. On base `4fab0c6` the complete list of places that could reach

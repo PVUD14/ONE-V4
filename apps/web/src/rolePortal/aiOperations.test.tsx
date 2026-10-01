@@ -28,13 +28,15 @@ const feature = (over: Record<string, unknown> = {}) => ({
   featureKey: 'career.summary', description: 'Drafts a career summary for review', enabled: true, effectiveEnabled: true, model: 'local/model-a',
   cap: 100, capWindow: 'DAY', maxInputChars: 4000, prompt: { key: 'career.summary', version: 2 }, usedInWindow: 37,
   evaluation: { state: 'PASS', evaluationId: crypto.randomUUID(), decidedAt: '2026-09-29T10:00:00.000Z' }, updatedAt: '2026-09-29T10:00:00.000Z',
-  outcomes: { succeeded: 37, refused: 4, failed: 1 }, tokens: { input: 12_345, output: 6_789 }, ...over,
+  outcomes: { succeeded: 37, refused: 4, failed: 1 }, tokens: { input: 12_345, output: 6_789 }, averageLatencyMs: 1_840, ...over,
 });
+const unconfiguredInference = { configured: false, reason: 'BASE_URL_MISSING', providerKey: 'unconfigured', endpointHost: null, model: null, keyConfigured: false, lastProbe: null };
 const summary = (over: Record<string, unknown> = {}) => ({
   period: 'DAY', periodStart: '2026-09-30T00:00:00Z',
   killSwitch: { key: 'ai.global-kill-switch', enabled: false, lastChangedAt: null, lastReasonCode: null },
   assistantFlag: { key: 'ai.assistant', enabled: false, lastChangedAt: null, lastReasonCode: null },
   assistant: { serverSwitch: false, providerKeyConfigured: false, consoleSwitch: false, killSwitchEngaged: false, answering: false },
+  inference: unconfiguredInference,
   features: [feature(), feature({ featureKey: 'lesson.hint', enabled: false, effectiveEnabled: false, evaluation: { state: 'NONE', evaluationId: null, decidedAt: null }, prompt: null })],
   failureClasses: [{ featureKey: 'career.summary', outcome: 'REFUSED', failureClass: 'CAP_EXCEEDED', count: 4 }],
   totals: { succeeded: 37, refused: 4, failed: 1, inputTokens: 12_345, outputTokens: 6_789 },
@@ -103,6 +105,35 @@ describe('AI Operations console', () => {
     expect(screen.getByText(costText)).toBeInTheDocument();
     expect(await screen.findByText('Current verdict')).toBeInTheDocument();
     expect(screen.getByText('Prompt: NA (not declared)')).toBeInTheDocument();
+  });
+
+  it('shows average latency per feature, and NA when none was recorded', async () => {
+    render(<OperationsAiOperationsPage />);
+    expect(within(await featureRow('career.summary')).getByText('Average latency 1,840 ms')).toBeInTheDocument();
+  });
+
+  it('shows the inference endpoint as unconfigured, with NA, when the server has no endpoint', async () => {
+    render(<OperationsAiOperationsPage />);
+    expect(await screen.findByText('Inference endpoint')).toBeInTheDocument();
+    expect(screen.getByText('No — no endpoint address is set')).toBeInTheDocument();
+    expect(screen.getByText('Not probed yet')).toBeInTheDocument();
+    expect(screen.getByText('Endpoint host').nextSibling?.textContent).toBe('NA');
+    expect(screen.getByText('Model served (last probe)').nextSibling?.textContent).toBe('NA');
+  });
+
+  it('shows a configured endpoint with its latest probe, and never a key', async () => {
+    summaryResponse = () => ok(summary({ inference: {
+      configured: true, reason: null, providerKey: 'openai-compatible', endpointHost: 'pod-8888.proxy.example.test', model: 'qwen2.5-14b-instruct', keyConfigured: true,
+      lastProbe: { configured: true, endpointHost: 'pod-8888.proxy.example.test', model: 'qwen2.5-14b-instruct', reachable: false, modelServed: null,
+        failureClass: 'PROVIDER_AUTH_FAILED', latencyMs: 210, probedAt: '2026-10-01T10:00:00.000Z', matchesConfiguration: false },
+    } }));
+    render(<OperationsAiOperationsPage />);
+    expect(await screen.findByText('pod-8888.proxy.example.test')).toBeInTheDocument();
+    expect(screen.getByText('qwen2.5-14b-instruct')).toBeInTheDocument();
+    expect(screen.getByText('Key set on the server').nextSibling?.textContent).toBe('Yes');
+    expect(screen.getByText('Unreachable')).toBeInTheDocument();
+    expect(screen.getByText(/PROVIDER_AUTH_FAILED/)).toBeInTheDocument();
+    expect(screen.getByText(/different endpoint or model/)).toBeInTheDocument();
   });
 
   it('withholds organisation rows under 5 people', async () => {

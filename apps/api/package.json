@@ -29,6 +29,7 @@
     "@planthepath/assessments": "workspace:*"
   },
   "devDependencies": {
+    "@planthepath/ai-orchestration": "workspace:*",
     "@nestjs/testing": "^11.1.6",
     "@types/node": "^22.13.0",
     "@types/pg": "^8.15.0",

@@ -25,6 +25,9 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import * as schema from '@planthepath/persistence/src/schema.js';
 import { findIdentityByExternalSubject, loadActiveMembershipsForUser } from '@planthepath/persistence/src/identity-authentication.js';
 import { loadAiFeaturePolicy } from '@planthepath/persistence/src/ai-orchestration.js';
+import { createWorkerAiOrchestrator, runAiProviderProbe } from '@planthepath/persistence/src/ai-workers.js';
+import { PromptRegistry } from '@planthepath/ai-orchestration/src/index.js';
+import { startFakeOpenAiServer } from '@planthepath/ai-orchestration/src/testing/fake-openai-server.js';
 import { Phase1ApiSecurityModule } from './api-security.module.js';
 import { PlatformControlsController } from './platform-controls.controller.js';
 import { PG_POOL } from '../persistence.provider.js';
@@ -49,6 +52,8 @@ let secondSuperAdmin: Member;
 let suspendedConfigurer: Member;
 let collegeAdmin: Member;
 const providerCalls: unknown[] = [];
+// Captured before the stub below, for ENG-20's local fake endpoint only (127.0.0.1, never the network).
+const loopbackFetch = globalThis.fetch;
 const savedEnv = { enabled: process.env.ASSISTANT_ENABLED, key: process.env.ANTHROPIC_API_KEY };
 
 interface Member { readonly userId: string; readonly membershipId: string; readonly email: string }
@@ -726,3 +731,87 @@ async function backdate(approvalId: string, interval: string): Promise<void> {
     client.release();
   }
 }
+
+describe('the inference endpoint (ENG-20)', () => {
+  // Test-only sentinels; neither is a credential.
+  const testKey = 'test-only-bearer-value-eng20-api';
+  const upstreamText = 'UPSTREAM-DETAIL-must-not-reach-a-browser';
+  const inferenceVariables = ['ONE_AI_BASE_URL', 'ONE_AI_API_KEY', 'ONE_AI_MODEL'] as const;
+
+  async function withInferenceEnv<T>(values: Partial<Record<(typeof inferenceVariables)[number], string>>, work: () => Promise<T>): Promise<T> {
+    const saved = inferenceVariables.map((name) => [name, process.env[name]] as const);
+    for (const name of inferenceVariables) {
+      if (values[name] === undefined) delete process.env[name]; else process.env[name] = values[name];
+    }
+    try {
+      return await work();
+    } finally {
+      for (const [name, value] of saved) if (value === undefined) delete process.env[name]; else process.env[name] = value;
+    }
+  }
+
+  it('reads as unconfigured, with its reason, when the variables are blank', async () => {
+    await withInferenceEnv({}, async () => {
+      const response = await api().get(base + '/summary').set(auth(security.userId)).expect(200);
+      expect(response.body.inference).toMatchObject({ configured: false, reason: 'BASE_URL_MISSING', providerKey: 'unconfigured', endpointHost: null, keyConfigured: false });
+    });
+  });
+
+  it('shows configured, host, model and the latest probe; no response carries the key, the URL or upstream text', async () => {
+    await killSwitchOff();
+    const model = 'local/test-model-a';
+    const server = await startFakeOpenAiServer((sent) => (sent.path.endsWith('/models')
+      ? { status: 200, json: { object: 'list', data: [{ id: model }] } }
+      : { status: 500, raw: `${upstreamText} ${testKey}` }));
+    try {
+      const env = { ONE_AI_BASE_URL: server.baseUrl, ONE_AI_API_KEY: testKey, ONE_AI_MODEL: model };
+      await withInferenceEnv(env, async () => {
+        const before = await api().get(base + '/summary').set(auth(security.userId)).expect(200);
+        expect(before.body.inference).toMatchObject({ configured: true, reason: null, providerKey: 'openai-compatible', endpointHost: new URL(server.baseUrl).host, model, keyConfigured: true, lastProbe: null });
+
+        // The probe and the failing generation run as a worker would — never through a route.
+        const requestsBefore = server.requests.length;
+        await runAiProviderProbe({ db: pool, env, tuning: { fetchImpl: loopbackFetch } });
+        const featureKey = 'eng20.f-' + randomUUID().slice(0, 8);
+        await pool.query(
+          `INSERT INTO ai_feature_policies (feature_key, description, model, cap, cap_window, enabled)
+           VALUES ($1, 'An ENG-20 test feature', $2, 5, 'DAY', true)`, [featureKey, model],
+        );
+        const prompt = { key: 'eng20.prompt', version: 1, purpose: 'Test fixture.', system: 'You draft.', parameters: [], user: 'Draft.', maxOutputTokens: 32, temperature: 0 };
+        const { orchestrator } = createWorkerAiOrchestrator({
+          db: pool, env, prompts: new PromptRegistry([prompt]),
+          tuning: { fetchImpl: loopbackFetch, sleep: async () => undefined, timeoutMs: 2_000 },
+        });
+        await expect(orchestrator.generate({ featureKey, promptKey: 'eng20.prompt', promptVersion: 1, parameters: {}, correlationId: 'eng20-api-corr' })).rejects.toThrow();
+        expect(server.requests.length - requestsBefore).toBe(4); // one probe, three attempts
+
+        const summary = await api().get(base + '/summary').set(auth(security.userId)).expect(200);
+        expect(summary.body.inference.lastProbe).toMatchObject({ configured: true, reachable: true, modelServed: true, failureClass: null, matchesConfiguration: true, model });
+        expect(summary.body.failureClasses).toEqual(expect.arrayContaining([{ featureKey, outcome: 'FAILED', failureClass: 'PROVIDER_SERVER_ERROR', count: 1 }]));
+        const row = summary.body.features.find((entry: { featureKey: string }) => entry.featureKey === featureKey);
+        expect(row).toMatchObject({ outcomes: { succeeded: 0, refused: 0, failed: 1 }, averageLatencyMs: null });
+
+        const surfaced = [
+          summary,
+          await api().get(base + '/summary?period=MONTH').set(auth(security.userId)).expect(200),
+          await api().get(base + '/usage').set(auth(security.userId)).expect(200),
+          await api().get(base + '/usage/organizations').set(auth(security.userId)).expect(200),
+          await api().get(base + '/evaluations').set(auth(security.userId)).expect(200),
+          await api().get(base + '/policy').set(auth(security.userId)).expect(200),
+        ].map((response) => response.text).join(' | ');
+        expect(surfaced).not.toContain(testKey);
+        expect(surfaced).not.toContain('UPSTREAM-DETAIL');
+        expect(surfaced).not.toContain(server.baseUrl);
+      });
+
+      // A probe taken for this endpoint does not vouch for a different one configured later.
+      await withInferenceEnv({ ONE_AI_BASE_URL: 'https://another-pod.example.test/v1', ONE_AI_API_KEY: testKey, ONE_AI_MODEL: model }, async () => {
+        const later = await api().get(base + '/summary').set(auth(security.userId)).expect(200);
+        expect(later.body.inference.lastProbe).toMatchObject({ reachable: true, matchesConfiguration: false });
+        expect(later.text).not.toContain(testKey);
+      });
+    } finally {
+      await server.close();
+    }
+  });
+});

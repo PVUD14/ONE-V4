@@ -8,6 +8,7 @@
  */
 import { ApiRequestError, apiBaseUrl } from './core.js';
 import { requestJson } from './http.js';
+import { bearerHeader } from '../sandbox.js';
 
 export interface PrivacyRequestDto {
   readonly id: string;
@@ -40,7 +41,7 @@ export function cancelPrivacyRequest(token: string, requestId: string): Promise<
 
 export async function downloadDataExport(token: string, requestId: string): Promise<Blob> {
   const response = await fetch(`${apiBaseUrl}/api/v1/students/me/privacy/exports/${encodeURIComponent(requestId)}/download`, {
-    headers: { Authorization: `Bearer ${token}`, 'X-Correlation-Id': crypto.randomUUID() },
+    headers: { ...bearerHeader(token), 'X-Correlation-Id': crypto.randomUUID() },
   });
   if (!response.ok) {
     const body = await response.json().catch(() => null) as { readonly error?: { readonly code?: string } } | null;

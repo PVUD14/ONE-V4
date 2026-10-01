@@ -9,6 +9,7 @@
 import { ApiRequestError, apiBaseUrl } from './core.js';
 import { requestJson } from './http.js';
 import type { SuppressedCountDto } from './privacyOperations.js';
+import { bearerHeader } from '../sandbox.js';
 
 export interface InstitutionUnitDto {
   readonly id: string; readonly institutionId: string; readonly kind: string; readonly name: string; readonly parentUnitId?: string | null;
@@ -580,7 +581,7 @@ export async function downloadInstitutionExport(token: string, institutionId: st
   const correlationId = crypto.randomUUID();
   const response = await fetch(`${apiBaseUrl}/api/v1/institutions/${encodeURIComponent(institutionId)}/exports/${path}`, {
     method: 'POST',
-    headers: { Accept: 'text/csv', 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, 'X-Correlation-Id': correlationId },
+    headers: { Accept: 'text/csv', 'Content-Type': 'application/json', ...bearerHeader(token), 'X-Correlation-Id': correlationId },
     body: JSON.stringify(body),
   });
   if (!response.ok) {

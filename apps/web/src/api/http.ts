@@ -8,6 +8,7 @@
  * file. `api.ts` re-exports every public module, so importers are unchanged.
  */
 import { ApiRequestError, apiBaseUrl } from './core.js';
+import { bearerHeader } from '../sandbox.js';
 
 export async function requestJson<T>(path: string, input: {
   readonly token?: string; readonly method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; readonly body?: unknown;
@@ -15,7 +16,7 @@ export async function requestJson<T>(path: string, input: {
 } = {}): Promise<T> {
   const correlationId = crypto.randomUUID();
   const headers: Record<string, string> = { Accept: 'application/json', 'X-Correlation-Id': correlationId };
-  if (input.token) headers.Authorization = `Bearer ${input.token}`;
+  if (input.token) Object.assign(headers, bearerHeader(input.token));
   if (input.body !== undefined) headers['Content-Type'] = 'application/json';
   if (input.idempotencyKey) headers['Idempotency-Key'] = input.idempotencyKey;
   const response = await fetch(`${apiBaseUrl}${path}`, {

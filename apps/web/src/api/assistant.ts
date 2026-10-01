@@ -7,6 +7,7 @@
  * file. `api.ts` re-exports every public module, so importers are unchanged.
  */
 import { ApiRequestError, apiBaseUrl } from './core.js';
+import { bearerHeader } from '../sandbox.js';
 
 export type AssistantPersona = 'student' | 'institution' | 'employer';
 
@@ -32,7 +33,7 @@ export async function streamAssistantChat(
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
+      ...bearerHeader(token),
       'X-Correlation-Id': correlationId,
     },
     body: JSON.stringify({ persona, messages }),
@@ -67,7 +68,7 @@ export async function sendAssistantFeedback(token: string, helpful: boolean, que
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
+      ...bearerHeader(token),
       'X-Correlation-Id': crypto.randomUUID(),
     },
     body: JSON.stringify({ helpful, question, answer }),

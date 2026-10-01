@@ -10,6 +10,7 @@ import { Ring } from '../pilot/pilotComponents.js';
 import { NaListCard, go } from './naWidgets.js';
 import { AlertTriangle, Plus } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { bearerHeader } from '../sandbox.js';
 
 interface Intervention {
   id: string; title: string; note: string | null; outcomeNote: string | null;
@@ -33,7 +34,7 @@ async function interventionRequest<T>(path: string, token: string, signal: Abort
   const correlationId = crypto.randomUUID();
   const response = await fetch(apiBaseUrl + path, {
     method: body === undefined ? 'GET' : 'POST', signal,
-    headers: { Accept: 'application/json', Authorization: 'Bearer ' + token, 'X-Correlation-Id': correlationId,
+    headers: { Accept: 'application/json', ...bearerHeader(token), 'X-Correlation-Id': correlationId,
       ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });

@@ -8,6 +8,7 @@
  */
 import { ApiRequestError, apiBaseUrl } from './core.js';
 import { requestJson } from './http.js';
+import { bearerHeader } from '../sandbox.js';
 
 export type AccessReviewDecision = 'KEEP' | 'REVOKE';
 export type AccessReviewScheduleStatus = 'NEVER_REVIEWED' | 'REVIEW_OVERDUE' | 'CAMPAIGN_OVERDUE' | 'IN_PROGRESS' | 'CURRENT';
@@ -122,7 +123,7 @@ export async function downloadAccessReviewCsv(token: string, campaignId: string,
   const correlationId = crypto.randomUUID();
   const response = await fetch(`${apiBaseUrl}${base}/${encodeURIComponent(campaignId)}/export`, {
     method: 'POST',
-    headers: { Accept: 'text/csv', 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, 'X-Correlation-Id': correlationId },
+    headers: { Accept: 'text/csv', 'Content-Type': 'application/json', ...bearerHeader(token), 'X-Correlation-Id': correlationId },
     body: JSON.stringify({ reasonCode }),
   });
   if (!response.ok) {

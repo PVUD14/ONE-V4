@@ -1,16 +1,17 @@
 #!/usr/bin/env node
 /**
- * Proves the line between the real site and the demo site in the built files.
+ * Proves the line between the real site and the sandbox in the built files.
  *
- * oneby8.com is built without VITE_DEMO_SITE and must carry none of the pilot's or the
- * demo site's fictional people - CLAUDE.md forbids invented data on screens real users
+ * oneby8.com is built without VITE_SANDBOX and must carry none of the pilot's fictional
+ * people and no sandbox marker - CLAUDE.md forbids invented data on screens real users
  * can reach, and the old release script grepped for exactly this leak. demo.oneby8.com
- * is built with VITE_DEMO_SITE=true and must carry the demo and none of the real
- * application (no sign-in, no API client). Both rely on the bundler dropping code
- * behind build-time flags, so the only trustworthy check is the output itself.
+ * (ADR-046) is built with VITE_SANDBOX=true: it must be the real application, carry the
+ * "Demo - sample data" marker, and still ship no pilot fiction - its sample people live in
+ * its own database, never in the bundle. Both rely on the bundler dropping code behind
+ * build-time flags, so the only trustworthy check is the output itself.
  *
  *   node scripts/check-demo-boundary.mjs <distDir> production   # oneby8.com
- *   node scripts/check-demo-boundary.mjs <distDir> demo         # demo.oneby8.com
+ *   node scripts/check-demo-boundary.mjs <distDir> sandbox      # demo.oneby8.com
  *
  * Run by deploy/vps/Dockerfile.web after every web build and by CI (phase1-ci.yml).
  * Exits non-zero, naming each failed marker, if the boundary is crossed.
@@ -21,11 +22,13 @@ import { join } from 'node:path';
 // ASCII-only markers: the bundler may escape non-ASCII characters in string literals.
 const FICTION = ['Meera Nair', 'Arjun Reddy', 'Lakeview Institute', 'Zenvia Labs', 'ONE product demo', 'Kavitha Selvam'];
 const DEV_ONLY = ['pilot-preview'];
-const REAL_APP = ['Sign in to your verified ONE', 'CognitoUserPool', 'Choose workspace'];
+const REAL_APP = ['Sign in to your verified ONE', 'Choose workspace'];
+// The sandbox marker (src/sandboxMarker.tsx) and the header the sandbox sends its token in.
+const SANDBOX = ['data-one-sandbox', 'X-One-Authorization'];
 
 const [distDir, variant] = process.argv.slice(2);
-if (!distDir || (variant !== 'production' && variant !== 'demo')) {
-  console.error('usage: check-demo-boundary.mjs <distDir> production|demo');
+if (!distDir || (variant !== 'production' && variant !== 'sandbox')) {
+  console.error('usage: check-demo-boundary.mjs <distDir> production|sandbox');
   process.exit(2);
 }
 
@@ -50,12 +53,12 @@ const mustLack = (markers, why) => markers.filter((marker) => text.includes(mark
 const mustHave = (markers, why) => markers.filter((marker) => !text.includes(marker)).forEach((marker) => failures.push(`missing "${marker}" - ${why}`));
 
 mustLack(DEV_ONLY, 'the development-only preview route must never ship');
+mustLack(FICTION, `the ${variant} build must carry no demo or pilot sample data in the bundle`);
+mustHave(REAL_APP, 'this does not look like the real application build');
 if (variant === 'production') {
-  mustLack(FICTION, 'the production build must carry no demo or pilot sample data');
-  mustHave(REAL_APP.slice(0, 1), 'this does not look like the real application build');
+  mustLack(SANDBOX, 'the production build must not carry the sandbox marker or send its token as the sandbox does');
 } else {
-  mustHave(FICTION, 'the demo build must carry the demo site');
-  mustLack(REAL_APP, 'the demo build must not carry the real application or its sign-in');
+  mustHave(SANDBOX, 'the sandbox build must carry the "Demo - sample data" marker and the sandbox token header');
 }
 
 if (failures.length > 0) {

@@ -9,6 +9,7 @@
 import { ApiRequestError, apiBaseUrl } from './core.js';
 import { requestJson } from './http.js';
 import type { CampusDriveState, StudentCampusDriveDto } from './campusDrives.js';
+import { bearerHeader } from '../sandbox.js';
 
 export interface CompensationDto {
   readonly currency: string | null;
@@ -516,7 +517,7 @@ export function getInterviewScorecards(token: string, employerId: string, interv
 /** EMP-09: an interview's calendar invite, fetched with the access token for the browser to save. */
 async function downloadCalendar(token: string, path: string): Promise<{ readonly blob: Blob; readonly filename: string }> {
   const correlationId = crypto.randomUUID();
-  const response = await fetch(`${apiBaseUrl}${path}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'text/calendar', 'X-Correlation-Id': correlationId } });
+  const response = await fetch(`${apiBaseUrl}${path}`, { headers: { ...bearerHeader(token), Accept: 'text/calendar', 'X-Correlation-Id': correlationId } });
   if (!response.ok) throw new ApiRequestError({ status: response.status, correlationId: response.headers?.get('x-correlation-id') ?? correlationId });
   const disposition = response.headers?.get('content-disposition') ?? '';
   const filename = /filename="([^"]+)"/.exec(disposition)?.[1] ?? 'interview.ics';
@@ -550,7 +551,7 @@ export async function downloadEmployerApplicantExport(token: string, employerId:
   const correlationId = crypto.randomUUID();
   const response = await fetch(`${apiBaseUrl}/api/v1/employers/${encodeURIComponent(employerId)}/opportunities/${encodeURIComponent(opportunityId)}/applicant-export`, {
     method: 'POST',
-    headers: { Accept: 'text/csv', 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, 'X-Correlation-Id': correlationId },
+    headers: { Accept: 'text/csv', 'Content-Type': 'application/json', ...bearerHeader(token), 'X-Correlation-Id': correlationId },
     body: JSON.stringify(body),
   });
   if (!response.ok) {
@@ -1130,7 +1131,7 @@ export async function downloadCandidateResume(token: string, employerId: string,
   const { download } = await requestJson<{ readonly download: { readonly path: string; readonly expiresAt: string } }>(
     `/api/v1/employers/${encodeURIComponent(employerId)}/applications/${encodeURIComponent(applicationId)}/resume`, { token });
   const correlationId = crypto.randomUUID();
-  const response = await fetch(`${apiBaseUrl}${download.path}`, { headers: { Authorization: `Bearer ${token}`, 'X-Correlation-Id': correlationId } });
+  const response = await fetch(`${apiBaseUrl}${download.path}`, { headers: { ...bearerHeader(token), 'X-Correlation-Id': correlationId } });
   if (!response.ok) throw new ApiRequestError({ status: response.status, correlationId: response.headers?.get('x-correlation-id') ?? correlationId });
   const disposition = response.headers?.get('content-disposition') ?? '';
   const filename = /filename="([^"]+)"/.exec(disposition)?.[1] ?? 'resume';

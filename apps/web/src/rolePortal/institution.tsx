@@ -19,6 +19,7 @@ import { AnalyticsAccessPanel } from './institutionAnalytics.js';
 import { PlacementStatusChip, useRosterPlacementStatus } from './institutionPlacementStatus.js';
 import { YearEndBatchPanel } from './institutionBatchLifecycle.js';
 import { useEffect, useRef, useState } from 'react';
+import { bearerHeader } from '../sandbox.js';
 
 /** Why an invitation is being sent again; recorded with the resend (INST-01). */
 const invitationResendReasons = [
@@ -344,7 +345,7 @@ async function staffWorkflowRequest<T>(path: string, token: string, signal: Abor
   const correlationId = crypto.randomUUID();
   const response = await fetch(apiBaseUrl + path, {
     method: body === undefined ? 'GET' : 'POST', signal,
-    headers: { Accept: 'application/json', Authorization: 'Bearer ' + token, 'X-Correlation-Id': correlationId,
+    headers: { Accept: 'application/json', ...bearerHeader(token), 'X-Correlation-Id': correlationId,
       ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });

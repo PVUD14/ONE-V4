@@ -7,6 +7,7 @@
  */
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { apiBaseUrl, ApiRequestError, getProtectedAccessToken } from './api.js';
+import { bearerHeader } from './sandbox.js';
 
 interface InstitutionReport {
   readonly reportId: string;
@@ -97,7 +98,7 @@ export function InstitutionReportsPage({ institutionId, title = 'Reports', descr
         `${apiBaseUrl}/api/v1/institutions/${encodeURIComponent(institutionId)}/career-readiness/reports?${query}`,
         {
           method: 'POST',
-          headers: { Accept: 'application/json', Authorization: `Bearer ${token}`, 'X-Correlation-Id': correlationId },
+          headers: { Accept: 'application/json', ...bearerHeader(token), 'X-Correlation-Id': correlationId },
           signal: controller.signal,
         },
       );

@@ -9,6 +9,7 @@
  */
 import { ApiRequestError, apiBaseUrl } from './core.js';
 import { requestJson } from './http.js';
+import { bearerHeader } from '../sandbox.js';
 
 export interface CurrentStudentDto {
   readonly userId: string;
@@ -75,7 +76,7 @@ export async function uploadDocumentFile(token: string, documentId: string, file
     method: 'POST',
     headers: {
       Accept: 'application/json',
-      Authorization: `Bearer ${token}`,
+      ...bearerHeader(token),
       'Content-Type': file.type,
       'X-Filename': file.name,
       'X-Correlation-Id': correlationId,
@@ -98,7 +99,7 @@ export async function uploadDocumentFile(token: string, documentId: string, file
 /** Returns the bytes so the caller decides how to present them. */
 export async function downloadDocumentFile(token: string, documentId: string): Promise<Blob> {
   const response = await fetch(`${apiBaseUrl}/api/v1/students/me/documents/${encodeURIComponent(documentId)}/file`, {
-    headers: { Authorization: `Bearer ${token}`, 'X-Correlation-Id': crypto.randomUUID() },
+    headers: { ...bearerHeader(token), 'X-Correlation-Id': crypto.randomUUID() },
   });
   if (!response.ok) throw new ApiRequestError({ status: response.status, correlationId: response.headers?.get('x-correlation-id') ?? '' });
   return response.blob();

@@ -7,6 +7,7 @@
  */
 import { ApiRequestError, apiBaseUrl } from './core.js';
 import { requestJson } from './http.js';
+import { bearerHeader } from '../sandbox.js';
 
 export type InstitutionDataTermsStatus = 'NO_TERMS_PUBLISHED' | 'ACCEPTED' | 'ACCEPTANCE_REQUIRED';
 export type InstitutionDataTermsLegalReviewState = 'DRAFT_FOR_LEGAL_REVIEW' | 'LEGAL_APPROVED';
@@ -78,7 +79,7 @@ export async function downloadInstitutionExitExport(token: string, institutionId
   const correlationId = crypto.randomUUID();
   const response = await fetch(`${apiBaseUrl}${institutionPath(institutionId)}/exit-export/${section}`, {
     method: 'POST',
-    headers: { Accept: 'text/csv', 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, 'X-Correlation-Id': correlationId },
+    headers: { Accept: 'text/csv', 'Content-Type': 'application/json', ...bearerHeader(token), 'X-Correlation-Id': correlationId },
     body: JSON.stringify(body),
   });
   if (!response.ok) {

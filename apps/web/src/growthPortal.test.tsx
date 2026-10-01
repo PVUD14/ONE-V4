@@ -34,6 +34,15 @@ function signInAs(role: 'GROWTH_EXECUTIVE' | 'GROWTH_MANAGER', me: Record<string
     if (url.endsWith('/api/v1/growth/territory')) {
       return { ok: true, json: async () => (territoryResponse ?? { role, regions: [], correlationId: 'corr-territory' }) };
     }
+    if (url.includes('/api/v1/growth/field?view=')) {
+      return { ok: true, json: async () => ({
+        view: 'MINE', canSeeTeam: role === 'GROWTH_MANAGER', today: '2026-10-01',
+        counts: { visitsThisMonth: 2, activitiesThisMonth: 3, metThisMonth: 1, followUpsOverdue: 0, followUpsDueToday: 0, followUpsOpen: 0 },
+        followUps: [], activities: [],
+        vocabulary: { kinds: ['VISIT'], outcomes: ['MET'], cancelReasons: ['OTHER'], notesMax: 2000, titleMax: 280, reportMaxAgeDays: 7, locationRetentionDays: 180, listLimit: 100,
+          locationNotice: { version: 'draft-2026-10', status: 'DRAFT_FOR_LEGAL_REVIEW', text: ['Attaching your location to a visit is optional.'] } },
+        correlationId: 'corr-field' }) };
+    }
     if (url.endsWith('/api/v1/growth/me')) {
       return { ok: true, json: async () => (me ?? { role, staffType: 'EMPLOYEE', teams: [], correlationId: 'corr-me' }) };
     }
@@ -98,14 +107,16 @@ describe('a growth executive signing in', () => {
     // Every figure slot is NA until its source exists: nothing is invented.
     expect(within(stats).getAllByText('NA')).toHaveLength(4);
     expect(within(stats).queryByText(/\d/)).not.toBeInTheDocument();
-    expect(screen.getByText(/Field visits, targets and commission are not built yet/i)).toBeInTheDocument();
+    // GROWTH-06 built Field; targets and commission still say plainly they are not built.
+    expect(screen.getByText(/Targets and commission are not built yet/i)).toBeInTheDocument();
   });
 
   it('shows an honest empty state on every other page', async () => {
     signInAs('GROWTH_EXECUTIVE');
     render(<App />);
     const sidebar = await screen.findByLabelText('Growth navigation');
-    for (const label of ['Field', 'Targets', 'Commission']) {
+    // GROWTH-06: Field is built, so it is no longer in this list (see the Field case below).
+    for (const label of ['Targets', 'Commission']) {
       fireEvent.click(within(sidebar).getByRole('button', { name: label }));
       expect(await screen.findByRole('heading', { name: label })).toBeInTheDocument();
       expect(screen.getByText(/is not built yet/i)).toBeInTheDocument();
@@ -125,6 +136,23 @@ describe('a growth executive signing in', () => {
     render(<App />);
     expect(await screen.findByRole('heading', { name: 'You do not have access to this workspace' })).toBeInTheDocument();
     expect(screen.queryByLabelText('Growth navigation')).not.toBeInTheDocument();
+  });
+});
+
+describe('Growth → Field (GROWTH-06)', () => {
+  it('opens the Field page with the server counts, and Home shows this month visits', async () => {
+    signInAs('GROWTH_EXECUTIVE', { role: 'GROWTH_EXECUTIVE', staffType: 'EMPLOYEE', teams: [], openLeads: 1, visitsThisMonth: 2, followUpsDue: 0, correlationId: 'corr-me' });
+    render(<App />);
+    const sidebar = await screen.findByLabelText('Growth navigation');
+    const stats = screen.getByLabelText('Growth summary');
+    expect(await within(stats).findByText('2')).toBeInTheDocument();
+    expect(screen.getByText(/Nothing is due today/)).toBeInTheDocument();
+    fireEvent.click(within(sidebar).getByRole('button', { name: 'Field' }));
+    expect(await screen.findByRole('heading', { name: 'Field', level: 1 })).toBeInTheDocument();
+    const field = await screen.findByLabelText('Field summary');
+    expect(within(field).getByText('Visits this month').parentElement).toHaveTextContent('2');
+    expect(screen.queryByText(/is not built yet/i)).not.toBeInTheDocument();
+    expect(within(sidebar).getByRole('button', { name: 'Field' })).toHaveAttribute('aria-current', 'page');
   });
 });
 

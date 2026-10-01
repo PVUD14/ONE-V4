@@ -126,20 +126,26 @@ Hosted UI), add `https://oneby8.com/auth/callback` to the allowed callback URLs 
 - [ ] Check `https://one.ai8ht.pro/login` lands on `https://oneby8.com/login`.
 - [ ] Take a final backup of the VPS database, keep it offline, then shut the VPS down.
 
-## 7. The demo site — demo.oneby8.com
+## 7. The sandbox — demo.oneby8.com
 
-The sales demo runs on this same server, from the same Compose pack, as its own
-container with sample data only and no route to the API (ADR-045). Full steps and
-checks: `docs/ops/runbook-demo-site.md`. In short:
+The sales demo runs on this same server, from the same Compose pack: the real
+application over its own database of sample data, its own Cognito pool and its own
+Docker networks, behind a per-person login (ADR-046, which replaced ADR-045's mock).
+Full steps and checks: `docs/ops/runbook-demo-site.md`. In short:
 
 - [ ] **DNS:** at the oneby8.com DNS provider add `A  demo → <server IP>` (the same
       Elastic IP as `oneby8.com`). Check: `nslookup demo.oneby8.com 8.8.8.8`.
-- [ ] **Install:** with a release that contains `feat/demo-site`,
-      `cd /srv/one/deploy/vps && sudo docker compose up -d --build`. That one command
-      builds `web-demo` and gives Caddy the `demo.oneby8.com` site. No `.env` change.
-- [ ] **Check:** `https://demo.oneby8.com` shows the ONE logo, "LEARN | PREPARE |
-      BUILD | GROW", "Demo — sample data" and seven roles;
-      `https://demo.oneby8.com/api/me` answers 404; `https://oneby8.com` is unchanged.
+- [ ] **Cognito:** create the separate sandbox user pool, app client and ten demo
+      accounts (runbook section 2). Never reuse the production pool.
+- [ ] **`.env`:** set `COMPOSE_PROFILES=sandbox`, `DEMO_POSTGRES_PASSWORD` and the
+      `DEMO_COGNITO_*` / `DEMO_ACCOUNT_SUBJECTS` values (runbook section 3). Blank keeps
+      the sandbox off and production unchanged.
+- [ ] **Install:** `cd /srv/one/deploy/vps && sudo docker compose up -d --build
+      --remove-orphans`, then load the sample data with `sudo docker compose run --rm
+      sandbox-reset` and install the nightly reset timer (runbook sections 4–6).
+- [ ] **Check:** runbook section 8 — the front door asks for a login, each demo account
+      opens one workspace, a demo account cannot sign in to `https://oneby8.com`, and
+      `https://oneby8.com` is unchanged.
 
 ## Rollback
 

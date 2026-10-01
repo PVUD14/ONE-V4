@@ -21,10 +21,12 @@
 > The Compose pack below remains valid for standing up an independent environment
 > from scratch; keep the two in step if the live host is ever migrated onto it.
 
-> **Demo site.** The pack also serves `https://demo.oneby8.com` from a separate
-> `web-demo` container: the sales demo, sample data only, no API route, no database
-> (ADR-045, `docs/ops/runbook-demo-site.md`). Both web images refuse to build if the
-> production image contains demo data or the demo image contains the real app.
+> **Sandbox.** With `COMPOSE_PROFILES=sandbox` in `.env`, the pack also serves
+> `https://demo.oneby8.com`: the real application over its own database of sample data
+> (`postgres-demo`, `api-demo`, `web-sandbox`), its own Cognito pool and its own networks,
+> behind a per-person login (ADR-046, `docs/ops/runbook-demo-site.md`). Without the
+> profile none of it starts. Both web images refuse to build if the production image
+> carries sample data or the sandbox marker, or the sandbox image is not the real app.
 
 ## Security posture
 

@@ -2,212 +2,200 @@
 
 How to show ONE to a college (or an employer) on **https://demo.oneby8.com**.
 
-The demo site needs no login. Open the link, pick a role, click around. Everything on
-it — every person, college, company and number — is invented. Nothing you do is saved;
-**reload the page to start again.** Every screen says "Demo — sample data" at the top.
+**This is the real product.** demo.oneby8.com runs the same application as
+https://oneby8.com, over its own database of invented sample data (ADR-046). What you click
+really happens: a job you post is posted, an applicant you move is moved. Every person,
+college, company and number in it is fictional, and every screen says **"Demo — sample
+data"** at the top. **Every night it resets** to the same starting story, so mistakes do no
+harm — but within a day, what you change stays changed, also for the next presenter.
 
-Each story below has: **who it is**, **why it matters to the college**, **the clicks**,
-and **"Live in the real app?"** — what a college can actually use today on
-https://oneby8.com. Read that part before every demo. Never promise something the
-"Live" note says is not built.
+## Getting in
 
-> **Three rules that are true in the demo and in the real product — say them out loud,
-> colleges care about them:**
+1. Open https://demo.oneby8.com. Your browser asks for **your own** username and password
+   (the front door). Divakar gives you these; they are yours alone — never share them.
+2. You then see the ONE sign-in page. Click **Sign in** and use the **demo account** for
+   the story you are telling (table below). Divakar gives you only the demo accounts your
+   demos need.
+3. Each demo account opens exactly one workspace — the same rule the real product follows.
+   To switch story, **Sign out** and sign in as the other account.
+
+| Demo account | Who you are | Story |
+|---|---|---|
+| `student@demo.oneby8.com` | Arjun Reddy, final-year B.Tech CSE, Lakeview Institute of Technology | A |
+| `placement@demo.oneby8.com` | Prof. Meera Nair, placement officer, Lakeview | B |
+| `institution-admin@demo.oneby8.com` | Dr. Lakshmi Menon, Lakeview's administrator | B (setup) |
+| `lecturer@demo.oneby8.com` | Prof. Suresh Raman, CSE lecturer, Lakeview | B, D |
+| `department-head@demo.oneby8.com` | Dr. Farah Siddiqui, head of CSE, Lakeview | B |
+| `employer@demo.oneby8.com` | Rohan Iyer, recruiter at Corvane Labs | C |
+| `employer-owner@demo.oneby8.com` | Neha Kapoor, talent lead (owner) at Corvane Labs — also sees Team and company settings | C |
+| `graduate@demo.oneby8.com` | Kavitha Selvam, Lakeview CSE graduate (2022) | D |
+| `operations@demo.oneby8.com` | Ananya Kulkarni, AI8HT platform operations | E |
+| `growth@demo.oneby8.com` | Vikram Shetty, AI8HT college partnerships | Growth |
+
+> **Three rules that are true in the sandbox because they are true in the product — say
+> them out loud, colleges care about them:**
 > 1. **Readiness is a band, never a score.** A student is *Not enough evidence*,
 >    *Developing*, *Progressing* or *Ready for next step*. ONE never turns a student into
->    a number.
-> 2. **Employers never see the readiness band.** They see only the evidence a student
->    chose to share with them when applying.
-> 3. **The college vouches for its students.** Students join through their college,
->    and records are verified by the college — that is why a verified record on ONE is
->    worth something to an employer.
+>    a number. In the sandbox the bands are computed by the real engine from each
+>    student's sample evidence.
+> 2. **Employers never see the readiness band.** They see only what a student shared with
+>    them when applying.
+> 3. **The college vouches for its students.** Students join through their college, and
+>    records are verified by the college.
 
-### The cast (same people in every role, so the story connects)
+### What is in the sandbox each morning
 
-| Person | Who they are |
-|---|---|
-| Arjun Reddy | Final-year B.Tech CSE student at Lakeview Institute of Technology |
-| Kavitha Selvam | Graduated from Lakeview in 2022, now working |
-| Prof. Meera Nair | Placement officer at Lakeview |
-| Prof. Suresh Raman | Lecturer (CSE) at Lakeview |
-| Rohan Iyer | Talent lead at Zenvia Labs (an employer) |
-| Ananya Kulkarni | Platform operations at AI8HT |
-| Vikram Shetty | AI8HT partnerships (growth) executive |
+- **Lakeview Institute of Technology** (fictional): departments CSE and ECE, three batches,
+  30 current students with verified semester results and a career goal each, two
+  graduates. Readiness bands across the cohort: some *Ready for next step*, most
+  *Progressing* or *Developing*, a few *Not enough evidence*.
+- **Corvane Labs** (fictional, verified): three published jobs aimed at Lakeview —
+  *Graduate Software Engineer* (Bengaluru, hybrid; with an approved **campus drive**),
+  *Data Analyst Intern* (remote), *Embedded Systems Trainee* (Pune, ECE students only).
+- **Twelve applications** at every stage: applied, screening, shortlisted, interview (two
+  video interviews scheduled), an offer waiting for an answer, one hired, one rejected.
+- **Published learning content**: the Career Readiness Fundamentals lessons and check, the
+  career catalogue, and the Practice, Company Prep, Career Tools, Scholarships and Resume
+  Builder guides. The aptitude question bank sits in Operations as drafts for review.
 
----
-
-## Before you start (2 minutes)
-
-1. Open https://demo.oneby8.com. You see the ONE logo, "LEARN | PREPARE | BUILD |
-   GROW" and seven role cards.
-2. Say: *"Everything you will see is sample data, so we can show every role safely.
-   I'll tell you which parts your college can switch on today."*
-3. To change role at any time, click **Switch role** (top right) or a role in the left
-   menu on the home page.
+Menu names below are the real app's. Before your first demo, **walk your story once** —
+signed in as that account — so you know where each screen is.
 
 ---
 
 ## Story A — A student's journey (8–10 minutes)
 
-**Who:** Arjun, final-year CSE student. **Why it matters:** the college sees students
-practise, close skill gaps and get placed — with less chasing by the placement cell.
+**Sign in as:** `student@demo.oneby8.com` (Arjun). **Why it matters:** the college sees
+students practise, close skill gaps and get placed — with less chasing.
 
-| Step | Click | What to say |
+| Step | Where (left menu) | What to show and say |
 |---|---|---|
-| 1. Joins | Home → **Start with a student joining** → *Accept Invitation* → *Continue* → *These Are Right* → *Open My Dashboard* | "Students don't sign up on their own. The placement cell uploads the roster and each student gets an invitation. Their details come from the college, so they're right from day one. The student chooses what employers may see — and the readiness band is never one of those things." |
-| 2. Dashboard | (lands on **Dashboard**) | Point at **Career Readiness → Progressing** and the four-step bar. "This is advisory, a band, not a mark out of 100. It moves as Arjun builds evidence." Show *Today's Plan* and *Upcoming*. |
-| 3. Placement test / practice | Left menu **Assessments**, then **Practice** | "Arjun takes the college's placement tests and practises by topic. Results feed his skill picture." |
-| 4. Skill gaps | **My Roadmap** | "Here's the path to his goal — Software Engineer — with the gaps still to close." |
-| 5. Learning plan | **Learn** | "Courses and practice tied to those gaps." |
-| 6. Applies to a job | **Opportunities** → **Apply Now** on any role → **Submit Application** | The button turns to *Applied ✓*. "He applies with the evidence he chooses to share." |
-| 7. Privacy | **Profile** → right column **Privacy & Consent** | Toggle one setting. "Arjun controls what is shared. 'Readiness band visible to employers' says *Never* — that's not a setting, it's a rule." |
+| 1. Home | **Home** | Arjun's dashboard: his goal (Software Engineer), his readiness band (*Progressing*) marked advisory, and what to do next. "This is a band, not a mark out of 100." |
+| 2. Readiness and skills | **Readiness**, **Skills** | The band and the evidence behind it, per skill. "It moves as he builds evidence." |
+| 3. Learning | **Learning** | The published lessons; open one and complete it live. |
+| 4. Career goal | **My Career** | The goal and the gaps against it, from the real career catalogue. |
+| 5. Jobs | **Opportunities** | Two Corvane jobs aimed at his college. The ECE-only role is not shown to him — "jobs reach exactly the students they are meant for." Open one: the eligibility check uses his verified results. |
+| 6. Applications | **Applications**, **Interviews** | Graduate Software Engineer is at *Interview*, with a video interview in three days; the internship is *Applied*. |
+| 7. Privacy | **Profile**, **Settings** | Arjun decides what is shared. "Readiness visible to employers" is not a setting — it is a rule. |
 
-**Live in the real app?**
-- **Live:** joining by college invitation (roster upload or one at a time); placement
-  tests and assessments; the readiness *band* (marked advisory and never employer-visible);
-  goals, learning resources and lecturer-assigned practice; browsing jobs and applying
-  (with eligibility rules); a public profile link; consent settings.
-- **Not live yet:** students cannot sign up on their own (college invitation only).
-  Invitation **emails** go out only once Divakar switches on outgoing email for students
-  — until then the college shares the link. Several Practice tabs, Company Prep,
-  Career Tools, Scholarships and Resume Builder are placeholders in the real app (they
-  show "NA").
-- **Built but switched off:** the employer seeing a student's *verified skill evidence*
-  is built but off pending approval; today employers see the application snapshot.
+**Live in the real app?** All of the above. **Not live yet:** students cannot sign up on
+their own (college invitation only); email; file upload (so **Resume Builder** and
+**Documents** show their guides and an empty list — say "upload arrives with document
+storage"); AI Career Coach (AI is switched off until it is approved).
 
 ---
 
-## Story B — A placement officer (8 minutes)
+## Story B — The college: placement officer, lecturer, department head (8 minutes)
 
-**Who:** Prof. Meera Nair, placement officer at Lakeview. **Why it matters:** one place
-for the roster, who needs help, and campus drives — without spreadsheets.
+**Sign in as:** `placement@demo.oneby8.com` (Meera). **Why it matters:** one place for the
+roster, who needs help and campus drives — without spreadsheets.
 
-| Step | Click | What to say |
+| Step | Where | What to show and say |
 |---|---|---|
-| 1. Roster upload | **Switch role** → **Placement Officer** → **Students** → **Upload Roster** → *Use sample file* | Show the check: 120 rows, 117 ready, 3 need attention (a duplicate email, a missing registration number, someone who already has an account). "Nothing is created until the file is clean enough." |
-| 2. Invite | *Import 117 & Send Invitations* → *Done* | The banner shows *117 students invited, 0 activated so far*. "Students appear as they activate." |
-| 3. Batch readiness bands | **Students** (filter *Batch*), then **Dashboard** | Point at **Cohort Readiness** (the ring — counts of students in each band) and **Department Readiness Bands**. "You see how many students are in each band, by department — no averages, no scores." |
-| 4. Who needs help | Dashboard → **Students Needing Attention** → *Review*, then **Interventions** | "Assign a counselling session or a practice plan and track it." |
-| 5. Campus drive | **Placement Drives** → **Schedule Drive** → fill in → *Schedule Drive* | The new drive appears at the top of the list and on the dashboard. "Registrations, reminders and results in one place." |
-| 6. Reports | **Reports** → **Download Report** | "For management and accreditation." |
+| 1. Dashboard | **Dashboard** | The cohort at a glance, Corvane's approved campus drive and the applications in flight. |
+| 2. Students | **Students**, **Student Search** | The Lakeview roster from the college's own records. Search for *Arjun*. |
+| 3. Readiness | **Readiness** | How many students are in each band, by department — counts only, no averages, no scores; groups smaller than 5 are hidden for privacy. |
+| 4. Structure | **Departments**, **Batches** | CSE and ECE, three batches. |
 
-**Live in the real app?**
-- **Live:** CSV roster import with a validation preview, and invitations; readiness
-  bands by cohort (groups of fewer than 5 students are hidden for privacy);
-  interventions and counselling notes; reports and exports (readiness report,
-  accreditation exports, placement register); campus drives (requested by an employer
-  and approved by the placement office; nominations need the student's consent).
-- **Different in the real app:** drives sit on the Dashboard and Placement screens, not
-  under their own "Placement Drives" menu item; the real roster shows a student as
-  *Invited* until they activate.
-- **Not live yet:** student invitation emails (see Story A).
+Then **sign out** and sign in as `lecturer@demo.oneby8.com` (Suresh): **My Students** and
+**Academic Verification** — the lecturer sees his department's students and verifies
+records. Optionally `department-head@demo.oneby8.com` (Farah): **Department Overview**,
+**Placement Pipeline**, **Opportunities and Offers** for CSE only. `institution-admin@…`
+shows **Academic Structure**, **Staff** and **Settings** (roster import lives here).
+
+**Live in the real app?** All of the above, plus CSV roster import with a preview,
+invitations, interventions, reports and exports, campus drives requested by employers and
+approved by the placement office. **Not live yet:** student invitation emails.
 
 ---
 
 ## Story C — An employer (7 minutes)
 
-**Who:** Rohan Iyer, talent lead at Zenvia Labs. **Why it matters to a college:**
-employers on ONE are checked, and they only see what students share.
+**Sign in as:** `employer@demo.oneby8.com` (Rohan) — or `employer-owner@…` (Neha) to also
+show **Team** and company settings. **Why it matters to a college:** employers on ONE are
+checked, and see only what students share.
 
-| Step | Click | What to say |
+| Step | Where | What to show and say |
 |---|---|---|
-| 1. Verification | **Switch role** → **Employer** → **Company Profile** → right column **Organisation Verification** | "Every employer is checked by ONE before it can post a job, see applicants or ask for a campus drive." |
-| 2. Post a job | **Opportunities** → **Post a Role** → type a title → **Post Role** | The role appears in the list. |
-| 3. Applicants | **Applicants** → **Advance** on any candidate | The stage changes live. |
-| 4. Consented evidence | **Applicants** → **Profile** on *Arjun Reddy* | Show **Skill evidence shared with consent** — each item says who verified it (the college, a lecturer). Read the line below: *readiness bands … are never visible to employers.* |
-| 5. Interviews and offers | **Interviews**, then **Offers** | "Scheduling and offers in the same place." |
+| 1. Company | **Company Profile** | Corvane is *verified* — "every employer is checked before it can post, see applicants or ask for a campus drive." |
+| 2. Jobs | **Opportunities** | Three published jobs; open *Graduate Software Engineer*: stages, skills, the campus drive Lakeview approved. Post a new role live if you like. |
+| 3. Applicants | **Applicants** | Seven applicants for the engineer role at different stages. Move one forward live. Contact details appear only from *Shortlisted* on. |
+| 4. Candidate | **Candidate Detail** on *Arjun Reddy* | The application snapshot he consented to share — verified education, no readiness band, ever. |
+| 5. Interviews and offers | **Interviews**, **Offers** | Two scheduled video interviews; an offer to Priya Sharma waiting for her answer. |
 
-**Live in the real app?**
-- **Live:** employer access request and verification by operations (an unverified
-  employer can't hire); posting jobs (edit, pause, close, reopen; terms accepted
-  first); applicant pipeline with stage changes, messages and CSV export; the consented
-  application snapshot; interview scheduling with calendar invites, scorecards and
-  offers; screening assessments.
-- **Built but switched off:** the per-skill *verified evidence* list is built "dark"
-  and waits for approval — say "coming next", not "live".
-- **Not live yet:** the requester gets no confirmation email yet; no two-way calendar
-  sync.
+**Live in the real app?** All of the above, plus messages, CSV export, scorecards and
+screening assessments. **Built but switched off:** the per-skill *verified evidence* list
+(waits for approval — say "coming next"). **Not live yet:** confirmation emails; two-way
+calendar sync.
 
 ---
 
 ## Story D — A graduate who has already left college (5 minutes)
 
-**Who:** Kavitha Selvam finished at Lakeview in 2022 and has been working since.
-**Why it matters:** colleges serve their alumni too, without office visits and
-paper requests.
+**Sign in as:** `graduate@demo.oneby8.com` (Kavitha, Lakeview CSE 2022). **Why it
+matters:** colleges serve their alumni too.
 
-| Step | Click | What to say |
+| Step | Where | What to show and say |
 |---|---|---|
-| 1. Home | **Switch role** → **Graduate** | "Kavitha left in 2022. Her college is on ONE, so she can ask it to verify her records." |
-| 2. Request | **Request Verification** → *Continue* → *Continue* → choose what to verify → *Continue* → attach the sample file → **Send Request** | "The college sees her as a *former student*." |
-| 3. College side | **Switch role** → **Lecturer** → **Evidence & Verification** → **Academic record requests** → *Review* on Kavitha → **Verify** | Status turns *Verified*. "Every decision carries a reason; former students are served like current ones." |
-| 4. Records | **Switch role** → **Graduate** → **My Records** → **Share Profile** | (The demo resets when you switch roles — that's expected.) "Verified records go on her profile; she decides who sees them." |
+| 1. Her space | **Home**, **Profile** | Kavitha keeps her own ONE space after leaving: her verified Lakeview record is still hers. |
+| 2. Opportunities | **Opportunities** | Jobs aimed at Lakeview's *current* students are not shown to her — she has left, and nothing scopes her by the college any more. |
+| 3. College side | sign in as `lecturer@…` → **Academic Verification** | Requests are marked *Current / Former student / Not on your roster*; every decision carries a reason. |
 
-**Live in the real app?**
-- **Live (college side):** the academic verification queue marks each request
-  *Current / Former student / Not on your roster*; decisions carry reasons; colleges
-  can also bulk-upload marks.
-- **Not live yet:** a past graduate **cannot join ONE on their own** yet (joining is by
-  college invitation); the "request verification" screen exists in the **Android app
-  only**, not on the website; uploaded documents can't be opened by the college yet;
-  the student isn't notified of the decision yet. Present this story as "where ONE is
-  going", with the college queue as the part that works today.
+**Live in the real app?** The graduate's workspace and the college's verification queue.
+**Not live yet:** a past graduate cannot join ONE on their own; the "request verification"
+screen is in the Android app only; the student is not yet notified of the decision. Present
+the self-service part as "where ONE is going".
 
 ---
 
-## Story E — Operations onboarding a college (5 minutes)
+## Story E — Operations (5 minutes)
 
-**Who:** Ananya at AI8HT operations. **Why it matters to a college:** onboarding is a
-short, checked process — and the college's own admin stays in control of its students.
+**Sign in as:** `operations@demo.oneby8.com` (Ananya). **Why it matters to a college:**
+onboarding is a short, checked process, and every sensitive change is recorded.
 
-| Step | Click | What to say |
+| Step | Where | What to show and say |
 |---|---|---|
-| 1. Overview | **Switch role** → **Operations** | Colleges live, colleges onboarding, employers waiting. |
-| 2. Onboard | **Colleges** → **Onboard a College** → *Continue* → *Mark Verified* → **Send Invitation** → *Done* | The college joins the table at *Admin invited*. "Next, your admin sets up departments and uploads the roster — that's Story B." |
-| 3. Employer checks | **Employer Verification** → *Review* on *QuickHire Staffing* | Show the failed checks (free email, website mismatch) → **Ask for More**. Then *Brightpath Fintech* → **Verify Employer**. |
-| 4. Trail | **Audit Log** | "Every sensitive change is recorded, and some need a second person." |
+| 1. Overview | **Overview** | Colleges, employers, students on the platform — the sandbox's own counts. |
+| 2. Organisations | **Organizations**, **Verification** | Lakeview and Corvane, both verified; onboard a new college live if you like. |
+| 3. Content | **Content Management** | The aptitude question bank waiting as drafts: "content is reviewed by a second person before any student sees it." |
+| 4. Trail | **Audit Logs** | Every sensitive change, with who and when. |
 
-**Live in the real app?**
-- **Live:** creating and verifying a college organisation and inviting its first
-  admin; college contract and account fields; the employer verification queue
-  (suspending an employer needs a second approver); audit search; feature flags (only
-  the global switch; risky flags need two people); a minimal support desk.
-- **Demo only:** the onboarding *stage pipeline* view and the question-bank page as
-  drawn here are presentation; the underlying steps are real.
-- **Not live yet:** outgoing email for invitations needs Divakar to switch on mail
-  first.
+**Live in the real app?** All of the above, plus feature flags (risky ones need two
+people) and the support desk. **Not live yet:** outgoing email for invitations.
 
 ---
 
-## Optional — Growth (partnerships) (3 minutes)
+## Optional — Growth (3 minutes)
 
-Use with partners or investors, not usually with colleges.
-**Switch role** → **Growth** → **Leads** → **Advance** a lead until *Won* → **Field
-Visits** → **Log Visit** → **Targets** → **Commission**.
-
-**Live in the real app?** Only the Growth sign-in, menu and team set-up are live.
-**Leads, field visits, territory, targets and commission are not built** — the real
-pages say "Not built yet". Present this entirely as a preview. The commission figures
-are invented.
+**Sign in as:** `growth@demo.oneby8.com` (Vikram). Use with partners or investors, not
+usually with colleges. **Home** shows his role, team (College partnerships) and manager.
+**Leads, Field, Territory, Targets and Commission are not built yet** — the pages say so
+plainly. Present Growth as a preview of the plan, never as working.
 
 ---
 
 ## Questions you will get
 
-- **"Is this our data?"** No. Everything on demo.oneby8.com is invented. Your college's
-  real space on ONE starts empty and fills only with your own students.
+- **"Is this our data?"** No. Everything on demo.oneby8.com is invented, in its own
+  database. Your college's real space on ONE starts empty and fills only with your own
+  students.
+- **"Is this the real product or a mock-up?"** The real product — the same code as the
+  live site. Only the data is invented.
 - **"Can employers see our students' scores?"** No. Employers never see the readiness
-  band, and see only the evidence a student chose to share with them.
+  band, and see only what a student chose to share.
 - **"Is there AI in this?"** Not in what you see today. Any AI feature will arrive
   switched off, behind its own switch, and anything it produces is a draft a person
   approves.
-- **"Does it work on phones?"** Yes — there is an Android app for the real product.
-  The demo site is for laptops and projectors; it works on a phone browser too.
-- **"Can we try it ourselves?"** Send them the link. No login, nothing to break; reload
-  to start again.
+- **"Does it work on phones?"** Yes — there is an Android app for the real product. The
+  sandbox is for laptops and projectors; it works in a phone browser too.
+- **"Can we try it ourselves?"** Not on their own: access is per person. Ask Divakar for a
+  front-door login for them, and give them one demo account.
 
 ## If something goes wrong
 
-- A screen looks odd → reload the page (it resets to the start of that role).
-- The site does not open → tell Divakar; do not use the real site for a demo, and never
-  sign in to https://oneby8.com with a real account in front of an audience.
+- Someone changed the story you need (moved an applicant, closed a job) → ask Divakar to
+  reset the sandbox, or work with what is there; it resets tonight anyway.
+- "No active ONE workspace" after sign-in → that demo account is not switched on yet; tell
+  Divakar.
+- The site does not open → tell Divakar. Never use https://oneby8.com for a demo, and never
+  sign in there with a real account in front of an audience.

@@ -13,5 +13,9 @@ After=docker.service
 [Service]
 Type=oneshot
 WorkingDirectory=/srv/one/deploy/vps
+# The sandbox API is stopped while its database is dropped (otherwise it crashes on the
+# closed connections and Docker restarts it), and started again whatever the outcome.
+ExecStartPre=/usr/bin/docker compose --profile sandbox stop api-demo
 ExecStart=/usr/bin/docker compose --profile sandbox --profile sandbox-tools run --rm sandbox-reset
+ExecStopPost=/usr/bin/docker compose --profile sandbox start api-demo
 TimeoutStartSec=900

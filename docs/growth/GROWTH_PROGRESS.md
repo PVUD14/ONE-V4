@@ -767,3 +767,125 @@ code, so an offline creation would promise a link that does not exist yet.
   institution-department-workspace 17/17) still printed "out of shared memory" from teardown `DROP SCHEMA` after all their
   tests had passed — the known environmental condition, not a test failure. Log: `E:/one-wt/logs/growth05-rerun.log`.
 - The base moved 19 commits during the work; this branch is not rebased onto it (the coordinator merges).
+
+## GROWTH-07 — Attribution, disputes, reassignment and leavers — 2026-10-02
+**Result:** Complete — every college and employer handed to AI8HT is credited (or deliberately not) in the same
+transaction as its handoff; a conflicting referral and lead owner opens a dispute instead; disputes, reassignment and
+ending change credit only as an end plus a new row, by someone who is not a party, with a reason, audit and an event;
+growth leave dates are recorded for the ledger; and nobody verifies, links, onboards, decides or reassigns anything that
+credits them — checked on the user in the routes and in the database. No amount anywhere.
+**Branch / PR:** feat/growth-attribution (from feat/plan-phases-0-to-2 at 31aaaf8) → feat/plan-phases-0-to-2 (pushed; not merged)
+**Commits:** aa45815 (design) · 975043d (tests) · ec9d523 (implementation) · this report
+**Files created:**
+- `docs/architecture/growth-attribution-table-design.md` (written and committed before the migration)
+- `packages/persistence/drizzle/0110_growth_attribution.sql`
+- `packages/authorization/src/growth-attribution.ts`, `growth-attribution.test.ts`
+- `apps/api/src/http/growth-attribution-service.ts`, `growth-attribution.controller.ts`, `growth-attribution.integration.spec.ts`
+- `apps/web/src/rolePortal/growthCommission.tsx`, `growthAttributionAdmin.tsx`, `growthCommission.test.tsx`
+- Android `GrowthCredit.kt`
+**Files modified:** `packages/authorization/src/index.ts`; `packages/events/src/index.ts` (four events);
+`apps/api/src/http/growth-pipeline-service.ts` (the link writes the attribution; the owner cannot link),
+`growth-employer-service.ts` (the onboarding writes the attribution or opens the conflict dispute; the referrer or lead
+owner cannot onboard or hand-link), `operations-institution-onboarding.controller.ts` (the verification guard, four
+lines), `privacy-export-sections.ts`, `api-security.module.ts`; `docs/architecture/privacy-export-coverage.md`; web
+`api/growth.ts`, `rolePortal/growth.tsx` (Commission routed), `rolePortalPages.tsx` (one Settings section),
+`growthPortal.test.tsx`; Android `Api.kt`, `Growth.kt`.
+**Migrations added:** `0110_growth_attribution.sql` (the number assigned). No earlier migration edited; no earlier
+function redefined — new tables, new functions and new triggers only (including a `BEFORE INSERT` trigger on
+`organization_verification_events` and a third `AFTER UPDATE OF state` trigger on `organization_memberships`); no
+capability CHECK, grant trigger, scope trigger or `operation_approval_extended_target_type()` touched. Applied twice by
+the migrator and replayed twice by hand with `psql -v ON_ERROR_STOP=1` on a migrated database without error.
+
+**What was built**
+1. *Schema (0110).* `growth_attributions` (§8.1): one live row per organisation (partial unique index); basis CHECKed
+   against its source (college handoff request, employer onboarding, dispute, superseded row) and its reason; **CHECKs that
+   the creator and the ender are never the beneficiary**; a guard trigger that refuses deletes, starts rows live on the
+   database clock, verifies the source names the beneficiary (owner at link; the onboarding's candidate), and allows only
+   the end, once. `growth_attribution_disputes` (§8.4): `CLAIM` or `ONBOARDING_CONFLICT`, one `OPEN` per organisation,
+   statement 1–2000 characters for a claim, **a CHECK that the decider is neither party**, decided once; the trigger
+   enforces the 90-day window on the database clock and that the claimant is ACTIVE and worked on the organisation.
+   `growth_leaver_events`: `LEFT` / `RETURNED` for growth memberships, written by trigger in the same statement,
+   append-only. Helper functions `growth_organization_handed_off_at`, `growth_user_worked_on` and
+   `growth_organization_parties` (the last is what GROWTH-09/10/12 reuse for their own self-dealing checks).
+2. *Credit at handoff.* The college link credits the lead's owner at the link (`LEAD_OWNER_AT_HANDOFF`), nobody when the
+   lead had no owner. The employer onboarding, at the employer's **first** onboarding only, credits the referrer
+   (`REFERRAL_LINK`) or the lead owner, writes nothing for house, and on `CONFLICT` writes **no attribution and opens an
+   `ONBOARDING_CONFLICT` dispute** (referrer as claimant, lead owner as respondent).
+3. *Disputes.* A growth person claims an organisation they worked on (owned or once owned its lead, requested its
+   handoff, referred one of its requests, or is named by its onboarding) within 90 days of its handoff; not one already
+   credited to them, not while another is open. A growth admin who is neither party decides: upheld ends the disputed row
+   and credits the claimant **from the original date**; rejected changes nothing, except a conflict, where it credits the
+   lead owner. The claimant sees their statement; the respondent is told a dispute exists, never what it says; the audit
+   row records the statement's length, never its text.
+4. *Reassignment, ending and leavers.* A growth admin reassigns (reasons `BENEFICIARY_LEFT`, `WRONG_PERSON_CREDITED`,
+   `TEAM_CHANGE`, `CORRECTION`; effective now; only to an ACTIVE growth person on the matching team; not while a dispute
+   is open) or ends credit (`CORRECTION`, `ORGANIZATION_EXITED`). The admin list's "Credited person left" view shows each
+   leaver's leave date and the end of their 90-day settlement.
+5. *Self-dealing guard (§8.6).* Refused for the person, across memberships: a verification transition of an organisation
+   they are credited for or party to a dispute about (route `403 GROWTH_SELF_DEALING_REFUSED` and a trigger on
+   `organization_verification_events`); linking a handoff whose lead they own; onboarding an access request they
+   referred or whose lead they own (the decision rolls back; another operator must do it); hand-linking a request to
+   their own lead; deciding their own dispute; reassigning or ending credit to or from themselves.
+6. *Web.* Growth → Commission: "Credited to you" (basis, since, dispute open), ended credit, "Your disputes", "Dispute a
+   credit" (only what the server offers), four tiles with NA in the commission slot, "Rate not set" and "Employer
+   commission on hold" chips. Operations → Settings → Growth attribution (`GROWTH_ADMIN`; a section, no navigation item):
+   open disputes with statement, parties and evidence, and the decision form; attributions by view with search;
+   reassign and end.
+7. *Android.* A read-only "Credited to you" card on the Growth home (saved copy offline), with the person's disputes and
+   their states; it says disputes are opened on the web.
+
+**Tests added**
+- `packages/authorization/src/growth-attribution.test.ts` (16): vocabulary pinned to 0110; credit from the onboarding
+  candidate (referral, lead owner, conflict, house, never someone the candidate does not name); window and settlement
+  dates; decision effects for a claim, a house claim and a conflict; who may decide; reassignment refusals; statements
+  and notes.
+- `apps/api/src/http/growth-attribution.integration.spec.ts` (17): college credit with audit and event and no amount;
+  house; **one live attribution per organisation (index) and only-ever-ended rows**; employer referral / lead owner /
+  house / second onboarding; **conflict → no attribution, a dispute**; claims (eligible, not eligible 404, already
+  credited, too long, one open per organisation in the route and the index; the respondent never sees the statement);
+  **the 90-day window in the API and on the database clock**; **a disputant cannot decide, either side, route and
+  CHECK**, then a third admin upholds from the original date; conflict upheld / rejected and OTHER needing a note; leaver
+  date, admin LEFT view, reassignment rules and history; RETURNED events and none for operators; reassign / end never to
+  or from the admin, never during a dispute; **an operator credited for an employer cannot verify it (route and
+  trigger), another can**; a dispute party cannot verify; link, onboarding and hand-link refused for the person they
+  would credit; access for every route; the export (own statement only).
+- `apps/web/src/rolePortal/growthCommission.test.tsx` (6); `growthPortal.test.tsx` updated on purpose (Commission now
+  shows credit; still no amount).
+
+**Acceptance criteria**
+- [x] One live attribution per organisation — `growth_attributions_live_org_uq`, a duplicate insert refused in the spec;
+  rows are only ever ended (trigger).
+- [x] A conflicting referral and lead owner writes no attribution and opens a dispute — `attributeEmployerOnboarding`;
+  the trigger also refuses a conflict dispute where someone is credited.
+- [x] A disputant cannot decide their own dispute — route (`403`) and `growth_dispute_decider_ck`, claimant and respondent.
+- [x] An operator attributed to an employer cannot verify it — route (`403`) and the verification trigger; another
+  operator verifies it.
+- [x] Design §18: table design first; attribution at college handoff and employer onboarding; disputes with the 90-day
+  window; admin reassignment; the self-dealing guard on `OPS_VERIFY` and on linking (deferred by GROWTH-04/05); employer
+  attributions written and disputable, earning nothing (D11); Android read-only "Credited to you".
+
+**Decisions for Divakar** (recommended answers taken, recorded in the table design)
+- Attribution is written only at an organisation's first handoff; a later onboarding of the same employer writes nothing.
+- A conflict's dispute names the referrer as claimant; upheld credits the referrer, rejected the lead owner.
+- A claim may be made on a house organisation by someone who worked on it, within the window.
+- One open dispute per organisation; the window runs from the handoff, not from a later reassignment.
+- Disputes and reassignment are controlled by separation (decider not a party; admin not the old or new beneficiary) and
+  audit, **not** an OPS-02 approval: a new extended action key would redefine `operation_approval_extended_target_type()`
+  in parallel with GROWTH-09/10, and the money a change leads to still passes a dual-controlled payout (GROWTH-12).
+- Reassignment only to an ACTIVE growth person on the matching team, never while a dispute is open.
+- A referral credits its owner at onboarding even if they have left; the admin list flags it.
+- The verification guard covers every transition and the parties of an open dispute; a refused link or onboarding is
+  done by another operator.
+- Leave dates are recorded from 0110 on, not back-filled.
+
+**Android:** changed (above). Opening a dispute is web-only by design (§18: read-only on the phone).
+
+**Limitations / not done**
+- No ledger, so nothing yet holds or moves accruals on a dispute or a reassignment (GROWTH-11 follows the events).
+- The payment and approval self-dealing checks are GROWTH-09/10/12's (they reuse `growth_organization_parties`).
+- No manager team view of credit (design §10.8 places it with statements, GROWTH-11).
+- The approver of an OPS-02 organisation suspension is not checked against attribution (a suspension is not in the
+  credited person's favour); the executor is.
+- Android compiled, not run on a device.
+
+**Validation** — pending; recorded below when the full run completes.

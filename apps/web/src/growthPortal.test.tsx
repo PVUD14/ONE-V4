@@ -43,6 +43,9 @@ function signInAs(role: 'GROWTH_EXECUTIVE' | 'GROWTH_MANAGER', me: Record<string
           locationNotice: { version: 'draft-2026-10', status: 'DRAFT_FOR_LEGAL_REVIEW', text: ['Attaching your location to a visit is optional.'] } },
         correlationId: 'corr-field' }) };
     }
+    if (url.endsWith('/api/v1/growth/attributions')) {
+      return { ok: true, json: async () => ({ credited: [], disputes: [], disputable: [], windowDays: 90, correlationId: 'corr-attr' }) };
+    }
     if (url.endsWith('/api/v1/growth/me')) {
       return { ok: true, json: async () => (me ?? { role, staffType: 'EMPLOYEE', teams: [], correlationId: 'corr-me' }) };
     }
@@ -107,24 +110,26 @@ describe('a growth executive signing in', () => {
     // Every figure slot is NA until its source exists: nothing is invented.
     expect(within(stats).getAllByText('NA')).toHaveLength(4);
     expect(within(stats).queryByText(/\d/)).not.toBeInTheDocument();
-    // GROWTH-06 built Field; targets and commission still say plainly they are not built.
-    expect(screen.getByText(/Targets and commission are not built yet/i)).toBeInTheDocument();
+    // GROWTH-06 built Field; GROWTH-07 built credit; targets and commission amounts still say plainly they are not built.
+    expect(screen.getByText(/Targets and commission amounts are not built yet/i)).toBeInTheDocument();
   });
 
   it('shows an honest empty state on every other page', async () => {
     signInAs('GROWTH_EXECUTIVE');
     render(<App />);
     const sidebar = await screen.findByLabelText('Growth navigation');
-    // GROWTH-06: Field is built, so it is no longer in this list (see the Field case below).
-    for (const label of ['Targets', 'Commission']) {
+    // GROWTH-06: Field is built; GROWTH-07: Commission shows credit (see growthCommission.test.tsx).
+    for (const label of ['Targets']) {
       fireEvent.click(within(sidebar).getByRole('button', { name: label }));
       expect(await screen.findByRole('heading', { name: label })).toBeInTheDocument();
       expect(screen.getByText(/is not built yet/i)).toBeInTheDocument();
       expect(within(sidebar).getByRole('button', { name: label })).toHaveAttribute('aria-current', 'page');
     }
     // Commission never shows an amount: rates are not set.
+    fireEvent.click(within(sidebar).getByRole('button', { name: 'Commission' }));
+    expect(await screen.findByRole('heading', { name: 'Credit and commission' })).toBeInTheDocument();
     expect(screen.getByText(/no amount is shown/i)).toBeInTheDocument();
-    expect(screen.queryByText(/₹|INR|Rs\./)).not.toBeInTheDocument();
+    expect(screen.queryByText(/INR|Rs\./)).not.toBeInTheDocument();
   });
 
   it('cannot open the Operations workspace', async () => {

@@ -275,6 +275,16 @@ object Api {
     // GROWTH-04: the college pipeline. Reads keep a saved copy; moves and the handoff go through GrowthQueue.
     suspend fun growthLeadPipelineRaw(context: Context, leadId: String): String = request(context, "GET", "/api/v1/growth/leads/$leadId/pipeline")
 
+    // GROWTH-05: employer referral links. The list keeps a saved copy (sharing works offline); creating
+    // and revoking need a signal, because the server generates the code.
+    suspend fun growthReferralCodesRaw(context: Context): String = request(context, "GET", "/api/v1/growth/referral-codes")
+
+    suspend fun createGrowthReferralCode(context: Context, idempotencyKey: String): String =
+        request(context, "POST", "/api/v1/growth/referral-codes", "{}", idempotencyKey)
+
+    suspend fun revokeGrowthReferralCode(context: Context, codeId: String): String =
+        request(context, "POST", "/api/v1/growth/referral-codes/$codeId/revoke", "{}")
+
     fun growthStageBody(fromStage: String, toStage: String, reasonCode: String?): String = kotlinx.serialization.json.buildJsonObject {
         put("fromStage", kotlinx.serialization.json.JsonPrimitive(fromStage))
         put("toStage", kotlinx.serialization.json.JsonPrimitive(toStage))
@@ -1036,7 +1046,21 @@ internal fun documentVerificationLabel(doc: DocumentDto): String = when {
 )
 /** GROWTH-04: `GET /api/v1/growth/leads/{id}/pipeline`. Milestones are null until operations links the college. */
 @Serializable data class GrowthSuppressedCountDto(val suppressed: Boolean = true, val value: Int? = null)
-@Serializable data class GrowthMilestoneDto(val code: String = "", val state: String = "NA", val at: String? = null, val note: String? = null, val count: GrowthSuppressedCountDto? = null)
+@Serializable data class GrowthMilestoneDto(
+    val code: String = "", val state: String = "NA", val at: String? = null, val note: String? = null, val count: GrowthSuppressedCountDto? = null,
+    /** GROWTH-05, employer leads: PUBLISHED_NOW on FIRST_JOB_PUBLISHED, a count per drive state on CAMPUS_DRIVE. Records, never people. */
+    val counts: Map<String, Int> = emptyMap(),
+)
+/** GROWTH-05: an access request linked to an employer lead — time, state and whose referral ("YOU" / "ANOTHER_TEAM_MEMBER"). */
+@Serializable data class GrowthLeadAccessRequestDto(val receivedAt: String? = null, val state: String = "", val referral: String? = null)
+/** GROWTH-05: `GET /api/v1/growth/referral-codes`. The link is the public form path and a random code. */
+@Serializable data class GrowthReferralCountsDto(val pending: Int = 0, val onboarded: Int = 0, val closed: Int = 0)
+@Serializable data class GrowthReferralCodeDto(
+    val id: String = "", val code: String = "", val linkPath: String = "", val createdAt: String? = null,
+    val revokedAt: String? = null, val revokedReasonCode: String? = null, val referrals: GrowthReferralCountsDto = GrowthReferralCountsDto(),
+)
+@Serializable data class GrowthReferralLimitsDto(val liveCodesPerPerson: Int = 3, val createdPerDay: Int = 5)
+@Serializable data class GrowthReferralCodesDto(val eligible: Boolean = false, val codes: List<GrowthReferralCodeDto> = emptyList(), val limits: GrowthReferralLimitsDto = GrowthReferralLimitsDto())
 @Serializable data class GrowthHandoffRequestDto(
     val id: String = "", val state: String = "", val requestedAt: String? = null, val contractReferenceReported: String = "",
     val decidedAt: String? = null, val declineReasonCode: String? = null, val contactsCarried: Int? = null,
@@ -1053,6 +1077,7 @@ internal fun documentVerificationLabel(doc: DocumentDto): String = when {
     val canRequestHandoff: Boolean = false,
     val handoffRequests: List<GrowthHandoffRequestDto> = emptyList(),
     val milestones: List<GrowthMilestoneDto>? = null,
+    val accessRequests: List<GrowthLeadAccessRequestDto> = emptyList(),
     val vocabulary: GrowthPipelineVocabularyDto = GrowthPipelineVocabularyDto(),
 )
 @Serializable data class GrowthRegionPersonDto(val email: String = "", val role: String = "", val since: String = "")

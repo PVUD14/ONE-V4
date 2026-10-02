@@ -6,6 +6,11 @@ package pro.ai8ht.one
 // once operations has linked it, follows onboarding through milestones read from Operations' own
 // records: NA where there is no source, "<5" for a small count, never a student or an amount.
 //
+// GROWTH-05: on an employer lead, the employer's milestones from the start (access request,
+// onboarding, verification, terms, first job with how many are published now, campus drives per
+// state) and the access requests linked to it, with whether the referral link was yours or another
+// team member's. Counts and states only: never a job's content, an applicant or a college.
+//
 // Moves and the handoff request go through GrowthQueue (offline-safe, sent once). A move carries the
 // stage the person saw; if the lead moved meanwhile the server refuses it and the queue says so.
 
@@ -55,7 +60,21 @@ private val milestoneLabels = mapOf(
     "STUDENTS_ACTIVATING" to "Students activating",
     "FIRST_PAYMENT_CLEARED" to "First payment cleared",
     "EXITED" to "College left ONE",
+    "ACCESS_REQUESTED" to "Asked for employer access",
+    "ONBOARDED" to "Onboarded by operations",
+    "TERMS_ACCEPTED" to "Employer terms accepted",
+    "FIRST_JOB_PUBLISHED" to "First job published",
+    "CAMPUS_DRIVE" to "Campus drives",
+    "SUSPENDED" to "Suspended by operations",
 )
+
+private val requestStateLabels = mapOf("PENDING" to "Waiting for operations", "ONBOARDED" to "Onboarded", "DECLINED" to "Declined", "SPAM" to "Closed as spam")
+
+private fun milestoneCounts(milestone: GrowthMilestoneDto): String? = when {
+    milestone.counts.isEmpty() -> null
+    milestone.code == "FIRST_JOB_PUBLISHED" -> "${milestone.counts["PUBLISHED_NOW"] ?: 0} published now"
+    else -> milestone.counts.entries.joinToString(" · ") { "${it.value} ${prettify(it.key).lowercase()}" }
+}
 
 private val contractReferencePattern = Regex("^[A-Za-z0-9][A-Za-z0-9/_.:-]{0,63}$")
 
@@ -185,6 +204,19 @@ internal fun LeadPipelineSection(leadId: String, leadName: String, contacts: Lis
             style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
     }
 
+    if (data.kind == "EMPLOYER") {
+        SectionTitle("Access requests")
+        if (data.accessRequests.isEmpty()) {
+            Text("No access request from this company yet. Share your referral link, or ask them to use the request form with their work email.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        data.accessRequests.forEach { item ->
+            Text((item.receivedAt?.let(::formatWhen) ?: "NA") + " · " + (requestStateLabels[item.state] ?: prettify(item.state)) +
+                when (item.referral) { "YOU" -> " · through your referral link"; "ANOTHER_TEAM_MEMBER" -> " · through another team member's referral link"; else -> "" },
+                style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
+        }
+    }
+
     data.milestones?.let { milestones ->
         SectionTitle("Onboarding")
         PilotCard(Modifier.fillMaxWidth()) {
@@ -192,16 +224,20 @@ internal fun LeadPipelineSection(leadId: String, leadName: String, contacts: Lis
                 milestones.forEach { milestone ->
                     Row(Modifier.padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
                         IconBubble(when (milestone.state) { "REACHED" -> Icons.Filled.CheckCircle; "NA" -> Icons.Filled.RemoveCircleOutline; else -> Icons.Filled.Schedule },
-                            when (milestone.state) { "REACHED" -> Tone.Green; "NA" -> Tone.Violet; else -> Tone.Amber }, size = 26.dp)
+                            if (milestone.code == "SUSPENDED" && milestone.state == "REACHED") Tone.Amber
+                            else when (milestone.state) { "REACHED" -> Tone.Green; "NA" -> Tone.Violet; else -> Tone.Amber }, size = 26.dp)
                         Spacer(Modifier.width(8.dp))
                         Column(Modifier.weight(1f)) {
-                            Text(milestoneLabels[milestone.code] ?: prettify(milestone.code), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                            Text(if (milestone.code == "VERIFIED" && data.kind == "EMPLOYER") "Employer verified" else milestoneLabels[milestone.code] ?: prettify(milestone.code),
+                                style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
                             milestone.note?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                            milestoneCounts(milestone)?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                         }
                         Text(milestoneValue(milestone), style = MaterialTheme.typography.labelMedium)
                     }
                 }
-                Text("Read from operations' records each time; nothing here names a student or shows an amount.",
+                Text(if (data.kind == "EMPLOYER") "Read from operations' and the employer's records each time; counts and states only, never a job's content, an applicant or a college."
+                    else "Read from operations' records each time; nothing here names a student or shows an amount.",
                     style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
             }
         }

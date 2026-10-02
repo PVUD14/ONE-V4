@@ -12,6 +12,8 @@ package pro.ai8ht.one
 //
 // GROWTH-03: a Leads tab (GrowthLeads.kt) and real counts in the Open leads and Unowned slots.
 //
+// GROWTH-05: on Home, the employer team's referral links (GrowthReferrals.kt), shared through the
+// Android share sheet even offline.
 // GROWTH-06: a Field tab (GrowthField.kt) — follow-ups due, recent work, and what is still waiting
 // to be sent — real "Visits this month" and a Today card on Home, the offline queue sent whenever
 // the network returns, and a sign-out that warns about unsent work and then clears the cache, the
@@ -222,6 +224,8 @@ private fun GrowthHome(me: GrowthMeDto, onOpenField: () -> Unit) {
         GrowthTodayCard(me.followUpsDue, onOpenField)
         Spacer(Modifier.height(10.dp))
         GrowthQueueCard()
+        // GROWTH-05: only the employer partnerships team has referral links to share.
+        if (me.teams.any { it.team == "EMPLOYER_PARTNERSHIPS" }) GrowthReferralLinksCard()
         SectionTitle("Your teams")
         if (me.teams.isEmpty()) {
             PilotCard {

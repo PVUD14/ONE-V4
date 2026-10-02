@@ -2987,4 +2987,11 @@ cases (design open point 1); the worker is not added to any Compose pack or syst
 applied / 89 already applied): ai-evaluation 47/47, ai-orchestration 62/62, authorization (content factory, lesson
 editor, question bank) 22/22, career-readiness 132/132, events 14/14, persistence AI and content suites 64/64, API
 (content factory, lessons, question bank, lesson languages, AI operations, inference boundary) 83/83, web (content
-factory, lessons, question bank) 48/48. Full run: to follow in this entry.
+factory, lessons, question bank) 48/48. Full run (`E:/one-wt/logs/validate.sh E:/one-wt/eng23 one_eng23 eng23`,
+fresh `one_eng23`): install 0; migrate twice (89 applied, then 0 / 89 already applied); typecheck 0; build 0;
+policy 0; `pnpm audit --prod --audit-level=high` 0; tests — every package passed except shared-Postgres load
+failures: api `employer-assessments-emp12` and `operations-analytics` (whole-file, `out of shared memory`) and one
+`institution-announcements` case (`out of shared memory`), and web `App.test.tsx` "resolves every visible navigation
+item…" (20 s timeout) and one `institutionDepartment.test.tsx` case under load (api 1417/1418 and web 1000/1002 in the
+run). Re-run alone: 16/16, 10/10, 21/21, and the two web files 113/113. None touches ENG-23 code; no test was skipped
+or changed to pass. Android not touched, so not compiled.

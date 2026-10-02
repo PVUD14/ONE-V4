@@ -32,6 +32,7 @@ import {
 } from '../api.js';
 import type { ApprovalPolicyDto, HighRiskActionKey, OperationApprovalDto, OperationApprovalQueueDto } from '../api.js';
 import { purgeInstitutionOffboarding } from '../api/institutionContract.js';
+import { clearCollegePayment, formatPaise } from '../api/collegePayments.js';
 import { V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { StatusBadge } from '../studentComponents.js';
 import { formatApiError } from './shared.js';
@@ -71,6 +72,8 @@ export function describeApproval(approval: OperationApprovalDto): string {
       return `Raise the limits of the AI feature ${summary.aiFeatureKey ?? 'NA'} to ${summary.aiCap ?? 'NA'} per ${summary.aiCapWindow === 'MONTH' ? 'month' : 'day'}, input up to ${summary.aiMaxInputChars ?? 'NA'} characters`;
     case 'INSTITUTION_DATA_PURGE':
       return `Delete the records of ${summary.organizationName ?? 'NA'}, which has left ONE`;
+    case 'INSTITUTION_PAYMENT_CLEARANCE':
+      return `Record as cleared on ${summary.paymentClearedOn ?? 'NA'}: ${summary.organizationName ?? 'NA'}'s ${(summary.paymentInstrument ?? 'NA').replaceAll('_', ' ').toLowerCase()} ${summary.paymentReference ?? 'NA'} of ${typeof summary.paymentAmountPaise === 'number' ? formatPaise(summary.paymentAmountPaise) : 'NA'} for ${summary.paymentStudentsPaid ?? 'NA'} students, received ${summary.paymentReceivedOn ?? 'NA'}`;
   }
 }
 
@@ -113,6 +116,8 @@ async function executeApproval(token: string, approval: OperationApprovalDto): P
       }); return;
     case 'INSTITUTION_DATA_PURGE':
       await purgeInstitutionOffboarding(token, String(payload.offboardingId), { reasonCode, approvalId }); return;
+    case 'INSTITUTION_PAYMENT_CLEARANCE':
+      await clearCollegePayment(token, String(payload.paymentId), { clearedOn: String(payload.clearedOn), reasonCode, approvalId }); return;
   }
 }
 

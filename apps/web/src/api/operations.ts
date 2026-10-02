@@ -273,7 +273,7 @@ export function revokeStaffCapability(
 
 export type HighRiskActionKey = 'ORGANIZATION_SUSPEND' | 'FEATURE_FLAG_HIGH_RISK_CHANGE' | 'OUTBOX_BACKLOG_SUPERSEDE' | 'PRIVACY_HOLD_RELEASE' | 'CAPABILITY_GRANT_HIGH_RISK'
   | 'CAREER_REQUIREMENT_SET_PUBLISH' | 'CONTENT_SKILL_PUBLISH' | 'CONTENT_QUESTION_PUBLISH' | 'CONTENT_LESSON_PUBLISH'
-  | 'COMMS_TEMPLATE_PUBLISH' | 'AI_FEATURE_ENABLE' | 'AI_FEATURE_LIMITS_RAISE' | 'INSTITUTION_DATA_PURGE';
+  | 'COMMS_TEMPLATE_PUBLISH' | 'AI_FEATURE_ENABLE' | 'AI_FEATURE_LIMITS_RAISE' | 'INSTITUTION_DATA_PURGE' | 'INSTITUTION_PAYMENT_CLEARANCE';
 
 export interface ApprovalDecisionReasonsDto {
   readonly APPROVE: readonly string[];
@@ -313,6 +313,9 @@ export interface OperationApprovalDto {
     /** OPS-12: switching an AI feature on names the model and prompt version; widening names the new limits. */
     readonly aiFeatureKey?: string | null; readonly aiModel?: string | null; readonly aiPromptKey?: string | null; readonly aiPromptVersion?: number | null;
     readonly aiCap?: number | null; readonly aiCapWindow?: string | null; readonly aiMaxInputChars?: number | null;
+    /** GROWTH-10: a college payment clearance names the instrument, the amount, the count and the cleared date. */
+    readonly paymentInstrument?: string | null; readonly paymentReference?: string | null; readonly paymentReceivedOn?: string | null;
+    readonly paymentAmountPaise?: number | null; readonly paymentStudentsPaid?: number | null; readonly paymentClearedOn?: string | null;
   };
   readonly reasonCode: string;
   readonly note: string | null;

@@ -30,6 +30,7 @@ export * from './api/operationsOverview.js';
 export * from './api/careerCatalogue.js';
 export * from './api/roleDemand.js';
 export * from './api/collegeHealth.js';
+export * from './api/collegePayments.js';
 export * from './api/skillMap.js';
 export * from './api/questionBank.js';
 export * from './api/lessons.js';

@@ -54,6 +54,7 @@ import { OperationsApprovalsPanel } from './rolePortal/approvals.js';
 import { OperationsSystemHealthPage } from './rolePortal/systemHealth.js';
 import { OperationsRoleDemandPage } from './rolePortal/roleDemand.js';
 import { OperationsCollegeAccountPanel, OperationsCollegeHealthPanel } from './rolePortal/collegeHealth.js';
+import { OperationsCollegePaymentsPanel } from './rolePortal/collegePayments.js';
 import { OperationsPrivacyConsolePage } from './rolePortal/privacyConsole.js';
 import { OperationsAccessReviewsPage } from './rolePortal/accessReviews.js';
 import { OperationsIncidentRegisterPage } from './rolePortal/incidents.js';
@@ -295,7 +296,7 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   if (!demoMode && portal.key === 'operations-admin' && route.label === 'Organizations') return <OperationsOrganizationsPage portal={portal} />;
   // OPS-14: Organization Detail adds the college account fields (renewal, contract reference,
   // AI8HT owner, contacts) beneath the organisation list. Organizations itself is unchanged.
-  if (!demoMode && portal.key === 'operations-admin' && route.label === 'Organization Detail') return <><OperationsOrganizationsPage portal={portal} /><OperationsCollegeAccountPanel /></>;
+  if (!demoMode && portal.key === 'operations-admin' && route.label === 'Organization Detail') return <><OperationsOrganizationsPage portal={portal} /><OperationsCollegeAccountPanel /><OperationsCollegePaymentsPanel /></>;
   // OPS-05: Users and User Detail are the minimised account lookup (masked contacts,
   // audited reads) with invitation tracking kept beneath it (Appendix 1 §4.2).
   if (!demoMode && portal.key === 'operations-admin' && route.label === 'Users') return <><OperationsAccountLookupPage /><OperationsInvitationTrackingPanel /></>;

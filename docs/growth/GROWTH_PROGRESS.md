@@ -628,3 +628,126 @@ with GROWTH-06 beneath; then rebased onto f501905):
   `growth-leads` 23/23, `growth-foundation` 19/19 — pass.
 
 **Next goal:** GROWTH-05 — Employer pipeline, referral links and the EMP-04 handoff (or GROWTH-07, as the coordinator decides).
+
+## GROWTH-05 — Employer pipeline, referral links and the EMP-04 handoff — 2026-10-02
+**Result:** Complete — a growth person on the employer team shares a referral link (web and Android share sheet) that
+carries only a random code; the public EMP-04 form records the referral and the matching employer lead without its
+answer or its rate limits depending on the code; operations see "Referred by" and "Matches growth lead" in the queue and
+can link a request to a lead by hand; marking a request onboarded records, in the same transaction, the lead's owner
+and the referrer as they stand and the §8.3 credit candidate GROWTH-07 will build attribution from, and links the lead;
+every employer lead shows its milestones from the employer's own records, as counts and states only.
+**Branch / PR:** feat/growth-employer-pipeline (from feat/plan-phases-0-to-2 at 772afa4) → feat/plan-phases-0-to-2 (pushed; not merged)
+**Commits:** 12e3919 (design) · 7980191 (tests) · afd8f2b (server) · 29a948e (web) · 611c737 (Android) · this report
+**Files created:**
+- `docs/architecture/growth-employer-pipeline-table-design.md` (written and committed before the migration)
+- `packages/persistence/drizzle/0109_growth_employer_pipeline.sql`
+- `packages/persistence/src/employer-access-request-retention.ts`
+- `packages/authorization/src/growth-employer.ts`, `growth-employer.test.ts`
+- `apps/api/src/http/growth-employer-service.ts`, `growth-employer.controller.ts`, `growth-employer.integration.spec.ts`
+- `apps/web/src/rolePortal/growthReferrals.tsx`, `growthEmployer.test.tsx`
+- Android `GrowthReferrals.kt`
+**Files modified:** `packages/authorization/src/index.ts`; `packages/events/src/index.ts` (six events);
+`apps/api/src/http/employer-access-requests.controller.ts` (the form accepts `ref`; the queue's growth columns; the
+onboarding record on ONBOARDED — the route contracts are unchanged), `growth-pipeline.controller.ts` (employer milestones
+and access requests), `api-security.module.ts`, `privacy-export-sections.ts` (`growthWork.referralCodes`),
+`run-privacy-worker.ts` (the retention sweep); `docs/architecture/privacy-export-coverage.md`; web `api/growth.ts`,
+`api/operations.ts`, `publicEmployerAccessPage.tsx` (+ test), `rolePortal/growthPipeline.tsx`, `growthLeads.tsx` (the card
+in the rail), `operationsEmployerAccessRequests.tsx`; Android `Api.kt`, `Growth.kt`, `GrowthPipeline.kt`.
+**Migrations added:** `0109_growth_employer_pipeline.sql` (the number assigned). No earlier migration edited; no earlier
+function redefined (new functions on new triggers only: a third trigger on `growth_leads`, a second leaver trigger on
+`organization_memberships`, a trigger on `growth_team_members`); no capability CHECK, grant trigger or scope trigger
+touched. Applied twice by the migrator (the second run applies nothing) and replayed by hand with `psql -v ON_ERROR_STOP=1`
+on a migrated database without error.
+
+**What was built**
+1. *Schema (0109).* `growth_referral_codes` (10 characters of a 31-character unambiguous alphabet, CHECKed; owner an ACTIVE
+   growth membership on the employer team; **at most 3 live and 5 created a day per person**, under a per-membership
+   advisory lock; revoked once — by the owner, or automatically when the membership leaves ACTIVE or the employer team row
+   ends; never deleted). `employer_access_request_referrals` and `employer_access_request_leads` (one per request,
+   **`ON DELETE CASCADE` from the request**, so EMP-04's retention takes them; a referral needs a live code of an ACTIVE
+   membership; a lead link only to an open, contactable employer lead and only while the request is PENDING; neither can be
+   deleted on its own while its request exists, except an operator's unlink). `growth_employer_onboardings` (insert-only;
+   only after an ONBOARDED request for that employer; owner and referrer columns paired; the §8.3 basis CHECKed against
+   them). `growth_lead_employer_org_guard`: an employer lead names its organisation only through an onboarding record.
+2. *The public form.* Accepts an optional `ref`, read after the unchanged rate-limit check and request upsert, inside a
+   savepoint (nothing it does can fail the submission). Malformed, unknown, revoked, a left owner's and a capped code are
+   ignored silently, and a well-formed one is looked up whatever its fate; **20 referrals per code per 24 hours**; the
+   first referral of a pending request wins; `growth.referral.recorded` with no actor. The same transaction links the
+   request to the one open, contactable employer lead whose domain matches the email domain or website host.
+3. *Operations → Organizations (no navigation change).* Each queue row shows "Referred by <work email>" (and whether the
+   link was since revoked), "Matches growth lead <name> · owner", and read-time candidates (same domain or name);
+   `OPS_ORG_MANAGE` links, moves or removes a pending request's lead (audited old → new) and searches open employer leads.
+   The unchanged decision route, on ONBOARDED, writes the onboarding record (lead owner and referrer *now*, the candidate
+   `REFERRAL_LINK` / `LEAD_OWNER_AT_HANDOFF` / `CONFLICT` / `HOUSE`), links the lead when it can, audits and emits
+   `growth.employer.onboarded`. A lost, do-not-contact or already-linked lead is not recorded and never blocks the decision.
+4. *Growth.* `GET/POST /growth/referral-codes`, `POST …/:id/revoke` (owner only; another's is 404; creation takes an
+   Idempotency-Key). An employer lead's pipeline shows `ACCESS_REQUESTED`, `ONBOARDED`, `VERIFIED` (first verification),
+   `TERMS_ACCEPTED` (**NA** while no employer terms are published), `FIRST_JOB_PUBLISHED` (first publish time and the count
+   **published now**), `CAMPUS_DRIVE` (a count per drive state), `SUSPENDED`; and its linked requests with time, state and
+   whether the referral was "yours" or "another team member's" — never whose, and never what the requester typed.
+5. *Retention (EMP-04 decision 4, unbuilt until now).* The privacy worker deletes DECLINED and SPAM requests 180 days after
+   the decision, bounded and idempotent; their referral and lead link go with them by cascade.
+6. *Privacy export.* A growth person's own codes, with referrals recorded, under `growthWork.referralCodes`.
+7. *Web.* "Your employer referral links" card on the Leads page (copy, revoke, new link, counts per code, the limits); the
+   employer pipeline on the lead; the queue's Growth column; the public page passes the link's `ref` on untouched.
+8. *Android.* The same card on the Growth home for the employer team: **shares through the Android share sheet, from a saved
+   copy when offline**; create and revoke need a signal and say so (the server makes the code). Employer milestones and
+   access requests on the lead's pipeline (saved copy offline); employer stage moves already went through the offline queue
+   (GROWTH-04).
+
+**Tests added**
+- `packages/authorization/src/growth-employer.test.ts` (10): alphabet, length, limits, revoke reasons and bases pinned to
+  0109; no ambiguous character; generation; every malformed `ref` shape; the link carries only the path and code; employer
+  team only; the hosts a request matches on; the §8.3 candidate; "yours" / "another's"; milestone order.
+- `apps/api/src/http/growth-employer.integration.spec.ts` (21): codes (team only, audited, no code in the event; 3 live and
+  5 a day in the API and the database; owner-only revoke, 404 for another's, never changed or deleted; automatic revocation
+  on leaving and on leaving the team; a resent creation lands once; in the owner's export only); **twelve `ref` variants
+  (valid, lower case, revoked, unknown, malformed, ambiguous, empty, 500 characters, a number, an object, null, absent)
+  produce responses equal in status, every header but Date, and body text, with the correlation id pinned; only the valid
+  code is recorded**; **five variants follow the identical 202×5 then 429 sequence with identical 429 responses, and a
+  refused submission records nothing**; the per-code cap; first referral wins; a leaver's code is ignored; **retention
+  deletes 181-day-old declined and spam requests with their referral and lead link, keeps a 179-day one, a pending and an
+  onboarded one, refuses a direct referral delete, and is idempotent**; domain match (one lead; never lost; never a guess
+  between two); the queue's growth facts, OPS_ORG_MANAGE-only link / move / unlink with audit, lost lead and decided request
+  refused; onboarding: referral, conflict, lead owner, house, a lead naming another employer; the database rule and the
+  immutable record; growth staff cannot decide; employer stage moves; **milestones re-read after each source changes
+  (request, onboarding, verification, terms published then accepted, a job drafted, published then closed, a campus drive,
+  suspension), with no job title or reference, college, requester or candidate anywhere in the answer**.
+- `apps/web/src/rolePortal/growthEmployer.test.tsx` (8) and a referral case in `publicEmployerAccessPage.test.tsx`.
+
+**Acceptance criteria**
+- [x] A valid, revoked, unknown and malformed code produce byte-identical responses — status, all headers except Date, and
+  body bytes compared across twelve variants with the per-request correlation id pinned (it is random per request
+  whatever the code); and the same rate-limit behaviour — five variants, identical 202/429 sequences and identical 429s.
+- [x] A referral row is deleted with its request under EMP-04 retention — `ON DELETE CASCADE` plus the 180-day sweep built
+  here; a direct delete while the request exists is refused.
+- [x] Growth sees job and drive counts and states, never content or candidates — the milestone spec asserts the counts and
+  that no title, reference, college, requester or candidate field appears.
+- [x] Design §7: employer stages and derived milestones; `growth_referral_codes`, `employer_access_request_referrals`; the
+  queue shows referral and lead matches; onboarding links the lead and records the attribution candidate.
+- [x] Android: share my link (share sheet, offline from a saved copy); employer pipeline on the lead.
+
+**Decisions for Divakar** (recommended answers taken, recorded in the table design)
+- Codes: 10 of 31 unambiguous characters, stored plainly (they open nothing; the owner must see the link again).
+- Abuse limits: 3 live links and 5 new a day per person; 20 recorded referrals per code per day, beyond which requests are
+  received normally without the referral.
+- First referral wins on a repeated pending request; a referral credits its code's owner even if the code was revoked
+  after use (how a leaver's credit is treated is GROWTH-07's, §8.5).
+- Codes are revoked when the owner leaves ACTIVE and when they leave the employer team.
+- Domain match only to exactly one open, contactable lead; lost and do-not-contact leads are never linked (form, operator
+  or onboarding); operators may link, move or remove while pending.
+- EMP-04's 180-day retention of declined and spam requests is built now (it was recommended and unbuilt).
+- A growth person sees counts of referred requests by state, not the companies; on a lead, "yours" or "another team
+  member's", not whose.
+- No employer commission figure anywhere (D11); the candidate is a fact, not credit.
+
+**Android:** changed (above). Creating and revoking a link are not queued offline, by design: the server generates the
+code, so an offline creation would promise a link that does not exist yet.
+
+**Limitations / not done**
+- `growth_attributions` and disputes are GROWTH-07's: this goal records the candidate (including `CONFLICT`) and writes
+  no attribution. The self-dealing guard on `OPS_VERIFY` (§8.6) needs attribution and is GROWTH-07's too.
+- No growth "lead from an inbound request" creation: an unmatched request stays operations' to onboard (house).
+- No manual run on an emulator this goal (compile only); the share sheet is the platform's.
+
+**Validation:** in progress; recorded here when the full run finishes.

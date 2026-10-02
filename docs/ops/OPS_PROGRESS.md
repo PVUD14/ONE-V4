@@ -3017,13 +3017,17 @@ It is off by default, and it serves only a deployment that declares itself the s
 worker. Switching it on goes only through the existing 0089 evaluation gate and OPS-02 approval. Nothing was
 switched on, no model was called (tests use ENG-20's local fake endpoint), and the pod was not touched.
 
-**Branch / PR:** `feat/eng-22-tutor-hints`, from `onev4/feat/plan-phases-0-to-2` (837da63). Commits:
-- design (b4efb94)
-- acceptance tests (f374e57)
-- implementation (48d1bc2)
-- Android (759c736)
-- runbook and doc updates (a10e25c)
-- this report
+**Branch / PR:** `feat/eng-22-tutor-hints`, rebased onto `onev4/feat/plan-phases-0-to-2` at 07a65b0 (ENG-23 and the
+document-verification fix merged). Commits after the rebase:
+- design (981b1d0)
+- acceptance tests (30bf954)
+- implementation (f3840bf)
+- Android (dd9e2cd)
+- runbook and doc updates (d007b44)
+- this report (d4d8671)
+- the poll fix (db83f71)
+- the renumbering to 0108 (eae357d)
+- the validation amendment
 
 Pushed to onev4; not merged.
 
@@ -3194,16 +3198,19 @@ The AI Operations panel is web-only (operator console).
   - a dedicated tutor worker for ENG-25;
   - a per-college daily cap.
 
-**Validation:** running — results to follow in this entry. Before the full run, on the fresh database `one_eng22`:
-- typecheck 0;
-- tutoring 35/35;
-- ai-evaluation 33/33;
-- persistence 46/46 — the tutor unit tests and boundary, jobs-health, ai-bake-off and ai-workers;
-- API:
-  - tutor-hints 17/17 (twice);
-  - inference-boundary 2/2;
-  - institution-contract-lifecycle passed;
-  - learning-experience, operations-ai and privacy failed with "out of shared memory" when run together with
-    other files; each passed alone: 9/9, 22/22 and 17/17;
-- web: studentLearning 8/8, studentLearningTutor 4/4, tutorHintReview 4/4, aiOperations 15/15;
-- Android compile 0.
+**Validation** after the rebase onto 07a65b0, on the fresh database `one_eng22`:
+- install 0;
+- migrate twice: 94 applied (…0105, 0106, 0107, 0108 in order), then 0 applied / 94 already applied;
+- typecheck 0, build 0, `pnpm audit --prod --audit-level=high` 0, foundation optional-chain policy clean;
+- tutoring 35/35, ai-evaluation 47/47;
+- persistence 46/46 — the tutor unit tests and boundary, jobs-health, ai-bake-off (ENG-23's registered-feature
+  assertions included) and ai-workers;
+- API, each file run alone: tutor-hints 17/17, inference-boundary 2/2, operations-ai 22/22 (the union of the
+  registered prompts), learning-experience 9/9, privacy 17/17, institution-contract-lifecycle 20/20;
+- web, the whole suite: 94 files, 1015/1015;
+- Android `:app:compileDebugKotlin` 0.
+
+Earlier in the goal, three API files hit "out of shared memory" when run together; each passed alone. The full
+`validate.sh` run of the whole API suite was started three times and stopped each time for a coordinator rebase
+or renumbering, so the whole API and persistence suites have not completed in one run on this final head; the
+touched and assertion-affected files above have. No test was skipped or changed to pass.

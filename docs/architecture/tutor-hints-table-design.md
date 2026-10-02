@@ -3,7 +3,7 @@
 **Status:** Adopted (ENG-22). Recommended options taken per AGENTS.md ("ask once, recommend, carry on");
 every decision below records what was rejected.
 **Date:** 2026-10-02
-**Migration:** `0107_tutor_hints.sql` (see "Migration number" — 0105, the number on the register, is
+**Migration:** `0108_tutor_hints.sql` (see "Migration number" — 0105, the number first on the register, is
 already used by ENG-20's `0105_inference_adapter.sql`)
 **Rule:** Written before the migration, per the migrations rule in `AGENTS.md`. The table carries
 provenance and an audit trail of what a model said to a student, so it is a table with consequences.
@@ -316,11 +316,9 @@ on in AI Operations through the existing OPS-02 approval. Production is not touc
 
 ## Migration number
 
-The register in `.program/PROGRAM_STATE.md` assigns 0105 to ENG-22, but ENG-20 merged
-`0105_inference_adapter.sql` under that number. Two files sharing a number would sort by name and work,
-but would break the "one number, one change" convention the register exists for. This change uses
-**0107**, the next number nobody holds; the coordinator may renumber it before merging (no other file
-refers to the number).
+The register first assigned 0105 to ENG-22, but ENG-20 merged `0105_inference_adapter.sql` under that
+number; 0106 is ENG-23's and 0107 is `fix/document-verification`'s (`0107_student_document_verifier.sql`).
+The coordinator assigned **0108**. Nothing else refers to the number.
 
 ## Open points
 

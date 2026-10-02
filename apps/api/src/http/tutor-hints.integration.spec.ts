@@ -496,7 +496,7 @@ describe('ENG-22: a hint is a job, guarded, labelled and counted like the ladder
     expect((await pool.query('SELECT count(*)::int AS n FROM tutor_hints WHERE subject_user_id = $1', [learner.id])).rows[0].n).toBe(20);
   });
 
-  it('the 0107 guards: a request at a level the step does not record, a changed request, or a deletion are refused', async () => {
+  it('the 0108 guards: a request at a level the step does not record, a changed request, or a deletion are refused', async () => {
     const learner = await learnerWithStep({ consent: true });
     await expect(pool.query(`INSERT INTO tutor_hints (id, subject_user_id, decision_id, item_id, hint_level, language, prompt_version, policy_version, correlation_id)
       VALUES ($1,$2,$3,$4,2,'en','tutor-hint@1','tutor-hint-policy-v1','x')`, [randomUUID(), learner.id, learner.decisionId, learner.questionId])).rejects.toThrow(/level the item records/u);

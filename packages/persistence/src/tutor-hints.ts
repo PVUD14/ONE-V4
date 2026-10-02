@@ -1,5 +1,5 @@
 /**
- * Tutor hints (ENG-22, migration 0107) — the request side, the student's view and the staff review.
+ * Tutor hints (ENG-22, migration 0108) — the request side, the student's view and the staff review.
  *
  * Why this exists: a student stuck on a practice question can ask the AI tutor for the next hint. This
  * module is everything about that which is plain database work: whether the student may ask now (the
@@ -200,7 +200,7 @@ export class TutorHintRequestError extends Error {
 
 /**
  * Records an allowed request at its level: the row (PENDING, DRAFT), the outbox job and the audit row.
- * The caller has already raised the step item's hint level in this transaction (the 0107 insert trigger
+ * The caller has already raised the step item's hint level in this transaction (the 0108 insert trigger
  * checks the two agree).
  */
 export async function recordTutorHintRequest(db: PersistenceDb, input: {

@@ -1,4 +1,4 @@
--- 0107 — tutor_hints (ENG-22): one row per AI hint a student asked for on a practice question, with the
+-- 0108 — tutor_hints (ENG-22): one row per AI hint a student asked for on a practice question, with the
 -- provenance of what the model wrote, what ONE's guard found, what the student was shown, and a staff
 -- review state. Design: docs/architecture/tutor-hints-table-design.md.
 --
@@ -8,7 +8,7 @@
 -- to a student. A request raises the step item's hint level in the same transaction (an AI hint is a
 -- ladder level, Decision 2), so the 0047 assisted rule applies unchanged.
 --
--- Numbered 0107 because ENG-20 already merged 0105 (see the design's "Migration number").
+-- Numbered 0108 by the coordinator: 0105 is ENG-20's, 0106 ENG-23's, 0107 fix/document-verification's.
 -- Applied once by the ledger runner (ADR-035); written idempotently all the same.
 
 CREATE TABLE IF NOT EXISTS tutor_hints (

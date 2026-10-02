@@ -3036,7 +3036,7 @@ Pushed to onev4; not merged.
   - `guard.ts` — `tutor-guard-v1`;
   - `arithmetic.ts` — maths checked by code, no `eval`;
   - tests: policy, brief (including byte-parity with the evaluation set), guard, arithmetic.
-- `packages/persistence/drizzle/0107_tutor_hints.sql`.
+- `packages/persistence/drizzle/0108_tutor_hints.sql`.
 - `packages/persistence/src/`:
   - `tutor-hints.ts` — request recording, the step view's hint entries and tutor availability, staff list and
     review;
@@ -3075,9 +3075,8 @@ Pushed to onev4; not merged.
 - Android: `ApiLearning.kt`, `StudentLearningPlan.kt`.
 - Docs: `privacy-export-coverage.md`, `runbook-ai-kill-switch.md` (path D).
 
-**Migrations added:** `0107_tutor_hints.sql`. The register assigns 0105 to ENG-22, but ENG-20 already merged
-`0105_inference_adapter.sql`, so this uses the next unheld number. The coordinator may renumber it; nothing refers
-to the number. What it contains:
+**Migrations added:** `0108_tutor_hints.sql`, the number the coordinator assigned (0105 is ENG-20's, 0106 is
+ENG-23's, 0107 is `fix/document-verification`'s). What it contains:
 - one row per AI hint request, with `source` (always `AI_GENERATED`), `generator_version`, `prompt_version`,
   `prompt_fingerprint`, `model`, `policy_version`, `guard_version`, `review_state` (DRAFT by default),
   `generated_at`, the guard's findings and repairs, the outcome, and the staff review;
@@ -3099,7 +3098,7 @@ Applied twice on a fresh database (89 applied, then 0 applied / 89 already appli
   The API test inspects the request the fake endpoint received: no user id, email, decision id or band value.
   Readiness is never read.
 - [x] **The four-step hint ladder policy.** An AI hint is the next ladder level, one at a time, at most four. The
-  0107 trigger ties the row to the level the step item records.
+  0108 trigger ties the row to the level the step item records.
 - [x] **Tutor off in assessment mode.** The policy refuses outside LEARN, PRACTICE and REVIEW, and the route exists
   only on learning steps (the placement test, readiness checks and exams have none).
 - [x] **Answer-leak check.** ENG-15's `hintLeakFinding` (through `tutorLeaks`) and the runtime "the answer is…"
@@ -3189,7 +3188,6 @@ The AI Operations panel is web-only (operator console).
 - The sandbox compose entries: the snippet is in the runbook, because the compose file lives on the unmerged
   `feat/demo-sandbox`.
 - Unify `tutor-sandbox.ts`'s lock with that branch's `sandbox-guard.ts` when both are merged.
-- Migration number 0107 rather than 0105, as explained above.
 - The open points in the design:
   - fold the runtime-only checks into `bake-off-checks-v2`;
   - add free-text questions with their own evaluation cases;

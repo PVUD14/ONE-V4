@@ -308,7 +308,7 @@ async function erase(deps: DeletionExecutionDeps, subjectUserId: string): Promis
     await tx.execute(sql`SELECT set_config('one.privacy_erase_subject', ${subjectUserId}, true)`);
     const removed = async (query: ReturnType<typeof sql>): Promise<number> =>
       Number(((await tx.execute(query)) as QueryResult<{ count: number }>).rows[0]?.count ?? 0);
-    // The AI tutor's hints (ENG-22, 0107) reference decisions and questions: before them.
+    // The AI tutor's hints (ENG-22, 0108) reference decisions and questions: before them.
     const tutorHints = await removed(sql`WITH gone AS (DELETE FROM tutor_hints WHERE subject_user_id = ${subjectUserId}::uuid RETURNING 1) SELECT count(*)::int AS count FROM gone`);
     // Practice questions served on steps (ENG-18, 0072) reference decisions, sessions and questions: first.
     const stepItems = await removed(sql`WITH gone AS (DELETE FROM learning_step_items WHERE subject_user_id = ${subjectUserId}::uuid RETURNING 1) SELECT count(*)::int AS count FROM gone`);

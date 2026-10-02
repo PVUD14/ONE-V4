@@ -7,6 +7,7 @@ import { eraseExpiredApplicationMessages, MESSAGE_RETENTION_DAYS_AFTER_GRANT } f
 import { revokeExpiredApplicantGrants } from '@planthepath/persistence/src/employer-terms.js';
 import { sweepGrowthLeadContactRetention } from '@planthepath/persistence/src/growth-leads.js';
 import { sweepGrowthActivityLocations, sweepGrowthFieldText } from '@planthepath/persistence/src/growth-field.js';
+import { EMPLOYER_ACCESS_REQUEST_RETENTION_DAYS, sweepEmployerAccessRequestRetention } from '@planthepath/persistence/src/employer-access-request-retention.js';
 import { GROWTH_CONTACT_RETENTION_MONTHS, GROWTH_LOCATION_RETENTION_DAYS } from '@planthepath/authorization/src/index.js';
 import { createLocalDiskStorage } from './storage/file-storage.js';
 import { survivePoolErrors } from '@planthepath/persistence/src/pool-errors.js';
@@ -18,7 +19,8 @@ import { survivePoolErrors } from '@planthepath/persistence/src/pool-errors.js';
  * retention hold still needs. GROWTH-03: erases the contacts of growth leads with no activity for
  * 24 months (D12) — people who are not ONE users and never agreed to be kept. GROWTH-06: erases visit
  * locations 180 days after the visit (O-23), and the visit notes and follow-up titles of the same
- * expired leads as the contacts.
+ * expired leads as the contacts. GROWTH-05: deletes declined and spam employer access requests 180
+ * days after the decision (EMP-04 decision 4), with their growth referral and lead link.
  *
  * Deliberately a one-shot run rather than a loop: a deletion sweep is a daily job,
  * and a long-lived process holding a connection to do nothing most of the time is
@@ -88,6 +90,12 @@ async function main(): Promise<void> {
       titles += batch.titles;
     }
     console.log(JSON.stringify({ event: 'growth.field_text.retention_sweep', retentionMonths: GROWTH_CONTACT_RETENTION_MONTHS, notes, followUpTitles: titles }));
+
+    // EMP-04 decision 4 (built by GROWTH-05): declined and spam employer access requests are deleted
+    // 180 days after the decision; their growth referral and lead link go with them (ON DELETE CASCADE).
+    let accessRequests = 0;
+    for (let batch = await sweepEmployerAccessRequestRetention(db); batch > 0; batch = await sweepEmployerAccessRequestRetention(db)) accessRequests += batch;
+    console.log(JSON.stringify({ event: 'employer.access_requests.retention_sweep', retentionDays: EMPLOYER_ACCESS_REQUEST_RETENTION_DAYS, deleted: accessRequests }));
 
     for (const failure of failed) {
       console.error(JSON.stringify({ event: 'privacy.deletion.failed', requestId: failure.requestId, detail: failure.detail }));

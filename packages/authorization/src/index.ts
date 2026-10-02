@@ -140,3 +140,4 @@ export * from './growth-scope.js';
 export * from './growth-leads.js';
 export * from './growth-field.js';
 export * from './growth-pipeline.js';
+export * from './growth-employer.js';

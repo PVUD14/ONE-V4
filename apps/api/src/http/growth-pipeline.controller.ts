@@ -15,6 +15,7 @@ import { Body, Controller, ForbiddenException, Get, HttpException, Inject, Param
 import { sql } from 'drizzle-orm';
 import {
   growthCollegeMilestones,
+  growthEmployerMilestones,
   growthHandoffDeclineReasons,
   growthNextStages,
   growthOwningMembership,
@@ -51,6 +52,7 @@ import {
   linkHandoff,
 } from './growth-pipeline-service.js';
 import { callerHasInternalCapability, dbCapabilityGrantLoader } from './internal-capability-guard.js';
+import { accessRequestsForLead, employerMilestones } from './growth-employer-service.js';
 
 const notFoundRefusals = new Set(['GROWTH_LEAD_NOT_FOUND']);
 const forbiddenRefusals = new Set(['GROWTH_NOT_LEAD_OWNER']);
@@ -76,7 +78,7 @@ function mapPipelineError(error: unknown, correlationId: string): HttpException 
 }
 
 export function growthPipelineVocabulary(): Record<string, unknown> {
-  return { reasons: growthStageReasons, declineReasons: growthHandoffDeclineReasons, milestones: growthCollegeMilestones };
+  return { reasons: growthStageReasons, declineReasons: growthHandoffDeclineReasons, milestones: growthCollegeMilestones, employerMilestones: growthEmployerMilestones };
 }
 
 @Controller('/api/v1/growth/leads')
@@ -90,9 +92,10 @@ export class GrowthPipelineController {
   @Get('/:leadId/pipeline')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async pipeline(@Req() request: ProtectedHttpRequest, @Param('leadId') leadId: string): Promise<Record<string, unknown>> {
-    const { correlationId, caller } = await this.require(request);
+    const { correlationId, caller, userId } = await this.require(request);
     const id = readUuid(leadId, correlationId);
     const loaded = await this.visible(this.db, id, caller, correlationId);
+    const employer = loaded.row.kind === 'EMPLOYER';
     const canMove = refuseGrowthStageWriter(caller, loaded.facts) === null;
     const handedOff = loaded.row.organization_id !== null;
     return {
@@ -100,7 +103,10 @@ export class GrowthPipelineController {
       canMove, nextStages: canMove && !handedOff ? growthNextStages(loaded.row.kind, loaded.row.stage) : [],
       canRequestHandoff: canMove && refuseGrowthHandoffRequest({ kind: loaded.row.kind, stage: loaded.row.stage, doNotContact: loaded.facts.doNotContact, handedOff }, 'X') === null,
       handoffRequests: await handoffRequestsForLead(this.db, id),
-      milestones: await collegeMilestones(this.db, loaded.row),
+      // GROWTH-05: an employer lead's milestones are shown from the start (its access request comes first);
+      // a college's only once operations has linked it.
+      milestones: employer ? await employerMilestones(this.db, loaded.row) : await collegeMilestones(this.db, loaded.row),
+      accessRequests: employer ? await accessRequestsForLead(this.db, id, userId) : [],
       vocabulary: growthPipelineVocabulary(), correlationId,
     };
   }

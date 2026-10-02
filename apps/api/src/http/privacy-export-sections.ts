@@ -544,10 +544,11 @@ async function learningSections(one: Query, subject: Subject): Promise<Record<st
  * territory assignments and the leads they created or own (organisation, kind, stage, dates).
  * Never the lead contacts' personal data: those people are third parties, not the subject. For
  * anyone who is not growth staff every list is empty. GROWTH-06: their field log and follow-ups,
- * with each visit's location while it is still held.
+ * with each visit's location while it is still held. GROWTH-05: their employer referral codes, with
+ * counts of the requests each brought — never what a requester typed.
  */
 async function growthWorkSection(one: Query, subject: Subject): Promise<Record<string, unknown>> {
-  const [staffTypes, teams, assignments, leads, activities, followUps] = await Promise.all([
+  const [staffTypes, teams, assignments, leads, activities, followUps, referralCodes] = await Promise.all([
     one(sql`SELECT t.staff_type, t.reason_code, t.effective_from, t.ended_at
             FROM growth_staff_types t JOIN organization_memberships m ON m.id = t.membership_id
             WHERE m.user_id = ${subject} ORDER BY t.effective_from, t.id`),
@@ -574,6 +575,9 @@ async function growthWorkSection(one: Query, subject: Subject): Promise<Record<s
             FROM growth_follow_ups f JOIN growth_leads l ON l.id = f.lead_id
             WHERE f.created_by_user_id = ${subject} OR f.assignee_membership_id IN (SELECT id FROM organization_memberships WHERE user_id = ${subject})
             ORDER BY f.created_at, f.id LIMIT 10000`),
+    one(sql`SELECT c.code, c.created_at, c.revoked_at, c.revoked_reason_code,
+                   (SELECT count(*)::int FROM employer_access_request_referrals r WHERE r.referral_code_id = c.id) AS referrals
+            FROM growth_referral_codes c WHERE c.user_id = ${subject} ORDER BY c.created_at, c.id LIMIT 1000`),
   ]);
   return {
     staffTypes: staffTypes.map((row) => ({ staffType: row.staff_type, reasonCode: row.reason_code, from: row.effective_from, to: row.ended_at })),
@@ -586,6 +590,9 @@ async function growthWorkSection(one: Query, subject: Subject): Promise<Record<s
       location: row.location_latitude === null || row.location_latitude === undefined ? null
         : { latitude: Number(row.location_latitude), longitude: Number(row.location_longitude), accuracyM: Number(row.location_accuracy_m) },
       locationErasedAt: row.location_erased_at ?? null, locationErasedReason: row.location_erased_reason ?? null,
+    })),
+    referralCodes: referralCodes.map((row) => ({
+      code: row.code, createdAt: row.created_at, revokedAt: row.revoked_at ?? null, revokedReasonCode: row.revoked_reason_code ?? null, referralsRecorded: Number(row.referrals),
     })),
     followUps: followUps.map((row) => ({
       organisation: row.lead_name, dueOn: row.due_on, title: row.title ?? null, titleErasedAt: row.title_erased_at ?? null,

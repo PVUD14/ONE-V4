@@ -22,6 +22,12 @@
  *
  * The queue (`/operations/employer-access-requests`) needs OPS_ORG_MANAGE, the capability that
  * creates organisations, and is shown on the existing Organizations screen.
+ *
+ * GROWTH-05 (growth-employer-pipeline-table-design.md): the form also accepts an optional `ref`, a
+ * growth referral code. It is read only after the rate limits and the request upsert, inside a
+ * savepoint, and an unknown, revoked or malformed code is ignored silently — the answer is the same
+ * whatever it is. The queue shows the referral and the matching growth lead; marking a request
+ * ONBOARDED also writes the onboarding record attribution is later built from.
  */
 import {
   BadRequestException,
@@ -55,6 +61,7 @@ import {
   type ProtectedHttpRequest,
 } from './api-security.js';
 import { callerHasInternalCapability, dbCapabilityGrantLoader } from './internal-capability-guard.js';
+import { accessRequestGrowthColumns, presentAccessRequestGrowth, recordAccessRequestGrowthSignals, recordEmployerOnboarding } from './growth-employer-service.js';
 
 type QueryResult<T> = { rows: T[] };
 
@@ -142,6 +149,10 @@ export class EmployerAccessRequestsController {
         RETURNING id, (xmax = 0) AS inserted
       `) as QueryResult<{ id: string; inserted: boolean }>;
       const row = saved.rows[0]!;
+      // GROWTH-05: the referral and the lead match, in a savepoint; nothing here changes the answer.
+      await recordAccessRequestGrowthSignals(tx, {
+        requestId: row.id, ref: input.ref, emailDomain: input.emailDomain, websiteUrl: input.websiteUrl, uuid: () => this.ids.uuid(), correlationId,
+      });
       if (row.inserted) {
         const event = { id: this.ids.uuid(), aggregateType: 'employer_access_request', aggregateId: row.id, eventType: 'employer_access_request.submitted',
           payload: { requestId: row.id }, correlationId };
@@ -189,7 +200,8 @@ export class EmployerAccessRequestsController {
                       = regexp_replace(lower(substring(r.website_url from '^https://([^/:?#]+)')), '^www\\.', ''))
                  ORDER BY o.legal_name LIMIT 5
                ) m
-             ), '[]'::json) AS possible_matches
+             ), '[]'::json) AS possible_matches,
+             ${accessRequestGrowthColumns}
       FROM employer_access_requests r
       WHERE (${state}::text IS NULL OR r.state = ${state})
         AND (${cursor?.createdAt ?? null}::timestamptz IS NULL OR (r.created_at, r.id) < (${cursor?.createdAt ?? null}::timestamptz, ${cursor?.id ?? null}::uuid))
@@ -236,6 +248,10 @@ export class EmployerAccessRequestsController {
         VALUES (${this.ids.uuid()}::uuid, ${actorUserId}::uuid, 'employer_access_request.decided', 'employer_access_request', ${requestId},
                 ${decision.organizationId ?? null}::uuid, 'SUCCESS', ${correlationId}, ${JSON.stringify(auditContext)}::jsonb)
       `);
+      // GROWTH-05: who could be credited, as it stands at this moment (design §8.3), and the lead linked.
+      if (decision.decision === 'ONBOARDED' && decision.organizationId) {
+        await recordEmployerOnboarding(tx, { requestId, organizationId: decision.organizationId, actorUserId, correlationId, uuid: () => this.ids.uuid() });
+      }
       return { id: requestId, state: decision.decision, organizationId: decision.organizationId ?? null, reasonCode: decision.reasonCode };
     }).catch((error: unknown) => {
       if (error instanceof HttpException) throw error;
@@ -303,12 +319,14 @@ interface Submission {
   readonly workEmail: string;
   readonly emailDomain: string;
   readonly websiteUrl: string;
+  /** GROWTH-05: the raw `ref`, never validated here — a malformed one is ignored like an unknown one. */
+  readonly ref: unknown;
 }
 
 function readSubmission(body: unknown, correlationId: string): Submission {
   if (!body || typeof body !== 'object' || Array.isArray(body)) throw badRequest('INVALID_REQUEST', correlationId);
   const raw = body as Record<string, unknown>;
-  const allowed = ['requesterName', 'companyName', 'workEmail', 'websiteUrl'];
+  const allowed = ['requesterName', 'companyName', 'workEmail', 'websiteUrl', 'ref'];
   if (Object.keys(raw).some((key) => !allowed.includes(key))) throw badRequest('INVALID_REQUEST', correlationId);
   const text = (value: unknown, max: number, code: string): string => {
     const trimmed = typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : '';
@@ -323,7 +341,7 @@ function readSubmission(body: unknown, correlationId: string): Submission {
   if (emailDomain.length < 3 || emailDomain.length > 253) throw badRequest('EMPLOYER_ACCESS_REQUEST_EMAIL_INVALID', correlationId);
   const websiteUrl = typeof raw.websiteUrl === 'string' ? raw.websiteUrl.trim() : '';
   if (websiteUrl.length > 256 || !/^https:\/\/\S+$/i.test(websiteUrl) || !hostOf(websiteUrl)) throw badRequest('EMPLOYER_ACCESS_REQUEST_WEBSITE_INVALID', correlationId);
-  return { requesterName, companyName, workEmail, emailDomain, websiteUrl };
+  return { requesterName, companyName, workEmail, emailDomain, websiteUrl, ref: raw.ref };
 }
 
 function readDecision(body: unknown, correlationId: string): { readonly decision: Decision; readonly reasonCode: string; readonly organizationId?: string } {
@@ -397,6 +415,7 @@ function presentRequest(row: Record<string, unknown>): Record<string, unknown> {
     createdAt: iso(row.created_at),
     lastSubmittedAt: iso(row.last_submitted_at),
     possibleMatches: row.possible_matches ?? [],
+    ...presentAccessRequestGrowth(row),
   };
 }
 

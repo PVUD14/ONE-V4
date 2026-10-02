@@ -898,3 +898,122 @@ the migrator and replayed twice by hand with `psql -v ON_ERROR_STOP=1` on a migr
   "out of shared memory" in this run; nothing re-run.
 - Android `./gradlew --no-daemon -q :app:compileDebugKotlin` (Android Studio JBR) — pass.
 - CI parity: private-key, optional-chain and conflict-marker greps — clean; `corepack pnpm audit --prod --audit-level=high` — exit 0.
+
+## GROWTH-10 — College payments received — 2026-10-02
+**Result:** Complete — finance records what a college paid AI8HT (instrument, reference, integer paise, students paid for,
+period), and moves it only by the listed transitions; clearance, the event commission starts from (D10), needs a second
+person's `INSTITUTION_PAYMENT_CLEARANCE` approval bound to the amount, count and cleared date; anyone credited with the
+college is refused; growth sees only whether a payment has cleared.
+**Branch / PR:** feat/growth-college-payments (from feat/plan-phases-0-to-2 at 31aaaf8) → feat/plan-phases-0-to-2 (pushed; not merged)
+**Commits:** b32e5d7 (design) · decab48 (tests) · a631969 (server) · b6c9b10 (web) · this report
+**Files created:**
+- `docs/architecture/institution-payments-table-design.md` (written and committed before the migration)
+- `packages/persistence/drizzle/0111_institution_payments.sql`
+- `packages/authorization/src/institution-payments.ts`, `institution-payments.test.ts`
+- `packages/persistence/src/institution-payments.ts`
+- `apps/api/src/http/operations-college-payments.controller.ts`, `institution-payments.integration.spec.ts`
+- `apps/web/src/api/collegePayments.ts`, `rolePortal/collegePayments.tsx`, `rolePortal/collegePayments.test.tsx`
+**Files modified:** `packages/authorization/src/high-risk-actions.ts`, `index.ts`; `packages/events/src/index.ts` (five events
+and the approval key); `packages/persistence/src/operation-approvals.ts` (the queue names the college and instrument),
+`institution-contract.ts` (the exit purge's out-of-scope list); `apps/api/src/http/operation-approval-gate.ts`,
+`operations-approvals.controller.ts` (request validation, the approver self-dealing check, summary fields),
+`api-security.module.ts`, `growth-pipeline-service.ts` (the milestone), `growth-pipeline.integration.spec.ts` (the NA pin
+becomes "not reached"); web `api.ts`, `api/operations.ts`, `rolePortal/approvals.tsx`, `rolePortalPages.tsx`.
+**Migrations added:** `0111_institution_payments.sql` (the number assigned). No earlier migration edited. It redefines
+`operation_approval_extended_target_type()` (0051, last 0089) repeating every earlier key — CAREER_REQUIREMENT_SET_PUBLISH,
+CONTENT_SKILL/QUESTION/LESSON_PUBLISH, COMMS_TEMPLATE_PUBLISH, INSTITUTION_DATA_PURGE, AI_FEATURE_ENABLE,
+AI_FEATURE_LIMITS_RAISE — and adding INSTITUTION_PAYMENT_CLEARANCE (a unit test asserts every extended key is in 0111). No
+capability CHECK, grant trigger or scope trigger touched. Applied twice by the migrator and replayed by hand with
+`psql -v ON_ERROR_STOP=1` on a migrated database without error.
+
+**What was built**
+1. *Schema (0111).* `institution_payments`: instrument (`CHEQUE`, `DEMAND_DRAFT`, `BANK_TRANSFER`, `UPI`), reference
+   (`^[A-Za-z0-9/-]{4,40}$`), `amount_paise bigint` from 1 paisa to ₹100 crore, `currency = 'INR'`, `students_paid` 1 to
+   100 000, received date (not future, IST database date), coverage period (at most 3 years), state `RECEIVED → CLEARED |
+   BOUNCED`, `CLEARED → REFUNDED`, any live state `→ VOIDED`. Each transition's columns are set together, once (CHECK); the
+   trigger refuses every other change, any edit of what was recorded at receipt, DELETE and TRUNCATE, and stamps every time
+   with `now()`. A correction is a void plus a new row naming it (`CORRECTION`, one per voided row). The same instrument
+   cannot be recorded twice while it stands (a bounced cheque presented again can). `CLEARED` needs an executed
+   `INSTITUTION_PAYMENT_CLEARANCE` approval for this row, executed by the clearer, whose payload carries this row's amount,
+   count and cleared date. `institution_payment_credited_user()` — the self-dealing rule — reads the handoff owner at link
+   (GROWTH-04) and, once GROWTH-07's `growth_attributions` exists, its live beneficiary (fails closed if that table has
+   another shape).
+2. *Dual control.* New OPS-02 extended key `INSTITUTION_PAYMENT_CLEARANCE` (capability `GROWTH_FINANCE`, reasons
+   `BANK_STATEMENT_CONFIRMED`, `BANK_ADVICE_RECEIVED`): the request names the payment and cleared date and the server binds the
+   amount and count from the row; the approver is never the requester (OPS-02's solo safeguard unchanged) and never a person
+   credited with the college (`APPROVAL_SUBJECT_CONFLICT`); `POST /operations/college-payments/:id/clear` consumes it in the
+   clearance's transaction (`403 APPROVAL_REQUIRED` without one).
+3. *Routes* `/api/v1/operations/college-payments` — policy and list (`GROWTH_FINANCE` or `ACCOUNT_MANAGE`), record, clear,
+   bounce, refund, void (`GROWTH_FINANCE`); unknown fields refused; each write one transaction with its audit row and outbox
+   event (`institution_payment.recorded|cleared|bounced|refunded|voided`). Audit context and events carry no amount and no
+   reference.
+4. *GROWTH-04's `FIRST_PAYMENT_CLEARED`* now reads this table: reached while a payment stands `CLEARED`; otherwise "Waiting
+   for the college's payment to clear." whether or not a payment was received. Never an amount, count, reference or date.
+5. *Web.* Operations → Organization Detail gains "Payments received" (a section, no navigation change): college picker, four
+   state counts (NA before a college is chosen), the payments table, record (rupees typed → paise by string arithmetic),
+   request clearance (date, then the standard approval dialog), bounced, refunded, void, record correction; read-only for
+   account managers; the existing "Not permitted" state otherwise; a plain sentence when nothing is recorded. The approvals
+   queue describes and executes the clearance.
+6. *INST-18.* `institution_payments` is in the exit purge's out-of-scope list (AI8HT's finance record).
+
+**Tests added**
+- `packages/authorization/src/institution-payments.test.ts` (7): vocabulary pinned to 0111's CHECKs; the key's capability,
+  target and reasons; **0111 repeats every extended key**; transitions; rupees and paise (`0.29` → 29) and Indian grouping;
+  amount, count and date validators.
+- `apps/api/src/http/institution-payments.integration.spec.ts` (15): access (finance writes; account manager reads only;
+  growth executive, growth manager and security admin 403 on every route; growth cannot file the approval); recording, with
+  audit and event free of amount and reference; **students_paid 0, negative, fractional, text, null and over the bound
+  refused by the route, 0 and negative by the CHECK**; amount, reference, instrument, date and period rules; non-INR,
+  non-college and future dates refused by the database; duplicate instrument; **every direct edit, DELETE and TRUNCATE
+  refused**; bounce, refund, void with dates and reasons, earlier columns kept, correction rules; **clearance without
+  approval, before approval, by the requester (self-decision), by another executor, for another date — all refused; with a
+  second person's approval it clears once; the database refuses a clearance using another payment's approval**;
+  self-dealing (record refused by route and trigger, approval request refused, approver refused, other colleges allowed); the
+  milestone (not reached → same words after receipt → reached after clearance with no amount, count, reference or date for
+  executive and manager → not reached after a void); **a source scan: only the payments controller, the approvals controller
+  and the growth milestone read the table, and the milestone imports only the yes/no read; every non-operations GET route of
+  the API, called by a college admin, a student, an employer admin, a growth executive and a growth manager, returns no
+  payment field or reference and answers with the same status before any payment, after a bounce, after a clearance and
+  after a void**.
+- `apps/web/src/rolePortal/collegePayments.test.tsx` (9).
+- `growth-pipeline.integration.spec.ts`: `FIRST_PAYMENT_CLEARED` pinned as not reached (was NA) — the change this goal makes.
+
+**Acceptance criteria**
+- [x] A payment row cannot change except by the listed transitions — trigger and CHECKs, proven by direct SQL and the routes.
+- [x] Clearance needs a second person — OPS-02 approval consumed in the clearance; the trigger repeats the binding.
+- [x] `students_paid` must be a positive count — route validation and CHECK.
+- [x] No institution, employer, student or growth route returns an amount, a student count or a cheque reference — the sweep
+  over every non-operations GET route for five kinds of caller, plus the source scan.
+- [x] A college's access in ONE is unaffected by any payment state — the same sweep's statuses are identical across states.
+- [x] GROWTH-04's "first payment cleared" reads this table (NA replaced).
+- [x] Do not: no amount on `institution_accounts`; no payment shown to a college, employer or growth person; no bank or
+  payment service; no student allocation (GROWTH-08) and no commission computed.
+
+**Decisions for Divakar** (recommended answers taken, recorded in the table design)
+- The four instruments of design §11.1; bounds ₹100 crore and 100 000 students per payment, coverage at most 3 years.
+- Reason codes for record, clearance, bounce, refund and void as listed in the design.
+- `ACCOUNT_MANAGE` holders read payments; only `GROWTH_FINANCE` writes.
+- The milestone counts only payments currently `CLEARED` (a refunded or voided one does not), shows no date, and says the
+  same words before and after a receipt.
+- OPS-02's solo safeguard applies to clearance as to every high-risk action while AI8HT has one approver.
+- Void is allowed from every live state and keeps every earlier column; bounce, refund and void are single-person.
+- Amounts and references are kept out of audit context and events; the approver sees them in the approvals queue.
+
+**Android:** no change, by design (§18 GROWTH-10: finance is desk work; operations is view-only on Android). The only
+growth-visible effect — `FIRST_PAYMENT_CLEARED` moving from NA to reached / not reached with a note — uses the milestone
+contract the app already renders generically (`GrowthPipeline.kt` shows any state and its note), so the app needs no code.
+
+**Limitations / not done**
+- Allocation of students to a payment is GROWTH-08's (`institution_payment_coverages`, `growth_student_refs`); commission is
+  GROWTH-11's. Nothing here computes either.
+- The self-dealing rule reads GROWTH-04's handoff owner today; GROWTH-07 should confirm the attribution branch of
+  `institution_payment_credited_user()` (or redefine the function) when `growth_attributions` lands.
+- No "stale received payment" alert for finance.
+
+**Risks / follow-ups**
+- GROWTH-09 (rates) also adds an OPS-02 extended key. Whichever of its migration and 0111 sorts later must repeat every key,
+  including `INSTITUTION_PAYMENT_CLEARANCE` → `institution_payment`; the unit test here fails if 0111's list drops one, and
+  GROWTH-09 needs the same care for this key.
+- `api-security.module.ts`'s controller list and `high-risk-actions.ts` are merge hotspots; this goal appends at the end.
+
+**Validation:** pending — recorded below once the full run completes.

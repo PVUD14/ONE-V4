@@ -24,8 +24,9 @@ import {
 } from '@planthepath/authorization/src/index.js';
 import { readInstitutionDataTermsStatus } from '@planthepath/persistence/src/institution-contract.js';
 import type { PersistenceDb } from '@planthepath/persistence/src/repositories.js';
-import { conflict, iso, notFound, writeGrowthAudit, writeGrowthOutbox, type QueryResult } from './growth-http.js';
+import { conflict, forbidden, iso, notFound, writeGrowthAudit, writeGrowthOutbox, type QueryResult } from './growth-http.js';
 import type { LeadRow, WriteContext } from './growth-leads-service.js';
+import { attributeCollegeHandoff, SELF_DEALING_CODE } from './growth-attribution-service.js';
 
 type Runner = Pick<PersistenceDb, 'execute'>;
 
@@ -215,6 +216,8 @@ export async function linkHandoff(tx: Runner, ctx: WriteContext, input: { readon
     SELECT l.owner_membership_id, m.user_id AS owner_user_id FROM growth_leads l
     LEFT JOIN organization_memberships m ON m.id = l.owner_membership_id WHERE l.id = ${input.leadId}::uuid FOR UPDATE OF l
   `) as QueryResult<{ owner_membership_id: string | null; owner_user_id: string | null }>).rows[0]!;
+  // GROWTH-07 self-dealing guard (design §8.6): the link credits the lead's owner, so the owner never links it.
+  if (lead.owner_user_id === ctx.actorUserId) throw forbidden(SELF_DEALING_CODE, ctx.correlationId);
   const org = (await tx.execute(sql`SELECT kind::text AS kind FROM organizations WHERE id = ${input.organizationId}::uuid FOR SHARE`) as QueryResult<{ kind: string }>).rows[0];
   if (!org) throw notFound('ORGANIZATION_NOT_FOUND', ctx.correlationId);
   if (org.kind !== 'INSTITUTION') throw conflict('GROWTH_HANDOFF_NOT_AN_INSTITUTION', ctx.correlationId);
@@ -266,12 +269,14 @@ export async function linkHandoff(tx: Runner, ctx: WriteContext, input: { readon
     WHERE id = ${request.id}::uuid
   `);
   await tx.execute(sql`UPDATE growth_leads SET organization_id = ${input.organizationId}::uuid, last_activity_at = now() WHERE id = ${input.leadId}::uuid`);
+  // GROWTH-07 (design §8.2): the college is credited to the lead's owner at this moment; nobody when unowned.
+  const attributionId = await attributeCollegeHandoff(tx, ctx, { requestId: request.id, leadId: input.leadId, organizationId: input.organizationId, ownerUserId: lead.owner_user_id });
   await audit(tx, ctx, 'operations.growth_handoff.linked', 'growth_handoff_request', request.id, {
     leadId: input.leadId, organizationId: input.organizationId, ownerMembershipIdAtLink: lead.owner_membership_id,
-    contactsCarried: carried.length, contactsErased: erased.rows.length, contactsOverLimit: marked.rows.length - carried.length,
+    contactsCarried: carried.length, contactsErased: erased.rows.length, contactsOverLimit: marked.rows.length - carried.length, attributionId,
   });
   await outbox(tx, ctx, 'growth.lead.handed_off', 'growth_lead', input.leadId, { leadId: input.leadId, organizationId: input.organizationId });
-  return { requestId: request.id, contactsCarried: carried.length, contactsErased: erased.rows.length, contactsOverLimit: marked.rows.length - carried.length };
+  return { requestId: request.id, contactsCarried: carried.length, contactsErased: erased.rows.length, contactsOverLimit: marked.rows.length - carried.length, attributionId };
 }
 
 export async function declineHandoff(tx: Runner, ctx: WriteContext, input: { readonly leadId: string; readonly reasonCode: string }): Promise<string> {

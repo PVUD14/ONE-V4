@@ -1044,6 +1044,58 @@ export const eventSchemas = {
       candidateBasis: { kind: 'enum', values: ['REFERRAL_LINK', 'LEAD_OWNER_AT_HANDOFF', 'CONFLICT', 'HOUSE'] },
     },
   },
+  // GROWTH-07: attribution and disputes. Identifiers, enums and reason codes only — never a
+  // statement, a name or an email. The ledger (GROWTH-11) follows these to move unpaid accruals.
+  growthAttributionCreatedV1: {
+    eventType: 'growth.attribution.created',
+    eventVersion: 1,
+    producer: 'identity-organization',
+    aggregateType: 'growth_attribution',
+    purpose: 'growth-attribution',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://growth.attribution.created/1',
+    payload: {
+      attributionId: { kind: 'uuid' }, organizationId: { kind: 'uuid' },
+      basis: { kind: 'enum', values: ['LEAD_OWNER_AT_HANDOFF', 'REFERRAL_LINK', 'DISPUTE_DECISION', 'MANUAL_CORRECTION'] },
+    },
+  },
+  growthAttributionEndedV1: {
+    eventType: 'growth.attribution.ended',
+    eventVersion: 1,
+    producer: 'identity-organization',
+    aggregateType: 'growth_attribution',
+    purpose: 'growth-attribution',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://growth.attribution.ended/1',
+    payload: {
+      attributionId: { kind: 'uuid' }, organizationId: { kind: 'uuid' },
+      reasonCode: { kind: 'enum', values: ['REASSIGNED', 'DISPUTE_DECISION', 'CORRECTION', 'ORGANIZATION_EXITED'] },
+    },
+  },
+  growthAttributionDisputeOpenedV1: {
+    eventType: 'growth.attribution_dispute.opened',
+    eventVersion: 1,
+    producer: 'identity-organization',
+    aggregateType: 'growth_attribution_dispute',
+    purpose: 'growth-attribution',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://growth.attribution_dispute.opened/1',
+    payload: { disputeId: { kind: 'uuid' }, organizationId: { kind: 'uuid' }, origin: { kind: 'enum', values: ['CLAIM', 'ONBOARDING_CONFLICT'] } },
+  },
+  growthAttributionDisputeDecidedV1: {
+    eventType: 'growth.attribution_dispute.decided',
+    eventVersion: 1,
+    producer: 'identity-organization',
+    aggregateType: 'growth_attribution_dispute',
+    purpose: 'growth-attribution',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://growth.attribution_dispute.decided/1',
+    payload: {
+      disputeId: { kind: 'uuid' }, organizationId: { kind: 'uuid' },
+      outcome: { kind: 'enum', values: ['UPHELD', 'REJECTED'] },
+      reasonCode: { kind: 'enum', values: ['CLAIMANT_DID_THE_WORK', 'RESPONDENT_DID_THE_WORK', 'INSUFFICIENT_EVIDENCE', 'OUTSIDE_POLICY', 'OTHER'] },
+    },
+  },
   // GROWTH-06: field work. Identifiers, kinds and states only — never notes, a follow-up's title or
   // a location (the audit row records whether a location was attached, never where).
   growthActivityLoggedV1: {

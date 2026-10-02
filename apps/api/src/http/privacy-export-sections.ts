@@ -545,10 +545,12 @@ async function learningSections(one: Query, subject: Subject): Promise<Record<st
  * Never the lead contacts' personal data: those people are third parties, not the subject. For
  * anyone who is not growth staff every list is empty. GROWTH-06: their field log and follow-ups,
  * with each visit's location while it is still held. GROWTH-05: their employer referral codes, with
- * counts of the requests each brought — never what a requester typed.
+ * counts of the requests each brought — never what a requester typed. GROWTH-07: the organisations
+ * credited to them, the disputes they opened (with their own statement) or that named them (without
+ * the other party's), and their leave dates.
  */
 async function growthWorkSection(one: Query, subject: Subject): Promise<Record<string, unknown>> {
-  const [staffTypes, teams, assignments, leads, activities, followUps, referralCodes] = await Promise.all([
+  const [staffTypes, teams, assignments, leads, activities, followUps, referralCodes, attributions, disputes, leaverEvents] = await Promise.all([
     one(sql`SELECT t.staff_type, t.reason_code, t.effective_from, t.ended_at
             FROM growth_staff_types t JOIN organization_memberships m ON m.id = t.membership_id
             WHERE m.user_id = ${subject} ORDER BY t.effective_from, t.id`),
@@ -578,6 +580,15 @@ async function growthWorkSection(one: Query, subject: Subject): Promise<Record<s
     one(sql`SELECT c.code, c.created_at, c.revoked_at, c.revoked_reason_code,
                    (SELECT count(*)::int FROM employer_access_request_referrals r WHERE r.referral_code_id = c.id) AS referrals
             FROM growth_referral_codes c WHERE c.user_id = ${subject} ORDER BY c.created_at, c.id LIMIT 1000`),
+    one(sql`SELECT o.legal_name, a.organization_kind, a.basis, a.reason_code, a.effective_from, a.ended_at, a.ended_reason_code
+            FROM growth_attributions a JOIN organizations o ON o.id = a.organization_id
+            WHERE a.beneficiary_user_id = ${subject} ORDER BY a.created_at, a.id LIMIT 5000`),
+    one(sql`SELECT o.legal_name, d.origin, d.state, d.opened_at, d.decided_at, d.decision_reason_code,
+                   (d.claimant_user_id = ${subject}) AS claimant, CASE WHEN d.claimant_user_id = ${subject} THEN d.statement END AS statement
+            FROM growth_attribution_disputes d JOIN organizations o ON o.id = d.organization_id
+            WHERE d.claimant_user_id = ${subject} OR d.respondent_user_id = ${subject} ORDER BY d.opened_at, d.id LIMIT 1000`),
+    one(sql`SELECT e.event, e.from_state, e.to_state, e.occurred_at FROM growth_leaver_events e
+            WHERE e.user_id = ${subject} ORDER BY e.occurred_at, e.id LIMIT 1000`),
   ]);
   return {
     staffTypes: staffTypes.map((row) => ({ staffType: row.staff_type, reasonCode: row.reason_code, from: row.effective_from, to: row.ended_at })),
@@ -598,5 +609,14 @@ async function growthWorkSection(one: Query, subject: Subject): Promise<Record<s
       organisation: row.lead_name, dueOn: row.due_on, title: row.title ?? null, titleErasedAt: row.title_erased_at ?? null,
       state: row.state, createdAt: row.created_at, closedAt: row.closed_at ?? null, cancelReasonCode: row.cancel_reason_code ?? null,
     })),
+    attributions: attributions.map((row) => ({
+      organisation: row.legal_name, kind: row.organization_kind, basis: row.basis, reasonCode: row.reason_code,
+      from: row.effective_from, to: row.ended_at ?? null, endedReasonCode: row.ended_reason_code ?? null,
+    })),
+    attributionDisputes: disputes.map((row) => ({
+      organisation: row.legal_name, origin: row.origin, role: row.claimant ? 'CLAIMANT' : 'RESPONDENT', statement: row.statement ?? null,
+      state: row.state, openedAt: row.opened_at, decidedAt: row.decided_at ?? null, decisionReasonCode: row.decision_reason_code ?? null,
+    })),
+    leaverEvents: leaverEvents.map((row) => ({ event: row.event, fromState: row.from_state, toState: row.to_state, at: row.occurred_at })),
   };
 }

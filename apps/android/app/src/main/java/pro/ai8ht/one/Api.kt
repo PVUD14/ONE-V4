@@ -279,6 +279,9 @@ object Api {
     // and revoking need a signal, because the server generates the code.
     suspend fun growthReferralCodesRaw(context: Context): String = request(context, "GET", "/api/v1/growth/referral-codes")
 
+    // GROWTH-07: what is credited to the person and the disputes they are party to (read-only on the phone).
+    suspend fun growthAttributionsRaw(context: Context): String = request(context, "GET", "/api/v1/growth/attributions")
+
     suspend fun createGrowthReferralCode(context: Context, idempotencyKey: String): String =
         request(context, "POST", "/api/v1/growth/referral-codes", "{}", idempotencyKey)
 
@@ -1060,6 +1063,20 @@ internal fun documentVerificationLabel(doc: DocumentDto): String = when {
     val revokedAt: String? = null, val revokedReasonCode: String? = null, val referrals: GrowthReferralCountsDto = GrowthReferralCountsDto(),
 )
 @Serializable data class GrowthReferralLimitsDto(val liveCodesPerPerson: Int = 3, val createdPerDay: Int = 5)
+// GROWTH-07: credit and disputes. No amount field exists: commission amounts are not built, and
+// employer commission is on hold (D11).
+@Serializable data class GrowthCreditDto(
+    val attributionId: String = "", val organizationId: String = "", val organizationName: String = "", val organizationKind: String = "",
+    val basis: String = "", val since: String? = null, val endedAt: String? = null, val endedReasonCode: String? = null,
+    val disputeOpen: Boolean = false, val commission: String = "NOT_BUILT",
+)
+@Serializable data class GrowthMyDisputeDto(
+    val disputeId: String = "", val organizationName: String = "", val organizationKind: String = "", val origin: String = "",
+    val state: String = "", val role: String? = null, val openedAt: String? = null, val decidedAt: String? = null, val statement: String? = null,
+)
+@Serializable data class GrowthAttributionsDto(
+    val credited: List<GrowthCreditDto> = emptyList(), val disputes: List<GrowthMyDisputeDto> = emptyList(), val windowDays: Int = 90,
+)
 @Serializable data class GrowthReferralCodesDto(val eligible: Boolean = false, val codes: List<GrowthReferralCodeDto> = emptyList(), val limits: GrowthReferralLimitsDto = GrowthReferralLimitsDto())
 @Serializable data class GrowthHandoffRequestDto(
     val id: String = "", val state: String = "", val requestedAt: String? = null, val contractReferenceReported: String = "",

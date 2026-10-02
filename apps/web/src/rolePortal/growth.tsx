@@ -9,6 +9,9 @@
  *
  * GROWTH-06: Field is built (growthField.tsx); Home's "Visits this month" and the follow-ups-due
  * card come from the field log.
+ *
+ * GROWTH-07: Commission shows the person's credit and disputes (growthCommission.tsx); every amount
+ * still reads NA.
  */
 import { useEffect, useState } from 'react';
 import { ApiRequestError, getGrowthMe, getGrowthTerritory, getProtectedAccessToken, type GrowthMeDto, type GrowthTerritoryDto } from '../api.js';
@@ -16,6 +19,7 @@ import { V2Chip, V2EmptyState, V2Ring, V2Stat } from '../dashboardsV2.js';
 import type { RoleNavItem } from '../rolePortalConfig.js';
 import { GrowthLeadsPage } from './growthLeads.js';
 import { GrowthFieldPage } from './growthField.js';
+import { GrowthCommissionPage } from './growthCommission.js';
 import { AuthenticatedNotYetAvailable } from './shared.js';
 
 const NA = 'NA';
@@ -30,7 +34,6 @@ const roleLabels: Readonly<Record<string, string>> = { GROWTH_EXECUTIVE: 'Growth
 /** What each page will hold once built, said plainly (design §16.1). */
 const notBuilt: Readonly<Record<string, string>> = {
   Targets: 'Targets is not built yet. When it is, your targets for the month and quarter, and progress counted from real records, will be here.',
-  Commission: 'Commission is not built yet. Commission rates have not been set by operations, so no amount is shown anywhere.',
   Team: 'Team is not built yet. When it is, your team members, their workload and stale leads will be here.',
 };
 
@@ -120,7 +123,7 @@ export function GrowthHomePage(): React.ReactElement {
         </section>
         <section className="v2-card">
           <div className="v2-card-head"><h2>Coming next</h2><V2Chip tone="slate">Not built yet</V2Chip></div>
-          <p className="v2-empty">Targets and commission are not built yet. Each page says so until it is, and every figure above reads NA until it has a real source.</p>
+          <p className="v2-empty">Targets and commission amounts are not built yet. Commission shows what is credited to you; every figure above reads NA until it has a real source.</p>
         </section>
         <section className="v2-card">
           <div className="v2-card-head"><h2>Protected boundaries</h2></div>
@@ -139,6 +142,7 @@ export function GrowthModulePage({ route, role }: { readonly route: RoleNavItem;
   if (route.label === 'Territory') return <GrowthTerritoryPage />;
   if (route.label === 'Leads') return <GrowthLeadsPage role={role} />;
   if (route.label === 'Field') return <GrowthFieldPage role={role} />;
+  if (route.label === 'Commission') return <GrowthCommissionPage />;
   return <AuthenticatedNotYetAvailable title={route.label} detail={notBuilt[route.label] ?? `${route.label} is not built yet.`} />;
 }
 

@@ -226,6 +226,8 @@ private fun GrowthHome(me: GrowthMeDto, onOpenField: () -> Unit) {
         GrowthQueueCard()
         // GROWTH-05: only the employer partnerships team has referral links to share.
         if (me.teams.any { it.team == "EMPLOYER_PARTNERSHIPS" }) GrowthReferralLinksCard()
+        // GROWTH-07: what is credited to the person, read-only, with a saved copy for offline.
+        GrowthCreditCard()
         SectionTitle("Your teams")
         if (me.teams.isEmpty()) {
             PilotCard {
@@ -255,7 +257,7 @@ private fun GrowthHome(me: GrowthMeDto, onOpenField: () -> Unit) {
             Column(Modifier.padding(16.dp)) {
                 Text("Not built yet", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(6.dp))
-                Text("Targets and commission are not built yet. Each appears here when it is, and every figure above reads NA until it has a real source. Commission rates have not been set, so no amount is shown.",
+                Text("Targets and commission amounts are not built yet. Credit is shown above; every figure reads NA until it has a real source. Commission rates have not been set, so no amount is shown.",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }

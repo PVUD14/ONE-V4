@@ -634,3 +634,133 @@ export function searchGrowthEmployerLeads(token: string, query: string, signal?:
 export function setEmployerAccessRequestGrowthLead(token: string, requestId: string, leadId: string | null): Promise<{ readonly linked: { readonly requestId: string; readonly leadId: string | null } }> {
   return requestJson(`/api/v1/operations/employer-access-requests/${encodeURIComponent(requestId)}/growth-lead`, { token, method: 'POST', body: { leadId } });
 }
+
+// ---------------------------------------------------------------------------
+// GROWTH-07: attribution — who is credited, disputes, reassignment (design §8). No amount anywhere.
+// ---------------------------------------------------------------------------
+
+export type GrowthOrganizationKindDto = 'INSTITUTION' | 'EMPLOYER';
+
+export interface GrowthCreditDto {
+  readonly attributionId: string;
+  readonly organizationId: string;
+  readonly organizationName: string;
+  readonly organizationKind: GrowthOrganizationKindDto;
+  readonly basis: string;
+  readonly since: string | null;
+  readonly endedAt: string | null;
+  readonly endedReasonCode: string | null;
+  readonly disputeOpen: boolean;
+  /** Never an amount: commission is not built for colleges yet, and employer commission is on hold (D11). */
+  readonly commission: 'NOT_BUILT' | 'EMPLOYER_ON_HOLD';
+}
+
+export interface GrowthMyDisputeDto {
+  readonly disputeId: string;
+  readonly organizationId: string;
+  readonly organizationName: string;
+  readonly organizationKind: GrowthOrganizationKindDto;
+  readonly origin: 'CLAIM' | 'ONBOARDING_CONFLICT';
+  readonly state: 'OPEN' | 'UPHELD' | 'REJECTED';
+  readonly role: 'CLAIMANT' | 'RESPONDENT' | null;
+  readonly openedAt: string | null;
+  readonly decidedAt: string | null;
+  readonly decisionReasonCode: string | null;
+  /** The claimant's own statement; always null for the respondent. */
+  readonly statement: string | null;
+}
+
+export interface GrowthDisputableDto {
+  readonly organizationId: string;
+  readonly organizationName: string;
+  readonly organizationKind: GrowthOrganizationKindDto;
+  readonly handedOffAt: string | null;
+  readonly windowEndsAt: string | null;
+  readonly disputeOpen: boolean;
+}
+
+export interface GrowthAttributionsDto {
+  readonly credited: readonly GrowthCreditDto[];
+  readonly disputes: readonly GrowthMyDisputeDto[];
+  readonly disputable: readonly GrowthDisputableDto[];
+  readonly windowDays: number;
+}
+
+export function getGrowthAttributions(token: string, signal?: AbortSignal): Promise<GrowthAttributionsDto> {
+  return requestJson('/api/v1/growth/attributions', { token, ...(signal ? { signal } : {}) });
+}
+
+export function openGrowthAttributionDispute(token: string, body: { readonly organizationId: string; readonly statement: string }): Promise<GrowthAttributionsDto & { readonly disputeId: string }> {
+  return requestJson('/api/v1/growth/attribution-disputes', { token, method: 'POST', body });
+}
+
+export interface GrowthAdminAttributionDto {
+  readonly attributionId: string;
+  readonly organizationId: string;
+  readonly organizationName: string;
+  readonly organizationKind: GrowthOrganizationKindDto;
+  readonly beneficiary: { readonly userId: string; readonly email: string; readonly active: boolean };
+  readonly leaver: { readonly leftAt: string | null; readonly settlementEndsAt: string | null } | null;
+  readonly basis: string;
+  readonly reasonCode: string;
+  readonly lead: { readonly leadId: string; readonly name: string | null } | null;
+  readonly since: string | null;
+  readonly endedAt: string | null;
+  readonly endedReasonCode: string | null;
+  readonly endedBy: string | null;
+  readonly createdBy: string;
+  readonly disputeOpen: boolean;
+}
+
+export interface GrowthAdminDisputeDto {
+  readonly disputeId: string;
+  readonly organizationId: string;
+  readonly organizationName: string;
+  readonly organizationKind: GrowthOrganizationKindDto;
+  readonly origin: 'CLAIM' | 'ONBOARDING_CONFLICT';
+  readonly currentBasis: string | null;
+  readonly claimant: { readonly userId: string; readonly email: string };
+  readonly respondent: { readonly userId: string; readonly email: string | null } | null;
+  readonly statement: string | null;
+  readonly openedAt: string | null;
+  readonly openedBy: string;
+  readonly state: 'OPEN' | 'UPHELD' | 'REJECTED';
+  readonly decidedAt: string | null;
+  readonly decidedBy: string | null;
+  readonly decisionReasonCode: string | null;
+  readonly decisionNote: string | null;
+  readonly evidence: { readonly handedOffAt: string | null; readonly onboardingCandidate: string | null; readonly leadName: string | null };
+}
+
+export interface GrowthAdminAttributionsDto {
+  readonly attributions: readonly GrowthAdminAttributionDto[];
+  readonly counts: { readonly live: number; readonly beneficiaryLeft: number; readonly ended: number; readonly openDisputes: number };
+  readonly vocabulary: { readonly reassignReasons: readonly string[]; readonly endReasons: readonly string[]; readonly decisionReasons: readonly string[]; readonly outcomes: readonly string[] };
+}
+
+const attributionAdminPath = '/api/v1/operations/growth-attribution';
+
+export function listGrowthAdminAttributions(token: string, query: { readonly view: 'LIVE' | 'LEFT' | 'ENDED'; readonly q?: string }, signal?: AbortSignal): Promise<GrowthAdminAttributionsDto> {
+  const params = new URLSearchParams({ view: query.view, ...(query.q ? { q: query.q } : {}) });
+  return requestJson(`${attributionAdminPath}?${params.toString()}`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function listGrowthAdminDisputes(token: string, state: 'OPEN' | 'DECIDED', signal?: AbortSignal): Promise<{ readonly disputes: readonly GrowthAdminDisputeDto[] }> {
+  return requestJson(`${attributionAdminPath}/disputes?state=${state}`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function getGrowthAttributionReassignOptions(token: string, kind: GrowthOrganizationKindDto): Promise<{ readonly options: readonly { readonly userId: string; readonly email: string }[] }> {
+  return requestJson(`${attributionAdminPath}/reassign-options?kind=${kind}`, { token });
+}
+
+export function decideGrowthAttributionDispute(token: string, disputeId: string, body: { readonly outcome: string; readonly reasonCode: string; readonly note?: string }): Promise<unknown> {
+  return requestJson(`${attributionAdminPath}/disputes/${encodeURIComponent(disputeId)}/decide`, { token, method: 'POST', body });
+}
+
+export function reassignGrowthAttribution(token: string, attributionId: string, body: { readonly toUserId: string; readonly reasonCode: string }): Promise<unknown> {
+  return requestJson(`${attributionAdminPath}/${encodeURIComponent(attributionId)}/reassign`, { token, method: 'POST', body });
+}
+
+export function endGrowthAttribution(token: string, attributionId: string, body: { readonly reasonCode: string }): Promise<unknown> {
+  return requestJson(`${attributionAdminPath}/${encodeURIComponent(attributionId)}/end`, { token, method: 'POST', body });
+}

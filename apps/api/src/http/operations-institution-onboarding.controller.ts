@@ -21,6 +21,7 @@ import { isHighRiskVerificationTransition } from '@planthepath/authorization/src
 import { consumeOperationApproval } from '@planthepath/persistence/src/operation-approvals.js';
 import { InstitutionContractError, assertInstitutionRosterIntakeAllowed } from '@planthepath/persistence/src/institution-contract.js';
 import { approvalHttpError, approvalNotRequired, approvalPayloads, approvalRequired, readApprovalId } from './operation-approval-gate.js';
+import { refuseSelfDealing } from './growth-attribution-service.js';
 
 type QueryResult<T> = { rows: T[] };
 type OrganizationKind = 'INSTITUTION' | 'EMPLOYER';
@@ -209,6 +210,9 @@ export class OperationsInstitutionOnboardingController {
       const current = await tx.execute(sql`SELECT verification_state FROM organizations WHERE id = ${id}::uuid AND kind IN ('INSTITUTION','EMPLOYER') FOR UPDATE`) as QueryResult<{ verification_state: VerificationState }>;
       const [row] = current.rows;
       if (!row || !isAllowedVerificationTransition(row.verification_state, toState)) throw new Error('invalid verification transition');
+      // GROWTH-07 self-dealing guard (design §8.6): never on an organisation credited to the operator or
+      // in dispute with them as a party; checked on the person across memberships (and by 0110's trigger).
+      await refuseSelfDealing(tx, context.authorization.principal.userId, id, context.correlationId);
       const approval = approvalId ? await consumeOperationApproval(tx, {
         approvalId, actionKey: 'ORGANIZATION_SUSPEND', payload: approvalPayloads.ORGANIZATION_SUSPEND({ organizationId: id, reasonCode }),
         executorUserId: context.authorization.principal.userId, correlationId: context.correlationId,

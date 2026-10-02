@@ -26,8 +26,9 @@ import {
 } from '@planthepath/authorization/src/index.js';
 import { readEmployerTermsStatus } from '@planthepath/persistence/src/employer-terms.js';
 import { validateOutboxWriteInput, type PersistenceDb } from '@planthepath/persistence/src/repositories.js';
-import { iso, notFound, writeGrowthAudit, writeGrowthOutbox, conflict, type QueryResult } from './growth-http.js';
+import { iso, notFound, writeGrowthAudit, writeGrowthOutbox, conflict, forbidden, type QueryResult } from './growth-http.js';
 import type { WriteContext } from './growth-leads-service.js';
+import { attributeEmployerOnboarding, SELF_DEALING_CODE } from './growth-attribution-service.js';
 
 type Runner = Pick<PersistenceDb, 'execute'>;
 type Transactional = Runner & { transaction<T>(work: (tx: Transactional) => Promise<T>): Promise<T> };
@@ -104,12 +105,18 @@ export interface OnboardingRecord {
   readonly candidateBasis: GrowthEmployerCandidateBasis;
   readonly leadId: string | null;
   readonly leadLinked: boolean;
+  readonly attributionId: string | null;
+  readonly disputeId: string | null;
 }
 
 /**
  * Called by the decision route right after a request became ONBOARDED. Records the linked lead and
  * its owner, and the referral and its owner, as they stand now, with the §8.3 candidate; links the
- * lead to the employer when it can. Never refuses: an unusable lead is simply not recorded.
+ * lead to the employer when it can. An unusable lead is simply not recorded.
+ *
+ * GROWTH-07: at the employer's first onboarding it also writes the attribution (or, on a conflict,
+ * opens a dispute), and it refuses — rolling the decision back — an operator who is the referrer or
+ * the lead's owner (design §8.6): another operator must onboard it.
  */
 export async function recordEmployerOnboarding(tx: Runner, input: {
   readonly requestId: string; readonly organizationId: string; readonly actorUserId: string; readonly correlationId: string; readonly uuid: () => string;
@@ -133,6 +140,7 @@ export async function recordEmployerOnboarding(tx: Runner, input: {
     JOIN growth_referral_codes c ON c.id = r.referral_code_id WHERE r.access_request_id = ${input.requestId}::uuid
   `) as QueryResult<{ id: string; membership_id: string; user_id: string }>).rows[0];
   const leadOwnerUserId = usableLead?.owner_user_id ?? null;
+  if (input.actorUserId === referral?.user_id || input.actorUserId === leadOwnerUserId) throw forbidden(SELF_DEALING_CODE, input.correlationId);
   const basis = growthEmployerCandidateBasis({ referrerUserId: referral?.user_id ?? null, leadOwnerUserId });
   await tx.execute(sql`
     INSERT INTO growth_employer_onboardings (access_request_id, organization_id, lead_id, lead_owner_membership_id, lead_owner_user_id,
@@ -146,13 +154,18 @@ export async function recordEmployerOnboarding(tx: Runner, input: {
   if (usableLead && leadLinked) {
     await tx.execute(sql`UPDATE growth_leads SET organization_id = ${input.organizationId}::uuid, last_activity_at = now() WHERE id = ${usableLead.id}::uuid`);
   }
-  const context = { requestId: input.requestId, organizationId: input.organizationId, leadId: usableLead?.id ?? null, leadLinked, candidateBasis: basis, referral: Boolean(referral) };
+  const credit = await attributeEmployerOnboarding(tx, { actorUserId: input.actorUserId, organizationId: input.organizationId, correlationId: input.correlationId, uuid: input.uuid }, {
+    requestId: input.requestId, organizationId: input.organizationId, leadId: leadLinked || usableLead?.organization_id === input.organizationId ? usableLead?.id ?? null : null,
+    candidate: basis, referrerUserId: referral?.user_id ?? null, leadOwnerUserId,
+  });
+  const context = { requestId: input.requestId, organizationId: input.organizationId, leadId: usableLead?.id ?? null, leadLinked, candidateBasis: basis, referral: Boolean(referral),
+    attributionId: credit.attributionId, disputeId: credit.disputeId, firstHandoff: credit.firstHandoff };
   await writeGrowthAudit(tx, { id: input.uuid(), actorUserId: input.actorUserId, action: 'operations.employer.growth_onboarding_recorded',
     resourceType: 'growth_employer_onboarding', resourceId: input.requestId, organizationId: input.organizationId, correlationId: input.correlationId, context });
   await writeGrowthOutbox(tx, { id: input.uuid(), aggregateType: 'growth_employer_onboarding', aggregateId: input.requestId, eventType: 'growth.employer.onboarded',
     payload: { requestId: input.requestId, organizationId: input.organizationId, candidateBasis: basis }, actorUserId: input.actorUserId,
     organizationId: input.organizationId, correlationId: input.correlationId });
-  return { candidateBasis: basis, leadId: usableLead?.id ?? null, leadLinked };
+  return { candidateBasis: basis, leadId: usableLead?.id ?? null, leadLinked, attributionId: credit.attributionId, disputeId: credit.disputeId };
 }
 
 // ---------------------------------------------------------------------------
@@ -215,9 +228,12 @@ export async function setAccessRequestLead(tx: Runner, ctx: WriteContext, input:
     await tx.execute(sql`DELETE FROM employer_access_request_leads WHERE access_request_id = ${input.requestId}::uuid`);
   } else {
     const lead = (await tx.execute(sql`
-      SELECT 1 FROM growth_leads WHERE id = ${input.leadId}::uuid AND kind = 'EMPLOYER' AND stage <> 'LOST' AND do_not_contact_at IS NULL AND organization_id IS NULL
-    `) as QueryResult<unknown>).rows[0];
+      SELECT m.user_id AS owner_user_id FROM growth_leads l LEFT JOIN organization_memberships m ON m.id = l.owner_membership_id
+      WHERE l.id = ${input.leadId}::uuid AND l.kind = 'EMPLOYER' AND l.stage <> 'LOST' AND l.do_not_contact_at IS NULL AND l.organization_id IS NULL
+    `) as QueryResult<{ owner_user_id: string | null }>).rows[0];
     if (!lead) throw conflict('GROWTH_EMPLOYER_LEAD_NOT_LINKABLE', ctx.correlationId);
+    // GROWTH-07 (design §8.6): linking makes the lead's owner the credit candidate, so the owner never links their own.
+    if (lead.owner_user_id === ctx.actorUserId) throw forbidden(SELF_DEALING_CODE, ctx.correlationId);
     if (before === input.leadId) return { requestId: input.requestId, leadId: input.leadId };
     await tx.execute(sql`
       INSERT INTO employer_access_request_leads (access_request_id, lead_id, basis, linked_by_user_id)

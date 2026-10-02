@@ -355,7 +355,9 @@ describe('derived milestones match their source tables', () => {
     expect(m.HANDED_OFF!.state).toBe('REACHED');
     for (const code of ['CONTRACT_RECORDED', 'VERIFIED', 'ADMIN_JOINED', 'FIRST_ROSTER', 'EXITED', 'STUDENTS_ACTIVATING']) expect(m[code]!.state).toBe('NOT_REACHED');
     expect(m.DATA_TERMS_ACCEPTED!.state).toBe('NA');
-    expect(m.FIRST_PAYMENT_CLEARED!.state).toBe('NA');
+    // GROWTH-10 records college payments; until one clears the milestone is not reached (its own spec
+    // changes the source: institution-payments.integration.spec.ts).
+    expect(m.FIRST_PAYMENT_CLEARED).toEqual({ code: 'FIRST_PAYMENT_CLEARED', state: 'NOT_REACHED', at: null, note: "Waiting for the college's payment to clear." });
     expect(m.STUDENTS_ACTIVATING!.count).toEqual({ suppressed: true, value: null });
 
     // CONTRACT_RECORDED: operations records the reference on the account (OPS-14).

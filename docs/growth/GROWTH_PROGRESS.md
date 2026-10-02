@@ -888,4 +888,13 @@ the migrator and replayed twice by hand with `psql -v ON_ERROR_STOP=1` on a migr
   credited person's favour); the executor is.
 - Android compiled, not run on a device.
 
-**Validation** — pending; recorded below when the full run completes.
+**Validation** (`E:/one-wt/logs/validate.sh E:/one-wt/growth07 one_growth07 growth07 android` on a fresh database
+`one_growth07`, only `DATABASE_URL` exported, on base 31aaaf8):
+- `corepack pnpm db:migrate` twice — pass (96 applied, then 0 applied / 96 already applied); 0110 also replayed twice by
+  hand with `psql -v ON_ERROR_STOP=1` — pass.
+- `corepack pnpm typecheck` — pass. `corepack pnpm build` — pass.
+- `corepack pnpm -r --no-bail --workspace-concurrency=1 test` — **exit 0, all 4 425 tests passed** (api 1 572, web 1 030,
+  authorization 524, persistence 515, others), including `growth-attribution` 17/17 and every earlier growth spec. No
+  "out of shared memory" in this run; nothing re-run.
+- Android `./gradlew --no-daemon -q :app:compileDebugKotlin` (Android Studio JBR) — pass.
+- CI parity: private-key, optional-chain and conflict-marker greps — clean; `corepack pnpm audit --prod --audit-level=high` — exit 0.

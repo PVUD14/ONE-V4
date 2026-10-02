@@ -122,6 +122,14 @@ services:
       COGNITO_CLIENT_ID: ${DEMO_COGNITO_CLIENT_ID:-}
       DATABASE_URL: postgresql://one_sandbox:${DEMO_POSTGRES_PASSWORD:-}@postgres-demo:5432/one_sandbox
       NODE_ENV: development
+      # The AI tutor and content drafts may only ever switch on here (ENG-22/23). The AI
+      # endpoint comes from DEMO_ONE_AI_*, never production's ONE_AI_*, so setting AI up for
+      # the demo cannot reach oneby8.com. Blank = AI unavailable.
+      ONE_SANDBOX: "true"
+      ONE_AI_TUTOR_AUDIENCE: sandbox
+      ONE_AI_BASE_URL: ${DEMO_ONE_AI_BASE_URL:-}
+      ONE_AI_API_KEY: ${DEMO_ONE_AI_API_KEY:-}
+      ONE_AI_MODEL: ${DEMO_ONE_AI_MODEL:-}
       # Deliberately absent: SMTP (the sandbox sends no mail), the automation secret and
       # the staff pool. Fictional people never get an email.
     depends_on:
@@ -133,6 +141,47 @@ services:
       - demo-db
       - demo-edge
     mem_limit: 512m
+    profiles: ["sandbox"]
+
+  # The sandbox's AI workers (ENG-22 tutor hints, ENG-23 content drafts). Model calls run
+  # here, never in a request handler. Both stay idle while the features are off, and refuse
+  # every job while the kill switch is engaged. They reach the pod over demo-edge.
+  worker-demo:
+    image: one-api-sandbox:local
+    restart: unless-stopped
+    working_dir: /app
+    command: ["pnpm", "--filter", "@planthepath/persistence", "worker:automation"]
+    environment: &sandbox-ai-env
+      AUTOMATION_WORKER_MODE: local-outbox
+      DATABASE_URL: postgresql://one_sandbox:${DEMO_POSTGRES_PASSWORD:-}@postgres-demo:5432/one_sandbox
+      NODE_ENV: development
+      ONE_SANDBOX: "true"
+      ONE_AI_TUTOR_AUDIENCE: sandbox
+      ONE_AI_BASE_URL: ${DEMO_ONE_AI_BASE_URL:-}
+      ONE_AI_API_KEY: ${DEMO_ONE_AI_API_KEY:-}
+      ONE_AI_MODEL: ${DEMO_ONE_AI_MODEL:-}
+    depends_on:
+      postgres-demo:
+        condition: service_healthy
+    networks:
+      - demo-db
+      - demo-edge
+    mem_limit: 384m
+    profiles: ["sandbox"]
+
+  ai-content-demo:
+    image: one-api-sandbox:local
+    restart: unless-stopped
+    working_dir: /app
+    command: ["pnpm", "--filter", "@planthepath/persistence", "ai:content-factory"]
+    environment: *sandbox-ai-env
+    depends_on:
+      postgres-demo:
+        condition: service_healthy
+    networks:
+      - demo-db
+      - demo-edge
+    mem_limit: 384m
     profiles: ["sandbox"]
 
   # The nightly reset and the first seed (runbook step 5): drops the sandbox database,

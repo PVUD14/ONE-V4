@@ -269,3 +269,24 @@ node apps/web/scripts/check-demo-boundary.mjs apps/web/dist production
 VITE_SANDBOX=true corepack pnpm --filter @planthepath/web exec vite build --outDir /tmp/one-sandbox-dist --emptyOutDir
 node apps/web/scripts/check-demo-boundary.mjs /tmp/one-sandbox-dist sandbox
 ```
+
+## AI in the demo (ENG-22 tutor hints, ENG-23 content drafts)
+
+AI may only ever switch on in the sandbox. Its endpoint is the demo's own `DEMO_ONE_AI_*`
+in `.env`; production's `ONE_AI_*` stay blank, so this cannot reach oneby8.com.
+
+1. Start the RunPod pod and run `deploy/ai-pod/setup-pod.sh` on it (ADR-047).
+2. In `.env` set `DEMO_ONE_AI_BASE_URL=https://<pod-id>-8888.proxy.runpod.net/v1`,
+   `DEMO_ONE_AI_MODEL=<served model name>`, and `DEMO_ONE_AI_API_KEY=` the key from
+   `/root/one-ai/api-key` on the pod (typed on the server only).
+3. `sudo docker compose up -d` — this (re)starts `api-demo`, `worker-demo` (tutor hints)
+   and `ai-content-demo` (content drafts) with the new values.
+4. Inside the sandbox: `ai:register-features`, record the bake-off for the served model with
+   `ai:bake-off-import` (the gate refuses to switch a feature on without a PASS), run
+   `ai:tutor-sandbox-consent`, then switch `tutor.hint` and `content.lesson-draft` on in
+   AI Operations with a second person. Detail: `runbook-tutor-hints-sandbox.md` and
+   `sop-ai-operations.md` §F.
+5. The nightly reset clears step 4; re-run it before a demo day, or after the reset.
+
+Stop the pod when not demoing: the workers then report the endpoint unreachable and every
+request falls back (tutor shows the written hint; drafts are refused, nothing lands).

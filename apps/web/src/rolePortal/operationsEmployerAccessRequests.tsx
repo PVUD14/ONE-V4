@@ -11,14 +11,22 @@
  * Deciding never creates or verifies anything: "Onboarded" links the request to an employer
  * the operator created with the Add Organization form above, which starts unverified.
  * Declined and spam need a reason from the server's fixed list.
+ *
+ * GROWTH-05: each request also shows the growth referral it arrived with ("Referred by") and the
+ * employer lead it belongs to ("Matches growth lead"), matched on the domain or linked here by
+ * hand. While a request is pending the operator may link it to a suggested or searched lead, or
+ * remove the link. Marking it onboarded records who could be credited; nothing here credits anyone.
  */
 import { useEffect, useState } from 'react';
 import {
   decideEmployerAccessRequest,
   getProtectedAccessToken,
   listEmployerAccessRequests,
+  searchGrowthEmployerLeads,
+  setEmployerAccessRequestGrowthLead,
   type EmployerAccessRequestDto,
   type EmployerAccessRequestQueueDto,
+  type GrowthEmployerLeadOptionDto,
   type OrganizationManagementDto,
 } from '../api.js';
 import { formatApiError } from './shared.js';
@@ -55,6 +63,8 @@ export function EmployerAccessRequestsSection({ organizations }: { readonly orga
   const [reason, setReason] = useState('');
   const [organizationId, setOrganizationId] = useState('');
   const [busy, setBusy] = useState(false);
+  const [leadSearch, setLeadSearch] = useState<Readonly<Record<string, string>>>({});
+  const [leadOptions, setLeadOptions] = useState<Readonly<Record<string, readonly GrowthEmployerLeadOptionDto[]>>>({});
 
   useEffect(() => {
     if (!token) return;
@@ -93,6 +103,54 @@ export function EmployerAccessRequestsSection({ organizations }: { readonly orga
     }
   }
 
+  async function linkLead(request: EmployerAccessRequestDto, leadId: string | null, leadName: string): Promise<void> {
+    setBusy(true); setError(''); setNotice('');
+    try {
+      await setEmployerAccessRequestGrowthLead(token!, request.id, leadId);
+      setNotice(leadId ? `${request.companyName} is linked to the growth lead ${leadName}.` : `${request.companyName} is no longer linked to a growth lead.`);
+      setLeadOptions({ ...leadOptions, [request.id]: [] });
+      setReload((value) => value + 1);
+    } catch (cause) {
+      setError(formatApiError(cause, 'The growth lead could not be linked.'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function findLeads(request: EmployerAccessRequestDto): Promise<void> {
+    setError('');
+    try {
+      const found = await searchGrowthEmployerLeads(token!, (leadSearch[request.id] ?? '').trim());
+      setLeadOptions({ ...leadOptions, [request.id]: found.leads });
+    } catch (cause) {
+      setError(formatApiError(cause, 'Growth leads could not be searched.'));
+    }
+  }
+
+  function growthCell(request: EmployerAccessRequestDto): React.ReactElement {
+    const linked = request.growthLead ?? null;
+    const options = [...(request.growthLeadCandidates ?? []), ...(leadOptions[request.id] ?? [])]
+      .filter((option, index, all) => option.leadId !== linked?.leadId && all.findIndex((other) => other.leadId === option.leadId) === index);
+    return <div>
+      <div>{request.growthReferral
+        ? <>Referred by {request.growthReferral.referrerEmail}{request.growthReferral.codeRevoked ? <small> (link since revoked)</small> : null}</>
+        : 'No referral link'}</div>
+      {linked ? <div>Matches growth lead: <strong>{linked.name}</strong> · owner {linked.ownerEmail ?? 'none'}
+        <small> ({linked.basis === 'OPERATOR_LINKED' ? 'linked by operations' : 'same domain'})</small>
+        <button type="button" className="secondary" disabled={busy} onClick={() => void linkLead(request, null, linked.name)}>Remove link</button></div>
+        : <div>No growth lead</div>}
+      {options.map((option) => <div key={option.leadId}>
+        <button type="button" className="secondary" disabled={busy} onClick={() => void linkLead(request, option.leadId, option.name)}
+          aria-label={`Link ${request.companyName} to growth lead ${option.name}`}>Link</button>
+        {' '}{option.name}{option.websiteDomain ? ` · ${option.websiteDomain}` : ''} · owner {option.ownerEmail ?? 'none'}
+      </div>)}
+      <label><span className="sr-only">Find a growth lead for {request.companyName}</span>
+        <input aria-label={`Find a growth lead for ${request.companyName}`} value={leadSearch[request.id] ?? ''} maxLength={120} placeholder="Find a growth lead"
+          onChange={(event) => setLeadSearch({ ...leadSearch, [request.id]: event.target.value })} /></label>
+      <button type="button" className="secondary" disabled={busy} onClick={() => void findLeads(request)}>Search</button>
+    </div>;
+  }
+
   const requests = queue?.requests ?? [];
   return <section className="role-card role-wide" aria-label="Employer access requests">
     <h2>Employer access requests</h2>
@@ -122,7 +180,7 @@ export function EmployerAccessRequestsSection({ organizations }: { readonly orga
     {queue !== null && requests.length === 0 ? <p>No pending employer access requests.</p> : null}
     {requests.length ? <div className="role-record-table-wrap"><table className="role-record-table">
       <caption className="sr-only">Pending employer access requests</caption>
-      <thead><tr><th>Company</th><th>Requested by</th><th>Checks</th><th>Possible matches</th><th>Received</th><th>Actions</th></tr></thead>
+      <thead><tr><th>Company</th><th>Requested by</th><th>Checks</th><th>Possible matches</th><th>Growth</th><th>Received</th><th>Actions</th></tr></thead>
       <tbody>{requests.map((request) => <tr key={request.id} className="role-record-row">
         <th scope="row"><strong>{request.companyName}</strong><small>{request.websiteUrl}</small></th>
         <td>{request.requesterName}<br /><small>{request.workEmail}</small></td>
@@ -133,6 +191,7 @@ export function EmployerAccessRequestsSection({ organizations }: { readonly orga
           {request.submissionCount > 1 ? <li>Sent {request.submissionCount} times</li> : null}
         </ul></td>
         <td>{request.possibleMatches.length ? request.possibleMatches.map((match) => <div key={match.organizationId}>{match.legalName} ({match.verificationState})</div>) : 'None'}</td>
+        <td>{growthCell(request)}</td>
         <td>{formatDate(request.createdAt)}</td>
         <td><div className="role-record-actions">
           <button type="button" className="secondary" disabled={busy} onClick={() => start(request, 'ONBOARDED')}>Mark onboarded</button>

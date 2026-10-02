@@ -38,6 +38,7 @@ import { V2Chip, V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { formatApiError } from './shared.js';
 import { LeadFieldPanel } from './growthField.js';
 import { LeadPipelinePanel } from './growthPipeline.js';
+import { GrowthReferralLinksCard } from './growthReferrals.js';
 
 const NA = 'NA';
 
@@ -190,6 +191,7 @@ export function GrowthLeadsPage({ role }: { readonly role?: string | undefined }
       </div>
 
       <div className="v2-rail">
+        {token ? <GrowthReferralLinksCard token={token} /> : null}
         <section className="v2-card">
           <div className="v2-card-head"><h2>Contact details are personal data</h2></div>
           <p className="v2-empty">{vocabulary?.purpose ?? NA} Add only details the person gave you, that their organisation published for enquiries, or that a colleague of theirs passed on. Never purchased lists, scraped data, or personal mobile numbers from anywhere else. They are erased 24 months after the lead&apos;s last activity.</p>

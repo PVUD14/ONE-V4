@@ -8,6 +8,11 @@
  * college — the milestones read from Operations' own records. A milestone with no source says NA;
  * the student-activation count says "<5" below five. No student, amount or contract text appears.
  *
+ * GROWTH-05: on an employer lead, the employer's own milestones from the start — its access request,
+ * onboarding, verification, terms, first job (with how many are published now) and campus drives
+ * (a count per state) — and the access requests linked to it, with whether a referral link was yours
+ * or another team member's. Counts and states only: never a job's content, an applicant or a college.
+ *
  * In Operations (OPS_ORG_MANAGE): the open requests, each linked to a college the operator created
  * with Add Organization above, or declined with a reason. Contacts are shown masked; the link moves
  * them to the college's account on the server.
@@ -44,7 +49,24 @@ const milestoneLabels: Readonly<Record<string, string>> = {
   STUDENTS_ACTIVATING: 'Students activating',
   FIRST_PAYMENT_CLEARED: 'First payment cleared',
   EXITED: 'College left ONE',
+  ACCESS_REQUESTED: 'Asked for employer access',
+  ONBOARDED: 'Onboarded by operations',
+  TERMS_ACCEPTED: 'Employer terms accepted',
+  FIRST_JOB_PUBLISHED: 'First job published',
+  CAMPUS_DRIVE: 'Campus drives',
+  SUSPENDED: 'Suspended by operations',
 };
+
+const employerVerifiedLabel = 'Employer verified';
+const requestStateLabels: Readonly<Record<string, string>> = { PENDING: 'Waiting for operations', ONBOARDED: 'Onboarded', DECLINED: 'Declined', SPAM: 'Closed as spam' };
+
+function milestoneCounts(milestone: GrowthMilestoneDto): string | null {
+  const counts = milestone.counts;
+  if (!counts) return null;
+  if (milestone.code === 'FIRST_JOB_PUBLISHED') return `${counts.PUBLISHED_NOW ?? 0} published now`;
+  const parts = Object.entries(counts).map(([state, value]) => `${value} ${growthCodeLabel(state).toLowerCase()}`);
+  return parts.length ? parts.join(' · ') : null;
+}
 
 function pipelineError(cause: unknown, fallback: string): string {
   if (cause instanceof ApiRequestError) {
@@ -151,16 +173,27 @@ export function LeadPipelinePanel({ leadId, token, contacts, onChanged }: {
       </li>)}</ul>
     </> : null}
 
+    {pipeline.kind === 'EMPLOYER' ? <>
+      <h4>Access requests</h4>
+      {(pipeline.accessRequests ?? []).length ? <ul aria-label="Access requests">{(pipeline.accessRequests ?? []).map((item, index) => <li key={`${item.receivedAt ?? NA}-${index}`}>
+        {item.receivedAt ? new Date(item.receivedAt).toLocaleDateString() : NA}: {requestStateLabels[item.state] ?? growthCodeLabel(item.state)}
+        {item.referral === 'YOU' ? ' · through your referral link' : item.referral === 'ANOTHER_TEAM_MEMBER' ? " · through another team member's referral link" : ''}
+      </li>)}</ul> : <p className="v2-empty">No access request from this company yet. Share your referral link, or ask them to use the request form with their work email.</p>}
+    </> : null}
+
     {pipeline.milestones ? <>
       <h4>Onboarding</h4>
       <div className="v2-list" aria-label="Onboarding milestones">{pipeline.milestones.map((milestone) => (
         <div key={milestone.code} className="v2-list-row">
           <span className="v2-tile teal" aria-hidden="true">{milestone.state === 'REACHED' ? '✓' : milestone.state === 'NA' ? '–' : '…'}</span>
-          <div className="grow"><strong>{milestoneLabels[milestone.code] ?? growthCodeLabel(milestone.code)}</strong>{milestone.note ? <small>{milestone.note}</small> : null}</div>
-          <V2Chip tone={milestone.state === 'REACHED' ? 'green' : milestone.state === 'NA' ? 'slate' : 'amber'}>{milestoneValue(milestone)}</V2Chip>
+          <div className="grow"><strong>{milestone.code === 'VERIFIED' && pipeline.kind === 'EMPLOYER' ? employerVerifiedLabel : milestoneLabels[milestone.code] ?? growthCodeLabel(milestone.code)}</strong>
+            {milestone.note ? <small>{milestone.note}</small> : null}{milestoneCounts(milestone) ? <small>{milestoneCounts(milestone)}</small> : null}</div>
+          <V2Chip tone={milestone.code === 'SUSPENDED' && milestone.state === 'REACHED' ? 'red' : milestone.state === 'REACHED' ? 'green' : milestone.state === 'NA' ? 'slate' : 'amber'}>{milestoneValue(milestone)}</V2Chip>
         </div>
       ))}</div>
-      <small>Read from operations&apos; records each time; nothing here names a student or shows an amount.</small>
+      <small>{pipeline.kind === 'EMPLOYER'
+        ? "Read from operations' and the employer's records each time; counts and states only, never a job's content, an applicant or a college."
+        : "Read from operations' records each time; nothing here names a student or shows an amount."}</small>
     </> : null}
   </div>;
 }

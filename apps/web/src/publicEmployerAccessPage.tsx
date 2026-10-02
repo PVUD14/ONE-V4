@@ -11,12 +11,22 @@
  * server's; this page only reports their answers. It renders without a session, so it is
  * routed before any signed-in check in App.tsx. Branding is the ONE logo via
  * BrandLogo, like the sign-in page it sits beside.
+ *
+ * GROWTH-05: a growth person's referral link is this page with `?ref=<code>`. The code is passed
+ * on with the request exactly as it arrived and is never shown or checked here: the server answers
+ * the same whether it is valid or not, so this page has nothing to say about it.
  */
 import { useEffect, useState, type FormEvent } from 'react';
 import { ApiRequestError, submitEmployerAccessRequest } from './api.js';
 import { BrandLogo } from './brand.js';
 
 const productName = 'ONE by AI8HT';
+
+/** The `ref` of the link the visitor followed, passed on untouched (bounded so a pasted page cannot ride along). */
+export function referralFromLocation(search: string): string | undefined {
+  const ref = new URLSearchParams(search).get('ref');
+  return ref && ref.length <= 64 ? ref : undefined;
+}
 
 function messageFor(error: unknown): string {
   if (!(error instanceof ApiRequestError)) return 'Your request could not be sent. Check your connection and try again.';
@@ -43,9 +53,11 @@ export function PublicEmployerAccessPage({ onNavigate }: { readonly onNavigate: 
     event.preventDefault();
     setBusy(true); setError('');
     try {
+      const ref = referralFromLocation(window.location.search);
       await submitEmployerAccessRequest({
         requesterName: form.requesterName.trim(), companyName: form.companyName.trim(),
         workEmail: form.workEmail.trim(), websiteUrl: form.websiteUrl.trim(),
+        ...(ref ? { ref } : {}),
       });
       setSent(true);
     } catch (cause) {

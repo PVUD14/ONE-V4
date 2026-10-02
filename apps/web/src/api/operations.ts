@@ -385,6 +385,8 @@ export interface EmployerAccessRequestInput {
   readonly companyName: string;
   readonly workEmail: string;
   readonly websiteUrl: string;
+  /** GROWTH-05: the referral code from the link the company followed, if any. Never changes the answer. */
+  readonly ref?: string;
 }
 
 /** Public: no token. The answer is the same whatever exists on ONE. */
@@ -410,6 +412,19 @@ export interface EmployerAccessRequestDto {
   readonly createdAt: string;
   readonly lastSubmittedAt: string;
   readonly possibleMatches: readonly { readonly organizationId: string; readonly legalName: string; readonly verificationState: string }[];
+  /** GROWTH-05: the growth referral the request arrived with, its linked employer lead, and other open leads that look like it. */
+  readonly growthReferral?: { readonly referrerEmail: string; readonly codeRevoked: boolean; readonly recordedAt: string | null } | null;
+  readonly growthLead?: EmployerAccessRequestGrowthLeadDto | null;
+  readonly growthLeadCandidates?: readonly EmployerAccessRequestGrowthLeadDto[];
+}
+
+export interface EmployerAccessRequestGrowthLeadDto {
+  readonly leadId: string;
+  readonly name: string;
+  readonly websiteDomain: string | null;
+  readonly stage: string;
+  readonly ownerEmail: string | null;
+  readonly basis?: 'DOMAIN_MATCH' | 'OPERATOR_LINKED';
 }
 
 export interface EmployerAccessRequestQueueDto {

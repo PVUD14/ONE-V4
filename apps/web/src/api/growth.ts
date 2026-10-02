@@ -505,6 +505,15 @@ export interface GrowthMilestoneDto {
   readonly note?: string;
   /** STUDENTS_ACTIVATING only: a suppressed count (fewer than 5 is never a number). */
   readonly count?: { readonly suppressed: boolean; readonly value: number | null };
+  /** GROWTH-05, employer leads: FIRST_JOB_PUBLISHED carries PUBLISHED_NOW; CAMPUS_DRIVE a count per drive state. Counts of records, never people. */
+  readonly counts?: Readonly<Record<string, number>>;
+}
+
+/** GROWTH-05: an access request linked to an employer lead — its time, state and whose referral, nothing the requester typed. */
+export interface GrowthLeadAccessRequestDto {
+  readonly receivedAt: string | null;
+  readonly state: 'PENDING' | 'ONBOARDED' | 'DECLINED' | 'SPAM';
+  readonly referral: 'YOU' | 'ANOTHER_TEAM_MEMBER' | null;
 }
 
 export interface GrowthHandoffRequestDto {
@@ -530,6 +539,8 @@ export interface GrowthLeadPipelineDto {
   readonly canRequestHandoff: boolean;
   readonly handoffRequests: readonly GrowthHandoffRequestDto[];
   readonly milestones: readonly GrowthMilestoneDto[] | null;
+  /** GROWTH-05: employer leads only (empty for colleges); absent from an older server. */
+  readonly accessRequests?: readonly GrowthLeadAccessRequestDto[];
   readonly vocabulary: {
     readonly reasons: { readonly backward: readonly string[]; readonly hold: readonly string[]; readonly lost: readonly string[] };
     readonly declineReasons: readonly string[];
@@ -570,4 +581,56 @@ export function linkGrowthHandoff(token: string, leadId: string, body: { readonl
 
 export function declineGrowthHandoff(token: string, leadId: string, body: { readonly reasonCode: string }): Promise<unknown> {
   return requestJson(`${handoffsPath}/${encodeURIComponent(leadId)}/decline`, { token, method: 'POST', body });
+}
+
+// ---------------------------------------------------------------------------
+// GROWTH-05: employer referral links. The link is the public access-request form's path and the
+// code; it carries nothing about the person. Creating and revoking need the server.
+// ---------------------------------------------------------------------------
+
+export interface GrowthReferralCodeDto {
+  readonly id: string;
+  readonly code: string;
+  readonly linkPath: string;
+  readonly createdAt: string | null;
+  readonly revokedAt: string | null;
+  readonly revokedReasonCode: string | null;
+  readonly referrals: { readonly pending: number; readonly onboarded: number; readonly closed: number };
+}
+
+export interface GrowthReferralCodesDto {
+  readonly eligible: boolean;
+  readonly codes: readonly GrowthReferralCodeDto[];
+  readonly limits: { readonly liveCodesPerPerson: number; readonly createdPerDay: number; readonly referralsPerCodePerDay: number };
+}
+
+const referralPath = '/api/v1/growth/referral-codes';
+
+export function listGrowthReferralCodes(token: string, signal?: AbortSignal): Promise<GrowthReferralCodesDto> {
+  return requestJson(referralPath, { token, ...(signal ? { signal } : {}) });
+}
+
+export function createGrowthReferralCode(token: string, idempotencyKey: string): Promise<{ readonly code: GrowthReferralCodeDto | null; readonly codes: readonly GrowthReferralCodeDto[] }> {
+  return requestJson(referralPath, { token, method: 'POST', body: {}, idempotencyKey });
+}
+
+export function revokeGrowthReferralCode(token: string, codeId: string): Promise<{ readonly codes: readonly GrowthReferralCodeDto[] }> {
+  return requestJson(`${referralPath}/${encodeURIComponent(codeId)}/revoke`, { token, method: 'POST', body: {} });
+}
+
+/** Operations: open employer leads for linking an access request to one (OPS_ORG_MANAGE). */
+export interface GrowthEmployerLeadOptionDto {
+  readonly leadId: string;
+  readonly name: string;
+  readonly websiteDomain: string | null;
+  readonly stage: string;
+  readonly ownerEmail: string | null;
+}
+
+export function searchGrowthEmployerLeads(token: string, query: string, signal?: AbortSignal): Promise<{ readonly leads: readonly GrowthEmployerLeadOptionDto[] }> {
+  return requestJson(`/api/v1/operations/growth-employer-leads?q=${encodeURIComponent(query)}`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function setEmployerAccessRequestGrowthLead(token: string, requestId: string, leadId: string | null): Promise<{ readonly linked: { readonly requestId: string; readonly leadId: string | null } }> {
+  return requestJson(`/api/v1/operations/employer-access-requests/${encodeURIComponent(requestId)}/growth-lead`, { token, method: 'POST', body: { leadId } });
 }

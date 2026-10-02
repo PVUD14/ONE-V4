@@ -67,6 +67,19 @@ describe('EMP-04 public employer access request page', () => {
       body: { requesterName: 'Priya Raman', companyName: 'Aster Mobility', workEmail: 'priya@aster.example', websiteUrl: 'https://www.aster.example' } }]);
   });
 
+  it('passes the code of a referral link on with the request and shows nothing about it (GROWTH-05)', async () => {
+    window.history.pushState({}, '', '/employer-access?ref=ABCDEFGHJK');
+    try {
+      render(<PublicEmployerAccessPage onNavigate={() => undefined} />);
+      fill();
+      expect(await screen.findByText('Thank you. Your request has been received.')).toBeInTheDocument();
+      expect(posts()[0]!.body).toEqual({ requesterName: 'Priya Raman', companyName: 'Aster Mobility', workEmail: 'priya@aster.example', websiteUrl: 'https://www.aster.example', ref: 'ABCDEFGHJK' });
+      expect(document.body.textContent).not.toContain('ABCDEFGHJK');
+    } finally {
+      window.history.pushState({}, '', '/');
+    }
+  });
+
   it('explains the work-email rule and the rate limit plainly', async () => {
     render(<PublicEmployerAccessPage onNavigate={() => undefined} />);
     failWith = { status: 400, body: { error: { code: 'EMPLOYER_ACCESS_REQUEST_WORK_EMAIL_REQUIRED', correlationId: 'c-2' } } };

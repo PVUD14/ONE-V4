@@ -750,4 +750,20 @@ code, so an offline creation would promise a link that does not exist yet.
 - No growth "lead from an inbound request" creation: an unmatched request stays operations' to onboard (house).
 - No manual run on an emulator this goal (compile only); the share sheet is the platform's.
 
-**Validation:** in progress; recorded here when the full run finishes.
+**Validation** (`E:/one-wt/logs/validate.sh E:/one-wt/growth05 one_growth05 growth05 android` on a fresh database
+`one_growth05`, only `DATABASE_URL` exported, on base 772afa4):
+- `corepack pnpm db:migrate` twice — pass (93 applied, then 0 applied / 93 already applied); 0109 also replayed by hand — pass.
+- `corepack pnpm typecheck` — pass. `corepack pnpm build` — pass. Android `:app:compileDebugKotlin` (Android Studio JBR) — pass.
+- CI parity: private-key, optional-chain and conflict-marker greps — clean; `corepack pnpm audit --prod --audit-level=high` — exit 0.
+- `corepack pnpm -r --no-bail --workspace-concurrency=1 test` — every package green except api: 1 524 of 1 525 tests passed,
+  including `growth-employer.integration.spec.ts` 21/21 and every growth spec; web 1 006/1 006, persistence 504/504,
+  authorization 495/495. The run exits 1 because 40 API files hit the shared Postgres's "out of shared memory" (39 in
+  teardown after their tests passed) and one test failed under that load:
+  `institution-accreditation-exports` › "drops a revoked share and a withdrawn self-report on the next export" (a count
+  assertion; the file touches no growth or access-request table). **All 40 files were re-run alone, sequentially, on the
+  same database: every test passed** (accreditation-exports 11/11, employer-company-profile 20/20, growth-field 25/25,
+  growth-foundation 19/19, growth-pipeline 16/16, growth-territories 17/17, sandbox-seed 12/12, and the other 33 files in
+  full). Four of them (employer-applicant-access 7/7, employer-applicant-export 9/9, employer-company-profile 20/20,
+  institution-department-workspace 17/17) still printed "out of shared memory" from teardown `DROP SCHEMA` after all their
+  tests had passed — the known environmental condition, not a test failure. Log: `E:/one-wt/logs/growth05-rerun.log`.
+- The base moved 19 commits during the work; this branch is not rebased onto it (the coordinator merges).

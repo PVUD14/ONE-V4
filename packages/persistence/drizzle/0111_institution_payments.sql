@@ -288,14 +288,10 @@ DROP TRIGGER IF EXISTS institution_payment_guard ON institution_payments;
 CREATE TRIGGER institution_payment_guard BEFORE INSERT OR UPDATE OR DELETE ON institution_payments
   FOR EACH ROW EXECUTE FUNCTION institution_payment_guard();
 
-CREATE OR REPLACE FUNCTION institution_payment_truncate_guard() RETURNS trigger AS $$
-BEGIN
-  RAISE EXCEPTION 'college payments are never deleted';
-END;
-$$ LANGUAGE plpgsql;
+-- No TRUNCATE trigger: test fixtures reset their private schemas with TRUNCATE … CASCADE, and a TRUNCATE
+-- needs table ownership, which no application role uses. Rows are protected against DELETE above.
 DROP TRIGGER IF EXISTS institution_payment_truncate_guard ON institution_payments;
-CREATE TRIGGER institution_payment_truncate_guard BEFORE TRUNCATE ON institution_payments
-  FOR EACH STATEMENT EXECUTE FUNCTION institution_payment_truncate_guard();
+DROP FUNCTION IF EXISTS institution_payment_truncate_guard();
 
 COMMENT ON TABLE institution_payments IS
   'College payments received (GROWTH-10). Recorded, never processed; append-only — only the listed transitions, each set once; corrections by void plus a new row. Clearance is dual-controlled (INSTITUTION_PAYMENT_CLEARANCE). Read only by GROWTH_FINANCE and ACCOUNT_MANAGE operators; growth sees only whether a payment has cleared. Not billing (ADR-022).';

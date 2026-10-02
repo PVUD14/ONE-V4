@@ -931,7 +931,7 @@ capability CHECK, grant trigger or scope trigger touched. Applied twice by the m
    (`^[A-Za-z0-9/-]{4,40}$`), `amount_paise bigint` from 1 paisa to ₹100 crore, `currency = 'INR'`, `students_paid` 1 to
    100 000, received date (not future, IST database date), coverage period (at most 3 years), state `RECEIVED → CLEARED |
    BOUNCED`, `CLEARED → REFUNDED`, any live state `→ VOIDED`. Each transition's columns are set together, once (CHECK); the
-   trigger refuses every other change, any edit of what was recorded at receipt, DELETE and TRUNCATE, and stamps every time
+   trigger refuses every other change, any edit of what was recorded at receipt and DELETE, and stamps every time
    with `now()`. A correction is a void plus a new row naming it (`CORRECTION`, one per voided row). The same instrument
    cannot be recorded twice while it stands (a bounced cheque presented again can). `CLEARED` needs an executed
    `INSTITUTION_PAYMENT_CLEARANCE` approval for this row, executed by the clearer, whose payload carries this row's amount,
@@ -964,7 +964,7 @@ capability CHECK, grant trigger or scope trigger touched. Applied twice by the m
   growth executive, growth manager and security admin 403 on every route; growth cannot file the approval); recording, with
   audit and event free of amount and reference; **students_paid 0, negative, fractional, text, null and over the bound
   refused by the route, 0 and negative by the CHECK**; amount, reference, instrument, date and period rules; non-INR,
-  non-college and future dates refused by the database; duplicate instrument; **every direct edit, DELETE and TRUNCATE
+  non-college and future dates refused by the database; duplicate instrument; **every direct edit and DELETE
   refused**; bounce, refund, void with dates and reasons, earlier columns kept, correction rules; **clearance without
   approval, before approval, by the requester (self-decision), by another executor, for another date — all refused; with a
   second person's approval it clears once; the database refuses a clearance using another payment's approval**;

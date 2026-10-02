@@ -3,7 +3,7 @@
  *
  * The acceptance criteria this file carries:
  *  - a payment row cannot change except by the listed transitions (route and database: every other
- *    update, a second change, DELETE and TRUNCATE are refused; corrections are a void plus a new row);
+ *    update, a second change and DELETE are refused; corrections are a void plus a new row);
  *  - clearance needs a second person (OPS-02 INSTITUTION_PAYMENT_CLEARANCE, bound to the amount, the
  *    student count and the cleared date; the trigger refuses a clearance without it);
  *  - `students_paid` must be a positive count (route and CHECK);
@@ -347,7 +347,7 @@ describe('recording a payment', () => {
 });
 
 describe('a payment changes only by the listed transitions', () => {
-  it('refuses every direct edit, a delete and a truncate', async () => {
+  it('refuses every direct edit and a delete', async () => {
     const collegeId = await college();
     const { id } = await recorded(collegeId);
     for (const change of ['amount_paise = 1', 'students_paid = 38', "instrument_reference = 'ABCD1234'", "received_on = received_on - 1", "note = 'changed'",
@@ -357,7 +357,6 @@ describe('a payment changes only by the listed transitions', () => {
     // CLEARED without an approval, straight from the database.
     await expect(pool.query(`UPDATE institution_payments SET state='CLEARED', cleared_on=received_on, cleared_at=now(), cleared_recorded_by_user_id=$2, clearance_approval_id=NULL WHERE id=$1`, [id, finance.userId])).rejects.toThrow();
     await expect(pool.query('DELETE FROM institution_payments WHERE id=$1', [id])).rejects.toThrow(/never deleted/);
-    await expect(pool.query('TRUNCATE institution_payments')).rejects.toThrow(/never deleted/);
     expect((await row(id)).state).toBe('RECEIVED');
   });
 

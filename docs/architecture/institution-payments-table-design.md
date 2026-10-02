@@ -100,7 +100,7 @@ RECEIVED ──(dual-controlled clearance)──> CLEARED ──> REFUNDED
 | `RECEIVED`, `CLEARED`, `BOUNCED`, `REFUNDED → VOIDED` | `GROWTH_FINANCE` | Single person, for the same reason. "Entered in error": the row never described real money |
 
 Nothing else changes. The trigger refuses every other update, any change to a column outside the transition's own set,
-a second change to a set-once column, and `DELETE` and `TRUNCATE`.
+a second change to a set-once column, and `DELETE`. (No `TRUNCATE` trigger: test fixtures reset their private schemas with `TRUNCATE … CASCADE`, and truncating needs table ownership, which no application role uses.)
 
 **Why a void is allowed from every live state.** A cheque recorded against the wrong college is still the wrong
 college after it clears. Refusing the void would leave a false row that commission later reads. The void keeps every

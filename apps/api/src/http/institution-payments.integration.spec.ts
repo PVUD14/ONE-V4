@@ -484,8 +484,13 @@ describe('the self-dealing guard (design §8.6)', () => {
     const seller = await member('GROWTH_EXECUTIVE');
     await team(seller, manager);
     await assign(regionId, seller, 'EXECUTIVE');
-    const created = await api().post('/api/v1/growth/leads').set(auth(seller.userId)).send({ kind: 'COLLEGE', name: 'College ' + unique(), stateCode: 'IN-KA', source: 'FIELD_VISIT' }).expect(201);
+    // A colleague found the lead first and their manager moved it to the seller, so both worked on it.
+    const claimant = await member('GROWTH_EXECUTIVE');
+    await team(claimant, manager);
+    await assign(regionId, claimant, 'EXECUTIVE');
+    const created = await api().post('/api/v1/growth/leads').set(auth(claimant.userId)).send({ kind: 'COLLEGE', name: 'College ' + unique(), stateCode: 'IN-KA', source: 'FIELD_VISIT' }).expect(201);
     const leadId = created.body.lead.id as string;
+    await api().post(`/api/v1/growth/leads/${leadId}/reassign`).set(auth(manager.userId)).send({ toMembershipId: seller.membershipId, reasonCode: 'WORKLOAD' }).expect(201);
     await api().post(`/api/v1/growth/leads/${leadId}/stage`).set(auth(seller.userId)).send({ fromStage: 'IDENTIFIED', toStage: 'AGREEMENT_SIGNED_REPORTED' }).expect(201);
     await api().post(`/api/v1/growth/leads/${leadId}/handoff`).set(auth(seller.userId)).send({ contractReference: 'AGR/2026-' + unique(), contactIds: [] }).expect(201);
     const collegeId = await college();
@@ -510,6 +515,17 @@ describe('the self-dealing guard (design §8.6)', () => {
     await approve(approvalId, execAsOperator).expect(403).expect((r) => expect(r.body.error.code).toBe('APPROVAL_SUBJECT_CONFLICT'));
     await approve(approvalId).expect(201);
     await clear(id, day(-1), approvalId).expect(201);
+    // GROWTH-07's parties: the live attribution's beneficiary is the seller; a claimant to an open
+    // dispute about the college is refused too, through growth_organization_parties().
+    const attribution = (await pool.query('SELECT id, beneficiary_user_id FROM growth_attributions WHERE organization_id=$1 AND ended_at IS NULL', [collegeId])).rows[0];
+    expect(attribution.beneficiary_user_id).toBe(seller.userId);
+    const claimantAsOperator = await member('OPERATIONS_ADMIN', claimant);
+    await grant(claimantAsOperator, 'GROWTH_FINANCE');
+    await api().post(payments).set(auth(claimant.userId)).send(paymentBody(collegeId)).expect(201);
+    await pool.query(`INSERT INTO growth_attribution_disputes (id,organization_id,organization_kind,origin,attribution_id,claimant_user_id,respondent_user_id,statement,opened_by_user_id,correlation_id)
+      VALUES ($1,$2,'INSTITUTION','CLAIM',$3,$4,$5,'I met the principal first.',$4,'corr-dispute')`, [randomUUID(), collegeId, attribution.id, claimant.userId, seller.userId]);
+    await api().post(payments).set(auth(claimant.userId)).send(paymentBody(collegeId)).expect(403)
+      .expect((r) => expect(r.body.error.code).toBe('INSTITUTION_PAYMENT_SELF_DEALING'));
     // Another college is not this person's: they may record its payments.
     await api().post(payments).set(auth(seller.userId)).send(paymentBody(await college())).expect(201);
   });

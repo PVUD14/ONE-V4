@@ -146,18 +146,20 @@ ledger (GROWTH-11) lapses any unpaid accrual of a voided payment, as design §10
 `institution_payment_credited_user(institution uuid, user uuid) → boolean` is true when the user is credited with the
 college:
 
-- the lead's owner at the moment operations linked the college's handoff (`growth_handoff_requests.owner_user_id_at_link`
-  of the `LINKED` request, GROWTH-04) — the only credit record on this base;
-- and, once GROWTH-07's `growth_attributions` exists, any live attribution of the college whose beneficiary is the user
-  (read through `to_regclass` so this migration does not depend on GROWTH-07; if that table exists without the columns
-  design §8.1 names, the function **fails closed** — it raises — rather than silently allowing).
+- anyone GROWTH-07's `growth_organization_parties(org)` (0110) names: the beneficiary of the college's live attribution
+  and both parties to an open attribution dispute about it;
+- and the lead's owner at the moment operations linked the college's handoff (`growth_handoff_requests.owner_user_id_at_link`
+  of the `LINKED` request, GROWTH-04), kept so the rule never depends on an attribution having been written.
+
+(Amended after GROWTH-07 merged: the first draft read `growth_attributions` dynamically because 0110 was not yet on the
+base; 0111 now calls 0110's own function, which is the one rule every growth self-dealing check uses.)
 
 It is checked on the user id, across all memberships (a person with both a growth membership and an operations one is
 one person). It refuses: recording a payment for the college, requesting its clearance, approving its clearance, and
 executing it. The API answers `403 INSTITUTION_PAYMENT_SELF_DEALING` (or `APPROVAL_SUBJECT_CONFLICT` at approval), and the
 trigger refuses the insert and the clearance as a backstop. Bounce, refund and void are not guarded: they only take
-commission away. GROWTH-07 may redefine the function with `CREATE OR REPLACE` when it settles attribution; it must keep
-the handoff rule or replace it with the attribution rule that supersedes it.
+commission away. A later goal that widens who has a stake in a college's credit changes `growth_organization_parties()`,
+and this guard follows.
 
 ## Who sees what
 
@@ -237,6 +239,6 @@ paise by string arithmetic, never through a float.
 4. `ACCOUNT_MANAGE` holders read the payments section; only `GROWTH_FINANCE` writes.
 5. The milestone counts only payments currently `CLEARED`; a refunded or voided payment does not.
 6. The OPS-02 solo safeguard applies to clearance as to every other high-risk action, while AI8HT has one approver.
-7. The self-dealing guard reads the handoff owner at link now and the live attribution once GROWTH-07 exists, failing
-   closed if that table does not have the expected shape.
+7. The self-dealing guard refuses everyone `growth_organization_parties()` names (live beneficiary, open-dispute parties)
+   and the lead owner at handoff link.
 8. Amounts and cheque references are kept out of audit context and outbox payloads.

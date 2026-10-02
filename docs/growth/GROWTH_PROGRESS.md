@@ -904,8 +904,8 @@ the migrator and replayed twice by hand with `psql -v ON_ERROR_STOP=1` on a migr
 period), and moves it only by the listed transitions; clearance, the event commission starts from (D10), needs a second
 person's `INSTITUTION_PAYMENT_CLEARANCE` approval bound to the amount, count and cleared date; anyone credited with the
 college is refused; growth sees only whether a payment has cleared.
-**Branch / PR:** feat/growth-college-payments (from feat/plan-phases-0-to-2 at 31aaaf8) → feat/plan-phases-0-to-2 (pushed; not merged)
-**Commits:** b32e5d7 (design) · decab48 (tests) · a631969 (server) · b6c9b10 (web) · this report
+**Branch / PR:** feat/growth-college-payments (cut at 31aaaf8, rebased onto feat/plan-phases-0-to-2 at eb605db after GROWTH-07 merged) → feat/plan-phases-0-to-2 (pushed; not merged)
+**Commits:** b69051c (design) · 94c633b (tests) · d7213cf (server) · cc48893 (web) · ed315c5 (report) · 9a9a6fe (TRUNCATE guard dropped) · the GROWTH-07 parties commit · validation record
 **Files created:**
 - `docs/architecture/institution-payments-table-design.md` (written and committed before the migration)
 - `packages/persistence/drizzle/0111_institution_payments.sql`
@@ -935,9 +935,9 @@ capability CHECK, grant trigger or scope trigger touched. Applied twice by the m
    with `now()`. A correction is a void plus a new row naming it (`CORRECTION`, one per voided row). The same instrument
    cannot be recorded twice while it stands (a bounced cheque presented again can). `CLEARED` needs an executed
    `INSTITUTION_PAYMENT_CLEARANCE` approval for this row, executed by the clearer, whose payload carries this row's amount,
-   count and cleared date. `institution_payment_credited_user()` — the self-dealing rule — reads the handoff owner at link
-   (GROWTH-04) and, once GROWTH-07's `growth_attributions` exists, its live beneficiary (fails closed if that table has
-   another shape).
+   count and cleared date. `institution_payment_credited_user()` — the self-dealing rule — refuses everyone GROWTH-07's
+   `growth_organization_parties()` names (the live attribution's beneficiary and both parties to an open dispute) and the
+   lead owner at handoff link (GROWTH-04).
 2. *Dual control.* New OPS-02 extended key `INSTITUTION_PAYMENT_CLEARANCE` (capability `GROWTH_FINANCE`, reasons
    `BANK_STATEMENT_CONFIRMED`, `BANK_ADVICE_RECEIVED`): the request names the payment and cleared date and the server binds the
    amount and count from the row; the approver is never the requester (OPS-02's solo safeguard unchanged) and never a person
@@ -968,7 +968,7 @@ capability CHECK, grant trigger or scope trigger touched. Applied twice by the m
   refused**; bounce, refund, void with dates and reasons, earlier columns kept, correction rules; **clearance without
   approval, before approval, by the requester (self-decision), by another executor, for another date — all refused; with a
   second person's approval it clears once; the database refuses a clearance using another payment's approval**;
-  self-dealing (record refused by route and trigger, approval request refused, approver refused, other colleges allowed); the
+  self-dealing (record refused by route and trigger, approval request refused, approver refused, a claimant to an open dispute refused, other colleges allowed); the
   milestone (not reached → same words after receipt → reached after clearance with no amount, count, reference or date for
   executive and manager → not reached after a void); **a source scan: only the payments controller, the approvals controller
   and the growth milestone read the table, and the milestone imports only the yes/no read; every non-operations GET route of
@@ -1006,8 +1006,6 @@ contract the app already renders generically (`GrowthPipeline.kt` shows any stat
 **Limitations / not done**
 - Allocation of students to a payment is GROWTH-08's (`institution_payment_coverages`, `growth_student_refs`); commission is
   GROWTH-11's. Nothing here computes either.
-- The self-dealing rule reads GROWTH-04's handoff owner today; GROWTH-07 should confirm the attribution branch of
-  `institution_payment_credited_user()` (or redefine the function) when `growth_attributions` lands.
 - No "stale received payment" alert for finance.
 
 **Risks / follow-ups**

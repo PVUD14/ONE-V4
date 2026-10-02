@@ -40,41 +40,22 @@ COMMENT ON FUNCTION operation_approval_extended_target_type(text) IS
   'Approval actions added after 0038, stored in extended_action_key. 0051: CAREER_REQUIREMENT_SET_PUBLISH; 0057: CONTENT_SKILL_PUBLISH; 0061: CONTENT_QUESTION_PUBLISH; 0065: CONTENT_LESSON_PUBLISH; 0081: COMMS_TEMPLATE_PUBLISH; 0088: INSTITUTION_DATA_PURGE; 0089: AI_FEATURE_ENABLE, AI_FEATURE_LIMITS_RAISE; 0111: INSTITUTION_PAYMENT_CLEARANCE. A later key repeats every earlier one.';
 
 -- ---------------------------------------------------------------------------
--- 2. Who is credited with a college (design §8.6), for the self-dealing guard.
---    The owner of the college's lead when operations linked the handoff (GROWTH-04) is the credit
---    record on this base. Once GROWTH-07's growth_attributions exists, a live attribution's
---    beneficiary is credited too; it is read dynamically so this file does not depend on GROWTH-07,
---    and if that table lacks the columns design §8.1 names the function raises (fails closed) rather
---    than allowing. GROWTH-07 may replace this function; it must keep or supersede both rules.
+-- 2. Who is credited with a college (design §8.6), for the self-dealing guard: anyone with a stake in
+--    its credit — GROWTH-07's growth_organization_parties() (0110: the live attribution's beneficiary
+--    and both parties of an open attribution dispute) — and the owner of the college's lead when
+--    operations linked the handoff (GROWTH-04), kept so the rule never depends on an attribution
+--    having been written. Checked on the user id, across all memberships.
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION institution_payment_credited_user(p_institution uuid, p_user uuid) RETURNS boolean
-LANGUAGE plpgsql STABLE AS $$
-DECLARE
-  credited boolean;
-BEGIN
-  IF p_institution IS NULL OR p_user IS NULL THEN
-    RETURN false;
-  END IF;
-  SELECT EXISTS (
-    SELECT 1 FROM growth_handoff_requests
-    WHERE organization_id = p_institution AND state = 'LINKED' AND owner_user_id_at_link = p_user
-  ) INTO credited;
-  IF credited THEN
-    RETURN true;
-  END IF;
-  IF to_regclass('growth_attributions') IS NOT NULL THEN
-    BEGIN
-      EXECUTE 'SELECT EXISTS (SELECT 1 FROM growth_attributions WHERE organization_id = $1 AND beneficiary_user_id = $2 AND ended_at IS NULL)'
-        INTO credited USING p_institution, p_user;
-    EXCEPTION WHEN undefined_column THEN
-      RAISE EXCEPTION 'institution_payment_credited_user cannot read growth_attributions; redefine it with that table';
-    END;
-  END IF;
-  RETURN COALESCE(credited, false);
-END;
+LANGUAGE sql STABLE AS $$
+  SELECT p_institution IS NOT NULL AND p_user IS NOT NULL AND (
+    p_user IN (SELECT growth_organization_parties(p_institution))
+    OR EXISTS (
+      SELECT 1 FROM growth_handoff_requests
+      WHERE organization_id = p_institution AND state = 'LINKED' AND owner_user_id_at_link = p_user));
 $$;
 COMMENT ON FUNCTION institution_payment_credited_user(uuid, uuid) IS
-  'GROWTH-10 self-dealing guard (design §8.6): true when the user is credited with the college — the lead owner at handoff link (GROWTH-04), or a live growth_attributions beneficiary once that table exists. Fails closed.';
+  'GROWTH-10 self-dealing guard (design §8.6): true when the user has a stake in the college''s credit — growth_organization_parties() (GROWTH-07) or the lead owner at handoff link (GROWTH-04).';
 
 -- ---------------------------------------------------------------------------
 -- 3. institution_payments

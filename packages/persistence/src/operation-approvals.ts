@@ -195,6 +195,10 @@ export interface OperationApprovalRow {
   /** For a status notice template publish (OPS-16): the template key and version. */
   readonly commsTemplateKey: string | null;
   readonly commsTemplateVersion: number | null;
+  /** For a college payment clearance (GROWTH-10): the instrument, its reference and the receipt date. */
+  readonly paymentInstrument: string | null;
+  readonly paymentReference: string | null;
+  readonly paymentReceivedOn: string | null;
 }
 
 interface ApprovalDbRow {
@@ -209,6 +213,7 @@ interface ApprovalDbRow {
   question_key: string | null; question_revision: number | null;
   lesson_key: string | null; lesson_variant: string | null; lesson_revision: number | null;
   comms_template_key: string | null; comms_template_version: number | null;
+  payment_instrument: string | null; payment_reference: string | null; payment_received_on: string | null;
 }
 
 // Microsecond text timestamps for the keyset cursor: a millisecond cursor would repeat
@@ -224,7 +229,7 @@ const approvalSelect = sql`
          now() >= a.expires_at AS expired,
          a.decided_by_user_id, du.email AS decider_email, a.decided_at, a.decision_reason_code,
          a.solo, a.solo_notice_state, a.executed_at,
-         COALESCE(o.legal_name, offboarded.legal_name) AS organization_name, mu.email AS member_email, mu.id AS member_user_id, h.reason_code AS hold_reason,
+         COALESCE(o.legal_name, offboarded.legal_name, paid_org.legal_name) AS organization_name, mu.email AS member_email, mu.id AS member_user_id, h.reason_code AS hold_reason,
          cr.title AS career_role_title, cr.catalogue_code AS career_role_catalogue_code, crs.version AS career_set_version,
          CASE WHEN skr.entity_type = 'TOPIC' THEN COALESCE(skr.body->>'name', skn.name) END AS skill_name, skn.stable_key AS skill_key,
          CASE WHEN skr.entity_type = 'TOPIC' THEN skr.revision END AS skill_revision,
@@ -234,7 +239,9 @@ const approvalSelect = sql`
          CASE WHEN skr.entity_type = 'LESSON' THEN concat_ws('/', COALESCE(skr.body #>> '{variant,language}', 'en'),
            COALESCE(skr.body #>> '{variant,level}', 'STANDARD'), COALESCE(skr.body #>> '{variant,style}', 'EXPLANATION')) END AS lesson_variant,
          CASE WHEN skr.entity_type = 'LESSON' THEN skr.revision END AS lesson_revision,
-         snt.template_key AS comms_template_key, snt.version AS comms_template_version
+         snt.template_key AS comms_template_key, snt.version AS comms_template_version,
+         ipay.instrument AS payment_instrument, ipay.instrument_reference AS payment_reference,
+         to_char(ipay.received_on, 'YYYY-MM-DD') AS payment_received_on
   FROM operation_approvals a
   JOIN users ru ON ru.id = a.requested_by_user_id
   LEFT JOIN users du ON du.id = a.decided_by_user_id
@@ -249,7 +256,10 @@ const approvalSelect = sql`
   LEFT JOIN status_notice_templates snt ON a.extended_target_type = 'status_notice_template' AND snt.id::text = a.target_id
   -- INST-18: a purge names the college whose records it deletes.
   LEFT JOIN institution_offboardings iob ON a.extended_target_type = 'institution_offboarding' AND iob.id::text = a.target_id
-  LEFT JOIN organizations offboarded ON offboarded.id = iob.institution_id`;
+  LEFT JOIN organizations offboarded ON offboarded.id = iob.institution_id
+  -- GROWTH-10: a clearance names the college that paid and the instrument the approver checks.
+  LEFT JOIN institution_payments ipay ON a.extended_target_type = 'institution_payment' AND ipay.id::text = a.target_id
+  LEFT JOIN organizations paid_org ON paid_org.id = ipay.institution_id`;
 
 function mapApproval(row: ApprovalDbRow): OperationApprovalRow {
   const live = row.state === 'PENDING' || row.state === 'APPROVED';
@@ -294,6 +304,9 @@ function mapApproval(row: ApprovalDbRow): OperationApprovalRow {
     lessonRevision: row.lesson_revision === null ? null : Number(row.lesson_revision),
     commsTemplateKey: row.comms_template_key,
     commsTemplateVersion: row.comms_template_version === null ? null : Number(row.comms_template_version),
+    paymentInstrument: row.payment_instrument,
+    paymentReference: row.payment_reference,
+    paymentReceivedOn: row.payment_received_on,
   };
 }
 

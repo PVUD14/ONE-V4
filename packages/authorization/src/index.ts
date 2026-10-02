@@ -142,3 +142,4 @@ export * from './growth-field.js';
 export * from './growth-pipeline.js';
 export * from './growth-employer.js';
 export * from './growth-attribution.js';
+export * from './institution-payments.js';

@@ -35,6 +35,7 @@ import {
   hasInternalCapability,
   highRiskActionKeys,
   highRiskActions,
+  isCalendarDate,
   isHighRiskActionKey,
   isHighRiskFlagChange,
   isHighRiskInternalCapability,
@@ -55,6 +56,7 @@ import { loadQuestionRevisionForPublish } from '@planthepath/persistence/src/que
 import { loadLessonRevisionForPublish } from '@planthepath/persistence/src/lesson-editor.js';
 import { loadStatusNoticeTemplate } from '@planthepath/persistence/src/status-notices.js';
 import { loadAiPolicyFacts } from '@planthepath/persistence/src/ai-operations.js';
+import { institutionPaymentToday, isCreditedWithInstitution, loadInstitutionPayment } from '@planthepath/persistence/src/institution-payments.js';
 import {
   countHighRiskApprovers,
   createOperationApproval,
@@ -165,6 +167,17 @@ export class OperationsApprovalsController {
     if (typeof raw.reasonCode !== 'string' || !reasons.includes(raw.reasonCode)) throw badRequest('REASON_CODE_INVALID', correlationId);
     const note = readNote(raw.note, correlationId);
     try {
+      // GROWTH-10 (design §8.6): nobody approves the clearance of a college they are credited with.
+      // The 0111 trigger refuses the clearance itself too; this answers at the decision.
+      if (decision === 'APPROVE') {
+        const pending = await loadOperationApproval(this.db, approvalId.toLowerCase());
+        if (pending?.actionKey === 'INSTITUTION_PAYMENT_CLEARANCE') {
+          const payment = await loadInstitutionPayment(this.db, pending.targetId);
+          if (payment && await isCreditedWithInstitution(this.db, payment.institutionId, actor.userId)) {
+            throw new ForbiddenException(domainError('APPROVAL_SUBJECT_CONFLICT', correlationId));
+          }
+        }
+      }
       const decided = await decideOperationApproval(this.db, {
         approvalId: approvalId.toLowerCase(), actorUserId: actor.userId, decision, reasonCode: raw.reasonCode, ...(note ? { note } : {}), correlationId,
         decide: (facts) => decideApproval({ actor, decision, approval: facts, approverCount: facts.approverCount }),
@@ -362,6 +375,25 @@ export class OperationsApprovalsController {
         if (offboarding.state !== 'ENDED' || !offboarding.retention_elapsed) throw badRequest('APPROVAL_TARGET_STATE_INVALID', correlationId);
         return { targetId: offboardingId, canonical: approvalPayloads.INSTITUTION_DATA_PURGE({ offboardingId, reasonCode }) };
       }
+      case 'INSTITUTION_PAYMENT_CLEARANCE': {
+        // GROWTH-10: only a received payment, a real cleared date on or after receipt and not in the
+        // future (the database's date in India), and never by someone credited with the college. The
+        // amount and the student count are bound from the immutable row, not from the request.
+        const paymentId = requireUuidField(payload.paymentId, correlationId);
+        if (!isCalendarDate(payload.clearedOn)) throw badRequest('INSTITUTION_PAYMENT_DATE_INVALID', correlationId);
+        const clearedOn = payload.clearedOn;
+        const payment = await loadInstitutionPayment(this.db, paymentId);
+        if (!payment) throw new OperationApprovalError('APPROVAL_TARGET_NOT_FOUND');
+        if (payment.state !== 'RECEIVED') throw badRequest('APPROVAL_TARGET_STATE_INVALID', correlationId);
+        if (clearedOn < payment.receivedOn || clearedOn > await institutionPaymentToday(this.db)) throw badRequest('INSTITUTION_PAYMENT_DATE_INVALID', correlationId);
+        if (await isCreditedWithInstitution(this.db, payment.institutionId, actor.userId)) {
+          throw new ForbiddenException(domainError('INSTITUTION_PAYMENT_SELF_DEALING', correlationId));
+        }
+        return {
+          targetId: paymentId,
+          canonical: approvalPayloads.INSTITUTION_PAYMENT_CLEARANCE({ paymentId, amountPaise: payment.amountPaise, studentsPaid: payment.studentsPaid, clearedOn, reasonCode }),
+        };
+      }
     }
   }
 }
@@ -381,6 +413,7 @@ const payloadFields: Readonly<Record<HighRiskActionKey, readonly string[]>> = {
   AI_FEATURE_ENABLE: ['featureKey', 'reasonCode'],
   AI_FEATURE_LIMITS_RAISE: ['featureKey', 'cap', 'capWindow', 'maxInputChars', 'reasonCode'],
   INSTITUTION_DATA_PURGE: ['offboardingId', 'reasonCode'],
+  INSTITUTION_PAYMENT_CLEARANCE: ['paymentId', 'clearedOn', 'reasonCode'],
 };
 
 /**
@@ -433,6 +466,13 @@ function toApprovalDto(row: OperationApprovalRow, actor: Actor, approverCount: n
       aiCap: row.actionKey === 'AI_FEATURE_LIMITS_RAISE' ? payload.cap ?? null : null,
       aiCapWindow: row.actionKey === 'AI_FEATURE_LIMITS_RAISE' ? payload.capWindow ?? null : null,
       aiMaxInputChars: row.actionKey === 'AI_FEATURE_LIMITS_RAISE' ? payload.maxInputChars ?? null : null,
+      // GROWTH-10: what the approver checks against the bank (the college is organizationName).
+      paymentInstrument: row.paymentInstrument,
+      paymentReference: row.paymentReference,
+      paymentReceivedOn: row.paymentReceivedOn,
+      paymentAmountPaise: row.actionKey === 'INSTITUTION_PAYMENT_CLEARANCE' ? payload.amountPaise ?? null : null,
+      paymentStudentsPaid: row.actionKey === 'INSTITUTION_PAYMENT_CLEARANCE' ? payload.studentsPaid ?? null : null,
+      paymentClearedOn: row.actionKey === 'INSTITUTION_PAYMENT_CLEARANCE' ? payload.clearedOn ?? null : null,
     },
     reasonCode: row.reasonCode,
     note: row.note,

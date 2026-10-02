@@ -23,6 +23,7 @@ import {
   type GrowthCollegeMilestone,
 } from '@planthepath/authorization/src/index.js';
 import { readInstitutionDataTermsStatus } from '@planthepath/persistence/src/institution-contract.js';
+import { institutionHasClearedPayment } from '@planthepath/persistence/src/institution-payments.js';
 import type { PersistenceDb } from '@planthepath/persistence/src/repositories.js';
 import { conflict, forbidden, iso, notFound, writeGrowthAudit, writeGrowthOutbox, type QueryResult } from './growth-http.js';
 import type { LeadRow, WriteContext } from './growth-leads-service.js';
@@ -154,6 +155,7 @@ export async function collegeMilestones(runner: Runner, lead: { readonly id: str
     SELECT count(*)::int AS n FROM invitations WHERE organization_id = ${org}::uuid AND kind = 'STUDENT' AND state::text = 'ACCEPTED'`);
   const exited = await one<{ at: Date | null }>(sql`
     SELECT max(ended_at) AS at FROM institution_offboardings WHERE institution_id = ${org}::uuid AND state IN ('ENDED', 'PURGED')`);
+  const paymentCleared = await institutionHasClearedPayment(runner, org);
   const activatedCount = suppressSmallCount(Number(activated?.n ?? 0));
   return [
     { code: 'HANDED_OFF', state: linked ? 'REACHED' : 'NOT_REACHED', at: iso(linked?.decided_at ?? null) },
@@ -166,7 +168,11 @@ export async function collegeMilestones(runner: Runner, lead: { readonly id: str
     { code: 'FIRST_ROSTER', state: roster?.at ? 'REACHED' : 'NOT_REACHED', at: iso(roster?.at ?? null) },
     // A milestone only, never a list or a name; fewer than 5 is shown as "<5" (design §6.1).
     { code: 'STUDENTS_ACTIVATING', state: activatedCount.suppressed ? 'NOT_REACHED' : 'REACHED', at: null, count: activatedCount },
-    { code: 'FIRST_PAYMENT_CLEARED', state: 'NA', at: null, note: 'College payments are not recorded in ONE yet.' },
+    // GROWTH-10: reached or not, never an amount, a reference, a count or a date (design §6.1). The
+    // same words whether or not a payment has been received, so the milestone cannot reveal a receipt.
+    paymentCleared
+      ? { code: 'FIRST_PAYMENT_CLEARED', state: 'REACHED', at: null }
+      : { code: 'FIRST_PAYMENT_CLEARED', state: 'NOT_REACHED', at: null, note: "Waiting for the college's payment to clear." },
     { code: 'EXITED', state: exited?.at ? 'REACHED' : 'NOT_REACHED', at: iso(exited?.at ?? null) },
   ];
 }

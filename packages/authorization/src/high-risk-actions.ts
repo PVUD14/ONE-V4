@@ -15,6 +15,7 @@ import { lessonPublishReasons } from './lesson-editor.js';
 import { commsTemplatePublishReasons } from './incidents.js';
 import { aiFeatureEnableReasons, aiLimitsRaiseReasons } from './ai-operations.js';
 import { institutionDataPurgeReasons } from './institution-contract.js';
+import { institutionPaymentClearanceReasons } from './institution-payments.js';
 import { hasInternalCapability, internalCapabilityGrantReasons, type InternalCapability, type InternalCapabilityContext } from './internal-capabilities.js';
 
 export const highRiskActionKeys = [
@@ -42,6 +43,9 @@ export const highRiskActionKeys = [
   // INST-18. Extended key too (0088 adds it to operation_approval_extended_target_type): a departed
   // college's institution-owned records are deleted only with a second person's approval.
   'INSTITUTION_DATA_PURGE',
+  // GROWTH-10. Extended key too (0111 adds it to operation_approval_extended_target_type): a college
+  // payment clears — the event commission starts from (D10) — only with a second person's approval.
+  'INSTITUTION_PAYMENT_CLEARANCE',
 ] as const;
 
 /** The keys 0038's CHECK allows in `action_key`; any other key is an extended key (0051). */
@@ -58,7 +62,7 @@ export type HighRiskActionKey = (typeof highRiskActionKeys)[number];
 export interface HighRiskActionDefinition {
   /** Needed both to request the action and to execute it. */
   readonly capability: InternalCapability;
-  readonly targetType: 'organization' | 'feature_flag' | 'outbox_backlog' | 'data_retention_hold' | 'organization_membership' | 'career_requirement_set' | 'content_revision' | 'status_notice_template' | 'ai_feature_policy' | 'institution_offboarding';
+  readonly targetType: 'organization' | 'feature_flag' | 'outbox_backlog' | 'data_retention_hold' | 'organization_membership' | 'career_requirement_set' | 'content_revision' | 'status_notice_template' | 'ai_feature_policy' | 'institution_offboarding' | 'institution_payment';
   readonly label: string;
 }
 
@@ -76,6 +80,7 @@ export const highRiskActions: Readonly<Record<HighRiskActionKey, HighRiskActionD
   AI_FEATURE_ENABLE: { capability: 'AI_OPS_CONFIGURE', targetType: 'ai_feature_policy', label: 'Switch an AI feature on' },
   AI_FEATURE_LIMITS_RAISE: { capability: 'AI_OPS_CONFIGURE', targetType: 'ai_feature_policy', label: 'Raise an AI feature cap or limit' },
   INSTITUTION_DATA_PURGE: { capability: 'OPS_ORG_MANAGE', targetType: 'institution_offboarding', label: 'Delete a departed college’s records' },
+  INSTITUTION_PAYMENT_CLEARANCE: { capability: 'GROWTH_FINANCE', targetType: 'institution_payment', label: 'Record a college payment as cleared' },
 };
 
 export function isLegacyHighRiskActionKey(key: HighRiskActionKey): boolean {
@@ -104,6 +109,7 @@ export const approvalRequestReasons: Readonly<Record<HighRiskActionKey, readonly
   AI_FEATURE_ENABLE: aiFeatureEnableReasons,
   AI_FEATURE_LIMITS_RAISE: aiLimitsRaiseReasons,
   INSTITUTION_DATA_PURGE: institutionDataPurgeReasons,
+  INSTITUTION_PAYMENT_CLEARANCE: institutionPaymentClearanceReasons,
 };
 
 /** Hours from request to expiry; one window covers deciding and executing. */

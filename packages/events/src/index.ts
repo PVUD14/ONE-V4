@@ -106,6 +106,8 @@ const operationApprovalActionKeys = [
   'AI_FEATURE_LIMITS_RAISE',
   // INST-18: extended key as well (0088) — deleting a departed college's records.
   'INSTITUTION_DATA_PURGE',
+  // GROWTH-10: extended key as well (0111) — a college payment clears, which commission starts from.
+  'INSTITUTION_PAYMENT_CLEARANCE',
 ] as const;
 
 // EMP-05: opportunities.lifecycle_state (0007 CHECK).
@@ -1747,6 +1749,58 @@ export const eventSchemas = {
     dataClassification: 'internal',
     schemaRef: 'registry://institution.offboarding.purged/1',
     payload: { offboardingId: { kind: 'uuid' }, institutionId: { kind: 'uuid' }, approvalId: { kind: 'uuid' } },
+  },
+  // GROWTH-10: a college payment recorded, cleared (with its OPS-02 approval), bounced, refunded or
+  // voided. Identifiers and enums only — never an amount, a cheque or transfer reference or a count.
+  institutionPaymentRecordedV1: {
+    eventType: 'institution_payment.recorded',
+    eventVersion: 1,
+    producer: 'identity-organization',
+    aggregateType: 'institution_payment',
+    purpose: 'institution-payments',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://institution_payment.recorded/1',
+    payload: { paymentId: { kind: 'uuid' }, institutionId: { kind: 'uuid' } },
+  },
+  institutionPaymentClearedV1: {
+    eventType: 'institution_payment.cleared',
+    eventVersion: 1,
+    producer: 'identity-organization',
+    aggregateType: 'institution_payment',
+    purpose: 'institution-payments',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://institution_payment.cleared/1',
+    payload: { paymentId: { kind: 'uuid' }, institutionId: { kind: 'uuid' }, approvalId: { kind: 'uuid' } },
+  },
+  institutionPaymentBouncedV1: {
+    eventType: 'institution_payment.bounced',
+    eventVersion: 1,
+    producer: 'identity-organization',
+    aggregateType: 'institution_payment',
+    purpose: 'institution-payments',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://institution_payment.bounced/1',
+    payload: { paymentId: { kind: 'uuid' }, institutionId: { kind: 'uuid' }, fromState: { kind: 'enum', values: ['RECEIVED'] } },
+  },
+  institutionPaymentRefundedV1: {
+    eventType: 'institution_payment.refunded',
+    eventVersion: 1,
+    producer: 'identity-organization',
+    aggregateType: 'institution_payment',
+    purpose: 'institution-payments',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://institution_payment.refunded/1',
+    payload: { paymentId: { kind: 'uuid' }, institutionId: { kind: 'uuid' }, fromState: { kind: 'enum', values: ['CLEARED'] } },
+  },
+  institutionPaymentVoidedV1: {
+    eventType: 'institution_payment.voided',
+    eventVersion: 1,
+    producer: 'identity-organization',
+    aggregateType: 'institution_payment',
+    purpose: 'institution-payments',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://institution_payment.voided/1',
+    payload: { paymentId: { kind: 'uuid' }, institutionId: { kind: 'uuid' }, fromState: { kind: 'enum', values: ['RECEIVED', 'CLEARED', 'BOUNCED', 'REFUNDED'] } },
   },
 } as const satisfies Record<string, EventSchemaDefinition>;
 

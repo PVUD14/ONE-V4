@@ -53,6 +53,10 @@ export const approvalPayloads = {
   // INST-18: an exit's institution-owned records are deleted once; the exit id binds which college.
   INSTITUTION_DATA_PURGE: (input: { readonly offboardingId: string; readonly reasonCode: string }) =>
     ({ offboardingId: input.offboardingId.toLowerCase(), reasonCode: input.reasonCode }),
+  // GROWTH-10: a clearance is bound to the payment, its amount and student count (read from the
+  // immutable row, never from the request) and the cleared date the approver saw.
+  INSTITUTION_PAYMENT_CLEARANCE: (input: { readonly paymentId: string; readonly amountPaise: number; readonly studentsPaid: number; readonly clearedOn: string; readonly reasonCode: string }) =>
+    ({ paymentId: input.paymentId.toLowerCase(), amountPaise: input.amountPaise, studentsPaid: input.studentsPaid, clearedOn: input.clearedOn, reasonCode: input.reasonCode }),
 } satisfies Record<HighRiskActionKey, (input: never) => Record<string, unknown> & { reasonCode: string }>;
 
 function domainError(code: string, correlationId: string): { readonly error: { readonly code: string; readonly message: string; readonly correlationId: string } } {

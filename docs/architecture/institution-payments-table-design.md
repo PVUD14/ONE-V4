@@ -188,6 +188,12 @@ bounced or who has never paid loses nothing in ONE. A spec proves it: a college 
 the same before any payment, after a bounce and after a void. ADR-022's warning stands in reverse: the absence of a
 payment row does not mean a college has not paid; it means nobody recorded it.
 
+## A college that leaves ONE (INST-18)
+
+`institution_payments` is listed in `institutionPurgeOutOfScope`: the exit purge never deletes it. It is AI8HT's
+finance record of money received, not the college's data; commission (GROWTH-11) and disputes read it, and design
+§10.5 says a college's exit changes nothing about what it has already paid for.
+
 ## Routes
 
 All under `/api/v1/operations/college-payments`, all refusing unknown fields, all writes one transaction with the

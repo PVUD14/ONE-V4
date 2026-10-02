@@ -631,6 +631,7 @@ export const institutionPurgeOutOfScope: Readonly<Record<string, string>> = {
   external_review_assignments: "AI8HT's content review record",
   institution_accounts: "AI8HT's commercial record (OPS-14)",
   institution_account_contacts: "AI8HT's record; removed through OPS-14's erasing route as a runbook step",
+  institution_payments: "AI8HT's finance record of money received (GROWTH-10); never deleted, commission and disputes read it",
   institution_data_terms_acceptances: 'the contract record itself',
   institution_offboardings: 'the exit record itself',
   learner_goals: "the student's own learning record",

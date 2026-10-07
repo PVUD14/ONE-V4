@@ -346,7 +346,7 @@ export function EmployerDashboardV3({ basePath }: { readonly basePath: string })
         ] as const).map(([label, value, tone, Icon, note]) => (
           <section key={label} className="pilot-card pilot-kpi">
             <span className={`pilot-tile ${tone}`}><Icon size={17} /></span>
-            <div><b>{value}</b><small>{label}</small>{note ? <small>{note}</small> : null}</div>
+            <div><b>{value}</b><small>{label}</small>{note ? <><br /><small>{note}</small></> : null}</div>
           </section>
         ))}
       </div>

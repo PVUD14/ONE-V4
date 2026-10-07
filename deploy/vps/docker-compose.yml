@@ -186,7 +186,7 @@ services:
 
   # The nightly reset and the first seed (runbook step 5): drops the sandbox database,
   # migrates it and loads the sample data. A one-off job, never left running:
-  #   docker compose --profile sandbox run --rm sandbox-reset
+  #   docker compose --profile sandbox --profile sandbox-tools run --rm sandbox-reset
   sandbox-reset:
     image: one-api-sandbox:local
     environment:

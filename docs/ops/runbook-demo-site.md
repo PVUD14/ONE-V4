@@ -155,13 +155,16 @@ sudo docker compose up -d --force-recreate reverse-proxy     # first time only
 
 ```bash
 cd /srv/one/deploy/vps
-sudo docker compose stop api-demo
-sudo docker compose run --rm sandbox-reset
-sudo docker compose start api-demo
+sudo docker compose --profile sandbox stop api-demo worker-demo ai-content-demo
+sudo docker compose --profile sandbox --profile sandbox-tools run --rm sandbox-reset
+sudo docker compose --profile sandbox start api-demo worker-demo ai-content-demo
 ```
 
-(The sandbox API is stopped while its database is dropped and recreated; left running, it
-crashes on the closed connections and Docker restarts it, which is harmless but noisy.)
+(The sandbox API and workers are stopped while the database is dropped and recreated; left
+running, they crash on the closed connections and Docker restarts them, which is harmless but
+noisy. Both profiles must be named: `sandbox-reset` is in `sandbox-tools` but depends on
+`postgres-demo` in `sandbox`, and a `--profile` flag replaces `COMPOSE_PROFILES` rather than
+adding to it, so naming only one fails with "depends on undefined service".)
 
 It prints `sandbox reset: ... migrations applied` and `sandbox reset: seeded 30 students,
 2 graduates, 10 demo accounts; sign-in bound for …`. Any persona listed under "not yet

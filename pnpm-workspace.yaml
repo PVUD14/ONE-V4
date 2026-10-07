@@ -5,5 +5,8 @@ packages:
 # multer <2.3.0 carries three high-severity DoS advisories (GHSA-qfvm-cv95-jqjf, GHSA-535w-7cp7-47q4 and a
 # third, 2026-09-08) and arrives through @nestjs/platform-express 11. Lifting it within its own major keeps
 # NestJS on 11; drop this override once NestJS pins a patched multer itself.
+# proxy-addr <2.0.8 lets an IPv4-mapped IPv6 address spoof a trusted proxy (GHSA-jqcg-44mw-7w3h, critical)
+# and arrives through express. 2.0.8 is the same major; drop this once express pins it itself.
 overrides:
   multer: '>=2.3.0 <3'
+  proxy-addr: '>=2.0.8 <3'

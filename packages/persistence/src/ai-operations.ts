@@ -26,7 +26,7 @@ import {
   type AiEvaluationMetric,
   type AiLimits,
 } from '@planthepath/authorization/src/index.js';
-import { describeInferenceConfiguration, registeredPrompts, type InferenceConfigurationView } from '@planthepath/ai-orchestration/src/index.js';
+import { describeInferenceConfiguration, registeredEmbeddingRecipes, registeredPrompts, type InferenceConfigurationView } from '@planthepath/ai-orchestration/src/index.js';
 import { consumeOperationApproval, type ConsumedApproval } from './operation-approvals.js';
 import { validateAuditWriteInput, validateOutboxWriteInput } from './repositories.js';
 
@@ -172,8 +172,13 @@ export interface AiOperationsSummary {
   };
 }
 
+/** Prompts, and (ENG-24) the embedding recipes that embedding features name as their prompt. */
+const registeredVersions: readonly { readonly key: string; readonly version: number; readonly purpose: string }[] = [
+  ...registeredPrompts, ...registeredEmbeddingRecipes,
+];
+
 function isRegistered(key: string, version: number): boolean {
-  return registeredPrompts.some((prompt) => prompt.key === key && prompt.version === version);
+  return registeredVersions.some((prompt) => prompt.key === key && prompt.version === version);
 }
 
 export async function loadAiOperationsSummary(runner: SqlRunner, input: { readonly period: AiPeriod }): Promise<AiOperationsSummary> {
@@ -272,7 +277,7 @@ export async function loadAiOperationsSummary(runner: SqlRunner, input: { readon
     failureClasses,
     totals,
     prompts: {
-      registered: registeredPrompts.map((prompt) => ({ key: prompt.key, version: prompt.version, purpose: prompt.purpose })),
+      registered: registeredVersions.map((prompt) => ({ key: prompt.key, version: prompt.version, purpose: prompt.purpose })),
       declared: features.filter((row) => row.prompt_key && row.prompt_version !== null).map((row) => ({
         featureKey: row.feature_key, key: row.prompt_key!, version: Number(row.prompt_version), registered: isRegistered(row.prompt_key!, Number(row.prompt_version)),
       })),

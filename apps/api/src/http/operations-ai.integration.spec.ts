@@ -327,6 +327,8 @@ describe('reading: every figure has a source, or NA', () => {
       // The versions v2 replaced after the 2026-10-07 bake-off stay registered, so older records resolve.
       { key: 'tutor-hint', version: 1, purpose: expect.any(String) },
       { key: 'content-lesson-draft', version: 1, purpose: expect.any(String) },
+      // ENG-24: the embedding recipe content.embeddings and tutor.retrieval name as their prompt.
+      { key: 'content-embedding', version: 1, purpose: expect.any(String) },
     ]);
     expect(JSON.stringify(response.body.prompts.registered)).not.toContain('never reveal');
     expect(response.body.prompts.inUse).toEqual(expect.arrayContaining([

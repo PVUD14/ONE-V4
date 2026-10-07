@@ -22,15 +22,20 @@ const forbidden: readonly [string, RegExp][] = [
   ['the content factory worker', /persistence\/src\/(content-factory-worker|run-content-factory-worker)(\.js)?['"]/],
   // ENG-22: the tutor's job calls the model; only the outbox worker may load it.
   ['the tutor hint worker module', /persistence\/src\/tutor-hint-worker(\.js)?['"]/],
+  // ENG-24: the embedding job and tutor retrieval embed text through the model; workers and jobs only.
+  ['the content embedding job or retrieval', /persistence\/src\/(content-embeddings|content-retrieval|run-content-embeddings)(\.js)?['"]/],
   ['the test fake endpoint', /ai-orchestration\/src\/testing\//],
   ['the inference adapter', /\bOpenAICompatibleProvider\b/],
   ['the environment adapter factory', /\binferenceProviderFromEnvironment\b/],
+  ['the environment embedding adapter factory', /\bembeddingProviderFromEnvironment\b/],
   ['the worker orchestrator factory', /\bcreateWorkerAiOrchestrator\b/],
   ['the orchestrator itself', /\bAiOrchestrator\b/],
   // Reading the variables, not naming them: the console's copy may say which variables exist.
   ['reading the endpoint key', /\benv(\.|\[['"])ONE_AI_API_KEY\b/],
   ['reading the endpoint address', /\benv(\.|\[['"])ONE_AI_BASE_URL\b/],
+  ['reading the embedding endpoint key or address', /\benv(\.|\[['"])ONE_AI_EMBEDDING_(API_KEY|BASE_URL)\b/],
   ['a chat-completions call', /\/chat\/completions/],
+  ['an embeddings call', /['"`][^'"`\n]*\/embeddings['"`]/],
   // ENG-12 (ADR-034 §6): untrusted code runs only on the sandbox VM, reached only by the outbox worker.
   ['the code sandbox client', /persistence\/src\/(code-sandbox-client|code-submission-worker)(\.js)?['"]/],
   ['reading the sandbox address or token', /\benv(\.|\[['"])ONE_CODE_SANDBOX_(URL|TOKEN)\b/],
@@ -73,6 +78,10 @@ describe('the inference boundary', () => {
     expect(forbidden.some(([, pattern]) => pattern.test("import { requestContentDraft } from '@planthepath/persistence/src/content-factory.js';"))).toBe(false);
     expect(forbidden.some(([, pattern]) => pattern.test('const key = process.env.ONE_AI_API_KEY;'))).toBe(true);
     expect(forbidden.some(([, pattern]) => pattern.test("const url = env['ONE_AI_BASE_URL'];"))).toBe(true);
+    expect(forbidden.filter(([, pattern]) => pattern.test("import { retrieveApprovedContent } from '@planthepath/persistence/src/content-retrieval.js';")).map(([what]) => what))
+      .toEqual(['the content embedding job or retrieval']);
+    expect(forbidden.some(([, pattern]) => pattern.test('const key = process.env.ONE_AI_EMBEDDING_API_KEY;'))).toBe(true);
+    expect(forbidden.some(([, pattern]) => pattern.test('await fetch(`${base}/embeddings`, init);'))).toBe(true);
     expect(forbidden.filter(([, pattern]) => pattern.test("import { gradeInSandbox } from '@planthepath/persistence/src/code-sandbox-client.js';")).map(([what]) => what))
       .toEqual(['the code sandbox client']);
     expect(forbidden.some(([, pattern]) => pattern.test("import { queueCodeSubmission } from '@planthepath/persistence/src/code-submissions.js';"))).toBe(false);

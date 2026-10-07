@@ -7,7 +7,7 @@
  * only; a contract test (apps/api/src/inference-boundary.spec.ts) fails if anything under apps/
  * imports it. It joins three things that must never be wired separately:
  *  - the adapter from the server environment (ONE_AI_BASE_URL / ONE_AI_API_KEY / ONE_AI_MODEL;
- *    blank = unavailable, never a crash);
+ *    blank = unavailable, never a crash), and the embedding adapter from ONE_AI_EMBEDDING_* (ENG-24);
  *  - the database policy, the global kill switch and the cap, consulted before every call;
  *  - metering into ai_generations, with tokens, latency and attempts.
  *
@@ -17,6 +17,7 @@ import type { Pool, PoolClient } from 'pg';
 import {
   AiOrchestrator,
   describeInferenceConfiguration,
+  embeddingProviderFromEnvironment,
   inferenceProviderFromEnvironment,
   onePromptRegistry,
   type InferenceAdapterTuning,
@@ -55,13 +56,18 @@ export interface WorkerAiOrchestratorOptions {
 export function createWorkerAiOrchestrator(options: WorkerAiOrchestratorOptions): {
   readonly orchestrator: AiOrchestrator;
   readonly configuration: InferenceConfiguration;
+  /** ENG-24: the embedding endpoint (ONE_AI_EMBEDDING_*), configured or not, by the same rules. */
+  readonly embeddingConfiguration: InferenceConfiguration;
 } {
   const { provider, configuration } = inferenceProviderFromEnvironment(options.env ?? process.env, options.tuning ?? {});
+  const embedding = embeddingProviderFromEnvironment(options.env ?? process.env, options.tuning ?? {});
   const db = options.db;
   return {
     configuration,
+    embeddingConfiguration: embedding.configuration,
     orchestrator: new AiOrchestrator({
       provider,
+      embeddings: embedding.provider,
       prompts: options.prompts ?? onePromptRegistry(),
       usage: {
         count: (input) => countAiGenerations(db, input),

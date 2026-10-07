@@ -93,6 +93,11 @@ beforeEach(async () => {
   client = await pool.connect();
   await client.query('BEGIN');
   await client.query("UPDATE feature_flags SET enabled = false WHERE key = 'ai.global-kill-switch'");
+  // Other suites commit published lessons to the shared test database. Inside this test's transaction
+  // (rolled back afterwards) their releases are rolled back, so the only approved content is this test's.
+  await client.query("UPDATE release_manifests SET status = 'ROLLED_BACK' WHERE status = 'PUBLISHED'");
+  await client.query('DELETE FROM content_embeddings');
+  expect((await client.query('SELECT count(*)::int AS n FROM content_retrieval_sources')).rows[0].n).toBe(0);
   author = await user();
   reviewer = await user();
   const runId = randomUUID();

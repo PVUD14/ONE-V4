@@ -267,8 +267,8 @@ systemd timer runs it nightly; installing it is Divakar's step. Why TypeScript r
 `ai-workers.ts`; the API boundary test forbids `apps/` from importing it) takes the student, the query text
 and the languages wanted (the hint's language, then English), embeds the query through `tutor.retrieval`, and
 returns at most 3 passages (at most 3,000 characters in all) with their revision ids and scores — or
-`UNAVAILABLE` with a reason (`FEATURE_DISABLED`, `CAP_REACHED`, `ENDPOINT_UNCONFIGURED`, `PROVIDER_FAILED`,
-`NO_INDEX_FOR_MODEL`). It never throws for an AI reason, so a caller's fallback is the existing human path.
+`UNAVAILABLE` with a reason (`QUERY_EMPTY`, `FEATURE_DISABLED`, `CAP_REACHED`, `INPUT_TOO_LARGE`,
+`ENDPOINT_UNCONFIGURED`, `PROVIDER_FAILED`, `NO_INDEX_FOR_MODEL`). It never throws for an AI reason, so a caller's fallback is the existing human path.
 
 **It is not wired into the tutor hint job.** Putting passages in front of the model means a new prompt
 version (`tutor-hint@3`, with a `retrievedContent` parameter), and a new prompt version needs a new bake-off

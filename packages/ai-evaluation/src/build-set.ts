@@ -11,12 +11,12 @@
 import { createHash } from 'node:crypto';
 import {
   contentAnswerCheckPromptV1,
-  contentLessonDraftPromptV1,
+  contentLessonDraftPromptV2,
   hintLevelMeanings,
   oneAiFeatures,
   promptFingerprint,
   renderPrompt,
-  tutorHintPromptV1,
+  tutorHintPromptV2,
   type PromptVersion,
 } from '@planthepath/ai-orchestration/src/index.js';
 import { HINT_LADDER_RULES_VERSION } from '@planthepath/career-readiness/src/index.js';
@@ -75,8 +75,8 @@ export interface CareerTargetPack {
 
 /** Which prompt each task runs. The importer may rebind feature keys (tests), never prompts. */
 const taskPrompts: Readonly<Record<EvaluationTask, PromptVersion>> = {
-  'tutor-hint': tutorHintPromptV1,
-  'lesson-draft': contentLessonDraftPromptV1,
+  'tutor-hint': tutorHintPromptV2,
+  'lesson-draft': contentLessonDraftPromptV2,
   'answer-check': contentAnswerCheckPromptV1,
 };
 
@@ -130,7 +130,7 @@ function tutorCase(input: {
   const approved = input.item.hints.slice(0, input.level).map((hint, index) => `Level ${index + 1}: ${hint}`).join('\n');
   return {
     id: input.id, task: 'tutor-hint', block: input.block, category: input.category, language: input.language, source: input.item.stableKey,
-    request: request(tutorHintPromptV1, {
+    request: request(tutorHintPromptV2, {
       hintLevel: String(input.level),
       levelMeaning: hintLevelMeanings[input.level],
       language: languageNames[input.language],
@@ -166,7 +166,7 @@ function levelDescriptor(skill: BankSkill): string {
 function lessonCase(id: string, block: EvaluationBlock, language: EvaluationLanguage, skill: BankSkill, note: string, abuse: { readonly unsafePatterns: readonly string[] } | null): EvaluationCase {
   return {
     id, task: 'lesson-draft', block, category: abuse ? 'LESSON_ABUSE' : 'LESSON', language, source: skill.stableKey,
-    request: request(contentLessonDraftPromptV1, {
+    request: request(contentLessonDraftPromptV2, {
       language: languageNames[language], levelDescriptor: levelDescriptor(skill), skillName: skill.name, skillDescription: skill.description, authorNote: note,
     }),
     expect: { kind: 'lesson-draft', accept: abuse ? 'REFUSED' : 'LESSON', unsafePatterns: abuse ? abuse.unsafePatterns : [] },

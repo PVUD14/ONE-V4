@@ -98,7 +98,7 @@ async function queueLesson(stableKey = `eng23-lesson-${randomUUID().slice(0, 8)}
   await client.query(
     `INSERT INTO ai_content_drafts (id, kind, feature_key, prompt_key, prompt_version, topic_id, stable_key, title, language, level, style,
                                     requested_by_user_id, reason_code, correlation_id)
-     VALUES ($1, 'LESSON', 'content.lesson-draft', 'content-lesson-draft', 1, $2, $3, 'Subnetting', 'en', 'STANDARD', 'EXPLANATION', $4, 'NEW_LESSON', 'eng23-test-corr')`,
+     VALUES ($1, 'LESSON', 'content.lesson-draft', 'content-lesson-draft', 2, $2, $3, 'Subnetting', 'en', 'STANDARD', 'EXPLANATION', $4, 'NEW_LESSON', 'eng23-test-corr')`,
     [id, topicId, stableKey, userId],
   );
   return id;
@@ -109,7 +109,7 @@ async function job(id: string): Promise<Record<string, unknown>> {
 }
 
 const record = (text: string): GenerationRecord => ({
-  featureKey: 'content.lesson-draft', text, source: 'AI_GENERATED', generatorVersion: 'test-generator', promptVersion: 'content-lesson-draft@1',
+  featureKey: 'content.lesson-draft', text, source: 'AI_GENERATED', generatorVersion: 'test-generator', promptVersion: 'content-lesson-draft@2',
   promptFingerprint: 'abcd1234', model: 'test/model', reviewState: 'DRAFT', generatedAt: new Date().toISOString(),
   usage: { inputTokens: 1, outputTokens: 1 }, truncated: false, latencyMs: 1,
 });
@@ -125,7 +125,7 @@ describe('0106: the job row', () => {
     await expectRefused(
       `INSERT INTO ai_content_drafts (id, kind, feature_key, prompt_key, prompt_version, topic_id, stable_key, title, language, level, style,
                                       requested_by_user_id, reason_code, correlation_id, state, attempts, started_at, lease_expires_at)
-       VALUES ($1, 'LESSON', 'content.lesson-draft', 'content-lesson-draft', 1, $2, 'eng23-running', 'T', 'en', 'STANDARD', 'EXPLANATION', $3,
+       VALUES ($1, 'LESSON', 'content.lesson-draft', 'content-lesson-draft', 2, $2, 'eng23-running', 'T', 'en', 'STANDARD', 'EXPLANATION', $3,
                'NEW_LESSON', 'eng23-test-corr', 'RUNNING', 1, now(), now())`, [randomUUID(), topicId, userId], /starts queued/);
     await expectRefused("UPDATE ai_content_drafts SET title = 'Changed' WHERE id = $1", [id], /request is immutable/);
     await expectRefused('UPDATE ai_content_drafts SET requested_by_user_id = $2 WHERE id = $1', [id, randomUUID()], /request is immutable|foreign key/);
@@ -135,11 +135,11 @@ describe('0106: the job row', () => {
   it('runs each kind on its own feature, with exactly its target', async () => {
     await expectRefused(
       `INSERT INTO ai_content_drafts (id, kind, feature_key, prompt_key, prompt_version, topic_id, stable_key, title, language, level, style, requested_by_user_id, reason_code, correlation_id)
-       VALUES ($1, 'LESSON', 'content.item-draft', 'content-lesson-draft', 1, $2, 'eng23-wrong-feature', 'T', 'en', 'STANDARD', 'EXPLANATION', $3, 'NEW_LESSON', 'eng23-test-corr')`,
+       VALUES ($1, 'LESSON', 'content.item-draft', 'content-lesson-draft', 2, $2, 'eng23-wrong-feature', 'T', 'en', 'STANDARD', 'EXPLANATION', $3, 'NEW_LESSON', 'eng23-test-corr')`,
       [randomUUID(), topicId, userId], /ai_content_draft_feature_ck/);
     await expectRefused(
       `INSERT INTO ai_content_drafts (id, kind, feature_key, prompt_key, prompt_version, stable_key, title, language, level, style, requested_by_user_id, reason_code, correlation_id)
-       VALUES ($1, 'LESSON', 'content.lesson-draft', 'content-lesson-draft', 1, 'eng23-no-topic', 'T', 'en', 'STANDARD', 'EXPLANATION', $2, 'NEW_LESSON', 'eng23-test-corr')`,
+       VALUES ($1, 'LESSON', 'content.lesson-draft', 'content-lesson-draft', 2, 'eng23-no-topic', 'T', 'en', 'STANDARD', 'EXPLANATION', $2, 'NEW_LESSON', 'eng23-test-corr')`,
       [randomUUID(), userId], /ai_content_draft_target_ck/);
     await expectRefused(
       `INSERT INTO ai_content_drafts (id, kind, feature_key, prompt_key, prompt_version, topic_id, stable_key, language, level, requested_by_user_id, reason_code, correlation_id)
@@ -147,7 +147,7 @@ describe('0106: the job row', () => {
       [randomUUID(), topicId, userId], /ai_content_draft_target_ck/);
     await expectRefused(
       `INSERT INTO ai_content_drafts (id, kind, feature_key, prompt_key, prompt_version, topic_id, stable_key, title, language, level, style, author_note, requested_by_user_id, reason_code, correlation_id)
-       VALUES ($1, 'LESSON', 'content.lesson-draft', 'content-lesson-draft', 1, $2, 'eng23-note', 'T', 'en', 'STANDARD', 'EXPLANATION', $3, $4, 'NEW_LESSON', 'eng23-test-corr')`,
+       VALUES ($1, 'LESSON', 'content.lesson-draft', 'content-lesson-draft', 2, $2, 'eng23-note', 'T', 'en', 'STANDARD', 'EXPLANATION', $3, $4, 'NEW_LESSON', 'eng23-test-corr')`,
       [randomUUID(), topicId, 'x'.repeat(1001), userId], /ai_content_draft_text_ck/);
   });
 

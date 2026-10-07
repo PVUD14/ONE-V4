@@ -14,7 +14,7 @@
  *
  * Design: docs/architecture/content-factory-design.md (Decisions 3 and 4).
  */
-import { lessonDraftHeadings } from '@planthepath/ai-orchestration/src/index.js';
+import { lessonDraftHeadings, lessonHeadingIndex } from '@planthepath/ai-orchestration/src/index.js';
 import { hintLadderFindings } from '@planthepath/career-readiness/src/index.js';
 import {
   countWords,
@@ -141,7 +141,7 @@ function splitSections(text: string): Readonly<Record<LessonSectionName, string>
   let current: LessonSectionName | null = null;
   const buffer: Record<string, string[]> = {};
   for (const line of lines) {
-    const heading = lessonDraftHeadings.findIndex((entry) => entry === line.trim());
+    const heading = lessonHeadingIndex(line);
     if (heading >= 0) { current = lessonSectionNames[heading]!; buffer[current] = []; continue; }
     if (current) buffer[current]!.push(line);
   }

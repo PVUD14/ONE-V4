@@ -81,7 +81,7 @@ export function buildTutorBrief(input: {
   };
 }
 
-/** The `tutor-hint@1` parameters, rendered exactly as the evaluation set renders a tutor case. */
+/** The `tutor-hint` parameters (v2; v1 declared the same set), rendered exactly as the evaluation set renders a tutor case. */
 export function tutorPromptParameters(brief: TutorBrief): Readonly<Record<string, string>> {
   const correct = brief.options.find((option) => option.id === brief.correctOptionId);
   if (!correct) throw new TutorBriefError('UNKNOWN_KEY');

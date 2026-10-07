@@ -300,14 +300,14 @@ describe('a lesson drafted with AI', () => {
     expect(job).toMatchObject({
       state: 'SUCCEEDED', requestedBy: { userId: secondEditor.userId },
       generation: { source: 'AI_GENERATED', generatorVersion: 'one-ai-orchestration-v1+openai-compatible-v1', model: servedModelAtRegistration, truncated: false, fitted: false },
-      prompt: { key: 'content-lesson-draft', version: 1 },
+      prompt: { key: 'content-lesson-draft', version: 2 },
     });
     const lessonId = job.produced.lessonId as string;
     const detail = (await api().get(`${lessons}/lessons/${lessonId}`).set(auth(reviewer.userId)).expect(200)).body.lesson;
     expect(detail).toMatchObject({ stableKey: 'eng23-subnet-lesson', status: 'PENDING', aiDrafted: true, topic: { stableKey: topicKey } });
     expect(detail.open).toMatchObject({
       id: job.produced.revisionId, state: 'DRAFT', author: { userId: secondEditor.userId },
-      aiDraft: { jobId, promptVersion: 'content-lesson-draft@1', model: servedModelAtRegistration, fitted: false },
+      aiDraft: { jobId, promptVersion: 'content-lesson-draft@2', model: servedModelAtRegistration, fitted: false },
     });
     expect(detail.open.aiDraft.sections.Explanation).toBe(paragraph(6));
     expect(detail.open.fields.summary.startsWith('What you will learn\nHow to read a subnet mask')).toBe(true);

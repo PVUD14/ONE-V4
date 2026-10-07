@@ -19,7 +19,7 @@ import {
   contentFactoryMaxInFlight,
   type ContentFactoryKind,
 } from '@planthepath/authorization/src/index.js';
-import { contentAnswerCheckPromptV1, contentItemDraftPromptV1, contentLessonDraftPromptV1, type PromptVersion } from '@planthepath/ai-orchestration/src/index.js';
+import { contentAnswerCheckPromptV1, contentItemDraftPromptV1, contentLessonDraftPromptV2, type PromptVersion } from '@planthepath/ai-orchestration/src/index.js';
 import { matchesAny, personalDataPatterns } from '@planthepath/ai-evaluation/src/checks.js';
 import {
   LESSON_LANGUAGES,
@@ -53,8 +53,8 @@ export const contentDraftOpenStates: readonly ContentDraftState[] = ['QUEUED', '
 
 /** The prompt each kind runs. The policy row must name exactly this prompt, or the request is refused. */
 export const contentDraftPrompts: Readonly<Record<ContentDraftKind, PromptVersion>> = {
-  LESSON: contentLessonDraftPromptV1,
-  LESSON_VARIANT: contentLessonDraftPromptV1,
+  LESSON: contentLessonDraftPromptV2,
+  LESSON_VARIANT: contentLessonDraftPromptV2,
   QUESTION: contentItemDraftPromptV1,
   ANSWER_CHECK: contentAnswerCheckPromptV1,
 };

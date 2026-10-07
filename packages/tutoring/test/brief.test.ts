@@ -5,9 +5,9 @@
  */
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { renderPrompt, tutorHintPromptV1 } from '@planthepath/ai-orchestration/src/index.js';
+import { renderPrompt, tutorHintPromptV2 } from '@planthepath/ai-orchestration/src/index.js';
 import { hintMessages, repositoryEvaluationSet, type AptitudeBankPack } from '@planthepath/ai-evaluation/src/index.js';
-import { TUTOR_BRIEF_KEYS, TutorBriefError, buildTutorBrief, tutorPromptParameters, tutorStudentMessage } from '../src/index.js';
+import { TUTOR_BRIEF_KEYS, TUTOR_HINT_PROMPT, TutorBriefError, buildTutorBrief, tutorPromptParameters, tutorStudentMessage } from '../src/index.js';
 
 const options = [{ id: 'a', text: '12' }, { id: 'b', text: '15' }, { id: 'c', text: '18' }, { id: 'd', text: '21' }];
 const ladder = ['Nudge text', 'Strategy text', 'Worked step text', 'Near solution text'];
@@ -58,9 +58,13 @@ describe('the tutoring brief', () => {
     expect(code({ questionPrompt: '  ' })).toBe('EMPTY_PROMPT');
   });
 
-  it('renders every parameter tutor-hint@1 declares, and no other', () => {
+  it('runs the prompt version the bake-off evaluates (tutor-hint@2)', () => {
+    expect(TUTOR_HINT_PROMPT).toEqual({ key: tutorHintPromptV2.key, version: tutorHintPromptV2.version });
+  });
+
+  it('renders every parameter tutor-hint@2 declares, and no other', () => {
     const parameters = tutorPromptParameters(buildTutorBrief(base));
-    expect(Object.keys(parameters).sort()).toEqual([...tutorHintPromptV1.parameters].sort());
+    expect(Object.keys(parameters).sort()).toEqual([...tutorHintPromptV2.parameters].sort());
     expect(parameters.correctOption).toBe('c) 18');
     expect(parameters.approvedHints).toBe('Level 1: Nudge text\nLevel 2: Strategy text');
   });
@@ -85,7 +89,7 @@ describe('parity with the evaluation set', () => {
         questionPrompt: item!.prompt, options: item!.options.map((option) => ({ id: option.id, text: option.text })),
         correctOptionId: item!.correctOptionId, publishedLadder: item!.hints, level, language,
       });
-      const rendered = renderPrompt(tutorHintPromptV1, tutorPromptParameters(brief));
+      const rendered = renderPrompt(tutorHintPromptV2, tutorPromptParameters(brief));
       expect([{ role: 'system', content: rendered.system }, { role: 'user', content: rendered.user }], entry.id).toEqual(entry.request.messages);
       compared += 1;
       languages.add(language);

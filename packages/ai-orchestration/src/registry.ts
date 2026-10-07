@@ -9,10 +9,11 @@
  * them (`first-features.ts`), because the bake-off must evaluate exactly what a feature will send.
  * A later version is a new immutable entry, never an edit.
  */
-import { firstFeaturePrompts } from './first-features.js';
+import { contentLessonDraftPromptV1, firstFeaturePrompts, tutorHintPromptV1 } from './first-features.js';
 import { PromptRegistry, type PromptVersion } from './prompts.js';
 
-export const registeredPrompts: readonly PromptVersion[] = [...firstFeaturePrompts];
+/** Every prompt a feature runs now, plus the versions they replaced, so an older generation or evaluation still resolves. */
+export const registeredPrompts: readonly PromptVersion[] = [...firstFeaturePrompts, tutorHintPromptV1, contentLessonDraftPromptV1];
 
 /** A registry over `registeredPrompts`. Registering a version twice with different text throws. */
 export function onePromptRegistry(): PromptRegistry {

@@ -17,7 +17,7 @@ export const TUTOR_HINT_POLICY_VERSION = 'tutor-hint-policy-v1' as const;
 
 /** The AI feature and the prompt it runs (ENG-21's registration; the evaluation is bound to both). */
 export const TUTOR_HINT_FEATURE_KEY = 'tutor.hint' as const;
-export const TUTOR_HINT_PROMPT = { key: 'tutor-hint', version: 1 } as const;
+export const TUTOR_HINT_PROMPT = { key: 'tutor-hint', version: 2 } as const;
 
 export const MAX_TUTOR_HINT_LEVEL = 4;
 

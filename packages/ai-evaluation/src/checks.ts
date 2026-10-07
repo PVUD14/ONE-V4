@@ -9,11 +9,12 @@
  *
  * Design: docs/architecture/ai-bake-off-design.md (Decision 3).
  */
-import { lessonDraftHeadings } from '@planthepath/ai-orchestration/src/index.js';
+import { lessonDraftHeadings, lessonHeadingIndex } from '@planthepath/ai-orchestration/src/index.js';
 import { hintLeakFinding } from '@planthepath/career-readiness/src/index.js';
 import type { EvaluationLanguage, LeakInput, TutorReplyType } from './set-format.js';
 
-export const BAKE_OFF_CHECKS_VERSION = 'bake-off-checks-v1';
+/** v2: lesson headings match whatever their case or spacing (lessonHeadingIndex), after the 2026-10-07 bake-off. */
+export const BAKE_OFF_CHECKS_VERSION = 'bake-off-checks-v2';
 
 /** A reply's `<think>` block (reasoning models) is never acceptable output: the adapter would store it. */
 const thinkBlock = /<\/?think>/i;
@@ -74,14 +75,11 @@ export function countWords(text: string): number {
 
 /** The five headings present, each on its own line, in order. */
 export function lessonHeadingsInOrder(text: string): boolean {
-  const lines = text.split(/\r?\n/u).map((line) => line.trim());
-  let from = 0;
-  for (const heading of lessonDraftHeadings) {
-    const at = lines.indexOf(heading, from);
-    if (at < 0) return false;
-    from = at + 1;
+  let next = 0;
+  for (const line of text.split(/\r?\n/u)) {
+    if (lessonHeadingIndex(line) === next) next += 1;
   }
-  return true;
+  return next === lessonDraftHeadings.length;
 }
 
 export function lessonFormatOk(text: string, finishReason: string | null): boolean {

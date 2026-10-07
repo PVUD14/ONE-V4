@@ -181,8 +181,8 @@ describe('registering the features', () => {
       expect(rows).toEqual([
         { feature_key: 'content.answer-check', enabled: false, model, prompt_key: 'content-answer-check', prompt_version: 1 },
         { feature_key: 'content.item-draft', enabled: false, model, prompt_key: 'content-item-draft', prompt_version: 1 },
-        { feature_key: 'content.lesson-draft', enabled: false, model, prompt_key: 'content-lesson-draft', prompt_version: 1 },
-        { feature_key: 'tutor.hint', enabled: false, model, prompt_key: 'tutor-hint', prompt_version: 1 },
+        { feature_key: 'content.lesson-draft', enabled: false, model, prompt_key: 'content-lesson-draft', prompt_version: 2 },
+        { feature_key: 'tutor.hint', enabled: false, model, prompt_key: 'tutor-hint', prompt_version: 2 },
       ]);
     }
     await client.query("UPDATE ai_feature_policies SET model = 'operator/choice', cap = 7 WHERE feature_key = 'tutor.hint'");
@@ -220,11 +220,11 @@ describe('importing a run', () => {
     const events = (await client.query("SELECT count(*)::int AS n FROM outbox_events WHERE event_type = 'ai_evaluation.recorded' AND actor_user_id = $1", [recorder])).rows[0];
     expect(events.n).toBe(3);
     expect((await client.query('SELECT bool_or(enabled) AS any FROM ai_feature_policies WHERE feature_key = ANY($1)', [oneAiFeatures.map((feature) => feature.featureKey)])).rows[0].any).toBe(false);
-    expect((await client.query("SELECT ai_evaluation_passes('tutor.hint', $1, 'tutor-hint', 1) AS passes", [model])).rows[0].passes).toBe(true);
+    expect((await client.query("SELECT ai_evaluation_passes('tutor.hint', $1, 'tutor-hint', 2) AS passes", [model])).rows[0].passes).toBe(true);
   });
 
   it('gives 0089 what it needs: a recorded PASS lets the feature switch on; a leaky run FAIL does not', async () => {
-    await client.query("UPDATE ai_feature_policies SET model = $1, prompt_key = 'tutor-hint', prompt_version = 1 WHERE feature_key = 'tutor.hint'", [model]);
+    await client.query("UPDATE ai_feature_policies SET model = $1, prompt_key = 'tutor-hint', prompt_version = 2 WHERE feature_key = 'tutor.hint'", [model]);
     await importBakeOffResults(db, { resultsText: leakyResultsText, recorderUserId: recorder, onlyFeatures: ['tutor.hint'] });
     expect(await evaluationRows()).toEqual([expect.objectContaining({ feature_key: 'tutor.hint', decision: 'FAIL' })]);
     await client.query('SAVEPOINT before_enable');

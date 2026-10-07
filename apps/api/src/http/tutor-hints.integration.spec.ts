@@ -20,7 +20,7 @@ import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
-import { renderPrompt, tutorHintPromptV1 } from '@planthepath/ai-orchestration/src/index.js';
+import { renderPrompt, tutorHintPromptV2 } from '@planthepath/ai-orchestration/src/index.js';
 import { completion, startFakeOpenAiServer, type FakeAnswer, type FakeOpenAiServer } from '@planthepath/ai-orchestration/src/testing/fake-openai-server.js';
 import { createTrustedJwtVerifier, type TrustedJwk } from '@planthepath/identity/src/jwt.js';
 import { createLocalIntegrationEventPublisher, publishOutboxOnce } from '@planthepath/persistence/src/automation-workers.js';
@@ -109,7 +109,7 @@ beforeAll(async () => {
 
   // The feature as ENG-21 registers it, on the model the fake serves. Off (0033 default).
   await pool.query(`INSERT INTO ai_feature_policies (feature_key, description, model, cap, cap_window, max_input_chars, prompt_key, prompt_version)
-    VALUES ('tutor.hint', 'Practice tutor (ENG-22 test)', $1, 500, 'DAY', 12000, 'tutor-hint', 1) ON CONFLICT (feature_key) DO NOTHING`, [MODEL]);
+    VALUES ('tutor.hint', 'Practice tutor (ENG-22 test)', $1, 500, 'DAY', 12000, 'tutor-hint', 2) ON CONFLICT (feature_key) DO NOTHING`, [MODEL]);
 });
 
 afterAll(async () => {
@@ -141,7 +141,7 @@ async function switchOn(): Promise<void> {
   const passing = await pool.query("SELECT count(*)::int AS n FROM ai_evaluations WHERE feature_key = 'tutor.hint' AND decision = 'PASS'");
   if (passing.rows[0].n === 0) {
     await pool.query(`INSERT INTO ai_evaluations (id, feature_key, provider_key, model, prompt_key, prompt_version, evaluation_set_key, evaluation_set_version, metrics, decision, reason_code, decided_by_user_id, correlation_id)
-      VALUES ($1,'tutor.hint','openai-compatible',$2,'tutor-hint',1,'one-ai-bakeoff',1,$3::jsonb,'PASS','INITIAL_BENCHMARK',$4,'eng22-test')`,
+      VALUES ($1,'tutor.hint','openai-compatible',$2,'tutor-hint',2,'one-ai-bakeoff',1,$3::jsonb,'PASS','INITIAL_BENCHMARK',$4,'eng22-test')`,
     [randomUUID(), MODEL, JSON.stringify([{ name: 'answer_leak_rate', value: 0, threshold: 0.0099, comparator: 'AT_MOST' }]), reviewer]);
   }
   await pool.query("UPDATE ai_feature_policies SET enabled = true WHERE feature_key = 'tutor.hint'");
@@ -333,7 +333,7 @@ describe('ENG-22: a hint is a job, guarded, labelled and counted like the ladder
     // No model call in the request handler: the fake endpoint has seen nothing; the job is on the outbox.
     expect(server.requests).toHaveLength(0);
     const row = await hintRow(learner.decisionId, learner.questionId, 1);
-    expect(row).toMatchObject({ status: 'PENDING', source: 'AI_GENERATED', prompt_version: 'tutor-hint@1', review_state: 'DRAFT', language: 'en', policy_version: 'tutor-hint-policy-v1' });
+    expect(row).toMatchObject({ status: 'PENDING', source: 'AI_GENERATED', prompt_version: 'tutor-hint@2', review_state: 'DRAFT', language: 'en', policy_version: 'tutor-hint-policy-v1' });
     expect((await pool.query("SELECT count(*)::int AS n FROM outbox_events WHERE event_type = 'tutor.hint.requested' AND aggregate_id = $1", [row.id])).rows[0].n).toBe(1);
     expect((await pool.query('SELECT hint_level FROM learning_step_items WHERE decision_id = $1 AND item_id = $2', [learner.decisionId, learner.questionId])).rows[0].hint_level).toBe(1);
 
@@ -345,7 +345,7 @@ describe('ENG-22: a hint is a job, guarded, labelled and counted like the ladder
     expect(shown.tutor).toEqual({ available: true, reason: null, remainingToday: 19 });
     const done = await hintRow(learner.decisionId, learner.questionId, 1);
     expect(done).toMatchObject({ status: 'SHOWN', fallback_reason: null, generated_text: SAFE_HINT, model: MODEL, review_state: 'DRAFT',
-      guard_version: 'tutor-guard-v1', source: 'AI_GENERATED', prompt_version: 'tutor-hint@1' });
+      guard_version: 'tutor-guard-v1', source: 'AI_GENERATED', prompt_version: 'tutor-hint@2' });
     expect(done.generator_version).toMatch(/one-ai-orchestration/u);
     expect(done.generated_at).not.toBeNull();
     expect(done.prompt_fingerprint).toMatch(/^[0-9a-f]{8}$/u);
@@ -366,7 +366,7 @@ describe('ENG-22: a hint is a job, guarded, labelled and counted like the ladder
     const sent = JSON.parse(server.requests[0]!.body) as { model: string; messages: { role: string; content: string }[] };
     expect(sent.model).toBe(MODEL);
     const question = (await pool.query('SELECT prompt FROM question_versions WHERE id = $1', [learner.questionId])).rows[0].prompt as string;
-    const expected = renderPrompt(tutorHintPromptV1, tutorPromptParameters(buildTutorBrief({
+    const expected = renderPrompt(tutorHintPromptV2, tutorPromptParameters(buildTutorBrief({
       questionPrompt: question, options: OPTIONS, correctOptionId: 'b', publishedLadder: LADDER, level: 1, language: 'en',
     })));
     expect(sent.messages).toEqual([{ role: 'system', content: expected.system }, { role: 'user', content: expected.user }]);
@@ -499,7 +499,7 @@ describe('ENG-22: a hint is a job, guarded, labelled and counted like the ladder
   it('the 0108 guards: a request at a level the step does not record, a changed request, or a deletion are refused', async () => {
     const learner = await learnerWithStep({ consent: true });
     await expect(pool.query(`INSERT INTO tutor_hints (id, subject_user_id, decision_id, item_id, hint_level, language, prompt_version, policy_version, correlation_id)
-      VALUES ($1,$2,$3,$4,2,'en','tutor-hint@1','tutor-hint-policy-v1','x')`, [randomUUID(), learner.id, learner.decisionId, learner.questionId])).rejects.toThrow(/level the item records/u);
+      VALUES ($1,$2,$3,$4,2,'en','tutor-hint@2','tutor-hint-policy-v1','x')`, [randomUUID(), learner.id, learner.decisionId, learner.questionId])).rejects.toThrow(/level the item records/u);
     await api().post(`${learner.base}/tutor-hints`).set(auth(learner.token)).send({ questionId: learner.questionId });
     const row = await hintRow(learner.decisionId, learner.questionId, 1);
     await expect(pool.query("UPDATE tutor_hints SET hint_level = 2 WHERE id = $1", [row.id])).rejects.toThrow(/never changed/u);
@@ -547,7 +547,7 @@ describe('ENG-22: staff review, privacy export and deletion', () => {
     const bundle = await assembleSubjectExport(db as unknown as PersistenceDb, learner.id) as Record<string, any>;
     const step = (bundle.learning.steps as Record<string, any>[]).find((entry) => entry.aiTutorHints?.length);
     expect(step?.aiTutorHints).toEqual([
-      expect.objectContaining({ level: 1, outcome: 'AI_HINT_SHOWN', aiHintShown: SAFE_HINT, model: MODEL, promptVersion: 'tutor-hint@1', reviewState: 'DRAFT' }),
+      expect.objectContaining({ level: 1, outcome: 'AI_HINT_SHOWN', aiHintShown: SAFE_HINT, model: MODEL, promptVersion: 'tutor-hint@2', reviewState: 'DRAFT' }),
       expect.objectContaining({ level: 2, outcome: 'WRITTEN_HINT_SHOWN', aiHintShown: null }),
     ]);
     expect(JSON.stringify(bundle)).not.toContain('It is 42, trust me.');

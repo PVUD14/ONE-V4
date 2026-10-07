@@ -58,12 +58,15 @@ export {
   contentAnswerCheckPromptV1,
   contentItemDraftPromptV1,
   contentLessonDraftPromptV1,
+  contentLessonDraftPromptV2,
   firstFeaturePrompts,
   hintLevelMeanings,
   lessonDraftHeadings,
+  lessonHeadingIndex,
   oneAiFeatures,
   servedModelAtRegistration,
   tutorHintPromptV1,
+  tutorHintPromptV2,
   type AiFeatureDeclaration,
 } from './first-features.js';
 

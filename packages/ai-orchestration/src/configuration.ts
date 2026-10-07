@@ -9,13 +9,33 @@
  * endpoint's host and the model id — never the key, never the full URL.
  * Design: docs/architecture/inference-adapter-design.md §1.
  */
-import { OpenAICompatibleProvider, UnconfiguredInferenceProvider, type FetchLike, type InferenceProvider } from './provider.js';
+import {
+  OpenAICompatibleProvider,
+  UnconfiguredEmbeddingProvider,
+  UnconfiguredInferenceProvider,
+  type EmbeddingProvider,
+  type FetchLike,
+  type InferenceProvider,
+} from './provider.js';
 
 export const inferenceEnvironmentVariables = {
   baseUrl: 'ONE_AI_BASE_URL',
   apiKey: 'ONE_AI_API_KEY',
   model: 'ONE_AI_MODEL',
 } as const;
+
+/**
+ * ENG-24: the embedding endpoint, also all or nothing. Separate from the chat endpoint because a vLLM
+ * server serves one model, so the embedding model is a second endpoint (or a second port on the pod).
+ * The key may be the same value as ONE_AI_API_KEY; it is still named on its own so neither is assumed.
+ */
+export const embeddingEnvironmentVariables = {
+  baseUrl: 'ONE_AI_EMBEDDING_BASE_URL',
+  apiKey: 'ONE_AI_EMBEDDING_API_KEY',
+  model: 'ONE_AI_EMBEDDING_MODEL',
+} as const;
+
+type EndpointVariableNames = { readonly baseUrl: string; readonly apiKey: string; readonly model: string };
 
 export type InferenceUnconfiguredReason =
   | 'BASE_URL_MISSING'
@@ -45,10 +65,10 @@ type Environment = Readonly<Record<string, string | undefined>>;
 const loopbackHosts = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
 
 /** Read the three variables. Never throws; anything unusable is a reason, not an exception. */
-export function readInferenceConfiguration(env: Environment = process.env): InferenceConfiguration {
-  const rawUrl = env[inferenceEnvironmentVariables.baseUrl]?.trim() ?? '';
-  const apiKey = env[inferenceEnvironmentVariables.apiKey]?.trim() ?? '';
-  const model = env[inferenceEnvironmentVariables.model]?.trim() ?? '';
+export function readInferenceConfiguration(env: Environment = process.env, names: EndpointVariableNames = inferenceEnvironmentVariables): InferenceConfiguration {
+  const rawUrl = env[names.baseUrl]?.trim() ?? '';
+  const apiKey = env[names.apiKey]?.trim() ?? '';
+  const model = env[names.model]?.trim() ?? '';
   if (!rawUrl) return { state: 'UNCONFIGURED', reason: 'BASE_URL_MISSING' };
 
   let url: URL;
@@ -95,6 +115,35 @@ export function inferenceProviderFromEnvironment(
   const configuration = readInferenceConfiguration(env);
   if (configuration.state === 'UNCONFIGURED') {
     return { provider: new UnconfiguredInferenceProvider(configuration.reason), configuration };
+  }
+  return {
+    configuration,
+    provider: new OpenAICompatibleProvider({
+      baseUrl: configuration.baseUrl,
+      apiKey: configuration.apiKey,
+      model: configuration.model,
+      providerKey: configuredProviderKey,
+      ...tuning,
+    }),
+  };
+}
+
+/** ENG-24: the embedding endpoint's configuration, by the same rules as the chat endpoint's. */
+export function readEmbeddingConfiguration(env: Environment = process.env): InferenceConfiguration {
+  return readInferenceConfiguration(env, embeddingEnvironmentVariables);
+}
+
+/**
+ * ENG-24: the embedding provider a worker or offline job should use. Unconfigured →
+ * `UnconfiguredEmbeddingProvider`, a typed refusal at call time rather than a crash at start.
+ */
+export function embeddingProviderFromEnvironment(
+  env: Environment = process.env,
+  tuning: InferenceAdapterTuning = {},
+): { readonly provider: EmbeddingProvider; readonly configuration: InferenceConfiguration } {
+  const configuration = readEmbeddingConfiguration(env);
+  if (configuration.state === 'UNCONFIGURED') {
+    return { provider: new UnconfiguredEmbeddingProvider(configuration.reason), configuration };
   }
   return {
     configuration,

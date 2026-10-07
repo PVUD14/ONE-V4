@@ -63,6 +63,31 @@ export interface InferenceProvider {
   probe?(): Promise<InferenceProbe>;
 }
 
+/**
+ * ENG-24: one embedding call — several texts in, one vector each out. Used only by offline and worker
+ * jobs through `AiOrchestrator.embed`, never by a request handler.
+ */
+export interface EmbeddingRequest {
+  readonly model: string;
+  readonly inputs: readonly string[];
+  readonly signal?: AbortSignal;
+}
+
+export interface EmbeddingResult {
+  /** One vector per input, in input order, all of one length. */
+  readonly vectors: readonly (readonly number[])[];
+  /** What actually answered, as the endpoint reported it. */
+  readonly model: string;
+  readonly usage: InferenceUsage;
+  readonly latencyMs?: number;
+  readonly attempts?: number;
+}
+
+export interface EmbeddingProvider {
+  readonly providerKey: string;
+  embed(request: EmbeddingRequest): Promise<EmbeddingResult>;
+}
+
 export type InferenceFailureClass =
   | 'PROVIDER_UNCONFIGURED'
   | 'PROVIDER_MODEL_MISMATCH'
@@ -184,6 +209,21 @@ export class UnconfiguredInferenceProvider implements InferenceProvider {
   }
 }
 
+/**
+ * ENG-24: the embedding counterpart of `UnconfiguredInferenceProvider` — what ONE runs whenever
+ * ONE_AI_EMBEDDING_BASE_URL, ONE_AI_EMBEDDING_API_KEY or ONE_AI_EMBEDDING_MODEL is blank. Every call is a
+ * typed PROVIDER_UNCONFIGURED refusal; nothing crashes and nothing is invented.
+ */
+export class UnconfiguredEmbeddingProvider implements EmbeddingProvider {
+  readonly providerKey = 'unconfigured';
+
+  constructor(private readonly reason = 'BASE_URL_MISSING') {}
+
+  async embed(): Promise<EmbeddingResult> {
+    throw new InferenceUnconfiguredError(`no embedding endpoint is configured (${this.reason}); set ONE_AI_EMBEDDING_BASE_URL, ONE_AI_EMBEDDING_API_KEY and ONE_AI_EMBEDDING_MODEL on the server`);
+  }
+}
+
 interface FetchResponseLike {
   readonly ok: boolean;
   readonly status: number;
@@ -226,7 +266,7 @@ const retryableStatuses = new Set([429, 500, 502, 503, 504]);
  * nobody is waiting on the first token. A timed-out attempt is not retried — the model may still
  * be generating and billing, and a retry doubles both.
  */
-export class OpenAICompatibleProvider implements InferenceProvider {
+export class OpenAICompatibleProvider implements InferenceProvider, EmbeddingProvider {
   readonly providerKey: string;
   private readonly baseUrl: string;
   private readonly timeoutMs: number;
@@ -247,9 +287,6 @@ export class OpenAICompatibleProvider implements InferenceProvider {
   async complete(request: InferenceRequest): Promise<InferenceResult> {
     // Before the network: a feature evaluated on one model never silently runs on another.
     if (this.options.model && request.model !== this.options.model) throw new InferenceModelMismatchError();
-
-    const clock = this.options.clock ?? (() => performance.now());
-    const started = clock();
     const body = JSON.stringify({
       model: request.model,
       messages: request.messages,
@@ -257,29 +294,52 @@ export class OpenAICompatibleProvider implements InferenceProvider {
       temperature: request.temperature ?? 0,
       stream: false,
     });
+    const { value, attempts, latencyMs } = await this.exchange('/chat/completions', body, request.signal, (text) => parseCompletion(text, request.model));
+    return { ...value, latencyMs, attempts };
+  }
 
+  /**
+   * ENG-24: the OpenAI embeddings shape (`POST /embeddings`), with the same model guard, timeout,
+   * retries and no-leak errors as `complete`. The vectors come back exactly as served; normalising
+   * them is the caller's choice.
+   */
+  async embed(request: EmbeddingRequest): Promise<EmbeddingResult> {
+    if (this.options.model && request.model !== this.options.model) throw new InferenceModelMismatchError();
+    if (request.inputs.length === 0) throw new InferenceMalformedResponseError();
+    const body = JSON.stringify({ model: request.model, input: request.inputs, encoding_format: 'float' });
+    const { value, attempts, latencyMs } = await this.exchange('/embeddings', body, request.signal, (text) => parseEmbeddings(text, request.inputs.length, request.model));
+    return { ...value, latencyMs, attempts };
+  }
+
+  /**
+   * One POST with retries: a retryable status or an unreachable endpoint is tried again with backoff
+   * until `maxAttempts`; a timeout is not (the model may still be working, and billing). Every failure
+   * is a typed error stamped with attempts and wall time.
+   */
+  private async exchange<T>(path: string, body: string, signal: AbortSignal | undefined, parse: (text: string) => T): Promise<{ value: T; attempts: number; latencyMs: number }> {
+    const clock = this.options.clock ?? (() => performance.now());
+    const started = clock();
     let attempts = 0;
     for (;;) {
       attempts += 1;
       try {
-        const answer = await this.send('POST', '/chat/completions', body, this.timeoutMs, request.signal);
+        const answer = await this.send('POST', path, body, this.timeoutMs, signal);
         if (!answer.ok) {
           const failure = answer.status === 401 || answer.status === 403 ? new InferenceAuthError(answer.status)
             : answer.status === 429 ? new InferenceRateLimitedError()
               : new InferenceUpstreamError(answer.status);
           if (retryableStatuses.has(answer.status) && attempts < this.maxAttempts) {
-            await this.backoff(attempts, request.signal);
+            await this.backoff(attempts, signal);
             continue;
           }
           throw failure;
         }
-        const parsed = parseCompletion(answer.text, request.model);
-        return { ...parsed, latencyMs: elapsed(clock, started), attempts };
+        return { value: parse(answer.text), attempts, latencyMs: elapsed(clock, started) };
       } catch (error) {
         const failure = error instanceof InferenceProviderError ? error : new InferenceUnreachableError();
         if (failure instanceof InferenceUnreachableError && attempts < this.maxAttempts) {
           try {
-            await this.backoff(attempts, request.signal);
+            await this.backoff(attempts, signal);
             continue;
           } catch (cancelled) {
             throw stamp(cancelled instanceof InferenceProviderError ? cancelled : new InferenceCancelledError(), attempts, elapsed(clock, started));
@@ -381,6 +441,38 @@ function parseCompletion(text: string, requestedModel: string): Omit<InferenceRe
     },
     model: typeof body.model === 'string' && body.model ? body.model : requestedModel,
     stopReason: choice?.finish_reason === 'length' ? 'MAX_TOKENS' : choice?.finish_reason === 'stop' ? 'END' : 'OTHER',
+  };
+}
+
+/**
+ * The OpenAI embeddings body: `data[i].embedding` with `data[i].index`. Every vector must be present,
+ * finite and of one length, or the whole answer is unusable — a partial index is worse than none.
+ */
+function parseEmbeddings(text: string, expected: number, requestedModel: string): Omit<EmbeddingResult, 'latencyMs' | 'attempts'> {
+  let body: { data?: unknown; usage?: { prompt_tokens?: unknown }; model?: unknown } | null;
+  try {
+    body = JSON.parse(text) as typeof body;
+  } catch {
+    throw new InferenceMalformedResponseError();
+  }
+  if (!body || typeof body !== 'object' || !Array.isArray(body.data) || body.data.length !== expected) throw new InferenceMalformedResponseError();
+  const vectors: (readonly number[] | undefined)[] = Array.from({ length: expected }, () => undefined);
+  for (const [position, entry] of (body.data as unknown[]).entries()) {
+    if (!entry || typeof entry !== 'object') throw new InferenceMalformedResponseError();
+    const { index, embedding } = entry as { index?: unknown; embedding?: unknown };
+    const slot = typeof index === 'number' ? index : position;
+    if (!Number.isInteger(slot) || slot < 0 || slot >= expected || vectors[slot] !== undefined) throw new InferenceMalformedResponseError();
+    if (!Array.isArray(embedding) || embedding.length === 0 || !embedding.every((value) => typeof value === 'number' && Number.isFinite(value))) {
+      throw new InferenceMalformedResponseError();
+    }
+    vectors[slot] = embedding as number[];
+  }
+  const dimensions = vectors[0]?.length ?? 0;
+  if (vectors.some((vector) => vector === undefined || vector.length !== dimensions)) throw new InferenceMalformedResponseError();
+  return {
+    vectors: vectors as (readonly number[])[],
+    model: typeof body.model === 'string' && body.model ? body.model : requestedModel,
+    usage: { inputTokens: asCount(body.usage?.prompt_tokens), outputTokens: 0 },
   };
 }
 

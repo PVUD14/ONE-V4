@@ -14,7 +14,10 @@
  *    a plausible substitute in front of a student is the outcome to avoid.
  */
 import {
+  InferenceMalformedResponseError,
   InferenceProviderError,
+  UnconfiguredEmbeddingProvider,
+  type EmbeddingProvider,
   type InferenceProvider,
   type InferenceUsage,
 } from './provider.js';
@@ -62,6 +65,42 @@ export interface GenerationRecord {
   /** Wall time of the provider call, retries included; null when the provider does not measure it. */
   readonly latencyMs: number | null;
 }
+
+/**
+ * ENG-24: one embedding call for a feature. The recipe names how the inputs were made (chunking, any
+ * prefix); it is the embedding's prompt version, metered and stamped like one.
+ */
+export interface EmbeddingGenerationRequest {
+  readonly featureKey: string;
+  readonly recipe: { readonly key: string; readonly version: number };
+  readonly inputs: readonly string[];
+  readonly subjectUserId?: string | undefined;
+  readonly correlationId: string;
+  readonly signal?: AbortSignal | undefined;
+}
+
+export interface EmbeddingRecord {
+  readonly featureKey: string;
+  /** One vector per input, as served (not normalised), all of `dimensions` length. */
+  readonly vectors: readonly (readonly number[])[];
+  readonly dimensions: number;
+  /** The model the policy asked for (the endpoint is held to it), and so the key an index is built under. */
+  readonly model: string;
+  /** What the endpoint said answered. */
+  readonly servedModel: string;
+  readonly source: 'AI_GENERATED';
+  readonly generatorVersion: string;
+  /** `recipe@version`, e.g. `content-embedding@1`. */
+  readonly promptVersion: string;
+  readonly generatedAt: string;
+  readonly usage: InferenceUsage;
+  readonly latencyMs: number | null;
+}
+
+/** At most this many texts in one embedding call; a job batches above it. */
+export const maxEmbeddingInputsPerCall = 64;
+
+type MeterSubject = Pick<GenerationRequest, 'featureKey' | 'subjectUserId' | 'promptKey' | 'promptVersion' | 'correlationId'>;
 
 export class AiFeatureDisabledError extends Error {
   constructor(featureKey: string) {
@@ -129,6 +168,11 @@ export interface OrchestratorOptions {
    * tests should rely on — the worker factory always supplies it.
    */
   readonly killSwitchEngaged?: () => Promise<boolean>;
+  /**
+   * ENG-24: the embedding endpoint. Absent means unconfigured: `embed` fails with a metered
+   * PROVIDER_UNCONFIGURED, exactly as a blank chat endpoint does.
+   */
+  readonly embeddings?: EmbeddingProvider | undefined;
   /** Stamped on every row so a change of serving stack is visible in the data. */
   readonly generatorVersion: string;
   readonly now?: () => Date;
@@ -235,19 +279,99 @@ export class AiOrchestrator {
     };
   }
 
+  /**
+   * ENG-24: embed texts for a feature. The same order of checks as `generate` (kill switch, the
+   * feature's switch, its cap, the input size), and every refusal, failure and success is metered.
+   * Nothing is stored here; the caller writes its rows with the provenance this returns.
+   */
+  async embed(request: EmbeddingGenerationRequest): Promise<EmbeddingRecord> {
+    const meterAs: MeterSubject = {
+      featureKey: request.featureKey,
+      subjectUserId: request.subjectUserId,
+      promptKey: request.recipe.key,
+      promptVersion: request.recipe.version,
+      correlationId: request.correlationId,
+    };
+    const provider = this.options.embeddings ?? new UnconfiguredEmbeddingProvider();
+    const policy = await this.options.policy(request.featureKey);
+    if (!policy) throw new AiFeatureDisabledError(request.featureKey);
+    if (this.options.killSwitchEngaged && await this.options.killSwitchEngaged()) {
+      await this.meter(meterAs, policy, 'REFUSED', 'KILL_SWITCH_ENGAGED', {}, provider.providerKey);
+      throw new AiKillSwitchEngagedError(request.featureKey);
+    }
+    if (!policy.enabled) {
+      await this.meter(meterAs, policy, 'REFUSED', 'FEATURE_DISABLED', {}, provider.providerKey);
+      throw new AiFeatureDisabledError(request.featureKey);
+    }
+    const used = await this.options.usage.count({ featureKey: policy.featureKey, window: policy.window });
+    if (used >= policy.cap) {
+      await this.meter(meterAs, policy, 'REFUSED', 'CAP_EXCEEDED', {}, provider.providerKey);
+      throw new AiCapExceededError(policy.featureKey, policy.cap);
+    }
+    const size = request.inputs.reduce((total, input) => total + input.length, 0);
+    if (request.inputs.length === 0 || request.inputs.length > maxEmbeddingInputsPerCall || size > policy.maxInputChars
+        || request.inputs.some((input) => input.trim().length === 0)) {
+      await this.meter(meterAs, policy, 'REFUSED', 'INPUT_TOO_LARGE', {}, provider.providerKey);
+      throw new AiInputTooLargeError(policy.featureKey);
+    }
+
+    let result;
+    try {
+      result = await provider.embed({ model: policy.model, inputs: request.inputs, ...(request.signal ? { signal: request.signal } : {}) });
+      if (result.vectors.length !== request.inputs.length) throw new InferenceMalformedResponseError();
+    } catch (error) {
+      const known = error instanceof InferenceProviderError ? error : undefined;
+      await this.meter(meterAs, policy, 'FAILED', known?.failureClass ?? 'PROVIDER_FAILED', {
+        latencyMs: known?.latencyMs ?? result?.latencyMs,
+        attempts: known?.attempts ?? result?.attempts,
+      }, provider.providerKey);
+      // Rethrown: a partial or invented vector would put the wrong passage in front of a student.
+      throw error;
+    }
+
+    await this.options.usage.record({
+      featureKey: policy.featureKey,
+      subjectUserId: request.subjectUserId,
+      promptKey: request.recipe.key,
+      promptVersion: request.recipe.version,
+      providerKey: provider.providerKey,
+      model: result.model,
+      usage: result.usage,
+      correlationId: request.correlationId,
+      outcome: 'SUCCEEDED',
+      latencyMs: result.latencyMs,
+      attempts: result.attempts,
+    });
+
+    return {
+      featureKey: policy.featureKey,
+      vectors: result.vectors,
+      dimensions: result.vectors[0]?.length ?? 0,
+      model: policy.model,
+      servedModel: result.model,
+      source: 'AI_GENERATED',
+      generatorVersion: this.options.generatorVersion,
+      promptVersion: `${request.recipe.key}@${request.recipe.version}`,
+      generatedAt: (this.options.now?.() ?? new Date()).toISOString(),
+      usage: result.usage,
+      latencyMs: result.latencyMs ?? null,
+    };
+  }
+
   private async meter(
-    request: GenerationRequest,
+    request: MeterSubject,
     policy: AiFeaturePolicy,
     outcome: 'REFUSED' | 'FAILED',
     failureClass: string,
     timing: { readonly latencyMs?: number | undefined; readonly attempts?: number | undefined } = {},
+    providerKey: string = this.options.provider.providerKey,
   ): Promise<void> {
     await this.options.usage.record({
       featureKey: request.featureKey,
       subjectUserId: request.subjectUserId,
       promptKey: request.promptKey,
       promptVersion: request.promptVersion,
-      providerKey: this.options.provider.providerKey,
+      providerKey,
       model: policy.model,
       usage: { inputTokens: 0, outputTokens: 0 },
       correlationId: request.correlationId,

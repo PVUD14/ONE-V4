@@ -155,4 +155,16 @@ describe('gradeInSandbox', () => {
     expect(graded.cases[1]).toMatchObject({ exitCode: null, signal: null, wallTimeMs: null });
     expect(graded).toMatchObject({ passed: 0, total: 3, verdict: 'FAILED' });
   });
+
+  it('gives up as SANDBOX_UNAVAILABLE when a slow sandbox would run past the job budget (inside the outbox lease)', async () => {
+    let clock = 0;
+    const fetch: FetchLike = async () => {
+      clock += 30_000; // each run takes 30 s: the third case would start past the 45 s budget
+      return { status: 200, json: async () => ({ language: 'python', version: '3.12.0', run: { stdout: '1\n', code: 0, signal: null, status: null } }) };
+    };
+    await expect(gradeInSandbox(config, {
+      language: 'python', languageVersion: '3.12.0', source: 'print(1)', fetch, now: () => clock,
+      testCases: [{ stdin: '', expectedStdout: '1' }, { stdin: '', expectedStdout: '1' }, { stdin: '', expectedStdout: '1' }],
+    })).rejects.toMatchObject({ code: 'SANDBOX_UNAVAILABLE' });
+  });
 });

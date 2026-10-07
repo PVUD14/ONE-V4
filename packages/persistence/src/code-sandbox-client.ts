@@ -25,6 +25,11 @@ export const CODE_SANDBOX_LIMITS = {
 
 /** HTTP deadline for one run: the wall limit plus queueing and transport. */
 export const CODE_SANDBOX_REQUEST_TIMEOUT_MS = 15_000;
+/**
+ * Budget for a whole submission, kept inside the outbox lease (60 s) so a slow sandbox can never make a
+ * second worker pick the event up while the first is still running it.
+ */
+export const CODE_SANDBOX_JOB_BUDGET_MS = 45_000;
 
 export type CodeCaseOutcome = 'PASSED' | 'WRONG_OUTPUT' | 'RUNTIME_ERROR' | 'TIME_LIMIT' | 'MEMORY_LIMIT' | 'OUTPUT_LIMIT' | 'NOT_RUN';
 export type CodeSandboxFailureCode = 'SANDBOX_UNAVAILABLE' | 'SANDBOX_ERROR' | 'SANDBOX_REJECTED';
@@ -220,7 +225,12 @@ export async function gradeInSandbox(config: CodeSandboxConfig, input: {
   readonly source: string;
   readonly testCases: readonly { readonly stdin: string; readonly expectedStdout: string }[];
   readonly fetch?: FetchLike;
+  /** Whole-submission budget; defaults to CODE_SANDBOX_JOB_BUDGET_MS. Exhausted = SANDBOX_UNAVAILABLE. */
+  readonly budgetMs?: number;
+  readonly now?: () => number;
 }): Promise<GradedSubmission> {
+  const now = input.now ?? Date.now;
+  const deadline = now() + (input.budgetMs ?? CODE_SANDBOX_JOB_BUDGET_MS);
   const cases: GradedCase[] = [];
   let runtime = '';
   let stopped = false;
@@ -229,8 +239,12 @@ export async function gradeInSandbox(config: CodeSandboxConfig, input: {
       cases.push({ caseIndex: index + 1, outcome: 'NOT_RUN', exitCode: null, signal: null, wallTimeMs: null, cpuTimeMs: null, memoryBytes: null });
       continue;
     }
+    // A sandbox too slow to finish inside the budget is, for this job, not available.
+    const remaining = deadline - now();
+    if (remaining < 1_000) throw new CodeSandboxError('SANDBOX_UNAVAILABLE');
     const run = await runInSandbox(config, {
       language: input.language, languageVersion: input.languageVersion, source: input.source, stdin: testCase.stdin,
+      timeoutMs: Math.min(CODE_SANDBOX_REQUEST_TIMEOUT_MS, remaining),
       ...(input.fetch ? { fetch: input.fetch } : {}),
     });
     runtime = run.runtime;

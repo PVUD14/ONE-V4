@@ -171,7 +171,9 @@ The consumer (`code-submission-worker.ts`, run by the outbox worker):
    `TASK_UNAVAILABLE`. `ONE_CODE_SANDBOX_URL` blank → `SANDBOX_UNAVAILABLE`. None of these call anything.
 3. Claim `QUEUED → RUNNING` (a redelivered event never runs the code twice).
 4. Outside any transaction: one Piston run per case, in order, each with the v1 limits and a 15-second
-   HTTP deadline. A `TIME_LIMIT` case stops the rest (`NOT_RUN`). Unreachable / 5xx / timeout →
+   HTTP deadline, inside a 45-second budget for the whole submission (so a slow sandbox can never outlast
+   the 60-second outbox lease and let a second worker pick the event up). A `TIME_LIMIT` case stops the
+   rest (`NOT_RUN`); an exhausted budget is `SANDBOX_UNAVAILABLE`. Unreachable / 5xx / timeout →
    `SANDBOX_UNAVAILABLE`; 4xx → `SANDBOX_REJECTED`; Piston status `XX` → `SANDBOX_ERROR`.
 5. Under the consumer receipt, one transaction: the cases, `COMPLETED` with verdict and provenance, the
    attempt (below), the audit row.

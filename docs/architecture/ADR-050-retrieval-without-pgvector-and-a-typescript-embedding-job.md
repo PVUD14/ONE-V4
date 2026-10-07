@@ -15,9 +15,10 @@ why its offline job is TypeScript where ADR-034 expected Python.
 1. **No pgvector in this step.** `content_embeddings.embedding` is a unit-normalised `real[]`; retrieval
    is an exact inner-product scan in SQL after the approval and tenant filters. Migration 0114 creates no
    extension and runs on the `postgres:16-alpine` image that production, the demo and development use.
-2. **The upgrade is a later migration plus an image Divakar chooses.** When the corpus passes about 20,000
-   chunks of one model, or retrieval's p95 passes 500 ms, a new migration adds a `vector` column cast from
-   the array with an HNSW index. The table, the job and the retrieval contract stay as they are.
+2. **The upgrade is a later migration plus an image Divakar chooses.** When the corpus passes about 5,000
+   chunks of one model, or retrieval's p95 passes 1 second (measured: 1.39 s for 5,000 chunks of 1,024
+   dimensions on the development container), a new migration adds a `vector` column cast from the array with
+   an HNSW index. The table, the job and the retrieval contract stay as they are.
 3. **The recommended image is alpine with pgvector compiled in**, not the Debian `pgvector/pgvector:pg16`
    image. Same musl libc, so text collation and every existing index are unchanged. Moving to a glibc image
    is acceptable only by dump and restore (or, if the data directory is reused, `REINDEX DATABASE` on every

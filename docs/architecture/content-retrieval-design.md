@@ -39,17 +39,18 @@ the student's tenant may see.
 **Chosen: the vector is a `real[]` column, unit-normalised on write, and retrieval is an exact
 inner-product scan in SQL over the rows the tenant and approval filters leave.** No extension is created.
 
-Why this is enough now: retrieval runs over *approved lessons* — hundreds today, low thousands of chunks at
-the plan's horizon — never over student data. An exact scan over a few thousand 1,024-dimension vectors
-is well inside the tutor's 45-second pending window and, unlike an approximate index, can never miss the
-best passage. Measured on the local development database (Postgres 16, alpine; see "Measured" below).
+Why this is enough now: retrieval runs over *approved lessons* — tens to hundreds today, a few thousand
+chunks at the plan's horizon — never over student data. An exact scan costs about 0.28 ms per 1,024-dimension
+chunk ("Measured" below): a few hundred milliseconds for today's corpus, about 1.4 s at 5,000 chunks. That is
+inside the tutor's 45-second pending window, runs in a worker rather than a request, and, unlike an
+approximate index, can never miss the best passage.
 
 **The upgrade path, when the corpus or the latency needs it.** A later migration (not this one) adds a
 pgvector column cast from the same array — `embedding::vector(1024)` — with an HNSW index, partial on one
 dimension count. The table, the job and the retrieval contract do not change; only the `ORDER BY` in
 `retrieveApprovedContent` does. That migration needs pgvector in the image, which is Divakar's decision
-(below). Triggers to take it: more than about 20,000 chunks of one model, or a measured retrieval p95 above
-500 ms.
+(below). Triggers to take it: more than about 5,000 chunks of one model, or a measured retrieval p95 above
+1 second.
 
 **What Divakar must decide before pgvector can be used anywhere.** The production database runs
 `postgres:16-alpine` (musl libc). The published `pgvector/pgvector:pg16` image is Debian (glibc). The two
@@ -58,9 +59,18 @@ linguistically. Starting the Debian image on the existing alpine data directory 
 B-tree index on a collatable text column ordered by the old rule — lookups and `UNIQUE` checks can silently
 miss rows until the indexes are rebuilt. Two safe ways, in order of preference:
 
-1. **Keep alpine and add pgvector to it.** A small image `FROM postgres:16-alpine` that builds pgvector from
-   source (`apk add --virtual .build git build-base clang15 llvm15`; `make && make install`; remove the build
-   packages). Same libc, same collation, no reindex. Recommended.
+1. **Keep alpine and add pgvector to it.** Same libc, same collation, no reindex. Recommended. Built and
+   checked locally on 2026-10-08 (the image built, `CREATE EXTENSION vector` gave 0.8.0, and `real[]` casts to
+   `vector`); the image was then deleted, and nothing was pushed or deployed:
+
+   ```dockerfile
+   FROM postgres:16-alpine
+   RUN apk add --no-cache --virtual .pgvector-build git build-base     && git clone --branch v0.8.0 --depth 1 https://github.com/pgvector/pgvector.git /tmp/pgvector     && cd /tmp/pgvector && make with_llvm=no OPTFLAGS="" && make with_llvm=no install     && cd / && rm -rf /tmp/pgvector && apk del .pgvector-build
+   ```
+
+   `with_llvm=no` skips the JIT bitcode, which needs a clang matching the image's LLVM; `OPTFLAGS=""` drops
+   `-march=native`, so the binary does not depend on the build machine's CPU. Pin the `postgres:16-alpine`
+   digest the server already runs, so the swap changes nothing but the added extension.
 2. **Move to the Debian image by dump and restore**, never by reusing the data directory: `pg_dumpall`
    from the old container, a fresh volume for the new one, restore (which rebuilds every index under the new
    collation), then check the row counts. If the data directory is ever reused instead, the runbook is:
@@ -269,9 +279,13 @@ job already checks), and passes the passages to `tutor-hint@3`.
 
 ## Measured
 
-Exact scan on the local development database (Postgres 16 alpine), synthetic unit vectors, 1,024
-dimensions, one model, both scope filters applied: see the ENG-24 entry in `docs/ops/OPS_PROGRESS.md` for the
-numbers taken when this was built.
+2026-10-08, local development container (`postgres:16-alpine`, Docker on Windows), the retrieval query exactly
+as `retrieveApprovedContent` issues it — approval view, owner check and student scope included — over 100
+published lessons x 50 chunks = **5,000 chunks of random 1,024-dimension unit vectors**: **1.39 s** execution
+(`EXPLAIN ANALYZE`, one run, warm cache). The scoring subquery is almost all of it; the joins and filters are
+index lookups. Cost is linear in chunks x dimensions, so 500 chunks is about 0.14 s, and a 384-dimension model
+costs a little over a third of the 1,024-dimension figure. Writing the 5,000 rows took about 1.4 s. The script
+was a throwaway run in a rolled-back transaction; it is not in the repository.
 
 ## Acceptance, and where it is proved
 

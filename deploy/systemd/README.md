@@ -198,3 +198,32 @@ A run logs three lines of counts — never a pseudonym, user or item:
 ```
 
 `CALIBRATION_MIN_RESPONSES` in `app.env` overrides the CALIBRATED threshold (default 200).
+
+## Content embeddings (ENG-24)
+
+Nightly (21:30 UTC), one run of `ai:content-embeddings`: approved, current lesson text is chunked
+and embedded through ONE AI Orchestration into `content_embeddings`, which the tutor's retrieval
+reads. It does nothing, and logs why, while the `content.embeddings` feature is off (the default —
+it needs a chosen embedding model and a passing evaluation), the kill switch is engaged, or
+`ONE_AI_EMBEDDING_BASE_URL` / `ONE_AI_EMBEDDING_API_KEY` / `ONE_AI_EMBEDDING_MODEL` are blank.
+Archived or replaced content never waits for this job: retrieval re-checks approval on every query.
+Design: `docs/architecture/content-retrieval-design.md`; ADR-050.
+
+**Written, not installed.** Installing it is a manual step:
+
+```bash
+sudo cp /srv/planthepath-next/current/deploy/systemd/planthepath-content-embeddings.* /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now planthepath-content-embeddings.timer
+```
+
+A run logs one line of counts and codes — never content text, a vector or the key:
+
+```json
+{"event":"content-embeddings.unavailable","state":"UNAVAILABLE","reason":"FEATURE_DISABLED"}
+{"event":"content-embeddings.finished","state":"COMPLETED","mode":"INCREMENTAL","model":"…","embeddingVersion":"content-embedding@1","pruned":0,"embeddedRevisions":12,"chunksWritten":31,"skipped":{"empty":0,"tooLong":0,"withdrawnDuringRun":0},"stopReason":null,"failureClass":null}
+```
+
+A run that stopped early (cap reached, switched off mid-run, endpoint failing) exits 2 and shows as a
+failed unit; the next run resumes. `--rebuild` (by hand) empties the index and re-embeds approved
+content only.

@@ -15,7 +15,7 @@ const viewerId = crypto.randomUUID();
 const lessonId = crypto.randomUUID();
 const revisionId = crypto.randomUUID();
 const vocabulary = {
-  languages: [{ language: 'en', name: 'English' }, { language: 'te', name: 'Telugu' }],
+  languages: [{ language: 'en', name: 'English' }, { language: 'hi', name: 'Hindi' }, { language: 'te', name: 'Telugu' }],
   levels: [{ level: 'FOUNDATION', meaning: 'Simpler' }, { level: 'STANDARD', meaning: 'As written' }],
   styles: [{ style: 'EXPLANATION', meaning: 'Prose' }, { style: 'SUMMARY', meaning: 'Recap' }],
 };
@@ -31,7 +31,7 @@ const status = (over: Record<string, unknown> = {}, viewer: Record<string, unkno
     feature('content.item-draft', ['QUESTION'], { switchedOn: false, available: false, usedInWindow: 0 }),
     feature('content.answer-check', ['ANSWER_CHECK']),
   ],
-  maxInFlight: 3, viewerOpenJobs: 0,
+  maxInFlight: 3, viewerOpenJobs: 0, translationLanguages: ['en', 'hi'],
   viewer: { userId: viewerId, mayRequest: { LESSON: true, LESSON_VARIANT: true, QUESTION: true, ANSWER_CHECK: true }, seesAnswerChecks: true, ...viewer },
   reasons: { LESSON: ['NEW_LESSON', 'TRACK_BUILD'], LESSON_VARIANT: ['NEW_LANGUAGE'], QUESTION: ['NEW_QUESTION'], ANSWER_CHECK: ['ANSWER_KEY_CHECK'] },
   limits: { authorNote: 1000 }, correlationId: 'corr-status', ...over,
@@ -159,12 +159,15 @@ describe('a translation with AI', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Draft a translation of write-for-action with AI' });
     expect(within(dialog).getByText(/marked for native-speaker review/)).toBeInTheDocument();
     await within(dialog).findByText('On', { selector: '.status-pill' });
-    fireEvent.change(within(dialog).getByLabelText('Language'), { target: { value: 'te' } });
-    fireEvent.change(within(dialog).getByLabelText('Title of the translation'), { target: { value: 'చర్య కోసం రాయండి' } });
+    // Only the languages the model passed its evaluation in are offered: Telugu is not.
+    expect(within(dialog).getByRole('option', { name: 'Hindi (hi)' })).toBeInTheDocument();
+    expect(within(dialog).queryByRole('option', { name: 'Telugu (te)' })).toBeNull();
+    fireEvent.change(within(dialog).getByLabelText('Language'), { target: { value: 'hi' } });
+    fireEvent.change(within(dialog).getByLabelText('Title of the translation'), { target: { value: 'कार्रवाई के लिए लिखें' } });
     fireEvent.change(within(dialog).getByLabelText(/Reason code/), { target: { value: 'NEW_LANGUAGE' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Ask for a translation' }));
     await waitFor(() => expect(onQueued).toHaveBeenCalled());
-    expect(posted()[0]).toEqual({ kind: 'LESSON_VARIANT', baseLessonId: lessonId, language: 'te', level: 'STANDARD', style: 'EXPLANATION', title: 'చర్య కోసం రాయండి', reasonCode: 'NEW_LANGUAGE' });
+    expect(posted()[0]).toEqual({ kind: 'LESSON_VARIANT', baseLessonId: lessonId, language: 'hi', level: 'STANDARD', style: 'EXPLANATION', title: 'कार्रवाई के लिए लिखें', reasonCode: 'NEW_LANGUAGE' });
   });
 });
 

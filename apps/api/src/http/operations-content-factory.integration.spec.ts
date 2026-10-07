@@ -13,7 +13,7 @@
  *  - the cap stops calls with a typed error: AI_CAP_REACHED at request, CAP_EXCEEDED on the job,
  *    with no request reaching the endpoint; the kill switch and a switched-off feature likewise;
  *  - the guard keeps a reply with personal data out, and a model refusal lands nothing;
- *  - a Telugu variant is marked for native-speaker review; an item and its hint ladder keep AI
+ *  - a Hindi variant is marked for native-speaker review (Telugu and untested languages are refused); an item and its hint ladder keep AI
  *    provenance at submission; an answer check is shown only to answer-key holders;
  *  - §6.6 minimums: 401, 403, input 400s, 404, audit rows.
  * Real Postgres in a throwaway schema; synthetic data only.
@@ -99,10 +99,10 @@ const englishLesson = (check = 'How many usable hosts does a /26 network have? W
   '## What you will learn', 'How to read a subnet mask and count the hosts it allows.',
   '## Explanation', paragraph(6), '## Worked example', paragraph(4), '## Common mistakes', paragraph(2), '## Check yourself', check,
 ].join('\n');
-const teluguSentence = 'సబ్‌నెట్ అనేది ఒకే నెట్‌వర్క్ ప్రిఫిక్స్‌ను పంచుకునే చిరునామాల సమూహం, మాస్క్ ఆ ప్రిఫిక్స్ ఎన్ని బిట్‌లను వాడుతుందో చెబుతుంది.';
-const telugu = (count: number): string => Array.from({ length: count }, () => teluguSentence).join(' ');
-const teluguLesson = (): string => [
-  '## What you will learn', telugu(1), '## Explanation', telugu(6), '## Worked example', telugu(4), '## Common mistakes', telugu(2), '## Check yourself', telugu(1),
+const hindiSentence = 'सबनेट एक ही नेटवर्क प्रीफ़िक्स साझा करने वाले पतों का समूह है, और मास्क बताता है कि वह प्रीफ़िक्स कितने बिट लेता है।';
+const hindi = (count: number): string => Array.from({ length: count }, () => hindiSentence).join(' ');
+const hindiLesson = (): string => [
+  '## What you will learn', hindi(1), '## Explanation', hindi(6), '## Worked example', hindi(4), '## Common mistakes', hindi(2), '## Check yourself', hindi(1),
 ].join('\n');
 const itemReply = (): string => JSON.stringify({
   prompt: 'A network uses the mask 255.255.255.224. How many usable host addresses does each subnet have?',
@@ -268,7 +268,7 @@ describe('access (§6.6 minimums)', () => {
     const note = await requestDraft(editor, lessonRequest('eng23-note', { authorNote: 'Mention that students can call 98765 43210.' }));
     expect(note.status).toBe(400);
     expect(note.body.error.code).toBe('AI_NOTE_PERSONAL_DATA');
-    expect((await requestDraft(editor, { kind: 'LESSON_VARIANT', baseLessonId: randomUUID(), language: 'te', level: 'STANDARD', style: 'EXPLANATION', title: 'X', reasonCode: 'NEW_LANGUAGE' })).status).toBe(404);
+    expect((await requestDraft(editor, { kind: 'LESSON_VARIANT', baseLessonId: randomUUID(), language: 'hi', level: 'STANDARD', style: 'EXPLANATION', title: 'X', reasonCode: 'NEW_LANGUAGE' })).status).toBe(404);
     expect((await api().get(`${base}/drafts/${randomUUID()}`).set(auth(editor.userId))).status).toBe(404);
     expect((await api().get(`${base}/drafts?limit=0`).set(auth(editor.userId))).status).toBe(400);
     expect((await api().get(`${base}/drafts?kinds=ESSAY`).set(auth(editor.userId))).status).toBe(400);
@@ -456,23 +456,36 @@ describe('the guard', () => {
 });
 
 describe('variants, questions and answer checks', () => {
-  it('a Telugu variant of a live lesson lands marked for native-speaker review', async () => {
-    lessonReply = () => teluguLesson();
+  it('a Hindi variant of a live lesson lands marked for native-speaker review', async () => {
+    lessonReply = () => hindiLesson();
     const queued = await requestDraft(thirdEditor, {
-      kind: 'LESSON_VARIANT', baseLessonId, language: 'te', level: 'STANDARD', style: 'EXPLANATION', title: 'సబ్‌నెట్ మాస్క్', reasonCode: 'NEW_LANGUAGE',
+      kind: 'LESSON_VARIANT', baseLessonId, language: 'hi', level: 'STANDARD', style: 'EXPLANATION', title: 'सबनेट मास्क', reasonCode: 'NEW_LANGUAGE',
     });
     expect(queued.status, JSON.stringify(queued.body)).toBe(201);
     expect(await runWorker()).toMatchObject({ state: 'SUCCEEDED' });
     const sent = JSON.parse(posts()[0]!.body) as { messages: { content: string }[] };
-    expect(sent.messages[0]!.content).toContain('Write the lesson in Telugu.');
-    expect(sent.messages[1]!.content).toContain('Telugu rendering of the published lesson');
+    expect(sent.messages[0]!.content).toContain('Write the lesson in Hindi.');
+    expect(sent.messages[1]!.content).toContain('Hindi rendering of the published lesson');
     const job = (await api().get(`${base}/drafts/${queued.body.draft.id}`).set(auth(thirdEditor.userId))).body.draft;
     const variant = (await api().get(`${lessons}/lessons/${job.produced.lessonId}`).set(auth(reviewer.userId))).body.lesson;
-    expect(variant).toMatchObject({ kind: 'VARIANT', variant: { language: 'te' }, variantOf: baseLessonId, aiDrafted: true });
+    expect(variant).toMatchObject({ kind: 'VARIANT', variant: { language: 'hi' }, variantOf: baseLessonId, aiDrafted: true });
     expect(variant.open).toMatchObject({ state: 'DRAFT', author: { userId: thirdEditor.userId }, aiDraft: { jobId: job.id } });
     // The same variant cannot be asked for twice.
-    expect((await requestDraft(thirdEditor, { kind: 'LESSON_VARIANT', baseLessonId, language: 'te', level: 'STANDARD', style: 'EXPLANATION', title: 'X', reasonCode: 'NEW_LANGUAGE' })).body.error.code)
+    expect((await requestDraft(thirdEditor, { kind: 'LESSON_VARIANT', baseLessonId, language: 'hi', level: 'STANDARD', style: 'EXPLANATION', title: 'X', reasonCode: 'NEW_LANGUAGE' })).body.error.code)
       .toBe('AI_DRAFT_VARIANT_EXISTS');
+  });
+
+  it('refuses an AI translation into a language the model has not passed its evaluation in, and queues nothing', async () => {
+    const before = posts().length;
+    for (const language of ['te', 'ta']) {
+      const refused = await requestDraft(thirdEditor, { kind: 'LESSON_VARIANT', baseLessonId, language, level: 'STANDARD', style: 'EXPLANATION', title: 'X', reasonCode: 'NEW_LANGUAGE' });
+      expect(refused.status).toBe(400);
+      expect(refused.body.error.code).toBe('AI_DRAFT_LANGUAGE_NOT_EVALUATED');
+    }
+    expect(await runWorker()).toBeNull();
+    expect(posts().length).toBe(before);
+    const status = (await api().get(`${base}/status`).set(auth(thirdEditor.userId))).body;
+    expect(status.translationLanguages).toEqual(['en', 'hi']);
   });
 
   it('a practice question lands with its ladder; submitted, the ladder keeps AI provenance; an answer check is for key holders only', async () => {

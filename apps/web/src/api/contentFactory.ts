@@ -30,6 +30,8 @@ export interface ContentFactoryStatusDto {
   readonly features: readonly ContentFactoryFeatureDto[];
   readonly maxInFlight: number;
   readonly viewerOpenJobs: number;
+  /** The languages an AI translation may be asked for: only those the model passed its evaluation in. */
+  readonly translationLanguages: readonly string[];
   readonly viewer: { readonly userId: string; readonly mayRequest: Readonly<Record<ContentDraftKind, boolean>>; readonly seesAnswerChecks: boolean };
   readonly reasons: Readonly<Record<ContentDraftKind, readonly string[]>>;
   readonly limits: { readonly authorNote: number };
@@ -110,6 +112,7 @@ function normaliseStatus(raw: Partial<ContentFactoryStatusDto> | null | undefine
     features: Array.isArray(value.features) ? value.features : [],
     maxInFlight: typeof value.maxInFlight === 'number' ? value.maxInFlight : 0,
     viewerOpenJobs: typeof value.viewerOpenJobs === 'number' ? value.viewerOpenJobs : 0,
+    translationLanguages: Array.isArray(value.translationLanguages) ? value.translationLanguages.filter((entry): entry is string => typeof entry === 'string') : [],
     viewer: { userId: viewer.userId ?? '', mayRequest: { ...noKinds, ...(viewer.mayRequest ?? {}) }, seesAnswerChecks: viewer.seesAnswerChecks === true },
     reasons: { ...noReasons, ...(value.reasons ?? {}) },
     limits: { authorNote: value.limits && typeof value.limits.authorNote === 'number' ? value.limits.authorNote : 1000 },

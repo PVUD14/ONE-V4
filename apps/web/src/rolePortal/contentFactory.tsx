@@ -70,6 +70,7 @@ export function aiRequestError(cause: unknown, fallback: string): string {
     AI_DRAFT_VARIANT_EXISTS: 'That language, level and style already exists for this lesson, or is already being drafted.',
     AI_DRAFT_TOPIC_UNKNOWN: 'No live or pending skill has that key.',
     AI_DRAFT_BASE_NOT_LIVE: 'Only a published lesson can be translated.',
+    AI_DRAFT_LANGUAGE_NOT_EVALUATED: 'AI translation is not offered in that language yet: the model has not passed its evaluation in it. A person can still write the translation.',
     AI_DRAFT_QUESTION_NOT_CHECKABLE: 'The question needs its prompt, every option and an answer key before it can be checked.',
   };
   return formatApiError(cause, (code && words[code]) || fallback);
@@ -300,7 +301,7 @@ export function TranslateWithAiDialog({ token, lessonId, lessonKey, vocabulary, 
       <form onSubmit={(event) => void submit(event)} noValidate>
         <label><span>Language <em>required</em></span><select aria-label="Language" value={form.language} onChange={(event) => setForm({ ...form, language: event.target.value })}>
           <option value="">Choose a language…</option>
-          {vocabulary.languages.map((entry) => <option key={entry.language} value={entry.language}>{entry.name} ({entry.language})</option>)}</select></label>
+          {vocabulary.languages.filter((entry) => (status?.translationLanguages ?? []).includes(entry.language)).map((entry) => <option key={entry.language} value={entry.language}>{entry.name} ({entry.language})</option>)}</select></label>
         <label><span>Level</span><select aria-label="Level" value={form.level} onChange={(event) => setForm({ ...form, level: event.target.value })}>
           {vocabulary.levels.map((entry) => <option key={entry.level} value={entry.level}>{label(entry.level)} — {entry.meaning}</option>)}</select></label>
         <label><span>Style</span><select aria-label="Style" value={form.style} onChange={(event) => setForm({ ...form, style: event.target.value })}>

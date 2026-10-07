@@ -72,10 +72,18 @@ export type ContentFactoryErrorCode =
   | 'AI_DRAFT_KEY_EXISTS'
   | 'AI_DRAFT_BASE_NOT_FOUND'
   | 'AI_DRAFT_BASE_NOT_LIVE'
+  | 'AI_DRAFT_LANGUAGE_NOT_EVALUATED'
   | 'AI_DRAFT_VARIANT_EXISTS'
   | 'AI_DRAFT_QUESTION_NOT_FOUND'
   | 'AI_DRAFT_QUESTION_NOT_CHECKABLE'
   | 'AI_DRAFT_NOT_FOUND';
+
+/**
+ * The languages an AI translation may be asked for: those the served model passed its evaluation in
+ * (ENG-21, the 2026-10-07 bake-off). Telugu lessons failed there (cut off and too slow) and the other
+ * lesson languages were never tested, so they stay human-written until a model passes them (ADR-048).
+ */
+export const AI_TRANSLATION_LANGUAGES: readonly string[] = ['en', 'hi'];
 
 export class ContentFactoryError extends Error {
   constructor(readonly code: ContentFactoryErrorCode, readonly problems: readonly string[] = []) {
@@ -157,6 +165,8 @@ export interface ContentFactoryStatus {
   readonly maxInFlight: number;
   /** The viewer's own jobs still queued or running. */
   readonly viewerOpenJobs: number;
+  /** The languages a translation may be asked for (AI_TRANSLATION_LANGUAGES). */
+  readonly translationLanguages: readonly string[];
 }
 
 const featureKinds = (featureKey: string): ContentDraftKind[] =>
@@ -185,7 +195,8 @@ export async function loadContentFactoryStatus(runner: SqlRunner, viewerUserId: 
   }
   const [mine] = await rows<{ n: number }>(runner, sql`
     SELECT count(*)::int AS n FROM ai_content_drafts WHERE requested_by_user_id = ${viewerUserId}::uuid AND state IN ('QUEUED','RUNNING')`);
-  return { killSwitchEngaged: Boolean(kill?.engaged), features, maxInFlight: contentFactoryMaxInFlight, viewerOpenJobs: Number(mine?.n ?? 0) };
+  return { killSwitchEngaged: Boolean(kill?.engaged), features, maxInFlight: contentFactoryMaxInFlight, viewerOpenJobs: Number(mine?.n ?? 0),
+    translationLanguages: AI_TRANSLATION_LANGUAGES };
 }
 
 // ---------------------------------------------------------------------------
@@ -318,6 +329,7 @@ export async function requestContentDraft(db: TransactionalRunner, input: Conten
     if (kind === 'LESSON_VARIANT') {
       const chosen = oneOf(input.language, LESSON_LANGUAGES);
       if (!chosen) problems.push('AI_DRAFT_LANGUAGE_INVALID');
+      else if (!AI_TRANSLATION_LANGUAGES.includes(chosen)) throw new ContentFactoryError('AI_DRAFT_LANGUAGE_NOT_EVALUATED');
       else language = chosen;
     }
     if (kind === 'QUESTION') {

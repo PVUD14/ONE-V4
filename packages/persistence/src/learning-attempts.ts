@@ -36,12 +36,14 @@ export type LearningAttemptContext = (typeof learningAttemptContexts)[number];
 /** DIAGNOSTIC (0064) is the placement test's sitting (ENG-14). */
 export const learningSessionModes = ['LEARN', 'PRACTICE', 'REVIEW', 'ASSESSMENT', 'EXPLORE', 'DIAGNOSTIC'] as const;
 export type LearningSessionMode = (typeof learningSessionModes)[number];
-export type LearningItemSource = 'CAREER_READINESS_QUESTION' | 'INSTITUTION_EXAM_QUESTION';
+/** CODE_TASK (0113): a program graded in the code sandbox (ENG-12, ADR-049). */
+export type LearningItemSource = 'CAREER_READINESS_QUESTION' | 'INSTITUTION_EXAM_QUESTION' | 'CODE_TASK';
 /**
  * placement_test (0064): the source of the placement test's DIAGNOSTIC attempts (ENG-14).
  * learning_step (0072): a practice or review step the student takes on a planner decision (ENG-18).
+ * code_submission (0113): a program run in the code sandbox (ENG-12).
  */
-export type LearningSourceAttemptType = 'assessment_attempt' | 'exam_attempt' | 'placement_test' | 'learning_step';
+export type LearningSourceAttemptType = 'assessment_attempt' | 'exam_attempt' | 'placement_test' | 'learning_step' | 'code_submission';
 
 /** The assisted rule lives in learning-model (ENG-04); re-exported so existing imports keep working. */
 export { ASSISTED_HINT_LEVEL, MAX_HINT_LEVEL };

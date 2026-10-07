@@ -442,7 +442,7 @@ async function collegeSections(one: Query, subject: Subject): Promise<Record<str
 }
 
 async function learningSections(one: Query, subject: Subject): Promise<Record<string, unknown>> {
-  const [sessions, attempts, activity, lessons, steps, stepItems, tutorHints, placements, skills, evidence, bands, readiness, roadmap, checks] = await Promise.all([
+  const [sessions, attempts, activity, lessons, steps, stepItems, tutorHints, placements, skills, evidence, bands, readiness, roadmap, checks, codeSubmissions] = await Promise.all([
     // Model, prompt, token and cost columns are internal metering, not about the person.
     one(sql`SELECT mode, language, started_at, ended_at FROM learning_sessions WHERE subject_user_id = ${subject} ORDER BY started_at, id`),
     // Not the item or the option chosen: with correctness, those would be the answer key.
@@ -490,6 +490,13 @@ async function learningSections(one: Query, subject: Subject): Promise<Record<st
             JOIN assessment_assignments x ON x.id = t.assignment_id
             JOIN assessment_definitions d ON d.id = x.assessment_definition_id
             WHERE t.subject_user_id = ${subject} ORDER BY t.started_at, t.id`),
+    // ENG-12: the programs you sent to the code sandbox, as you wrote them, and how each run ended. The
+    // task's test cases are reused content; the program's output is never stored.
+    one(sql`SELECT ct.title AS task_title, s.source_code, s.status, s.failure_code, s.verdict, s.tests_passed, s.tests_total,
+                   s.requested_at, s.completed_at,
+                   coalesce((SELECT array_agg(c.outcome ORDER BY c.case_index) FROM code_submission_cases c WHERE c.submission_id = s.id), '{}') AS case_outcomes
+            FROM code_submissions s JOIN code_tasks ct ON ct.id = s.task_id
+            WHERE s.subject_user_id = ${subject} ORDER BY s.requested_at, s.id`),
   ]);
   return {
     sessions: sessions.map((row) => ({ mode: row.mode, language: row.language ?? null, startedAt: row.started_at, endedAt: row.ended_at ?? null })),
@@ -511,6 +518,11 @@ async function learningSections(one: Query, subject: Subject): Promise<Record<st
         aiHintShown: hint.shown_text ?? null, model: hint.model ?? null, promptVersion: hint.prompt_version,
         reviewState: hint.review_state, requestedAt: hint.requested_at, completedAt: hint.completed_at ?? null,
       })),
+    })),
+    codeSubmissions: codeSubmissions.map((row) => ({
+      taskTitle: row.task_title, program: row.source_code, status: row.status, failureCode: row.failure_code ?? null, verdict: row.verdict ?? null,
+      testsPassed: num(row.tests_passed), testsTotal: num(row.tests_total), caseOutcomes: row.case_outcomes ?? [],
+      sentAt: row.requested_at, finishedAt: row.completed_at ?? null,
     })),
     placementTests: placements.map((row) => ({
       scope: row.scope, state: row.state, startedAt: row.started_at, deadlineAt: row.deadline_at, completedAt: row.completed_at ?? null,

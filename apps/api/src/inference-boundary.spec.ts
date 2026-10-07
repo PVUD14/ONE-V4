@@ -1,5 +1,5 @@
 /**
- * Contract: no request handler can reach the inference endpoint (ENG-20).
+ * Contract: no request handler can reach the inference endpoint (ENG-20) or the code sandbox (ENG-12).
  *
  * CLAUDE.md: "No portal and no request handler calls an inference endpoint", and generation is a
  * job on the outbox pipeline. The adapter and the worker factory that wires it to the database
@@ -31,6 +31,10 @@ const forbidden: readonly [string, RegExp][] = [
   ['reading the endpoint key', /\benv(\.|\[['"])ONE_AI_API_KEY\b/],
   ['reading the endpoint address', /\benv(\.|\[['"])ONE_AI_BASE_URL\b/],
   ['a chat-completions call', /\/chat\/completions/],
+  // ENG-12 (ADR-034 §6): untrusted code runs only on the sandbox VM, reached only by the outbox worker.
+  ['the code sandbox client', /persistence\/src\/(code-sandbox-client|code-submission-worker)(\.js)?['"]/],
+  ['reading the sandbox address or token', /\benv(\.|\[['"])ONE_CODE_SANDBOX_(URL|TOKEN)\b/],
+  ['a sandbox execute call', /\/api\/v2\/execute/],
 ];
 
 async function sources(dir: string): Promise<string[]> {
@@ -69,5 +73,9 @@ describe('the inference boundary', () => {
     expect(forbidden.some(([, pattern]) => pattern.test("import { requestContentDraft } from '@planthepath/persistence/src/content-factory.js';"))).toBe(false);
     expect(forbidden.some(([, pattern]) => pattern.test('const key = process.env.ONE_AI_API_KEY;'))).toBe(true);
     expect(forbidden.some(([, pattern]) => pattern.test("const url = env['ONE_AI_BASE_URL'];"))).toBe(true);
+    expect(forbidden.filter(([, pattern]) => pattern.test("import { gradeInSandbox } from '@planthepath/persistence/src/code-sandbox-client.js';")).map(([what]) => what))
+      .toEqual(['the code sandbox client']);
+    expect(forbidden.some(([, pattern]) => pattern.test("import { queueCodeSubmission } from '@planthepath/persistence/src/code-submissions.js';"))).toBe(false);
+    expect(forbidden.some(([, pattern]) => pattern.test('const url = process.env.ONE_CODE_SANDBOX_URL;'))).toBe(true);
   });
 });

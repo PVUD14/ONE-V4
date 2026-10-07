@@ -124,6 +124,8 @@ export async function exportCalibrationAttempts(db: PersistenceDb): Promise<Cali
         e.subject_user_id, e.item_source, e.item_id, e.item_version, e.correct, e.assisted
       FROM learning_attempt_events e
       JOIN consenting c ON c.user_id = e.subject_user_id
+      -- Only the item banks 2PL calibrates; a code task's pass/fail (ENG-12, ADR-049) is not a 2PL item.
+      WHERE e.item_source IN ('CAREER_READINESS_QUESTION', 'INSTITUTION_EXAM_QUESTION')
       ORDER BY e.subject_user_id, e.item_source, e.item_id, e.item_version, e.occurred_at, e.id
     ),
     unaided AS (

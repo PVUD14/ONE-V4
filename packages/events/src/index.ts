@@ -1581,6 +1581,18 @@ export const eventSchemas = {
     schemaRef: 'registry://tutor.hint.requested/1',
     payload: { tutorHintId: { kind: 'uuid' } },
   },
+  // ENG-12: a student sent a program to the code sandbox; the worker runs it on the isolated VM (no
+  // sandbox call in the request). Carries only the submission's id: the worker reads the rest itself.
+  codeSubmissionRequestedV1: {
+    eventType: 'code.submission.requested',
+    eventVersion: 1,
+    producer: 'learning-engine',
+    aggregateType: 'code_submission',
+    purpose: 'code-execution',
+    dataClassification: 'confidential',
+    schemaRef: 'registry://code.submission.requested/1',
+    payload: { codeSubmissionId: { kind: 'uuid' } },
+  },
   assessmentAttemptStartedV1: {
     eventType: 'assessment.attempt.started',
     eventVersion: 1,

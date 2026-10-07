@@ -310,6 +310,9 @@ async function erase(deps: DeletionExecutionDeps, subjectUserId: string): Promis
       Number(((await tx.execute(query)) as QueryResult<{ count: number }>).rows[0]?.count ?? 0);
     // The AI tutor's hints (ENG-22, 0108) reference decisions and questions: before them.
     const tutorHints = await removed(sql`WITH gone AS (DELETE FROM tutor_hints WHERE subject_user_id = ${subjectUserId}::uuid RETURNING 1) SELECT count(*)::int AS count FROM gone`);
+    // Programs sent to the code sandbox (ENG-12, 0113): case outcomes, then the submissions they belong to.
+    const codeRuns = await removed(sql`WITH gone AS (DELETE FROM code_submission_cases WHERE subject_user_id = ${subjectUserId}::uuid RETURNING 1) SELECT count(*)::int AS count FROM gone`)
+      + await removed(sql`WITH gone AS (DELETE FROM code_submissions WHERE subject_user_id = ${subjectUserId}::uuid RETURNING 1) SELECT count(*)::int AS count FROM gone`);
     // Practice questions served on steps (ENG-18, 0072) reference decisions, sessions and questions: first.
     const stepItems = await removed(sql`WITH gone AS (DELETE FROM learning_step_items WHERE subject_user_id = ${subjectUserId}::uuid RETURNING 1) SELECT count(*)::int AS count FROM gone`);
     const attempts = await removed(sql`WITH gone AS (DELETE FROM learning_attempt_events WHERE subject_user_id = ${subjectUserId}::uuid RETURNING 1) SELECT count(*)::int AS count FROM gone`);
@@ -350,7 +353,7 @@ async function erase(deps: DeletionExecutionDeps, subjectUserId: string): Promis
     // Deletion triggers a rebuild of the skill state projection (ENG-05). With the facts gone the
     // rebuild is the empty set, so every projection row of the subject is removed here.
     const projection = await projectSubjectSkillState(tx, subjectUserId);
-    return tutorHints + stepItems + attempts + placementItems + placementTests + sessions + activity + facultyActions + decisions + history + projection.deleted;
+    return tutorHints + codeRuns + stepItems + attempts + placementItems + placementTests + sessions + activity + facultyActions + decisions + history + projection.deleted;
   });
 
   // Institution roster history survives, with the person removed from it.

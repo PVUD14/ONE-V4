@@ -1,0 +1,13 @@
+# Install overlay for the code sandbox (ENG-12): gives Piston an outbound route ONLY while runtimes are
+# installed, then the plain compose file is brought up again and the route is gone.
+#
+# Why this exists: Piston downloads runtime packages from its package index. Keeping that ability out
+# of the running sandbox means a student's code can never ride on it, and the network API cannot
+# install anything (the proxy does not forward /api/v2/packages). Used by README.md step 4 and by the
+# attack suite.
+services:
+  piston:
+    networks: [sandbox, install]
+
+networks:
+  install: {}

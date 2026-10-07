@@ -1,0 +1,83 @@
+# The isolated code sandbox (ENG-12): Piston behind a token-checking proxy, for one dedicated VM.
+#
+# Why this exists: ADR-034 §6 runs untrusted student code on a separate machine, reached only by the
+# outbox worker. Piston runs each submission inside `isolate` (fresh box, own PID/mount/network
+# namespaces, cgroup v2 CPU/memory/process limits). This file adds the layers around it:
+#   - the Piston container sits on an `internal` network: no route out, not even for Piston itself;
+#   - its root file system is read-only; the only writable places are tmpfs scratch and the
+#     runtime packages volume;
+#   - the only way in is the proxy, which demands a bearer token and forwards exactly two routes
+#     (POST /api/v2/execute, GET /api/v2/runtimes). Package install/removal and the interactive
+#     websocket are not reachable over the network at all.
+#
+# Runtimes are installed once with the install overlay (docker-compose.install.yml), which is the only
+# time Piston gets an outbound route. See README.md. Provisioning the VM is HG-1 / HG-7 (Divakar).
+#
+#   SANDBOX_TOKEN=... docker compose -f deploy/sandbox/docker-compose.yml up -d
+name: one-sandbox
+
+services:
+  piston:
+    # Pinned by digest: the sandbox is the one always-on component that runs hostile input.
+    image: ghcr.io/engineer-man/piston@sha256:2f66b7456189c4d713aa986d98eccd0b6ee16d26c7ec5f21b30e942756fd127a
+    # isolate needs to create cgroups and namespaces; this is why the container must live alone on its
+    # own VM (threat model in docs/architecture/code-sandbox-design.md).
+    privileged: true
+    read_only: true
+    tmpfs:
+      - /piston:size=16m,mode=0755
+      - /tmp:size=64m,mode=1777
+      - /var/local/lib/isolate:size=512m,mode=0755
+      - /run/isolate:size=1m,mode=0755
+    volumes:
+      - piston-packages:/piston/packages
+    environment:
+      PISTON_LOG_LEVEL: INFO
+      PISTON_DISABLE_NETWORKING: "true"
+      # Ceilings. The worker asks for exactly these (code-sandbox-limits-v1); Piston refuses more.
+      PISTON_RUN_TIMEOUT: "5000"
+      PISTON_RUN_CPU_TIME: "3000"
+      PISTON_RUN_MEMORY_LIMIT: "134217728"
+      PISTON_COMPILE_TIMEOUT: "10000"
+      PISTON_COMPILE_CPU_TIME: "10000"
+      PISTON_COMPILE_MEMORY_LIMIT: "268435456"
+      PISTON_MAX_PROCESS_COUNT: "16"
+      PISTON_MAX_OPEN_FILES: "64"
+      PISTON_MAX_FILE_SIZE: "1000000"
+      PISTON_OUTPUT_MAX_SIZE: "65536"
+      PISTON_MAX_CONCURRENT_JOBS: "4"
+    mem_limit: 3g
+    cpus: 2
+    pids_limit: 1024
+    networks: [sandbox]
+    restart: unless-stopped
+
+  proxy:
+    image: nginx:1.27-alpine
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx:size=16m
+      - /var/run:size=1m
+      - /etc/nginx/conf.d:size=1m
+      - /tmp:size=8m
+    environment:
+      SANDBOX_TOKEN: ${SANDBOX_TOKEN:?set SANDBOX_TOKEN (a long random value, also given to the worker as ONE_CODE_SANDBOX_TOKEN)}
+    volumes:
+      - ./proxy/sandbox.conf.template:/etc/nginx/templates/sandbox.conf.template:ro
+    ports:
+      # Bind to the VM's private address on the VM (SANDBOX_BIND); loopback for local runs.
+      - "${SANDBOX_BIND:-127.0.0.1}:${SANDBOX_PORT:-2000}:8080"
+    mem_limit: 128m
+    pids_limit: 128
+    depends_on: [piston]
+    networks: [sandbox, ingress]
+    restart: unless-stopped
+
+networks:
+  # No gateway, no egress: the only peer Piston can reach is the proxy.
+  sandbox:
+    internal: true
+  ingress: {}
+
+volumes:
+  piston-packages: {}

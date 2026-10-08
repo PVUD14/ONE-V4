@@ -27,6 +27,7 @@ import { requestJson } from '../api/http.js';
 import { V2Chip, V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { growthCodeLabel, LeadDetailPanel } from './growthLeads.js';
 import { formatApiError } from './shared.js';
+import { formatDate } from '../dates.js';
 
 export function OperationsGrowthLeadsPanel(): React.ReactElement | null {
   const token = getProtectedAccessToken();
@@ -143,7 +144,7 @@ export function OperationsGrowthContactsPrivacyPanel(): React.ReactElement | nul
       <ul className="role-check-list">{live.map((match) => <li key={match.contactId}>
         <strong>{match.organisation}</strong> ({match.kind === 'COLLEGE' ? 'college' : 'employer'}) · {growthCodeLabel(match.contactRole)}
         <div>{match.fullName} · {match.email ?? '—'} · {match.phone ?? '—'}</div>
-        <small>How we got it: {growthCodeLabel(match.permissionBasis)} ({growthCodeLabel(match.source)}) · added {new Date(match.addedAt).toLocaleDateString()} · {match.noticeGivenAt ? `notice given ${new Date(match.noticeGivenAt).toLocaleDateString()} (${match.noticeVersion ?? 'NA'})` : 'no notice recorded'}{match.leadDoNotContact ? ' · organisation marked do not contact' : ''}</small>
+        <small>How we got it: {growthCodeLabel(match.permissionBasis)} ({growthCodeLabel(match.source)}) · added {formatDate(match.addedAt)} · {match.noticeGivenAt ? `notice given ${formatDate(match.noticeGivenAt)} (${match.noticeVersion ?? 'NA'})` : 'no notice recorded'}{match.leadDoNotContact ? ' · organisation marked do not contact' : ''}</small>
       </li>)}</ul>
       <label><input type="checkbox" checked={stopContact} onChange={(event) => setStopContact(event.target.checked)} /> They asked not to be contacted at all: mark their organisations do not contact</label>
       <label><input type="checkbox" checked={confirm} onChange={(event) => setConfirm(event.target.checked)} /> I understand erasure cannot be undone</label>

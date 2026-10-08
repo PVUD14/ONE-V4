@@ -188,15 +188,16 @@ describe('Access reviews', () => {
   it('shows an error with its reference', async () => {
     fetchMock.mockImplementation(() => failure(500, 'INTERNAL', 'corr-broken'));
     render(<OperationsAccessReviewsPage />);
-    expect(await screen.findByText(/Unable to load access reviews\. Reference: corr-broken/)).toBeInTheDocument();
+    expect(await screen.findByText(/Unable to load access reviews\. Support code: corrbrok/)).toBeInTheDocument();
   });
 
   it('shows a forbidden state to staff without the capability', async () => {
     fetchMock.mockImplementation(() => failure(403, 'FORBIDDEN', 'corr-denied'));
     render(<OperationsAccessReviewsPage />);
     expect(await screen.findByText('Not permitted')).toBeInTheDocument();
-    expect(screen.getByText('Reference: corr-denied')).toBeInTheDocument();
-    expect(screen.queryByRole('button')).toBeNull();
+    expect(screen.getByText('Support code: corrdeni')).toBeInTheDocument();
+    // The only control on a forbidden page copies the support code; nothing acts on reviews.
+    expect(screen.queryAllByRole('button').map((button) => button.textContent)).toEqual(['Copy support code']);
   });
 
   it('keeps the Operations navigation labels unchanged', () => {

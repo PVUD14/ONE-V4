@@ -9,14 +9,38 @@ import { deleteResume, documentVerificationLabel, getProtectedAccessToken, getRe
 import type {
   ResumeCheckDto, ResumeContentDto, ResumeDraftDto, ResumeSourcesDto, ResumeSummaryDto, ResumeTemplateDto, ResumeTemplateKey, StudentDocumentDto,
 } from '../api.js';
-import { MultiRing } from '../pilot/pilotComponents.js';
+import { NaSlotStrip, PilotStat, allMissing } from '../naState.js';
 import { ResumeBuilder, ResumeChecksList, ResumePaper, defaultResumeDraft, downloadVersion } from '../studentResumes.js';
 import { PilotTabs } from '../pilot/pilotOverlay.js';
 import { NaCourseTiles, NaListCard, NaRingRailCard, go } from './naWidgets.js';
 import { PublishedContentCard } from './publishedContent.js';
 import { PracticeBySkillCard } from '../studentLearning.js';
 import { Award, Building2, ClipboardCheck, Code2, Download, FileText, Flame, LineChart, Target, Trash2, Trophy, Wrench } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { formatDate } from '../dates.js';
+
+/** Numbered slot labels for a row of widgets that has no source yet ("Practice set 1", ...). */
+function numbered(label: string, count: number): readonly string[] {
+  return Array.from({ length: count }, (_, index) => `${label} ${index + 1}`);
+}
+
+type HeroStat = { readonly icon: ReactNode; readonly tone: string; readonly value: ReactNode; readonly label: string };
+
+/**
+ * The pilot's hero stat row. When every stat is NA it collapses into one compact strip that
+ * still names each stat; when some are real, the missing ones are muted and one line says why.
+ */
+function StatHero({ stats, reason, label }: { readonly stats: readonly HeroStat[]; readonly reason: string; readonly label: string }): React.ReactElement {
+  if (allMissing(stats.map((stat) => stat.value))) {
+    return <NaSlotStrip label={label} slots={stats.map((stat) => ({ label: stat.label, value: stat.value }))} reason={reason} />;
+  }
+  return <section className="pilot-hero" aria-label={label}>
+    <div style={{ display: 'flex', gap: 26, flexWrap: 'wrap' }}>
+      {stats.map((stat) => <PilotStat key={stat.label} icon={stat.icon} tone={stat.tone} value={stat.value} label={stat.label} />)}
+    </div>
+    <p className="na-reason" style={{ marginTop: 10 }}>{reason}</p>
+  </section>;
+}
 
 export const PRACTICE_TABS = ['Overview', 'Coding', 'Aptitude', 'Projects', 'Contests'] as const;
 
@@ -42,32 +66,22 @@ export function StudentPracticePage(): React.ReactElement {
       {tab > 0 ? <NaListCard title={tabLabel} note={`${tabLabel} problem sets are not live yet — NA. Institution assessments are live under Assessments.`} /> : null}
 
       {tab === 0 ? <>
-        <section className="pilot-hero">
-          <div style={{ display: 'flex', gap: 26, flexWrap: 'wrap' }}>
-            <div className="pilot-stat"><span className="pilot-tile green"><Code2 size={17} /></span><div><b>NA</b><small>Problems Solved</small></div></div>
-            <div className="pilot-stat"><span className="pilot-tile amber"><Trophy size={17} /></span><div><b>NA</b><small>Contests Participated</small></div></div>
-            <div className="pilot-stat"><span className="pilot-tile blue"><ClipboardCheck size={17} /></span><div><b>NA</b><small>Practice Time</small></div></div>
-            <div className="pilot-stat"><span className="pilot-tile rose"><Flame size={17} /></span><div><b>{streak ?? 'NA'}</b><small>Day Streak</small></div></div>
-            <div className="pilot-stat"><span className="pilot-tile teal"><LineChart size={17} /></span><div><b>NA</b><small>Success Rate</small></div></div>
-          </div>
-        </section>
-        <NaCourseTiles title="Continue Practicing" labels={['NA', 'NA', 'NA', 'NA', 'NA']} />
-        <NaCourseTiles title="Recommended for You" labels={['NA', 'NA', 'NA', 'NA', 'NA']} />
+        <StatHero label="Practice figures" reason="Problem sets and contests are not live yet, so these read NA." stats={[
+          { icon: <Code2 size={17} />, tone: 'green', value: 'NA', label: 'Problems Solved' },
+          { icon: <Trophy size={17} />, tone: 'amber', value: 'NA', label: 'Contests Participated' },
+          { icon: <ClipboardCheck size={17} />, tone: 'blue', value: 'NA', label: 'Practice Time' },
+          { icon: <Flame size={17} />, tone: 'rose', value: streak ?? 'NA', label: 'Day Streak' },
+          { icon: <LineChart size={17} />, tone: 'teal', value: 'NA', label: 'Success Rate' },
+        ]} />
+        <NaCourseTiles title="Continue Practicing" slots={numbered('Practice set', 5)} reason="Practice sets are not live yet — NA. Timed practice runs through your institution's assessments." />
+        <NaCourseTiles title="Recommended for You" slots={numbered('Recommendation', 5)} reason="Practice recommendations are not live yet — NA." />
         <PublishedContentCard contentType="PRACTICE" title="Practice resources" />
         <PracticeBySkillCard />
       </> : null}
     </div>
 
     {tab === 0 ? <aside className="pilot-rail">
-      <section className="pilot-card">
-        <div className="pilot-card-head"><h2>Practice Overview</h2><span className="pilot-chip slate">NA</span></div>
-        <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-          <MultiRing segments={[]}>NA<div style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--p-muted)' }}>Attempts</div></MultiRing>
-          <div className="pilot-legend" style={{ flex: 1 }}>
-            {['Solved', 'Attempted', 'Bookmarked'].map((label) => <div key={label}><i style={{ background: '#e5eaf2' }} /> {label} <span className="num">NA</span></div>)}
-          </div>
-        </div>
-      </section>
+      <NaRingRailCard title="Practice Overview" center="Attempts" legend={['Solved', 'Attempted', 'Bookmarked']} reason="Practice attempts are not recorded yet." />
       <section className="pilot-card">
         <h2>Live today</h2>
         <p style={{ color: 'var(--p-muted)', margin: '4px 0' }}>Timed practice happens through your institution&apos;s assessments.</p>
@@ -88,19 +102,17 @@ export function StudentCompanyPrepPage(): React.ReactElement {
       </div>
       <PilotTabs labels={['Overview', 'Companies', 'Interview Prep', 'Aptitude Prep', 'Mock Interviews', 'Saved']} active={tab} onChange={setTab} />
       {tab === 0 ? <>
-        <section className="pilot-hero">
-          <div style={{ display: 'flex', gap: 26, flexWrap: 'wrap' }}>
-            <div className="pilot-stat"><span className="pilot-tile blue"><Building2 size={17} /></span><div><b>NA</b><small>Target Companies</small></div></div>
-            <div className="pilot-stat"><span className="pilot-tile purple"><ClipboardCheck size={17} /></span><div><b>NA</b><small>Prep Sets Completed</small></div></div>
-            <div className="pilot-stat"><span className="pilot-tile amber"><Target size={17} /></span><div><b>NA</b><small>Mock Interviews</small></div></div>
-          </div>
-        </section>
+        <StatHero label="Company prep figures" reason="Company prep is not live yet, so these read NA." stats={[
+          { icon: <Building2 size={17} />, tone: 'blue', value: 'NA', label: 'Target Companies' },
+          { icon: <ClipboardCheck size={17} />, tone: 'purple', value: 'NA', label: 'Prep Sets Completed' },
+          { icon: <Target size={17} />, tone: 'amber', value: 'NA', label: 'Mock Interviews' },
+        ]} />
         <PublishedContentCard contentType="COMPANY_PREP" title="Company preparation" />
         <NaListCard title="Companies" note="Company prep guides are not live yet — NA. Real openings from real employers are under Opportunities." />
       </> : <NaListCard title={['Overview', 'Companies', 'Interview Prep', 'Aptitude Prep', 'Mock Interviews', 'Saved'][tab] ?? ''} note="This prep content is not live yet — NA." />}
     </div>
     {tab === 0 ? <aside className="pilot-rail">
-      <NaRingRailCard title="Preparation Progress" center="Overall" legend={['Completed', 'In Progress', 'Not Started', 'Saved']} />
+      <NaRingRailCard title="Preparation Progress" center="Overall" legend={['Completed', 'In Progress', 'Not Started', 'Saved']} reason="Preparation progress is not tracked yet." />
       <NaListCard title="Upcoming Interviews" note="No interview schedule yet — NA." />
     </aside> : null}
   </div></div>;
@@ -120,21 +132,14 @@ export function StudentCareerToolsPage(): React.ReactElement {
       <PilotTabs labels={TOOL_TABS} active={tab} onChange={setTab} />
       <section className="pilot-card">
         <div className="pilot-card-head"><h2>{TOOL_TABS[tab]}</h2><span className="pilot-chip slate">NA</span></div>
-        <div className="pilot-row cols-3">
-          {[['Career Path Planner', 'Map the roles you can grow into'], ['Skill Gap Analyzer', 'Compare your skills against a target role'], ['Salary Insights', 'Compensation ranges by role and city']].map(([title, detail]) => (
-            <div key={title} className="pilot-course-card" style={{ opacity: .65 }}>
-              <span className="pilot-tile" style={{ background: '#eef1f6', color: '#9aa5b8' }}><Wrench size={17} /></span>
-              <strong>{title}</strong>
-              <small>{detail} — NA, not live yet</small>
-              <button type="button" className="pilot-btn ghost small" disabled>Open →</button>
-            </div>
-          ))}
-        </div>
+        <NaSlotStrip card={false} label={`${TOOL_TABS[tab] ?? 'Overview'} tools`}
+          slots={[{ label: 'Career Path Planner' }, { label: 'Skill Gap Analyzer' }, { label: 'Salary Insights' }]}
+          reason="Not live yet: the path planner (roles you can grow into), the skill gap analyzer (your skills against a target role) and salary insights (ranges by role and city)." />
         <p style={{ color: 'var(--p-muted)', marginTop: 12 }}>What is live today: your readiness band and roadmap under My Career, and real skills evidence under Skills.</p>
       </section>
     </div>
     {tab === 0 ? <aside className="pilot-rail">
-      <NaRingRailCard title="Tools Usage Overview" center="Tools Used" legend={['Resume & Docs', 'Skill Tools', 'Planning', 'Job Search']} />
+      <NaRingRailCard title="Tools Usage Overview" center="Tools Used" legend={['Resume & Docs', 'Skill Tools', 'Planning', 'Job Search']} reason="Tool usage is not recorded yet." />
       <PublishedContentCard contentType="CAREER_TOOL" title="Career tools" />
         <NaListCard title="Recommended for You" note="Tool recommendations are not live yet — NA." />
     </aside> : null}
@@ -153,18 +158,16 @@ export function StudentScholarshipsPage(): React.ReactElement {
       </div>
       <PilotTabs labels={labels} active={tab} onChange={setTab} />
       {tab === 0 ? (
-        <section className="pilot-hero">
-          <div style={{ display: 'flex', gap: 26, flexWrap: 'wrap' }}>
-            <div className="pilot-stat"><span className="pilot-tile amber"><Award size={17} /></span><div><b>NA</b><small>Matched to You</small></div></div>
-            <div className="pilot-stat"><span className="pilot-tile blue"><ClipboardCheck size={17} /></span><div><b>NA</b><small>Applications</small></div></div>
-            <div className="pilot-stat"><span className="pilot-tile rose"><Flame size={17} /></span><div><b>NA</b><small>Closing Soon</small></div></div>
-          </div>
-        </section>
+        <StatHero label="Scholarship figures" reason="Scholarship listings are not connected yet, so these read NA." stats={[
+          { icon: <Award size={17} />, tone: 'amber', value: 'NA', label: 'Matched to You' },
+          { icon: <ClipboardCheck size={17} />, tone: 'blue', value: 'NA', label: 'Applications' },
+          { icon: <Flame size={17} />, tone: 'rose', value: 'NA', label: 'Closing Soon' },
+        ]} />
       ) : null}
       <NaListCard title={labels[tab] ?? ''} note="Scholarship listings are not live yet — NA. They arrive when a scholarships content partner or institution feed is connected." />
     </div>
     {tab === 0 ? <aside className="pilot-rail">
-      <NaRingRailCard title="Scholarship Insights" center="Available" legend={['Merit Based', 'Need Based', 'Corporate', 'Private']} />
+      <NaRingRailCard title="Scholarship Insights" center="Available" legend={['Merit Based', 'Need Based', 'Corporate', 'Private']} reason="No scholarship feed is connected yet." />
       <PublishedContentCard contentType="SCHOLARSHIP" title="Scholarships" />
         <NaListCard title="Upcoming Deadlines" note="No scholarship deadlines yet — NA." />
     </aside> : null}
@@ -376,7 +379,7 @@ function templateName(load: ResumeLoad | null, key: ResumeTemplateKey): string {
 
 function formatDay(value: string): string {
   const date = new Date(value);
-  return Number.isFinite(date.getTime()) ? date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : value;
+  return Number.isFinite(date.getTime()) ? formatDate(date) : value;
 }
 
 // --- Institution Interventions ----------------------------------------------

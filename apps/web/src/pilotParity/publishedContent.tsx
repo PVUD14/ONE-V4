@@ -46,7 +46,7 @@ export function PublishedContentCard({ contentType, title }: {
       {items.map((item) => <li key={item.id}>
         <div>
           <b>{item.title}</b>
-          {item.summary ? <small>{item.summary}</small> : null}
+          {item.summary ? <><br /><small>{item.summary}</small></> : null}
           {bodyLines(item.content).map((line, index) => <p key={index} style={{ margin: '4px 0 0', fontSize: 12.5 }}>{line}</p>)}
         </div>
       </li>)}

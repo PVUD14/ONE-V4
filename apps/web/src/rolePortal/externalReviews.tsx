@@ -48,6 +48,8 @@ import type {
 import { V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { StatusBadge } from '../studentComponents.js';
 import { formatApiError } from './shared.js';
+import { SupportCode, supportCodeSuffix } from '../supportCode.js';
+import { codeLabel } from '../labels.js';
 
 const statusWords: Readonly<Record<ExternalReviewStatus, { readonly label: string; readonly tone: 'success' | 'warning' | 'neutral' | 'info' | 'danger' }>> = {
   OPEN: { label: 'Open', tone: 'info' },
@@ -78,7 +80,7 @@ function reviewError(cause: unknown, fallback: string): string {
       EXTERNAL_REVIEW_WINDOW_INVALID: 'Choose between the allowed number of days.',
     };
     const text = cause.code ? words[cause.code] : undefined;
-    if (text) return `${text} Reference: ${cause.correlationId}`;
+    if (text) return `${text}${supportCodeSuffix(cause.correlationId)}`;
   }
   return formatApiError(cause, fallback);
 }
@@ -154,7 +156,7 @@ export function OperationsExternalReviewsPage(): React.ReactElement | null {
     return <section className="role-module role-module--dense">{heading}
       <div className="role-wide"><V2EmptyState icon="🔐" title="Not permitted"
         note="Faculty review is for content staff and capability administrators. Your access has not changed; the rest of Content Management is unaffected."
-        hint={`Reference: ${forbiddenReference}`} /></div></section>;
+        hint={<SupportCode reference={forbiddenReference} />} /></div></section>;
   }
 
   const granted = (reviewers ?? []).filter((reviewer) => reviewer.grant && reviewer.state === 'ACTIVE');
@@ -178,18 +180,18 @@ export function OperationsExternalReviewsPage(): React.ReactElement | null {
     try {
       if (dialog.kind === 'grant') {
         const result = await grantExternalReviewer(token, dialog.reviewer.membershipId, { reasonCode });
-        setNotice(`${result.reviewer.email} can now be assigned drafts to review. Reference: ${result.correlationId}`);
+        setNotice(`${result.reviewer.email} can now be assigned drafts to review.`);
         setCandidates(null);
       } else if (dialog.kind === 'revoke') {
         const result = await revokeExternalReviewer(token, dialog.reviewer.membershipId, { reasonCode });
-        setNotice(`Faculty review revoked for ${result.reviewer.email}; ${result.reviewer.closedAssignments} open ${result.reviewer.closedAssignments === 1 ? 'assignment was' : 'assignments were'} withdrawn. Reference: ${result.correlationId}`);
+        setNotice(`Faculty review revoked for ${result.reviewer.email}; ${result.reviewer.closedAssignments} open ${result.reviewer.closedAssignments === 1 ? 'assignment was' : 'assignments were'} withdrawn.`);
       } else if (dialog.kind === 'assign') {
         const result = await assignExternalReviews(token, { revisionIds: dialog.revisionIds, reviewerMembershipId: dialog.reviewer.membershipId, days: dialog.days, reasonCode });
-        setNotice(`Assigned ${result.assignments.length} ${result.assignments.length === 1 ? 'draft' : 'drafts'} to ${dialog.reviewer.email}. Reference: ${result.correlationId}`);
+        setNotice(`Assigned ${result.assignments.length} ${result.assignments.length === 1 ? 'draft' : 'drafts'} to ${dialog.reviewer.email}.`);
         setSelected([]);
       } else {
         const result = await withdrawExternalReview(token, dialog.assignment.id, reasonCode);
-        setNotice(`Assignment withdrawn. Reference: ${result.correlationId}`);
+        setNotice(`Assignment withdrawn.`);
       }
       setDialog(null);
       setError('');
@@ -280,7 +282,7 @@ export function OperationsExternalReviewsPage(): React.ReactElement | null {
           <td>{assignment.reviewer.email}<br /><small>{assignment.reviewer.institutionName}{assignment.reviewer.eligible ? '' : ' · no longer eligible'}</small></td>
           <td><StatusBadge label={statusWords[assignment.status].label} tone={statusWords[assignment.status].tone} /></td>
           <td>{day(assignment.expiresAt)}</td>
-          <td>{assignment.decision ? <><strong>{decisionWords[assignment.decision.decision]}</strong> ({assignment.decision.reasonCode}){assignment.decision.comment ? <><br /><q>{assignment.decision.comment}</q></> : null}</> : 'NA'}</td>
+          <td>{assignment.decision ? <><strong>{decisionWords[assignment.decision.decision]}</strong> ({codeLabel(assignment.decision.reasonCode)}){assignment.decision.comment ? <><br /><q>{assignment.decision.comment}</q></> : null}</> : 'NA'}</td>
           <td>{policy.viewer.assign && assignment.status === 'OPEN' ? <button type="button" className="secondary" onClick={() => setDialog({ kind: 'withdraw', assignment })}>Withdraw…</button> : null}</td>
         </tr>)}</tbody></table></div> : null}
     </section> : null}
@@ -391,7 +393,7 @@ export function FacultyContentReviewsPage({ institutionId, hideWhenForbidden = f
     if (!open) return;
     try {
       const result = await decideFacultyReview(token, institutionId, open.id, { decision, reasonCode, ...(comment.trim() ? { comment: comment.trim() } : {}) });
-      setNotice(`Your decision is recorded and sent to ONE's reviewers. Reference: ${result.correlationId}`);
+      setNotice(`Your decision is recorded and sent to ONE's reviewers.`);
       setOpen(null);
       setError('');
       await load();

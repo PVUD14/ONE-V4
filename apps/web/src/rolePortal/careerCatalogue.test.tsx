@@ -126,7 +126,7 @@ describe('job-role catalogue', () => {
   it('shows an error with its reference', async () => {
     listResponse = () => failure(500, 'INTERNAL', 'corr-list-fail');
     render(<OperationsCareerCataloguePage />);
-    expect(await screen.findByRole('alert')).toHaveTextContent('corr-list-fail');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Support code: corrlist');
   });
 
   it('shows a forbidden state with its reference to staff without a catalogue capability', async () => {
@@ -134,7 +134,7 @@ describe('job-role catalogue', () => {
     listResponse = () => failure(403, 'FORBIDDEN', 'corr-forbidden');
     render(<OperationsCareerCataloguePage />);
     expect(await screen.findByText('Not permitted')).toBeInTheDocument();
-    expect(screen.getByText('Reference: corr-forbidden')).toBeInTheDocument();
+    expect(screen.getByText('Support code: corrforb')).toBeInTheDocument();
   });
 
   it('sends the search and filters to the server', async () => {

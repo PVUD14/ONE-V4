@@ -33,9 +33,9 @@ describe('learner content studio', () => {
     await authenticate();
     render(<LearnerContentStudio />);
     // IN_REVIEW can move to changes requested or approved — and nowhere else.
-    expect(await screen.findByRole('button', { name: 'approved' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'changes requested' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'published' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Approved' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Changes requested' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Published' })).not.toBeInTheDocument();
   });
 
   it('explains a refused step instead of leaking the database message', async () => {
@@ -45,7 +45,7 @@ describe('learner content studio', () => {
     );
     await authenticate();
     render(<LearnerContentStudio />);
-    fireEvent.click(await screen.findByRole('button', { name: 'approved' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Approved' }));
     await waitFor(() => expect(screen.getByText(/an author cannot approve their own work/)).toBeInTheDocument());
   });
 

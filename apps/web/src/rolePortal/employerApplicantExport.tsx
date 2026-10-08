@@ -11,10 +11,11 @@ import { useState, type FormEvent } from 'react';
 import { getAccessToken } from '../auth.js';
 import { ApiRequestError } from '../api/core.js';
 import { downloadEmployerApplicantExport, employerExportReasons, saveDownloadedFile, type EmployerExportScope } from '../api/hiring.js';
+import { supportCodeSuffix } from '../supportCode.js';
 
 function exportError(error: unknown): string {
   if (!(error instanceof ApiRequestError)) return 'The export could not be prepared. Try again.';
-  const reference = ` Reference: ${error.correlationId}`;
+  const reference = supportCodeSuffix(error.correlationId);
   switch (error.code) {
     case 'EXPORT_RATE_LIMITED': return 'You have reached the limit of 20 exports in 24 hours. Try again later.' + reference;
     case 'EXPORT_TOO_LARGE': return 'This job has more than 5,000 applicants to export. Export Shortlisted onward instead.' + reference;

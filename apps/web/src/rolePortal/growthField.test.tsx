@@ -75,7 +75,7 @@ describe('Growth → Field', () => {
     expect(screen.getByRole('heading', { name: 'Due today (1)' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Upcoming (1)' })).toBeInTheDocument();
     expect(screen.getByText(/12\.972, 77\.595 \(±413 m\)/)).toBeInTheDocument();
-    expect(screen.getByText('Draft for legal review')).toBeInTheDocument();
+    expect(screen.getByText('Draft wording, pending approval')).toBeInTheDocument();
     expect(screen.getByText('It is never used for attendance, pay, performance ratings or discipline.')).toBeInTheDocument();
     // An executive has no team view.
     expect(screen.queryByRole('button', { name: 'My team' })).not.toBeInTheDocument();

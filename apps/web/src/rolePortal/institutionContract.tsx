@@ -25,6 +25,8 @@ import {
 } from '../api/institutionContract.js';
 import { StatusBadge } from '../studentComponents.js';
 import { formatApiError } from './shared.js';
+import { supportCodeSuffix } from '../supportCode.js';
+import * as dates from '../dates.js';
 
 const termsStatusLabels: Readonly<Record<string, string>> = {
   NO_TERMS_PUBLISHED: 'None published yet', ACCEPTED: 'Accepted', ACCEPTANCE_REQUIRED: 'Acceptance needed',
@@ -49,7 +51,7 @@ export const exitReasonLabels: Readonly<Record<string, string>> = {
 function formatDate(value: string | null | undefined): string {
   if (!value) return 'NA';
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? 'NA' : date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  return Number.isNaN(date.getTime()) ? 'NA' : dates.formatDate(date);
 }
 
 function saveFile(filename: string, csv: string): void {
@@ -63,7 +65,7 @@ function saveFile(filename: string, csv: string): void {
 
 export function exitExportErrorMessage(error: unknown): string {
   if (!(error instanceof ApiRequestError)) return 'The file could not be prepared. Try again.';
-  const reference = ` Reference: ${error.correlationId}`;
+  const reference = supportCodeSuffix(error.correlationId);
   switch (error.code) {
     case 'EXIT_NOT_IN_NOTICE': return 'The exit export is available only while an exit notice is open for your college.' + reference;
     case 'EXPORT_RATE_LIMITED': return 'You have reached the limit of 30 exports in 24 hours. Try again later.' + reference;

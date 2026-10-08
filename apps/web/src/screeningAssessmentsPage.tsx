@@ -11,6 +11,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { getAccessToken } from './auth.js';
+import { formatDateTime } from './dates.js';
 import {
   getScreeningBrief,
   listScreeningInvitations,
@@ -159,7 +160,7 @@ function BriefPanel({ brief, onStart, onBack }: {
         {minutes === null ? 'NA' : resuming ? `You have ${minutes} minutes left.` : minutes < fullMinutes
           ? `The test closes soon, so if you start now you have ${minutes} minutes.`
           : `If you start now you have the full ${minutes} minutes.`}</p>
-      <p className="hiring-meta">Closes {new Date(brief.closesAt).toLocaleString()}.</p>
+      <p className="hiring-meta">Closes {formatDateTime(brief.closesAt)}.</p>
     </section>
     <section className="card wide-card">
       <h3>Before you start</h3>
@@ -171,7 +172,7 @@ function BriefPanel({ brief, onStart, onBack }: {
         <li>It is not part of your academic record or your learning evidence, and it does not change your readiness.</li>
       </ul>
       {brief.notOpenYet
-        ? <p role="status">This test opens {new Date(brief.opensAt).toLocaleString()}.</p>
+        ? <p role="status">This test opens {formatDateTime(brief.opensAt)}.</p>
         : !brief.available
           ? <p role="status">This test is no longer available.</p>
           : <>

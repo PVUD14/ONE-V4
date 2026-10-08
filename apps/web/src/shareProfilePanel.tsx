@@ -11,6 +11,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { getAccessToken } from './auth.js';
+import * as dates from './dates.js';
 import {
   publishShareLink,
   readMyShareLink,
@@ -49,7 +50,7 @@ function profileUrl(token: string): string {
 }
 
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
+  return dates.formatDate(iso);
 }
 
 function daysLeft(iso: string): number {

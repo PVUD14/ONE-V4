@@ -190,7 +190,7 @@ internal fun PilotHomeScreen(
                     },
                 )
                 Spacer(Modifier.height(12.dp))
-                WeekSpark(points = (activity?.last7 ?: emptyList()).map { it.count }.ifEmpty { List(7) { 0 } })
+                WeekSpark(points = activity?.last7?.map { it.count }?.takeIf { it.isNotEmpty() })
             }
         }
 

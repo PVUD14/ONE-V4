@@ -151,7 +151,7 @@ describe('System Health console', () => {
   it('shows an error with its reference, and NA in every tile', async () => {
     summaryResponse = () => failure(500, 'INTERNAL', 'corr-broken');
     render(<OperationsSystemHealthPage />);
-    expect(await screen.findByText(/Reference: corr-broken/)).toBeInTheDocument();
+    expect(await screen.findByText(/Support code: corrbrok/)).toBeInTheDocument();
     expect(screen.getByText('Failed events', { selector: 'small' }).previousSibling).toHaveTextContent('NA');
   });
 
@@ -159,7 +159,7 @@ describe('System Health console', () => {
     summaryResponse = () => failure(403, 'FORBIDDEN', 'corr-denied');
     render(<OperationsSystemHealthPage />);
     expect(await screen.findByText('Not permitted')).toBeInTheDocument();
-    expect(screen.getByText('Reference: corr-denied')).toBeInTheDocument();
+    expect(screen.getByText('Support code: corrdeni')).toBeInTheDocument();
   });
 
   it('asks for sign-in without a token', () => {

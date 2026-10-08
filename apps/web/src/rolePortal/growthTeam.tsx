@@ -27,6 +27,7 @@ import {
 import { V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { StatusBadge } from '../studentComponents.js';
 import { formatApiError } from './shared.js';
+import { formatDate } from '../dates.js';
 
 const roleLabels: Readonly<Record<string, string>> = { GROWTH_EXECUTIVE: 'Growth executive', GROWTH_MANAGER: 'Regional manager' };
 const teamLabels: Readonly<Record<string, string>> = { COLLEGE_PARTNERSHIPS: 'College partnerships', EMPLOYER_PARTNERSHIPS: 'Employer partnerships' };
@@ -134,7 +135,7 @@ function PendingInvitation({ invitation, reasons, busy, onRevoke }: {
   const [reason, setReason] = useState('');
   return <li>
     <strong>{invitation.email}</strong> · {roleLabels[invitation.role] ?? invitation.role} · {typeLabels[invitation.staffType] ?? invitation.staffType}
-    {' '}<small>Email: {reasonLabel(invitation.delivery.state)}{invitation.expiresAt ? ` · expires ${new Date(invitation.expiresAt).toLocaleDateString()}` : ''}</small>
+    {' '}<small>Email: {reasonLabel(invitation.delivery.state)}{invitation.expiresAt ? ` · expires ${formatDate(invitation.expiresAt)}` : ''}</small>
     <span className="role-actions">
       <select value={reason} aria-label={`Reason for revoking the invitation to ${invitation.email}`} onChange={(event) => setReason(event.target.value)}>
         <option value="">Reason…</option>

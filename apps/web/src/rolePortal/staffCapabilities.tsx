@@ -18,6 +18,9 @@ import { V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { StatusBadge } from '../studentComponents.js';
 import { formatApiError, RestrictedApiState } from './shared.js';
 import { RequestApprovalDialog } from './approvals.js';
+import { SupportCode } from '../supportCode.js';
+import { formatDate } from '../dates.js';
+import { codeLabel, roleLabel } from '../labels.js';
 
 type PendingChange =
   | { readonly kind: 'grant'; readonly member: StaffMemberDto; readonly capability: string }
@@ -60,7 +63,7 @@ export function OperationsStaffCapabilitiesPage(): React.ReactElement {
     return <section className="role-module role-module--dense">{heading}
       <div className="role-wide"><V2EmptyState icon="🔐" title="Not permitted"
         note="Managing staff capabilities needs the Capability Admin capability. Your access has not changed."
-        hint={`Reference: ${forbiddenReference}`} /></div></section>;
+        hint={<SupportCode reference={forbiddenReference} />} /></div></section>;
   }
 
   const staff = directory?.staff ?? [];
@@ -103,14 +106,14 @@ export function OperationsStaffCapabilitiesPage(): React.ReactElement {
           const locked = member.isSelf || member.state !== 'ACTIVE';
           return <tr key={member.membershipId}>
             <td>{member.email}{member.isSelf ? <><br /><small>You</small></> : null}</td>
-            <td>{member.role}</td>
+            <td>{roleLabel(member.role)}</td>
             <td><StatusBadge label={member.state} tone={member.state === 'ACTIVE' ? 'success' : 'neutral'} /></td>
             <td>{member.state === 'ACTIVE' ? `${member.baseline.length} capabilities` : 'None while not active'}</td>
             <td>{member.grants.length ? <ul>{member.grants.map((grant) => <li key={grant.capability}>
               <StatusBadge label={grant.capability} tone={grant.highRisk ? 'warning' : 'info'} />{' '}
-              <small>{grant.reasonCode} · {new Date(grant.grantedAt).toLocaleDateString()}</small>{' '}
+              <small>{codeLabel(grant.reasonCode)} · {formatDate(grant.grantedAt)}</small>{' '}
               {member.isSelf ? null : <button type="button" className="pilot-btn" onClick={() => setPending({ kind: 'revoke', member, capability: grant.capability })}
-                aria-label={`Revoke ${grant.capability} from ${member.email}`}>Revoke</button>}
+                aria-label={`Revoke ${codeLabel(grant.capability)} from ${member.email}`}>Revoke</button>}
             </li>)}</ul> : 'None'}</td>
             <td>{locked
               ? <small>{member.isSelf ? 'Your own access is changed by another operator.' : 'Only active memberships can be granted capabilities.'}</small>
@@ -119,7 +122,7 @@ export function OperationsStaffCapabilitiesPage(): React.ReactElement {
                   <select value={choice} aria-label={`Capability for ${member.email}`}
                       onChange={(event) => setSelected({ ...selected, [member.membershipId]: event.target.value })}>
                       <option value="">Choose…</option>
-                      {options.map((capability) => <option key={capability} value={capability}>{capability}{highRisk.has(capability) ? ' (high-risk)' : ''}</option>)}
+                      {options.map((capability) => <option key={capability} value={capability}>{codeLabel(capability)}{highRisk.has(capability) ? ' (high-risk)' : ''}</option>)}
                   </select>
                   <button type="button" className="pilot-btn" disabled={!choice}
                     onClick={() => setPending({ kind: 'grant', member, capability: choice })}>Grant…</button>
@@ -132,8 +135,8 @@ export function OperationsStaffCapabilitiesPage(): React.ReactElement {
       // OPS-02: a high-risk grant files an approval request; it is granted from the Approvals queue once approved.
       ? <RequestApprovalDialog token={token} actionKey="CAPABILITY_GRANT_HIGH_RISK"
         payload={{ membershipId: pending.member.membershipId, capability: pending.capability }}
-        title={`Grant ${pending.capability}`} reasons={directory.grantReasons}
-        details={[['Staff member', pending.member.email], ['Role', pending.member.role], ['Capability', `${pending.capability} (high-risk)`]]}
+        title={`Grant ${codeLabel(pending.capability)}`} reasons={directory.grantReasons}
+        details={[['Staff member', pending.member.email], ['Role', roleLabel(pending.member.role)], ['Capability', `${codeLabel(pending.capability)} (high-risk)`]]}
         onCancel={() => setPending(null)} onFiled={(message) => { setPending(null); setNotice(message); }} />
       : pending && directory ? <ConfirmCapabilityChange token={token} change={pending} directory={directory}
         onCancel={() => setPending(null)} onDone={completed} /> : null}
@@ -162,7 +165,7 @@ function ConfirmCapabilityChange({ token, change, directory, onCancel, onDone }:
       const body = { reasonCode, ...(note.trim() ? { note: note.trim() } : {}) };
       if (grant) await grantStaffCapability(token, change.member.membershipId, { capability: change.capability, ...body });
       else await revokeStaffCapability(token, change.member.membershipId, change.capability, body);
-      onDone(`${change.capability} ${grant ? 'granted to' : 'revoked from'} ${change.member.email}.`);
+      onDone(`${codeLabel(change.capability)} ${grant ? 'granted to' : 'revoked from'} ${change.member.email}.`);
     } catch (cause) {
       setError(formatApiError(cause, grant ? 'The capability could not be granted.' : 'The capability could not be revoked.'));
       setBusy(false);
@@ -171,10 +174,10 @@ function ConfirmCapabilityChange({ token, change, directory, onCancel, onDone }:
 
   return <div className="role-modal-backdrop" role="presentation">
     <section className="role-modal" role="dialog" aria-modal="true" aria-labelledby="staff-capability-title">
-      <h2 id="staff-capability-title">{grant ? 'Grant' : 'Revoke'} {change.capability}</h2>
+      <h2 id="staff-capability-title">{grant ? 'Grant' : 'Revoke'} {codeLabel(change.capability)}</h2>
       <dl>
         <div><dt>Staff member</dt><dd>{change.member.email}</dd></div>
-        <div><dt>Role</dt><dd>{change.member.role}</dd></div>
+        <div><dt>Role</dt><dd>{roleLabel(change.member.role)}</dd></div>
         <div><dt>Approval</dt><dd>No second approval is required.</dd></div>
       </dl>
       <form onSubmit={(event) => void submit(event)} noValidate>

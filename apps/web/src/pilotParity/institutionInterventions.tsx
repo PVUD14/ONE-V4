@@ -11,6 +11,8 @@ import { NaListCard, go } from './naWidgets.js';
 import { AlertTriangle, Plus } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { bearerHeader } from '../sandbox.js';
+import { formatDate, formatDateTime } from '../dates.js';
+import { codeLabel } from '../labels.js';
 
 interface Intervention {
   id: string; title: string; note: string | null; outcomeNote: string | null;
@@ -137,7 +139,7 @@ function InterventionsWorkspace({ institutionId, basePath, token }: { readonly i
               <div key={`${entry.institutionStudentId}-${index}`} className="pilot-list-row">
                 <span className="pilot-tile rose"><AlertTriangle size={16} /></span>
                 <div className="grow"><strong>{entry.studentName}</strong><small>{entry.inProgress ? `In progress now: ${entry.examTitle}` : `Has not attempted: ${entry.examTitle}`}</small></div>
-                <span className="pilot-chip amber">Due {new Date(entry.endsAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+                <span className="pilot-chip amber">Due {formatDate(entry.endsAt)}</span>
                 <button type="button" className="pilot-btn ghost small" onClick={() => go(`${basePath}/assessments`)}>Review</button>
               </div>
             )) : <p style={{ color: 'var(--p-muted)', margin: '8px 0' }}>Nobody needs attention right now — every assigned assessment is attempted.</p>}
@@ -150,15 +152,15 @@ function InterventionsWorkspace({ institutionId, basePath, token }: { readonly i
           !actions.length ? <p>No tracked interventions in your scope yet.</p> : <div className="pilot-list">
             {actions.map((action) => <article className="pilot-card" key={action.id}>
               <h3>{action.title}</h3><p>{action.studentName} · Owner: {action.ownerName}</p>
-              <span className="pilot-chip blue">{action.state.replaceAll('_', ' ')}</span>
-              <p>Due: {action.dueAt ? new Date(action.dueAt).toLocaleString() : 'NA'}</p>
+              <span className="pilot-chip blue">{codeLabel(action.state)}</span>
+              <p>Due: {action.dueAt ? formatDateTime(action.dueAt) : 'NA'}</p>
               {action.note ? <p>{action.note}</p> : null}{action.outcomeNote ? <p>Outcome: {action.outcomeNote}</p> : null}
               {action.allowedTransitions.length ? <>
                 <label>Review or outcome note for {action.title}<textarea maxLength={2000} disabled={busy} value={reasons[action.id] ?? ''} onChange={(event) => setReasons({ ...reasons, [action.id]: event.target.value })} /></label>
                 <div className="role-record-actions">{action.allowedTransitions.map((state) => <button className="pilot-btn ghost small" type="button" key={state} disabled={busy} onClick={() => {
                   if (['REJECTED', 'COMPLETED', 'CANCELLED'].includes(state) && !reasons[action.id]?.trim()) { setError('Add a review or outcome note before this action.'); return; }
                   void save({ toState: state, version: action.version, note: reasons[action.id] ?? null }, '/' + encodeURIComponent(action.id) + '/transition');
-                }}>{transitionLabels[state] ?? state.replaceAll('_', ' ')}</button>)}</div>
+                }}>{transitionLabels[state] ?? codeLabel(state)}</button>)}</div>
               </> : null}
             </article>)}
           </div>}

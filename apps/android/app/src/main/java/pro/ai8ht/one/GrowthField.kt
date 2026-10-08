@@ -83,9 +83,9 @@ private fun activityIcon(kind: String) = when (kind) {
 
 private fun dueText(followUp: GrowthFollowUpDto): String = when {
     followUp.state != "OPEN" -> prettify(followUp.state)
-    followUp.overdue -> "Overdue since ${followUp.dueOn}"
+    followUp.overdue -> "Overdue since ${formatDate(followUp.dueOn)}"
     followUp.dueToday -> "Due today"
-    else -> "Due ${followUp.dueOn}"
+    else -> "Due ${formatDate(followUp.dueOn)}"
 }
 
 /** The result of queueing one write and trying to send it straight away. */
@@ -207,15 +207,15 @@ internal fun GrowthFieldTab(onOpenLead: (String) -> Unit) {
         if (failed) { CenteredNote("Your field work could not be loaded, and nothing was saved on this phone yet. Try again when you have a signal."); return@Column }
         val data = field ?: run { HomeSkeleton(); return@Column }
         val counts = data.counts
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            StatCell(counts?.visitsThisMonth?.toString() ?: FIELD_NA, "Visits this month", Tone.Green, Icons.Filled.Place, Modifier.weight(1f))
-            StatCell(counts?.metThisMonth?.toString() ?: FIELD_NA, "Met this month", Tone.Accent, Icons.Filled.Handshake, Modifier.weight(1f))
-        }
-        Spacer(Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            StatCell(counts?.followUpsDueToday?.toString() ?: FIELD_NA, "Due today", Tone.Amber, Icons.Filled.CalendarMonth, Modifier.weight(1f))
-            StatCell(counts?.followUpsOverdue?.toString() ?: FIELD_NA, "Overdue", Tone.Violet, Icons.Filled.EventBusy, Modifier.weight(1f))
-        }
+        StatGrid(
+            listOf(
+                StatSpec(counts?.visitsThisMonth?.toString() ?: FIELD_NA, "Visits this month", Tone.Green, Icons.Filled.Place),
+                StatSpec(counts?.metThisMonth?.toString() ?: FIELD_NA, "Met this month", Tone.Accent, Icons.Filled.Handshake),
+                StatSpec(counts?.followUpsDueToday?.toString() ?: FIELD_NA, "Due today", Tone.Amber, Icons.Filled.CalendarMonth),
+                StatSpec(counts?.followUpsOverdue?.toString() ?: FIELD_NA, "Overdue", Tone.Violet, Icons.Filled.EventBusy),
+            ),
+            emptyReason = "Your field counts are not available right now.",
+        )
         if (!GrowthReminders.notificationsAllowed(context)) {
             Text("Reminders are off: allow notifications for ONE in the phone's settings to be reminded on the morning a follow-up is due.",
                 style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
@@ -526,7 +526,7 @@ internal fun AddFollowUpScreen(leadId: String, leadName: String, titleMax: Int, 
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             choices.forEach { (label, offset) -> FilterChip(selected = days == offset, onClick = { days = offset }, label = { Text(label) }) }
         }
-        Text("Due ${LocalDate.now().plusDays(days)}. ONE reminds you at 9:00 that morning.", style = MaterialTheme.typography.labelSmall,
+        Text("Due ${formatDate(LocalDate.now().plusDays(days))}. ONE reminds you at 9:00 that morning.", style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
         error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
         Spacer(Modifier.height(10.dp))

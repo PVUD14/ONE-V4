@@ -16,6 +16,7 @@
 import React, { useEffect, useState } from 'react';
 import { readPublicProfile, type PublicProfileDto } from './api.js';
 import { BrandLogo } from './brand.js';
+import * as dates from './dates.js';
 
 const COVERS: Readonly<Record<string, string>> = {
   MIDNIGHT: 'linear-gradient(112deg,#16233a 0%,#1f3a6b 52%,#24306b 100%)',
@@ -34,7 +35,7 @@ function year(iso: string | null): string | null {
 }
 
 function formatDate(iso: string | null): string {
-  return iso ? new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) : 'NA';
+  return iso ? dates.formatDate(iso) : 'NA';
 }
 
 const muted = { color: 'var(--p-muted)', fontSize: 12.5 } as const;

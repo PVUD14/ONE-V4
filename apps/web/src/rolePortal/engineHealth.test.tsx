@@ -132,13 +132,14 @@ describe('AI Operations: learning engine panels', () => {
     render(<EngineBehaviourPanels token="t" />);
     expect(screen.getByText('Loading learning engine health…')).toBeInTheDocument();
     fail(await failure(500, 'INTERNAL', 'corr-engine-error'));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Reference: corr-engine-error');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Support code: correngi');
   });
 
   it('shows forbidden with its reference, and no figures', async () => {
     behaviourResponse = () => failure(403, 'FORBIDDEN', 'corr-engine-forbidden');
     render(<EngineBehaviourPanels token="t" />);
-    expect(await screen.findByText(/Not permitted: these panels need AI Operations View\. Reference: corr-engine-forbidden/)).toBeInTheDocument();
+    expect(await screen.findByText(/Not permitted: these panels need AI Operations View\./)).toBeInTheDocument();
+    expect(screen.getByText('Support code: correngi')).toBeInTheDocument();
     expect(screen.queryByText('29.4%')).not.toBeInTheDocument();
   });
 });
@@ -152,7 +153,7 @@ describe('System Health: learning engine jobs panels', () => {
     expect(within(calibration).getByText('Items still provisional').nextSibling).toHaveTextContent('2');
     expect(within(calibration).getByText('Learners read').nextSibling).toHaveTextContent('40');
     expect(within(calibration).getByText('Runs recorded').nextSibling).toHaveTextContent('3');
-    expect(within(calibration).getByText('too few responses: 2')).toBeInTheDocument();
+    expect(within(calibration).getByText('Too few responses: 2')).toBeInTheDocument();
     const sandbox = screen.getByRole('heading', { name: 'Code sandbox' }).closest('section')!;
     expect(within(sandbox).getByText('Not built')).toBeInTheDocument();
     expect(within(sandbox).getByText('Available').nextSibling).toHaveTextContent('NA');
@@ -180,11 +181,12 @@ describe('System Health: learning engine jobs panels', () => {
   it('shows an error with its reference and a forbidden reference', async () => {
     jobsResponse = () => failure(500, 'INTERNAL', 'corr-jobs-error');
     const { unmount } = render(<EngineJobsPanels token="t" />);
-    expect(await screen.findByRole('alert')).toHaveTextContent('Reference: corr-jobs-error');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Support code: corrjobs');
     unmount();
     jobsResponse = () => failure(403, 'FORBIDDEN', 'corr-jobs-forbidden');
     render(<EngineJobsPanels token="t" />);
-    expect(await screen.findByText('Not permitted. Reference: corr-jobs-forbidden')).toBeInTheDocument();
+    expect(await screen.findByText(/^Not permitted\./)).toBeInTheDocument();
+    expect(screen.getByText('Support code: corrjobs')).toBeInTheDocument();
   });
 });
 

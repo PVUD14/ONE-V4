@@ -1,7 +1,7 @@
 :root {
   color: #101828;
   background: #f6f8fb;
-  font-family: Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: "Inter Variable", Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   font-synthesis: none;
   line-height: 1.4;
   text-rendering: optimizeLegibility;
@@ -148,53 +148,186 @@
 .role-modal textarea { min-height: 96px; resize: vertical; }
 .role-empty { text-align: center; border: 1px dashed #cbd5e1; background: #fff; }
 
+/* Signed-out pages. One deep brand gradient, the same on every signed-out screen, in place of
+   the black-to-white fade image that read as muddy grey through the middle. */
+.login-shell,
+.auth-showcase {
+  background:
+    radial-gradient(circle at 18% 12%, rgba(52, 120, 255, .30), transparent 42%),
+    radial-gradient(circle at 85% 90%, rgba(31, 85, 229, .22), transparent 40%),
+    linear-gradient(160deg, #05070d 0%, #0a1430 55%, #0b2a6b 100%);
+}
+
 .login-shell {
   min-height: 100vh;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  padding: 56px 60px;
-  background:
-    linear-gradient(90deg, rgba(247, 250, 255, 0.08), rgba(247, 250, 255, 0.18)),
-    url('/assets/login-background.png') center / 100% 100% no-repeat,
-    radial-gradient(circle at 22% 18%, rgba(52, 120, 255, .16), transparent 30%),
-    linear-gradient(180deg, #fbfdff 0%, #f5f8fe 100%);
-  color: var(--ink);
+  justify-content: center;
+  padding: 56px 24px;
+  color: #101828;
 }
 
+.auth-split {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(420px, 1fr);
+  background: var(--canvas);
+}
+
+.auth-showcase {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 24px;
+  padding: clamp(32px, 4vw, 56px) clamp(40px, 5vw, 72px);
+  overflow: hidden;
+  color: #e7ecf6;
+}
+
+.auth-showcase-logo { align-self: flex-start; }
+
+.auth-showcase-title {
+  max-width: 22ch;
+  margin: 0;
+  color: #fff;
+  font-size: clamp(30px, 2.6vw, 40px);
+  font-weight: 700;
+  letter-spacing: -.03em;
+  line-height: 1.12;
+}
+
+.auth-benefits {
+  display: grid;
+  gap: 14px;
+  max-width: 520px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.auth-benefits li {
+  display: grid;
+  gap: 2px;
+  padding-left: 18px;
+  border-left: 2px solid rgba(96, 150, 255, .7);
+}
+
+.auth-benefits strong { color: #fff; font-size: 14px; font-weight: 600; }
+.auth-benefits span { color: #b6c2da; font-size: 14px; line-height: 1.5; }
+
+.auth-product-frame {
+  position: relative;
+  max-width: 600px;
+  margin: 4px 0 0;
+  padding: 0;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #0f1729;
+  border: 1px solid rgba(255, 255, 255, .14);
+  box-shadow: 0 30px 80px -20px rgba(0, 0, 0, .65);
+}
+
+.auth-product-chrome {
+  display: flex;
+  gap: 6px;
+  padding: 9px 12px;
+  background: rgba(255, 255, 255, .06);
+  border-bottom: 1px solid rgba(255, 255, 255, .08);
+}
+
+.auth-product-chrome i { width: 9px; height: 9px; border-radius: 50%; background: rgba(255, 255, 255, .22); }
+
+.auth-product-frame img { display: block; width: 100%; height: auto; }
+
+.auth-product-frame figcaption {
+  position: absolute;
+  top: 34px;
+  right: 10px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(5, 7, 13, .8);
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: .02em;
+  border: 1px solid rgba(255, 255, 255, .2);
+}
+
+.auth-showcase-tagline {
+  margin: 0;
+  color: #8fa0c0;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: .32em;
+}
+
+.auth-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: radial-gradient(circle at 70% 0%, rgba(31, 85, 229, .06), transparent 45%), var(--canvas);
+}
+
+.auth-panel-main {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: 32px 24px;
+}
+
+.auth-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 20px;
+  padding: 18px 32px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.auth-footer nav { display: flex; gap: 18px; }
+.auth-footer a { color: var(--muted); font-weight: 500; text-decoration: none; }
+.auth-footer a:hover, .auth-footer a:focus-visible { color: var(--student); text-decoration: underline; }
+
 .login-card {
-  width: clamp(300px, 32vw, 408px);
-  max-width: calc(100vw - 44px);
+  width: min(420px, 100%);
   display: grid;
   gap: 0;
   padding: 40px;
   border-radius: 20px;
-  background: rgba(255, 255, 255, .95);
-  border: 1px solid #dce6f6;
-  box-shadow: 0 24px 70px rgba(32, 56, 112, .18);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 24px 60px -24px rgba(16, 24, 40, .22);
 }
 
 .login-card h1 {
   margin: 0;
-  color: #000;
-  font-size: 28px;
-  font-weight: 500;
-  letter-spacing: -.04em;
+  color: #0b1324;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -.03em;
   line-height: 1.15;
 }
 
+.login-card a { color: var(--student); font-weight: 600; text-decoration: none; }
+.login-card a:hover, .login-card a:focus-visible { text-decoration: underline; }
+
 .auth-eyebrow {
-  margin: 0 0 12px;
-  color: #3478ff;
+  margin: 0 0 10px;
+  color: var(--student);
   font-size: 11px;
-  letter-spacing: .12em;
+  font-weight: 600;
+  letter-spacing: .14em;
 }
 
 .auth-subtitle {
   margin: 10px 0 26px;
-  color: #64718d;
+  color: var(--muted);
   font-size: 14px;
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
 .login-form {
@@ -205,20 +338,34 @@
 .login-form label {
   color: #263657;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
 }
+
+.login-label-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.login-label-row a { font-size: 12.5px; }
 
 .login-form input {
   width: 100%;
   min-height: 46px;
   margin: 0 0 9px;
-  padding: 10px 12px;
+  padding: 10px 14px;
   color: #17264a;
-  background: #fbfdff;
-  border: 1px solid #9aa3ad;
+  font: inherit;
+  font-size: 14.5px;
+  background: #fff;
+  border: 1px solid var(--line-strong);
   border-radius: 12px;
-  box-shadow: inset 0 1px 2px rgba(18, 37, 73, .06);
+  box-shadow: inset 0 1px 2px rgba(18, 37, 73, .05);
+  transition: border-color .15s ease, box-shadow .15s ease;
 }
+
+.login-form input:focus-visible {
+  outline: none;
+  border-color: var(--student);
+  box-shadow: 0 0 0 4px rgba(31, 85, 229, .14);
+}
+
+.login-form input[aria-invalid="true"] { border-color: var(--red); }
 
 .login-form input:disabled {
   color: #7b8798;
@@ -226,56 +373,109 @@
   cursor: not-allowed;
 }
 
-.login-form button {
-  width: 100%;
-  min-height: 46px;
-  margin-top: 4px;
-  border-radius: 10px;
-  font-weight: 500;
+.field-error { margin: -4px 0 8px; color: #b42335; font-size: 12.5px; font-weight: 500; }
+.field-hint { margin: -4px 0 8px; color: var(--muted); font-size: 12.5px; }
+
+.password-field { position: relative; display: block; }
+.password-field input { padding-right: 48px; }
+
+/* (0,2,0) outranks the application-wide solid-blue button rule at (0,1,1). */
+.login-form .password-toggle {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 38px;
+  min-height: 38px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  color: var(--muted);
+  background: transparent;
 }
 
-.login-form button:disabled {
+.login-form .password-toggle:hover { color: #101828; background: var(--canvas); }
+
+/* The primary action matches the inputs above it: same height, readable text. */
+.login-card .login-form button[type="submit"],
+.login-card button.auth-primary {
+  width: 100%;
+  min-height: 46px;
+  margin-top: 6px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, .08), 0 8px 18px -10px rgba(31, 85, 229, .6);
+}
+
+.login-card .login-form button[type="submit"]:hover:not(:disabled) { background: #1a48c4; }
+
+.login-card .login-form button[type="submit"]:disabled {
   color: #fff;
-  background: #bcbcbc;
-  border-color: #bcbcbc;
-  box-shadow: 0 12px 24px rgba(99, 116, 139, .12);
+  background: #a9b4c7;
+  box-shadow: none;
   cursor: not-allowed;
+}
+
+.login-card .auth-text-button {
+  justify-self: center;
+  min-height: 0;
+  margin-top: 14px;
+  padding: 4px 8px;
+  color: var(--student);
+  background: transparent;
+  font-size: 13px;
 }
 
 .auth-boundary {
   margin: 16px 0 0;
-  color: #64718d;
-  font-size: 12px;
+  color: var(--muted);
+  font-size: 13px;
   line-height: 1.45;
+}
+
+.auth-boundary.auth-error {
+  padding: 10px 12px;
+  border: 1px solid #f6c9cf;
+  border-radius: 10px;
+  background: #fff5f6;
+  color: #b42335;
 }
 
 .auth-footnote {
   margin: 22px 0 0;
-  color: #8a96ad;
-  font-size: 11px;
+  color: var(--muted);
+  font-size: 13px;
   text-align: center;
-  letter-spacing: .06em;
 }
 
 .login-card > button.secondary {
   width: 100%;
+  min-height: 42px;
   margin-top: 18px;
-  color: #3478ff;
-  background: #edf4ff;
-  border-color: #dce6f6;
+  border-radius: 12px;
+  color: var(--student);
+  background: var(--student-soft);
+  font-size: 14px;
 }
 
-@media (max-width: 760px) {
-  .login-shell {
-    justify-content: center;
-    padding: 40px 22px;
-    background-size: auto 100%, auto 100%, auto, auto;
-    background-position: center;
-  }
+@media (max-width: 1100px) {
+  .auth-split { grid-template-columns: minmax(0, 1fr) minmax(400px, 1fr); }
+  .auth-product-frame { display: none; }
+}
 
-  .login-card {
-    padding: 40px;
-  }
+/* On phones the showcase shrinks to a brand band above the card: logo and headline only. */
+@media (max-width: 760px) {
+  .auth-split { grid-template-columns: 1fr; }
+  .auth-showcase { gap: 14px; padding: 28px 16px 32px; }
+  .auth-showcase-title { font-size: 24px; max-width: none; }
+  .auth-benefits, .auth-showcase-tagline { display: none; }
+  .auth-panel { min-height: 0; }
+  .auth-panel-main { padding: 24px 16px 32px; }
+  .login-card { padding: 28px 22px; }
+  .auth-footer { padding: 16px; justify-content: center; text-align: center; }
+  .login-shell { padding: 32px 16px; }
 }
 
 .workspace-grid {
@@ -4874,3 +5074,221 @@ button.secondary {
 .pilot-embed .embedded-real .career-api-panel { border: 0; box-shadow: none; background: transparent; padding: 0; margin: 0; }
 .pilot-embed .embedded-real .role-module { display: flex; flex-direction: column; gap: 16px; }
 .pilot-embed .embedded-real .workspace-grid { gap: 16px; }
+
+/* =============================================================================
+   Layout repair (fix/ui-layout). Each block names the defect it closes. Kept at
+   the end of the file on purpose: several rules must win over same-specificity
+   rules above, including ones inside earlier media queries.
+   ============================================================================= */
+
+/* --- 1. Twelve-column role grids ---------------------------------------------
+   `.role-dashboard` / `.role-module` are 12-track grids. A child with no span
+   class was auto-placed into ONE track (~75-150px), so embedded pilot sections
+   (placement statistics, register, drive calendar, cohort readiness, a nested
+   reports module) rendered one word per line. Default every child to the full
+   row; `:where()` keeps this at zero specificity so any explicit span class
+   (`.role-card` halves, dashboard card spans) still wins. */
+:where(.role-dashboard, .role-module) > :where(:not(.role-card)) { grid-column: 1 / -1; }
+
+/* In flex-column hosts (the embedded pilot shells) the card rule
+   `align-self: start` and the module's `align-items: start` shrink-wrapped each
+   card to its content: ragged Settings cards (a 140px "College profile"), and on
+   employer Reports cards grew to the table's width and scrolled the whole page
+   sideways. Stretch them to the column and cap them at it. */
+.pilot-embed .embedded-real .role-module { align-items: stretch; }
+.pilot-embed .embedded-real > :where(:not(button, a)),
+.pilot-embed .embedded-real .role-module > :where(:not(button, a)),
+:is(.pilot-content, .v2-content) > :where(.role-card, .role-module, section, form) { align-self: stretch; max-width: 100%; min-width: 0; }
+/* Sections stacked in a block-level embed, or a module after a pilot page, had no gap. */
+.pilot.pilot-embed > .pilot-card + .pilot-card { margin-top: 16px; }
+.pilot.pilot-embed + .role-module { margin-top: 18px; }
+.pilot-card > .role-record-table-wrap { margin-bottom: 12px; }
+
+/* --- 2. Wide tables scroll inside their card, never the page ------------------ */
+.pilot-card, .v2-card, .role-card { min-width: 0; }
+.role-record-table-wrap, .data-table-wrap { max-width: 100%; overflow-x: auto; scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+/* Overlay scrollbars are invisible until hovered, so a table cut at the card edge
+   read as clipped. Edge shadows (the classic local/scroll background pair) appear
+   only on the side that has more columns to scroll to. */
+.role-record-table-wrap, .data-table-wrap {
+  background:
+    linear-gradient(to right, #fff 30%, rgba(255, 255, 255, 0)) left center / 32px 100% no-repeat local,
+    linear-gradient(to left, #fff 30%, rgba(255, 255, 255, 0)) right center / 32px 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, rgba(15, 23, 42, .16), rgba(15, 23, 42, 0)) left center / 12px 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, rgba(15, 23, 42, .16), rgba(15, 23, 42, 0)) right center / 12px 100% no-repeat scroll,
+    #fff;
+}
+/* A 42% row-header column suits two-column key/value tables; on a wide table it
+   crushed every other column. */
+.role-record-table:has(thead th:nth-child(5)) th[scope="row"] { width: auto; min-width: 160px; }
+.role-record-table td > button, .role-record-table td > .pilot-btn { white-space: nowrap; }
+
+/* --- 3. Role portal and student topbars ---------------------------------------
+   The portal pill repeats the sidebar's portal name and squeezed the role pill
+   into "Placement Offi..."; the search collapsed to an empty padded pill; "Switch
+   workspace" wrapped; the auth chip showed a truncated "Acc..." label beside an
+   email the profile chip already shows. */
+.role-context { flex: 0 1 auto; max-width: 320px; }
+.role-org { flex: 0 1 auto; }
+.role-search { flex: 1 1 180px; min-width: 180px; }
+.role-topbar-actions { flex: 0 1 auto; margin-left: auto; }
+.role-topbar-actions > button.secondary { flex: 0 0 auto; white-space: nowrap; }
+.role-topbar .auth-controls > span:has(+ span),
+.role-topbar .auth-controls > span + span,
+.student-topbar .auth-controls > span:has(+ span) { display: none; }
+.role-topbar .auth-controls:has(> span + span) { padding: 3px; }
+.auth-controls button { flex: 0 0 auto; }
+@media (max-width: 1599px) { .role-org { display: none; } }
+@media (min-width: 761px) and (max-width: 1365px) { .role-search { display: none; } }
+
+/* --- 4. Plain data tables (student Applications and other `.data-table-wrap`)
+   had no styles at all: centred headers over left cells, no dividers, cramped
+   cells. Give them the `.role-record-table` treatment. */
+.data-table-wrap { border: 1px solid var(--line); border-radius: 14px; background: #fff; margin-top: 10px; }
+.data-table-wrap > table { width: 100%; min-width: 720px; border-collapse: collapse; font-size: 13px; }
+.data-table-wrap th, .data-table-wrap td { padding: 12px 14px; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: top; }
+.data-table-wrap thead th { color: #475569; background: #f8fafc; font-size: .74rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
+.data-table-wrap tbody tr:last-child th, .data-table-wrap tbody tr:last-child td { border-bottom: 0; }
+.data-table-wrap td > button, .data-table-wrap td > span + button { margin: 4px 6px 0 0; white-space: nowrap; }
+.data-table-wrap td > .hiring-tag { display: inline-block; margin-top: 4px; }
+
+/* --- 5. Clickable list rows and toggle buttons ---------------------------------
+   Growth Leads rows are <button class="v2-list-row">, caught by the global button
+   rule: solid student blue, centred white text, unreadable subtitle. Make them
+   list rows. The Colleges/Employers toggle showed both options as active. */
+.v2-list button.v2-list-row { width: 100%; min-height: 0; padding: 11px 10px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0;
+  background: var(--surface); color: var(--student-ink); font: inherit; font-weight: 500; text-align: left; cursor: pointer; }
+.v2-list button.v2-list-row:last-child { border-bottom: 0; }
+.v2-list button.v2-list-row:hover { background: var(--canvas); }
+.v2-list button.v2-list-row[aria-pressed="true"] { background: var(--student-soft); box-shadow: inset 3px 0 0 var(--student); }
+.v2-list button.v2-list-row:focus-visible { outline: 2px solid var(--student); outline-offset: -2px; }
+button.pilot-btn[aria-pressed="false"] { background: var(--surface); color: var(--student); border: 1px solid var(--line-strong); }
+button.pilot-btn[aria-pressed="true"] { background: var(--student); color: #fff; border: 1px solid var(--student); }
+
+/* --- 6. Native form controls ------------------------------------------------------
+   Selects and inputs without a styling context rendered as browser defaults
+   (Settings inline selects, Growth filters, Approvals "Show"). Zero specificity:
+   any component's own control styling still wins. */
+:where(select, textarea, input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"], [type="hidden"], [type="submit"], [type="button"], [type="reset"], [type="image"])) {
+  max-width: 100%; min-height: 38px; padding: 8px 11px; border: 1px solid #cbd5e1; border-radius: 10px;
+  background-color: #fff; color: #172033; font: inherit; font-size: 13px;
+}
+:where(textarea) { width: 100%; min-height: 96px; }
+/* Inputs drawn inside a pill (topbar searches) keep the pill's own box. */
+:is(.global-search, .role-search, .pilot-search, .local-search, .staff-search, .attention-search) input { min-height: 0; padding: 0; border-radius: 0; background-color: transparent; }
+:where(select, textarea, input):focus-visible { outline: 2px solid color-mix(in srgb, var(--student) 45%, transparent); outline-offset: 1px; border-color: var(--student); }
+.role-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+:where(.role-actions, .role-card, .pilot-card, .v2-card) > label { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; color: #475569; font-size: 12.5px; font-weight: 600; }
+:where(.role-card, .pilot-card, .v2-card) > label { margin: 0 12px 10px 0; }
+/* A textarea's label took one 240px track of the management form's auto-fit grid
+   (the textarea itself spans, but it sits inside the label), so long text such as
+   the college profile was edited in a box a quarter of the card wide. */
+.role-management-form label:has(> textarea) { grid-column: 1 / -1; }
+
+/* --- 7. Disabled buttons look disabled -----------------------------------------
+   The global button rule painted disabled buttons ("Already attempted") as active
+   primaries. Career Tools' "Open" buttons sat at different heights. */
+button:disabled:not(.icon-button, .mobile-menu-button, .side-nav-item, .role-nav-item, .role-collapse, .collapse-button, .profile-menu, .drawer-scrim, .sidebar-close, .v2-list-row, .assistant-launcher, .assistant-close),
+button[aria-disabled="true"]:not(.icon-button, .mobile-menu-button, .side-nav-item, .role-nav-item, .role-collapse, .collapse-button, .profile-menu, .drawer-scrim, .sidebar-close, .v2-list-row) {
+  background: #eef1f6; color: #8a94a6; border-color: #e2e8f0; box-shadow: none; cursor: not-allowed; opacity: 1;
+}
+.pilot-course-card > button:last-child { margin-top: auto; }
+
+/* --- 8. Mobile: brand in the top bar, compact banners, two-up KPI tiles ----------
+   Below the drawer breakpoint the sidebar (and its logo) is off-canvas, which
+   left the top bar with no brand at all. */
+.topbar-brand { display: none; align-items: center; flex: 0 0 auto; }
+@media (max-width: 1220px) {
+  .student-topbar .topbar-brand { display: flex; }
+  .student-topbar { grid-template-columns: auto auto minmax(0, 1fr) auto; }
+}
+@media (max-width: 1180px) { .role-topbar .topbar-brand { display: flex; } }
+@media (max-width: 430px) {
+  .student-topbar { grid-template-columns: auto auto minmax(0, 1fr); }
+  .student-topbar .global-search { justify-self: end; }
+}
+@media (max-width: 760px) {
+  .role-topbar { flex-wrap: wrap; justify-content: flex-start; }
+  .staff-demo-notice { flex-wrap: nowrap; gap: 6px; margin-bottom: 8px; padding: 6px 10px; font-size: 11.5px; line-height: 1.35; }
+  .staff-demo-notice > span:first-child { flex: 0 0 auto; white-space: nowrap; }
+  .staff-demo-notice > span + span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .role-preview-notice { flex-direction: row; align-items: center; margin-bottom: 12px; padding: 8px 12px; border-radius: 12px; font-size: 12px; }
+  .role-preview-notice > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; overflow-wrap: normal; }
+  .role-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pilot .pilot-row:has(> .pilot-kpi),
+  .pilot.pilot-embed .pilot-row:has(> .pilot-kpi) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pilot-kpi { gap: 9px; padding: 12px; }
+}
+
+/* --- 9. Room under the floating assistant button ---------------------------------- */
+.role-main, .student-main { padding-bottom: 104px; }
+
+/* ===== NA / suppressed-count presentation (fix/ui-nastate) ===================
+   One calm look for a figure ONE does not have ("NA") or will not show ("<5",
+   "Withheld", "Too few answers"), shared by every portal. The slot and its exact
+   text always stay; only the weight changes, so real numbers stand out and an
+   unbuilt widget reads as "not yet", not as broken. Components: src/naState.tsx.
+   Colours fall back from the pilot tokens to the app tokens, so the same classes
+   work inside .pilot pages and on the role-portal pages. */
+.na-value {
+  color: var(--p-muted, var(--muted, #5d6b82));
+  font-weight: 600;
+  letter-spacing: .01em;
+}
+:is(b, strong) > .na-value { font-size: .68em; font-weight: 600; }
+td .na-value, dd .na-value, .num > .na-value { font-weight: 500; opacity: .85; }
+.na-reason {
+  display: block;
+  margin: 2px 0 0;
+  color: var(--p-muted, var(--muted, #5d6b82));
+  font-size: 11px;
+  line-height: 1.4;
+  font-weight: 500;
+}
+.pilot-tile.na-tile { background: #eef1f6; color: #9aa5b8; }
+.v2-tile.na-tile { background: #eef1f6; filter: grayscale(1); opacity: .7; }
+
+/* A group whose slots are all missing: one strip, every slot a small labelled chip. */
+.na-strip { display: grid; gap: 8px; align-content: start; }
+.na-strip .pilot-card-head { margin-bottom: 0; }
+.na-strip--inline { padding: 2px 0; }
+.role-record-table-wrap + .na-strip--inline, .na-count-table + .na-caption { margin-top: 10px; }
+.na-strip-slots { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.na-slot {
+  display: inline-flex; align-items: center; gap: 2px; max-width: 100%;
+  padding: 3px 10px; border: 1px dashed var(--p-line, var(--line, #e5eaf2)); border-radius: 999px;
+  background: #f8fafc; color: var(--p-ink-2, #344054); font-size: 11.5px; font-weight: 500; line-height: 1.5;
+}
+.na-slot-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.na-slot-value::before { content: "\00B7"; margin: 0 5px 0 3px; color: #b4bfcf; }
+.na-slot .na-value { font-size: inherit; }
+.na-strip > .na-reason, .na-strip--inline > .na-reason { margin: 0; font-size: 11.5px; }
+/* In the student score row, the strip takes the columns its missing cards would have. */
+.v3-score-row > .na-strip { grid-column: span var(--na-span, 1); }
+@media (max-width: 1180px) { .v3-score-row > .na-strip { grid-column: 1 / -1; } }
+
+/* A chart with a suppressed or missing point: the frame stays, no line is drawn. */
+.na-chart-empty {
+  position: relative; display: grid; place-items: center; margin: 6px 0 4px; padding: 14px 12px;
+  border: 1px dashed var(--p-line, var(--line, #e5eaf2)); border-radius: 10px; background: #fafbfd; text-align: center;
+}
+.na-chart-empty p { margin: 0; max-width: 30ch; color: var(--p-muted, var(--muted, #5d6b82)); font-size: 12px; line-height: 1.45; }
+.na-chart-axis { position: absolute; left: 12px; right: 12px; bottom: 12px; border-bottom: 1px solid #e3e8f0; }
+
+/* A short series as label / bar / count; suppressed rows keep an empty track. */
+.na-count-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12.5px; }
+.na-count-table thead th {
+  padding: 0 0 6px; color: var(--p-muted, var(--muted, #5d6b82)); font-size: 10.5px; font-weight: 600;
+  letter-spacing: .04em; text-transform: uppercase; text-align: left;
+}
+.na-count-table tbody th, .na-count-table td { padding: 4px 0; border-top: 1px solid var(--p-line, var(--line, #eef1f6)); vertical-align: middle; }
+.na-count-table tbody th { width: 34%; font-weight: 500; text-align: left; white-space: nowrap; }
+.na-count-table .na-count-bar { padding: 4px 12px; }
+.na-count-track { display: block; height: 7px; border-radius: 999px; background: #edf1f7; overflow: hidden; }
+.na-count-track i { display: block; height: 100%; border-radius: 999px; background: var(--student, #1f55e5); }
+.na-count-table .na-count-value, .na-count-table thead th:last-child { width: 72px; text-align: right; font-weight: 700; }
+
+/* The one caption under a table that holds withheld cells; a row-wide withheld note. */
+.na-caption { margin: 8px 0 0; color: var(--p-muted, var(--muted, #5d6b82)); font-size: 12px; line-height: 1.45; }
+.na-row-note { color: var(--p-muted, var(--muted, #5d6b82)); font-size: .92em; }
+/* ===== end NA / suppressed-count presentation ============================== */

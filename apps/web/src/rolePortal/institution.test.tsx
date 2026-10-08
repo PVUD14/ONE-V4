@@ -291,13 +291,13 @@ describe('External application distinction in the placement roster', () => {
     expect(fetchMock.mock.calls.some(([url]) => /\/students\/[^/]+\/(external-)?applications/.test(String(url)))).toBe(false);
     await openFirst();
     const externalRegion = screen.getByRole('region', { name: 'Student-declared external applications (unverified)' });
-    const nativeRegion = screen.getByRole('region', { name: 'Native applications' });
+    const nativeRegion = screen.getByRole('region', { name: 'Applications on ONE' });
     await within(externalRegion).findByRole('table');
     await within(nativeRegion).findByRole('table');
-    expect(within(externalRegion).getByText('HIRED (student-declared)')).toBeInTheDocument();
+    expect(within(externalRegion).getByText('Hired (student-declared)')).toBeInTheDocument();
     expect(externalRegion).toHaveTextContent('Shared external declarations shown: 1');
-    expect(externalRegion).toHaveTextContent('does not contribute to native or placement metrics');
-    expect(nativeRegion).toHaveTextContent('Shared native applications shown: 1');
+    expect(externalRegion).toHaveTextContent('is not counted in placement figures');
+    expect(nativeRegion).toHaveTextContent('Shared applications on ONE shown: 1');
     expect(within(nativeRegion).queryByText('Declared employer')).not.toBeInTheDocument();
     expect(within(externalRegion).queryByText('Native employer')).not.toBeInTheDocument();
     expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith('/students/' + studentId + '/external-applications'))).toBe(true);
@@ -333,7 +333,7 @@ describe('External application distinction in the placement roster', () => {
     expect(await within(region).findByRole('alert')).not.toHaveTextContent('private upstream error');
     expect(region).toHaveTextContent('Shared external declarations shown: NA');
     expect(screen.queryByText('private upstream error')).not.toBeInTheDocument();
-    expect(await within(screen.getByRole('region', { name: 'Native applications' })).findByText('Native employer')).toBeInTheDocument();
+    expect(await within(screen.getByRole('region', { name: 'Applications on ONE' })).findByText('Native employer')).toBeInTheDocument();
   });
 
   it('aborts old student requests, discards late data and clears details on a workspace switch', async () => {

@@ -170,7 +170,8 @@ describe('EMP-02 employer Team screen', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Send invitation' }));
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('This person is already on your team.');
-    expect(alert).toHaveTextContent(correlationId);
+    expect(alert).toHaveTextContent(`Support code: ${correlationId.slice(0, 8)}`);
+    expect(alert).not.toHaveTextContent(correlationId);
     expect(document.body.textContent).not.toContain('duplicate key');
   });
 

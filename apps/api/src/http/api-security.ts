@@ -37,6 +37,8 @@ import {
   hasInstitutionRelationshipAuthorizationForActivity,
   type PersistenceDb,
 } from '@planthepath/persistence/src/repositories.js';
+import { effectiveInternalCapabilities } from '@planthepath/authorization/src/index.js';
+import { dbCapabilityGrantLoader } from './internal-capability-guard.js';
 
 export const API_IDENTITY_VERIFIER = Symbol('API_IDENTITY_VERIFIER');
 export const API_INTERNAL_IDENTITY_STORE = Symbol('API_INTERNAL_IDENTITY_STORE');
@@ -195,6 +197,13 @@ export class Phase1ProtectedApiRoutes {
       ORDER BY effective_to DESC NULLS LAST, effective_from DESC
       LIMIT 25
     `) as QueryResult<{ institution_id: string; state: string; effective_from: Date; effective_to: Date | null }>;
+    // The caller's own effective internal capabilities per membership (ADR-032): baseline
+    // plus live grants valid for the role. The web uses them only to avoid offering screens
+    // and calls the server would refuse; every endpoint still makes its own decision.
+    const activeMembershipIds = context.authorization.memberships
+      .filter((membership) => membership.state === 'ACTIVE' && /^[0-9a-f-]{36}$/i.test(membership.id))
+      .map((membership) => membership.id);
+    const grants = activeMembershipIds.length ? await dbCapabilityGrantLoader(this.db)(activeMembershipIds) : new Map<string, readonly string[]>();
     return {
       userId: context.authorization.principal.userId,
       selectedOrganizationId: context.authorization.selectedMembership?.organizationId ?? null,
@@ -202,6 +211,7 @@ export class Phase1ProtectedApiRoutes {
         organizationId: membership.organizationId,
         role: membership.role,
         scope: membership.scope,
+        capabilities: membership.state === 'ACTIVE' ? effectiveInternalCapabilities(membership.role, grants.get(membership.id) ?? []) : [],
       })),
       studentRelationships: studentRelationships.rows.map((relationship) => ({
         institutionId: relationship.institution_id,

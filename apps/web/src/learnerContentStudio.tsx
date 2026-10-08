@@ -12,6 +12,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { getAccessToken } from './auth.js';
+import { codeLabel } from './labels.js';
 import {
   createLearnerContent,
   listLearnerContentQueue,
@@ -76,8 +77,8 @@ export function LearnerContentStudio(): React.ReactElement {
   return <div className="workspace-grid">
     <section className="card wide-card">
       <h2>Learner content</h2>
-      <p>Practice, Company Prep, Career Tools, Scholarships and Resume Builder read from here. Until something is published, those pages show NA — which is the truth, not a bug.</p>
-      <p className="hiring-meta"><strong>Approving needs a reviewer other than the author, and publishing needs somebody other than the approver.</strong> The database enforces both.</p>
+      <p>Practice, Company Prep, Career Tools, Scholarships and Resume Builder read from here. Until something is published, those pages show NA.</p>
+      <p className="hiring-meta"><strong>Approving needs a reviewer other than the author, and publishing needs somebody other than the approver.</strong> ONE will not allow either step otherwise.</p>
       <label className="student-form-field"><span>Page</span>
         <select value={filter} onChange={(event) => setFilter(event.target.value as LearnerContentType | '')}>
           <option value="">All pages</option>
@@ -100,7 +101,7 @@ export function LearnerContentStudio(): React.ReactElement {
         <tbody>{items.map((item) => <tr key={item.id}>
           <td>{item.title}{item.summary ? <><br /><span className="hiring-meta">{item.summary}</span></> : null}</td>
           <td>{CONTENT_TYPES.find(([code]) => code === item.contentType)?.[1] ?? item.contentType}</td>
-          <td><span className={`hiring-state state-${item.reviewState.toLowerCase()}`}>{item.reviewState.replace(/_/g, ' ').toLowerCase()}</span></td>
+          <td><span className={`hiring-state state-${item.reviewState.toLowerCase()}`}>{codeLabel(item.reviewState)}</span></td>
           <td>{item.source.toLowerCase()}</td>
           <td>{item.generatorVersion
             ? <>{item.generatorVersion}<br /><span className="hiring-meta">prompt {item.promptVersion ?? 'NA'}</span></>
@@ -111,7 +112,7 @@ export function LearnerContentStudio(): React.ReactElement {
               type="button"
               className={next === 'PUBLISHED' ? undefined : 'secondary'}
               onClick={() => { void move(item.id, next); }}
-            >{next.replace(/_/g, ' ').toLowerCase()}</button>)}
+            >{codeLabel(next)}</button>)}
           </div></td>
         </tr>)}</tbody>
       </table></div>

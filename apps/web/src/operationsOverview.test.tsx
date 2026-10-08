@@ -148,7 +148,7 @@ describe('Operations Overview', () => {
     overviewResponse = () => failure(500, 'OVERVIEW_UNAVAILABLE', 'corr-broken');
     render(<OperationsDashboardV2 basePath={basePath} />);
     expect(await screen.findByText('The overview could not be loaded')).toBeInTheDocument();
-    expect(screen.getByText('Reference: corr-broken')).toBeInTheDocument();
+    expect(screen.getByText('Support code: corrbrok')).toBeInTheDocument();
     expect(screen.queryByText('Operator queues')).toBeNull();
   });
 
@@ -156,7 +156,7 @@ describe('Operations Overview', () => {
     overviewResponse = () => failure(403, 'FORBIDDEN', 'corr-denied');
     render(<OperationsDashboardV2 basePath={basePath} />);
     expect(await screen.findByText('Not permitted')).toBeInTheDocument();
-    expect(screen.getByText('Reference: corr-denied')).toBeInTheDocument();
+    expect(screen.getByText('Support code: corrdeni')).toBeInTheDocument();
   });
 
   it('keeps the Operations navigation labels unchanged', () => {

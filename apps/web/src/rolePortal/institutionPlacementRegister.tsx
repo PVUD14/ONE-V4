@@ -32,15 +32,16 @@ import {
 } from '../api/placementRegister.js';
 import { Kpis, loadError } from './institutionDepartment.js';
 import { formatApiError } from './shared.js';
+import * as dates from '../dates.js';
 
 function formatDate(value: string | null | undefined): string {
   if (!value) return 'NA';
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? 'NA' : date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  return Number.isNaN(date.getTime()) ? 'NA' : dates.formatDate(date);
 }
 function monthLabel(month: string): string {
   const date = new Date(`${month}-01T00:00:00Z`);
-  return Number.isNaN(date.getTime()) ? month : date.toLocaleDateString(undefined, { month: 'short', year: 'numeric', timeZone: 'UTC' });
+  return Number.isNaN(date.getTime()) ? month : dates.formatMonth(date, { utc: true });
 }
 /** A percentage as shown: withheld reads <5 (a group under five is behind it), no source reads NA. */
 export function percentLabel(row: PlacementStatisticsRowDto | null | undefined): string {

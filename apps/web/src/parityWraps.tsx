@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ArrowRight, BookOpen, CheckCircle2, ClipboardCheck, Sparkles } from 'lucide-react';
 import { MultiRing, Ring } from './pilot/pilotComponents.js';
+import { codeLabel } from './labels.js';
 import {
   getLearnerCareerReadinessState,
   getProtectedAccessToken,
@@ -75,7 +76,7 @@ export function StudentRoadmapV3({ children }: { readonly children: React.ReactN
       <div style={{ display: 'flex', gap: 12 }}>
         <span className="pilot-tile purple"><Sparkles size={18} /></span>
         <div>
-          <strong style={{ fontSize: 13 }}>{actions.length ? actions[0]!.actionCode.replaceAll('_', ' ').toLowerCase() : 'Complete a lesson'}</strong>
+          <strong style={{ fontSize: 13 }}>{actions.length ? codeLabel(actions[0]!.actionCode) : 'Complete a lesson'}</strong>
           <small style={{ display: 'block', color: 'var(--p-muted)', margin: '3px 0 8px' }}>{actions.length ? 'Your next advisory action from real evidence.' : 'Advisory actions appear as your evidence grows.'}</small>
           <button type="button" className="pilot-btn soft small" onClick={() => go('/student/learning')}>Open Learning <ArrowRight size={13} /></button>
         </div>
@@ -181,7 +182,7 @@ export function StudentAssessmentsV3({ children }: { readonly children: React.Re
     </section>
     <section className="pilot-card">
       <div className="pilot-card-head"><h2>Strength &amp; Weakness</h2><span className="pilot-chip slate">NA</span></div>
-      <p style={{ color: 'var(--p-muted)', margin: '4px 0' }}>Per-topic strengths need the category scoring engine — NA.</p>
+      <p style={{ color: 'var(--p-muted)', margin: '4px 0' }}>Strengths and weaknesses by topic are not available yet.</p>
     </section>
   </>}>{children}</PilotShell>;
 }

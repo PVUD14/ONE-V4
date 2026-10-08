@@ -111,13 +111,13 @@ describe('EMP-04 employer Company Profile screen', () => {
     failWith = { status: 400, body: { error: { code: 'COMPANY_PROFILE_CAREERS_URL_OFF_DOMAIN', correlationId: 'corr-7' } } };
     fireEvent.change(within(form).getByLabelText('Careers page (on your website)'), { target: { value: 'https://elsewhere.example/jobs' } });
     fireEvent.click(within(form).getByRole('button', { name: 'Save profile' }));
-    expect(await screen.findByText(/The careers page must be on your company website, or a subdomain of it\. Reference: corr-7/)).toBeInTheDocument();
+    expect(await screen.findByText(/The careers page must be on your company website, or a subdomain of it\. Support code: corr7/)).toBeInTheDocument();
   });
 
   it('explains a suspended employer instead of showing an empty profile', async () => {
     failWith = { status: 403, body: { error: { code: 'EMPLOYER_ORGANISATION_INACTIVE', correlationId: 'corr-9' } } };
     show();
-    expect(await screen.findByRole('alert')).toHaveTextContent('Your employer account is suspended or was not approved, so the company profile is not available. Reference: corr-9');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Your employer account is suspended or was not approved, so the company profile is not available. Support code: corr9');
   });
 
   it('leaves every other unbuilt label saying so', async () => {

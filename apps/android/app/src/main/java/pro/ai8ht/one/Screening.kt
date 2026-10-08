@@ -263,7 +263,7 @@ private fun ScreeningBriefPage(brief: ScreeningBriefDto, onBegin: () -> Unit, on
                         Text("Before you start", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                         listOf(
                             "One sitting. There is no second attempt at this test.",
-                            "The timer runs on ONE's server from the moment you start and does not pause if you leave the app.",
+                            "The timer starts the moment you begin and does not pause if you leave the app.",
                             "No camera, microphone or screen capture is used, and nothing records switching apps.",
                             "Your result goes to ${brief.employerName} for this application only, while they can see your application.",
                             "It is not part of your academic record or your learning evidence, and it does not change your readiness.",
@@ -332,7 +332,7 @@ private fun ScreeningAttemptPage(
             secondsLeft?.let { left ->
                 Spacer(Modifier.height(10.dp))
                 Text(
-                    "Time left: ${left / 60}:${(left % 60).toString().padStart(2, '0')}. ONE's server keeps the time; answers after it runs out are not saved.",
+                    "Time left: ${left / 60}:${(left % 60).toString().padStart(2, '0')}. ONE keeps the time; answers after it runs out are not saved.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

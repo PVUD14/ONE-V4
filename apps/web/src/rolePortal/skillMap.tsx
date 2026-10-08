@@ -30,9 +30,12 @@ import { V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { StatusBadge } from '../studentComponents.js';
 import { RequestApprovalDialog } from './approvals.js';
 import { formatApiError } from './shared.js';
+import { SupportCode } from '../supportCode.js';
+import { formatDateTime } from '../dates.js';
+import { codeLabel } from '../labels.js';
 
 const label = (value: string): string => value.split('_').map((word) => word.charAt(0) + word.slice(1).toLowerCase()).join(' ');
-const when = (value: string | null | undefined): string => (value ? new Date(value).toLocaleString() : 'NA');
+const when = (value: string | null | undefined): string => (value ? formatDateTime(value) : 'NA');
 const statusText = (status: string): string => (status === 'LIVE' ? 'Live' : status === 'PENDING' ? 'Not yet published' : status === 'RETIRED' ? 'Retired' : 'Unknown');
 const statusTone = (status: string): 'success' | 'warning' | 'neutral' | 'info' => (status === 'LIVE' ? 'success' : status === 'PENDING' ? 'warning' : 'neutral');
 const stateTone = (state: SkillRevisionState): 'success' | 'warning' | 'neutral' | 'info' =>
@@ -95,7 +98,7 @@ export function OperationsSkillMapPage(): React.ReactElement | null {
     return <section className="role-module role-module--dense">{heading}
       <div className="role-wide"><V2EmptyState icon="🔐" title="Not permitted"
         note="The skill map is for staff who hold Content Edit, Content Review, Content Publish or Catalogue Manage. Your access has not changed; the rest of Content Management is unaffected."
-        hint={`Reference: ${forbiddenReference}`} /></div></section>;
+        hint={<SupportCode reference={forbiddenReference} />} /></div></section>;
   }
 
   const skills = [...(list?.skills ?? []), ...more];
@@ -240,7 +243,7 @@ function SkillPanel({ token, topicId, policy, onChanged, onClose }: {
       <thead><tr><th>When</th><th>Revision</th><th>Action</th><th>Move</th><th>Reason</th><th>By</th></tr></thead>
       <tbody>{skill.history.map((entry, index) => <tr key={`${entry.occurredAt}-${index}`}>
         <td>{when(entry.occurredAt)}</td><td>{entry.revision}</td><td>{label(entry.action)}</td>
-        <td>{label(entry.fromState)} → {label(entry.toState)}</td><td>{entry.reasonCode}</td><td>{entry.actorEmail}</td>
+        <td>{label(entry.fromState)} → {label(entry.toState)}</td><td>{codeLabel(entry.reasonCode)}</td><td>{entry.actorEmail}</td>
       </tr>)}</tbody></table></div> : <p>No review actions yet.</p>}
 
     {dialog?.kind === 'archive' ? <ReasonDialog title={`Archive ${skill.stableKey}`}

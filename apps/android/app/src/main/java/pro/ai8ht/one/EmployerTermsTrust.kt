@@ -138,7 +138,7 @@ private fun statementLabel(kind: String): String = when (kind) {
     else -> prettify(kind)
 }
 
-private fun day(value: String?): String = value?.take(10) ?: "NA"
+private fun day(value: String?): String = formatDate(value)
 
 private sealed interface Loaded<out T> {
     data object Loading : Loaded<Nothing>

@@ -2,6 +2,9 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App.js';
 import { SandboxMarker } from './sandboxMarker.js';
+// Inter is bundled and served from oneby8.com itself. Without it each device fell back to its
+// own system face (Segoe UI, San Francisco, Roboto) and ONE looked different everywhere.
+import '@fontsource-variable/inter';
 import './styles.css';
 
 const root = createRoot(document.getElementById('root') as HTMLElement);

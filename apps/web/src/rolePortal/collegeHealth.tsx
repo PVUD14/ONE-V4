@@ -40,6 +40,9 @@ import type {
 import { V2Bar, V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { StatusBadge } from '../studentComponents.js';
 import { formatApiError } from './shared.js';
+import { SupportCode, supportCodeSuffix } from '../supportCode.js';
+import { formatDate, formatDateTime } from '../dates.js';
+import { codeLabel } from '../labels.js';
 
 const NA = 'NA';
 
@@ -63,12 +66,12 @@ const bandLabel: Readonly<Record<string, string>> = {
 };
 
 function words(value: string): string {
-  return value.toLowerCase().replaceAll('_', ' ').replace(/^./, (first) => first.toUpperCase());
+  return codeLabel(value);
 }
 
 function dateText(value: string | null | undefined): string {
   if (!value) return NA;
-  return new Date(`${value}T00:00:00Z`).toLocaleDateString(undefined, { timeZone: 'UTC', day: 'numeric', month: 'short', year: 'numeric' });
+  return formatDate(`${value}T00:00:00Z`, { utc: true });
 }
 
 /** Shown counts first, largest first; suppressed after, by name, never by true size (as the server). */
@@ -137,7 +140,7 @@ export function OperationsCollegeHealthPanel(): React.ReactElement | null {
   const title = <div className="role-section-title"><h2>College health</h2></div>;
   if (forbidden) {
     return <section className="role-card role-wide" aria-label="College health">{title}
-      <V2EmptyState icon="🔐" title="Not permitted" note="College health is for staff who hold aggregate analytics access. Your access has not changed." hint={`Reference: ${forbidden}`} />
+      <V2EmptyState icon="🔐" title="Not permitted" note="College health is for staff who hold aggregate analytics access. Your access has not changed." hint={<SupportCode reference={forbidden} />} />
     </section>;
   }
 
@@ -286,7 +289,7 @@ export function OperationsCollegeAccountPanel(): React.ReactElement | null {
   const heading = <div className="role-section-title"><h2>College account</h2></div>;
   if (forbidden) {
     return <section className="role-card role-wide" aria-label="College account">{heading}
-      <V2EmptyState icon="🔐" title="Not permitted" note="College account fields are for staff who hold account management access. Your access has not changed." hint={`Reference: ${forbidden}`} />
+      <V2EmptyState icon="🔐" title="Not permitted" note="College account fields are for staff who hold account management access. Your access has not changed." hint={<SupportCode reference={forbidden} />} />
     </section>;
   }
 
@@ -312,7 +315,7 @@ export function OperationsCollegeAccountPanel(): React.ReactElement | null {
         <div><dt>Contract reference</dt><dd>{fields?.contractReference ?? NA}</dd></div>
         <div><dt>AI8HT account owner</dt><dd>{fields?.accountOwner ? `${fields.accountOwner.email} (${words(fields.accountOwner.role)})${fields.accountOwner.active ? '' : ' — no longer active'}` : NA}</dd></div>
         <div><dt>Verification</dt><dd>{words(account.institution.verificationState)}</dd></div>
-        <div><dt>Last changed</dt><dd>{fields ? new Date(fields.updatedAt).toLocaleString() : 'Never'}</dd></div>
+        <div><dt>Last changed</dt><dd>{fields ? formatDateTime(fields.updatedAt) : 'Never'}</dd></div>
       </dl>
       <div className="role-section-title"><h3>College contacts</h3>
         <div className="role-actions"><button type="button" className="secondary" onClick={() => setDialog({ kind: 'add' })} disabled={!policy || account.contacts.length >= account.contactLimit}>Add contact…</button></div></div>
@@ -455,5 +458,5 @@ function accountErrorText(cause: unknown): string {
     CONTACT_PHONE_INVALID: 'Enter a valid phone number.',
   };
   const message = (cause.code ? messages[cause.code] : undefined) ?? formatApiError(cause, 'The change could not be saved.');
-  return message.includes('Reference:') ? message : `${message} Reference: ${cause.correlationId}`;
+  return message.includes('Support code:') ? message : `${message}${supportCodeSuffix(cause.correlationId)}`;
 }

@@ -37,10 +37,13 @@ import { OperationsCareerReadinessPanel } from '../operationsCareerReadinessPane
 import { StatusBadge } from '../studentComponents.js';
 import { RequestApprovalDialog } from './approvals.js';
 import { formatApiError, RestrictedApiState } from './shared.js';
+import { SupportCode } from '../supportCode.js';
+import { formatDateTime } from '../dates.js';
+import { codeLabel } from '../labels.js';
 
 const NA = 'NA';
 const detailLimit = 2000;
-const when = (value: string | null | undefined): string => (value ? new Date(value).toLocaleString() : NA);
+const when = (value: string | null | undefined): string => (value ? formatDateTime(value) : NA);
 
 const views = [
   { value: 'OPEN', label: 'Open' },
@@ -126,7 +129,7 @@ export function OperationsPrivacyConsolePage(): React.ReactElement {
     return <section className="role-module role-module--dense">{heading}
       <div className="role-wide"><V2EmptyState icon="🔐" title="Not permitted"
         note="The privacy console is for staff who work privacy requests. Your access has not changed."
-        hint={`Reference: ${forbiddenReference}`} /></div>
+        hint={<SupportCode reference={forbiddenReference} />} /></div>
       <OperationsCareerReadinessPanel /></section>;
   }
 
@@ -234,7 +237,7 @@ export function OperationsPrivacyConsolePage(): React.ReactElement {
         <thead><tr><th>Person</th><th>Reason</th><th>Context</th><th>Placed</th><th>Blocks</th><th>Release</th></tr></thead>
         <tbody>{holds.holds.map((hold) => <tr key={hold.id}>
           <th scope="row">{subjectLabel(hold.subject)}</th>
-          <td>{hold.reasonCode}</td>
+          <td>{codeLabel(hold.reasonCode)}</td>
           <td>{hold.detail ?? NA}</td>
           <td>{when(hold.placedAt)}<br /><small>{hold.placedBy.email}</small></td>
           <td>{hold.openDeletion ? <>Deletion {hold.openDeletion.reference}<br /><small>scheduled {when(hold.openDeletion.scheduledFor)}</small></> : 'No open deletion'}</td>
@@ -254,7 +257,7 @@ export function OperationsPrivacyConsolePage(): React.ReactElement {
     </section>
 
     <OperationsCareerReadinessPanel />
-    <section className="role-card role-wide"><h2>Mutation boundary</h2><p>n8n remains inactive unless explicitly enabled outside this UI. Kill-switch, workflow activation and credential operations are not exposed as buttons here.</p></section>
+    <section className="role-card role-wide"><h2>What you can change here</h2><p>Automations stay off unless they are switched on outside ONE. Workflow switches and credentials are not available on this page.</p></section>
 
     {placing && holds ? <PlaceHoldDialog token={token} request={placing} reasons={holds.reasons.place}
       onCancel={() => setPlacing(null)}

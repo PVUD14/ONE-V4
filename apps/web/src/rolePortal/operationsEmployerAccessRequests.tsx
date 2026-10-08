@@ -30,6 +30,7 @@ import {
   type OrganizationManagementDto,
 } from '../api.js';
 import { formatApiError } from './shared.js';
+import * as dates from '../dates.js';
 
 type Decision = 'ONBOARDED' | 'DECLINED' | 'SPAM';
 
@@ -49,7 +50,7 @@ const decisionLabels: Readonly<Record<Decision, string>> = { ONBOARDED: 'Mark on
 function formatDate(value: string | null): string {
   if (!value) return 'NA';
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? 'NA' : date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  return Number.isNaN(date.getTime()) ? 'NA' : dates.formatDate(date);
 }
 
 export function EmployerAccessRequestsSection({ organizations }: { readonly organizations: readonly OrganizationManagementDto[] }): React.ReactElement | null {

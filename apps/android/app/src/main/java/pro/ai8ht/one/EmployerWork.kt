@@ -158,7 +158,7 @@ internal fun ApplicantActionsPage(
                     Text("Move this candidate", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        "The server decides which moves are allowed from here; anything it refuses is reported back.",
+                        "ONE checks every move. If one is not allowed from this stage, you are told why.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -556,7 +556,9 @@ private fun ReportGroupCard(name: String, detail: String?, table: ReportTableDto
                     Text(name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                     if (detail != null) Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Text(table.totalLabel(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                val total = table.totalLabel()
+                if (isMissingFigure(total)) NaValueText(total, MaterialTheme.typography.titleSmall)
+                else Text(total, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
             Spacer(Modifier.height(6.dp))
             Text(

@@ -32,7 +32,12 @@ export function AuthLayout({ children, onNavigate }: { readonly children: ReactN
       <p className="auth-showcase-tagline">{productTagline}</p>
     </aside>
     <div className="auth-panel">
-      <main className="auth-panel-main">{children}</main>
+      <main className="auth-panel-main">
+        {/* The AI8HT ribbon 8 turning slowly behind the card: its loops pass in and out around
+            the card's edges. Decorative only, so hidden from assistive technology. */}
+        <img className="auth-brand-eight" src="/assets/ai8ht-eight-ribbon.webp" alt="" aria-hidden="true" width={603} height={1160} decoding="async" />
+        {children}
+      </main>
       <AuthFooter onNavigate={onNavigate} />
     </div>
   </div>;

@@ -232,10 +232,48 @@
 }
 
 .auth-panel-main {
+  position: relative;
   flex: 1;
   display: grid;
   place-items: center;
   padding: 32px 24px;
+  overflow: hidden;
+}
+
+/* The AI8HT ribbon 8 and the card share one grid cell, so the 8 sits centred behind the card.
+   It turns on its vertical axis; the card is frosted glass, so the ribbon reads through it
+   softly and in full around its edges. */
+.auth-panel-main { grid-template-columns: minmax(0, 1fr); }
+.auth-panel-main > * { grid-area: 1 / 1; justify-self: center; }
+
+.auth-brand-eight {
+  z-index: 0;
+  height: min(88vh, 860px);
+  width: auto;
+  max-width: none;
+  pointer-events: none;
+  user-select: none;
+  opacity: .9;
+  filter: drop-shadow(0 30px 40px rgba(16, 24, 40, .18));
+  transform: perspective(1600px) rotateY(0deg);
+  animation: auth-eight-turn 16s linear infinite;
+}
+
+@keyframes auth-eight-turn {
+  from { transform: perspective(1600px) rotateY(0deg); }
+  to { transform: perspective(1600px) rotateY(360deg); }
+}
+
+.auth-panel-main > .login-card {
+  position: relative;
+  z-index: 1;
+  background: rgba(255, 255, 255, .8);
+  -webkit-backdrop-filter: blur(10px) saturate(1.2);
+  backdrop-filter: blur(10px) saturate(1.2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-brand-eight { animation: none; }
 }
 
 .auth-footer {
@@ -434,6 +472,7 @@
   .auth-benefits, .auth-showcase-tagline { display: none; }
   .auth-panel { min-height: 0; }
   .auth-panel-main { padding: 24px 16px 32px; }
+  .auth-brand-eight { height: min(92vh, 700px); }
   .login-card { padding: 28px 22px; }
   .auth-footer { padding: 16px; justify-content: center; text-align: center; }
   .login-shell { padding: 32px 16px; }

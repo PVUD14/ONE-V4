@@ -169,7 +169,7 @@ describe('Assign and plan learning', () => {
     fireEvent.click(screen.getByText('Set next step', { selector: 'form button' }));
     const alert = await screen.findByText(/already has a next step set by a lecturer/);
     expect(alert).toHaveTextContent('already has a next step set by a lecturer');
-    expect(alert).toHaveTextContent('corr-pending');
+    expect(alert).toHaveTextContent('Support code: corrpend');
     expect(screen.queryByText(/private upstream text/)).not.toBeInTheDocument();
   });
 
@@ -185,7 +185,7 @@ describe('Assign and plan learning', () => {
   it('shows a safe forbidden state without upstream text', async () => {
     fetchMock.mockResolvedValue(ok({ message: 'private upstream error', error: { code: 'FORBIDDEN', correlationId: 'corr-403' } }, 403));
     render(page());
-    expect((await screen.findAllByRole('alert'))[0]).toHaveTextContent('corr-403');
+    expect((await screen.findAllByRole('alert'))[0]).toHaveTextContent('Support code: corr403');
     expect(screen.queryByText('private upstream error')).not.toBeInTheDocument();
   });
 

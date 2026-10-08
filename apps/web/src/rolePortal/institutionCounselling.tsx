@@ -9,6 +9,8 @@
  */
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ApiRequestError, getProtectedAccessToken } from '../api.js';
+import { supportCodeSuffix } from '../supportCode.js';
+import { formatDate } from '../dates.js';
 import {
   addCounsellingParticipant, eraseCounsellingNote, listCounsellingCases, listCounsellingNotes, removeCounsellingParticipant,
   setCounsellingNoteVisibility, writeCounsellingNote, type CounsellingCasesDto, type CounsellingNotesDto,
@@ -25,7 +27,7 @@ const eraseReasons = [['STUDENT_REQUEST', 'The student asked for it'], ['RECORDE
 /** A plain message and the correlation ID; never upstream error text (build rules). */
 export function counsellingError(cause: unknown): string {
   if (cause instanceof ApiRequestError) {
-    const reference = ` Reference: ${cause.correlationId}.`;
+    const reference = supportCodeSuffix(cause.correlationId);
     if (cause.status === 401) return 'Your session has expired. Sign in again.' + reference;
     if (cause.code === 'SCOPE_REQUIRED') return 'Writing a counselling note needs a department or teaching assignment on your staff membership. An administrator can set it.' + reference;
     if (cause.status === 403) return 'Counselling notes for this student are not available to you.' + reference;
@@ -38,7 +40,7 @@ export function counsellingError(cause: unknown): string {
 
 function dateOf(value: string | null | undefined): string {
   if (!value || !Number.isFinite(Date.parse(value))) return 'NA';
-  return new Date(value).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  return formatDate(value);
 }
 
 export function CounsellingNotesSection({ institutionId }: { readonly institutionId: string }): React.ReactElement {

@@ -32,11 +32,14 @@ import type { BreachClockDto, IncidentDetailDto, IncidentDto, IncidentListDto, I
 import { V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { StatusBadge } from '../studentComponents.js';
 import { formatApiError } from './shared.js';
+import { SupportCode } from '../supportCode.js';
+import { formatDateTime } from '../dates.js';
+import { codeLabel } from '../labels.js';
 
 type Tone = 'success' | 'warning' | 'neutral' | 'info' | 'danger';
 
 const label = (value: string): string => value.split('_').map((word) => word.charAt(0) + word.slice(1).toLowerCase()).join(' ');
-const when = (value: string | null | undefined): string => (value ? new Date(value).toLocaleString() : 'NA');
+const when = (value: string | null | undefined): string => (value ? formatDateTime(value) : 'NA');
 const textGuidance = 'No names, email addresses or phone numbers: describe what happened, not who it happened to.';
 
 const stateTone = (state: string): Tone => (state === 'CLOSED' || state === 'RESOLVED' ? 'success' : state === 'CONTAINED' ? 'info' : 'warning');
@@ -116,7 +119,7 @@ export function OperationsIncidentRegisterPage(): React.ReactElement | null {
 
   if (forbiddenReference) {
     return <section className="role-module role-module--dense">{heading}
-      <div className="role-wide"><V2EmptyState icon="🔐" title="Not permitted" note="The incident register is for staff who hold Incident Manage. Your access has not changed." hint={`Reference: ${forbiddenReference}`} /></div></section>;
+      <div className="role-wide"><V2EmptyState icon="🔐" title="Not permitted" note="The incident register is for staff who hold Incident Manage. Your access has not changed." hint={<SupportCode reference={forbiddenReference} />} /></div></section>;
   }
 
   const incidents = [...(list?.incidents ?? []), ...more];
@@ -272,7 +275,7 @@ function IncidentPanel({ token, incidentId, policy, onChanged, onClose }: {
 
     <h3>Timeline</h3>
     <ol className="role-check-list">{detail.timeline.map((entry, index) => <li key={`${entry.occurredAt}-${index}`}>
-      <strong>{describeEntry(entry)}</strong> — {entry.actor}, {when(entry.occurredAt)} · {entry.reasonCode}
+      <strong>{describeEntry(entry)}</strong> — {entry.actor}, {when(entry.occurredAt)} · {codeLabel(entry.reasonCode)}
       {entry.note ? <><br />{entry.note}</> : null}
     </li>)}</ol>
     {!closed ? <form onSubmit={(event) => void submitNote(event)} noValidate aria-label="Add to the timeline">

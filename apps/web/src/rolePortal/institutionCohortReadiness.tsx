@@ -34,6 +34,8 @@ import type {
 } from '../api.js';
 import { V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { formatApiError } from './shared.js';
+import { supportCodeSuffix } from '../supportCode.js';
+import { formatDate } from '../dates.js';
 
 export const REQUIREMENT_CELL_LABELS: Readonly<Record<string, string>> = {
   MET: 'Met', PARTIAL: 'Partly there', MISSING: 'Not yet', NOT_ENOUGH_EVIDENCE: 'Too little evidence', NO_EVIDENCE: 'No evidence yet',
@@ -63,13 +65,13 @@ const ERROR_TEXT: Readonly<Record<string, string>> = {
 
 function sprintError(error: unknown, fallback: string): string {
   if (error instanceof ApiRequestError) {
-    if (error.code && ERROR_TEXT[error.code]) return `${ERROR_TEXT[error.code]} Reference: ${error.correlationId}`;
-    if (error.status === 403) return `You do not have access to cohort readiness. Reference: ${error.correlationId}`;
+    if (error.code && ERROR_TEXT[error.code]) return `${ERROR_TEXT[error.code]}${supportCodeSuffix(error.correlationId)}`;
+    if (error.status === 403) return `You do not have access to cohort readiness.${supportCodeSuffix(error.correlationId)}`;
   }
   return formatApiError(error, fallback);
 }
 
-const day = (value: string): string => new Date(value).toLocaleDateString([], { dateStyle: 'medium' });
+const day = (value: string): string => formatDate(value);
 const cellLabel = (cells: readonly CountCellDto[], key: string): string => {
   const cell = cells.find((entry) => entry.key === key);
   return cell ? suppressedCountLabel(cell) : 'NA';

@@ -26,6 +26,8 @@ import { StudentConversationCard } from './applicationMessages.js';
 import { venueModeLabels, type StudentCampusDriveDto } from './api/campusDrives.js';
 import { StudentNominationsCard } from './studentNominations.js';
 import { EmployerApplicantExportPanel } from './rolePortal/employerApplicantExport.js';
+import * as dates from './dates.js';
+import { codeLabel } from './labels.js';
 import {
   ApiRequestError,
   addOpportunityAudience,
@@ -128,11 +130,11 @@ function formatMoney(currency: string | null, amount: string | null | undefined,
 function formatDate(value: string | null | undefined): string {
   if (!value) return '—';
   const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? '—' : parsed.toLocaleDateString();
+  return Number.isNaN(parsed.getTime()) ? '—' : dates.formatDate(parsed);
 }
 
 function humanise(value: string): string {
-  return value.replace(/_/g, ' ').toLowerCase().replace(/^./, (c) => c.toUpperCase());
+  return codeLabel(value);
 }
 
 // ---------------------------------------------------------------------------
@@ -1144,7 +1146,7 @@ export function CandidateIdentity({ item }: { readonly item: Pick<EmployerApplic
 
 function formatDateTime(value: string | null): string {
   if (!value || !Number.isFinite(Date.parse(value))) return 'NA';
-  return new Date(value).toLocaleString();
+  return dates.formatDateTime(value);
 }
 
 function ScheduleFields(): React.ReactElement {

@@ -84,8 +84,8 @@ describe('Approvals queue', () => {
     render(<OperationsApprovalsPanel />);
     const row = (await screen.findByText('Suspend Northwind Employer')).closest('tr')!;
     expect(within(row).getByText('ops.lead@example.test')).toBeInTheDocument();
-    expect(within(row).getByText('POLICY_VIOLATION')).toBeInTheDocument();
-    expect(within(row).getByText('PENDING')).toBeInTheDocument();
+    expect(within(row).getByText('Policy violation')).toBeInTheDocument();
+    expect(within(row).getByText('Pending')).toBeInTheDocument();
     expect(row.textContent).not.toContain(organizationId);
     expect(screen.getByText('People who can approve').previousSibling).toHaveTextContent('2');
     expect(screen.getByText('Solo safeguard').previousSibling).toHaveTextContent('Off');
@@ -125,7 +125,7 @@ describe('Approvals queue', () => {
     current = queue([approval({ state: 'APPROVED', canApprove: false, canReject: false, decidedBy: { email: 'me@example.test', isSelf: true },
       decidedAt: '2026-09-25T10:20:00.000Z', decisionReasonCode: 'VERIFIED_NEED', mode: 'SOLO', soloNotice: 'NOT_DELIVERED' })], { approverCount: 1, soloSafeguardActive: true });
     render(<OperationsApprovalsPanel />);
-    expect(await screen.findByText('SOLO')).toBeInTheDocument();
+    expect(await screen.findByText('Solo')).toBeInTheDocument();
     expect(screen.getByText('Notice not delivered — no email sender is configured.')).toBeInTheDocument();
     expect(screen.getByText(/Only one person can approve right now/)).toBeInTheDocument();
   });
@@ -151,13 +151,13 @@ describe('Approvals queue', () => {
 
     fetchMock.mockImplementation(() => failure(500, 'INTERNAL', 'corr-appr-error'));
     render(<OperationsApprovalsPanel />);
-    expect(await screen.findByRole('alert')).toHaveTextContent('Unable to load approvals. Reference: corr-appr-error');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Unable to load approvals. Support code: corrappr');
     cleanup();
 
     fetchMock.mockImplementation(() => failure(403, 'FORBIDDEN', 'corr-appr-403'));
     render(<OperationsApprovalsPanel />);
     expect(await screen.findByText('Not permitted')).toBeInTheDocument();
-    expect(screen.getByText('Reference: corr-appr-403')).toBeInTheDocument();
+    expect(screen.getByText('Support code: corrappr')).toBeInTheDocument();
   });
 });
 

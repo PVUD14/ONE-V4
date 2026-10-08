@@ -88,7 +88,7 @@ describe('verification queue', () => {
     render(<AcademicVerificationPage institutionId={institutionId} />);
     fireEvent.click(await screen.findByRole('button', { name: 'Confirm' }));
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(
-      /confirming or uploading results needs a department or teaching assignment on your account\. Ask your institution administrator to assign one\. Reference: corr-403/));
+      /confirming or uploading results needs a department or teaching assignment on your account\. Ask your institution administrator to assign one\. Support code: corr403/));
     expect(screen.getByRole('status')).not.toHaveTextContent(/SCOPE_REQUIRED|permanent and cannot be reversed/);
     expect(screen.getByText('Local Student')).toBeInTheDocument();
   });
@@ -96,7 +96,7 @@ describe('verification queue', () => {
   it('shows a plain error with a reference when the queue cannot load', async () => {
     routes({ [`${base}/academic-verification-queue`]: new Error('down') });
     render(<AcademicVerificationPage institutionId={institutionId} />);
-    expect(await screen.findByText(/The verification queue could not be loaded\. Reference: corr-500/)).toBeInTheDocument();
+    expect(await screen.findByText(/The verification queue could not be loaded\. Support code: corr500/)).toBeInTheDocument();
     expect(screen.queryByText(/stack|Error:/)).not.toBeInTheDocument();
   });
 
@@ -143,7 +143,7 @@ describe('results upload', () => {
     routes({ [previewPath]: scopeRequired });
     render(<AcademicResultsUpload institutionId={institutionId} />);
     fireEvent.click(screen.getByRole('button', { name: 'Validate results' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent(/needs a department or teaching assignment on your account\. Ask your institution administrator to assign one\. Reference: corr-403/);
+    expect(await screen.findByRole('alert')).toHaveTextContent(/needs a department or teaching assignment on your account\. Ask your institution administrator to assign one\. Support code: corr403/);
     expect(screen.queryByRole('button', { name: /^Record / })).not.toBeInTheDocument();
   });
 

@@ -149,7 +149,7 @@ describe('role demand dashboard', () => {
   it('shows an error with its reference and no numbers', async () => {
     summaryResponse = () => failure(500, 'ROLE_DEMAND_UNAVAILABLE', 'corr-broken');
     render(<OperationsRoleDemandPage />);
-    expect(await screen.findByRole('alert')).toHaveTextContent('Reference: corr-broken');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Support code: corrbrok');
     expect(screen.getByText('Students with a career target').parentElement).toHaveTextContent('NA');
   });
 
@@ -157,7 +157,7 @@ describe('role demand dashboard', () => {
     summaryResponse = () => failure(403, 'FORBIDDEN', 'corr-forbidden');
     render(<OperationsRoleDemandPage />);
     expect(await screen.findByText('Not permitted')).toBeInTheDocument();
-    expect(screen.getByText('Reference: corr-forbidden')).toBeInTheDocument();
+    expect(screen.getByText('Support code: corrforb')).toBeInTheDocument();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
 

@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { V2Stat } from './dashboardsV2.js';
+import { formatDateTime } from './dates.js';
+import { codeLabel } from './labels.js';
 import {
   assignInstitutionExam,
   createExamQuestion,
@@ -50,7 +52,7 @@ export function InstitutionExamEnginePage({ institutionId, canApprove = true }: 
       setQuestions(questionsResponse.questions);
       setExams(examsResponse.assessments);
       setStudents(studentsResponse.students.filter((student) => (student.relationship?.state ?? student.status) === 'ACTIVE'));
-    }).catch(() => setError('Assessment engine data could not be loaded.'));
+    }).catch(() => setError('Assessments could not be loaded. Try again.'));
     return () => abort.abort();
   }, [token, institutionId, reloadNonce]);
 
@@ -69,7 +71,7 @@ export function InstitutionExamEnginePage({ institutionId, canApprove = true }: 
 
   return <section className="role-module role-module--dense">
     <div className="role-page-heading"><div>
-      <span className="eyebrow">Authenticated API-backed</span>
+      <span className="eyebrow">Assessments</span>
       <h1>Assessments</h1>
       <p>Build a governed question bank, assemble blueprint assessments over approved questions, publish, assign rostered students and read results.</p>
     </div></div>
@@ -226,7 +228,7 @@ function QuestionBankCard({ token, institutionId, subjects, questions, canApprov
           <tr key={question.id}>
             <th scope="row"><strong>{question.questionText.slice(0, 90)}{question.questionText.length > 90 ? '…' : ''}</strong></th>
             <td>{question.subjectName}</td>
-            <td>{question.questionType.replace(/_/g, ' ')}</td>
+            <td>{codeLabel(question.questionType)}</td>
             <td>{question.difficulty}</td>
             <td>{question.approvalStatus.replace('_', ' ')}</td>
             <td><div className="role-record-actions">
@@ -373,8 +375,8 @@ function ExamListCard({ token, institutionId, exams, students, canApprove, onDon
           <tr key={exam.id}>
             <th scope="row"><strong>{exam.title}</strong><span>{exam.assessmentKind.replace('_', ' ')} · {exam.totalMarks} marks · {Math.round(exam.durationSeconds / 60)} min</span></th>
             <td>{exam.subjectName}</td>
-            <td>{new Date(exam.startsAt).toLocaleString()} → {new Date(exam.endsAt).toLocaleString()}</td>
-            <td>{exam.lifecycleState}</td>
+            <td>{formatDateTime(exam.startsAt)} → {formatDateTime(exam.endsAt)}</td>
+            <td>{codeLabel(exam.lifecycleState)}</td>
             <td>{exam.assignedCount}</td>
             <td>{exam.completedAttempts}</td>
             <td><div className="role-record-actions">

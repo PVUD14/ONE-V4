@@ -91,7 +91,7 @@ export function EmployerReportsPage({ employerId }: { readonly employerId: strin
 
     <div className="v2-row v2-cols-4 career-stat-strip role-wide">
       <V2Stat icon="📨" tone="blue" label="Applications" value={reports ? total(reports.overall) : 'NA'} />
-      <V2Stat icon="⏱" tone="amber" label="Median days to first offer" value={!offerDays ? 'NA' : offerDays.medianDays === null ? '<5 offers' : offerDays.medianDays.toFixed(1)} />
+      <V2Stat icon="⏱" tone="amber" label="Median days to first offer" value={!offerDays ? 'NA' : offerDays.medianDays === null ? 'Too few offers' : offerDays.medianDays.toFixed(1)} />
       <V2Stat icon="🤝" tone="green" label="Offer acceptance" value={!reports ? 'NA' : reports.offers.acceptanceRate === null ? 'Too few answers' : `${(reports.offers.acceptanceRate * 100).toFixed(0)}%`} />
       <V2Stat icon="🏫" tone="indigo" label="Campus drives" value={reports ? reports.byDrive.length : 'NA'} />
     </div>

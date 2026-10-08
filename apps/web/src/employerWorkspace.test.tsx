@@ -90,9 +90,9 @@ describe('D-1: employer owners and admins resolve the employer workspace', () =>
     render(React.createElement(App));
     await waitFor(() => expect(window.location.pathname).toBe('/employer/recruiter'));
     expect(screen.queryByText('No active ONE workspace is available for this identity.')).not.toBeInTheDocument();
-    expect((await screen.findAllByText(role)).length).toBeGreaterThan(0);
     // The portal is shared with recruiters, but the label names the role actually held.
     const roleName = role === 'EMPLOYER_OWNER' ? 'Employer Owner' : 'Employer Admin';
+    expect((await screen.findAllByText(roleName)).length).toBeGreaterThan(0);
     expect(screen.getByText(`Signed in as ${roleName}`)).toBeInTheDocument();
     expect(screen.queryByText('Signed in as Recruiter')).not.toBeInTheDocument();
   });
@@ -130,7 +130,7 @@ describe('D-1: employer owners and admins resolve the employer workspace', () =>
     const { App } = await import('./App.js');
     render(React.createElement(App));
     await waitFor(() => expect(window.location.pathname).toBe('/employer/recruiter'));
-    expect((await screen.findAllByText('RECRUITER')).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText('Recruiter')).length).toBeGreaterThan(0);
   });
 
   it('keeps an institution-only identity out of the employer workspace', async () => {

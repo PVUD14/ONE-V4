@@ -76,7 +76,7 @@ describe('Growth → Leads', () => {
     const stats = screen.getByLabelText('Leads summary');
     await waitFor(() => expect(within(stats).getByText('Your open leads').parentElement).toHaveTextContent('3'));
     expect(within(stats).getByText('Unowned in your regions').parentElement).toHaveTextContent('2');
-    expect(screen.getByText('Draft for legal review')).toBeInTheDocument();
+    expect(screen.getByText('Draft wording, pending approval')).toBeInTheDocument();
     expect(screen.getByText('We erase them 24 months after our last contact.')).toBeInTheDocument();
     // Executives are not offered the managers' "needs a new owner" list.
     expect(within(screen.getByLabelText('Which leads')).queryByRole('option', { name: 'Needs a new owner' })).not.toBeInTheDocument();

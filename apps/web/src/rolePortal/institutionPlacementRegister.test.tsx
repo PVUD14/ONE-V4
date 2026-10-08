@@ -133,7 +133,7 @@ describe('admin Placement: statistics and register', () => {
     routes({ [`${base}/placement-statistics`]: 'FORBIDDEN', [`${base}/placement-register`]: 'FORBIDDEN' });
     open('institution-admin', 'Placement', 'INSTITUTION_ADMIN');
     const section = await screen.findByRole('region', { name: 'Placement statistics' });
-    expect(await within(section).findByRole('alert')).toHaveTextContent('Reference: corr-403');
+    expect(await within(section).findByRole('alert')).toHaveTextContent('Support code: corr403');
     expect(within(section).getAllByText('NA').length).toBe(5);
     expect(document.body.textContent).not.toContain('upstream private detail');
   });

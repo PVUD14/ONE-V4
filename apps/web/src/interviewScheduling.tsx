@@ -9,6 +9,9 @@
  */
 import { useEffect, useState } from 'react';
 import { getAccessToken } from './auth.js';
+import { supportCodeSuffix } from './supportCode.js';
+import { formatDateTime } from './dates.js';
+import { codeLabel } from './labels.js';
 import {
   ApiRequestError,
   createScorecardTemplate,
@@ -41,12 +44,12 @@ const modeLabels: Readonly<Record<string, string>> = { VIDEO: 'Video', PHONE: 'P
 
 function when(value: string | null): string {
   if (!value || !Number.isFinite(Date.parse(value))) return 'NA';
-  return new Date(value).toLocaleString();
+  return formatDateTime(value);
 }
 
 function failure(error: unknown, fallback: string): string {
   if (error instanceof ApiRequestError && error.status === 403) return 'You do not have access to this, or the candidate is no longer sharing their details.';
-  return error instanceof ApiRequestError && error.correlationId ? `${fallback} Reference: ${error.correlationId}.` : fallback;
+  return error instanceof ApiRequestError && error.correlationId ? `${fallback}${supportCodeSuffix(error.correlationId)}` : fallback;
 }
 
 /** The latest change as one line for a table cell: "Rescheduled — The candidate asked". */
@@ -108,7 +111,7 @@ export function InterviewScorecardsPanel({ employerId, interviewId, onClose }: {
       {(data.scorecards ?? []).length === 0 ? <p>No scorecards recorded yet.</p> : <ul className="hiring-list">
         {(data.scorecards ?? []).map((card) => <li key={`${card.submittedBy}-${card.submittedAt ?? ''}`} className="hiring-list-item"><div>
           <h3>{card.submittedBy}</h3>
-          <p className="hiring-meta">Recommendation: {card.recommendation.replace(/_/g, ' ').toLowerCase()} · Overall rating: {card.overallRating ?? 'NA'} · {when(card.submittedAt)}</p>
+          <p className="hiring-meta">Recommendation: {codeLabel(card.recommendation)} · Overall rating: {card.overallRating ?? 'NA'} · {when(card.submittedAt)}</p>
           {card.ratings.length ? <ul>{card.ratings.map((rating) => <li key={rating.criterionId}>{rating.label}: {rating.rating} of 5{rating.note ? ` — ${rating.note}` : ''}</li>)}</ul> : null}
           {card.strengths ? <p>Strengths: {card.strengths}</p> : null}
           {card.concerns ? <p>Concerns: {card.concerns}</p> : null}

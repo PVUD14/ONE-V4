@@ -277,7 +277,7 @@ describe('Cognito Hosted UI browser authentication', () => {
     render(React.createElement(App));
     await waitFor(() => expect(window.location.pathname).toBe('/institution/admin'));
     await waitFor(() => expect(screen.getAllByText('institution.admin@uat.example.test').length).toBeGreaterThan(0));
-    expect(screen.getByText('INSTITUTION_ADMIN')).toBeInTheDocument();
+    expect(screen.getByText('Institution Admin')).toBeInTheDocument();
     expect(screen.queryByText('Rahul Kumar')).not.toBeInTheDocument();
 
     window.history.pushState(null, '', '/student');
@@ -363,7 +363,7 @@ describe('Cognito Hosted UI browser authentication', () => {
     const { App } = await import('./App.js');
     render(React.createElement(App));
     await waitFor(() => expect(window.location.pathname).toBe('/operations/admin'));
-    expect(await screen.findByText('OPERATIONS_ADMIN')).toBeInTheDocument();
+    expect(await screen.findByText('Operations Admin')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Student Dashboard' })).not.toBeInTheDocument();
     expect(screen.queryByText('Rahul Kumar')).not.toBeInTheDocument();
   });
@@ -389,7 +389,7 @@ describe('Cognito Hosted UI browser authentication', () => {
     }));
     const { App } = await import('./App.js');
     render(React.createElement(App));
-    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('We could not load your ONE workspace. Reference: ctx-ref-123456'));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('We could not load your ONE workspace. Support code: ctxref12'));
     expect(screen.queryByRole('heading', { name: 'Student Dashboard' })).not.toBeInTheDocument();
     expect(screen.queryByText('Rahul Kumar')).not.toBeInTheDocument();
     expect(screen.queryByText('ONE could not resolve an active workspace for this identity.')).not.toBeInTheDocument();

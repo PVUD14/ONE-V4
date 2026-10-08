@@ -25,6 +25,8 @@ import { campusDriveStateLabels, listEmployerCampusDrives, listInstitutionCampus
 import { getPlacementStatistics, type PlacementStatisticsDto } from './api/placementRegister.js';
 import type { SuppressedCountDto } from './api/privacyOperations.js';
 import { getEmployerSummary, listEmployerInterviews, type EmployerInterviewDto, type EmployerSummaryDto } from './api/hiring.js';
+import { formatDate } from './dates.js';
+import { codeLabel } from './labels.js';
 
 /**
  * Pilot-exact staff dashboards. Same rule as the student V3: the pilot's
@@ -203,7 +205,7 @@ export function InstitutionDashboardV3({ institutionId, basePath }: { readonly i
             <div key={entry.institutionStudentId} className="pilot-list-row">
               <span className="pilot-tile rose"><AlertTriangle size={16} /></span>
               <div className="grow"><strong>{entry.studentName}</strong><small>{entry.inProgress ? `In progress now: ${entry.examTitle}` : `Has not attempted: ${entry.examTitle}`}</small></div>
-              <span className="pilot-chip amber">Due {new Date(entry.endsAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+              <span className="pilot-chip amber">Due {formatDate(entry.endsAt)}</span>
               <button type="button" className="pilot-btn ghost small" onClick={() => go(`${basePath}/assessments`)}>Review</button>
             </div>
           )) : <p style={{ color: 'var(--p-muted)', margin: '8px 0' }}>Nobody needs attention right now — every assigned assessment is attempted.</p>}
@@ -229,7 +231,7 @@ export function InstitutionDashboardV3({ institutionId, basePath }: { readonly i
           : data.drives.upcoming.length ? <div className="pilot-list">{data.drives.upcoming.slice(0, 4).map((drive) => (
             <div key={drive.id} className="pilot-list-row">
               <span className="pilot-tile blue"><Building2 size={16} /></span>
-              <div className="grow"><strong>{drive.employerName}</strong><small>{drive.opportunityTitle ?? 'Untitled'} · {new Date(drive.scheduledStartAt ?? '').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</small></div>
+              <div className="grow"><strong>{drive.employerName}</strong><small>{drive.opportunityTitle ?? 'Untitled'} · {formatDate(drive.scheduledStartAt ?? '')}</small></div>
             </div>))}</div>
             : <p style={{ color: 'var(--p-muted)', margin: '4px 0' }}>No drive is scheduled yet.</p>}
       </section>
@@ -341,7 +343,7 @@ export function EmployerDashboardV3({ basePath }: { readonly basePath: string })
           ['Open Roles', figure(summary?.openJobs), 'blue', Briefcase, null],
           ['Total Applicants', figure(summary?.applicationsTotal), 'indigo', Users, summary ? `${summary.newApplicantsLast7Days} new in 7 days` : null],
           ['In Pipeline', figure(summary?.openApplications), 'purple', ClipboardCheck, null],
-          ['Offers Extended', figure(summary?.offersPending), 'amber', TrendingUp, summary ? 'Awaiting an answer' : null],
+          ['Offers Pending', figure(summary?.offersPending), 'amber', TrendingUp, null],
           ['Hires', figure(summary?.hires), 'green', Building2, null],
         ] as const).map(([label, value, tone, Icon, note]) => (
           <section key={label} className="pilot-card pilot-kpi">
@@ -385,7 +387,7 @@ export function EmployerDashboardV3({ basePath }: { readonly basePath: string })
             <div key={applicant.id} className="pilot-list-row">
               <span className="pilot-avatar" style={{ width: 34, height: 34, fontSize: 11.5 }}>{(applicant.candidateName ?? 'C').split(/\s+/).slice(0, 2).map((word) => word[0]).join('')}</span>
               <div className="grow"><strong>{applicant.candidateName ?? 'Candidate'}</strong><small>{applicant.opportunityTitle}</small></div>
-              <span className={`pilot-chip ${STAGE_TONE[applicant.state] ?? 'blue'}`}>{applicant.state.replaceAll('_', ' ')}</span>
+              <span className={`pilot-chip ${STAGE_TONE[applicant.state] ?? 'blue'}`}>{codeLabel(applicant.state)}</span>
             </div>
           )) : <p style={{ color: 'var(--p-muted)', margin: '8px 0' }}>Nobody shortlisted yet.</p>}
         </div>

@@ -32,8 +32,10 @@ import { V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { StatusBadge } from '../studentComponents.js';
 import { formatApiError } from './shared.js';
 import { emailSummary } from './incidents.js';
+import { SupportCode, supportCodeSuffix } from '../supportCode.js';
+import { formatDateTime } from '../dates.js';
 
-const when = (value: string | null | undefined): string => (value ? new Date(value).toLocaleString() : 'NA');
+const when = (value: string | null | undefined): string => (value ? formatDateTime(value) : 'NA');
 const label = (value: string): string => value.split('_').map((word) => word.charAt(0) + word.slice(1).toLowerCase()).join(' ');
 
 type Action =
@@ -83,7 +85,7 @@ export function OperationsCommunicationsPage(): React.ReactElement | null {
 
   if (forbiddenReference) {
     return <section className="role-module role-module--dense">{heading}
-      <div className="role-wide"><V2EmptyState icon="🔐" title="Not permitted" note="Status communications are for staff who hold Communications Templates. Your access has not changed." hint={`Reference: ${forbiddenReference}`} /></div></section>;
+      <div className="role-wide"><V2EmptyState icon="🔐" title="Not permitted" note="Status communications are for staff who hold Communications Templates. Your access has not changed." hint={<SupportCode reference={forbiddenReference} />} /></div></section>;
   }
   if (!policy?.reasons || !templates || !notices) {
     return <section className="role-module role-module--dense">{heading}
@@ -272,11 +274,11 @@ function CommunicationsActionDialog({ token, policy, action, onCancel, onDone }:
       }
     } catch (cause) {
       setError(cause instanceof ApiRequestError && cause.status === 429
-        ? `Rate limit: a notice for this incident was approved in the last ${policy.rateLimit.minimumSpacingMinutes} minutes, or ${policy.rateLimit.dailyLimit} in the last day. Reference: ${cause.correlationId}`
+        ? `Rate limit: a notice for this incident was approved in the last ${policy.rateLimit.minimumSpacingMinutes} minutes, or ${policy.rateLimit.dailyLimit} in the last day.${supportCodeSuffix(cause.correlationId)}`
         : cause instanceof ApiRequestError && cause.code === 'STATUS_NOTICE_SELF_APPROVAL_REFUSED'
-          ? `You drafted this notice and someone else can approve it, so they must. Reference: ${cause.correlationId}`
+          ? `You drafted this notice and someone else can approve it, so they must.${supportCodeSuffix(cause.correlationId)}`
           : cause instanceof ApiRequestError && cause.code === 'STATUS_NOTICE_SOLO_COOLING_OFF'
-            ? `The solo cooling-off has not passed: you can approve your own notice from ${when(action.kind === 'approveNotice' ? action.notice.soloApprovalAvailableAt : null)}. Reference: ${cause.correlationId}`
+            ? `The solo cooling-off has not passed: you can approve your own notice from ${when(action.kind === 'approveNotice' ? action.notice.soloApprovalAvailableAt : null)}.${supportCodeSuffix(cause.correlationId)}`
             : formatApiError(cause, 'The change could not be saved.'));
       setBusy(false);
     }

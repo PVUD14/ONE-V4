@@ -109,7 +109,7 @@ describe('EMP-15 employer Dashboard', () => {
     expect(within(kpi('Total Applicants')).getByText('41')).toBeInTheDocument();
     expect(within(kpi('Total Applicants')).getByText('4 new in 7 days')).toBeInTheDocument();
     expect(within(kpi('In Pipeline')).getByText('30')).toBeInTheDocument();
-    expect(within(kpi('Offers Extended')).getByText('1')).toBeInTheDocument();
+    expect(within(kpi('Offers Pending')).getByText('1')).toBeInTheDocument();
     expect(within(kpi('Hires')).getByText('6')).toBeInTheDocument();
     expect(screen.getByText('2 awaiting colleges')).toBeInTheDocument();
     expect(screen.getByText('1 drive needs your changes.')).toBeInTheDocument();
@@ -129,7 +129,7 @@ describe('EMP-15 employer Dashboard', () => {
     routes({ summaryStatus: 500 });
     render(<EmployerDashboardV3 basePath="/employer/recruiter" />);
     expect(await screen.findByText('Your hiring figures could not be loaded, so they read NA.')).toBeInTheDocument();
-    for (const label of ['Open Roles', 'Total Applicants', 'In Pipeline', 'Offers Extended', 'Hires']) expect(within(kpi(label)).getByText('NA')).toBeInTheDocument();
+    for (const label of ['Open Roles', 'Total Applicants', 'In Pipeline', 'Offers Pending', 'Hires']) expect(within(kpi(label)).getByText('NA')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Hiring Funnel' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Pipeline Mix' })).toBeInTheDocument();
     expect(screen.getByText('Interviews this week could not be counted — NA.')).toBeInTheDocument();
@@ -174,7 +174,7 @@ describe('EMP-15 employer Reports', () => {
     routes({ reportsStatus: 403 });
     render(<EmployerRecruiterRealityPage portal={portal} routeLabel="Reports" />);
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('Reference: corr-reports-1');
+    expect(alert).toHaveTextContent('Support code: corrrepo');
     expect(alert.textContent).not.toMatch(/stack|Error:/);
     expect(screen.getByRole('heading', { name: 'Funnel by college' })).toBeInTheDocument();
   });

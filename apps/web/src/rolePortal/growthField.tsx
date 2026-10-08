@@ -33,6 +33,7 @@ import {
 import { V2Chip, V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { growthCodeLabel } from './growthLeads.js';
 import { formatApiError } from './shared.js';
+import { formatDateTime } from '../dates.js';
 
 const NA = 'NA';
 
@@ -55,7 +56,7 @@ function fieldError(cause: unknown, fallback: string): string {
 }
 
 function when(value: string | null): string {
-  return value ? new Date(value).toLocaleString() : NA;
+  return value ? formatDateTime(value) : NA;
 }
 
 function dueLabel(followUp: GrowthFollowUpDto): string {
@@ -155,7 +156,7 @@ export function GrowthFieldPage({ role }: { readonly role?: string | undefined }
 
 function LocationNoticeCard({ vocabulary }: { readonly vocabulary: GrowthFieldVocabularyDto | null }): React.ReactElement {
   return <section className="v2-card" aria-label="Visit location">
-    <div className="v2-card-head"><h2>Visit location</h2><V2Chip tone="amber">Draft for legal review</V2Chip></div>
+    <div className="v2-card-head"><h2>Visit location</h2><V2Chip tone="amber">Draft wording, pending approval</V2Chip></div>
     {vocabulary ? <>{vocabulary.locationNotice.text.map((line) => <p key={line} className="v2-empty">{line}</p>)}<small>Version {vocabulary.locationNotice.version}</small></> : <p className="v2-empty">{NA}</p>}
   </section>;
 }

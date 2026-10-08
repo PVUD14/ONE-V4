@@ -14,11 +14,12 @@ import { listTutorHintsForReview, reviewTutorHint, type TutorHintReviewDto, type
 import { V2EmptyState } from '../dashboardsV2.js';
 import { StatusBadge } from '../studentComponents.js';
 import { formatApiError } from './shared.js';
+import { formatDateTime } from '../dates.js';
 
 const VIEWS: readonly { readonly key: TutorHintReviewView; readonly label: string }[] = [
   { key: 'sample', label: 'Today’s sample' }, { key: 'refused', label: 'Refused by the guard' }, { key: 'reviewed', label: 'Reviewed' },
 ];
-const when = (value: string | null | undefined): string => (value ? new Date(value).toLocaleString() : 'NA');
+const when = (value: string | null | undefined): string => (value ? formatDateTime(value) : 'NA');
 
 function outcome(hint: TutorHintReviewDto): string {
   if (hint.status === 'SHOWN') return 'Shown to the student';

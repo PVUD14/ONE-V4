@@ -104,7 +104,7 @@ describe('department head workspace', () => {
   it('shows a safe error, never upstream text, when the overview is refused', async () => {
     routes({ [`${base}/department-overview`]: 'FORBIDDEN' });
     open('department-head', 'Department Overview', 'DEPARTMENT_HEAD');
-    expect(await screen.findByRole('alert')).toHaveTextContent('You do not have permission to view this. Reference: corr-403');
+    expect(await screen.findByRole('alert')).toHaveTextContent('You do not have permission to view this. Support code: corr403');
     expect(screen.queryByText(/upstream private detail/)).not.toBeInTheDocument();
   });
 

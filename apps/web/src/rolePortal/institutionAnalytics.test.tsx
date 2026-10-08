@@ -80,7 +80,7 @@ describe('Analytics and exports access', () => {
     fetchMock.mockImplementation((_url: string, init?: { method?: string }) => Promise.resolve(init?.method === 'POST' ? refused(400, 'CAPABILITY_SELF_GRANT_REFUSED') : ok({ eligible })));
     render(<AnalyticsAccessPanel token="token" institutionId={institutionId} />);
     fireEvent.click(await screen.findByRole('button', { name: 'Grant access to head@example.test' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('You cannot grant access to yourself. Another owner or admin must. Reference: corr-export');
+    expect(await screen.findByRole('alert')).toHaveTextContent('You cannot grant access to yourself. Another owner or admin must. Support code: correxpo');
     expect(screen.queryByText(/upstream detail text/)).not.toBeInTheDocument();
   });
 });
@@ -140,7 +140,7 @@ describe('Exports panel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Export CSV' }));
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent(message);
-    expect(alert).toHaveTextContent('Reference: corr-export');
+    expect(alert).toHaveTextContent('Support code: correxpo');
     expect(screen.queryByText(/upstream detail text/)).not.toBeInTheDocument();
     expect(URL.createObjectURL).not.toHaveBeenCalled();
   });

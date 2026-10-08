@@ -103,14 +103,14 @@ describe('Year-end actions', () => {
     await screen.findByRole('table');
     fetchMock.mockResolvedValueOnce(refused(409, 'BATCH_PREVIEW_STALE'));
     fireEvent.click(screen.getByRole('button', { name: 'Commit 1 change' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('The roster changed since your preview. Nothing was saved — preview again. Reference: corr-batch');
+    expect(await screen.findByRole('alert')).toHaveTextContent('The roster changed since your preview. Nothing was saved — preview again. Support code: corrbatc');
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
     fetchMock.mockResolvedValueOnce(refused(400, 'EFFECTIVE_DATE_IN_FUTURE'));
     fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('The date cannot be in the future.');
     fetchMock.mockResolvedValueOnce(refused(403, 'FORBIDDEN'));
     fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
-    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Reference: corr-batch'));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Support code: corrbatc'));
     expect(document.body.textContent).not.toContain('upstream detail text');
   });
 

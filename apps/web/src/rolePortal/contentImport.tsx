@@ -23,6 +23,7 @@ import type { ContentImportFormat, ContentImportKind, ContentImportPolicyDto, Co
 import { V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { StatusBadge } from '../studentComponents.js';
 import { formatApiError } from './shared.js';
+import { SupportCode, supportCodeSuffix } from '../supportCode.js';
 
 const kindNames: Readonly<Record<ContentImportKind, string>> = {
   SKILL: 'Skills (skill map)',
@@ -88,10 +89,10 @@ function describeIssue(code: string, words: Readonly<Record<string, string>>): s
 
 function importError(cause: unknown, fallback: string): string {
   if (cause instanceof ApiRequestError) {
-    if (cause.code === 'IMPORT_STALE') return `The file or the content changed since the preview, so nothing was imported. It has been previewed again; check the report and commit again. Reference: ${cause.correlationId}`;
-    if (cause.code === 'IMPORT_HAS_INVALID_ROWS') return `A row is no longer valid, so nothing was imported. It has been previewed again; fix the rows below. Reference: ${cause.correlationId}`;
-    if (cause.code === 'IMPORT_FILE_INVALID') return `The file has a problem, so nothing was imported. Reference: ${cause.correlationId}`;
-    if (cause.code === 'IMPORT_FILE_TOO_LARGE') return `The file is larger than the import allows. Split it. Reference: ${cause.correlationId}`;
+    if (cause.code === 'IMPORT_STALE') return `The file or the content changed since the preview, so nothing was imported. It has been previewed again; check the report and commit again.${supportCodeSuffix(cause.correlationId)}`;
+    if (cause.code === 'IMPORT_HAS_INVALID_ROWS') return `A row is no longer valid, so nothing was imported. It has been previewed again; fix the rows below.${supportCodeSuffix(cause.correlationId)}`;
+    if (cause.code === 'IMPORT_FILE_INVALID') return `The file has a problem, so nothing was imported.${supportCodeSuffix(cause.correlationId)}`;
+    if (cause.code === 'IMPORT_FILE_TOO_LARGE') return `The file is larger than the import allows. Split it.${supportCodeSuffix(cause.correlationId)}`;
   }
   return formatApiError(cause, fallback);
 }
@@ -153,7 +154,7 @@ export function OperationsContentImportPage(): React.ReactElement | null {
     return <section className="role-module role-module--dense">{heading}
       <div className="role-wide"><V2EmptyState icon="🔐" title="Not permitted"
         note="Bulk import is for staff who hold Content Edit. Your access has not changed; the rest of Content Management is unaffected."
-        hint={`Reference: ${forbiddenReference}`} /></div></section>;
+        hint={<SupportCode reference={forbiddenReference} />} /></div></section>;
   }
 
   const fields = policy ? policy.kinds.find((entry) => entry.kind === kind) : undefined;
@@ -203,7 +204,7 @@ export function OperationsContentImportPage(): React.ReactElement | null {
     try {
       const result = await commitContentImport(token, { ...previewed, previewDigest: report.digest, reasonCode });
       setConfirming(false);
-      setNotice(`Imported ${result.import.created} ${result.import.created === 1 ? 'draft' : 'drafts'}. Open them in the editors above to finish, submit and review them. Reference: ${result.correlationId}`);
+      setNotice(`Imported ${result.import.created} ${result.import.created === 1 ? 'draft' : 'drafts'}. Open them in the editors above to finish, submit and review them.`);
       setReport(null);
       setPreviewed(null);
       setFile(null);

@@ -23,11 +23,12 @@ import {
   type VenueMode,
 } from '../api/campusDrives.js';
 import { formatApiError } from './shared.js';
+import { formatDateTime } from '../dates.js';
 
 function formatWhen(value: string | null | undefined): string {
   if (!value) return 'NA';
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? 'NA' : date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  return Number.isNaN(date.getTime()) ? 'NA' : formatDateTime(date);
 }
 function localToIso(value: string): string | undefined {
   if (!value) return undefined;

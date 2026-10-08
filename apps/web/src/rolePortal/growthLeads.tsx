@@ -39,6 +39,7 @@ import { formatApiError } from './shared.js';
 import { LeadFieldPanel } from './growthField.js';
 import { LeadPipelinePanel } from './growthPipeline.js';
 import { GrowthReferralLinksCard } from './growthReferrals.js';
+import { formatDate } from '../dates.js';
 
 const NA = 'NA';
 
@@ -197,7 +198,7 @@ export function GrowthLeadsPage({ role }: { readonly role?: string | undefined }
           <p className="v2-empty">{vocabulary?.purpose ?? NA} Add only details the person gave you, that their organisation published for enquiries, or that a colleague of theirs passed on. Never purchased lists, scraped data, or personal mobile numbers from anywhere else. They are erased 24 months after the lead&apos;s last activity.</p>
         </section>
         <section className="v2-card">
-          <div className="v2-card-head"><h2>Contact notice</h2><V2Chip tone="amber">Draft for legal review</V2Chip></div>
+          <div className="v2-card-head"><h2>Contact notice</h2><V2Chip tone="amber">Draft wording, pending approval</V2Chip></div>
           {vocabulary ? <>{vocabulary.notice.text.map((line) => <p key={line} className="v2-empty">{line}</p>)}<small>Version {vocabulary.notice.version}</small></> : <p className="v2-empty">{NA}</p>}
         </section>
       </div>
@@ -313,7 +314,7 @@ export function LeadDetailPanel({ leadId, vocabulary, token, mode, manager, onCh
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {notice ? <p role="status">{notice}</p> : null}
     <p>{lead.kind === 'COLLEGE' ? 'College' : 'Employer'} · {areaText(lead)}{lead.aisheCode ? ` · AISHE ${lead.aisheCode}` : ''}{lead.websiteDomain ? ` · ${lead.websiteDomain}` : ''}</p>
-    <p>Owner: {lead.owner ? (owner ? 'you' : lead.owner.email ?? NA) : lead.needsNewOwner ? 'nobody — the previous owner left' : 'nobody (unowned)'} · Found by {growthCodeLabel(lead.source)} · Last activity {lead.lastActivityAt ? new Date(lead.lastActivityAt).toLocaleDateString() : NA}</p>
+    <p>Owner: {lead.owner ? (owner ? 'you' : lead.owner.email ?? NA) : lead.needsNewOwner ? 'nobody — the previous owner left' : 'nobody (unowned)'} · Found by {growthCodeLabel(lead.source)} · Last activity {lead.lastActivityAt ? formatDate(lead.lastActivityAt) : NA}</p>
     <div className="v2-hero-chips">
       {lead.doNotContact ? <V2Chip tone="red">Do not contact ({growthCodeLabel(lead.doNotContact.reasonCode)})</V2Chip> : null}
       {lead.possibleDuplicate ? <V2Chip tone="amber">Possible duplicate — check with your manager</V2Chip> : null}
@@ -332,7 +333,7 @@ export function LeadDetailPanel({ leadId, vocabulary, token, mode, manager, onCh
       return <li key={contact.id} aria-label={`Contact ${contact.fullName}`}>
         <strong>{contact.fullName}</strong> · {growthCodeLabel(contact.role)}
         <div>{email ? (owner && !contact.masked ? <a href={`mailto:${email}`}>{email}</a> : email) : null}{email && phone ? ' · ' : ''}{phone ? (owner && !contact.masked ? <a href={`tel:${phone.replace(/[^0-9+]/g, '')}`}>{phone}</a> : phone) : null}</div>
-        <small>{basisLabels[contact.permissionBasis] ?? growthCodeLabel(contact.permissionBasis)} ({growthCodeLabel(contact.source)}) · {contact.notice ? `Notice given ${contact.notice.givenAt ? new Date(contact.notice.givenAt).toLocaleDateString() : ''} (${contact.notice.version ?? NA})` : 'Notice not yet given'}</small>
+        <small>{basisLabels[contact.permissionBasis] ?? growthCodeLabel(contact.permissionBasis)} ({growthCodeLabel(contact.source)}) · {contact.notice ? `Notice given ${contact.notice.givenAt ? formatDate(contact.notice.givenAt) : ''} (${contact.notice.version ?? NA})` : 'Notice not yet given'}</small>
         <span className="role-actions">
           {owner && !contact.notice && !lead.doNotContact ? <button type="button" className="pilot-btn" disabled={busy}
             onClick={() => void act(() => recordGrowthContactNotice(token, lead.id, contact.id), 'Notice recorded.')}>Record notice given</button> : null}
@@ -374,7 +375,7 @@ export function LeadDetailPanel({ leadId, vocabulary, token, mode, manager, onCh
     {!operations ? <LeadFieldPanel leadId={lead.id} token={token} contacts={lead.contacts} /> : null}
 
     <h3>Owner history</h3>
-    <ul>{lead.ownerHistory.map((entry, index) => <li key={`${entry.at ?? ''}-${index}`}>{entry.at ? new Date(entry.at).toLocaleDateString() : NA}: {growthCodeLabel(entry.reasonCode)} — {entry.from ?? 'nobody'} → {entry.to ?? 'nobody'}</li>)}</ul>
+    <ul>{lead.ownerHistory.map((entry, index) => <li key={`${entry.at ?? ''}-${index}`}>{entry.at ? formatDate(entry.at) : NA}: {growthCodeLabel(entry.reasonCode)} — {entry.from ?? 'nobody'} → {entry.to ?? 'nobody'}</li>)}</ul>
   </section>;
 }
 

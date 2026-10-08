@@ -137,7 +137,7 @@ describe('lesson editor', () => {
   it('shows an error with its reference', async () => {
     listResponse = () => failure(500, 'INTERNAL', 'corr-list-fail');
     render(<OperationsLessonsPage />);
-    expect(await screen.findByRole('alert')).toHaveTextContent('corr-list-fail');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Support code: corrlist');
   });
 
   it('shows a forbidden state with its reference to staff without a content capability', async () => {
@@ -145,7 +145,7 @@ describe('lesson editor', () => {
     listResponse = () => failure(403, 'FORBIDDEN', 'corr-forbidden');
     render(<OperationsLessonsPage />);
     expect(await screen.findByText('Not permitted')).toBeInTheDocument();
-    expect(screen.getByText('Reference: corr-forbidden')).toBeInTheDocument();
+    expect(screen.getByText('Support code: corrforb')).toBeInTheDocument();
   });
 
   it('sends the search and filter to the server', async () => {

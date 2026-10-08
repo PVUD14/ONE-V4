@@ -23,6 +23,8 @@ import type { AccessReviewCampaignDto, AccessReviewDecision, AccessReviewItemDto
 import { V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { StatusBadge } from '../studentComponents.js';
 import { formatApiError } from './shared.js';
+import { SupportCode } from '../supportCode.js';
+import * as dates from '../dates.js';
 
 const noteLimit = 500;
 const NA = 'NA';
@@ -42,8 +44,8 @@ const refusalText: Readonly<Record<string, string>> = {
   ACCESS_REVIEW_NOT_OPEN: 'Review closed.',
 };
 
-const formatDate = (value: string | null | undefined): string => (value ? new Date(value).toLocaleDateString() : NA);
-const formatDateTime = (value: string | null | undefined): string => (value ? new Date(value).toLocaleString() : NA);
+const formatDate = (value: string | null | undefined): string => (value ? dates.formatDate(value) : NA);
+const formatDateTime = (value: string | null | undefined): string => (value ? dates.formatDateTime(value) : NA);
 
 /** What the item grants, in words: a role with its capability set, or one capability. */
 export function describeAccessReviewItem(item: AccessReviewItemDto): string {
@@ -108,7 +110,7 @@ export function OperationsAccessReviewsPage(): React.ReactElement | null {
     return <section className="role-module role-module--dense">{heading}
       <div className="role-wide"><V2EmptyState icon="🔐" title="Not permitted"
         note="Access reviews are run by staff who hold the access review capability. Your access has not changed."
-        hint={`Reference: ${forbiddenReference}`} /></div></section>;
+        hint={<SupportCode reference={forbiddenReference} />} /></div></section>;
   }
 
   const summary = overview?.summary;
@@ -180,7 +182,7 @@ export function OperationsAccessReviewsPage(): React.ReactElement | null {
             {item.canKeep ? <button type="button" className="pilot-btn" onClick={() => setDeciding({ item, decision: 'KEEP' })}>{item.keepMode === 'SOLO' ? 'Keep (solo)…' : 'Keep…'}</button> : null}
             {item.canRevoke ? <button type="button" className="secondary" onClick={() => setDeciding({ item, decision: 'REVOKE' })}>Revoke…</button> : null}
             {!item.decision && item.refusal ? <small>{refusalText[item.refusal] ?? 'You cannot decide this item.'}
-              {item.coolingOffEndsAt ? ` From ${new Date(item.coolingOffEndsAt).toLocaleTimeString()}.` : ''}</small> : null}
+              {item.coolingOffEndsAt ? ` From ${dates.formatTime(item.coolingOffEndsAt)}.` : ''}</small> : null}
           </div></td>
         </tr>)}</tbody></table></div> : null}
     </section> : null}

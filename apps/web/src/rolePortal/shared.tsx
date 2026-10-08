@@ -9,6 +9,7 @@
  */
 import { ApiRequestError } from '../api.js';
 import { V2EmptyState } from '../dashboardsV2.js';
+import { supportCodeSuffix } from '../supportCode.js';
 
 export interface AuthenticatedWorkspaceSummary {
   readonly role: string;
@@ -30,7 +31,7 @@ export function isInstitutionStaffWorkspace(workspace: AuthenticatedWorkspaceSum
 }
 
 export function InstitutionWorkspaceError({ title, unauthorized = false }: { readonly title: string; readonly unauthorized?: boolean }): React.ReactElement {
-  return <section className="role-module role-module--dense"><div className="role-page-heading"><div><span className="eyebrow">Authenticated API-backed</span><h1>{title}</h1><p>{unauthorized ? 'You do not have permission to perform this action.' : 'We could not resolve your institution workspace.'}</p></div></div><p className="form-error" role="alert">{unauthorized ? 'You do not have permission to perform this action.' : 'We could not load your institution workspace. Reference: workspace-context-missing'}</p></section>;
+  return <section className="role-module role-module--dense"><div className="role-page-heading"><div><span className="eyebrow">Your workspace</span><h1>{title}</h1><p>{unauthorized ? 'You do not have permission to perform this action.' : 'We could not open your institution workspace.'}</p></div></div><p className="form-error" role="alert">{unauthorized ? 'You do not have permission to perform this action.' : 'We could not load your institution workspace. Sign out and sign in again, or contact support if this keeps happening.'}</p></section>;
 }
 
 export function AuthenticatedReadOnlyModule({ title, detail }: { readonly title: string; readonly detail: string }): React.ReactElement {
@@ -43,20 +44,25 @@ export function AuthenticatedReadOnlyModule({ title, detail }: { readonly title:
 export function AuthenticatedNotYetAvailable({ title, detail }: { readonly title: string; readonly detail: string }): React.ReactElement {
   return <section className="role-module"><div className="role-page-heading"><div><span className="eyebrow">Coming later</span><h1>{title}</h1><p>{detail}</p></div></div>
     <div className="role-wide"><V2EmptyState icon="🧭" title="Not built yet"
-      note="This module is on the roadmap but has no live workflow behind it yet — nothing here is hidden or broken."
+      note="This section is planned but not available yet."
       hint="Your dashboard shows everything that is live for your role today." /></div></section>;
 }
 
 export function RestrictedApiState({ title, message }: { readonly title: string; readonly message: string }): React.ReactElement {
-  return <section className="role-module"><div className="role-page-heading"><div><span className="eyebrow">Authenticated API-backed</span><h1>{title}</h1><p>{message}</p></div></div>
+  return <section className="role-module"><div className="role-page-heading"><div><span className="eyebrow">Protected</span><h1>{title}</h1><p>{message}</p></div></div>
     <div className="role-wide"><V2EmptyState icon="🔐" title="Sign-in required"
-      note="This protected workflow only renders for an authorized identity — no preview or fake data is substituted." /></div></section>;
+      note="Sign in with an account that has access to see this page." /></div></section>;
 }
 
 export function formatApiError(error: unknown, fallback: string): string {
   if (!(error instanceof ApiRequestError)) return fallback;
   const message = safeErrorMessage(error.code) ?? fallback;
-  return `${message}${error.field ? ` Field: ${error.field}.` : ''} Reference: ${error.correlationId}`;
+  return `${message}${error.field ? ` Check: ${fieldLabel(error.field)}.` : ''}${supportCodeSuffix(error.correlationId)}`;
+}
+
+/** "applicationDeadline" → "application deadline": a field name a person can read. */
+function fieldLabel(field: string): string {
+  return field.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[_.]+/g, ' ').toLowerCase();
 }
 
 export function safeErrorMessage(code: string | undefined): string | undefined {

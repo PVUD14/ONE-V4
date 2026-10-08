@@ -15,6 +15,9 @@ import { basisLabels, describeEligibilityRule } from './hiringEligibility.js';
 import { ApiRequestError } from './api.js';
 import { downloadCandidateResume, getEmployerCandidate, type ApplicationSnapshotDto, type CandidateDetailDto } from './api/hiring.js';
 import { EmployerEvidencePanel } from './skillEvidence.js';
+import { supportCodeSuffix } from './supportCode.js';
+import * as dates from './dates.js';
+import { codeLabel } from './labels.js';
 
 const verificationLabels: Readonly<Record<string, string>> = {
   VERIFIED: 'verified by the college', SELF_REPORTED: 'self-reported', PENDING_VERIFICATION: 'awaiting the college',
@@ -26,13 +29,13 @@ const snapshotStatusText: Readonly<Record<string, string>> = {
 };
 
 function humanise(value: string): string {
-  return value.replace(/_/g, ' ').toLowerCase().replace(/^./, (c) => c.toUpperCase());
+  return codeLabel(value);
 }
 function formatDate(value: string | null | undefined, withTime = false): string {
   if (!value) return 'NA';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return 'NA';
-  return withTime ? date.toLocaleString() : date.toLocaleDateString();
+  return withTime ? dates.formatDateTime(date) : dates.formatDate(date);
 }
 function fileSize(bytes: number): string {
   return bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
@@ -96,7 +99,7 @@ export function CandidateDetailPanel({ employerId, applicationId, onClose }: { r
         if (abort.signal.aborted) return;
         setStatus(error instanceof ApiRequestError && error.status === 403
           ? 'This candidate is no longer sharing their details with you, or you do not have access to them.'
-          : `The candidate could not be loaded.${error instanceof ApiRequestError && error.correlationId ? ` Reference: ${error.correlationId}.` : ''}`);
+          : `The candidate could not be loaded.${error instanceof ApiRequestError && error.correlationId ? supportCodeSuffix(error.correlationId) : ''}`);
       });
     return () => abort.abort();
   }, [employerId, applicationId]);

@@ -17,6 +17,7 @@ import { PublishedContentCard } from './publishedContent.js';
 import { PracticeBySkillCard } from '../studentLearning.js';
 import { Award, Building2, ClipboardCheck, Code2, Download, FileText, Flame, LineChart, Target, Trash2, Trophy, Wrench } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { formatDate } from '../dates.js';
 
 export const PRACTICE_TABS = ['Overview', 'Coding', 'Aptitude', 'Projects', 'Contests'] as const;
 
@@ -376,7 +377,7 @@ function templateName(load: ResumeLoad | null, key: ResumeTemplateKey): string {
 
 function formatDay(value: string): string {
   const date = new Date(value);
-  return Number.isFinite(date.getTime()) ? date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : value;
+  return Number.isFinite(date.getTime()) ? formatDate(date) : value;
 }
 
 // --- Institution Interventions ----------------------------------------------

@@ -43,11 +43,12 @@ import { applicationStageLabels, offerResponseLabels } from './institutionDepart
 import { formatApiError } from './shared.js';
 import { DriveCategoryCell, useActiveDriveCategories } from './institutionPlacementRegister.js';
 import { DriveNominationsPanel } from './institutionNominations.js';
+import { formatDateTime } from '../dates.js';
 
 function formatWhen(value: string | null | undefined): string {
   if (!value) return 'NA';
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? 'NA' : date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  return Number.isNaN(date.getTime()) ? 'NA' : formatDateTime(date);
 }
 function localToIso(value: FormDataEntryValue | null): string | undefined {
   if (typeof value !== 'string' || !value) return undefined;

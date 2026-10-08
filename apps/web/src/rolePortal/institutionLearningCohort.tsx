@@ -17,6 +17,7 @@ import { V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { go } from '../pilotParity/naWidgets.js';
 import { formatApiError } from './shared.js';
 import type { AuthenticatedWorkspaceSummary } from './shared.js';
+import { supportCodeSuffix } from '../supportCode.js';
 
 /** A response is used only when it has the shape the server sends; anything else is treated as a failed load. */
 function isCohort(value: unknown): value is LearningCohortDto {
@@ -31,7 +32,7 @@ function isDuePage(value: unknown): value is LearningCohortDueDto {
 }
 
 function loadError(error: unknown, fallback: string): string {
-  if (error instanceof ApiRequestError && error.status === 403) return `You do not have permission to view this. Reference: ${error.correlationId}`;
+  if (error instanceof ApiRequestError && error.status === 403) return `You do not have permission to view this.${supportCodeSuffix(error.correlationId)}`;
   return formatApiError(error, fallback);
 }
 

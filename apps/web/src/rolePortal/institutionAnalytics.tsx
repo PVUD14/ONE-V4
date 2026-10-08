@@ -22,6 +22,7 @@ import {
 } from '../api.js';
 import type { InstitutionAnalyticsAccessDto, InstitutionExportPath, InstitutionUnitDto } from '../api.js';
 import { formatApiError } from './shared.js';
+import { supportCodeSuffix } from '../supportCode.js';
 
 /** Why access is granted; recorded with the grant. */
 export const analyticsGrantReasons = [
@@ -62,7 +63,7 @@ function latestEndedMonth(today: string): string {
 
 function exportError(error: unknown): string {
   if (!(error instanceof ApiRequestError)) return 'The export could not be prepared. Try again.';
-  const reference = ` Reference: ${error.correlationId}`;
+  const reference = supportCodeSuffix(error.correlationId);
   switch (error.code) {
     case 'ANALYTICS_CAPABILITY_REQUIRED': return 'You do not have analytics and exports access. An owner or admin of your college can grant it on the Staff page.' + reference;
     case 'SCOPE_REQUIRED': return 'Exports need a department on your staff membership. An admin of your college can set it on the Staff page.' + reference;
@@ -113,7 +114,7 @@ export function AnalyticsAccessPanel({ token, institutionId }: { readonly token:
       setNotice(member.grant ? `Access removed for ${member.email}. It stops on their next request.` : `Access granted to ${member.email}.`);
     } catch (cause) {
       if (cause instanceof ApiRequestError && cause.code === 'CAPABILITY_SELF_GRANT_REFUSED') {
-        setError(`You cannot grant access to yourself. Another owner or admin must. Reference: ${cause.correlationId}`);
+        setError(`You cannot grant access to yourself. Another owner or admin must.${supportCodeSuffix(cause.correlationId)}`);
       } else {
         setError(formatApiError(cause, member.grant ? 'Removing access failed.' : 'Granting access failed.'));
       }

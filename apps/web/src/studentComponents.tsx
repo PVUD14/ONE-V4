@@ -1,5 +1,6 @@
 import { Filter, Search, type LucideIcon } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
+import { codeLabel } from './labels.js';
 
 export interface PageMeta {
   readonly title: string;
@@ -33,7 +34,8 @@ export function MetricCard({ label, value, suffix, detail, tone = 'student' }: {
 }
 
 export function StatusBadge({ label, tone = 'neutral' }: { readonly label: string; readonly tone?: 'success' | 'warning' | 'neutral' | 'info' | 'danger' }): React.ReactElement {
-  return <span className={`status-pill ${tone}`}>{label}</span>;
+  // A raw code (ACTIVE, UNDER_REVIEW) reads as words; any other label is shown as written.
+  return <span className={`status-pill ${tone}`}>{codeLabel(label)}</span>;
 }
 
 export function VerificationBadge({ state }: { readonly state: string }): React.ReactElement {

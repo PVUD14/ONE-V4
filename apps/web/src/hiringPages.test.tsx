@@ -71,7 +71,7 @@ describe('student opportunity discovery', () => {
     await authenticate();
     render(<StudentOpportunitiesPage />);
     fireEvent.click(await screen.findByRole('button', { name: 'View details' }));
-    expect(await screen.findByText(/We cannot confirm Min cgpa yet/)).toBeInTheDocument();
+    expect(await screen.findByText(/We cannot confirm Min CGPA yet/)).toBeInTheDocument();
     expect(screen.queryByText(/You do not currently meet/)).not.toBeInTheDocument();
   });
 

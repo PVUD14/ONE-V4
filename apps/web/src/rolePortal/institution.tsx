@@ -8,9 +8,9 @@
  */
 import { ApiRequestError, apiBaseUrl, addInstitutionStudent, commitStudentRosterImport, createInstitutionUnit, endInstitutionStudentRelationship, getProtectedAccessToken, inviteInstitutionStaff, listInstitutionStaff, setInstitutionStaffScope, listInstitutionStudents, listInstitutionUnits, institutionStudentScopeLabel, previewStudentRosterImport, resendStudentInvitations, studentActivationLabels, studentInvitationDeliveryNote, updateInstitutionStudent, updateInstitutionUnit } from '../api.js';
 import type { InstitutionStaffDto, InstitutionStudentCreateRequest, InstitutionStudentDto, InstitutionUnitDto, RosterImportPreviewDto, StaffUnitScopeDto } from '../api.js';
-import { V2Stat } from '../dashboardsV2.js';
+import { V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import type { RolePortalConfig } from '../rolePortalConfig.js';
-import { InstitutionWorkspaceError, RestrictedApiState, formatApiError, institutionWorkspaceRoles, isInstitutionStaffWorkspace, isInstitutionWorkspace } from './shared.js';
+import { InstitutionWorkspaceError, RestrictedApiState, formatApiError, institutionWorkspaceRoles, isInstitutionStaffWorkspace, isInstitutionWorkspace, openPortalRecord } from './shared.js';
 import type { AuthenticatedWorkspaceSummary } from './shared.js';
 import { Search } from 'lucide-react';
 import { NaListCard } from '../pilotParity/naWidgets.js';
@@ -142,11 +142,15 @@ function InstitutionAdminStudentsPage({ portal, authenticatedWorkspace }: { read
     <section className="role-card role-wide role-management-form"><h2>Student invitations</h2><p>Each student gets an invitation email when they are added or imported. Resend to anyone who has not activated yet.</p><label><span>Reason for resending</span><select value={resendReason} onChange={(event) => setResendReason(event.target.value)}>{invitationResendReasons.map(([code, label]) => <option key={code} value={code}>{label}</option>)}</select></label><div className="role-record-actions"><button type="button" onClick={() => void resend({ all: true })}>Resend to all students not yet activated</button></div></section>
     <YearEndBatchPanel token={token} institutionId={institutionId} units={units} onChanged={(message) => { setRelationshipError(''); setNotice(message); }} />
     <section className="role-card role-wide"><h2>Search students</h2><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search name, email, or institution ID" /></section>
-    <div className="role-record-table-wrap"><table className="role-record-table"><caption className="sr-only">{portal.roleName} real students</caption><thead><tr><th>Student</th><th>Institution ID</th><th>Units</th><th>Relationship</th><th>Invitation</th><th>Actions</th></tr></thead><tbody>{filteredStudents.map((student) => <tr key={student.id} className="role-record-row"><th scope="row"><strong>{student.fullName}</strong><span>{student.email}</span></th><td>{student.institutionStudentId}</td><td>{Object.values(student.units ?? {}).filter(Boolean).length} assigned</td><td>{student.relationship?.state ?? student.status}</td><td>{student.activation ? studentActivationLabels[student.activation.state] : 'NA'}{studentInvitationDeliveryNote(student.activation) ? <span>{studentInvitationDeliveryNote(student.activation)}</span> : null}</td><td><div className="role-record-actions">{student.activation && student.activation.state !== 'ACTIVATED' && student.studentUserId ? <button type="button" className="secondary" onClick={() => void resend({ studentUserIds: [student.studentUserId!] })}>Resend invitation</button> : null}<button type="button" className="secondary" onClick={() => void editStudent(student)}>Edit student</button><button type="button" onClick={() => void relationship(student.id, 'TRANSFERRED')}>Transfer</button><button type="button" onClick={() => void relationship(student.id, 'GRADUATED')}>Graduate</button><button type="button" className="secondary" onClick={() => void relationship(student.id, 'ENDED')}>End relationship</button><button type="button" className="secondary" onClick={() => void relationship(student.id, 'REVOKED')}>Revoke</button></div></td></tr>)}</tbody></table></div>
+    <div className="role-record-table-wrap"><table className="role-record-table"><caption className="sr-only">{portal.roleName} real students</caption><thead><tr><th>Student</th><th>Institution ID</th><th>Units</th><th>Relationship</th><th>Invitation</th><th>Actions</th></tr></thead><tbody>{filteredStudents.map((student) => <tr key={student.id} className="role-record-row"><th scope="row"><strong>{student.fullName}</strong><span>{student.email}</span></th><td>{student.institutionStudentId}</td><td>{Object.values(student.units ?? {}).filter(Boolean).length} assigned</td><td>{student.relationship?.state ?? student.status}</td><td>{student.activation ? studentActivationLabels[student.activation.state] : 'NA'}{studentInvitationDeliveryNote(student.activation) ? <span>{studentInvitationDeliveryNote(student.activation)}</span> : null}</td><td><div className="role-record-actions">{student.activation && student.activation.state !== 'ACTIVATED' && student.studentUserId ? <button type="button" className="secondary" onClick={() => void resend({ studentUserIds: [student.studentUserId!] })}>Resend invitation</button> : null}<button type="button" className="secondary" aria-label={`Open detail for ${student.fullName}`} onClick={() => openPortalRecord(`${portal.basePath}/student-detail`, { studentProfileId: student.id })}>Open detail</button><button type="button" className="secondary" onClick={() => void editStudent(student)}>Edit student</button><button type="button" onClick={() => void relationship(student.id, 'TRANSFERRED')}>Transfer</button><button type="button" onClick={() => void relationship(student.id, 'GRADUATED')}>Graduate</button><button type="button" className="secondary" onClick={() => void relationship(student.id, 'ENDED')}>End relationship</button><button type="button" className="secondary" onClick={() => void relationship(student.id, 'REVOKED')}>Revoke</button></div></td></tr>)}</tbody></table></div>
   </section>;
 }
 
-export function InstitutionAcademicStructurePage({ portal, authenticatedWorkspace, canManage = true }: { readonly canManage?: boolean; readonly portal: RolePortalConfig; readonly authenticatedWorkspace?: AuthenticatedWorkspaceSummary | undefined }): React.ReactElement {
+/**
+ * The academic structure. `kind` focuses it on one kind of unit — the placement officer's
+ * Departments and Batches items — with the parent each sits under; without it, every unit.
+ */
+export function InstitutionAcademicStructurePage({ portal, authenticatedWorkspace, canManage = true, kind }: { readonly canManage?: boolean; readonly portal: RolePortalConfig; readonly authenticatedWorkspace?: AuthenticatedWorkspaceSummary | undefined; readonly kind?: 'DEPARTMENT' | 'BATCH' }): React.ReactElement {
   const token = getProtectedAccessToken();
   const institutionId = authenticatedWorkspace?.organizationId ?? '';
   const [units, setUnits] = useState<readonly InstitutionUnitDto[]>([]);
@@ -178,6 +182,19 @@ export function InstitutionAcademicStructurePage({ portal, authenticatedWorkspac
     } catch {
       setError('Academic unit update failed.');
     }
+  }
+  if (kind) {
+    const label = kind === 'DEPARTMENT' ? 'Departments' : 'Batches';
+    const focused = units.filter((unit) => unit.kind === kind);
+    const children = (unit: InstitutionUnitDto): number => units.filter((candidate) => candidate.parentUnitId === unit.id).length;
+    return <section className="role-module role-module--dense"><div className="role-page-heading"><div><span className="eyebrow">Academic structure</span><h2>{label}</h2>
+      <p>{kind === 'DEPARTMENT' ? 'The departments of your institution, and how many programs, batches or sections sit under each.' : 'The batches of your institution and the department or program each belongs to.'}</p></div></div>
+      {error ? <p className="form-error" role="alert">{error}</p> : null}
+      <div className="role-record-table-wrap"><table className="role-record-table"><caption className="sr-only">{`${portal.roleName} ${label.toLowerCase()}`}</caption>
+        <thead><tr><th>Name</th><th>{kind === 'DEPARTMENT' ? 'Units under it' : 'Belongs to'}</th></tr></thead>
+        <tbody>{focused.length ? focused.map((unit) => <tr key={unit.id}><th>{unit.name}</th>
+          <td>{kind === 'DEPARTMENT' ? children(unit) : units.find((candidate) => candidate.id === unit.parentUnitId)?.name ?? 'Institution'}</td></tr>)
+          : <tr><td colSpan={2}>{kind === 'DEPARTMENT' ? 'No departments are set up yet.' : 'No batches are set up yet.'}</td></tr>}</tbody></table></div></section>;
   }
   return <section className="role-module role-module--dense"><div className="role-page-heading"><div><span className="eyebrow">Authenticated API-backed</span><h1>Academic Structure</h1><p>{canManage ? "Manage institution-scoped departments, programs, batches, sections and campuses. Parent choices are institution-scoped." : "View institution-scoped departments, programs, batches, sections and campuses."}</p></div></div>
     <div className="v2-row v2-cols-4 career-stat-strip role-wide">
@@ -494,7 +511,7 @@ function StaffActionWorkflow({ token, institutionId, type, title, routeLabel }: 
   </aside></div></div>;
 }
 
-type InstitutionPageProps = { readonly portal: RolePortalConfig; readonly authenticatedWorkspace?: AuthenticatedWorkspaceSummary | undefined };
+type InstitutionPageProps = { readonly portal: RolePortalConfig; readonly authenticatedWorkspace?: AuthenticatedWorkspaceSummary | undefined; readonly searchFirst?: boolean };
 
 export function InstitutionStudentsPage(props: InstitutionPageProps): React.ReactElement {
   // INST-07: a department head gets the same read-only roster as the placement office,
@@ -504,13 +521,18 @@ export function InstitutionStudentsPage(props: InstitutionPageProps): React.Reac
     if (!token) return <RestrictedApiState title="Students" message="Sign in to your institution staff workspace." />;
     if (!isInstitutionStaffWorkspace(props.authenticatedWorkspace)) return <InstitutionWorkspaceError title="Students" unauthorized />;
     return <PlacementStudentRoster key={props.authenticatedWorkspace.organizationId + ':' + token}
-      token={token} institutionId={props.authenticatedWorkspace.organizationId}
+      token={token} institutionId={props.authenticatedWorkspace.organizationId} searchFirst={props.searchFirst ?? false}
       eyebrow={props.authenticatedWorkspace.role === 'DEPARTMENT_HEAD' ? 'Your department' : 'Institution placement'} />;
   }
   return <InstitutionAdminStudentsPage {...props} />;
 }
 
-function PlacementStudentRoster({ token, institutionId, eyebrow = 'Institution placement' }: { readonly token: string; readonly institutionId: string; readonly eyebrow?: string }): React.ReactElement {
+/**
+ * The placement roster. `searchFirst` is Student Search: nothing is listed until something is
+ * typed, the search box is the page, and the department/batch/status filters narrow a search
+ * rather than browse the whole roster (which is what Students is for).
+ */
+function PlacementStudentRoster({ token, institutionId, eyebrow = 'Institution placement', searchFirst = false }: { readonly token: string; readonly institutionId: string; readonly eyebrow?: string; readonly searchFirst?: boolean }): React.ReactElement {
   // The roster response includes studentUserId separately from its profile id.
   const [data, setData] = useState<{ students: readonly (InstitutionStudentDto & { readonly studentUserId?: string })[]; units: readonly InstitutionUnitDto[]; scopeLabel?: string | null } | null>(null);
   const [selectedStudentId, setSelectedStudentId] = useState('');
@@ -535,10 +557,11 @@ function PlacementStudentRoster({ token, institutionId, eyebrow = 'Institution p
     [student.fullName, student.institutionStudentId, unitName(student.units?.departmentUnitId), unitName(student.units?.batchUnitId)]
       .join(' ').toLowerCase().includes(filters.query.trim().toLowerCase()));
   const selectedStudent = students.find((student) => student.id === selectedStudentId);
+  const awaitingQuery = searchFirst && !filters.query.trim();
   return <section className="role-module role-module--dense">
-    <div className="role-page-heading"><div><span className="eyebrow">{eyebrow}</span><h1>Students</h1><p>Search your institution roster. Unavailable placement information is shown as NA.</p>{data?.scopeLabel && <p>Showing students in {data.scopeLabel}.</p>}</div></div>
+    <div className="role-page-heading"><div><span className="eyebrow">{eyebrow}</span><h1>{searchFirst ? 'Student Search' : 'Students'}</h1><p>{searchFirst ? 'Find one student by name, roll number, department or batch, then open the applications they shared.' : 'Search your institution roster. Unavailable placement information is shown as NA.'}</p>{data?.scopeLabel && <p>Showing students in {data.scopeLabel}.</p>}</div></div>
     <section className="role-card role-wide role-management-form">
-      <label>Search students<input type="search" value={filters.query} onChange={(event) => setFilters({ ...filters, query: event.target.value })} /></label>
+      <label>Search students<input type="search" value={filters.query} autoFocus={searchFirst} placeholder={searchFirst ? 'Name, roll number, department or batch' : undefined} onChange={(event) => setFilters({ ...filters, query: event.target.value })} /></label>
       <label>Department<select value={filters.department} onChange={(event) => setFilters({ ...filters, department: event.target.value })}><option value="">All departments</option>
         {(data?.units ?? []).filter((unit) => unit.kind === 'DEPARTMENT').map((unit) => <option key={unit.id} value={unit.id}>{unit.name}</option>)}</select></label>
       <label>Batch<select value={filters.batch} onChange={(event) => setFilters({ ...filters, batch: event.target.value })}><option value="">All batches</option>
@@ -548,8 +571,10 @@ function PlacementStudentRoster({ token, institutionId, eyebrow = 'Institution p
       <button type="button" onClick={() => { setSelectedStudentId(''); setRefresh((value) => value + 1); }}>Refresh roster</button>
     </section>
     {error ? <p className="form-error" role="alert">{error}</p> : null}
-    {!data ? <p role="status">{error ? 'Roster unavailable.' : 'Loading roster…'}</p> :
-      <div className="role-record-table-wrap"><table className="role-record-table"><caption className="sr-only">Placement student roster</caption>
+    {!data ? <p role="status">{error ? 'Roster unavailable.' : 'Loading roster…'}</p> : awaitingQuery ?
+      <div className="role-wide"><V2EmptyState icon="🔎" title="Search for a student"
+        note={`Type a name, roll number, department or batch to search ${data.students.length} students in your scope. Students lists everyone.`} /></div> :
+      <div className="role-record-table-wrap"><table className="role-record-table"><caption className="sr-only">{searchFirst ? 'Student search results' : 'Placement student roster'}</caption>
         <thead><tr><th>Name</th><th>Roll number</th><th>Department</th><th>Batch</th><th>Status</th><th>Readiness band</th><th>Placement status</th><th>Applications</th><th>Last activity</th></tr></thead>
         <tbody>{students.length ? students.map((student) => {
           const shared = student.studentUserId ? placement.byStudent?.get(student.studentUserId) : undefined;

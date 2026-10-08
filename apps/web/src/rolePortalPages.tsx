@@ -39,8 +39,10 @@ import { EmployerRecruiterRealityPage } from './rolePortal/employer.js';
 import { EmployerOrganisationGate } from './rolePortal/employerOrganisationState.js';
 import { InstitutionAcademicStructurePage, InstitutionStaffActionsPage, InstitutionStaffPage, InstitutionStudentsPage } from './rolePortal/institution.js';
 import { FacultyMyStudentsPage, InstitutionFacultyAndStaffPage } from './rolePortal/institutionTeaching.js';
+import { DepartmentHeadHome, FacultyTeachingHome, InstitutionAdminHome } from './rolePortal/institutionHomes.js';
+import { InstitutionStudentDetailPage } from './rolePortal/institutionStudentDetail.js';
 import { FacultyMessagesPage } from './rolePortal/institutionAnnouncements.js';
-import { InstitutionPlacementPage, PlacementStatusList } from './rolePortal/institutionPlacement.js';
+import { InstitutionPlacementPage } from './rolePortal/institutionPlacement.js';
 import { CampusDriveApprovalsSection, PlacementPoliciesSection } from './rolePortal/institutionCampusDrives.js';
 import { PlacementRegisterSection, PlacementStatisticsSection } from './rolePortal/institutionPlacementRegister.js';
 import { DepartmentBatchesPage, DepartmentOverviewPage, DepartmentReadinessPage, DepartmentReportsAnalyticsPage, FacultyAssessmentDetailPage, FacultyClassReportsPage, OpportunitiesAndOffersPage, PlacementPipelinePage } from './rolePortal/institutionDepartment.js';
@@ -65,7 +67,7 @@ import { OperationsGrowthSetupPanel } from './rolePortal/growthSetup.js';
 import { OperationsGrowthContactsPrivacyPanel, OperationsGrowthLeadsPanel } from './rolePortal/growthLeadsAdmin.js';
 import { OperationsGrowthAttributionPanel } from './rolePortal/growthAttributionAdmin.js';
 import type { AuthenticatedWorkspaceSummary } from './rolePortal/shared.js';
-import { AuthenticatedNotYetAvailable, AuthenticatedReadOnlyModule, institutionStaffWorkspaceRoles, institutionWorkspaceRoles, InstitutionWorkspaceError, isInstitutionStaffWorkspace, isInstitutionWorkspace } from './rolePortal/shared.js';
+import { AuthenticatedNotYetAvailable, AuthenticatedReadOnlyModule, institutionStaffWorkspaceRoles, institutionWorkspaceRoles, InstitutionWorkspaceError, isInstitutionStaffWorkspace, isInstitutionWorkspace, operationsScreenCapabilities, workspaceHoldsAny } from './rolePortal/shared.js';
 import type { RoleFixture, RoleNavItem, RolePortalConfig } from './rolePortalConfig.js';
 import { portalFamilyIcons, rolePortals } from './rolePortalConfig.js';
 import { RolePreviewProvider, useRolePreviewState } from './rolePortalPreviewState.js';
@@ -141,7 +143,7 @@ function RolePortalInner({ portal, apiHealth, authStatus, authNotice, showDevelo
     <ConsentGate>
     <div className={`role-shell role-accent-${portal.accent} ${collapsed ? 'role-sidebar-collapsed' : ''}`}>
       <a className="skip-link" href="#role-main">Skip to content</a>
-      <RoleSidebar portal={portal} role={authenticatedWorkspace?.role} activePath={path} collapsed={collapsed} drawerOpen={drawerOpen} onNavigate={navigate} onCollapse={() => setCollapsed((value) => !value)} onClose={() => { setDrawerOpen(false); menuButtonRef.current?.focus(); }} />
+      <RoleSidebar portal={portal} workspace={demoMode ? undefined : authenticatedWorkspace} activePath={path} collapsed={collapsed} drawerOpen={drawerOpen} onNavigate={navigate} onCollapse={() => setCollapsed((value) => !value)} onClose={() => { setDrawerOpen(false); menuButtonRef.current?.focus(); }} />
       {drawerOpen ? <button className="drawer-scrim role-scrim" type="button" aria-label={`Close ${portal.roleName} navigation`} onClick={() => setDrawerOpen(false)} /> : null}
       <div className="role-workspace">
         <RoleTopbar portal={portal} apiHealth={apiHealth} authStatus={authStatus} authNotice={authNotice} showDevelopmentIndicators={showDevelopmentIndicators} menuButtonRef={menuButtonRef} onOpenMenu={() => setDrawerOpen(true)} onMessages={() => { const messagesRoute = portal.nav.find((item) => /messages|communications/i.test(item.label)); if (messagesRoute) navigate(messagesRoute.path); else setTopbarNotice(`${portal.roleName} messaging is backend-dependent and no message route exists for this role.`); }} onNotifications={() => {
@@ -179,7 +181,7 @@ function RolePortalInner({ portal, apiHealth, authStatus, authNotice, showDevelo
           <PortalModeNotice portal={portal} notice={topbarNotice} demoMode={demoMode} authenticatedWorkspace={authenticatedWorkspace} />
           {/* GROWTH-01: the Growth portal has no demo preview; it renders the same honest pages in every mode. */}
           {portal.family === 'Growth' ? (activeRoute?.path === portal.basePath ? <GrowthHomePage /> : <GrowthModulePage route={activeRoute ?? portal.nav[0]!} role={authenticatedWorkspace?.role} />)
-            : !demoMode && activeRoute?.path === portal.basePath ? <AuthenticatedDashboardChooser portal={portal} routeLabel={activeRoute?.label ?? 'Dashboard'} onNavigate={navigate} authenticatedWorkspace={authenticatedWorkspace} /> : activeRoute?.path === portal.basePath ? <RoleDashboard portal={portal} onNavigate={navigate} /> : <RoleModulePage portal={portal} route={activeRoute ?? portal.nav[0]!} demoMode={demoMode} authenticatedWorkspace={authenticatedWorkspace} />}
+            : !demoMode && activeRoute?.path === portal.basePath ? <AuthenticatedDashboardChooser portal={portal} routeLabel={activeRoute?.label ?? 'Dashboard'} onNavigate={navigate} authenticatedWorkspace={authenticatedWorkspace} /> : activeRoute?.path === portal.basePath ? <RoleDashboard portal={portal} onNavigate={navigate} /> : <RoleModulePage key={(activeRoute ?? portal.nav[0]!).path} portal={portal} route={activeRoute ?? portal.nav[0]!} demoMode={demoMode} authenticatedWorkspace={authenticatedWorkspace} />}
         </main>
       </div>
       {/* The assistant has no growth persona; a student answer would mislead field staff (GROWTH-01). */}
@@ -189,9 +191,13 @@ function RolePortalInner({ portal, apiHealth, authStatus, authNotice, showDevelo
   );
 }
 
-function RoleSidebar({ portal, role, activePath, collapsed, drawerOpen, onNavigate, onCollapse, onClose }: { readonly portal: RolePortalConfig; readonly role?: string | undefined; readonly activePath: string; readonly collapsed: boolean; readonly drawerOpen: boolean; readonly onNavigate: (path: string) => void; readonly onCollapse: () => void; readonly onClose: () => void }): React.ReactElement {
-  // An item limited to some roles (GROWTH-01: Team, for managers) is shown only to them.
-  const items = portal.nav.filter((item) => !item.roles || (role !== undefined && item.roles.includes(role)));
+function RoleSidebar({ portal, workspace, activePath, collapsed, drawerOpen, onNavigate, onCollapse, onClose }: { readonly portal: RolePortalConfig; readonly workspace?: AuthenticatedWorkspaceSummary | undefined; readonly activePath: string; readonly collapsed: boolean; readonly drawerOpen: boolean; readonly onNavigate: (path: string) => void; readonly onCollapse: () => void; readonly onClose: () => void }): React.ReactElement {
+  const role = workspace?.role;
+  // An item limited to some roles (GROWTH-01: Team, for managers) is shown only to them. An item
+  // read with an internal capability is shown only when the server says the workspace holds
+  // one (ADR-032) — the same decision the screen's endpoints make, not a hidden unfinished page.
+  const items = portal.nav.filter((item) => (!item.roles || (role !== undefined && item.roles.includes(role)))
+    && (!item.capabilities || workspaceHoldsAny(workspace, item.capabilities)));
   const groups = [...new Set(items.map((item) => item.group))];
   return (
     <aside className={`role-sidebar ${drawerOpen ? 'drawer-open' : ''}`} aria-label={`${portal.roleName} navigation`}>
@@ -254,7 +260,11 @@ function AuthenticatedDashboardChooser({ portal, routeLabel, onNavigate, authent
           <div className="pilot pilot-embed"><PlacementStatisticsSection institutionId={authenticatedWorkspace.organizationId} />
             <PlacementRegisterSection institutionId={authenticatedWorkspace.organizationId} /></div></section></>;
     }
-    return <InstitutionDashboardV3 institutionId={authenticatedWorkspace.organizationId} basePath={portal.basePath} />;
+    // Each other institution role lands on its own home, built from what that role may read;
+    // the Placement Dashboard above is the placement officer's.
+    if (portal.key === 'institution-admin') return <InstitutionAdminHome authenticatedWorkspace={authenticatedWorkspace} basePath={portal.basePath} title={portal.dashboardTitle} />;
+    if (portal.key === 'faculty') return <FacultyTeachingHome authenticatedWorkspace={authenticatedWorkspace} basePath={portal.basePath} title={portal.dashboardTitle} />;
+    return <DepartmentHeadHome authenticatedWorkspace={authenticatedWorkspace} basePath={portal.basePath} title={portal.dashboardTitle} />;
   }
   if (portal.family === 'Employer') return <EmployerOrganisationGate employerId={authenticatedWorkspace?.organizationId} routeLabel={routeLabel}><EmployerDashboardV3 basePath={portal.basePath} /></EmployerOrganisationGate>;
   if (portal.key === 'operations-admin') return <OperationsDashboardV2 basePath={portal.basePath} />;
@@ -302,17 +312,25 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   if (!demoMode && portal.key === 'operations-admin' && route.label === 'Organizations') return <OperationsOrganizationsPage portal={portal} />;
   // OPS-14: Organization Detail adds the college account fields (renewal, contract reference,
   // AI8HT owner, contacts) beneath the organisation list. Organizations itself is unchanged.
-  if (!demoMode && portal.key === 'operations-admin' && route.label === 'Organization Detail') return <><OperationsOrganizationsPage portal={portal} /><OperationsCollegeAccountPanel /></>;
+  // Organization Detail is one organisation (chosen there, or opened from Organizations).
+  if (!demoMode && portal.key === 'operations-admin' && route.label === 'Organization Detail') return <><OperationsOrganizationsPage portal={portal} mode="detail" /><OperationsCollegeAccountPanel /></>;
   // OPS-05: Users and User Detail are the minimised account lookup (masked contacts,
   // audited reads) with invitation tracking kept beneath it (Appendix 1 §4.2).
   if (!demoMode && portal.key === 'operations-admin' && route.label === 'Users') return <><OperationsAccountLookupPage /><OperationsInvitationTrackingPanel /></>;
-  if (!demoMode && portal.key === 'operations-admin' && route.label === 'User Detail') return <><OperationsAccountLookupPage /><OperationsInvitationTrackingPanel /></>;
+  // User Detail is one account; Users is the search and the invitations, and opens accounts here.
+  if (!demoMode && portal.key === 'operations-admin' && route.label === 'User Detail') return <OperationsAccountLookupPage mode="detail" />;
   // The studio goes above the existing read-only career-readiness panel rather than
   // replacing it: that panel reports on a different content pipeline and still works.
   // OPS-08: the job-role catalogue sits above both; only this label's branch changes.
   // OPS-09a: the skill map editor sits under the catalogue, whose sets name its skills.
   // OPS-09d: bulk import sits under the three editors it writes through.
   if (!demoMode && portal.key === 'operations-admin' && route.label === 'Content Management') {
+    // Every section here is read with a content capability, which an operations admin holds
+    // only by explicit grant (ADR-032). The item is not offered without one; reached by
+    // address, the page says so once instead of stacking a refusal per section.
+    if (!workspaceHoldsAny(authenticatedWorkspace, operationsScreenCapabilities.contentManagement)) {
+      return <AuthenticatedNotYetAvailable title="Content Management" detail="Content Management is for staff who hold a content capability (catalogue, edit, review or publish). Your access does not include one; an administrator who holds Capability Admin can grant it." />;
+    }
     return <><OperationsCareerCataloguePage /><OperationsSkillMapPage /><OperationsQuestionBankPage /><OperationsLessonsPage /><OperationsContentImportPage /><OperationsExternalReviewsPage /><LearnerContentStudio /><OperationsContentReadOnlyPage /></>;
   }
   // Audit Logs leaves the shared technical panel: the audit-event search endpoint is
@@ -324,18 +342,33 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   // showed before kept beneath it. Only this label's branch changes; AI Operations has
   // its own branch below (OPS-12). OPS-15: quarterly access reviews and OPS-16: the incident register sit
   // beneath the privacy console, under the same label (Appendix 1 §4.2).
-  if (!demoMode && portal.key === 'operations-admin' && route.label === 'Security') return <><OperationsPrivacyConsolePage /><OperationsGrowthContactsPrivacyPanel /><OperationsAccessReviewsPage /><OperationsIncidentRegisterPage /></>;
+  // Access reviews and the incident register are read with their own capabilities, which an
+  // operations admin does not hold by baseline (ADR-032); they are not asked for without them.
+  if (!demoMode && portal.key === 'operations-admin' && route.label === 'Security') {
+    return <><OperationsPrivacyConsolePage /><OperationsGrowthContactsPrivacyPanel />
+      {workspaceHoldsAny(authenticatedWorkspace, operationsScreenCapabilities.accessReviews) ? <OperationsAccessReviewsPage /> : null}
+      {workspaceHoldsAny(authenticatedWorkspace, operationsScreenCapabilities.incidents) ? <OperationsIncidentRegisterPage /> : null}</>;
+  }
   // OPS-12: AI Operations is the AI console (usage, caps, evaluations, kill switch). Only this label's branch changes.
   if (!demoMode && portal.key === 'operations-admin' && route.label === 'AI Operations') return <OperationsAiOperationsPage />;
   if (!demoMode && portal.key === 'operations-admin' && /system health|security|ai operations/i.test(route.label)) return <OperationsTechnicalReadOnlyPage routeLabel={route.label} />;
-  if (!demoMode && portal.key === 'operations-admin' && /verification/i.test(route.label)) return <OperationsOrganizationsPage portal={portal} />;
+  // Verification is the organisations waiting on a verification decision, not the whole list.
+  if (!demoMode && portal.key === 'operations-admin' && /verification/i.test(route.label)) return <OperationsOrganizationsPage portal={portal} mode="verification" />;
   if (!demoMode && portal.key === 'operations-admin' && /feature flags/i.test(route.label)) return <OperationsFeatureFlagsPage />;
   if (!demoMode && portal.key === 'operations-admin' && /trust and safety/i.test(route.label)) return <OperationsTrustSafetyPage />;
   // OPS-01: Settings holds internal staff and capabilities; OPS-02 adds the approvals
   // queue above it (Appendix 1 §4.2). Only this label's branch changes; the others keep
   // the not-yet-available state below.
   // GROWTH-01: the Growth team section sits beneath them, shown only to a GROWTH_ADMIN holder.
-  if (!demoMode && portal.key === 'operations-admin' && route.label === 'Settings') return <><OperationsApprovalsPanel /><OperationsStaffCapabilitiesPage /><OperationsCommunicationsPage /><OperationsGrowthTeamPanel /><OperationsGrowthSetupPanel /><OperationsGrowthLeadsPanel /><OperationsGrowthAttributionPanel /></>;
+  // Staff and capabilities need Capability Admin and the growth sections Growth Admin; neither is
+  // an operations admin baseline (ADR-032, ADR-040), so they are mounted only for a holder.
+  if (!demoMode && portal.key === 'operations-admin' && route.label === 'Settings') {
+    const growth = workspaceHoldsAny(authenticatedWorkspace, operationsScreenCapabilities.growthAdmin);
+    return <><OperationsApprovalsPanel />
+      {workspaceHoldsAny(authenticatedWorkspace, operationsScreenCapabilities.staffCapabilities) ? <OperationsStaffCapabilitiesPage /> : null}
+      <OperationsCommunicationsPage />
+      {growth ? <><OperationsGrowthTeamPanel /><OperationsGrowthSetupPanel /><OperationsGrowthLeadsPanel /><OperationsGrowthAttributionPanel /></> : null}</>;
+  }
   // OPS-05: Support is the case desk. Only this label's branch changes; Subscriptions,
   // Billing and Analytics keep the not-yet-available state below.
   if (!demoMode && portal.key === 'operations-admin' && route.label === 'Support') return <OperationsSupportDeskPage />;
@@ -344,18 +377,18 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   // state below (ADR-022).
   if (!demoMode && portal.key === 'operations-admin' && route.label === 'Analytics') return <><OperationsRoleDemandPage /><OperationsCollegeHealthPanel /></>;
   if (!demoMode && portal.key === 'operations-admin' && /subscriptions|billing|analytics|support|settings/i.test(route.label)) return <AuthenticatedNotYetAvailable title={route.label} detail="This Operations module is not yet backed by a Phase 2A persistent workflow." />;
-  if (!demoMode && portal.key === 'institution-admin' && ['Students', 'Student Detail'].includes(route.label)) {
+  if (!demoMode && portal.key === 'institution-admin' && route.label === 'Students') {
     // INST-04: the admin reaches academic verification here, under Students (plan §4.2);
     // there is no admin Academic Verification item and none is added.
     return <StaffPilotWrap title="Students" subtitle="Roster, readiness and the lifecycle of every student relationship.">
       <InstitutionStudentsPage portal={portal} authenticatedWorkspace={authenticatedWorkspace} />
-      {route.label === 'Students' && isInstitutionWorkspace(authenticatedWorkspace)
+      {isInstitutionWorkspace(authenticatedWorkspace)
         ? <AcademicVerificationSection institutionId={authenticatedWorkspace.organizationId} canUpload /> : null}
-      {/* INST-09: Student Detail adds each student's consented placement status and shared applications. */}
-      {route.label === 'Student Detail' && isInstitutionWorkspace(authenticatedWorkspace) && getProtectedAccessToken()
-        ? <PlacementStatusList key={authenticatedWorkspace.organizationId} token={getProtectedAccessToken()!} institutionId={authenticatedWorkspace.organizationId} /> : null}
     </StaffPilotWrap>;
   }
+  // INST-09: Student Detail is one student — their record, consented placement status and the
+  // applications they shared — chosen there or opened from a Students row.
+  if (!demoMode && portal.key === 'institution-admin' && route.label === 'Student Detail') return <InstitutionStudentDetailPage authenticatedWorkspace={authenticatedWorkspace} />;
   if (!demoMode && portal.key === 'department-head' && route.label === 'Students') {
     // INST-04: the department's verification queue and results upload, scoped server-side
     // to the department. INST-07: the department roster (read-only) above it.
@@ -380,7 +413,8 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
       return isInstitutionStaffWorkspace(authenticatedWorkspace)
         ? <><StaffPilotWrap title="Assessments" subtitle="Create, publish and track assessments over the governed question bank.">
             <InstitutionExamEnginePage institutionId={authenticatedWorkspace.organizationId} canApprove={portal.key !== 'faculty'} /></StaffPilotWrap>
-          {portal.key === 'department-head' ? <FacultyContentReviewsPage institutionId={authenticatedWorkspace.organizationId} hideWhenForbidden /> : null}</>
+          {portal.key === 'department-head' && workspaceHoldsAny(authenticatedWorkspace, operationsScreenCapabilities.externalContentReview)
+            ? <FacultyContentReviewsPage institutionId={authenticatedWorkspace.organizationId} hideWhenForbidden /> : null}</>
         : <InstitutionWorkspaceError title='Assessments' />;
     }
   // Placement Officer's real portal. Each screen is routed to a surface this role is
@@ -390,9 +424,11 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   // units endpoint, which is institution-admin only, so they stay on the honest empty
   // state until that read is widened rather than rendering an error to the officer.
   if (!demoMode && portal.key === 'placement-officer' && /^students$|^student search$/i.test(route.label)) {
+    // Students browses the whole roster; Student Search is search-first and lists nothing until asked.
+    const searchFirst = route.label === 'Student Search';
     return isInstitutionStaffWorkspace(authenticatedWorkspace)
-      ? <StaffPilotWrap title={route.label} subtitle="The roster you are placing: readiness, department and the state of every relationship.">
-          <InstitutionStudentsPage portal={portal} authenticatedWorkspace={authenticatedWorkspace} /></StaffPilotWrap>
+      ? <StaffPilotWrap title={route.label} subtitle={searchFirst ? 'Find one student quickly, then open what they shared with the college.' : 'The roster you are placing: readiness, department and the state of every relationship.'}>
+          <InstitutionStudentsPage portal={portal} authenticatedWorkspace={authenticatedWorkspace} searchFirst={searchFirst} /></StaffPilotWrap>
       : <InstitutionWorkspaceError title={route.label} />;
   }
   if (!demoMode && portal.key === 'placement-officer' && route.label === 'Readiness') {
@@ -400,7 +436,8 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
     // the narrower institution-admin predicate would deny the very role this branch
     // exists for.
     return isInstitutionStaffWorkspace(authenticatedWorkspace)
-      ? <InstitutionReportsPage key={authenticatedWorkspace.organizationId} institutionId={authenticatedWorkspace.organizationId}>
+      ? <InstitutionReportsPage key={authenticatedWorkspace.organizationId} institutionId={authenticatedWorkspace.organizationId}
+          title="Readiness" description="Advisory readiness bands for your cohort: the monthly career-readiness report, then readiness by career role. Select a month that has ended to generate a report.">
           {/* INST-17: cohort readiness by career role and preparation sprints, under the monthly report. */}
           <CohortReadinessByRoleSection institutionId={authenticatedWorkspace.organizationId} /></InstitutionReportsPage>
       : <InstitutionWorkspaceError title="Readiness" unauthorized={Boolean(authenticatedWorkspace && !institutionStaffWorkspaceRoles.has(authenticatedWorkspace.role))} />;
@@ -411,8 +448,8 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
     // management view would get controls that always fail. canManage={false} keeps the
     // table and drops exactly those controls.
     return isInstitutionStaffWorkspace(authenticatedWorkspace)
-      ? <StaffPilotWrap title={route.label} subtitle="The departments and batches you are placing into, as your institution has structured them.">
-          <InstitutionAcademicStructurePage portal={portal} authenticatedWorkspace={authenticatedWorkspace} canManage={false} /></StaffPilotWrap>
+      ? <StaffPilotWrap title={route.label} subtitle={route.label === 'Departments' ? 'The departments you are placing from, as your institution has structured them.' : 'The batches you are placing, and where each sits in your institution.'}>
+          <InstitutionAcademicStructurePage portal={portal} authenticatedWorkspace={authenticatedWorkspace} canManage={false} kind={route.label === 'Departments' ? 'DEPARTMENT' : 'BATCH'} /></StaffPilotWrap>
       : <InstitutionWorkspaceError title={route.label} unauthorized={Boolean(authenticatedWorkspace && !institutionStaffWorkspaceRoles.has(authenticatedWorkspace.role))} />;
   }
   if (!demoMode && portal.key === 'institution-admin' && route.label === 'Staff') return <InstitutionStaffPage portal={portal} authenticatedWorkspace={authenticatedWorkspace} />;
@@ -470,9 +507,13 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   // assign, group sessions and next-step overrides, replacing the read-only notice. Only this
   // label's branch changes; no navigation item is added (HG-3).
   if (!demoMode && portal.key === 'faculty' && route.label === 'Learning Resources') {
+    // The review queue needs a CONTENT_REVIEW_EXTERNAL grant on this membership (OPS-10); without
+    // one it is not asked for, and the page is the learning the lecturer can assign.
     return isInstitutionStaffWorkspace(authenticatedWorkspace)
-      ? <><FacultyContentReviewsPage institutionId={authenticatedWorkspace.organizationId} />
-          <FacultyLearningActionsPage authenticatedWorkspace={authenticatedWorkspace} /></>
+      ? <StaffPilotWrap title="Learning Resources" subtitle="Approved ONE content to assign to your classes, group sessions and next-step overrides.">
+          {workspaceHoldsAny(authenticatedWorkspace, operationsScreenCapabilities.externalContentReview)
+            ? <FacultyContentReviewsPage institutionId={authenticatedWorkspace.organizationId} hideWhenForbidden /> : null}
+          <FacultyLearningActionsPage authenticatedWorkspace={authenticatedWorkspace} /></StaffPilotWrap>
       : <InstitutionWorkspaceError title="Learning Resources" />;
   }
   // INST-06: faculty Messages — announcements to assigned sections and the lecturer's inbox. Only this label's branch changes.

@@ -13,6 +13,45 @@ import { V2EmptyState } from '../dashboardsV2.js';
 export interface AuthenticatedWorkspaceSummary {
   readonly role: string;
   readonly organizationId: string | null;
+  /**
+   * The signed-in membership's effective internal capabilities, as /security/context reports
+   * them (ADR-032). Undefined means the server did not say, and nothing is withheld on it.
+   */
+  readonly capabilities?: readonly string[];
+}
+
+/**
+ * Whether the server says this workspace holds at least one of these capabilities. It decides
+ * only what the web offers and calls, so a screen is not opened onto a refusal; every
+ * endpoint still makes its own decision. Unknown (an older API) counts as yes, which keeps
+ * the previous behaviour of asking the server and showing its answer.
+ */
+export function workspaceHoldsAny(workspace: AuthenticatedWorkspaceSummary | undefined, capabilities: readonly string[]): boolean {
+  if (!workspace?.capabilities) return true;
+  return capabilities.some((capability) => workspace.capabilities!.includes(capability));
+}
+
+export { operationsScreenCapabilities } from '../rolePortalConfig.js';
+
+/**
+ * Opens another item of the same portal on one record, carrying the record in the history
+ * entry's state rather than the address, so an internal identifier never shows in the URL.
+ * The portal shell follows the popstate to the new item (as it does for Back).
+ */
+export function openPortalRecord(path: string, state: Readonly<Record<string, string>>): void {
+  const prefix = window.location.pathname.startsWith('/demo/') ? '/demo' : '';
+  window.history.pushState(state, '', `${prefix}${path}`);
+  window.dispatchEvent(new PopStateEvent('popstate', { state }));
+}
+
+/** The record a portal item was opened on by `openPortalRecord`, or null. */
+export function portalRecordFromHistory(key: string): string | null {
+  try {
+    const value = (window.history.state as Record<string, unknown> | null)?.[key];
+    return typeof value === 'string' && value ? value : null;
+  } catch {
+    return null;
+  }
 }
 
 export const institutionWorkspaceRoles = new Set(['INSTITUTION_OWNER', 'INSTITUTION_ADMIN']);

@@ -207,7 +207,7 @@ export function DepartmentOverviewPage({ authenticatedWorkspace, basePath }: Wor
   </div></div>;
 }
 
-function VerificationCard({ summary, onOpen }: { readonly summary: VerificationSummaryDto | null; readonly onOpen: () => void }): React.ReactElement {
+export function VerificationCard({ summary, onOpen }: { readonly summary: VerificationSummaryDto | null; readonly onOpen: () => void }): React.ReactElement {
   return <section className="pilot-card">
     <div className="pilot-card-head"><h2>Academic Verification</h2><button type="button" className="pilot-link" onClick={onOpen}>Review Queue</button></div>
     <div className="pilot-legend">

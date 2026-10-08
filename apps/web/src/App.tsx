@@ -158,6 +158,8 @@ interface PortalChoice {
 type AuthorizedWorkspace = PortalChoice & {
   readonly role: string;
   readonly organizationId: string | null;
+  /** The server's word on what this membership may do (ADR-032); undefined when not reported. */
+  readonly capabilities?: readonly string[];
 };
 type WorkspaceResolution =
   | { readonly state: 'loading' }
@@ -417,7 +419,7 @@ export function App(): React.ReactElement {
   }
 
   if (rolePortal) {
-    return <RolePortal portal={rolePortal} apiHealth={apiHealth} authStatus={authStatus} authNotice={authNotice} onSignIn={handleHostedSignIn} onSignOut={handleSignOut} showDevelopmentIndicators={showDevelopmentIndicators} onNavigate={() => setPath(currentPath())} demoMode={Boolean(demoPath)} authenticatedWorkspace={activeWorkspace ? { role: activeWorkspace.role, organizationId: activeWorkspace.organizationId } : undefined} />;
+    return <RolePortal portal={rolePortal} apiHealth={apiHealth} authStatus={authStatus} authNotice={authNotice} onSignIn={handleHostedSignIn} onSignOut={handleSignOut} showDevelopmentIndicators={showDevelopmentIndicators} onNavigate={() => setPath(currentPath())} demoMode={Boolean(demoPath)} authenticatedWorkspace={activeWorkspace ? { role: activeWorkspace.role, organizationId: activeWorkspace.organizationId, ...(activeWorkspace.capabilities ? { capabilities: activeWorkspace.capabilities } : {}) } : undefined} />;
   }
 
   if (!demoPath && authenticated) {
@@ -637,6 +639,11 @@ function employerRoleRank(role: string): number {
 }
 
 function workspaceForMembership(membership: SecurityContextDto['memberships'][number]): AuthorizedWorkspace | null {
+  const workspace = workspaceForMembershipRole(membership);
+  return workspace && membership.capabilities ? { ...workspace, capabilities: membership.capabilities } : workspace;
+}
+
+function workspaceForMembershipRole(membership: SecurityContextDto['memberships'][number]): AuthorizedWorkspace | null {
   const organizationId = membership.organizationId;
   if (membership.role === 'INSTITUTION_OWNER' || membership.role === 'INSTITUTION_ADMIN') return { ...portalChoices[1], role: membership.role, organizationId };
   if (membership.role === 'PLACEMENT_ADMIN') return { ...portalChoices[1], path: '/institution/placement-officer', label: 'Placement Admin', detail: 'Placement operations for the authorized institution.', role: membership.role, organizationId };

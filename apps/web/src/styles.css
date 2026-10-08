@@ -5074,3 +5074,151 @@ button.secondary {
 .pilot-embed .embedded-real .career-api-panel { border: 0; box-shadow: none; background: transparent; padding: 0; margin: 0; }
 .pilot-embed .embedded-real .role-module { display: flex; flex-direction: column; gap: 16px; }
 .pilot-embed .embedded-real .workspace-grid { gap: 16px; }
+
+/* =============================================================================
+   Layout repair (fix/ui-layout). Each block names the defect it closes. Kept at
+   the end of the file on purpose: several rules must win over same-specificity
+   rules above, including ones inside earlier media queries.
+   ============================================================================= */
+
+/* --- 1. Twelve-column role grids ---------------------------------------------
+   `.role-dashboard` / `.role-module` are 12-track grids. A child with no span
+   class was auto-placed into ONE track (~75-150px), so embedded pilot sections
+   (placement statistics, register, drive calendar, cohort readiness, a nested
+   reports module) rendered one word per line. Default every child to the full
+   row; `:where()` keeps this at zero specificity so any explicit span class
+   (`.role-card` halves, dashboard card spans) still wins. */
+:where(.role-dashboard, .role-module) > :where(:not(.role-card)) { grid-column: 1 / -1; }
+
+/* In flex-column hosts (the embedded pilot shells) the card rule
+   `align-self: start` and the module's `align-items: start` shrink-wrapped each
+   card to its content: ragged Settings cards (a 140px "College profile"), and on
+   employer Reports cards grew to the table's width and scrolled the whole page
+   sideways. Stretch them to the column and cap them at it. */
+.pilot-embed .embedded-real .role-module { align-items: stretch; }
+.pilot-embed .embedded-real > :where(:not(button, a)),
+.pilot-embed .embedded-real .role-module > :where(:not(button, a)),
+:is(.pilot-content, .v2-content) > :where(.role-card, .role-module, section, form) { align-self: stretch; max-width: 100%; min-width: 0; }
+/* Sections stacked in a block-level embed, or a module after a pilot page, had no gap. */
+.pilot.pilot-embed > .pilot-card + .pilot-card { margin-top: 16px; }
+.pilot.pilot-embed + .role-module { margin-top: 18px; }
+.pilot-card > .role-record-table-wrap { margin-bottom: 12px; }
+
+/* --- 2. Wide tables scroll inside their card, never the page ------------------ */
+.pilot-card, .v2-card, .role-card { min-width: 0; }
+.role-record-table-wrap, .data-table-wrap { max-width: 100%; overflow-x: auto; scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+/* Overlay scrollbars are invisible until hovered, so a table cut at the card edge
+   read as clipped. Edge shadows (the classic local/scroll background pair) appear
+   only on the side that has more columns to scroll to. */
+.role-record-table-wrap, .data-table-wrap {
+  background:
+    linear-gradient(to right, #fff 30%, rgba(255, 255, 255, 0)) left center / 32px 100% no-repeat local,
+    linear-gradient(to left, #fff 30%, rgba(255, 255, 255, 0)) right center / 32px 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, rgba(15, 23, 42, .16), rgba(15, 23, 42, 0)) left center / 12px 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, rgba(15, 23, 42, .16), rgba(15, 23, 42, 0)) right center / 12px 100% no-repeat scroll,
+    #fff;
+}
+/* A 42% row-header column suits two-column key/value tables; on a wide table it
+   crushed every other column. */
+.role-record-table:has(thead th:nth-child(5)) th[scope="row"] { width: auto; min-width: 160px; }
+.role-record-table td > button, .role-record-table td > .pilot-btn { white-space: nowrap; }
+
+/* --- 3. Role portal and student topbars ---------------------------------------
+   The portal pill repeats the sidebar's portal name and squeezed the role pill
+   into "Placement Offi..."; the search collapsed to an empty padded pill; "Switch
+   workspace" wrapped; the auth chip showed a truncated "Acc..." label beside an
+   email the profile chip already shows. */
+.role-context { flex: 0 1 auto; max-width: 320px; }
+.role-org { flex: 0 1 auto; }
+.role-search { flex: 1 1 180px; min-width: 180px; }
+.role-topbar-actions { flex: 0 1 auto; margin-left: auto; }
+.role-topbar-actions > button.secondary { flex: 0 0 auto; white-space: nowrap; }
+.role-topbar .auth-controls > span:has(+ span),
+.role-topbar .auth-controls > span + span,
+.student-topbar .auth-controls > span:has(+ span) { display: none; }
+.role-topbar .auth-controls:has(> span + span) { padding: 3px; }
+.auth-controls button { flex: 0 0 auto; }
+@media (max-width: 1599px) { .role-org { display: none; } }
+@media (min-width: 761px) and (max-width: 1365px) { .role-search { display: none; } }
+
+/* --- 4. Plain data tables (student Applications and other `.data-table-wrap`)
+   had no styles at all: centred headers over left cells, no dividers, cramped
+   cells. Give them the `.role-record-table` treatment. */
+.data-table-wrap { border: 1px solid var(--line); border-radius: 14px; background: #fff; margin-top: 10px; }
+.data-table-wrap > table { width: 100%; min-width: 720px; border-collapse: collapse; font-size: 13px; }
+.data-table-wrap th, .data-table-wrap td { padding: 12px 14px; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: top; }
+.data-table-wrap thead th { color: #475569; background: #f8fafc; font-size: .74rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
+.data-table-wrap tbody tr:last-child th, .data-table-wrap tbody tr:last-child td { border-bottom: 0; }
+.data-table-wrap td > button, .data-table-wrap td > span + button { margin: 4px 6px 0 0; white-space: nowrap; }
+.data-table-wrap td > .hiring-tag { display: inline-block; margin-top: 4px; }
+
+/* --- 5. Clickable list rows and toggle buttons ---------------------------------
+   Growth Leads rows are <button class="v2-list-row">, caught by the global button
+   rule: solid student blue, centred white text, unreadable subtitle. Make them
+   list rows. The Colleges/Employers toggle showed both options as active. */
+.v2-list button.v2-list-row { width: 100%; min-height: 0; padding: 11px 10px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0;
+  background: var(--surface); color: var(--student-ink); font: inherit; font-weight: 500; text-align: left; cursor: pointer; }
+.v2-list button.v2-list-row:last-child { border-bottom: 0; }
+.v2-list button.v2-list-row:hover { background: var(--canvas); }
+.v2-list button.v2-list-row[aria-pressed="true"] { background: var(--student-soft); box-shadow: inset 3px 0 0 var(--student); }
+.v2-list button.v2-list-row:focus-visible { outline: 2px solid var(--student); outline-offset: -2px; }
+button.pilot-btn[aria-pressed="false"] { background: var(--surface); color: var(--student); border: 1px solid var(--line-strong); }
+button.pilot-btn[aria-pressed="true"] { background: var(--student); color: #fff; border: 1px solid var(--student); }
+
+/* --- 6. Native form controls ------------------------------------------------------
+   Selects and inputs without a styling context rendered as browser defaults
+   (Settings inline selects, Growth filters, Approvals "Show"). Zero specificity:
+   any component's own control styling still wins. */
+:where(select, textarea, input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"], [type="hidden"], [type="submit"], [type="button"], [type="reset"], [type="image"])) {
+  max-width: 100%; min-height: 38px; padding: 8px 11px; border: 1px solid #cbd5e1; border-radius: 10px;
+  background-color: #fff; color: #172033; font: inherit; font-size: 13px;
+}
+:where(textarea) { width: 100%; min-height: 96px; }
+/* Inputs drawn inside a pill (topbar searches) keep the pill's own box. */
+:is(.global-search, .role-search, .pilot-search, .local-search, .staff-search, .attention-search) input { min-height: 0; padding: 0; border-radius: 0; background-color: transparent; }
+:where(select, textarea, input):focus-visible { outline: 2px solid color-mix(in srgb, var(--student) 45%, transparent); outline-offset: 1px; border-color: var(--student); }
+.role-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+:where(.role-actions, .role-card, .pilot-card, .v2-card) > label { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; color: #475569; font-size: 12.5px; font-weight: 600; }
+:where(.role-card, .pilot-card, .v2-card) > label { margin: 0 12px 10px 0; }
+/* A textarea's label took one 240px track of the management form's auto-fit grid
+   (the textarea itself spans, but it sits inside the label), so long text such as
+   the college profile was edited in a box a quarter of the card wide. */
+.role-management-form label:has(> textarea) { grid-column: 1 / -1; }
+
+/* --- 7. Disabled buttons look disabled -----------------------------------------
+   The global button rule painted disabled buttons ("Already attempted") as active
+   primaries. Career Tools' "Open" buttons sat at different heights. */
+button:disabled:not(.icon-button, .mobile-menu-button, .side-nav-item, .role-nav-item, .role-collapse, .collapse-button, .profile-menu, .drawer-scrim, .sidebar-close, .v2-list-row, .assistant-launcher, .assistant-close),
+button[aria-disabled="true"]:not(.icon-button, .mobile-menu-button, .side-nav-item, .role-nav-item, .role-collapse, .collapse-button, .profile-menu, .drawer-scrim, .sidebar-close, .v2-list-row) {
+  background: #eef1f6; color: #8a94a6; border-color: #e2e8f0; box-shadow: none; cursor: not-allowed; opacity: 1;
+}
+.pilot-course-card > button:last-child { margin-top: auto; }
+
+/* --- 8. Mobile: brand in the top bar, compact banners, two-up KPI tiles ----------
+   Below the drawer breakpoint the sidebar (and its logo) is off-canvas, which
+   left the top bar with no brand at all. */
+.topbar-brand { display: none; align-items: center; flex: 0 0 auto; }
+@media (max-width: 1220px) {
+  .student-topbar .topbar-brand { display: flex; }
+  .student-topbar { grid-template-columns: auto auto minmax(0, 1fr) auto; }
+}
+@media (max-width: 1180px) { .role-topbar .topbar-brand { display: flex; } }
+@media (max-width: 430px) {
+  .student-topbar { grid-template-columns: auto auto minmax(0, 1fr); }
+  .student-topbar .global-search { justify-self: end; }
+}
+@media (max-width: 760px) {
+  .role-topbar { flex-wrap: wrap; justify-content: flex-start; }
+  .staff-demo-notice { flex-wrap: nowrap; gap: 6px; margin-bottom: 8px; padding: 6px 10px; font-size: 11.5px; line-height: 1.35; }
+  .staff-demo-notice > span:first-child { flex: 0 0 auto; white-space: nowrap; }
+  .staff-demo-notice > span + span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .role-preview-notice { flex-direction: row; align-items: center; margin-bottom: 12px; padding: 8px 12px; border-radius: 12px; font-size: 12px; }
+  .role-preview-notice > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; overflow-wrap: normal; }
+  .role-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pilot .pilot-row:has(> .pilot-kpi),
+  .pilot.pilot-embed .pilot-row:has(> .pilot-kpi) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pilot-kpi { gap: 9px; padding: 12px; }
+}
+
+/* --- 9. Room under the floating assistant button ---------------------------------- */
+.role-main, .student-main { padding-bottom: 104px; }

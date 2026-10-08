@@ -58,6 +58,42 @@ function measure(minCard) {
     if (element.children.length === 0 && (element.innerText || '').trim() && style.overflowX === 'visible' && element.scrollWidth > element.clientWidth + 2
       && style.textOverflow !== 'ellipsis') failures.push(`text overflows ${element.clientWidth}<${element.scrollWidth}: ${describe(element)}`);
   }
+  // Space wasted the other way: a wide card whose content covers under 30% of its width, or a
+  // single row of cards that leaves grid columns standing empty beside them.
+  const cardClass = /(^|\s)(pilot-card|v2-card|role-card)(\s|$)/;
+  for (const card of document.querySelectorAll('main .pilot-card, main .v2-card, main .role-card')) {
+    const box = card.getBoundingClientRect();
+    if (box.width < 560 || box.height < 2 || innerWidth <= 600) continue;
+    let left = Infinity; let right = -Infinity;
+    const walker = document.createTreeWalker(card, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      if (!node.textContent.trim()) continue;
+      const range = document.createRange(); range.selectNodeContents(node);
+      for (const rect of range.getClientRects()) { if (rect.width) { left = Math.min(left, rect.left); right = Math.max(right, rect.right); } }
+    }
+    for (const graphic of card.querySelectorAll('svg, img, canvas, input, select, textarea, button, table')) {
+      const rect = graphic.getBoundingClientRect(); if (rect.width) { left = Math.min(left, rect.left); right = Math.max(right, rect.right); }
+    }
+    // Only a card left alone on its row while its siblings sit side by side is wasted room;
+    // an empty state alone in a stacked page is the honest layout.
+    const siblings = [...(card.parentElement?.children ?? [])].filter((item) => item !== card && item.getBoundingClientRect().width > 0);
+    const aloneOnRow = !siblings.some((item) => Math.abs(item.getBoundingClientRect().top - box.top) < 4);
+    const siblingsShareRows = siblings.some((item, index) => siblings.some((other, otherIndex) => otherIndex !== index && Math.abs(other.getBoundingClientRect().top - item.getBoundingClientRect().top) < 4));
+    if (right > left && (right - left) < box.width * 0.3 && aloneOnRow && siblingsShareRows) failures.push(`mostly empty card: content ${Math.round(right - left)}px of ${Math.round(box.width)}px: ${describe(card)}`);
+  }
+  for (const row of document.querySelectorAll('main *')) {
+    const style = getComputedStyle(row);
+    if (style.display !== 'grid' || row.getBoundingClientRect().width < 500 || innerWidth <= 600) continue;
+    const tracks = style.gridTemplateColumns.split(' ').filter((track) => parseFloat(track) > 0).length;
+    const items = [...row.children].filter((child) => getComputedStyle(child).display !== 'none' && getComputedStyle(child).position !== 'absolute');
+    if (tracks >= 3 && items.length >= 2 && items.length < tracks && items.every((item) => cardClass.test(String(item.className))))
+      failures.push(`row leaves ${tracks - items.length} empty column(s): ${describe(row)}`);
+  }
+  // A stat tile is a small figure: stretched across a page it reads as a broken layout.
+  for (const tile of document.querySelectorAll('main .pilot-kpi, main .role-kpi, main .v2-stat')) {
+    const width = tile.getBoundingClientRect().width;
+    if (width > 480 && innerWidth > 600) failures.push(`stat tile stretched to ${Math.round(width)}px: ${describe(tile)}`);
+  }
   return [...new Set(failures)];
 }
 

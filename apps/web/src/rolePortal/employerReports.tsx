@@ -13,6 +13,7 @@ import { useEffect, useState } from 'react';
 import { getAccessToken } from '../auth.js';
 import { getEmployerReports, type EmployerReportsDto, type ReportCountDto, type ReportTableDto } from '../api/hiring.js';
 import { V2Stat } from '../dashboardsV2.js';
+import { NaSlotStrip, NaValue, SuppressionNote, isMissing } from '../naState.js';
 import { formatApiError } from './shared.js';
 
 const cellLabels: readonly (readonly [string, string])[] = [
@@ -49,17 +50,33 @@ function StageTable({ caption, groupHeading, rows, empty }: {
   readonly rows: readonly { readonly key: string; readonly label: React.ReactNode; readonly table: ReportTableDto }[];
 }): React.ReactElement {
   if (!rows.length) return <p>{empty}</p>;
-  return <div className="role-record-table-wrap"><table className="role-record-table">
+  const brokenDown = rows.filter((row) => !row.table.suppressed);
+  // A stage that reads "<5" in every broken-down row says the same thing in every cell, so its
+  // column folds into one labelled chip under the table: every stage stays named with its value,
+  // and the columns left are the ones carrying a number.
+  const folded = brokenDown.length ? cellLabels.filter(([key]) => brokenDown.every((row) => isMissing(cellValue(row.table, key)))) : [];
+  const columns = cellLabels.filter((entry) => !folded.includes(entry));
+  const anyWithheld = rows.some((row) => row.table.suppressed || [total(row.table), ...cellLabels.map(([key]) => cellValue(row.table, key))].some(isMissing));
+  const stageSpan = Math.max(1, columns.length);
+  return <><div className="role-record-table-wrap"><table className="role-record-table">
     <caption className="sr-only">{caption}</caption>
-    <thead><tr><th>{groupHeading}</th><th>Applications</th>{cellLabels.map(([key, label]) => <th key={key}>{label}</th>)}</tr></thead>
+    <thead><tr><th>{groupHeading}</th><th>Applications</th>{columns.length ? columns.map(([key, label]) => <th key={key}>{label}</th>) : <th>Stages</th>}</tr></thead>
     <tbody>{rows.map((row) => <tr key={row.key}>
-      <td>{row.label}</td><td>{total(row.table)}</td>
+      <td>{row.label}</td><td><NaValue value={total(row.table)} /></td>
       {row.table.suppressed
-        ? <td colSpan={cellLabels.length}>Fewer than 5 applications — not broken down.</td>
-        : cellLabels.map(([key]) => <td key={key}>{cellValue(row.table, key)}</td>)}
+        ? <td colSpan={stageSpan} className="na-row-note">Fewer than 5 applications — not broken down.</td>
+        : columns.length ? columns.map(([key]) => <td key={key}><NaValue value={cellValue(row.table, key)} /></td>)
+          : <td className="na-row-note">Fewer than 5 at every stage — see below.</td>}
     </tr>)}</tbody>
-  </table></div>;
+  </table></div>
+  {folded.length ? <NaSlotStrip card={false} label={`${caption}: stages under 5 in every row`}
+    slots={folded.map(([key, label]) => ({ label, value: cellValue(brokenDown[0]!.table, key) }))}
+    reason={`Fewer than 5 applications in every ${brokenDown.length === 1 ? 'row' : 'one of these rows'} at these stages, so they are folded here instead of a column each.`} /> : null}
+  {anyWithheld ? <SuppressionNote>{SUPPRESSION_NOTE}</SuppressionNote> : null}</>;
 }
+
+/** The single caption under any table here that holds a withheld figure. */
+const SUPPRESSION_NOTE = 'Muted figures are withheld: "<5" is a group of fewer than 5 applications, and "Withheld" is a total that would let one be worked out. No candidate can be singled out.';
 
 export function EmployerReportsPage({ employerId }: { readonly employerId: string }): React.ReactElement {
   const [result, setResult] = useState<{ readonly employerId: string; readonly reports: EmployerReportsDto } | null>(null);
@@ -90,9 +107,11 @@ export function EmployerReportsPage({ employerId }: { readonly employerId: strin
     {status ? <p role={failed ? 'alert' : 'status'}>{status}</p> : null}
 
     <div className="v2-row v2-cols-4 career-stat-strip role-wide">
-      <V2Stat icon="📨" tone="blue" label="Applications" value={reports ? total(reports.overall) : 'NA'} />
-      <V2Stat icon="⏱" tone="amber" label="Median days to first offer" value={!offerDays ? 'NA' : offerDays.medianDays === null ? '<5 offers' : offerDays.medianDays.toFixed(1)} />
-      <V2Stat icon="🤝" tone="green" label="Offer acceptance" value={!reports ? 'NA' : reports.offers.acceptanceRate === null ? 'Too few answers' : `${(reports.offers.acceptanceRate * 100).toFixed(0)}%`} />
+      <V2Stat icon="📨" tone="blue" label="Applications" value={reports ? total(reports.overall) : 'NA'} reason={reports ? 'Too few to show' : 'Not loaded'} />
+      <V2Stat icon="⏱" tone="amber" label="Median days to first offer" value={!offerDays ? 'NA' : offerDays.medianDays === null ? '<5 offers' : offerDays.medianDays.toFixed(1)}
+        reason={offerDays ? 'Shown at 5+ offers' : 'Not loaded'} />
+      <V2Stat icon="🤝" tone="green" label="Offer acceptance" value={!reports ? 'NA' : reports.offers.acceptanceRate === null ? 'Too few answers' : `${(reports.offers.acceptanceRate * 100).toFixed(0)}%`}
+        reason={reports ? 'Shown at 5+ answers each way' : 'Not loaded'} />
       <V2Stat icon="🏫" tone="indigo" label="Campus drives" value={reports ? reports.byDrive.length : 'NA'} />
     </div>
 
@@ -123,17 +142,18 @@ export function EmployerReportsPage({ employerId }: { readonly employerId: strin
     <section className="role-card role-wide"><h2>Time to each stage</h2>
       <p>Median days from submission, over applications that reached the stage. Shown only when at least 5 did.</p>
       {reports ? <div className="role-record-table-wrap"><table className="role-record-table"><thead><tr><th>Step</th><th>Applications</th><th>Median days</th></tr></thead>
-        <tbody>{reports.timeToStage.map((row) => <tr key={row.metric}><td>{metricLabels[row.metric] ?? row.metric}</td><td>{count(row.applications)}</td>
-          <td>{row.medianDays === null ? 'NA' : row.medianDays.toFixed(1)}</td></tr>)}</tbody></table></div> : <p>NA</p>}
+        <tbody>{reports.timeToStage.map((row) => <tr key={row.metric}><td>{metricLabels[row.metric] ?? row.metric}</td><td><NaValue value={count(row.applications)} /></td>
+          <td><NaValue value={row.medianDays === null ? 'NA' : row.medianDays.toFixed(1)} /></td></tr>)}</tbody></table></div> : <p>NA</p>}
+      {reports?.timeToStage.some((row) => row.medianDays === null) ? <SuppressionNote>A median reads NA until at least 5 applications reach that stage; their count reads &quot;&lt;5&quot; until then.</SuppressionNote> : null}
     </section>
 
     <section className="role-card role-wide"><h2>Offer outcomes</h2>
       <p>The latest offer on each application. The acceptance rate is accepted ÷ (accepted + declined + expired), shown only when both groups hold at least 5.</p>
       {reports ? <div className="role-record-table-wrap"><table className="role-record-table"><thead><tr><th>Outcome</th><th>Applications</th></tr></thead>
         <tbody>{reports.offers.table.suppressed
-          ? <tr><td colSpan={2}>Fewer than 5 applications have an offer — not broken down.</td></tr>
-          : offerLabels.map(([key, label]) => <tr key={key}><td>{label}</td><td>{cellValue(reports.offers.table, key)}</td></tr>)}
-        <tr><td>All offers</td><td>{total(reports.offers.table)}</td></tr></tbody></table></div> : <p>NA</p>}
+          ? <tr><td colSpan={2} className="na-row-note">Fewer than 5 applications have an offer — not broken down.</td></tr>
+          : offerLabels.map(([key, label]) => <tr key={key}><td>{label}</td><td><NaValue value={cellValue(reports.offers.table, key)} /></td></tr>)}
+        <tr><td>All offers</td><td><NaValue value={total(reports.offers.table)} /></td></tr></tbody></table></div> : <p>NA</p>}
     </section>
   </section>;
 }

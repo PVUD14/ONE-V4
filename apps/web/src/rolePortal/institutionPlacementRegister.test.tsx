@@ -179,6 +179,24 @@ describe('dashboard placement widgets', () => {
     expect(trend).toHaveTextContent('2026-08 12');
   });
 
+  it('draws no offers line and no pipeline bars when every figure is withheld, and names every slot as <5', async () => {
+    const allWithheld = row({ eligible: withheld, notShared: withheld, applied: withheld, shortlisted: withheld, withOffer: withheld, placed: withheld, placementPercentage: null, offersPerPlacedStudent: null });
+    routes({ [`${base}/placement-statistics`]: { ...statistics, overall: allWithheld,
+      offersByMonth: ['2026-04', '2026-05', '2026-06'].map((month) => ({ month, offers: withheld })) } });
+    render(<InstitutionDashboardV3 institutionId={institutionId} basePath="/institution/placement-officer" />);
+    const trend = (await screen.findByRole('heading', { name: 'Offers Trend' })).closest('section')!;
+    // A flat line at zero would be a false figure: the frame stays with its title and says why.
+    expect(trend.querySelector('svg polyline')).toBeNull();
+    expect(within(trend).getByText(/Not enough data yet/)).toBeInTheDocument();
+    const months = within(within(trend).getByRole('list', { name: 'Offers by month' })).getAllByRole('listitem');
+    expect(months.map((slot) => slot.textContent)).toEqual(['2026-04 <5', '2026-05 <5', '2026-06 <5']);
+    const pipeline = screen.getByRole('heading', { name: 'Placement Pipeline' }).closest('section')!;
+    expect(pipeline.querySelector('.pilot-bar')).toBeNull();
+    expect(within(within(pipeline).getByRole('list', { name: 'Placement pipeline stages' })).getAllByRole('listitem').map((slot) => slot.textContent))
+      .toEqual(['Eligible <5', 'Applied <5', 'Shortlisted <5', 'Offers <5', 'Placed <5']);
+    expect(screen.getByText('Students Placed').parentElement).toHaveTextContent('<5Students Placed');
+  });
+
   it('reads NA, not zero, when the statistics cannot be read (faculty)', async () => {
     routes({ [`${base}/placement-statistics`]: 'FORBIDDEN' });
     render(<InstitutionDashboardV3 institutionId={institutionId} basePath="/institution/faculty" />);

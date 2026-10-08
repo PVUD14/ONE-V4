@@ -87,7 +87,7 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 describe('role demand dashboard', () => {
   it('renders the server summary, ranks only shown roles, and shows <5 where the server suppressed', async () => {
     render(<OperationsRoleDemandPage />);
-    const table = await screen.findByRole('table');
+    const table = await screen.findByRole('table', { name: 'Roles ranked by demand' });
     const rows = within(table).getAllByRole('row').slice(1);
     expect(rows.map((row) => within(row).getAllByRole('cell')[0]!.textContent)).toEqual(['1', '2', '—', '—']);
     expect(within(rows[0]!).getByText('S01 · Software Developer')).toBeInTheDocument();
@@ -99,22 +99,23 @@ describe('role demand dashboard', () => {
     expect(within(rows[3]!).getByText('Not in catalogue')).toBeInTheDocument();
     expect(screen.getByText('411', { selector: 'b' })).toBeInTheDocument();
     expect(screen.getByText(/at least 200 students across at least 3 colleges/)).toBeInTheDocument();
-    expect(screen.getByLabelText('Monthly trend')).toHaveTextContent('2026-08: <5');
-    expect(screen.getByLabelText('Monthly trend')).toHaveTextContent('2026-09: 52');
+    const trend = screen.getByRole('table', { name: 'Monthly trend' });
+    expect(within(trend).getByRole('row', { name: /2026-08/ })).toHaveTextContent('<5');
+    expect(within(trend).getByRole('row', { name: /2026-09/ })).toHaveTextContent('52');
   });
 
   it('keeps the employer-demand slot and says NA instead of dropping it', async () => {
     render(<OperationsRoleDemandPage />);
-    await screen.findByRole('table');
+    await screen.findByRole('table', { name: 'Roles ranked by demand' });
     expect(screen.getByText('Employer demand (not recorded)').parentElement).toHaveTextContent('NA');
     expect(screen.getByText(/Employer demand is NA/)).toBeInTheDocument();
   });
 
   it('filters by release label without refetching', async () => {
     render(<OperationsRoleDemandPage />);
-    await screen.findByRole('table');
+    await screen.findByRole('table', { name: 'Roles ranked by demand' });
     fireEvent.change(screen.getByLabelText('Release label filter'), { target: { value: 'NONE' } });
-    expect(screen.getAllByRole('row')).toHaveLength(2);
+    expect(within(screen.getByRole('table', { name: 'Roles ranked by demand' })).getAllByRole('row')).toHaveLength(2);
     expect(screen.getByText('Starter role')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Release label filter'), { target: { value: 'VERIFIED' } });
     expect(screen.getByText('No roles carry this release label.')).toBeInTheDocument();

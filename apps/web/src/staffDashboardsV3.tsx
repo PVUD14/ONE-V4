@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle, ArrowRight, Briefcase, Building2, ClipboardCheck, Download, Plus, TrendingUp, Users, Video } from 'lucide-react';
 import { MultiRing, Spark } from './pilot/pilotComponents.js';
+import { NaSlotStrip, NaValue, PilotKpi, SuppressedChart, allMissing } from './naState.js';
 import {
   getProtectedAccessToken,
   getSecurityContext,
@@ -38,17 +39,30 @@ function go(path: string): void {
   window.dispatchEvent(new PopStateEvent('popstate'));
 }
 
-function Funnel({ rows }: { readonly rows: readonly { readonly label: string; readonly value: number | null; readonly display?: string }[] }): React.ReactElement {
+function Funnel({ rows, label, naReason = 'Placement figures are not available to your role — NA.' }: {
+  readonly rows: readonly { readonly label: string; readonly value: number | null; readonly display?: string }[]; readonly label: string; readonly naReason?: string;
+}): React.ReactElement {
+  const displays = rows.map((row) => row.display ?? (row.value === null ? 'NA' : String(row.value)));
+  // Every stage withheld or missing: empty bars would read as zero, so each stage is a labelled chip.
+  if (allMissing(displays)) {
+    return <NaSlotStrip card={false} label={label} slots={rows.map((row, index) => ({ label: row.label, value: displays[index] }))}
+      reason={displays.includes('<5') ? 'Each stage holds fewer than 5 students, so the counts are withheld.' : naReason} />;
+  }
   const max = Math.max(...rows.map((row) => row.value ?? 0), 1);
   return <div className="pilot-funnel">
-    {rows.map((row) => (
+    {rows.map((row, index) => (
       <div key={row.label} className="pilot-funnel-row">
         <span>{row.label}</span>
         <div className="pilot-bar"><i style={{ width: `${((row.value ?? 0) / max) * 100}%` }} /></div>
-        <span className="num">{row.display ?? row.value ?? 'NA'}</span>
+        <span className="num"><NaValue value={displays[index]} /></span>
       </div>
     ))}
   </div>;
+}
+
+/** The one-line reason under a missing KPI: withheld for size, or no source for this role. */
+function kpiReason(value: string): string {
+  return value.startsWith('<') ? 'Too few to show' : 'Not for your role';
 }
 
 /** INST-12: a suppressed count for the funnel: the bar only when published, <5 when withheld, NA without a source. */
@@ -149,28 +163,20 @@ export function InstitutionDashboardV3({ institutionId, basePath }: { readonly i
           ['Students Placed', data.placement ? countLabel(data.placement.overall.placed) : 'NA', 'teal', Building2],
           ['Need Intervention', String(data.notAttempted.length), 'rose', AlertTriangle],
         ] as const).map(([label, value, tone, Icon]) => (
-          <section key={label} className="pilot-card pilot-kpi">
-            <span className={`pilot-tile ${tone}`}><Icon size={17} /></span>
-            <div><b>{value}</b><small>{label}</small></div>
-          </section>
+          <PilotKpi key={label} icon={<Icon size={17} />} tone={tone} value={value} label={label} reason={kpiReason(value)} />
         ))}
       </div>
 
       <div className="pilot-row cols-2">
         <section className="pilot-card">
           <div className="pilot-card-head"><h2>Cohort Readiness</h2><small style={{ color: 'var(--p-muted)' }}>{activeStudents} on roster</small></div>
-          <div style={{ display: 'flex', gap: 18, alignItems: 'center' }}>
-            <MultiRing segments={[]}>NA<div style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--p-muted)' }}>Avg readiness</div></MultiRing>
-            <div className="pilot-legend" style={{ flex: 1 }}>
-              {['Job Ready', 'Nearly Ready', 'Developing', 'Needs Support'].map((label) => (
-                <div key={label}><i style={{ background: '#e5eaf2' }} /> {label} <span className="num">NA</span></div>
-              ))}
-            </div>
-          </div>
+          {/* Readiness is an advisory band per student, never an average: each band's count is a slot. */}
+          <NaSlotStrip card={false} label="Cohort readiness bands" slots={['Job Ready', 'Nearly Ready', 'Developing', 'Needs Support'].map((label) => ({ label }))}
+            reason="Cohort band counts are not published yet — NA." />
         </section>
         <section className="pilot-card">
           <div className="pilot-card-head"><h2>Placement Pipeline</h2><small style={{ color: 'var(--p-muted)' }}>{data.placement ? `As of ${data.placement.asOf.lastDay}` : 'NA'}</small></div>
-          <Funnel rows={[
+          <Funnel label="Placement pipeline stages" rows={[
             funnelRow('Eligible', data.placement?.overall.eligible), funnelRow('Applied', data.placement?.overall.applied),
             funnelRow('Shortlisted', data.placement?.overall.shortlisted), funnelRow('Offers', data.placement?.overall.withOffer), funnelRow('Placed', data.placement?.overall.placed),
           ]} />
@@ -214,12 +220,19 @@ export function InstitutionDashboardV3({ institutionId, basePath }: { readonly i
     <aside className="pilot-rail">
       <section className="pilot-card">
         <div className="pilot-card-head"><h2>Offers Trend</h2><span className="pilot-chip slate">{data.placement ? 'Last 6 months' : 'NA'}</span></div>
-        {data.placement && data.placement.offersByMonth.length && data.placement.offersByMonth.every((entry) => !entry.offers.suppressed)
-          ? <Spark points={data.placement.offersByMonth.map((entry) => entry.offers.value ?? 0)} tone="green" />
-          : <Spark points={[0, 0, 0, 0, 0, 0, 0]} tone="green" />}
-        {data.placement ? <div className="pilot-legend">{data.placement.offersByMonth.map((entry) => (
-          <div key={entry.month}><i style={{ background: '#e5eaf2' }} /> {entry.month} <span className="num">{countLabel(entry.offers)}</span></div>))}</div>
-          : <p style={{ color: 'var(--p-muted)', margin: '4px 0' }}>Offer figures are not available to your role — NA.</p>}
+        {/* A month under 5 has no number to plot; drawing it as 0 would be a false line, so the
+            line is drawn only when every month is shown, and the frame says why otherwise. */}
+        <SuppressedChart label="Offers Trend" height={96}
+          points={(data.placement?.offersByMonth ?? []).map((entry) => (entry.offers.suppressed ? null : entry.offers.value))}
+          note={!data.placement ? 'Offer figures are not available to your role — NA.'
+            : data.placement.offersByMonth.length ? 'Not enough data yet — the line is drawn once every month has 5 or more offers.' : 'No offer months recorded yet — NA.'}>
+          <Spark points={(data.placement?.offersByMonth ?? []).map((entry) => entry.offers.value ?? 0)} tone="green" />
+        </SuppressedChart>
+        {data.placement && data.placement.offersByMonth.length ? (allMissing(data.placement.offersByMonth.map((entry) => countLabel(entry.offers)))
+          ? <NaSlotStrip card={false} label="Offers by month" slots={data.placement.offersByMonth.map((entry) => ({ label: entry.month, value: countLabel(entry.offers) }))}
+            reason="Every month had fewer than 5 offers." />
+          : <div className="pilot-legend">{data.placement.offersByMonth.map((entry) => (
+            <div key={entry.month}><i style={{ background: '#e5eaf2' }} /> {entry.month} <span className="num"><NaValue value={countLabel(entry.offers)} /></span></div>))}</div>) : null}
       </section>
       <section className="pilot-card">
         <div className="pilot-card-head"><h2>Upcoming Drives</h2>{data.drives
@@ -235,12 +248,8 @@ export function InstitutionDashboardV3({ institutionId, basePath }: { readonly i
       </section>
       <section className="pilot-card">
         <h2>Department Readiness</h2>
-        {departments.length ? departments.slice(0, 5).map((department) => (
-          <div key={department.id} className="pilot-skill">
-            <header><b>{department.name}</b><span>NA</span></header>
-            <div className="pilot-bar thin"><i style={{ width: '0%' }} /></div>
-          </div>
-        )) : <p style={{ color: 'var(--p-muted)', margin: '4px 0' }}>No departments defined yet.</p>}
+        {departments.length ? <NaSlotStrip card={false} label="Department readiness" slots={departments.slice(0, 5).map((department) => ({ label: department.name }))}
+          reason="Department readiness bands are not published yet — NA." /> : <p style={{ color: 'var(--p-muted)', margin: '4px 0' }}>No departments defined yet.</p>}
       </section>
     </aside>
   </div></div>;
@@ -346,7 +355,7 @@ export function EmployerDashboardV3({ basePath }: { readonly basePath: string })
         ] as const).map(([label, value, tone, Icon, note]) => (
           <section key={label} className="pilot-card pilot-kpi">
             <span className={`pilot-tile ${tone}`}><Icon size={17} /></span>
-            <div><b>{value}</b><small>{label}</small>{note ? <><br /><small>{note}</small></> : null}</div>
+            <div><b><NaValue value={value} /></b><small>{label}</small>{note ? <><br /><small>{note}</small></> : null}</div>
           </section>
         ))}
       </div>
@@ -354,7 +363,7 @@ export function EmployerDashboardV3({ basePath }: { readonly basePath: string })
       <div className="pilot-row cols-2">
         <section className="pilot-card">
           <div className="pilot-card-head"><h2>Hiring Funnel</h2><small style={{ color: 'var(--p-muted)' }}>All roles · where applications are now</small></div>
-          <Funnel rows={[
+          <Funnel label="Hiring funnel stages" naReason="Each stage reads NA until your hiring figures can be loaded." rows={[
             { label: 'Applied', value: summary ? summary.applicationsTotal : null },
             { label: 'Shortlisted', value: stage('SHORTLISTED') },
             { label: 'Interview', value: stage('INTERVIEW') },

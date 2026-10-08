@@ -11,6 +11,14 @@ import * as api from './api.js';
 import { StudentDashboardV3 } from './studentDashboardV3.js';
 import type { StudentStaffActionDto } from './api/student.js';
 
+/** All five readiness-factor slots are present, each labelled and saying NA, with the reason stated once. */
+function expectFiveUnprojectedFactors(): void {
+  const slots = within(screen.getByRole('list', { name: 'Readiness factors without a projection' })).getAllByRole('listitem');
+  expect(slots).toHaveLength(5);
+  for (const slot of slots) expect(slot).toHaveTextContent('Readiness factor NA');
+  expect(screen.getByText('No mastery projection available.')).toBeInTheDocument();
+}
+
 const apiState = vi.hoisted(() => ({
   token: 'learner-token' as string | null,
   learner: null as Record<string, unknown> | null,
@@ -297,7 +305,7 @@ describe('StudentDashboardV3 readiness presentation', () => {
 
     expect(await screen.findByText('No advisory band yet')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Readiness band unavailable' })).toBeInTheDocument();
-    expect(screen.getAllByText('No mastery projection available.')).toHaveLength(5);
+    expectFiveUnprojectedFactors();
     expect(document.body.textContent).not.toContain('/100');
   });
 
@@ -309,7 +317,7 @@ describe('StudentDashboardV3 readiness presentation', () => {
     expect(await screen.findByRole('heading', { name: 'Career Readiness Band' })).toBeInTheDocument();
     expect(screen.getByText('No advisory band yet')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Readiness band unavailable' })).toBeInTheDocument();
-    expect(screen.getAllByText('No mastery projection available.')).toHaveLength(5);
+    expectFiveUnprojectedFactors();
     expect(document.body.textContent).not.toContain('/100');
   });
 });
@@ -407,7 +415,7 @@ describe('StudentDashboardV3 student reports', () => {
     render(<StudentDashboardV3 studentName="Aanya Rao" />);
 
     expectUnavailableReports(await screen.findByRole('region', { name: 'Your Reports' }));
-    expect(screen.getAllByText('No mastery projection available.')).toHaveLength(5);
+    expectFiveUnprojectedFactors();
     expect(document.body.innerHTML).not.toContain('/100');
   });
 

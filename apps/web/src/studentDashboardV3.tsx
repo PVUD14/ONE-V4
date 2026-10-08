@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowRight, Award, BookOpen, Building2, CalendarDays, CheckCircle2, ClipboardCheck, Flame, Play, Star, Target, TrendingUp, Trophy } from 'lucide-react';
+import { ArrowRight, Award, BookOpen, Building2, CalendarDays, CheckCircle2, ClipboardCheck, Flame, Play, Star, Target, TrendingUp } from 'lucide-react';
 import { Spark, toneColor } from './pilot/pilotComponents.js';
+import { NaSlotChip, NaSlotStrip } from './naState.js';
 import { completeStudentStaffAction, getCurrentStudent, listStudentStaffActions, type StudentStaffActionDto } from './api/student.js';
 import { SharedCounsellingNotes } from './studentCounsellingNotes.js';
 import {
@@ -395,13 +396,16 @@ export function StudentDashboardV3({ studentName }: { readonly studentName: stri
               {factor ? <small>{factor.explanation}</small> : null}
             </section>
           })}
-          {Array.from({ length: Math.max(0, 5 - masteryCards.length) }).map((_, index) => (
-            <section key={`mastery-na-${index}`} className="pilot-card pilot-score-card">
-              <header>Readiness factor</header>
-              <span className="pilot-chip slate">NA</span>
-              <small>No mastery projection available.</small>
-            </section>
-          ))}
+          {masteryCards.length < 5 ? <section className="pilot-card na-strip" data-na-strip="true"
+            style={{ '--na-span': String(5 - masteryCards.length) } as React.CSSProperties}>
+            <div className="pilot-card-head"><h2>Readiness factors</h2><span className="pilot-chip slate">NA</span></div>
+            <ul className="na-strip-slots" aria-label="Readiness factors without a projection">
+              {Array.from({ length: 5 - masteryCards.length }).map((_, index) => (
+                <NaSlotChip key={`mastery-na-${index}`} label="Readiness factor" />
+              ))}
+            </ul>
+            <p className="na-reason">No mastery projection available.</p>
+          </section> : null}
         </div>
 
         <div className="pilot-row cols-3">
@@ -461,15 +465,10 @@ export function StudentDashboardV3({ studentName }: { readonly studentName: stri
                   <button type="button" className="pilot-btn soft small" onClick={() => go('/student/learning')}>Start</button>
                 </div>
               ))}
-              {Array.from({ length: Math.max(0, 4 - modules.length) }).map((_, index) => (
-                <div key={`na-${index}`} className="pilot-course-card" style={{ opacity: .65 }}>
-                  <span className="pilot-tile" style={{ background: '#eef1f6', color: '#9aa5b8' }}><BookOpen size={18} /></span>
-                  <strong>NA</strong>
-                  <small>Recommendations not live yet</small>
-                  <button type="button" className="pilot-btn soft small" disabled>Start</button>
-                </div>
-              ))}
             </div>
+            {modules.length < 4 ? <NaSlotStrip card={false} label="Recommendation slots without a source"
+              slots={Array.from({ length: 4 - modules.length }, (_, index) => ({ label: `Recommendation ${modules.length + index + 1}` }))}
+              reason="Recommendations not live yet." /> : null}
           </section>
 
           <section className="pilot-card">
@@ -500,14 +499,8 @@ export function StudentDashboardV3({ studentName }: { readonly studentName: stri
           </section>
           <section className="pilot-card">
             <div className="pilot-card-head"><h2>Badges Earned</h2><button type="button" className="pilot-link" disabled>View All Badges</button></div>
-            <div className="pilot-row cols-4">
-              {['NA', 'NA', 'NA', 'NA'].map((label, index) => (
-                <div key={index} style={{ textAlign: 'center', opacity: .6 }}>
-                  <span className="pilot-tile" style={{ margin: '0 auto 8px', background: '#eef1f6', color: '#9aa5b8' }}><Trophy size={18} /></span>
-                  <small style={{ display: 'block', fontSize: 11, color: 'var(--p-muted)', fontWeight: 600 }}>{label}</small>
-                </div>
-              ))}
-            </div>
+            <NaSlotStrip card={false} label="Badge slots" slots={[1, 2, 3, 4].map((index) => ({ label: `Badge ${index}` }))}
+              reason="Badges are not live yet." />
             <div style={{ borderTop: '1px solid var(--p-line)', marginTop: 14, paddingTop: 14 }}>
               <div className="pilot-card-head" style={{ marginBottom: 8 }}><h2 style={{ fontSize: 13.5 }}>Career Goal · {data.profile?.targetCareer ?? 'NA'}</h2><button type="button" className="pilot-link" onClick={() => go('/student/profile')}>Change Goal</button></div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>

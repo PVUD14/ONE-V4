@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { NaReason, NaValue, isMissing } from './naState.js';
 import {
   ApiRequestError,
   getLearnerCareerReadinessState,
@@ -83,10 +84,13 @@ export function V2Ring({ percent, label, value, tone = '#1f55e5' }: {
   );
 }
 
-export function V2Stat({ icon, tone, value, label }: {
-  readonly icon: string; readonly tone: string; readonly value: React.ReactNode; readonly label: string;
+/** A stat tile. A missing value (NA, <5, Withheld, Too few answers) keeps its text, muted, with an optional reason. */
+export function V2Stat({ icon, tone, value, label, reason }: {
+  readonly icon: string; readonly tone: string; readonly value: React.ReactNode; readonly label: string; readonly reason?: string;
 }): React.ReactElement {
-  return <div className="v2-card v2-stat"><span className={`v2-tile ${tone}`} aria-hidden="true">{icon}</span><div><b>{value}</b><small>{label}</small></div></div>;
+  const missing = isMissing(value);
+  return <div className="v2-card v2-stat" data-na={missing ? 'true' : undefined}><span className={`v2-tile ${missing ? 'na-tile' : tone}`} aria-hidden="true">{icon}</span>
+    <div><b><NaValue value={value} /></b><small>{label}</small>{missing && reason ? <NaReason>{reason}</NaReason> : null}</div></div>;
 }
 
 export function V2Chip({ tone, children }: { readonly tone: string; readonly children: React.ReactNode }): React.ReactElement {

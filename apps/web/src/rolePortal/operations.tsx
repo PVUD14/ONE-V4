@@ -13,11 +13,11 @@ import { GrowthHandoffsSection } from './growthPipeline.js';
 import { EmployerTermsSection } from './operationsEmployerTerms.js';
 import { CollegeExitsSection, InstitutionDataTermsOperationsSection } from './operationsInstitutionExits.js';
 import type { AuditEventDto, AuditSearchFilters, FeatureFlagDto, OperationsInvitationDto, OrganizationManagementDto } from '../api.js';
-import { V2Stat } from '../dashboardsV2.js';
+import { V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { OperationsCareerReadinessPanel } from '../operationsCareerReadinessPanel.js';
 import type { RolePortalConfig } from '../rolePortalConfig.js';
 import { StatusBadge } from '../studentComponents.js';
-import { formatApiError, RestrictedApiState } from './shared.js';
+import { formatApiError, openPortalRecord, portalRecordFromHistory, RestrictedApiState } from './shared.js';
 import { RequestApprovalDialog } from './approvals.js';
 import { Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
@@ -25,8 +25,19 @@ import { SupportCode } from '../supportCode.js';
 import { formatDate, formatDateTime } from '../dates.js';
 import { codeLabel, roleLabel } from '../labels.js';
 
-export function OperationsOrganizationsPage({ portal }: { readonly portal: RolePortalConfig }): React.ReactElement {
+/** The history-state key Organizations sets when it opens one organisation in Organization Detail. */
+const organizationRecordKey = 'organizationId';
+const awaitingVerification: readonly string[] = ['PENDING', 'UNDER_REVIEW'];
+
+/**
+ * One list, three navigation items, three different jobs:
+ * - `manage` (Organizations): every organisation, onboarding, and the cross-organisation sections;
+ * - `verification` (Verification): only the organisations waiting on a verification decision;
+ * - `detail` (Organization Detail): one organisation, chosen here or opened from the list.
+ */
+export function OperationsOrganizationsPage({ portal, mode = 'manage' }: { readonly portal: RolePortalConfig; readonly mode?: 'manage' | 'verification' | 'detail' }): React.ReactElement {
   const token = getProtectedAccessToken();
+  const [selectedId, setSelectedId] = useState<string | null>(() => (mode === 'detail' ? portalRecordFromHistory(organizationRecordKey) : null));
   const [organizations, setOrganizations] = useState<readonly OrganizationManagementDto[]>([]);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
@@ -44,7 +55,8 @@ export function OperationsOrganizationsPage({ portal }: { readonly portal: RoleP
     load(controller.signal).catch(() => setError('Unable to load organizations for this Operations identity.'));
     return () => controller.abort();
   }, [load]);
-  if (!token) return <RestrictedApiState title="Organizations" message="Sign in with an Operations identity to manage organizations." />;
+  const title = mode === 'verification' ? 'Verification' : mode === 'detail' ? 'Organization Detail' : 'Organizations';
+  if (!token) return <RestrictedApiState title={title} message="Sign in with an Operations identity to manage organizations." />;
   const pending = organizations.filter((org) => ['PENDING', 'UNDER_REVIEW'].includes(org.verificationState)).length;
   const verified = organizations.filter((org) => org.verificationState === 'VERIFIED').length;
   const suspended = organizations.filter((org) => org.verificationState === 'SUSPENDED').length;
@@ -101,20 +113,40 @@ export function OperationsOrganizationsPage({ portal }: { readonly portal: RoleP
       setError('Organization update failed. Check required fields and authorization.');
     }
   }
+  const rows = mode === 'verification' ? organizations.filter((org) => awaitingVerification.includes(org.verificationState))
+    : mode === 'detail' ? organizations.filter((org) => org.id === selectedId) : organizations;
+  const choose = (id: string | null): void => {
+    setSelectedId(id);
+    try { window.history.replaceState(id ? { [organizationRecordKey]: id } : null, ''); } catch { /* the choice still shows */ }
+  };
+  const summary = mode === 'verification'
+    ? 'Organisations waiting on a verification decision: begin the review, then verify or reject. Everything else is under Organizations.'
+    : mode === 'detail'
+      ? 'One organisation: its profile, verification state, initial administrator and the actions open to it.'
+      : 'Manage platform organization onboarding. Operations can create, verify, suspend and invite initial administrators, but cannot manage students here.';
   return <section className="role-module role-module--dense">
-    <div className="role-page-heading"><div><span className="eyebrow">Operations</span><h1>Organizations</h1><p>Manage platform organization onboarding. Operations can create, verify, suspend and invite initial administrators, but cannot manage students here.</p></div></div>
-    <section className="role-kpi-grid" aria-label="Organization lifecycle summary"><article className="role-card role-kpi"><span>Total</span><strong>{organizations.length}</strong><p>Institutions and employers</p></article><article className="role-card role-kpi"><span>Pending / Review</span><strong>{pending}</strong><p>Need Operations action</p></article><article className="role-card role-kpi"><span>Verified</span><strong>{verified}</strong><p>Approved organizations</p></article><article className="role-card role-kpi"><span>Suspended</span><strong>{suspended}</strong><p>No student controls exposed</p></article></section>
-    <section className="role-card role-wide"><h2>Search and filters</h2><div className="role-management-form"><label><span>Search</span><input value={filters.q} onChange={(event) => setFilters((value) => ({ ...value, q: event.target.value }))} placeholder="Legal/display name" /></label><label><span>Type</span><select value={filters.kind} onChange={(event) => setFilters((value) => ({ ...value, kind: event.target.value }))}><option value="">All</option><option value="INSTITUTION">Institution</option><option value="EMPLOYER">Employer</option></select></label><label><span>Verification</span><select value={filters.verification} onChange={(event) => setFilters((value) => ({ ...value, verification: event.target.value }))}><option value="">All</option><option value="PENDING">Pending</option><option value="UNDER_REVIEW">Under review</option><option value="VERIFIED">Verified</option><option value="REJECTED">Rejected</option><option value="SUSPENDED">Suspended</option></select></label></div></section>
-    <form className="role-card role-wide role-management-form" onSubmit={(event) => void create(event)}><h2>Add Organization</h2><label><span>Type *</span><select value={form.kind} onChange={(event) => setForm((value) => ({ ...value, kind: event.target.value }))}><option value="INSTITUTION">Institution</option><option value="EMPLOYER">Employer</option></select></label><label><span>Legal Name *</span><input value={form.legalName} onChange={(event) => setForm((value) => ({ ...value, legalName: event.target.value }))} required /></label><label><span>Display Name</span><input value={form.displayName} onChange={(event) => setForm((value) => ({ ...value, displayName: event.target.value }))} /></label><label><span>Country *</span><input value={form.countryCode} onChange={(event) => setForm((value) => ({ ...value, countryCode: event.target.value.toUpperCase() }))} maxLength={2} required /></label><label><span>City</span><input value={form.city} onChange={(event) => setForm((value) => ({ ...value, city: event.target.value }))} /></label><label><span>Primary Admin Email</span><input type="email" value={form.adminEmail} onChange={(event) => setForm((value) => ({ ...value, adminEmail: event.target.value }))} /></label><button type="submit">Create organization</button></form>
+    <div className="role-page-heading"><div><span className="eyebrow">Operations</span><h1>{title}</h1><p>{summary}</p></div></div>
+    {mode !== 'detail' ? <section className="role-kpi-grid" aria-label="Organization lifecycle summary"><article className="role-card role-kpi"><span>Total</span><strong>{organizations.length}</strong><p>Institutions and employers</p></article><article className="role-card role-kpi"><span>Pending / Review</span><strong>{pending}</strong><p>Need Operations action</p></article><article className="role-card role-kpi"><span>Verified</span><strong>{verified}</strong><p>Approved organizations</p></article><article className="role-card role-kpi"><span>Suspended</span><strong>{suspended}</strong><p>No student controls exposed</p></article></section> : null}
+    {mode !== 'detail' ? <section className="role-card role-wide"><h2>Search and filters</h2><div className="role-management-form"><label><span>Search</span><input value={filters.q} onChange={(event) => setFilters((value) => ({ ...value, q: event.target.value }))} placeholder="Legal/display name" /></label><label><span>Type</span><select value={filters.kind} onChange={(event) => setFilters((value) => ({ ...value, kind: event.target.value }))}><option value="">All</option><option value="INSTITUTION">Institution</option><option value="EMPLOYER">Employer</option></select></label>{mode === 'manage' ? <label><span>Verification</span><select value={filters.verification} onChange={(event) => setFilters((value) => ({ ...value, verification: event.target.value }))}><option value="">All</option><option value="PENDING">Pending</option><option value="UNDER_REVIEW">Under review</option><option value="VERIFIED">Verified</option><option value="REJECTED">Rejected</option><option value="SUSPENDED">Suspended</option></select></label> : null}</div></section> : null}
+    {mode === 'manage' ? <form className="role-card role-wide role-management-form" onSubmit={(event) => void create(event)}><h2>Add Organization</h2><label><span>Type *</span><select value={form.kind} onChange={(event) => setForm((value) => ({ ...value, kind: event.target.value }))}><option value="INSTITUTION">Institution</option><option value="EMPLOYER">Employer</option></select></label><label><span>Legal Name *</span><input value={form.legalName} onChange={(event) => setForm((value) => ({ ...value, legalName: event.target.value }))} required /></label><label><span>Display Name</span><input value={form.displayName} onChange={(event) => setForm((value) => ({ ...value, displayName: event.target.value }))} /></label><label><span>Country *</span><input value={form.countryCode} onChange={(event) => setForm((value) => ({ ...value, countryCode: event.target.value.toUpperCase() }))} maxLength={2} required /></label><label><span>City</span><input value={form.city} onChange={(event) => setForm((value) => ({ ...value, city: event.target.value }))} /></label><label><span>Primary Admin Email</span><input type="email" value={form.adminEmail} onChange={(event) => setForm((value) => ({ ...value, adminEmail: event.target.value }))} /></label><button type="submit">Create organization</button></form> : null}
     {notice ? <p className="role-api-success" role="status">{notice}</p> : null}{error ? <p className="form-error" role="alert">{error}</p> : null}
-    <div className="role-record-table-wrap"><table className="role-record-table"><caption className="sr-only">{portal.roleName} real organizations</caption><thead><tr><th>Organization</th><th>Kind</th><th>Location</th><th>Contact</th><th>Verification</th><th>Initial Admin</th><th>Updated</th><th>Actions</th></tr></thead><tbody>{organizations.map((org) => <tr key={org.id} className="role-record-row"><th scope="row"><strong>{org.profile.displayName || org.legalName}</strong><span>{org.legalName}</span><small>{org.profile.websiteUrl ?? 'No website'}</small></th><td>{codeLabel(org.kind)}</td><td>{[org.profile.city, org.profile.stateOrProvince, org.profile.countryCode, org.profile.postalCode].filter(Boolean).join(', ') || 'Not set'}</td><td>{org.profile.primaryContactEmail ?? 'Not set'}</td><td><StatusBadge label={codeLabel(org.verificationState)} tone="info" /></td><td>{org.initialAdminInvitation?.email ?? 'Not invited'}</td><td>{formatDate(org.updatedAt)}</td><td><div className="role-record-actions"><button type="button" className="secondary" onClick={() => void edit(org)}>Edit details</button><button type="button" className="secondary" onClick={() => void onboarding(org.id)}>Onboarding</button>{org.verificationState === 'PENDING' ? <button type="button" onClick={() => void transition(org.id, 'UNDER_REVIEW')}>Begin review</button> : null}{org.verificationState === 'UNDER_REVIEW' ? <><button type="button" onClick={() => void transition(org.id, 'VERIFIED')}>Verify</button><button type="button" className="secondary" onClick={() => void transition(org.id, 'REJECTED')}>Reject</button></> : null}{org.verificationState === 'VERIFIED' ? <button type="button" className="secondary" onClick={() => setSuspending(org)}>Suspend…</button> : null}<button type="button" className="secondary" onClick={() => void invite(org.id)}>Invite admin</button></div></td></tr>)}</tbody></table></div>
-    <EmployerAccessRequestsSection organizations={organizations} />
-    {/* GROWTH-04: colleges growth reports as signed, linked here to the college operations created. */}
-    <GrowthHandoffsSection organizations={organizations} />
-    <EmployerTermsSection />
-    {/* INST-18: college data-processing terms and the college exit runbook. */}
-    <InstitutionDataTermsOperationsSection />
-    <CollegeExitsSection organizations={organizations} />
+    {mode === 'detail' ? <section className="role-card role-wide"><label className="role-local-search"><span>Organisation</span>
+      <select value={selectedId ?? ''} onChange={(event) => choose(event.target.value || null)}><option value="">Choose an organisation</option>
+        {organizations.map((org) => <option key={org.id} value={org.id}>{org.profile.displayName || org.legalName} ({codeLabel(org.kind)})</option>)}</select></label></section> : null}
+    {mode === 'detail' && !rows.length ? <div className="role-wide"><V2EmptyState icon="🏛️" title="Choose an organisation to see its detail"
+      note="Pick one above, or use Open detail on the Organizations list." /></div> : null}
+    {mode === 'verification' && !rows.length ? <div className="role-wide"><V2EmptyState icon="✅" title="Nothing is awaiting verification"
+      note="No organisation is pending or under review. New organisations appear here until someone verifies or rejects them." /></div> : null}
+    {rows.length ? <div className="role-record-table-wrap"><table className="role-record-table"><caption className="sr-only">{portal.roleName} real organizations</caption><thead><tr><th>Organization</th><th>Kind</th><th>Location</th><th>Contact</th><th>Verification</th><th>Initial Admin</th><th>Updated</th><th>Actions</th></tr></thead><tbody>{rows.map((org) => <tr key={org.id} className="role-record-row"><th scope="row"><strong>{org.profile.displayName || org.legalName}</strong><span>{org.legalName}</span><small>{org.profile.websiteUrl ?? 'No website'}</small></th><td>{codeLabel(org.kind)}</td><td>{[org.profile.city, org.profile.stateOrProvince, org.profile.countryCode, org.profile.postalCode].filter(Boolean).join(', ') || 'Not set'}</td><td>{org.profile.primaryContactEmail ?? 'Not set'}</td><td><StatusBadge label={codeLabel(org.verificationState)} tone="info" /></td><td>{org.initialAdminInvitation?.email ?? 'Not invited'}</td><td>{formatDate(org.updatedAt)}</td><td><div className="role-record-actions"><button type="button" className="secondary" onClick={() => void edit(org)}>Edit details</button><button type="button" className="secondary" onClick={() => void onboarding(org.id)}>Onboarding</button>{org.verificationState === 'PENDING' ? <button type="button" onClick={() => void transition(org.id, 'UNDER_REVIEW')}>Begin review</button> : null}{org.verificationState === 'UNDER_REVIEW' ? <><button type="button" onClick={() => void transition(org.id, 'VERIFIED')}>Verify</button><button type="button" className="secondary" onClick={() => void transition(org.id, 'REJECTED')}>Reject</button></> : null}{org.verificationState === 'VERIFIED' ? <button type="button" className="secondary" onClick={() => setSuspending(org)}>Suspend…</button> : null}<button type="button" className="secondary" onClick={() => void invite(org.id)}>Invite admin</button>{mode !== 'detail' ? <button type="button" className="secondary" aria-label={`Open detail for ${org.profile.displayName || org.legalName}`} onClick={() => openPortalRecord('/operations/admin/organization-detail', { [organizationRecordKey]: org.id })}>Open detail</button> : null}</div></td></tr>)}</tbody></table></div> : null}
+    {mode === 'manage' ? <>
+      <EmployerAccessRequestsSection organizations={organizations} />
+      {/* GROWTH-04: colleges growth reports as signed, linked here to the college operations created. */}
+      <GrowthHandoffsSection organizations={organizations} />
+      <EmployerTermsSection />
+      {/* INST-18: college data-processing terms and the college exit runbook. */}
+      <InstitutionDataTermsOperationsSection />
+      <CollegeExitsSection organizations={organizations} />
+    </> : null}
     <section className="role-card role-wide"><h2>Operations boundary</h2><p>Student add/import/transfer controls are intentionally absent from Operations. Those workflows belong to Institution Administration.</p></section>
     {suspending ? <RequestApprovalDialog token={token} actionKey="ORGANIZATION_SUSPEND" payload={{ organizationId: suspending.id }}
       title={`Suspend ${suspending.profile.displayName || suspending.legalName}`}

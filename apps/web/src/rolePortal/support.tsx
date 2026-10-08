@@ -39,7 +39,7 @@ import type {
 } from '../api.js';
 import { V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { StatusBadge } from '../studentComponents.js';
-import { formatApiError, RestrictedApiState } from './shared.js';
+import { formatApiError, openPortalRecord, portalRecordFromHistory, RestrictedApiState } from './shared.js';
 import { SupportCode } from '../supportCode.js';
 import { formatDateTime } from '../dates.js';
 import { codeLabel } from '../labels.js';
@@ -427,7 +427,15 @@ export function OpenCaseDialog({ token, policy, subject, onCancel, onOpened }: {
 // Users / User Detail → account lookup
 // ---------------------------------------------------------------------------
 
-export function OperationsAccountLookupPage(): React.ReactElement {
+/** The history-state key Users sets when it opens one account in User Detail. */
+const accountRecordKey = 'accountUserId';
+
+/**
+ * Users (`directory`) finds accounts and lists the matches; each opens in User Detail
+ * (`detail`), which is one account. The account travels in the history entry's state, so its
+ * reference never shows in the address bar.
+ */
+export function OperationsAccountLookupPage({ mode = 'directory' }: { readonly mode?: 'directory' | 'detail' }): React.ReactElement {
   const token = getProtectedAccessToken();
   const { policy } = useSupportPolicy(token);
   const [draft, setDraft] = useState('');
@@ -435,12 +443,21 @@ export function OperationsAccountLookupPage(): React.ReactElement {
   const [error, setError] = useState('');
   const [forbiddenReference, setForbiddenReference] = useState('');
   const [searching, setSearching] = useState(false);
-  const [selectedId, setSelectedId] = useState('');
+  const [selectedId, setSelectedId] = useState(() => (mode === 'detail' ? portalRecordFromHistory(accountRecordKey) ?? '' : ''));
+  const title = mode === 'detail' ? 'User Detail' : 'Users';
 
-  if (!token) return <RestrictedApiState title="Users" message="Sign in with an Operations identity to look up accounts." />;
+  if (!token) return <RestrictedApiState title={title} message="Sign in with an Operations identity to look up accounts." />;
 
-  const heading = <div className="role-page-heading"><div><span className="eyebrow">Users</span><h1>Account lookup</h1>
-    <p>Find an account from the address or reference a person gives you. Contacts are masked; the full value needs a reason and is recorded. Every lookup is recorded in the audit log.</p></div></div>;
+  const heading = <div className="role-page-heading"><div><span className="eyebrow">Account lookup</span><h1>{title}</h1>
+    <p>{mode === 'detail' ? 'One account: its state, memberships and support history. ' : ''}Find an account from the address or reference a person gives you. Contacts are masked; the full value needs a reason and is recorded. Every lookup is recorded in the audit log.</p></div></div>;
+  const open = (userId: string): void => {
+    if (mode === 'detail') {
+      setSelectedId(userId);
+      try { window.history.replaceState({ [accountRecordKey]: userId }, ''); } catch { /* the choice still shows */ }
+      return;
+    }
+    openPortalRecord('/operations/admin/user-detail', { [accountRecordKey]: userId });
+  };
 
   if (forbiddenReference) return <Forbidden heading={heading} reference={forbiddenReference} note="Account lookup is for staff who hold Support Account Lookup. Your access has not changed." />;
 
@@ -451,7 +468,7 @@ export function OperationsAccountLookupPage(): React.ReactElement {
     try {
       const result = await searchSupportAccounts(token, draft.trim());
       setResults(result.accounts);
-      setSelectedId(result.accounts.length === 1 ? result.accounts[0]!.userId : '');
+      if (mode === 'detail') setSelectedId(result.accounts.length === 1 ? result.accounts[0]!.userId : '');
       setError('');
     } catch (cause) {
       if (cause instanceof ApiRequestError && cause.status === 403) setForbiddenReference(cause.correlationId);
@@ -477,10 +494,12 @@ export function OperationsAccountLookupPage(): React.ReactElement {
           <td>{account.identityLinked ? 'Yes' : 'No'}</td>
           <td>{account.membershipCount}</td>
           <td>{when(account.createdAt)}</td>
-          <td><button type="button" className="secondary" onClick={() => setSelectedId(account.userId)}>View account</button></td>
+          <td><button type="button" className="secondary" onClick={() => open(account.userId)}>View account</button></td>
         </tr>)}</tbody></table></div> : null}
     </section>
-    {selectedId ? <SupportAccountPanel token={token} userId={selectedId} policy={policy} /> : null}
+    {mode === 'detail' && selectedId ? <SupportAccountPanel token={token} userId={selectedId} policy={policy} /> : null}
+    {mode === 'detail' && !selectedId ? <div className="role-wide"><V2EmptyState icon="👤" title="Choose an account to see its detail"
+      note="Search above, or use View account on the Users list." /></div> : null}
   </section>;
 }
 

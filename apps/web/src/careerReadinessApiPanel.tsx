@@ -130,9 +130,10 @@ export function CareerReadinessApiPanel({ route }: { readonly route: CareerRoute
       {route === 'assessments' ? <AssessmentApiView catalog={catalog} learner={learner} token={token} busy={busy} attempt={attempt}
         selectedOptions={selectedOptions} onSelect={(questionId, optionId) => setSelectedOptions((current) => ({ ...current, [questionId]: optionId }))}
         onStart={start} onSubmit={submit} /> : null}
-      {learner && route !== 'notifications' ? <CareerStatStrip learner={learner} catalog={catalog} /> : null}
-      {route === 'readiness' ? <ReadinessApiView learner={learner} /> : null}
-      {route === 'skills' ? <SkillsApiView learner={learner} /> : null}
+      {/* Readiness is about the advisory band; Skills about each topic's mastery, so it has its own strip. */}
+      {learner && route !== 'notifications' && route !== 'skills' ? <CareerStatStrip learner={learner} catalog={catalog} /> : null}
+      {route === 'readiness' ? <ReadinessApiView learner={learner} catalog={learner ? learner.catalog : catalog} /> : null}
+      {route === 'skills' ? <SkillsApiView learner={learner} catalog={learner ? learner.catalog : catalog} /> : null}
       {route === 'roadmap' ? <RoadmapApiView learner={learner} /> : null}
       {route === 'notifications' ? <NotificationsApiView learner={learner} /> : null}
       <p className="career-api-boundary">Readiness bands are advice for you. They are never shown to employers and come only from the evidence you build in ONE.</p>
@@ -226,16 +227,43 @@ function CareerStatStrip({ learner, catalog }: { readonly learner: LearnerCareer
   );
 }
 
-function ReadinessApiView({ learner }: { readonly learner: LearnerCareerReadinessState | null }): React.ReactElement {
-  return learner?.readiness ? <div className="career-readiness-result"><span>Current advisory band</span><strong>{formatBand(learner.readiness.band)}</strong>
-    <p>Based on {learner.evidence.length} immutable evidence record{learner.evidence.length === 1 ? '' : 's'}. No personal readiness history is shown.</p></div>
-    : <V2EmptyState icon="📈" title="No advisory band yet"
-      note="Complete learning and the published assessment to create enough evidence. Bands are advisory and never employer-visible." />;
+function topicName(catalog: CareerReadinessCatalog | null, topicId: string): string {
+  return catalog?.topics?.find((topic) => topic.id === topicId)?.name ?? 'NA';
 }
 
-function SkillsApiView({ learner }: { readonly learner: LearnerCareerReadinessState | null }): React.ReactElement {
-  return <div className="career-api-grid">{learner?.mastery?.map((mastery) => <article key={mastery.id}><span>Evidence-derived mastery</span>
-    <h3>{formatBand(mastery.band)}</h3><p>{mastery.evidenceIds.length} active evidence record{mastery.evidenceIds.length === 1 ? '' : 's'}.</p></article>) ?? null}</div>;
+/** Readiness: the advisory band, what it rests on, and the bands it has been before. Bands only, never a number. */
+function ReadinessApiView({ learner, catalog }: { readonly learner: LearnerCareerReadinessState | null; readonly catalog: CareerReadinessCatalog | null }): React.ReactElement {
+  if (!learner?.readiness) return <V2EmptyState icon="📈" title="No advisory band yet"
+    note="Complete learning and the published assessment to create enough evidence. Bands are advisory and never employer-visible." />;
+  const factors = learner.readiness.explanation.factors ?? [];
+  const history = learner.readinessHistory ?? [];
+  return <>
+    <div className="career-readiness-result"><span>Current advisory band</span><strong>{formatBand(learner.readiness.band)}</strong>
+      <p>Based on {learner.evidence.length} immutable evidence record{learner.evidence.length === 1 ? '' : 's'}.</p></div>
+    <div className="career-api-grid">{factors.length ? factors.map((factor) => <article key={factor.topicId}><span>What this band rests on</span>
+      <h3>{topicName(catalog, factor.topicId)}</h3><p>{formatBand(factor.masteryBand)}. {factor.explanation}</p></article>)
+      : <article><span>What this band rests on</span><h3>NA</h3><p>No topic-level explanation was recorded with this band.</p></article>}</div>
+    <div className="career-api-grid">{history.length ? history.slice(0, 6).map((entry) => <article key={entry.id}><span>Band on {new Date(entry.generatedAt).toLocaleDateString()}</span>
+      <h3>{formatBand(entry.band)}</h3></article>)
+      : <article><span>Band history</span><h3>NA</h3><p>No earlier band has been recorded for you yet.</p></article>}</div>
+  </>;
+}
+
+/** Skills: each topic's evidence-derived mastery, named, with the evidence behind it. */
+function SkillsApiView({ learner, catalog }: { readonly learner: LearnerCareerReadinessState | null; readonly catalog: CareerReadinessCatalog | null }): React.ReactElement {
+  const mastery = learner?.mastery ?? [];
+  const topics = catalog?.topics ?? [];
+  return <>
+    <div className="v2-row v2-cols-4 career-stat-strip">
+      <V2Stat icon="🧩" tone="purple" value={catalog ? topics.length : 'NA'} label="Skills in this pathway" />
+      <V2Stat icon="🎯" tone="green" value={learner ? mastery.length : 'NA'} label="Skills with evidence" />
+      <V2Stat icon="🧾" tone="blue" value={learner ? learner.evidence.length : 'NA'} label="Evidence records" />
+      <V2Stat icon="📌" tone="amber" value={catalog && learner ? Math.max(topics.length - mastery.length, 0) : 'NA'} label="Skills not yet evidenced" />
+    </div>
+    {mastery.length ? <div className="career-api-grid">{mastery.map((entry) => <article key={entry.id}><span>{topicName(catalog, entry.topicId)}</span>
+      <h3>{formatBand(entry.band)}</h3><p>{entry.evidenceIds.length} active evidence record{entry.evidenceIds.length === 1 ? '' : 's'}.</p></article>)}</div>
+      : <V2EmptyState icon="🧩" title="No skill evidence yet" note="Lessons and assessments you complete become evidence for each skill here." />}
+  </>;
 }
 
 function RoadmapApiView({ learner }: { readonly learner: LearnerCareerReadinessState | null }): React.ReactElement {

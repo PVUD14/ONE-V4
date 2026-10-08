@@ -170,8 +170,9 @@ describe('support desk', () => {
 });
 
 describe('account lookup', () => {
+  // User Detail is where one account is shown; Users lists the matches and opens them there.
   const search = async (): Promise<void> => {
-    render(<OperationsAccountLookupPage />);
+    render(<OperationsAccountLookupPage mode="detail" />);
     fireEvent.change(screen.getByLabelText(/Email address, part of one/), { target: { value: 'asha.rao@college.edu' } });
     fireEvent.click(screen.getByRole('button', { name: 'Search' }));
   };
@@ -227,5 +228,32 @@ describe('account lookup', () => {
     });
     await search();
     expect(await screen.findByText('No matching account')).toBeInTheDocument();
+  });
+
+  it('Users lists the matches and opens one in User Detail, keeping its reference out of the address', async () => {
+    window.history.replaceState(null, '', '/operations/admin/users');
+    render(<OperationsAccountLookupPage />);
+    expect(screen.getByRole('heading', { name: 'Users', level: 1 })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/Email address, part of one/), { target: { value: 'asha.rao@college.edu' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'View account' }));
+    expect(window.location.pathname).toBe('/operations/admin/user-detail');
+    expect(window.location.search).toBe('');
+    expect(window.history.state).toEqual({ accountUserId: userId });
+    // Users itself never opens the account inline: that is User Detail's job.
+    expect(screen.queryByRole('region', { name: 'Account summary' })).not.toBeInTheDocument();
+    window.history.replaceState(null, '', '/');
+  });
+
+  it('User Detail opens on the account Users chose, and says how to choose one when none was', async () => {
+    window.history.replaceState({ accountUserId: userId }, '', '/operations/admin/user-detail');
+    render(<OperationsAccountLookupPage mode="detail" />);
+    expect(screen.getByRole('heading', { name: 'User Detail', level: 1 })).toBeInTheDocument();
+    expect(await screen.findByRole('region', { name: 'Account summary' })).toBeInTheDocument();
+    cleanup();
+    window.history.replaceState(null, '', '/operations/admin/user-detail');
+    render(<OperationsAccountLookupPage mode="detail" />);
+    expect(screen.getByText('Choose an account to see its detail')).toBeInTheDocument();
+    window.history.replaceState(null, '', '/');
   });
 });

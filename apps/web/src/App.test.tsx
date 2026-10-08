@@ -434,7 +434,9 @@ describe('All-role portal registry and preview workflows', () => {
     render(<App />);
     fireEvent.click(await screen.findByRole('button', { name: 'Retry workspace' }));
     await waitFor(() => expect(window.location.pathname).toBe('/institution/admin'));
-    await waitFor(() => expect(screen.getByText('Placement Dashboard')).toBeInTheDocument());
+    // The administrator lands on their own home, not the placement officer's dashboard.
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Institution Administration', level: 1 })).toBeInTheDocument());
+    expect(screen.queryByText('Placement Dashboard')).not.toBeInTheDocument();
     expect(screen.queryByText(/Rahul Kumar/)).not.toBeInTheDocument();
   });
 

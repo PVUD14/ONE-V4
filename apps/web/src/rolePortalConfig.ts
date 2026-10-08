@@ -24,7 +24,30 @@ export interface RoleNavItem {
   readonly icon: LucideIcon;
   /** Shown only to these authenticated roles; every role when absent (GROWTH-01: Team). */
   readonly roles?: readonly string[];
+  /**
+   * Shown only to a workspace the server reports holding at least one of these internal
+   * capabilities (ADR-032); every workspace when absent or when the server does not report.
+   */
+  readonly capabilities?: readonly string[];
 }
+
+/**
+ * The internal capabilities each Operations screen is read with, mirroring the read
+ * predicates in packages/authorization (career-catalogue.ts, content-factory.ts,
+ * skill-map.ts, question-bank.ts, lesson-editor.ts, growth-roles.ts, growth-scope.ts) and
+ * the baselines in internal-capabilities.ts. OPERATIONS_ADMIN holds none of the content
+ * capabilities by baseline: they are granted explicitly (internal-capabilities-table-design.md).
+ */
+export const operationsScreenCapabilities = {
+  /** Content Management: the catalogue, skill map, question bank, lessons, imports and reviews. */
+  contentManagement: ['CATALOGUE_MANAGE', 'CONTENT_EDIT', 'CONTENT_REVIEW', 'CONTENT_PUBLISH'],
+  accessReviews: ['SECURITY_ACCESS_REVIEW'],
+  incidents: ['INCIDENT_MANAGE'],
+  staffCapabilities: ['CAPABILITY_ADMIN'],
+  growthAdmin: ['GROWTH_ADMIN'],
+  /** OPS-10: the faculty review of assigned global drafts, granted per institution membership. */
+  externalContentReview: ['CONTENT_REVIEW_EXTERNAL'],
+} as const satisfies Readonly<Record<string, readonly string[]>>;
 
 export interface RoleFixture {
   readonly id: string;
@@ -171,7 +194,10 @@ export const rolePortals: readonly RolePortalConfig[] = [
   {
     key: 'operations-admin', family: 'Operations', roleName: 'Platform Administrator / Operations Administrator', backendRole: 'OPERATIONS_ADMIN', enforcementStatus: 'Backend enforced', basePath: '/operations/admin', subtitle: 'Operations Portal', organization: 'ONE Platform', previewUser: 'Samir Das', initials: 'SD', accent: 'slate', dashboardTitle: 'Operations Dashboard', dashboardSummary: 'Organizations, users, verification, trust queues, usage, system health, audit and feature flags.',
     allowedOperations: ['Review organization', 'Add operational note', 'Update preview queue status', 'Create support case', 'Configure preview feature flag', 'Acknowledge simulated event', 'Create saved operational view'], readOnlyData: ['Secrets', 'Production billing effects', 'Real privileged mutations'], forbiddenOperations: ['Expose tokens', 'Fake production health', 'Weaken backend authorization'],
-    nav: nav('/operations/admin', [['Home', ['Overview']], ['Organizations', ['Organizations', 'Organization Detail', 'Users', 'User Detail', 'Verification', 'Trust and Safety', 'Content Management', 'AI Operations']], ['Platform', ['Subscriptions', 'Billing', 'Analytics', 'System Health', 'Audit Logs', 'Security', 'Feature Flags', 'Support', 'Settings']]]),
+    // Content Management is offered only to a holder of a content capability: every section
+    // of it is read with one, and an operations admin holds none by baseline (ADR-032).
+    nav: nav('/operations/admin', [['Home', ['Overview']], ['Organizations', ['Organizations', 'Organization Detail', 'Users', 'User Detail', 'Verification', 'Trust and Safety', 'Content Management', 'AI Operations']], ['Platform', ['Subscriptions', 'Billing', 'Analytics', 'System Health', 'Audit Logs', 'Security', 'Feature Flags', 'Support', 'Settings']]])
+      .map((item) => (item.label === 'Content Management' ? { ...item, capabilities: operationsScreenCapabilities.contentManagement } : item)),
     kpis: [{ label: 'Total students', value: '42.8k', detail: 'Preview platform total' }, { label: 'Institutions', value: '38', detail: '7 under review' }, { label: 'Employers', value: '124', detail: '18 active campaigns' }, { label: 'Requests today', value: '18.2k', detail: 'Healthy simulated load' }],
     records: opsRecords,
   },

@@ -29,7 +29,7 @@ import {
   type StudentProfileDto,
   type StudentSavedOpportunityDto,
 } from './api.js';
-import { beginHostedLogin, completeHostedLoginFromLocation, getAccessToken, getAuthStatus, getAuthDebugStatus, hasStoredAuthSession, restoreAuthenticatedSession, signInWithPassword, signOut, type AuthStatus } from './auth.js';
+import { completeHostedLoginFromLocation, getAccessToken, getAuthStatus, hasStoredAuthSession, restoreAuthenticatedSession, signInWithPassword, signOut, type AuthStatus } from './auth.js';
 import { AuthControls } from './authControls.js';
 import { PageHeader, type PageMeta } from './studentComponents.js';
 import { rolePortalFromPath } from './rolePortalConfig.js';
@@ -52,6 +52,8 @@ import { HelpFaqPanel } from './helpFaqPanel.js';
 import { CalendarPage } from './calendarPage.js';
 import { PublicProfilePage } from './publicProfilePage.js';
 import { PublicEmployerAccessPage } from './publicEmployerAccessPage.js';
+import { AuthLayout, LegalPlaceholderPage, PasswordInput } from './authLayout.js';
+import { ForgotPasswordPage } from './forgotPasswordPage.js';
 import { ShareProfilePanel } from './shareProfilePanel.js';
 import { StudentTalentPoolCard } from './talentPool.js';
 import { ScreeningAssessmentsPage } from './screeningAssessmentsPage.js';
@@ -178,7 +180,7 @@ export function App(): React.ReactElement {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [apiHealth, setApiHealth] = useState<ApiHealth>('checking');
   const [authStatus, setAuthStatus] = useState<AuthStatus>(() => (hasStoredAuthSession() && !currentPath().startsWith('/demo') ? { state: 'restoring' } : getAuthStatus()));
-  const [authNotice, setAuthNotice] = useState(getAuthDebugStatus());
+  const [authNotice, setAuthNotice] = useState('');
   const [workspaceResolution, setWorkspaceResolution] = useState<WorkspaceResolution>({ state: 'loading' });
   const [workspaceRetryNonce, setWorkspaceRetryNonce] = useState(0);
   const [currentStudent, setCurrentStudent] = useState<CurrentStudentState>({ state: 'idle' });
@@ -334,6 +336,13 @@ export function App(): React.ReactElement {
     if (shareToken) return <PublicProfilePage token={shareToken} />;
   }
 
+  // Password reset and the legal placeholders are signed-out pages too, for the same reason.
+  if (path === '/forgot-password' || path === '/privacy' || path === '/terms') {
+    const navigate = (nextPath: string) => { window.history.pushState(null, '', nextPath); setPath(currentPath()); };
+    if (path === '/forgot-password') return <ForgotPasswordPage onNavigate={navigate} />;
+    return <LegalPlaceholderPage kind={path === '/privacy' ? 'privacy' : 'terms'} onNavigate={navigate} />;
+  }
+
   // EMP-04: the public employer access request. Like /p/, it renders without a session and
   // creates nothing but a pending request for operations to review.
   if (path === '/employer-access') {
@@ -454,18 +463,18 @@ export function App(): React.ReactElement {
     setAuthNotice(loginNoticeFor(result.state));
   }
 
-  async function handleHostedSignIn(): Promise<void> {
-    try {
-      await beginHostedLogin(`${window.location.pathname}${window.location.search}`);
-    } catch {
-      setAuthNotice('Cognito UAT login is not configured. Supply the approved non-production Hosted UI settings.');
-    }
+  // Every "Sign in" control leads to the sign-in card. The Cognito Hosted UI is not offered:
+  // on oneby8.com it ended on Amazon's bare error page under a pool domain named "uat".
+  // completeHostedLoginFromLocation still finishes any hosted sign-in already under way.
+  function handleHostedSignIn(): void {
+    window.history.pushState(null, '', '/login');
+    setPath(currentPath());
   }
 
   function handleSignOut(): void {
     signOut();
     setAuthStatus(getAuthStatus());
-    setAuthNotice(getAuthDebugStatus());
+    setAuthNotice('You have signed out.');
   }
 
   function handleRetryWorkspace(): void {
@@ -477,51 +486,70 @@ export function App(): React.ReactElement {
 function LoginEntry({ authStatus, authNotice, workspaceResolution, onSignIn, onHostedSignIn, onSignOut, onRetryWorkspace, onNavigate }: { readonly authStatus: AuthStatus; readonly authNotice: string; readonly workspaceResolution: WorkspaceResolution; readonly onSignIn: (email: string, password: string) => void | Promise<void>; readonly onHostedSignIn: () => void; readonly onSignOut: () => void; readonly onRetryWorkspace: () => void; readonly onNavigate: (path: string) => void }): React.ReactElement {
   useEffect(() => { document.title = `Sign in | ${productName}`; }, []);
   if (authStatus.state === 'authenticated') return <WorkspaceChooser authStatus={authStatus} authNotice={authNotice} workspaceResolution={workspaceResolution} onSignIn={onHostedSignIn} onSignOut={onSignOut} onRetryWorkspace={onRetryWorkspace} onNavigate={onNavigate} />;
-  const signInUnavailable = authStatus.state === 'unconfigured';
-  function submitLogin(event: FormEvent<HTMLFormElement>): void {
+  return <SignInCard signInUnavailable={authStatus.state === 'unconfigured'} authNotice={authNotice} onSignIn={onSignIn} onNavigate={onNavigate} />;
+}
+
+function SignInCard({ signInUnavailable, authNotice, onSignIn, onNavigate }: { readonly signInUnavailable: boolean; readonly authNotice: string; readonly onSignIn: (email: string, password: string) => void | Promise<void>; readonly onNavigate: (path: string) => void }): React.ReactElement {
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
+  const [busy, setBusy] = useState(false);
+  async function submitLogin(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
-    if (signInUnavailable) return;
+    if (signInUnavailable || busy) return;
     const form = new FormData(event.currentTarget);
-    const email = String(form.get('email') ?? '');
+    const email = String(form.get('email') ?? '').trim();
     const password = String(form.get('password') ?? '');
-    void onSignIn(email, password);
+    const errors: { email?: string; password?: string } = {};
+    if (!email) errors.email = 'Enter your email address.';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = 'Enter a valid email address.';
+    if (!password) errors.password = 'Enter your password.';
+    setFieldErrors(errors);
+    if (errors.email || errors.password) {
+      (event.currentTarget.elements.namedItem(errors.email ? 'email' : 'password') as HTMLInputElement | null)?.focus();
+      return;
+    }
+    setBusy(true);
+    try { await onSignIn(email, password); } finally { setBusy(false); }
   }
-  return <main className="login-shell">
+  const go = (path: string) => (event: React.MouseEvent<HTMLAnchorElement>) => { event.preventDefault(); onNavigate(path); };
+  const noticeIsError = /failed|incorrect|required|expired|could not|not available/i.test(authNotice);
+  return <AuthLayout onNavigate={onNavigate}>
     <section className="login-card" aria-labelledby="one-login-title">
-      <BrandLogo className="login-logo" height={72} />
       <p className="auth-eyebrow">ONE PLATFORM</p>
       <h1 id="one-login-title">Sign in</h1>
       <p className="auth-subtitle">Sign in to your verified ONE career-readiness workspace.</p>
-      <form className="login-form" onSubmit={submitLogin} noValidate>
+      <form className="login-form" onSubmit={(event) => void submitLogin(event)} noValidate>
         <label htmlFor="one-login-email">Email</label>
-        <input id="one-login-email" name="email" type="email" autoComplete="username" inputMode="email" disabled={signInUnavailable} aria-describedby={signInUnavailable ? 'one-auth-unavailable' : undefined} />
-        <label htmlFor="one-login-password">Password</label>
-        <input id="one-login-password" name="password" type="password" autoComplete="current-password" disabled={signInUnavailable} aria-describedby={signInUnavailable ? 'one-auth-unavailable' : undefined} />
-        <button type="submit" disabled={signInUnavailable}>Sign in</button>
+        <input id="one-login-email" name="email" type="email" autoComplete="username" inputMode="email" disabled={signInUnavailable} aria-invalid={fieldErrors.email ? true : undefined} aria-describedby={signInUnavailable ? 'one-auth-unavailable' : fieldErrors.email ? 'one-login-email-error' : undefined} />
+        {fieldErrors.email ? <p id="one-login-email-error" className="field-error">{fieldErrors.email}</p> : null}
+        <span className="login-label-row">
+          <label htmlFor="one-login-password">Password</label>
+          <a href="/forgot-password" onClick={go('/forgot-password')}>Forgot password?</a>
+        </span>
+        <PasswordInput id="one-login-password" name="password" autoComplete="current-password" disabled={signInUnavailable} invalid={Boolean(fieldErrors.password)} describedBy={signInUnavailable ? 'one-auth-unavailable' : fieldErrors.password ? 'one-login-password-error' : undefined} />
+        {fieldErrors.password ? <p id="one-login-password-error" className="field-error">{fieldErrors.password}</p> : null}
+        <button type="submit" disabled={signInUnavailable || busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
       </form>
-      {signInUnavailable ? <p id="one-auth-unavailable" className="auth-boundary" role="status">Secure sign-in is not available in this UAT environment yet.</p> : null}
-      {!signInUnavailable && authNotice ? <p className="auth-boundary" role={/failed|incorrect|required|expired|not configured/i.test(authNotice) ? 'alert' : 'status'}>{authNotice}</p> : null}
-      <p className="auth-footnote">{productTagline}</p>
-      {!signInUnavailable ? <button type="button" className="secondary" onClick={onHostedSignIn}>Use hosted sign-in fallback</button> : null}
+      {signInUnavailable ? <p id="one-auth-unavailable" className="auth-boundary" role="status">Sign-in is not available right now. Please try again later.</p> : null}
+      {!signInUnavailable && authNotice ? <p className={noticeIsError ? 'auth-boundary auth-error' : 'auth-boundary'} role={noticeIsError ? 'alert' : 'status'}>{authNotice}</p> : null}
       {enableDemoPortal ? <button type="button" className="secondary" onClick={() => onNavigate('/demo')}>Open demo previews</button> : null}
-      <p className="auth-footnote">Hiring graduates? <a href="/employer-access" onClick={(event) => { event.preventDefault(); onNavigate('/employer-access'); }}>Request employer access</a></p>
+      <p className="auth-footnote">Hiring graduates? <a href="/employer-access" onClick={go('/employer-access')}>Request employer access</a></p>
     </section>
-  </main>;
+  </AuthLayout>;
 }
 
 function loginNoticeFor(state: string): string {
   if (state === 'invalid_credentials') return 'Sign-in failed. Check your email and password.';
-  if (state === 'password_reset_required') return 'Password reset is required before this account can sign in.';
-  if (state === 'new_password_required') return 'A new password is required before this UAT account can continue.';
-  if (state === 'mfa_required') return 'MFA is required for this account and is not completed in this UAT form yet.';
-  if (state === 'session_expired') return 'The Cognito session expired. Please sign in again.';
-  if (state === 'unconfigured') return 'Cognito UAT password sign-in is not configured.';
-  return 'Sign-in could not be completed. Try again or verify the non-production Cognito configuration.';
+  if (state === 'password_reset_required') return 'This account needs a new password. Use “Forgot password?” to set one.';
+  if (state === 'new_password_required') return 'This account needs a new password before it can continue. Use “Forgot password?” to set one.';
+  if (state === 'mfa_required') return 'This account requires multi-factor sign-in, which is not available here yet. Write to info@ai8ht.pro for help.';
+  if (state === 'session_expired') return 'Your session expired. Please sign in again.';
+  if (state === 'unconfigured') return 'Sign-in is not available right now. Please try again later.';
+  return 'Sign-in could not be completed. Please try again.';
 }
 
 function SessionRestorationPage(): React.ReactElement {
   useEffect(() => { document.title = `Restoring session | ${productName}`; }, []);
-  return <main className="login-shell"><section className="login-card"><span className="eyebrow">{productTagline}</span><h1>Restoring your ONE session...</h1><p>ONE is checking your session-scoped Cognito tokens before opening a workspace.</p></section></main>;
+  return <main className="login-shell"><section className="login-card"><span className="eyebrow">{productTagline}</span><h1>Restoring your ONE session…</h1><p>Checking your sign-in before opening your workspace.</p></section></main>;
 }
 
 function WorkspaceChooser({ authStatus, authNotice, workspaceResolution, onSignIn, onSignOut, onRetryWorkspace, onNavigate }: { readonly authStatus: AuthStatus; readonly authNotice: string; readonly workspaceResolution: WorkspaceResolution; readonly onSignIn: () => void; readonly onSignOut: () => void; readonly onRetryWorkspace: () => void; readonly onNavigate: (path: string) => void }): React.ReactElement {

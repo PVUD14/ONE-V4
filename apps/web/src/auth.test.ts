@@ -109,7 +109,7 @@ describe('Cognito Hosted UI browser authentication', () => {
     expect(screen.getByText('ONE PLATFORM')).toBeInTheDocument();
     expect(screen.getByLabelText('Email')).toBeDisabled();
     expect(screen.getByLabelText('Password')).toBeDisabled();
-    expect(screen.getByText('Secure sign-in is not available in this UAT environment yet.')).toBeInTheDocument();
+    expect(screen.getByText('Sign-in is not available right now. Please try again later.')).toBeInTheDocument();
   });
 
   it('saves authenticated Student profile fields through the protected API', async () => {

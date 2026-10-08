@@ -9,8 +9,8 @@
  * The API answers the same way whatever already exists on ONE, so the confirmation here never
  * says whether a company or address is known. Rate limits and the work-email rule are the
  * server's; this page only reports their answers. It renders without a session, so it is
- * routed before any signed-in check in App.tsx. Branding is the ONE logo via
- * BrandLogo, like the sign-in page it sits beside.
+ * routed before any signed-in check in App.tsx. It sits in the same AuthLayout as the sign-in
+ * page, whose brand panel carries the ONE logo.
  *
  * GROWTH-05: a growth person's referral link is this page with `?ref=<code>`. The code is passed
  * on with the request exactly as it arrived and is never shown or checked here: the server answers
@@ -18,9 +18,16 @@
  */
 import { useEffect, useState, type FormEvent } from 'react';
 import { ApiRequestError, submitEmployerAccessRequest } from './api.js';
-import { BrandLogo } from './brand.js';
+import { AuthLayout } from './authLayout.js';
 
 const productName = 'ONE by AI8HT';
+
+/** A bare "acme.com" is what most people type; the server needs the scheme, so add it for them. */
+export function normalizeWebsite(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return trimmed;
+  return /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
 
 /** The `ref` of the link the visitor followed, passed on untouched (bounded so a pasted page cannot ride along). */
 export function referralFromLocation(search: string): string | undefined {
@@ -43,7 +50,7 @@ function messageFor(error: unknown): string {
 }
 
 export function PublicEmployerAccessPage({ onNavigate }: { readonly onNavigate: (path: string) => void }): React.ReactElement {
-  const [form, setForm] = useState({ requesterName: '', companyName: '', workEmail: '', websiteUrl: 'https://' });
+  const [form, setForm] = useState({ requesterName: '', companyName: '', workEmail: '', websiteUrl: '' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [sent, setSent] = useState(false);
@@ -56,7 +63,7 @@ export function PublicEmployerAccessPage({ onNavigate }: { readonly onNavigate: 
       const ref = referralFromLocation(window.location.search);
       await submitEmployerAccessRequest({
         requesterName: form.requesterName.trim(), companyName: form.companyName.trim(),
-        workEmail: form.workEmail.trim(), websiteUrl: form.websiteUrl.trim(),
+        workEmail: form.workEmail.trim(), websiteUrl: normalizeWebsite(form.websiteUrl),
         ...(ref ? { ref } : {}),
       });
       setSent(true);
@@ -67,9 +74,8 @@ export function PublicEmployerAccessPage({ onNavigate }: { readonly onNavigate: 
     }
   }
 
-  return <main className="login-shell">
+  return <AuthLayout onNavigate={onNavigate}>
     <section className="login-card" aria-labelledby="one-employer-access-title">
-      <BrandLogo className="login-logo" height={72} />
       <p className="auth-eyebrow">ONE FOR EMPLOYERS</p>
       <h1 id="one-employer-access-title">Request employer access</h1>
       {sent ? <>
@@ -89,7 +95,7 @@ export function PublicEmployerAccessPage({ onNavigate }: { readonly onNavigate: 
           <input id="one-access-email" name="workEmail" type="email" autoComplete="email" inputMode="email" maxLength={254} required value={form.workEmail}
             onChange={(event) => setForm((value) => ({ ...value, workEmail: event.target.value }))} />
           <label htmlFor="one-access-website">Company website</label>
-          <input id="one-access-website" name="websiteUrl" type="url" autoComplete="url" maxLength={256} required value={form.websiteUrl}
+          <input id="one-access-website" name="websiteUrl" type="text" inputMode="url" placeholder="yourcompany.com" autoComplete="url" maxLength={256} required value={form.websiteUrl}
             onChange={(event) => setForm((value) => ({ ...value, websiteUrl: event.target.value }))} />
           <button type="submit" disabled={busy}>{busy ? 'Sending…' : 'Send request'}</button>
         </form>
@@ -98,5 +104,5 @@ export function PublicEmployerAccessPage({ onNavigate }: { readonly onNavigate: 
         <button type="button" className="secondary" onClick={() => onNavigate('/login')}>Back to sign in</button>
       </>}
     </section>
-  </main>;
+  </AuthLayout>;
 }

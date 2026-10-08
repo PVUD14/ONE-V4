@@ -94,14 +94,15 @@ describe('All-role portal registry and preview workflows', () => {
       window.history.pushState(null, '', path);
       render(<App />);
       expect(screen.getByText('ONE PLATFORM')).toBeInTheDocument();
-      expect(screen.getByRole('img', { name: 'ONE by AI8HT' })).toHaveAttribute('src', '/assets/one-logo-light.png');
+      expect(screen.getByRole('img', { name: 'ONE by AI8HT' })).toHaveAttribute('src', '/assets/one-logo-dark.png');
       expect(document.title).toBe('Sign in | ONE by AI8HT');
       expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
       expect(screen.getByText('LEARN | PREPARE | BUILD | GROW')).toBeInTheDocument();
       expect(screen.getByLabelText('Email')).toHaveAttribute('autocomplete', 'username');
       expect(screen.getByLabelText('Password')).toHaveAttribute('autocomplete', 'current-password');
       expect(screen.getByRole('button', { name: 'Sign in' })).toBeDisabled();
-      expect(screen.getByText(/Secure sign-in is not available in this UAT environment yet/i)).toBeInTheDocument();
+      expect(screen.getByText(/Sign-in is not available right now/i)).toBeInTheDocument();
+      expect(screen.queryByText(/\bUAT\b|Cognito/)).not.toBeInTheDocument();
       expect(screen.queryByText(/Cognito UAT login is not configured/i)).not.toBeInTheDocument();
       expect(screen.queryByText('Rahul Kumar')).not.toBeInTheDocument();
     }
@@ -115,7 +116,7 @@ describe('All-role portal registry and preview workflows', () => {
     expect(window.location.pathname).toBe('/employer-access');
     expect(screen.getByRole('heading', { name: 'Request employer access' })).toBeInTheDocument();
     const logo = screen.getByRole('img', { name: 'ONE by AI8HT' });
-    expect(logo).toHaveAttribute('src', '/assets/one-logo-light.png');
+    expect(logo).toHaveAttribute('src', '/assets/one-logo-dark.png');
     expect(screen.getByLabelText('Work email')).toBeInTheDocument();
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/employer-access-requests'))).toBe(false);
   });

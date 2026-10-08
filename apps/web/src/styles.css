@@ -1,7 +1,7 @@
 :root {
   color: #101828;
   background: #f6f8fb;
-  font-family: Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: "Inter Variable", Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   font-synthesis: none;
   line-height: 1.4;
   text-rendering: optimizeLegibility;
@@ -148,53 +148,186 @@
 .role-modal textarea { min-height: 96px; resize: vertical; }
 .role-empty { text-align: center; border: 1px dashed #cbd5e1; background: #fff; }
 
+/* Signed-out pages. One deep brand gradient, the same on every signed-out screen, in place of
+   the black-to-white fade image that read as muddy grey through the middle. */
+.login-shell,
+.auth-showcase {
+  background:
+    radial-gradient(circle at 18% 12%, rgba(52, 120, 255, .30), transparent 42%),
+    radial-gradient(circle at 85% 90%, rgba(31, 85, 229, .22), transparent 40%),
+    linear-gradient(160deg, #05070d 0%, #0a1430 55%, #0b2a6b 100%);
+}
+
 .login-shell {
   min-height: 100vh;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  padding: 56px 60px;
-  background:
-    linear-gradient(90deg, rgba(247, 250, 255, 0.08), rgba(247, 250, 255, 0.18)),
-    url('/assets/login-background.png') center / 100% 100% no-repeat,
-    radial-gradient(circle at 22% 18%, rgba(52, 120, 255, .16), transparent 30%),
-    linear-gradient(180deg, #fbfdff 0%, #f5f8fe 100%);
-  color: var(--ink);
+  justify-content: center;
+  padding: 56px 24px;
+  color: #101828;
 }
 
+.auth-split {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(420px, 1fr);
+  background: var(--canvas);
+}
+
+.auth-showcase {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 24px;
+  padding: clamp(32px, 4vw, 56px) clamp(40px, 5vw, 72px);
+  overflow: hidden;
+  color: #e7ecf6;
+}
+
+.auth-showcase-logo { align-self: flex-start; }
+
+.auth-showcase-title {
+  max-width: 22ch;
+  margin: 0;
+  color: #fff;
+  font-size: clamp(30px, 2.6vw, 40px);
+  font-weight: 700;
+  letter-spacing: -.03em;
+  line-height: 1.12;
+}
+
+.auth-benefits {
+  display: grid;
+  gap: 14px;
+  max-width: 520px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.auth-benefits li {
+  display: grid;
+  gap: 2px;
+  padding-left: 18px;
+  border-left: 2px solid rgba(96, 150, 255, .7);
+}
+
+.auth-benefits strong { color: #fff; font-size: 14px; font-weight: 600; }
+.auth-benefits span { color: #b6c2da; font-size: 14px; line-height: 1.5; }
+
+.auth-product-frame {
+  position: relative;
+  max-width: 600px;
+  margin: 4px 0 0;
+  padding: 0;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #0f1729;
+  border: 1px solid rgba(255, 255, 255, .14);
+  box-shadow: 0 30px 80px -20px rgba(0, 0, 0, .65);
+}
+
+.auth-product-chrome {
+  display: flex;
+  gap: 6px;
+  padding: 9px 12px;
+  background: rgba(255, 255, 255, .06);
+  border-bottom: 1px solid rgba(255, 255, 255, .08);
+}
+
+.auth-product-chrome i { width: 9px; height: 9px; border-radius: 50%; background: rgba(255, 255, 255, .22); }
+
+.auth-product-frame img { display: block; width: 100%; height: auto; }
+
+.auth-product-frame figcaption {
+  position: absolute;
+  top: 34px;
+  right: 10px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(5, 7, 13, .8);
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: .02em;
+  border: 1px solid rgba(255, 255, 255, .2);
+}
+
+.auth-showcase-tagline {
+  margin: 0;
+  color: #8fa0c0;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: .32em;
+}
+
+.auth-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: radial-gradient(circle at 70% 0%, rgba(31, 85, 229, .06), transparent 45%), var(--canvas);
+}
+
+.auth-panel-main {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: 32px 24px;
+}
+
+.auth-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 20px;
+  padding: 18px 32px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.auth-footer nav { display: flex; gap: 18px; }
+.auth-footer a { color: var(--muted); font-weight: 500; text-decoration: none; }
+.auth-footer a:hover, .auth-footer a:focus-visible { color: var(--student); text-decoration: underline; }
+
 .login-card {
-  width: clamp(300px, 32vw, 408px);
-  max-width: calc(100vw - 44px);
+  width: min(420px, 100%);
   display: grid;
   gap: 0;
   padding: 40px;
   border-radius: 20px;
-  background: rgba(255, 255, 255, .95);
-  border: 1px solid #dce6f6;
-  box-shadow: 0 24px 70px rgba(32, 56, 112, .18);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 24px 60px -24px rgba(16, 24, 40, .22);
 }
 
 .login-card h1 {
   margin: 0;
-  color: #000;
-  font-size: 28px;
-  font-weight: 500;
-  letter-spacing: -.04em;
+  color: #0b1324;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -.03em;
   line-height: 1.15;
 }
 
+.login-card a { color: var(--student); font-weight: 600; text-decoration: none; }
+.login-card a:hover, .login-card a:focus-visible { text-decoration: underline; }
+
 .auth-eyebrow {
-  margin: 0 0 12px;
-  color: #3478ff;
+  margin: 0 0 10px;
+  color: var(--student);
   font-size: 11px;
-  letter-spacing: .12em;
+  font-weight: 600;
+  letter-spacing: .14em;
 }
 
 .auth-subtitle {
   margin: 10px 0 26px;
-  color: #64718d;
+  color: var(--muted);
   font-size: 14px;
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
 .login-form {
@@ -205,20 +338,34 @@
 .login-form label {
   color: #263657;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
 }
+
+.login-label-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.login-label-row a { font-size: 12.5px; }
 
 .login-form input {
   width: 100%;
   min-height: 46px;
   margin: 0 0 9px;
-  padding: 10px 12px;
+  padding: 10px 14px;
   color: #17264a;
-  background: #fbfdff;
-  border: 1px solid #9aa3ad;
+  font: inherit;
+  font-size: 14.5px;
+  background: #fff;
+  border: 1px solid var(--line-strong);
   border-radius: 12px;
-  box-shadow: inset 0 1px 2px rgba(18, 37, 73, .06);
+  box-shadow: inset 0 1px 2px rgba(18, 37, 73, .05);
+  transition: border-color .15s ease, box-shadow .15s ease;
 }
+
+.login-form input:focus-visible {
+  outline: none;
+  border-color: var(--student);
+  box-shadow: 0 0 0 4px rgba(31, 85, 229, .14);
+}
+
+.login-form input[aria-invalid="true"] { border-color: var(--red); }
 
 .login-form input:disabled {
   color: #7b8798;
@@ -226,56 +373,109 @@
   cursor: not-allowed;
 }
 
-.login-form button {
-  width: 100%;
-  min-height: 46px;
-  margin-top: 4px;
-  border-radius: 10px;
-  font-weight: 500;
+.field-error { margin: -4px 0 8px; color: #b42335; font-size: 12.5px; font-weight: 500; }
+.field-hint { margin: -4px 0 8px; color: var(--muted); font-size: 12.5px; }
+
+.password-field { position: relative; display: block; }
+.password-field input { padding-right: 48px; }
+
+/* (0,2,0) outranks the application-wide solid-blue button rule at (0,1,1). */
+.login-form .password-toggle {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 38px;
+  min-height: 38px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  color: var(--muted);
+  background: transparent;
 }
 
-.login-form button:disabled {
+.login-form .password-toggle:hover { color: #101828; background: var(--canvas); }
+
+/* The primary action matches the inputs above it: same height, readable text. */
+.login-card .login-form button[type="submit"],
+.login-card button.auth-primary {
+  width: 100%;
+  min-height: 46px;
+  margin-top: 6px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, .08), 0 8px 18px -10px rgba(31, 85, 229, .6);
+}
+
+.login-card .login-form button[type="submit"]:hover:not(:disabled) { background: #1a48c4; }
+
+.login-card .login-form button[type="submit"]:disabled {
   color: #fff;
-  background: #bcbcbc;
-  border-color: #bcbcbc;
-  box-shadow: 0 12px 24px rgba(99, 116, 139, .12);
+  background: #a9b4c7;
+  box-shadow: none;
   cursor: not-allowed;
+}
+
+.login-card .auth-text-button {
+  justify-self: center;
+  min-height: 0;
+  margin-top: 14px;
+  padding: 4px 8px;
+  color: var(--student);
+  background: transparent;
+  font-size: 13px;
 }
 
 .auth-boundary {
   margin: 16px 0 0;
-  color: #64718d;
-  font-size: 12px;
+  color: var(--muted);
+  font-size: 13px;
   line-height: 1.45;
+}
+
+.auth-boundary.auth-error {
+  padding: 10px 12px;
+  border: 1px solid #f6c9cf;
+  border-radius: 10px;
+  background: #fff5f6;
+  color: #b42335;
 }
 
 .auth-footnote {
   margin: 22px 0 0;
-  color: #8a96ad;
-  font-size: 11px;
+  color: var(--muted);
+  font-size: 13px;
   text-align: center;
-  letter-spacing: .06em;
 }
 
 .login-card > button.secondary {
   width: 100%;
+  min-height: 42px;
   margin-top: 18px;
-  color: #3478ff;
-  background: #edf4ff;
-  border-color: #dce6f6;
+  border-radius: 12px;
+  color: var(--student);
+  background: var(--student-soft);
+  font-size: 14px;
 }
 
-@media (max-width: 760px) {
-  .login-shell {
-    justify-content: center;
-    padding: 40px 22px;
-    background-size: auto 100%, auto 100%, auto, auto;
-    background-position: center;
-  }
+@media (max-width: 1100px) {
+  .auth-split { grid-template-columns: minmax(0, 1fr) minmax(400px, 1fr); }
+  .auth-product-frame { display: none; }
+}
 
-  .login-card {
-    padding: 40px;
-  }
+/* On phones the showcase shrinks to a brand band above the card: logo and headline only. */
+@media (max-width: 760px) {
+  .auth-split { grid-template-columns: 1fr; }
+  .auth-showcase { gap: 14px; padding: 28px 16px 32px; }
+  .auth-showcase-title { font-size: 24px; max-width: none; }
+  .auth-benefits, .auth-showcase-tagline { display: none; }
+  .auth-panel { min-height: 0; }
+  .auth-panel-main { padding: 24px 16px 32px; }
+  .login-card { padding: 28px 22px; }
+  .auth-footer { padding: 16px; justify-content: center; text-align: center; }
+  .login-shell { padding: 32px 16px; }
 }
 
 .workspace-grid {

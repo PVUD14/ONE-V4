@@ -463,13 +463,7 @@ object Api {
      *  Stores access+refresh tokens on success. */
     suspend fun passwordSignIn(context: Context, email: String, password: String): Unit =
         kotlinx.coroutines.suspendCancellableCoroutine { continuation ->
-            val pool = com.amazonaws.mobileconnectors.cognitoidentityprovider.CognitoUserPool(
-                context.applicationContext,
-                "ap-south-1_nPl3qFkvB",
-                BuildConfig.COGNITO_SPA_CLIENT_ID,
-                null,
-                com.amazonaws.regions.Regions.AP_SOUTH_1,
-            )
+            val pool = userPool(context)
             val handler = object : com.amazonaws.mobileconnectors.cognitoidentityprovider.handlers.AuthenticationHandler {
                 override fun onSuccess(
                     session: com.amazonaws.mobileconnectors.cognitoidentityprovider.CognitoUserSession,
@@ -498,7 +492,7 @@ object Api {
                     val name = exception.javaClass.simpleName
                     continuation.resumeWith(Result.failure(SignInException(when {
                         name.contains("NotAuthorized") || name.contains("UserNotFound") -> "Incorrect email or password."
-                        name.contains("PasswordResetRequired") -> "Password reset required - complete it on the web first."
+                        name.contains("PasswordResetRequired") -> "Your password needs to be reset. Use Forgot password? to set a new one."
                         name.contains("UserNotConfirmed") -> "This account is not confirmed yet - contact your placement cell."
                         else -> "Sign-in failed. Check your connection and try again."
                     })))
@@ -506,6 +500,64 @@ object Api {
             }
             pool.getUser(email.trim()).getSessionInBackground(handler)
         }
+
+    private fun userPool(context: Context) = com.amazonaws.mobileconnectors.cognitoidentityprovider.CognitoUserPool(
+        context.applicationContext,
+        "ap-south-1_nPl3qFkvB",
+        BuildConfig.COGNITO_SPA_CLIENT_ID,
+        null,
+        com.amazonaws.regions.Regions.AP_SOUTH_1,
+    )
+
+    /**
+     * Self-service password reset, the same two steps the web reset page runs: the user pool
+     * emails a one-time code, then the code and a new password are confirmed. "No such
+     * account" collapses into the same answer as success, so the reset screen never tells
+     * anyone which addresses have accounts on ONE. Neither the code nor the password is
+     * logged or stored; they live only in the screen's memory until the call returns.
+     */
+    enum class PasswordReset { CodeSent, Reset, CodeInvalid, CodeExpired, PasswordRejected, RateLimited, Failed }
+
+    suspend fun requestPasswordReset(context: Context, email: String): PasswordReset =
+        kotlinx.coroutines.suspendCancellableCoroutine { continuation ->
+            fun finish(result: PasswordReset) { if (continuation.isActive) continuation.resumeWith(Result.success(result)) }
+            userPool(context).getUser(email.trim()).forgotPasswordInBackground(object :
+                com.amazonaws.mobileconnectors.cognitoidentityprovider.handlers.ForgotPasswordHandler {
+                override fun onSuccess() = finish(PasswordReset.CodeSent)
+                // The code is on its way; the second step confirms it statelessly, so this
+                // continuation is deliberately left unfinished.
+                override fun getResetCode(
+                    resetContinuation: com.amazonaws.mobileconnectors.cognitoidentityprovider.continuations.ForgotPasswordContinuation?,
+                ) = finish(PasswordReset.CodeSent)
+                override fun onFailure(exception: Exception?) = finish(passwordResetFailure(exception, PasswordReset.CodeSent))
+            })
+        }
+
+    suspend fun confirmPasswordReset(context: Context, email: String, code: String, newPassword: String): PasswordReset =
+        kotlinx.coroutines.suspendCancellableCoroutine { continuation ->
+            fun finish(result: PasswordReset) { if (continuation.isActive) continuation.resumeWith(Result.success(result)) }
+            userPool(context).getUser(email.trim()).confirmPasswordInBackground(code.trim(), newPassword, object :
+                com.amazonaws.mobileconnectors.cognitoidentityprovider.handlers.ForgotPasswordHandler {
+                override fun onSuccess() = finish(PasswordReset.Reset)
+                override fun getResetCode(
+                    resetContinuation: com.amazonaws.mobileconnectors.cognitoidentityprovider.continuations.ForgotPasswordContinuation?,
+                ) = Unit
+                override fun onFailure(exception: Exception?) = finish(passwordResetFailure(exception, PasswordReset.CodeInvalid))
+            })
+        }
+
+    private fun passwordResetFailure(exception: Exception?, unknownAccount: PasswordReset): PasswordReset {
+        val names = generateSequence(exception as Throwable?) { it.cause }.take(4).map { it.javaClass.simpleName }.toList()
+        fun any(vararg candidates: String) = names.any { name -> candidates.any { name.contains(it) } }
+        return when {
+            any("UserNotFound", "NotAuthorized") -> unknownAccount
+            any("CodeMismatch") -> PasswordReset.CodeInvalid
+            any("ExpiredCode") -> PasswordReset.CodeExpired
+            any("InvalidPassword") -> PasswordReset.PasswordRejected
+            any("LimitExceeded", "TooManyRequests", "TooManyFailedAttempts") -> PasswordReset.RateLimited
+            else -> PasswordReset.Failed
+        }
+    }
 
     /** Exchanges the stored refresh token for a fresh access token; null if unavailable. */
     fun refreshSession(context: Context): String? {

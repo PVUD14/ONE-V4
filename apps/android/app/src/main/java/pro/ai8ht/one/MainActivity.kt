@@ -61,7 +61,6 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -1174,6 +1173,8 @@ private fun SignInScreen(
     var showAdvanced by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    // Forgot password replaces the sign-in card in place, so the band and theme stay put.
+    var resetting by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize().background(signPalette.bandBottom)) {
         BrandBand {
@@ -1194,7 +1195,10 @@ private fun SignInScreen(
         BandSheet {
         Column(Modifier.fillMaxSize().padding(20.dp).verticalScroll(rememberScrollState())) {
         Spacer(Modifier.height(8.dp))
-        PilotCard {
+        if (resetting) PasswordResetCard(initialEmail = email, onBack = { returned ->
+            if (returned.isNotBlank()) email = returned
+            password = ""; error = null; resetting = false
+        }) else PilotCard {
             Column(Modifier.padding(20.dp)) {
                 Text("Sign in", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 if (expired) {
@@ -1205,19 +1209,19 @@ private fun SignInScreen(
                     }
                 }
                 Spacer(Modifier.height(12.dp))
-                val fieldColors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                )
+                val fieldColors = signInFieldColors()
                 OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("Email") },
-                    modifier = Modifier.fillMaxWidth(), singleLine = true, shape = RoundedCornerShape(10.dp), colors = fieldColors)
-                Spacer(Modifier.height(10.dp))
-                OutlinedTextField(value = password, onValueChange = { password = it }, label = { Text("Password") },
                     modifier = Modifier.fillMaxWidth(), singleLine = true,
-                    visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Password),
+                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Email, autoCorrectEnabled = false),
                     shape = RoundedCornerShape(10.dp), colors = fieldColors)
+                Spacer(Modifier.height(10.dp))
+                PasswordField(value = password, onValueChange = { password = it }, label = "Password")
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = { error = null; resetting = true }, enabled = !busy) {
+                        Text("Forgot password?", color = signPalette.accent, fontWeight = FontWeight.SemiBold)
+                    }
+                }
                 (error ?: redirectError)?.let {
                     Spacer(Modifier.height(8.dp))
                     Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
@@ -1244,7 +1248,7 @@ private fun SignInScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Spacer(Modifier.height(14.dp))
+                Spacer(Modifier.height(6.dp))
                 Button(
                     onClick = {
                         busy = true; error = null
@@ -1258,17 +1262,22 @@ private fun SignInScreen(
                         }
                     },
                     enabled = !busy && email.isNotBlank() && password.isNotBlank(),
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().height(46.dp),
                     shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                ) { Text(if (busy) "Signing in…" else "Sign in") }
+                    colors = ButtonDefaults.buttonColors(containerColor = signPalette.accent, contentColor = signPalette.onAccent),
+                ) { Text(if (busy) "Signing in…" else "Sign in", fontWeight = FontWeight.SemiBold) }
 
+                // Token sign-in and the API override are developer tools: debug builds only,
+                // so no release user ever sees them or the test-environment wording.
+                if (BuildConfig.DEBUG) {
                 Spacer(Modifier.height(10.dp))
                 TextButton(onClick = { showAdvanced = !showAdvanced }) {
-                    Text(if (showAdvanced) "Hide UAT options" else "UAT options (token sign-in)")
+                    Text(if (showAdvanced) "Hide developer options" else "Developer options (token sign-in)",
+                        color = signPalette.muted)
                 }
-                if (showAdvanced) {
-                    OutlinedTextField(value = token, onValueChange = { token = it }, label = { Text("Access token (UAT)") },
+                }
+                if (BuildConfig.DEBUG && showAdvanced) {
+                    OutlinedTextField(value = token, onValueChange = { token = it }, label = { Text("Access token") },
                         modifier = Modifier.fillMaxWidth(), minLines = 3, shape = RoundedCornerShape(10.dp), colors = fieldColors)
                     Spacer(Modifier.height(8.dp))
                     OutlinedTextField(value = apiOverride, onValueChange = { apiOverride = it },

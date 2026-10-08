@@ -5026,15 +5026,17 @@ button.secondary {
   .pilot-page, .pilot.pilot-embed .pilot-page, .v2-page { grid-template-columns: 1fr; }
 }
 
-/* The student score row: the band card and five factor cards side by side only when every
-   factor card gets at least ~150px; otherwise the band card takes its own line and the
-   factor cards flow beneath it. */
-.v3-score-row { grid-template-columns: minmax(0, 2.4fr) repeat(5, minmax(0, 1fr)); }
-@container (max-width: 1179px) {
-  .v3-score-row { grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr)); }
-  .v3-score-row > section:first-child,
-  .v3-score-row > .na-strip { grid-column: 1 / -1; }
-}
+/* The student score row: the band card beside the readiness factors (about 1 : 2), stacked
+   only when the content column is narrow. The factors - real cards and the strip of topics
+   with no evidence yet - wrap in one flexible area and stretch to fill each line, so a row
+   never leaves empty columns or a mostly blank full-width card. */
+.v3-score-row { grid-template-columns: minmax(260px, 1fr) minmax(0, 2fr); }
+@container (max-width: 639px) { .v3-score-row { grid-template-columns: 1fr; } }
+.v3-factor-grid { display: flex; flex-wrap: wrap; gap: 14px; align-content: stretch; min-width: 0; }
+.v3-factor-grid > .pilot-score-card { flex: 1 1 150px; }
+.v3-factor-grid > .na-strip { flex: 2 1 280px; }
+/* With room, the band legend sits beside the ring instead of under it. */
+.v3-band-body { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 24px; }
 
 /* Portal rows follow the same thresholds as the pilot rows. */
 @container (max-width: 699px) { .v2-cols-4, .role-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -5239,7 +5241,6 @@ td .na-value, dd .na-value, .num > .na-value { font-weight: 500; opacity: .85; }
 .na-slot .na-value { font-size: inherit; }
 .na-strip > .na-reason, .na-strip--inline > .na-reason { margin: 0; font-size: 11.5px; }
 /* In the student score row, the strip takes the columns its missing cards would have. */
-@container (min-width: 1180px) { .v3-score-row > .na-strip { grid-column: span var(--na-span, 1); } }
 
 /* A chart with a suppressed or missing point: the frame stays, no line is drawn. */
 .na-chart-empty {
@@ -5298,3 +5299,9 @@ td .na-value, dd .na-value, .num > .na-value { font-weight: 500; opacity: .85; }
 /* A card that holds its own row of tiles ("Recommended for You") is that row's container, so
    the row lays out by the card's width rather than the whole content column's. */
 .pilot-card:has(> .pilot-row) { container-type: inline-size; }
+
+/* Stat tiles sit one per column of their own grid. `.role-card:not(.role-wide)` spans six
+   columns of the twelve-column module grid; on a stat tile inside the four-column
+   `.role-kpi-grid` that same span pushed every tile onto its own full-width row
+   (Operations Organizations showed four 1,100px-wide tiles stacked). */
+.role-kpi-grid > .role-card { grid-column: auto; }

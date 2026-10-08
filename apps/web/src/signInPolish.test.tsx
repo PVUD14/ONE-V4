@@ -72,13 +72,10 @@ describe('sign-in card', () => {
     // No sandbox capture on a page real users reach: no sample-data label and no product picture.
     expect(screen.queryByText(/sample data/i)).not.toBeInTheDocument();
     expect(document.querySelector('img[src*="sign-in-product"]')).toBeNull();
-    // The AI8HT ribbon 8 turns behind the card as decoration only: no text for screen readers.
-    const eight = document.querySelector('.auth-eight');
-    expect(eight).toHaveAttribute('aria-hidden', 'true');
-    // Solid, not a flat picture: edge layers through the depth, plus a front and a back face.
-    expect(eight!.querySelectorAll('.auth-eight-edge').length).toBeGreaterThan(6);
-    expect(eight!.querySelectorAll('.auth-eight-face img[src="/assets/ai8ht-eight-ice.webp"]')).toHaveLength(2);
-    for (const image of eight!.querySelectorAll('img')) expect(image).toHaveAttribute('alt', '');
+    // The ONE by AI8HT lockup is large on the panel, so it also offers the full-resolution file.
+    const logo = screen.getByRole('img', { name: 'ONE by AI8HT' });
+    expect(logo).toHaveAttribute('srcset', '/assets/one-logo-dark.png 1x, /assets/one-logo-dark@2x.webp 2x');
+    expect(document.querySelector('.auth-eight')).toBeNull();
   });
 
   it('asks for the missing fields itself instead of sending an empty sign-in to Cognito', async () => {

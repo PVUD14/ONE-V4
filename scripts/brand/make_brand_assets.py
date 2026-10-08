@@ -289,6 +289,10 @@ def main() -> int:
     # on a 3x display, and small enough to ship.
     resize_h(word_dark, 240).save(ensure(os.path.join(WEB_ASSETS, 'one-logo-dark.png')), optimize=True)
     resize_h(word_light, 240).save(ensure(os.path.join(WEB_ASSETS, 'one-logo-light.png')), optimize=True)
+    # Full-resolution lockups (the crop's own size, never enlarged) for high-density screens
+    # and large slots such as the sign-in panel, so a bigger logo is never a stretched one.
+    word_dark.save(os.path.join(WEB_ASSETS, 'one-logo-dark@2x.webp'), 'WEBP', quality=92, method=6)
+    word_light.save(os.path.join(WEB_ASSETS, 'one-logo-light@2x.webp'), 'WEBP', quality=92, method=6)
     fit_square(mark_dark, 256, 0.96).save(ensure(os.path.join(WEB_ASSETS, 'one-mark-dark.png')), optimize=True)
     fit_square(mark_light, 256, 0.96).save(ensure(os.path.join(WEB_ASSETS, 'one-mark-light.png')), optimize=True)
 

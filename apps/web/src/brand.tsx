@@ -24,6 +24,12 @@ const LOCKUP: Record<BrandSurface, string> = {
   dark: '/assets/one-logo-dark.png',
 };
 
+/** The lockups at the source crop's full resolution, for high-density screens and large slots. */
+const LOCKUP_HD: Record<BrandSurface, string> = {
+  light: '/assets/one-logo-light@2x.webp',
+  dark: '/assets/one-logo-dark@2x.webp',
+};
+
 const MARK: Record<BrandSurface, string> = {
   light: '/assets/one-mark-light.png',
   dark: '/assets/one-mark-dark.png',
@@ -38,6 +44,7 @@ export function BrandLogo({ height = 30, surface = 'light', compact = false, cla
   return <img
     className={`brand-logo${compact ? ' brand-logo-compact' : ''}${className ? ` ${className}` : ''}`}
     src={compact ? MARK[surface] : LOCKUP[surface]}
+    srcSet={compact ? undefined : `${LOCKUP[surface]} 1x, ${LOCKUP_HD[surface]} 2x`}
     alt={BRAND_NAME}
     draggable={false}
     style={{ height, width: 'auto', display: 'block', flex: '0 0 auto', userSelect: 'none' }}

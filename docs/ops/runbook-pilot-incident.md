@@ -121,9 +121,11 @@ All of it is Divakar's on the server (`cd /srv/planthepath-next/current`, `DATAB
    `CONSENT_VERSION_MISMATCH` otherwise). Today no definition is published, so this lever is
    already "pulled" in every pilot database.
 4. **Calibration looks wrong.** Calibrations are append-only; the reader prefers the latest
-   `CALIBRATED` run over newer `PROVISIONAL` ones. Stop the timer
-   (`systemctl disable --now planthepath-calibration.timer`) and fix forward with a new run
-   (`deploy/scripts/run-calibration.sh`). Not installed anywhere yet.
+   `CALIBRATED` run over newer `PROVISIONAL` ones. Revert the last accepted recalibration
+   (`$F engine:recalibration revert --run <id> --reason "…"`,
+   [runbook-monthly-recalibration.md](runbook-monthly-recalibration.md) §7), and stop the timer
+   (`systemctl disable --now planthepath-recalibration.timer`) if the export itself is the problem.
+   Not installed anywhere yet.
 
 ## 4. Tell the affected colleges and employers (status notices)
 

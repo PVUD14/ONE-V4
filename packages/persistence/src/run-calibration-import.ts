@@ -4,7 +4,8 @@
  *
  * Why this exists: the Python job has no database access; this validates its results file
  * strictly and writes the run and its item calibrations in one transaction. Replaying the same
- * run is a no-op. Prints counts only. Started by deploy/scripts/run-calibration.sh; on no route.
+ * run is a no-op. Prints counts only. On no route. Since ENG-26 nothing schedules it: the monthly
+ * recalibration imports through the same importer only when a run is accepted (engine:recalibration).
  */
 import { readFile } from 'node:fs/promises';
 import { Pool } from 'pg';

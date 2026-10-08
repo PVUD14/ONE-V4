@@ -4,7 +4,8 @@
  *
  * Why this exists: the Python calibration job must only ever see de-identified, consented
  * responses. This writes that export (mode 0600) for one new run and prints counts only —
- * never a pseudonym, user or item. Started by deploy/scripts/run-calibration.sh; on no route.
+ * never a pseudonym, user or item. On no route. Since ENG-26 the monthly run uses
+ * `engine:recalibration export --kind items`, which writes this same export plus a baseline.
  */
 import { writeFile } from 'node:fs/promises';
 import { Pool } from 'pg';

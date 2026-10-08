@@ -51,12 +51,12 @@ describe('planner window', () => {
 });
 
 describe('calibration status', () => {
-  it('is NO_RUN without a run, CURRENT up to eight days, OVERDUE after', () => {
+  it('is NO_RUN without a run, CURRENT up to thirty-eight days, OVERDUE after', () => {
     expect(calibrationHealthStatus(null)).toBe('NO_RUN');
     expect(calibrationHealthStatus(0)).toBe('CURRENT');
-    expect(calibrationHealthStatus(8)).toBe('CURRENT');
-    expect(calibrationHealthStatus(8.01)).toBe('OVERDUE');
-    expect(calibrationHealthStatus(40)).toBe('OVERDUE');
+    expect(calibrationHealthStatus(38)).toBe('CURRENT');
+    expect(calibrationHealthStatus(38.01)).toBe('OVERDUE');
+    expect(calibrationHealthStatus(60)).toBe('OVERDUE');
   });
 });
 

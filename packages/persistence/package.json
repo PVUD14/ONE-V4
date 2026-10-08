@@ -32,6 +32,8 @@
     "engine:replay-decisions": "tsx src/replay-learning-decisions.ts",
     "engine:calibration-export": "tsx src/run-calibration-export.ts",
     "engine:calibration-import": "tsx src/run-calibration-import.ts",
+    "engine:recalibration": "tsx src/run-recalibration.ts",
+    "engine:recalibration-synthetic-seed": "tsx src/seed-recalibration-synthetic.ts",
     "jobs:alert-check": "tsx src/run-jobs-alert-check.ts",
     "mail:send-test": "tsx src/send-test-mail.ts",
     "test": "vitest run --fileParallelism=false",

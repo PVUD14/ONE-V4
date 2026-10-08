@@ -45,7 +45,7 @@ a model, or that model-derived output could come from, is:
 | C | A feature flag guarding an AI feature (`feature_flags`, `high_risk_direction = 'ENABLE'`) | — | **No AI flag exists.** The two flags are `employer-access.allow-free-mail` and `career-catalogue.selectable-roles`, neither high-risk | [Lever 3](#lever-3--an-ai-feature-flag-operations--feature-flags) |
 | D | The engine's AI tutoring purpose (`ai-tutoring` consent, ENG-01) and the practice tutor (`tutor.hint`, ENG-22) | **Yes**, through ONE AI Orchestration, from the outbox worker only (`tutor.hint.requested`) | Off three ways: `tutor.hint` disabled, no `ai-tutoring` definition published (HG-6), and the API/worker serve it only with `ONE_SANDBOX=true` + `ONE_AI_TUTOR_AUDIENCE=sandbox` | Lever 2 (`tutor.hint`) or the kill switch; a hint being written falls back to the written hint. See `runbook-tutor-hints-sandbox.md` |
 | E | Seeded content generation (`worker:content-generation`, consumer `learner-content-seeded-generation-v1`) | **No** — copies fixed seed content into a DRAFT; no model | Not an AI path | Not needed |
-| F | Offline calibration (`planthepath-calibration.timer`, ENG-13) and BKT in shadow (ENG-06) | **No** — statistical fitting and a formula; no LLM | Timer written, not installed | [Lever 4](#lever-4--offline-model-jobs-not-an-llm) (only if the incident is about attempt data) |
+| F | Offline recalibration (`planthepath-recalibration.timer`, ENG-13 / ENG-26) and BKT in shadow (ENG-06) | **No** — statistical fitting and a formula; no LLM | Timer written, not installed | [Lever 4](#lever-4--offline-model-jobs-not-an-llm) (only if the incident is about attempt data) |
 
 So in the pilot as built, **the only live AI path is the assistant (A)**, and it is already off
 unless someone set `ASSISTANT_ENABLED=true` on the server. Levers 2 and 3 are the procedure for
@@ -198,16 +198,17 @@ change**. No AI flag exists yet; when one does:
 
 ## Lever 4 — offline model jobs (not an LLM)
 
-The calibration job fits item statistics from de-identified, consented attempts; it calls no model
-provider. Stop it only if the incident concerns attempt data or its export:
+The monthly recalibration fits item and BKT statistics from de-identified, consented attempts; it
+calls no model provider, and it only proposes — nothing is adopted until Divakar accepts a run. Stop it
+only if the incident concerns attempt data or its export:
 
 ```
-systemctl disable --now planthepath-calibration.timer
-systemctl list-timers | grep planthepath-calibration     # nothing listed
+systemctl disable --now planthepath-recalibration.timer
+systemctl list-timers | grep planthepath-recalibration     # nothing listed
 ```
 
-Online code keeps using the last imported calibrations; a skipped week changes nothing for
-students. The timer is not installed anywhere yet (ENG-13), so today this is a no-op.
+Online code keeps using the last accepted calibrations; a skipped month changes nothing for
+students. The timer is not installed anywhere yet (ENG-26), so today this is a no-op.
 
 The BKT model runs only in shadow and in the offline report (`engine:bkt-shadow-report`); it never
 decides a band a student sees, so it has no switch to pull.

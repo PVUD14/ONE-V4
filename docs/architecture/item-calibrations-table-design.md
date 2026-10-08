@@ -4,6 +4,8 @@
 **Date:** 2026-09-28
 **Migration:** `0062_item_calibrations.sql` (`item_calibration_runs` and `item_calibrations`)
 **Rule:** Written before the migration, per the migrations rule in `AGENTS.md` and D.2 of the program
+**Superseded in part (2026-10-08, ENG-26):** the weekly, automatically imported run below is retired.
+Refits are now monthly proposals, imported only when accepted — `recalibration-runs-table-design.md`.
 **Builds on:** ADR-034 (TypeScript online, Python offline — Proposed, followed here), ADR-035 (migrations
 apply once), ADR-020 (readiness is a band), `learning-attempt-events-table-design.md` (ENG-03),
 `engine-consent-purposes-design.md` (ENG-01)

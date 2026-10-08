@@ -35,9 +35,12 @@ export function readEngineHealthWindowDays(value: unknown): EngineHealthWindowDa
   return (engineHealthWindowDays as readonly number[]).includes(parsed) ? parsed as EngineHealthWindowDays : null;
 }
 
-/** The calibration job runs weekly (ENG-13's timer); a day's grace before it is called overdue. */
-export const calibrationExpectedIntervalDays = 7;
-export const calibrationOverdueAfterDays = 8;
+/**
+ * Item calibrations are imported only when Divakar accepts the monthly recalibration (ENG-26, which
+ * replaced ENG-13's weekly auto-import): a month, plus a week to review the report, before overdue.
+ */
+export const calibrationExpectedIntervalDays = 31;
+export const calibrationOverdueAfterDays = 38;
 export type CalibrationHealthStatus = 'NO_RUN' | 'CURRENT' | 'OVERDUE';
 
 export function calibrationHealthStatus(ageDays: number | null): CalibrationHealthStatus {

@@ -180,15 +180,17 @@ The engine's tables are those listed in Part D.1 of the program plan. Checked ag
 
 - **Adds:** `item_calibration_runs`, `item_calibrations` (append-only; `item_calibrations_threshold`
   refuses `CALIBRATED` below the run's minimum responses).
-- **Written by:** `engine:calibration-import` only. **Read by:** the placement test (latest
+- **Written by:** `engine:calibration-import`, and since 0115 by an accepted or reverted
+  recalibration (`engine:recalibration accept|revert`). **Read by:** the placement test (latest
   `CALIBRATED` preferred over newer `PROVISIONAL`).
 - **Code rollback:** safe.
-- **Inert:** `systemctl disable --now planthepath-calibration.timer` (not installed yet); the
+- **Inert:** `systemctl disable --now planthepath-recalibration.timer` (not installed yet); the
   placement test keeps using the last imported calibrations. An item with no calibration row is left
   out of the placement pool, never given invented parameters.
 - **Data:** kept; runs are never rewritten.
-- **Forward fix:** a new run (`deploy/scripts/run-calibration.sh`); a bad run is superseded, not
-  deleted.
+- **Forward fix:** revert the accepted recalibration, or accept a new one
+  ([runbook-monthly-recalibration.md](runbook-monthly-recalibration.md)); a bad run is superseded,
+  not deleted.
 - **Check:** `$F engine:calibration-export --out <file>` prints counts only
   (`{"event":"engine.calibration.exported",...}`); delete the file after.
 
@@ -293,6 +295,25 @@ internal `CONTENT_REVIEW` and `CONTENT_PUBLISH` holders.
 - **Forward fix:** a new migration.
 - **Check:** `SELECT state, count(*) FROM content_revisions WHERE state = 'ARCHIVED' GROUP BY state;`
   and `SELECT count(*) FILTER (WHERE approve_solo) FROM incident_status_notices;`
+
+## 0115 — recalibration runs (ENG-26)
+
+- **Adds:** `recalibration_runs` (proposed 2PL recalibrations and BKT refits with their drift
+  report) and `recalibration_decisions` (accept / reject / revert, one each per run, in that order —
+  enforced by `recalibration_decisions_order`). Both append-only.
+- **Written by:** `engine:recalibration record` (the monthly timer) and `accept | reject | revert`
+  (Divakar). **Read by:** `engine:recalibration list | report`, and `acceptedBktParameters`, which
+  nothing on the live path calls until ENG-27.
+- **Code rollback:** safe. The previous release ignores both tables; it has no way to adopt a proposal,
+  so pending proposals simply wait. Item calibrations an accept already imported stay live (they are
+  ordinary 0062 rows).
+- **Inert:** `systemctl disable --now planthepath-recalibration.timer` (not installed yet); proposals
+  stop arriving and nothing live changes.
+- **Data:** kept; parameters and counts only, no personal data.
+- **Forward fix:** a new run; revert an accepted one
+  ([runbook-monthly-recalibration.md](runbook-monthly-recalibration.md)).
+- **Check:** `SELECT kind, verdict, count(*) FROM recalibration_runs GROUP BY 1, 2;` and
+  `SELECT decision, count(*) FROM recalibration_decisions GROUP BY 1;`
 
 ## Gaps
 

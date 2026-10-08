@@ -238,7 +238,7 @@ describe('with no engine data yet', () => {
     expect((await api().get(aiRoute).query({ days: '30' }).set(auth(operations.userId)).expect(200)).body.planner.days).toHaveLength(30);
 
     const jobs = (await api().get(jobsRoute).set(auth(security.userId)).expect(200)).body;
-    expect(jobs.calibration).toEqual({ status: 'NO_RUN', expectedIntervalDays: 7, overdueAfterDays: 8, runsRecorded: 0, lastRun: null });
+    expect(jobs.calibration).toEqual({ status: 'NO_RUN', expectedIntervalDays: 31, overdueAfterDays: 38, runsRecorded: 0, lastRun: null });
     expect(jobs.sandbox).toEqual({ state: 'NOT_BUILT', available: null, rejectedExecutions: null });
   });
 });
@@ -320,12 +320,12 @@ describe('mastery shadow comparison (learner_skill_state, mastery_projections, a
 
 describe('last calibration run and status (item_calibration_runs, item_calibrations)', () => {
   it('reports an old run as overdue and withholds a small run\'s learners and responses', async () => {
-    await calibrationRun({ ago: '10 days', learners: 3, calibrated: 2, provisional: 1 });
+    await calibrationRun({ ago: '40 days', learners: 3, calibrated: 2, provisional: 1 });
     const calibration = (await api().get(jobsRoute).set(auth(operations.userId)).expect(200)).body.calibration;
     expect(calibration.status).toBe('OVERDUE');
     expect(calibration.runsRecorded).toBe(1);
     expect(calibration.lastRun).toMatchObject({
-      algorithmId: 'item-calibration-2pl-v1', library: 'girth 0.8.0', minResponses: 30, ageDays: 10,
+      algorithmId: 'item-calibration-2pl-v1', library: 'girth 0.8.0', minResponses: 30, ageDays: 40,
       learnersRead: withheld, responsesRead: null, itemsRead: 3,
       items: { calibrated: 2, provisional: 1, provisionalByReason: { TOO_FEW_RESPONSES: 1 } },
     });

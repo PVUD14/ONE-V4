@@ -32,7 +32,7 @@ const behaviour = (over: Record<string, unknown> = {}) => ({
 });
 const jobs = (over: Record<string, unknown> = {}) => ({
   calibration: {
-    status: 'OVERDUE', expectedIntervalDays: 7, overdueAfterDays: 8, runsRecorded: 3,
+    status: 'OVERDUE', expectedIntervalDays: 31, overdueAfterDays: 38, runsRecorded: 3,
     lastRun: {
       algorithmId: 'item-calibration-2pl-v1', library: 'girth 0.8.0', minResponses: 30,
       exportedAt: '2026-09-20T20:00:00.000Z', generatedAt: '2026-09-20T21:00:00.000Z', recordedAt: '2026-09-20T22:00:00.000Z', ageDays: 10,
@@ -160,7 +160,7 @@ describe('System Health: learning engine jobs panels', () => {
   });
 
   it('shows a run that never happened as NA, and a small run\'s learners as <5', async () => {
-    jobsResponse = () => ok(jobs({ calibration: { status: 'NO_RUN', expectedIntervalDays: 7, overdueAfterDays: 8, runsRecorded: 0, lastRun: null } }));
+    jobsResponse = () => ok(jobs({ calibration: { status: 'NO_RUN', expectedIntervalDays: 31, overdueAfterDays: 38, runsRecorded: 0, lastRun: null } }));
     const { unmount } = render(<EngineJobsPanels token="t" />);
     expect(await screen.findByText('No run recorded')).toBeInTheDocument();
     const calibration = screen.getByRole('heading', { name: 'Item calibration job' }).closest('section')!;

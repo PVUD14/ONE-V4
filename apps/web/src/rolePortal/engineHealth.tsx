@@ -171,9 +171,9 @@ function ShadowSummary({ shadow }: { readonly shadow: MasteryShadowHealthDto }):
 // --- System Health: calibration job and sandbox --------------------------------------------------
 
 const calibrationStatus = {
-  NO_RUN: { label: 'No run recorded', tone: 'neutral', note: 'The weekly calibration job has never imported a run here. Every item keeps its provisional parameters.' },
-  CURRENT: { label: 'Current', tone: 'success', note: 'The last calibration run was imported within the weekly schedule.' },
-  OVERDUE: { label: 'Overdue', tone: 'warning', note: 'No run has been imported within the weekly schedule. The job may have failed: a failed run imports nothing, so it shows only as a missing run.' },
+  NO_RUN: { label: 'No run recorded', tone: 'neutral', note: 'No calibration run has been accepted and imported here. Every item keeps its provisional parameters.' },
+  CURRENT: { label: 'Current', tone: 'success', note: 'The last calibration run was accepted and imported within the monthly schedule.' },
+  OVERDUE: { label: 'Overdue', tone: 'warning', note: 'No run has been imported within the monthly schedule. The job may have failed, or its proposal is still waiting for review: either way nothing new was imported.' },
 } as const;
 
 export function EngineJobsPanels({ token }: { readonly token: string }): React.ReactElement {
@@ -203,7 +203,7 @@ export function EngineJobsPanels({ token }: { readonly token: string }): React.R
       {run && Object.keys(run.items.provisionalByReason).length
         ? <ul className="role-check-list">{Object.entries(run.items.provisionalByReason).map(([reason, count]) => <li key={reason}>{reason.toLowerCase().replaceAll('_', ' ')}: {count.toLocaleString()}</li>)}</ul>
         : null}
-      <p><small>Source: item_calibration_runs and item_calibrations. Scheduled weekly; overdue after {calibration?.overdueAfterDays ?? 8} days.</small></p>
+      <p><small>Source: item_calibration_runs and item_calibrations. Recalibrated monthly and imported only when accepted; overdue after {calibration?.overdueAfterDays ?? 38} days.</small></p>
     </section>
     <section className="role-card"><h2>Code sandbox</h2>
       <p><StatusBadge label={data?.sandbox?.state === 'NOT_BUILT' ? 'Not built' : NA} tone="neutral" /></p>

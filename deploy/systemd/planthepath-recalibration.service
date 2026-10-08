@@ -1,7 +1,7 @@
-# ENG-13: runs one item-calibration pass (deploy/scripts/run-calibration.sh).
+# ENG-26: one monthly recalibration pass (deploy/scripts/run-recalibration.sh) — proposes, never adopts.
 # Written in the repository only — not installed on any server by the agent.
 [Unit]
-Description=ONE item calibration (offline 2PL fit)
+Description=ONE monthly recalibration (2PL items and BKT skills, proposals for review)
 Documentation=https://github.com/PVUD14/planthepath-next
 After=network-online.target postgresql.service
 Wants=network-online.target
@@ -12,19 +12,20 @@ User=aight
 Group=aight
 WorkingDirectory=/srv/planthepath-next/current
 EnvironmentFile=/srv/planthepath-next/shared/app.env
-ExecStart=/usr/bin/env bash deploy/scripts/run-calibration.sh
+ExecStart=/usr/bin/env bash deploy/scripts/run-recalibration.sh
 
 # A batch job on the production host: it must never starve the API or the database.
 Nice=10
 CPUQuota=50%
 MemoryMax=1G
-TimeoutStartSec=2h
+TimeoutStartSec=4h
 
-# It needs the database and a private temporary directory, nothing else.
+# It needs the database, a private temporary directory and the report directory, nothing else.
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
+ReadWritePaths=/srv/planthepath-next/shared/recalibration-reports
 ProtectKernelTunables=true
 ProtectControlGroups=true
 RestrictSUIDSGID=true

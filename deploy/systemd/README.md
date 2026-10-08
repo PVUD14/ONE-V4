@@ -168,15 +168,17 @@ The unit runs as `aight` from `/srv/planthepath-next/current`, so it always uses
 release currently serving traffic and needs no update when a new release is switched
 in. `ReadWritePaths` grants it the storage root and nothing else.
 
-## Item calibration (ENG-13)
+## Monthly recalibration (ENG-26; replaces ENG-13's weekly calibration)
 
-Weekly (Sunday 22:00 UTC), one offline 2PL calibration run: the TypeScript export writes a
-de-identified file of first, unaided responses from students holding the live
-`model-improvement` consent; the Python job (`jobs/calibration`, girth 2PL) fits item
-difficulty and discrimination; the TypeScript import validates the result and stores it in
-`item_calibrations`. Until the engine consent purposes are published (HG-6) the export is
-empty and every run fits nothing — that is the intended fail-closed behaviour. Design:
-`docs/architecture/item-calibrations-table-design.md`.
+Monthly (the 1st, 22:00 UTC), one pass per kind — 2PL items, then BKT skills: the TypeScript
+export writes a de-identified file from students holding the live `model-improvement` consent
+plus a baseline of the parameters a refit would replace; the Python job (`jobs/calibration`)
+fits and compares; the TypeScript `record` stores the result as a **PENDING proposal** and
+writes a markdown report. **Nothing is adopted by the timer**: Divakar accepts or rejects each
+run (`docs/ops/runbook-monthly-recalibration.md`). ENG-13's weekly `planthepath-calibration`
+units, which imported every fit straight into `item_calibrations`, are removed. Until the engine
+consent purposes are published (HG-6) the exports are empty and every run fits nothing — the
+intended fail-closed behaviour. Design: `docs/architecture/recalibration-runs-table-design.md`.
 
 **Written, not installed.** Installing it is a manual step:
 
@@ -184,20 +186,25 @@ empty and every run fits nothing — that is the intended fail-closed behaviour.
 # Python 3.11 or newer; the job's pinned dependencies in their own venv.
 python3 -m venv /srv/planthepath-next/shared/calibration-venv
 /srv/planthepath-next/shared/calibration-venv/bin/pip install -r /srv/planthepath-next/current/jobs/calibration/requirements.txt
-sudo cp /srv/planthepath-next/current/deploy/systemd/planthepath-calibration.* /etc/systemd/system/
+sudo install -d -o aight -g aight -m 0750 /srv/planthepath-next/shared/recalibration-reports
+sudo cp /srv/planthepath-next/current/deploy/systemd/planthepath-recalibration.* /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now planthepath-calibration.timer
+sudo systemctl enable --now planthepath-recalibration.timer
 ```
 
-A run logs three lines of counts — never a pseudonym, user or item:
+A run logs counts only — never a pseudonym, user, item or skill:
 
 ```json
-{"event":"engine.calibration.exported","runId":"…","learners":0,"items":0,"responses":0}
+{"event":"engine.recalibration.exported","kind":"ITEM_2PL","runId":"…","learners":0,"items":0,"responses":0,"baselineItems":0}
 {"event":"engine.calibration.fitted","runId":"…","learners":0,"responses":0,"items":0,"statuses":{}}
-{"event":"engine.calibration.imported","runId":"…","imported":true,"calibrated":0,"provisional":0}
+{"event":"engine.recalibration.compared","kind":"ITEM_2PL","runId":"…","verdict":"NO_COMPARISON","counts":{…}}
+{"event":"engine.recalibration.recorded","runId":"…","kind":"ITEM_2PL","recorded":true,"verdict":"NO_COMPARISON","counts":{…}}
+{"event":"engine.recalibration.report-written","runId":"…","file":"/srv/planthepath-next/shared/recalibration-reports/…md"}
 ```
 
-`CALIBRATION_MIN_RESPONSES` in `app.env` overrides the CALIBRATED threshold (default 200).
+`CALIBRATION_MIN_RESPONSES` (default 200) and `RECALIBRATION_MIN_LEARNERS` (default 100) in
+`app.env` override the CALIBRATED / FITTED thresholds; `RECALIBRATION_KINDS` (default `items bkt`)
+limits a run to one kind.
 
 ## Content embeddings (ENG-24)
 

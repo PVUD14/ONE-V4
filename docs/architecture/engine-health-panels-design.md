@@ -129,7 +129,9 @@ HG-5, not operational health, and each extra cut is more to suppress.
   - `OVERDUE` — older than 8 days.
 
   The job is scheduled weekly (`deploy/systemd/planthepath-calibration.timer`, ENG-13); 8 days is one period
-  plus a day's grace. A failed job imports nothing, so a failure shows as the absence of a new run and becomes
+  plus a day's grace. *(2026-10-08, ENG-26: imports now happen only when a monthly recalibration is accepted;
+  the expected interval is 31 days and `OVERDUE` starts after 38 — a month plus a week of review. See
+  `recalibration-runs-table-design.md`.)* A failed job imports nothing, so a failure shows as the absence of a new run and becomes
   `OVERDUE` — the calibration job records no failure rows, and none are invented here.
 
 ## Panel 4 — Code sandbox availability and rejected executions

@@ -25,8 +25,19 @@ object Api {
     fun baseUrl(context: Context): String =
         Session.apiOverride(context).ifBlank { BuildConfig.API_BASE_URL }
 
-    class ApiException(val status: Int, val code: String?, val detail: String? = null) :
-        Exception(detail ?: "API request failed ($status${code?.let { ", $it" } ?: ""})")
+    /**
+     * A refused or failed request. [detail] is the message the server wrote for an end user;
+     * [correlationId] is the request's id, shown to a person only as a short support code
+     * (SupportCode.kt), never in full.
+     */
+    class ApiException(val status: Int, val code: String?, val detail: String? = null, val correlationId: String? = null) :
+        Exception(detail ?: "ONE could not complete that request.")
+
+    /**
+     * A plain UUID, as the web sends, so the eight-character support code a person reads out
+     * is the start of the id in the server's logs. The client is already named by X-Client.
+     */
+    private fun newCorrelationId(): String = UUID.randomUUID().toString()
 
     /**
      * @param idempotencyKey sent as Idempotency-Key where the route requires one. A retry
@@ -41,10 +52,11 @@ object Api {
     ): String =
         withContext(Dispatchers.IO) {
             val token = Session.token(context) ?: throw ApiException(401, "NO_TOKEN")
+            val correlationId = newCorrelationId()
             val builder = Request.Builder()
                 .url(baseUrl(context) + path)
                 .header("Accept", "application/json")
-                .header("X-Correlation-Id", "and-" + UUID.randomUUID())
+                .header("X-Correlation-Id", correlationId)
                 .header("X-Client", "one-android/" + BuildConfig.VERSION_NAME)
             if (idempotencyKey != null) builder.header("Idempotency-Key", idempotencyKey)
             when (method) {
@@ -73,7 +85,7 @@ object Api {
             }
             if (code !in 200..299) {
                 val parsed = runCatching { json.decodeFromString<ErrorEnvelope>(text).error }.getOrNull()
-                throw ApiException(code, parsed?.code, parsed?.message)
+                throw ApiException(code, parsed?.code, parsed?.message, parsed?.correlationId ?: correlationId)
             }
             text
         }
@@ -85,10 +97,11 @@ object Api {
     internal suspend fun requestBytes(context: Context, path: String): ByteArray =
         withContext(Dispatchers.IO) {
             val token = Session.token(context) ?: throw ApiException(401, "NO_TOKEN")
+            val correlationId = newCorrelationId()
             val builder = Request.Builder()
                 .url(baseUrl(context) + path)
                 .header("Accept", "application/pdf, application/json")
-                .header("X-Correlation-Id", "and-" + UUID.randomUUID())
+                .header("X-Correlation-Id", correlationId)
                 .header("X-Client", "one-android/" + BuildConfig.VERSION_NAME)
                 .get()
             fun run(tokenValue: String): Triple<Int, ByteArray, String> {
@@ -102,7 +115,7 @@ object Api {
             if (result.first == 401) refreshSession(context)?.let { result = run(it) }
             if (result.first !in 200..299) {
                 val parsed = runCatching { json.decodeFromString<ErrorEnvelope>(result.third).error }.getOrNull()
-                throw ApiException(result.first, parsed?.code, parsed?.message)
+                throw ApiException(result.first, parsed?.code, parsed?.message, parsed?.correlationId ?: correlationId)
             }
             result.second
         }
@@ -407,6 +420,7 @@ object Api {
         onDelta: (String) -> Unit,
     ): String = withContext(Dispatchers.IO) {
         val token = Session.token(context) ?: throw ApiException(401, "NO_TOKEN")
+        val correlationId = newCorrelationId()
         val payload = buildString {
             append("{\"persona\":")
             append(json.encodeToString(kotlinx.serialization.serializer<String>(), persona))
@@ -425,7 +439,7 @@ object Api {
             Request.Builder()
                 .url(baseUrl(context) + "/api/v1/assistant/chat")
                 .header("Authorization", "Bearer $token")
-                .header("X-Correlation-Id", "and-" + UUID.randomUUID())
+                .header("X-Correlation-Id", correlationId)
                 .header("X-Client", "one-android/" + BuildConfig.VERSION_NAME)
                 .post(payload.toRequestBody(jsonMedia))
                 .build(),
@@ -434,7 +448,7 @@ object Api {
             if (!response.isSuccessful) {
                 val text = response.body?.string() ?: ""
                 val parsed = runCatching { json.decodeFromString<ErrorEnvelope>(text).error }.getOrNull()
-                throw ApiException(response.code, parsed?.code, parsed?.message)
+                throw ApiException(response.code, parsed?.code, parsed?.message, parsed?.correlationId ?: correlationId)
             }
             val source = response.body?.source() ?: return@use ""
             val full = StringBuilder()
@@ -590,7 +604,7 @@ object Api {
 @Serializable data class ErrorEnvelope(val error: ErrorBody? = null)
 /** Only the summary is read; the roster rows themselves stay on the web Students page. */
 @Serializable data class RosterActivationEnvelope(val activationSummary: Map<String, Int>? = null)
-@Serializable data class ErrorBody(val code: String? = null, val message: String? = null)
+@Serializable data class ErrorBody(val code: String? = null, val message: String? = null, val correlationId: String? = null)
 
 /** The college academic calendar (INST-05). */
 @Serializable data class CalendarTermsEnvelope(val terms: List<CalendarTermDto> = emptyList())
@@ -728,8 +742,6 @@ internal fun NotificationDto.statusNoticeSource(): String? =
 )
 @Serializable data class StudentRelationshipWindowDto(val state: String = "", val effectiveTo: String? = null)
 
-private val alumniDate = java.time.format.DateTimeFormatter.ofPattern("d MMMM yyyy", java.util.Locale.ENGLISH)
-
 /**
  * INST-10: "Graduated from Local College on 31 May 2026" for someone who has left their college,
  * or null for a current student. The date is read in India time, as the college set it.
@@ -742,9 +754,8 @@ internal fun StudentDto.formerStudentLine(): String? {
         "TRANSFERRED" -> "Transferred from"
         else -> "Left"
     }
-    val date = relationship?.effectiveTo?.let { iso ->
-        runCatching { java.time.Instant.parse(iso).atZone(java.time.ZoneId.of("Asia/Kolkata")).format(alumniDate) }.getOrNull()
-    }
+    val date = relationship?.effectiveTo
+        ?.let { formatDate(it, fallback = "", zone = java.time.ZoneId.of("Asia/Kolkata")) }?.takeIf { it.isNotEmpty() }
     return if (date != null) "$verb $college on $date" else "$verb $college"
 }
 

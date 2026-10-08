@@ -70,6 +70,8 @@ dependencies {
     implementation("com.amazonaws:aws-android-sdk-cognitoidentityprovider:2.77.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+    // Pure JVM tests for the display helpers (labels, dates, support code, missing figures).
+    testImplementation("junit:junit:4.13.2")
     debugImplementation("androidx.compose.ui:ui-tooling")
     implementation("androidx.compose.ui:ui-tooling-preview")
 }

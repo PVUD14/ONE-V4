@@ -325,7 +325,7 @@ private fun DemoAccountScreen(onSignOut: () -> Unit) {
                 horizontalAlignment = Alignment.CenterHorizontally) {
                 IconBubble(Icons.Filled.AutoAwesome, Tone.Amber, size = 64.dp)
                 Spacer(Modifier.height(16.dp))
-                Text("This account showcases the web pilot", style = MaterialTheme.typography.titleMedium,
+                Text("This account is for the guided tour on the web", style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
                 Spacer(Modifier.height(6.dp))
                 Text("Demo accounts present a guided, fictional walkthrough at oneby8.com on the web. " +

@@ -115,7 +115,7 @@ internal fun CareerTargetPage(onClose: () -> Unit) {
             }
             when (val state = goals) {
                 is Load.Loading -> LoadingSpinner()
-                is Load.Failed -> FailedState(state.message) { reload += 1 }
+                is Load.Failed -> FailedState(state.message, state.reference) { reload += 1 }
                 is Load.Ready -> {
                     val data = state.value
                     val hasPrimary = data.goals.any { it.priority == "PRIMARY" }

@@ -96,10 +96,7 @@ private val sprintStates = mapOf("RUNNING" to "Running", "ENDED" to "Ended", "CA
 private fun countText(count: RoleCountDto): String = if (count.suppressed || count.count == null) "<5" else count.count.toString()
 private fun cellText(cells: List<RoleCellDto>, key: String): String =
     cells.firstOrNull { it.key == key }?.let { if (it.suppressed || it.count == null) "<5" else it.count.toString() } ?: "<5"
-private fun dayText(value: String): String = runCatching {
-    java.time.OffsetDateTime.parse(value).atZoneSameInstant(java.time.ZoneId.systemDefault())
-        .format(java.time.format.DateTimeFormatter.ofPattern("d MMM"))
-}.getOrDefault("NA")
+private fun dayText(value: String): String = formatDate(value)
 
 @Composable
 private fun Quiet(text: String) {
@@ -131,7 +128,7 @@ internal fun CohortByRoleSection(state: ScopedView<CohortByRoleView>) {
                 Quiet("No campus drive or sprint names a role yet. Choose a role on the web (Career Readiness or Readiness) to see where your students stand.")
             } else {
                 Text(view.role.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                Quiet((value.source ?: "") + " As at the end of ${view.period.month.ifBlank { "NA" }}; bands, never scores; groups under five read <5.")
+                Quiet((value.source ?: "") + " As at the end of ${formatMonth(view.period.month)}; bands, never scores; groups under five read <5.")
                 if (view.cohort.suppressed) Quiet("Fewer than five students: every figure is withheld.")
                 if (view.requirements.isEmpty()) Quiet("This role has no essential requirement published in ONE yet: NA.")
                 view.requirements.forEach { requirement ->

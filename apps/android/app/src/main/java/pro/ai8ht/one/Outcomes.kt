@@ -114,12 +114,12 @@ internal fun StudentOutcomesSection() {
                 Spacer(Modifier.height(10.dp))
                 Text(college.institutionName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                 Text(
-                    if (college.relationship == "GRADUATED") "Graduated ${college.graduatedOn ?: "NA"}"
+                    if (college.relationship == "GRADUATED") "Graduated ${formatDate(college.graduatedOn)}"
                     else "Studying here now — counted once your graduation is recorded",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    college.declaration?.let { "Shared: ${outcomeLabels[it.outcome] ?: "NA"} · since ${it.declaredAt?.take(10) ?: "NA"}" } ?: "Nothing shared",
+                    college.declaration?.let { "Shared: ${outcomeLabels[it.outcome] ?: "NA"} · since ${formatDate(it.declaredAt)}" } ?: "Nothing shared",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(6.dp))

@@ -204,7 +204,7 @@ internal object GrowthQueue {
 
 /** The words for a refusal the person may read later, out of context, on the "Not sent" list. */
 internal fun growthRefusalText(code: String?): String = when (code) {
-    "GROWTH_REPORT_TOO_OLD" -> "It was more than 7 days old when it reached the server, so it was not recorded."
+    "GROWTH_REPORT_TOO_OLD" -> "It was more than 7 days old when it reached ONE, so it was not recorded."
     "GROWTH_REPORT_IN_FUTURE" -> "The phone's clock put it in the future. Check the phone's date and time."
     "GROWTH_LEAD_DO_NOT_CONTACT" -> "The organisation asked not to be contacted, so no work can be logged on it."
     "GROWTH_LEAD_CLOSED" -> "The lead was closed (lost or handed off) before this arrived."
@@ -225,5 +225,5 @@ internal fun growthRefusalText(code: String?): String = when (code) {
     "GROWTH_HANDOFF_NEEDS_AGREEMENT" -> "Report the agreement signed before asking for the handoff."
     "GROWTH_CONTRACT_REFERENCE_INVALID" -> "The agreement reference was not in the expected form (letters, digits and / _ . : - only)."
     "GROWTH_HANDOFF_ALREADY_OPEN" -> "A handoff request for this lead is already open."
-    else -> "The server did not accept it."
+    else -> "ONE did not accept it."
 }

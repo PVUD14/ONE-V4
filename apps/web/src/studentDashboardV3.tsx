@@ -379,9 +379,12 @@ export function StudentDashboardV3({ studentName }: { readonly studentName: stri
 
         <StudentSupport key={token} token={token} />
 
+        {/* The band card beside the readiness factors; the factors (real cards, then the
+            topics with no evidence yet) share one wrapping grid so they fill the room they have. */}
         <div className="pilot-row v3-score-row">
-          <section className="pilot-card">
+          <section className="pilot-card v3-band-card">
             <h2>Career Readiness Band</h2>
+            <div className="v3-band-body">
             <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'nowrap' }}>
               <div style={{ minWidth: 0 }}>
                 <div>{band
@@ -398,7 +401,9 @@ export function StudentDashboardV3({ studentName }: { readonly studentName: stri
                 {index + 1}. {prettify(candidate)}{candidate === band ? ' (current)' : ''}
               </span>)}
             </div>
+            </div>
           </section>
+          <div className="v3-factor-grid">
           {masteryCards.map((mastery) => {
             const factor = factors.get(mastery.topicId);
             return <section key={mastery.id} className="pilot-card pilot-score-card">
@@ -408,8 +413,7 @@ export function StudentDashboardV3({ studentName }: { readonly studentName: stri
               {factor && plainFactorExplanation(factor.explanation) ? <small>{plainFactorExplanation(factor.explanation)}</small> : null}
             </section>
           })}
-          {masteryCards.length < 5 ? <section className="pilot-card na-strip" data-na-strip="true"
-            style={{ '--na-span': String(5 - masteryCards.length) } as React.CSSProperties}>
+          {masteryCards.length < 5 ? <section className="pilot-card na-strip" data-na-strip="true">
             <div className="pilot-card-head"><h2>Readiness factors</h2><span className="pilot-chip slate">NA</span></div>
             <ul className="na-strip-slots" aria-label="Readiness factors without a projection">
               {Array.from({ length: 5 - masteryCards.length }).map((_, index) => (
@@ -418,6 +422,7 @@ export function StudentDashboardV3({ studentName }: { readonly studentName: stri
             </ul>
             <p className="na-reason">No evidence recorded yet.</p>
           </section> : null}
+          </div>
         </div>
 
         <div className="pilot-row cols-3">

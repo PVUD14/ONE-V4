@@ -26,7 +26,7 @@ import { campusDriveStateLabels, listEmployerCampusDrives, listInstitutionCampus
 import { getPlacementStatistics, type PlacementStatisticsDto } from './api/placementRegister.js';
 import type { SuppressedCountDto } from './api/privacyOperations.js';
 import { getEmployerSummary, listEmployerInterviews, type EmployerInterviewDto, type EmployerSummaryDto } from './api/hiring.js';
-import { formatDate } from './dates.js';
+import { formatDate, formatMonth } from './dates.js';
 import { codeLabel } from './labels.js';
 
 /**
@@ -177,7 +177,7 @@ export function InstitutionDashboardV3({ institutionId, basePath }: { readonly i
             reason="Cohort band counts are not published yet — NA." />
         </section>
         <section className="pilot-card">
-          <div className="pilot-card-head"><h2>Placement Pipeline</h2><small style={{ color: 'var(--p-muted)' }}>{data.placement ? `As of ${data.placement.asOf.lastDay}` : 'NA'}</small></div>
+          <div className="pilot-card-head"><h2>Placement Pipeline</h2><small style={{ color: 'var(--p-muted)' }}>{data.placement ? `As of ${formatDate(data.placement.asOf.lastDay)}` : 'NA'}</small></div>
           <Funnel label="Placement pipeline stages" rows={[
             funnelRow('Eligible', data.placement?.overall.eligible), funnelRow('Applied', data.placement?.overall.applied),
             funnelRow('Shortlisted', data.placement?.overall.shortlisted), funnelRow('Offers', data.placement?.overall.withOffer), funnelRow('Placed', data.placement?.overall.placed),
@@ -231,10 +231,10 @@ export function InstitutionDashboardV3({ institutionId, basePath }: { readonly i
           <Spark points={(data.placement?.offersByMonth ?? []).map((entry) => entry.offers.value ?? 0)} tone="green" />
         </SuppressedChart>
         {data.placement && data.placement.offersByMonth.length ? (allMissing(data.placement.offersByMonth.map((entry) => countLabel(entry.offers)))
-          ? <NaSlotStrip card={false} label="Offers by month" slots={data.placement.offersByMonth.map((entry) => ({ label: entry.month, value: countLabel(entry.offers) }))}
+          ? <NaSlotStrip card={false} label="Offers by month" slots={data.placement.offersByMonth.map((entry) => ({ label: formatMonth(entry.month), value: countLabel(entry.offers) }))}
             reason="Every month had fewer than 5 offers." />
           : <div className="pilot-legend">{data.placement.offersByMonth.map((entry) => (
-            <div key={entry.month}><i style={{ background: '#e5eaf2' }} /> {entry.month} <span className="num"><NaValue value={countLabel(entry.offers)} /></span></div>))}</div>) : null}
+            <div key={entry.month}><i style={{ background: '#e5eaf2' }} /> {formatMonth(entry.month)} <span className="num"><NaValue value={countLabel(entry.offers)} /></span></div>))}</div>) : null}
       </section>
       <section className="pilot-card">
         <div className="pilot-card-head"><h2>Upcoming Drives</h2>{data.drives

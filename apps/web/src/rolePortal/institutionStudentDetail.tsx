@@ -19,6 +19,7 @@ import { StudentApplicationRecords } from './institution.js';
 import { PlacementStatusChip, useRosterPlacementStatus } from './institutionPlacementStatus.js';
 import { formatApiError, InstitutionWorkspaceError, isInstitutionStaffWorkspace, openPortalRecord, portalRecordFromHistory, RestrictedApiState } from './shared.js';
 import type { AuthenticatedWorkspaceSummary } from './shared.js';
+import { codeLabel } from '../labels.js';
 
 /** The history-state key the roster sets when it opens one student. */
 export const studentDetailRecordKey = 'studentProfileId';
@@ -78,7 +79,7 @@ export function InstitutionStudentDetailPage({ authenticatedWorkspace }: { reado
           <tr><th scope="row">Institution ID</th><td>{selected.institutionStudentId}</td></tr>
           <tr><th scope="row">Email</th><td>{selected.email || 'NA'}</td></tr>
           {unitLabels.map(([key, label]) => <tr key={key}><th scope="row">{label}</th><td>{unitName(selected.units?.[key])}</td></tr>)}
-          <tr><th scope="row">Relationship</th><td>{(selected.relationship?.state ?? selected.status).replaceAll('_', ' ')}</td></tr>
+          <tr><th scope="row">Relationship</th><td>{codeLabel(selected.relationship?.state ?? selected.status)}</td></tr>
           <tr><th scope="row">Relationship since</th><td>{selected.relationship?.effectiveFrom?.slice(0, 10) ?? 'NA'}</td></tr>
           <tr><th scope="row">Invitation</th><td>{selected.activation ? studentActivationLabels[selected.activation.state] : 'NA'}</td></tr>
           <tr><th scope="row">Placement status</th><td>{shared ? <PlacementStatusChip status={shared.status} /> : placement.byStudent === null && !placement.failed ? '…' : 'NA'}</td></tr>
@@ -98,7 +99,7 @@ export function InstitutionStudentDetailPage({ authenticatedWorkspace }: { reado
             <thead><tr><th>Student</th><th>Institution ID</th><th>Department</th><th>Relationship</th><th>Detail</th></tr></thead>
             <tbody>{matches.length ? matches.map((student) => <tr key={student.id}>
               <th scope="row">{student.fullName}</th><td>{student.institutionStudentId}</td><td>{unitName(student.units?.departmentUnitId)}</td>
-              <td>{(student.relationship?.state ?? student.status).replaceAll('_', ' ')}</td>
+              <td>{codeLabel(student.relationship?.state ?? student.status)}</td>
               <td><button type="button" className="secondary" aria-label={`Open detail for ${student.fullName}`} onClick={() => choose(student.id)}>Open detail</button></td>
             </tr>) : <tr><td colSpan={5}>No students match your search.</td></tr>}</tbody></table></div>}
       </section>

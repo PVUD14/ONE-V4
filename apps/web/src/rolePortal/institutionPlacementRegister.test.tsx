@@ -174,9 +174,9 @@ describe('dashboard placement widgets', () => {
     expect(pipeline).toHaveTextContent(/Eligible\s*30/);
     expect(pipeline).toHaveTextContent(/Shortlisted\s*18/);
     expect(pipeline).toHaveTextContent(/Placed\s*<5/);
-    expect(pipeline).toHaveTextContent('As of 2026-08-31');
+    expect(pipeline).toHaveTextContent('As of 31 Aug 2026');
     const trend = screen.getByRole('heading', { name: 'Offers Trend' }).closest('section')!;
-    expect(trend).toHaveTextContent('2026-08 12');
+    expect(trend).toHaveTextContent('Aug 2026 12');
   });
 
   it('draws no offers line and no pipeline bars when every figure is withheld, and names every slot as <5', async () => {
@@ -189,7 +189,7 @@ describe('dashboard placement widgets', () => {
     expect(trend.querySelector('svg polyline')).toBeNull();
     expect(within(trend).getByText(/Not enough data yet/)).toBeInTheDocument();
     const months = within(within(trend).getByRole('list', { name: 'Offers by month' })).getAllByRole('listitem');
-    expect(months.map((slot) => slot.textContent)).toEqual(['2026-04 <5', '2026-05 <5', '2026-06 <5']);
+    expect(months.map((slot) => slot.textContent)).toEqual(['Apr 2026 <5', 'May 2026 <5', 'Jun 2026 <5']);
     const pipeline = screen.getByRole('heading', { name: 'Placement Pipeline' }).closest('section')!;
     expect(pipeline.querySelector('.pilot-bar')).toBeNull();
     expect(within(within(pipeline).getByRole('list', { name: 'Placement pipeline stages' })).getAllByRole('listitem').map((slot) => slot.textContent))

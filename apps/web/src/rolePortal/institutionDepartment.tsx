@@ -46,6 +46,7 @@ import { go } from '../pilotParity/naWidgets.js';
 import { InstitutionWorkspaceError, RestrictedApiState, formatApiError, isInstitutionStaffWorkspace } from './shared.js';
 import type { AuthenticatedWorkspaceSummary } from './shared.js';
 import { supportCodeSuffix } from '../supportCode.js';
+import { PilotKpi } from '../naState.js';
 
 type WorkspaceProps = { readonly authenticatedWorkspace?: AuthenticatedWorkspaceSummary | undefined };
 
@@ -103,10 +104,7 @@ export function PageHead({ title, summary, scopeLabel }: { readonly title: strin
 
 export function Kpis({ items }: { readonly items: readonly (readonly [string, string, string, typeof Users])[] }): React.ReactElement {
   return <div className={`pilot-row cols-${items.length}`}>
-    {items.map(([label, value, tone, Icon]) => <section key={label} className="pilot-card pilot-kpi">
-      <span className={`pilot-tile ${tone}`}><Icon size={17} /></span>
-      <div><b>{value}</b><small>{label}</small></div>
-    </section>)}
+    {items.map(([label, value, tone, Icon]) => <PilotKpi key={label} icon={<Icon size={17} />} tone={tone} value={value} label={label} />)}
   </div>;
 }
 

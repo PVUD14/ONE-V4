@@ -142,7 +142,8 @@ describe('admin Placement', () => {
     const detail = await screen.findByRole('region', { name: 'Detail for Asha Local' });
     await waitFor(() => expect(within(detail).getByText('Offer')).toBeInTheDocument());
     expect(within(detail).getByText('CSE-001')).toBeInTheDocument();
-    expect(await screen.findByRole('region', { name: 'Native applications' })).toBeInTheDocument();
+    expect(within(detail).getByText('Active')).toBeInTheDocument();
+    expect(await screen.findByRole('region', { name: 'Applications on ONE' })).toBeInTheDocument();
   });
 });
 

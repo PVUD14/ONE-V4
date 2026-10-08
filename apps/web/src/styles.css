@@ -340,6 +340,10 @@
 
 .password-field { position: relative; display: block; }
 .password-field input { padding-right: 48px; }
+/* Edge (and old IE) draw their own reveal and clear buttons inside password fields; with
+   ONE's show/hide toggle that showed two eyes. ONE's toggle is the one that stays. */
+.password-field input::-ms-reveal,
+.password-field input::-ms-clear { display: none; }
 
 /* (0,2,0) outranks the application-wide solid-blue button rule at (0,1,1). */
 .login-form .password-toggle {

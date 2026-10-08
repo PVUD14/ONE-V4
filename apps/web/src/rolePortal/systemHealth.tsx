@@ -23,6 +23,9 @@ import { StatusBadge } from '../studentComponents.js';
 import { RequestApprovalDialog } from './approvals.js';
 import { EngineJobsPanels } from './engineHealth.js';
 import { formatApiError, RestrictedApiState } from './shared.js';
+import { SupportCode } from '../supportCode.js';
+import { formatDateTime } from '../dates.js';
+import { codeLabel } from '../labels.js';
 
 const NA = 'NA';
 const dayMs = 24 * 60 * 60 * 1000;
@@ -32,7 +35,7 @@ export function formatCapped(count: CappedCountDto | undefined): string {
   return count.capped ? `${count.value.toLocaleString()}+` : count.value.toLocaleString();
 }
 
-const when = (value: string | null | undefined): string => (value ? new Date(value).toLocaleString() : NA);
+const when = (value: string | null | undefined): string => (value ? formatDateTime(value) : NA);
 
 const verdictText = {
   DRAINING: { label: 'Draining', tone: 'success', note: 'Events that are due are being delivered within the alert limit.' },
@@ -129,7 +132,7 @@ export function OperationsSystemHealthPage(): React.ReactElement {
     return <section className="role-module role-module--dense">{heading}
       <div className="role-wide"><V2EmptyState icon="🔐" title="Not permitted"
         note="The background jobs console is for staff who can replay failed events. Your access has not changed."
-        hint={`Reference: ${forbiddenReference}`} /></div></section>;
+        hint={<SupportCode reference={forbiddenReference} />} /></div></section>;
   }
 
   const summary = health?.summary;
@@ -165,7 +168,7 @@ export function OperationsSystemHealthPage(): React.ReactElement {
       <V2Stat icon="⛔" tone="amber" value={formatCapped(summary?.outbox.counts.FAILED)} label="Failed events" />
       <V2Stat icon="⏳" tone="blue" value={formatCapped(summary?.outbox.counts.PENDING)} label="Waiting events" />
       <V2Stat icon="🕰️" tone="purple" value={summary?.outbox.oldestDueWaitingMinutes != null ? `${summary.outbox.oldestDueWaitingMinutes} min` : NA} label="Oldest due event waiting" />
-      <V2Stat icon="📬" tone="teal" value={summary?.worker.lastDeliveredAt ? new Date(summary.worker.lastDeliveredAt).toLocaleString() : NA} label="Last event delivered" />
+      <V2Stat icon="📬" tone="teal" value={summary?.worker.lastDeliveredAt ? formatDateTime(summary.worker.lastDeliveredAt) : NA} label="Last event delivered" />
     </div>
 
     <div className="v2-row v2-cols-2 role-wide">
@@ -219,7 +222,7 @@ export function OperationsSystemHealthPage(): React.ReactElement {
           <td><StatusBadge label={workflow.killSwitch ? 'On' : 'Off'} tone={workflow.killSwitch ? 'warning' : 'success'} /></td>
         </tr>)}</tbody></table></div> : null}
       <dl>
-        {Object.entries(summary?.automation.commandCounts ?? {}).map(([state, count]) => <div key={state}><dt>Commands {state.toLowerCase().replaceAll('_', ' ')}</dt><dd>{formatCapped(count)}</dd></div>)}
+        {Object.entries(summary?.automation.commandCounts ?? {}).map(([state, count]) => <div key={state}><dt>Commands {codeLabel(state).toLowerCase()}</dt><dd>{formatCapped(count)}</dd></div>)}
         <div><dt>Last command created</dt><dd>{when(summary?.automation.lastCommandAt)}</dd></div>
         <div><dt>Last workflow callback</dt><dd>{when(summary?.automation.lastCallbackAt)}</dd></div>
       </dl>

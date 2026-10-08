@@ -167,7 +167,7 @@ describe('college health on Analytics', () => {
   it('shows an error with its reference and NA in every stat slot', async () => {
     listResponse = () => failure(500, 'COLLEGE_HEALTH_UNAVAILABLE', 'corr-broken');
     render(<OperationsCollegeHealthPanel />);
-    expect(await screen.findByRole('alert')).toHaveTextContent('Reference: corr-broken');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Support code: corrbrok');
     expect(screen.getByText('Colleges in ONE').parentElement).toHaveTextContent('NA');
     expect(screen.getByText('Open support cases').parentElement).toHaveTextContent('NA');
   });
@@ -179,7 +179,7 @@ describe('college health on Analytics', () => {
     expect(screen.getByText('Loading college health…')).toBeInTheDocument();
     resolve(await failure(403, 'FORBIDDEN', 'corr-forbidden'));
     expect(await screen.findByText('Not permitted')).toBeInTheDocument();
-    expect(screen.getByText('Reference: corr-forbidden')).toBeInTheDocument();
+    expect(screen.getByText('Support code: corrforb')).toBeInTheDocument();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
 
@@ -261,7 +261,7 @@ describe('college account fields on Organization Detail', () => {
     policyResponse = () => failure(403, 'FORBIDDEN', 'corr-no-account');
     render(<OperationsCollegeAccountPanel />);
     expect(await screen.findByText('Not permitted')).toBeInTheDocument();
-    expect(screen.getByText('Reference: corr-no-account')).toBeInTheDocument();
+    expect(screen.getByText('Support code: corrnoac')).toBeInTheDocument();
   });
 
   it('shows an error with its reference when an account cannot load', async () => {
@@ -270,7 +270,7 @@ describe('college account fields on Organization Detail', () => {
     const select = await screen.findByLabelText('College');
     await within(select).findByText('Alpha College');
     fireEvent.change(select, { target: { value: alphaId } });
-    expect(await screen.findByRole('alert')).toHaveTextContent('Reference: corr-account-broken');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Support code: corracco');
   });
 
   it('keeps the Operations navigation labels unchanged', () => {

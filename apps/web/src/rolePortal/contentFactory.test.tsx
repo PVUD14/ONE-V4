@@ -121,7 +121,7 @@ describe('the AI drafts card', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Ask for a draft' }));
     const alert = await within(dialog).findByRole('alert');
     expect(alert.textContent).toContain("Today's limit for this AI feature is reached");
-    expect(alert.textContent).toContain('corr-refused');
+    expect(alert.textContent).toContain('Support code: corrrefu');
   });
 
   it('offers nothing to ask for when the feature is off, and says why', async () => {

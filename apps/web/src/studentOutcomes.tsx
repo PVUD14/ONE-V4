@@ -12,6 +12,8 @@
 import { useEffect, useState } from 'react';
 import { getAccessToken } from './auth.js';
 import { ApiRequestError } from './api.js';
+import { supportCodeSuffix } from './supportCode.js';
+import { formatDate } from './dates.js';
 import {
   listMyOutcomeDeclarations,
   selfReportedOutcomeLabels,
@@ -24,14 +26,14 @@ import {
 function formatDay(value: string | null): string {
   if (!value) return 'NA';
   const date = new Date(value + (value.length === 10 ? 'T00:00:00Z' : ''));
-  return Number.isNaN(date.getTime()) ? 'NA' : date.toLocaleDateString(undefined, { dateStyle: 'medium', timeZone: 'UTC' });
+  return Number.isNaN(date.getTime()) ? 'NA' : formatDate(date, { utc: true });
 }
 
 function failure(error: unknown, fallback: string): string {
   if (error instanceof ApiRequestError && error.code === 'OUTCOME_COLLEGE_NOT_ELIGIBLE') {
-    return `You can share this only with a college you study at or graduated from. Reference: ${error.correlationId}`;
+    return `You can share this only with a college you study at or graduated from.${supportCodeSuffix(error.correlationId)}`;
   }
-  return error instanceof ApiRequestError ? `${fallback} Reference: ${error.correlationId}` : fallback;
+  return error instanceof ApiRequestError ? `${fallback}${supportCodeSuffix(error.correlationId)}` : fallback;
 }
 
 export function StudentOutcomesCard(): React.ReactElement | null {

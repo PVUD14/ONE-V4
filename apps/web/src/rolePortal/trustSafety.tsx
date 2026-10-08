@@ -23,6 +23,8 @@ import { StatusBadge } from '../studentComponents.js';
 import { formatApiError, RestrictedApiState } from './shared.js';
 import { useEffect, useState } from 'react';
 import { getOperatorTrustCase, requestEmployerTrustResponse, shareEmployerTrustStatement, type OperatorTrustCaseTimelineDto } from '../api/employerTerms.js';
+import { formatDate, formatDateTime } from '../dates.js';
+import { codeLabel } from '../labels.js';
 
 export function OperationsTrustSafetyPage(): React.ReactElement {
   const token = getProtectedAccessToken();
@@ -154,7 +156,7 @@ export function OperationsTrustSafetyPage(): React.ReactElement {
           <td><StatusBadge label={signal.signalCode} tone={signal.signalCode === 'APPLICANT_PAYMENT_DEMAND' ? 'danger' : 'warning'} /></td>
           <td>{signal.opportunityVersionId}</td>
           <td>{signal.detectorVersion}</td>
-          <td>{new Date(signal.firstDetectedAt).toLocaleString()}</td>
+          <td>{formatDateTime(signal.firstDetectedAt)}</td>
           <td><button type="button" className="pilot-btn" disabled={busy === signal.id} onClick={() => void openFromSignal(signal)}>Open case</button></td>
         </tr>)}</tbody></table></div>}
     </section>
@@ -167,10 +169,10 @@ export function OperationsTrustSafetyPage(): React.ReactElement {
           <td>{record.subjectKind}</td>
           <td>{record.organizationName ?? 'Platform'}</td>
           <td><StatusBadge label={record.severity} tone={record.severity === 'CRITICAL' ? 'danger' : record.severity === 'HIGH' ? 'warning' : 'neutral'} /></td>
-          <td>{record.state}</td>
+          <td>{codeLabel(record.state)}</td>
           <td>{record.evidenceCount}{record.caseType === 'EMPLOYER_ACCOUNTABILITY'
             ? <> <button type="button" className="pilot-btn" disabled={busy === record.id} onClick={() => void readConversation(record)}>Reported conversation</button></> : null}</td>
-          <td>{new Date(record.openedAt).toLocaleDateString()}</td>
+          <td>{formatDate(record.openedAt)}</td>
           <td>{record.state === 'REPORTED'
             ? <button type="button" className="pilot-btn" disabled={busy === record.id} onClick={() => void advance(record, 'TRIAGED')}>Triage</button>
             : record.state === 'TRIAGED'
@@ -189,7 +191,7 @@ export function OperationsTrustSafetyPage(): React.ReactElement {
             what: item.authorSide === 'EMPLOYER' ? (item.kind === 'EMPLOYER_APPEAL' ? 'Employer appeal' : 'Employer response') : (item.kind === 'DECISION_SUMMARY' ? 'Decision shared with employer' : 'Concern shared with employer'),
             detail: item.body })),
         ].sort((a, b) => a.at.localeCompare(b.at)).map((row, index) => <tr key={index}>
-          <td>{new Date(row.at).toLocaleString()}</td><td>{row.what}</td><td style={{ whiteSpace: 'pre-wrap' }}>{row.detail}</td>
+          <td>{formatDateTime(row.at)}</td><td>{row.what}</td><td style={{ whiteSpace: 'pre-wrap' }}>{row.detail}</td>
         </tr>)}</tbody>
       </table></div>
       {timeline.subjectEmployerId && ['TRIAGED', 'DECIDED', 'ACTIONED', 'CLOSED', 'APPEALED'].includes(timeline.state)
@@ -209,7 +211,7 @@ export function OperationsTrustSafetyPage(): React.ReactElement {
           <thead><tr><th>From</th><th>Sent</th><th>Message</th><th>Report</th></tr></thead>
           <tbody>{thread.messages.map((message, index) => <tr key={index}>
             <td>{message.from === 'EMPLOYER' ? 'Employer' : 'Candidate'}</td>
-            <td>{new Date(message.sentAt).toLocaleString()}</td>
+            <td>{formatDateTime(message.sentAt)}</td>
             <td style={{ whiteSpace: 'pre-wrap' }}>{message.body ?? 'Erased'}{message.containsLink ? ' (contains a link)' : ''}</td>
             <td>{message.reported ? <StatusBadge label={message.reportReasonCode ?? 'REPORTED'} tone="warning" /> : null}</td>
           </tr>)}</tbody>

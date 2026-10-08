@@ -15,8 +15,9 @@ import { PilotTabs } from '../pilot/pilotOverlay.js';
 import { NaCourseTiles, NaListCard, NaRingRailCard, go } from './naWidgets.js';
 import { PublishedContentCard } from './publishedContent.js';
 import { PracticeBySkillCard } from '../studentLearning.js';
-import { Award, Building2, ClipboardCheck, Code2, Download, FileText, Flame, LineChart, Target, Trash2, Trophy } from 'lucide-react';
+import { Award, Building2, ClipboardCheck, Code2, Download, FileText, Flame, LineChart, Target, Trash2, Trophy, Wrench } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
+import { formatDate } from '../dates.js';
 
 /** Numbered slot labels for a row of widgets that has no source yet ("Practice set 1", ...). */
 function numbered(label: string, count: number): readonly string[] {
@@ -378,7 +379,7 @@ function templateName(load: ResumeLoad | null, key: ResumeTemplateKey): string {
 
 function formatDay(value: string): string {
   const date = new Date(value);
-  return Number.isFinite(date.getTime()) ? date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : value;
+  return Number.isFinite(date.getTime()) ? formatDate(date) : value;
 }
 
 // --- Institution Interventions ----------------------------------------------

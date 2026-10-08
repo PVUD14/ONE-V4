@@ -19,6 +19,7 @@ import { V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { CountBars, NaValue, SuppressionNote } from '../naState.js';
 import { StatusBadge } from '../studentComponents.js';
 import { formatApiError, RestrictedApiState } from './shared.js';
+import { SupportCode } from '../supportCode.js';
 
 const NA = 'NA';
 /** Roles listed before "Show all": the ranked head of the list; the rest stay one click away. */
@@ -110,7 +111,7 @@ export function OperationsRoleDemandPage(): React.ReactElement {
     return <section className="role-module role-module--dense">{heading}
       <div className="role-wide"><V2EmptyState icon="🔐" title="Not permitted"
         note="Role demand is for staff who hold aggregate analytics access. Your access has not changed."
-        hint={`Reference: ${forbiddenReference}`} /></div></section>;
+        hint={<SupportCode reference={forbiddenReference} />} /></div></section>;
   }
 
   return <section className="role-module role-module--dense">

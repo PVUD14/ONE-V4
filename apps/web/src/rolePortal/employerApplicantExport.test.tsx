@@ -64,7 +64,7 @@ describe('EmployerApplicantExportPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Export CSV' }));
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent(message);
-    expect(alert).toHaveTextContent('Reference: corr-export');
+    expect(alert).toHaveTextContent('Support code: correxpo');
     expect(alert).not.toHaveTextContent('upstream detail text');
     expect(anchorClick).not.toHaveBeenCalled();
   });

@@ -108,7 +108,7 @@ describe('EMP-10 employer Messages', () => {
 
     routes[`GET ${base}/applications/${applicationId}/messages`] = () => ({ status: 403, body: { error: { code: 'FORBIDDEN', correlationId: 'corr-10' } } });
     render(<EmployerConversationPanel employerId={employerId} applicationId={applicationId} />);
-    expect(await screen.findByText('This candidate no longer shares their details with you, so the conversation is closed. (reference corr-10)')).toBeInTheDocument();
+    expect(await screen.findByText('This candidate no longer shares their details with you, so the conversation is closed. Support code: corr10.')).toBeInTheDocument();
   });
 
   it('keeps the recruiter navigation labels exactly as they were', () => {
@@ -210,7 +210,7 @@ describe('EMP-10 operations: the reported conversation is the case evidence', ()
     fireEvent.click(await screen.findByRole('button', { name: 'Reported conversation' }));
     const section = await screen.findByRole('region', { name: 'Reported conversation' });
     expect(within(section).getByText('Pay the deposit at pay-now.in (contains a link)')).toBeInTheDocument();
-    expect(within(section).getByText('SCAM_OR_PAYMENT_REQUEST')).toBeInTheDocument();
+    expect(within(section).getByText('Scam or payment request')).toBeInTheDocument();
     expect(within(section).queryByRole('link')).toBeNull();
   });
 });

@@ -150,7 +150,7 @@ describe('EMP-16 employer Settings', () => {
   it('explains a suspended employer instead of an empty screen', async () => {
     routes[`GET ${base}/settings`] = () => ({ status: 403, body: { error: { code: 'EMPLOYER_ORGANISATION_INACTIVE', correlationId: 'corr-4' } } });
     showSettings();
-    expect(await screen.findByRole('alert')).toHaveTextContent('Your employer account is suspended or was not approved, so Settings is not available. Reference: corr-4');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Your employer account is suspended or was not approved, so Settings is not available. Support code: corr4');
   });
 });
 
@@ -195,7 +195,7 @@ describe('EMP-16 trust cases for the employer', () => {
     const form = within(panel).getByRole('form', { name: 'Appeal the decision' });
     fireEvent.change(within(form).getByLabelText('Why the decision should change (you can appeal once)'), { target: { value: 'Please reconsider.' } });
     fireEvent.click(within(form).getByRole('button', { name: 'Send appeal' }));
-    expect(await within(panel).findByRole('alert')).toHaveTextContent('This decision has already been appealed. Each decision can be appealed once. Reference: corr-8');
+    expect(await within(panel).findByRole('alert')).toHaveTextContent('This decision has already been appealed. Each decision can be appealed once. Support code: corr8');
   });
 
   it('shows the cases on a suspended employer\'s status page, where answering is still allowed', async () => {

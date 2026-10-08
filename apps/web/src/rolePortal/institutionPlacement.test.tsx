@@ -94,7 +94,7 @@ describe('admin Placement', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'View shared applications for Asha Local' }));
     const region = await screen.findByRole('region', { name: 'Shared applications for Asha Local' });
     expect(await within(region).findByText('Local Employer')).toBeInTheDocument();
-    expect(within(region).getByText('EXTENDED')).toBeInTheDocument();
+    expect(within(region).getByText('Extended')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'View shared applications for Ravi Local' })).not.toBeInTheDocument();
   });
 
@@ -152,7 +152,7 @@ describe('placement officer and department head', () => {
     expect(within(table).getByRole('columnheader', { name: 'Placement status' })).toBeInTheDocument();
     await waitFor(() => expect(within(within(table).getByRole('row', { name: /Asha Local/ })).getByText('Offer')).toBeInTheDocument());
     expect(within(within(table).getByRole('row', { name: /Ravi Local/ })).getByText('Nothing shared')).toBeInTheDocument();
-    expect(within(table).getByRole('row', { name: /Asha Local/ })).toHaveTextContent('2026-09-20');
+    expect(within(table).getByRole('row', { name: /Asha Local/ })).toHaveTextContent('20 Sep 2026');
   });
 
   it('the roster reads NA in the status column when the status list is refused', async () => {

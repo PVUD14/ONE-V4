@@ -39,10 +39,13 @@ import { V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { StatusBadge } from '../studentComponents.js';
 import { RequestApprovalDialog } from './approvals.js';
 import { formatApiError } from './shared.js';
+import { SupportCode } from '../supportCode.js';
+import { formatDateTime } from '../dates.js';
+import { codeLabel } from '../labels.js';
 
 const noteLimit = 500;
 const label = (value: string): string => value.split('_').map((word) => word.charAt(0) + word.slice(1).toLowerCase()).join(' ');
-const when = (value: string | null | undefined): string => (value ? new Date(value).toLocaleString() : 'NA');
+const when = (value: string | null | undefined): string => (value ? formatDateTime(value) : 'NA');
 
 /** A role's honest label: nothing is verified until an approved publish says so. */
 export function releaseLabelText(releaseLabel: string | null): string {
@@ -103,7 +106,7 @@ export function OperationsCareerCataloguePage(): React.ReactElement | null {
     return <section className="role-module role-module--dense">{heading}
       <div className="role-wide"><V2EmptyState icon="🔐" title="Not permitted"
         note="The job-role catalogue is for staff who hold Catalogue Manage, Content Review or Content Publish. Your access has not changed; the content studio below is unaffected."
-        hint={`Reference: ${forbiddenReference}`} /></div></section>;
+        hint={<SupportCode reference={forbiddenReference} />} /></div></section>;
   }
 
   const roles = [...(list?.roles ?? []), ...more];
@@ -256,7 +259,7 @@ function CatalogueRolePanel({ token, roleId, policy, onChanged, onClose }: {
     {!open && policy.viewer.manage ? <button type="button" className="secondary" onClick={() => setDialog({ kind: 'draft' })}>Start a new draft…</button> : null}
     {role.requirementSets.length ? role.requirementSets.map((set) => <article key={set.id} className="role-card" aria-label={`Requirement set v${set.version}`}>
       <div className="role-section-title"><h4>Version {set.version}</h4><StatusBadge label={label(set.state)} tone={setTone(set.state)} /></div>
-      <p><small>Drafted by {set.author.email} ({set.reasonCode}, from {set.basedOn === 'LIVE' ? 'the live requirements' : set.basedOn === 'SET' ? 'the published set' : 'nothing'}) · {when(set.createdAt)}
+      <p><small>Drafted by {set.author.email} ({codeLabel(set.reasonCode)}, from {set.basedOn === 'LIVE' ? 'the live requirements' : set.basedOn === 'SET' ? 'the published set' : 'nothing'}) · {when(set.createdAt)}
         {set.reviewer ? ` · reviewed by ${set.reviewer.email}` : ''}{set.publishedAt ? ` · published ${when(set.publishedAt)} as ${releaseLabelText(set.releaseLabelAtPublish)}` : ''}</small></p>
       {set.provenance?.source === 'AGENT_DRAFTED' ? <p><StatusBadge label="Agent-drafted" tone="warning" />{' '}
         <small>Written by {set.provenance.generatorVersion ?? 'NA'} ({set.provenance.promptVersion ?? 'NA'}){set.provenance.generatedAt ? ` · ${when(set.provenance.generatedAt)}` : ''}.

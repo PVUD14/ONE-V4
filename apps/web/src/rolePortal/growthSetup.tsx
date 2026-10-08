@@ -29,6 +29,7 @@ import {
 } from '../api.js';
 import { V2Chip, V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { formatApiError } from './shared.js';
+import { formatDate } from '../dates.js';
 
 const roleLabels: Readonly<Record<string, string>> = { EXECUTIVE: 'Executive', MANAGER: 'Manager', GROWTH_EXECUTIVE: 'Growth executive', GROWTH_MANAGER: 'Regional manager' };
 const statusLabels: Readonly<Record<string, string>> = { NEW: 'New', UNCHANGED: 'Unchanged', RENAMED: 'Renamed', ERROR: 'Error' };
@@ -123,7 +124,7 @@ export function OperationsGrowthSetupPanel(): React.ReactElement | null {
       {setup?.truncated ? <p>Showing the first 200 regions.</p> : null}
       {live.map((region) => <RegionCard key={region.id} region={region} setup={setup!} token={token} busy={busy} run={run} />)}
       {retired.length ? <details><summary>Retired regions ({retired.length})</summary><ul>
-        {retired.map((region) => <li key={region.id}>{region.name} — retired {region.retiredAt ? new Date(region.retiredAt).toLocaleDateString() : 'NA'} ({reasonLabel(region.retiredReasonCode ?? 'NA')})</li>)}
+        {retired.map((region) => <li key={region.id}>{region.name} — retired {region.retiredAt ? formatDate(region.retiredAt) : 'NA'} ({reasonLabel(region.retiredReasonCode ?? 'NA')})</li>)}
       </ul></details> : null}
     </section>
   </section>;
@@ -151,7 +152,7 @@ function DistrictImport({ setup, token, busy, run }: { readonly setup: GrowthSet
 
   return <section className="role-card role-wide" aria-label="District import"><h2>Districts (LGD import)</h2>
     <p>Districts come from the official Local Government Directory list (lgdirectory.gov.in), downloaded as CSV. Preview first: nothing is written until you commit exactly the file you previewed. Districts are never deleted; a changed name is recorded.</p>
-    <p>{last ? <>Last import: <strong>{last.filename}</strong> by {last.importedBy}{last.importedAt ? ` on ${new Date(last.importedAt).toLocaleDateString()}` : ''} — {last.created} new, {last.renamed} renamed, {last.unchanged} unchanged.</>
+    <p>{last ? <>Last import: <strong>{last.filename}</strong> by {last.importedBy}{last.importedAt ? ` on ${formatDate(last.importedAt)}` : ''} — {last.created} new, {last.renamed} renamed, {last.unchanged} unchanged.</>
       : 'No district list has been imported yet. Regions can still cover whole states.'}</p>
     <div className="role-actions">
       <label>LGD district file (CSV)<input type="file" accept=".csv,text/csv" aria-label="LGD district file" onChange={(event) => {
@@ -243,7 +244,7 @@ function RegionCard({ region, setup, token, busy, run }: {
     <h4>People</h4>
     {region.assignments.length ? <ul>{region.assignments.map((assignment) => <li key={assignment.id}>
       {assignment.email} · {roleLabels[assignment.role] ?? assignment.role}{assignment.membershipState !== 'ACTIVE' ? ` · ${reasonLabel(assignment.membershipState)}` : ''}
-      {assignment.startsAt ? ` · since ${new Date(assignment.startsAt).toLocaleDateString()}` : ''}
+      {assignment.startsAt ? ` · since ${formatDate(assignment.startsAt)}` : ''}
       {' '}<button type="button" className="pilot-btn" disabled={!endReason || busy}
         onClick={() => void run(() => endGrowthTerritoryAssignment(token, region.id, assignment.id, { reasonCode: endReason }), 'Assignment ended.')}>End</button>
     </li>)}</ul> : <p>Nobody is assigned yet.</p>}

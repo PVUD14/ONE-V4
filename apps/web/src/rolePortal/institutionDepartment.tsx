@@ -45,6 +45,7 @@ import { placementStatusLabels } from './institutionPlacementStatus.js';
 import { go } from '../pilotParity/naWidgets.js';
 import { InstitutionWorkspaceError, RestrictedApiState, formatApiError, isInstitutionStaffWorkspace } from './shared.js';
 import type { AuthenticatedWorkspaceSummary } from './shared.js';
+import { supportCodeSuffix } from '../supportCode.js';
 
 type WorkspaceProps = { readonly authenticatedWorkspace?: AuthenticatedWorkspaceSummary | undefined };
 
@@ -66,7 +67,7 @@ export const offerResponseLabels: Readonly<Record<string, string>> = {
 
 /** A load error as the screen may show it: plain words and the reference, never upstream text. */
 export function loadError(error: unknown, fallback: string): string {
-  if (error instanceof ApiRequestError && error.status === 403) return `You do not have permission to view this. Reference: ${error.correlationId}`;
+  if (error instanceof ApiRequestError && error.status === 403) return `You do not have permission to view this.${supportCodeSuffix(error.correlationId)}`;
   return formatApiError(error, fallback);
 }
 

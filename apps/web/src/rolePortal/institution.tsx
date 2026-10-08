@@ -20,6 +20,8 @@ import { PlacementStatusChip, useRosterPlacementStatus } from './institutionPlac
 import { YearEndBatchPanel } from './institutionBatchLifecycle.js';
 import { useEffect, useRef, useState } from 'react';
 import { bearerHeader } from '../sandbox.js';
+import { formatDate, formatDateTime } from '../dates.js';
+import { codeLabel, roleLabel } from '../labels.js';
 
 /** Why an invitation is being sent again; recorded with the resend (INST-01). */
 const invitationResendReasons = [
@@ -129,7 +131,7 @@ function InstitutionAdminStudentsPage({ portal, authenticatedWorkspace }: { read
     setNotice('Roster import committed.');
     setPreview(null);
   }
-  return <section className="role-module role-module--dense"><div className="role-page-heading"><div><span className="eyebrow">Authenticated API-backed</span><h1>Students</h1><p>Institution-owned roster and relationship lifecycle. This is not an Operations workflow.</p>{scopeLabel && <p>Showing students in {scopeLabel}.</p>}</div></div>
+  return <section className="role-module role-module--dense"><div className="role-page-heading"><div><span className="eyebrow">Institution</span><h1>Students</h1><p>Your college's student roster: add, import and manage each student's place in your college.</p>{scopeLabel && <p>Showing students in {scopeLabel}.</p>}</div></div>
     <div className="v2-row v2-cols-4 career-stat-strip role-wide">
       <V2Stat icon="🎓" tone="blue" value={students.length} label="Students on roster" />
       <V2Stat icon="✅" tone="green" value={students.filter((student) => (student.relationship?.state ?? student.status) === 'ACTIVE').length} label="Active" />
@@ -138,7 +140,7 @@ function InstitutionAdminStudentsPage({ portal, authenticatedWorkspace }: { read
     </div>
     {loadError ? <p className="form-error" role="alert">{loadError}</p> : null}{relationshipError ? <p className="form-error" role="alert">{relationshipError}</p> : null}{notice ? <p className="role-api-success" role="status">{notice}</p> : null}
     <form className="role-card role-wide role-management-form" onSubmit={(event) => void addStudent(event)}><h2>Add Student</h2>{studentError ? <p className="form-error" role="alert">{studentError}</p> : null}<label><span>Full name *</span><input value={form.fullName} onChange={(event) => setForm((value) => ({ ...value, fullName: event.target.value }))} required /></label><label><span>Institution ID *</span><input value={form.institutionStudentId} onChange={(event) => setForm((value) => ({ ...value, institutionStudentId: event.target.value }))} required /></label><label><span>Email *</span><input type="email" value={form.email} onChange={(event) => setForm((value) => ({ ...value, email: event.target.value }))} required /></label><UnitSelect label="Department" value={form.departmentUnitId} units={unitsByKind('DEPARTMENT')} onChange={(departmentUnitId) => setForm((value) => ({ ...value, departmentUnitId }))} /><UnitSelect label="Program" value={form.programUnitId} units={unitsByKind('PROGRAM')} onChange={(programUnitId) => setForm((value) => ({ ...value, programUnitId }))} /><UnitSelect label="Batch" value={form.batchUnitId} units={unitsByKind('BATCH')} onChange={(batchUnitId) => setForm((value) => ({ ...value, batchUnitId }))} /><UnitSelect label="Section" value={form.sectionUnitId} units={unitsByKind('SECTION')} onChange={(sectionUnitId) => setForm((value) => ({ ...value, sectionUnitId }))} /><label><span>Academic start date</span><input type="date" value={form.academicStartDate} onChange={(event) => setForm((value) => ({ ...value, academicStartDate: event.target.value }))} /></label><label><span>Expected graduation date</span><input type="date" value={form.expectedGraduationDate} onChange={(event) => setForm((value) => ({ ...value, expectedGraduationDate: event.target.value }))} /></label><button type="submit">Add student</button></form>
-    <section className="role-card role-wide"><h2>Import Students</h2>{csvError ? <p className="form-error" role="alert">{csvError}</p> : null}<p>CSV validates academic unit names, stores resolved institution unit IDs, and rejects unknown/cross-institution names.</p><textarea value={csv} onChange={(event) => setCsv(event.target.value)} rows={5} /><div className="role-record-actions"><button type="button" onClick={() => void previewImport()}>Validate CSV</button>{preview ? <button type="button" disabled={preview.rejectedCount > 0} onClick={() => void commitImport()}>Commit {preview.acceptedCount} rows</button> : null}</div>{preview ? <div><p>{preview.acceptedCount} accepted, {preview.warningCount} warnings, {preview.rejectedCount} rejected.</p><table className="role-record-table"><thead><tr><th>Row</th><th>Email</th><th>State</th><th>Resolved units</th><th>Issues</th></tr></thead><tbody>{preview.rows.map((row) => <tr key={row.rowNumber}><td>{row.rowNumber}</td><td>{row.email}</td><td>{row.state}</td><td>{[row.departmentUnitId, row.programUnitId, row.batchUnitId, row.sectionUnitId].filter(Boolean).length} IDs</td><td>{row.issues.join(', ') || 'None'}</td></tr>)}</tbody></table></div> : null}</section>
+    <section className="role-card role-wide"><h2>Import Students</h2>{csvError ? <p className="form-error" role="alert">{csvError}</p> : null}<p>Department, programme, batch and section names in the file are checked against your academic structure. Rows with names your college does not have are rejected.</p><textarea value={csv} onChange={(event) => setCsv(event.target.value)} rows={5} /><div className="role-record-actions"><button type="button" onClick={() => void previewImport()}>Validate CSV</button>{preview ? <button type="button" disabled={preview.rejectedCount > 0} onClick={() => void commitImport()}>Commit {preview.acceptedCount} rows</button> : null}</div>{preview ? <div><p>{preview.acceptedCount} accepted, {preview.warningCount} warnings, {preview.rejectedCount} rejected.</p><table className="role-record-table"><thead><tr><th>Row</th><th>Email</th><th>State</th><th>Resolved units</th><th>Issues</th></tr></thead><tbody>{preview.rows.map((row) => <tr key={row.rowNumber}><td>{row.rowNumber}</td><td>{row.email}</td><td>{codeLabel(row.state)}</td><td>{[row.departmentUnitId, row.programUnitId, row.batchUnitId, row.sectionUnitId].filter(Boolean).length} matched</td><td>{row.issues.join(', ') || 'None'}</td></tr>)}</tbody></table></div> : null}</section>
     <section className="role-card role-wide role-management-form"><h2>Student invitations</h2><p>Each student gets an invitation email when they are added or imported. Resend to anyone who has not activated yet.</p><label><span>Reason for resending</span><select value={resendReason} onChange={(event) => setResendReason(event.target.value)}>{invitationResendReasons.map(([code, label]) => <option key={code} value={code}>{label}</option>)}</select></label><div className="role-record-actions"><button type="button" onClick={() => void resend({ all: true })}>Resend to all students not yet activated</button></div></section>
     <YearEndBatchPanel token={token} institutionId={institutionId} units={units} onChanged={(message) => { setRelationshipError(''); setNotice(message); }} />
     <section className="role-card role-wide"><h2>Search students</h2><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search name, email, or institution ID" /></section>
@@ -179,14 +181,14 @@ export function InstitutionAcademicStructurePage({ portal, authenticatedWorkspac
       setError('Academic unit update failed.');
     }
   }
-  return <section className="role-module role-module--dense"><div className="role-page-heading"><div><span className="eyebrow">Authenticated API-backed</span><h1>Academic Structure</h1><p>{canManage ? "Manage institution-scoped departments, programs, batches, sections and campuses. Parent choices are institution-scoped." : "View institution-scoped departments, programs, batches, sections and campuses."}</p></div></div>
+  return <section className="role-module role-module--dense"><div className="role-page-heading"><div><span className="eyebrow">Institution</span><h1>Academic Structure</h1><p>{canManage ? "Manage your college's departments, programmes, batches, sections and campuses." : "Your college's departments, programmes, batches, sections and campuses."}</p></div></div>
     <div className="v2-row v2-cols-4 career-stat-strip role-wide">
       <V2Stat icon="🏛️" tone="blue" value={units.filter((unit) => unit.kind === 'DEPARTMENT').length} label="Departments" />
       <V2Stat icon="🎓" tone="purple" value={units.filter((unit) => unit.kind === 'PROGRAM').length} label="Programs" />
       <V2Stat icon="📅" tone="green" value={units.filter((unit) => unit.kind === 'BATCH').length} label="Batches" />
       <V2Stat icon="🧩" tone="amber" value={units.filter((unit) => ['SECTION', 'CAMPUS'].includes(unit.kind)).length} label="Sections and campuses" />
     </div>
-    {notice ? <p className="role-api-success" role="status">{notice}</p> : null}{error ? <p className="form-error" role="alert">{error}</p> : null}{canManage ? <form className="role-card role-wide role-management-form" onSubmit={(event) => void create(event)}><h2>Add academic unit</h2><label><span>Kind</span><select value={form.kind} onChange={(event) => setForm((value) => ({ ...value, kind: event.target.value }))}><option>DEPARTMENT</option><option>PROGRAM</option><option>BATCH</option><option>SECTION</option><option>CAMPUS</option></select></label><label><span>Name</span><input value={form.name} onChange={(event) => setForm((value) => ({ ...value, name: event.target.value }))} required /></label><UnitSelect label="Parent unit" value={form.parentUnitId} units={units} onChange={(parentUnitId) => setForm((value) => ({ ...value, parentUnitId }))} /><button type="submit">Create unit</button></form> : null}<div className="role-record-table-wrap"><table className="role-record-table"><caption className="sr-only">{portal.roleName} academic units</caption><thead><tr><th>Name</th><th>Kind</th><th>Parent</th><th>Action</th></tr></thead><tbody>{units.map((unit) => <tr key={unit.id}><th>{unit.name}</th><td>{unit.kind}</td><td>{units.find((candidate) => candidate.id === unit.parentUnitId)?.name ?? 'Institution'}</td><td>{canManage ? <button type="button" className="secondary" onClick={() => void edit(unit)}>Edit unit</button> : "NA"}</td></tr>)}</tbody></table></div></section>;
+    {notice ? <p className="role-api-success" role="status">{notice}</p> : null}{error ? <p className="form-error" role="alert">{error}</p> : null}{canManage ? <form className="role-card role-wide role-management-form" onSubmit={(event) => void create(event)}><h2>Add academic unit</h2><label><span>Kind</span><select value={form.kind} onChange={(event) => setForm((value) => ({ ...value, kind: event.target.value }))}><option>DEPARTMENT</option><option>PROGRAM</option><option>BATCH</option><option>SECTION</option><option>CAMPUS</option></select></label><label><span>Name</span><input value={form.name} onChange={(event) => setForm((value) => ({ ...value, name: event.target.value }))} required /></label><UnitSelect label="Parent unit" value={form.parentUnitId} units={units} onChange={(parentUnitId) => setForm((value) => ({ ...value, parentUnitId }))} /><button type="submit">Create unit</button></form> : null}<div className="role-record-table-wrap"><table className="role-record-table"><caption className="sr-only">{portal.roleName} academic units</caption><thead><tr><th>Name</th><th>Kind</th><th>Parent</th><th>Action</th></tr></thead><tbody>{units.map((unit) => <tr key={unit.id}><th>{unit.name}</th><td>{codeLabel(unit.kind)}</td><td>{units.find((candidate) => candidate.id === unit.parentUnitId)?.name ?? 'Institution'}</td><td>{canManage ? <button type="button" className="secondary" onClick={() => void edit(unit)}>Edit unit</button> : "NA"}</td></tr>)}</tbody></table></div></section>;
 }
 
 export function InstitutionStaffPage({ portal: _portal, authenticatedWorkspace }: { readonly portal: RolePortalConfig; readonly authenticatedWorkspace?: AuthenticatedWorkspaceSummary | undefined }): React.ReactElement {
@@ -240,7 +242,7 @@ export function InstitutionStaffPage({ portal: _portal, authenticatedWorkspace }
   function editScope(membershipId: string, current: StaffUnitScopeDto | undefined, change: Partial<StaffUnitScopeDto>): void {
     setScopeEdits((edits) => ({ ...edits, [membershipId]: { departmentUnitId: current?.departmentUnitId ?? null, batchUnitId: current?.batchUnitId ?? null, ...edits[membershipId], ...change } }));
   }
-  return <section className="role-module role-module--dense"><div className="role-page-heading"><div><span className="eyebrow">Authenticated API-backed</span><h1>Staff</h1><p>Invite institution staff through the verified-recipient invitation lifecycle. This screen does not attach arbitrary global user IDs.</p></div></div>
+  return <section className="role-module role-module--dense"><div className="role-page-heading"><div><span className="eyebrow">Institution</span><h1>Staff</h1><p>Invite staff by email. Each person accepts their own invitation before they can sign in.</p></div></div>
     <div className="v2-row v2-cols-4 career-stat-strip role-wide">
       <V2Stat icon="👥" tone="teal" value={staff?.memberships?.length ?? 0} label="Active memberships" />
       <V2Stat icon="✉️" tone="amber" value={(staff?.invitations ?? []).filter((invite) => invite.state === 'PENDING').length} label="Pending invitations" />
@@ -257,12 +259,12 @@ export function InstitutionStaffPage({ portal: _portal, authenticatedWorkspace }
       <button type="submit">Send staff invitation</button>
     </form>
     <section className="role-card role-wide"><h2>Staff onboarding boundary</h2><ul className="role-check-list"><li>Allowed roles: PLACEMENT_ADMIN, DEPARTMENT_HEAD, FACULTY_LECTURER.</li><li>No platform, employer or self-escalation role is exposed.</li><li>The recipient must authenticate with a verified matching email before membership is created.</li><li>A department or batch scope limits which students the staff member sees. Without one, a placement admin or department head sees the whole institution; a lecturer sees the students of their teaching assignments once your college records any.</li></ul></section>
-    <section className="role-card role-wide"><h2>Staff invitations</h2>{staff?.invitations?.length ? <table className="role-record-table"><thead><tr><th>Email</th><th>Role</th><th>State</th><th>Delivery</th><th>Expires</th></tr></thead><tbody>{staff.invitations.map((invite) => <tr key={invite.id}><td>{invite.email}</td><td>{invite.role}{invite.scope && (invite.scope.departmentUnitId || invite.scope.batchUnitId) ? <span>{scopeLabel(invite.scope)}</span> : null}</td><td>{invite.state}</td><td>{invite.delivery?.state ?? 'Pending command'}</td><td>{new Date(invite.expiresAt).toLocaleDateString()}</td></tr>)}</tbody></table> : <p>No staff invitations yet.</p>}</section>
+    <section className="role-card role-wide"><h2>Staff invitations</h2>{staff?.invitations?.length ? <table className="role-record-table"><thead><tr><th>Email</th><th>Role</th><th>State</th><th>Delivery</th><th>Expires</th></tr></thead><tbody>{staff.invitations.map((invite) => <tr key={invite.id}><td>{invite.email}</td><td>{roleLabel(invite.role)}{invite.scope && (invite.scope.departmentUnitId || invite.scope.batchUnitId) ? <span>{scopeLabel(invite.scope)}</span> : null}</td><td>{codeLabel(invite.state)}</td><td>{invite.delivery?.state ? codeLabel(invite.delivery.state) : 'Not sent yet'}</td><td>{formatDate(invite.expiresAt)}</td></tr>)}</tbody></table> : <p>No staff invitations yet.</p>}</section>
     <section className="role-card role-wide role-management-form"><h2>Active staff memberships</h2>
       <label><span>Reason for scope change</span><select value={scopeReason} onChange={(event) => setScopeReason(event.target.value)}>{staffScopeReasons.map(([code, label]) => <option key={code} value={code}>{label}</option>)}</select></label>
       {staff?.memberships?.length ? <table className="role-record-table"><thead><tr><th>Email</th><th>Role</th><th>State</th><th>Scope</th><th>Actions</th></tr></thead><tbody>{staff.memberships.map((member) => {
         const edit = scopeEdits[member.id] ?? { departmentUnitId: member.scope?.departmentUnitId ?? null, batchUnitId: member.scope?.batchUnitId ?? null };
-        return <tr key={member.id}><td>{member.email}</td><td>{member.role}</td><td>{member.state}</td><td>{scopeLabel(member.scope)}</td><td><div className="role-record-actions">
+        return <tr key={member.id}><td>{member.email}</td><td>{roleLabel(member.role)}</td><td>{codeLabel(member.state)}</td><td>{scopeLabel(member.scope)}</td><td><div className="role-record-actions">
           <select aria-label={`Department for ${member.email}`} value={edit.departmentUnitId ?? ''} onChange={(event) => editScope(member.id, member.scope, { departmentUnitId: event.target.value || null })}><option value="">None</option>{departmentChoices(member.role).map((unit) => <option key={unit.id} value={unit.id}>{unit.name}</option>)}</select>
           {member.role !== 'DEPARTMENT_HEAD' ? <select aria-label={`Batch for ${member.email}`} value={edit.batchUnitId ?? ''} onChange={(event) => editScope(member.id, member.scope, { batchUnitId: event.target.value || null })}><option value="">None</option>{batchChoices.map((unit) => <option key={unit.id} value={unit.id}>{unit.name}</option>)}</select> : null}
           <button type="button" className="secondary" onClick={() => void saveScope(member.id, member.scope)}>Save scope</button>
@@ -282,7 +284,7 @@ const staffScopeReasons = [
 ] as const;
 
 export function UnitSelect({ label, value, units, onChange }: { readonly label: string; readonly value: string; readonly units: readonly InstitutionUnitDto[]; readonly onChange: (value: string) => void }): React.ReactElement {
-  return <label><span>{label}</span><select value={value} onChange={(event) => onChange(event.target.value)}><option value="">None</option>{units.map((unit) => <option key={unit.id} value={unit.id}>{unit.kind}: {unit.name}</option>)}</select></label>;
+  return <label><span>{label}</span><select value={value} onChange={(event) => onChange(event.target.value)}><option value="">None</option>{units.map((unit) => <option key={unit.id} value={unit.id}>{codeLabel(unit.kind)}: {unit.name}</option>)}</select></label>;
 }
 
 export function cleanStudentPayload(form: Record<string, string>): InstitutionStudentCreateRequest {
@@ -441,7 +443,7 @@ function StaffActionWorkflow({ token, institutionId, type, title, routeLabel }: 
         <label>Filter student<select value={filters.studentUserId} disabled={busy} onChange={(event) => setFilters({ ...filters, studentUserId: event.target.value })}>
           <option value="">All students in scope</option>{(records?.students ?? []).map((student) => <option key={student.id} value={student.id}>{student.name}</option>)}</select></label>
         <label>Filter state<select value={filters.state} disabled={busy} onChange={(event) => setFilters({ ...filters, state: event.target.value })}>
-          <option value="">All states</option>{['DRAFT', 'UNDER_REVIEW', 'APPROVED', 'REJECTED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'ARCHIVED'].map((state) => <option key={state} value={state}>{state.replaceAll('_', ' ')}</option>)}</select></label>
+          <option value="">All states</option>{['DRAFT', 'UNDER_REVIEW', 'APPROVED', 'REJECTED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'ARCHIVED'].map((state) => <option key={state} value={state}>{codeLabel(state)}</option>)}</select></label>
         <label>Filter responsibility<select value={filters.assigneeMembershipId} disabled={busy} onChange={(event) => setFilters({ ...filters, assigneeMembershipId: event.target.value })}>
           <option value="">All responsible staff</option>{(records?.assignees ?? []).map((staff) => <option key={staff.id} value={staff.id}>{staff.name}</option>)}</select></label>
         {type === 'MEETING' ? <label>Meeting period<select value={filters.period} disabled={busy} onChange={(event) => setFilters({ ...filters, period: event.target.value })}><option value="">All meetings</option><option value="upcoming">Upcoming or ongoing</option><option value="past">Past</option></select></label> : null}
@@ -469,12 +471,12 @@ function StaffActionWorkflow({ token, institutionId, type, title, routeLabel }: 
     {!records ? <p role="status">{error ? 'Records unavailable.' : 'Loading records…'}</p> : !actions.length ? <section className="role-card role-wide"><p>No records match your current scope and filters.</p></section> :
       actions.map((action) => <article className="role-card role-wide" key={action.id}>
         <h3>{action.title}</h3><p>{action.studentName ?? 'Staff meeting'} · Responsible: {action.ownerName}</p>
-        <p>Author: {action.authorName} · Staff only · {action.state.replaceAll('_', ' ')}</p>
+        <p>Author: {action.authorName} · Staff only · {codeLabel(action.state)}</p>
         {action.note ? <p>{action.note}</p> : null}
-        {action.dueAt ? <p>Due: {new Date(action.dueAt).toLocaleString()}</p> : null}
-        {action.scheduledStartAt && action.scheduledEndAt ? <p>Meeting: {new Date(action.scheduledStartAt).toLocaleString()} — {new Date(action.scheduledEndAt).toLocaleString()}</p> : null}
+        {action.dueAt ? <p>Due: {formatDateTime(action.dueAt)}</p> : null}
+        {action.scheduledStartAt && action.scheduledEndAt ? <p>Meeting: {formatDateTime(action.scheduledStartAt)} — {formatDateTime(action.scheduledEndAt)}</p> : null}
         {action.outcomeNote ? <p>Outcome: {action.outcomeNote}</p> : null}
-        {action.reviewerName && action.lastReviewedAt ? <p>Reviewed by {action.reviewerName} on {new Date(action.lastReviewedAt).toLocaleString()}</p> : null}
+        {action.reviewerName && action.lastReviewedAt ? <p>Reviewed by {action.reviewerName} on {formatDateTime(action.lastReviewedAt)}</p> : null}
         {action.canEdit ? <button type="button" className="secondary" disabled={busy} onClick={() => {
           setEditing(action); setShowForm(true); setForm({ ...emptyForm, title: action.title, note: action.note ?? '', dueAt: localDate(action.dueAt) });
         }}>Edit task</button> : null}
@@ -485,7 +487,7 @@ function StaffActionWorkflow({ token, institutionId, type, title, routeLabel }: 
               setError('Add a review or outcome note before this action.'); return;
             }
             void save({ version: action.version, toState: state, note: reasons[action.id] ?? null }, '/' + encodeURIComponent(action.id) + '/transition');
-          }}>{workflowTransitions[state] ?? state.replaceAll('_', ' ')}</button>)}</div>
+          }}>{workflowTransitions[state] ?? codeLabel(state)}</button>)}</div>
         </> : null}
       </article>)}
   </section></div><aside className="pilot-rail">
@@ -544,7 +546,7 @@ function PlacementStudentRoster({ token, institutionId, eyebrow = 'Institution p
       <label>Batch<select value={filters.batch} onChange={(event) => setFilters({ ...filters, batch: event.target.value })}><option value="">All batches</option>
         {(data?.units ?? []).filter((unit) => unit.kind === 'BATCH').map((unit) => <option key={unit.id} value={unit.id}>{unit.name}</option>)}</select></label>
       <label>Status<select value={filters.status} onChange={(event) => setFilters({ ...filters, status: event.target.value })}><option value="">All statuses</option>
-        {[...new Set((data?.students ?? []).map((student) => student.relationship?.state ?? student.status))].sort().map((state) => <option key={state} value={state}>{state.replaceAll('_', ' ')}</option>)}</select></label>
+        {[...new Set((data?.students ?? []).map((student) => student.relationship?.state ?? student.status))].sort().map((state) => <option key={state} value={state}>{codeLabel(state)}</option>)}</select></label>
       <button type="button" onClick={() => { setSelectedStudentId(''); setRefresh((value) => value + 1); }}>Refresh roster</button>
     </section>
     {error ? <p className="form-error" role="alert">{error}</p> : null}
@@ -554,10 +556,10 @@ function PlacementStudentRoster({ token, institutionId, eyebrow = 'Institution p
         <tbody>{students.length ? students.map((student) => {
           const shared = student.studentUserId ? placement.byStudent?.get(student.studentUserId) : undefined;
           return <tr key={student.id}><th>{student.fullName}</th><td>{student.institutionStudentId}</td>
-          <td>{unitName(student.units?.departmentUnitId)}</td><td>{unitName(student.units?.batchUnitId)}</td><td>{(student.relationship?.state ?? student.status).replaceAll('_', ' ')}</td>
+          <td>{unitName(student.units?.departmentUnitId)}</td><td>{unitName(student.units?.batchUnitId)}</td><td>{codeLabel(student.relationship?.state ?? student.status)}</td>
           <td>NA</td><td>{shared ? <PlacementStatusChip status={shared.status} /> : placement.byStudent === null ? '…' : 'NA'}</td>
           <td>{student.studentUserId ? <button type="button" className="secondary" aria-label={'View applications for ' + student.fullName} onClick={() => setSelectedStudentId(student.id)}>View applications</button> : 'NA'}</td>
-          <td>{shared?.lastSharedActivityAt?.slice(0, 10) ?? 'NA'}</td></tr>;
+          <td>{formatDate(shared?.lastSharedActivityAt)}</td></tr>;
         }) : <tr><td colSpan={9}>No students match your scope and filters.</td></tr>}</tbody>
       </table></div>}
     {selectedStudent?.studentUserId ? <section className="role-card role-wide" aria-label={'Shared applications for ' + selectedStudent.fullName}>
@@ -584,7 +586,7 @@ export function StudentApplicationRecords({ token, institutionId, studentUserId,
   const [rows, setRows] = useState<readonly { id: string; company: string; title: string; stage: string; date: string | null; detail: string }[] | null>(null);
   const [error, setError] = useState('');
   const [refresh, setRefresh] = useState(0);
-  const title = external ? 'Student-declared external applications (unverified)' : 'Native applications';
+  const title = external ? 'Student-declared external applications (unverified)' : 'Applications on ONE';
   useEffect(() => {
     const controller = new AbortController();
     setRows(null); setError('');
@@ -598,12 +600,12 @@ export function StudentApplicationRecords({ token, institutionId, studentUserId,
             throw new Error('Invalid external declaration response');
           }
           setRows(result.externalApplications.map((row) => ({ id: row.id, company: row.companyName, title: row.roleTitle,
-            stage: row.stage.replaceAll('_', ' ') + ' (student-declared)', date: row.appliedOn, detail: row.sourceKind.replaceAll('_', ' ') })));
+            stage: codeLabel(row.stage) + ' (student-declared)', date: row.appliedOn, detail: codeLabel(row.sourceKind) })));
         } else {
           if (!Array.isArray(result.applications)) throw new Error('Invalid native application response');
           setRows(result.applications.map((row) => ({ id: row.id, company: row.employer.name, title: row.opportunityTitle,
-            stage: row.state.replaceAll('_', ' '), date: row.submittedAt ?? row.createdAt,
-            detail: row.offer.exists ? row.offer.responseState?.replaceAll('_', ' ') ?? 'NA' : 'No offer' })));
+            stage: codeLabel(row.state), date: row.submittedAt ?? row.createdAt,
+            detail: row.offer.exists ? codeLabel(row.offer.responseState) : 'No offer' })));
         }
       })
       .catch((cause: unknown) => { if (!controller.signal.aborted) setError(workflowError(cause)); });
@@ -611,15 +613,15 @@ export function StudentApplicationRecords({ token, institutionId, studentUserId,
   }, [token, institutionId, studentUserId, external, refresh]);
   return <section className="role-card role-wide" aria-label={title}>
     <h3>{title}</h3>
-    {external ? <p>These are unverified student declarations. A declared HIRED is not a verified placement and does not contribute to native or placement metrics.</p> : null}
-    <p>{external ? 'Shared external declarations shown' : 'Shared native applications shown'}: <strong>{rows === null ? 'NA' : rows.length}</strong></p>
-    <button type="button" className="secondary" onClick={() => setRefresh((value) => value + 1)}>Refresh {external ? 'external declarations' : 'native applications'}</button>
-    {error ? <p className="form-error" role="alert">{error}</p> : rows === null ? <p role="status">Loading {external ? 'external declarations' : 'native applications'}…</p> :
-      rows.length === 0 ? <p>No {external ? 'external declarations' : 'native applications'} are shared and available in this scope.</p> :
+    {external ? <p>These are unverified student declarations. A declared hire is not a verified placement and is not counted in placement figures.</p> : null}
+    <p>{external ? 'Shared external declarations shown' : 'Shared applications on ONE shown'}: <strong>{rows === null ? 'NA' : rows.length}</strong></p>
+    <button type="button" className="secondary" onClick={() => setRefresh((value) => value + 1)}>Refresh {external ? 'external declarations' : 'applications on ONE'}</button>
+    {error ? <p className="form-error" role="alert">{error}</p> : rows === null ? <p role="status">Loading {external ? 'external declarations' : 'applications on ONE'}…</p> :
+      rows.length === 0 ? <p>No {external ? 'external declarations' : 'applications on ONE'} are shared and available in this scope.</p> :
         <div className="role-record-table-wrap"><table className="role-record-table"><caption>{title}</caption>
           <thead><tr><th>Company</th><th>Role</th><th>Stage</th><th>Applied</th><th>{external ? 'Declared source' : 'Offer response'}</th></tr></thead>
           <tbody>{rows.map((row) => <tr key={row.id}><th>{row.company}</th><td>{row.title}</td><td>{row.stage}</td>
-            <td>{row.date?.slice(0, 10) ?? 'NA'}</td><td>{row.detail}</td></tr>)}</tbody>
+            <td>{formatDate(row.date)}</td><td>{row.detail}</td></tr>)}</tbody>
         </table></div>}
   </section>;
 }

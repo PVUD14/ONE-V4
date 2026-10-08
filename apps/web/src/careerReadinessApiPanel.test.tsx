@@ -79,7 +79,7 @@ describe('API-backed Career Readiness surfaces', () => {
     render(<OperationsCareerReadinessPanel />);
     await waitFor(() => expect(screen.getByText('11 quarantined records.')).toBeInTheDocument());
     expect(screen.getByText('1 workflow')).toBeInTheDocument();
-    expect(screen.getByText(/No source database, event payload, recipient address, or secret/)).toBeInTheDocument();
+    expect(screen.getByText(/Source data, message contents, recipient addresses and secrets are never shown here/)).toBeInTheDocument();
   });
 });
 

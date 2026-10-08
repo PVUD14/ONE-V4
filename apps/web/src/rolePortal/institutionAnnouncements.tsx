@@ -21,6 +21,8 @@ import type { AnnouncementAudienceDto, AnnouncementChannel, InstitutionAnnouncem
 import { V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { InstitutionWorkspaceError, RestrictedApiState, formatApiError, isInstitutionStaffWorkspace } from './shared.js';
 import type { AuthenticatedWorkspaceSummary } from './shared.js';
+import { supportCodeSuffix } from '../supportCode.js';
+import { formatDateTime } from '../dates.js';
 
 /** Why a scheduled announcement is cancelled; recorded with it. */
 export const announcementCancelReasons = [
@@ -39,7 +41,7 @@ export function audienceLabel(audience: AnnouncementAudienceDto): string {
 }
 
 function when(value: string | null): string {
-  return value ? new Date(value).toLocaleString() : 'NA';
+  return value ? formatDateTime(value) : 'NA';
 }
 
 export function announcementStateLabel(announcement: InstitutionAnnouncementDto): string {
@@ -74,8 +76,8 @@ function errorMessage(error: unknown, fallback: string): string {
       INVALID_AUDIENCE: 'Choose who the announcement is for.',
     };
     const message = error.code ? known[error.code] : undefined;
-    if (message) return `${message} Reference: ${error.correlationId}`;
-    if (error.status === 403) return `You cannot send an announcement to that group. Reference: ${error.correlationId}`;
+    if (message) return `${message}${supportCodeSuffix(error.correlationId)}`;
+    if (error.status === 403) return `You cannot send an announcement to that group.${supportCodeSuffix(error.correlationId)}`;
   }
   return formatApiError(error, fallback);
 }

@@ -165,6 +165,6 @@ describe('EMP-06 eligibility, skills and stages on Opportunity Detail', () => {
     show();
     fireEvent.click(within(await screen.findByRole('region', { name: 'Eligibility, skills and stages' })).getByRole('button', { name: 'Edit eligibility, skills and stages' }));
     fireEvent.click(within(screen.getByRole('form', { name: 'Edit eligibility, skills and stages' })).getByRole('button', { name: 'Save new version' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('A rule cannot refer to gender, religion, caste, age, disability, marital status, region of origin or a photo. Reference: corr-400');
+    expect(await screen.findByRole('alert')).toHaveTextContent('A rule cannot refer to gender, religion, caste, age, disability, marital status, region of origin or a photo. Support code: corr400');
   });
 });

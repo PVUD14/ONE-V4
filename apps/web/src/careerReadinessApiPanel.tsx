@@ -15,6 +15,7 @@ import {
 } from './api.js';
 import { V2EmptyState, V2Stat } from './dashboardsV2.js';
 import { lessonTextProps } from './lessonScript.js';
+import { formatDate, formatDateTime } from './dates.js';
 
 type CareerRoute = 'readiness' | 'skills' | 'assessments' | 'learning' | 'roadmap' | 'notifications';
 
@@ -34,12 +35,12 @@ export function CareerReadinessApiPanel({ route }: { readonly route: CareerRoute
       if (token) {
         const state = await getLearnerCareerReadinessState(token, signal);
         setLearner(state);
-        setStatus('API-backed learner state is current.');
+        setStatus('Your progress is up to date.');
       } else {
-        setStatus('Published API content is available. Sign in to record learner progress.');
+        setStatus('Sign in to save your progress.');
       }
     } catch {
-      setStatus('Career Readiness API is unavailable. The demo preview below remains read-only and separate.');
+      setStatus('Career Readiness could not be loaded right now. Try again shortly.');
     }
   }
 
@@ -55,7 +56,7 @@ export function CareerReadinessApiPanel({ route }: { readonly route: CareerRoute
     try {
       await completeCareerReadinessLesson(token, lessonId);
       await refresh();
-      setStatus('Lesson completion and evidence were committed by the API.');
+      setStatus('Lesson completed and added to your evidence.');
     } catch (error) {
       // Prefer the API's named reason ("finish \"X\" first") over a generic line.
       if (error instanceof ApiRequestError && error.detail) {
@@ -120,8 +121,8 @@ export function CareerReadinessApiPanel({ route }: { readonly route: CareerRoute
   return (
     <section className="career-api-panel" aria-labelledby="career-api-title">
       <div className="career-api-heading">
-        <div><span className="eyebrow">Published API content</span><h2 id="career-api-title">Career Readiness Fundamentals</h2></div>
-        <span className={`career-api-state ${catalog ? 'connected' : 'unavailable'}`}>{catalog ? 'API-backed' : 'API unavailable'}</span>
+        <div><span className="eyebrow">Career Readiness</span><h2 id="career-api-title">Career Readiness Fundamentals</h2></div>
+        <span className={`career-api-state ${catalog ? 'connected' : 'unavailable'}`}>{catalog ? 'Up to date' : 'Unavailable'}</span>
       </div>
       <p className="career-api-status" role="status" aria-live="polite">{status}</p>
       {route === 'learning' ? <LearningApiView catalog={learner ? learner.catalog : catalog} learner={learner} token={token} busy={busy}
@@ -134,7 +135,7 @@ export function CareerReadinessApiPanel({ route }: { readonly route: CareerRoute
       {route === 'skills' ? <SkillsApiView learner={learner} /> : null}
       {route === 'roadmap' ? <RoadmapApiView learner={learner} /> : null}
       {route === 'notifications' ? <NotificationsApiView learner={learner} /> : null}
-      <p className="career-api-boundary">Named bands are advisory, never employer-visible, and derived only from versioned ONE evidence. The preview content below is not written to the API.</p>
+      <p className="career-api-boundary">Readiness bands are advice for you. They are never shown to employers and come only from the evidence you build in ONE.</p>
     </section>
   );
 }
@@ -189,7 +190,7 @@ function AssessmentApiView({ catalog, learner, token, busy, attempt, selectedOpt
   readonly onSelect: (questionId: string, optionId: string) => void; readonly onStart: (assessmentId: string) => void; readonly onSubmit: () => void;
 }): React.ReactElement {
   if (attempt) return <form className="career-assessment-form" onSubmit={(event) => { event.preventDefault(); void onSubmit(); }}>
-    <p>Expires {new Date(attempt.expiresAt).toLocaleString()}. Answer keys and scoring logic remain server-side.</p>
+    <p>Expires {formatDateTime(attempt.expiresAt)}. Answers are checked after you submit.</p>
     {attempt.questions.map((question, index) => <fieldset key={question.id}><legend>{index + 1}. {question.prompt}</legend>
       {question.options.map((option) => <label key={option.id}><input type="radio" name={question.id} value={option.id}
         checked={selectedOptions[question.id] === option.id} onChange={() => onSelect(question.id, option.id)} />{option.text}</label>)}</fieldset>)}
@@ -239,10 +240,10 @@ function SkillsApiView({ learner }: { readonly learner: LearnerCareerReadinessSt
 
 function RoadmapApiView({ learner }: { readonly learner: LearnerCareerReadinessState | null }): React.ReactElement {
   if (!learner?.roadmap?.length) return <V2EmptyState icon="🗺️" title="No next action yet"
-    note="Advisory next actions appear here after your versioned evidence is evaluated — complete lessons and assessments to generate them." />;
+    note="Suggested next steps appear here once you have completed lessons and assessments." />;
   return <div className="career-api-grid">{learner.roadmap.map((action) => <article key={action.id}><span>Advisory next action</span>
     <h3>{formatBand(action.actionCode)}</h3><p>Reason: {formatBand(action.reasonCode)}. State: {formatBand(action.state)}.</p>
-    {action.dueAt ? <small>Due {new Date(action.dueAt).toLocaleDateString()}</small> : null}</article>)}</div>;
+    {action.dueAt ? <small>Due {formatDate(action.dueAt)}</small> : null}</article>)}</div>;
 }
 
 function NotificationsApiView({ learner }: { readonly learner: LearnerCareerReadinessState | null }): React.ReactElement {

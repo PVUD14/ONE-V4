@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getAccessToken } from './auth.js';
+import * as dates from './dates.js';
+import { codeLabel } from './labels.js';
 import {
   ApiRequestError,
   cancelPrivacyRequest,
@@ -36,7 +38,7 @@ function messageFor(error: unknown, fallback: string): string {
 function formatDate(value: string | null): string {
   if (!value) return '—';
   const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? '—' : parsed.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+  return Number.isNaN(parsed.getTime()) ? '—' : dates.formatDate(parsed);
 }
 
 function isOpen(request: PrivacyRequestDto): boolean {
@@ -169,7 +171,7 @@ export function StudentPrivacyPanel(): React.ReactElement {
         <thead><tr><th>Request</th><th>Status</th><th>Asked on</th><th></th></tr></thead>
         <tbody>{requests.map((item) => <tr key={item.id}>
           <td>{item.requestType === 'EXPORT' ? 'Copy of my data' : 'Delete my account'}</td>
-          <td><span className={`hiring-state state-${item.state.toLowerCase()}`}>{item.state.replace(/_/g, ' ').toLowerCase().replace(/^./, (c) => c.toUpperCase())}</span></td>
+          <td><span className={`hiring-state state-${item.state.toLowerCase()}`}>{codeLabel(item.state)}</span></td>
           <td>{formatDate(item.requestedAt)}</td>
           <td>{isOpen(item) ? <button type="button" className="secondary" onClick={() => { void cancel(item.id); }}>Cancel</button> : null}</td>
         </tr>)}</tbody>

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Bell, MessageSquare } from 'lucide-react';
 import { getProtectedAccessToken, listMyNotifications, listStudentExams, markAllNotificationsRead } from './api.js';
+import { formatDateTime } from './dates.js';
 
 interface DerivedNotification {
   readonly id: string;
@@ -44,7 +45,7 @@ export function StudentNotificationsBell(): React.ReactElement {
       if (exams.status === 'fulfilled') {
         for (const exam of exams.value.assessments) {
           if (exam.openAttemptId) {
-            merged.push({ id: `${exam.id}-open`, text: `Attempt in progress: ${exam.title} — resume before ${new Date(exam.endsAt).toLocaleString()}.`, actionable: true });
+            merged.push({ id: `${exam.id}-open`, text: `Attempt in progress: ${exam.title} — resume before ${formatDateTime(exam.endsAt)}.`, actionable: true });
           }
         }
       }

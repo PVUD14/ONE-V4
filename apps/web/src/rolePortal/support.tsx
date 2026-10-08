@@ -40,12 +40,15 @@ import type {
 import { V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { StatusBadge } from '../studentComponents.js';
 import { formatApiError, RestrictedApiState } from './shared.js';
+import { SupportCode } from '../supportCode.js';
+import { formatDateTime } from '../dates.js';
+import { codeLabel } from '../labels.js';
 
 const noteLimit = 2000;
 const summaryLimit = 500;
 
 const label = (value: string): string => value.split('_').map((word) => word.charAt(0) + word.slice(1).toLowerCase()).join(' ');
-const when = (value: string | null | undefined): string => (value ? new Date(value).toLocaleString() : 'NA');
+const when = (value: string | null | undefined): string => (value ? formatDateTime(value) : 'NA');
 
 const stateTone = (state: string): 'success' | 'warning' | 'neutral' | 'info' | 'danger' =>
   state === 'RESOLVED' || state === 'CLOSED' ? 'success' : state === 'WAITING_ON_CUSTOMER' ? 'info' : state === 'OPEN' ? 'warning' : 'neutral';
@@ -73,7 +76,7 @@ function useSupportPolicy(token: string | null): { readonly policy: SupportPolic
 
 function Forbidden({ heading, note, reference }: { readonly heading: React.ReactElement; readonly note: string; readonly reference: string }): React.ReactElement {
   return <section className="role-module role-module--dense">{heading}
-    <div className="role-wide"><V2EmptyState icon="🔐" title="Not permitted" note={note} hint={`Reference: ${reference}`} /></div></section>;
+    <div className="role-wide"><V2EmptyState icon="🔐" title="Not permitted" note={note} hint={<SupportCode reference={reference} />} /></div></section>;
 }
 
 // ---------------------------------------------------------------------------
@@ -263,7 +266,7 @@ function SupportCasePanel({ token, caseId, policy, onChanged, onClose }: {
       <button key={state} type="button" className="secondary" onClick={() => setMoving(state)}>Move to {label(state)}…</button>)}</div> : <p>This case is closed.</p>}
     <h3>History</h3>
     <ol className="role-check-list">{item.events.map((event) => <li key={event.id}>
-      <strong>{describeEvent(event)}</strong> — {event.actor.email}, {when(event.occurredAt)} · {event.reasonCode}
+      <strong>{describeEvent(event)}</strong> — {event.actor.email}, {when(event.occurredAt)} · {codeLabel(event.reasonCode)}
       {event.noteRedacted ? <><br /><em>Note removed on privacy deletion.</em></> : event.note ? <><br />{event.note}</> : null}
       {event.linkedCorrelationId ? <><br /><small>Linked reference: {event.linkedCorrelationId}</small></> : null}
     </li>)}</ol>

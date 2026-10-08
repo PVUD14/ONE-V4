@@ -88,14 +88,14 @@ describe('bulk import', () => {
     policyResponse = () => failure(403, 'FORBIDDEN', 'corr-forbidden');
     render(<OperationsContentImportPage />);
     expect(await screen.findByText('Not permitted')).toBeInTheDocument();
-    expect(screen.getByText('Reference: corr-forbidden')).toBeInTheDocument();
+    expect(screen.getByText('Support code: corrforb')).toBeInTheDocument();
     expect(screen.queryByLabelText('Import file')).not.toBeInTheDocument();
   });
 
   it('shows an error with its reference when the policy cannot load', async () => {
     policyResponse = () => failure(500, 'INTERNAL', 'corr-broken');
     render(<OperationsContentImportPage />);
-    expect(await screen.findByRole('alert')).toHaveTextContent('corr-broken');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Support code: corrbrok');
   });
 
   it('previews the picked file: kind, format, file name and content go to the server', async () => {
@@ -166,7 +166,7 @@ describe('bulk import', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Import 2 as drafts…' }));
     fireEvent.change(screen.getByLabelText('Reason code'), { target: { value: 'TRACK_BUILD' } });
     fireEvent.click(screen.getByRole('button', { name: 'Import as drafts' }));
-    expect(await screen.findByText(/changed since the preview, so nothing was imported.*corr-stale/)).toBeInTheDocument();
+    expect(await screen.findByText(/changed since the preview, so nothing was imported.*Support code: corrstal/)).toBeInTheDocument();
     await waitFor(() => expect(posts('/preview')).toHaveLength(2));
   });
 

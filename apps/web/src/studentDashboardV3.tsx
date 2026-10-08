@@ -4,6 +4,7 @@ import { Spark, toneColor } from './pilot/pilotComponents.js';
 import { NaSlotChip, NaSlotStrip } from './naState.js';
 import { completeStudentStaffAction, getCurrentStudent, listStudentStaffActions, type StudentStaffActionDto } from './api/student.js';
 import { SharedCounsellingNotes } from './studentCounsellingNotes.js';
+import { formatDateTime } from './dates.js';
 import {
   getLearnerCareerReadinessState,
   getProtectedAccessToken,
@@ -81,11 +82,21 @@ interface DashboardData {
   readonly applications: readonly StudentApplicationDto[] | null;
 }
 
+/**
+ * The readiness explanation names the evidence count and the internal model that
+ * evaluated it ("4 active evidence records evaluated by career-readiness-mastery-v1").
+ * The card already shows the count, and a model id means nothing to a student, so that
+ * form is dropped; any other explanation is shown as written.
+ */
+export function plainFactorExplanation(explanation: string | null | undefined): string | null {
+  if (!explanation) return null;
+  if (/\bevaluated by [\w.-]+\s*\.?$/i.test(explanation)) return null;
+  return explanation;
+}
+
 function ReportDate({ value }: { readonly value: string | null | undefined }): React.ReactElement {
   if (!value || !Number.isFinite(Date.parse(value))) return <>NA</>;
-  return <time dateTime={value}>{new Date(value).toLocaleString(undefined, {
-    year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
-  })}</time>;
+  return <time dateTime={value}>{formatDateTime(value)}</time>;
 }
 
 function reportState(value: string | undefined, allowed: readonly string[]): string {
@@ -105,7 +116,7 @@ function StudentReports({ learner, exams, applications }: Pick<DashboardData, 'l
     </div></div>
     <section className="pilot-card" aria-labelledby="report-readiness-title">
       <h3 id="report-readiness-title">Readiness over time</h3>
-      <p>Latest available snapshots, newest first (up to 100). Each step is a band, not a score.</p>
+      <p>Your 100 most recent readiness steps, newest first. Each step is a band, not a score.</p>
       <p>Not Enough Evidence · Developing · Progressing · Ready For Next Step</p>
       {history.length ? <ol className="pilot-list" aria-label="Readiness band history, newest first">
         {history.map((point, index) => {
@@ -155,7 +166,7 @@ function StudentReports({ learner, exams, applications }: Pick<DashboardData, 'l
         </div></li>)}
       </ul> : <p>NA — no career-readiness attempts available.</p>}
       <h4>Assigned assessments</h4>
-      <p>Available assignments ordered by start date (up to 100). Attempts used excludes any attempt still in progress.</p>
+      <p>Up to 100 of your assigned assessments, by start date. Attempts used does not count an attempt still in progress.</p>
       {exams?.length ? <ul className="pilot-list" aria-label="Assigned assessment activity">
         {exams.map((exam) => <li key={exam.id} className="pilot-list-row"><div className="grow">
           <strong>{exam.title || 'NA'}</strong>
@@ -167,7 +178,7 @@ function StudentReports({ learner, exams, applications }: Pick<DashboardData, 'l
     </section>
     <section className="pilot-card" aria-labelledby="report-applications-title">
       <h3 id="report-applications-title">Application activity</h3>
-      <p>Your latest available applications (up to 200), most recently updated first. This is not a lifetime total.</p>
+      <p>Your 200 most recently updated applications, newest first.</p>
       {applications?.length ? <ul className="pilot-list" aria-label="Your application activity">
         {applications.map((item) => <li key={item.id} className="pilot-list-row"><div className="grow">
           <strong>{item.title || 'NA'}</strong>
@@ -262,9 +273,7 @@ function StudentSupport({ token }: { readonly token: string | null }): React.Rea
           <p>{action.actionType === 'ASSIGNED_TASK' ? 'Assigned task' : action.actionType === 'INTERVENTION' ? 'Intervention' : 'NA'}</p>
           <p>{role ? `Assigned by your ${role}` : 'Assigned by your college'}</p>
           <p>Due: {action.dueAt && Number.isFinite(Date.parse(action.dueAt))
-            ? <time dateTime={action.dueAt}>{new Date(action.dueAt).toLocaleString(undefined, {
-              year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
-            })}</time> : 'NA'}</p>
+            ? <time dateTime={action.dueAt}>{formatDateTime(action.dueAt)}</time> : 'NA'}</p>
           <p>State: <span className="pilot-chip slate">{state}</span></p>
           {action.note ? <p>{action.note}</p> : null}
           {action.responseNote ? <p>Your response: {action.responseNote}</p> : null}
@@ -319,6 +328,9 @@ export function StudentDashboardV3({ studentName }: { readonly studentName: stri
   const topics = new Map((data.learner?.catalog?.topics ?? []).map((topic) => [topic.id, topic]));
   const factors = new Map((data.learner?.readiness?.explanation?.factors ?? []).map((factor) => [factor.topicId, factor]));
   const masteryCards = (data.learner?.mastery ?? []).slice(0, 5);
+  // The empty slots name the published topics with no evidence yet, so they are not five identical cards.
+  const measuredTopicIds = new Set((data.learner?.mastery ?? []).map((mastery) => mastery.topicId));
+  const unmeasuredTopics = (data.learner?.catalog?.topics ?? []).filter((topic) => !measuredTopicIds.has(topic.id));
 
   // Today's plan is rule-derived from live account state - the honest v1 of
   // the pilot's daily-plan engine.
@@ -336,8 +348,8 @@ export function StudentDashboardV3({ studentName }: { readonly studentName: stri
   ].slice(0, 4);
 
   const upcoming = [
-    ...exams.filter((exam) => Date.parse(exam.startsAt) > now).map((exam) => ({ title: `${exam.title} opens`, when: new Date(exam.startsAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) })),
-    ...openExams.filter((exam) => Date.parse(exam.endsAt) > now).map((exam) => ({ title: `${exam.title} closes`, when: new Date(exam.endsAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) })),
+    ...exams.filter((exam) => Date.parse(exam.startsAt) > now).map((exam) => ({ title: `${exam.title} opens`, when: formatDateTime(exam.startsAt) })),
+    ...openExams.filter((exam) => Date.parse(exam.endsAt) > now).map((exam) => ({ title: `${exam.title} closes`, when: formatDateTime(exam.endsAt) })),
   ].slice(0, 3);
 
   const activityRows = (data.notifications?.notifications ?? []).slice(0, 4);
@@ -393,7 +405,7 @@ export function StudentDashboardV3({ studentName }: { readonly studentName: stri
               <header>{topics.get(mastery.topicId)?.name ?? 'Readiness topic'}</header>
               <span className="pilot-chip blue">{prettify(mastery.band)}</span>
               <small>{mastery.evidenceIds.length} active evidence record{mastery.evidenceIds.length === 1 ? '' : 's'}</small>
-              {factor ? <small>{factor.explanation}</small> : null}
+              {factor && plainFactorExplanation(factor.explanation) ? <small>{plainFactorExplanation(factor.explanation)}</small> : null}
             </section>
           })}
           {masteryCards.length < 5 ? <section className="pilot-card na-strip" data-na-strip="true"
@@ -401,10 +413,10 @@ export function StudentDashboardV3({ studentName }: { readonly studentName: stri
             <div className="pilot-card-head"><h2>Readiness factors</h2><span className="pilot-chip slate">NA</span></div>
             <ul className="na-strip-slots" aria-label="Readiness factors without a projection">
               {Array.from({ length: 5 - masteryCards.length }).map((_, index) => (
-                <NaSlotChip key={`mastery-na-${index}`} label="Readiness factor" />
+                <NaSlotChip key={`mastery-na-${index}`} label={unmeasuredTopics[index]?.name ?? 'Readiness factor'} />
               ))}
             </ul>
-            <p className="na-reason">No mastery projection available.</p>
+            <p className="na-reason">No evidence recorded yet.</p>
           </section> : null}
         </div>
 

@@ -73,6 +73,7 @@ import { EmployerDashboardV3, InstitutionDashboardV3 } from './staffDashboardsV3
 import { StatusBadge } from './studentComponents.js';
 import { Bell, ChevronDown, ChevronsLeft, ChevronsRight, Filter, Menu, MessageSquare, Search, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { roleLabel } from './labels.js';
 
 export function DemoPortalLauncher({ onNavigate }: { readonly onNavigate: (path: string) => void }): React.ReactElement {
   const groups = ['Student', 'Institution', 'Employer', 'Operations'] as const;
@@ -144,7 +145,7 @@ function RolePortalInner({ portal, apiHealth, authStatus, authNotice, showDevelo
       <RoleSidebar portal={portal} role={authenticatedWorkspace?.role} activePath={path} collapsed={collapsed} drawerOpen={drawerOpen} onNavigate={navigate} onCollapse={() => setCollapsed((value) => !value)} onClose={() => { setDrawerOpen(false); menuButtonRef.current?.focus(); }} />
       {drawerOpen ? <button className="drawer-scrim role-scrim" type="button" aria-label={`Close ${portal.roleName} navigation`} onClick={() => setDrawerOpen(false)} /> : null}
       <div className="role-workspace">
-        <RoleTopbar portal={portal} apiHealth={apiHealth} authStatus={authStatus} authNotice={authNotice} showDevelopmentIndicators={showDevelopmentIndicators} menuButtonRef={menuButtonRef} onOpenMenu={() => setDrawerOpen(true)} onMessages={() => { const messagesRoute = portal.nav.find((item) => /messages|communications/i.test(item.label)); if (messagesRoute) navigate(messagesRoute.path); else setTopbarNotice(`${portal.roleName} messaging is backend-dependent and no message route exists for this role.`); }} onNotifications={() => {
+        <RoleTopbar portal={portal} apiHealth={apiHealth} authStatus={authStatus} authNotice={authNotice} showDevelopmentIndicators={showDevelopmentIndicators} menuButtonRef={menuButtonRef} onOpenMenu={() => setDrawerOpen(true)} onMessages={() => { const messagesRoute = portal.nav.find((item) => /messages|communications/i.test(item.label)); if (messagesRoute) navigate(messagesRoute.path); else setTopbarNotice(`${portal.roleName} messaging is not available for this role.`); }} onNotifications={() => {
           if (demoMode) { setTopbarNotice(`${portal.roleName} notifications preview: 4 local demo alerts are summarized only; no backend notification state was changed.`); return; }
           if (portal.key === 'institution-admin' && isInstitutionWorkspace(authenticatedWorkspace)) {
             const token = getProtectedAccessToken();
@@ -216,7 +217,7 @@ function workspaceRoleName(portal: RolePortalConfig, authenticatedWorkspace?: Au
 
 function RoleTopbar({ portal, apiHealth, authStatus, authNotice, showDevelopmentIndicators, menuButtonRef, onOpenMenu, onMessages, onNotifications, onSwitch, onSignIn, onSignOut, demoMode, authenticatedWorkspace }: { readonly portal: RolePortalConfig; readonly apiHealth: ApiHealth; readonly authStatus: AuthStatus; readonly authNotice: string; readonly showDevelopmentIndicators: boolean; readonly menuButtonRef: React.RefObject<HTMLButtonElement | null>; readonly onOpenMenu: () => void; readonly onMessages: () => void; readonly onNotifications: () => void; readonly onSwitch: () => void; readonly onSignIn: () => void; readonly onSignOut: () => void; readonly demoMode: boolean; readonly authenticatedWorkspace?: AuthenticatedWorkspaceSummary | undefined }): React.ReactElement {
   const displayName = demoMode ? portal.previewUser : (authStatus.state === 'authenticated' && authStatus.email ? authStatus.email : portal.roleName);
-  const displayRole = authenticatedWorkspace?.role ?? portal.roleName;
+  const displayRole = authenticatedWorkspace?.role ? roleLabel(authenticatedWorkspace.role) : portal.roleName;
   // Never surface the raw organization UUID to an end user; it is an internal identifier.
   const displayOrg = authenticatedWorkspace?.organizationId ? portal.subtitle : portal.organization;
   return <header className="role-topbar"><button ref={menuButtonRef} className="icon-button mobile-menu-button" type="button" aria-label={`Open ${portal.roleName} navigation`} onClick={onOpenMenu}><Menu size={20} /></button><span className="topbar-brand"><BrandLogo height={28} /></span><span className="role-context">{demoMode ? portal.roleName : workspaceRoleName(portal, authenticatedWorkspace)}</span><span className="role-org">{displayOrg}</span><label className="role-search" role="search"><Search size={16} /><span className="sr-only">Search {portal.roleName} workspace</span><input placeholder={`Search ${portal.family.toLowerCase()} records...`} /></label><div className="role-topbar-actions"><button type="button" className="secondary" onClick={onSwitch}>{demoMode ? 'Switch preview portal' : 'Switch workspace'}</button><button className="icon-button" type="button" aria-label="Messages" onClick={onMessages}><MessageSquare size={17} /></button><button className="icon-button notification" type="button" aria-label="Notifications" onClick={onNotifications}><Bell size={17} /></button><AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />{showDevelopmentIndicators ? <span className={`staff-api-dot ${apiHealth}`}>{apiHealth}</span> : null}<span className="role-profile"><span>{demoMode ? portal.initials : initialsFor(displayName)}</span><span><strong>{displayName}</strong><small>{displayRole}</small></span><ChevronDown size={14} /></span></div></header>;
@@ -232,7 +233,7 @@ function normalizeRolePath(path: string, portal: RolePortalConfig): string {
 function PortalModeNotice({ portal, notice, demoMode, authenticatedWorkspace }: { readonly portal: RolePortalConfig; readonly notice: string; readonly demoMode: boolean; readonly authenticatedWorkspace?: AuthenticatedWorkspaceSummary | undefined }): React.ReactElement {
   const { dirty, reset } = useRolePreviewState();
   if (!demoMode && authenticatedWorkspace) {
-    return <section className="role-preview-notice" role="note"><span><strong>Signed in as {workspaceRoleName(portal, authenticatedWorkspace)}</strong> - sections that are not built yet say so plainly instead of showing another role&apos;s data.</span>{notice ? <span role="status">{notice}</span> : null}</section>;
+    return <section className="role-preview-notice" role="note"><span><strong>Signed in as {workspaceRoleName(portal, authenticatedWorkspace)}</strong>. Some sections are not available yet and say so.</span>{notice ? <span role="status">{notice}</span> : null}</section>;
   }
   return <section className="role-preview-notice" role="note"><span><strong>{dirty ? 'Unsaved session changes' : 'Portal preview'}</strong> — role selection here does not authenticate or authorize a user. {portal.enforcementStatus}.</span>{notice ? <span role="status">{notice}</span> : null}{dirty ? <button type="button" className="secondary" onClick={reset}>Reset demo data</button> : null}</section>;
 }
@@ -343,7 +344,7 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   // Only this label's branch changes; Subscriptions and Billing keep the not-yet-available
   // state below (ADR-022).
   if (!demoMode && portal.key === 'operations-admin' && route.label === 'Analytics') return <><OperationsRoleDemandPage /><OperationsCollegeHealthPanel /></>;
-  if (!demoMode && portal.key === 'operations-admin' && /subscriptions|billing|analytics|support|settings/i.test(route.label)) return <AuthenticatedNotYetAvailable title={route.label} detail="This Operations module is not yet backed by a Phase 2A persistent workflow." />;
+  if (!demoMode && portal.key === 'operations-admin' && /subscriptions|billing|analytics|support|settings/i.test(route.label)) return <AuthenticatedNotYetAvailable title={route.label} detail="This part of Operations is not available yet." />;
   if (!demoMode && portal.key === 'institution-admin' && ['Students', 'Student Detail'].includes(route.label)) {
     // INST-04: the admin reaches academic verification here, under Students (plan §4.2);
     // there is no admin Academic Verification item and none is added.
@@ -433,7 +434,7 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
           <CohortReadinessByRoleSection key={authenticatedWorkspace.organizationId} institutionId={authenticatedWorkspace.organizationId} /></StaffPilotWrap>
       : <InstitutionWorkspaceError title="Career Readiness" unauthorized={Boolean(authenticatedWorkspace && !institutionWorkspaceRoles.has(authenticatedWorkspace.role))} />;
   }
-  if (!demoMode && portal.key === 'institution-admin' && /career readiness|placement|reports/i.test(route.label)) return <AuthenticatedReadOnlyModule title={route.label} detail="Institution reports and readiness information are read-only in Phase 2A unless a dedicated persistent mutation is available." />;
+  if (!demoMode && portal.key === 'institution-admin' && /career readiness|placement|reports/i.test(route.label)) return <AuthenticatedReadOnlyModule title={route.label} detail="Institution reports and readiness information are view only for now." />;
   // INST-05: the admin's Settings label now opens the college settings; navigation is unchanged.
   if (!demoMode && portal.key === 'institution-admin' && route.label === 'Settings') return <InstitutionSettingsPage authenticatedWorkspace={authenticatedWorkspace} />;
   // organizationId is nullable on the workspace summary, so the page only mounts once
@@ -501,8 +502,8 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
   // Every other authenticated role with a Calendar in its navigation had nothing behind
   // it at all, so the merged feed is purely additive there.
   if (!demoMode && route.label === 'Calendar') return <CalendarPage />;
-  if (!demoMode && ['faculty', 'department-head'].includes(portal.key)) return <AuthenticatedReadOnlyModule title={route.label} detail="This authenticated staff role can view authorized context only in Phase 2A. Assessment, task, resource, workload, intervention, and meeting mutations are disabled until persistent APIs exist." />;
-  if (!demoMode) return <AuthenticatedNotYetAvailable title={route.label} detail="This authenticated module has no approved persistent Phase 2A workflow yet." />;
+  if (!demoMode && ['faculty', 'department-head'].includes(portal.key)) return <AuthenticatedReadOnlyModule title={route.label} detail="Your role can view this section. Changing assessments, tasks, resources, workload, interventions and meetings from here is not available yet." />;
+  if (!demoMode) return <AuthenticatedNotYetAvailable title={route.label} detail="This section is not available yet." />;
   const categories = [...new Set(portal.records.map((record) => record.category))];
   const records = portal.records.filter((record) => {
     const filterMatch = filters.length === 0 || filters.includes(record.category) || filters.includes(record.status);

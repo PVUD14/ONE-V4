@@ -19,6 +19,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { ApiRequestError, submitEmployerAccessRequest } from './api.js';
 import { AuthLayout } from './authLayout.js';
+import { supportCodeSuffix } from './supportCode.js';
 
 const productName = 'ONE by AI8HT';
 
@@ -37,7 +38,7 @@ export function referralFromLocation(search: string): string | undefined {
 
 function messageFor(error: unknown): string {
   if (!(error instanceof ApiRequestError)) return 'Your request could not be sent. Check your connection and try again.';
-  const reference = ` Reference: ${error.correlationId}`;
+  const reference = supportCodeSuffix(error.correlationId);
   switch (error.code) {
     case 'EMPLOYER_ACCESS_REQUEST_WORK_EMAIL_REQUIRED': return `Use your work email address — personal webmail addresses cannot be accepted.${reference}`;
     case 'EMPLOYER_ACCESS_REQUEST_RATE_LIMITED': return `Too many requests have been sent from here recently. Please try again later.${reference}`;

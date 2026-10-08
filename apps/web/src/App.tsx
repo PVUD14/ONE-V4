@@ -63,6 +63,9 @@ import { StudentGoalsPanel } from './studentGoals.js';
 import { StudentLearningPlan } from './studentLearning.js';
 import { StudentCareerToolsPage, StudentCompanyPrepPage, StudentPracticePage, StudentResumeBuilderPage, StudentScholarshipsPage } from './pilotParityPages.js';
 import { StudentAssessmentsV3, StudentLearningV3, StudentOpportunitiesV3, StudentProfileV3, StudentRoadmapV3 } from './parityWraps.js';
+import { supportCodeSuffix } from './supportCode.js';
+import { formatDate } from './dates.js';
+import { roleLabel } from './labels.js';
 
 type RouteKey = 'dashboard' | 'career-path' | 'ai-coach' | 'readiness' | 'skills' | 'assessments' | 'learning' | 'experience' | 'opportunities' | 'applications' | 'interviews' | 'documents' | 'profile' | 'settings' | 'help' | 'practice' | 'company-prep' | 'career-tools' | 'scholarships' | 'resume-builder' | 'calendar';
 
@@ -107,7 +110,7 @@ const routeTitles: Record<RouteKey, PageMeta> = {
   'resume-builder': { title: 'Resume Builder', eyebrow: 'Account', description: 'Create professional resumes that showcase your skills and land your dream job.' },
   calendar: { title: 'Calendar', eyebrow: 'Apply', description: 'Interviews, exam windows, assigned tasks and deadlines already recorded across ONE.' },
   'career-path': { title: 'My Career Path', eyebrow: 'Target career', description: 'Milestones, skill gaps, learning, and experience needed for your goal.' },
-  'ai-coach': { title: 'AI Career Coach', eyebrow: 'Preview guidance', description: 'Explainable, non-authoritative recommendations using demo-only Student data.' },
+  'ai-coach': { title: 'AI Career Coach', eyebrow: 'Guidance', description: 'Career guidance that explains its suggestions. It advises; you decide.' },
   readiness: { title: 'Readiness', eyebrow: 'Employability model', description: 'Category scores, blockers, history, interventions, and supporting evidence.' },
   skills: { title: 'Skills', eyebrow: 'Skill profile', description: 'Claimed, evidenced, institution-verified, and assessment-verified capabilities.' },
   assessments: { title: 'Assessments', eyebrow: 'Skill checks', description: 'Scheduled, available, completed, and recommended reassessments for your goal.' },
@@ -141,7 +144,7 @@ const protectedPortalRoots = ['/student', '/institution', '/employer', '/operati
 const portalChoices = [
   { family: 'Student', path: '/student', label: 'Student', detail: 'Learning, readiness, applications and personal growth.', icon: GraduationCap },
   { family: 'Institution', path: '/institution/admin', label: 'Institution', detail: 'Institution administration and student support.', icon: Building2 },
-  { family: 'Employer', path: '/employer/recruiter', label: 'Employer', detail: 'Hiring workflows where backend support exists.', icon: BriefcaseBusiness },
+  { family: 'Employer', path: '/employer/recruiter', label: 'Employer', detail: 'Post jobs, review applicants and run your hiring.', icon: BriefcaseBusiness },
   { family: 'Operations', path: '/operations/admin', label: 'Operations', detail: 'Platform administration and governance.', icon: ShieldCheck },
   // GROWTH-01 (ADR-040): AI8HT's partnerships field staff. Navigation approved (HG-3, 2026-09-30).
   { family: 'Growth', path: '/growth', label: 'Growth', detail: 'College and employer partnerships: leads, field visits, territory, targets and commission.', icon: MapPinned },
@@ -210,7 +213,7 @@ export function App(): React.ReactElement {
         setAuthStatus(getAuthStatus());
         window.history.replaceState(null, '', '/login');
         setPath(currentPath());
-        setAuthNotice('Sign-in could not be completed. Try again or verify the non-production Cognito configuration.');
+        setAuthNotice('Sign-in could not be completed. Try again.');
       });
     return () => { mounted = false; };
   }, []);
@@ -266,7 +269,7 @@ export function App(): React.ReactElement {
     }
     const token = getAccessToken();
     if (!token) {
-      setCurrentStudent({ state: 'error', message: 'No protected access token is available for Student identity.' });
+      setCurrentStudent({ state: 'error', message: 'Sign in again to open your account.' });
       return;
     }
     const controller = new AbortController();
@@ -626,7 +629,7 @@ function workspaceError(reason: WorkspaceResolutionFailureReason, correlationId?
     reason,
     retryable,
     ...(correlationId ? { correlationId } : {}),
-    message: `We could not load your ONE workspace.${correlationId ? ` Reference: ${correlationId}` : ''}`,
+    message: `We could not load your ONE workspace.${correlationId ? supportCodeSuffix(correlationId) : ''}`,
   };
 }
 
@@ -674,9 +677,9 @@ function AuthRequiredPage({ requestedPath, authStatus, authNotice, onSignIn, onS
     <section className="login-card">
       <span className="eyebrow">{productTagline}</span>
       <h1>Sign in required</h1>
-      <p>The {family} portal is protected. ONE does not use role selection, fixture data, or browser-stored demo identities to authenticate a user.</p>
+      <p>The {family} portal is only for people with an account. Sign in to continue.</p>
       <AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />
-      {authStatus.state === 'unconfigured' ? <p className="auth-boundary">Cognito is not configured, so this route fails closed.</p> : null}
+      {authStatus.state === 'unconfigured' ? <p className="auth-boundary">Sign-in is not available right now, so this page stays closed.</p> : null}
     </section>
   </main>;
 }
@@ -748,9 +751,9 @@ function InvitationAcceptancePage({ authStatus, authNotice, onSignIn, onSignOut 
 
   return <main className="invitation-acceptance">
     <section className="role-page-heading"><div><span className="eyebrow">Verified invitation</span><h1>Accept organization invitation</h1>
-      <p>This page uses the existing protected invitation-acceptance API. The raw invitation token is read only from this link and is not stored in browser storage.</p></div>
+      <p>Accept the invitation you were sent. Your invitation link is used only on this page and is not saved in your browser.</p></div>
       <AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} /></section>
-    {!invitationToken ? <section className="role-empty"><h2>Invitation token missing</h2><p>Open the exact link delivered to the intended UAT email recipient.</p></section> : null}
+    {!invitationToken ? <section className="role-empty"><h2>Invitation link incomplete</h2><p>Open the full link from your invitation email.</p></section> : null}
     {authStatus.state !== 'authenticated' && invitationToken ? <section className="role-empty"><h2>Sign in required</h2><p>Sign in with the verified email address that received this invitation. If sign-in redirects away, reopen the Mailpit invitation link after the session is established.</p></section> : null}
     <section className="role-card role-wide" role="status"><h2>{accepted ? 'Accepted' : 'Status'}</h2><p>{status}</p></section>
   </main>;
@@ -760,7 +763,7 @@ function DemoStudentShell(props: Parameters<typeof StudentShell>[0]): React.Reac
   const { dispatch } = useStudentPreview();
   return <StudentShell
     {...props}
-    onMessages={() => dispatch({ type: 'status', status: 'Student messages require the secure backend messaging workflow; no message inbox was opened in preview.' })}
+    onMessages={() => dispatch({ type: 'status', status: 'Messages are not available in this preview.' })}
     onNotifications={() => dispatch({ type: 'status', status: 'Student notifications preview: 3 reminders are represented by local demo data only.' })}
   />;
 }
@@ -818,7 +821,7 @@ function StudentShell({ apiHealth, authNotice, authStatus, currentStudent, demoM
 function StudentPreviewStatus({ authenticated }: { readonly authenticated: boolean }): React.ReactElement {
   const { state, dispatch } = useStudentPreview();
   if (authenticated) {
-    return <section className="student-preview-status" role="status" aria-live="polite"><div><strong>Authenticated API-backed mode</strong><span>Career Readiness data is loaded from the protected backend. Remaining preview-only modules stay labelled separately.</span></div></section>;
+    return <section className="student-preview-status" role="status" aria-live="polite"><div><strong>Signed in</strong><span>Your Career Readiness information is up to date. Sections that are not available yet say so.</span></div></section>;
   }
   return (
     <section className="student-preview-status" role="status" aria-live="polite">
@@ -848,20 +851,20 @@ function TopBar({ apiHealth, authNotice, authStatus, showDevelopmentIndicators, 
       <button ref={menuButtonRef} className="icon-button mobile-menu-button" type="button" onClick={onOpenMenu} aria-label="Open student navigation"><Menu size={20} /></button>
       <span className="topbar-brand"><BrandLogo height={28} /></span>
       <label className="global-search" role="search"><Search size={17} aria-hidden="true" /><span className="sr-only">Search student workspace</span><input placeholder="Search opportunities, skills, assessments..." /></label>
-      <div className="topbar-actions"><StudentMessagesFlyout /><StudentNotificationsBell /><AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />{showDevelopmentIndicators ? <span className={`api-dot ${apiHealth}`}>{apiHealth === 'online' ? 'API Online' : apiHealth === 'offline' ? 'API Offline' : 'Checking'}</span> : null}<button className="profile-menu" type="button" aria-label="Student profile menu" onClick={onProfile} disabled={profileActive}><span className="avatar">{identity.initials}</span><span><strong>{identity.name}</strong><small>{workspace ? `Role: ${workspace.role}` : identity.detail}</small></span><ChevronDown size={15} aria-hidden="true" /></button></div>
+      <div className="topbar-actions"><StudentMessagesFlyout /><StudentNotificationsBell /><AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />{showDevelopmentIndicators ? <span className={`api-dot ${apiHealth}`}>{apiHealth === 'online' ? 'API Online' : apiHealth === 'offline' ? 'API Offline' : 'Checking'}</span> : null}<button className="profile-menu" type="button" aria-label="Student profile menu" onClick={onProfile} disabled={profileActive}><span className="avatar">{identity.initials}</span><span><strong>{identity.name}</strong><small>{workspace ? `Role: ${roleLabel(workspace.role)}` : identity.detail}</small></span><ChevronDown size={15} aria-hidden="true" /></button></div>
     </header>
   );
 }
 
 function AuthenticatedStudentStatus({ currentStudent }: { readonly currentStudent: CurrentStudentState }): React.ReactElement {
   if (currentStudent.state === 'loading' || currentStudent.state === 'idle') {
-    return <section className="student-preview-status" role="status" aria-live="polite"><div><strong>Loading real Student identity</strong><span>ONE is loading your protected Student profile from the API.</span></div></section>;
+    return <section className="student-preview-status" role="status" aria-live="polite"><div><strong>Loading your profile</strong><span>One moment while ONE opens your account.</span></div></section>;
   }
   if (currentStudent.state === 'error') {
     return <section className="student-preview-status" role="alert"><div><strong>Student identity unavailable</strong><span>{currentStudent.message}</span></div></section>;
   }
   if (currentStudent.state !== 'resolved') {
-    return <section className="student-preview-status" role="status" aria-live="polite"><div><strong>Loading real Student identity</strong><span>ONE is loading your protected Student profile from the API.</span></div></section>;
+    return <section className="student-preview-status" role="status" aria-live="polite"><div><strong>Loading your profile</strong><span>One moment while ONE opens your account.</span></div></section>;
   }
   // INST-10: a former student is told plainly where they stand and what they keep.
   if (currentStudent.student.formerStudent) return <FormerStudentNotice student={currentStudent.student} />;
@@ -877,7 +880,7 @@ export function FormerStudentNotice({ student }: { readonly student: CurrentStud
   const college = student.institutionName ?? 'your college';
   const state = student.relationship?.state ?? student.academicStatus;
   const when = student.relationship?.effectiveTo
-    ? new Date(student.relationship.effectiveTo).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'long', year: 'numeric' })
+    ? formatDate(student.relationship.effectiveTo)
     : null;
   return <section className="student-preview-status" role="status" aria-live="polite"><div>
     <strong>{formerStudentWords[state] ?? 'Left'} {college}{when ? ` on ${when}` : ''}</strong>
@@ -967,7 +970,7 @@ function AuthenticatedStudentProfile(): React.ReactElement {
   useEffect(() => {
     const token = getAccessToken();
     if (!token) {
-      setStatus('No protected access token is available.');
+      setStatus('Sign in again to continue.');
       return undefined;
     }
     const controller = new AbortController();
@@ -980,7 +983,7 @@ function AuthenticatedStudentProfile(): React.ReactElement {
   async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     const token = getAccessToken();
-    if (!token) return setStatus('No protected access token is available.');
+    if (!token) return setStatus('Sign in again to continue.');
     const form = new FormData(event.currentTarget);
     const body = {
       targetCareer: String(form.get('targetCareer') ?? '').trim(),
@@ -1031,7 +1034,7 @@ function AuthenticatedStudentDocuments(): React.ReactElement {
   async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     const token = getAccessToken();
-    if (!token) return setStatus('No protected access token is available.');
+    if (!token) return setStatus('Sign in again to continue.');
     const form = new FormData(event.currentTarget);
     try {
       await createStudentDocument(token, {
@@ -1151,16 +1154,16 @@ function AuthenticatedStudentSavedOpportunities(): React.ReactElement {
   const [status, setStatus] = useState('Loading saved opportunities...');
   const reload = async (): Promise<void> => {
     const token = getAccessToken();
-    if (!token) return setStatus('No protected access token is available.');
+    if (!token) return setStatus('Sign in again to continue.');
     const response = await listStudentSavedOpportunities(token);
     setSaved(response.savedOpportunities);
-    setStatus('Saved opportunities loaded.');
+    setStatus(response.savedOpportunities.length ? '' : 'Nothing saved yet.');
   };
   useEffect(() => { void reload().catch(() => setStatus('Saved opportunities could not be loaded.')); }, []);
   async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     const token = getAccessToken();
-    if (!token) return setStatus('No protected access token is available.');
+    if (!token) return setStatus('Sign in again to continue.');
     const form = new FormData(event.currentTarget);
     try {
       const response = await saveStudentOpportunity(token, {
@@ -1193,7 +1196,7 @@ function AuthenticatedStudentSavedOpportunities(): React.ReactElement {
 
 function AuthenticatedStudentUnavailable({ route }: { readonly route: RouteKey }): React.ReactElement {
   return <V2EmptyState icon="🧭" title={`${routeTitles[route].title} is not built yet`}
-    note="This module is on the roadmap but has no live workflow behind it yet — nothing here is hidden or broken."
+    note="This section is planned but not available yet."
     hint="Your Home dashboard shows everything that is live for you today." />;
 }
 

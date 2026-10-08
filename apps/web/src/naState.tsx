@@ -32,7 +32,7 @@ export function missingKind(value: unknown): MissingKind | null {
   if (text === 'NA') return 'na';
   if (/^<\s?\d/.test(text)) return 'suppressed';
   if (text === 'Withheld') return 'withheld';
-  if (text === 'Too few answers') return 'few';
+  if (/^Too few /.test(text)) return 'few';
   return null;
 }
 

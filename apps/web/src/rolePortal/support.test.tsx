@@ -116,14 +116,14 @@ describe('support desk', () => {
   it('shows an error with its reference', async () => {
     casesResponse = () => failure(500, 'INTERNAL', 'corr-broken-1');
     render(<OperationsSupportDeskPage />);
-    expect(await screen.findByRole('alert')).toHaveTextContent('Reference: corr-broken-1');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Support code: corrbrok');
   });
 
   it('shows a forbidden state, not an empty queue, to staff without Support Cases', async () => {
     casesResponse = () => failure(403, 'FORBIDDEN', 'corr-denied-1');
     render(<OperationsSupportDeskPage />);
     expect(await screen.findByText('Not permitted')).toBeInTheDocument();
-    expect(screen.getByText('Reference: corr-denied-1')).toBeInTheDocument();
+    expect(screen.getByText('Support code: corrdeni')).toBeInTheDocument();
     expect(screen.queryByText('No cases here')).not.toBeInTheDocument();
   });
 
@@ -217,7 +217,7 @@ describe('account lookup', () => {
     });
     await search();
     expect(await screen.findByText('Not permitted')).toBeInTheDocument();
-    expect(screen.getByText('Reference: corr-denied-2')).toBeInTheDocument();
+    expect(screen.getByText('Support code: corrdeni')).toBeInTheDocument();
   });
 
   it('says so when nothing matches', async () => {

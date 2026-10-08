@@ -41,6 +41,8 @@ import { V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { REASON_TEXT } from '../studentLearning.js';
 import { formatApiError } from './shared.js';
 import type { AuthenticatedWorkspaceSummary } from './shared.js';
+import { supportCodeSuffix } from '../supportCode.js';
+import { formatDateTime } from '../dates.js';
 
 export const OVERRIDE_REASON_LABELS: Readonly<Record<string, string>> = {
   CLASS_TOPIC_ALIGNMENT: 'Matches what the class is working on now',
@@ -72,8 +74,8 @@ const ERROR_TEXT: Readonly<Record<string, string>> = {
 
 function actionError(error: unknown, fallback: string): string {
   if (error instanceof ApiRequestError) {
-    if (error.code && ERROR_TEXT[error.code]) return `${ERROR_TEXT[error.code]} Reference: ${error.correlationId}`;
-    if (error.status === 403) return `You do not have permission to do this. Reference: ${error.correlationId}`;
+    if (error.code && ERROR_TEXT[error.code]) return `${ERROR_TEXT[error.code]}${supportCodeSuffix(error.correlationId)}`;
+    if (error.status === 403) return `You do not have permission to do this.${supportCodeSuffix(error.correlationId)}`;
   }
   return formatApiError(error, fallback);
 }
@@ -81,7 +83,7 @@ function actionError(error: unknown, fallback: string): string {
 const refOf = (resource: LearningResourceRefDto): LearningResourceRefDto =>
   ({ kind: resource.kind, skillId: resource.skillId, lessonVersionId: resource.lessonVersionId });
 const keyOf = (resource: LearningResourceRefDto): string => `${resource.kind}:${resource.skillId}:${resource.lessonVersionId ?? ''}`;
-const when = (value: string): string => new Date(value).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+const when = (value: string): string => formatDateTime(value);
 
 function isActions(value: unknown): value is FacultyLearningActionsDto {
   const body = value as Partial<FacultyLearningActionsDto> | null;

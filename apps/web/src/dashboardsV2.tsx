@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
 import { NaReason, NaValue, isMissing } from './naState.js';
+import { SupportCode } from './supportCode.js';
+import { formatDate } from './dates.js';
+import { codeLabel, roleLabel } from './labels.js';
 import {
   ApiRequestError,
   getLearnerCareerReadinessState,
@@ -94,7 +97,8 @@ export function V2Stat({ icon, tone, value, label, reason }: {
 }
 
 export function V2Chip({ tone, children }: { readonly tone: string; readonly children: React.ReactNode }): React.ReactElement {
-  return <span className={`v2-chip ${tone}`}>{children}</span>;
+  // A raw code passed as the whole label (ACTIVE, UNDER_REVIEW) reads as words.
+  return <span className={`v2-chip ${tone}`}>{typeof children === 'string' ? codeLabel(children) : children}</span>;
 }
 
 export function V2Bar({ percent, tone = '' }: { readonly percent: number; readonly tone?: string }): React.ReactElement {
@@ -109,7 +113,7 @@ function chipToneForState(state: string): string {
 }
 
 export function V2EmptyState({ icon, title, note, hint }: {
-  readonly icon: string; readonly title: string; readonly note: string; readonly hint?: string;
+  readonly icon: string; readonly title: string; readonly note: string; readonly hint?: React.ReactNode;
 }): React.ReactElement {
   return (
     <section className="v2-card v2-empty-state">
@@ -173,7 +177,7 @@ export function StudentDashboardV2({ studentName }: { readonly studentName: stri
             <p className="v2-hero-over">Your placement-readiness workspace</p>
             <h1>{greeting()}, {firstName} 👋</h1>
             <p>{nextDeadline
-              ? <>Your next assessment window closes <b>{new Date(nextDeadline).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</b>. Keep building your evidence.</>
+              ? <>Your next assessment window closes <b>{formatDate(nextDeadline)}</b>. Keep building your evidence.</>
               : 'No assessment window is open right now. Keep building your evidence.'}</p>
             <div className="v2-hero-chips">
               {(data.activity?.currentStreakDays ?? 0) > 0 ? <V2Chip tone="amber">🔥 {data.activity!.currentStreakDays}-day streak</V2Chip> : null}
@@ -198,7 +202,7 @@ export function StudentDashboardV2({ studentName }: { readonly studentName: stri
               {openExams.slice(0, 2).map((exam) => (
                 <div key={exam.id} className="v2-list-row">
                   <span className="v2-tile blue" aria-hidden="true">📝</span>
-                  <div className="grow"><strong>{exam.title}</strong><small>{exam.openAttemptId ? 'Attempt in progress — resume it' : `Window closes ${new Date(exam.endsAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`} · {exam.attemptsUsed} of {exam.attemptsAllowed} attempts used</small></div>
+                  <div className="grow"><strong>{exam.title}</strong><small>{exam.openAttemptId ? 'Attempt in progress — resume it' : `Window closes ${formatDate(exam.endsAt)}`} · {exam.attemptsUsed} of {exam.attemptsAllowed} attempts used</small></div>
                   <button type="button" className="v2-btn small" onClick={() => go('/student/assessments')}>{exam.openAttemptId ? 'Resume' : 'Start'}</button>
                 </div>
               ))}
@@ -381,7 +385,7 @@ export function InstitutionDashboardV2({ institutionId, basePath }: { readonly i
             <p className="v2-hero-over">Institution workspace</p>
             <h1>{greeting()} 👋</h1>
             <p>{attention.length ? <><b>{attention[0]!.title}</b> — {attention[0]!.detail}.</> : 'Nothing needs your attention right now.'}</p>
-            <div className="v2-hero-chips"><V2Chip tone="green">Backend enforced</V2Chip><V2Chip tone="blue">Institution scope only</V2Chip></div>
+            <div className="v2-hero-chips"><V2Chip tone="green">Access-controlled</V2Chip><V2Chip tone="blue">Institution scope only</V2Chip></div>
           </div>
           {data.results ? <V2Ring percent={data.results.summary.averagePercentage} value={`${data.results.summary.averagePercentage}%`} label={`CLASS AVERAGE · ${data.results.exam.subjectName.toUpperCase()}`} tone="#0d6b4f" /> : null}
         </div>
@@ -402,10 +406,10 @@ export function InstitutionDashboardV2({ institutionId, basePath }: { readonly i
                   <span className={`v2-tile ${exam.lifecycleState === 'PUBLISHED' ? 'green' : 'amber'}`} aria-hidden="true">{exam.lifecycleState === 'PUBLISHED' ? '📝' : '✏️'}</span>
                   <div className="grow">
                     <strong>{exam.title}</strong>
-                    <small>{new Date(exam.startsAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} → {new Date(exam.endsAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} · {exam.totalMarks} marks · {Math.round(exam.durationSeconds / 60)} min · {exam.assignedCount} assigned</small>
+                    <small>{formatDate(exam.startsAt)} → {formatDate(exam.endsAt)} · {exam.totalMarks} marks · {Math.round(exam.durationSeconds / 60)} min · {exam.assignedCount} assigned</small>
                     {exam.assignedCount > 0 ? <><V2Bar percent={(exam.completedAttempts / exam.assignedCount) * 100} tone="green" /><small>{exam.completedAttempts} of {exam.assignedCount} attempts completed</small></> : null}
                   </div>
-                  <V2Chip tone={chipToneForState(exam.lifecycleState)}>{exam.lifecycleState}</V2Chip>
+                  <V2Chip tone={chipToneForState(exam.lifecycleState)}>{codeLabel(exam.lifecycleState)}</V2Chip>
                 </div>
               ))}
             </div>
@@ -477,7 +481,7 @@ export function InstitutionDashboardV2({ institutionId, basePath }: { readonly i
               {memberships.slice(0, 4).map((member) => (
                 <div key={member.id} className="v2-list-row">
                   <div className="grow"><strong>{member.email}</strong><small>{prettify(member.role)}</small></div>
-                  <V2Chip tone={chipToneForState(member.state)}>{member.state}</V2Chip>
+                  <V2Chip tone={chipToneForState(member.state)}>{codeLabel(member.state)}</V2Chip>
                 </div>
               ))}
             </div>
@@ -553,7 +557,7 @@ export function EmployerDashboardV2({ basePath }: { readonly basePath: string })
             <p className="v2-hero-over">Employer workspace</p>
             <h1>{greeting()} 👋</h1>
             <p>{openApplications > 0 ? <><b>{openApplications} open application{openApplications === 1 ? '' : 's'}</b> across your roles await review.</> : 'No open applications right now.'}</p>
-            <div className="v2-hero-chips"><V2Chip tone="green">Backend enforced</V2Chip><V2Chip tone="amber">Consent-based candidate access</V2Chip></div>
+            <div className="v2-hero-chips"><V2Chip tone="green">Access-controlled</V2Chip><V2Chip tone="amber">Consent-based candidate access</V2Chip></div>
           </div>
           {totalApplications > 0 ? <V2Ring percent={(openApplications / totalApplications) * 100} value={`${openApplications}/${totalApplications}`} label="APPLICATIONS OPEN" tone="#b45309" /> : null}
         </div>
@@ -574,10 +578,10 @@ export function EmployerDashboardV2({ basePath }: { readonly basePath: string })
                   <span className={`v2-tile ${opportunity.lifecycleState === 'PUBLISHED' ? 'blue' : 'amber'}`} aria-hidden="true">{opportunity.lifecycleState === 'PUBLISHED' ? '💼' : '✏️'}</span>
                   <div className="grow">
                     <strong>{opportunity.title ?? opportunity.referenceCode}</strong>
-                    <small>{[opportunity.employmentType ? prettify(opportunity.employmentType) : null, opportunity.locationCity, opportunity.applicationDeadline ? `deadline ${new Date(opportunity.applicationDeadline).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` : null].filter(Boolean).join(' · ') || 'Details pending'}</small>
+                    <small>{[opportunity.employmentType ? prettify(opportunity.employmentType) : null, opportunity.locationCity, opportunity.applicationDeadline ? `deadline ${formatDate(opportunity.applicationDeadline)}` : null].filter(Boolean).join(' · ') || 'Details pending'}</small>
                     {opportunity.applicationCount > 0 ? <><V2Bar percent={((opportunity.applicationCount - opportunity.openApplicationCount) / opportunity.applicationCount) * 100} /><small>{opportunity.applicationCount} applied · {opportunity.openApplicationCount} open</small></> : null}
                   </div>
-                  <V2Chip tone={chipToneForState(opportunity.lifecycleState)}>{opportunity.lifecycleState}</V2Chip>
+                  <V2Chip tone={chipToneForState(opportunity.lifecycleState)}>{codeLabel(opportunity.lifecycleState)}</V2Chip>
                 </div>
               ))}
             </div>
@@ -674,7 +678,7 @@ function operationsQueues(overview: OperationsOverviewDto): readonly OperationsQ
     {
       key: 'employer-access', icon: '📨', tone: 'amber', title: 'Employer access requests', count: employerAccessRequests?.pending ?? null,
       detail: employerAccessRequests
-        ? (employerAccessRequests.oldestPendingAt ? `Oldest waiting since ${new Date(employerAccessRequests.oldestPendingAt).toLocaleDateString()}` : 'None waiting')
+        ? (employerAccessRequests.oldestPendingAt ? `Oldest waiting since ${formatDate(employerAccessRequests.oldestPendingAt)}` : 'None waiting')
         : null,
       screen: 'Organizations', path: '/organizations',
     },
@@ -748,11 +752,11 @@ export function OperationsDashboardV2({ basePath }: { readonly basePath: string 
 
   if (state.kind === 'loading') return <section className="v2-card"><h2>Overview</h2><p className="v2-empty">Loading the operations workspace…</p></section>;
   if (state.kind === 'forbidden') {
-    return <V2EmptyState icon="🔐" title="Not permitted" note="The operations overview is for AI8HT operations staff. Your access has not changed." hint={`Reference: ${state.reference}`} />;
+    return <V2EmptyState icon="🔐" title="Not permitted" note="The operations overview is for AI8HT operations staff. Your access has not changed." hint={<SupportCode reference={state.reference} />} />;
   }
   if (state.kind === 'error') {
     return <V2EmptyState icon="⚠️" title="The overview could not be loaded" note="Nothing on this page is shown until the server's counts load. Try again shortly."
-      {...(state.reference ? { hint: `Reference: ${state.reference}` } : {})} />;
+      {...(state.reference ? { hint: <SupportCode reference={state.reference} /> } : {})} />;
   }
 
   const { overview } = state;
@@ -771,7 +775,7 @@ export function OperationsDashboardV2({ basePath }: { readonly basePath: string 
             <h1>{greeting()} 👋</h1>
             <p>{staff === null ? 'Invitation counts are NA for your access.'
               : pending ? <><b>{formatOverviewCount(staff.pending)} invitation{pending === 1 ? '' : 's'}</b> pending acceptance.</> : 'No invitations are pending.'}</p>
-            <div className="v2-hero-chips"><V2Chip tone="green">Backend enforced</V2Chip><V2Chip tone="slate">Full mutations on web · view-only in app</V2Chip></div>
+            <div className="v2-hero-chips"><V2Chip tone="green">Access-controlled</V2Chip><V2Chip tone="slate">Full controls on web · view only in the app</V2Chip></div>
           </div>
           <V2Ring percent={share(staff?.accepted.value, staff?.total.value)}
             value={staff ? `${formatOverviewCount(staff.accepted)}/${formatOverviewCount(staff.total)}` : NA} label="INVITATIONS ACCEPTED" tone="#475569" />
@@ -781,11 +785,11 @@ export function OperationsDashboardV2({ basePath }: { readonly basePath: string 
           <V2Stat icon="🏛️" tone="blue" value={formatOverviewCount(organizations?.total)} label="Organizations" />
           <V2Stat icon="👥" tone="teal" value={formatOverviewPeople(accounts?.total)} label="Accounts" />
           <V2Stat icon="✉️" tone="amber" value={formatOverviewCount(staff?.pending)} label="Pending invitations" />
-          <V2Stat icon="🏢" tone="purple" value={<>{formatOverviewCount(organizations?.institutions.total)} <span className="v2-stat-extra">inst</span> · {formatOverviewCount(organizations?.employers.total)} <span className="v2-stat-extra">emp</span></>} label="By kind" />
+          <V2Stat icon="🏢" tone="purple" value={<>{formatOverviewCount(organizations?.institutions.total)} <span className="v2-stat-extra">{organizations?.institutions.total?.value === 1 ? 'college' : 'colleges'}</span> · {formatOverviewCount(organizations?.employers.total)} <span className="v2-stat-extra">{organizations?.employers.total?.value === 1 ? 'employer' : 'employers'}</span></>} label="By kind" />
         </div>
 
         <section className="v2-card" aria-label="Operator queues">
-          <div className="v2-card-head"><h2>Operator queues</h2><V2Chip tone="slate">Counted on the server</V2Chip></div>
+          <div className="v2-card-head"><h2>Operator queues</h2><V2Chip tone="slate">Live counts</V2Chip></div>
           <div className="v2-list">
             {queues.map((queue) => (
               <div key={queue.key} className="v2-list-row" data-queue={queue.key}>
@@ -808,7 +812,7 @@ export function OperationsDashboardV2({ basePath }: { readonly basePath: string 
                   <div key={organization.id} className="v2-list-row">
                     <span className={`v2-tile ${organization.kind === 'INSTITUTION' ? 'blue' : 'amber'}`} aria-hidden="true">{organization.kind === 'INSTITUTION' ? '🏛️' : '🏢'}</span>
                     <div className="grow"><strong>{organization.name}</strong><small>{prettify(organization.kind)} · {prettify(organization.verificationState)}</small></div>
-                    <V2Chip tone={organization.active ? 'green' : 'slate'}>{organization.active ? 'ACTIVE' : 'INACTIVE'}</V2Chip>
+                    <V2Chip tone={organization.active ? 'green' : 'slate'}>{organization.active ? 'Active' : 'Inactive'}</V2Chip>
                   </div>
                 ))}
               </div>
@@ -823,8 +827,8 @@ export function OperationsDashboardV2({ basePath }: { readonly basePath: string 
                 <div className="v2-list">
                   {invitations.recent.map((invitation) => (
                     <div key={invitation.id} className="v2-list-row">
-                      <div className="grow"><strong>{invitation.role ? prettify(invitation.role) : 'Invitation'}</strong><small>{invitation.organizationName ?? 'No organization'} · sent {new Date(invitation.createdAt).toLocaleDateString()}</small></div>
-                      <V2Chip tone={chipToneForState(invitation.state)}>{invitation.state}</V2Chip>
+                      <div className="grow"><strong>{invitation.role ? roleLabel(invitation.role) : 'Invitation'}</strong><small>{invitation.organizationName ?? 'No organization'} · sent {formatDate(invitation.createdAt)}</small></div>
+                      <V2Chip tone={chipToneForState(invitation.state)}>{codeLabel(invitation.state)}</V2Chip>
                     </div>
                   ))}
                 </div>
@@ -854,7 +858,7 @@ export function OperationsDashboardV2({ basePath }: { readonly basePath: string 
                   return (
                     <div key={invitation.id} className="v2-list-row">
                       <span className="v2-date"><b>{date.month}</b><span>{date.day}</span></span>
-                      <div className="grow"><strong>Invitation expires</strong><small>{invitation.role ? prettify(invitation.role) : 'Invitation'}{invitation.organizationName ? ` · ${invitation.organizationName}` : ''}</small></div>
+                      <div className="grow"><strong>Invitation expires</strong><small>{invitation.role ? roleLabel(invitation.role) : 'Invitation'}{invitation.organizationName ? ` · ${invitation.organizationName}` : ''}</small></div>
                     </div>
                   );
                 })}

@@ -30,11 +30,13 @@ import { V2Stat } from '../dashboardsV2.js';
 import { StaffPilotWrap } from '../parityWraps.js';
 import { StatusBadge } from '../studentComponents.js';
 import { formatApiError } from './shared.js';
+import { supportCodeSuffix } from '../supportCode.js';
+import * as dates from '../dates.js';
 
 function formatDate(value: string | null | undefined): string {
   if (!value) return 'NA';
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? 'NA' : date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  return Number.isNaN(date.getTime()) ? 'NA' : dates.formatDate(date);
 }
 
 const termsStatusLabels: Readonly<Record<string, string>> = {
@@ -72,7 +74,7 @@ export function EmployerSettingsPage({ employerId }: { readonly employerId: stri
     }).catch((cause: unknown) => {
       if (controller.signal.aborted) return;
       setLoadError(cause instanceof ApiRequestError && cause.code === 'EMPLOYER_ORGANISATION_INACTIVE'
-        ? `Your employer account is suspended or was not approved, so Settings is not available. Reference: ${cause.correlationId}`
+        ? `Your employer account is suspended or was not approved, so Settings is not available.${supportCodeSuffix(cause.correlationId)}`
         : formatApiError(cause, 'Your settings could not be loaded.'));
     });
     return () => controller.abort();

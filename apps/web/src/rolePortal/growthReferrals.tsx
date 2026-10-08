@@ -17,6 +17,7 @@ import {
 } from '../api.js';
 import { V2Chip } from '../dashboardsV2.js';
 import { formatApiError } from './shared.js';
+import { formatDate } from '../dates.js';
 
 const NA = 'NA';
 
@@ -98,7 +99,7 @@ export function GrowthReferralLinksCard({ token }: { readonly token: string }): 
           onClick={() => void act(() => createGrowthReferralCode(token, key.current), 'New referral link created.')}>New referral link</button> : null}
         <small>Up to {data.limits.liveCodesPerPerson ?? NA} live links and {data.limits.createdPerDay ?? NA} new links a day. Links stop working if you leave the employer team.</small>
         {revoked.length ? <details><summary>Revoked links ({revoked.length})</summary><ul>{revoked.map((code) => <li key={code.id}>
-          {code.code} · revoked {code.revokedAt ? new Date(code.revokedAt).toLocaleDateString() : NA} · {code.referrals.onboarded} onboarded
+          {code.code} · revoked {code.revokedAt ? formatDate(code.revokedAt) : NA} · {code.referrals.onboarded} onboarded
         </li>)}</ul></details> : null}
       </>}
   </section>;

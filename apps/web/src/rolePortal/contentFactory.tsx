@@ -19,8 +19,9 @@ import {
 import type { AiDraftDto, ContentDraftDto, ContentDraftKind, ContentDraftRequestDto, ContentFactoryStatusDto } from '../api.js';
 import { StatusBadge } from '../studentComponents.js';
 import { formatApiError } from './shared.js';
+import { formatDateTime } from '../dates.js';
 
-const when = (value: string | null | undefined): string => (value ? new Date(value).toLocaleString() : 'NA');
+const when = (value: string | null | undefined): string => (value ? formatDateTime(value) : 'NA');
 const label = (value: string): string => value.split('_').map((word) => word.charAt(0) + word.slice(1).toLowerCase()).join(' ');
 const keyPattern = /^[a-z0-9][a-z0-9-]{2,79}$/;
 

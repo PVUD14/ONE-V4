@@ -202,7 +202,7 @@ describe('INST-14 college: nominations in a drive\'s details', () => {
     unmount();
     fetchMock.mockImplementation(async () => ok({ error: { code: 'FORBIDDEN', correlationId: 'corr-42' } }, 403));
     render(<DriveNominationsPanel institutionId={institutionId} driveId={driveId} />);
-    expect(await screen.findByRole('alert')).toHaveTextContent('Reference: corr-42');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Support code: corr42');
   });
 });
 

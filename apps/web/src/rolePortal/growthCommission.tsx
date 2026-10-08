@@ -16,6 +16,8 @@ import {
 } from '../api.js';
 import { V2Chip, V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { formatApiError } from './shared.js';
+import { SupportCode } from '../supportCode.js';
+import { formatDate } from '../dates.js';
 
 const NA = 'NA';
 
@@ -34,7 +36,7 @@ const endedLabels: Readonly<Record<string, string>> = {
 const stateLabels: Readonly<Record<string, string>> = { OPEN: 'Open', UPHELD: 'Upheld', REJECTED: 'Rejected' };
 
 function day(value: string | null | undefined): string {
-  return value ? new Date(value).toLocaleDateString() : NA;
+  return value ? formatDate(value) : NA;
 }
 
 type State =
@@ -66,7 +68,7 @@ export function GrowthCommissionPage(): React.ReactElement {
 
   if (state.kind === 'forbidden') {
     return <V2EmptyState icon="🔐" title="Not permitted" note="Commission is for AI8HT's partnerships staff. Your access has not changed."
-      {...(state.reference ? { hint: `Reference: ${state.reference}` } : {})} />;
+      {...(state.reference ? { hint: <SupportCode reference={state.reference} /> } : {})} />;
   }
   const data = state.kind === 'ready' ? state.data : null;
   const live = (data?.credited ?? []).filter((credit) => !credit.endedAt);

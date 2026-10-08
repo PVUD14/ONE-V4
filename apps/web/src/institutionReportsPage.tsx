@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { apiBaseUrl, ApiRequestError, getProtectedAccessToken } from './api.js';
 import { bearerHeader } from './sandbox.js';
+import { supportCodeSuffix } from './supportCode.js';
 
 interface InstitutionReport {
   readonly reportId: string;
@@ -110,11 +111,11 @@ export function InstitutionReportsPage({ institutionId, title = 'Reports', descr
       if (cause instanceof ApiRequestError && cause.status === 401) {
         setError('Your session has expired. Sign in again to generate a report.');
       } else if (cause instanceof ApiRequestError && cause.status === 400) {
-        setError(`Reports cover one whole month that has ended. Choose another month. Reference: ${correlationId}`);
+        setError(`Reports cover one whole month that has ended. Choose another month.${supportCodeSuffix(correlationId)}`);
       } else if (cause instanceof ApiRequestError && cause.status === 403) {
         setError('You do not have permission to generate reports for this institution.');
       } else {
-        setError(`Unable to generate the report. Try again. Reference: ${correlationId}`);
+        setError(`Unable to generate the report. Try again.${supportCodeSuffix(correlationId)}`);
       }
     } finally {
       if (!controller.signal.aborted) setLoading(false);

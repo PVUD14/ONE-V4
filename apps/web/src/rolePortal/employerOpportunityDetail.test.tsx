@@ -151,7 +151,7 @@ describe('EMP-05 employer Opportunity Detail screen', () => {
     show();
     fireEvent.click(within(await screen.findByRole('region', { name: 'Job state' })).getByRole('button', { name: 'Edit job' }));
     fireEvent.click(within(screen.getByRole('form', { name: 'Edit job' })).getByRole('button', { name: 'Save new version' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Someone saved a newer version of this job while you were editing. Reload it and make your change again. Reference: corr-409');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Someone saved a newer version of this job while you were editing. Reload it and make your change again. Support code: corr409');
   });
 
   it('says there are no jobs instead of showing any', async () => {
@@ -163,7 +163,7 @@ describe('EMP-05 employer Opportunity Detail screen', () => {
   it('refuses a suspended employer plainly', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => response({ error: { code: 'EMPLOYER_ORGANISATION_INACTIVE', correlationId: 'corr-403' } }, 403)));
     show();
-    expect(await screen.findByRole('alert')).toHaveTextContent('Your employer account is suspended or was not approved, so your jobs are not available. Reference: corr-403');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Your employer account is suspended or was not approved, so your jobs are not available. Support code: corr403');
   });
 
   it('keeps Opportunities as the list, now linking each job to its detail', async () => {

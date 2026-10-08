@@ -22,6 +22,8 @@ import { EmployerReportsPage } from './employerReports.js';
 import type { RolePortalConfig } from '../rolePortalConfig.js';
 import { RestrictedApiState } from './shared.js';
 import { useEffect, useState } from 'react';
+import { formatDateTime } from '../dates.js';
+import { codeLabel } from '../labels.js';
 
 const participantRouteLabels = ['My Interviews', 'Candidate Brief', 'Scorecards'];
 const ownerAdminOnlyLabels = ['Team', 'Settings'];
@@ -119,7 +121,7 @@ function EmployerManagementRealityPage({ portal, routeLabel }: { readonly portal
       <p>Opportunities and Applicants carry your live pipeline today.</p>
     </div></div>
     <div className="role-wide"><V2EmptyState icon="🧭" title="Not built yet"
-      note={`${routeLabel} is on the roadmap but has no live workflow behind it yet - nothing here is hidden or broken.`}
+      note={`${routeLabel} is planned but not available yet.`}
       hint="Interviews and offers are managed from the applicant row on the Applicants page." /></div>
   </section>;
 }
@@ -214,7 +216,7 @@ function AssignedInterviewWorkspace({ employerIds, routeLabel }: { readonly empl
   const current = detail && selectedListItem && detail.id === selectedListItem.id
     ? { ...detail, consentRevoked: detail.consentRevoked || selectedListItem.consentRevoked,
       canRecordOutcome: detail.canRecordOutcome && selectedListItem.canRecordOutcome } : null;
-  const label = (item: AssignedInterview) => `${item.title || 'NA'} · Round ${item.roundNumber} · ${new Date(item.scheduledStart).toLocaleString()}`;
+  const label = (item: AssignedInterview) => `${item.title || 'NA'} · Round ${item.roundNumber} · ${formatDateTime(item.scheduledStart)}`;
   return <section className="role-module role-module--dense">
     <div className="role-page-heading"><div><h1>{routeLabel}</h1><p>Only your active interview assignments appear here. Times are local.</p></div></div>
     <section className="role-card role-wide">
@@ -223,8 +225,8 @@ function AssignedInterviewWorkspace({ employerIds, routeLabel }: { readonly empl
       {!status && active.length === 0 ? <p>No interviews are assigned to you.</p> : null}
       {routeLabel === 'My Interviews' ? <div className="role-record-table-wrap"><table className="role-record-table">
         <thead><tr><th>Candidate</th><th>Opportunity</th><th>Round</th><th>Mode</th><th>Start</th><th>End</th><th>Action</th></tr></thead>
-        <tbody>{active.map((item) => <tr key={`${item.employerId}-${item.id}`}><td><CandidateIdentity item={item} /></td><td>{item.title || 'NA'}</td><td>{item.roundNumber}</td><td>{item.mode}</td>
-          <td>{new Date(item.scheduledStart).toLocaleString()}</td><td>{item.scheduledEnd ? new Date(item.scheduledEnd).toLocaleString() : 'NA'}</td>
+        <tbody>{active.map((item) => <tr key={`${item.employerId}-${item.id}`}><td><CandidateIdentity item={item} /></td><td>{item.title || 'NA'}</td><td>{item.roundNumber}</td><td>{codeLabel(item.mode)}</td>
+          <td>{formatDateTime(item.scheduledStart)}</td><td>{item.scheduledEnd ? formatDateTime(item.scheduledEnd) : 'NA'}</td>
           <td><button type="button" onClick={() => { setDetail(null); setSelected(item); }}>Candidate brief</button></td></tr>)}</tbody>
       </table></div> : <label className="student-form-field"><span>Assigned interview</span>
         <select value={selectedListItem?.id ?? ''} onChange={(event) => { setDetail(null); setSelected(active.find((item) => item.id === event.target.value) ?? null); }}>

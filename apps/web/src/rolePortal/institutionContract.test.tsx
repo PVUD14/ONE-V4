@@ -67,7 +67,7 @@ describe('data-processing terms', () => {
   it('shows a plain error with its reference', async () => {
     fetchMock.mockResolvedValueOnce({ ok: false, status: 500, json: async () => ({ error: { code: 'REQUEST_FAILED', message: 'x', correlationId: 'ref-inst18-1' } }), headers: new Headers() });
     render(<InstitutionDataTermsSection token={token} institutionId={institutionId} />);
-    expect(await screen.findByRole('alert')).toHaveTextContent('Reference: ref-inst18-1');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Support code: refinst1');
   });
 });
 
@@ -136,6 +136,6 @@ describe('leaving ONE', () => {
     render(<InstitutionExitSection token={token} institutionId={institutionId} />);
     const table = await screen.findByRole('table', { name: 'Exit export sections' });
     fireEvent.click(within(within(table).getByRole('row', { name: /Academic structure/ })).getByRole('button', { name: 'Download' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('limit of 30 exports in 24 hours. Try again later. Reference: ref-inst18-2');
+    expect(await screen.findByRole('alert')).toHaveTextContent('limit of 30 exports in 24 hours. Try again later. Support code: refinst1');
   });
 });

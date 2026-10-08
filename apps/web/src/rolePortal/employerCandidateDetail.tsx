@@ -19,9 +19,10 @@ import { CandidateDetailPanel } from '../applicationSnapshotView.js';
 import { EmployerConversationPanel } from '../applicationMessages.js';
 import { EmployerCandidateAssessmentsPanel } from '../employerAssessmentsPage.js';
 import { EmployerTalentPoolWorkspace } from '../talentPool.js';
+import { codeLabel } from '../labels.js';
 
 function humanise(value: string): string {
-  return value.replace(/_/g, ' ').toLowerCase().replace(/^./, (c) => c.toUpperCase());
+  return codeLabel(value);
 }
 
 export function EmployerCandidateDetailPage({ employerId }: { readonly employerId: string }): React.ReactElement {

@@ -12,6 +12,7 @@
 import React from 'react';
 import { BookOpen, ClipboardList, Compass, Users } from 'lucide-react';
 import type { StudentLearningActionsDto } from './api.js';
+import { formatDate, formatDateTime } from './dates.js';
 
 /** Why a lecturer set a student's next step, as the student reads it. */
 export const LECTURER_REASON_TEXT: Readonly<Record<string, string>> = {
@@ -25,8 +26,8 @@ export const LECTURER_REASON_TEXT: Readonly<Record<string, string>> = {
 const ACTION_WORD: Readonly<Record<string, string>> = { LEARN: 'Learn', PRACTICE: 'Practise', REVIEW: 'Review' };
 const KIND_WORD: Readonly<Record<string, string>> = { PRACTICE: 'Practice set', LESSON: 'Lesson' };
 const muted: React.CSSProperties = { color: 'var(--p-muted)', margin: '4px 0' };
-const when = (value: string): string => new Date(value).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
-const day = (value: string): string => new Date(value).toLocaleDateString([], { dateStyle: 'medium' });
+const when = (value: string): string => formatDateTime(value);
+const day = (value: string): string => formatDate(value);
 
 /** True when a lecturer has set something the planner will bring up next. */
 export function hasLecturerWork(actions: StudentLearningActionsDto | null): boolean {

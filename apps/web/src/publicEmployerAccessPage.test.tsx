@@ -84,10 +84,10 @@ describe('EMP-04 public employer access request page', () => {
     render(<PublicEmployerAccessPage onNavigate={() => undefined} />);
     failWith = { status: 400, body: { error: { code: 'EMPLOYER_ACCESS_REQUEST_WORK_EMAIL_REQUIRED', correlationId: 'c-2' } } };
     fill();
-    expect(await screen.findByRole('alert')).toHaveTextContent('Use your work email address — personal webmail addresses cannot be accepted. Reference: c-2');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Use your work email address — personal webmail addresses cannot be accepted. Support code: c2');
     failWith = { status: 429, body: { error: { code: 'EMPLOYER_ACCESS_REQUEST_RATE_LIMITED', correlationId: 'c-3' } } };
     fireEvent.click(screen.getByRole('button', { name: 'Send request' }));
-    expect(await screen.findByText(/Too many requests have been sent from here recently\. Please try again later\. Reference: c-3/)).toBeInTheDocument();
+    expect(await screen.findByText(/Too many requests have been sent from here recently\. Please try again later\. Support code: c3/)).toBeInTheDocument();
   });
 });
 

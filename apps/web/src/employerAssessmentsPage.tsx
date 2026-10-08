@@ -38,6 +38,9 @@ import {
   type EmployerQuestionDto,
 } from './api.js';
 import { V2Stat } from './dashboardsV2.js';
+import { supportCodeSuffix } from './supportCode.js';
+import { formatDate, formatDateTime } from './dates.js';
+import { codeLabel } from './labels.js';
 
 const QUESTION_TYPES = [
   ['SINGLE_CHOICE_MCQ', 'Single choice'],
@@ -168,7 +171,7 @@ function QuestionBank({ employerId, questions, onDone, onFail }: {
               {question.mentionsProtectedAttribute ? <><br /><span className="hiring-state state-rejected">Names a protected attribute — check it does not screen people on who they are</span></> : null}</td>
             <td>{QUESTION_TYPES.find(([code]) => code === question.questionType)?.[1] ?? question.questionType}</td>
             <td>{question.marks}</td>
-            <td><span className={`hiring-state state-${question.approvalStatus.toLowerCase()}`}>{question.approvalStatus.replace(/_/g, ' ').toLowerCase()}</span></td>
+            <td><span className={`hiring-state state-${question.approvalStatus.toLowerCase()}`}>{codeLabel(question.approvalStatus)}</span></td>
             <td><div className="hiring-actions">
               {question.approvalStatus === 'DRAFT' ? <button type="button" className="secondary" onClick={() => { void move(question.id, 'UNDER_REVIEW'); }}>Send for review</button> : null}
               {question.approvalStatus === 'UNDER_REVIEW' ? <>
@@ -551,7 +554,7 @@ function ResultsPanel({ employerId, assessmentId }: { readonly employerId: strin
         <td><span className={`hiring-state state-${result.state.toLowerCase()}`}>{result.state.toLowerCase()}</span></td>
         <td>{result.percentage === null ? <span className="hiring-meta">NA</span> : `${result.percentage}%`}
           {result.score !== null ? <><br /><span className="hiring-meta">{result.score} / {result.maxScore}</span></> : null}</td>
-        <td>{result.submittedAt ? new Date(result.submittedAt).toLocaleDateString() : <span className="hiring-meta">Not yet</span>}</td>
+        <td>{result.submittedAt ? formatDate(result.submittedAt) : <span className="hiring-meta">Not yet</span>}</td>
         <td>{result.endedBy === 'TIME_LIMIT' ? 'Time ran out' : result.endedBy === 'CANDIDATE' ? 'Submitted by candidate'
           : result.submittedAt ? 'Submitted' : <span className="hiring-meta">Not yet</span>}</td>
       </tr>)}</tbody>
@@ -581,7 +584,7 @@ export function EmployerCandidateAssessmentsPanel({ employerId, applicationId }:
         const failure = error as { status?: number; correlationId?: string };
         setStatus(failure?.status === 403
           ? 'This candidate is no longer sharing their application with you, so their test results are not shown.'
-          : `Their screening test results could not be loaded.${failure?.correlationId ? ` Reference: ${failure.correlationId}` : ''}`);
+          : `Their screening test results could not be loaded.${failure?.correlationId ? supportCodeSuffix(failure.correlationId) : ''}`);
       });
     return () => abort.abort();
   }, [employerId, applicationId]);
@@ -595,7 +598,7 @@ export function EmployerCandidateAssessmentsPanel({ employerId, applicationId }:
       <h3>{item.title}</h3>
       <p className="hiring-meta">
         <span className={`hiring-state state-${item.state.toLowerCase()}`}>{item.state.toLowerCase()}</span>
-        {' '}· window {new Date(item.opensAt).toLocaleString()} – {new Date(item.closesAt).toLocaleString()}
+        {' '}· window {formatDateTime(item.opensAt)} – {formatDateTime(item.closesAt)}
         {' '}· {Math.round(item.durationSeconds / 60)} min
       </p>
       <p>{item.percentage === null ? 'Score: NA' : `Score: ${item.percentage}% (${item.score} / ${item.maxScore})`}

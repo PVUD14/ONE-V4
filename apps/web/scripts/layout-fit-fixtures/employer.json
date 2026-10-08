@@ -1,0 +1,1695 @@
+{
+ "email": "employer@demo.oneby8.com",
+ "landing": "/employer/recruiter",
+ "labels": [
+  "Dashboard",
+  "Opportunities",
+  "Opportunity Detail",
+  "Applicants",
+  "Candidate Detail",
+  "Assessments",
+  "Interviews",
+  "Talent Pool",
+  "Offers",
+  "Reports",
+  "Team",
+  "Messages",
+  "Company Profile",
+  "Settings",
+  "Help & FAQ"
+ ],
+ "responses": {
+  "GET /health": {
+   "status": 200,
+   "body": {
+    "status": "ok"
+   }
+  },
+  "GET /api/v1/security/context": {
+   "status": 200,
+   "body": {
+    "userId": "ffe87cbc-89e0-4a38-b2d8-da34109e1650",
+    "selectedOrganizationId": null,
+    "memberships": [
+     {
+      "organizationId": "ea7073f5-6a18-4866-b126-09ff8a5d5256",
+      "role": "RECRUITER",
+      "scope": {
+       "organizationId": "ea7073f5-6a18-4866-b126-09ff8a5d5256",
+       "employerId": "ea7073f5-6a18-4866-b126-09ff8a5d5256"
+      },
+      "capabilities": []
+     }
+    ],
+    "studentRelationships": [],
+    "formerStudentRelationships": [],
+    "correlationId": "9148fb31-183a-45e5-b847-3d01a76b6d99"
+   }
+  },
+  "GET /api/v1/me/consents/privacy-notice": {
+   "status": 200,
+   "body": {
+    "requiredVersion": null,
+    "grantedVersion": null,
+    "required": false,
+    "correlationId": "689c0402-def0-4386-97fe-3c7741546ddb"
+   }
+  },
+  "GET /api/v1/employers/ea7073f5-6a18-4866-b126-09ff8a5d5256/organisation-status": {
+   "status": 200,
+   "body": {
+    "organisation": {
+     "verificationState": "VERIFIED",
+     "active": true,
+     "canDraft": true,
+     "canPublish": true,
+     "canReachCandidates": true
+    },
+    "correlationId": "d9e36dbc-518d-41f8-87a7-976d6bbb7e41"
+   }
+  },
+  "GET /api/v1/employers/ea7073f5-6a18-4866-b126-09ff8a5d5256/summary": {
+   "status": 200,
+   "body": {
+    "summary": {
+     "openJobs": 3,
+     "newApplicantsLast7Days": 3,
+     "interviewsThisWeek": 1,
+     "offersPending": 1,
+     "drivesAwaitingApproval": 0,
+     "drivesChangesRequested": 0,
+     "applicationsTotal": 12,
+     "openApplications": 9,
+     "hires": 1,
+     "currentStages": {
+      "APPLIED": 2,
+      "SCREENING": 1,
+      "SHORTLISTED": 3,
+      "ASSESSMENT": 0,
+      "INTERVIEW": 2,
+      "OFFER": 1,
+      "HIRED": 1,
+      "REJECTED": 1,
+      "WITHDRAWN": 1
+     },
+     "week": {
+      "startsAt": "2026-10-04T18:30:00.000Z",
+      "endsAt": "2026-10-11T18:30:00.000Z"
+     },
+     "timeZone": "Asia/Kolkata"
+    },
+    "correlationId": "e83c0083-b4bc-401f-9dba-bd0a4b65d844"
+   }
+  },
+  "GET /api/v1/employers/ea7073f5-6a18-4866-b126-09ff8a5d5256/opportunities": {
+   "status": 200,
+   "body": {
+    "opportunities": [
+     {
+      "id": "7674a8ea-2bfa-49dd-9dd8-e70471447d9d",
+      "referenceCode": "CORV-2026-01",
+      "lifecycleState": "PUBLISHED",
+      "title": "Graduate Software Engineer",
+      "employmentType": "FULL_TIME",
+      "workMode": "HYBRID",
+      "locationCity": "Bengaluru",
+      "applicationDeadline": "2026-11-21 18:29:59+00",
+      "publishedAt": "2026-09-07 05:46:54.765115+00",
+      "closedAt": null,
+      "versionNumber": 1,
+      "applicationCount": 7,
+      "openApplicationCount": 6
+     },
+     {
+      "id": "34c5d55c-3448-4eb4-8b79-23f286f6f7cf",
+      "referenceCode": "CORV-2026-02",
+      "lifecycleState": "PUBLISHED",
+      "title": "Data Analyst Intern",
+      "employmentType": "INTERNSHIP",
+      "workMode": "REMOTE",
+      "locationCity": null,
+      "applicationDeadline": "2026-11-06 18:29:59+00",
+      "publishedAt": "2026-09-07 05:46:54.765115+00",
+      "closedAt": null,
+      "versionNumber": 1,
+      "applicationCount": 3,
+      "openApplicationCount": 1
+     },
+     {
+      "id": "46791985-4fe3-4008-9d22-6fbea8e3d912",
+      "referenceCode": "CORV-2026-03",
+      "lifecycleState": "PUBLISHED",
+      "title": "Embedded Systems Trainee",
+      "employmentType": "FULL_TIME",
+      "workMode": "ONSITE",
+      "locationCity": "Pune",
+      "applicationDeadline": "2026-11-16 18:29:59+00",
+      "publishedAt": "2026-09-07 05:46:54.765115+00",
+      "closedAt": null,
+      "versionNumber": 1,
+      "applicationCount": 2,
+      "openApplicationCount": 2
+     }
+    ],
+    "correlationId": "b4412677-fd70-4380-bbb2-178cfe600390"
+   }
+  },
+  "GET /api/v1/employers/ea7073f5-6a18-4866-b126-09ff8a5d5256/campus-drives": {
+   "status": 200,
+   "body": {
+    "drives": [
+     {
+      "id": "a9cc6374-002e-4a43-adff-ea629d478b09",
+      "opportunityId": "7674a8ea-2bfa-49dd-9dd8-e70471447d9d",
+      "opportunityTitle": "Graduate Software Engineer",
+      "opportunityState": "PUBLISHED",
+      "applicationDeadline": "2026-11-21T18:29:59.000Z",
+      "employerName": "Corvane Labs Private Limited",
+      "employerInGoodStanding": true,
+      "institutionName": "Lakeview Institute of Technology",
+      "state": "APPROVED",
+      "revision": 2,
+      "proposedStartAt": "2026-10-21T10:00:00.000Z",
+      "proposedEndAt": "2026-10-21T16:00:00.000Z",
+      "scheduledStartAt": null,
+      "scheduledEndAt": null,
+      "venueMode": "ON_CAMPUS",
+      "employerNote": "Coding exercise in the morning, interviews in the afternoon. Sample drive.",
+      "offerHoldersEligible": false,
+      "decision": {
+       "reasonCode": null,
+       "note": null,
+       "decidedAt": "2026-09-17T05:46:54.765Z"
+      },
+      "closedAt": null,
+      "closeReasonCode": null,
+      "createdAt": "2026-09-12T05:46:54.765Z",
+      "updatedAt": "2026-10-07T05:46:54.765Z",
+      "availableActions": [
+       "COMPLETE",
+       "CANCEL"
+      ],
+      "applicationCount": 7
+     }
+    ],
+    "correlationId": "8f9b0d83-64cb-474d-ac68-e45ad841e8dc"
+   }
+  },
+  "GET /api/v1/employers/ea7073f5-6a18-4866-b126-09ff8a5d5256/interviews": {
+   "status": 200,
+   "body": {
+    "interviews": [
+     {
+      "id": "1260812e-ee12-4f49-900d-b71932cf39c7",
+      "applicationId": "3526a635-d9d4-45f3-9485-b3298ae48692",
+      "applicationState": "INTERVIEW",
+      "opportunityId": "7674a8ea-2bfa-49dd-9dd8-e70471447d9d",
+      "referenceCode": "CORV-2026-01",
+      "title": "Graduate Software Engineer",
+      "consentRevoked": false,
+      "candidateAccess": true,
+      "candidateName": null,
+      "candidateEmail": "student@demo.oneby8.com",
+      "institutionStudentId": null,
+      "roundNumber": 1,
+      "mode": "VIDEO",
+      "state": "SCHEDULED",
+      "scheduledStart": "2026-10-10 05:00:00+00",
+      "scheduledEnd": "2026-10-10 06:00:00+00",
+      "locationDetail": null,
+      "joiningLink": "https://meet.corvane.example/sample-interview",
+      "joiningLinkWithheld": false,
+      "stageLabel": "Technical interview",
+      "scorecardTemplate": null,
+      "lastChange": {
+       "kind": "SCHEDULED",
+       "reasonCode": null,
+       "at": "2026-10-07T05:46:54.765Z"
+      },
+      "submittedAt": "2026-09-25 05:46:54.765115+00",
+      "closedAt": null,
+      "outcomeCount": 0,
+      "createdAt": "2026-10-07 05:46:54.765115+00",
+      "updatedAt": "2026-10-07 05:46:54.765115+00"
+     },
+     {
+      "id": "318bf04b-f657-43d4-a3c3-a23cea2278a5",
+      "applicationId": "c0113731-5515-43e6-ac7c-061dcc0a9969",
+      "applicationState": "INTERVIEW",
+      "opportunityId": "7674a8ea-2bfa-49dd-9dd8-e70471447d9d",
+      "referenceCode": "CORV-2026-01",
+      "title": "Graduate Software Engineer",
+      "consentRevoked": false,
+      "candidateAccess": true,
+      "candidateName": null,
+      "candidateEmail": "ishita@students.lakeview.example",
+      "institutionStudentId": null,
+      "roundNumber": 1,
+      "mode": "VIDEO",
+      "state": "SCHEDULED",
+      "scheduledStart": "2026-10-12 05:00:00+00",
+      "scheduledEnd": "2026-10-12 06:00:00+00",
+      "locationDetail": null,
+      "joiningLink": "https://meet.corvane.example/sample-interview",
+      "joiningLinkWithheld": false,
+      "stageLabel": "Technical interview",
+      "scorecardTemplate": null,
+      "lastChange": {
+       "kind": "SCHEDULED",
+       "reasonCode": null,
+       "at": "2026-10-07T05:46:54.765Z"
+      },
+      "submittedAt": "2026-09-26 05:46:54.765115+00",
+      "closedAt": null,
+      "outcomeCount": 0,
+      "createdAt": "2026-10-07 05:46:54.765115+00",
+      "updatedAt": "2026-10-07 05:46:54.765115+00"
+     }
+    ],
+    "correlationId": "c71e56c8-6fb0-4c2d-a96e-d7badcb43bc8"
+   }
+  },
+  "GET /api/v1/employers/ea7073f5-6a18-4866-b126-09ff8a5d5256/opportunities/7674a8ea-2bfa-49dd-9dd8-e70471447d9d/applications": {
+   "status": 200,
+   "body": {
+    "applications": [
+     {
+      "id": "3526a635-d9d4-45f3-9485-b3298ae48692",
+      "state": "INTERVIEW",
+      "consentRevoked": false,
+      "candidateAccess": true,
+      "candidateName": null,
+      "candidateEmail": "student@demo.oneby8.com",
+      "institutionStudentId": null,
+      "submittedAt": "2026-09-25 05:46:54.765115+00",
+      "closedAt": null,
+      "interviewCount": 1,
+      "offerState": null,
+      "termsAcknowledgementPending": false,
+      "eligibility": null,
+      "source": "DIRECT",
+      "updatedAt": "2026-10-07 10:23:58.358181+00"
+     },
+     {
+      "id": "f3d67e44-2be5-409f-9b4c-ae08246cad35",
+      "state": "SHORTLISTED",
+      "consentRevoked": false,
+      "candidateAccess": true,
+      "candidateName": null,
+      "candidateEmail": "karthik@students.lakeview.example",
+      "institutionStudentId": null,
+      "submittedAt": "2026-09-28 05:46:54.765115+00",
+      "closedAt": null,
+      "interviewCount": 0,
+      "offerState": null,
+      "termsAcknowledgementPending": false,
+      "eligibility": null,
+      "source": "DIRECT",
+      "updatedAt": "2026-10-07 05:46:54.765115+00"
+     },
+     {
+      "id": "c0113731-5515-43e6-ac7c-061dcc0a9969",
+      "state": "INTERVIEW",
+      "consentRevoked": false,
+      "candidateAccess": true,
+      "candidateName": null,
+      "candidateEmail": "ishita@students.lakeview.example",
+      "institutionStudentId": null,
+      "submittedAt": "2026-09-26 05:46:54.765115+00",
+      "closedAt": null,
+      "interviewCount": 1,
+      "offerState": null,
+      "termsAcknowledgementPending": false,
+      "eligibility": null,
+      "source": "DIRECT",
+      "updatedAt": "2026-10-07 05:46:54.765115+00"
+     },
+     {
+      "id": "0cf372e6-81b9-42a7-99b2-b4d41c98b90d",
+      "state": "OFFER",
+      "consentRevoked": false,
+      "candidateAccess": true,
+      "candidateName": null,
+      "candidateEmail": "priya@students.lakeview.example",
+      "institutionStudentId": null,
+      "submittedAt": "2026-09-17 05:46:54.765115+00",
+      "closedAt": null,
+      "interviewCount": 0,
+      "offerState": "EXTENDED",
+      "termsAcknowledgementPending": false,
+      "eligibility": null,
+      "source": "DIRECT",
+      "updatedAt": "2026-10-07 05:46:54.765115+00"
+     },
+     {
+      "id": "1b41f870-1fe0-4caf-bfcb-0fb120f2a514",
+      "state": "REJECTED",
+      "consentRevoked": false,
+      "candidateAccess": false,
+      "candidateName": null,
+      "candidateEmail": null,
+      "institutionStudentId": null,
+      "submittedAt": "2026-09-22 05:46:54.765115+00",
+      "closedAt": "2026-10-06 05:46:54.765115+00",
+      "interviewCount": 0,
+      "offerState": null,
+      "termsAcknowledgementPending": false,
+      "eligibility": null,
+      "source": "DIRECT",
+      "updatedAt": "2026-10-07 05:46:54.765115+00"
+     },
+     {
+      "id": "ef2911b5-798c-4a2d-9095-d077bdaa94d5",
+      "state": "APPLIED",
+      "consentRevoked": false,
+      "candidateAccess": true,
+      "candidateName": null,
+      "candidateEmail": "meghana@students.lakeview.example",
+      "institutionStudentId": null,
+      "submittedAt": "2026-10-04 05:46:54.765115+00",
+      "closedAt": null,
+      "interviewCount": 0,
+      "offerState": null,
+      "termsAcknowledgementPending": false,
+      "eligibility": null,
+      "source": "DIRECT",
+      "updatedAt": "2026-10-07 05:46:54.765115+00"
+     },
+     {
+      "id": "95835055-e786-42ab-ace2-a355a1aba514",
+      "state": "SCREENING",
+      "consentRevoked": false,
+      "candidateAccess": true,
+      "candidateName": null,
+      "candidateEmail": "divya@students.lakeview.example",
+      "institutionStudentId": null,
+      "submittedAt": "2026-10-01 05:46:54.765115+00",
+      "closedAt": null,
+      "interviewCount": 0,
+      "offerState": null,
+      "termsAcknowledgementPending": false,
+      "eligibility": null,
+      "source": "DIRECT",
+      "updatedAt": "2026-10-07 05:46:54.765115+00"
+     }
+    ],
+    "stages": [
+     {
+      "id": "c6159f1c-e1d3-46c5-959d-e44515d6ad67",
+      "order": 1,
+      "kind": "SCREENING",
+      "label": "Application review",
+      "detail": null,
+      "applicationState": "SCREENING",
+      "scorecardTemplate": null
+     },
+     {
+      "id": "f786c68e-95e4-4656-a8f6-abfe7af25aff",
+      "order": 2,
+      "kind": "ASSESSMENT",
+      "label": "Coding exercise",
+      "detail": null,
+      "applicationState": "ASSESSMENT",
+      "scorecardTemplate": null
+     },
+     {
+      "id": "f6ccfc0e-d565-4c71-becc-b323f0b4aefc",
+      "order": 3,
+      "kind": "INTERVIEW",
+      "label": "Technical interview",
+      "detail": null,
+      "applicationState": "INTERVIEW",
+      "scorecardTemplate": null
+     },
+     {
+      "id": "bff49485-162e-40cd-99eb-041dcb30bc7f",
+      "order": 4,
+      "kind": "OFFER",
+      "label": "Offer",
+      "detail": null,
+      "applicationState": "OFFER",
+      "scorecardTemplate": null
+     }
+    ],
+    "correlationId": "decf93e5-7231-42be-a469-5415ab09a138"
+   }
+  },
+  "GET /api/v1/employers/ea7073f5-6a18-4866-b126-09ff8a5d5256/opportunities/34c5d55c-3448-4eb4-8b79-23f286f6f7cf/applications": {
+   "status": 200,
+   "body": {
+    "applications": [
+     {
+      "id": "40fa27a4-61cb-43da-9220-cc31faa21704",
+      "state": "WITHDRAWN",
+      "consentRevoked": true,
+      "candidateAccess": false,
+      "candidateName": null,
+      "candidateEmail": null,
+      "institutionStudentId": null,
+      "submittedAt": "2026-10-05 05:46:54.765115+00",
+      "closedAt": "2026-10-07 10:23:59.968523+00",
+      "interviewCount": 0,
+      "offerState": null,
+      "termsAcknowledgementPending": false,
+      "eligibility": null,
+      "source": "DIRECT",
+      "updatedAt": "2026-10-07 10:24:06.134894+00"
+     },
+     {
+      "id": "d08e2925-3a63-4fcf-981e-838d197379ed",
+      "state": "HIRED",
+      "consentRevoked": false,
+      "candidateAccess": false,
+      "candidateName": null,
+      "candidateEmail": null,
+      "institutionStudentId": null,
+      "submittedAt": "2026-09-12 05:46:54.765115+00",
+      "closedAt": "2026-10-06 05:46:54.765115+00",
+      "interviewCount": 0,
+      "offerState": "ACCEPTED",
+      "termsAcknowledgementPending": false,
+      "eligibility": null,
+      "source": "DIRECT",
+      "updatedAt": "2026-10-07 05:46:54.765115+00"
+     },
+     {
+      "id": "a8e718cd-1686-433b-a1fb-a566b81e8bf0",
+      "state": "SHORTLISTED",
+      "consentRevoked": false,
+      "candidateAccess": true,
+      "candidateName": null,
+      "candidateEmail": "nandini@students.lakeview.example",
+      "institutionStudentId": null,
+      "submittedAt": "2026-09-29 05:46:54.765115+00",
+      "closedAt": null,
+      "interviewCount": 0,
+      "offerState": null,
+      "termsAcknowledgementPending": false,
+      "eligibility": null,
+      "source": "DIRECT",
+      "updatedAt": "2026-10-07 05:46:54.765115+00"
+     }
+    ],
+    "stages": [
+     {
+      "id": "ddd801fb-545d-4d17-baf1-2ac540a2fdb7",
+      "order": 1,
+      "kind": "SCREENING",
+      "label": "Application review",
+      "detail": null,
+      "applicationState": "SCREENING",
+      "scorecardTemplate": null
+     },
+     {
+      "id": "22eeab51-4c9f-4fad-bc1d-aa066b0b1326",
+      "order": 2,
+      "kind": "INTERVIEW",
+      "label": "Conversation with the team",
+      "detail": null,
+      "applicationState": "INTERVIEW",
+      "scorecardTemplate": null
+     },
+     {
+      "id": "3daaffe1-134f-4bde-a29e-94f701021985",
+      "order": 3,
+      "kind": "OFFER",
+      "label": "Offer",
+      "detail": null,
+      "applicationState": "OFFER",
+      "scorecardTemplate": null
+     }
+    ],
+    "correlationId": "355574d7-a217-4582-aecf-f4d1fdd88f1f"
+   }
+  },
+  "GET /api/v1/employers/ea7073f5-6a18-4866-b126-09ff8a5d5256/opportunities/46791985-4fe3-4008-9d22-6fbea8e3d912/applications": {
+   "status": 200,
+   "body": {
+    "applications": [
+     {
+      "id": "1d046681-927d-431b-9f2f-d1756a77f987",
+      "state": "APPLIED",
+      "consentRevoked": false,
+      "candidateAccess": true,
+      "candidateName": "Vishal Patil",
+      "candidateEmail": "vishal@students.lakeview.example",
+      "institutionStudentId": "LIT-ECE-27-001",
+      "submittedAt": "2026-10-03 05:46:54.765115+00",
+      "closedAt": null,
+      "interviewCount": 0,
+      "offerState": null,
+      "termsAcknowledgementPending": false,
+      "eligibility": null,
+      "source": "DIRECT",
+      "updatedAt": "2026-10-07 05:46:54.765115+00"
+     },
+     {
+      "id": "a0aa6e41-348a-427f-b152-f3e483accd80",
+      "state": "SHORTLISTED",
+      "consentRevoked": false,
+      "candidateAccess": true,
+      "candidateName": "Ritu Chauhan",
+      "candidateEmail": "ritu@students.lakeview.example",
+      "institutionStudentId": "LIT-ECE-27-002",
+      "submittedAt": "2026-09-27 05:46:54.765115+00",
+      "closedAt": null,
+      "interviewCount": 0,
+      "offerState": null,
+      "termsAcknowledgementPending": false,
+      "eligibility": null,
+      "source": "DIRECT",
+      "updatedAt": "2026-10-07 05:46:54.765115+00"
+     }
+    ],
+    "stages": [
+     {
+      "id": "cfad5c1c-d745-42f6-9a09-471adbb736e1",
+      "order": 1,
+      "kind": "SCREENING",
+      "label": "Application review",
+      "detail": null,
+      "applicationState": "SCREENING",
+      "scorecardTemplate": null
+     },
+     {
+      "id": "21cd47ee-a735-492f-8209-c79729a20ac9",
+      "order": 2,
+      "kind": "INTERVIEW",
+      "label": "Technical interview",
+      "detail": null,
+      "applicationState": "INTERVIEW",
+      "scorecardTemplate": null
+     },
+     {
+      "id": "8a8f4216-8007-469b-b8f9-8875986cac0a",
+      "order": 3,
+      "kind": "OFFER",
+      "label": "Offer",
+      "detail": null,
+      "applicationState": "OFFER",
+      "scorecardTemplate": null
+     }
+    ],
+    "correlationId": "eb17aebd-6015-481c-b0bc-8fe612982cf6"
+   }
+  },
+  "GET /api/v1/employers/ea7073f5-6a18-4866-b126-09ff8a5d5256/opportunities/7674a8ea-2bfa-49dd-9dd8-e70471447d9d": {
+   "status": 200,
+   "body": {
+    "opportunity": {
+     "id": "7674a8ea-2bfa-49dd-9dd8-e70471447d9d",
+     "referenceCode": "CORV-2026-01",
+     "lifecycleState": "PUBLISHED",
+     "publishedAt": "2026-09-07 05:46:54.765115+00",
+     "closedAt": null,
+     "createdAt": "2026-10-07 05:46:54.765115+00",
+     "updatedAt": "2026-10-07 05:46:54.765115+00",
+     "canEdit": true,
+     "availableActions": [
+      "PAUSE",
+      "CLOSE",
+      "WITHDRAW"
+     ],
+     "reasonCodes": {
+      "PAUSE": [
+       "HIRING_ON_HOLD",
+       "REVIEWING_APPLICANTS",
+       "UPDATING_DETAILS"
+      ],
+      "CLOSE": [
+       "POSITION_FILLED",
+       "ENOUGH_APPLICANTS",
+       "HIRING_ON_HOLD",
+       "ROLE_CANCELLED",
+       "POSTED_IN_ERROR"
+      ],
+      "REOPEN": [],
+      "WITHDRAW": [
+       "POSTED_IN_ERROR",
+       "ROLE_CANCELLED",
+       "DUPLICATE_POSTING",
+       "TERMS_INCORRECT"
+      ]
+     },
+     "audiences": [
+      {
+       "kind": "INSTITUTION",
+       "institutionName": "Lakeview Institute of Technology",
+       "unitName": null
+      }
+     ],
+     "applicationCount": 7,
+     "openApplicationCount": 6,
+     "awaitingAcknowledgementCount": 0,
+     "lastLifecycleChange": null
+    },
+    "currentVersion": {
+     "id": "d0de172d-6905-47f7-92ef-e2c5baf00b52",
+     "versionNumber": 1,
+     "title": "Graduate Software Engineer",
+     "summary": "Join the platform team building Corvane's internal tools. Sample job in the ONE sandbox.",
+     "responsibilities": "Write and review code, fix defects, and pair with a senior engineer on one product area.",
+     "employmentType": "FULL_TIME",
+     "workMode": "HYBRID",
+     "locationCity": "Bengaluru",
+     "positionsAvailable": 4,
+     "durationMonths": null,
+     "compensationDisclosed": true,
+     "compensationCurrency": "INR",
+     "compensationMin": "700000.00",
+     "compensationMax": "900000.00",
+     "compensationPeriod": "YEAR",
+     "joiningConditions": null,
+     "applicationDeadline": "2026-11-21 18:29:59+00",
+     "createdAt": "2026-10-07 05:46:54.765115+00",
+     "requirements": {
+      "eligibilityRules": [
+       {
+        "ruleType": "MIN_CGPA",
+        "comparator": "GTE",
+        "valueNumeric": 6,
+        "valueText": null,
+        "isBlocking": false,
+        "displayValue": "6"
+       }
+      ],
+      "skills": [
+       {
+        "name": "Data structures and algorithms",
+        "level": "REQUIRED",
+        "taxonomyTopicId": null,
+        "catalogue": false
+       },
+       {
+        "name": "Professional communication",
+        "level": "REQUIRED",
+        "taxonomyTopicId": null,
+        "catalogue": false
+       },
+       {
+        "name": "SQL",
+        "level": "PREFERRED",
+        "taxonomyTopicId": null,
+        "catalogue": false
+       }
+      ],
+      "stages": [
+       {
+        "order": 1,
+        "kind": "SCREENING",
+        "label": "Application review",
+        "detail": null,
+        "applicationState": "SCREENING",
+        "scorecardTemplate": null
+       },
+       {
+        "order": 2,
+        "kind": "ASSESSMENT",
+        "label": "Coding exercise",
+        "detail": null,
+        "applicationState": "ASSESSMENT",
+        "scorecardTemplate": null
+       },
+       {
+        "order": 3,
+        "kind": "INTERVIEW",
+        "label": "Technical interview",
+        "detail": null,
+        "applicationState": "INTERVIEW",
+        "scorecardTemplate": null
+       },
+       {
+        "order": 4,
+        "kind": "OFFER",
+        "label": "Offer",
+        "detail": null,
+        "applicationState": "OFFER",
+        "scorecardTemplate": null
+       }
+      ],
+      "careerRole": null
+     }
+    },
+    "requirementReasonCodes": [
+     "DETAILS_CORRECTED",
+     "TERMS_UPDATED",
+     "ELIGIBILITY_CORRECTED",
+     "ELIGIBILITY_RELAXED",
+     "ELIGIBILITY_TIGHTENED",
+     "PLACEMENT_OFFICE_REQUEST",
+     "SKILLS_UPDATED",
+     "STAGES_UPDATED"
+    ],
+    "versions": [
+     {
+      "id": "d0de172d-6905-47f7-92ef-e2c5baf00b52",
+      "versionNumber": 1,
+      "title": "Graduate Software Engineer",
+      "createdAt": "2026-10-07 05:46:54.765115+00",
+      "isCurrent": true,
+      "change": "INITIAL",
+      "changedTerms": [],
+      "changedDetails": []
+     }
+    ],
+    "correlationId": "727db5d4-3d96-4b8a-9255-2e3058d1e16c"
+   }
+  },
+  "GET /api/v1/employers/ea7073f5-6a18-4866-b126-09ff8a5d5256/campus-drives?opportunityId=7674a8ea-2bfa-49dd-9dd8-e70471447d9d": {
+   "status": 200,
+   "body": {
+    "drives": [
+     {
+      "id": "a9cc6374-002e-4a43-adff-ea629d478b09",
+      "opportunityId": "7674a8ea-2bfa-49dd-9dd8-e70471447d9d",
+      "opportunityTitle": "Graduate Software Engineer",
+      "opportunityState": "PUBLISHED",
+      "applicationDeadline": "2026-11-21T18:29:59.000Z",
+      "employerName": "Corvane Labs Private Limited",
+      "employerInGoodStanding": true,
+      "institutionName": "Lakeview Institute of Technology",
+      "state": "APPROVED",
+      "revision": 2,
+      "proposedStartAt": "2026-10-21T10:00:00.000Z",
+      "proposedEndAt": "2026-10-21T16:00:00.000Z",
+      "scheduledStartAt": null,
+      "scheduledEndAt": null,
+      "venueMode": "ON_CAMPUS",
+      "employerNote": "Coding exercise in the morning, interviews in the afternoon. Sample drive.",
+      "offerHoldersEligible": false,
+      "decision": {
+       "reasonCode": null,
+       "note": null,
+       "decidedAt": "2026-09-17T05:46:54.765Z"
+      },
+      "closedAt": null,
+      "closeReasonCode": null,
+      "createdAt": "2026-09-12T05:46:54.765Z",
+      "updatedAt": "2026-10-07T05:46:54.765Z",
+      "availableActions": [
+       "COMPLETE",
+       "CANCEL"
+      ],
+      "applicationCount": 7
+     }
+    ],
+    "correlationId": "cad5b871-6b72-4fa6-9c5d-559c1d5bfb80"
+   }
+  },
+  "GET /api/v1/employers/ea7073f5-6a18-4866-b126-09ff8a5d5256/assessment-questions": {
+   "status": 200,
+   "body": {
+    "questions": [],
+    "correlationId": "a617d4ca-87ae-4ebc-9fc5-e912b68585dd"
+   }
+  },
+  "GET /api/v1/employers/ea7073f5-6a18-4866-b126-09ff8a5d5256/assessments": {
+   "status": 200,
+   "body": {
+    "assessments": [],
+    "closeReasonCodes": [
+     "ROLE_FILLED",
+     "ROLE_CLOSED",
+     "SCREENING_COMPLETE",
+     "REPLACED_BY_NEW_TEST",
+     "CONTENT_FLAWED"
+    ],
+    "correlationId": "698dc75e-2721-49fb-8e24-b7d1182ac613"
+   }
+  },
+  "GET /api/v1/employers/ea7073f5-6a18-4866-b126-09ff8a5d5256/talent-pool": {
+   "status": 200,
+   "body": {
+    "talentPool": {
+     "available": false
+    },
+    "correlationId": "dc634da4-ccba-4821-b504-c508e3971350"
+   }
+  },
+  "GET /api/v1/employers/ea7073f5-6a18-4866-b126-09ff8a5d5256/reports": {
+   "status": 200,
+   "body": {
+    "reports": {
+     "threshold": 5,
+     "overall": {
+      "suppressed": false,
+      "total": {
+       "suppressed": false,
+       "value": 12
+      },
+      "cells": [
+       {
+        "key": "APPLIED",
+        "count": null,
+        "suppressed": true
+       },
+       {
+        "key": "SCREENING",
+        "count": null,
+        "suppressed": true
+       },
+       {
+        "key": "SHORTLISTED",
+        "count": null,
+        "suppressed": true
+       },
+       {
+        "key": "ASSESSMENT",
+        "count": null,
+        "suppressed": true
+       },
+       {
+        "key": "INTERVIEW",
+        "count": null,
+        "suppressed": true
+       },
+       {
+        "key": "OFFER",
+        "count": null,
+        "suppressed": true
+       },
+       {
+        "key": "HIRED",
+        "count": null,
+        "suppressed": true
+       },
+       {
+        "key": "LEFT_AT_APPLIED",
+        "count": null,
+        "suppressed": true
+       },
+       {
+        "key": "LEFT_AT_SCREENING",
+        "count": null,
+        "suppressed": true
+       },
+       {
+        "key": "LEFT_AT_SHORTLISTED",
+        "count": null,
+        "suppressed": true
+       },
+       {
+        "key": "LEFT_AT_ASSESSMENT",
+        "count": null,
+        "suppressed": true
+       },
+       {
+        "key": "LEFT_AT_INTERVIEW",
+        "count": null,
+        "suppressed": true
+       },
+       {
+        "key": "LEFT_AT_OFFER",
+        "count": null,
+        "suppressed": true
+       }
+      ]
+     },
+     "byJob": [
+      {
+       "opportunityId": "34c5d55c-3448-4eb4-8b79-23f286f6f7cf",
+       "referenceCode": "CORV-2026-02",
+       "title": "Data Analyst Intern",
+       "lifecycleState": "PUBLISHED",
+       "table": {
+        "suppressed": true,
+        "total": {
+         "suppressed": true,
+         "value": null
+        },
+        "cells": []
+       }
+      },
+      {
+       "opportunityId": "46791985-4fe3-4008-9d22-6fbea8e3d912",
+       "referenceCode": "CORV-2026-03",
+       "title": "Embedded Systems Trainee",
+       "lifecycleState": "PUBLISHED",
+       "table": {
+        "suppressed": true,
+        "total": {
+         "suppressed": true,
+         "value": null
+        },
+        "cells": []
+       }
+      },
+      {
+       "opportunityId": "7674a8ea-2bfa-49dd-9dd8-e70471447d9d",
+       "referenceCode": "CORV-2026-01",
+       "title": "Graduate Software Engineer",
+       "lifecycleState": "PUBLISHED",
+       "table": {
+        "suppressed": false,
+        "total": {
+         "suppressed": false,
+         "value": 7
+        },
+        "cells": [
+         {
+          "key": "APPLIED",
+          "count": null,
+          "suppressed": true
+         },
+         {
+          "key": "SCREENING",
+          "count": null,
+          "suppressed": true
+         },
+         {
+          "key": "SHORTLISTED",
+          "count": null,
+          "suppressed": true
+         },
+         {
+          "key": "ASSESSMENT",
+          "count": null,
+          "suppressed": true
+         },
+         {
+          "key": "INTERVIEW",
+          "count": null,
+          "suppressed": true
+         },
+         {
+          "key": "OFFER",
+          "count": null,
+          "suppressed": true
+         },
+         {
+          "key": "HIRED",
+          "count": null,
+          "suppressed": true
+         },
+         {
+          "key": "LEFT_AT_APPLIED",
+          "count": null,
+          "suppressed": true
+         },
+         {
+          "key": "LEFT_AT_SCREENING",
+          "count": null,
+          "suppressed": true
+         },
+         {
+          "key": "LEFT_AT_SHORTLISTED",
+          "count": null,
+          "suppressed": true
+         },
+         {
+          "key": "LEFT_AT_ASSESSMENT",
+          "count": null,
+          "suppressed": true
+         },
+         {
+          "key": "LEFT_AT_INTERVIEW",
+          "count": null,
+          "suppressed": true
+         },
+         {
+          "key": "LEFT_AT_OFFER",
+          "count": null,
+          "suppressed": true
+         }
+        ]
+       }
+      }
+     ],
+     "byJobTruncated": false,
+     "byCollege": [
+      {
+       "collegeName": "Lakeview Institute of Technology",
+       "table": {
+        "suppressed": false,
+        "total": {
+         "suppressed": false,
+         "value": 12
+        },
+        "cells": [
+         {
+          "key": "APPLIED",
+          "count": null,
+          "suppressed": true
+         },
+         {
+          "key": "SCREENING",
+          "count": null,
+          "suppressed": true
+         },
+         {
+          "key": "SHORTLISTED",
+          "count": null,
+          "suppressed": true
+         },
+         {
+          "key": "ASSESSMENT",
+          "count": null,
+          "suppressed": true
+         },
+         {
+          "key": "INTERVIEW",
+          "count": null,
+          "suppressed": true
+         },
+         {
+          "key": "OFFER",
+          "count": null,
+          "suppressed": true
+         },
+         {
+          "key": "HIRED",
+          "count": null,
+          "suppressed": true
+         },
+         {
+          "key": "LEFT_AT_APPLIED",
+          "count": null,
+          "suppressed": true
+         },
+         {
+          "key": "LEFT_AT_SCREENING",
+          "count": null,
+          "suppressed": true
+         },
+         {
+          "key": "LEFT_AT_SHORTLISTED",
+          "count": null,
+          "suppressed": true
+         },
+         {
+          "key": "LEFT_AT_ASSESSMENT",
+          "count": null,
+          "suppressed": true
+         },
+         {
+          "key": "LEFT_AT_INTERVIEW",
+          "count": null,
+          "suppressed": true
+         },
+         {
+          "key": "LEFT_AT_OFFER",
+          "count": null,
+          "suppressed": true
+         }
+        ]
+       }
+      }
+     ],
+     "byDrive": [
+      {
+       "driveId": "a9cc6374-002e-4a43-adff-ea629d478b09",
+       "opportunityId": "7674a8ea-2bfa-49dd-9dd8-e70471447d9d",
+       "opportunityTitle": "Graduate Software Engineer",
+       "institutionName": "Lakeview Institute of Technology",
+       "state": "APPROVED",
+       "table": {
+        "suppressed": false,
+        "total": {
+         "suppressed": false,
+         "value": 7
+        },
+        "cells": [
+         {
+          "key": "APPLIED",
+          "count": null,
+          "suppressed": true
+         },
+         {
+          "key": "SCREENING",
+          "count": null,
+          "suppressed": true
+         },
+         {
+          "key": "SHORTLISTED",
+          "count": null,
+          "suppressed": true
+         },
+         {
+          "key": "ASSESSMENT",
+          "count": null,
+          "suppressed": true
+         },
+         {
+          "key": "INTERVIEW",
+          "count": null,
+          "suppressed": true
+         },
+         {
+          "key": "OFFER",
+          "count": null,
+          "suppressed": true
+         },
+         {
+          "key": "HIRED",
+          "count": null,
+          "suppressed": true
+         },
+         {
+          "key": "LEFT_AT_APPLIED",
+          "count": null,
+          "suppressed": true
+         },
+         {
+          "key": "LEFT_AT_SCREENING",
+          "count": null,
+          "suppressed": true
+         },
+         {
+          "key": "LEFT_AT_SHORTLISTED",
+          "count": null,
+          "suppressed": true
+         },
+         {
+          "key": "LEFT_AT_ASSESSMENT",
+          "count": null,
+          "suppressed": true
+         },
+         {
+          "key": "LEFT_AT_INTERVIEW",
+          "count": null,
+          "suppressed": true
+         },
+         {
+          "key": "LEFT_AT_OFFER",
+          "count": null,
+          "suppressed": true
+         }
+        ]
+       }
+      }
+     ],
+     "byDriveTruncated": false,
+     "timeToStage": [
+      {
+       "metric": "SHORTLIST",
+       "applications": {
+        "suppressed": false,
+        "value": 7
+       },
+       "medianDays": 2.5
+      },
+      {
+       "metric": "INTERVIEW",
+       "applications": {
+        "suppressed": true,
+        "value": null
+       },
+       "medianDays": null
+      },
+      {
+       "metric": "OFFER",
+       "applications": {
+        "suppressed": true,
+        "value": null
+       },
+       "medianDays": null
+      },
+      {
+       "metric": "HIRE",
+       "applications": {
+        "suppressed": true,
+        "value": null
+       },
+       "medianDays": null
+      }
+     ],
+     "offers": {
+      "table": {
+       "suppressed": true,
+       "total": {
+        "suppressed": true,
+        "value": null
+       },
+       "cells": []
+      },
+      "acceptanceRate": null
+     }
+    },
+    "correlationId": "dc0d886a-cf98-4832-b637-724a261aafaa"
+   }
+  },
+  "GET /api/v1/employers/ea7073f5-6a18-4866-b126-09ff8a5d5256/message-threads": {
+   "status": 200,
+   "body": {
+    "threads": [],
+    "withheldCount": 0,
+    "nextCursor": null,
+    "correlationId": "a90d5f20-8a61-40c0-bab9-a1f6e14a8b40"
+   }
+  },
+  "GET /api/v1/employers/ea7073f5-6a18-4866-b126-09ff8a5d5256/company-profile": {
+   "status": 200,
+   "body": {
+    "companyProfile": {
+     "legalName": "Corvane Labs Private Limited",
+     "verificationState": "VERIFIED",
+     "profileSetUp": true,
+     "displayName": "Corvane Labs",
+     "websiteUrl": "https://corvane.example",
+     "countryCode": "IN",
+     "stateOrProvince": "Karnataka",
+     "city": "Bengaluru",
+     "postalCode": null,
+     "primaryContactEmail": "talent@corvane.example",
+     "about": "Corvane Labs is a fictional software company used only in the ONE sandbox. Its jobs and people are sample data.",
+     "industry": "SOFTWARE_AND_IT_SERVICES",
+     "companySizeBand": "201-1000",
+     "careersPageUrl": null,
+     "updatedAt": "2026-10-07T05:46:51.068Z",
+     "canEdit": false,
+     "editableFields": [
+      "about",
+      "industry",
+      "companySizeBand",
+      "careersPageUrl"
+     ],
+     "operationsControlledFields": [
+      "legalName",
+      "displayName",
+      "websiteUrl",
+      "countryCode",
+      "stateOrProvince",
+      "city",
+      "postalCode",
+      "addressLine1",
+      "addressLine2",
+      "primaryContactEmail"
+     ],
+     "options": {
+      "industries": [
+       "SOFTWARE_AND_IT_SERVICES",
+       "FINANCIAL_SERVICES",
+       "MANUFACTURING",
+       "ENGINEERING_AND_CONSTRUCTION",
+       "HEALTHCARE_AND_LIFE_SCIENCES",
+       "CONSULTING_AND_PROFESSIONAL_SERVICES",
+       "RETAIL_AND_CONSUMER",
+       "EDUCATION",
+       "MEDIA_AND_COMMUNICATIONS",
+       "ENERGY_AND_UTILITIES",
+       "LOGISTICS_AND_TRANSPORT",
+       "GOVERNMENT_AND_PUBLIC_SECTOR",
+       "NON_PROFIT",
+       "OTHER"
+      ],
+      "sizeBands": [
+       "1-10",
+       "11-50",
+       "51-200",
+       "201-1000",
+       "1001-5000",
+       "5001+"
+      ]
+     }
+    },
+    "correlationId": "9e808683-4b42-4592-a4c2-9964021fbd94"
+   }
+  },
+  "GET /api/v1/help": {
+   "status": 200,
+   "body": {
+    "articles": [
+     {
+      "id": "signing-in",
+      "personas": [
+       "all"
+      ],
+      "title": "Signing in and choosing a workspace",
+      "keywords": [
+       "login",
+       "sign in",
+       "password",
+       "workspace",
+       "account",
+       "locked"
+      ],
+      "body": "Sign in at oneby8.com with the email and password issued to you. After signing in you land in the workspace that matches your role: students in the student portal, institution staff in the institution portal, employers in the employer portal. If your password does not work or your account is locked, contact your placement cell (students) or the ONE operator who issued your account — the assistant cannot reset passwords."
+     },
+     {
+      "id": "navigation",
+      "personas": [
+       "all"
+      ],
+      "title": "Finding your way around",
+      "keywords": [
+       "sidebar",
+       "menu",
+       "navigate",
+       "topbar",
+       "where",
+       "find"
+      ],
+      "body": "The left sidebar lists every section of your workspace; the top bar shows your account, the Messages icon and the Notifications bell. The bell shows a count only when something actually needs your attention. Messages will hold conversations with your placement cell and recruiters once messaging launches; today it is an empty inbox by design."
+     },
+     {
+      "id": "notifications",
+      "personas": [
+       "all"
+      ],
+      "title": "Notifications",
+      "keywords": [
+       "notification",
+       "bell",
+       "alert",
+       "badge",
+       "unread"
+      ],
+      "body": "For students, notifications are derived from real account state: assessments assigned and still open, attempts in progress, and freshly published results. For institution staff, the bell summarises published assessments, completed attempts and questions awaiting review. Institution faculty and department heads can set email reminders and quiet hours under Settings; ONE does not send staff reminder emails yet."
+     },
+     {
+      "id": "privacy-data",
+      "personas": [
+       "all"
+      ],
+      "title": "Your data and privacy",
+      "keywords": [
+       "privacy",
+       "data",
+       "download",
+       "export",
+       "delete",
+       "consent",
+       "dpdp"
+      ],
+      "body": "Students can download a copy of their personal data from Settings; the export is currently a machine-readable JSON bundle. Sharing your profile with anyone is always your explicit choice. Internal readiness signals are advisory guidance for you and your institution only — they are never shown to employers and never made public."
+     },
+     {
+      "id": "getting-help",
+      "personas": [
+       "all"
+      ],
+      "title": "Getting more help",
+      "keywords": [
+       "support",
+       "help",
+       "contact",
+       "bug",
+       "issue",
+       "problem",
+       "report"
+      ],
+      "body": "If something looks broken or you are stuck beyond what this assistant can answer, report it to your placement cell (students) or to the ONE support contact your organisation was given. Include what you clicked, what you expected, and what happened instead — a screenshot helps."
+     },
+     {
+      "id": "student-profile",
+      "personas": [
+       "student"
+      ],
+      "title": "Your profile",
+      "keywords": [
+       "profile",
+       "edit",
+       "skills",
+       "projects",
+       "education",
+       "photo",
+       "update"
+      ],
+      "body": "Your profile is your living record: education, skills, projects and certifications. Keep it current — it is what your placement cell works from and what employers see when you choose to share it. Update it from the Profile section of your workspace."
+     },
+     {
+      "id": "public-profile-qr",
+      "personas": [
+       "student"
+      ],
+      "title": "Public profile and QR sharing",
+      "keywords": [
+       "public",
+       "qr",
+       "share",
+       "link",
+       "recruiter",
+       "scan"
+      ],
+      "body": "You can present a public view of your profile and share it with a QR code that a recruiter scans from your screen. Sharing is consent-based: nothing is public unless you choose to share it, and internal readiness scores are never part of the public view."
+     },
+     {
+      "id": "taking-assessments",
+      "personas": [
+       "student"
+      ],
+      "title": "Taking an assessment",
+      "keywords": [
+       "assessment",
+       "exam",
+       "test",
+       "start",
+       "attempt",
+       "timer",
+       "resume",
+       "save"
+      ],
+      "body": "Assessments are taken on a laptop or desktop only - phone screens and app switching do not mix with timed, proctored attempts. Open Assessments in your workspace to see what is assigned to you, with each assessment’s window and your attempts used. Start an attempt to get your paper; every attempt runs on its own countdown clock (the assessment’s duration), which is separate from the window in which you may start. Answers save automatically as you go, and if you lose connection you can resume the same attempt with the remaining time. Submit before the clock runs out; when it reaches zero the attempt submits itself."
+     },
+     {
+      "id": "assessment-rules",
+      "personas": [
+       "student"
+      ],
+      "title": "Assessment rules: attempts, focus and marking",
+      "keywords": [
+       "attempts",
+       "tab",
+       "switch",
+       "focus",
+       "warning",
+       "negative",
+       "marking",
+       "auto",
+       "submit",
+       "result"
+      ],
+      "body": "Each assessment allows a fixed number of attempts. Leaving the exam tab or window is recorded: you get warnings, and repeated focus loss auto-submits the attempt, so stay on the exam screen. Some questions carry negative marking, shown with the question. Results appear in the same Assessments section once published, with your score and percentage."
+     },
+     {
+      "id": "assessment-troubleshooting",
+      "personas": [
+       "student"
+      ],
+      "title": "Why can’t I start my assessment?",
+      "keywords": [
+       "cannot",
+       "start",
+       "unable",
+       "window",
+       "closed",
+       "opens",
+       "soon",
+       "expired",
+       "exhausted"
+      ],
+      "body": "If an assessment shows Opens soon, its window has not started yet. Window closed means the start window has passed. Completed with no attempts left means you used your allowance. In all three cases only your institution can help: staff can reopen the window, add attempts, or change the per-attempt duration. Ask your placement cell — the assistant cannot change assessment windows. Also note assessments are laptop-only: on a phone you will see the assignment but the start button is replaced with a laptop-only notice."
+     },
+     {
+      "id": "employer-screening-tests",
+      "personas": [
+       "student"
+      ],
+      "title": "Screening tests from employers",
+      "keywords": [
+       "screening",
+       "employer",
+       "screening test",
+       "invited",
+       "recruiter test",
+       "phone"
+      ],
+      "body": "An employer can send you a screening test once your application reaches its Assessment stage; you are told in your notifications, and it appears under Assessments (and Screening tests in the app, where you can take it). Before you start you see what it covers: how many questions, their formats, the marks, and the minutes you will have. It is one sitting; the timer runs on ONE’s server from the moment you begin and does not pause, and if the test’s window closes first you get less time. No camera, microphone or screen capture is used. Your result goes only to that employer, for that application, while you share it with them; it is not part of your academic record or learning evidence and never changes your readiness."
+     },
+     {
+      "id": "learning-lessons",
+      "personas": [
+       "student"
+      ],
+      "title": "Learning and lesson completion",
+      "keywords": [
+       "learning",
+       "lesson",
+       "complete",
+       "prerequisite",
+       "locked",
+       "module"
+      ],
+      "body": "Learning modules contain lessons that may build on each other: a lesson with prerequisites can only be completed after the lessons it depends on are completed. If Complete Lesson reports that prerequisites are not met, finish the earlier lessons in the module first, in order. Completed lessons feed your readiness evidence automatically."
+     },
+     {
+      "id": "career-readiness",
+      "personas": [
+       "student"
+      ],
+      "title": "Career readiness guidance",
+      "keywords": [
+       "readiness",
+       "career",
+       "score",
+       "roadmap",
+       "gap",
+       "next",
+       "step"
+      ],
+      "body": "Career readiness turns your completed lessons and assessments into private, advisory guidance: where you stand and what to do next. It is coaching, not a ranking — employers never see it, and it never appears on your public profile. Treat it as your personal roadmap."
+     },
+     {
+      "id": "question-bank",
+      "personas": [
+       "institution"
+      ],
+      "title": "The governed question bank",
+      "keywords": [
+       "question",
+       "bank",
+       "author",
+       "draft",
+       "review",
+       "approve",
+       "reject",
+       "archive",
+       "subject"
+      ],
+      "body": "Questions live in subjects and follow a governed lifecycle: DRAFT, then UNDER REVIEW, then APPROVED or REJECTED, with ARCHIVED at end of life. Only approved questions can enter an exam. Authoring supports objective types including single and multiple choice, true/false, numeric and fill-in-the-blank (write the blank as five underscores), each with marks and optional negative marking. Senior staff approve; authors send for review."
+     },
+     {
+      "id": "exam-build-publish",
+      "personas": [
+       "institution"
+      ],
+      "title": "Building, publishing and assigning an exam",
+      "keywords": [
+       "exam",
+       "create",
+       "build",
+       "section",
+       "pool",
+       "publish",
+       "assign",
+       "students",
+       "marks"
+      ],
+      "body": "An exam takes a title, window (start and end), per-attempt duration, attempts allowed and a section whose question pool you pick from approved questions; section marks must reconcile with the pool you selected. Publishing re-validates the pool against the live bank, so an archived question blocks publish with a named error. After publishing, assign students from your roster — each assigned student sees the exam in their own portal within the window. Every attempt gets a uniquely shuffled paper, seeded per attempt."
+     },
+     {
+      "id": "exam-reopen-results",
+      "personas": [
+       "institution"
+      ],
+      "title": "Reopening exams and reading results",
+      "keywords": [
+       "reopen",
+       "extend",
+       "duration",
+       "window",
+       "attempts",
+       "results",
+       "not",
+       "attempted",
+       "csv",
+       "average"
+      ],
+      "body": "Reopen/Extend on a published exam asks three things: extra WINDOW minutes (how much longer students may start), extra ATTEMPTS, and optionally a new per-attempt DURATION. The window and the duration are different clocks — extending the window does not lengthen each attempt. The results view lists every scored attempt, the class average, and by name the students who never attempted, so follow-up is direct. Completed data can be exported."
+     },
+     {
+      "id": "institution-operations",
+      "personas": [
+       "institution"
+      ],
+      "title": "Roster, drives and interventions",
+      "keywords": [
+       "roster",
+       "batch",
+       "department",
+       "drive",
+       "intervention",
+       "analytics",
+       "placement"
+      ],
+      "body": "The institution portal carries your student roster by department and batch, campus drives, skill interventions and analytics. Employers ask to run a role as a campus drive; it reaches your students only after your placement office approves it (the placement officer decides on the Dashboard, an administrator under Placement), and your one-offer-per-student policy, set under Settings or on the placement officer Dashboard, applies to applications through your drives. Placement statistics by department and batch, and the placement register of employers engaged and the drive calendar, are on Placement (and the placement officer Dashboard); they count only applications students chose to share with the college, stand at the end of the last full month, show any group under five as <5, and never count a student who shared nothing as unplaced. Your own drive categories, such as Dream, Core or Mass, are set under Settings and are never shown to employers or students. Assessments are assigned against active roster students. Readiness analytics are aggregate and advisory — they inform your placement work and are never exposed to employers at student level."
+     },
+     {
+      "id": "employer-roles-drives",
+      "personas": [
+       "employer"
+      ],
+      "title": "Roles and campus drives",
+      "keywords": [
+       "role",
+       "post",
+       "job",
+       "drive",
+       "campus",
+       "pipeline",
+       "applications",
+       "shortlist",
+       "offer"
+      ],
+      "body": "Post roles from the employer portal. To run a campus drive, open the role under Opportunity Detail and ask a college for one: the role reaches the students of that college only after its placement office approves, and the placement rules of the college apply to applications through the drive. Applications, shortlists and offers are tracked per role so the pipeline stays in one view. The Dashboard counts your open roles, new applicants in the last 7 days, the interviews this week, offers awaiting an answer and drives awaiting a college. Reports break applications down by role, college and drive, with time to each stage and offer acceptance; any group of fewer than 5 people reads <5, so no candidate is singled out."
+     },
+     {
+      "id": "employer-candidates",
+      "personas": [
+       "employer"
+      ],
+      "title": "Meeting candidates",
+      "keywords": [
+       "candidate",
+       "profile",
+       "verified",
+       "qr",
+       "readiness",
+       "score",
+       "screen"
+      ],
+      "body": "You meet candidates through profiles they have consented to share — current skills, projects and certifications, opened from a link or a QR code the student presents. ONE does not expose internal readiness scores to employers by design: candidates are evaluated on real evidence, and your own assessments, not on an opaque platform ranking."
+     },
+     {
+      "id": "employer-screening-assessments",
+      "personas": [
+       "employer"
+      ],
+      "title": "Screening tests for applicants",
+      "keywords": [
+       "assessment",
+       "screening",
+       "test",
+       "question bank",
+       "invite",
+       "window",
+       "results"
+      ],
+      "body": "Under Assessments you write questions into your own bank (someone other than the author approves each one), build a test from approved questions, publish it and send it to applicants who are in the Assessment stage, with a window of up to 30 days. Each candidate gets the test’s full length unless the window closes first, and ONE’s server keeps the time. Results are listed in the order candidates were sent the test, never ranked by score, and each candidate’s answers question by question appear in Candidate Detail — only while they share their application with you. Rejecting or archiving a question and closing a test ask for a reason. Your bank is yours alone: you cannot see a college’s question bank, and it cannot see yours."
+     },
+     {
+      "id": "mobile-app",
+      "personas": [
+       "all"
+      ],
+      "title": "The ONE mobile app",
+      "keywords": [
+       "app",
+       "mobile",
+       "android",
+       "phone",
+       "theme",
+       "install",
+       "sign in"
+      ],
+      "body": "The Android app signs in with the same email and password as the web. Students see their dashboard, assessments and results, learning, jobs and notifications; institution and employer staff see live monitoring dashboards; operations accounts see a view-only overview. College exams are never taken in the app - a laptop is required; screening tests an employer sends can be taken on the phone. Pick your look from six themes via the palette icon at the top of any screen. Demo accounts work only in the web pilot, not the app."
+     },
+     {
+      "id": "help-faq",
+      "personas": [
+       "all"
+      ],
+      "title": "Where to find help",
+      "keywords": [
+       "help",
+       "faq",
+       "guide",
+       "how"
+      ],
+      "body": "The Help & FAQ section lists answers for your role, and the ONE Assistant (the sparkle button) answers questions conversationally from the same guide. If neither resolves it, report the issue to your placement cell or the ONE support contact with what you clicked and what happened."
+     }
+    ]
+   }
+  }
+ }
+}

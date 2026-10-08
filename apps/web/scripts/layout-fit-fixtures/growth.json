@@ -1,0 +1,424 @@
+{
+ "email": "growth@demo.oneby8.com",
+ "landing": "/growth",
+ "labels": [
+  "Home",
+  "Leads",
+  "Field",
+  "Territory",
+  "Targets",
+  "Commission"
+ ],
+ "responses": {
+  "GET /health": {
+   "status": 200,
+   "body": {
+    "status": "ok"
+   }
+  },
+  "GET /api/v1/security/context": {
+   "status": 200,
+   "body": {
+    "userId": "123c6910-2413-45c2-98cf-2ba7c86e5685",
+    "selectedOrganizationId": null,
+    "memberships": [
+     {
+      "organizationId": "04f1ac5b-d952-4b92-93cb-04bc8db5a5a0",
+      "role": "GROWTH_EXECUTIVE",
+      "scope": {
+       "organizationId": "04f1ac5b-d952-4b92-93cb-04bc8db5a5a0"
+      },
+      "capabilities": []
+     }
+    ],
+    "studentRelationships": [],
+    "formerStudentRelationships": [],
+    "correlationId": "b569e858-aa14-42ca-88ce-574a72aea124"
+   }
+  },
+  "GET /api/v1/me/consents/privacy-notice": {
+   "status": 200,
+   "body": {
+    "requiredVersion": null,
+    "grantedVersion": null,
+    "required": false,
+    "correlationId": "12c3b45c-746f-4d0d-a5af-242d52dae1f1"
+   }
+  },
+  "GET /api/v1/growth/me": {
+   "status": 200,
+   "body": {
+    "role": "GROWTH_EXECUTIVE",
+    "staffType": "CONTRACTOR",
+    "openLeads": 3,
+    "visitsThisMonth": 0,
+    "followUpsDue": 0,
+    "teams": [
+     {
+      "team": "COLLEGE_PARTNERSHIPS",
+      "joinedAt": "2026-10-07T05:46:51.068Z",
+      "manager": {
+       "email": "growth.manager@demo.oneby8.com"
+      }
+     }
+    ],
+    "correlationId": "4d8bba8f-13f8-429d-8af3-2051cf084c9b"
+   }
+  },
+  "GET /api/v1/growth/leads/vocabulary": {
+   "status": 200,
+   "body": {
+    "kinds": [
+     "COLLEGE",
+     "EMPLOYER"
+    ],
+    "stages": {
+     "COLLEGE": [
+      "IDENTIFIED",
+      "CONTACTED",
+      "MEETING_SCHEDULED",
+      "MET",
+      "PROPOSAL_SHARED",
+      "NEGOTIATION",
+      "AGREEMENT_SIGNED_REPORTED",
+      "HANDOFF_REQUESTED",
+      "ON_HOLD",
+      "LOST"
+     ],
+     "EMPLOYER": [
+      "IDENTIFIED",
+      "CONTACTED",
+      "MEETING_SCHEDULED",
+      "MET",
+      "INTERESTED",
+      "ACCESS_REQUEST_INVITED",
+      "ON_HOLD",
+      "LOST"
+     ]
+    },
+    "sources": [
+     "FIELD_VISIT",
+     "REFERRAL_LINK",
+     "INBOUND_ACCESS_REQUEST",
+     "EVENT",
+     "PUBLIC_DIRECTORY",
+     "INTRODUCTION",
+     "OTHER"
+    ],
+    "contactRoles": [
+     "PRINCIPAL",
+     "DIRECTOR",
+     "CHAIRMAN_OR_TRUSTEE",
+     "PLACEMENT_OFFICER",
+     "HR",
+     "TALENT_ACQUISITION",
+     "FOUNDER",
+     "OTHER"
+    ],
+    "contactSourcesByBasis": {
+     "PROVIDED_BY_PERSON": [
+      "BUSINESS_CARD",
+      "MEETING",
+      "EMAIL_FROM_PERSON",
+      "ACCESS_REQUEST_FORM"
+     ],
+     "PUBLIC_INSTITUTIONAL_LISTING": [
+      "OFFICIAL_WEBSITE"
+     ],
+     "INTRODUCED_BY_COLLEAGUE": [
+      "COLLEAGUE_INTRODUCTION"
+     ]
+    },
+    "reasons": {
+     "reassign": [
+      "TERRITORY_CHANGE",
+      "WORKLOAD",
+      "INACTIVITY",
+      "CORRECTION"
+     ],
+     "adminReassign": [
+      "TERRITORY_CHANGE",
+      "WORKLOAD",
+      "INACTIVITY",
+      "DISPUTE_DECISION",
+      "CORRECTION"
+     ],
+     "removeContact": [
+      "OWNER_REMOVED",
+      "WRONG_DETAILS",
+      "LEFT_ORGANISATION"
+     ],
+     "adminRemoveContact": [
+      "WRONG_DETAILS",
+      "LEFT_ORGANISATION",
+      "PRIVACY_REQUEST"
+     ],
+     "revealContact": [
+      "MANAGER_REVIEW",
+      "REASSIGNMENT_HANDOVER",
+      "DATA_CORRECTION"
+     ],
+     "doNotContact": [
+      "ORGANISATION_DECLINED",
+      "PERSON_REQUEST",
+      "PRIVACY_REQUEST",
+      "LEGAL"
+     ]
+    },
+    "contactLimit": 10,
+    "purpose": "To contact this person about their organisation partnering with AI8HT's ONE platform.",
+    "notice": {
+     "version": "draft-2026-10",
+     "status": "DRAFT_FOR_LEGAL_REVIEW",
+     "text": [
+      "AI8HT runs ONE, a platform that helps colleges prepare their students for work and helps employers hire them.",
+      "We hold your name and your work contact details only to contact you about your organisation partnering with ONE.",
+      "We got them from you, from your organisation's official listing, or from a colleague at your organisation who passed them on for this purpose.",
+      "We do not use them for marketing campaigns, do not share them outside AI8HT and do not buy or combine them with other data.",
+      "We keep them while we are in touch with your organisation and erase them 24 months after our last contact, or sooner if you ask.",
+      "To see what we hold, have it corrected or erased, or ask us not to contact you again, write to the privacy contact named in this notice."
+     ]
+    },
+    "correlationId": "6b2dc192-3f16-4772-86c6-1f76f4d71d93"
+   }
+  },
+  "GET /api/v1/growth/referral-codes": {
+   "status": 200,
+   "body": {
+    "eligible": false,
+    "codes": [],
+    "limits": {
+     "liveCodesPerPerson": 3,
+     "createdPerDay": 5,
+     "referralsPerCodePerDay": 20
+    },
+    "correlationId": "d2ea2a63-f0a1-4177-beef-7cfc4309b67e"
+   }
+  },
+  "GET /api/v1/growth/territory": {
+   "status": 200,
+   "body": {
+    "role": "GROWTH_EXECUTIVE",
+    "regions": [
+     {
+      "id": "b62efc38-0659-4428-b60a-846b6588a472",
+      "name": "Karnataka",
+      "myRole": "EXECUTIVE",
+      "since": "2026-10-07T05:46:54.838Z",
+      "areas": [
+       {
+        "stateCode": "IN-KA",
+        "stateName": "Karnataka",
+        "districtCode": null,
+        "districtName": null
+       }
+      ],
+      "people": [
+       {
+        "email": "growth.manager@demo.oneby8.com",
+        "role": "MANAGER",
+        "since": "2026-10-07T05:46:54.838Z"
+       }
+      ],
+      "unownedLeads": 2
+     }
+    ],
+    "correlationId": "bed3d822-d9c6-462b-b879-c37d61156860"
+   }
+  },
+  "GET /api/v1/growth/leads?kind=COLLEGE&view=ALL": {
+   "status": 200,
+   "body": {
+    "leads": [
+     {
+      "id": "cb279056-930e-46c7-b7e0-bc6561e398d4",
+      "kind": "COLLEGE",
+      "name": "Sunvale Polytechnic",
+      "area": {
+       "stateCode": "IN-KA",
+       "stateName": "Karnataka",
+       "districtCode": null,
+       "districtName": null,
+       "city": "Tumakuru"
+      },
+      "aisheCode": null,
+      "websiteDomain": null,
+      "owner": {
+       "email": "growth@demo.oneby8.com",
+       "isMe": true
+      },
+      "needsNewOwner": false,
+      "stage": "CONTACTED",
+      "lostReasonCode": null,
+      "source": "INTRODUCTION",
+      "possibleDuplicate": false,
+      "doNotContact": null,
+      "handedOff": false,
+      "liveContacts": 0,
+      "createdAt": "2026-10-07T05:46:54.838Z",
+      "lastActivityAt": "2026-10-07T05:46:54.838Z",
+      "stale": false,
+      "version": 2
+     },
+     {
+      "id": "58138c23-ac63-4839-b12d-29831aea93b5",
+      "kind": "COLLEGE",
+      "name": "Riverbend College of Engineering",
+      "area": {
+       "stateCode": "IN-KA",
+       "stateName": "Karnataka",
+       "districtCode": null,
+       "districtName": null,
+       "city": "Mandya"
+      },
+      "aisheCode": null,
+      "websiteDomain": null,
+      "owner": {
+       "email": "growth@demo.oneby8.com",
+       "isMe": true
+      },
+      "needsNewOwner": false,
+      "stage": "MET",
+      "lostReasonCode": null,
+      "source": "FIELD_VISIT",
+      "possibleDuplicate": false,
+      "doNotContact": null,
+      "handedOff": false,
+      "liveContacts": 1,
+      "createdAt": "2026-10-07T05:46:54.838Z",
+      "lastActivityAt": "2026-10-07T05:46:54.838Z",
+      "stale": false,
+      "version": 2
+     },
+     {
+      "id": "361ea118-12d5-47c2-a277-926aec09aace",
+      "kind": "COLLEGE",
+      "name": "Hillcrest Institute of Management",
+      "area": {
+       "stateCode": "IN-KA",
+       "stateName": "Karnataka",
+       "districtCode": null,
+       "districtName": null,
+       "city": "Hassan"
+      },
+      "aisheCode": null,
+      "websiteDomain": null,
+      "owner": {
+       "email": "growth@demo.oneby8.com",
+       "isMe": true
+      },
+      "needsNewOwner": false,
+      "stage": "MEETING_SCHEDULED",
+      "lostReasonCode": null,
+      "source": "EVENT",
+      "possibleDuplicate": false,
+      "doNotContact": null,
+      "handedOff": false,
+      "liveContacts": 1,
+      "createdAt": "2026-10-07T05:46:54.838Z",
+      "lastActivityAt": "2026-10-07T05:46:54.838Z",
+      "stale": false,
+      "version": 2
+     },
+     {
+      "id": "31da8269-ec9b-4c99-8473-922c0bec15f2",
+      "kind": "COLLEGE",
+      "name": "Mangrove Arts and Science College",
+      "area": {
+       "stateCode": "IN-KA",
+       "stateName": "Karnataka",
+       "districtCode": null,
+       "districtName": null,
+       "city": "Udupi"
+      },
+      "aisheCode": null,
+      "websiteDomain": null,
+      "owner": null,
+      "needsNewOwner": false,
+      "stage": "IDENTIFIED",
+      "lostReasonCode": null,
+      "source": "PUBLIC_DIRECTORY",
+      "possibleDuplicate": false,
+      "doNotContact": null,
+      "handedOff": false,
+      "liveContacts": 0,
+      "createdAt": "2026-10-07T05:46:54.838Z",
+      "lastActivityAt": "2026-10-07T05:46:54.838Z",
+      "stale": false,
+      "version": 1
+     }
+    ],
+    "nextCursor": null,
+    "correlationId": "1719ba9c-bd3b-496a-a368-bf7e283b54f0"
+   }
+  },
+  "GET /api/v1/growth/field?view=MINE": {
+   "status": 200,
+   "body": {
+    "view": "MINE",
+    "canSeeTeam": false,
+    "today": "2026-10-08",
+    "counts": {
+     "visitsThisMonth": 0,
+     "activitiesThisMonth": 0,
+     "metThisMonth": 0,
+     "followUpsOverdue": 0,
+     "followUpsDueToday": 0,
+     "followUpsOpen": 0
+    },
+    "followUps": [],
+    "activities": [],
+    "vocabulary": {
+     "kinds": [
+      "VISIT",
+      "CALL",
+      "MEETING",
+      "NOTE"
+     ],
+     "outcomes": [
+      "MET",
+      "NOT_AVAILABLE",
+      "RESCHEDULED",
+      "DECLINED",
+      "INTERESTED"
+     ],
+     "cancelReasons": [
+      "NO_LONGER_NEEDED",
+      "LEAD_LOST",
+      "DUPLICATE",
+      "REASSIGNED",
+      "OTHER"
+     ],
+     "notesMax": 2000,
+     "titleMax": 280,
+     "reportMaxAgeDays": 7,
+     "locationRetentionDays": 180,
+     "listLimit": 100,
+     "locationNotice": {
+      "version": "draft-2026-10",
+      "status": "DRAFT_FOR_LEGAL_REVIEW",
+      "text": [
+       "Attaching your location to a visit is optional. A visit without a location is a complete visit.",
+       "ONE reads your phone's approximate location only at the moment you tap \"Attach my location\", and never in the background.",
+       "It is stored rounded to about 100 metres, with the accuracy your phone reported, beside that one visit.",
+       "Only you and your manager can see it. It shows that the visit was logged at or near the organisation's area.",
+       "It is never used for attendance, pay, performance ratings or discipline.",
+       "It is erased automatically 180 days after the visit was logged. You can remove it from any of your visits sooner, and it is included when you ask for a copy of your data."
+      ]
+     }
+    },
+    "correlationId": "d71f692e-b70f-4d8a-8062-89cc3af0a14c"
+   }
+  },
+  "GET /api/v1/growth/attributions": {
+   "status": 200,
+   "body": {
+    "credited": [],
+    "disputes": [],
+    "disputable": [],
+    "windowDays": 90,
+    "correlationId": "7473213a-80aa-4b57-bf5c-4231eca2ae93"
+   }
+  }
+ }
+}

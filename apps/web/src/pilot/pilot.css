@@ -141,6 +141,18 @@
 .pilot-row.cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .pilot-row.cols-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 
+/* Rows lay out by the width they are actually given, not the window's: the content column
+   is a size container, so a five-tile row drops to three, then two, as the column narrows,
+   whatever the sidebar and right rail take. No tile is squeezed below about 150px. Rows
+   with no sized container above them keep the column counts above. */
+.pilot-content { container-type: inline-size; }
+@container (max-width: 819px) { .pilot-row.cols-5 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@container (max-width: 699px) { .pilot-row.cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container (max-width: 559px) { .pilot-row.cols-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container (max-width: 519px) { .pilot-row.cols-5 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container (max-width: 479px) { .pilot-row.cols-2 { grid-template-columns: 1fr; } }
+@container (max-width: 329px) { .pilot-row.cols-3, .pilot-row.cols-4, .pilot-row.cols-5 { grid-template-columns: 1fr; } }
+
 /* --- Buttons & chips ------------------------------------------------------- */
 
 .pilot .pilot-btn {
@@ -333,18 +345,14 @@
 
 @media (max-width: 1180px) {
   .pilot-page { grid-template-columns: 1fr; }
-  .pilot-row.cols-5 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .pilot-row.cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 860px) {
   .pilot { grid-template-columns: 1fr; }
   .pilot-sidebar { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; }
   .pilot-side-note { display: none; }
-  .pilot-row.cols-3, .pilot-row.cols-5 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .pilot-two { grid-template-columns: 1fr; }
 }
 @media (max-width: 560px) {
-  .pilot-row.cols-2, .pilot-row.cols-3, .pilot-row.cols-4, .pilot-row.cols-5 { grid-template-columns: 1fr; }
   .pilot-search { display: none; }
 }
 

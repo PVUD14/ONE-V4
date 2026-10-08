@@ -76,6 +76,7 @@ import { StatusBadge } from './studentComponents.js';
 import { Bell, ChevronDown, ChevronsLeft, ChevronsRight, Filter, Menu, MessageSquare, Search, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { roleLabel } from './labels.js';
+import { initialSidebarCollapsed, rememberSidebarCollapsed } from './sidebarPreference.js';
 
 export function DemoPortalLauncher({ onNavigate }: { readonly onNavigate: (path: string) => void }): React.ReactElement {
   const groups = ['Student', 'Institution', 'Employer', 'Operations'] as const;
@@ -104,7 +105,7 @@ export function RolePortal({ portal, apiHealth, authStatus, authNotice, showDeve
 function RolePortalInner({ portal, apiHealth, authStatus, authNotice, showDevelopmentIndicators, onNavigate, onSignIn, onSignOut, demoMode, authenticatedWorkspace }: { readonly portal: RolePortalConfig; readonly apiHealth: ApiHealth; readonly authStatus: AuthStatus; readonly authNotice: string; readonly showDevelopmentIndicators: boolean; readonly onNavigate: (path: string) => void; readonly onSignIn: () => void; readonly onSignOut: () => void; readonly demoMode: boolean; readonly authenticatedWorkspace?: AuthenticatedWorkspaceSummary | undefined }): React.ReactElement {
   const [path, setPath] = useState(normalizeRolePath(window.location.pathname, portal));
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(initialSidebarCollapsed);
   const [topbarNotice, setTopbarNotice] = useState('');
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const activeRoute = resolveRoute(portal, path);
@@ -144,7 +145,7 @@ function RolePortalInner({ portal, apiHealth, authStatus, authNotice, showDevelo
     <ConsentGate>
     <div className={`role-shell role-accent-${portal.accent} ${collapsed ? 'role-sidebar-collapsed' : ''}`}>
       <a className="skip-link" href="#role-main">Skip to content</a>
-      <RoleSidebar portal={portal} workspace={demoMode ? undefined : authenticatedWorkspace} activePath={path} collapsed={collapsed} drawerOpen={drawerOpen} onNavigate={navigate} onCollapse={() => setCollapsed((value) => !value)} onClose={() => { setDrawerOpen(false); menuButtonRef.current?.focus(); }} />
+      <RoleSidebar portal={portal} workspace={demoMode ? undefined : authenticatedWorkspace} activePath={path} collapsed={collapsed} drawerOpen={drawerOpen} onNavigate={navigate} onCollapse={() => { rememberSidebarCollapsed(!collapsed); setCollapsed(!collapsed); }} onClose={() => { setDrawerOpen(false); menuButtonRef.current?.focus(); }} />
       {drawerOpen ? <button className="drawer-scrim role-scrim" type="button" aria-label={`Close ${portal.roleName} navigation`} onClick={() => setDrawerOpen(false)} /> : null}
       <div className="role-workspace">
         <RoleTopbar portal={portal} apiHealth={apiHealth} authStatus={authStatus} authNotice={authNotice} showDevelopmentIndicators={showDevelopmentIndicators} menuButtonRef={menuButtonRef} onOpenMenu={() => setDrawerOpen(true)} onMessages={() => { const messagesRoute = portal.nav.find((item) => /messages|communications/i.test(item.label)); if (messagesRoute) navigate(messagesRoute.path); else setTopbarNotice(`${portal.roleName} messaging is not available for this role.`); }} onNotifications={() => {
@@ -221,12 +222,19 @@ function workspaceRoleName(portal: RolePortalConfig, authenticatedWorkspace?: Au
   return (authenticatedWorkspace && workspaceRoleNames[authenticatedWorkspace.role]) ?? portal.roleName;
 }
 
+/** The role pill shows the role a person is acting as; a compound title such as
+ *  "Platform Administrator / Operations Administrator" shows its last part, in full on hover. */
+function RoleContextPill({ name }: { readonly name: string }): React.ReactElement {
+  const short = name.includes(' / ') ? name.split(' / ').at(-1) ?? name : name;
+  return <span className="role-context" title={name}>{short}</span>;
+}
+
 function RoleTopbar({ portal, apiHealth, authStatus, authNotice, showDevelopmentIndicators, menuButtonRef, onOpenMenu, onMessages, onNotifications, onSwitch, onSignIn, onSignOut, demoMode, authenticatedWorkspace }: { readonly portal: RolePortalConfig; readonly apiHealth: ApiHealth; readonly authStatus: AuthStatus; readonly authNotice: string; readonly showDevelopmentIndicators: boolean; readonly menuButtonRef: React.RefObject<HTMLButtonElement | null>; readonly onOpenMenu: () => void; readonly onMessages: () => void; readonly onNotifications: () => void; readonly onSwitch: () => void; readonly onSignIn: () => void; readonly onSignOut: () => void; readonly demoMode: boolean; readonly authenticatedWorkspace?: AuthenticatedWorkspaceSummary | undefined }): React.ReactElement {
   const displayName = demoMode ? portal.previewUser : (authStatus.state === 'authenticated' && authStatus.email ? authStatus.email : portal.roleName);
   const displayRole = authenticatedWorkspace?.role ? roleLabel(authenticatedWorkspace.role) : portal.roleName;
   // Never surface the raw organization UUID to an end user; it is an internal identifier.
   const displayOrg = authenticatedWorkspace?.organizationId ? portal.subtitle : portal.organization;
-  return <header className="role-topbar"><button ref={menuButtonRef} className="icon-button mobile-menu-button" type="button" aria-label={`Open ${portal.roleName} navigation`} onClick={onOpenMenu}><Menu size={20} /></button><span className="topbar-brand"><BrandLogo height={28} /></span><span className="role-context">{demoMode ? portal.roleName : workspaceRoleName(portal, authenticatedWorkspace)}</span><span className="role-org">{displayOrg}</span><label className="role-search" role="search"><Search size={16} /><span className="sr-only">Search {portal.roleName} workspace</span><input placeholder={`Search ${portal.family.toLowerCase()} records...`} /></label><div className="role-topbar-actions"><button type="button" className="secondary" onClick={onSwitch}>{demoMode ? 'Switch preview portal' : 'Switch workspace'}</button><button className="icon-button" type="button" aria-label="Messages" onClick={onMessages}><MessageSquare size={17} /></button><button className="icon-button notification" type="button" aria-label="Notifications" onClick={onNotifications}><Bell size={17} /></button><AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />{showDevelopmentIndicators ? <span className={`staff-api-dot ${apiHealth}`}>{apiHealth}</span> : null}<span className="role-profile"><span>{demoMode ? portal.initials : initialsFor(displayName)}</span><span><strong>{displayName}</strong><small>{displayRole}</small></span><ChevronDown size={14} /></span></div></header>;
+  return <header className="role-topbar"><button ref={menuButtonRef} className="icon-button mobile-menu-button" type="button" aria-label={`Open ${portal.roleName} navigation`} onClick={onOpenMenu}><Menu size={20} /></button><span className="topbar-brand"><BrandLogo height={28} /></span><RoleContextPill name={demoMode ? portal.roleName : workspaceRoleName(portal, authenticatedWorkspace)} /><span className="role-org">{displayOrg}</span><label className="role-search" role="search"><Search size={16} /><span className="sr-only">Search {portal.roleName} workspace</span><input placeholder={`Search ${portal.family.toLowerCase()} records...`} /></label><div className="role-topbar-actions"><button type="button" className="secondary" onClick={onSwitch}>{demoMode ? 'Switch preview portal' : 'Switch workspace'}</button><button className="icon-button" type="button" aria-label="Messages" onClick={onMessages}><MessageSquare size={17} /></button><button className="icon-button notification" type="button" aria-label="Notifications" onClick={onNotifications}><Bell size={17} /></button><AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />{showDevelopmentIndicators ? <span className={`staff-api-dot ${apiHealth}`}>{apiHealth}</span> : null}<span className="role-profile"><span>{demoMode ? portal.initials : initialsFor(displayName)}</span><span><strong>{displayName}</strong><small>{displayRole}</small></span><ChevronDown size={14} /></span></div></header>;
 }
 
 function normalizeRolePath(path: string, portal: RolePortalConfig): string {

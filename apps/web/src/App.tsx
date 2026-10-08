@@ -66,6 +66,7 @@ import { StudentAssessmentsV3, StudentLearningV3, StudentOpportunitiesV3, Studen
 import { supportCodeSuffix } from './supportCode.js';
 import { formatDate } from './dates.js';
 import { roleLabel } from './labels.js';
+import { initialSidebarCollapsed, rememberSidebarCollapsed } from './sidebarPreference.js';
 
 type RouteKey = 'dashboard' | 'career-path' | 'ai-coach' | 'readiness' | 'skills' | 'assessments' | 'learning' | 'experience' | 'opportunities' | 'applications' | 'interviews' | 'documents' | 'profile' | 'settings' | 'help' | 'practice' | 'company-prep' | 'career-tools' | 'scholarships' | 'resume-builder' | 'calendar';
 
@@ -182,7 +183,7 @@ type CurrentStudentState =
 export function App(): React.ReactElement {
   const [path, setPath] = useState(currentPath());
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(initialSidebarCollapsed);
   const [apiHealth, setApiHealth] = useState<ApiHealth>('checking');
   const [authStatus, setAuthStatus] = useState<AuthStatus>(() => (hasStoredAuthSession() && !currentPath().startsWith('/demo') ? { state: 'restoring' } : getAuthStatus()));
   const [authNotice, setAuthNotice] = useState('');
@@ -792,7 +793,7 @@ function StudentShell({ apiHealth, authNotice, authStatus, currentStudent, demoM
     <ConsentGate>
     <div className={`student-shell ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
       <a className="skip-link" href="#main-content">Skip to content</a>
-      <Sidebar path={path} collapsed={sidebarCollapsed} drawerOpen={drawerOpen} onNavigate={navigate} onCollapse={() => setSidebarCollapsed((value) => !value)} onClose={closeDrawer} />
+      <Sidebar path={path} collapsed={sidebarCollapsed} drawerOpen={drawerOpen} onNavigate={navigate} onCollapse={() => { rememberSidebarCollapsed(!sidebarCollapsed); setSidebarCollapsed(!sidebarCollapsed); }} onClose={closeDrawer} />
       {drawerOpen ? <button className="drawer-scrim" type="button" aria-label="Close navigation" onClick={closeDrawer} /> : null}
       <div className="student-workspace">
         <TopBar

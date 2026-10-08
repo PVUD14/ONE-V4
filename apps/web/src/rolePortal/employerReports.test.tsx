@@ -152,7 +152,14 @@ describe('EMP-15 employer Reports', () => {
     const engineer = within(byJob).getByRole('row', { name: /Graduate engineer/ });
     expect(within(engineer).getByText('9')).toBeInTheDocument();
     expect(within(engineer).getByText('Withheld')).toBeInTheDocument();
-    expect(within(engineer).getAllByText('<5').length).toBe(12);
+    // Every stage except Applied is <5 in every broken-down job, so those twelve columns fold into
+    // one strip under the table: each stage is still named, and still reads <5.
+    expect(within(engineer).queryAllByText('<5')).toHaveLength(0);
+    const folded = within(within(byJob).getByRole('list', { name: 'Funnel by job: stages under 5 in every row' })).getAllByRole('listitem');
+    expect(folded.map((slot) => slot.textContent)).toEqual(['Screening <5', 'Shortlisted <5', 'Assessment <5', 'Interview <5', 'Offer <5', 'Hired <5',
+      'Left at applied <5', 'Left at screening <5', 'Left at shortlisted <5', 'Left at assessment <5', 'Left at interview <5', 'Left at offer <5']);
+    expect(within(byJob).getByRole('columnheader', { name: 'Applied' })).toBeInTheDocument();
+    expect(within(byJob).queryByRole('columnheader', { name: 'Hired' })).toBeNull();
     expect(within(within(byJob).getByRole('row', { name: /Data analyst/ })).getByText('Fewer than 5 applications — not broken down.')).toBeInTheDocument();
 
     const byCollege = screen.getByRole('heading', { name: 'Funnel by college' }).closest('section') as HTMLElement;

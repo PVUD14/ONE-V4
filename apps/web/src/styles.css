@@ -5074,3 +5074,73 @@ button.secondary {
 .pilot-embed .embedded-real .career-api-panel { border: 0; box-shadow: none; background: transparent; padding: 0; margin: 0; }
 .pilot-embed .embedded-real .role-module { display: flex; flex-direction: column; gap: 16px; }
 .pilot-embed .embedded-real .workspace-grid { gap: 16px; }
+
+/* ===== NA / suppressed-count presentation (fix/ui-nastate) ===================
+   One calm look for a figure ONE does not have ("NA") or will not show ("<5",
+   "Withheld", "Too few answers"), shared by every portal. The slot and its exact
+   text always stay; only the weight changes, so real numbers stand out and an
+   unbuilt widget reads as "not yet", not as broken. Components: src/naState.tsx.
+   Colours fall back from the pilot tokens to the app tokens, so the same classes
+   work inside .pilot pages and on the role-portal pages. */
+.na-value {
+  color: var(--p-muted, var(--muted, #5d6b82));
+  font-weight: 600;
+  letter-spacing: .01em;
+}
+:is(b, strong) > .na-value { font-size: .68em; font-weight: 600; }
+td .na-value, dd .na-value, .num > .na-value { font-weight: 500; opacity: .85; }
+.na-reason {
+  display: block;
+  margin: 2px 0 0;
+  color: var(--p-muted, var(--muted, #5d6b82));
+  font-size: 11px;
+  line-height: 1.4;
+  font-weight: 500;
+}
+.pilot-tile.na-tile { background: #eef1f6; color: #9aa5b8; }
+.v2-tile.na-tile { background: #eef1f6; filter: grayscale(1); opacity: .7; }
+
+/* A group whose slots are all missing: one strip, every slot a small labelled chip. */
+.na-strip { display: grid; gap: 8px; align-content: start; }
+.na-strip .pilot-card-head { margin-bottom: 0; }
+.na-strip--inline { padding: 2px 0; }
+.role-record-table-wrap + .na-strip--inline, .na-count-table + .na-caption { margin-top: 10px; }
+.na-strip-slots { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.na-slot {
+  display: inline-flex; align-items: center; gap: 2px; max-width: 100%;
+  padding: 3px 10px; border: 1px dashed var(--p-line, var(--line, #e5eaf2)); border-radius: 999px;
+  background: #f8fafc; color: var(--p-ink-2, #344054); font-size: 11.5px; font-weight: 500; line-height: 1.5;
+}
+.na-slot-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.na-slot-value::before { content: "\00B7"; margin: 0 5px 0 3px; color: #b4bfcf; }
+.na-slot .na-value { font-size: inherit; }
+.na-strip > .na-reason, .na-strip--inline > .na-reason { margin: 0; font-size: 11.5px; }
+/* In the student score row, the strip takes the columns its missing cards would have. */
+.v3-score-row > .na-strip { grid-column: span var(--na-span, 1); }
+@media (max-width: 1180px) { .v3-score-row > .na-strip { grid-column: 1 / -1; } }
+
+/* A chart with a suppressed or missing point: the frame stays, no line is drawn. */
+.na-chart-empty {
+  position: relative; display: grid; place-items: center; margin: 6px 0 4px; padding: 14px 12px;
+  border: 1px dashed var(--p-line, var(--line, #e5eaf2)); border-radius: 10px; background: #fafbfd; text-align: center;
+}
+.na-chart-empty p { margin: 0; max-width: 30ch; color: var(--p-muted, var(--muted, #5d6b82)); font-size: 12px; line-height: 1.45; }
+.na-chart-axis { position: absolute; left: 12px; right: 12px; bottom: 12px; border-bottom: 1px solid #e3e8f0; }
+
+/* A short series as label / bar / count; suppressed rows keep an empty track. */
+.na-count-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12.5px; }
+.na-count-table thead th {
+  padding: 0 0 6px; color: var(--p-muted, var(--muted, #5d6b82)); font-size: 10.5px; font-weight: 600;
+  letter-spacing: .04em; text-transform: uppercase; text-align: left;
+}
+.na-count-table tbody th, .na-count-table td { padding: 4px 0; border-top: 1px solid var(--p-line, var(--line, #eef1f6)); vertical-align: middle; }
+.na-count-table tbody th { width: 34%; font-weight: 500; text-align: left; white-space: nowrap; }
+.na-count-table .na-count-bar { padding: 4px 12px; }
+.na-count-track { display: block; height: 7px; border-radius: 999px; background: #edf1f7; overflow: hidden; }
+.na-count-track i { display: block; height: 100%; border-radius: 999px; background: var(--student, #1f55e5); }
+.na-count-table .na-count-value, .na-count-table thead th:last-child { width: 72px; text-align: right; font-weight: 700; }
+
+/* The one caption under a table that holds withheld cells; a row-wide withheld note. */
+.na-caption { margin: 8px 0 0; color: var(--p-muted, var(--muted, #5d6b82)); font-size: 12px; line-height: 1.45; }
+.na-row-note { color: var(--p-muted, var(--muted, #5d6b82)); font-size: .92em; }
+/* ===== end NA / suppressed-count presentation ============================== */

@@ -5009,25 +5009,37 @@ button.secondary {
 .pilot.pilot-embed { display: block; min-height: 0; grid-template-columns: none; background: transparent; }
 .pilot.pilot-embed .pilot-page { padding: 0; }
 
-/* Embedded pilot page: the pilot's breakpoints assume its own narrow sidebar,
-   so shift them for the real shell, and give the score row proper collapse
-   (the pilot used an inline column template that could never respond). */
+/* Embedded pilot pages and the V2 portal pages lay out by the width they are given.
+   The workspace (student or staff) and each page's content column are size containers,
+   so rows and the right rail respond to the room left after the sidebar, not to the
+   window: on 1280-1536px laptops a fixed five- or seven-column row used to squeeze its
+   cards to 80-130px. */
+.student-main, .role-main { container: workspace / inline-size; }
+.v2-content { container-type: inline-size; }
+
+/* The right rail narrows on laptop widths, then moves under the content when the
+   workspace itself is narrow. */
+@media (max-width: 1440px) {
+  .pilot-page, .v2-page { grid-template-columns: minmax(0, 1fr) 280px; }
+}
+@container workspace (max-width: 979px) {
+  .pilot-page, .pilot.pilot-embed .pilot-page, .v2-page { grid-template-columns: 1fr; }
+}
+
+/* The student score row: the band card and five factor cards side by side only when every
+   factor card gets at least ~150px; otherwise the band card takes its own line and the
+   factor cards flow beneath it. */
 .v3-score-row { grid-template-columns: minmax(0, 2.4fr) repeat(5, minmax(0, 1fr)); }
-@media (max-width: 1180px) {
-  .v3-score-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .v3-score-row > section:first-child { grid-column: 1 / -1; }
-  .pilot.pilot-embed .pilot-page { grid-template-columns: 1fr; }
-  .pilot.pilot-embed .pilot-row.cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@container (max-width: 1179px) {
+  .v3-score-row { grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr)); }
+  .v3-score-row > section:first-child,
+  .v3-score-row > .na-strip { grid-column: 1 / -1; }
 }
-@media (max-width: 1000px) {
-  .pilot.pilot-embed .pilot-row.cols-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-@media (max-width: 760px) {
-  .v3-score-row,
-  .pilot.pilot-embed .pilot-row.cols-2,
-  .pilot.pilot-embed .pilot-row.cols-3,
-  .pilot.pilot-embed .pilot-row.cols-4 { grid-template-columns: 1fr; }
-}
+
+/* Portal rows follow the same thresholds as the pilot rows. */
+@container (max-width: 699px) { .v2-cols-4, .role-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container (max-width: 479px) { .v2-cols-2 { grid-template-columns: 1fr; } }
+@container (max-width: 329px) { .v2-cols-4, .role-kpi-grid { grid-template-columns: 1fr; } }
 
 /* Real functional panels embedded inside pilot shells: strip their legacy
    page chrome so they read as pilot content; functionality is untouched. */
@@ -5227,8 +5239,7 @@ td .na-value, dd .na-value, .num > .na-value { font-weight: 500; opacity: .85; }
 .na-slot .na-value { font-size: inherit; }
 .na-strip > .na-reason, .na-strip--inline > .na-reason { margin: 0; font-size: 11.5px; }
 /* In the student score row, the strip takes the columns its missing cards would have. */
-.v3-score-row > .na-strip { grid-column: span var(--na-span, 1); }
-@media (max-width: 1180px) { .v3-score-row > .na-strip { grid-column: 1 / -1; } }
+@container (min-width: 1180px) { .v3-score-row > .na-strip { grid-column: span var(--na-span, 1); } }
 
 /* A chart with a suppressed or missing point: the frame stays, no line is drawn. */
 .na-chart-empty {
@@ -5255,3 +5266,35 @@ td .na-value, dd .na-value, .num > .na-value { font-weight: 500; opacity: .85; }
 .na-caption { margin: 8px 0 0; color: var(--p-muted, var(--muted, #5d6b82)); font-size: 12px; line-height: 1.45; }
 .na-row-note { color: var(--p-muted, var(--muted, #5d6b82)); font-size: .92em; }
 /* ===== end NA / suppressed-count presentation ============================== */
+
+/* ===== Small-screen fit: header, chips and the sidebar tagline ================
+   On 1280-1536px laptops the student header cut the email ("student@demo.oneby8.c…"),
+   wrapped the name onto two lines, and chips spilled out of narrow cards. */
+
+/* The signed-in email moves out of the student top bar on laptop widths; the profile
+   chip still names the person, and Sign out stays. */
+@media (max-width: 1440px) {
+  .student-topbar .auth-controls > span + span { display: none; }
+}
+.profile-menu strong,
+.profile-menu small { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
+
+/* A chip never runs out of its card; a long label ends in an ellipsis instead. */
+.pilot-card .pilot-chip,
+.v2-card .pilot-chip { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pilot .pilot-btn.small { white-space: nowrap; }
+
+/* The tagline under the sidebar logo stays on one line, with room before the first group. */
+.brand-copy small { display: block; white-space: nowrap; font-size: 9.5px; letter-spacing: .05em; }
+.student-sidebar .nav-group:first-child .nav-group-label { margin-top: 6px; }
+
+/* A missing-data chip never runs out of its card: in the narrower laptop rail a long label
+   ("Electronics and Communication Engineering · NA") ends in an ellipsis, the value stays. */
+.na-strip { grid-template-columns: minmax(0, 1fr); }
+.na-strip-slots { min-width: 0; }
+.na-slot-label { min-width: 0; }
+.na-slot-value { flex: 0 0 auto; }
+
+/* A card that holds its own row of tiles ("Recommended for You") is that row's container, so
+   the row lays out by the card's width rather than the whole content column's. */
+.pilot-card:has(> .pilot-row) { container-type: inline-size; }

@@ -241,27 +241,70 @@
 }
 
 /* The AI8HT ribbon 8 and the card share one grid cell, so the 8 sits centred behind the card.
-   It turns on its vertical axis; the card is frosted glass, so the ribbon reads through it
-   softly and in full around its edges. */
+   It is a faint block of blue ice: edge layers stacked through its depth give it real
+   thickness as it turns, and a highlight masked to the logo sweeps each face like light off
+   metal. The card is frosted glass, so the 8 reads softly through it and in full around it. */
 .auth-panel-main { grid-template-columns: minmax(0, 1fr); }
 .auth-panel-main > * { grid-area: 1 / 1; justify-self: center; }
 
-.auth-brand-eight {
+.auth-eight {
+  --eight-h: min(88vh, 860px);
   z-index: 0;
-  height: min(88vh, 860px);
-  width: auto;
-  max-width: none;
+  width: calc(var(--eight-h) * 603 / 1160);
+  height: var(--eight-h);
+  perspective: 1800px;
   pointer-events: none;
   user-select: none;
-  opacity: .9;
-  filter: drop-shadow(0 30px 40px rgba(16, 24, 40, .18));
-  transform: perspective(1600px) rotateY(0deg);
-  animation: auth-eight-turn 16s linear infinite;
+  opacity: .55;
 }
 
+.auth-eight-solid {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  animation: auth-eight-turn 18s linear infinite;
+}
+
+.auth-eight-solid > * {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  backface-visibility: visible;
+}
+
+.auth-eight-edge { transform: translateZ(var(--z)); }
+/* The outermost layers are the polished rims of the block: lighter, so they catch the light. */
+.auth-eight-edge:first-child, .auth-eight-edge:nth-child(13) { filter: brightness(1.7) saturate(.7); }
+
+.auth-eight-face { display: block; }
+.auth-eight-face img { display: block; width: 100%; height: 100%; }
+.auth-eight-front { transform: translateZ(15px); backface-visibility: hidden; }
+.auth-eight-back { transform: rotateY(180deg) translateZ(15px); backface-visibility: hidden; }
+
+/* Light off metal: a bright band, cut to the logo's shape, sweeps across the face. */
+.auth-eight-sheen {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 34%, rgba(170, 215, 255, .55) 42%, #fff 47%, rgba(225, 242, 255, .95) 50%, rgba(150, 200, 255, .5) 55%, transparent 63%);
+  background-size: 320% 100%;
+  -webkit-mask: url('/assets/ai8ht-eight-ice.webp') center / 100% 100% no-repeat;
+  mask: url('/assets/ai8ht-eight-ice.webp') center / 100% 100% no-repeat;
+  mix-blend-mode: screen;
+  animation: auth-eight-sheen 6s ease-in-out infinite;
+}
+
+.auth-eight-back .auth-eight-sheen { animation-delay: -3s; }
+
 @keyframes auth-eight-turn {
-  from { transform: perspective(1600px) rotateY(0deg); }
-  to { transform: perspective(1600px) rotateY(360deg); }
+  from { transform: rotateX(8deg) rotateY(0deg); }
+  to { transform: rotateX(8deg) rotateY(360deg); }
+}
+
+@keyframes auth-eight-sheen {
+  0% { background-position: 120% 0; }
+  60%, 100% { background-position: -20% 0; }
 }
 
 .auth-panel-main > .login-card {
@@ -273,7 +316,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .auth-brand-eight { animation: none; }
+  .auth-eight-solid { animation: none; transform: rotateX(8deg) rotateY(-24deg); }
+  .auth-eight-sheen { animation: none; background-position: 50% 0; }
 }
 
 .auth-footer {
@@ -472,7 +516,7 @@
   .auth-benefits, .auth-showcase-tagline { display: none; }
   .auth-panel { min-height: 0; }
   .auth-panel-main { padding: 24px 16px 32px; }
-  .auth-brand-eight { height: min(92vh, 700px); }
+  .auth-eight { --eight-h: min(92vh, 700px); }
   .login-card { padding: 28px 22px; }
   .auth-footer { padding: 16px; justify-content: center; text-align: center; }
   .login-shell { padding: 32px 16px; }

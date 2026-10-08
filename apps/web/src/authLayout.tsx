@@ -33,12 +33,30 @@ export function AuthLayout({ children, onNavigate }: { readonly children: ReactN
     </aside>
     <div className="auth-panel">
       <main className="auth-panel-main">
-        {/* The AI8HT ribbon 8 turning slowly behind the card: its loops pass in and out around
-            the card's edges. Decorative only, so hidden from assistive technology. */}
-        <img className="auth-brand-eight" src="/assets/ai8ht-eight-ribbon.webp" alt="" aria-hidden="true" width={603} height={1160} decoding="async" />
+        <IceEight />
         {children}
       </main>
       <AuthFooter onNavigate={onNavigate} />
+    </div>
+  </div>;
+}
+
+/** Depths (px) of the stacked edge layers that give the 8 its thickness. */
+const iceEightDepths = Array.from({ length: 13 }, (_, index) => -14 + index * (28 / 12));
+
+/**
+ * The AI8HT ribbon 8 as a faint, solid block of blue ice turning behind the sign-in card.
+ * A flat picture turned on its axis vanishes edge-on; stacking edge layers through the depth
+ * gives it real thickness, and a highlight masked to the logo's shape sweeps across each face
+ * like light off metal. Decorative only, so hidden from assistive technology.
+ */
+function IceEight(): React.ReactElement {
+  return <div className="auth-eight" aria-hidden="true">
+    <div className="auth-eight-solid">
+      {iceEightDepths.map((depth) => <img key={depth} className="auth-eight-edge" src="/assets/ai8ht-eight-ice-edge.webp" alt=""
+        style={{ '--z': `${depth.toFixed(1)}px` } as React.CSSProperties} decoding="async" />)}
+      <span className="auth-eight-face auth-eight-front"><img src="/assets/ai8ht-eight-ice.webp" alt="" decoding="async" /><i className="auth-eight-sheen" /></span>
+      <span className="auth-eight-face auth-eight-back"><img src="/assets/ai8ht-eight-ice.webp" alt="" decoding="async" /><i className="auth-eight-sheen" /></span>
     </div>
   </div>;
 }

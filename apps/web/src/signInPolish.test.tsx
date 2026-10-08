@@ -69,7 +69,9 @@ describe('sign-in card', () => {
     expect(screen.queryByText(/\bUAT\b|Cognito|configured/)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /hosted sign-in/i })).not.toBeInTheDocument();
     expect(screen.getAllByText('LEARN | PREPARE | BUILD | GROW')).toHaveLength(1);
-    expect(screen.getByText('Demo – sample data')).toBeInTheDocument();
+    // No sandbox capture on a page real users reach: no sample-data label and no product picture.
+    expect(screen.queryByText(/sample data/i)).not.toBeInTheDocument();
+    expect(document.querySelector('img[src*="sign-in-product"]')).toBeNull();
   });
 
   it('asks for the missing fields itself instead of sending an empty sign-in to Cognito', async () => {

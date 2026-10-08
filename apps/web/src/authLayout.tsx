@@ -3,9 +3,9 @@
  * the legal placeholders.
  *
  * The left panel says what ONE is before asking anyone to sign in, which the bare logo on a
- * black-to-white fade never did. The product picture is a capture of the sandbox and is labelled
- * as sample data on the frame itself, so nobody reads its fictional student as a real one.
- * Partner institution logos belong here too, but only once real partners have agreed to be
+ * black-to-white fade never did. It carries no product screenshot: any capture shows a sandbox
+ * student and figures, and Divakar did not want a "Demo – sample data" label on the sign-in page,
+ * so a picture would put fictional people in front of real users. Partner institution logos belong here too, but only once real partners have agreed to be
  * shown; until then the slot is simply absent rather than filled with stand-ins.
  */
 import { useState, type ReactNode } from 'react';
@@ -29,11 +29,6 @@ export function AuthLayout({ children, onNavigate }: { readonly children: ReactN
       <ul className="auth-benefits">
         {benefits.map((benefit) => <li key={benefit.who}><strong>{benefit.who}</strong><span>{benefit.what}</span></li>)}
       </ul>
-      <figure className="auth-product-frame">
-        <span className="auth-product-chrome" aria-hidden="true"><i /><i /><i /></span>
-        <img src="/assets/sign-in-product-demo.webp" alt="The ONE student home, shown with sandbox sample data" width={1600} height={833} loading="lazy" decoding="async" />
-        <figcaption>Demo – sample data</figcaption>
-      </figure>
       <p className="auth-showcase-tagline">{productTagline}</p>
     </aside>
     <div className="auth-panel">

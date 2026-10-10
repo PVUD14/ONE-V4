@@ -3,6 +3,8 @@ import { NaReason, NaValue, isMissing } from './naState.js';
 import { SupportCode } from './supportCode.js';
 import { formatDate } from './dates.js';
 import { codeLabel, roleLabel } from './labels.js';
+import { SMALL_COUNT_TEXT, SMALL_COUNT_THRESHOLD } from './momentum/smallCountRule.js';
+import { SuppressedBlock } from './momentum/smallCount.js';
 import {
   ApiRequestError,
   getLearnerCareerReadinessState,
@@ -70,7 +72,7 @@ function greeting(): string {
 
 // --- Shared primitives -------------------------------------------------------
 
-export function V2Ring({ percent, label, value, tone = '#1f55e5' }: {
+export function V2Ring({ percent, label, value, tone = 'var(--brand)' }: {
   readonly percent: number; readonly label: string; readonly value: string; readonly tone?: string;
 }): React.ReactElement {
   const clamped = Math.max(0, Math.min(100, percent));
@@ -78,8 +80,8 @@ export function V2Ring({ percent, label, value, tone = '#1f55e5' }: {
   return (
     <div className="v2-ring" role="img" aria-label={`${value} ${label}`}>
       <svg width="106" height="106">
-        <circle cx="53" cy="53" r="45" fill="none" stroke="#edf1f7" strokeWidth="10" />
-        <circle cx="53" cy="53" r="45" fill="none" stroke={tone} strokeWidth="10" strokeLinecap="round"
+        <circle cx="53" cy="53" r="45" fill="none" style={{ stroke: 'var(--surface-3)' }} strokeWidth="10" />
+        <circle cx="53" cy="53" r="45" fill="none" style={{ stroke: tone }} strokeWidth="10" strokeLinecap="round"
           strokeDasharray={`${(clamped / 100) * circumference} ${circumference}`} transform="rotate(-90 53 53)" />
       </svg>
       <div><b>{value}</b><small>{label}</small></div>
@@ -387,7 +389,7 @@ export function InstitutionDashboardV2({ institutionId, basePath }: { readonly i
             <p>{attention.length ? <><b>{attention[0]!.title}</b> — {attention[0]!.detail}.</> : 'Nothing needs your attention right now.'}</p>
             <div className="v2-hero-chips"><V2Chip tone="green">Access-controlled</V2Chip><V2Chip tone="blue">Institution scope only</V2Chip></div>
           </div>
-          {data.results ? <V2Ring percent={data.results.summary.averagePercentage} value={`${data.results.summary.averagePercentage}%`} label={`CLASS AVERAGE · ${data.results.exam.subjectName.toUpperCase()}`} tone="#0d6b4f" /> : null}
+          {data.results ? <V2Ring percent={data.results.summary.averagePercentage} value={`${data.results.summary.averagePercentage}%`} label={`CLASS AVERAGE · ${data.results.exam.subjectName.toUpperCase()}`} tone="var(--ok)" /> : null}
         </div>
 
         <div className="v2-row v2-cols-4">
@@ -559,7 +561,7 @@ export function EmployerDashboardV2({ basePath }: { readonly basePath: string })
             <p>{openApplications > 0 ? <><b>{openApplications} open application{openApplications === 1 ? '' : 's'}</b> across your roles await review.</> : 'No open applications right now.'}</p>
             <div className="v2-hero-chips"><V2Chip tone="green">Access-controlled</V2Chip><V2Chip tone="amber">Consent-based candidate access</V2Chip></div>
           </div>
-          {totalApplications > 0 ? <V2Ring percent={(openApplications / totalApplications) * 100} value={`${openApplications}/${totalApplications}`} label="APPLICATIONS OPEN" tone="#b45309" /> : null}
+          {totalApplications > 0 ? <V2Ring percent={(openApplications / totalApplications) * 100} value={`${openApplications}/${totalApplications}`} label="APPLICATIONS OPEN" tone="var(--warn)" /> : null}
         </div>
 
         <div className="v2-row v2-cols-4">
@@ -648,7 +650,8 @@ export function formatOverviewCount(count: OverviewCountDto | null | undefined):
 
 export function formatOverviewPeople(count: OverviewPeopleCountDto | null | undefined): string {
   if (!count) return NA;
-  if (count.suppressed) return '<5';
+  if (count.suppressed) return SMALL_COUNT_TEXT;
+  if (count.value < SMALL_COUNT_THRESHOLD) return SMALL_COUNT_TEXT;
   return count.capped ? `${count.value.toLocaleString()}+` : count.value.toLocaleString();
 }
 
@@ -778,7 +781,7 @@ export function OperationsDashboardV2({ basePath }: { readonly basePath: string 
             <div className="v2-hero-chips"><V2Chip tone="green">Access-controlled</V2Chip><V2Chip tone="slate">Full controls on web · view only in the app</V2Chip></div>
           </div>
           <V2Ring percent={share(staff?.accepted.value, staff?.total.value)}
-            value={staff ? `${formatOverviewCount(staff.accepted)}/${formatOverviewCount(staff.total)}` : NA} label="INVITATIONS ACCEPTED" tone="#475569" />
+            value={staff ? `${formatOverviewCount(staff.accepted)}/${formatOverviewCount(staff.total)}` : NA} label="INVITATIONS ACCEPTED" tone="var(--text-3)" />
         </div>
 
         <div className="v2-row v2-cols-4">
@@ -838,9 +841,9 @@ export function OperationsDashboardV2({ basePath }: { readonly basePath: string 
           <section className="v2-card">
             <div className="v2-card-head"><h2>Accounts</h2><button type="button" className="v2-link" onClick={open('/users')}>Open Users</button></div>
             <div className="v2-list">
-              <div className="v2-list-row"><div className="grow"><strong>Student accounts</strong><V2Bar percent={share(accounts?.students.value, accounts?.total.value)} /></div><V2Chip tone="blue">{formatOverviewPeople(accounts?.students)}</V2Chip></div>
-              <div className="v2-list-row"><div className="grow"><strong>With organization roles</strong><V2Bar percent={share(accounts?.withOrganizationRoles.value, accounts?.total.value)} tone="green" /></div><V2Chip tone="green">{formatOverviewPeople(accounts?.withOrganizationRoles)}</V2Chip></div>
-              <div className="v2-list-row"><div className="grow"><strong>All accounts</strong><V2Bar percent={accounts && !accounts.total.suppressed ? 100 : 0} tone="" /></div><V2Chip tone="slate">{formatOverviewPeople(accounts?.total)}</V2Chip></div>
+              <div className="v2-list-row"><div className="grow"><strong>Student accounts</strong>{accounts?.students.suppressed ? <SuppressedBlock /> : <V2Bar percent={share(accounts?.students.value, accounts?.total.value)} />}</div><V2Chip tone="blue"><NaValue value={formatOverviewPeople(accounts?.students)} /></V2Chip></div>
+              <div className="v2-list-row"><div className="grow"><strong>With organization roles</strong>{accounts?.withOrganizationRoles.suppressed ? <SuppressedBlock /> : <V2Bar percent={share(accounts?.withOrganizationRoles.value, accounts?.total.value)} tone="green" />}</div><V2Chip tone="green"><NaValue value={formatOverviewPeople(accounts?.withOrganizationRoles)} /></V2Chip></div>
+              <div className="v2-list-row"><div className="grow"><strong>All accounts</strong>{accounts?.total.suppressed ? <SuppressedBlock /> : <V2Bar percent={accounts ? 100 : 0} tone="" />}</div><V2Chip tone="slate"><NaValue value={formatOverviewPeople(accounts?.total)} /></V2Chip></div>
             </div>
             <p className="v2-boundary">{accounts === null ? 'NA — aggregate analytics is not part of your access.' : 'Counts of fewer than 5 people show <5.'}</p>
           </section>

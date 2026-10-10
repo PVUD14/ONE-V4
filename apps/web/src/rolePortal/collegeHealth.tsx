@@ -39,23 +39,26 @@ import type {
 } from '../api.js';
 import { V2Bar, V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { StatusBadge } from '../studentComponents.js';
+import { NaValue } from '../naState.js';
+import { StatusTag } from '../momentum/statusTag.js';
 import { formatApiError } from './shared.js';
 import { SupportCode, supportCodeSuffix } from '../supportCode.js';
 import { formatDate, formatDateTime } from '../dates.js';
 import { codeLabel } from '../labels.js';
+import { SmallCount, SuppressedBlock, SMALL_COUNT_TEXT, isSmallCount, smallCountText } from '../momentum/smallCount.js';
 
 const NA = 'NA';
 
 export function formatCollegePeople(count: CollegePeopleCountDto | undefined): string {
   if (!count) return NA;
-  return count.suppressed ? '<5' : count.value.toLocaleString();
+  return smallCountText(count, (value) => value.toLocaleString());
 }
 
 /** A split total: "<5" when the whole split is small, "Withheld" when only the total is hidden. */
 export function formatSplitTotal(split: CollegeSplitDto | undefined): string {
   if (!split) return NA;
   if (!split.total.suppressed) return split.total.value.toLocaleString();
-  return split.yes.suppressed && split.no.suppressed ? '<5' : 'Withheld';
+  return split.yes.suppressed && split.no.suppressed ? SMALL_COUNT_TEXT : 'Withheld';
 }
 
 const bandLabel: Readonly<Record<string, string>> = {
@@ -174,13 +177,13 @@ export function OperationsCollegeHealthPanel(): React.ReactElement | null {
         <thead><tr><th>College</th><th>Verification</th><th>Renewal</th><th>Students rostered</th><th>Signed in</th><th>Not yet signed in</th><th>Active learners last week</th><th>Staff active last week</th><th>Open cases</th><th>Actions</th></tr></thead>
         <tbody>{rows.map((college) => <tr key={college.id}>
           <th scope="row">{college.name}{college.active ? null : <><br /><small>Inactive</small></>}</th>
-          <td><StatusBadge label={words(college.verificationState)} tone={college.verificationState === 'VERIFIED' ? 'success' : 'info'} /></td>
+          <td><StatusTag kind="verification" state={college.verificationState} label={words(college.verificationState)} /></td>
           <td>{dateText(college.renewalDate)}</td>
-          <td>{formatSplitTotal(college.students)}</td>
-          <td>{formatCollegePeople(college.students.yes)}</td>
-          <td>{formatCollegePeople(college.students.no)}</td>
-          <td>{formatCollegePeople(college.weeklyActiveLearners)}</td>
-          <td>{formatCollegePeople(college.staff.yes)} of {formatSplitTotal(college.staff)}</td>
+          <td><NaValue value={formatSplitTotal(college.students)} /></td>
+          <td><NaValue value={formatCollegePeople(college.students.yes)} /></td>
+          <td><NaValue value={formatCollegePeople(college.students.no)} /></td>
+          <td><NaValue value={formatCollegePeople(college.weeklyActiveLearners)} /></td>
+          <td><NaValue value={formatCollegePeople(college.staff.yes)} /> of <NaValue value={formatSplitTotal(college.staff)} /></td>
           <td>{college.openSupportCases.toLocaleString()}{college.overdueSupportCases ? ` (${college.overdueSupportCases.toLocaleString()} overdue)` : ''}</td>
           <td><button type="button" className="secondary" onClick={() => setSelectedId(college.id)} aria-label={`Health of ${college.name}`}>Details…</button></td>
         </tr>)}</tbody></table></div> : null}
@@ -210,22 +213,22 @@ function CollegeHealthDetail({ detail }: { readonly detail: CollegeHealthDetailR
     <div className="v2-row v2-cols-2">
       <section className="role-card"><h3>Weekly active learners</h3>
         <ul className="role-check-list" aria-label="Weekly active learners">{detail.weeklyActiveTrend.map((week) => <li key={week.weekStart}>
-          <span>Week of {dateText(week.weekStart)}: <strong>{formatCollegePeople(week.learners)}</strong></span>
-          {week.learners.suppressed ? null : <V2Bar percent={(week.learners.value / trendMax) * 100} />}
+          <span>Week of {dateText(week.weekStart)}: <strong><NaValue value={formatCollegePeople(week.learners)} /></strong></span>
+          {isSmallCount(week.learners) || week.learners.suppressed ? <SuppressedBlock /> : <V2Bar percent={(week.learners.value / trendMax) * 100} />}
         </li>)}</ul>
         <p>Students who completed a lesson or took an assessment that week while studying at this college.</p>
       </section>
       <section className="role-card"><h3>Readiness bands, {detail.windows.month}</h3>
         {bands.suppressed
           ? <p>Fewer than 5 students had a readiness update in {detail.windows.month}, so no bands are shown.</p>
-          : <dl>{bands.bands.map((band) => <div key={band.band}><dt>{bandLabel[band.band] ?? words(band.band)}</dt><dd>{band.suppressed || band.count === null ? '<5' : band.count.toLocaleString()}</dd></div>)}
+          : <dl>{bands.bands.map((band) => <div key={band.band}><dt>{bandLabel[band.band] ?? words(band.band)}</dt><dd><SmallCount value={band} format={(value) => value.toLocaleString()} /></dd></div>)}
               <div><dt>Students with an update</dt><dd>{bands.cohortSizeSuppressed || bands.cohortSize === null ? 'Withheld' : bands.cohortSize.toLocaleString()}</dd></div></dl>}
         <p>Readiness band movement: {NA}. Movement per student is not computed; each month&apos;s distribution stands on its own.</p>
       </section>
     </div>
     <dl>
-      <div><dt>Assessments taken, {detail.windows.month}</dt><dd>{formatCollegePeople(detail.assessments.attempts)} attempts by {formatCollegePeople(detail.assessments.students)} students</dd></div>
-      <div><dt>Staff active last week</dt><dd>{formatCollegePeople(detail.college.staff.yes)} of {formatSplitTotal(detail.college.staff)} staff</dd></div>
+      <div><dt>Assessments taken, {detail.windows.month}</dt><dd><NaValue value={formatCollegePeople(detail.assessments.attempts)} /> attempts by <NaValue value={formatCollegePeople(detail.assessments.students)} /> students</dd></div>
+      <div><dt>Staff active last week</dt><dd><NaValue value={formatCollegePeople(detail.college.staff.yes)} /> of <NaValue value={formatSplitTotal(detail.college.staff)} /> staff</dd></div>
       <div><dt>Open support cases</dt><dd>{detail.college.openSupportCases.toLocaleString()} ({detail.college.overdueSupportCases.toLocaleString()} past their target time)</dd></div>
       <div><dt>Verification</dt><dd>{words(detail.college.verificationState)}</dd></div>
       <div><dt>Renewal date</dt><dd>{dateText(detail.college.renewalDate)}</dd></div>

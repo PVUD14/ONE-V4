@@ -43,6 +43,7 @@ import { formatApiError } from './shared.js';
 import type { AuthenticatedWorkspaceSummary } from './shared.js';
 import { supportCodeSuffix } from '../supportCode.js';
 import { formatDateTime } from '../dates.js';
+import { NaValue } from '../naState.js';
 
 export const OVERRIDE_REASON_LABELS: Readonly<Record<string, string>> = {
   CLASS_TOPIC_ALIGNMENT: 'Matches what the class is working on now',
@@ -439,7 +440,7 @@ function YourActions({ actions, token, institutionId, onChanged }: {
           <th scope="row">{assignment.resource.title}<span>{KIND_LABELS[assignment.resource.kind]} · {when(assignment.assignedAt)}</span></th>
           <td>{assignment.target.kind === 'UNIT' ? assignment.target.unitName ?? 'A class' : 'Selected students'}</td>
           <td>{assignment.students}</td>
-          <td>{assignment.withdrawn ? 'Withdrawn' : suppressedCountLabel(assignment.done)}</td>
+          <td><NaValue value={assignment.withdrawn ? 'Withdrawn' : suppressedCountLabel(assignment.done)} /></td>
           <td><div className="hiring-actions">
             <button type="button" className="pilot-link" onClick={() => void show(assignment.id)}>Who it reached</button>
             {assignment.withdrawn ? null : withdrawSelect('assignment', assignment.id, `Withdraw ${assignment.resource.title}`)}

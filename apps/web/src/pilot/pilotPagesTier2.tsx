@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Icon, type IconName } from '../icons/Icon.js';
-import { MultiRing, Ring, WeekBars, toneColor } from './pilotComponents.js';
+import { MultiRing, Ring, WeekBars, toneColor, toneMix } from './pilotComponents.js';
 import {
   tabAptitudeSets, tabMockInterviews, tabPrepQuestionSets, tabProblemSets,
   tabResumeExamples, tabSavedResources, tabToolGroups,
@@ -91,7 +91,7 @@ export function PilotPractice(): React.ReactElement {
         <div className="pilot-row cols-5">
           {PRACTICE_CONTINUE.map((entry) => (
             <div key={entry.title} className="pilot-course-card">
-              <span className="pilot-tile" style={{ background: `${toneColor(entry.tone)}1a`, color: toneColor(entry.tone) }}><Icon name="practice" size={16} /></span>
+              <span className="pilot-tile" style={{ background: toneMix(entry.tone, 10), color: toneColor(entry.tone) }}><Icon name="practice" size={16} /></span>
               <strong>{entry.title}</strong>
               <small>{entry.kind}</small>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -109,7 +109,7 @@ export function PilotPractice(): React.ReactElement {
         <div className="pilot-row cols-5">
           {PRACTICE_RECOMMENDED.map((entry) => (
             <div key={entry.title} className="pilot-course-card">
-              <span className="pilot-tile" style={{ background: `${toneColor(entry.tone)}1a`, color: toneColor(entry.tone) }}><Icon name="targets" size={16} /></span>
+              <span className="pilot-tile" style={{ background: toneMix(entry.tone, 10), color: toneColor(entry.tone) }}><Icon name="targets" size={16} /></span>
               <strong>{entry.title}</strong>
               <span className={`pilot-chip ${entry.difficulty === 'Easy' ? 'green' : 'amber'}`}>{entry.difficulty}</span>
               <small>{entry.problems} problems</small>
@@ -288,7 +288,7 @@ export function PilotCompanyPrep(): React.ReactElement {
         <div className="pilot-row cols-5">
           {PREP_TOOLS.map((tool) => (
             <div key={tool.title} className="pilot-course-card">
-              <span className="pilot-tile" style={{ background: `${toneColor(tool.tone)}1a`, color: toneColor(tool.tone) }}><Icon name="opportunities" size={16} /></span>
+              <span className="pilot-tile" style={{ background: toneMix(tool.tone, 10), color: toneColor(tool.tone) }}><Icon name="opportunities" size={16} /></span>
               <strong>{tool.title}</strong>
               <small>{tool.detail}</small>
               <button type="button" className="pilot-btn ghost small">{tool.action} →</button>
@@ -382,7 +382,7 @@ export function PilotCareerTools(): React.ReactElement {
           <div className="pilot-row cols-3">
             {groupTools.map((tool) => (
               <div key={tool.title} className="pilot-course-card">
-                {(<span className="pilot-tile" style={{ background: `${toneColor(tool.tone)}1a`, color: toneColor(tool.tone) }}><Icon name={tool.icon} size={16} /></span>)}
+                {(<span className="pilot-tile" style={{ background: toneMix(tool.tone, 10), color: toneColor(tool.tone) }}><Icon name={tool.icon} size={16} /></span>)}
                 <strong>{tool.title}</strong>
                 <small>{tool.detail}</small>
                 <button type="button" className="pilot-btn ghost small">{tool.action} →</button>
@@ -410,7 +410,7 @@ export function PilotCareerTools(): React.ReactElement {
         <div className="pilot-row cols-4">
           {CAREER_TOOLS.map((tool) => (
             <div key={tool.title} className="pilot-course-card">
-              {(<span className="pilot-tile" style={{ background: `${toneColor(tool.tone)}1a`, color: toneColor(tool.tone) }}><Icon name={tool.icon} size={16} /></span>)}
+              {(<span className="pilot-tile" style={{ background: toneMix(tool.tone, 10), color: toneColor(tool.tone) }}><Icon name={tool.icon} size={16} /></span>)}
               <strong>{tool.title}</strong>
               <small>{tool.detail}</small>
               <button type="button" className="pilot-btn ghost small">{tool.action} →</button>
@@ -739,7 +739,7 @@ export function PilotResumeBuilder(): React.ReactElement {
         <div className="pilot-row cols-5">
           {RESUME_TOOLS.map((tool) => (
             <div key={tool.title} className="pilot-course-card">
-              <span className="pilot-tile" style={{ background: `${toneColor(tool.tone)}1a`, color: toneColor(tool.tone) }}><Icon name="edit" size={16} /></span>
+              <span className="pilot-tile" style={{ background: toneMix(tool.tone, 10), color: toneColor(tool.tone) }}><Icon name="edit" size={16} /></span>
               <strong>{tool.title}</strong>
               <small>{tool.detail}</small>
               <button type="button" className="pilot-btn ghost small">{tool.action} →</button>

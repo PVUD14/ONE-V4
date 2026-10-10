@@ -28,6 +28,7 @@ import { StudentNominationsCard } from './studentNominations.js';
 import { EmployerApplicantExportPanel } from './rolePortal/employerApplicantExport.js';
 import * as dates from './dates.js';
 import { codeLabel } from './labels.js';
+import { StatusTag } from './momentum/statusTag.js';
 import { openPortalRecord } from './rolePortal/shared.js';
 import {
   ApiRequestError,
@@ -563,7 +564,7 @@ export function StudentApplicationsPage(): React.ReactElement {
             <td>{item.title}</td>
             <td>{item.employerName}{item.campusDrive ? <span className="hiring-tag">Campus drive · {item.campusDrive.institutionName}</span> : null}
               {item.nominatedBy ? <span className="hiring-tag">Nominated by {item.nominatedBy.institutionName}</span> : null}</td>
-            <td><span className={`hiring-state state-${item.state.toLowerCase()}`}>{humanise(item.state)}</span>
+            <td><StatusTag kind="application" state={item.state} label={humanise(item.state)} />
               {item.termsAcknowledgementPending ? <>
                 <span className="hiring-tag warn">Terms changed</span>
                 <button type="button" className="secondary" onClick={() => { void openTermsChange(item.id); }}>Review new terms</button>
@@ -890,7 +891,7 @@ export function StudentInterviewsPanel(): React.ReactElement {
       {/* EMP-09: the invite updates in place when the interview moves; a cancelled one clears it. */}
       {item.upcoming || item.state === 'CANCELLED' ? <AddToCalendarButton download={(token) => downloadStudentInterviewCalendar(token, item.id)} /> : null}
     </div>
-    <div className="hiring-actions"><span className={`hiring-state state-${item.state.toLowerCase()}`}>{humanise(item.state)}</span></div>
+    <div className="hiring-actions"><StatusTag state={item.state} label={humanise(item.state)} /></div>
   </li>;
   return <section className="card wide-card" aria-label="Your interviews">
     <h2>Your interviews</h2>
@@ -951,7 +952,7 @@ export function StudentOffersPanel({ onChanged }: { readonly onChanged?: () => v
               <button type="button" onClick={() => { void respond(offer.id, 'ACCEPT'); }}>Accept</button>
               <button type="button" className="secondary" onClick={() => { void respond(offer.id, 'DECLINE'); }}>Decline</button>
             </>
-            : <span className={`hiring-state state-${offer.state.toLowerCase()}`}>{humanise(offer.state)}</span>}
+            : <StatusTag kind="offer" state={offer.state} label={humanise(offer.state)} />}
         </div>
       </li>)}</ul>}
   </section>;
@@ -1076,7 +1077,7 @@ export function EmployerOpportunitiesPage({ employerId }: { readonly employerId:
           <tbody>{opportunities.map((item) => <tr key={item.id}>
             <td>{item.title ?? 'Untitled'}</td>
             <td>{item.referenceCode}</td>
-            <td><span className={`hiring-state state-${item.lifecycleState.toLowerCase()}`}>{humanise(item.lifecycleState)}</span></td>
+            <td><StatusTag state={item.lifecycleState} label={humanise(item.lifecycleState)} /></td>
             <td>{item.applicationCount} ({item.openApplicationCount} open)</td>
             <td>{item.lifecycleState === 'DRAFT'
               ? <button type="button" onClick={() => { void publish(item.id); }}>Publish</button>
@@ -1352,7 +1353,7 @@ export function EmployerInterviewsPage({ employerId }: { readonly employerId: st
         <thead><tr>{['Candidate', 'Opportunity', 'Round', 'Mode', 'Start', 'End', 'State', 'Last change', 'Outcomes', 'Actions'].map((title) => <th key={title}>{title}</th>)}</tr></thead>
         <tbody>{interviews.map((item) => <tr key={item.id}>
           <td><CandidateIdentity item={item} /></td><td>{item.title || 'NA'}{item.stageLabel ? <span className="hiring-meta"> · {item.stageLabel}</span> : null}</td><td>{item.roundNumber}</td><td>{humanise(item.mode)}</td>
-          <td>{formatDateTime(item.scheduledStart)}</td><td>{formatDateTime(item.scheduledEnd)}</td><td>{humanise(item.state)}</td>
+          <td>{formatDateTime(item.scheduledStart)}</td><td>{formatDateTime(item.scheduledEnd)}</td><td><StatusTag state={item.state} label={humanise(item.state)} /></td>
           <td>{lastChangeText(item.lastChange)}</td><td>{item.outcomeCount}</td>
           <td>{!item.consentRevoked && !item.closedAt ? <div className="hiring-actions">
             {['SCHEDULED', 'RESCHEDULED'].includes(item.state) ? <>
@@ -1456,7 +1457,7 @@ export function EmployerOffersPage({ employerId }: { readonly employerId: string
       {rows.length ? <div className="role-record-table-wrap"><table className="role-record-table">
         <thead><tr>{['Candidate', 'Opportunity', 'State', 'Joining date', 'Expiry', 'Response state', 'Actions'].map((title) => <th key={title}>{title}</th>)}</tr></thead>
         <tbody>{rows.map((item) => <tr key={item.id}>
-          <td><CandidateIdentity item={item} /></td><td>{item.title || 'NA'}</td><td>{humanise(item.state)}</td>
+          <td><CandidateIdentity item={item} /></td><td>{item.title || 'NA'}</td><td><StatusTag kind="offer" state={item.state} label={humanise(item.state)} /></td>
           <td>{item.joiningDate ? formatDate(item.joiningDate.slice(0, 10) + 'T00:00:00') : 'NA'}</td><td>{formatDateTime(item.offerExpiresAt)}</td><td>{offerResponse(item)}</td>
           <td>{!item.consentRevoked && !item.closedAt && ['DRAFT', 'EXTENDED'].includes(item.state)
             ? <button className="secondary" disabled={busy} onClick={() => { void withdraw(item.id); }}>Withdraw offer</button> : 'NA'}</td>
@@ -1617,7 +1618,7 @@ export function EmployerApplicantsPage({ employerId, applicationStateFilter, can
         </select>
       </label> : null}
       {evidenceSkill ? <p className="hiring-meta">Showing only applicants who chose to share evidence for this skill, in the usual order. This is a filter, not a ranking.</p> : null}
-      {applicationStateFilter ? <p className="hiring-meta">Application state filter: <span className={`hiring-state state-${applicationStateFilter.toLowerCase()}`}>{humanise(applicationStateFilter)}</span></p> : null}
+      {applicationStateFilter ? <p className="hiring-meta">Application state filter: <StatusTag kind="application" state={applicationStateFilter} label={humanise(applicationStateFilter)} /></p> : null}
       {status ? <p role="status">{status}</p> : null}
       {selectedOpportunity ? <p className="hiring-meta">{stages.length
         ? `Selection stages: ${stages.map((stage) => `${stage.order}. ${stage.label}`).join(' → ')}`
@@ -1635,7 +1636,7 @@ export function EmployerApplicantsPage({ employerId, applicationStateFilter, can
               {item.candidateAccess !== false && !item.consentRevoked
                 ? <div><a href="#candidate-detail" onClick={(event) => { event.preventDefault(); setViewing(item.id); }}>View candidate</a>
                   {' · '}<a href="#candidate-detail-page" onClick={(event) => { event.preventDefault(); openPortalRecord('/employer/recruiter/candidate-detail', { opportunityId: selectedOpportunity, applicationId: item.id }); }}>Open in Candidate Detail</a></div> : null}</td>
-            <td><span className={`hiring-state state-${item.state.toLowerCase()}`}>{humanise(item.state)}</span>
+            <td><StatusTag kind="application" state={item.state} label={humanise(item.state)} />
               {stagesAt(stages, item.state) ? <span className="hiring-meta">{` ${stagesAt(stages, item.state)}`}</span> : null}
               {item.termsAcknowledgementPending ? <span className="hiring-tag warn">Awaiting new-terms acceptance</span> : null}</td>
             <td><ApplicantEligibility item={item} /></td>

@@ -37,6 +37,8 @@ import { V2Chip } from '../dashboardsV2.js';
 import { growthCodeLabel } from './growthLeads.js';
 import { formatApiError } from './shared.js';
 import { formatDate } from '../dates.js';
+import { smallCountText } from '../momentum/smallCountRule.js';
+import { NaValue } from '../naState.js';
 
 const NA = 'NA';
 
@@ -83,7 +85,7 @@ function pipelineError(cause: unknown, fallback: string): string {
 
 function milestoneValue(milestone: GrowthMilestoneDto): string {
   if (milestone.state === 'NA') return NA;
-  if (milestone.code === 'STUDENTS_ACTIVATING' && milestone.count) return milestone.count.suppressed ? '<5' : String(milestone.count.value);
+  if (milestone.code === 'STUDENTS_ACTIVATING' && milestone.count) return smallCountText(milestone.count);
   if (milestone.state === 'REACHED') return milestone.at ? formatDate(milestone.at) : 'Reached';
   return 'Not yet';
 }
@@ -189,7 +191,7 @@ export function LeadPipelinePanel({ leadId, token, contacts, onChanged }: {
           <span className="v2-tile teal" aria-hidden="true">{milestone.state === 'REACHED' ? '✓' : milestone.state === 'NA' ? '–' : '…'}</span>
           <div className="grow"><strong>{milestone.code === 'VERIFIED' && pipeline.kind === 'EMPLOYER' ? employerVerifiedLabel : milestoneLabels[milestone.code] ?? growthCodeLabel(milestone.code)}</strong>
             {milestone.note ? <small>{milestone.note}</small> : null}{milestoneCounts(milestone) ? <small>{milestoneCounts(milestone)}</small> : null}</div>
-          <V2Chip tone={milestone.code === 'SUSPENDED' && milestone.state === 'REACHED' ? 'red' : milestone.state === 'REACHED' ? 'green' : milestone.state === 'NA' ? 'slate' : 'amber'}>{milestoneValue(milestone)}</V2Chip>
+          <V2Chip tone={milestone.code === 'SUSPENDED' && milestone.state === 'REACHED' ? 'red' : milestone.state === 'REACHED' ? 'green' : milestone.state === 'NA' ? 'slate' : 'amber'}><NaValue value={milestoneValue(milestone)} /></V2Chip>
         </div>
       ))}</div>
       <small>{pipeline.kind === 'EMPLOYER'

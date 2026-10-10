@@ -26,6 +26,8 @@ import { formatApiError } from './shared.js';
 import { SupportCode } from '../supportCode.js';
 import { formatDateTime } from '../dates.js';
 import { codeLabel } from '../labels.js';
+import { NaValue } from '../naState.js';
+import { SuppressedBlock, SMALL_COUNT_TEXT, shownCount, smallCountText } from '../momentum/smallCount.js';
 
 const NA = 'NA';
 const windowChoices: readonly EngineHealthWindowDays[] = [7, 14, 30];
@@ -33,8 +35,7 @@ const windowChoices: readonly EngineHealthWindowDays[] = [7, 14, 30];
 /** A server count: NA when absent, <5 when withheld, else the value. */
 export function engineCount(count: EngineSuppressedCountDto | null | undefined): string {
   if (!count) return NA;
-  if (count.suppressed || count.value === null) return '<5';
-  return count.value.toLocaleString();
+  return smallCountText(count, (value) => value.toLocaleString());
 }
 
 const when = (value: string | null | undefined): string => (value ? formatDateTime(value) : NA);
@@ -115,24 +116,25 @@ export function EngineBehaviourPanels({ token }: { readonly token: string }): Re
 function overrideRateText(planner: PlannerHealthDto | null): string {
   if (!planner) return NA;
   if (planner.overrideRate !== null) return `${(planner.overrideRate * 100).toFixed(1)}%`;
-  return planner.active ? '<5' : NA;
+  return planner.active ? SMALL_COUNT_TEXT : NA;
 }
 
 function PlannerTable({ planner }: { readonly planner: PlannerHealthDto }): React.ReactElement {
-  const peak = Math.max(0, ...planner.days.map((day) => (day.decisions.suppressed ? 0 : day.decisions.value ?? 0)));
+  const peak = Math.max(0, ...planner.days.map((day) => shownCount(day.decisions) ?? 0));
   return <>
     {!planner.active ? <p><StatusBadge label="No planner decisions in this window" tone="neutral" /></p> : null}
     <dl>
-      <div><dt>Decisions in the window</dt><dd>{engineCount(planner.decisions)}</dd></div>
-      <div><dt>Overridden by faculty</dt><dd>{engineCount(planner.overridden)}</dd></div>
-      <div><dt>Override rate</dt><dd>{overrideRateText(planner)}</dd></div>
+      <div><dt>Decisions in the window</dt><dd><NaValue value={engineCount(planner.decisions)} /></dd></div>
+      <div><dt>Overridden by faculty</dt><dd><NaValue value={engineCount(planner.overridden)} /></dd></div>
+      <div><dt>Override rate</dt><dd><NaValue value={overrideRateText(planner)} /></dd></div>
     </dl>
     <div className="role-record-table-wrap"><table className="role-record-table">
       <thead><tr><th>Day (UTC)</th><th>Decisions</th><th aria-hidden="true" /></tr></thead>
       <tbody>{planner.days.map((day) => <tr key={day.day}>
         <td>{day.day}</td>
-        <td>{engineCount(day.decisions)}</td>
-        <td>{!day.decisions.suppressed && peak > 0 ? <V2Bar percent={((day.decisions.value ?? 0) / peak) * 100} /> : null}</td>
+        <td><NaValue value={engineCount(day.decisions)} /></td>
+        {/* A small day has no proportional bar: the uniform hatched block stands in for it. */}
+        <td>{shownCount(day.decisions) === null ? <SuppressedBlock /> : peak > 0 ? <V2Bar percent={(shownCount(day.decisions)! / peak) * 100} /> : null}</td>
       </tr>)}</tbody>
     </table></div>
   </>;
@@ -160,12 +162,12 @@ function ShadowSummary({ shadow }: { readonly shadow: MasteryShadowHealthDto }):
   return <>
     <div className="role-record-table-wrap"><table className="role-record-table">
       <thead><tr><th>Against the live band</th><th>Two-day evidence rule</th><th>BKT (shadow)</th></tr></thead>
-      <tbody>{comparisonRows.map(([key, label]) => <tr key={key}><th scope="row">{label}</th><td>{engineCount(c3[key])}</td><td>{engineCount(bkt[key])}</td></tr>)}</tbody>
+      <tbody>{comparisonRows.map(([key, label]) => <tr key={key}><th scope="row">{label}</th><td><NaValue value={engineCount(c3[key])} /></td><td><NaValue value={engineCount(bkt[key])} /></td></tr>)}</tbody>
     </table></div>
     <dl>
-      <div><dt>Engine rows needing a rebuild</dt><dd>{engineCount(shadow.coverage?.engineRowsOnOlderProjector)}</dd></div>
-      <div><dt>Live bands without an engine row</dt><dd>{engineCount(shadow.coverage?.livePairsWithoutEngineRow)}</dd></div>
-      <div><dt>Engine rows without a live band</dt><dd>{engineCount(shadow.coverage?.engineRowsWithoutLiveBand)}</dd></div>
+      <div><dt>Engine rows needing a rebuild</dt><dd><NaValue value={engineCount(shadow.coverage?.engineRowsOnOlderProjector)} /></dd></div>
+      <div><dt>Live bands without an engine row</dt><dd><NaValue value={engineCount(shadow.coverage?.livePairsWithoutEngineRow)} /></dd></div>
+      <div><dt>Engine rows without a live band</dt><dd><NaValue value={engineCount(shadow.coverage?.engineRowsWithoutLiveBand)} /></dd></div>
       <div><dt>Models</dt><dd>{shadow.algorithms.live} (live) · {shadow.algorithms.engineBand} · {shadow.algorithms.shadow} (shadow)</dd></div>
     </dl>
   </>;
@@ -198,8 +200,8 @@ export function EngineJobsPanels({ token }: { readonly token: string }): React.R
         <div><dt>Attempts exported</dt><dd>{when(run?.exportedAt)}</dd></div>
         <div><dt>Items calibrated</dt><dd>{run ? run.items.calibrated.toLocaleString() : NA}</dd></div>
         <div><dt>Items still provisional</dt><dd>{run ? run.items.provisional.toLocaleString() : NA}</dd></div>
-        <div><dt>Learners read</dt><dd>{run ? engineCount(run.learnersRead) : NA}</dd></div>
-        <div><dt>Responses read</dt><dd>{run ? (run.responsesRead === null ? '<5' : run.responsesRead.toLocaleString()) : NA}</dd></div>
+        <div><dt>Learners read</dt><dd><NaValue value={run ? engineCount(run.learnersRead) : NA} /></dd></div>
+        <div><dt>Responses read</dt><dd><NaValue value={run ? smallCountText(run.responsesRead, (value) => value.toLocaleString()) : NA} /></dd></div>
         <div><dt>Runs recorded</dt><dd>{calibration ? calibration.runsRecorded.toLocaleString() : NA}</dd></div>
         <div><dt>Algorithm</dt><dd>{run ? `${run.algorithmId} · ${run.library} · at least ${run.minResponses} responses per item` : NA}</dd></div>
       </dl>

@@ -14,6 +14,7 @@ import { getAccessToken } from '../auth.js';
 import { getEmployerReports, type EmployerReportsDto, type ReportCountDto, type ReportTableDto } from '../api/hiring.js';
 import { V2Stat } from '../dashboardsV2.js';
 import { NaSlotStrip, NaValue, SuppressionNote, isMissing } from '../naState.js';
+import { SMALL_COUNT_TEXT, smallCountText } from '../momentum/smallCountRule.js';
 import { formatApiError } from './shared.js';
 
 const cellLabels: readonly (readonly [string, string])[] = [
@@ -34,14 +35,14 @@ const driveStateLabels: Readonly<Record<string, string>> = {
 };
 
 function count(value: ReportCountDto): string {
-  return value.suppressed || value.value === null ? '<5' : String(value.value);
+  return smallCountText(value);
 }
 function cellValue(table: ReportTableDto, key: string): string {
   const found = table.cells.find((cell) => cell.key === key);
-  return !found || found.suppressed || found.count === null ? '<5' : String(found.count);
+  return found ? smallCountText(found) : SMALL_COUNT_TEXT;
 }
 function total(table: ReportTableDto): string {
-  if (table.suppressed) return '<5';
+  if (table.suppressed) return SMALL_COUNT_TEXT;
   return table.total.suppressed || table.total.value === null ? 'Withheld' : String(table.total.value);
 }
 
@@ -76,7 +77,7 @@ function StageTable({ caption, groupHeading, rows, empty }: {
 }
 
 /** The single caption under any table here that holds a withheld figure. */
-const SUPPRESSION_NOTE = 'Muted figures are withheld: "<5" is a group of fewer than 5 applications, and "Withheld" is a total that would let one be worked out. No candidate can be singled out.';
+const SUPPRESSION_NOTE = `Muted figures are withheld: "${SMALL_COUNT_TEXT}" is a group of fewer than 5 applications, and "Withheld" is a total that would let one be worked out. No candidate can be singled out.`;
 
 export function EmployerReportsPage({ employerId }: { readonly employerId: string }): React.ReactElement {
   const [result, setResult] = useState<{ readonly employerId: string; readonly reports: EmployerReportsDto } | null>(null);

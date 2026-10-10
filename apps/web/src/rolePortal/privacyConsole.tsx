@@ -40,6 +40,8 @@ import { formatApiError, RestrictedApiState } from './shared.js';
 import { SupportCode } from '../supportCode.js';
 import { formatDateTime } from '../dates.js';
 import { codeLabel } from '../labels.js';
+import { NaValue } from '../naState.js';
+import { smallCountText } from '../momentum/smallCountRule.js';
 
 const NA = 'NA';
 const detailLimit = 2000;
@@ -66,7 +68,7 @@ const stateTone = (state: string): 'success' | 'warning' | 'neutral' | 'info' | 
 /** A people count as the server sent it: suppressed counts have no value to show. */
 export function formatSuppressed(count: SuppressedCountDto | undefined): string {
   if (!count) return NA;
-  return count.suppressed ? '<5' : count.value.toLocaleString();
+  return smallCountText(count, (value) => value.toLocaleString());
 }
 
 const subjectLabel = (subject: { readonly maskedEmail: string | null; readonly erased: boolean }): string =>
@@ -293,9 +295,9 @@ function ConsentCoverageSection({ coverage, error }: { readonly coverage: Consen
         <td>{key.status === 'LIVE' ? key.liveVersion
           : <StatusBadge label={key.status === 'NOT_PUBLISHED' ? 'Not published' : 'No version in force'} tone="neutral" />}</td>
         <td>{key.enforcement ?? NA}</td>
-        <td>{coverageCell(key, (counts) => counts.consentedToLiveVersion)}</td>
-        <td>{coverageCell(key, (counts) => counts.withdrawn)}</td>
-        <td>{coverageCell(key, (counts) => counts.onOlderVersion)}</td>
+        <td><NaValue value={coverageCell(key, (counts) => counts.consentedToLiveVersion)} /></td>
+        <td><NaValue value={coverageCell(key, (counts) => counts.withdrawn)} /></td>
+        <td><NaValue value={coverageCell(key, (counts) => counts.onOlderVersion)} /></td>
       </tr>)}</tbody></table></div> : null}
     {coverage?.keys?.some((key) => key.status === 'NOT_PUBLISHED')
       ? <p>Not published: the learning-engine consents are drafted but their wording waits for legal approval, so nobody has been asked yet and there is no coverage to report.</p> : null}

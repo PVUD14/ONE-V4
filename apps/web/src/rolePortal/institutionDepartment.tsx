@@ -46,7 +46,8 @@ import { go } from '../pilotParity/naWidgets.js';
 import { InstitutionWorkspaceError, RestrictedApiState, formatApiError, isInstitutionStaffWorkspace } from './shared.js';
 import type { AuthenticatedWorkspaceSummary } from './shared.js';
 import { supportCodeSuffix } from '../supportCode.js';
-import { PilotKpi } from '../naState.js';
+import { NaValue, PilotKpi } from '../naState.js';
+import { SuppressedBlock, SuppressedLegend, SMALL_COUNT_TEXT, isSmallCountText } from '../momentum/smallCount.js';
 
 type WorkspaceProps = { readonly authenticatedWorkspace?: AuthenticatedWorkspaceSummary | undefined };
 
@@ -108,7 +109,7 @@ export function Kpis({ items }: { readonly items: readonly (readonly [string, st
   </div>;
 }
 
-/** A funnel over a suppressed table: a cell under five reads <5 and draws no bar. */
+/** A funnel over a suppressed table: a cell under five reads <5 and takes the uniform hatched block, never a bar. */
 export function SuppressedFunnel({ table, labels }: { readonly table: SuppressedTableDto | null; readonly labels: Readonly<Record<string, string>> }): React.ReactElement {
   const keys = Object.keys(labels);
   const cells = new Map((table?.cells ?? []).map((cell) => [cell.key, cell]));
@@ -116,13 +117,16 @@ export function SuppressedFunnel({ table, labels }: { readonly table: Suppressed
   return <div className="pilot-funnel">
     {keys.map((key) => {
       const cell = cells.get(key);
-      const value = !table ? 'NA' : table.suppressed ? '<5' : suppressedCountLabel(cell ?? null);
+      const value = !table ? 'NA' : table.suppressed ? SMALL_COUNT_TEXT : suppressedCountLabel(cell ?? null);
       return <div key={key} className="pilot-funnel-row">
         <span>{labels[key]}</span>
-        <div className="pilot-bar"><i style={{ width: `${((cell && !cell.suppressed ? cell.count ?? 0 : 0) / max) * 100}%` }} /></div>
-        <span className="num">{value}</span>
+        {isSmallCountText(value)
+          ? <div className="sc-slot" aria-hidden="true"><SuppressedBlock /></div>
+          : <div className="pilot-bar"><i style={{ width: `${((cell && !cell.suppressed ? cell.count ?? 0 : 0) / max) * 100}%` }} /></div>}
+        <span className="num"><NaValue value={value} /></span>
       </div>;
     })}
+    {keys.some((key) => table && (table.suppressed || isSmallCountText(suppressedCountLabel(cells.get(key) ?? null)))) ? <SuppressedLegend /> : null}
   </div>;
 }
 
@@ -134,9 +138,9 @@ function ReadinessBands({ month, aggregate }: { readonly month: string | null; r
   return <div className="pilot-legend">
     {Object.keys(readinessBandLabels).map((band) => {
       const entry = aggregate.bands.find((item) => item.band === band);
-      return <div key={band}><i style={{ background: '#e5eaf2' }} /> {readinessBandLabels[band]} <span className="num">{entry ? suppressedCountLabel(entry) : '<5'}</span></div>;
+      return <div key={band}><i style={{ background: `var(--band-${Object.keys(readinessBandLabels).indexOf(band) + 1})` }} /> {readinessBandLabels[band]} <span className="num"><NaValue value={entry ? suppressedCountLabel(entry) : SMALL_COUNT_TEXT} /></span></div>;
     })}
-    <div><i style={{ background: '#e5eaf2' }} /> Students with readiness records <span className="num">{aggregate.cohortSizeSuppressed || aggregate.cohortSize === null ? 'withheld' : aggregate.cohortSize}</span></div>
+    <div><i /> Students with readiness records <span className="num">{aggregate.cohortSizeSuppressed || aggregate.cohortSize === null ? 'withheld' : aggregate.cohortSize}</span></div>
   </div>;
 }
 
@@ -176,7 +180,7 @@ export function DepartmentOverviewPage({ authenticatedWorkspace, basePath }: Wor
         <div className="pilot-card-head"><h2>Student Activation</h2><button type="button" className="pilot-link" onClick={() => go(`${basePath}/students`)}>View Students</button></div>
         <div className="pilot-legend">
           {(['ACTIVATED', 'INVITED', 'EXPIRED', 'BOUNCED', 'NOT_INVITED'] as const).map((state) => (
-            <div key={state}><i style={{ background: '#e5eaf2' }} /> {studentActivationLabels[state]} <span className="num">{data ? data.activation[state] : 'NA'}</span></div>
+            <div key={state}><i /> {studentActivationLabels[state]} <span className="num">{data ? data.activation[state] : 'NA'}</span></div>
           ))}
         </div>
       </section>
@@ -197,8 +201,8 @@ export function DepartmentOverviewPage({ authenticatedWorkspace, basePath }: Wor
       <section className="pilot-card">
         <div className="pilot-card-head"><h2>Assessments</h2></div>
         <div className="pilot-legend">
-          <div><i style={{ background: '#e5eaf2' }} /> Students with an assessment open <span className="num">{data ? data.assessments.assignedStudents : 'NA'}</span></div>
-          <div><i style={{ background: '#e5eaf2' }} /> Of them, completed <span className="num">{data ? data.assessments.completedStudents : 'NA'}</span></div>
+          <div><i /> Students with an assessment open <span className="num">{data ? data.assessments.assignedStudents : 'NA'}</span></div>
+          <div><i /> Of them, completed <span className="num">{data ? data.assessments.completedStudents : 'NA'}</span></div>
         </div>
       </section>
       <VerificationCard summary={verification.data} onOpen={() => go(`${basePath}/students`)} />
@@ -210,7 +214,7 @@ export function VerificationCard({ summary, onOpen }: { readonly summary: Verifi
   return <section className="pilot-card">
     <div className="pilot-card-head"><h2>Academic Verification</h2><button type="button" className="pilot-link" onClick={onOpen}>Review Queue</button></div>
     <div className="pilot-legend">
-      <div><i style={{ background: '#e5eaf2' }} /> Waiting for a decision <span className="num">{summary ? summary.pending : 'NA'}</span></div>
+      <div><i /> Waiting for a decision <span className="num">{summary ? summary.pending : 'NA'}</span></div>
     </div>
   </section>;
 }
@@ -276,8 +280,8 @@ export function PlacementPipelinePage({ authenticatedWorkspace, basePath, statis
       {!data && !pipeline.error ? <p role="status">Loading the placement pipeline…</p> : null}
       <Kpis items={[
         ['Students sharing applications', data ? suppressedCountLabel(data.studentsSharing) : 'NA', 'blue', 'applications'],
-        ['Shared applications', data ? (data.stages.suppressed ? '<5' : suppressedCountLabel(data.stages.total)) : 'NA', 'indigo', 'applications'],
-        ['Offers', data ? (data.offers.suppressed ? '<5' : suppressedCountLabel(data.offers.total)) : 'NA', 'green', 'offers'],
+        ['Shared applications', data ? (data.stages.suppressed ? SMALL_COUNT_TEXT : suppressedCountLabel(data.stages.total)) : 'NA', 'indigo', 'applications'],
+        ['Offers', data ? (data.offers.suppressed ? SMALL_COUNT_TEXT : suppressedCountLabel(data.offers.total)) : 'NA', 'green', 'offers'],
       ]} />
       <section className="pilot-card">
         <div className="pilot-card-head"><h2>Applications by stage</h2><button type="button" className="pilot-link" onClick={() => go(`${basePath}/opportunities-and-offers`)}>Opportunities and Offers</button></div>
@@ -399,8 +403,8 @@ export function DepartmentReportsAnalyticsPage({ authenticatedWorkspace }: Works
       {!stages ? <p>NA</p> : stages.suppressed ? <p>Withheld: fewer than five shared applications in your scope.</p>
         : <div className="role-record-table-wrap"><table className="role-record-table"><caption className="sr-only">Applications by stage</caption>
           <thead><tr><th scope="col">Stage</th><th scope="col">Applications</th></tr></thead>
-          <tbody>{stages.cells.map((cell) => <tr key={cell.key}><th scope="row">{applicationStageLabels[cell.key] ?? cell.key}</th><td>{suppressedCountLabel(cell)}</td></tr>)}
-            <tr><th scope="row">Total</th><td>{stages.total.suppressed ? 'withheld' : suppressedCountLabel(stages.total)}</td></tr></tbody></table></div>}
+          <tbody>{stages.cells.map((cell) => <tr key={cell.key}><th scope="row">{applicationStageLabels[cell.key] ?? cell.key}</th><td><NaValue value={suppressedCountLabel(cell)} /></td></tr>)}
+            <tr><th scope="row">Total</th><td><NaValue value={stages.total.suppressed ? 'withheld' : suppressedCountLabel(stages.total)} /></td></tr></tbody></table></div>}
     </section>
     {authenticatedWorkspace?.organizationId ? <InstitutionExportsPanel institutionId={authenticatedWorkspace.organizationId} /> : null}
     <InstitutionReportsPage key={authenticatedWorkspace?.organizationId ?? ''} institutionId={authenticatedWorkspace?.organizationId ?? ''} />

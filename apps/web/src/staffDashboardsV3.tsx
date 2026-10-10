@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { Icon } from './icons/Icon.js';
 import { MultiRing, Spark } from './pilot/pilotComponents.js';
 import { NaSlotStrip, NaValue, PilotKpi, SuppressedChart, allMissing } from './naState.js';
+import { StatusTag } from './momentum/statusTag.js';
+import { SuppressedBlock, SuppressedLegend, SMALL_COUNT_TEXT, isSmallCountText, smallCountText } from './momentum/smallCount.js';
 import {
   getProtectedAccessToken,
   getSecurityContext,
@@ -48,17 +50,21 @@ function Funnel({ rows, label, naReason = 'Placement figures are not available t
   // Every stage withheld or missing: empty bars would read as zero, so each stage is a labelled chip.
   if (allMissing(displays)) {
     return <NaSlotStrip card={false} label={label} slots={rows.map((row, index) => ({ label: row.label, value: displays[index] }))}
-      reason={displays.includes('<5') ? 'Each stage holds fewer than 5 students, so the counts are withheld.' : naReason} />;
+      reason={displays.some(isSmallCountText) ? 'Each stage holds fewer than 5 students, so the counts are withheld.' : naReason} />;
   }
   const max = Math.max(...rows.map((row) => row.value ?? 0), 1);
   return <div className="pilot-funnel">
     {rows.map((row, index) => (
       <div key={row.label} className="pilot-funnel-row">
         <span>{row.label}</span>
-        <div className="pilot-bar"><i style={{ width: `${((row.value ?? 0) / max) * 100}%` }} /></div>
+        {/* A small count has no proportional bar: the uniform hatched block takes its slot. */}
+        {isSmallCountText(displays[index])
+          ? <div className="sc-slot" aria-hidden="true"><SuppressedBlock /></div>
+          : <div className="pilot-bar"><i style={{ width: `${((row.value ?? 0) / max) * 100}%` }} /></div>}
         <span className="num"><NaValue value={displays[index]} /></span>
       </div>
     ))}
+    {displays.some(isSmallCountText) ? <SuppressedLegend /> : null}
   </div>;
 }
 
@@ -70,14 +76,14 @@ function kpiReason(value: string): string {
 /** INST-12: a suppressed count for the funnel: the bar only when published, <5 when withheld, NA without a source. */
 function funnelRow(label: string, count: SuppressedCountDto | null | undefined): { readonly label: string; readonly value: number | null; readonly display: string } {
   if (!count) return { label, value: null, display: 'NA' };
-  return count.suppressed ? { label, value: null, display: '<5' } : { label, value: count.value, display: String(count.value) };
+  return count.suppressed ? { label, value: null, display: SMALL_COUNT_TEXT } : { label, value: count.value, display: smallCountText(count) };
 }
 
 // --- Institution -------------------------------------------------------------
 
 function countLabel(count: SuppressedCountDto | null | undefined): string {
   if (!count) return 'NA';
-  return count.suppressed ? '<5' : String(count.value);
+  return smallCountText(count);
 }
 
 /** Where each institution portal reaches the verification queue (existing labels only). */
@@ -190,7 +196,7 @@ export function InstitutionDashboardV3({ institutionId, basePath }: { readonly i
         <div className="pilot-card-head"><h2>Student Activation</h2><button type="button" className="pilot-link" onClick={() => go(`${basePath}/students`)}>View Students</button></div>
         <div className="pilot-legend">
           {(['ACTIVATED', 'INVITED', 'EXPIRED', 'BOUNCED', 'NOT_INVITED'] as const).map((state) => (
-            <div key={state}><i style={{ background: '#e5eaf2' }} /> {studentActivationLabels[state]} <span className="num">{data.activation ? data.activation[state] : 'NA'}</span></div>
+            <div key={state}><i /> {studentActivationLabels[state]} <span className="num">{data.activation ? data.activation[state] : 'NA'}</span></div>
           ))}
         </div>
       </section>
@@ -199,8 +205,8 @@ export function InstitutionDashboardV3({ institutionId, basePath }: { readonly i
         <div className="pilot-card-head"><h2>Academic Verification</h2>{verificationPath(basePath)
           ? <button type="button" className="pilot-link" onClick={() => go(verificationPath(basePath)!)}>Review Queue</button> : null}</div>
         <div className="pilot-legend">
-          <div><i style={{ background: '#e5eaf2' }} /> Waiting for a decision <span className="num">{data.verification ? data.verification.pending : 'NA'}</span></div>
-          <div><i style={{ background: '#e5eaf2' }} /> From former students or people not on the roster <span className="num">{data.verification ? data.verification.notCurrent : 'NA'}</span></div>
+          <div><i /> Waiting for a decision <span className="num">{data.verification ? data.verification.pending : 'NA'}</span></div>
+          <div><i /> From former students or people not on the roster <span className="num">{data.verification ? data.verification.notCurrent : 'NA'}</span></div>
         </div>
       </section>
 
@@ -234,7 +240,7 @@ export function InstitutionDashboardV3({ institutionId, basePath }: { readonly i
           ? <NaSlotStrip card={false} label="Offers by month" slots={data.placement.offersByMonth.map((entry) => ({ label: formatMonth(entry.month), value: countLabel(entry.offers) }))}
             reason="Every month had fewer than 5 offers." />
           : <div className="pilot-legend">{data.placement.offersByMonth.map((entry) => (
-            <div key={entry.month}><i style={{ background: '#e5eaf2' }} /> {formatMonth(entry.month)} <span className="num"><NaValue value={countLabel(entry.offers)} /></span></div>))}</div>) : null}
+            <div key={entry.month}><i /> {formatMonth(entry.month)} <span className="num"><NaValue value={countLabel(entry.offers)} /></span></div>))}</div>) : null}
       </section>
       <section className="pilot-card">
         <div className="pilot-card-head"><h2>Upcoming Drives</h2>{data.drives
@@ -269,7 +275,6 @@ interface EmployerV3Data {
   readonly applicants: readonly (EmployerApplicantDto & { readonly opportunityTitle: string })[];
 }
 
-const STAGE_TONE: Readonly<Record<string, string>> = { SHORTLISTED: 'indigo', INTERVIEW: 'purple', APPLIED: 'blue', OFFER: 'amber', HIRED: 'green' };
 
 /** The interviews that count toward "this week": the server's window, not cancelled. */
 function interviewsInWeek(interviews: readonly EmployerInterviewDto[], summary: EmployerSummaryDto): readonly EmployerInterviewDto[] {
@@ -324,12 +329,13 @@ export function EmployerDashboardV3({ basePath }: { readonly basePath: string })
   const stage = (key: string): number | null => (summary ? summary.currentStages[key] ?? 0 : null);
   const shortlistRows = data.applicants.filter((applicant) => ['SHORTLIST', 'INTERVIEW'].some((needle) => applicant.state.includes(needle))).slice(0, 5);
   const mix = [
-    { label: 'Applied', value: stage('APPLIED'), color: '#1f55e5' },
-    { label: 'Screening', value: stage('SCREENING'), color: '#0e7490' },
-    { label: 'Shortlisted', value: stage('SHORTLISTED'), color: '#4f46e5' },
-    { label: 'Assessment', value: stage('ASSESSMENT'), color: '#0f766e' },
-    { label: 'Interview', value: stage('INTERVIEW'), color: '#5936cf' },
-    { label: 'Offer', value: stage('OFFER'), color: '#b45309' },
+    // The approved stage colours: the early stages in the brand blues, Interview cyan, Offer orange.
+    { label: 'Applied', value: stage('APPLIED'), color: 'var(--band-1)' },
+    { label: 'Screening', value: stage('SCREENING'), color: 'var(--band-2)' },
+    { label: 'Shortlisted', value: stage('SHORTLISTED'), color: 'var(--band-3)' },
+    { label: 'Assessment', value: stage('ASSESSMENT'), color: 'var(--band-4)' },
+    { label: 'Interview', value: stage('INTERVIEW'), color: 'var(--cyan)' },
+    { label: 'Offer', value: stage('OFFER'), color: 'var(--orange)' },
   ];
   const weekInterviews = summary && data.interviews ? interviewsInWeek(data.interviews, summary) : null;
   const openDrives = (data.drives ?? []).filter((drive) => !['REJECTED', 'COMPLETED', 'CANCELLED'].includes(drive.state));
@@ -396,7 +402,7 @@ export function EmployerDashboardV3({ basePath }: { readonly basePath: string })
             <div key={applicant.id} className="pilot-list-row">
               <span className="pilot-avatar" style={{ width: 34, height: 34, fontSize: 11.5 }}>{(applicant.candidateName ?? 'C').split(/\s+/).slice(0, 2).map((word) => word[0]).join('')}</span>
               <div className="grow"><strong>{applicant.candidateName ?? 'Candidate'}</strong><small>{applicant.opportunityTitle}</small></div>
-              <span className={`pilot-chip ${STAGE_TONE[applicant.state] ?? 'blue'}`}>{codeLabel(applicant.state)}</span>
+              <StatusTag kind="application" state={applicant.state} label={codeLabel(applicant.state)} />
             </div>
           )) : <p style={{ color: 'var(--p-muted)', margin: '8px 0' }}>Nobody shortlisted yet.</p>}
         </div>
@@ -426,7 +432,7 @@ export function EmployerDashboardV3({ basePath }: { readonly basePath: string })
               <div key={drive.id} className="pilot-list-row">
                 <span className="pilot-tile indigo"><Icon name="company" size={16} /></span>
                 <div className="grow"><strong>{drive.institutionName}</strong><small>{drive.opportunityTitle ?? 'Untitled'}</small></div>
-                <span className="pilot-chip blue">{campusDriveStateLabels[drive.state]}</span>
+                <StatusTag state={drive.state} label={campusDriveStateLabels[drive.state]} />
               </div>))}</div>
             : <p style={muted}>No open campus drives. Request one from a job&apos;s Opportunity Detail.</p>}
       </section>

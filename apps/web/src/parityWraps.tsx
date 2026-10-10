@@ -87,7 +87,7 @@ export function StudentRoadmapV3({ children }: { readonly children: React.ReactN
       <div className="pilot-list">
         {['Finish lessons in order — prerequisites unlock later ones.', 'Attempt every assigned assessment; results feed your band.', 'Keep your profile current so guidance stays relevant.'].map((tip) => (
           <div key={tip} className="pilot-list-row" style={{ padding: '8px 2px' }}>
-            <Icon name="check" size={16} style={{ color: "#1f55e5" }} />
+            <Icon name="check" size={16} style={{ color: "var(--brand)" }} />
             <small style={{ color: 'var(--p-ink-2)' }}>{tip}</small>
           </div>
         ))}
@@ -109,13 +109,13 @@ export function StudentLearningV3({ children }: { readonly children: React.React
       <div className="pilot-card-head"><h2>Learning Progress</h2><button type="button" className="pilot-link" onClick={() => go('/student/readiness')}>View Details</button></div>
       <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
         <MultiRing segments={lessons.length ? [
-          { value: completed, color: '#12996b' },
-          { value: notStarted, color: '#6d4fd8' },
+          { value: completed, color: 'var(--ok)' },
+          { value: notStarted, color: 'var(--band-1)' },
         ] : []}>{percent === null ? 'NA' : `${percent}%`}<div style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--p-muted)' }}>Overall</div></MultiRing>
         <div className="pilot-legend" style={{ flex: 1 }}>
-          <div><i style={{ background: '#12996b' }} /> Completed <span className="num">{lessons.length ? completed : 'NA'}</span></div>
-          <div><i style={{ background: '#1f55e5' }} /> In Progress <span className="num">NA</span></div>
-          <div><i style={{ background: '#6d4fd8' }} /> Not Started <span className="num">{lessons.length ? notStarted : 'NA'}</span></div>
+          <div><i style={{ background: 'var(--ok)' }} /> Completed <span className="num">{lessons.length ? completed : 'NA'}</span></div>
+          <div><i style={{ background: 'var(--brand)' }} /> In Progress <span className="num">NA</span></div>
+          <div><i style={{ background: 'var(--band-1)' }} /> Not Started <span className="num">{lessons.length ? notStarted : 'NA'}</span></div>
         </div>
       </div>
     </section>
@@ -159,12 +159,12 @@ export function StudentAssessmentsV3({ children }: { readonly children: React.Re
       <div className="pilot-card-head"><h2>Performance Summary</h2><small style={{ color: 'var(--p-muted)' }}>Published results</small></div>
       <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
         <MultiRing segments={results.length ? [
-          { value: high, color: '#12996b' }, { value: medium, color: '#f59e0b' }, { value: low, color: '#e5484d' },
+          { value: high, color: 'var(--ok)' }, { value: medium, color: 'var(--orange)' }, { value: low, color: 'var(--danger)' },
         ] : []}>{average === null ? 'NA' : `${average}%`}<div style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--p-muted)' }}>Average</div></MultiRing>
         <div className="pilot-legend" style={{ flex: 1 }}>
-          <div><i style={{ background: '#12996b' }} /> High (&gt;= 70%) <span className="num">{results.length ? high : 'NA'}</span></div>
-          <div><i style={{ background: '#f59e0b' }} /> Medium (40–69%) <span className="num">{results.length ? medium : 'NA'}</span></div>
-          <div><i style={{ background: '#e5484d' }} /> Low (&lt; 40%) <span className="num">{results.length ? low : 'NA'}</span></div>
+          <div><i style={{ background: 'var(--ok)' }} /> High (&gt;= 70%) <span className="num">{results.length ? high : 'NA'}</span></div>
+          <div><i style={{ background: 'var(--orange)' }} /> Medium (40–69%) <span className="num">{results.length ? medium : 'NA'}</span></div>
+          <div><i style={{ background: 'var(--danger)' }} /> Low (&lt; 40%) <span className="num">{results.length ? low : 'NA'}</span></div>
         </div>
       </div>
     </section>
@@ -196,7 +196,7 @@ export function StudentOpportunitiesV3({ children }: { readonly children: React.
       <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
         <MultiRing segments={[]}>NA<div style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--p-muted)' }}>By category</div></MultiRing>
         <div className="pilot-legend" style={{ flex: 1 }}>
-          {['Internships', 'Full Time', 'Contract'].map((label) => <div key={label}><i style={{ background: '#e5eaf2' }} /> {label} <span className="num">NA</span></div>)}
+          {['Internships', 'Full Time', 'Contract'].map((label) => <div key={label}><i style={{ background: 'var(--surface-3)' }} /> {label} <span className="num">NA</span></div>)}
         </div>
       </div>
     </section>
@@ -205,7 +205,7 @@ export function StudentOpportunitiesV3({ children }: { readonly children: React.
       <div className="pilot-list">
         {['Apply early — deadlines close applications automatically.', 'Applying shares your profile for that role only.', 'You can withdraw any time; it ends the employer’s access.'].map((tip) => (
           <div key={tip} className="pilot-list-row" style={{ padding: '8px 2px' }}>
-            <Icon name="check" size={16} style={{ color: "#1f55e5" }} />
+            <Icon name="check" size={16} style={{ color: "var(--brand)" }} />
             <small style={{ color: 'var(--p-ink-2)' }}>{tip}</small>
           </div>
         ))}
@@ -238,7 +238,7 @@ export function StudentProfileV3({ children }: { readonly children: React.ReactN
       <div className="pilot-list">
         {['A clear target career anchors your roadmap.', 'Your headline is the first line recruiters read.', 'Sharing is always your explicit choice — QR or link.'].map((tip) => (
           <div key={tip} className="pilot-list-row" style={{ padding: '8px 2px' }}>
-            <Icon name="check" size={16} style={{ color: "#1f55e5" }} />
+            <Icon name="check" size={16} style={{ color: "var(--brand)" }} />
             <small style={{ color: 'var(--p-ink-2)' }}>{tip}</small>
           </div>
         ))}

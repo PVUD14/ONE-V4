@@ -32,6 +32,8 @@ import {
 } from '../api/placementRegister.js';
 import { Kpis, loadError } from './institutionDepartment.js';
 import { formatApiError } from './shared.js';
+import { NaValue } from '../naState.js';
+import { SMALL_COUNT_TEXT } from '../momentum/smallCountRule.js';
 import * as dates from '../dates.js';
 
 function formatDate(value: string | null | undefined): string {
@@ -47,11 +49,11 @@ function monthLabel(month: string): string {
 export function percentLabel(row: PlacementStatisticsRowDto | null | undefined): string {
   if (!row) return 'NA';
   if (row.placementPercentage !== null && row.placementPercentage !== undefined) return `${row.placementPercentage}%`;
-  return row.placed?.suppressed || row.applied?.suppressed ? '<5' : 'NA';
+  return row.placed?.suppressed || row.applied?.suppressed ? SMALL_COUNT_TEXT : 'NA';
 }
 function ratioLabel(row: PlacementStatisticsRowDto): string {
   if (row.offersPerPlacedStudent !== null && row.offersPerPlacedStudent !== undefined) return String(row.offersPerPlacedStudent);
-  return row.placed?.suppressed ? '<5' : 'NA';
+  return row.placed?.suppressed ? SMALL_COUNT_TEXT : 'NA';
 }
 
 /** Load the statistics once; null while loading or on failure (with the error). */
@@ -72,14 +74,14 @@ export function usePlacementStatistics(institutionId: string | undefined): { rea
 
 function StatisticsCells({ row }: { readonly row: PlacementStatisticsRowDto }): React.ReactElement {
   return <>
-    <td>{suppressedCountLabel(row.eligible)}</td>
-    <td>{suppressedCountLabel(row.notShared)}</td>
-    <td>{suppressedCountLabel(row.applied)}</td>
-    <td>{suppressedCountLabel(row.shortlisted)}</td>
-    <td>{suppressedCountLabel(row.withOffer)}</td>
-    <td>{suppressedCountLabel(row.placed)}</td>
-    <td>{percentLabel(row)}</td>
-    <td>{ratioLabel(row)}</td>
+    <td><NaValue value={suppressedCountLabel(row.eligible)} /></td>
+    <td><NaValue value={suppressedCountLabel(row.notShared)} /></td>
+    <td><NaValue value={suppressedCountLabel(row.applied)} /></td>
+    <td><NaValue value={suppressedCountLabel(row.shortlisted)} /></td>
+    <td><NaValue value={suppressedCountLabel(row.withOffer)} /></td>
+    <td><NaValue value={suppressedCountLabel(row.placed)} /></td>
+    <td><NaValue value={percentLabel(row)} /></td>
+    <td><NaValue value={ratioLabel(row)} /></td>
   </>;
 }
 
@@ -111,7 +113,7 @@ export function PlacementStatisticsSection({ institutionId, title = 'Placement s
         </tbody>
       </table></div> : null}
     {data ? <div className="pilot-legend" aria-label="Offers made by month">
-      {(data.offersByMonth ?? []).map((entry) => <div key={entry.month}><i style={{ background: '#e5eaf2' }} /> Offers made in {monthLabel(entry.month)} <span className="num">{suppressedCountLabel(entry.offers)}</span></div>)}
+      {(data.offersByMonth ?? []).map((entry) => <div key={entry.month}><i /> Offers made in {monthLabel(entry.month)} <span className="num"><NaValue value={suppressedCountLabel(entry.offers)} /></span></div>)}
     </div> : null}
     <ul className="role-check-list">
       <li>Counted only from applications students have chosen to share with the college. A student who shared nothing is "Not shared" — never counted as unplaced, and not in the placement percentage.</li>
@@ -159,7 +161,7 @@ export function PlacementRegisterSection({ institutionId }: { readonly instituti
             <td>{drive.category ? <span className="pilot-chip blue">{drive.category.name}{drive.category.retired ? ' (retired)' : ''}</span> : 'NA'}</td>
             <td><span className="hiring-tag">{campusDriveStateLabels[drive.state]}</span></td>
             {drive.outcome
-              ? <><td>{suppressedCountLabel(drive.outcome.studentsSharing)}</td><td>{suppressedCountLabel(drive.outcome.withOffer)}</td><td>{suppressedCountLabel(drive.outcome.placed)}</td></>
+              ? <><td><NaValue value={suppressedCountLabel(drive.outcome.studentsSharing)} /></td><td><NaValue value={suppressedCountLabel(drive.outcome.withOffer)} /></td><td><NaValue value={suppressedCountLabel(drive.outcome.placed)} /></td></>
               : <td colSpan={3}>After the drive completes</td>}
           </tr>)}</tbody>
         </table></div>}

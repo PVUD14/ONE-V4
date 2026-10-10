@@ -25,6 +25,7 @@ import { StudentApplicationRecords } from './institution.js';
 import type { AuthenticatedWorkspaceSummary } from './shared.js';
 import { CampusDriveApprovalsSection } from './institutionCampusDrives.js';
 import { PlacementRegisterSection, PlacementStatisticsSection } from './institutionPlacementRegister.js';
+import { SMALL_COUNT_TEXT } from '../momentum/smallCountRule.js';
 
 /** The admin's Placement item: the status distribution, the stage funnel and every student's status. */
 export function InstitutionPlacementPage({ authenticatedWorkspace }: { readonly authenticatedWorkspace?: AuthenticatedWorkspaceSummary | undefined }): React.ReactElement {
@@ -41,9 +42,9 @@ export function InstitutionPlacementPage({ authenticatedWorkspace }: { readonly 
       {!data && !pipeline.error ? <p role="status">Loading placement status…</p> : null}
       <Kpis items={[
         ['Students sharing applications', data ? suppressedCountLabel(data.studentsSharing) : 'NA', 'blue', 'applications'],
-        ['In process', data?.placementStatus ? (data.placementStatus.suppressed ? '<5' : suppressedCountLabel(statusCell('IN_PROCESS'))) : 'NA', 'indigo', 'opportunities'],
-        ['With an offer', data?.placementStatus ? (data.placementStatus.suppressed ? '<5' : suppressedCountLabel(statusCell('OFFER'))) : 'NA', 'amber', 'offers'],
-        ['Accepted an offer', data?.placementStatus ? (data.placementStatus.suppressed ? '<5' : suppressedCountLabel(statusCell('ACCEPTED'))) : 'NA', 'green', 'offers'],
+        ['In process', data?.placementStatus ? (data.placementStatus.suppressed ? SMALL_COUNT_TEXT : suppressedCountLabel(statusCell('IN_PROCESS'))) : 'NA', 'indigo', 'opportunities'],
+        ['With an offer', data?.placementStatus ? (data.placementStatus.suppressed ? SMALL_COUNT_TEXT : suppressedCountLabel(statusCell('OFFER'))) : 'NA', 'amber', 'offers'],
+        ['Accepted an offer', data?.placementStatus ? (data.placementStatus.suppressed ? SMALL_COUNT_TEXT : suppressedCountLabel(statusCell('ACCEPTED'))) : 'NA', 'green', 'offers'],
       ]} />
       <div className="pilot-row cols-2">
         <section className="pilot-card">

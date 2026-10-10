@@ -9,6 +9,8 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { apiBaseUrl, ApiRequestError, getProtectedAccessToken } from './api.js';
 import { bearerHeader } from './sandbox.js';
 import { supportCodeSuffix } from './supportCode.js';
+import { NaValue } from './naState.js';
+import { SMALL_COUNT_TEXT, SMALL_COUNT_THRESHOLD, smallCountText } from './momentum/smallCountRule.js';
 
 interface InstitutionReport {
   readonly reportId: string;
@@ -46,7 +48,9 @@ function monthPeriod(month: string): { readonly periodStart: string; readonly pe
 
 /** A band count as it may be shown: anything under the threshold, or withheld, is "<5". */
 function bandCount(entry: InstitutionReport['aggregate']['bands'][number], threshold: number): string {
-  return entry.suppressed || entry.count === null || entry.count < threshold ? `<${threshold}` : String(entry.count);
+  const floor = Math.max(threshold, SMALL_COUNT_THRESHOLD);
+  if (entry.suppressed || entry.count === null || entry.count < floor) return floor === SMALL_COUNT_THRESHOLD ? SMALL_COUNT_TEXT : `<${floor}`;
+  return smallCountText(entry.count);
 }
 
 const bandLabels: Record<string, string> = {
@@ -147,7 +151,7 @@ export function InstitutionReportsPage({ institutionId, title = 'Reports', descr
             <caption>Readiness distribution</caption>
             <thead><tr><th scope="col">Readiness band</th><th scope="col">Students</th></tr></thead>
             <tbody>{report.aggregate.bands.map((entry) => <tr key={entry.band}>
-              <th scope="row">{bandLabels[entry.band] ?? entry.band}</th><td>{bandCount(entry, report.aggregate.minimumCohortSize)}</td>
+              <th scope="row">{bandLabels[entry.band] ?? entry.band}</th><td><NaValue value={bandCount(entry, report.aggregate.minimumCohortSize)} /></td>
             </tr>)}</tbody>
           </table></div> : <p>No readiness records were returned for this period.</p>}
           <p>A band with fewer than {report.aggregate.minimumCohortSize} students shows &lt;{report.aggregate.minimumCohortSize}, to protect student privacy.</p>

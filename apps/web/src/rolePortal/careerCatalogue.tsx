@@ -42,6 +42,7 @@ import { formatApiError } from './shared.js';
 import { SupportCode } from '../supportCode.js';
 import { formatDateTime } from '../dates.js';
 import { codeLabel } from '../labels.js';
+import { SmallCount } from '../momentum/smallCount.js';
 
 const noteLimit = 500;
 const label = (value: string): string => value.split('_').map((word) => word.charAt(0) + word.slice(1).toLowerCase()).join(' ');
@@ -232,7 +233,7 @@ function CatalogueRolePanel({ token, roleId, policy, onChanged, onClose }: {
       <div><dt>Main evidence</dt><dd>{role.mainEvidence ?? 'NA'}</dd></div>
       <div><dt>Plan</dt><dd>{plannedText(role.plannedRelease)}</dd></div>
       <div><dt>Label</dt><dd><StatusBadge label={releaseLabelText(role.releaseLabel)} tone={role.releaseLabel === 'VERIFIED' ? 'success' : 'neutral'} /></dd></div>
-      <div><dt>Students targeting it</dt><dd>{role.liveTargetCount === null || role.liveTargetCount < 5 ? '<5' : role.liveTargetCount}</dd></div>
+      <div><dt>Students targeting it</dt><dd><SmallCount value={role.liveTargetCount} /></dd></div>
     </dl>
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {notice ? <p role="status">{notice}</p> : null}

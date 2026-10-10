@@ -52,6 +52,8 @@ import { TutorCollegesPanel } from './tutorRollout.js';
 import { SupportCode } from '../supportCode.js';
 import { formatDateTime } from '../dates.js';
 import { codeLabel } from '../labels.js';
+import { NaValue } from '../naState.js';
+import { SMALL_COUNT_TEXT } from '../momentum/smallCountRule.js';
 
 const noteLimit = 500;
 const number = (value: number | null | undefined): string => (value === null || value === undefined ? 'NA' : value.toLocaleString());
@@ -530,7 +532,7 @@ function AiOrganizationUsagePanel({ token, period }: { readonly token: string; r
       .catch((cause) => { if (!controller.signal.aborted) setError(formatApiError(cause, 'Unable to load usage by organisation.')); });
     return () => controller.abort();
   }, [token, period]);
-  const cell = (row: AiOrganizationUsageDto, value: number | null): string => (row.suppressed ? '<5' : number(value));
+  const cell = (row: AiOrganizationUsageDto, value: number | null): string => (row.suppressed ? SMALL_COUNT_TEXT : number(value));
   return <section className="role-card role-wide"><h2>Usage by organisation</h2>
     <p><small>Where fewer than 5 people stand behind a row, its figures show &lt;5. A person in two organisations is counted in each.</small></p>
     {error ? <p className="form-error" role="alert">{error}</p> : null}
@@ -540,8 +542,8 @@ function AiOrganizationUsagePanel({ token, period }: { readonly token: string; r
       <thead><tr><th>Organisation</th><th>People</th><th>Succeeded</th><th>Refused</th><th>Failed</th><th>Tokens in / out</th></tr></thead>
       <tbody>{rows.map((row, index) => <tr key={`${row.organizationName ?? 'none'}-${index}`}>
         <td>{row.noSubject ? 'Not about a person' : row.organizationName ?? 'No organisation'}</td>
-        <td>{row.noSubject ? 'NA' : cell(row, row.people)}</td><td>{cell(row, row.succeeded)}</td><td>{cell(row, row.refused)}</td><td>{cell(row, row.failed)}</td>
-        <td>{row.suppressed ? '<5' : `${number(row.inputTokens)} / ${number(row.outputTokens)}`}</td>
+        <td><NaValue value={row.noSubject ? 'NA' : cell(row, row.people)} /></td><td><NaValue value={cell(row, row.succeeded)} /></td><td><NaValue value={cell(row, row.refused)} /></td><td><NaValue value={cell(row, row.failed)} /></td>
+        <td><NaValue value={row.suppressed ? SMALL_COUNT_TEXT : `${number(row.inputTokens)} / ${number(row.outputTokens)}`} /></td>
       </tr>)}</tbody></table></div> : null}
   </section>;
 }

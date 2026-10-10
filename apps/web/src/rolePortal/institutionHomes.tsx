@@ -41,6 +41,7 @@ import { go } from '../pilotParity/naWidgets.js';
 import { Kpis, PageHead, VerificationCard, workspaceGuard } from './institutionDepartment.js';
 import type { AuthenticatedWorkspaceSummary } from './shared.js';
 import { formatDate } from '../dates.js';
+import { NaValue } from '../naState.js';
 
 type HomeProps = { readonly authenticatedWorkspace?: AuthenticatedWorkspaceSummary | undefined; readonly basePath: string; readonly title: string };
 type NotAttempted = ExamNotAttemptedDto & { readonly examTitle: string; readonly endsAt: string };
@@ -82,7 +83,7 @@ function ActivationCard({ activation, onOpen }: { readonly activation: Readonly<
   return <section className="pilot-card">
     <div className="pilot-card-head"><h2>Student Activation</h2><button type="button" className="pilot-link" onClick={onOpen}>View Students</button></div>
     <div className="pilot-legend">
-      {activationStates.map((state) => <div key={state}><i style={{ background: '#e5eaf2' }} /> {studentActivationLabels[state]} <span className="num">{activation ? activation[state] : 'NA'}</span></div>)}
+      {activationStates.map((state) => <div key={state}><i /> {studentActivationLabels[state]} <span className="num">{activation ? activation[state] : 'NA'}</span></div>)}
     </div>
   </section>;
 }
@@ -153,14 +154,14 @@ export function InstitutionAdminHome({ authenticatedWorkspace, basePath, title }
         <section className="pilot-card">
           <div className="pilot-card-head"><h2>Academic Structure</h2><button type="button" className="pilot-link" onClick={() => go(`${basePath}/academic-structure`)}>Manage Structure</button></div>
           <div className="pilot-legend">
-            {unitKindLabels.map(([kind, label]) => <div key={kind}><i style={{ background: '#e5eaf2' }} /> {label} <span className="num">{data?.units ? data.units.filter((unit) => unit.kind === kind).length : 'NA'}</span></div>)}
+            {unitKindLabels.map(([kind, label]) => <div key={kind}><i /> {label} <span className="num">{data?.units ? data.units.filter((unit) => unit.kind === kind).length : 'NA'}</span></div>)}
           </div>
         </section>
         <section className="pilot-card">
           <div className="pilot-card-head"><h2>Staff</h2><button type="button" className="pilot-link" onClick={() => go(`${basePath}/staff`)}>Manage Staff</button></div>
           <div className="pilot-legend">
-            {Object.entries(staffRoleLabels).map(([role, label]) => <div key={role}><i style={{ background: '#e5eaf2' }} /> {label} <span className="num">{activeStaff ? activeStaff.filter((member) => member.role === role).length : 'NA'}</span></div>)}
-            <div><i style={{ background: '#e5eaf2' }} /> Invitations not yet accepted <span className="num">{show(pendingInvitations)}</span></div>
+            {Object.entries(staffRoleLabels).map(([role, label]) => <div key={role}><i /> {label} <span className="num">{activeStaff ? activeStaff.filter((member) => member.role === role).length : 'NA'}</span></div>)}
+            <div><i /> Invitations not yet accepted <span className="num">{show(pendingInvitations)}</span></div>
           </div>
         </section>
       </div>
@@ -172,16 +173,16 @@ export function InstitutionAdminHome({ authenticatedWorkspace, basePath, title }
       <section className="pilot-card">
         <div className="pilot-card-head"><h2>Assessments</h2><button type="button" className="pilot-link" onClick={() => go(`${basePath}/assessments`)}>Open</button></div>
         <div className="pilot-legend">
-          <div><i style={{ background: '#e5eaf2' }} /> Published <span className="num">{show(published)}</span></div>
-          <div><i style={{ background: '#e5eaf2' }} /> Not published <span className="num">{data?.exams && published !== null ? data.exams.length - published : 'NA'}</span></div>
+          <div><i /> Published <span className="num">{show(published)}</span></div>
+          <div><i /> Not published <span className="num">{data?.exams && published !== null ? data.exams.length - published : 'NA'}</span></div>
         </div>
       </section>
       <section className="pilot-card">
         <div className="pilot-card-head"><h2>Placement</h2><button type="button" className="pilot-link" onClick={() => go(`${basePath}/placement`)}>Open Placement</button></div>
         <div className="pilot-legend">
-          <div><i style={{ background: '#e5eaf2' }} /> Placement eligible <span className="num">{suppressedCountLabel(data?.placement?.overall.eligible)}</span></div>
-          <div><i style={{ background: '#e5eaf2' }} /> Students with offers <span className="num">{suppressedCountLabel(data?.placement?.overall.withOffer)}</span></div>
-          <div><i style={{ background: '#e5eaf2' }} /> Students placed <span className="num">{suppressedCountLabel(data?.placement?.overall.placed)}</span></div>
+          <div><i /> Placement eligible <span className="num"><NaValue value={suppressedCountLabel(data?.placement?.overall.eligible)} /></span></div>
+          <div><i /> Students with offers <span className="num"><NaValue value={suppressedCountLabel(data?.placement?.overall.withOffer)} /></span></div>
+          <div><i /> Students placed <span className="num"><NaValue value={suppressedCountLabel(data?.placement?.overall.placed)} /></span></div>
         </div>
         <small style={{ color: 'var(--p-muted)' }}>From applications students shared with the college. Fewer than five reads &lt;5.</small>
       </section>

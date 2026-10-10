@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Icon, type IconName } from '../icons/Icon.js';
-import { MultiRing, Ring, Spark, WeekBars, toneColor } from './pilotComponents.js';
+import { MultiRing, Ring, Spark, WeekBars, toneColor, toneMix } from './pilotComponents.js';
 import { DetailRows, OverlayForm, PilotTabs, downloadCsv, listModal, useOverlay } from './pilotOverlay.js';
 import { usePilotSession } from './pilotSession.js';
 import { PhotoUploadControl, PilotAvatar, shareProfileModal } from './pilotShare.js';
@@ -147,7 +147,7 @@ export function PilotDashboard(): React.ReactElement {
           <div className="pilot-row cols-4">
             {pilotRecommendedCourses.map((course) => (
               <div key={course.title} className="pilot-course-card">
-                <span className="pilot-tile" style={{ background: `${toneColor(course.tone)}1a`, color: toneColor(course.tone) }}><Icon name="learning" size={20} /></span>
+                <span className="pilot-tile" style={{ background: toneMix(course.tone, 10), color: toneColor(course.tone) }}><Icon name="learning" size={20} /></span>
                 <strong>{course.title}</strong>
                 <small>{course.lessons} Lessons</small>
                 <button type="button" className="pilot-btn soft small">Start</button>
@@ -518,7 +518,7 @@ export function PilotLearn(): React.ReactElement {
         <div className="pilot-row cols-5">
           {pilotPopularCourses.map((course) => (
             <div key={course.title} className="pilot-course-card">
-              <div className="pilot-course-art" style={{ background: `linear-gradient(135deg, ${toneColor(course.tone)}cc, ${toneColor(course.tone)})` }}><Icon name="learning" size={24} /></div>
+              <div className="pilot-course-art" style={{ background: `linear-gradient(135deg, ${toneMix(course.tone, 80)}, ${toneColor(course.tone)})` }}><Icon name="learning" size={24} /></div>
               <strong>{course.title}</strong>
               <small><Icon name="offers" size={16} style={{ color: "#f59e0b", verticalAlign: '-1px' }} /> {course.rating} ({course.learners}) · {course.level}</small>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -709,7 +709,7 @@ export function PilotAssessments(): React.ReactElement {
         <div className="pilot-row cols-5">
           {pilotRecommendedTests.map((test) => (
             <div key={test.title} className="pilot-course-card">
-              <span className="pilot-tile" style={{ background: `${toneColor(test.tone)}1a`, color: toneColor(test.tone) }}><Icon name="assessments" size={16} /></span>
+              <span className="pilot-tile" style={{ background: toneMix(test.tone, 10), color: toneColor(test.tone) }}><Icon name="assessments" size={16} /></span>
               <strong>{test.title}</strong>
               <span className={`pilot-chip ${test.difficulty === 'Easy' ? 'green' : test.difficulty === 'Medium' ? 'amber' : 'rose'}`}>{test.difficulty}</span>
               <small>{test.questions} Qs · {test.minutes} mins</small>

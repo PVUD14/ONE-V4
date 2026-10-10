@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Icon, type IconName } from './icons/Icon.js';
-import { Spark, toneColor } from './pilot/pilotComponents.js';
+import { Spark, toneColor, toneMix } from './pilot/pilotComponents.js';
+import { ReadinessBand, toReadinessBand } from './momentum/readinessBand.js';
 import { NaSlotChip, NaSlotStrip } from './naState.js';
 import { completeStudentStaffAction, getCurrentStudent, listStudentStaffActions, type StudentStaffActionDto } from './api/student.js';
 import { SharedCounsellingNotes } from './studentCounsellingNotes.js';
@@ -49,29 +50,6 @@ function relativeWhen(iso: string): string {
 
 const READINESS_BANDS = ['NOT_ENOUGH_EVIDENCE', 'DEVELOPING', 'PROGRESSING', 'READY_FOR_NEXT_STEP'] as const;
 const NA_COURSE_TONES = ['blue', 'purple', 'teal', 'green'] as const;
-
-function ReadinessBandRing({ band }: { readonly band: string | null }): React.ReactElement {
-  const size = 76;
-  const stroke = 9;
-  const radius = (size - stroke) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const segment = circumference / READINESS_BANDS.length;
-  const gap = 5;
-  const activeIndex = band ? READINESS_BANDS.indexOf(band as (typeof READINESS_BANDS)[number]) : -1;
-  const label = activeIndex >= 0 ? `${prettify(READINESS_BANDS[activeIndex]!)} readiness band` : 'Readiness band unavailable';
-  return <span style={{ position: 'relative', width: size, height: size, display: 'inline-grid', placeItems: 'center', flex: '0 0 auto' }}>
-    <svg width={size} height={size} role="img" aria-label={label}>
-      {READINESS_BANDS.map((candidate, index) => <circle key={candidate}
-        cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={index === activeIndex ? toneColor('blue') : '#dce3ee'}
-        strokeWidth={index === activeIndex ? stroke : stroke - 2} strokeLinecap="round"
-        strokeDasharray={`${segment - gap} ${circumference - segment + gap}`}
-        strokeDashoffset={-index * segment} transform={`rotate(-90 ${size / 2} ${size / 2})`} />)}
-    </svg>
-    <span style={{ position: 'absolute', textAlign: 'center', fontWeight: 700, fontSize: 11, color: activeIndex >= 0 ? 'var(--p-text)' : 'var(--p-muted)' }}>
-      {activeIndex >= 0 ? 'BAND' : 'NA'}
-    </span>
-  </span>;
-}
 
 interface DashboardData {
   readonly profile: StudentProfileDto | null;
@@ -385,22 +363,9 @@ export function StudentDashboardV3({ studentName }: { readonly studentName: stri
           <section className="pilot-card v3-band-card">
             <h2>Career Readiness Band</h2>
             <div className="v3-band-body">
-            <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'nowrap' }}>
-              <div style={{ minWidth: 0 }}>
-                <div>{band
-                  ? <span className="pilot-chip green">{prettify(band)}</span>
-                  : <span className="pilot-chip slate">No advisory band yet</span>}</div>
-                <div style={{ marginTop: 11 }}><a className="pilot-btn soft small" href="#student-reports-title">View Full Report</a></div>
-              </div>
-              <ReadinessBandRing band={band} />
-            </div>
-            <div aria-label="Readiness band legend" style={{ display: 'grid', gap: 5, marginTop: 12 }}>
-              {READINESS_BANDS.map((candidate, index) => <span key={candidate} style={{ display: 'flex', gap: 7, alignItems: 'center', fontSize: 10.5,
-                color: candidate === band ? 'var(--p-text)' : 'var(--p-muted)', fontWeight: candidate === band ? 700 : 500 }}>
-                <i aria-hidden="true" style={{ width: 8, height: 8, borderRadius: '50%', background: candidate === band ? toneColor('blue') : '#dce3ee' }} />
-                {index + 1}. {prettify(candidate)}{candidate === band ? ' (current)' : ''}
-              </span>)}
-            </div>
+              {/* The advisory band, drawn only by <ReadinessBand>: the enum in, never a number. */}
+              <ReadinessBand band={toReadinessBand(band)} variant="compact" />
+              <div style={{ marginTop: 11 }}><a className="pilot-btn soft small" href="#student-reports-title">View Full Report</a></div>
             </div>
           </section>
           <div className="v3-factor-grid">
@@ -431,7 +396,7 @@ export function StudentDashboardV3({ studentName }: { readonly studentName: stri
             <div className="pilot-list">
               {plan.length ? plan.map((task) => (
                 <div key={task.title} className="pilot-list-row" style={{ cursor: 'pointer' }} onClick={() => go(task.path)}>
-                  <Icon name="check" size={16} style={{ color: task.done ? '#12996b' : '#c2ccda' }} />
+                  <Icon name="check" size={16} style={{ color: task.done ? 'var(--ok)' : 'var(--line-2)' }} />
                   <div className="grow"><strong style={task.done ? { color: 'var(--p-muted)' } : undefined}>{task.title}</strong></div>
                   <small>{task.minutes}</small>
                 </div>
@@ -463,7 +428,7 @@ export function StudentDashboardV3({ studentName }: { readonly studentName: stri
                 <div key={item.title} className="pilot-list-row">
                   <span className="pilot-tile blue"><Icon name="calendar" size={16} /></span>
                   <div className="grow"><strong>{item.title}</strong><small>{item.when}</small></div>
-                  <Icon name="arrow-right" size={16} style={{ color: "#98a5ba" }} />
+                  <Icon name="arrow-right" size={16} style={{ color: "var(--text-3)" }} />
                 </div>
               )) : <p style={{ color: 'var(--p-muted)', margin: '8px 0' }}>NA — no scheduled windows.</p>}
             </div>
@@ -476,7 +441,7 @@ export function StudentDashboardV3({ studentName }: { readonly studentName: stri
             <div className="pilot-row cols-4">
               {modules.slice(0, 4).map((module, index) => (
                 <div key={module.id} className="pilot-course-card">
-                  <span className="pilot-tile" style={{ background: `${toneColor(NA_COURSE_TONES[index % 4]!)}1a`, color: toneColor(NA_COURSE_TONES[index % 4]!) }}><Icon name="learning" size={20} /></span>
+                  <span className="pilot-tile" style={{ background: toneMix(NA_COURSE_TONES[index % 4]!, 10), color: toneColor(NA_COURSE_TONES[index % 4]!) }}><Icon name="learning" size={20} /></span>
                   <strong>{module.title}</strong>
                   <small>{module.lessons.length} Lessons</small>
                   <button type="button" className="pilot-btn soft small" onClick={() => go('/student/learning')}>Start</button>
@@ -533,7 +498,7 @@ export function StudentDashboardV3({ studentName }: { readonly studentName: stri
       <aside className="pilot-rail">
         <section className="pilot-card">
           <div className="pilot-card-head">
-            <h2><Icon name="skills" size={16} style={{ color: "#f59e0b", verticalAlign: '-2px' }} /> {streak} Day Streak</h2>
+            <h2><Icon name="skills" size={16} style={{ color: "var(--orange)", verticalAlign: '-2px' }} /> {streak} Day Streak</h2>
             <small style={{ color: 'var(--p-muted)' }}>{streak > 0 ? 'Keep it up!' : 'Start today!'}</small>
           </div>
           <div className="pilot-streak-days">

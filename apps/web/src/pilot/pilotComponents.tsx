@@ -1,12 +1,21 @@
 /** Small presentational kit shared by the pilot pages. Pure SVG, no dependencies. */
 
+// Momentum tokens, so every chart follows the theme. No per-tone accents beyond the brand family:
+// purple and indigo fold into the brand blues (rule 5). Values are CSS var() references, so they
+// are applied through `style`, never as SVG presentation attributes (which do not resolve var()).
 const TONE_COLORS: Readonly<Record<string, string>> = {
-  blue: '#1f55e5', green: '#12996b', amber: '#f59e0b', purple: '#6d4fd8',
-  rose: '#e5484d', teal: '#0d9488', indigo: '#4f46e5', slate: '#64748b',
+  blue: 'var(--brand)', green: 'var(--ok)', amber: 'var(--warn)', purple: 'var(--band-2)',
+  rose: 'var(--danger)', teal: 'var(--cyan)', indigo: 'var(--band-1)', slate: 'var(--text-3)',
 };
+const TRACK = 'var(--surface-3)';
 
 export function toneColor(tone: string): string {
   return TONE_COLORS[tone] ?? TONE_COLORS.blue!;
+}
+
+/** A tone at a given strength over transparent (replaces hex-alpha suffixes, which var() cannot take). */
+export function toneMix(tone: string, percent: number): string {
+  return `color-mix(in srgb, ${toneColor(tone)} ${percent}%, transparent)`;
 }
 
 export function Ring({ value, size = 84, stroke = 9, tone = 'blue', children }: {
@@ -19,10 +28,10 @@ export function Ring({ value, size = 84, stroke = 9, tone = 'blue', children }: 
   return (
     <span style={{ position: 'relative', width: size, height: size, display: 'inline-grid', placeItems: 'center', flex: '0 0 auto' }}>
       <svg width={size} height={size} role="img" aria-label={`${clamped} percent`}>
-        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#edf1f7" strokeWidth={stroke} />
+        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" style={{ stroke: TRACK }} strokeWidth={stroke} />
         <circle
           cx={size / 2} cy={size / 2} r={radius} fill="none"
-          stroke={toneColor(tone)} strokeWidth={stroke} strokeLinecap="round"
+          style={{ stroke: toneColor(tone) }} strokeWidth={stroke} strokeLinecap="round"
           strokeDasharray={`${(clamped / 100) * circumference} ${circumference}`}
           transform={`rotate(-90 ${size / 2} ${size / 2})`}
         />
@@ -43,7 +52,7 @@ export function MultiRing({ segments, size = 118, stroke = 13, children }: {
   return (
     <span style={{ position: 'relative', width: size, height: size, display: 'inline-grid', placeItems: 'center', flex: '0 0 auto' }}>
       <svg width={size} height={size} aria-hidden="true">
-        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#edf1f7" strokeWidth={stroke} />
+        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" style={{ stroke: TRACK }} strokeWidth={stroke} />
         {segments.map((segment, index) => {
           const length = (segment.value / total) * circumference;
           const dash = `${Math.max(0, length - 3)} ${circumference}`;
@@ -51,7 +60,7 @@ export function MultiRing({ segments, size = 118, stroke = 13, children }: {
             <circle
               key={index}
               cx={size / 2} cy={size / 2} r={radius} fill="none"
-              stroke={segment.color} strokeWidth={stroke} strokeLinecap="round"
+              style={{ stroke: segment.color }} strokeWidth={stroke} strokeLinecap="round"
               strokeDasharray={dash} strokeDashoffset={-offset}
               transform={`rotate(-90 ${size / 2} ${size / 2})`}
             />
@@ -75,11 +84,11 @@ export function Spark({ points, height = 96, tone = 'blue' }: {
   const color = toneColor(tone);
   return (
     <svg viewBox={`0 0 ${width} ${height}`} style={{ width: '100%', height }} aria-hidden="true">
-      <polyline points={`0,${height} ${coords.join(' ')} ${width},${height}`} fill={`${color}18`} stroke="none" />
-      <polyline points={coords.join(' ')} fill="none" stroke={color} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" />
+      <polyline points={`0,${height} ${coords.join(' ')} ${width},${height}`} style={{ fill: color, fillOpacity: 0.09 }} stroke="none" />
+      <polyline points={coords.join(' ')} fill="none" style={{ stroke: color }} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" />
       {coords.map((coordinate, index) => {
         const [x, y] = coordinate.split(',');
-        return <circle key={index} cx={x} cy={y} r={3} fill="#fff" stroke={color} strokeWidth={2} />;
+        return <circle key={index} cx={x} cy={y} r={3} style={{ fill: 'var(--surface)', stroke: color }} strokeWidth={2} />;
       })}
     </svg>
   );
@@ -95,9 +104,9 @@ export function WeekBars({ hours, tone = 'green' }: {
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 8, alignItems: 'end', height: 110 }} aria-hidden="true">
       {hours.map((value, index) => (
         <div key={index} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, height: '100%', justifyContent: 'flex-end' }}>
-          <span style={{ fontSize: 10, color: '#5d6b82' }}>{value}h</span>
+          <span style={{ fontSize: 10, color: 'var(--text-3)' }}>{value}h</span>
           <span style={{ width: 15, borderRadius: 6, background: color, height: `${Math.max(8, (value / max) * 62)}px` }} />
-          <span style={{ fontSize: 10, color: '#5d6b82' }}>{labels[index]}</span>
+          <span style={{ fontSize: 10, color: 'var(--text-3)' }}>{labels[index]}</span>
         </div>
       ))}
     </div>

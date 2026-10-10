@@ -10,6 +10,7 @@ import { ApiRequestError, apiBaseUrl } from './core.js';
 import { requestJson } from './http.js';
 import type { SuppressedCountDto } from './privacyOperations.js';
 import { bearerHeader } from '../sandbox.js';
+import { smallCountText } from '../momentum/smallCountRule.js';
 
 export interface InstitutionUnitDto {
   readonly id: string; readonly institutionId: string; readonly kind: string; readonly name: string; readonly parentUnitId?: string | null;
@@ -717,11 +718,10 @@ export function listClassReports(token: string, institutionId: string, signal?: 
   return requestJson(`${institutionPath(institutionId)}/class-reports`, { token, ...(signal ? { signal } : {}) });
 }
 
-/** How a suppressed count is shown: never the number, always "<5". */
+/** How a suppressed count is shown: never the number, always "<5" (the shared small-count rule). */
 export function suppressedCountLabel(count: { readonly suppressed: boolean; readonly value?: number | null; readonly count?: number | null } | null | undefined): string {
   if (!count) return 'NA';
-  const value = count.value !== undefined ? count.value : count.count;
-  return count.suppressed || value === null || value === undefined ? '<5' : String(value);
+  return smallCountText(count);
 }
 
 // INST-15: the faculty cohort view over the learning engine. Names, labels and counts only — the

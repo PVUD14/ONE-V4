@@ -21,6 +21,7 @@
  * Styles live in the "NA / suppressed-count presentation" block at the end of styles.css.
  */
 import type { ReactNode } from 'react';
+import { SmallCount, SuppressedBlock, isSmallCountText } from './momentum/smallCount.js';
 
 export type MissingKind = 'na' | 'suppressed' | 'withheld' | 'few';
 
@@ -30,7 +31,7 @@ export function missingKind(value: unknown): MissingKind | null {
   if (typeof value !== 'string') return null;
   const text = value.trim();
   if (text === 'NA') return 'na';
-  if (/^<\s?\d/.test(text)) return 'suppressed';
+  if (isSmallCountText(text) || /^<\s?\d/.test(text)) return 'suppressed';
   if (text === 'Withheld') return 'withheld';
   if (/^Too few /.test(text)) return 'few';
   return null;
@@ -49,6 +50,8 @@ export function allMissing(values: readonly unknown[]): boolean {
 export function NaValue({ value }: { readonly value: ReactNode }): React.ReactElement {
   const kind = missingKind(value);
   if (!kind) return <>{value}</>;
+  // A small count is drawn by <SmallCount>, the one place "<5" is rendered.
+  if (kind === 'suppressed' && isSmallCountText(value)) return <SmallCount value={null} className="na-value" data-na={kind} />;
   return <span className="na-value" data-na={kind}>{value ?? 'NA'}</span>;
 }
 
@@ -167,7 +170,10 @@ export function CountBars({ rows, label, labelHeading, valueHeading, emptyReason
     <thead><tr><th scope="col">{labelHeading}</th><th scope="col"><span className="sr-only">Bar</span></th><th scope="col">{valueHeading}</th></tr></thead>
     <tbody>{rows.map((row, index) => <tr key={`${row.label}:${index}`} data-na={row.value === null ? 'true' : undefined}>
       <th scope="row">{row.label}</th>
-      <td className="na-count-bar"><span className="na-count-track" aria-hidden="true">{row.value === null ? null : <i style={{ width: `${(row.value / max) * 100}%` }} />}</span></td>
+      <td className="na-count-bar">{isSmallCountText(row.display)
+        // A small count has no proportional bar: the uniform hatched block stands in its place.
+        ? <span className="sc-slot" aria-hidden="true"><SuppressedBlock /></span>
+        : <span className="na-count-track" aria-hidden="true">{row.value === null ? null : <i style={{ width: `${(row.value / max) * 100}%` }} />}</span>}</td>
       <td className="na-count-value"><NaValue value={row.display} /></td>
     </tr>)}</tbody>
   </table>;

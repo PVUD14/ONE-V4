@@ -87,7 +87,7 @@ export function GrowthHomePage(): React.ReactElement {
               <V2Chip tone="slate">{me?.staffType ? staffTypeLabels[me.staffType] ?? me.staffType : 'Staff type not set'}</V2Chip>
             </div>
           </div>
-          <V2Ring percent={0} value={NA} label="TARGET PROGRESS" tone="#0f766e" />
+          <V2Ring percent={0} value={NA} label="TARGET PROGRESS" tone="var(--cyan)" />
         </div>
 
         <div className="v2-row v2-cols-4" role="region" aria-label="Growth summary">

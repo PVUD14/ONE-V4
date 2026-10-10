@@ -16,6 +16,7 @@ import {
 import { V2EmptyState, V2Stat } from './dashboardsV2.js';
 import { lessonTextProps } from './lessonScript.js';
 import { formatDate, formatDateTime } from './dates.js';
+import { ReadinessBand, toReadinessBand } from './momentum/readinessBand.js';
 
 type CareerRoute = 'readiness' | 'skills' | 'assessments' | 'learning' | 'roadmap' | 'notifications';
 
@@ -239,6 +240,7 @@ function ReadinessApiView({ learner, catalog }: { readonly learner: LearnerCaree
   const history = learner.readinessHistory ?? [];
   return <>
     <div className="career-readiness-result"><span>Current advisory band</span><strong>{formatBand(learner.readiness.band)}</strong>
+      <ReadinessBand band={toReadinessBand(learner.readiness.band)} variant="compact" />
       <p>Based on {learner.evidence.length} immutable evidence record{learner.evidence.length === 1 ? '' : 's'}.</p></div>
     <div className="career-api-grid">{factors.length ? factors.map((factor) => <article key={factor.topicId}><span>What this band rests on</span>
       <h3>{topicName(catalog, factor.topicId)}</h3><p>{formatBand(factor.masteryBand)}. {factor.explanation}</p></article>)

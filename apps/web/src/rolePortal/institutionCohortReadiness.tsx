@@ -33,6 +33,8 @@ import type {
   PreparationSprintsDto,
 } from '../api.js';
 import { V2EmptyState, V2Stat } from '../dashboardsV2.js';
+import { NaValue } from '../naState.js';
+import { SMALL_COUNT_TEXT } from '../momentum/smallCountRule.js';
 import { formatApiError } from './shared.js';
 import { supportCodeSuffix } from '../supportCode.js';
 import { formatDate } from '../dates.js';
@@ -161,7 +163,7 @@ export function CohortReadinessByRoleSection({ institutionId }: { readonly insti
     {notice ? <p role="status">{notice}</p> : null}
     <div className="v2-row v2-cols-4 career-stat-strip">
       <V2Stat icon="🎯" tone="blue" value={view ? view.role.title : 'NA'} label="Career role" />
-      <V2Stat icon="👥" tone="indigo" value={view ? (view.cohort.suppressed ? '<5' : suppressedCountLabel(view.cohort.total)) : 'NA'} label="Students in the month" />
+      <V2Stat icon="👥" tone="indigo" value={view ? (view.cohort.suppressed ? SMALL_COUNT_TEXT : suppressedCountLabel(view.cohort.total)) : 'NA'} label="Students in the month" />
       <V2Stat icon="🧩" tone="purple" value={view ? view.requirementCounts.essential : 'NA'} label="Essential requirements" />
       <V2Stat icon="🏃" tone="green" value={running ?? 'NA'} label="Sprints running" />
     </div>
@@ -205,9 +207,9 @@ function RequirementTable({ view, onSprint }: { readonly view: CohortReadinessDt
         <th scope="col">Gaps</th><th scope="col">Unknowns</th><th scope="col">Sprint</th></tr></thead>
       <tbody>{view.requirements.map((requirement) => <tr key={requirement.topicId}>
         <th scope="row">{requirement.skillName}</th>
-        {Object.keys(REQUIREMENT_CELL_LABELS).map((key) => <td key={key}>{requirement.cells.length ? cellLabel(requirement.cells, key) : '<5'}</td>)}
-        <td>{suppressedCountLabel(requirement.gaps)}</td>
-        <td>{suppressedCountLabel(requirement.unknowns)}</td>
+        {Object.keys(REQUIREMENT_CELL_LABELS).map((key) => <td key={key}><NaValue value={requirement.cells.length ? cellLabel(requirement.cells, key) : SMALL_COUNT_TEXT} /></td>)}
+        <td><NaValue value={suppressedCountLabel(requirement.gaps)} /></td>
+        <td><NaValue value={suppressedCountLabel(requirement.unknowns)} /></td>
         <td>{view.canRunSprints && requirement.resources.length
           ? <button type="button" className="pilot-link" onClick={() => onSprint(requirement)}>Run a sprint</button>
           : requirement.resources.length ? 'NA' : 'No published content'}</td>
@@ -301,10 +303,10 @@ function SprintList({ sprints, token, institutionId, onChanged }: {
           <th scope="row">{`${sprint.role.title} · ${sprint.skillName}`}
             <span>{`${sprint.resource.title} · ${SPRINT_REASON_LABELS[sprint.reasonCode] ?? 'NA'}${sprint.drive ? ` · ${sprint.drive.employerName}` : ''}${sprint.unitName ? ` · ${sprint.unitName}` : ''}`}</span></th>
           <td>{`${day(sprint.startsAt)} – ${day(sprint.endsAt)} · ${STATE_LABELS[sprint.state] ?? 'NA'}`}</td>
-          <td>{sprint.progress.available ? suppressedCountLabel(sprint.progress.reached) : 'NA'}</td>
-          {Object.keys(SPRINT_CELL_LABELS).map((key) => <td key={key}>{!sprint.progress.available || !sprint.progress.requirementLive ? 'NA'
-            : sprint.progress.cells.length ? cellLabel(sprint.progress.cells, key) : '<5'}</td>)}
-          <td>{sprint.progress.available ? suppressedCountLabel(sprint.progress.workDone) : 'NA'}</td>
+          <td><NaValue value={sprint.progress.available ? suppressedCountLabel(sprint.progress.reached) : 'NA'} /></td>
+          {Object.keys(SPRINT_CELL_LABELS).map((key) => <td key={key}><NaValue value={!sprint.progress.available || !sprint.progress.requirementLive ? 'NA'
+            : sprint.progress.cells.length ? cellLabel(sprint.progress.cells, key) : SMALL_COUNT_TEXT} /></td>)}
+          <td><NaValue value={sprint.progress.available ? suppressedCountLabel(sprint.progress.workDone) : 'NA'} /></td>
           <td>{sprint.canEnd ? <select aria-label={`End sprint ${sprint.role.title} ${sprint.skillName}`} defaultValue="" onChange={(event) => { if (event.target.value) void end(sprint, event.target.value); }}>
             <option value="">End early…</option>
             {sprints.cancelReasonCodes.map((code) => <option key={code} value={code}>{END_LABELS[code] ?? code}</option>)}

@@ -22,6 +22,7 @@ import {
   type RecordedResultDto, type ResultsImportOutcome, type ResultsImportPreviewDto, type VerificationQueueEntryDto,
 } from './api.js';
 import { formatApiError } from './rolePortal/shared.js';
+import { StatusTag, type StatusTone } from './momentum/statusTag.js';
 
 const RELATIONSHIP_LABEL: Readonly<Record<VerificationQueueEntryDto['relationship'], string>> = {
   CURRENT: 'Current student',
@@ -180,6 +181,11 @@ const OUTCOME_LABEL: Readonly<Record<ResultsImportOutcome, string>> = {
   SKIPPED: 'Skipped — nothing is recorded',
 };
 
+/** Verification colours (components.html §03): verified green, conflict red, needs a fix amber, nothing written neutral. */
+const OUTCOME_TONE: Readonly<Record<ResultsImportOutcome, StatusTone>> = {
+  CREATE: 'ok', CONFIRM: 'ok', UNCHANGED: 'mute', CONFLICT: 'danger', INVALID: 'warn', SKIPPED: 'mute',
+};
+
 const ISSUE_LABEL: Readonly<Record<string, string>> = {
   student_not_found: 'No student with this ID on the roster you manage',
   term_sequence_invalid: 'Term number must be 1 to 30',
@@ -276,7 +282,7 @@ export function AcademicResultsUpload({ institutionId }: { readonly institutionI
           <td>{row.studentName ?? <span className="hiring-meta">Not found</span>}<br /><span className="hiring-meta">{row.institutionStudentId || 'NA'}</span></td>
           <td>{row.termLabel || 'NA'}{row.termSequence !== null ? <><br /><span className="hiring-meta">Term {row.termSequence}</span></> : null}</td>
           <td>{row.result || 'NA'} {row.scale}{row.backlogs !== null ? <><br /><span className="hiring-meta">{row.backlogs} backlog</span></> : null}</td>
-          <td><span className={`hiring-state state-${row.outcome.toLowerCase()}`}>{OUTCOME_LABEL[row.outcome]}</span>
+          <td><StatusTag kind="verification" state={row.outcome} tone={OUTCOME_TONE[row.outcome]} label={OUTCOME_LABEL[row.outcome]} />
             {row.issues.map((issue) => <React.Fragment key={issue}><br /><span className="hiring-meta">{ISSUE_LABEL[issue] ?? issue}</span></React.Fragment>)}</td>
           <td>{row.studentReported ? <>Student entered {reported(row.studentReported)}</> : row.verifiedRecord ? <>Verified record: {reported(row.verifiedRecord)}</> : 'NA'}</td>
         </tr>)}</tbody>

@@ -25,6 +25,8 @@ import { V2EmptyState } from '../dashboardsV2.js';
 import { StatusBadge } from '../studentComponents.js';
 import { RequestApprovalDialog } from './approvals.js';
 import { formatApiError } from './shared.js';
+import { smallCountText } from '../momentum/smallCountRule.js';
+import { NaValue } from '../naState.js';
 
 const when = (value: string | null | undefined): string => (value ? new Date(value).toLocaleString() : 'NA');
 const METRIC_LABELS: readonly (readonly [TutorPilotMetricKey, string])[] = [
@@ -34,7 +36,7 @@ const METRIC_LABELS: readonly (readonly [TutorPilotMetricKey, string])[] = [
 ];
 
 function assignedText(group: TutorGroupSummaryDto): string {
-  return group.assigned.suppressed || group.assigned.value === null ? '<5' : group.assigned.value.toLocaleString();
+  return smallCountText(group.assigned, (value) => value.toLocaleString());
 }
 
 function metricText(group: TutorGroupSummaryDto, key: TutorPilotMetricKey): string {
@@ -126,7 +128,7 @@ export function TutorCollegesPanel({ token }: { readonly token: string }): React
 
 function GroupCell({ group, days }: { readonly group: TutorGroupSummaryDto; readonly days: number }): React.ReactElement {
   return <>
-    <strong>{assignedText(group)}</strong> students
+    <strong><NaValue value={assignedText(group)} /></strong> students
     {group.metrics ? <details><summary>Last {days} days</summary><dl>
       {METRIC_LABELS.map(([key, label]) => <div key={key}><dt>{label}</dt><dd>{metricText(group, key)}</dd></div>)}
     </dl></details> : <><br /><small>Counts withheld (&lt;5 students)</small></>}

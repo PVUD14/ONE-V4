@@ -16,6 +16,9 @@ import './styles/shell.css';
 // Momentum icons: base two-tone rules, then the play-once hover cues for module icons.
 import './styles/icons.css';
 import './styles/icon-motion.css';
+// Momentum components (buttons, fields, tags, cards, KPI tiles, tables, banners, modals, the
+// readiness band and small counts) restyle the app's shared classes, so they load last.
+import './styles/components.css';
 import { applyStoredTheme } from './themePreference.js';
 
 // A theme chosen with the top-bar toggle is applied before the first paint; otherwise the OS decides.

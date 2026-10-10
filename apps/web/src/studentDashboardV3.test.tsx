@@ -289,8 +289,9 @@ describe('StudentDashboardV3 readiness presentation', () => {
     render(<StudentDashboardV3 studentName="Aanya Rao" />);
 
     expect(await screen.findByRole('heading', { name: 'Career Readiness Band' })).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: 'Developing readiness band' })).toBeInTheDocument();
-    expect(screen.getByText('2. Developing (current)')).toBeInTheDocument();
+    // The band is drawn by <ReadinessBand>: the current step is named, with the privacy line, never a number.
+    expect(screen.getByRole('img', { name: 'Readiness band: Developing' })).toBeInTheDocument();
+    expect(screen.getByText('Advisory band · never a score · never shown to employers')).toBeInTheDocument();
     expect(screen.getByText('Professional Communication')).toBeInTheDocument();
     expect(screen.getByText('2 active evidence records')).toBeInTheDocument();
     // The explanation only repeats the count and names the internal model, so it is not shown.
@@ -305,7 +306,7 @@ describe('StudentDashboardV3 readiness presentation', () => {
     render(<StudentDashboardV3 studentName="Aanya Rao" />);
 
     expect(await screen.findByText('No advisory band yet')).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: 'Readiness band unavailable' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'No advisory band yet' })).toBeInTheDocument();
     expectFiveUnprojectedFactors();
     expect(document.body.textContent).not.toContain('/100');
   });
@@ -317,7 +318,7 @@ describe('StudentDashboardV3 readiness presentation', () => {
 
     expect(await screen.findByRole('heading', { name: 'Career Readiness Band' })).toBeInTheDocument();
     expect(screen.getByText('No advisory band yet')).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: 'Readiness band unavailable' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'No advisory band yet' })).toBeInTheDocument();
     expectFiveUnprojectedFactors();
     expect(document.body.textContent).not.toContain('/100');
   });

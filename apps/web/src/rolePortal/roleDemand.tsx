@@ -17,6 +17,7 @@ import { ApiRequestError, getProtectedAccessToken, getRoleDemandDetail, getRoleD
 import type { RoleDemandCellDto, RoleDemandDetailResponseDto, RoleDemandPeopleCountDto, RoleDemandRoleDto, RoleDemandSummaryResponseDto } from '../api.js';
 import { V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { CountBars, NaValue, SuppressionNote } from '../naState.js';
+import { shownCount, smallCountText } from '../momentum/smallCountRule.js';
 import { StatusBadge } from '../studentComponents.js';
 import { formatApiError, RestrictedApiState } from './shared.js';
 import { SupportCode } from '../supportCode.js';
@@ -28,8 +29,7 @@ const ROLE_PAGE = 25;
 export function formatPeople(count: RoleDemandPeopleCountDto | undefined, complementary = false): string {
   if (!count) return NA;
   if (complementary) return 'Withheld';
-  if (count.suppressed) return '<5';
-  return count.value.toLocaleString();
+  return smallCountText(count, (value) => value.toLocaleString());
 }
 
 const releaseLabelText: Readonly<Record<string, string>> = { SELECTABLE: 'Selectable', VERIFIED: 'Verified', NONE: 'Not in catalogue' };
@@ -139,8 +139,8 @@ export function OperationsRoleDemandPage(): React.ReactElement {
         {demand?.trend?.length ? <>
           <CountBars label="Monthly trend" labelHeading="Month" valueHeading="Students"
             emptyReason="Every month had fewer than 5 new selections, so there is no trend to draw yet."
-            rows={demand.trend.map((month) => ({ label: month.month, display: formatPeople(month.students), value: month.students.suppressed ? null : month.students.value }))} />
-          {demand.trend.some((month) => month.students.suppressed) && demand.trend.some((month) => !month.students.suppressed) ? <SuppressionNote>A month with fewer than 5 new selections reads &quot;&lt;5&quot; and draws no bar.</SuppressionNote> : null}
+            rows={demand.trend.map((month) => ({ label: month.month, display: formatPeople(month.students), value: shownCount(month.students) }))} />
+          {demand.trend.some((month) => month.students.suppressed) && demand.trend.some((month) => !month.students.suppressed) ? <SuppressionNote>A month with fewer than 5 new selections reads &quot;&lt;5&quot; and shows the hatched block, never a bar.</SuppressionNote> : null}
         </> : <p>{NA}</p>}
       </section>
     </div>
@@ -184,7 +184,7 @@ export function OperationsRoleDemandPage(): React.ReactElement {
       {detail && detail.colleges === null ? <V2EmptyState icon="🔒" title="Fewer than 5 students"
         note="Fewer than 5 students target this role, so no breakdown by college is shown." /> : null}
       {detail?.colleges ? <>
-        <p>Students: <strong>{formatPeople(detail.role.students)}</strong> across <strong>{detail.role.colleges ?? 'Withheld'}</strong> colleges. Departments are as each college names them. &quot;Withheld&quot; hides a count of 5 or more so a smaller one cannot be worked out by subtraction.</p>
+        <p>Students: <strong><NaValue value={formatPeople(detail.role.students)} /></strong> across <strong>{detail.role.colleges ?? 'Withheld'}</strong> colleges. Departments are as each college names them. &quot;Withheld&quot; hides a count of 5 or more so a smaller one cannot be worked out by subtraction.</p>
         {detail.collegesCapped ? <p>Showing the 200 largest colleges only.</p> : null}
         <div className="role-record-table-wrap"><table className="role-record-table">
           <thead><tr><th>College</th><th>Students</th><th>Departments</th></tr></thead>

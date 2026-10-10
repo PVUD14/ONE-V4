@@ -14,6 +14,7 @@
  * every rule; this screen shows what it says. Nothing here calls a model or the inference endpoint:
  * ENG-20's endpoint panel shows the server's configuration and the latest probe it recorded.
  * OPS-13 adds the learning engine panels (planner decisions, mastery shadow) from engineHealth.tsx.
+ * ENG-25 adds the tutor per college and the pilot's two groups (tutorRollout.tsx).
  */
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -47,6 +48,7 @@ import { formatApiError } from './shared.js';
 import { RequestApprovalDialog } from './approvals.js';
 import { EngineBehaviourPanels } from './engineHealth.js';
 import { TutorHintsPanel } from './tutorHintReview.js';
+import { TutorCollegesPanel } from './tutorRollout.js';
 
 const noteLimit = 500;
 const number = (value: number | null | undefined): string => (value === null || value === undefined ? 'NA' : value.toLocaleString());
@@ -222,6 +224,8 @@ export function OperationsAiOperationsPage(): React.ReactElement | null {
     </section>
 
     <AiEvaluationsPanel token={token} canRecord={viewer.canConfigure && features.length > 0} reload={reload} onRecord={() => setDialog({ kind: 'evaluation' })} />
+
+    <TutorCollegesPanel token={token} />
 
     <TutorHintsPanel token={token} />
 

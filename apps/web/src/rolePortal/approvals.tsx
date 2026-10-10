@@ -15,6 +15,7 @@ import {
   changeAiFeatureLimits,
   decideOperationApproval,
   enableAiFeature,
+  enableTutorForCollege,
   getApprovalPolicy,
   getProtectedAccessToken,
   grantStaffCapability,
@@ -71,6 +72,8 @@ export function describeApproval(approval: OperationApprovalDto): string {
       return `Raise the limits of the AI feature ${summary.aiFeatureKey ?? 'NA'} to ${summary.aiCap ?? 'NA'} per ${summary.aiCapWindow === 'MONTH' ? 'month' : 'day'}, input up to ${summary.aiMaxInputChars ?? 'NA'} characters`;
     case 'INSTITUTION_DATA_PURGE':
       return `Delete the records of ${summary.organizationName ?? 'NA'}, which has left ONE`;
+    case 'AI_TUTOR_COLLEGE_ENABLE':
+      return `Switch the AI tutor on for ${summary.organizationName ?? 'NA'} (model ${summary.aiModel ?? 'NA'}, prompt ${summary.aiPromptKey ?? 'NA'} v${summary.aiPromptVersion ?? 'NA'})`;
   }
 }
 
@@ -113,6 +116,8 @@ async function executeApproval(token: string, approval: OperationApprovalDto): P
       }); return;
     case 'INSTITUTION_DATA_PURGE':
       await purgeInstitutionOffboarding(token, String(payload.offboardingId), { reasonCode, approvalId }); return;
+    case 'AI_TUTOR_COLLEGE_ENABLE':
+      await enableTutorForCollege(token, String(payload.institutionId), { reasonCode, approvalId }); return;
   }
 }
 

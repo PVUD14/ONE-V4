@@ -5,9 +5,10 @@
  * own tables, and carries the console's switches: switch a feature off, engage the global kill
  * switch, switch the in-app assistant off (immediate), switch a feature on and widen its limits
  * (with an approval), and record evaluations. The server decides every rule; cost is always NA
- * because no price table exists.
+ * because no price table exists. ENG-25 adds the tutor per college and the pilot's two groups.
  */
 import { requestJson } from './http.js';
+import type { SuppressedCountDto } from './privacyOperations.js';
 
 export type AiPeriod = 'DAY' | 'MONTH';
 
@@ -98,6 +99,9 @@ export interface AiOperationsPolicyDto {
     readonly assistantDisable: readonly string[];
     readonly evaluation: readonly string[];
     readonly flagChange: readonly string[];
+    /** ENG-25 (absent from an older API): the tutor per college. */
+    readonly tutorCollegeEnable?: readonly string[];
+    readonly tutorCollegeDisable?: readonly string[];
   };
   readonly bounds: { readonly capWindows: readonly AiPeriod[]; readonly maxCap: number; readonly minInputChars: number; readonly maxInputChars: number; readonly maxMetrics: number };
   readonly decisions: readonly ('PASS' | 'FAIL')[];
@@ -253,4 +257,53 @@ export function listTutorHintsForReview(token: string, view: TutorHintReviewView
 
 export function reviewTutorHint(token: string, tutorHintId: string, body: { readonly verdict: 'APPROVE' | 'REJECT'; readonly reasonCode: string }): Promise<{ readonly tutorHint: { readonly id: string; readonly reviewState: string } }> {
   return requestJson(`/api/v1/operations/ai/tutor-hints/${encodeURIComponent(tutorHintId)}/review`, { token, method: 'POST', body });
+}
+
+// --- ENG-25: the AI tutor per college, and the pilot's two groups --------------------------------
+
+export type TutorPilotMetricKey = 'STEPS_STARTED' | 'QUESTIONS_ANSWERED' | 'QUESTIONS_CORRECT' | 'ANSWERS_ASSISTED' | 'STEPS_COMPLETED'
+  | 'WRITTEN_HINTS_SHOWN' | 'TUTOR_HINTS_REQUESTED' | 'TUTOR_HINTS_SHOWN' | 'TUTOR_HINTS_FALLBACK';
+
+export interface TutorGroupSummaryDto {
+  readonly assigned: SuppressedCountDto;
+  /** null when the group is suppressed (fewer than five students). */
+  readonly metrics: Readonly<Record<TutorPilotMetricKey, number>> | null;
+}
+
+export interface TutorCollegeDto {
+  readonly institutionId: string;
+  readonly institutionName: string;
+  /** null: the tutor has never been switched on for this college. */
+  readonly rollout: {
+    readonly enabled: boolean;
+    readonly assignmentMethod: string;
+    readonly tutorSharePercent: number;
+    readonly createdAt: string;
+    readonly enabledAt: string | null;
+    readonly changedAt: string;
+    readonly lastReasonCode: string;
+    readonly enabledModel: string | null;
+    readonly enabledPrompt: string | null;
+    readonly groups: { readonly TUTOR: TutorGroupSummaryDto; readonly NO_TUTOR: TutorGroupSummaryDto };
+  } | null;
+}
+
+export interface TutorCollegesDto {
+  readonly status: { readonly pilotAudience: boolean; readonly featureRegistered: boolean; readonly featureEnabled: boolean; readonly killSwitchEngaged: boolean; readonly evaluationPasses: boolean };
+  readonly colleges: readonly TutorCollegeDto[];
+  readonly days: number;
+  readonly suppressionThreshold: number;
+  readonly viewer: { readonly canStop: boolean; readonly canConfigure: boolean };
+}
+
+export function listTutorColleges(token: string, signal?: AbortSignal): Promise<TutorCollegesDto> {
+  return requestJson(`${base}/tutor-colleges`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function enableTutorForCollege(token: string, institutionId: string, body: { readonly reasonCode: string; readonly approvalId?: string }): Promise<{ readonly enabled: boolean }> {
+  return requestJson(`${base}/tutor-colleges/${encodeURIComponent(institutionId)}/enable`, { token, method: 'POST', body });
+}
+
+export function disableTutorForCollege(token: string, institutionId: string, body: { readonly reasonCode: string }): Promise<{ readonly enabled: boolean }> {
+  return requestJson(`${base}/tutor-colleges/${encodeURIComponent(institutionId)}/disable`, { token, method: 'POST', body });
 }

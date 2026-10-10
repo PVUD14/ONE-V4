@@ -333,7 +333,7 @@ describe('ENG-22: a hint is a job, guarded, labelled and counted like the ladder
     // No model call in the request handler: the fake endpoint has seen nothing; the job is on the outbox.
     expect(server.requests).toHaveLength(0);
     const row = await hintRow(learner.decisionId, learner.questionId, 1);
-    expect(row).toMatchObject({ status: 'PENDING', source: 'AI_GENERATED', prompt_version: 'tutor-hint@2', review_state: 'DRAFT', language: 'en', policy_version: 'tutor-hint-policy-v1' });
+    expect(row).toMatchObject({ status: 'PENDING', source: 'AI_GENERATED', prompt_version: 'tutor-hint@2', review_state: 'DRAFT', language: 'en', policy_version: 'tutor-hint-policy-v2' });
     expect((await pool.query("SELECT count(*)::int AS n FROM outbox_events WHERE event_type = 'tutor.hint.requested' AND aggregate_id = $1", [row.id])).rows[0].n).toBe(1);
     expect((await pool.query('SELECT hint_level FROM learning_step_items WHERE decision_id = $1 AND item_id = $2', [learner.decisionId, learner.questionId])).rows[0].hint_level).toBe(1);
 

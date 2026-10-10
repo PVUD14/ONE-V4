@@ -242,7 +242,9 @@ private fun StepPracticeBlock(step: LearningStepDto, onStep: (LearningStepDto) -
                     val entries = hintEntries(question)
                     val pending = entries.any { it.state == "PENDING" }
                     val tutor = question.tutor
-                    // The AI control appears only where the tutor is the student's to use (as on the web).
+                    // The AI control appears only where the tutor is the student's to use (as on the web). ENG-25: a
+                    // student in the pilot's no-tutor group, or whose college has no tutor, gets reason OFF from the
+                    // server — the same view as AI off — so this allowlist hides the control for them too.
                     val showTutor = tutor != null && (tutor.available || tutor.reason in setOf("DAILY_LIMIT", "LANGUAGE_NOT_SUPPORTED", "PENDING"))
                     entries.forEach { entry ->
                         Spacer(Modifier.height(4.dp))

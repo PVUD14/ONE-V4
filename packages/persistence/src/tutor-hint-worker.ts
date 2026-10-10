@@ -43,6 +43,7 @@ import { drizzleAsPgClient } from './learning-attempts.js';
 import { handleEventIdempotently } from './outbox-dispatcher.js';
 import type { PersistenceDb } from './repositories.js';
 import { TUTOR_HINT_CONSUMER, TUTOR_HINT_REQUESTED } from './tutor-hints.js';
+import { recordTutorPilotMetric, tutorPilotGate } from './tutor-rollout.js';
 
 type QueryResult<T> = { rows: T[] };
 type Environment = Readonly<Record<string, string | undefined>>;
@@ -117,7 +118,7 @@ interface Completion {
  * at commit (database clock); a late one is kept for audit and marked EXPIRED. With nothing claimed,
  * an abandoned GENERATING row past its window is closed as EXPIRED.
  */
-async function finish(db: PersistenceDb, event: IntegrationEventEnvelope, context: HintContext, completion: Completion | null): Promise<{ executed: boolean; result?: TutorHintJobOutcome }> {
+async function finish(db: PersistenceDb, event: IntegrationEventEnvelope, context: HintContext, completion: Completion | null, env: Environment): Promise<{ executed: boolean; result?: TutorHintJobOutcome }> {
   return handleEventIdempotently(db, {
     consumerName: TUTOR_HINT_CONSUMER,
     eventId: event.eventId,
@@ -130,7 +131,10 @@ async function finish(db: PersistenceDb, event: IntegrationEventEnvelope, contex
             AND requested_at <= now() - make_interval(secs => ${TUTOR_HINT_PENDING_SECONDS})
           RETURNING id::text AS id
         `);
-        if (closed.length) await audit(tx, context, 'EXPIRED', []);
+        if (closed.length) {
+          await audit(tx, context, 'EXPIRED', []);
+          await pilotCount(tx, context, 'TUTOR_HINTS_FALLBACK', env);
+        }
         return closed.length ? 'EXPIRED' : 'NOTHING_TO_DO';
       }
       const guard = completion.guard;
@@ -162,6 +166,7 @@ async function finish(db: PersistenceDb, event: IntegrationEventEnvelope, contex
       if (!updated) return 'NOTHING_TO_DO';
       const outcome: TutorHintJobOutcome = updated.status === 'SHOWN' ? 'SHOWN' : (updated.fallback_reason as FallbackReason);
       await audit(tx, context, outcome, findings);
+      await pilotCount(tx, context, outcome === 'SHOWN' ? 'TUTOR_HINTS_SHOWN' : 'TUTOR_HINTS_FALLBACK', env);
       return outcome;
     },
   });
@@ -179,8 +184,13 @@ async function audit(db: PersistenceDb, context: HintContext, outcome: string, f
   `);
 }
 
+/** ENG-25: the pilot counter for how the request ended (no-op outside the pilot or the groups). */
+async function pilotCount(db: PersistenceDb, context: HintContext, metric: 'TUTOR_HINTS_SHOWN' | 'TUTOR_HINTS_FALLBACK', env: Environment): Promise<void> {
+  await recordTutorPilotMetric(db, { subjectUserId: context.subject_user_id, institutionId: context.institution_id, metric, env });
+}
+
 /** Closes a request without a model call (still PENDING), under the receipt. */
-async function closeWithoutCall(db: PersistenceDb, event: IntegrationEventEnvelope, context: HintContext, reason: FallbackReason): Promise<{ executed: boolean; result?: TutorHintJobOutcome }> {
+async function closeWithoutCall(db: PersistenceDb, event: IntegrationEventEnvelope, context: HintContext, reason: FallbackReason, env: Environment): Promise<{ executed: boolean; result?: TutorHintJobOutcome }> {
   return handleEventIdempotently(db, {
     consumerName: TUTOR_HINT_CONSUMER,
     eventId: event.eventId,
@@ -192,6 +202,7 @@ async function closeWithoutCall(db: PersistenceDb, event: IntegrationEventEnvelo
       `);
       if (!closed.length) return 'NOTHING_TO_DO' as const;
       await audit(tx, context, reason, []);
+      await pilotCount(tx, context, 'TUTOR_HINTS_FALLBACK', env);
       return reason;
     },
   });
@@ -210,23 +221,30 @@ export async function consumeTutorHintRequested(options: TutorHintWorkerOptions,
   const shape = (result: { executed: boolean; result?: TutorHintJobOutcome }) =>
     ({ executed: result.executed, ...(result.result ? { outcome: result.result } : {}) });
 
-  if (context.status !== 'PENDING') return shape(await finish(db, event, context, null));
+  if (context.status !== 'PENDING') return shape(await finish(db, event, context, null, env));
 
   // Re-check everything that may have changed since the request; none of these call the model.
   const windowMs = TUTOR_HINT_PENDING_SECONDS * 1000;
   const remainingMs = windowMs - Number(context.age_ms) - WRITE_MARGIN_MS;
   const ladder = [context.hint_1, context.hint_2, context.hint_3, context.hint_4];
-  if (remainingMs <= 0) return shape(await closeWithoutCall(db, event, context, 'EXPIRED'));
-  if (context.answered) return shape(await closeWithoutCall(db, event, context, 'WITHDRAWN'));
-  if (tutorAudienceFromEnvironment(env) !== 'SANDBOX') return shape(await closeWithoutCall(db, event, context, 'AI_UNAVAILABLE'));
-  if (!(await hasConsentPurpose(db, context.subject_user_id, 'ai-tutoring'))) return shape(await closeWithoutCall(db, event, context, 'AI_UNAVAILABLE'));
-  if (!context.correct_option_id || ladder.some((hint) => typeof hint !== 'string')) return shape(await closeWithoutCall(db, event, context, 'AI_UNAVAILABLE'));
+  if (remainingMs <= 0) return shape(await closeWithoutCall(db, event, context, 'EXPIRED', env));
+  if (context.answered) return shape(await closeWithoutCall(db, event, context, 'WITHDRAWN', env));
+  const audience = tutorAudienceFromEnvironment(env);
+  if (audience === 'NONE') return shape(await closeWithoutCall(db, event, context, 'AI_UNAVAILABLE', env));
+  const consented = await hasConsentPurpose(db, context.subject_user_id, 'ai-tutoring');
+  if (!consented) return shape(await closeWithoutCall(db, event, context, 'AI_UNAVAILABLE', env));
+  if (audience === 'PILOT') {
+    // ENG-25: the college may have been switched off since the request; the group never changes, but is re-read.
+    const pilot = await tutorPilotGate(db, { subjectUserId: context.subject_user_id, institutionId: context.institution_id, consented, correlationId: context.correlation_id, env });
+    if (!pilot.collegeEnabled || pilot.group !== 'TUTOR') return shape(await closeWithoutCall(db, event, context, 'AI_UNAVAILABLE', env));
+  }
+  if (!context.correct_option_id || ladder.some((hint) => typeof hint !== 'string')) return shape(await closeWithoutCall(db, event, context, 'AI_UNAVAILABLE', env));
 
   // Claim: only one worker ever calls the model for a request.
   const claimed = await rows<{ id: string }>(db, sql`
     UPDATE tutor_hints SET status = 'GENERATING' WHERE id = ${context.id}::uuid AND status = 'PENDING' RETURNING id::text AS id
   `);
-  if (!claimed.length) return shape(await finish(db, event, context, null));
+  if (!claimed.length) return shape(await finish(db, event, context, null, env));
 
   let completion: Completion;
   const brief = buildTutorBrief({
@@ -251,5 +269,5 @@ export async function consumeTutorHintRequested(options: TutorHintWorkerOptions,
   } catch (error) {
     completion = { reason: failureReason(error), guard: null, generation: null, model, rawText: null };
   }
-  return shape(await finish(db, event, context, completion));
+  return shape(await finish(db, event, context, completion, env));
 }

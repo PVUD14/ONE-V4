@@ -20,9 +20,9 @@ const reason = (change: Partial<TutorHintPolicyInput>) => {
   return decision.allowed ? 'ALLOWED' : decision.reason;
 };
 
-describe('tutor-hint-policy-v1', () => {
+describe('tutor-hint-policy-v2', () => {
   it('allows the next ladder level, one at a time, in the student\'s language', () => {
-    expect(decideTutorHintRequest(open)).toEqual({ allowed: true, level: 1, language: 'en', policyVersion: 'tutor-hint-policy-v1' });
+    expect(decideTutorHintRequest(open)).toEqual({ allowed: true, level: 1, language: 'en', policyVersion: 'tutor-hint-policy-v2' });
     expect(decideTutorHintRequest({ ...open, currentLevel: 3, language: 'te' })).toMatchObject({ allowed: true, level: 4, language: 'te' });
   });
 

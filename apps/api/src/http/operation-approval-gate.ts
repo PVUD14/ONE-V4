@@ -53,6 +53,11 @@ export const approvalPayloads = {
   // INST-18: an exit's institution-owned records are deleted once; the exit id binds which college.
   INSTITUTION_DATA_PURGE: (input: { readonly offboardingId: string; readonly reasonCode: string }) =>
     ({ offboardingId: input.offboardingId.toLowerCase(), reasonCode: input.reasonCode }),
+  // ENG-25: the tutor for one college, bound like AI_FEATURE_ENABLE to the model, prompt and passing
+  // evaluation current at request time; a later FAIL, or a model or prompt change, breaks the binding.
+  AI_TUTOR_COLLEGE_ENABLE: (input: { readonly institutionId: string; readonly featureKey: string; readonly model: string; readonly promptKey: string; readonly promptVersion: number; readonly evaluationId: string; readonly reasonCode: string }) =>
+    ({ institutionId: input.institutionId.toLowerCase(), featureKey: input.featureKey, model: input.model, promptKey: input.promptKey,
+      promptVersion: input.promptVersion, evaluationId: input.evaluationId.toLowerCase(), reasonCode: input.reasonCode }),
 } satisfies Record<HighRiskActionKey, (input: never) => Record<string, unknown> & { reasonCode: string }>;
 
 function domainError(code: string, correlationId: string): { readonly error: { readonly code: string; readonly message: string; readonly correlationId: string } } {

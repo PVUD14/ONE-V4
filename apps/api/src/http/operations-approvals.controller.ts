@@ -55,6 +55,7 @@ import { loadQuestionRevisionForPublish } from '@planthepath/persistence/src/que
 import { loadLessonRevisionForPublish } from '@planthepath/persistence/src/lesson-editor.js';
 import { loadStatusNoticeTemplate } from '@planthepath/persistence/src/status-notices.js';
 import { loadAiPolicyFacts } from '@planthepath/persistence/src/ai-operations.js';
+import { loadTutorCollegeFacts, refuseTutorCollegeEnable, tutorCollegeBinding } from '@planthepath/persistence/src/tutor-rollout.js';
 import {
   countHighRiskApprovers,
   createOperationApproval,
@@ -362,6 +363,19 @@ export class OperationsApprovalsController {
         if (offboarding.state !== 'ENDED' || !offboarding.retention_elapsed) throw badRequest('APPROVAL_TARGET_STATE_INVALID', correlationId);
         return { targetId: offboardingId, canonical: approvalPayloads.INSTITUTION_DATA_PURGE({ offboardingId, reasonCode }) };
       }
+      case 'AI_TUTOR_COLLEGE_ENABLE': {
+        // ENG-25: only a college whose tutor could be switched on the moment it is approved — kill switch
+        // released, the tutor's prompt declared, a passing evaluation for its current model and prompt. The
+        // server binds the model, prompt version and evaluation from the database, not from the request.
+        const institutionId = requireUuidField(payload.institutionId, correlationId);
+        const facts = await loadTutorCollegeFacts(this.db, institutionId);
+        if (!facts) throw new OperationApprovalError('APPROVAL_TARGET_NOT_FOUND');
+        const refusal = refuseTutorCollegeEnable(facts);
+        if (refusal === 'TUTOR_COLLEGE_ALREADY_ENABLED') throw new OperationApprovalError('APPROVAL_NOT_REQUIRED');
+        if (refusal === 'AI_FEATURE_NOT_FOUND') throw new OperationApprovalError('APPROVAL_TARGET_NOT_FOUND');
+        if (refusal) throw new ConflictException(domainError(refusal, correlationId));
+        return { targetId: facts.institutionId, canonical: approvalPayloads.AI_TUTOR_COLLEGE_ENABLE({ ...tutorCollegeBinding(facts), reasonCode }) };
+      }
     }
   }
 }
@@ -381,6 +395,7 @@ const payloadFields: Readonly<Record<HighRiskActionKey, readonly string[]>> = {
   AI_FEATURE_ENABLE: ['featureKey', 'reasonCode'],
   AI_FEATURE_LIMITS_RAISE: ['featureKey', 'cap', 'capWindow', 'maxInputChars', 'reasonCode'],
   INSTITUTION_DATA_PURGE: ['offboardingId', 'reasonCode'],
+  AI_TUTOR_COLLEGE_ENABLE: ['institutionId', 'reasonCode'],
 };
 
 /**
@@ -433,6 +448,10 @@ function toApprovalDto(row: OperationApprovalRow, actor: Actor, approverCount: n
       aiCap: row.actionKey === 'AI_FEATURE_LIMITS_RAISE' ? payload.cap ?? null : null,
       aiCapWindow: row.actionKey === 'AI_FEATURE_LIMITS_RAISE' ? payload.capWindow ?? null : null,
       aiMaxInputChars: row.actionKey === 'AI_FEATURE_LIMITS_RAISE' ? payload.maxInputChars ?? null : null,
+      // ENG-25: the tutor for one college — the college's name (above) and what the approval binds.
+      ...(row.actionKey === 'AI_TUTOR_COLLEGE_ENABLE' ? {
+        aiFeatureKey: payload.featureKey ?? null, aiModel: payload.model ?? null, aiPromptKey: payload.promptKey ?? null, aiPromptVersion: payload.promptVersion ?? null,
+      } : {}),
     },
     reasonCode: row.reasonCode,
     note: row.note,

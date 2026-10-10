@@ -106,6 +106,8 @@ const operationApprovalActionKeys = [
   'AI_FEATURE_LIMITS_RAISE',
   // INST-18: extended key as well (0088) — deleting a departed college's records.
   'INSTITUTION_DATA_PURGE',
+  // ENG-25: extended key as well (0116) — switching the AI tutor on for one college.
+  'AI_TUTOR_COLLEGE_ENABLE',
 ] as const;
 
 // EMP-05: opportunities.lifecycle_state (0007 CHECK).

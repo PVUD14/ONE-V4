@@ -640,6 +640,8 @@ export const institutionPurgeOutOfScope: Readonly<Record<string, string>> = {
   learning_sessions: "the student's own learning record",
   learning_step_items: "the student's own learning record",
   tutor_hints: "the student's own learning record",
+  tutor_group_assignments: "the student's own learning record (their tutor pilot group)",
+  tutor_college_rollouts: "AI8HT's AI operations record (the college's tutor experiment)",
   code_submissions: "the student's own learning record",
   placement_tests: "the student's own learning record",
   placement_test_items: "the student's own learning record",

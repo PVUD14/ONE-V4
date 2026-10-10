@@ -43,6 +43,8 @@ import {
   type StepHintView,
   type TutorAvailabilityView,
 } from './tutor-hints.js';
+import { recordTutorPilotMetric } from './tutor-rollout.js';
+import { visibleTutorReason } from '@planthepath/tutoring/src/index.js';
 
 /** Questions served per step (`learning-step-items-v1`); the 0072 CHECK allows positions 1–5. */
 export const STEP_ITEM_LIMIT = 5;
@@ -272,7 +274,7 @@ async function questionView(db: PersistenceDb, decision: DecisionRow, item: Serv
     hintDetails: entries,
     tutor: await tutorAvailability(db, {
       subjectUserId: decision.subject_user_id, decisionId: decision.id, itemId: item.item_id, sessionMode: sessionModeOf(decision),
-      ladderPublished: ladder !== null, currentLevel: item.hint_level,
+      ladderPublished: ladder !== null, currentLevel: item.hint_level, institutionId: decision.institution_id,
     }),
   };
 }
@@ -432,7 +434,12 @@ export async function startNextLearningStep(db: PersistenceDb, input: {
     const recorded = await planNextLearningStep(runner, { subjectUserId: input.subjectUserId, sessionMinutes: minutes, correlationId: input.correlationId });
     const decision = await loadDecision(runner, input.subjectUserId, recorded.decisionId);
     await serveNext(runner, decision!);
-    return (await stepView(runner, input.subjectUserId, recorded.decisionId))!;
+    const view = (await stepView(runner, input.subjectUserId, recorded.decisionId))!;
+    // ENG-25: a pilot counter for the student's group (no-op outside the pilot or the groups).
+    if (view.practice.status === 'IN_PROGRESS') {
+      await recordTutorPilotMetric(runner, { subjectUserId: input.subjectUserId, institutionId: decision!.institution_id, metric: 'STEPS_STARTED' });
+    }
+    return view;
   });
 }
 
@@ -464,6 +471,7 @@ export async function revealStepHint(db: PersistenceDb, input: {
       UPDATE learning_step_items SET hint_level = hint_level + 1
       WHERE decision_id = ${decision.id}::uuid AND item_id = ${questionId}::uuid
     `);
+    await recordTutorPilotMetric(runner, { subjectUserId: input.subjectUserId, institutionId: decision.institution_id, metric: 'WRITTEN_HINTS_SHOWN' });
     return (await stepView(runner, input.subjectUserId, decision.id))!;
   });
 }
@@ -490,9 +498,11 @@ export async function requestStepTutorHint(db: PersistenceDb, input: {
     const ladder = await publishedLadder(runner, questionId);
     const { decision: verdict } = await decideTutorHintFromStore(runner, {
       subjectUserId: input.subjectUserId, decisionId: decision.id, itemId: questionId, sessionMode: sessionModeOf(decision),
-      ladderPublished: ladder !== null, currentLevel: current.hint_level, ...(input.env ? { env: input.env } : {}),
+      ladderPublished: ladder !== null, currentLevel: current.hint_level, institutionId: decision.institution_id,
+      correlationId: input.correlationId, ...(input.env ? { env: input.env } : {}),
     });
-    if (!verdict.allowed) throw new TutorHintRequestError(verdict.reason);
+    // The pilot's own reasons leave the server as OFF (tutor-rollout-design.md, Decision 6).
+    if (!verdict.allowed) throw new TutorHintRequestError(visibleTutorReason(verdict.reason));
     await runner.execute(sql`
       UPDATE learning_step_items SET hint_level = hint_level + 1
       WHERE decision_id = ${decision.id}::uuid AND item_id = ${questionId}::uuid
@@ -500,6 +510,9 @@ export async function requestStepTutorHint(db: PersistenceDb, input: {
     await recordTutorHintRequest(runner, {
       subjectUserId: input.subjectUserId, institutionId: decision.institution_id, decisionId: decision.id, itemId: questionId,
       level: verdict.level, language: verdict.language, correlationId: input.correlationId,
+    });
+    await recordTutorPilotMetric(runner, {
+      subjectUserId: input.subjectUserId, institutionId: decision.institution_id, metric: 'TUTOR_HINTS_REQUESTED', ...(input.env ? { env: input.env } : {}),
     });
     return (await stepView(runner, input.subjectUserId, decision.id))!;
   });
@@ -570,7 +583,14 @@ export async function answerStepQuestion(db: PersistenceDb, input: {
     // "Linked outcome attempts" (ENG-08): what the student did acting on this decision.
     await linkDecisionOutcomeAttempts(runner, { decisionId: decision.id, attemptIds: [attempt!.id] });
     await serveNext(runner, decision);
-    return { feedback: { questionId, correct, assisted: attempt!.assisted === true }, step: (await stepView(runner, input.subjectUserId, decision.id))! };
+    const step = (await stepView(runner, input.subjectUserId, decision.id))!;
+    // ENG-25: the pilot counters for the student's group (no-op outside the pilot or the groups).
+    const counted = { subjectUserId: input.subjectUserId, institutionId: decision.institution_id } as const;
+    await recordTutorPilotMetric(runner, { ...counted, metric: 'QUESTIONS_ANSWERED' });
+    if (correct) await recordTutorPilotMetric(runner, { ...counted, metric: 'QUESTIONS_CORRECT' });
+    if (attempt!.assisted === true) await recordTutorPilotMetric(runner, { ...counted, metric: 'ANSWERS_ASSISTED' });
+    if (step.practice.status === 'COMPLETED') await recordTutorPilotMetric(runner, { ...counted, metric: 'STEPS_COMPLETED' });
+    return { feedback: { questionId, correct, assisted: attempt!.assisted === true }, step };
   });
 }
 

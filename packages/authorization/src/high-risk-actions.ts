@@ -13,7 +13,7 @@ import { skillPublishReasons } from './skill-map.js';
 import { questionPublishReasons } from './question-bank.js';
 import { lessonPublishReasons } from './lesson-editor.js';
 import { commsTemplatePublishReasons } from './incidents.js';
-import { aiFeatureEnableReasons, aiLimitsRaiseReasons } from './ai-operations.js';
+import { aiFeatureEnableReasons, aiLimitsRaiseReasons, aiTutorCollegeEnableReasons } from './ai-operations.js';
 import { institutionDataPurgeReasons } from './institution-contract.js';
 import { hasInternalCapability, internalCapabilityGrantReasons, type InternalCapability, type InternalCapabilityContext } from './internal-capabilities.js';
 
@@ -42,6 +42,9 @@ export const highRiskActionKeys = [
   // INST-18. Extended key too (0088 adds it to operation_approval_extended_target_type): a departed
   // college's institution-owned records are deleted only with a second person's approval.
   'INSTITUTION_DATA_PURGE',
+  // ENG-25. Extended key too (0116 adds it to operation_approval_extended_target_type): the AI tutor is
+  // switched on for one college only with a second person's approval and a passing evaluation.
+  'AI_TUTOR_COLLEGE_ENABLE',
 ] as const;
 
 /** The keys 0038's CHECK allows in `action_key`; any other key is an extended key (0051). */
@@ -58,7 +61,7 @@ export type HighRiskActionKey = (typeof highRiskActionKeys)[number];
 export interface HighRiskActionDefinition {
   /** Needed both to request the action and to execute it. */
   readonly capability: InternalCapability;
-  readonly targetType: 'organization' | 'feature_flag' | 'outbox_backlog' | 'data_retention_hold' | 'organization_membership' | 'career_requirement_set' | 'content_revision' | 'status_notice_template' | 'ai_feature_policy' | 'institution_offboarding';
+  readonly targetType: 'organization' | 'feature_flag' | 'outbox_backlog' | 'data_retention_hold' | 'organization_membership' | 'career_requirement_set' | 'content_revision' | 'status_notice_template' | 'ai_feature_policy' | 'institution_offboarding' | 'tutor_college';
   readonly label: string;
 }
 
@@ -76,6 +79,7 @@ export const highRiskActions: Readonly<Record<HighRiskActionKey, HighRiskActionD
   AI_FEATURE_ENABLE: { capability: 'AI_OPS_CONFIGURE', targetType: 'ai_feature_policy', label: 'Switch an AI feature on' },
   AI_FEATURE_LIMITS_RAISE: { capability: 'AI_OPS_CONFIGURE', targetType: 'ai_feature_policy', label: 'Raise an AI feature cap or limit' },
   INSTITUTION_DATA_PURGE: { capability: 'OPS_ORG_MANAGE', targetType: 'institution_offboarding', label: 'Delete a departed college’s records' },
+  AI_TUTOR_COLLEGE_ENABLE: { capability: 'AI_OPS_CONFIGURE', targetType: 'tutor_college', label: 'Switch the AI tutor on for a college' },
 };
 
 export function isLegacyHighRiskActionKey(key: HighRiskActionKey): boolean {
@@ -104,6 +108,7 @@ export const approvalRequestReasons: Readonly<Record<HighRiskActionKey, readonly
   AI_FEATURE_ENABLE: aiFeatureEnableReasons,
   AI_FEATURE_LIMITS_RAISE: aiLimitsRaiseReasons,
   INSTITUTION_DATA_PURGE: institutionDataPurgeReasons,
+  AI_TUTOR_COLLEGE_ENABLE: aiTutorCollegeEnableReasons,
 };
 
 /** Hours from request to expiry; one window covers deciding and executing. */

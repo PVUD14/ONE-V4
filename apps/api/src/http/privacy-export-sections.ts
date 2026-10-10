@@ -442,7 +442,7 @@ async function collegeSections(one: Query, subject: Subject): Promise<Record<str
 }
 
 async function learningSections(one: Query, subject: Subject): Promise<Record<string, unknown>> {
-  const [sessions, attempts, activity, lessons, steps, stepItems, tutorHints, placements, skills, evidence, bands, readiness, roadmap, checks, codeSubmissions] = await Promise.all([
+  const [sessions, attempts, activity, lessons, steps, stepItems, tutorHints, placements, skills, evidence, bands, readiness, roadmap, checks, codeSubmissions, tutorGroups] = await Promise.all([
     // Model, prompt, token and cost columns are internal metering, not about the person.
     one(sql`SELECT mode, language, started_at, ended_at FROM learning_sessions WHERE subject_user_id = ${subject} ORDER BY started_at, id`),
     // Not the item or the option chosen: with correctness, those would be the answer key.
@@ -497,6 +497,11 @@ async function learningSections(one: Query, subject: Subject): Promise<Record<st
                    coalesce((SELECT array_agg(c.outcome ORDER BY c.case_index) FROM code_submission_cases c WHERE c.submission_id = s.id), '{}') AS case_outcomes
             FROM code_submissions s JOIN code_tasks ct ON ct.id = s.task_id
             WHERE s.subject_user_id = ${subject} ORDER BY s.requested_at, s.id`),
+    // ENG-25: the tutor pilot group you were assigned to in a college's experiment, and when. The
+    // experiment's seed is AI8HT's operations record; the group is yours.
+    one(sql`SELECT o.legal_name AS institution_name, a.group_name, a.assignment_method, a.consent_version, a.assigned_at
+            FROM tutor_group_assignments a JOIN organizations o ON o.id = a.institution_id
+            WHERE a.subject_user_id = ${subject} ORDER BY a.assigned_at, a.id`),
   ]);
   return {
     sessions: sessions.map((row) => ({ mode: row.mode, language: row.language ?? null, startedAt: row.started_at, endedAt: row.ended_at ?? null })),
@@ -518,6 +523,10 @@ async function learningSections(one: Query, subject: Subject): Promise<Record<st
         aiHintShown: hint.shown_text ?? null, model: hint.model ?? null, promptVersion: hint.prompt_version,
         reviewState: hint.review_state, requestedAt: hint.requested_at, completedAt: hint.completed_at ?? null,
       })),
+    })),
+    tutorPilotGroups: tutorGroups.map((row) => ({
+      institutionName: row.institution_name, group: row.group_name, assignmentMethod: row.assignment_method,
+      consentVersion: row.consent_version, assignedAt: row.assigned_at,
     })),
     codeSubmissions: codeSubmissions.map((row) => ({
       taskTitle: row.task_title, program: row.source_code, status: row.status, failureCode: row.failure_code ?? null, verdict: row.verdict ?? null,

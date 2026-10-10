@@ -67,7 +67,7 @@
 | ONE version running at end (commit) | | Release record |
 | AI features switched on during the pilot (list, or "none") | | Operations → AI operations |
 | Engine consent purposes published? (date, or "not published") | | HG-6 approval |
-| Tutor / no-tutor groups assigned? (date, or "no — ENG-25 not built") | | ENG-25 |
+| Tutor / no-tutor groups assigned? (date each college's tutor was first switched on, or "no") | | `tutor_college_rollouts.created_at` (ENG-25) |
 | Students rostered at start (per college; `<5` if under five) | | Query A1 |
 | Students who signed in at least once (per college) | | Query A1 |
 
@@ -109,7 +109,7 @@ state of the repository today; re-check it on the pilot's start date.
 |---|---|---|
 | Published aptitude questions with hint ladders (enough for a placement test) | 1, 2, 4 | **Not met.** 300 items exist as DRAFT (ENG-10, ENG-15); none is published. Each needs subject-expert review and a second-person approval (OPS-09b). With none published, practice and the placement test say "not open yet". |
 | Engine consent purposes published (`adaptive-learning` and the others) | 1 | **Not met — HG-6 pending.** Until published, every student is on the non-adaptive path and the placement test is closed (`CONSENT_REQUIRED`, `packages/persistence/src/placement-tests.ts:153,170`). |
-| Random tutor / no-tutor groups recorded (ENG-25) | 1 (the comparison) | **Not built.** ENG-25 waits for the AI tutor (ENG-20 to ENG-22), which waits for inference (AI hold, ADR-030; the RunPod pod is also on hold). No table records a group today. |
+| Random tutor / no-tutor groups recorded (ENG-25) | 1 (the comparison) | **Built (ENG-25, migration 0116), not running.** `tutor_group_assignments` records each consenting student's group once, reproducibly (`docs/architecture/tutor-rollout-design.md`, ADR-051). Nobody can be assigned until `ai-tutoring` is published (HG-6), the tutor's evaluation PASS is recorded (ENG-21 human review) and a college is switched on. |
 | A way for a student to sit the placement test a second time | 1 (the delayed test) | **Not built on screen.** The database and the item selection already support a second sitting with unseen questions (`retestPool`, `packages/placement/src/index.ts:276`; `startPlacementTest` starts a new sitting after a completed one, `placement-tests.ts:166-198`), but the web and Android screens show only "Your placement level" after the first sitting (`apps/web/src/studentLearning.tsx:352`). Needs a small code change — reported, not built. |
 | A price for AI use (per token, or per hour of the inference server) | 3 | **Not recorded anywhere.** `ai_generations` keeps tokens but no price; `learning_sessions.cost_amount` exists but no code writes it. ENG-21's bake-off is meant to record per-token cost (ADR-033). |
 | Students can be invited and sign in on production | all | **Partly.** Production is `https://oneby8.com` on AWS (ADR-041). The automation worker that sends student invitations is not deployed on AWS yet (`docs/ops/runbook-move-to-aws.md`), and outgoing email is built (ADR-042) but not switched on — so invitations are not delivered by email today. |
@@ -193,19 +193,23 @@ separately, never counted as no change).
 | Table | Columns used | Written by |
 |---|---|---|
 | `placement_tests` | `subject_user_id`, `state`, `completed_at`, `placement_level` | ENG-14 (`packages/persistence/src/placement-tests.ts`) |
-| ENG-25 group assignment | student, group, assigned at | **Does not exist yet.** ENG-25 will create it. |
+| `tutor_group_assignments` | `subject_user_id`, `institution_id`, `group_name` (`TUTOR` / `NO_TUTOR`), `assigned_at` | ENG-25 (`packages/persistence/src/tutor-rollout.ts`) |
 | consent records | `adaptive-learning` held | `consentPurposeHeldSql`, `packages/persistence/src/consent-purposes.ts:36` |
 
 **Extra psql variable:** `\set delay_days <whole number>` — the minimum number of days between the
 two sittings (Part F, decision 2).
 
-**Query 1a — level change by group.** The `pilot_groups` view is a placeholder until ENG-25 exists;
-replace its body with a read of ENG-25's assignment table. Until then the query cannot run, and the
-slot says "no comparison group — ENG-25 not built".
+**Query 1a — level change by group.** The `pilot_groups` view reads ENG-25's assignment table. If no
+college had the tutor switched on during the pilot, the view is empty and the slot says "no comparison
+group — the tutor was not switched on". A student is in the group they were assigned to, whether or not
+they later withdrew `ai-tutoring` (intent to treat); report withdrawals separately from the consent log.
 
 ```sql
--- PLACEHOLDER until ENG-25: one row per student with their randomly assigned group.
--- CREATE TEMP VIEW pilot_groups AS SELECT student_user_id, group_label FROM <ENG-25 assignment table>;
+-- ENG-25: one row per student with their randomly assigned group (TUTOR / NO_TUTOR), in the pilot colleges.
+CREATE TEMP VIEW pilot_groups AS
+  SELECT DISTINCT a.subject_user_id AS student_user_id, a.group_name AS group_label
+  FROM tutor_group_assignments a
+  JOIN pilot_students ps ON ps.student_user_id = a.subject_user_id AND ps.institution_id = a.institution_id;
 
 WITH sittings AS (
   SELECT t.subject_user_id, t.completed_at, t.placement_level,
@@ -559,7 +563,8 @@ DOC-2 is documentation only, so these are listed here and not built:
 
 1. **A second placement sitting on screen** (web and Android): after a completed sitting, offer "Take
    it again" when the delayed-test date or rule allows. The backend already supports it.
-2. **ENG-25 group assignment**, recorded reproducibly — part of ENG-25, which waits for the AI tutor.
+2. ~~**ENG-25 group assignment**~~ — built (migration 0116, `tutor_group_assignments`); it waits only for
+   HG-6, ENG-21's human review and a college being switched on.
 3. **A price record for AI use** — per model and period, so Measure 3 can be computed inside ONE
    rather than by hand; ENG-21's bake-off is the natural place.
 4. **Optional:** have learning-step practice and placement answers write `learner_activity_events`

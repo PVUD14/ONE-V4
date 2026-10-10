@@ -10,6 +10,11 @@
  * with its reason code. Releasing the kill switch and switching the assistant on are high-risk flag
  * changes through the existing feature-flag endpoint and its approval.
  *
+ * ENG-25 adds the tutor per college: the colleges with their tutor state and the pilot's two groups
+ * (sizes and counters, groups under five withheld); switching a college on (AI_OPS_CONFIGURE, an
+ * AI_TUTOR_COLLEGE_ENABLE approval and the same passing-evaluation rule) and off (immediate).
+ * Design: docs/architecture/tutor-rollout-design.md
+ *
  * Nothing here calls a model or the inference endpoint (CLAUDE.md: no request handler does). ENG-20
  * adds the endpoint's status to the summary — configured, host, model, key set or not (never the
  * key), and reachability from the latest `ai:probe` row. The assistant's server switch
@@ -53,6 +58,8 @@ import {
   aiMaxMetrics,
   aiMinInputChars,
   aiStopIsBreakGlass,
+  aiTutorCollegeDisableReasons,
+  aiTutorCollegeEnableReasons,
   approvalRequestReasons,
   canConfigureAi,
   canStopAi,
@@ -89,6 +96,12 @@ import {
   reviewTutorHint,
   type TutorReviewListView,
 } from '@planthepath/persistence/src/tutor-hints.js';
+import {
+  disableTutorForCollege,
+  enableTutorForCollege,
+  listTutorCollegeRollouts,
+  loadTutorRolloutStatus,
+} from '@planthepath/persistence/src/tutor-rollout.js';
 import type { PersistenceDb } from '@planthepath/persistence/src/repositories.js';
 import { API_PERSISTENCE_DB, ProtectedApiAuthenticationGuard, requireTrustedAuthorization, safeError, type ProtectedHttpRequest } from './api-security.js';
 import { dbCapabilityGrantLoader, loadCallerCapabilityContext } from './internal-capability-guard.js';
@@ -129,6 +142,8 @@ export class OperationsAiController {
         limitsRaise: aiLimitsRaiseReasons,
         killSwitchEngage: aiKillSwitchEngageReasons,
         assistantDisable: aiAssistantDisableReasons,
+        tutorCollegeEnable: aiTutorCollegeEnableReasons,
+        tutorCollegeDisable: aiTutorCollegeDisableReasons,
         evaluation: aiEvaluationRecordReasons,
         // Releasing the kill switch and switching the assistant on are FEATURE_FLAG_HIGH_RISK_CHANGE requests.
         flagChange: approvalRequestReasons.FEATURE_FLAG_HIGH_RISK_CHANGE,
@@ -379,6 +394,68 @@ export class OperationsAiController {
     }
   }
 
+  /**
+   * ENG-25: every college with its tutor state; for colleges with an experiment, the two groups' sizes and
+   * their pilot counters over the last `days` days (default 30). Groups under five are withheld. Whether the
+   * deployment serves the pilot, the feature is on, the kill switch is released and a PASS exists — only whether.
+   */
+  @Get('/tutor-colleges')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async tutorColleges(@Req() request: ProtectedHttpRequest, @Query() query: Record<string, unknown>): Promise<Record<string, unknown>> {
+    const { correlationId, actor } = await this.requireView(request);
+    rejectUnknown(query, ['days'], correlationId);
+    const days = query.days === undefined || query.days === '' ? 30 : Number(query.days);
+    if (!Number.isInteger(days) || days < 1 || days > 366) throw badRequest('TUTOR_ROLLOUT_DAYS_INVALID', correlationId);
+    return {
+      status: await loadTutorRolloutStatus(this.db),
+      colleges: await listTutorCollegeRollouts(this.db, { days }),
+      days,
+      suppressionThreshold: aggregateSuppressionThreshold,
+      viewer: { canStop: canStopAi(actor), canConfigure: canConfigureAi(actor) },
+      correlationId,
+    };
+  }
+
+  /**
+   * ENG-25: switch the tutor on for one college — a passing evaluation, the kill switch released, and an approval.
+   * The parameter is `collegeId`, not `institutionId`: the security guard reads an `institutionId` parameter as
+   * the caller's own organisation, and AI8HT staff act on a college from the platform.
+   */
+  @Post('/tutor-colleges/:collegeId/enable')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async enableTutorCollege(@Req() request: ProtectedHttpRequest, @Param('collegeId') institutionId: string, @Body() body: unknown): Promise<Record<string, unknown>> {
+    const { correlationId, actor } = await this.requireConfigure(request);
+    if (!uuidPattern.test(institutionId)) throw badRequest('INVALID_REQUEST', correlationId);
+    const raw = readObject(body, ['reasonCode', 'approvalId'], correlationId);
+    const reasonCode = readReason(raw.reasonCode, aiTutorCollegeEnableReasons, correlationId);
+    const approvalId = readApprovalId(raw, correlationId);
+    try {
+      const result = await enableTutorForCollege(this.db, this.aiActor(actor, correlationId, 'CONFIGURE'), {
+        institutionId: institutionId.toLowerCase(), reasonCode, approvalId,
+        approvalPayload: (binding) => approvalPayloads.AI_TUTOR_COLLEGE_ENABLE({ ...binding, reasonCode }),
+      });
+      return { enabled: true, experimentCreated: result.created, correlationId };
+    } catch (error) {
+      throw mapError(error, correlationId);
+    }
+  }
+
+  /** ENG-25: switch the tutor off for one college. Immediate; no approval. The groups stay recorded. */
+  @Post('/tutor-colleges/:collegeId/disable')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async disableTutorCollege(@Req() request: ProtectedHttpRequest, @Param('collegeId') institutionId: string, @Body() body: unknown): Promise<Record<string, unknown>> {
+    const { correlationId, actor } = await this.requireStop(request);
+    if (!uuidPattern.test(institutionId)) throw badRequest('INVALID_REQUEST', correlationId);
+    const raw = readObject(body, ['reasonCode'], correlationId);
+    const reasonCode = readReason(raw.reasonCode, aiTutorCollegeDisableReasons, correlationId);
+    try {
+      await disableTutorForCollege(this.db, this.aiActor(actor, correlationId, 'STOP'), { institutionId: institutionId.toLowerCase(), reasonCode });
+      return { enabled: false, correlationId };
+    } catch (error) {
+      throw mapError(error, correlationId);
+    }
+  }
+
   private async afterWrite(correlationId: string): Promise<Record<string, unknown>> {
     const summary = await loadAiOperationsSummary(this.db, { period: 'DAY' });
     return { killSwitch: summary.killSwitch, assistantFlag: summary.assistantFlag, features: summary.features, correlationId };
@@ -427,7 +504,9 @@ function mapError(error: unknown, correlationId: string): HttpException {
   if (approval) return approval;
   if (error instanceof AiOperationsError) {
     switch (error.code) {
-      case 'AI_FEATURE_NOT_FOUND': return new NotFoundException(domainError(error.code, correlationId));
+      case 'AI_FEATURE_NOT_FOUND':
+      case 'TUTOR_COLLEGE_NOT_FOUND':
+        return new NotFoundException(domainError(error.code, correlationId));
       case 'APPROVAL_REQUIRED': return new ForbiddenException(domainError(error.code, correlationId));
       case 'AI_LIMITS_UNCHANGED':
       case 'REASON_CODE_INVALID':

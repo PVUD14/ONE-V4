@@ -24,7 +24,7 @@ import {
   type StepAnswerView,
 } from '@planthepath/persistence/src/learning-experience.js';
 import { TutorHintRequestError } from '@planthepath/persistence/src/tutor-hints.js';
-import type { TutorRefusalReason } from '@planthepath/tutoring/src/index.js';
+import type { TutorVisibleReason } from '@planthepath/tutoring/src/index.js';
 import { API_PERSISTENCE_DB, ProtectedApiAuthenticationGuard, type ProtectedHttpRequest } from './api-security.js';
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -68,8 +68,11 @@ function readAnswer(body: unknown, correlationId: string): { questionId: string;
   return { questionId, selectedOptionId };
 }
 
-/** ENG-22: why the AI tutor cannot give a hint right now, in plain words. Never anything internal. */
-const TUTOR_REFUSAL_MESSAGES: Readonly<Record<TutorRefusalReason, string>> = {
+/**
+ * ENG-22: why the AI tutor cannot give a hint right now, in plain words. Never anything internal: the
+ * pilot's own reasons (ENG-25: college off, no-tutor group) reach here as OFF, like AI off.
+ */
+const TUTOR_REFUSAL_MESSAGES: Readonly<Record<TutorVisibleReason, string>> = {
   ASSESSMENT_MODE: 'The AI tutor is not available here.',
   OFF: 'The AI tutor is not switched on.',
   NO_CONSENT: 'The AI tutor needs your agreement first.',

@@ -133,4 +133,39 @@ describe('the AI tutor in practice (ENG-22)', () => {
       cleanup();
     }
   });
+
+  it('X2 (ENG-25): a no-tutor or AI-off student walks a practice step to the end with the written hints, and never sees the tutor', async () => {
+    // A no-tutor-group student gets exactly the AI-off view from the server: reason OFF, nothing counted.
+    const off = { available: false, reason: 'OFF', remainingToday: null };
+    const second = { ...question([], off), id: 'q-2', position: 2, prompt: 'Synthetic question two: which option?' };
+    const hinted = inProgress(question(['Written nudge'], off, [{ level: 1, source: 'LADDER', state: 'SHOWN', text: 'Written nudge', fallback: null }]));
+    const onSecond = { ...inProgress(second), practice: { status: 'IN_PROGRESS', questionsAnswered: 1, question: second } };
+    const finished = { ...inProgress(second), practice: { status: 'COMPLETED', questionsAnswered: 2 } };
+    stub({
+      ...base,
+      '/api/v1/learning/path': { body: { path: path(inProgress(question([], off))) } },
+      '/api/v1/learning/steps/d-1/hints:POST': { status: 201, body: { step: hinted } },
+      '/api/v1/learning/steps/d-1/answers:POST': [
+        { status: 201, body: { feedback: { questionId: 'q-1', correct: true, assisted: false }, step: onSecond } },
+        { status: 201, body: { feedback: { questionId: 'q-2', correct: false, assisted: false }, step: finished } },
+      ],
+    });
+    await authenticate();
+    render(<StudentLearningPlan />);
+    fireEvent.click(await screen.findByRole('button', { name: /Show hint 1 · Nudge/ }));
+    expect(await screen.findByText('Written nudge')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Ask the AI tutor/ })).toBeNull();
+    fireEvent.click(screen.getByLabelText('Option B'));
+    fireEvent.click(screen.getByRole('button', { name: 'Check answer' }));
+    expect(await screen.findByText('Synthetic question two: which option?')).toBeInTheDocument();
+    expect(screen.getByText('Right.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Ask the AI tutor/ })).toBeNull();
+    fireEvent.click(screen.getByLabelText('Option A'));
+    fireEvent.click(screen.getByRole('button', { name: 'Check answer' }));
+    expect(await screen.findByText(/Step finished: you answered 2 questions/)).toBeInTheDocument();
+    // No AI control, no AI label, no AI count, no empty widget, at any point.
+    expect(screen.queryByText('AI')).toBeNull();
+    expect(screen.queryByText(/AI tutor|AI hints left/)).toBeNull();
+    expect(calls.some((call) => call.path.endsWith('/tutor-hints'))).toBe(false);
+  });
 });

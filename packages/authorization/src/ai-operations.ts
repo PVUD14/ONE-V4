@@ -26,6 +26,9 @@ export const aiFeatureEnableReasons = ['EVALUATION_COMPLETE', 'PILOT_ROLLOUT', '
 /** Lowering a limit: ordinary. Widening one: put to an approver with one of the raise reasons. */
 export const aiLimitsLowerReasons = ['COST_CONTROL', 'INCIDENT_MITIGATION', 'CORRECTION'] as const;
 export const aiLimitsRaiseReasons = ['DEMAND_GROWTH', 'PILOT_EXPANSION', 'CORRECTION'] as const;
+/** ENG-25: why the tutor is put to an approver for one college, and why it is switched off there. */
+export const aiTutorCollegeEnableReasons = ['PILOT_ROLLOUT', 'PILOT_EXPANSION', 'INCIDENT_RESOLVED'] as const;
+export const aiTutorCollegeDisableReasons = ['INCIDENT_MITIGATION', 'QUALITY_CONCERN', 'COLLEGE_REQUEST', 'PILOT_ENDED', 'ROLLBACK'] as const;
 export const aiEvaluationRecordReasons = ['INITIAL_BENCHMARK', 'MODEL_CHANGE', 'PROMPT_CHANGE', 'PERIODIC_REVIEW', 'INCIDENT_REVIEW'] as const;
 
 /** The same bounds 0033 puts on a policy. */

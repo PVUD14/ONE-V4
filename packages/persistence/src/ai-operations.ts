@@ -53,7 +53,11 @@ export type AiOperationsErrorCode =
   | 'AI_CHANGE_REJECTED'
   | 'REASON_CODE_INVALID'
   | 'APPROVAL_REQUIRED'
-  | 'APPROVAL_NOT_REQUIRED';
+  | 'APPROVAL_NOT_REQUIRED'
+  // ENG-25: the tutor per college (tutor-rollout.ts).
+  | 'TUTOR_COLLEGE_NOT_FOUND'
+  | 'TUTOR_COLLEGE_ALREADY_ENABLED'
+  | 'TUTOR_COLLEGE_ALREADY_DISABLED';
 
 export class AiOperationsError extends Error {
   constructor(readonly code: AiOperationsErrorCode) {

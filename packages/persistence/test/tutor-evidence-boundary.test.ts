@@ -1,7 +1,7 @@
 /**
  * ENG-22 acceptance: the tutor cannot write evidence. The tutor's code — the pure rules in
- * packages/tutoring, the request side (tutor-hints.ts), the job (tutor-hint-worker.ts) and the sandbox
- * set-up — is read here, and any write to the tables a person's record or a readiness band is built
+ * packages/tutoring, the request side (tutor-hints.ts), the job (tutor-hint-worker.ts), the sandbox
+ * set-up and ENG-25's rollout (tutor-rollout.ts) — is read here, and any write to the tables a person's record or a readiness band is built
  * from fails the build, as does any read of readiness. The behavioural half (a full request → job →
  * answer cycle leaves evidence and mastery to the existing answer path) is in the API's
  * tutor-hints.integration.spec.ts.
@@ -19,7 +19,8 @@ const protectedTables = [
 ] as const;
 
 async function tutorSources(): Promise<{ name: string; text: string }[]> {
-  const persistence = ['tutor-hints.ts', 'tutor-hint-worker.ts', 'tutor-sandbox.ts', 'run-tutor-sandbox-consent.ts'];
+  // ENG-25's rollout (college switch, groups, pilot counters) is tutor code too.
+  const persistence = ['tutor-hints.ts', 'tutor-hint-worker.ts', 'tutor-sandbox.ts', 'run-tutor-sandbox-consent.ts', 'tutor-rollout.ts'];
   const files = [
     ...await Promise.all(persistence.map(async (name) => ({ name, text: await readFile(new URL(name, persistenceSrc), 'utf8') }))),
     ...await Promise.all((await readdir(tutoringSrc)).filter((name) => name.endsWith('.ts'))

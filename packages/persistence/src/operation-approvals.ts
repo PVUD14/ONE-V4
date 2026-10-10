@@ -224,7 +224,7 @@ const approvalSelect = sql`
          now() >= a.expires_at AS expired,
          a.decided_by_user_id, du.email AS decider_email, a.decided_at, a.decision_reason_code,
          a.solo, a.solo_notice_state, a.executed_at,
-         COALESCE(o.legal_name, offboarded.legal_name) AS organization_name, mu.email AS member_email, mu.id AS member_user_id, h.reason_code AS hold_reason,
+         COALESCE(o.legal_name, offboarded.legal_name, tutor_college.legal_name) AS organization_name, mu.email AS member_email, mu.id AS member_user_id, h.reason_code AS hold_reason,
          cr.title AS career_role_title, cr.catalogue_code AS career_role_catalogue_code, crs.version AS career_set_version,
          CASE WHEN skr.entity_type = 'TOPIC' THEN COALESCE(skr.body->>'name', skn.name) END AS skill_name, skn.stable_key AS skill_key,
          CASE WHEN skr.entity_type = 'TOPIC' THEN skr.revision END AS skill_revision,
@@ -249,7 +249,9 @@ const approvalSelect = sql`
   LEFT JOIN status_notice_templates snt ON a.extended_target_type = 'status_notice_template' AND snt.id::text = a.target_id
   -- INST-18: a purge names the college whose records it deletes.
   LEFT JOIN institution_offboardings iob ON a.extended_target_type = 'institution_offboarding' AND iob.id::text = a.target_id
-  LEFT JOIN organizations offboarded ON offboarded.id = iob.institution_id`;
+  LEFT JOIN organizations offboarded ON offboarded.id = iob.institution_id
+  -- ENG-25: switching the tutor on names the college it is for.
+  LEFT JOIN organizations tutor_college ON a.extended_target_type = 'tutor_college' AND tutor_college.id::text = a.target_id`;
 
 function mapApproval(row: ApprovalDbRow): OperationApprovalRow {
   const live = row.state === 'PENDING' || row.state === 'APPROVED';

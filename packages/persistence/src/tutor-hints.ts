@@ -3,7 +3,7 @@
  *
  * Why this exists: a student stuck on a practice question can ask the AI tutor for the next hint. This
  * module is everything about that which is plain database work: whether the student may ask now (the
- * pure `tutor-hint-policy-v1` over what is stored and the deployment's audience), recording the request
+ * pure `tutor-hint-policy-v2` over what is stored and the deployment's audience), recording the request
  * with its outbox job in the step's transaction, what the step view shows for each hint level (the AI
  * hint, "being written", or the human hint for that level), and the staff sample and review.
  *
@@ -25,15 +25,17 @@ import {
   TUTOR_HINT_PROMPT,
   decideTutorHintRequest,
   tutorAudienceFromEnvironment,
+  visibleTutorReason,
   type TutorHintDecision,
   type TutorLanguage,
-  type TutorRefusalReason,
+  type TutorVisibleReason,
 } from '@planthepath/tutoring/src/index.js';
 import { loadAiFeaturePolicy, loadAiKillSwitchEngaged } from './ai-orchestration.js';
 import { hasConsentPurpose } from './consent-purposes.js';
 import { drizzleAsPgClient } from './learning-attempts.js';
 import { learnerLessonLanguage } from './lesson-languages.js';
 import type { PersistenceDb } from './repositories.js';
+import { tutorPilotGate } from './tutor-rollout.js';
 
 export const TUTOR_HINT_REQUESTED = 'tutor.hint.requested' as const;
 export const TUTOR_HINT_CONSUMER = 'tutor-hint-generator' as const;
@@ -66,8 +68,11 @@ export interface StepHintView {
 
 export interface TutorAvailabilityView {
   readonly available: boolean;
-  /** Null when available. `OFF` means the screen shows no AI control at all. */
-  readonly reason: TutorRefusalReason | null;
+  /**
+   * Null when available. `OFF` means the screen shows no AI control at all. The pilot's own reasons
+   * (college off, no-tutor group, ENG-25) are shown as `OFF`: the no-tutor group sees what AI-off sees.
+   */
+  readonly reason: TutorVisibleReason | null;
   /** AI hints left today; null where the tutor is off for this student. */
   readonly remainingToday: number | null;
 }
@@ -142,10 +147,18 @@ export interface TutorPolicyContext {
   readonly sessionMode: string;
   readonly ladderPublished: boolean;
   readonly currentLevel: number;
+  /** ENG-25: the college the step's decision recorded; the pilot audience gates the tutor on it. */
+  readonly institutionId?: string | null;
+  /** ENG-25: carried on a group assignment recorded by this read or request. */
+  readonly correlationId?: string;
   readonly env?: Environment;
 }
 
-/** Reads everything the policy needs (no cache: consent, the switch and the kill switch apply on the next request). */
+/**
+ * Reads everything the policy needs (no cache: consent, the switch and the kill switch apply on the next
+ * request). In the pilot audience it also reads the college's switch and the student's group, recording the
+ * group the first time a consenting student of a switched-on college is seen (tutor-rollout.ts).
+ */
 export async function decideTutorHintFromStore(db: PersistenceDb, context: TutorPolicyContext): Promise<{
   readonly decision: TutorHintDecision; readonly requestedToday: number;
 }> {
@@ -154,6 +167,10 @@ export async function decideTutorHintFromStore(db: PersistenceDb, context: Tutor
   const policy = await loadAiFeaturePolicy(pg, TUTOR_HINT_FEATURE_KEY);
   const killSwitchEngaged = await loadAiKillSwitchEngaged(pg);
   const consented = await hasConsentPurpose(db, context.subjectUserId, 'ai-tutoring');
+  const pilot = await tutorPilotGate(db, {
+    subjectUserId: context.subjectUserId, institutionId: context.institutionId ?? null, consented,
+    correlationId: context.correlationId ?? `tutor-assignment-${randomUUID()}`, env: context.env ?? process.env,
+  });
   const language = await learnerLessonLanguage(pg, context.subjectUserId);
   const [counts] = await rows<{ pending: boolean; today: number }>(db, sql`
     SELECT
@@ -168,6 +185,8 @@ export async function decideTutorHintFromStore(db: PersistenceDb, context: Tutor
     featureEnabled: policy?.enabled === true,
     killSwitchEngaged,
     consented,
+    collegeEnabled: pilot.collegeEnabled,
+    group: pilot.group,
     language,
     ladderPublished: context.ladderPublished,
     currentLevel: context.currentLevel,
@@ -182,8 +201,9 @@ export async function tutorAvailability(db: PersistenceDb, context: TutorPolicyC
   const { decision, requestedToday } = await decideTutorHintFromStore(db, context);
   const remaining = Math.max(0, TUTOR_HINTS_PER_STUDENT_PER_DAY - requestedToday);
   if (decision.allowed) return { available: true, reason: null, remainingToday: remaining };
-  const counted = !['OFF', 'NO_CONSENT', 'ASSESSMENT_MODE'].includes(decision.reason);
-  return { available: false, reason: decision.reason, remainingToday: counted ? remaining : null };
+  const reason = visibleTutorReason(decision.reason);
+  const counted = !['OFF', 'NO_CONSENT', 'ASSESSMENT_MODE'].includes(reason);
+  return { available: false, reason, remainingToday: counted ? remaining : null };
 }
 
 // ---------------------------------------------------------------------------
@@ -192,7 +212,7 @@ export async function tutorAvailability(db: PersistenceDb, context: TutorPolicyC
 
 /** The policy refused the request; `reason` is what the screen explains. */
 export class TutorHintRequestError extends Error {
-  constructor(readonly reason: TutorRefusalReason) {
+  constructor(readonly reason: TutorVisibleReason) {
     super(`tutor hint refused: ${reason}`);
     this.name = 'TutorHintRequestError';
   }

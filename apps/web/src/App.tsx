@@ -39,7 +39,7 @@ import { studentProfile } from './studentData.js';
 import { ApplicationsPage, AssessmentsPage, CareerPath, CoachPage, Dashboard, DocumentsPage, ExperiencePage, InterviewsPage, Learning, OpportunitiesPage, ProfilePage, ReadinessPage, SettingsPage, SkillsPage } from './studentPages.js';
 import { StudentPreviewProvider, useStudentPreview } from './studentPreviewState.js';
 import { PlacementOfficerPortal } from './staffPages.js';
-import { StudentApplicationsPage, StudentOpportunitiesPage } from './hiringPages.js';
+import { StudentApplicationsPage, StudentInterviewsPanel, StudentOpportunitiesPage } from './hiringPages.js';
 import { StudentPrivacyPanel } from './privacyPanel.js';
 import { StudentOutcomesCard } from './studentOutcomes.js';
 import { PilotApp } from './pilot/PilotApp.js';
@@ -968,6 +968,10 @@ function AuthenticatedStudentRoute({ route, currentStudent }: { readonly route: 
   if (route === 'career-tools') return <StudentCareerToolsPage />;
   if (route === 'scholarships') return <StudentScholarshipsPage />;
   if (route === 'resume-builder') return <StudentResumeBuilderPage />;
+  // Interviews and Calendar open the real, already-built views: the interview list Applications
+  // shows (EMP-08) and the one calendar every role reads (/api/v1/me/calendar).
+  if (route === 'interviews') return <StudentInterviewsPanel />;
+  if (route === 'calendar') return <CalendarPage />;
   return <AuthenticatedStudentUnavailable route={route} />;
 }
 

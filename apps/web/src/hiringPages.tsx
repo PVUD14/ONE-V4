@@ -887,7 +887,7 @@ export function StudentInterviewsPanel(): React.ReactElement {
       <p className="hiring-meta">{interviewWindow(item)}</p>
       {item.joiningLink ? <p>Join: <a href={item.joiningLink} target="_blank" rel="noopener noreferrer">{item.joiningLink}</a></p> : null}
       {item.locationDetail ? <p>{item.mode === 'ONSITE' ? 'Where' : 'Arrangements'}: {item.locationDetail}</p> : null}
-      {item.upcoming ? <p><strong>What to prepare:</strong> {item.preparationNote ?? 'NA — the employer has not added anything to prepare.'}</p> : null}
+      {item.upcoming ? <p><strong>What to prepare:</strong> {item.preparationNote ?? 'The employer has not added anything to prepare.'}</p> : null}
       {/* EMP-09: the invite updates in place when the interview moves; a cancelled one clears it. */}
       {item.upcoming || item.state === 'CANCELLED' ? <AddToCalendarButton download={(token) => downloadStudentInterviewCalendar(token, item.id)} /> : null}
     </div>

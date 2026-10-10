@@ -213,12 +213,12 @@ describe('Cognito Hosted UI browser authentication', () => {
     // UAT #18: the resolved workspace shows no auth/debug banner; identity
     // lives in the top bar only.
     expect(screen.queryByText('Authenticated Student workspace')).not.toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText('Quick Actions')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Quick actions' })).toBeInTheDocument());
     expect(screen.queryByText('Rahul Kumar')).not.toBeInTheDocument();
     expect(screen.queryByText('DEMO PREVIEW')).not.toBeInTheDocument();
     // The protected readiness engine is banded, so authenticated UI must keep
     // the visual slot without presenting a fabricated numeric score.
-    expect(screen.getByRole('heading', { name: 'Career Readiness Band' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'No advisory band yet' })).toBeInTheDocument();
     expect(screen.getByText('No advisory band yet')).toBeInTheDocument();
     expect(document.body.textContent).not.toContain('/100');
     window.history.pushState(null, '', '/student/readiness');
@@ -227,6 +227,14 @@ describe('Cognito Hosted UI browser authentication', () => {
       headers: expect.objectContaining({ Authorization: 'Bearer uat-access-token' }),
     })));
     expect(window.sessionStorage.getItem('planthepath.accessToken')).toBeNull();
+    // Interviews and Calendar open the real views (no "not built yet" page).
+    window.history.pushState(null, '', '/student/interviews');
+    render(React.createElement(App));
+    expect(await screen.findByRole('region', { name: 'Your interviews' })).toBeInTheDocument();
+    window.history.pushState(null, '', '/student/calendar');
+    render(React.createElement(App));
+    expect(await screen.findByRole('heading', { name: 'Your calendar' })).toBeInTheDocument();
+    expect(screen.queryByText(/Interviews is not built yet|Calendar is not built yet/)).not.toBeInTheDocument();
   });
 
   it('ignores legacy access-token fragments and requires authorization-code PKCE', async () => {

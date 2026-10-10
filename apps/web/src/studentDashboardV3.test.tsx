@@ -11,12 +11,19 @@ import * as api from './api.js';
 import { StudentDashboardV3 } from './studentDashboardV3.js';
 import type { StudentStaffActionDto } from './api/student.js';
 
-/** All five readiness-factor slots are present, each labelled and saying NA, with the reason stated once. */
-function expectFiveUnprojectedFactors(): void {
-  const slots = within(screen.getByRole('list', { name: 'Readiness factors without a projection' })).getAllByRole('listitem');
-  expect(slots).toHaveLength(5);
-  for (const slot of slots) expect(slot).toHaveTextContent(/ NA$/);
-  expect(screen.getByText('No evidence recorded yet.')).toBeInTheDocument();
+/**
+ * Re-skin phase 5 (owner decision 2026-10-10): a home block renders only when its data exists, and
+ * never "NA" or a placeholder in its place. With no evidence and no topic mastery, the
+ * "What's building your band" card is absent rather than a row of NA slots.
+ */
+function expectNoBandEvidenceCard(): void {
+  expect(screen.queryByRole('heading', { name: 'What’s building your band' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('list', { name: 'Readiness factors without a projection' })).not.toBeInTheDocument();
+}
+
+/** No standalone "NA" anywhere on the student home. */
+function expectNoNa(): void {
+  expect(document.body.textContent).not.toMatch(/(^|[^A-Za-z])NA([^A-Za-z]|$)/);
 }
 
 const apiState = vi.hoisted(() => ({
@@ -27,6 +34,9 @@ const apiState = vi.hoisted(() => ({
   learnerError: null as string | null,
   examsError: null as string | null,
   applicationsError: null as string | null,
+  activity: { today: '2030-01-07', currentStreakDays: 0, activeDaysLast7: 0, last7: [], days: [] } as Record<string, unknown> | null,
+  calendar: [] as Record<string, unknown>[],
+  calendarError: null as string | null,
 }));
 const supportApi = vi.hoisted(() => ({ current: vi.fn(), list: vi.fn(), complete: vi.fn() }));
 const counsellingApi = vi.hoisted(() => ({ shared: vi.fn() }));
@@ -56,7 +66,11 @@ vi.mock('./api.js', () => ({
     return { applications: apiState.applications };
   }),
   listMyNotifications: vi.fn(async () => ({ notifications: [], unreadCount: 0 })),
-  getStudentActivity: vi.fn(async () => ({ currentStreakDays: 0, activeDaysLast7: 0, last7: [] })),
+  getStudentActivity: vi.fn(async () => apiState.activity),
+  listCalendar: vi.fn(async () => {
+    if (apiState.calendarError) throw new Error(apiState.calendarError);
+    return { entries: apiState.calendar, range: { from: '2030-01-01T00:00:00Z', to: '2030-12-31T00:00:00Z' } };
+  }),
 }));
 
 const catalog = {
@@ -75,6 +89,9 @@ beforeEach(() => {
   apiState.learnerError = null;
   apiState.examsError = null;
   apiState.applicationsError = null;
+  apiState.activity = { today: '2030-01-07', currentStreakDays: 0, activeDaysLast7: 0, last7: [], days: [] };
+  apiState.calendar = [];
+  apiState.calendarError = null;
   supportApi.current.mockReset().mockResolvedValue({ student: { institutionId: 'student-institution' } });
   supportApi.list.mockReset().mockResolvedValue({ actions: [] });
   supportApi.complete.mockReset();
@@ -155,7 +172,7 @@ describe('Student support', () => {
     render(<StudentDashboardV3 studentName="Aanya Rao" />);
     const section = await supportSection();
     expect(within(section).getByText('Intervention')).toBeInTheDocument();
-    expect(within(section).getByText('Due: NA')).toBeInTheDocument();
+    expect(within(section).getByText('No due date set')).toBeInTheDocument();
     expect(within(section).getByText('Read-only — no student action is available for this item.')).toBeInTheDocument();
     expect(within(section).queryByRole('button')).not.toBeInTheDocument();
     expect(within(section).queryByRole('textbox')).not.toBeInTheDocument();
@@ -176,8 +193,9 @@ describe('Student support', () => {
     render(<StudentDashboardV3 studentName="Aanya Rao" />);
     const section = await supportSection();
     expect(within(section).getByText('Assigned by your college')).toBeInTheDocument();
-    expect(within(section).getByText('Due: NA')).toBeInTheDocument();
-    expect(section.textContent).not.toMatch(/private-role-id|private-state-id|Invalid Date/);
+    expect(within(section).getByText('No due date set')).toBeInTheDocument();
+    expect(within(section).getByText('Status unavailable')).toBeInTheDocument();
+    expect(section.textContent).not.toMatch(/private-role-id|private-state-id|Invalid Date|\bNA\b/);
   });
 
   it('shows only the counselling notes the college shared, with the writer role and no names or ids (INST-11)', async () => {
@@ -201,7 +219,7 @@ describe('Student support', () => {
     counsellingApi.shared.mockRejectedValue(new Error('internal stack trace'));
     render(<StudentDashboardV3 studentName="Aanya Rao" />);
     const section = await supportSection();
-    expect(await within(section).findByText('NA — shared counselling notes are unavailable right now.')).toBeInTheDocument();
+    expect(await within(section).findByText('Shared counselling notes are unavailable right now.')).toBeInTheDocument();
     expect(section.textContent).not.toMatch(/stack trace/);
   });
 
@@ -288,12 +306,15 @@ describe('StudentDashboardV3 readiness presentation', () => {
   it('highlights the real four-segment readiness band and shows evidence-derived factors without numeric scores', async () => {
     render(<StudentDashboardV3 studentName="Aanya Rao" />);
 
-    expect(await screen.findByRole('heading', { name: 'Career Readiness Band' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: /^Good (morning|afternoon|evening), Aanya\.$/ })).toBeInTheDocument();
     // The band is drawn by <ReadinessBand>: the current step is named, with the privacy line, never a number.
     expect(screen.getByRole('img', { name: 'Readiness band: Developing' })).toBeInTheDocument();
     expect(screen.getByText('Advisory band · never a score · never shown to employers')).toBeInTheDocument();
-    expect(screen.getByText('Professional Communication')).toBeInTheDocument();
-    expect(screen.getByText('2 active evidence records')).toBeInTheDocument();
+    expect(screen.getByText(/One more climb to/)).toHaveTextContent('Progressing');
+    const building = screen.getByRole('article', { name: 'What’s building your band' });
+    expect(within(building).getByText('Professional Communication')).toBeInTheDocument();
+    expect(within(building).getByText('2 evidence records')).toBeInTheDocument();
+    expectNoNa();
     // The explanation only repeats the count and names the internal model, so it is not shown.
     expect(screen.queryByText(/career-readiness-mastery-v1/)).not.toBeInTheDocument();
     expect(document.body.textContent).not.toContain('/100');
@@ -307,7 +328,8 @@ describe('StudentDashboardV3 readiness presentation', () => {
 
     expect(await screen.findByText('No advisory band yet')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'No advisory band yet' })).toBeInTheDocument();
-    expectFiveUnprojectedFactors();
+    expectNoBandEvidenceCard();
+    expectNoNa();
     expect(document.body.textContent).not.toContain('/100');
   });
 
@@ -316,10 +338,10 @@ describe('StudentDashboardV3 readiness presentation', () => {
 
     render(<StudentDashboardV3 studentName="Aanya Rao" />);
 
-    expect(await screen.findByRole('heading', { name: 'Career Readiness Band' })).toBeInTheDocument();
-    expect(screen.getByText('No advisory band yet')).toBeInTheDocument();
+    expect(await screen.findByText('No advisory band yet')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'No advisory band yet' })).toBeInTheDocument();
-    expectFiveUnprojectedFactors();
+    expectNoBandEvidenceCard();
+    expectNoNa();
     expect(document.body.textContent).not.toContain('/100');
   });
 });
@@ -351,12 +373,12 @@ function expectUnavailableReports(reports: HTMLElement): void {
     expect(within(reports).getByRole('heading', { name: title })).toBeInTheDocument();
   }
   for (const message of [
-    'NA — no readiness history available.',
-    'NA — no recorded lesson progress available.',
-    'NA — no learning evidence available.',
-    'NA — no career-readiness attempts available.',
-    'NA — no assigned assessment activity available.',
-    'NA — no application activity available.',
+    'No readiness history recorded yet.',
+    'No lesson progress recorded yet.',
+    'No learning evidence recorded yet.',
+    'No career-readiness attempts recorded yet.',
+    'No assigned assessment activity recorded yet.',
+    'No application activity recorded yet.',
   ]) expect(within(reports).getByText(message)).toBeInTheDocument();
 }
 
@@ -373,7 +395,7 @@ describe('StudentDashboardV3 student reports', () => {
     render(<StudentDashboardV3 studentName="Aanya Rao" />);
 
     const reports = await screen.findByRole('region', { name: 'Your Reports' });
-    expect(screen.getByRole('link', { name: 'View Full Report' })).toHaveAttribute('href', '#student-reports-title');
+    expect(screen.getByRole('link', { name: 'Readiness report' })).toHaveAttribute('href', '#student-reports-title');
     const timeline = within(reports).getByRole('list', { name: 'Readiness band history, newest first' });
     const steps = within(timeline).getAllByRole('listitem');
     expect(steps).toHaveLength(4);
@@ -417,7 +439,8 @@ describe('StudentDashboardV3 student reports', () => {
     render(<StudentDashboardV3 studentName="Aanya Rao" />);
 
     expectUnavailableReports(await screen.findByRole('region', { name: 'Your Reports' }));
-    expectFiveUnprojectedFactors();
+    expectNoBandEvidenceCard();
+    expectNoNa();
     expect(document.body.innerHTML).not.toContain('/100');
   });
 
@@ -474,7 +497,7 @@ describe('StudentDashboardV3 student reports', () => {
     expect(reports.innerHTML).not.toMatch(/private-|87|\/\s*100/);
   });
 
-  it('uses NA for invalid dates, unavailable labels and unknown state codes without leaking their values', async () => {
+  it('says plainly what is missing for invalid dates, unavailable labels and unknown state codes without leaking their values', async () => {
     apiState.learner = {
       ...apiState.learner,
       readinessHistory: [{ id: 'private-snapshot', band: 'PRIVATE_UPSTREAM_STATE', generatedAt: 'private-invalid-date' }],
@@ -490,10 +513,16 @@ describe('StudentDashboardV3 student reports', () => {
     const reports = await screen.findByRole('region', { name: 'Your Reports' });
     const timeline = within(reports).getByRole('list', { name: 'Readiness band history, newest first' });
     expect(within(timeline).getByText('Model version unavailable; comparison unavailable.')).toBeInTheDocument();
-    expect(within(timeline).getAllByText('NA')).toHaveLength(2);
-    expect(within(reports).getByRole('list', { name: 'Recorded lesson progress' })).toHaveTextContent('Started: NA · Completed: NA');
-    expect(within(reports).getByRole('list', { name: 'Career-readiness assessment attempts' })).toHaveTextContent('Started: NA · Submitted: NA');
-    expect(within(reports).getByRole('list', { name: 'Your application activity' })).toHaveTextContent('Submitted: NA · Updated: NA');
+    expect(within(timeline).getByText('Date not recorded')).toBeInTheDocument();
+    expect(within(timeline).getByText('Status unavailable')).toBeInTheDocument();
+    const lessons = within(reports).getByRole('list', { name: 'Recorded lesson progress' });
+    expect(lessons).toHaveTextContent('Lesson title unavailable');
+    expect(lessons).not.toHaveTextContent('Started:');
+    expect(within(reports).getByRole('list', { name: 'Career-readiness assessment attempts' })).not.toHaveTextContent('Submitted:');
+    const applications = within(reports).getByRole('list', { name: 'Your application activity' });
+    expect(applications).toHaveTextContent('Role title unavailable');
+    expect(applications).not.toHaveTextContent('Updated:');
+    expectNoNa();
     expect(reports.querySelector('time')).toBeNull();
     expect(reports.innerHTML).not.toMatch(/private-|PRIVATE_UPSTREAM_STATE|Invalid Date|NaN/);
   });
@@ -510,7 +539,7 @@ describe('StudentDashboardV3 student reports', () => {
     const reports = await screen.findByRole('region', { name: 'Your Reports' });
     expect(within(reports).getByRole('list', { name: 'Readiness band history, newest first' })).toBeInTheDocument();
     expect(within(reports).getByText('Recorded communication assessment')).toBeInTheDocument();
-    expect(within(reports).getByText('NA — no application activity available.')).toBeInTheDocument();
+    expect(within(reports).getByText('No application activity recorded yet.')).toBeInTheDocument();
     expect(reports.innerHTML).not.toContain('upstream stack trace');
   });
 
@@ -523,8 +552,8 @@ describe('StudentDashboardV3 student reports', () => {
 
     const reports = await screen.findByRole('region', { name: 'Your Reports' });
     expect(within(reports).getByText('Engineering placement')).toBeInTheDocument();
-    expect(within(reports).getByText('NA — no readiness history available.')).toBeInTheDocument();
-    expect(within(reports).getByText('NA — no assigned assessment activity available.')).toBeInTheDocument();
+    expect(within(reports).getByText('No readiness history recorded yet.')).toBeInTheDocument();
+    expect(within(reports).getByText('No assigned assessment activity recorded yet.')).toBeInTheDocument();
     expect(reports.innerHTML).not.toMatch(/upstream|private-/);
   });
 
@@ -534,7 +563,7 @@ describe('StudentDashboardV3 student reports', () => {
     render(<StudentDashboardV3 studentName="Aanya Rao" />);
 
     for (const request of [api.getStudentProfile, api.getLearnerCareerReadinessState, api.listStudentExams,
-      api.listMyNotifications, api.getStudentActivity, api.listStudentApplications]) {
+      api.listMyNotifications, api.getStudentActivity, api.listStudentApplications, api.listCalendar]) {
       expect(request).not.toHaveBeenCalled();
     }
     expect(screen.queryByRole('region', { name: 'Your Reports' })).not.toBeInTheDocument();
@@ -545,12 +574,100 @@ describe('StudentDashboardV3 student reports', () => {
     await screen.findByRole('region', { name: 'Your Reports' });
 
     for (const request of [api.getStudentProfile, api.getLearnerCareerReadinessState, api.listStudentExams,
-      api.listMyNotifications, api.getStudentActivity, api.listStudentApplications]) {
+      api.listMyNotifications, api.getStudentActivity, api.listStudentApplications, api.listCalendar]) {
       expect(request).toHaveBeenCalledExactlyOnceWith('learner-token', expect.any(AbortSignal));
     }
     const signal = vi.mocked(api.getLearnerCareerReadinessState).mock.calls[0]![1]!;
     expect(signal.aborted).toBe(false);
     view.unmount();
     expect(signal.aborted).toBe(true);
+  });
+});
+
+describe('StudentDashboardV3 Momentum home: sections render only with real data', () => {
+  const inDays = (days: number) => new Date(Date.now() + days * 86400000).toISOString();
+  const dayKey = (offset: number) => new Date(Date.now() - offset * 86400000).toISOString().slice(0, 10);
+
+  it('hides every section whose data is missing, and never shows NA, badges or filler', async () => {
+    apiState.learner = { catalog, progress: [], attempts: [], evidence: [], mastery: [], readiness: null,
+      roadmap: [], notificationPreferences: null, notifications: [] };
+    apiState.activity = null;
+    render(<StudentDashboardV3 studentName="Aanya Rao" />);
+    await screen.findByRole('region', { name: 'Your Reports' });
+    for (const title of ['What’s building your band', 'Up next', 'Continue learning', 'Applications', 'This week', 'Recent activity']) {
+      expect(screen.queryByRole('heading', { name: title })).not.toBeInTheDocument();
+    }
+    // No streak card without activity data, no badges (no backend yet), no static quote.
+    expect(screen.queryByRole('region', { name: 'Learning streak' })).not.toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/badge|Discipline today|Target companies|Recommendation \d/i);
+    // What is always real stays: the hero, the plan rules and the quick actions.
+    expect(screen.getByRole('heading', { name: 'Today’s plan' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Quick actions' })).toBeInTheDocument();
+    expectNoNa();
+  });
+
+  it('hides This week when no learning was recorded, but keeps the real zero streak', async () => {
+    apiState.activity = { today: dayKey(0), currentStreakDays: 0, activeDaysLast7: 0, days: [],
+      last7: [6, 5, 4, 3, 2, 1, 0].map((offset) => ({ date: dayKey(offset), count: 0 })) };
+    render(<StudentDashboardV3 studentName="Aanya Rao" />);
+    const streak = await screen.findByRole('region', { name: 'Learning streak' });
+    expect(within(streak).getByText('No streak yet')).toBeInTheDocument();
+    expect(streak).toHaveClass('sh-streak--none');
+    expect(screen.queryByRole('heading', { name: 'This week' })).not.toBeInTheDocument();
+  });
+
+  it('shows each section from the records that exist', async () => {
+    apiState.learner = {
+      ...apiState.learner,
+      catalog: { ...catalog, modules: [{ id: 'module-1', title: 'Recorded fundamentals', description: '', lessons: [
+        { id: 'lesson-1', title: 'First recorded lesson' }, { id: 'lesson-2', title: 'Second recorded lesson' },
+      ] }] },
+      progress: [{ lessonVersionId: 'lesson-1', state: 'COMPLETED' }],
+      evidence: [{ id: 'evidence-1', topicId: 'topic-communication', evidenceType: 'LESSON_COMPLETION', occurredAt: '2030-01-02T09:00:00Z', demonstrated: 1, possible: 1 }],
+    };
+    apiState.applications = [application({ state: 'INTERVIEW', updatedAt: inDays(-1) })];
+    apiState.calendar = [{ id: 'cal-1', kind: 'INTERVIEW', title: 'Interview · Engineering placement', detail: 'Round 1', startsAt: inDays(3),
+      endsAt: null, location: null, joinUrl: null, audience: 'STUDENT' }];
+    apiState.activity = { today: dayKey(0), currentStreakDays: 3, activeDaysLast7: 3, days: [],
+      last7: [6, 5, 4, 3, 2, 1, 0].map((offset) => ({ date: dayKey(offset), count: offset < 3 ? 2 : 0 })) };
+
+    render(<StudentDashboardV3 studentName="Aanya Rao" />);
+
+    const streak = await screen.findByRole('region', { name: 'Learning streak' });
+    expect(within(streak).getByText('3-day streak')).toBeInTheDocument();
+    expect(streak).not.toHaveClass('sh-streak--none');
+    const next = screen.getByRole('region', { name: 'Complete lesson: Second recorded lesson' });
+    expect(within(next).getByText('Recorded fundamentals · Lesson 2 of 2')).toBeInTheDocument();
+    expect(within(next).getByRole('progressbar', { name: 'Course progress' })).toHaveAttribute('aria-valuenow', '50');
+    expect(within(next).getByRole('button', { name: /Resume lesson/ })).toBeInTheDocument();
+
+    const upNext = screen.getByRole('article', { name: 'Up next' });
+    expect(within(upNext).getByText('Interview · Engineering placement')).toBeInTheDocument();
+    expect(within(upNext).getByText('Interview')).toHaveClass('t-cyan');
+    fireEvent.click(within(upNext).getByRole('button', { name: 'Prepare for this interview' }));
+    expect(window.location.pathname).toBe('/student/interviews');
+
+    const learning = screen.getByRole('article', { name: 'Continue learning' });
+    expect(within(learning).getByText('2 lessons · 1 complete')).toBeInTheDocument();
+    const applications = screen.getByRole('article', { name: 'Applications' });
+    expect(within(applications).getByText('Engineering placement')).toBeInTheDocument();
+    expect(within(applications).getByRole('list', { name: 'Stage: Interview' })).toBeInTheDocument();
+    const week = screen.getByRole('article', { name: 'This week' });
+    expect(within(week).getByText('6')).toBeInTheDocument();
+    expect(within(week).getByText('3 of 7 days active')).toBeInTheDocument();
+    expect(screen.getByRole('article', { name: 'What’s building your band' })).toHaveTextContent('1evidence record');
+    // Readiness only as the band; no score or percentage of readiness anywhere.
+    expect(document.body.textContent).not.toMatch(/\/100|readiness score|\d+% ready/i);
+    expectNoNa();
+  });
+
+  it('falls back to exam windows for Up next when the calendar cannot be read', async () => {
+    apiState.calendarError = 'upstream calendar stack';
+    apiState.exams = [exam({ title: 'Recorded future assessment', startsAt: inDays(5), endsAt: inDays(6) })];
+    render(<StudentDashboardV3 studentName="Aanya Rao" />);
+    const upNext = await screen.findByRole('article', { name: 'Up next' });
+    expect(within(upNext).getByText('Recorded future assessment opens')).toBeInTheDocument();
+    expect(within(upNext).getByRole('button', { name: 'Open calendar' })).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain('upstream calendar stack');
   });
 });

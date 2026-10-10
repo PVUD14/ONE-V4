@@ -27,16 +27,16 @@ export function SharedCounsellingNotes({ token, institutionId }: { readonly toke
   }, [token, institutionId]);
   return <div aria-labelledby="shared-counselling-title">
     <h3 id="shared-counselling-title">Counselling notes shared with you</h3>
-    {unavailable ? <p>NA — shared counselling notes are unavailable right now.</p>
+    {unavailable ? <p>Shared counselling notes are unavailable right now.</p>
       : notes === null ? <p role="status">Loading shared notes…</p>
         : notes.length ? <ul className="pilot-list" aria-label="Shared counselling notes">{notes.map((note) => {
           const writer = Object.hasOwn(writerRoles, note.authorRole) ? writerRoles[note.authorRole] : null;
-          const written = Number.isFinite(Date.parse(note.createdAt))
-            ? formatDate(note.createdAt) : 'NA';
+          // A note with no readable date says who shared it and nothing else, rather than a placeholder.
+          const written = Number.isFinite(Date.parse(note.createdAt)) ? ` · ${formatDate(note.createdAt)}` : '';
           return <li key={note.id} className="pilot-list-row"><div className="grow">
             <strong>{note.title}</strong>
             <p>{note.note}</p>
-            <small>{writer ? `Shared by your ${writer}` : 'Shared by your college'} · {written}</small>
+            <small>{writer ? `Shared by your ${writer}` : 'Shared by your college'}{written}</small>
           </div></li>;
         })}</ul> : <p>Your college has not shared any counselling notes with you.</p>}
   </div>;

@@ -19,6 +19,8 @@ import './styles/icon-motion.css';
 // Momentum components (buttons, fields, tags, cards, KPI tiles, tables, banners, modals, the
 // readiness band and small counts) restyle the app's shared classes, so they load last.
 import './styles/components.css';
+// The Momentum student home (hero, next climb, streak, card rows); scoped under .sh.
+import './styles/student-home.css';
 import { applyStoredTheme } from './themePreference.js';
 
 // A theme chosen with the top-bar toggle is applied before the first paint; otherwise the OS decides.

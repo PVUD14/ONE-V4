@@ -791,7 +791,7 @@ describe('EMP-08 the student sees their interviews inside Applications', () => {
     stubFetch(routes({ interviews: [{ ...upcoming, preparationNote: null }] }));
     await authenticate();
     render(<StudentApplicationsPage />);
-    expect(await screen.findByText('NA — the employer has not added anything to prepare.')).toBeInTheDocument();
+    expect(await screen.findByText('The employer has not added anything to prepare.')).toBeInTheDocument();
     expect(screen.getByText('No past interviews yet.')).toBeInTheDocument();
     cleanup();
     stubFetch(routes({ interviews: [] }));

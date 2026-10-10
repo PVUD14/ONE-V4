@@ -10,7 +10,7 @@
  * Design: docs/architecture/ai-bake-off-design.md (Decision 6).
  */
 import type { BatchResult } from './results.js';
-import type { EvaluationTask } from './set-format.js';
+import { evaluationTasks, type EvaluationTask } from './set-format.js';
 
 export interface CostAssumptions {
   /** The pod's price (ADR-047: an RTX A6000 on RunPod). A fact, not an assumption. */
@@ -25,16 +25,17 @@ export interface CostAssumptions {
 
 export const defaultCostAssumptions: CostAssumptions = {
   podUsdPerHour: 0.57,
-  requestsPerStudentMonth: { 'tutor-hint': 100, 'lesson-draft': 0.1, 'answer-check': 0.2 },
+  // ADR-052: explanations a student asks for in a month (an assumption; cache hits cost nothing, so this is high).
+  requestsPerStudentMonth: { 'tutor-hint': 100, 'lesson-draft': 0.1, 'answer-check': 0.2, 'explain-topic': 4 },
   utilisation: 0.3,
   inrPerUsd: 85,
 };
 
 export interface CostEstimate {
   readonly assumptions: CostAssumptions;
-  /** Measured pod seconds per request, per feature. */
-  readonly secondsPerRequest: Readonly<Record<EvaluationTask, number>>;
-  readonly inrPerRequest: Readonly<Record<EvaluationTask, number>>;
+  /** Measured pod seconds per request, for each feature the run measured. */
+  readonly secondsPerRequest: Readonly<Partial<Record<EvaluationTask, number>>>;
+  readonly inrPerRequest: Readonly<Partial<Record<EvaluationTask, number>>>;
   /** Σ requests × cost ÷ utilisation, in rupees, per active student per month. */
   readonly inrPerStudentMonth: number;
 }
@@ -56,13 +57,15 @@ export function validateCostAssumptions(assumptions: CostAssumptions): void {
 
 export function estimateCost(batches: readonly BatchResult[], assumptions: CostAssumptions = defaultCostAssumptions): CostEstimate {
   validateCostAssumptions(assumptions);
-  const tasks: EvaluationTask[] = ['tutor-hint', 'lesson-draft', 'answer-check'];
-  const secondsPerRequest = {} as Record<EvaluationTask, number>;
-  const inrPerRequest = {} as Record<EvaluationTask, number>;
+  // The features this run measured (one set covers the first three, ADR-052's covers explain-topic): each
+  // set's cost is its own features' share of a student's month.
+  const tasks = evaluationTasks.filter((task) => batches.some((entry) => entry.task === task));
+  if (!tasks.length) throw new Error('no batch to measure');
+  const secondsPerRequest: Partial<Record<EvaluationTask, number>> = {};
+  const inrPerRequest: Partial<Record<EvaluationTask, number>> = {};
   let monthly = 0;
   for (const task of tasks) {
-    const batch = batches.find((entry) => entry.task === task);
-    if (!batch) throw new Error(`no ${task} batch to measure`);
+    const batch = batches.find((entry) => entry.task === task)!;
     const seconds = batch.wallSeconds / batch.cases;
     const inr = (assumptions.podUsdPerHour / 3600) * seconds * assumptions.inrPerUsd;
     secondsPerRequest[task] = round(seconds, 4);
@@ -73,7 +76,15 @@ export function estimateCost(batches: readonly BatchResult[], assumptions: CostA
 }
 
 /** One line for an evaluation note: what the cost figure assumed. */
-export function describeCostAssumptions(assumptions: CostAssumptions): string {
+const usageNames: Readonly<Record<EvaluationTask, string>> = { 'tutor-hint': 'hints', 'lesson-draft': 'drafts', 'answer-check': 'checks', 'explain-topic': 'explanations' };
+
+/** One line for an evaluation note: what the cost figure assumed, for the features it covered (v1's three by default). */
+export function describeCostAssumptions(assumptions: CostAssumptions, tasks: readonly EvaluationTask[] = ['tutor-hint', 'lesson-draft', 'answer-check']): string {
   const usage = assumptions.requestsPerStudentMonth;
-  return `cost assumes $${assumptions.podUsdPerHour}/h, ${usage['tutor-hint']} hints + ${usage['lesson-draft']} drafts + ${usage['answer-check']} checks per student-month, utilisation ${assumptions.utilisation}, Rs ${assumptions.inrPerUsd}/USD`;
+  return `cost assumes $${assumptions.podUsdPerHour}/h, ${tasks.map((task) => `${usage[task]} ${usageNames[task]}`).join(' + ')} per student-month, utilisation ${assumptions.utilisation}, Rs ${assumptions.inrPerUsd}/USD`;
+}
+
+/** The features a cost estimate measured, in task order. */
+export function costTasks(estimate: CostEstimate): readonly EvaluationTask[] {
+  return evaluationTasks.filter((task) => estimate.secondsPerRequest[task] !== undefined);
 }

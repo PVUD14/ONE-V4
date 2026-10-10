@@ -12,6 +12,7 @@ import { createHash } from 'node:crypto';
 import {
   contentAnswerCheckPromptV1,
   contentLessonDraftPromptV2,
+  explainTopicPromptV1,
   hintLevelMeanings,
   oneAiFeatures,
   promptFingerprint,
@@ -30,11 +31,15 @@ import {
   socLessonLevel,
   tutorAbuseCases,
 } from './cases.js';
+import { explainAbuseCases, explainTopicCases } from './explain-cases.js';
+import { normaliseExplainTopic } from './explain-topic-rules.js';
 import {
   EVALUATION_SET_FORMAT,
   EVALUATION_SET_FORMAT_VERSION,
   EVALUATION_SET_KEY,
   EVALUATION_SET_VERSION,
+  EXPLAIN_EVALUATION_SET_KEY,
+  EXPLAIN_EVALUATION_SET_VERSION,
   type EvaluationBlock,
   type EvaluationCase,
   type EvaluationLanguage,
@@ -78,16 +83,24 @@ const taskPrompts: Readonly<Record<EvaluationTask, PromptVersion>> = {
   'tutor-hint': tutorHintPromptV2,
   'lesson-draft': contentLessonDraftPromptV2,
   'answer-check': contentAnswerCheckPromptV1,
+  'explain-topic': explainTopicPromptV1,
 };
 
-export function taskBindings(): Readonly<Record<EvaluationTask, TaskBinding>> {
-  const bind = (task: EvaluationTask): TaskBinding => {
-    const prompt = taskPrompts[task];
-    const feature = oneAiFeatures.find((entry) => entry.prompt.key === prompt.key && entry.prompt.version === prompt.version);
-    if (!feature) throw new Error(`no feature runs prompt ${prompt.key} v${prompt.version}`);
-    return { featureKey: feature.featureKey, promptKey: prompt.key, promptVersion: prompt.version, promptFingerprint: promptFingerprint(prompt) };
-  };
+function bind(task: EvaluationTask): TaskBinding {
+  const prompt = taskPrompts[task];
+  const feature = oneAiFeatures.find((entry) => entry.prompt.key === prompt.key && entry.prompt.version === prompt.version);
+  if (!feature) throw new Error(`no feature runs prompt ${prompt.key} v${prompt.version}`);
+  return { featureKey: feature.featureKey, promptKey: prompt.key, promptVersion: prompt.version, promptFingerprint: promptFingerprint(prompt) };
+}
+
+/** The `one-ai-bakeoff` v1 tasks: exactly the three it was built with. */
+export function taskBindings(): Readonly<Record<'tutor-hint' | 'lesson-draft' | 'answer-check', TaskBinding>> {
   return { 'tutor-hint': bind('tutor-hint'), 'lesson-draft': bind('lesson-draft'), 'answer-check': bind('answer-check') };
+}
+
+/** ADR-052: the `one-ai-explain` set's one task. */
+export function explainTaskBindings(): Readonly<Record<'explain-topic', TaskBinding>> {
+  return { 'explain-topic': bind('explain-topic') };
 }
 
 function request(prompt: PromptVersion, parameters: Record<string, string>): EvaluationCase['request'] {
@@ -258,6 +271,33 @@ export function buildEvaluationSet(bank: AptitudeBankPack, soc: CareerTargetPack
       leakRules: HINT_LADDER_RULES_VERSION,
     },
     tasks: taskBindings(),
+    cases,
+  };
+}
+
+/**
+ * ADR-052: the `one-ai-explain` v1 set — 40 English topics across subjects (nuclear physics basics among
+ * them) and 15 requests that must be refused. Each case sends exactly what the worker sends: the explain
+ * prompt rendered with the normalised topic. Pure; the hand-written cases are in explain-cases.ts.
+ */
+export function buildExplainEvaluationSet(): EvaluationSet {
+  const explainCase = (id: string, block: EvaluationBlock, category: string, topic: string, accept: 'LESSON' | 'REFUSED', unsafePatterns: readonly string[]): EvaluationCase => ({
+    id, task: 'explain-topic', block, category, language: 'en', source: normaliseExplainTopic(topic),
+    request: request(explainTopicPromptV1, { topic: normaliseExplainTopic(topic) }),
+    expect: { kind: 'explain-topic', accept, unsafePatterns },
+  });
+  const cases: EvaluationCase[] = [
+    ...explainTopicCases.map((entry, index) => explainCase(`explain-en-${pad(index + 1)}`, 'ENGLISH', `EXPLAIN_${entry.domain}`, entry.topic, 'LESSON', [])),
+    ...explainAbuseCases.map((entry, index) => explainCase(`abuse-explain-${pad(index + 1, 2)}`, 'ABUSE', entry.category, entry.topic, 'REFUSED', entry.unsafePatterns)),
+  ];
+  return {
+    format: EVALUATION_SET_FORMAT,
+    formatVersion: EVALUATION_SET_FORMAT_VERSION,
+    setKey: EXPLAIN_EVALUATION_SET_KEY,
+    setVersion: EXPLAIN_EVALUATION_SET_VERSION,
+    notice: 'ONE AI evaluation set for Ask ONE to explain (ADR-052). Built by packages/ai-evaluation from explain-cases.ts; regenerate with `corepack pnpm --filter @planthepath/ai-evaluation bake-off:build-set`, never edit by hand. No real person or student data. `expect` is for the scorer and is never sent to a model.',
+    builtFrom: { cases: 'packages/ai-evaluation/src/explain-cases.ts', topicRules: 'normaliseExplainTopic (trim, lower-case, single spaces)' },
+    tasks: explainTaskBindings(),
     cases,
   };
 }

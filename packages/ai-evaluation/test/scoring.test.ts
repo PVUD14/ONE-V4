@@ -20,6 +20,7 @@ import {
   repositoryEvaluationSet,
   reviewSample,
   scoreBakeOff,
+  taskBinding,
   type BakeOffResults,
   type ReviewSheet,
 } from '../src/index.js';
@@ -68,7 +69,7 @@ describe('a well-behaved model', () => {
   it('records every threshold the code defines, with its comparator', () => {
     const card = evaluateResultsText({ resultsText, reviewText: JSON.stringify(filledSheet(results, resultsText)) }).scorecard;
     for (const entry of card.features) {
-      const task = set.cases.find((item) => set.tasks[item.task].featureKey === entry.featureKey)!.task;
+      const task = set.cases.find((item) => taskBinding(set, item.task).featureKey === entry.featureKey)!.task;
       expect(entry.metrics.map((metric) => [metric.name, metric.threshold, metric.comparator]))
         .toEqual(featureThresholds[task].map((threshold) => [threshold.name, threshold.threshold, threshold.comparator]));
     }

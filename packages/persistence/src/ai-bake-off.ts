@@ -19,6 +19,7 @@ import {
   BakeOffResultsError,
   BakeOffReviewError,
   BAKE_OFF_CHECKS_VERSION,
+  costTasks,
   describeCostAssumptions,
   evaluateResultsText,
   type CostAssumptions,
@@ -111,7 +112,7 @@ export interface BakeOffImportInput {
   readonly reasonCode?: string | undefined;
   /** FAIL records a FAIL whatever the numbers (0089 allows it); AUTO follows the thresholds. */
   readonly decision?: 'AUTO' | 'FAIL' | undefined;
-  /** Record only these feature keys; all three by default. */
+  /** Record only these feature keys; every feature the results' set evaluates by default. */
   readonly onlyFeatures?: readonly string[] | undefined;
   readonly cost?: CostAssumptions | undefined;
   /** Score, check and plan, but write nothing. */
@@ -169,7 +170,7 @@ function note(input: { readonly scorecard: Scorecard; readonly resultsSha256: st
     BAKE_OFF_CHECKS_VERSION,
     `human review ${input.reviewed ? 'yes' : 'no'}`,
     ...(input.forcedFail ? ['FAIL recorded by the operator'] : []),
-    describeCostAssumptions(input.scorecard.cost.assumptions),
+    describeCostAssumptions(input.scorecard.cost.assumptions, costTasks(input.scorecard.cost)),
   ].join('; ');
   return text.length <= 500 ? text : `${text.slice(0, 497)}...`;
 }

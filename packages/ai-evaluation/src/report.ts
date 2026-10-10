@@ -6,7 +6,7 @@
  * is recorded". This is the report; `ai:bake-off-import` is the recording. It contains metrics,
  * counts and case ids — never reply text, which stays in the results file.
  */
-import { describeCostAssumptions } from './cost.js';
+import { costTasks, describeCostAssumptions } from './cost.js';
 import type { Scorecard } from './score.js';
 
 const percent = (value: number): string => `${(value * 100).toFixed(2)} %`;
@@ -49,7 +49,7 @@ export function renderReport(card: Scorecard, input: { readonly resultsSha256: s
   lines.push('');
   lines.push(`Estimated **Rs ${card.cost.inrPerStudentMonth.toFixed(2)} per active student per month** against the plan's Rs 10. Pod seconds per request (measured): ${Object.entries(card.cost.secondsPerRequest).map(([task, seconds]) => `${task} ${seconds} s`).join(', ')}.`);
   lines.push('');
-  lines.push(`Assumptions (not measurements): ${describeCostAssumptions(card.cost.assumptions)}.`);
+  lines.push(`Assumptions (not measurements): ${describeCostAssumptions(card.cost.assumptions, costTasks(card.cost))}.`);
   lines.push('');
   return `${lines.join('\n')}\n`;
 }

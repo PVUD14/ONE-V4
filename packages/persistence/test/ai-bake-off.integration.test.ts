@@ -22,7 +22,9 @@ import { Pool, type PoolClient } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { oneAiFeatures } from '@planthepath/ai-orchestration/src/index.js';
 import { startFakeOpenAiServer, type FakeOpenAiServer } from '@planthepath/ai-orchestration/src/testing/fake-openai-server.js';
-import { buildReviewSheet, committedSetPath, contentSha256, readBakeOffResults, repositoryEvaluationSet, type EvaluationCase } from '@planthepath/ai-evaluation/src/index.js';
+import {
+  buildReviewSheet, committedSetPath, contentSha256, readBakeOffResults, repositoryEvaluationSet, repositoryExplainEvaluationSet, type EvaluationCase, type EvaluationSet,
+} from '@planthepath/ai-evaluation/src/index.js';
 import { completionBody, goodReply, leakyReply } from '@planthepath/ai-evaluation/src/testing/simulated-replies.js';
 import { BakeOffImportError, importBakeOffResults, registerOneAiFeatures } from '../src/ai-bake-off.js';
 import type { SqlRunner } from '../src/ai-operations.js';
@@ -41,19 +43,22 @@ const model = 'qwen2.5-14b-instruct';
 type Db = SqlRunner & { transaction<T>(work: (tx: SqlRunner) => Promise<T>): Promise<T> };
 
 const { set } = repositoryEvaluationSet();
-const caseByRequest = new Map<string, EvaluationCase>(set.cases.map((entry) => [JSON.stringify(entry.request.messages), entry]));
+// ADR-052: the explain set's cases too, so the harness can run either set against the fake endpoint.
+const explainSet = repositoryExplainEvaluationSet().set;
+const caseByRequest = new Map<string, EvaluationCase>([...set.cases, ...explainSet.cases].map((entry) => [JSON.stringify(entry.request.messages), entry]));
 
 let server: FakeOpenAiServer;
 let reply: (entry: EvaluationCase) => string = goodReply;
 let workDir: string;
 let goodResultsText: string;
 let leakyResultsText: string;
+let explainResultsText: string;
 
 /**
  * Run the real harness against the fake endpoint; returns the results file's text. Asynchronous on
  * purpose: the fake server lives in this process, so blocking on the child would deadlock it.
  */
-async function runHarness(extra: readonly string[] = []): Promise<string> {
+async function runHarness(extra: readonly string[] = ['--set', committedSetPath]): Promise<string> {
   const out = mkdtempSync(join(workDir, 'out-'));
   const child = spawn(python, [harness, '--model', model, '--base-url', server.baseUrl, '--key-file', join(workDir, 'api-key'), '--out', out, '--concurrency', '8', ...extra]);
   let output = '';
@@ -89,6 +94,7 @@ beforeAll(async () => {
   reply = leakyReply;
   leakyResultsText = await runHarness();
   reply = goodReply;
+  explainResultsText = await runHarness(['--only', 'explain-topic']);
 }, 300_000);
 
 afterAll(async () => {
@@ -130,9 +136,9 @@ async function member(role: string, capability?: string): Promise<string> {
   return userId;
 }
 
-function filledReview(resultsText: string): string {
+function filledReview(resultsText: string, forSet: EvaluationSet = set): string {
   const results = readBakeOffResults(JSON.parse(resultsText));
-  const sheet = buildReviewSheet(set, results, contentSha256(resultsText));
+  const sheet = buildReviewSheet(forSet, results, contentSha256(resultsText));
   return JSON.stringify({ ...sheet, items: sheet.items.map((item) => ({ ...item, scores: { teaching: 4, language: item.language === 'en' ? 'NA' : 4, factualError: false } })) });
 }
 
@@ -174,14 +180,17 @@ describe('registering the features', () => {
   it('inserts the declared features switched off, and leaves an existing row alone', async () => {
     const before = (await client.query('SELECT feature_key FROM ai_feature_policies WHERE feature_key = ANY($1)', [oneAiFeatures.map((feature) => feature.featureKey)])).rows;
     const first = await registerOneAiFeatures(db);
-    // ENG-23 added content.item-draft, declared off like the rest (no evaluation covers it yet).
-    expect([...first.registered, ...first.existing.map((entry) => entry.featureKey)].sort()).toEqual(['content.answer-check', 'content.item-draft', 'content.lesson-draft', 'tutor.hint']);
+    // ENG-23 added content.item-draft, declared off like the rest (no evaluation covers it yet); ADR-052 added
+    // learning.explain-topic, off until its own set (one-ai-explain) passes.
+    expect([...first.registered, ...first.existing.map((entry) => entry.featureKey)].sort())
+      .toEqual(['content.answer-check', 'content.item-draft', 'content.lesson-draft', 'learning.explain-topic', 'tutor.hint']);
     const rows = (await client.query('SELECT feature_key, enabled, model, prompt_key, prompt_version FROM ai_feature_policies WHERE feature_key = ANY($1) ORDER BY feature_key', [oneAiFeatures.map((feature) => feature.featureKey)])).rows;
     if (!before.length) {
       expect(rows).toEqual([
         { feature_key: 'content.answer-check', enabled: false, model, prompt_key: 'content-answer-check', prompt_version: 1 },
         { feature_key: 'content.item-draft', enabled: false, model, prompt_key: 'content-item-draft', prompt_version: 1 },
         { feature_key: 'content.lesson-draft', enabled: false, model, prompt_key: 'content-lesson-draft', prompt_version: 2 },
+        { feature_key: 'learning.explain-topic', enabled: false, model, prompt_key: 'explain-topic', prompt_version: 1 },
         { feature_key: 'tutor.hint', enabled: false, model, prompt_key: 'tutor-hint', prompt_version: 2 },
       ]);
     }
@@ -236,6 +245,25 @@ describe('importing a run', () => {
     expect((await client.query("SELECT enabled FROM ai_feature_policies WHERE feature_key = 'content.answer-check'")).rows[0].enabled).toBe(true);
   });
 
+  it('ADR-052: the harness runs one-ai-explain on its own; the import records learning.explain-topic, and 0089 then (and only then) lets it switch on', async () => {
+    const results = readBakeOffResults(JSON.parse(explainResultsText));
+    expect(results.set.key).toBe('one-ai-explain');
+    expect(results.cases).toHaveLength(55);
+    expect(results.batches.map((batch) => batch.task)).toEqual(['explain-topic']);
+    await client.query("UPDATE ai_feature_policies SET model = $1 WHERE feature_key = 'learning.explain-topic'", [model]);
+    await client.query('SAVEPOINT explain_off');
+    await expect(client.query("UPDATE ai_feature_policies SET enabled = true WHERE feature_key = 'learning.explain-topic'")).rejects.toThrow(/passing evaluation/u);
+    await client.query('ROLLBACK TO SAVEPOINT explain_off');
+    await expect(importBakeOffResults(db, { resultsText: explainResultsText, recorderUserId: recorder })).rejects.toMatchObject({ code: 'HUMAN_REVIEW_REQUIRED' });
+    const outcome = await importBakeOffResults(db, { resultsText: explainResultsText, reviewText: filledReview(explainResultsText, explainSet), recorderUserId: recorder });
+    expect(outcome.evaluations.map((entry) => [entry.featureKey, entry.promptKey, entry.promptVersion, entry.decision])).toEqual([['learning.explain-topic', 'explain-topic', 1, 'PASS']]);
+    const [row] = (await evaluationRows()).filter((entry) => entry.feature_key === 'learning.explain-topic');
+    expect(row).toMatchObject({ evaluation_set_key: 'one-ai-explain', evaluation_set_version: 1, decision: 'PASS' });
+    expect(row!.note).toContain('explanations per student-month');
+    await client.query("UPDATE ai_feature_policies SET enabled = true WHERE feature_key = 'learning.explain-topic'");
+    expect((await client.query("SELECT enabled FROM ai_feature_policies WHERE feature_key = 'learning.explain-topic'")).rows[0].enabled).toBe(true);
+  });
+
   it('refuses a PASS without a review sheet, but records a FAIL the operator asks for', async () => {
     await expect(importBakeOffResults(db, { resultsText: goodResultsText, recorderUserId: recorder })).rejects.toMatchObject({ code: 'HUMAN_REVIEW_REQUIRED' });
     expect(await evaluationRows()).toEqual([]);
@@ -272,7 +300,7 @@ describe('importing a run', () => {
   });
 
   it('refuses a smoke run made with --limit', async () => {
-    const partial = await runHarness(['--limit', '2']);
+    const partial = await runHarness(['--set', committedSetPath, '--limit', '2']);
     expect(readBakeOffResults(JSON.parse(partial)).partial).toBe(true);
     await expect(importBakeOffResults(db, { resultsText: partial, recorderUserId: recorder, decision: 'FAIL' })).rejects.toMatchObject({ code: 'RESULTS_PARTIAL' });
   }, 60_000);

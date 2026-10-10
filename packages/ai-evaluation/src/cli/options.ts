@@ -20,7 +20,7 @@ function numberOption(argv: readonly string[], name: string, fallback: number): 
   return value;
 }
 
-/** --pod-usd-per-hour, --hints-per-student, --drafts-per-student, --checks-per-student, --utilisation, --inr-per-usd. */
+/** --pod-usd-per-hour, --hints-per-student, --drafts-per-student, --checks-per-student, --explains-per-student, --utilisation, --inr-per-usd. */
 export function costAssumptionsFromArgv(argv: readonly string[]): CostAssumptions {
   const base = defaultCostAssumptions;
   return {
@@ -29,6 +29,7 @@ export function costAssumptionsFromArgv(argv: readonly string[]): CostAssumption
       'tutor-hint': numberOption(argv, '--hints-per-student', base.requestsPerStudentMonth['tutor-hint']),
       'lesson-draft': numberOption(argv, '--drafts-per-student', base.requestsPerStudentMonth['lesson-draft']),
       'answer-check': numberOption(argv, '--checks-per-student', base.requestsPerStudentMonth['answer-check']),
+      'explain-topic': numberOption(argv, '--explains-per-student', base.requestsPerStudentMonth['explain-topic']),
     },
     utilisation: numberOption(argv, '--utilisation', base.utilisation),
     inrPerUsd: numberOption(argv, '--inr-per-usd', base.inrPerUsd),

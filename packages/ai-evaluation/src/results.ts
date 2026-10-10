@@ -9,7 +9,7 @@
  * Design: docs/architecture/ai-bake-off-design.md (Decision 7).
  */
 import { contentSha256 } from './build-set.js';
-import { evaluationTasks, type EvaluationSet, type EvaluationTask } from './set-format.js';
+import { evaluationTasks, setTasks, type EvaluationSet, type EvaluationTask } from './set-format.js';
 
 export const RESULTS_FORMAT = 'one-bakeoff-results';
 export const RESULTS_FORMAT_VERSION = 1;
@@ -169,7 +169,7 @@ export function matchResultsToSet(results: BakeOffResults, set: EvaluationSet, s
     if (expected.get(entry.id) !== entry.task) throw new BakeOffResultsError('RESULTS_CASES_MISMATCH', `case ${entry.id} is not in the set with task ${entry.task}`);
   }
   if (seen.size !== expected.size) throw new BakeOffResultsError('RESULTS_CASES_MISMATCH', `${expected.size - seen.size} case(s) of the set have no result`);
-  for (const taskKey of evaluationTasks) {
+  for (const taskKey of setTasks(set)) {
     const batch = results.batches.filter((entry) => entry.task === taskKey);
     const cases = set.cases.filter((entry) => entry.task === taskKey).length;
     if (batch.length !== 1 || batch[0]!.cases !== cases) throw new BakeOffResultsError('RESULTS_CASES_MISMATCH', `the ${taskKey} batch does not cover its ${cases} cases`);

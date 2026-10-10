@@ -467,6 +467,7 @@ private fun MainScaffold(
             }
             return
         }
+        moreDest == MoreDest.Explain -> { SlideIn { ExplainPage(onClose = { moreDest = null }) }; return }
         moreDest == MoreDest.Help -> { SlideIn { HelpFaqPage(persona = "student", onClose = { moreDest = null }) }; return }
         moreDest == MoreDest.Settings -> { SlideIn { SettingsPage(currentTheme = currentTheme, onThemeChange = onThemeChange, onClose = { moreDest = null }, onSignOut = onSignOut, onSwitchWorkspace = onSwitchWorkspace) }; return }
     }

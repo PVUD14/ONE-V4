@@ -67,12 +67,13 @@ describe('each institution role lands on its own home', () => {
   });
 
   it('the institution admin lands on the institution overview', async () => {
-    routes({ [`${base}/units`]: { units: [{ id: crypto.randomUUID(), kind: 'DEPARTMENT', name: 'Computer Science', parentUnitId: null }] } });
+    routes({ [`${base}/units`]: { units: [{ id: crypto.randomUUID(), kind: 'DEPARTMENT', name: 'Computer Science', parentUnitId: null }] },
+      [`${base}/staff-role-assignments`]: { staff: { memberships: [], invitations: [], unavailableActions: [] } } });
     open('institution-admin', 'Dashboard', 'INSTITUTION_ADMIN');
     expect(await screen.findByRole('heading', { name: 'Institution Administration', level: 1 })).toBeInTheDocument();
     expect(screen.queryByText('Placement Dashboard')).not.toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Academic Structure' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Staff' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Academic structure' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Staff' })).toBeInTheDocument();
     await waitFor(() => expect(requested(`${base}/staff-role-assignments`)).toBe(true));
   });
 
@@ -86,8 +87,9 @@ describe('each institution role lands on its own home', () => {
     expect(screen.queryByText('Placement Dashboard')).not.toBeInTheDocument();
     const myStudents = screen.getByRole('heading', { name: 'My Students' }).closest('section')!;
     expect(await within(myStudents).findByText('Meera Local')).toBeInTheDocument();
+    expect(within(myStudents).getByText('2 tasks open')).toBeInTheDocument();
     const tasks = screen.getByRole('heading', { name: 'Assigned Tasks' }).closest('section')!;
-    expect(within(tasks).getByText('2 open')).toBeInTheDocument();
+    expect(within(tasks).getByText('You have not set any tasks yet.')).toBeInTheDocument();
     expect(requested('/campus-drives')).toBe(false);
     expect(requested('/placement-statistics')).toBe(false);
     expect(screen.queryByText(/not available to your role/)).not.toBeInTheDocument();
@@ -100,8 +102,8 @@ describe('each institution role lands on its own home', () => {
     expect(await screen.findByRole('heading', { name: 'Department Dashboard', level: 1 })).toBeInTheDocument();
     expect(screen.queryByText('Placement Dashboard')).not.toBeInTheDocument();
     await waitFor(() => expect(requested(`${base}/department-overview`)).toBe(true));
-    expect(screen.getByRole('heading', { name: 'Your Department' })).toBeInTheDocument();
-    expect(await screen.findByText('4 open')).toBeInTheDocument();
+    expect(within(document.querySelector('.ih-title')! as HTMLElement).getByRole('button', { name: 'Department Overview' })).toBeInTheDocument();
+    expect((await screen.findByText('Open interventions')).parentElement).toHaveTextContent('4Open interventions');
   });
 });
 

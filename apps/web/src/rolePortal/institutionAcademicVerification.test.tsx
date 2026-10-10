@@ -9,7 +9,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RolePortal } from '../rolePortalPages.js';
 import { rolePortals } from '../rolePortalConfig.js';
 import { AcademicResultsUpload, AcademicVerificationPage } from '../academicVerificationPage.js';
-import { InstitutionDashboardV3 } from '../staffDashboardsV3.js';
 
 vi.mock('../auth.js', async (original) => ({ ...await original<typeof import('../auth.js')>(), getAccessToken: () => 'test-access-token' }));
 vi.mock('../api.js', async (original) => ({ ...await original<typeof import('../api.js')>(), getProtectedAccessToken: () => 'test-access-token' }));
@@ -220,21 +219,36 @@ describe('reachable behind existing labels only', () => {
 });
 
 describe('dashboard verification backlog', () => {
+  const home = (key: string, role: string) => {
+    const portal = rolePortals.find((item) => item.key === key)!;
+    window.history.replaceState(null, '', portal.basePath);
+    render(<RolePortal portal={portal} apiHealth="online" authStatus={{ state: 'unconfigured' }} authNotice=""
+      showDevelopmentIndicators={false} onNavigate={vi.fn()} onSignIn={vi.fn()} onSignOut={vi.fn()}
+      authenticatedWorkspace={{ organizationId: institutionId, role }} />);
+  };
+
   it('shows the server-counted backlog and links to where this role reviews it', async () => {
     routes({ [`${base}/academic-verification-summary`]: { summary: { pending: 7, notCurrent: 2 } } });
-    render(<InstitutionDashboardV3 institutionId={institutionId} basePath="/institution/faculty" />);
-    const card = (await screen.findByRole('heading', { name: 'Academic Verification' })).closest('section')!;
-    expect(within(card).getByText('Waiting for a decision').parentElement).toHaveTextContent('Waiting for a decision 7');
-    expect(within(card).getByText(/not on the roster/).parentElement).toHaveTextContent(/2$/);
-    fireEvent.click(within(card).getByRole('button', { name: 'Review Queue' }));
+    home('faculty', 'FACULTY_LECTURER');
+    const card = (await screen.findByRole('heading', { name: 'Academic verification' })).closest('section')!;
+    expect(within(card).getByText(/records are waiting for a decision/).parentElement).toHaveTextContent('7records are waiting for a decision');
+    fireEvent.click(within(card).getByRole('button', { name: /Review queue/ }));
     expect(window.location.pathname).toBe('/institution/faculty/academic-verification');
   });
 
-  it('shows NA, not zero, when the summary cannot be read', async () => {
+  it('is calm when the queue is empty, and is left out (never NA or a made-up zero) when the summary cannot be read', async () => {
+    routes({ [`${base}/academic-verification-summary`]: { summary: { pending: 0, notCurrent: 0 } } });
+    home('institution-admin', 'INSTITUTION_ADMIN');
+    const card = (await screen.findByRole('heading', { name: 'Academic verification' })).closest('section')!;
+    expect(within(card).getByText('All clear')).toBeInTheDocument();
+    cleanup();
+    fetchMock.mockReset();
     routes({ [`${base}/academic-verification-summary`]: new Error('down') });
-    render(<InstitutionDashboardV3 institutionId={institutionId} basePath="/institution/placement-officer" />);
-    const card = (await screen.findByRole('heading', { name: 'Academic Verification' })).closest('section')!;
-    expect(within(card).getByText('Waiting for a decision').parentElement).toHaveTextContent('Waiting for a decision NA');
-    expect(within(card).queryByRole('button')).not.toBeInTheDocument();
+    home('institution-admin', 'INSTITUTION_ADMIN');
+    await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/academic-verification-summary'))).toBe(true));
+    await waitFor(() => expect(screen.queryByText('Loading your institution…')).not.toBeInTheDocument());
+    expect(screen.queryByRole('heading', { name: 'Academic verification' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Awaiting verification')).not.toBeInTheDocument();
+    expect(screen.queryByText(/NA/)).not.toBeInTheDocument();
   });
 });

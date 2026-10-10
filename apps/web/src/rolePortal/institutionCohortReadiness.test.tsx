@@ -108,12 +108,13 @@ describe('Cohort readiness by career role', () => {
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes(`careerRoleId=${roleId}`))).toBe(true);
   });
 
-  it('says NA plainly for a role with no essential requirements, and shows a safe error with a reference', async () => {
+  it('says plainly when a role has no essential requirements, and shows a safe error with a reference', async () => {
     route({ view: { ...view, role: { ...view.role, id: emptyRoleId, title: 'Game Tester' }, requirements: [], requirementCounts: { essential: 0, other: 0 } } });
     render(<CohortReadinessByRoleSection institutionId={institutionId} />);
     await chooseRole(`role:${emptyRoleId}`);
     expect(await screen.findByText('No essential requirements published')).toBeInTheDocument();
-    expect(screen.getByText(/nothing to measure: NA/)).toBeInTheDocument();
+    expect(screen.getByText(/nothing to measure yet\./)).toBeInTheDocument();
+    expect(screen.queryByText(/\bNA\b/)).not.toBeInTheDocument();
     cleanup();
     route({ viewError: refused('REPORT_PERIOD_INVALID', 400) });
     render(<CohortReadinessByRoleSection institutionId={institutionId} />);
@@ -165,11 +166,12 @@ describe('Cohort readiness by career role', () => {
     expect(posted).toEqual([{ url: expect.stringContaining(`/preparation-sprints/${sprintId}/cancel`), body: { reasonCode: 'REPLACED' } }]);
   });
 
-  it('shows NA for a sprint on its first day and an empty state with no sprints', async () => {
+  it('says a first-day sprint has figures from tomorrow, and an empty state with no sprints', async () => {
     route({ sprints: { ...sprints, sprints: [{ ...sprints.sprints[0], progress: { cutoff: null, available: false, requirementLive: true, reached: { suppressed: true, count: null }, cells: [], workDone: { suppressed: true, count: null } } }] } });
     render(<CohortReadinessByRoleSection institutionId={institutionId} />);
     const row = (await screen.findByText('SOC Analyst · Log triage')).closest('tr')!;
-    expect(within(row).getAllByText('NA')).toHaveLength(5);
+    expect(within(row).getAllByText('From tomorrow')).toHaveLength(5);
+    expect(within(row).queryByText('NA')).not.toBeInTheDocument();
     expect(screen.getByText(/first figures appear the day after it starts/)).toBeInTheDocument();
     cleanup();
     route({ sprints: { ...sprints, sprints: [] } });

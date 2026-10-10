@@ -46,9 +46,9 @@ import { DriveNominationsPanel } from './institutionNominations.js';
 import { formatDateTime } from '../dates.js';
 
 function formatWhen(value: string | null | undefined): string {
-  if (!value) return 'NA';
+  if (!value) return 'Not set';
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? 'NA' : formatDateTime(date);
+  return Number.isNaN(date.getTime()) ? 'Not set' : formatDateTime(date);
 }
 function localToIso(value: FormDataEntryValue | null): string | undefined {
   if (typeof value !== 'string' || !value) return undefined;
@@ -183,7 +183,7 @@ export function CampusDriveApprovalsSection({ institutionId }: { readonly instit
                   onChanged={(message, failed) => { if (failed) { setError(message); } else { setNotice(message); setReload((value) => value + 1); } }} /></td>
                 <td>{formatWhen(drive.proposedStartAt)}{drive.venueMode ? ` · ${venueModeLabels[drive.venueMode]}` : ''}</td>
                 <td>{formatWhen(drive.scheduledStartAt)}</td>
-                <td>{drive.employerNote ?? 'NA'}</td>
+                <td>{drive.employerNote ?? 'None'}</td>
                 <td><div className="hiring-actions">
                   {drive.availableActions.filter((action): action is CollegeAction => action !== 'RESUBMIT').map((action) => <button key={action} type="button"
                     className={action === 'APPROVE' ? undefined : 'secondary'} disabled={busy} onClick={() => { setActing({ drive, action }); setError(''); }}>{actionLabels[action]}</button>)}

@@ -10,11 +10,12 @@
  * .sc-hatch, .sc-legend).
  */
 import React from 'react';
-import { isSmallCount, smallCountText, SMALL_COUNT_TEXT, type SuppressibleCount } from './smallCountRule.js';
+import { isSmallCount, rangeCountText, smallCountText, SMALL_COUNT_TEXT, type SuppressibleCount } from './smallCountRule.js';
 
-export { isSmallCount, isSmallCountText, shownCount, smallCountText, SMALL_COUNT_TEXT, SMALL_COUNT_THRESHOLD, type SuppressibleCount } from './smallCountRule.js';
+export { isSmallCount, isSmallCountText, partitionNeedsRanges, rangeCountText, shownCount, smallCountText, SMALL_COUNT_TEXT, SMALL_COUNT_THRESHOLD, type SuppressibleCount } from './smallCountRule.js';
 
 const SMALL_COUNT_TITLE = 'Fewer than 5 — withheld so no one can be singled out';
+const RANGE_TITLE = 'Shown as a range so a smaller group cannot be worked out from the total';
 
 export interface SmallCountProps extends Omit<React.HTMLAttributes<HTMLSpanElement>, 'children' | 'title'> {
   readonly value: SuppressibleCount;
@@ -26,10 +27,16 @@ export interface SmallCountProps extends Omit<React.HTMLAttributes<HTMLSpanEleme
   readonly variant?: 'text' | 'chart';
   /** Formats a shown count (defaults to String). */
   readonly format?: (value: number) => string;
+  /**
+   * Draw a count of five or more as a five-wide range ("5–9") — where an exact figure next to a
+   * visible total would let a hidden "<5" group be worked out (see partitionNeedsRanges).
+   */
+  readonly range?: boolean;
 }
 
-export function SmallCount({ value, variant = 'text', format, className, ...rest }: SmallCountProps): React.ReactElement {
+export function SmallCount({ value, variant = 'text', format, range = false, className, ...rest }: SmallCountProps): React.ReactElement {
   const extra = className ? ` ${className}` : '';
+  if (range && !isSmallCount(value)) return <span {...rest} className={`small-count is-range${extra}`} title={RANGE_TITLE} data-range="true">{rangeCountText(value)}</span>;
   if (!isSmallCount(value)) return <span {...rest} className={`small-count${extra}`}>{smallCountText(value, format)}</span>;
   if (variant === 'chart') {
     return <span {...rest} className={`small-count is-suppressed sc-chart${extra}`} title={SMALL_COUNT_TITLE} data-suppressed="true">

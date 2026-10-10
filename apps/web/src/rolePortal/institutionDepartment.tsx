@@ -24,12 +24,10 @@ import {
   listInstitutionExamResults,
   listInstitutionExams,
   listPlacementApplications,
-  studentActivationLabels,
   suppressedCountLabel,
 } from '../api.js';
 import type {
   ClassReportsDto,
-  DepartmentOverviewDto,
   DepartmentStaffDto,
   InstitutionExamDto,
   PlacementApplicationDto,
@@ -47,16 +45,14 @@ import { InstitutionWorkspaceError, RestrictedApiState, formatApiError, isInstit
 import type { AuthenticatedWorkspaceSummary } from './shared.js';
 import { supportCodeSuffix } from '../supportCode.js';
 import { NaValue, PilotKpi } from '../naState.js';
-import { SuppressedBlock, SuppressedLegend, SMALL_COUNT_TEXT, isSmallCountText } from '../momentum/smallCount.js';
+import { SmallCount, SuppressedBlock, SuppressedLegend, SMALL_COUNT_TEXT, isSmallCountText, partitionNeedsRanges } from '../momentum/smallCount.js';
+import { BandClimb } from '../momentum/bandClimb.js';
+import {
+  ActivationCard, BatchTable, CohortBandsCard, IhCard, IhKpis, IhNote, IhPage, IhRows, IhTiles, PeopleCount, RecordCount, VerificationBlock, validOverview,
+} from './institutionMomentum.js';
 
 type WorkspaceProps = { readonly authenticatedWorkspace?: AuthenticatedWorkspaceSummary | undefined };
 
-const readinessBandLabels: Readonly<Record<string, string>> = {
-  NOT_ENOUGH_EVIDENCE: 'Not enough evidence',
-  DEVELOPING: 'Developing',
-  PROGRESSING: 'Progressing',
-  READY_FOR_NEXT_STEP: 'Ready for next step',
-};
 
 export const applicationStageLabels: Readonly<Record<string, string>> = {
   APPLIED: 'Applied', SCREENING: 'Screening', SHORTLISTED: 'Shortlisted', ASSESSMENT: 'Assessment', INTERVIEW: 'Interview',
@@ -131,83 +127,66 @@ export function SuppressedFunnel({ table, labels }: { readonly table: Suppressed
 }
 
 function ReadinessBands({ month, aggregate }: { readonly month: string | null; readonly aggregate: ReadinessAggregateDto | null }): React.ReactElement {
-  if (!aggregate || !month) return <p style={{ color: 'var(--p-muted)', margin: '4px 0' }}>Readiness bands: NA.</p>;
-  if (aggregate.suppressed) {
-    return <p style={{ color: 'var(--p-muted)', margin: '4px 0' }}>Withheld for {month}: fewer than {aggregate.minimumCohortSize} students have readiness records, so no band can be shown without singling someone out.</p>;
-  }
-  return <div className="pilot-legend">
-    {Object.keys(readinessBandLabels).map((band) => {
-      const entry = aggregate.bands.find((item) => item.band === band);
-      return <div key={band}><i style={{ background: `var(--band-${Object.keys(readinessBandLabels).indexOf(band) + 1})` }} /> {readinessBandLabels[band]} <span className="num"><NaValue value={entry ? suppressedCountLabel(entry) : SMALL_COUNT_TEXT} /></span></div>;
-    })}
-    <div><i /> Students with readiness records <span className="num">{aggregate.cohortSizeSuppressed || aggregate.cohortSize === null ? 'withheld' : aggregate.cohortSize}</span></div>
-  </div>;
+  if (!aggregate || !month) return <p style={{ color: 'var(--p-muted)', margin: '4px 0' }}>No month with band records has ended yet, so there is no distribution to show.</p>;
+  return <BandClimb aggregate={aggregate} month={month} />;
 }
 
 // --- Department Overview ---------------------------------------------------------
 
+/**
+ * The department overview in the approved Momentum composition (re-skin phase 6): the scope's
+ * headline figures, its band distribution, the shared-application pipeline, activation and
+ * batches. Each block renders only when its read succeeded; counts of people go through
+ * <SmallCount>, and parts sitting beside a visible total become ranges where a small group could
+ * otherwise be worked out.
+ */
 export function DepartmentOverviewPage({ authenticatedWorkspace, basePath }: WorkspaceProps & { readonly basePath: string }): React.ReactElement {
   const overview = useWorkspaceResource(authenticatedWorkspace, getDepartmentOverview, 'Unable to load the department overview.');
   const pipeline = useWorkspaceResource(authenticatedWorkspace, (token, id, signal) => getPlacementPipeline(token, id, signal).catch(() => null), '');
-  const verification = useWorkspaceResource(authenticatedWorkspace, (token, id, signal) => getVerificationSummary(token, id, signal).then((result) => result.summary ?? null).catch(() => null), '');
+  const verification = useWorkspaceResource(authenticatedWorkspace, (token, id, signal) => getVerificationSummary(token, id, signal).then((result) => result?.summary ?? null).catch(() => null), '');
   const guard = workspaceGuard('Department Overview', authenticatedWorkspace);
   if (guard) return guard;
-  const data = overview.data;
-  return <div className="pilot pilot-embed"><div className="pilot-page">
-    <div className="pilot-content">
-      <PageHead title="Department Overview" summary="Your department's students, activation, assessments, readiness and open work — counted by the server for your scope." scopeLabel={institutionStudentScopeLabel(data?.scope)} />
-      {overview.error ? <p className="form-error" role="alert">{overview.error}</p> : null}
-      {!data && !overview.error ? <p role="status">Loading the department overview…</p> : null}
-      <Kpis items={[
-        ['Students on roster', data ? String(data.students.onRoster) : 'NA', 'blue', 'students'],
-        ['Currently enrolled', data ? String(data.students.current) : 'NA', 'teal', 'students'],
-        ['Assessments in progress', data ? String(data.assessments.inProgress) : 'NA', 'indigo', 'assessments'],
-        ['Open interventions', data ? String(data.staffActions.openInterventions) : 'NA', 'rose', 'warning'],
-        ['Open tasks', data ? String(data.staffActions.openTasks) : 'NA', 'green', 'tasks'],
-      ]} />
-      <div className="pilot-row cols-2">
-        <section className="pilot-card">
-          <div className="pilot-card-head"><h2>Cohort Readiness</h2><small style={{ color: 'var(--p-muted)' }}>{data?.readiness.month ? `Month ${data.readiness.month}` : 'NA'}</small></div>
-          <ReadinessBands month={data?.readiness.month ?? null} aggregate={data?.readiness.aggregate ?? null} />
-        </section>
-        <section className="pilot-card">
-          <div className="pilot-card-head"><h2>Placement Pipeline</h2><button type="button" className="pilot-link" onClick={() => go(`${basePath}/placement-pipeline`)}>Open pipeline</button></div>
-          <SuppressedFunnel table={pipeline.data?.stages ?? null} labels={{ APPLIED: 'Applied', SHORTLISTED: 'Shortlisted', INTERVIEW: 'Interview', OFFER: 'Offer', HIRED: 'Hired' }} />
-          <small style={{ color: 'var(--p-muted)' }}>Applications students have shared with the college. Fewer than five reads &lt;5.</small>
-        </section>
+  const data = validOverview(overview.data);
+  const readiness = data?.readiness.aggregate && data.readiness.month ? data.readiness : null;
+  const stages = pipeline.data && pipeline.data.stages && Array.isArray(pipeline.data.stages.cells) ? pipeline.data.stages : null;
+  const currentRanged = data ? partitionNeedsRanges([data.students.current, data.students.onRoster - data.students.current]) : false;
+  const assessedRanged = data ? partitionNeedsRanges([data.assessments.completedStudents, data.assessments.assignedStudents - data.assessments.completedStudents]) : false;
+  return <IhPage eyebrow={institutionStudentScopeLabel(data?.scope) ?? null} title="Department Overview"
+    summary="Your department's students, activation, assessments, readiness and open work, counted by the server for your scope.">
+    {overview.error ? <p className="form-error" role="alert">{overview.error}</p> : null}
+    {!data && !overview.error ? <p role="status" className="ih-empty">Loading the department overview…</p> : null}
+    {data ? <IhKpis items={[
+      { key: 'roster', icon: 'students', value: <PeopleCount value={data.students.onRoster} />, label: 'Students on roster', note: data.batches.length ? `${data.batches.length} ${data.batches.length === 1 ? 'batch' : 'batches'}` : null },
+      { key: 'current', icon: 'students', value: <PeopleCount value={data.students.current} range={currentRanged} />, label: 'Enrolled now', note: 'Current relationship' },
+      { key: 'assessments', icon: 'assessments', value: <RecordCount value={data.assessments.inProgress} />, label: 'Assessments in progress' },
+      { key: 'interventions', icon: 'interventions', value: <RecordCount value={data.staffActions.openInterventions} />, label: 'Open interventions' },
+      { key: 'tasks', icon: 'tasks', value: <RecordCount value={data.staffActions.openTasks} />, label: 'Open tasks' },
+    ]} /> : null}
+    {data ? <div className="ih-grid">
+      {readiness ? <div className="ih-c8"><CohortBandsCard title="Cohort readiness" aggregate={readiness.aggregate!} month={readiness.month}
+        link={{ label: 'Readiness', onClick: () => go(`${basePath}/readiness`) }} /></div> : null}
+      <div className={`${readiness ? 'ih-c4' : 'ih-c12'} ih-col`}>
+        {verification.data ? <IhCard title="Academic verification" link={{ label: 'Review queue', onClick: () => go(`${basePath}/students`) }}>
+          <VerificationBlock pending={verification.data.pending} />
+        </IhCard> : null}
+        <IhCard title="Assessments">
+          <IhRows rows={[
+            ['Students with an assessment open', <SmallCount key="assigned" value={data.assessments.assignedStudents} />],
+            ['Of them, completed', <SmallCount key="completed" value={data.assessments.completedStudents} range={assessedRanged} />],
+          ]} />
+        </IhCard>
       </div>
-      <section className="pilot-card">
-        <div className="pilot-card-head"><h2>Student Activation</h2><button type="button" className="pilot-link" onClick={() => go(`${basePath}/students`)}>View Students</button></div>
-        <div className="pilot-legend">
-          {(['ACTIVATED', 'INVITED', 'EXPIRED', 'BOUNCED', 'NOT_INVITED'] as const).map((state) => (
-            <div key={state}><i /> {studentActivationLabels[state]} <span className="num">{data ? data.activation[state] : 'NA'}</span></div>
-          ))}
-        </div>
-      </section>
-      <section className="pilot-card">
-        <div className="pilot-card-head"><h2>Batches</h2><button type="button" className="pilot-link" onClick={() => go(`${basePath}/batches`)}>View Batches</button></div>
-        <div className="pilot-list">
-          {data && data.batches.length ? data.batches.slice(0, 6).map((batch) => (
-            <div key={batch.id} className="pilot-list-row">
-              <span className="pilot-tile blue"><Icon name="batches" size={16} /></span>
-              <div className="grow"><strong>{batch.name}</strong><small>{batch.parentName ?? 'NA'}</small></div>
-              <span className="pilot-chip slate">{batch.current} enrolled · {batch.activated} activated</span>
-            </div>
-          )) : <p style={{ color: 'var(--p-muted)', margin: '8px 0' }}>{data ? 'No batches are set up in your department yet.' : 'NA'}</p>}
-        </div>
-      </section>
-    </div>
-    <aside className="pilot-rail">
-      <section className="pilot-card">
-        <div className="pilot-card-head"><h2>Assessments</h2></div>
-        <div className="pilot-legend">
-          <div><i /> Students with an assessment open <span className="num">{data ? data.assessments.assignedStudents : 'NA'}</span></div>
-          <div><i /> Of them, completed <span className="num">{data ? data.assessments.completedStudents : 'NA'}</span></div>
-        </div>
-      </section>
-      <VerificationCard summary={verification.data} onOpen={() => go(`${basePath}/students`)} />
-    </aside>
-  </div></div>;
+      {stages ? <div className="ih-c8"><IhCard title="Placement pipeline" aside="From shared applications" link={{ label: 'Open pipeline', onClick: () => go(`${basePath}/placement-pipeline`) }}>
+        {stages.suppressed ? <p className="ih-empty">Fewer than five applications have been shared in your scope, so the stages are withheld.</p>
+          : <IhTiles columns={5} tiles={([['APPLIED', 'Applied'], ['SHORTLISTED', 'Shortlisted'], ['INTERVIEW', 'Interview'], ['OFFER', 'Offer'], ['HIRED', 'Hired']] as const)
+            .map(([key, label]) => ({ key, label, value: <SmallCount value={stages.cells.find((cell) => cell.key === key) ?? null} /> }))} />}
+        <IhNote>Applications students have shared with the college. Fewer than five reads “&lt;5”.</IhNote>
+      </IhCard></div> : null}
+      <div className={stages ? 'ih-c4' : 'ih-c12'}><ActivationCard activation={data.activation} onOpen={() => go(`${basePath}/students`)} /></div>
+      {data.batches.length ? <div className="ih-c12"><BatchTable overview={data} linkLabel="View Batches" onOpen={() => go(`${basePath}/batches`)} /></div>
+        : <div className="ih-c12"><IhCard title="Cohort by batch"><p className="ih-empty">No batches are set up in your department yet.</p></IhCard></div>}
+    </div> : null}
+  </IhPage>;
 }
 
 export function VerificationCard({ summary, onOpen }: { readonly summary: VerificationSummaryDto | null; readonly onOpen: () => void }): React.ReactElement {

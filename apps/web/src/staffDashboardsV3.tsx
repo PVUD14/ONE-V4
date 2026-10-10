@@ -1,35 +1,21 @@
 import { useEffect, useState } from 'react';
 import { Icon } from './icons/Icon.js';
-import { MultiRing, Spark } from './pilot/pilotComponents.js';
-import { NaSlotStrip, NaValue, PilotKpi, SuppressedChart, allMissing } from './naState.js';
+import { MultiRing } from './pilot/pilotComponents.js';
+import { NaSlotStrip, NaValue, allMissing } from './naState.js';
 import { StatusTag } from './momentum/statusTag.js';
-import { SuppressedBlock, SuppressedLegend, SMALL_COUNT_TEXT, isSmallCountText, smallCountText } from './momentum/smallCount.js';
+import { SuppressedBlock, SuppressedLegend, isSmallCountText } from './momentum/smallCount.js';
 import {
   getProtectedAccessToken,
   getSecurityContext,
-  getVerificationSummary,
   listEmployerApplicants,
   listEmployerOpportunities,
-  listInstitutionExamResults,
-  listInstitutionExams,
-  listInstitutionStudents,
-  listInstitutionUnits,
   type EmployerApplicantDto,
   type EmployerOpportunityDto,
-  type ExamNotAttemptedDto,
-  type InstitutionExamDto,
-  type InstitutionStudentDto,
-  type InstitutionUnitDto,
-  type StudentActivationState,
-  type VerificationSummaryDto,
-  studentActivationLabels,
 } from './api.js';
-import { campusDriveStateLabels, listEmployerCampusDrives, listInstitutionCampusDrives, type CampusDriveDto } from './api/campusDrives.js';
-import { getPlacementStatistics, type PlacementStatisticsDto } from './api/placementRegister.js';
-import type { SuppressedCountDto } from './api/privacyOperations.js';
+import { campusDriveStateLabels, listEmployerCampusDrives, type CampusDriveDto } from './api/campusDrives.js';
 import { getEmployerSummary, listEmployerInterviews, type EmployerInterviewDto, type EmployerSummaryDto } from './api/hiring.js';
-import { formatDate, formatMonth } from './dates.js';
 import { codeLabel } from './labels.js';
+import { PlacementOfficerHome } from './rolePortal/placementOfficerHome.js';
 
 /**
  * Pilot-exact staff dashboards. Same rule as the student V3: the pilot's
@@ -68,199 +54,14 @@ function Funnel({ rows, label, naReason = 'Placement figures are not available t
   </div>;
 }
 
-/** The one-line reason under a missing KPI: withheld for size, or no source for this role. */
-function kpiReason(value: string): string {
-  return value.startsWith('<') ? 'Too few to show' : 'Not for your role';
-}
-
-/** INST-12: a suppressed count for the funnel: the bar only when published, <5 when withheld, NA without a source. */
-function funnelRow(label: string, count: SuppressedCountDto | null | undefined): { readonly label: string; readonly value: number | null; readonly display: string } {
-  if (!count) return { label, value: null, display: 'NA' };
-  return count.suppressed ? { label, value: null, display: SMALL_COUNT_TEXT } : { label, value: count.value, display: smallCountText(count) };
-}
-
 // --- Institution -------------------------------------------------------------
 
-function countLabel(count: SuppressedCountDto | null | undefined): string {
-  if (!count) return 'NA';
-  return smallCountText(count);
-}
-
-/** Where each institution portal reaches the verification queue (existing labels only). */
-function verificationPath(basePath: string): string | null {
-  if (basePath.endsWith('/faculty')) return `${basePath}/academic-verification`;
-  if (basePath.endsWith('/admin') || basePath.endsWith('/department-head')) return `${basePath}/students`;
-  return null;
-}
-
-interface InstitutionV3Data {
-  readonly students: readonly InstitutionStudentDto[] | null;
-  /** Server-computed over the same roster the Students page lists, so the two always agree. */
-  readonly activation: Readonly<Record<StudentActivationState, number>> | null;
-  readonly exams: readonly InstitutionExamDto[] | null;
-  readonly units: readonly InstitutionUnitDto[] | null;
-  readonly notAttempted: readonly (ExamNotAttemptedDto & { readonly examTitle: string; readonly endsAt: string })[];
-  /** INST-04 verification backlog, counted server-side over the reader's scope; null reads NA. */
-  readonly verification: VerificationSummaryDto | null;
-  /** EMP-11: confirmed drives ahead and requests awaiting a decision; null (NA) when this role cannot read drives. */
-  readonly drives: { readonly upcoming: readonly CampusDriveDto[]; readonly waiting: number } | null;
-  /** INST-12: season statistics as of the last month end; null (NA) when this role cannot read them. */
-  readonly placement: PlacementStatisticsDto | null;
-}
-
-/** EMP-11: the college's scheduled drives still ahead, soonest first, and how many requests wait. */
-async function loadCollegeDrives(token: string, institutionId: string, signal: AbortSignal): Promise<InstitutionV3Data['drives']> {
-  const [scheduled, requested] = await Promise.all([
-    listInstitutionCampusDrives(token, institutionId, { state: 'SCHEDULED' }, signal),
-    listInstitutionCampusDrives(token, institutionId, { state: 'REQUESTED' }, signal),
-  ]);
-  const now = Date.now();
-  return {
-    upcoming: (scheduled.drives ?? []).filter((drive) => drive.scheduledStartAt && Date.parse(drive.scheduledStartAt) >= now)
-      .sort((a, b) => Date.parse(a.scheduledStartAt ?? '') - Date.parse(b.scheduledStartAt ?? '')),
-    waiting: (requested.drives ?? []).length,
-  };
-}
-
+/**
+ * The placement officer's Placement Dashboard. Re-skin phase 6 moved it to the approved Momentum
+ * composition in rolePortal/placementOfficerHome.tsx; this name stays so existing callers do not change.
+ */
 export function InstitutionDashboardV3({ institutionId, basePath }: { readonly institutionId: string; readonly basePath: string }): React.ReactElement {
-  const token = getProtectedAccessToken();
-  const [data, setData] = useState<InstitutionV3Data | null>(null);
-  useEffect(() => {
-    if (!token) return undefined;
-    const controller = new AbortController();
-    void Promise.all([
-      listInstitutionStudents(token, institutionId, controller.signal).catch(() => null),
-      listInstitutionExams(token, institutionId, controller.signal).then((response) => response.assessments).catch(() => null),
-      listInstitutionUnits(token, institutionId, controller.signal).then((response) => response.units).catch(() => null),
-      getVerificationSummary(token, institutionId, controller.signal).then((response) => response.summary ?? null).catch(() => null),
-      loadCollegeDrives(token, institutionId, controller.signal).catch(() => null),
-      getPlacementStatistics(token, institutionId, controller.signal).then((response) => (response && response.overall ? response : null)).catch(() => null),
-    ]).then(async ([roster, exams, units, verification, drives, placement]) => {
-      const students = roster?.students ?? null;
-      const activation = roster?.activationSummary ?? null;
-      const target = exams?.find((exam) => exam.lifecycleState === 'PUBLISHED' && exam.assignedCount > 0) ?? null;
-      const notAttempted = target
-        ? await listInstitutionExamResults(token, institutionId, target.id).then((response) =>
-            response.notAttempted.map((entry) => ({ ...entry, examTitle: target.title, endsAt: target.endsAt }))).catch(() => [])
-        : [];
-      setData({ students, activation, exams, units, notAttempted, verification, drives, placement });
-    });
-    return () => controller.abort();
-  }, [token, institutionId]);
-
-  if (!data) return <section className="pilot-card"><h2>Placement Dashboard</h2><p style={{ color: 'var(--p-muted)' }}>Loading…</p></section>;
-
-  const activeStudents = (data.students ?? []).filter((student) => (student.relationship?.state ?? student.status) === 'ACTIVE').length;
-  const departments = (data.units ?? []).filter((unit) => unit.kind === 'DEPARTMENT');
-
-  return <div className="pilot pilot-embed"><div className="pilot-page">
-    <div className="pilot-content">
-      <div className="pilot-page-head">
-        <div className="pilot-greeting">
-          <h1>Placement Dashboard</h1>
-          <p>Cohort readiness, placement activity and the students who need you this week.</p>
-        </div>
-        <button type="button" className="pilot-btn ghost" onClick={() => go(`${basePath}/assessments`)}><Icon name="download" size={16} /> Export Report</button>
-      </div>
-
-      <div className="pilot-row cols-5">
-        {([
-          ['Active Students', String(activeStudents), 'blue', 'students'],
-          ['Placement Eligible', data.placement ? countLabel(data.placement.overall.eligible) : 'NA', 'indigo', 'placement'],
-          ['Students With Offers', data.placement ? countLabel(data.placement.overall.withOffer) : 'NA', 'green', 'offers'],
-          ['Students Placed', data.placement ? countLabel(data.placement.overall.placed) : 'NA', 'teal', 'placement'],
-          ['Need Intervention', String(data.notAttempted.length), 'rose', 'warning'],
-        ] as const).map(([label, value, tone, glyph]) => (
-          <PilotKpi key={label} icon={<Icon name={glyph} size={16} />} tone={tone} value={value} label={label} reason={kpiReason(value)} />
-        ))}
-      </div>
-
-      <div className="pilot-row cols-2">
-        <section className="pilot-card">
-          <div className="pilot-card-head"><h2>Cohort Readiness</h2><small style={{ color: 'var(--p-muted)' }}>{activeStudents} on roster</small></div>
-          {/* Readiness is an advisory band per student, never an average: each band's count is a slot. */}
-          <NaSlotStrip card={false} label="Cohort readiness bands" slots={['Job Ready', 'Nearly Ready', 'Developing', 'Needs Support'].map((label) => ({ label }))}
-            reason="Cohort band counts are not published yet — NA." />
-        </section>
-        <section className="pilot-card">
-          <div className="pilot-card-head"><h2>Placement Pipeline</h2><small style={{ color: 'var(--p-muted)' }}>{data.placement ? `As of ${formatDate(data.placement.asOf.lastDay)}` : 'NA'}</small></div>
-          <Funnel label="Placement pipeline stages" rows={[
-            funnelRow('Eligible', data.placement?.overall.eligible), funnelRow('Applied', data.placement?.overall.applied),
-            funnelRow('Shortlisted', data.placement?.overall.shortlisted), funnelRow('Offers', data.placement?.overall.withOffer), funnelRow('Placed', data.placement?.overall.placed),
-          ]} />
-          <small style={{ color: 'var(--p-muted)' }}>From applications students shared with the college. A student who shared nothing is not counted as unplaced.</small>
-        </section>
-      </div>
-
-      <section className="pilot-card">
-        <div className="pilot-card-head"><h2>Student Activation</h2><button type="button" className="pilot-link" onClick={() => go(`${basePath}/students`)}>View Students</button></div>
-        <div className="pilot-legend">
-          {(['ACTIVATED', 'INVITED', 'EXPIRED', 'BOUNCED', 'NOT_INVITED'] as const).map((state) => (
-            <div key={state}><i /> {studentActivationLabels[state]} <span className="num">{data.activation ? data.activation[state] : 'NA'}</span></div>
-          ))}
-        </div>
-      </section>
-
-      <section className="pilot-card">
-        <div className="pilot-card-head"><h2>Academic Verification</h2>{verificationPath(basePath)
-          ? <button type="button" className="pilot-link" onClick={() => go(verificationPath(basePath)!)}>Review Queue</button> : null}</div>
-        <div className="pilot-legend">
-          <div><i /> Waiting for a decision <span className="num">{data.verification ? data.verification.pending : 'NA'}</span></div>
-          <div><i /> From former students or people not on the roster <span className="num">{data.verification ? data.verification.notCurrent : 'NA'}</span></div>
-        </div>
-      </section>
-
-      <section className="pilot-card">
-        <div className="pilot-card-head"><h2>Students Needing Attention</h2><button type="button" className="pilot-link" onClick={() => go(`${basePath}/assessments`)}>View All</button></div>
-        <div className="pilot-list">
-          {data.notAttempted.length ? data.notAttempted.slice(0, 5).map((entry) => (
-            <div key={entry.institutionStudentId} className="pilot-list-row">
-              <span className="pilot-tile rose"><Icon name="warning" size={16} /></span>
-              <div className="grow"><strong>{entry.studentName}</strong><small>{entry.inProgress ? `In progress now: ${entry.examTitle}` : `Has not attempted: ${entry.examTitle}`}</small></div>
-              <span className="pilot-chip amber">Due {formatDate(entry.endsAt)}</span>
-              <button type="button" className="pilot-btn ghost small" onClick={() => go(`${basePath}/assessments`)}>Review</button>
-            </div>
-          )) : <p style={{ color: 'var(--p-muted)', margin: '8px 0' }}>Nobody needs attention right now — every assigned assessment is attempted.</p>}
-        </div>
-      </section>
-    </div>
-
-    <aside className="pilot-rail">
-      <section className="pilot-card">
-        <div className="pilot-card-head"><h2>Offers Trend</h2><span className="pilot-chip slate">{data.placement ? 'Last 6 months' : 'NA'}</span></div>
-        {/* A month under 5 has no number to plot; drawing it as 0 would be a false line, so the
-            line is drawn only when every month is shown, and the frame says why otherwise. */}
-        <SuppressedChart label="Offers Trend" height={96}
-          points={(data.placement?.offersByMonth ?? []).map((entry) => (entry.offers.suppressed ? null : entry.offers.value))}
-          note={!data.placement ? 'Offer figures are not available to your role — NA.'
-            : data.placement.offersByMonth.length ? 'Not enough data yet — the line is drawn once every month has 5 or more offers.' : 'No offer months recorded yet — NA.'}>
-          <Spark points={(data.placement?.offersByMonth ?? []).map((entry) => entry.offers.value ?? 0)} tone="green" />
-        </SuppressedChart>
-        {data.placement && data.placement.offersByMonth.length ? (allMissing(data.placement.offersByMonth.map((entry) => countLabel(entry.offers)))
-          ? <NaSlotStrip card={false} label="Offers by month" slots={data.placement.offersByMonth.map((entry) => ({ label: formatMonth(entry.month), value: countLabel(entry.offers) }))}
-            reason="Every month had fewer than 5 offers." />
-          : <div className="pilot-legend">{data.placement.offersByMonth.map((entry) => (
-            <div key={entry.month}><i /> {formatMonth(entry.month)} <span className="num"><NaValue value={countLabel(entry.offers)} /></span></div>))}</div>) : null}
-      </section>
-      <section className="pilot-card">
-        <div className="pilot-card-head"><h2>Upcoming Drives</h2>{data.drives
-          ? <span className={`pilot-chip ${data.drives.waiting ? 'amber' : 'slate'}`}>{data.drives.waiting} awaiting decision</span>
-          : <span className="pilot-chip slate">NA</span>}</div>
-        {!data.drives ? <p style={{ color: 'var(--p-muted)', margin: '4px 0' }}>Campus drives are not available to your role — NA.</p>
-          : data.drives.upcoming.length ? <div className="pilot-list">{data.drives.upcoming.slice(0, 4).map((drive) => (
-            <div key={drive.id} className="pilot-list-row">
-              <span className="pilot-tile blue"><Icon name="company" size={16} /></span>
-              <div className="grow"><strong>{drive.employerName}</strong><small>{drive.opportunityTitle ?? 'Untitled'} · {formatDate(drive.scheduledStartAt ?? '')}</small></div>
-            </div>))}</div>
-            : <p style={{ color: 'var(--p-muted)', margin: '4px 0' }}>No drive is scheduled yet.</p>}
-      </section>
-      <section className="pilot-card">
-        <h2>Department Readiness</h2>
-        {departments.length ? <NaSlotStrip card={false} label="Department readiness" slots={departments.slice(0, 5).map((department) => ({ label: department.name }))}
-          reason="Department readiness bands are not published yet — NA." /> : <p style={{ color: 'var(--p-muted)', margin: '4px 0' }}>No departments defined yet.</p>}
-      </section>
-    </aside>
-  </div></div>;
+  return <PlacementOfficerHome institutionId={institutionId} basePath={basePath} />;
 }
 
 // --- Employer ----------------------------------------------------------------

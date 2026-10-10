@@ -21,6 +21,7 @@ import './styles/icon-motion.css';
 import './styles/components.css';
 // The Momentum student home (hero, next climb, streak, card rows); scoped under .sh.
 import './styles/student-home.css';
+import './styles/institution-home.css';
 import { applyStoredTheme } from './themePreference.js';
 
 // A theme chosen with the top-bar toggle is applied before the first paint; otherwise the OS decides.

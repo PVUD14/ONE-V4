@@ -8,7 +8,7 @@
  *
  * Rules on this screen: readiness is shown as bands of a requirement, never a number; every count of people comes
  * from the server already suppressed ("<5"); no student is named; the scope comes from the server and nothing is
- * filtered here for security; missing data reads NA. A sprint is a set of work students see on Learning — it never
+ * filtered here for security; missing data is said in words. A sprint is a set of work students see on Learning — it never
  * changes their results or readiness.
  */
 import { useEffect, useState } from 'react';
@@ -36,6 +36,7 @@ import { V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { NaValue } from '../naState.js';
 import { SMALL_COUNT_TEXT } from '../momentum/smallCountRule.js';
 import { formatApiError } from './shared.js';
+import { codeLabel } from '../labels.js';
 import { supportCodeSuffix } from '../supportCode.js';
 import { formatDate } from '../dates.js';
 
@@ -76,7 +77,8 @@ function sprintError(error: unknown, fallback: string): string {
 const day = (value: string): string => formatDate(value);
 const cellLabel = (cells: readonly CountCellDto[], key: string): string => {
   const cell = cells.find((entry) => entry.key === key);
-  return cell ? suppressedCountLabel(cell) : 'NA';
+  // A cell the server left out is withheld, never a zero.
+  return cell ? suppressedCountLabel(cell) : SMALL_COUNT_TEXT;
 };
 
 function isRoles(value: unknown): value is CohortRolesDto {
@@ -161,12 +163,15 @@ export function CohortReadinessByRoleSection({ institutionId }: { readonly insti
       smaller than five reads &lt;5.</p>
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {notice ? <p role="status">{notice}</p> : null}
-    <div className="v2-row v2-cols-4 career-stat-strip">
-      <V2Stat icon="🎯" tone="blue" value={view ? view.role.title : 'NA'} label="Career role" />
-      <V2Stat icon="👥" tone="indigo" value={view ? (view.cohort.suppressed ? SMALL_COUNT_TEXT : suppressedCountLabel(view.cohort.total)) : 'NA'} label="Students in the month" />
-      <V2Stat icon="🧩" tone="purple" value={view ? view.requirementCounts.essential : 'NA'} label="Essential requirements" />
-      <V2Stat icon="🏃" tone="green" value={running ?? 'NA'} label="Sprints running" />
-    </div>
+    {/* Each figure appears once it exists: the role's figures after a role is chosen, sprints once they load. */}
+    {view || running !== null ? <div className="v2-row v2-cols-4 career-stat-strip">
+      {view ? <>
+        <V2Stat icon="🎯" tone="blue" value={view.role.title} label="Career role" />
+        <V2Stat icon="👥" tone="indigo" value={view.cohort.suppressed ? SMALL_COUNT_TEXT : suppressedCountLabel(view.cohort.total)} label="Students in the month" />
+        <V2Stat icon="🧩" tone="purple" value={view.requirementCounts.essential} label="Essential requirements" />
+      </> : null}
+      {running !== null ? <V2Stat icon="🏃" tone="green" value={running} label="Sprints running" /> : null}
+    </div> : null}
     <form className="role-management-form" aria-label="Choose a role" onSubmit={(event) => event.preventDefault()}>
       <label><span>Role</span><select aria-label="Career role" defaultValue="" onChange={(event) => choose(event.target.value)}>
         <option value="">{roles ? 'Choose a role' : 'Loading roles…'}</option>
@@ -196,7 +201,7 @@ function RequirementTable({ view, onSprint }: { readonly view: CohortReadinessDt
   const scopeText = view.scope.kind === 'UNITS' && view.scope.units.length ? ` Your students: ${view.scope.units.map((unit) => unit.name).join(', ')}.` : '';
   if (view.requirements.length === 0) {
     return <V2EmptyState icon="🧩" title="No essential requirements published"
-      note={`${view.role.title} has no essential requirement in ONE's career catalogue yet, so there is nothing to measure: NA.`} />;
+      note={`${view.role.title} has no essential requirement in ONE's career catalogue yet, so there is nothing to measure yet.`} />;
   }
   return <>
     <p>{`As at the end of ${view.period.month}.${scopeText}${view.requirementCounts.other ? ` ${view.requirementCounts.other} further requirement${view.requirementCounts.other === 1 ? ' is' : 's are'} not essential and not shown.` : ''}`}</p>
@@ -212,7 +217,7 @@ function RequirementTable({ view, onSprint }: { readonly view: CohortReadinessDt
         <td><NaValue value={suppressedCountLabel(requirement.unknowns)} /></td>
         <td>{view.canRunSprints && requirement.resources.length
           ? <button type="button" className="pilot-link" onClick={() => onSprint(requirement)}>Run a sprint</button>
-          : requirement.resources.length ? 'NA' : 'No published content'}</td>
+          : requirement.resources.length ? 'Needs a unit scope' : 'No published content'}</td>
       </tr>)}</tbody></table></div>
     {!view.canRunSprints ? <p>Your role needs a department or unit scope before you can run a sprint.</p> : null}
   </>;
@@ -301,12 +306,12 @@ function SprintList({ sprints, token, institutionId, onChanged }: {
           <th scope="col">Work done</th><th scope="col">Actions</th></tr></thead>
         <tbody>{sprints.sprints.map((sprint) => <tr key={sprint.id}>
           <th scope="row">{`${sprint.role.title} · ${sprint.skillName}`}
-            <span>{`${sprint.resource.title} · ${SPRINT_REASON_LABELS[sprint.reasonCode] ?? 'NA'}${sprint.drive ? ` · ${sprint.drive.employerName}` : ''}${sprint.unitName ? ` · ${sprint.unitName}` : ''}`}</span></th>
-          <td>{`${day(sprint.startsAt)} – ${day(sprint.endsAt)} · ${STATE_LABELS[sprint.state] ?? 'NA'}`}</td>
-          <td><NaValue value={sprint.progress.available ? suppressedCountLabel(sprint.progress.reached) : 'NA'} /></td>
-          {Object.keys(SPRINT_CELL_LABELS).map((key) => <td key={key}><NaValue value={!sprint.progress.available || !sprint.progress.requirementLive ? 'NA'
+            <span>{`${sprint.resource.title} · ${SPRINT_REASON_LABELS[sprint.reasonCode] ?? codeLabel(sprint.reasonCode)}${sprint.drive ? ` · ${sprint.drive.employerName}` : ''}${sprint.unitName ? ` · ${sprint.unitName}` : ''}`}</span></th>
+          <td>{`${day(sprint.startsAt)} – ${day(sprint.endsAt)} · ${STATE_LABELS[sprint.state] ?? codeLabel(sprint.state)}`}</td>
+          <td><NaValue value={sprint.progress.available ? suppressedCountLabel(sprint.progress.reached) : 'From tomorrow'} /></td>
+          {Object.keys(SPRINT_CELL_LABELS).map((key) => <td key={key}><NaValue value={!sprint.progress.available ? 'From tomorrow' : !sprint.progress.requirementLive ? 'Requirement retired'
             : sprint.progress.cells.length ? cellLabel(sprint.progress.cells, key) : SMALL_COUNT_TEXT} /></td>)}
-          <td><NaValue value={sprint.progress.available ? suppressedCountLabel(sprint.progress.workDone) : 'NA'} /></td>
+          <td><NaValue value={sprint.progress.available ? suppressedCountLabel(sprint.progress.workDone) : 'From tomorrow'} /></td>
           <td>{sprint.canEnd ? <select aria-label={`End sprint ${sprint.role.title} ${sprint.skillName}`} defaultValue="" onChange={(event) => { if (event.target.value) void end(sprint, event.target.value); }}>
             <option value="">End early…</option>
             {sprints.cancelReasonCodes.map((code) => <option key={code} value={code}>{END_LABELS[code] ?? code}</option>)}

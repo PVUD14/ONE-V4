@@ -718,6 +718,30 @@ export function listClassReports(token: string, institutionId: string, signal?: 
   return requestJson(`${institutionPath(institutionId)}/class-reports`, { token, ...(signal ? { signal } : {}) });
 }
 
+/**
+ * One staff action as GET /institutions/:id/staff-actions returns it — the fields the institution
+ * homes read. The Interventions, Assigned Tasks and Meetings pages make the same read.
+ */
+export interface StaffActionSummaryDto {
+  readonly id: string;
+  readonly title: string;
+  readonly studentName: string | null;
+  readonly ownerName?: string | null;
+  readonly state: string;
+  readonly dueAt: string | null;
+  readonly updatedAt: string;
+  readonly actionType: string;
+  readonly scheduledStartAt?: string | null;
+  readonly scheduledEndAt?: string | null;
+}
+
+/** The reader's staff actions of one type, as the server scopes them. */
+export function listStaffActionSummaries(token: string, institutionId: string, actionType: 'INTERVENTION' | 'ASSIGNED_TASK' | 'MEETING', signal?: AbortSignal): Promise<readonly StaffActionSummaryDto[]> {
+  return requestJson<{ readonly actions?: readonly StaffActionSummaryDto[] }>(
+    `/api/v1/institutions/${encodeURIComponent(institutionId)}/staff-actions?actionType=${actionType}`, { token, ...(signal ? { signal } : {}) },
+  ).then((response) => (Array.isArray(response?.actions) ? response.actions : []));
+}
+
 /** How a suppressed count is shown: never the number, always "<5" (the shared small-count rule). */
 export function suppressedCountLabel(count: { readonly suppressed: boolean; readonly value?: number | null; readonly count?: number | null } | null | undefined): string {
   if (!count) return 'NA';

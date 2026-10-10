@@ -164,15 +164,15 @@ describe('placement officer and department head', () => {
     expect(within(table).getByRole('row', { name: /Asha Local/ })).toHaveTextContent('20 Sep 2026');
   });
 
-  it('the roster reads NA in the status column when the status list is refused', async () => {
+  it('the roster says the status is not available when the status list is refused', async () => {
     routes({
       [`${base}/students`]: { students: [{ id: crypto.randomUUID(), studentUserId: asha, fullName: 'Asha Local', institutionStudentId: 'CSE-001', status: 'ACTIVE', units: {} }] },
       [`${base}/units`]: { units: [] }, [`${base}/placement-status`]: 'FORBIDDEN',
     });
     open('placement-officer', 'Students', 'PLACEMENT_ADMIN');
     const table = await screen.findByRole('table', { name: 'Placement student roster' });
-    // Cells: roll, department, batch, status, readiness, placement status, applications, last activity.
-    await waitFor(() => expect(within(within(table).getByRole('row', { name: /Asha Local/ })).getAllByRole('cell')[5]).toHaveTextContent(/^NA$/));
+    // Cells: roll, department, batch, status, placement status, applications, last activity (no per-student band).
+    await waitFor(() => expect(within(within(table).getByRole('row', { name: /Asha Local/ })).getAllByRole('cell')[4]).toHaveTextContent(/^Not available$/));
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(document.body.textContent).not.toContain('upstream private detail');
   });

@@ -37,9 +37,9 @@ import { SMALL_COUNT_TEXT } from '../momentum/smallCountRule.js';
 import * as dates from '../dates.js';
 
 function formatDate(value: string | null | undefined): string {
-  if (!value) return 'NA';
+  if (!value) return 'Not set';
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? 'NA' : dates.formatDate(date);
+  return Number.isNaN(date.getTime()) ? 'Not set' : dates.formatDate(date);
 }
 function monthLabel(month: string): string {
   const date = new Date(`${month}-01T00:00:00Z`);
@@ -158,7 +158,7 @@ export function PlacementRegisterSection({ institutionId }: { readonly instituti
             <td>{formatDate(drive.scheduledStartAt ?? drive.proposedStartAt)}{drive.venueMode ? ` · ${venueModeLabels[drive.venueMode]}` : ''}</td>
             <th scope="row">{drive.employerName}</th>
             <td>{drive.opportunityTitle ?? 'Untitled'}</td>
-            <td>{drive.category ? <span className="pilot-chip blue">{drive.category.name}{drive.category.retired ? ' (retired)' : ''}</span> : 'NA'}</td>
+            <td>{drive.category ? <span className="pilot-chip blue">{drive.category.name}{drive.category.retired ? ' (retired)' : ''}</span> : 'None'}</td>
             <td><span className="hiring-tag">{campusDriveStateLabels[drive.state]}</span></td>
             {drive.outcome
               ? <><td><NaValue value={suppressedCountLabel(drive.outcome.studentsSharing)} /></td><td><NaValue value={suppressedCountLabel(drive.outcome.withOffer)} /></td><td><NaValue value={suppressedCountLabel(drive.outcome.placed)} /></td></>
@@ -274,7 +274,7 @@ export function DriveCategoryCell({ institutionId, driveId, current, categories,
 }): React.ReactElement {
   const token = getProtectedAccessToken();
   const [busy, setBusy] = useState(false);
-  const label = current ? `${current.name}${current.retired ? ' (retired)' : ''}` : 'NA';
+  const label = current ? `${current.name}${current.retired ? ' (retired)' : ''}` : 'None';
   if (!canSet || !categories || categories.length === 0 || !token) return <span>{label}</span>;
   async function change(value: string): Promise<void> {
     if (!token) return;

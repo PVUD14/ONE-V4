@@ -51,3 +51,39 @@ export function smallCountText(input: SuppressibleCount, format: (value: number)
 export function isSmallCountText(text: unknown): boolean {
   return typeof text === 'string' && /^<\s?5$/.test(text.trim());
 }
+
+/**
+ * A count of five or more as a five-wide range: 7 → "5–9", 23 → "20–24"; a small count stays "<5".
+ * Used where an exact figure next to a visible total would let a hidden "<5" group be worked out
+ * by subtraction (06-screens/README-institution.md, suppression rule 3).
+ */
+export function rangeCountText(input: SuppressibleCount): string {
+  const value = shownCount(input);
+  if (value === null) return SMALL_COUNT_TEXT;
+  const low = Math.floor(value / SMALL_COUNT_THRESHOLD) * SMALL_COUNT_THRESHOLD;
+  return `${low}–${low + SMALL_COUNT_THRESHOLD - 1}`;
+}
+
+/**
+ * Whether the shown parts of one partition must become ranges (README-institution rule 3).
+ *
+ * `parts` are every cell of a partition of people whose `total` is visible on the same view (a
+ * roster split by activation state, students split by batch). When some part is small and the
+ * small parts together hold fewer than five people — zero included, as the server's rule has it —
+ * subtracting the exact parts from the total would reveal them, so the shown parts are drawn as
+ * ranges instead. People the parts leave out (total minus the parts) count as one more part. A part
+ * the server already withheld has no known size, so its presence alone means ranges.
+ */
+export function partitionNeedsRanges(parts: readonly SuppressibleCount[], total?: number | null): boolean {
+  const values = parts.map((part) => (part === null ? null : typeof part === 'number' ? part
+    : part.suppressed ? null : (part.value !== undefined ? part.value : part.count) ?? null));
+  const all = [...values];
+  if (typeof total === 'number' && values.every((value) => value !== null)) {
+    const rest = total - values.reduce<number>((sum, value) => sum + (value ?? 0), 0);
+    if (rest > 0) all.push(rest);
+  }
+  const small = all.filter((value) => value === null || value < SMALL_COUNT_THRESHOLD);
+  if (!small.length) return false;
+  if (small.some((value) => value === null)) return true;
+  return small.reduce<number>((sum, value) => sum + (value ?? 0), 0) < SMALL_COUNT_THRESHOLD;
+}

@@ -206,9 +206,13 @@ describe('Placement Officer roster', () => {
     rosterResponse(); render(placement());
     expect(screen.getByText('Loading roster…')).toBeInTheDocument();
     const table = await screen.findByRole('table', { name: 'Placement student roster' });
-    expect(within(table).getByRole('columnheader', { name: 'Readiness band' })).toBeInTheDocument();
-    // INST-09 added the Placement status column: a roster row with no linked account has no status either, so NA (four NA cells).
-    expect(within(within(table).getByRole('row', { name: /Local placement student/ })).getAllByRole('cell', { name: 'NA' })).toHaveLength(4);
+    // No per-student band: the roster read carries none, and placement staff see bands only as cohort aggregates.
+    expect(within(table).queryByRole('columnheader', { name: /Readiness/ })).not.toBeInTheDocument();
+    // A roster row with no linked account has no placement status or applications, said in words — never "NA".
+    const row = within(table).getByRole('row', { name: /Local placement student/ });
+    expect(within(row).getAllByRole('cell', { name: 'Not available' })).toHaveLength(2);
+    expect(within(row).getByRole('cell', { name: 'No shared activity' })).toBeInTheDocument();
+    expect(within(table).queryByRole('cell', { name: 'NA' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Add student|Validate CSV|Edit/ })).not.toBeInTheDocument();
     expect(screen.queryByText(studentId)).not.toBeInTheDocument();
     expect(fetchMock.mock.calls.every(([url]) => String(url).includes('/institutions/' + institutionId + '/'))).toBe(true);
@@ -320,7 +324,7 @@ describe('External application distinction in the placement roster', () => {
     render(placement()); await openFirst();
     const region = screen.getByRole('region', { name: 'Student-declared external applications (unverified)' });
     expect(within(region).getByRole('status')).toHaveTextContent('Loading external declarations');
-    expect(region).toHaveTextContent('Shared external declarations shown: NA');
+    expect(region).toHaveTextContent('Shared external declarations shown: …');
     expect(within(region).queryByText(/No external declarations/)).not.toBeInTheDocument();
     await act(async () => resolve(response({ externalApplications: [] })));
     expect(region).toHaveTextContent('Shared external declarations shown: 0');
@@ -331,7 +335,7 @@ describe('External application distinction in the placement roster', () => {
     render(placement()); await openFirst();
     const region = screen.getByRole('region', { name: 'Student-declared external applications (unverified)' });
     expect(await within(region).findByRole('alert')).not.toHaveTextContent('private upstream error');
-    expect(region).toHaveTextContent('Shared external declarations shown: NA');
+    expect(region).toHaveTextContent('Shared external declarations shown: not available');
     expect(screen.queryByText('private upstream error')).not.toBeInTheDocument();
     expect(await within(screen.getByRole('region', { name: 'Applications on ONE' })).findByText('Native employer')).toBeInTheDocument();
   });
@@ -363,6 +367,6 @@ describe('External application distinction in the placement roster', () => {
     const region = screen.getByRole('region', { name: 'Student-declared external applications (unverified)' });
     await within(region).findByRole('alert');
     expect(within(region).queryByText('Declared employer')).not.toBeInTheDocument();
-    expect(region).toHaveTextContent('Shared external declarations shown: NA');
+    expect(region).toHaveTextContent('Shared external declarations shown: not available');
   });
 });

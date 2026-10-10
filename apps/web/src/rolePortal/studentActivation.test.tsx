@@ -7,7 +7,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getProtectedAccessToken } from '../api.js';
 import { rolePortals } from '../rolePortalConfig.js';
-import { InstitutionDashboardV3 } from '../staffDashboardsV3.js';
+import { InstitutionAdminHome } from './institutionHomes.js';
 import { InstitutionStudentsPage } from './institution.js';
 
 vi.mock('../api.js', async (original) => ({
@@ -49,7 +49,8 @@ describe('Students page activation', () => {
   it('shows each student activation state, says plainly when no email was sent, and offers resend only to those waiting', async () => {
     render(page());
     const waiting = (await screen.findByText('Waiting Student')).closest('tr')!;
-    expect(within(waiting).getByText('Invited')).toBeInTheDocument();
+    // The relationship state and the invitation state both read in words, never as codes.
+    expect(within(waiting).getAllByText('Invited')).toHaveLength(2);
     expect(within(waiting).getByText('Email not sent: no sender is set up yet')).toBeInTheDocument();
     expect(within(waiting).getByRole('button', { name: 'Resend invitation' })).toBeInTheDocument();
     const active = screen.getByText('Active Student').closest('tr')!;
@@ -78,18 +79,33 @@ describe('Students page activation', () => {
 });
 
 describe('Dashboard activation counts', () => {
-  it('shows the server summary the Students list is built from', async () => {
-    render(<InstitutionDashboardV3 institutionId={institutionId} basePath="/institution/admin" />);
-    const card = (await screen.findByRole('heading', { name: 'Student Activation' })).closest('section')!;
-    expect(within(card).getByText('Activated').parentElement).toHaveTextContent('Activated 1');
-    expect(within(card).getByText('Invited').parentElement).toHaveTextContent('Invited 1');
-    expect(within(card).getByText('Bounced').parentElement).toHaveTextContent('Bounced 0');
+  const home = () => <InstitutionAdminHome authenticatedWorkspace={{ organizationId: institutionId, role: 'INSTITUTION_ADMIN' }} basePath="/institution/admin" title="Institution Administration" />;
+
+  it('shows the server summary the Students list is built from, every group under five as <5 with no bar', async () => {
+    render(home());
+    const card = (await screen.findByRole('heading', { name: 'Student activation' })).closest('section')!;
+    expect(within(card).getByText('Activated', { selector: 'dt' }).parentElement).toHaveTextContent('Activated<5');
+    expect(within(card).getByText('Invited', { selector: 'dt' }).parentElement).toHaveTextContent('Invited<5');
+    expect(within(card).getByText('Bounced', { selector: 'dt' }).parentElement).toHaveTextContent('Bounced<5');
+    expect(card.querySelector('.ih-abar')).toBeNull();
   });
 
-  it('shows NA rather than zero when the roster cannot be loaded', async () => {
+  it('shows larger groups exactly, and turns them into ranges when a small group could be worked out from the roster total', async () => {
+    fetchMock.mockImplementation((url: string) => Promise.resolve(response(url.includes('/students') ? { ...roster, activationSummary: { ACTIVATED: 32, INVITED: 0, EXPIRED: 0, BOUNCED: 0, NOT_INVITED: 1 } } : {})));
+    render(home());
+    const card = (await screen.findByRole('heading', { name: 'Student activation' })).closest('section')!;
+    // 33 on the roster, 32 activated: an exact 32 would reveal the one student not invited.
+    expect(within(card).getByText('Activated', { selector: 'dt' }).parentElement).toHaveTextContent('Activated30–34');
+    expect(within(card).getByText('Not invited', { selector: 'dt' }).parentElement).toHaveTextContent('Not invited<5');
+    expect(card).not.toHaveTextContent(/32/);
+    expect(card.querySelector('.ih-abar')).toBeNull();
+  });
+
+  it('leaves the card out, never NA or zero, when the roster cannot be loaded', async () => {
     fetchMock.mockImplementation((url: string) => Promise.resolve(url.includes('/students') ? { ok: false, status: 500, json: async () => ({}) } : response(url.includes('/units') ? { units: [] } : { assessments: [] })));
-    render(<InstitutionDashboardV3 institutionId={institutionId} basePath="/institution/admin" />);
-    const card = (await screen.findByRole('heading', { name: 'Student Activation' })).closest('section')!;
-    expect(within(card).getByText('Activated').parentElement).toHaveTextContent('Activated NA');
+    render(home());
+    await waitFor(() => expect(screen.queryByText('Loading your institution…')).not.toBeInTheDocument());
+    expect(screen.queryByRole('heading', { name: 'Student activation' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/NA/)).not.toBeInTheDocument();
   });
 });

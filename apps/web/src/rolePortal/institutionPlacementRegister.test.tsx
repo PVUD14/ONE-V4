@@ -163,46 +163,48 @@ describe('placement officer Dashboard and department head Placement Pipeline', (
 });
 
 describe('dashboard placement widgets', () => {
-  it('fills Placement Eligible, the pipeline funnel and the offers trend from the statistics, <5 where withheld', async () => {
+  it('fills the placement KPIs, the pipeline and the offers months from the statistics, <5 where withheld', async () => {
     routes({ [`${base}/placement-statistics`]: { ...statistics, overall: row({ placed: withheld }) } });
     render(<InstitutionDashboardV3 institutionId={institutionId} basePath="/institution/placement-officer" />);
-    const eligible = (await screen.findByText('Placement Eligible')).parentElement!;
-    expect(eligible).toHaveTextContent('30Placement Eligible');
-    expect(screen.getByText('Students With Offers').parentElement).toHaveTextContent('12Students With Offers');
-    expect(screen.getByText('Students Placed').parentElement).toHaveTextContent('<5Students Placed');
-    const pipeline = screen.getByRole('heading', { name: 'Placement Pipeline' }).closest('section')!;
-    expect(pipeline).toHaveTextContent(/Eligible\s*30/);
-    expect(pipeline).toHaveTextContent(/Shortlisted\s*18/);
-    expect(pipeline).toHaveTextContent(/Placed\s*<5/);
+    expect((await screen.findByText('Placement eligible')).parentElement).toHaveTextContent('30Placement eligible');
+    expect(screen.getByText('With offers').parentElement).toHaveTextContent('12With offers');
+    expect(screen.getByText('Placed', { selector: '.ih-kl' }).parentElement).toHaveTextContent('<5Placed');
+    const pipeline = screen.getByRole('heading', { name: 'Placement pipeline' }).closest('section')!;
+    expect([...pipeline.querySelectorAll('.ih-tile')].map((tile) => tile.textContent)).toEqual(['Eligible30', 'Applied (shared)24', 'Shortlisted18', 'With an offer12', 'Placed<5']);
     expect(pipeline).toHaveTextContent('As of 31 Aug 2026');
-    const trend = screen.getByRole('heading', { name: 'Offers Trend' }).closest('section')!;
-    expect(trend).toHaveTextContent('Aug 2026 12');
+    expect(within(pipeline).getByRole('row', { name: /Computer Science/ })).toBeInTheDocument();
+    const trend = screen.getByRole('heading', { name: 'Offers trend' }).closest('section')!;
+    // One month under five: no line or bar is drawn, each month reads its figure.
+    expect(trend.querySelector('.ih-trend')).toBeNull();
+    const months = within(within(trend).getByRole('list', { name: 'Offers by month' })).getAllByRole('listitem');
+    expect(months.map((slot) => slot.textContent)).toEqual(['Jul 2026<5', 'Aug 202612']);
   });
 
-  it('draws no offers line and no pipeline bars when every figure is withheld, and names every slot as <5', async () => {
+  it('draws no offers bars and no proportional stage when every figure is withheld, and names every slot as <5', async () => {
     const allWithheld = row({ eligible: withheld, notShared: withheld, applied: withheld, shortlisted: withheld, withOffer: withheld, placed: withheld, placementPercentage: null, offersPerPlacedStudent: null });
     routes({ [`${base}/placement-statistics`]: { ...statistics, overall: allWithheld,
       offersByMonth: ['2026-04', '2026-05', '2026-06'].map((month) => ({ month, offers: withheld })) } });
     render(<InstitutionDashboardV3 institutionId={institutionId} basePath="/institution/placement-officer" />);
-    const trend = (await screen.findByRole('heading', { name: 'Offers Trend' })).closest('section')!;
-    // A flat line at zero would be a false figure: the frame stays with its title and says why.
-    expect(trend.querySelector('svg polyline')).toBeNull();
+    const trend = (await screen.findByRole('heading', { name: 'Offers trend' })).closest('section')!;
+    expect(trend.querySelector('.ih-trend')).toBeNull();
     expect(within(trend).getByText(/Not enough data yet/)).toBeInTheDocument();
     const months = within(within(trend).getByRole('list', { name: 'Offers by month' })).getAllByRole('listitem');
-    expect(months.map((slot) => slot.textContent)).toEqual(['Apr 2026 <5', 'May 2026 <5', 'Jun 2026 <5']);
-    const pipeline = screen.getByRole('heading', { name: 'Placement Pipeline' }).closest('section')!;
-    expect(pipeline.querySelector('.pilot-bar')).toBeNull();
-    expect(within(within(pipeline).getByRole('list', { name: 'Placement pipeline stages' })).getAllByRole('listitem').map((slot) => slot.textContent))
-      .toEqual(['Eligible <5', 'Applied <5', 'Shortlisted <5', 'Offers <5', 'Placed <5']);
-    expect(screen.getByText('Students Placed').parentElement).toHaveTextContent('<5Students Placed');
+    expect(months.map((slot) => slot.textContent)).toEqual(['Apr 2026<5', 'May 2026<5', 'Jun 2026<5']);
+    const pipeline = screen.getByRole('heading', { name: 'Placement pipeline' }).closest('section')!;
+    expect(pipeline.querySelector('.pilot-bar, .ih-trend, [style*="width"]')).toBeNull();
+    expect([...pipeline.querySelectorAll('.ih-tile')].map((tile) => tile.textContent)).toEqual(['Eligible<5', 'Applied (shared)<5', 'Shortlisted<5', 'With an offer<5', 'Placed<5']);
+    expect(screen.getByText('Placed', { selector: '.ih-kl' }).parentElement).toHaveTextContent('<5Placed');
   });
 
-  it('reads NA, not zero, when the statistics cannot be read (faculty)', async () => {
+  it('leaves the placement figures out, never NA or zero, when the statistics cannot be read', async () => {
     routes({ [`${base}/placement-statistics`]: 'FORBIDDEN' });
-    render(<InstitutionDashboardV3 institutionId={institutionId} basePath="/institution/faculty" />);
-    expect((await screen.findByText('Placement Eligible')).parentElement).toHaveTextContent('NAPlacement Eligible');
-    const pipeline = screen.getByRole('heading', { name: 'Placement Pipeline' }).closest('section')!;
-    expect(pipeline).toHaveTextContent(/Placed\s*NA/);
+    render(<InstitutionDashboardV3 institutionId={institutionId} basePath="/institution/placement-officer" />);
+    await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/placement-statistics'))).toBe(true));
+    await waitFor(() => expect(screen.queryByText('Loading the placement dashboard…')).not.toBeInTheDocument());
+    expect(screen.queryByText('Placement eligible')).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Placement pipeline' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/NA/)).not.toBeInTheDocument();
+    expect(document.body.textContent).not.toContain('upstream private detail');
   });
 });
 

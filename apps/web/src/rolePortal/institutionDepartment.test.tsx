@@ -75,30 +75,37 @@ describe('department head workspace', () => {
   it('Department Overview shows the server\'s scoped counts, readiness as bands with <5, and the pipeline', async () => {
     routes({ [`${base}/department-overview`]: overview, [`${base}/placement-pipeline`]: pipeline, [`${base}/academic-verification-summary`]: { summary: { pending: 5, notCurrent: 0 } } });
     open('department-head', 'Department Overview', 'DEPARTMENT_HEAD');
-    expect(await screen.findByRole('heading', { name: 'Department Overview' })).toBeInTheDocument();
-    expect(await screen.findByText('Students on roster')).toBeInTheDocument();
-    expect(screen.getByText('42')).toBeInTheDocument();
-    expect(screen.getByText('Showing students in Computer Science.')).toBeInTheDocument();
-    const readiness = screen.getByRole('heading', { name: 'Cohort Readiness' }).closest('section')!;
-    expect(within(readiness).getByText('14')).toBeInTheDocument();
-    expect(within(readiness).getAllByText('<5')).toHaveLength(2);
-    expect(within(readiness).getByText('withheld')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Department Overview', level: 1 })).toBeInTheDocument();
+    const roster = (await screen.findByText('Students on roster')).parentElement!;
+    expect(roster).toHaveTextContent('42Students on roster');
+    expect(screen.getByText(/^Computer Science · /)).toBeInTheDocument();
+    const readiness = screen.getByRole('heading', { name: 'Cohort readiness' }).closest('section')!;
+    const steps = within(readiness).getByRole('list', { name: /Readiness bands/ });
+    expect(within(steps).getByText('14')).toBeInTheDocument();
+    expect(within(steps).getAllByText('<5')).toHaveLength(2);
+    // A suppressed band is the uniform hatched block, never a step drawn to its size, and no mix bar is drawn.
+    expect(steps.querySelectorAll('.sc-hatch--step')).toHaveLength(2);
+    expect(readiness.querySelector('.bclimb-stack')).toBeNull();
+    // The server withheld the total, so none is shown.
+    expect(within(readiness).queryByText(/students with a band/)).not.toBeInTheDocument();
     expect(within(readiness).queryByText(/%/)).not.toBeInTheDocument();
-    const funnel = screen.getByRole('heading', { name: 'Placement Pipeline' }).closest('section')!;
-    expect(within(funnel).getByText('8')).toBeInTheDocument();
+    const funnel = screen.getByRole('heading', { name: 'Placement pipeline' }).closest('section')!;
+    expect(within(funnel).getByText('Applied').parentElement).toHaveTextContent('Applied8');
     expect(screen.getByText('CSE 2027')).toBeInTheDocument();
+    expect(screen.queryByText(/\bNA\b/)).not.toBeInTheDocument();
     expect(screen.queryByText('View-only for your role')).not.toBeInTheDocument();
   });
 
-  it('says readiness is withheld when the department is too small, and reads NA without a pipeline', async () => {
+  it('says readiness is withheld when the department is too small, and leaves the pipeline out when it cannot be read', async () => {
     routes({
       [`${base}/department-overview`]: { ...overview, readiness: { month: '2026-08', aggregate: { suppressed: true, minimumCohortSize: 5, cohortSize: 0, cohortSizeSuppressed: true, bands: [] } } },
       [`${base}/placement-pipeline`]: 'FORBIDDEN',
     });
     open('department-head', 'Department Overview', 'DEPARTMENT_HEAD');
-    expect(await screen.findByText(/Withheld for 2026-08/)).toBeInTheDocument();
-    const funnel = screen.getByRole('heading', { name: 'Placement Pipeline' }).closest('section')!;
-    await waitFor(() => expect(within(funnel).getAllByText('NA').length).toBeGreaterThan(0));
+    expect(await screen.findByText(/Fewer than five students had a band in August 2026/)).toBeInTheDocument();
+    await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/placement-pipeline'))).toBe(true));
+    expect(screen.queryByRole('heading', { name: 'Placement pipeline' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/\bNA\b/)).not.toBeInTheDocument();
   });
 
   it('shows a safe error, never upstream text, when the overview is refused', async () => {

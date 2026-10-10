@@ -442,7 +442,7 @@ async function collegeSections(one: Query, subject: Subject): Promise<Record<str
 }
 
 async function learningSections(one: Query, subject: Subject): Promise<Record<string, unknown>> {
-  const [sessions, attempts, activity, lessons, steps, stepItems, tutorHints, placements, skills, evidence, bands, readiness, roadmap, checks, codeSubmissions, tutorGroups] = await Promise.all([
+  const [sessions, attempts, activity, lessons, steps, stepItems, tutorHints, placements, skills, evidence, bands, readiness, roadmap, checks, codeSubmissions, tutorGroups, explainRequests, explainReports] = await Promise.all([
     // Model, prompt, token and cost columns are internal metering, not about the person.
     one(sql`SELECT mode, language, started_at, ended_at FROM learning_sessions WHERE subject_user_id = ${subject} ORDER BY started_at, id`),
     // Not the item or the option chosen: with correctness, those would be the answer key.
@@ -502,6 +502,16 @@ async function learningSections(one: Query, subject: Subject): Promise<Record<st
     one(sql`SELECT o.legal_name AS institution_name, a.group_name, a.assignment_method, a.consent_version, a.assigned_at
             FROM tutor_group_assignments a JOIN organizations o ON o.id = a.institution_id
             WHERE a.subject_user_id = ${subject} ORDER BY a.assigned_at, a.id`),
+    // ADR-052: what you asked ONE to explain, how each ended, and the lesson text when you were shown it
+    // (labelled AI-generated, not checked by a person). Text the checks refused to show is not yours to read.
+    one(sql`SELECT r.topic_text, r.requested_at, r.served_from_cache, l.status, l.review_state, l.prompt_version, l.served_model, l.generated_at,
+                   CASE WHEN l.status = 'READY' THEN l.generated_text END AS shown_text
+            FROM explain_topic_requests r JOIN explain_lessons l ON l.id = r.lesson_id
+            WHERE r.subject_user_id = ${subject} ORDER BY r.requested_at, r.id`),
+    one(sql`SELECT p.reason_code, p.note, p.reported_at, r.topic_text
+            FROM explain_lesson_reports p
+            LEFT JOIN explain_topic_requests r ON r.lesson_id = p.lesson_id AND r.subject_user_id = p.subject_user_id
+            WHERE p.subject_user_id = ${subject} ORDER BY p.reported_at, p.id`),
   ]);
   return {
     sessions: sessions.map((row) => ({ mode: row.mode, language: row.language ?? null, startedAt: row.started_at, endedAt: row.ended_at ?? null })),
@@ -524,6 +534,17 @@ async function learningSections(one: Query, subject: Subject): Promise<Record<st
         reviewState: hint.review_state, requestedAt: hint.requested_at, completedAt: hint.completed_at ?? null,
       })),
     })),
+    askOneToExplain: {
+      requests: explainRequests.map((row) => ({
+        topic: row.topic_text, askedAt: row.requested_at, servedFromCache: row.served_from_cache,
+        outcome: row.status === 'READY' ? (row.review_state === 'WITHDRAWN' ? 'SHOWN_THEN_WITHDRAWN' : 'LESSON_SHOWN') : row.status === 'REFUSED' ? 'REFUSED'
+          : row.status === 'PENDING' || row.status === 'GENERATING' ? 'NOT_FINISHED' : 'NOT_AVAILABLE',
+        lessonShown: row.shown_text ?? null, label: row.shown_text ? 'AI-generated — not checked by a person' : null,
+        model: row.shown_text ? row.served_model ?? null : null, promptVersion: row.prompt_version, reviewState: row.review_state,
+        generatedAt: row.generated_at ?? null,
+      })),
+      reports: explainReports.map((row) => ({ topic: row.topic_text ?? null, reasonCode: row.reason_code, note: row.note ?? null, reportedAt: row.reported_at })),
+    },
     tutorPilotGroups: tutorGroups.map((row) => ({
       institutionName: row.institution_name, group: row.group_name, assignmentMethod: row.assignment_method,
       consentVersion: row.consent_version, assignedAt: row.assigned_at,

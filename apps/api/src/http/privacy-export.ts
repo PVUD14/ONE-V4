@@ -113,6 +113,7 @@ export async function assembleSubjectExport(db: PersistenceDb, subjectUserId: st
       'Internal estimates the learning engine keeps about you (mastery likelihoods, review-scheduling parameters, suspected misconception codes) and the inputs the planner weighed. What they led to — your steps, bands, stages and review dates — is included.',
       'The questions and answer keys of college exams, readiness checks and practice items, which are reused. Your attempts, published results and whether each practice answer was right are included.',
       'Replies the AI tutor wrote that ONE’s checks refused to show you, and what the checks found. Every AI hint you were shown is included, under your learning steps.',
+      'For Ask ONE to explain: the text of lessons ONE’s checks refused to show you, and who else asked about the same topic. What you asked, how each request ended, the lessons you were shown and your reports are included under learning.askOneToExplain.',
       'Whether a retention hold is in place on your account, which is placed for an investigation or a legal claim.',
       'The summary and notes operations wrote on your support cases, and which employer team member downloaded your résumé.',
       'Trust and safety cases about you, and their investigation material.',

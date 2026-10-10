@@ -36,6 +36,8 @@ import { consumeSeededContentGenerationRequested } from './content-generation.js
 import { LEARNER_SKILL_STATE_PROJECTION_REQUESTED, consumeSkillStateProjectionRequested } from './learner-skill-state.js';
 import { TUTOR_HINT_REQUESTED } from './tutor-hints.js';
 import { consumeTutorHintRequested } from './tutor-hint-worker.js';
+import { EXPLAIN_LESSON_REQUESTED } from './explain-topic.js';
+import { consumeExplainLessonRequested } from './explain-topic-worker.js';
 import { CODE_SUBMISSION_REQUESTED } from './code-submissions.js';
 import { consumeCodeSubmissionRequested } from './code-submission-worker.js';
 
@@ -115,6 +117,10 @@ export function createLocalIntegrationEventPublisher(input: { readonly pool: Poo
     // ENG-22: writes one AI tutor hint through ONE AI Orchestration (worker-only; sandbox audience only).
     [TUTOR_HINT_REQUESTED]: async (event) => {
       await consumeTutorHintRequested({ db: input.db }, event);
+    },
+    // ADR-052: writes one "Ask ONE to explain" lesson through ONE AI Orchestration (worker-only; off by default).
+    [EXPLAIN_LESSON_REQUESTED]: async (event) => {
+      await consumeExplainLessonRequested({ db: input.db }, event);
     },
     // ENG-12: runs one student program on the isolated code sandbox (ONE_CODE_SANDBOX_URL; blank = FAILED
     // SANDBOX_UNAVAILABLE) and records the result with its graded attempt.

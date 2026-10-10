@@ -22,6 +22,8 @@ const forbidden: readonly [string, RegExp][] = [
   ['the content factory worker', /persistence\/src\/(content-factory-worker|run-content-factory-worker)(\.js)?['"]/],
   // ENG-22: the tutor's job calls the model; only the outbox worker may load it.
   ['the tutor hint worker module', /persistence\/src\/tutor-hint-worker(\.js)?['"]/],
+  // ADR-052: the explain lesson job calls the model; only the outbox worker may load it.
+  ['the explain lesson worker module', /persistence\/src\/explain-topic-worker(\.js)?['"]/],
   // ENG-24: the embedding job and tutor retrieval embed text through the model; workers and jobs only.
   ['the content embedding job or retrieval', /persistence\/src\/(content-embeddings|content-retrieval|run-content-embeddings)(\.js)?['"]/],
   ['the test fake endpoint', /ai-orchestration\/src\/testing\//],

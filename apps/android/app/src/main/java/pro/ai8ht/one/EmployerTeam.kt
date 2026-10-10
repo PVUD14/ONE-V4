@@ -81,7 +81,7 @@ internal fun employerTeamRoleLabel(role: String): String = when (role) {
     "EMPLOYER_OWNER" -> "Owner"
     "EMPLOYER_ADMIN" -> "Admin"
     "RECRUITER" -> "Recruiter"
-    else -> "NA"
+    else -> roleLabel(role)
 }
 
 internal fun employerTeamDeliveryLabel(state: String): String = when (state) {

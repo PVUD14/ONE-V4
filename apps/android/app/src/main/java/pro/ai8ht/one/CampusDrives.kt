@@ -196,7 +196,7 @@ internal fun RoleCampusDrives(employerId: String, opportunityId: String) {
     Text("Campus drives", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
     when (val current = state) {
         Load.Loading -> Text("Loading…", style = MaterialTheme.typography.bodySmall, color = muted)
-        is Load.Failed -> Text(current.message, style = MaterialTheme.typography.bodySmall, color = muted)
+        is Load.Failed -> Column { Text(current.message, style = MaterialTheme.typography.bodySmall, color = muted); SupportCode(current.reference) }
         is Load.Ready -> if (current.value.isEmpty()) {
             Text("No campus drives. Ask a college for one on the web, from Opportunity Detail.", style = MaterialTheme.typography.bodySmall, color = muted)
         } else current.value.forEach { drive ->

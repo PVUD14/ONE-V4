@@ -189,6 +189,34 @@ describe('Phase 1 API protected request path', () => {
     });
   });
 
+  it('reports each membership\'s own effective internal capabilities: the role baseline plus live grants', async () => {
+    const opsUserId = await seedUser('ops-context@example.test', 'sub:ops-context');
+    const granterId = await seedUser('granter-context@example.test', 'sub:granter-context');
+    const platformId = await seedOrg('PLATFORM', 'Platform');
+    const institutionId = await seedOrg('INSTITUTION', 'College C');
+    await seedMembership(opsUserId, platformId, 'OPERATIONS_ADMIN');
+    await seedMembership(opsUserId, institutionId, 'INSTITUTION_ADMIN');
+    const opsMembership = await pool.query<{ id: string }>('SELECT id FROM organization_memberships WHERE user_id = $1 AND role = $2', [opsUserId, 'OPERATIONS_ADMIN']);
+    await pool.query(
+      'INSERT INTO membership_capabilities (id,membership_id,capability,granted_by_user_id,reason_code) VALUES ($1,$2,$3,$4,$5)',
+      [randomUUID(), opsMembership.rows[0]!.id, 'CONTENT_REVIEW', granterId, 'NEW_RESPONSIBILITY'],
+    );
+
+    const response = await request(app.getHttpServer())
+      .get('/api/v1/security/context')
+      .set('Authorization', `Bearer ${signAccessToken(privateKey, { sub: 'sub:ops-context', email: 'ops-context@example.test' })}`)
+      .expect(200);
+
+    const memberships = response.body.memberships as { readonly role: string; readonly capabilities: readonly string[] }[];
+    const operations = memberships.find((membership) => membership.role === 'OPERATIONS_ADMIN')!;
+    expect(operations.capabilities).toEqual(expect.arrayContaining(['OPS_ORG_MANAGE', 'PRIVACY_REQUESTS', 'CONTENT_REVIEW']));
+    // Not held by an operations admin's baseline, and not granted here (ADR-032).
+    for (const capability of ['CATALOGUE_MANAGE', 'CONTENT_PUBLISH', 'SECURITY_ACCESS_REVIEW', 'INCIDENT_MANAGE', 'CAPABILITY_ADMIN', 'GROWTH_ADMIN']) {
+      expect(operations.capabilities).not.toContain(capability);
+    }
+    expect(memberships.find((membership) => membership.role === 'INSTITUTION_ADMIN')!.capabilities).toEqual([]);
+  });
+
   it('returns the current authenticated student profile from the verified principal only', async () => {
     const studentUserId = await seedUser('aanya.student@example.test', 'sub:aanya-student');
     const otherStudentUserId = await seedUser('other.student@example.test', 'sub:other-student');

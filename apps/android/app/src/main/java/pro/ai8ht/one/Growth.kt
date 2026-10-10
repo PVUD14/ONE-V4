@@ -32,8 +32,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.CurrencyRupee
-import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Handshake
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Map
@@ -81,11 +79,8 @@ private fun growthTeamLabel(team: String): String = when (team) {
     else -> prettify(team)
 }
 
-private fun growthRoleLabel(role: String): String = when (role.uppercase()) {
-    "GROWTH_MANAGER" -> "Regional manager"
-    "GROWTH_EXECUTIVE" -> "Growth executive"
-    else -> prettify(role)
-}
+/** The same job titles as every other screen and the web: "Regional Manager", "Growth Executive". */
+private fun growthRoleLabel(role: String): String = roleLabel(role.uppercase())
 
 private fun growthStaffTypeLabel(type: String?): String = when (type) {
     "EMPLOYEE" -> "Employee"
@@ -211,15 +206,19 @@ private fun GrowthHome(me: GrowthMeDto, onOpenField: () -> Unit) {
         }
         Spacer(Modifier.height(12.dp))
         // Every figure reads NA until its source exists: nothing here is invented.
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            StatCell(me.openLeads?.toString() ?: GROWTH_NA, "Open leads", Tone.Accent, Icons.Filled.Handshake, Modifier.weight(1f))
-            StatCell(me.visitsThisMonth?.toString() ?: GROWTH_NA, "Visits this month", Tone.Green, Icons.Filled.CalendarMonth, Modifier.weight(1f))
-        }
+        StatGrid(
+            listOf(
+                StatSpec(me.openLeads?.toString() ?: GROWTH_NA, "Open leads", Tone.Accent, Icons.Filled.Handshake, "Not reported yet"),
+                StatSpec(me.visitsThisMonth?.toString() ?: GROWTH_NA, "Visits this month", Tone.Green, Icons.Filled.CalendarMonth, "Not reported yet"),
+            ),
+            emptyReason = "Your lead and visit counts are not available right now.",
+        )
         Spacer(Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            StatCell(GROWTH_NA, "Target progress", Tone.Amber, Icons.Filled.Flag, Modifier.weight(1f))
-            StatCell(GROWTH_NA, "Commission this month", Tone.Violet, Icons.Filled.CurrencyRupee, Modifier.weight(1f))
-        }
+        // Targets and commission amounts have no source yet: one strip that names both slots.
+        NaSlotStrip(
+            listOf("Target progress" to GROWTH_NA, "Commission this month" to GROWTH_NA),
+            "Targets and commission amounts are not built yet. Commission shows what is credited to you.",
+        )
         Spacer(Modifier.height(12.dp))
         GrowthTodayCard(me.followUpsDue, onOpenField)
         Spacer(Modifier.height(10.dp))

@@ -23,6 +23,9 @@ import type {
 import { V2Bar, V2Stat } from '../dashboardsV2.js';
 import { StatusBadge } from '../studentComponents.js';
 import { formatApiError } from './shared.js';
+import { SupportCode } from '../supportCode.js';
+import { formatDateTime } from '../dates.js';
+import { codeLabel } from '../labels.js';
 
 const NA = 'NA';
 const windowChoices: readonly EngineHealthWindowDays[] = [7, 14, 30];
@@ -34,7 +37,7 @@ export function engineCount(count: EngineSuppressedCountDto | null | undefined):
   return count.value.toLocaleString();
 }
 
-const when = (value: string | null | undefined): string => (value ? new Date(value).toLocaleString() : NA);
+const when = (value: string | null | undefined): string => (value ? formatDateTime(value) : NA);
 
 function isPlanner(value: unknown): value is PlannerHealthDto {
   return Boolean(value) && Array.isArray((value as PlannerHealthDto).days);
@@ -79,7 +82,7 @@ export function EngineBehaviourPanels({ token }: { readonly token: string }): Re
 
   return <section className="role-card role-wide" aria-label="Learning engine health"><h2>Learning engine</h2>
     <p>How the adaptive engine is deciding: the planner&apos;s next steps and how often faculty overrode them, and how the mastery model running in shadow compares with the live bands. Counts only — no student, topic or college is named, and any figure standing for fewer than 5 people shows &lt;5. Nothing here is readiness, and nothing here calls a model.</p>
-    {forbiddenReference ? <p>Not permitted: these panels need AI Operations View. Reference: {forbiddenReference}</p> : null}
+    {forbiddenReference ? <p>Not permitted: these panels need AI Operations View. <SupportCode reference={forbiddenReference} /></p> : null}
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {loading && !data ? <p>Loading learning engine health…</p> : null}
 
@@ -184,7 +187,7 @@ export function EngineJobsPanels({ token }: { readonly token: string }): React.R
 
   return <div className="v2-row v2-cols-2 role-wide" aria-label="Learning engine jobs">
     <section className="role-card"><h2>Item calibration job</h2>
-      {forbiddenReference ? <p>Not permitted. Reference: {forbiddenReference}</p> : null}
+      {forbiddenReference ? <p>Not permitted. <SupportCode reference={forbiddenReference} /></p> : null}
       {error ? <p className="form-error" role="alert">{error}</p> : null}
       {loading && !data ? <p>Loading the calibration job…</p> : null}
       <p><StatusBadge label={status?.label ?? NA} tone={status?.tone ?? 'neutral'} /></p>
@@ -201,7 +204,7 @@ export function EngineJobsPanels({ token }: { readonly token: string }): React.R
         <div><dt>Algorithm</dt><dd>{run ? `${run.algorithmId} · ${run.library} · at least ${run.minResponses} responses per item` : NA}</dd></div>
       </dl>
       {run && Object.keys(run.items.provisionalByReason).length
-        ? <ul className="role-check-list">{Object.entries(run.items.provisionalByReason).map(([reason, count]) => <li key={reason}>{reason.toLowerCase().replaceAll('_', ' ')}: {count.toLocaleString()}</li>)}</ul>
+        ? <ul className="role-check-list">{Object.entries(run.items.provisionalByReason).map(([reason, count]) => <li key={reason}>{codeLabel(reason)}: {count.toLocaleString()}</li>)}</ul>
         : null}
       <p><small>Source: item_calibration_runs and item_calibrations. Recalibrated monthly and imported only when accepted; overdue after {calibration?.overdueAfterDays ?? 38} days.</small></p>
     </section>

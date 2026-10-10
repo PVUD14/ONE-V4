@@ -94,7 +94,7 @@ describe('admin Placement', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'View shared applications for Asha Local' }));
     const region = await screen.findByRole('region', { name: 'Shared applications for Asha Local' });
     expect(await within(region).findByText('Local Employer')).toBeInTheDocument();
-    expect(within(region).getByText('EXTENDED')).toBeInTheDocument();
+    expect(within(region).getByText('Extended')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'View shared applications for Ravi Local' })).not.toBeInTheDocument();
   });
 
@@ -129,12 +129,21 @@ describe('admin Placement', () => {
     expect(await screen.findByText('No students in your scope')).toBeInTheDocument();
   });
 
-  it('Student Detail carries the per-student placement status under the roster', async () => {
-    routes({ [`${base}/students`]: { students: [], scope: { kind: 'INSTITUTION' } }, [`${base}/units`]: { units: [] }, [`${base}/staff-role-assignments`]: { assignments: [] },
-      [`${base}/placement-status`]: { students: statusRows, nextCursor: null } });
+  it('Student Detail is one student: a chooser first, then their consented placement status and shared applications', async () => {
+    routes({ [`${base}/students`]: { students: [{ id: crypto.randomUUID(), studentUserId: asha, fullName: 'Asha Local', institutionStudentId: 'CSE-001', email: 'asha@example.test', status: 'ACTIVE', units: {} }], scope: { kind: 'INSTITUTION' } },
+      [`${base}/units`]: { units: [] }, [`${base}/placement-status`]: { students: statusRows, nextCursor: null },
+      [`${base}/students/${asha}/applications`]: { applications: [] }, [`${base}/students/${asha}/external-applications`]: { externalApplications: [] } });
     open('institution-admin', 'Student Detail', 'INSTITUTION_ADMIN');
-    const list = await screen.findByRole('region', { name: 'Placement status by student' });
-    expect(await within(list).findByText('Asha Local')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Student Detail', level: 1 })).toBeInTheDocument();
+    expect(screen.getByText('Choose a student to see their detail')).toBeInTheDocument();
+    // Not the roster a second time: no add, import or lifecycle controls here.
+    expect(screen.queryByRole('heading', { name: 'Add Student' })).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: 'Open detail for Asha Local' }));
+    const detail = await screen.findByRole('region', { name: 'Detail for Asha Local' });
+    await waitFor(() => expect(within(detail).getByText('Offer')).toBeInTheDocument());
+    expect(within(detail).getByText('CSE-001')).toBeInTheDocument();
+    expect(within(detail).getByText('Active')).toBeInTheDocument();
+    expect(await screen.findByRole('region', { name: 'Applications on ONE' })).toBeInTheDocument();
   });
 });
 
@@ -152,7 +161,7 @@ describe('placement officer and department head', () => {
     expect(within(table).getByRole('columnheader', { name: 'Placement status' })).toBeInTheDocument();
     await waitFor(() => expect(within(within(table).getByRole('row', { name: /Asha Local/ })).getByText('Offer')).toBeInTheDocument());
     expect(within(within(table).getByRole('row', { name: /Ravi Local/ })).getByText('Nothing shared')).toBeInTheDocument();
-    expect(within(table).getByRole('row', { name: /Asha Local/ })).toHaveTextContent('2026-09-20');
+    expect(within(table).getByRole('row', { name: /Asha Local/ })).toHaveTextContent('20 Sep 2026');
   });
 
   it('the roster reads NA in the status column when the status list is refused', async () => {
@@ -160,12 +169,28 @@ describe('placement officer and department head', () => {
       [`${base}/students`]: { students: [{ id: crypto.randomUUID(), studentUserId: asha, fullName: 'Asha Local', institutionStudentId: 'CSE-001', status: 'ACTIVE', units: {} }] },
       [`${base}/units`]: { units: [] }, [`${base}/placement-status`]: 'FORBIDDEN',
     });
-    open('placement-officer', 'Student Search', 'PLACEMENT_ADMIN');
+    open('placement-officer', 'Students', 'PLACEMENT_ADMIN');
     const table = await screen.findByRole('table', { name: 'Placement student roster' });
     // Cells: roll, department, batch, status, readiness, placement status, applications, last activity.
     await waitFor(() => expect(within(within(table).getByRole('row', { name: /Asha Local/ })).getAllByRole('cell')[5]).toHaveTextContent(/^NA$/));
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(document.body.textContent).not.toContain('upstream private detail');
+  });
+
+  it('Student Search is search-first: nothing is listed until something is typed', async () => {
+    routes({
+      [`${base}/students`]: { students: [
+        { id: crypto.randomUUID(), studentUserId: asha, fullName: 'Asha Local', institutionStudentId: 'CSE-001', status: 'ACTIVE', units: {} },
+        { id: crypto.randomUUID(), studentUserId: ravi, fullName: 'Ravi Local', institutionStudentId: 'CSE-002', status: 'ACTIVE', units: {} }] },
+      [`${base}/units`]: { units: [] }, [`${base}/placement-status`]: { students: statusRows, nextCursor: null },
+    });
+    open('placement-officer', 'Student Search', 'PLACEMENT_ADMIN');
+    expect(await screen.findByText('Search for a student')).toBeInTheDocument();
+    expect(screen.queryByRole('table', { name: 'Student search results' })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Search students'), { target: { value: 'ravi' } });
+    const table = await screen.findByRole('table', { name: 'Student search results' });
+    expect(within(table).getByRole('row', { name: /Ravi Local/ })).toBeInTheDocument();
+    expect(within(table).queryByRole('row', { name: /Asha Local/ })).not.toBeInTheDocument();
   });
 
   it('the department head\'s Placement Pipeline shows students by placement status', async () => {

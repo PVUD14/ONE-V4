@@ -10,7 +10,7 @@
  * discovery (EMP-14, talentPool.tsx); while it is switched off it says plainly that it is not
  * available, instead of borrowing the applicants list to look populated. No navigation item is added, removed, renamed or moved.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { getAccessToken } from '../auth.js';
 import { V2EmptyState } from '../dashboardsV2.js';
 import { StaffPilotWrap } from '../parityWraps.js';
@@ -19,14 +19,18 @@ import { CandidateDetailPanel } from '../applicationSnapshotView.js';
 import { EmployerConversationPanel } from '../applicationMessages.js';
 import { EmployerCandidateAssessmentsPanel } from '../employerAssessmentsPage.js';
 import { EmployerTalentPoolWorkspace } from '../talentPool.js';
+import { codeLabel } from '../labels.js';
+import { portalRecordFromHistory } from './shared.js';
 
 function humanise(value: string): string {
-  return value.replace(/_/g, ' ').toLowerCase().replace(/^./, (c) => c.toUpperCase());
+  return codeLabel(value);
 }
 
 export function EmployerCandidateDetailPage({ employerId }: { readonly employerId: string }): React.ReactElement {
   const [opportunities, setOpportunities] = useState<readonly EmployerOpportunityDto[]>([]);
-  const [opportunityId, setOpportunityId] = useState('');
+  // An Applicants row can open this page on one candidate; the choice arrives in history state.
+  const [opportunityId, setOpportunityId] = useState(() => portalRecordFromHistory('opportunityId') ?? '');
+  const pendingApplication = useRef(portalRecordFromHistory('applicationId'));
   const [applicants, setApplicants] = useState<readonly EmployerApplicantDto[]>([]);
   const [applicationId, setApplicationId] = useState('');
   const [status, setStatus] = useState('Loading your jobs…');
@@ -55,6 +59,9 @@ export function EmployerCandidateDetailPage({ employerId }: { readonly employerI
         if (abort.signal.aborted) return;
         setApplicants(response.applications);
         setStatus(response.applications.length ? '' : 'No applications for this job yet.');
+        const pending = pendingApplication.current;
+        pendingApplication.current = null;
+        if (pending && response.applications.some((item) => item.id === pending && item.candidateAccess !== false && !item.consentRevoked)) setApplicationId(pending);
       })
       .catch(() => { if (!abort.signal.aborted) setStatus('Applicants could not be loaded.'); });
     return () => abort.abort();

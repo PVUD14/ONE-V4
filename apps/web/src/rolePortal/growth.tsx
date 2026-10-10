@@ -21,6 +21,8 @@ import { GrowthLeadsPage } from './growthLeads.js';
 import { GrowthFieldPage } from './growthField.js';
 import { GrowthCommissionPage } from './growthCommission.js';
 import { AuthenticatedNotYetAvailable } from './shared.js';
+import { SupportCode } from '../supportCode.js';
+import { formatDate } from '../dates.js';
 
 const NA = 'NA';
 
@@ -65,7 +67,7 @@ export function GrowthHomePage(): React.ReactElement {
 
   if (state.kind === 'forbidden') {
     return <V2EmptyState icon="🔐" title="Not permitted" note="The Growth workspace is for AI8HT's partnerships staff. Your access has not changed."
-      {...(state.reference ? { hint: `Reference: ${state.reference}` } : {})} />;
+      {...(state.reference ? { hint: <SupportCode reference={state.reference} /> } : {})} />;
   }
   const me = state.kind === 'ready' ? state.me : null;
   const teams = me?.teams ?? [];
@@ -79,7 +81,7 @@ export function GrowthHomePage(): React.ReactElement {
             <h1>{greeting()} 👋</h1>
             <p>{state.kind === 'loading' ? 'Loading your growth details…'
               : state.kind === 'error' ? 'Your growth details could not be loaded. Try again shortly.'
-                : 'Your partnerships workspace. Pages fill in as each part of the Growth portal is built.'}</p>
+                : 'Your partnerships workspace. Some sections are not available yet and say so.'}</p>
             <div className="v2-hero-chips">
               <V2Chip tone="blue">{me ? roleLabels[me.role] ?? me.role : NA}</V2Chip>
               <V2Chip tone="slate">{me?.staffType ? staffTypeLabels[me.staffType] ?? me.staffType : 'Staff type not set'}</V2Chip>
@@ -106,7 +108,7 @@ export function GrowthHomePage(): React.ReactElement {
                       <span className="v2-tile teal" aria-hidden="true">{team.team === 'COLLEGE_PARTNERSHIPS' ? '🏛️' : '🏢'}</span>
                       <div className="grow"><strong>{teamLabels[team.team] ?? team.team}</strong>
                         <small>{team.manager ? `Manager: ${team.manager.email}` : 'No manager recorded'}</small></div>
-                      <V2Chip tone="green">Since {new Date(team.joinedAt).toLocaleDateString()}</V2Chip>
+                      <V2Chip tone="green">Since {formatDate(team.joinedAt)}</V2Chip>
                     </div>
                   ))}
                 </div>
@@ -179,7 +181,7 @@ export function GrowthTerritoryPage(): React.ReactElement {
 
   if (state.kind === 'forbidden') {
     return <V2EmptyState icon="🔐" title="Not permitted" note="Territory is for AI8HT's partnerships staff. Your access has not changed."
-      {...(state.reference ? { hint: `Reference: ${state.reference}` } : {})} />;
+      {...(state.reference ? { hint: <SupportCode reference={state.reference} /> } : {})} />;
   }
   const territory = state.kind === 'ready' ? state.territory : null;
   const regions = territory?.regions ?? [];
@@ -220,7 +222,7 @@ export function GrowthTerritoryPage(): React.ReactElement {
             <div className="v2-card-head"><h2>{region.name}</h2>
               <V2Chip tone={region.myRole === 'MANAGER' ? 'purple' : 'teal'}>{region.myRole === 'MANAGER' ? 'You manage this region' : 'You work this region'}</V2Chip>
               <V2Chip tone="amber">{typeof region.unownedLeads === 'number' ? `${region.unownedLeads} unowned lead${region.unownedLeads === 1 ? '' : 's'}` : `${NA} unowned leads`}</V2Chip></div>
-            <p className="v2-empty">{region.since ? `Since ${new Date(region.since).toLocaleDateString()}` : NA}</p>
+            <p className="v2-empty">{region.since ? `Since ${formatDate(region.since)}` : NA}</p>
             <div className="v2-hero-chips" aria-label={`Areas of ${region.name}`}>
               {region.areas.length ? region.areas.map((area) => <V2Chip key={`${area.stateCode}-${area.districtCode ?? 'all'}`} tone="slate">{areaLabel(area)}</V2Chip>)
                 : <span className="v2-empty">No areas yet — operations has not added any state or district to this region.</span>}

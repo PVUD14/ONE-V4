@@ -79,15 +79,9 @@ private val kindWord = mapOf("PRACTICE" to "Practice set", "LESSON" to "Lesson")
 internal fun StudentLearningActionsDto.hasLecturerWork(): Boolean =
     pendingOverride != null || assignments.any { it.status == "OPEN" }
 
-private fun whenText(value: String): String = runCatching {
-    java.time.OffsetDateTime.parse(value).atZoneSameInstant(java.time.ZoneId.systemDefault())
-        .format(java.time.format.DateTimeFormatter.ofPattern("d MMM, h:mm a"))
-}.getOrDefault("NA")
+private fun whenText(value: String): String = formatDateTime(value)
 
-private fun dayText(value: String): String = runCatching {
-    java.time.OffsetDateTime.parse(value).atZoneSameInstant(java.time.ZoneId.systemDefault())
-        .format(java.time.format.DateTimeFormatter.ofPattern("d MMM"))
-}.getOrDefault("NA")
+private fun dayText(value: String): String = formatDate(value)
 
 @Composable
 private fun Quiet(text: String) {

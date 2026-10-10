@@ -106,7 +106,7 @@ describe('the operator panel', () => {
     fireEvent.click(submit);
     await waitFor(() => expect(posts('/reviewers/m-2/grant')).toHaveLength(1));
     expect(bodyOf(posts('/reviewers/m-2/grant')[0]!)).toEqual({ reasonCode: 'FACULTY_REVIEWER_AGREED' });
-    expect(await screen.findByText(/can now be assigned drafts to review. Reference: corr-grant/)).toBeInTheDocument();
+    expect(await screen.findByText(/can now be assigned drafts to review.$/)).toBeInTheDocument();
   });
 
   it('assigns the selected drafts to a chosen reviewer for the chosen days', async () => {
@@ -147,11 +147,11 @@ describe('the operator panel', () => {
     routes['GET /operations/external-reviews/policy'] = () => failure(403, 'FORBIDDEN', 'corr-forbidden');
     render(<OperationsExternalReviewsPage />);
     expect(await screen.findByText('Not permitted')).toBeInTheDocument();
-    expect(screen.getByText('Reference: corr-forbidden')).toBeInTheDocument();
+    expect(screen.getByText('Support code: corrforb')).toBeInTheDocument();
     cleanup();
     routes['GET /operations/external-reviews/policy'] = () => failure(500, 'INTERNAL', 'corr-error');
     render(<OperationsExternalReviewsPage />);
-    expect(await screen.findByRole('alert')).toHaveTextContent('corr-error');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Support code: correrro');
   });
 });
 
@@ -183,7 +183,7 @@ describe('the faculty queue', () => {
     fireEvent.click(record);
     await waitFor(() => expect(posts('/content-reviews/a-2/decision')).toHaveLength(1));
     expect(bodyOf(posts('/content-reviews/a-2/decision')[0]!)).toEqual({ decision: 'REQUEST_CHANGES', reasonCode: 'CONTENT_INACCURATE', comment: 'Synthetic: option b is ambiguous.' });
-    expect(await screen.findByText(/Reference: corr-decided/)).toBeInTheDocument();
+    expect(await screen.findByText("Your decision is recorded and sent to ONE's reviewers.")).toBeInTheDocument();
   });
 
   it('says plainly when nothing is assigned, when access is absent, and hides itself where asked', async () => {
@@ -203,7 +203,7 @@ describe('the faculty queue', () => {
   it('shows an error with a reference', async () => {
     routes[`GET /institutions/${college}/content-reviews`] = () => failure(500, 'INTERNAL', 'corr-queue');
     render(<FacultyContentReviewsPage institutionId={college} />);
-    expect(await screen.findByRole('alert')).toHaveTextContent('corr-queue');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Support code: corrqueu');
   });
 });
 

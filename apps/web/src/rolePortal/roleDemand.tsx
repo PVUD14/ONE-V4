@@ -15,11 +15,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ApiRequestError, getProtectedAccessToken, getRoleDemandDetail, getRoleDemandSummary } from '../api.js';
 import type { RoleDemandCellDto, RoleDemandDetailResponseDto, RoleDemandPeopleCountDto, RoleDemandRoleDto, RoleDemandSummaryResponseDto } from '../api.js';
-import { V2Bar, V2EmptyState, V2Stat } from '../dashboardsV2.js';
+import { V2EmptyState, V2Stat } from '../dashboardsV2.js';
+import { CountBars, NaValue, SuppressionNote } from '../naState.js';
 import { StatusBadge } from '../studentComponents.js';
 import { formatApiError, RestrictedApiState } from './shared.js';
+import { SupportCode } from '../supportCode.js';
 
 const NA = 'NA';
+/** Roles listed before "Show all": the ranked head of the list; the rest stay one click away. */
+const ROLE_PAGE = 25;
 
 export function formatPeople(count: RoleDemandPeopleCountDto | undefined, complementary = false): string {
   if (!count) return NA;
@@ -38,7 +42,7 @@ function PromotionBadge({ role }: { readonly role: RoleDemandRoleDto }): React.R
 
 function CellList({ cells, empty }: { readonly cells: readonly RoleDemandCellDto[]; readonly empty: string }): React.ReactElement {
   if (!cells.length) return <p>{empty}</p>;
-  return <ul className="role-check-list">{cells.map((cell, index) => <li key={`${cell.label}:${index}`}>{cell.label}: <strong>{formatPeople(cell.students, cell.complementary)}</strong></li>)}</ul>;
+  return <ul className="role-check-list">{cells.map((cell, index) => <li key={`${cell.label}:${index}`}>{cell.label}: <strong><NaValue value={formatPeople(cell.students, cell.complementary)} /></strong></li>)}</ul>;
 }
 
 export function OperationsRoleDemandPage(): React.ReactElement {
@@ -92,7 +96,8 @@ export function OperationsRoleDemandPage(): React.ReactElement {
     (demand?.roles ?? []).filter((role) => !role.students.suppressed).forEach((role, index) => map.set(role.id, index + 1));
     return map;
   }, [demand]);
-  const trendMax = Math.max(1, ...(demand?.trend ?? []).map((month) => (month.students.suppressed ? 0 : month.students.value)));
+  const [showAllRoles, setShowAllRoles] = useState(false);
+  const shownRoles = showAllRoles ? visibleRoles : visibleRoles.slice(0, ROLE_PAGE);
 
   if (!token) return <RestrictedApiState title="Analytics" message="Sign in with an Operations identity to see role demand." />;
 
@@ -106,7 +111,7 @@ export function OperationsRoleDemandPage(): React.ReactElement {
     return <section className="role-module role-module--dense">{heading}
       <div className="role-wide"><V2EmptyState icon="🔐" title="Not permitted"
         note="Role demand is for staff who hold aggregate analytics access. Your access has not changed."
-        hint={`Reference: ${forbiddenReference}`} /></div></section>;
+        hint={<SupportCode reference={forbiddenReference} />} /></div></section>;
   }
 
   return <section className="role-module role-module--dense">
@@ -115,28 +120,28 @@ export function OperationsRoleDemandPage(): React.ReactElement {
     {loading && !summary ? <p>Loading role demand…</p> : null}
 
     <div className="v2-row v2-cols-4 career-stat-strip role-wide">
-      <V2Stat icon="🎯" tone="blue" value={formatPeople(demand?.totals.studentsWithTarget)} label="Students with a career target" />
+      <V2Stat icon="🎯" tone="blue" value={formatPeople(demand?.totals.studentsWithTarget)} label="Students with a career target" reason={demand ? 'Too few to show' : 'Not loaded'} />
       <V2Stat icon="🗂️" tone="purple" value={demand ? demand.totals.catalogueRoles.toLocaleString() : NA} label="Roles in the catalogue" />
       <V2Stat icon="🚀" tone="teal" value={demand ? demand.totals.rolesMeetingPromotionRule.toLocaleString() : NA} label="Roles meeting the promotion rule" />
-      <V2Stat icon="🏢" tone="amber" value={NA} label="Employer demand (not recorded)" />
+      <V2Stat icon="🏢" tone="amber" value={NA} label="Employer demand (not recorded)" reason="No employer request is linked to a role yet" />
     </div>
 
     <div className="v2-row v2-cols-2 role-wide">
       <section className="role-card"><h2>Demand by release label</h2>
         {demand?.byReleaseLabel?.length
-          ? <dl>{demand.byReleaseLabel.map((row) => <div key={row.releaseLabel}><dt>{releaseLabelText[row.releaseLabel] ?? row.releaseLabel} ({row.roles} roles)</dt><dd>{formatPeople(row.students, row.complementary)}</dd></div>)}</dl>
+          ? <dl>{demand.byReleaseLabel.map((row) => <div key={row.releaseLabel}><dt>{releaseLabelText[row.releaseLabel] ?? row.releaseLabel} ({row.roles} roles)</dt><dd><NaValue value={formatPeople(row.students, row.complementary)} /></dd></div>)}</dl>
           : <p>{NA}</p>}
         <p>{ruleText}</p>
         <p>Employer demand is NA: no job opportunity or employer request is linked to a career role in ONE yet, so the employer part of the rule cannot be read. &quot;Not met&quot; means not met on students alone.</p>
       </section>
       <section className="role-card"><h2>New target selections by month</h2>
         <p>Students who chose a career target in each month (UTC), whether or not they kept it.</p>
-        {demand?.trend?.length
-          ? <ul className="role-check-list" aria-label="Monthly trend">{demand.trend.map((month) => <li key={month.month}>
-              <span>{month.month}: <strong>{formatPeople(month.students)}</strong></span>
-              {month.students.suppressed ? null : <V2Bar percent={(month.students.value / trendMax) * 100} />}
-            </li>)}</ul>
-          : <p>{NA}</p>}
+        {demand?.trend?.length ? <>
+          <CountBars label="Monthly trend" labelHeading="Month" valueHeading="Students"
+            emptyReason="Every month had fewer than 5 new selections, so there is no trend to draw yet."
+            rows={demand.trend.map((month) => ({ label: month.month, display: formatPeople(month.students), value: month.students.suppressed ? null : month.students.value }))} />
+          {demand.trend.some((month) => month.students.suppressed) && demand.trend.some((month) => !month.students.suppressed) ? <SuppressionNote>A month with fewer than 5 new selections reads &quot;&lt;5&quot; and draws no bar.</SuppressionNote> : null}
+        </> : <p>{NA}</p>}
       </section>
     </div>
 
@@ -152,18 +157,23 @@ export function OperationsRoleDemandPage(): React.ReactElement {
       {demand && !demand.roles.length ? <V2EmptyState icon="🗂️" title="No career roles loaded" note="The job-role catalogue has not been loaded in this environment, so there is no demand to show." /> : null}
       {demand && demand.roles.length && !visibleRoles.length ? <p>No roles carry this release label.</p> : null}
       {demand?.rolesCapped ? <p>Showing the first 1,000 roles only.</p> : null}
-      {visibleRoles.length ? <div className="role-record-table-wrap"><table className="role-record-table">
+      {visibleRoles.length ? <div className="role-record-table-wrap"><table className="role-record-table" aria-label="Roles ranked by demand">
         <thead><tr><th>Rank</th><th>Role</th><th>Release label</th><th>Planned</th><th>Students</th><th>Colleges</th><th>Promotion rule</th><th>Actions</th></tr></thead>
-        <tbody>{visibleRoles.map((role) => <tr key={role.id}>
+        <tbody>{shownRoles.map((role) => <tr key={role.id}>
           <td>{ranks.get(role.id) ?? '—'}</td>
           <th scope="row">{role.catalogueCode ? `${role.catalogueCode} · ` : ''}{role.title}{role.active ? null : <><br /><small>Inactive</small></>}</th>
           <td>{releaseLabelText[role.releaseLabel ?? 'NONE']}</td>
           <td>{role.plannedRelease ?? NA}</td>
-          <td>{formatPeople(role.students)}</td>
-          <td>{role.colleges === null ? 'Withheld' : role.colleges.toLocaleString()}</td>
+          <td><NaValue value={formatPeople(role.students)} /></td>
+          <td><NaValue value={role.colleges === null ? 'Withheld' : role.colleges.toLocaleString()} /></td>
           <td><PromotionBadge role={role} /></td>
           <td><button type="button" className="secondary" onClick={() => setSelectedId(role.id)} aria-label={`Colleges for ${role.title}`}>Colleges…</button></td>
         </tr>)}</tbody></table></div> : null}
+      {visibleRoles.length > ROLE_PAGE ? <div className="role-management-form">
+        <p className="na-caption">{showAllRoles ? `Showing all ${visibleRoles.length.toLocaleString()} roles.` : `Showing the top ${ROLE_PAGE} of ${visibleRoles.length.toLocaleString()} roles by demand.`}</p>
+        <button type="button" className="secondary" onClick={() => setShowAllRoles((value) => !value)}>{showAllRoles ? `Show the top ${ROLE_PAGE} only` : `Show all ${visibleRoles.length.toLocaleString()} roles`}</button>
+      </div> : null}
+      {visibleRoles.some((role) => role.students.suppressed) ? <SuppressionNote>Muted figures are withheld: &quot;&lt;5&quot; is fewer than 5 students, and &quot;Withheld&quot; hides a college count that would let a small group be worked out. Roles under 5 have no rank.</SuppressionNote> : null}
     </section>
 
     {selectedId ? <section className="role-card role-wide" aria-label="Role demand by college">
@@ -180,7 +190,7 @@ export function OperationsRoleDemandPage(): React.ReactElement {
           <thead><tr><th>College</th><th>Students</th><th>Departments</th></tr></thead>
           <tbody>{detail.colleges.map((college, index) => <tr key={`${college.label}:${index}`}>
             <th scope="row">{college.label}</th>
-            <td>{formatPeople(college.students, college.complementary)}</td>
+            <td><NaValue value={formatPeople(college.students, college.complementary)} /></td>
             <td>{college.departments ? <CellList cells={college.departments} empty={NA} /> : 'Not shown for a withheld count'}</td>
           </tr>)}</tbody></table></div>
       </> : null}

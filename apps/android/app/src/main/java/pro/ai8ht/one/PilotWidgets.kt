@@ -115,12 +115,19 @@ fun StreakDots(active: List<Boolean>, letters: List<String>) {
     }
 }
 
-/** Weekly progress spark: filled polyline over the last-7 counts. */
+/**
+ * Weekly progress spark: filled polyline over the last-7 counts. With no counts to draw
+ * (the activity could not be read) the frame says so rather than drawing a flat line, which
+ * would read as seven days of nothing.
+ */
 @Composable
-fun WeekSpark(points: List<Int>, modifier: Modifier = Modifier) {
+fun WeekSpark(points: List<Int>?, modifier: Modifier = Modifier) {
     val palette = LocalOnePalette.current
+    if (points == null || !chartDrawable(points)) {
+        Box(modifier.fillMaxWidth()) { SuppressedChartNote("Not enough data yet") }
+        return
+    }
     Canvas(modifier.fillMaxWidth().height(72.dp)) {
-        if (points.isEmpty()) return@Canvas
         val max = (points.maxOrNull() ?: 0).coerceAtLeast(1).toFloat()
         val stepX = size.width / (points.size - 1).coerceAtLeast(1)
         val coords = points.mapIndexed { index, value ->

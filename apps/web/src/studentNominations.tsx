@@ -16,6 +16,7 @@ import { previewApplication, type ApplicationPreviewDto, type SnapshotChoicesInp
 import { venueModeLabels } from './api/campusDrives.js';
 import { acceptNomination, declineNomination, listMyNominations, studentNominationLabels, type StudentNominationDto } from './api/nominations.js';
 import { SnapshotSummary } from './applicationSnapshotView.js';
+import { formatDateTime } from './dates.js';
 
 const reasonWords: Readonly<Record<string, string>> = {
   MEETS_ELIGIBILITY: 'You meet the role\'s eligibility rules',
@@ -42,7 +43,7 @@ function messageFor(error: unknown, fallback: string): string {
 function formatWhen(value: string | null | undefined): string {
   if (!value) return 'NA';
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? 'NA' : date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  return Number.isNaN(date.getTime()) ? 'NA' : formatDateTime(date);
 }
 
 export function StudentNominationsCard({ onChanged }: { readonly onChanged?: () => void }): React.ReactElement | null {

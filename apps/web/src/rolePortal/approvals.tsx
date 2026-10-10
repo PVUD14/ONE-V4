@@ -36,6 +36,9 @@ import { purgeInstitutionOffboarding } from '../api/institutionContract.js';
 import { V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { StatusBadge } from '../studentComponents.js';
 import { formatApiError } from './shared.js';
+import { SupportCode } from '../supportCode.js';
+import { formatDateTime, formatTime } from '../dates.js';
+import { codeLabel } from '../labels.js';
 
 const noteLimit = 500;
 const states = [
@@ -53,7 +56,7 @@ export function describeApproval(approval: OperationApprovalDto): string {
   switch (approval.actionKey) {
     case 'ORGANIZATION_SUSPEND': return `Suspend ${summary.organizationName ?? 'NA'}`;
     case 'FEATURE_FLAG_HIGH_RISK_CHANGE': return `${summary.enabled ? 'Enable' : 'Disable'} flag ${summary.flagKey ?? 'NA'}`;
-    case 'OUTBOX_BACKLOG_SUPERSEDE': return `Supersede pending events older than ${summary.olderThan ? new Date(summary.olderThan).toLocaleString() : 'NA'} (up to ${summary.limit ?? 'NA'})`;
+    case 'OUTBOX_BACKLOG_SUPERSEDE': return `Supersede pending events older than ${summary.olderThan ? formatDateTime(summary.olderThan) : 'NA'} (up to ${summary.limit ?? 'NA'})`;
     case 'PRIVACY_HOLD_RELEASE': return `Release a legal hold (${summary.holdReason ?? 'NA'})`;
     case 'CAPABILITY_GRANT_HIGH_RISK': return `Grant ${summary.capability ?? 'NA'} to ${summary.memberEmail ?? 'NA'}`;
     case 'CAREER_REQUIREMENT_SET_PUBLISH':
@@ -157,7 +160,7 @@ export function OperationsApprovalsPanel(): React.ReactElement | null {
     return <section className="role-module role-module--dense">{heading}
       <div className="role-wide"><V2EmptyState icon="🔐" title="Not permitted"
         note="The approvals queue is for staff who can perform or approve high-risk actions. Your access has not changed."
-        hint={`Reference: ${forbiddenReference}`} /></div></section>;
+        hint={<SupportCode reference={forbiddenReference} />} /></div></section>;
   }
 
   const approvals = queue?.approvals ?? [];
@@ -198,10 +201,10 @@ export function OperationsApprovalsPanel(): React.ReactElement | null {
         <thead><tr><th>Action</th><th>Requested by</th><th>Reason</th><th>State</th><th>Expires</th><th>Decision</th><th>Actions</th></tr></thead>
         <tbody>{approvals.map((approval) => <tr key={approval.id}>
           <td><strong>{approval.actionLabel}</strong><br />{describeApproval(approval)}{approval.note ? <><br /><small>{approval.note}</small></> : null}</td>
-          <td>{approval.requestedBy.email}{approval.requestedBy.isSelf ? <><br /><small>You</small></> : null}<br /><small>{new Date(approval.requestedAt).toLocaleString()}</small></td>
-          <td>{approval.reasonCode}</td>
+          <td>{approval.requestedBy.email}{approval.requestedBy.isSelf ? <><br /><small>You</small></> : null}<br /><small>{formatDateTime(approval.requestedAt)}</small></td>
+          <td>{codeLabel(approval.reasonCode)}</td>
           <td><StatusBadge label={approval.state} tone={stateTone(approval.state)} /></td>
-          <td>{new Date(approval.expiresAt).toLocaleString()}</td>
+          <td>{formatDateTime(approval.expiresAt)}</td>
           <td>{approval.decidedBy
             ? <>{approval.decidedBy.email} · {approval.decisionReasonCode}{approval.mode === 'SOLO' ? <><br /><StatusBadge label="SOLO" tone="warning" /></> : null}
               {approval.soloNotice === 'NOT_DELIVERED' ? <><br /><small>Notice not delivered — no email sender is configured.</small></> : null}
@@ -211,7 +214,7 @@ export function OperationsApprovalsPanel(): React.ReactElement | null {
             {approval.canApprove ? <button type="button" className="pilot-btn" onClick={() => setDeciding({ approval, decision: 'APPROVE' })}>Approve…</button> : null}
             {approval.canReject ? <button type="button" className="secondary" onClick={() => setDeciding({ approval, decision: 'REJECT' })}>Reject…</button> : null}
             {approval.approveRefusal === 'APPROVAL_SOLO_COOLING_OFF'
-              ? <small>You can approve your own request from {new Date(approval.coolingOffEndsAt).toLocaleTimeString()} (solo).</small> : null}
+              ? <small>You can approve your own request from {formatTime(approval.coolingOffEndsAt)} (solo).</small> : null}
             {approval.canExecute ? <button type="button" className="pilot-btn" disabled={executing === approval.id}
               onClick={() => void execute(approval)}>{executing === approval.id ? 'Working…' : 'Execute'}</button> : null}
           </div></td>
@@ -252,7 +255,7 @@ function DecisionDialog({ token, approval, decision, reasons, onCancel, onDone }
       <dl>
         <div><dt>Action</dt><dd>{describeApproval(approval)}</dd></div>
         <div><dt>Requested by</dt><dd>{approval.requestedBy.email}</dd></div>
-        <div><dt>Reason given</dt><dd>{approval.reasonCode}</dd></div>
+        <div><dt>Reason given</dt><dd>{codeLabel(approval.reasonCode)}</dd></div>
         {approval.requestedBy.isSelf && approve ? <div><dt>Solo</dt><dd>You are approving your own request as the only approver. It will be marked SOLO in the audit record.</dd></div> : null}
       </dl>
       <form onSubmit={(event) => void submit(event)} noValidate>

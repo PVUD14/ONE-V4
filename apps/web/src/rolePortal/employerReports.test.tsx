@@ -109,7 +109,7 @@ describe('EMP-15 employer Dashboard', () => {
     expect(within(kpi('Total Applicants')).getByText('41')).toBeInTheDocument();
     expect(within(kpi('Total Applicants')).getByText('4 new in 7 days')).toBeInTheDocument();
     expect(within(kpi('In Pipeline')).getByText('30')).toBeInTheDocument();
-    expect(within(kpi('Offers Extended')).getByText('1')).toBeInTheDocument();
+    expect(within(kpi('Offers Pending')).getByText('1')).toBeInTheDocument();
     expect(within(kpi('Hires')).getByText('6')).toBeInTheDocument();
     expect(screen.getByText('2 awaiting colleges')).toBeInTheDocument();
     expect(screen.getByText('1 drive needs your changes.')).toBeInTheDocument();
@@ -129,7 +129,7 @@ describe('EMP-15 employer Dashboard', () => {
     routes({ summaryStatus: 500 });
     render(<EmployerDashboardV3 basePath="/employer/recruiter" />);
     expect(await screen.findByText('Your hiring figures could not be loaded, so they read NA.')).toBeInTheDocument();
-    for (const label of ['Open Roles', 'Total Applicants', 'In Pipeline', 'Offers Extended', 'Hires']) expect(within(kpi(label)).getByText('NA')).toBeInTheDocument();
+    for (const label of ['Open Roles', 'Total Applicants', 'In Pipeline', 'Offers Pending', 'Hires']) expect(within(kpi(label)).getByText('NA')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Hiring Funnel' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Pipeline Mix' })).toBeInTheDocument();
     expect(screen.getByText('Interviews this week could not be counted — NA.')).toBeInTheDocument();
@@ -152,7 +152,14 @@ describe('EMP-15 employer Reports', () => {
     const engineer = within(byJob).getByRole('row', { name: /Graduate engineer/ });
     expect(within(engineer).getByText('9')).toBeInTheDocument();
     expect(within(engineer).getByText('Withheld')).toBeInTheDocument();
-    expect(within(engineer).getAllByText('<5').length).toBe(12);
+    // Every stage except Applied is <5 in every broken-down job, so those twelve columns fold into
+    // one strip under the table: each stage is still named, and still reads <5.
+    expect(within(engineer).queryAllByText('<5')).toHaveLength(0);
+    const folded = within(within(byJob).getByRole('list', { name: 'Funnel by job: stages under 5 in every row' })).getAllByRole('listitem');
+    expect(folded.map((slot) => slot.textContent)).toEqual(['Screening <5', 'Shortlisted <5', 'Assessment <5', 'Interview <5', 'Offer <5', 'Hired <5',
+      'Left at applied <5', 'Left at screening <5', 'Left at shortlisted <5', 'Left at assessment <5', 'Left at interview <5', 'Left at offer <5']);
+    expect(within(byJob).getByRole('columnheader', { name: 'Applied' })).toBeInTheDocument();
+    expect(within(byJob).queryByRole('columnheader', { name: 'Hired' })).toBeNull();
     expect(within(within(byJob).getByRole('row', { name: /Data analyst/ })).getByText('Fewer than 5 applications — not broken down.')).toBeInTheDocument();
 
     const byCollege = screen.getByRole('heading', { name: 'Funnel by college' }).closest('section') as HTMLElement;
@@ -174,7 +181,7 @@ describe('EMP-15 employer Reports', () => {
     routes({ reportsStatus: 403 });
     render(<EmployerRecruiterRealityPage portal={portal} routeLabel="Reports" />);
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('Reference: corr-reports-1');
+    expect(alert).toHaveTextContent('Support code: corrrepo');
     expect(alert.textContent).not.toMatch(/stack|Error:/);
     expect(screen.getByRole('heading', { name: 'Funnel by college' })).toBeInTheDocument();
   });

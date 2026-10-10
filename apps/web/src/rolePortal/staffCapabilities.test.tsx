@@ -60,13 +60,13 @@ describe('Staff and capabilities', () => {
   it('renders each platform membership with its baseline and explicit grants from the server', async () => {
     render(<OperationsStaffCapabilitiesPage />);
     const row = (await screen.findByText('security.lead@example.test')).closest('tr')!;
-    expect(within(row).getByText('SECURITY_ADMIN')).toBeInTheDocument();
+    expect(within(row).getByText('Security Admin')).toBeInTheDocument();
     expect(within(row).getByText('2 capabilities')).toBeInTheDocument();
-    expect(within(row).getByText('INCIDENT_MANAGE')).toBeInTheDocument();
-    expect(within(row).getByText(/NEW_RESPONSIBILITY/)).toBeInTheDocument();
+    expect(within(row).getByText('Incident manage')).toBeInTheDocument();
+    expect(within(row).getByText(/New responsibility/)).toBeInTheDocument();
     // Already-held and faculty-only capabilities are not offered.
     const options = within(within(row).getByLabelText('Capability for security.lead@example.test')).getAllByRole('option').map((option) => option.textContent);
-    expect(options).toEqual(['Choose…', 'SUPPORT_CASES', 'PRIVACY_HOLDS (high-risk)']);
+    expect(options).toEqual(['Choose…', 'Support cases', 'Privacy holds (high-risk)']);
     expect(screen.getByText('Staff memberships').previousSibling).toHaveTextContent('2');
     expect(screen.getByText('Live explicit grants').previousSibling).toHaveTextContent('1');
   });
@@ -83,14 +83,14 @@ describe('Staff and capabilities', () => {
     const row = (await screen.findByText('security.lead@example.test')).closest('tr')!;
     fireEvent.change(within(row).getByLabelText('Capability for security.lead@example.test'), { target: { value: 'SUPPORT_CASES' } });
     fireEvent.click(within(row).getByRole('button', { name: 'Grant…' }));
-    const dialog = screen.getByRole('dialog', { name: 'Grant SUPPORT_CASES' });
+    const dialog = screen.getByRole('dialog', { name: 'Grant Support cases' });
     expect(within(dialog).getByText('No second approval is required.')).toBeInTheDocument();
     const confirm = within(dialog).getByRole('button', { name: 'Confirm grant' });
     expect(confirm).toBeDisabled();
     expect(posts()).toHaveLength(0);
     fireEvent.change(within(dialog).getByLabelText(/Reason code/), { target: { value: 'TEMPORARY_COVER' } });
     fireEvent.click(confirm);
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('SUPPORT_CASES granted to security.lead@example.test.'));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Support cases granted to security.lead@example.test.'));
     const [url, init] = posts()[0]!;
     expect(String(url)).toContain(`/api/v1/operations/staff/${securityMembership}/capabilities`);
     expect(JSON.parse(String(init.body))).toEqual({ capability: 'SUPPORT_CASES', reasonCode: 'TEMPORARY_COVER' });
@@ -103,13 +103,13 @@ describe('Staff and capabilities', () => {
     const row = (await screen.findByText('security.lead@example.test')).closest('tr')!;
     fireEvent.change(within(row).getByLabelText('Capability for security.lead@example.test'), { target: { value: 'PRIVACY_HOLDS' } });
     fireEvent.click(within(row).getByRole('button', { name: 'Grant…' }));
-    const dialog = screen.getByRole('dialog', { name: 'Grant PRIVACY_HOLDS' });
+    const dialog = screen.getByRole('dialog', { name: 'Grant Privacy holds' });
     expect(within(dialog).getByText(/approval required from a second person/)).toBeInTheDocument();
     const submit = within(dialog).getByRole('button', { name: 'Request approval' });
     expect(submit).toBeDisabled();
     fireEvent.change(within(dialog).getByLabelText(/Reason code/), { target: { value: 'NEW_RESPONSIBILITY' } });
     fireEvent.click(submit);
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Approval requested: Grant PRIVACY_HOLDS.'));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Approval requested: Grant Privacy holds.'));
     const [url, init] = posts()[0]!;
     expect(String(url)).toContain('/api/v1/operations/approvals');
     expect(JSON.parse(String(init.body))).toEqual({
@@ -121,8 +121,8 @@ describe('Staff and capabilities', () => {
   it('revokes a grant with a revoke reason code', async () => {
     render(<OperationsStaffCapabilitiesPage />);
     const row = (await screen.findByText('security.lead@example.test')).closest('tr')!;
-    fireEvent.click(within(row).getByRole('button', { name: 'Revoke INCIDENT_MANAGE from security.lead@example.test' }));
-    const dialog = screen.getByRole('dialog', { name: 'Revoke INCIDENT_MANAGE' });
+    fireEvent.click(within(row).getByRole('button', { name: 'Revoke Incident manage from security.lead@example.test' }));
+    const dialog = screen.getByRole('dialog', { name: 'Revoke Incident manage' });
     const reasons = within(within(dialog).getByLabelText(/Reason code/)).getAllByRole('option').map((option) => option.textContent);
     expect(reasons).toEqual(['Choose a reason…', 'RESPONSIBILITY_ENDED', 'LEAVER']);
     fireEvent.change(within(dialog).getByLabelText(/Reason code/), { target: { value: 'LEAVER' } });
@@ -150,13 +150,13 @@ describe('Staff and capabilities', () => {
     fetchMock.mockImplementation(() => failure(403, 'FORBIDDEN', 'corr-forbidden-1'));
     render(<OperationsStaffCapabilitiesPage />);
     expect(await screen.findByText('Not permitted')).toBeInTheDocument();
-    expect(screen.getByText('Reference: corr-forbidden-1')).toBeInTheDocument();
+    expect(screen.getByText('Support code: corrforb')).toBeInTheDocument();
   });
 
   it('shows an error with the correlation id and no internal detail', async () => {
     fetchMock.mockImplementation(() => failure(500, 'INTERNAL', 'corr-error-1'));
     render(<OperationsStaffCapabilitiesPage />);
-    expect(await screen.findByRole('alert')).toHaveTextContent('Unable to load staff and capabilities. Reference: corr-error-1');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Unable to load staff and capabilities. Support code: correrro');
   });
 
   it('asks for sign-in when there is no token', () => {

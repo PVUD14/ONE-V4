@@ -151,7 +151,7 @@ describe('EMP-11 placement officer: drive approvals and the one-offer policy on 
     });
     officerDashboard();
     const section = await screen.findByRole('region', { name: 'Campus drive approvals' });
-    expect(await within(section).findByRole('alert')).toHaveTextContent('Reference: corr-drives');
+    expect(await within(section).findByRole('alert')).toHaveTextContent('Support code: corrdriv');
   });
 });
 

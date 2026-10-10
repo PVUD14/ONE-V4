@@ -27,6 +27,7 @@ import {
 import { V2Stat } from '../dashboardsV2.js';
 import { StaffPilotWrap } from '../parityWraps.js';
 import { formatApiError } from './shared.js';
+import * as dates from '../dates.js';
 
 export const employerTeamRoleLabels: Readonly<Record<EmployerTeamRole, string>> = {
   EMPLOYER_OWNER: 'Owner',
@@ -63,7 +64,7 @@ type PendingAction =
 function formatDate(value: string | null): string {
   if (!value) return 'NA';
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? 'NA' : date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  return Number.isNaN(date.getTime()) ? 'NA' : dates.formatDate(date);
 }
 
 function deliveryNote(state: string): string {

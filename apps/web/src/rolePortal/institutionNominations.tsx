@@ -29,6 +29,7 @@ import {
   type NominationCandidateDto,
 } from '../api/nominations.js';
 import { formatApiError } from './shared.js';
+import { formatDate } from '../dates.js';
 
 const skippedWords: Readonly<Record<string, string>> = {
   ALREADY_NOMINATED: 'already nominated', NOT_ELIGIBLE: 'not eligible', NOT_IN_SCOPE: 'not a current student in your scope',
@@ -127,7 +128,7 @@ export function DriveNominationsPanel({ institutionId, driveId }: { readonly ins
             <td>{row.studentName}</td><td>{row.institutionStudentId ?? 'NA'}</td>
             <td><span className="hiring-tag">{collegeResponseLabels[row.response]}</span>{row.cancelReasonCode ? <span className="hiring-meta"> · {reasonLabel(row.cancelReasonCode)}</span> : null}</td>
             <td>{reasonLabel(row.reasonCode)}</td>
-            <td>{row.nominatedAt ? new Date(row.nominatedAt).toLocaleDateString() : 'NA'}</td>
+            <td>{row.nominatedAt ? formatDate(row.nominatedAt) : 'NA'}</td>
             <td>{row.canCancel ? <button type="button" className="secondary" disabled={busy} onClick={() => { setCancelling(row); setError(''); }}>Withdraw nomination</button> : <span className="hiring-meta">—</span>}</td>
           </tr>)}</tbody>
         </table></div>

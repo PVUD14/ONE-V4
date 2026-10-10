@@ -14,6 +14,7 @@ import { InstitutionWorkspaceError, RestrictedApiState, formatApiError, isInstit
 import { DepartmentStaffSection } from './institutionDepartment.js';
 import type { AuthenticatedWorkspaceSummary } from './shared.js';
 import { useEffect, useState } from 'react';
+import { supportCodeSuffix } from '../supportCode.js';
 
 /** Why an assignment is created; recorded with it. */
 export const teachingAssignmentReasons = [
@@ -37,7 +38,7 @@ function assignmentLabel(assignment: TeachingAssignmentDto): string {
 }
 
 function loadError(error: unknown, fallback: string): string {
-  if (error instanceof ApiRequestError && error.status === 403) return `You do not have permission to view this. Reference: ${error.correlationId}`;
+  if (error instanceof ApiRequestError && error.status === 403) return `You do not have permission to view this.${supportCodeSuffix(error.correlationId)}`;
   return formatApiError(error, fallback);
 }
 

@@ -94,14 +94,15 @@ describe('All-role portal registry and preview workflows', () => {
       window.history.pushState(null, '', path);
       render(<App />);
       expect(screen.getByText('ONE PLATFORM')).toBeInTheDocument();
-      expect(screen.getByRole('img', { name: 'ONE by AI8HT' })).toHaveAttribute('src', '/assets/one-logo-light.png');
+      expect(screen.getByRole('img', { name: 'ONE by AI8HT' })).toHaveAttribute('src', '/assets/one-logo-dark.png');
       expect(document.title).toBe('Sign in | ONE by AI8HT');
       expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
       expect(screen.getByText('LEARN | PREPARE | BUILD | GROW')).toBeInTheDocument();
       expect(screen.getByLabelText('Email')).toHaveAttribute('autocomplete', 'username');
       expect(screen.getByLabelText('Password')).toHaveAttribute('autocomplete', 'current-password');
       expect(screen.getByRole('button', { name: 'Sign in' })).toBeDisabled();
-      expect(screen.getByText(/Secure sign-in is not available in this UAT environment yet/i)).toBeInTheDocument();
+      expect(screen.getByText(/Sign-in is not available right now/i)).toBeInTheDocument();
+      expect(screen.queryByText(/\bUAT\b|Cognito/)).not.toBeInTheDocument();
       expect(screen.queryByText(/Cognito UAT login is not configured/i)).not.toBeInTheDocument();
       expect(screen.queryByText('Rahul Kumar')).not.toBeInTheDocument();
     }
@@ -115,7 +116,7 @@ describe('All-role portal registry and preview workflows', () => {
     expect(window.location.pathname).toBe('/employer-access');
     expect(screen.getByRole('heading', { name: 'Request employer access' })).toBeInTheDocument();
     const logo = screen.getByRole('img', { name: 'ONE by AI8HT' });
-    expect(logo).toHaveAttribute('src', '/assets/one-logo-light.png');
+    expect(logo).toHaveAttribute('src', '/assets/one-logo-dark.png');
     expect(screen.getByLabelText('Work email')).toBeInTheDocument();
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/employer-access-requests'))).toBe(false);
   });
@@ -137,7 +138,7 @@ describe('All-role portal registry and preview workflows', () => {
       window.history.pushState(null, '', path);
       render(<App />);
       expect(screen.getByRole('heading', { name: 'Sign in required' })).toBeInTheDocument();
-      expect(screen.getByText(/does not use role selection, fixture data, or browser-stored demo identities/i)).toBeInTheDocument();
+      expect(screen.getByText(/portal is only for people with an account/i)).toBeInTheDocument();
       expect(screen.queryByText('Rahul Kumar')).not.toBeInTheDocument();
     }
   });
@@ -237,8 +238,8 @@ describe('All-role portal registry and preview workflows', () => {
     window.history.pushState(null, '', '/operations/admin/organizations');
     render(<App />);
     expect(screen.getByRole('heading', { name: 'Sign in required' })).toBeInTheDocument();
-    expect(screen.getByText(/operations portal is protected/i)).toBeInTheDocument();
-    expect(screen.getByText(/Cognito is not configured, so this route fails closed/i)).toBeInTheDocument();
+    expect(screen.getByText(/operations portal is only for people with an account/i)).toBeInTheDocument();
+    expect(screen.getByText(/Sign-in is not available right now, so this page stays closed/i)).toBeInTheDocument();
     expect(screen.queryByText('ABC Engineering College')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Update preview queue status/i })).not.toBeInTheDocument();
   });
@@ -311,7 +312,7 @@ describe('All-role portal registry and preview workflows', () => {
     render(<App />);
     expect(screen.getByRole('heading', { name: 'Accept organization invitation' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Sign in required' })).toBeInTheDocument();
-    expect(screen.getByText(/raw invitation token is read only from this link and is not stored/i)).toBeInTheDocument();
+    expect(screen.getByText(/invitation link is used only on this page and is not saved in your browser/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sign in' })).toBeDisabled();
     expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/health'), expect.anything());
     expect(fetchMock).not.toHaveBeenCalledWith(expect.stringContaining('/api/v1/invitations/accept'), expect.anything());
@@ -412,7 +413,7 @@ describe('All-role portal registry and preview workflows', () => {
       return { ok: false };
     });
     render(<App />);
-    expect(await screen.findByRole('alert')).toHaveTextContent('We could not load your ONE workspace. Reference: ctx-500');
+    expect(await screen.findByRole('alert')).toHaveTextContent('We could not load your ONE workspace. Support code: ctx500');
     expect(screen.getByRole('button', { name: 'Retry workspace' })).toBeInTheDocument();
   });
 
@@ -433,7 +434,9 @@ describe('All-role portal registry and preview workflows', () => {
     render(<App />);
     fireEvent.click(await screen.findByRole('button', { name: 'Retry workspace' }));
     await waitFor(() => expect(window.location.pathname).toBe('/institution/admin'));
-    await waitFor(() => expect(screen.getByText('Placement Dashboard')).toBeInTheDocument());
+    // The administrator lands on their own home, not the placement officer's dashboard.
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Institution Administration', level: 1 })).toBeInTheDocument());
+    expect(screen.queryByText('Placement Dashboard')).not.toBeInTheDocument();
     expect(screen.queryByText(/Rahul Kumar/)).not.toBeInTheDocument();
   });
 

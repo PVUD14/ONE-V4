@@ -196,7 +196,7 @@ private fun AttemptBody(
             ) { Text(if (busy) "Submitting…" else "Submit") }
             Spacer(Modifier.height(8.dp))
             Text(
-                "You can submit once. Your answers are scored on the server.",
+                "You can submit once. ONE scores your answers after you submit.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

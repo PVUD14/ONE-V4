@@ -151,7 +151,7 @@ describe('admin Settings', () => {
   it('shows a safe error without upstream text', async () => {
     fetchMock.mockResolvedValue({ ok: false, status: 403, json: async () => ({ message: 'private stack' }) });
     render(<InstitutionSettingsPage authenticatedWorkspace={{ organizationId: institutionId, role: 'INSTITUTION_ADMIN' }} />);
-    expect((await screen.findAllByRole('alert'))[0]).toHaveTextContent('Reference:');
+    expect((await screen.findAllByRole('alert'))[0]).toHaveTextContent('Support code:');
     expect(screen.queryByText(/private stack/)).not.toBeInTheDocument();
   });
 });

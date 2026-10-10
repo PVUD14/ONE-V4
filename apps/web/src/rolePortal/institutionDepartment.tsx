@@ -45,6 +45,8 @@ import { placementStatusLabels } from './institutionPlacementStatus.js';
 import { go } from '../pilotParity/naWidgets.js';
 import { InstitutionWorkspaceError, RestrictedApiState, formatApiError, isInstitutionStaffWorkspace } from './shared.js';
 import type { AuthenticatedWorkspaceSummary } from './shared.js';
+import { supportCodeSuffix } from '../supportCode.js';
+import { PilotKpi } from '../naState.js';
 
 type WorkspaceProps = { readonly authenticatedWorkspace?: AuthenticatedWorkspaceSummary | undefined };
 
@@ -66,7 +68,7 @@ export const offerResponseLabels: Readonly<Record<string, string>> = {
 
 /** A load error as the screen may show it: plain words and the reference, never upstream text. */
 export function loadError(error: unknown, fallback: string): string {
-  if (error instanceof ApiRequestError && error.status === 403) return `You do not have permission to view this. Reference: ${error.correlationId}`;
+  if (error instanceof ApiRequestError && error.status === 403) return `You do not have permission to view this.${supportCodeSuffix(error.correlationId)}`;
   return formatApiError(error, fallback);
 }
 
@@ -102,10 +104,7 @@ export function PageHead({ title, summary, scopeLabel }: { readonly title: strin
 
 export function Kpis({ items }: { readonly items: readonly (readonly [string, string, string, typeof Users])[] }): React.ReactElement {
   return <div className={`pilot-row cols-${items.length}`}>
-    {items.map(([label, value, tone, Icon]) => <section key={label} className="pilot-card pilot-kpi">
-      <span className={`pilot-tile ${tone}`}><Icon size={17} /></span>
-      <div><b>{value}</b><small>{label}</small></div>
-    </section>)}
+    {items.map(([label, value, tone, Icon]) => <PilotKpi key={label} icon={<Icon size={17} />} tone={tone} value={value} label={label} />)}
   </div>;
 }
 
@@ -207,7 +206,7 @@ export function DepartmentOverviewPage({ authenticatedWorkspace, basePath }: Wor
   </div></div>;
 }
 
-function VerificationCard({ summary, onOpen }: { readonly summary: VerificationSummaryDto | null; readonly onOpen: () => void }): React.ReactElement {
+export function VerificationCard({ summary, onOpen }: { readonly summary: VerificationSummaryDto | null; readonly onOpen: () => void }): React.ReactElement {
   return <section className="pilot-card">
     <div className="pilot-card-head"><h2>Academic Verification</h2><button type="button" className="pilot-link" onClick={onOpen}>Review Queue</button></div>
     <div className="pilot-legend">

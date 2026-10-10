@@ -1,0 +1,79 @@
+<!doctype html>
+<!--
+  The AI8HT ribbon 8 as a faint, solid block of blue ice, turning in 3D. Kept as a standalone
+  piece after Divakar took it off the sign-in page (it did not fit there), so it can be shown
+  or reused. Edge layers stacked through the depth give it thickness; a band masked to the
+  logo sweeps each face like light off metal.
+
+  Serve this folder over http (the mask image will not load from file://), for example:
+    python -m http.server 8088      then open http://localhost:8088
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI8HT Ice Eight</title>
+  <style>
+    :root { --bg: #f6f8fb; --opacity: .55; --turn: 18s; }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #0b0f1a; --opacity: .8; } }
+    :root[data-theme="dark"] { --bg: #0b0f1a; --opacity: .8; }
+    html, body { height: 100%; margin: 0; }
+    body { display: grid; place-items: center; background: var(--bg); overflow: hidden; font-family: system-ui, sans-serif; }
+    .controls { position: fixed; top: 16px; right: 16px; display: flex; gap: 8px; }
+    .controls button { padding: 8px 12px; border: 1px solid #cdd7ea; border-radius: 10px; background: #fff; color: #17264a; cursor: pointer; }
+
+    .eight { --h: min(88vh, 860px); width: calc(var(--h) * 603 / 1160); height: var(--h); perspective: 1800px; opacity: var(--opacity); }
+    .solid { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; animation: turn var(--turn) linear infinite; }
+    .solid > * { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .edge { transform: translateZ(var(--z)); }
+    .edge.rim { filter: brightness(1.7) saturate(.7); }
+    .face img { display: block; width: 100%; height: 100%; }
+    .front { transform: translateZ(15px); backface-visibility: hidden; }
+    .back { transform: rotateY(180deg) translateZ(15px); backface-visibility: hidden; }
+    .sheen {
+      position: absolute; inset: 0;
+      background: linear-gradient(105deg, transparent 34%, rgba(170, 215, 255, .55) 42%, #fff 47%, rgba(225, 242, 255, .95) 50%, rgba(150, 200, 255, .5) 55%, transparent 63%);
+      background-size: 320% 100%;
+      -webkit-mask: url('ai8ht-eight-ice.webp') center / 100% 100% no-repeat;
+      mask: url('ai8ht-eight-ice.webp') center / 100% 100% no-repeat;
+      mix-blend-mode: screen;
+      animation: sheen 6s ease-in-out infinite;
+    }
+    .back .sheen { animation-delay: -3s; }
+    @keyframes turn { from { transform: rotateX(8deg) rotateY(0deg); } to { transform: rotateX(8deg) rotateY(360deg); } }
+    @keyframes sheen { 0% { background-position: 120% 0; } 60%, 100% { background-position: -20% 0; } }
+    @media (prefers-reduced-motion: reduce) {
+      .solid { animation: none; transform: rotateX(8deg) rotateY(-24deg); }
+      .sheen { animation: none; background-position: 50% 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="controls">
+    <button type="button" id="theme">Toggle background</button>
+  </div>
+  <div class="eight" aria-hidden="true"><div class="solid" id="solid"></div></div>
+  <script>
+    const solid = document.getElementById('solid');
+    const layers = 13;
+    for (let index = 0; index < layers; index++) {
+      const edge = document.createElement('img');
+      edge.src = 'ai8ht-eight-ice-edge.webp';
+      edge.alt = '';
+      edge.className = 'edge' + (index === 0 || index === layers - 1 ? ' rim' : '');
+      edge.style.setProperty('--z', `${(-14 + index * (28 / (layers - 1))).toFixed(1)}px`);
+      solid.appendChild(edge);
+    }
+    for (const side of ['front', 'back']) {
+      const face = document.createElement('span');
+      face.className = `face ${side}`;
+      face.innerHTML = '<img src="ai8ht-eight-ice.webp" alt=""><i class="sheen"></i>';
+      solid.appendChild(face);
+    }
+    document.getElementById('theme').addEventListener('click', () => {
+      const root = document.documentElement;
+      root.dataset.theme = root.dataset.theme === 'dark' ? 'light' : 'dark';
+    });
+  </script>
+</body>
+</html>

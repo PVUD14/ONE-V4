@@ -87,7 +87,11 @@ export const getProtectedAccessToken = getCareerReadinessAccessToken;
 export interface SecurityContextDto {
   readonly userId: string;
   readonly selectedOrganizationId?: string | null;
-  readonly memberships: readonly { readonly organizationId: string; readonly role: string; readonly scope: Record<string, string | undefined> }[];
+  /**
+   * `capabilities` is the caller's own effective internal capabilities on that membership
+   * (ADR-032: baseline plus live grants). Absent from an older API, which means "unknown".
+   */
+  readonly memberships: readonly { readonly organizationId: string; readonly role: string; readonly scope: Record<string, string | undefined>; readonly capabilities?: readonly string[] }[];
   readonly studentRelationships?: readonly { readonly institutionId: string; readonly state: string; readonly effectiveFrom: string; readonly effectiveTo?: string | null }[];
   /** INST-10: relationships the person left by graduating, transferring or ending; they keep the student workspace. */
   readonly formerStudentRelationships?: readonly { readonly institutionId: string; readonly state: string; readonly effectiveFrom: string; readonly effectiveTo?: string | null }[];

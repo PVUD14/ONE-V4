@@ -102,7 +102,7 @@ describe('Security: privacy and consent console', () => {
     const table = (await screen.findByText('PR-1A2B3C4D')).closest('table')!;
     const row = within(table).getByText('PR-1A2B3C4D').closest('tr')!;
     expect(within(row).getByText('l***@college.example')).toBeInTheDocument();
-    expect(within(row).getByText('RECEIVED')).toBeInTheDocument();
+    expect(within(row).getByText('Received')).toBeInTheDocument();
     // Statutory deadline column: NA, because no DPDP period is defined in code.
     expect(within(row).getAllByRole('cell')[4]).toHaveTextContent('NA');
     expect(screen.getByText(/no DPDP response period is defined in ONE yet/)).toBeInTheDocument();
@@ -195,7 +195,7 @@ describe('Security: privacy and consent console', () => {
   it('shows an error with its reference, and NA in every tile', async () => {
     queueResponse = () => failure(500, 'INTERNAL', 'corr-broken');
     render(<OperationsPrivacyConsolePage />);
-    expect(await screen.findByText(/Reference: corr-broken/)).toBeInTheDocument();
+    expect(await screen.findByText(/Support code: corrbrok/)).toBeInTheDocument();
     expect(screen.getByText('Erasures due in 7 days', { selector: 'small' }).previousSibling).toHaveTextContent('NA');
   });
 
@@ -203,7 +203,7 @@ describe('Security: privacy and consent console', () => {
     queueResponse = () => failure(403, 'FORBIDDEN', 'corr-denied');
     render(<OperationsPrivacyConsolePage />);
     expect(await screen.findByText('Not permitted')).toBeInTheDocument();
-    expect(screen.getByText('Reference: corr-denied')).toBeInTheDocument();
+    expect(screen.getByText('Support code: corrdeni')).toBeInTheDocument();
   });
 
   it('asks for sign-in without a token', () => {

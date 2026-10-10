@@ -118,7 +118,7 @@ describe('Cohort readiness by career role', () => {
     route({ viewError: refused('REPORT_PERIOD_INVALID', 400) });
     render(<CohortReadinessByRoleSection institutionId={institutionId} />);
     await chooseRole(`role:${roleId}`);
-    const alert = await screen.findByText(/Choose a whole calendar month that has ended\. Reference: corr-17/);
+    const alert = await screen.findByText(/Choose a whole calendar month that has ended\. Support code: corr17/);
     expect(alert).toBeInTheDocument();
     expect(document.body.textContent).not.toContain('upstream private detail');
   });
@@ -150,7 +150,7 @@ describe('Cohort readiness by career role', () => {
     const form = await screen.findByRole('form', { name: 'Run a preparation sprint' });
     fireEvent.change(within(form).getByLabelText('Reason'), { target: { value: 'ESSENTIAL_GAP' } });
     fireEvent.click(within(form).getByRole('button', { name: 'Start the sprint' }));
-    expect(await screen.findByText(/No current student in your scope has a gap in this requirement.*Reference: corr-17/)).toBeInTheDocument();
+    expect(await screen.findByText(/No current student in your scope has a gap in this requirement.*Support code: corr17/)).toBeInTheDocument();
   });
 
   it('lists sprints with progress as counts, and ends one early with a reason', async () => {

@@ -115,7 +115,7 @@ describe('Counselling notes section', () => {
     api.cases.mockRejectedValue(new ApiRequestError({ status: 403, correlationId: 'corr-123', detail: 'internal stack trace' }));
     render(<CounsellingNotesSection institutionId="inst-1" />);
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('Counselling notes for this student are not available to you. Reference: corr-123.');
+    expect(alert).toHaveTextContent('Counselling notes for this student are not available to you. Support code: corr123.');
     expect(document.body.textContent).not.toMatch(/stack trace/);
     expect(screen.getByText('NA — counselling notes unavailable.')).toBeInTheDocument();
   });

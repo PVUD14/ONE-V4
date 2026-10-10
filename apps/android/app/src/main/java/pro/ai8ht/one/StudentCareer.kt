@@ -220,7 +220,7 @@ internal fun AcademicRecordsPage(onClose: () -> Unit) {
             val data = (state as? Load.Ready)?.value
             when {
                 state is Load.Loading -> LoadingSpinner()
-                state is Load.Failed -> FailedState(state.message) { reload += 1 }
+                state is Load.Failed -> FailedState(state.message, state.reference) { reload += 1 }
                 data == null || data.qualifications.isEmpty() -> EmptyState(
                     Icons.Filled.School, Tone.Violet, "No academic record yet",
                     "Add the programme you studied, then ask the institution that issued it to confirm your results. " +

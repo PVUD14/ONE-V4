@@ -35,11 +35,12 @@ import {
 import { describeEvidence } from './skillEvidence.js';
 import { V2EmptyState } from './dashboardsV2.js';
 import { StaffPilotWrap } from './parityWraps.js';
+import * as dates from './dates.js';
 
 function formatDate(value: string | null | undefined): string {
   if (!value) return 'NA';
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? 'NA' : date.toLocaleDateString();
+  return Number.isNaN(date.getTime()) ? 'NA' : dates.formatDate(date);
 }
 
 const invitationStateLabels: Readonly<Record<string, string>> = {

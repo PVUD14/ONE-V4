@@ -47,7 +47,7 @@ private fun disputeStateLabel(state: String): String = when (state) {
 
 private const val CREDIT_NA = "NA"
 
-private fun shortDate(value: String?): String = value?.take(10) ?: CREDIT_NA
+private fun shortDate(value: String?): String = formatDate(value, CREDIT_NA)
 
 @Composable
 internal fun GrowthCreditCard() {

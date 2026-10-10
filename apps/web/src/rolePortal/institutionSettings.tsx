@@ -36,6 +36,7 @@ import type { AuthenticatedWorkspaceSummary } from './shared.js';
 import { PlacementPoliciesSection } from './institutionCampusDrives.js';
 import { DriveCategoriesSection } from './institutionPlacementRegister.js';
 import { InstitutionDataTermsSection, InstitutionExitSection } from './institutionContract.js';
+import * as dates from '../dates.js';
 
 const notProvided = 'Not provided';
 
@@ -70,7 +71,7 @@ export const academicTermArchiveReasons = [
 function formatDate(value: string | null | undefined): string {
   if (!value) return 'NA';
   const date = new Date(value.length === 10 ? value + 'T00:00:00' : value);
-  return Number.isNaN(date.getTime()) ? 'NA' : date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  return Number.isNaN(date.getTime()) ? 'NA' : dates.formatDate(date);
 }
 
 function minutesToTime(minutes: number): string {

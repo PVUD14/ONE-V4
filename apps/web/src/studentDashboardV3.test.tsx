@@ -11,6 +11,14 @@ import * as api from './api.js';
 import { StudentDashboardV3 } from './studentDashboardV3.js';
 import type { StudentStaffActionDto } from './api/student.js';
 
+/** All five readiness-factor slots are present, each labelled and saying NA, with the reason stated once. */
+function expectFiveUnprojectedFactors(): void {
+  const slots = within(screen.getByRole('list', { name: 'Readiness factors without a projection' })).getAllByRole('listitem');
+  expect(slots).toHaveLength(5);
+  for (const slot of slots) expect(slot).toHaveTextContent(/ NA$/);
+  expect(screen.getByText('No evidence recorded yet.')).toBeInTheDocument();
+}
+
 const apiState = vi.hoisted(() => ({
   token: 'learner-token' as string | null,
   learner: null as Record<string, unknown> | null,
@@ -285,7 +293,8 @@ describe('StudentDashboardV3 readiness presentation', () => {
     expect(screen.getByText('2. Developing (current)')).toBeInTheDocument();
     expect(screen.getByText('Professional Communication')).toBeInTheDocument();
     expect(screen.getByText('2 active evidence records')).toBeInTheDocument();
-    expect(screen.getByText('2 active evidence records evaluated by career-readiness-mastery-v1')).toBeInTheDocument();
+    // The explanation only repeats the count and names the internal model, so it is not shown.
+    expect(screen.queryByText(/career-readiness-mastery-v1/)).not.toBeInTheDocument();
     expect(document.body.textContent).not.toContain('/100');
   });
 
@@ -297,7 +306,7 @@ describe('StudentDashboardV3 readiness presentation', () => {
 
     expect(await screen.findByText('No advisory band yet')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Readiness band unavailable' })).toBeInTheDocument();
-    expect(screen.getAllByText('No mastery projection available.')).toHaveLength(5);
+    expectFiveUnprojectedFactors();
     expect(document.body.textContent).not.toContain('/100');
   });
 
@@ -309,7 +318,7 @@ describe('StudentDashboardV3 readiness presentation', () => {
     expect(await screen.findByRole('heading', { name: 'Career Readiness Band' })).toBeInTheDocument();
     expect(screen.getByText('No advisory band yet')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Readiness band unavailable' })).toBeInTheDocument();
-    expect(screen.getAllByText('No mastery projection available.')).toHaveLength(5);
+    expectFiveUnprojectedFactors();
     expect(document.body.textContent).not.toContain('/100');
   });
 });
@@ -407,7 +416,7 @@ describe('StudentDashboardV3 student reports', () => {
     render(<StudentDashboardV3 studentName="Aanya Rao" />);
 
     expectUnavailableReports(await screen.findByRole('region', { name: 'Your Reports' }));
-    expect(screen.getAllByText('No mastery projection available.')).toHaveLength(5);
+    expectFiveUnprojectedFactors();
     expect(document.body.innerHTML).not.toContain('/100');
   });
 
@@ -457,10 +466,10 @@ describe('StudentDashboardV3 student reports', () => {
     expect([...applications.querySelectorAll('time')].map((time) => time.dateTime)).toEqual([
       '2026-08-01T09:00:00Z', '2026-08-05T12:00:00Z',
     ]);
-    expect(within(reports).getByText(/Latest available snapshots, newest first \(up to 100\)/)).toBeInTheDocument();
-    expect(within(reports).getByText(/Attempts used excludes any attempt still in progress/)).toBeInTheDocument();
-    expect(within(reports).getByText(/Available assignments ordered by start date \(up to 100\)/)).toBeInTheDocument();
-    expect(within(reports).getByText(/up to 200.*This is not a lifetime total/)).toBeInTheDocument();
+    expect(within(reports).getByText(/Your 100 most recent readiness steps, newest first/)).toBeInTheDocument();
+    expect(within(reports).getByText(/Attempts used does not count an attempt still in progress/)).toBeInTheDocument();
+    expect(within(reports).getByText(/Up to 100 of your assigned assessments, by start date/)).toBeInTheDocument();
+    expect(within(reports).getByText(/Your 200 most recently updated applications/)).toBeInTheDocument();
     expect(reports.innerHTML).not.toMatch(/private-|87|\/\s*100/);
   });
 

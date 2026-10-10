@@ -31,6 +31,29 @@ describe('API-backed Career Readiness surfaces', () => {
     expect(document.body.textContent).not.toContain('@');
   });
 
+  it('keeps Readiness about the advisory band and Skills about each skill, never a number', async () => {
+    const topics = [{ id: 'topic-1', stableKey: 'networking', name: 'Networking basics', description: '' }, { id: 'topic-2', stableKey: 'siem', name: 'SIEM triage', description: '' }];
+    const banded = { ...learner, catalog: { ...catalog, topics },
+      evidence: [{ id: 'evidence-1', evidenceType: 'ASSESSMENT', topicId: 'topic-1', demonstrated: 3, possible: 4 }],
+      mastery: [{ id: 'mastery-1', topicId: 'topic-1', band: 'PROGRESSING', evidenceIds: ['evidence-1'] }],
+      readiness: { id: 'readiness-1', band: 'PROGRESSING', advisory: true, employerVisible: false,
+        explanation: { factors: [{ topicId: 'topic-1', masteryBand: 'PROGRESSING', explanation: 'Assessment evidence on networking.' }] } },
+      readinessHistory: [{ id: 'history-1', band: 'DEVELOPING', modelVersionId: 'model-2', generatedAt: '2026-09-01T00:00:00.000Z' }] };
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => ({ ok: true, json: async () => url.endsWith('/oauth2/token') ? { access_token: 'test-access-token' } : url.endsWith('/catalog') ? { ...catalog, topics } : banded })));
+    await authenticateThroughHostedUiCallback();
+    const { rerender } = render(<CareerReadinessApiPanel route="readiness" />);
+    expect(await screen.findByText('Current advisory band')).toBeInTheDocument();
+    expect(screen.getByText('Assessment evidence on networking.', { exact: false })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Developing' })).toBeInTheDocument();
+    expect(screen.queryByText('Skills in this pathway')).not.toBeInTheDocument();
+    rerender(<CareerReadinessApiPanel route="skills" />);
+    expect(await screen.findByText('Skills in this pathway')).toBeInTheDocument();
+    expect(screen.getByText('Networking basics')).toBeInTheDocument();
+    expect(screen.queryByText('Current advisory band')).not.toBeInTheDocument();
+    expect(screen.queryByText('Advisory band')).not.toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/\d+\s*%/);
+  });
+
   it('lets a student choose the lesson language; a lesson with no published version in it is shown in English with a notice (ENG-16)', async () => {
     const lesson = (id: string, over: Record<string, unknown>) => ({ id, stableKey: id, version: 1, topicId: 'topic-1', prerequisiteLessonIds: [], ...over });
     const telugu = {
@@ -79,7 +102,7 @@ describe('API-backed Career Readiness surfaces', () => {
     render(<OperationsCareerReadinessPanel />);
     await waitFor(() => expect(screen.getByText('11 quarantined records.')).toBeInTheDocument());
     expect(screen.getByText('1 workflow')).toBeInTheDocument();
-    expect(screen.getByText(/No source database, event payload, recipient address, or secret/)).toBeInTheDocument();
+    expect(screen.getByText(/Source data, message contents, recipient addresses and secrets are never shown here/)).toBeInTheDocument();
   });
 });
 

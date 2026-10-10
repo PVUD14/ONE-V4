@@ -142,14 +142,14 @@ describe('incident register', () => {
   it('shows an error with its reference', async () => {
     listResponse = () => failure(500, 'INTERNAL', 'corr-broken-1');
     render(<OperationsIncidentRegisterPage />);
-    expect(await screen.findByRole('alert')).toHaveTextContent('Reference: corr-broken-1');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Support code: corrbrok');
   });
 
   it('shows a forbidden state with the reference to a caller without Incident Manage', async () => {
     listResponse = () => failure(403, 'FORBIDDEN', 'corr-denied-7');
     render(<OperationsIncidentRegisterPage />);
     expect(await screen.findByText('Not permitted')).toBeInTheDocument();
-    expect(screen.getByText('Reference: corr-denied-7')).toBeInTheDocument();
+    expect(screen.getByText('Support code: corrdeni')).toBeInTheDocument();
   });
 
   it('shows NA for the clock of an incident that is not a breach', async () => {
@@ -279,7 +279,7 @@ describe('status communications', () => {
     expect(within(dialog).getByText(/from the approved wording only/)).toBeInTheDocument();
     fireEvent.change(within(dialog).getByLabelText(/Reason code/), { target: { value: 'APPROVED_FOR_SEND' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Confirm' }));
-    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Rate limit: a notice for this incident was approved in the last 15 minutes, or 6 in the last day. Reference: corr-limit-3');
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Rate limit: a notice for this incident was approved in the last 15 minutes, or 6 in the last day. Support code: corrlimi');
   });
 
   it('leaves a notice the viewer drafted to another person, and marks a solo approval', async () => {
@@ -307,7 +307,7 @@ describe('status communications', () => {
     expect(within(dialog).getByText(/15-minute cooling-off\) and is marked Solo/)).toBeInTheDocument();
     fireEvent.change(within(dialog).getByLabelText(/Reason code/), { target: { value: 'APPROVED_FOR_SEND' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Confirm' }));
-    expect(await within(dialog).findByRole('alert')).toHaveTextContent(/The solo cooling-off has not passed: you can approve your own notice from .+\. Reference: corr-cool-1/);
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(/The solo cooling-off has not passed: you can approve your own notice from .+\. Support code: corrcool/);
   });
 
   it('shows empty states plainly', async () => {
@@ -321,13 +321,13 @@ describe('status communications', () => {
     templatesResponse = () => failure(403, 'FORBIDDEN', 'corr-denied-9');
     render(<OperationsCommunicationsPage />);
     expect(await screen.findByText('Not permitted')).toBeInTheDocument();
-    expect(screen.getByText('Reference: corr-denied-9')).toBeInTheDocument();
+    expect(screen.getByText('Support code: corrdeni')).toBeInTheDocument();
   });
 
   it('shows an error with its reference', async () => {
     templatesResponse = () => failure(500, 'INTERNAL', 'corr-broken-4');
     render(<OperationsCommunicationsPage />);
-    expect(await screen.findByRole('alert')).toHaveTextContent('Reference: corr-broken-4');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Support code: corrbrok');
   });
 });
 

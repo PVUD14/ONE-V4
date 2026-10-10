@@ -10,6 +10,8 @@ import { useState } from 'react';
 import { ApiRequestError, commitRelationshipBatch, previewRelationshipBatch } from '../api.js';
 import type { InstitutionUnitDto, RelationshipBatchPreviewDto, RelationshipBatchRequest, RelationshipBatchState } from '../api.js';
 import { formatApiError } from './shared.js';
+import { supportCodeSuffix } from '../supportCode.js';
+import { formatDate } from '../dates.js';
 
 const actions: readonly (readonly [RelationshipBatchState, string, string])[] = [
   ['GRADUATED', 'Graduate', 'graduated'],
@@ -36,7 +38,7 @@ const unitKindLabels: Readonly<Record<string, string>> = { CAMPUS: 'Campus', DEP
 
 function batchErrorMessage(error: unknown): string {
   if (error instanceof ApiRequestError) {
-    const reference = ` Reference: ${error.correlationId}`;
+    const reference = supportCodeSuffix(error.correlationId);
     switch (error.code) {
       case 'BATCH_PREVIEW_STALE': return `The roster changed since your preview. Nothing was saved — preview again.${reference}`;
       case 'EFFECTIVE_DATE_IN_FUTURE': return `The date cannot be in the future. Prepare the batch now and commit it on the day.${reference}`;
@@ -114,7 +116,7 @@ export function YearEndBatchPanel({ token, institutionId, units, onChanged }: {
     setBusy(true);
     try {
       const result = await commitRelationshipBatch(token, institutionId, { ...preview.request, previewDigest: preview.batch.digest, reasonCode: reason });
-      const when = new Date(result.batch.effectiveTo).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+      const when = formatDate(result.batch.effectiveTo);
       setPreview(null);
       onChanged(`${result.batch.changed} student${result.batch.changed === 1 ? '' : 's'} recorded as ${words} from ${when}. They keep their ONE accounts and will be notified.`);
     } catch (cause) {

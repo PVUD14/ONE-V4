@@ -97,11 +97,11 @@ describe('AI Operations console', () => {
     const row = await featureRow('career.summary');
     expect(within(row).getByText('37 of 100 this day')).toBeInTheDocument();
     expect(within(row).getByText('12,345 / 6,789')).toBeInTheDocument();
-    expect(within(row).getByText('PASS')).toBeInTheDocument();
+    expect(within(row).getByText('Pass')).toBeInTheDocument();
     expect(within(row).getByText('NA')).toBeInTheDocument();
     expect(screen.getByText('Cost (no price table)').previousSibling?.textContent).toBe('NA');
     expect(screen.getByText('1 of 2')).toBeInTheDocument();
-    expect(screen.getByText('CAP_EXCEEDED')).toBeInTheDocument();
+    expect(screen.getByText('Cap exceeded')).toBeInTheDocument();
     expect(screen.getByText(costText)).toBeInTheDocument();
     expect(await screen.findByText('Current verdict')).toBeInTheDocument();
     expect(screen.getByText('Prompt: NA (not declared)')).toBeInTheDocument();
@@ -237,12 +237,12 @@ describe('AI Operations console', () => {
   it('shows an error with its reference, and a forbidden state', async () => {
     summaryResponse = () => failure(500, 'INTERNAL', 'corr-broken');
     render(<OperationsAiOperationsPage />);
-    expect(await screen.findByText(/Reference: corr-broken/)).toBeInTheDocument();
+    expect(await screen.findByText(/Support code: corrbrok/)).toBeInTheDocument();
     cleanup();
     summaryResponse = () => failure(403, 'FORBIDDEN', 'corr-denied');
     render(<OperationsAiOperationsPage />);
     expect(await screen.findByText('Not permitted')).toBeInTheDocument();
-    expect(screen.getByText('Reference: corr-denied')).toBeInTheDocument();
+    expect(screen.getByText('Support code: corrdeni')).toBeInTheDocument();
   });
 });
 

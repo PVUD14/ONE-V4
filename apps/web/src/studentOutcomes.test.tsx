@@ -91,7 +91,7 @@ describe('After college (student Profile)', () => {
     fireEvent.change(await screen.findByLabelText('What did you go on to do?'), { target: { value: 'ENTREPRENEURSHIP' } });
     fireEvent.click(screen.getByRole('button', { name: 'Share with Synthetic Institute' }));
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('You can share this only with a college you study at or graduated from. Reference: corr-outcome');
+    expect(alert).toHaveTextContent('You can share this only with a college you study at or graduated from. Support code: corroutc');
     expect(screen.queryByText(/upstream detail text/)).not.toBeInTheDocument();
   });
 

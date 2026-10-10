@@ -8,6 +8,7 @@
  */
 import { useEffect, useState } from 'react';
 import { listMySharedCounsellingNotes, type SharedCounsellingNoteDto } from './api/counselling.js';
+import { formatDate } from './dates.js';
 
 const writerRoles: Readonly<Record<string, string>> = {
   INSTITUTION_OWNER: 'college administration', INSTITUTION_ADMIN: 'college administration', PLACEMENT_ADMIN: 'placement office',
@@ -31,7 +32,7 @@ export function SharedCounsellingNotes({ token, institutionId }: { readonly toke
         : notes.length ? <ul className="pilot-list" aria-label="Shared counselling notes">{notes.map((note) => {
           const writer = Object.hasOwn(writerRoles, note.authorRole) ? writerRoles[note.authorRole] : null;
           const written = Number.isFinite(Date.parse(note.createdAt))
-            ? new Date(note.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : 'NA';
+            ? formatDate(note.createdAt) : 'NA';
           return <li key={note.id} className="pilot-list-row"><div className="grow">
             <strong>{note.title}</strong>
             <p>{note.note}</p>

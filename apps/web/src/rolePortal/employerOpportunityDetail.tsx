@@ -35,6 +35,9 @@ import { StaffPilotWrap } from '../parityWraps.js';
 import { formatApiError } from './shared.js';
 import { OpportunityRequirementsEditor, OpportunityRequirementsSection } from './employerOpportunityRequirements.js';
 import { EmployerCampusDrivesSection } from './employerCampusDrives.js';
+import { supportCodeSuffix } from '../supportCode.js';
+import { formatDateTime } from '../dates.js';
+import { codeLabel } from '../labels.js';
 
 const actionLabels: Readonly<Record<OpportunityLifecycleAction, string>> = {
   PAUSE: 'Pause', CLOSE: 'Close', REOPEN: 'Reopen', WITHDRAW: 'Withdraw',
@@ -72,12 +75,12 @@ const stateNotes: Readonly<Record<string, string>> = {
 };
 
 function humanise(value: string): string {
-  return value.replace(/_/g, ' ').toLowerCase().replace(/^./, (c) => c.toUpperCase());
+  return codeLabel(value);
 }
 function formatDate(value: string | null | undefined): string {
   if (!value) return 'NA';
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? 'NA' : date.toLocaleString();
+  return Number.isNaN(date.getTime()) ? 'NA' : formatDateTime(date);
 }
 function pay(version: OpportunityVersionTermsDto): string {
   if (!version.compensationDisclosed || !version.compensationMin || !version.compensationCurrency) return 'Not disclosed';
@@ -121,7 +124,7 @@ export function EmployerOpportunityDetailPage({ employerId }: { readonly employe
     }).catch((cause: unknown) => {
       if (controller.signal.aborted) return;
       setError(cause instanceof ApiRequestError && cause.code === 'EMPLOYER_ORGANISATION_INACTIVE'
-        ? `Your employer account is suspended or was not approved, so your jobs are not available. Reference: ${cause.correlationId}`
+        ? `Your employer account is suspended or was not approved, so your jobs are not available.${supportCodeSuffix(cause.correlationId)}`
         : formatApiError(cause, 'Your jobs could not be loaded.'));
     });
     return () => controller.abort();

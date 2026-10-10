@@ -104,18 +104,16 @@ internal fun CalendarPage(onClose: () -> Unit) {
 }
 
 private val dayFormat = DateTimeFormatter.ofPattern("EEEE d MMMM")
-private val timeFormat = DateTimeFormatter.ofPattern("HH:mm")
 
 private fun dayOf(iso: String): String =
     runCatching { Instant.parse(iso).atZone(ZoneId.systemDefault()).format(dayFormat) }.getOrDefault("Scheduled")
 
 /** A deadline is a moment: showing a range would invent a duration nobody recorded. */
 private fun timeRange(entry: CalendarEntryDto): String {
-    val start = runCatching { Instant.parse(entry.startsAt).atZone(ZoneId.systemDefault()).format(timeFormat) }
-        .getOrDefault("")
+    val start = formatTime(entry.startsAt, fallback = "")
     val end = entry.endsAt
         ?.takeIf { it != entry.startsAt }
-        ?.let { runCatching { Instant.parse(it).atZone(ZoneId.systemDefault()).format(timeFormat) }.getOrNull() }
+        ?.let { formatTime(it, fallback = "") }?.takeIf { it.isNotEmpty() }
     return if (end == null) start else "$start – $end"
 }
 

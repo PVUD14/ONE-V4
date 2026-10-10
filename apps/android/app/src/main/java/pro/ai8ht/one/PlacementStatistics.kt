@@ -87,7 +87,7 @@ internal fun PlacementStatisticsSection(statistics: ScopedView<PlacementStatisti
                 Text("NA — placement statistics could not be loaded right now.", style = MaterialTheme.typography.bodySmall, color = muted)
                 return@Column
             }
-            Text("As of ${data.asOf.lastDay}", style = MaterialTheme.typography.labelMedium, color = muted)
+            Text("As of ${formatDate(data.asOf.lastDay)}", style = MaterialTheme.typography.labelMedium, color = muted)
             Spacer(Modifier.height(8.dp))
             Row {
                 StatCell(countText(data.overall.eligible), "Eligible", Tone.Accent, Icons.Filled.School, Modifier.weight(1f))
@@ -105,7 +105,7 @@ internal fun PlacementStatisticsSection(statistics: ScopedView<PlacementStatisti
             ).forEach { (label, value) ->
                 Row(Modifier.padding(vertical = 3.dp)) {
                     Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
-                    Text(value, style = MaterialTheme.typography.bodySmall, color = muted)
+                    NaValueText(value, MaterialTheme.typography.bodySmall)
                 }
             }
             if (data.groups.isNotEmpty()) {
@@ -123,8 +123,19 @@ internal fun PlacementStatisticsSection(statistics: ScopedView<PlacementStatisti
             if (data.offersByMonth.isNotEmpty()) {
                 Spacer(Modifier.height(10.dp))
                 Text("Offers made by month", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
-                Text(data.offersByMonth.joinToString(" · ") { "${it.month}: ${countText(it.offers)}" },
-                    style = MaterialTheme.typography.bodySmall, color = muted)
+                val months = data.offersByMonth.map { formatMonth(it.month) to countText(it.offers) }
+                if (allMissingFigures(months.map { it.second })) {
+                    // Every month withheld: one strip that still names each month, not a row of "<5".
+                    Spacer(Modifier.height(6.dp))
+                    NaSlotStrip(months, "Not enough data yet: each month had fewer than five offers, so none is shown.", card = false)
+                } else {
+                    months.forEach { (month, offers) ->
+                        Row(Modifier.padding(vertical = 2.dp)) {
+                            Text(month, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+                            NaValueText(offers, MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
             }
             Spacer(Modifier.height(8.dp))
             Text("From applications students chose to share with the college. A student who shared nothing is \"Not shared\" — never counted as unplaced. Any group under five reads <5; offer pay is never shown. The register and drive categories are on the web.",

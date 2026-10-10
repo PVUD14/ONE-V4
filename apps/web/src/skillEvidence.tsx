@@ -13,6 +13,7 @@
 import { useEffect, useState } from 'react';
 import { getAccessToken } from './auth.js';
 import { ApiRequestError } from './api.js';
+import * as dates from './dates.js';
 import {
   getEmployerCandidateEvidence,
   getMyApplicationEvidence,
@@ -37,7 +38,7 @@ const sourceLabels: Readonly<Record<string, string>> = {
 function formatDate(value: string | null | undefined): string {
   if (!value) return 'NA';
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? 'NA' : date.toLocaleDateString();
+  return Number.isNaN(date.getTime()) ? 'NA' : dates.formatDate(date);
 }
 
 /** One item in words, the same for the student and the employer. */

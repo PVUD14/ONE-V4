@@ -35,8 +35,11 @@ internal sealed interface Load<out T> {
 
     data class Ready<T>(val value: T) : Load<T>
 
-    /** The request failed. [message] is already safe to show a user. */
-    data class Failed(val message: String) : Load<Nothing>
+    /**
+     * The request failed. [message] is already safe to show a user; [reference] is the
+     * request's correlation id, shown only as a short support code.
+     */
+    data class Failed(val message: String, val reference: String? = null) : Load<Nothing>
 }
 
 /**
@@ -58,13 +61,14 @@ internal suspend fun <T> loadOf(block: suspend () -> T): Load<T> =
                     // chasing a problem that is not theirs.
                     ?: if (failure?.status == 404) "This is not available on ONE yet."
                     else "We could not reach ONE. Check your connection and try again.",
+                failure?.correlationId,
             )
         },
     )
 
 /** What a screen shows when its data could not be loaded at all. */
 @Composable
-internal fun FailedState(message: String, onRetry: (() -> Unit)? = null) {
+internal fun FailedState(message: String, reference: String? = null, onRetry: (() -> Unit)? = null) {
     Column(
         Modifier.fillMaxSize().padding(32.dp),
         verticalArrangement = Arrangement.Center,
@@ -83,6 +87,7 @@ internal fun FailedState(message: String, onRetry: (() -> Unit)? = null) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
+        SupportCode(reference)
         if (onRetry != null) {
             Spacer(Modifier.height(16.dp))
             Button(onClick = onRetry) { Text("Try again") }

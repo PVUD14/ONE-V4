@@ -29,6 +29,9 @@ import {
   type StudentConversationDto,
 } from './api/hiring.js';
 import { V2Chip, V2EmptyState } from './dashboardsV2.js';
+import { supportCodeSuffix } from './supportCode.js';
+import { formatDateTime } from './dates.js';
+import { codeLabel } from './labels.js';
 
 export const MESSAGE_MAX_LENGTH = 2000;
 
@@ -45,17 +48,17 @@ const MESSAGE_ERRORS: Readonly<Record<string, string>> = {
 function explain(error: unknown, fallback: string): string {
   if (!(error instanceof ApiRequestError)) return fallback;
   const sentence = (error.code ? MESSAGE_ERRORS[error.code] : undefined) ?? (error.status === 403 ? MESSAGE_ERRORS.FORBIDDEN : fallback);
-  return `${sentence} (reference ${error.correlationId})`;
+  return `${sentence}${supportCodeSuffix(error.correlationId)}`;
 }
 
 function when(value: string | null): string {
   if (!value) return 'NA';
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? 'NA' : date.toLocaleString();
+  return Number.isNaN(date.getTime()) ? 'NA' : formatDateTime(date);
 }
 
 function humanise(value: string): string {
-  return value.replace(/_/g, ' ').toLowerCase().replace(/^./, (c) => c.toUpperCase());
+  return codeLabel(value);
 }
 
 /** The messages, oldest first, as plain text. */

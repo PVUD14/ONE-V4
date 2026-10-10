@@ -49,10 +49,13 @@ import { RequestApprovalDialog } from './approvals.js';
 import { EngineBehaviourPanels } from './engineHealth.js';
 import { TutorHintsPanel } from './tutorHintReview.js';
 import { TutorCollegesPanel } from './tutorRollout.js';
+import { SupportCode } from '../supportCode.js';
+import { formatDateTime } from '../dates.js';
+import { codeLabel } from '../labels.js';
 
 const noteLimit = 500;
 const number = (value: number | null | undefined): string => (value === null || value === undefined ? 'NA' : value.toLocaleString());
-const when = (value: string | null | undefined): string => (value ? new Date(value).toLocaleString() : 'NA');
+const when = (value: string | null | undefined): string => (value ? formatDateTime(value) : 'NA');
 const windowLabel = (window: AiPeriod): string => (window === 'DAY' ? 'day' : 'month');
 const unconfiguredText: Record<NonNullable<AiInferenceStatusDto['reason']>, string> = {
   BASE_URL_MISSING: 'no endpoint address is set',
@@ -121,7 +124,7 @@ export function OperationsAiOperationsPage(): React.ReactElement | null {
 
   if (forbiddenReference) {
     return <section className="role-module role-module--dense">{heading}
-      <div className="role-wide"><V2EmptyState icon="🔐" title="Not permitted" note="AI Operations is for staff who hold AI Operations View. Your access has not changed." hint={`Reference: ${forbiddenReference}`} /></div></section>;
+      <div className="role-wide"><V2EmptyState icon="🔐" title="Not permitted" note="AI Operations is for staff who hold AI Operations View. Your access has not changed." hint={<SupportCode reference={forbiddenReference} />} /></div></section>;
   }
 
   const viewer = policy?.viewer ?? { canStop: false, canConfigure: false };
@@ -203,7 +206,7 @@ export function OperationsAiOperationsPage(): React.ReactElement | null {
     <section className="role-card role-wide"><h2>Refusals and failures by class</h2>
       {summary && !summary.failureClasses.length ? <p>No refusals or failures this {windowLabel(period)}.</p> : null}
       {summary?.failureClasses?.length ? <table className="role-record-table"><thead><tr><th>Feature</th><th>Outcome</th><th>Class</th><th>Count</th></tr></thead>
-        <tbody>{summary.failureClasses.map((row) => <tr key={`${row.featureKey}-${row.outcome}-${row.failureClass}`}><td>{row.featureKey}</td><td>{row.outcome}</td><td>{row.failureClass}</td><td>{number(row.count)}</td></tr>)}</tbody></table> : null}
+        <tbody>{summary.failureClasses.map((row) => <tr key={`${row.featureKey}-${row.outcome}-${row.failureClass}`}><td>{row.featureKey}</td><td>{codeLabel(row.outcome)}</td><td>{codeLabel(row.failureClass)}</td><td>{number(row.count)}</td></tr>)}</tbody></table> : null}
     </section>
 
     <AiUsagePanel token={token} features={features} />
@@ -578,7 +581,7 @@ function AiEvaluationsPanel({ token, canRecord, reload, onRecord }: { readonly t
         <td>{row.evaluationSetKey} v{row.evaluationSetVersion}</td>
         <td><ul>{row.metrics.map((metric) => <li key={metric.name}>{metric.name}: {metric.value} ({metric.comparator === 'AT_LEAST' ? '≥' : '≤'} {metric.threshold})</li>)}</ul></td>
         <td><StatusBadge label={row.decision} tone={row.decision === 'PASS' ? 'success' : 'danger'} />{row.current ? <><br /><small>Current verdict</small></> : <><br /><small>Superseded</small></>}</td>
-        <td>{row.decidedBy}<br /><small>{when(row.decidedAt)} · {row.reasonCode}</small></td>
+        <td>{row.decidedBy}<br /><small>{when(row.decidedAt)} · {codeLabel(row.reasonCode)}</small></td>
       </tr>)}</tbody></table></div> : null}
     {nextCursor ? <button type="button" className="secondary" onClick={() => void more()}>Load more</button> : null}
   </section>;

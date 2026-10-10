@@ -24,11 +24,12 @@ import {
 import { V2Chip, V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { growthCodeLabel } from './growthLeads.js';
 import { formatApiError } from './shared.js';
+import { formatDate } from '../dates.js';
 
 type View = 'LIVE' | 'LEFT' | 'ENDED';
 
 function day(value: string | null | undefined): string {
-  return value ? new Date(value).toLocaleDateString() : 'NA';
+  return value ? formatDate(value) : 'NA';
 }
 
 export function OperationsGrowthAttributionPanel(): React.ReactElement | null {

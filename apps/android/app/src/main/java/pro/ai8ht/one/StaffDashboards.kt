@@ -143,7 +143,7 @@ internal fun WorkspaceChooserScreen(options: List<Workspace>, onPick: (Workspace
                                     },
                                     style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
                                 )
-                                Text(prettify(workspace.role), style = MaterialTheme.typography.bodySmall,
+                                Text(roleLabel(workspace.role.uppercase()), style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             Text("›", color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -189,14 +189,27 @@ internal fun StaffBandHeader(title: String, subtitle: String, unread: Int, onThe
 }
 
 @Composable
-internal fun StatCell(value: String, label: String, tone: Tone, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier = Modifier) {
+internal fun StatCell(
+    value: String,
+    label: String,
+    tone: Tone,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    modifier: Modifier = Modifier,
+    /** One line saying why the slot is empty; shown only when [value] is a missing figure. */
+    reason: String? = null,
+) {
+    // A missing figure (NA, <5, Withheld) keeps its slot and its exact text, but reads as a
+    // calm, muted slot rather than a big bold value — see NaState.kt.
+    val missing = isMissingFigure(value)
     PilotCard(modifier) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconBubble(icon, tone, size = 32.dp)
+            IconBubble(icon, if (missing) Tone.Gray else tone, size = 32.dp)
             Spacer(Modifier.width(10.dp))
             Column {
-                Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                if (missing) NaValueText(value, MaterialTheme.typography.titleSmall)
+                else Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (missing && reason != null) NaReason(reason)
             }
         }
     }
@@ -562,7 +575,7 @@ private fun AcademicCalendarSection(terms: List<CalendarTermDto>?) {
                     Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text(term.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                            Text("${academicTermKindLabels[term.kind] ?: "NA"} · ${term.startsOn} to ${term.endsOn} · ${term.unit?.name ?: "Whole college"}",
+                            Text("${academicTermKindLabels[term.kind] ?: "NA"} · ${formatDate(term.startsOn)} to ${formatDate(term.endsOn)} · ${term.unit?.name ?: "Whole college"}",
                                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         if (term.current) StatusChip("Now", ChipKind.Positive)
@@ -577,10 +590,13 @@ private fun AcademicCalendarSection(terms: List<CalendarTermDto>?) {
 private fun AnnouncementsSection(state: AnnouncementsState) {
     val loaded = (state as? AnnouncementsState.Loaded)?.envelope
     SectionTitle("Announcements")
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        StatCell(loaded?.announcements?.count { it.state == "SENT" }?.toString() ?: "NA", "Sent", Tone.Accent, Icons.Filled.Notifications, Modifier.weight(1f))
-        StatCell(loaded?.announcements?.count { it.state == "SCHEDULED" }?.toString() ?: "NA", "Scheduled", Tone.Violet, Icons.Filled.Notifications, Modifier.weight(1f))
-    }
+    StatGrid(
+        listOf(
+            StatSpec(loaded?.announcements?.count { it.state == "SENT" }?.toString() ?: "NA", "Sent", Tone.Accent, Icons.Filled.Notifications),
+            StatSpec(loaded?.announcements?.count { it.state == "SCHEDULED" }?.toString() ?: "NA", "Scheduled", Tone.Violet, Icons.Filled.Notifications),
+        ),
+        emptyReason = "Announcement counts could not be loaded right now.",
+    )
     Spacer(Modifier.height(10.dp))
     when {
         loaded == null -> PilotCard {
@@ -624,10 +640,13 @@ private fun AnnouncementsSection(state: AnnouncementsState) {
 private fun MyStudentsSection(state: MyStudentsState) {
     val loaded = (state as? MyStudentsState.Loaded)?.envelope
     SectionTitle("My students")
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        StatCell(loaded?.students?.size?.toString() ?: "NA", "Students", Tone.Accent, Icons.Filled.School, Modifier.weight(1f))
-        StatCell(loaded?.assignments?.size?.toString() ?: "NA", "Teaching", Tone.Violet, Icons.Filled.Assignment, Modifier.weight(1f))
-    }
+    StatGrid(
+        listOf(
+            StatSpec(loaded?.students?.size?.toString() ?: "NA", "Students", Tone.Accent, Icons.Filled.School),
+            StatSpec(loaded?.assignments?.size?.toString() ?: "NA", "Teaching", Tone.Violet, Icons.Filled.Assignment),
+        ),
+        emptyReason = "Student and teaching counts could not be loaded right now.",
+    )
     Spacer(Modifier.height(10.dp))
     when {
         loaded == null -> PilotCard {
@@ -994,26 +1013,18 @@ private fun EmployerHome(
     fun stage(key: String): Int? = summary?.let { it.currentStages[key] ?: 0 }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp)) {
         Spacer(Modifier.height(12.dp))
-        if (summary == null) {
-            Text("Your hiring figures could not be loaded, so they read NA.",
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(8.dp))
-        }
-        // Pilot KPI rows - all real.
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            StatCell(figure(summary?.openJobs), "Open Roles", Tone.Violet, Icons.Filled.WorkOutline, Modifier.weight(1f))
-            StatCell(figure(summary?.applicationsTotal), "Total Applicants", Tone.Accent, Icons.Filled.School, Modifier.weight(1f))
-        }
-        Spacer(Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            StatCell(figure(summary?.openApplications), "In Pipeline", Tone.Amber, Icons.Filled.Notifications, Modifier.weight(1f))
-            StatCell(figure(summary?.offersPending), "Offers awaiting answer", Tone.Green, Icons.Filled.WorkOutline, Modifier.weight(1f))
-        }
-        Spacer(Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            StatCell(figure(summary?.newApplicantsLast7Days), "New in 7 days", Tone.Accent, Icons.Filled.School, Modifier.weight(1f))
-            StatCell(figure(summary?.drivesAwaitingApproval), "Drives awaiting colleges", Tone.Violet, Icons.Filled.WorkOutline, Modifier.weight(1f))
-        }
+        // Pilot KPI rows - all real. When none could be loaded they fold into one strip.
+        StatGrid(
+            listOf(
+                StatSpec(figure(summary?.openJobs), "Open Roles", Tone.Violet, Icons.Filled.WorkOutline),
+                StatSpec(figure(summary?.applicationsTotal), "Total Applicants", Tone.Accent, Icons.Filled.School),
+                StatSpec(figure(summary?.openApplications), "In Pipeline", Tone.Amber, Icons.Filled.Notifications),
+                StatSpec(figure(summary?.offersPending), "Offers awaiting answer", Tone.Green, Icons.Filled.WorkOutline),
+                StatSpec(figure(summary?.newApplicantsLast7Days), "New in 7 days", Tone.Accent, Icons.Filled.School),
+                StatSpec(figure(summary?.drivesAwaitingApproval), "Drives awaiting colleges", Tone.Violet, Icons.Filled.WorkOutline),
+            ),
+            emptyReason = "Your hiring figures could not be loaded right now, so they read NA.",
+        )
 
         // Pilot: Hiring Funnel - where applications are now.
         SectionTitle("Hiring Funnel")
@@ -1210,7 +1221,7 @@ private fun RoleRequirements(employerId: String, opportunityId: String) {
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
     when (val current = state) {
         Load.Loading -> Text("Loading…", style = MaterialTheme.typography.bodySmall, color = muted)
-        is Load.Failed -> Text(current.message, style = MaterialTheme.typography.bodySmall, color = muted)
+        is Load.Failed -> Column { Text(current.message, style = MaterialTheme.typography.bodySmall, color = muted); SupportCode(current.reference) }
         is Load.Ready -> {
             val requirements = current.value
             Text("Who can apply", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
@@ -1355,7 +1366,7 @@ internal fun OpsScaffold(
             }
             BandSheet {
                 when {
-                    tab == 0 && overviewFailed -> CenteredNote("The operations overview could not be loaded. No numbers are shown until the server's counts load. Try again shortly.")
+                    tab == 0 && overviewFailed -> CenteredNote("The operations overview could not be loaded. No numbers are shown until it loads. Try again shortly.")
                     tab == 0 && overview == null -> HomeSkeleton()
                     tab == 0 -> OpsOverview(overview!!)
                     else -> StaffMore(onSignOut, onSwitchWorkspace,
@@ -1414,15 +1425,15 @@ private fun OpsOverview(overview: OpsOverviewDto) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            StatCell(opsCount(orgs?.institutions?.total), "Institutions", Tone.Green, Icons.Filled.School, Modifier.weight(1f))
-            StatCell(opsCount(orgs?.employers?.total), "Employers", Tone.Violet, Icons.Filled.WorkOutline, Modifier.weight(1f))
-        }
-        Spacer(Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            StatCell(opsCount(verified), "Verified", Tone.Accent, Icons.Filled.Assignment, Modifier.weight(1f))
-            StatCell(opsCount(overview.invitations?.staff?.pending), "Invites pending", Tone.Amber, Icons.Filled.Notifications, Modifier.weight(1f))
-        }
+        StatGrid(
+            listOf(
+                StatSpec(opsCount(orgs?.institutions?.total), "Institutions", Tone.Green, Icons.Filled.School, "Not part of your access"),
+                StatSpec(opsCount(orgs?.employers?.total), "Employers", Tone.Violet, Icons.Filled.WorkOutline, "Not part of your access"),
+                StatSpec(opsCount(verified), "Verified", Tone.Accent, Icons.Filled.Assignment, "Not part of your access"),
+                StatSpec(opsCount(overview.invitations?.staff?.pending), "Invites pending", Tone.Amber, Icons.Filled.Notifications, "Not part of your access"),
+            ),
+            emptyReason = "These counts are not part of your access.",
+        )
         SectionTitle("Operator queues")
         opsQueues(overview).forEach { queue ->
             PilotCard(Modifier.fillMaxWidth().padding(bottom = 10.dp)) {

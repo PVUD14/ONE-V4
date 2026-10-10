@@ -15,6 +15,7 @@ import { getProtectedAccessToken } from '../api.js';
 import { listOperatorEmployerTerms, publishOperatorEmployerTerms, type OperatorEmployerTermsVersionDto } from '../api/employerTerms.js';
 import { StatusBadge } from '../studentComponents.js';
 import { formatApiError } from './shared.js';
+import { formatDate } from '../dates.js';
 
 interface Draft { version: string; title: string; body: string; legalReviewState: 'DRAFT_FOR_LEGAL_REVIEW' | 'LEGAL_APPROVED'; legalReviewReference: string; requiresReacceptance: boolean; changeSummary: string }
 const emptyDraft: Draft = { version: '', title: '', body: '', legalReviewState: 'DRAFT_FOR_LEGAL_REVIEW', legalReviewReference: '', requiresReacceptance: true, changeSummary: '' };
@@ -78,7 +79,7 @@ export function EmployerTermsSection(): React.ReactElement | null {
         <td>{item.version}</td><td>{item.title}</td>
         <td>{item.legalReviewState === 'DRAFT_FOR_LEGAL_REVIEW' ? <StatusBadge label="Draft — pending legal review" tone="warning" /> : <StatusBadge label={`Reviewed: ${item.legalReviewReference ?? 'NA'}`} tone="success" />}</td>
         <td>{item.requiresReacceptance ? 'Yes' : 'No'}</td>
-        <td>{new Date(item.publishedAt).toLocaleDateString()}</td>
+        <td>{formatDate(item.publishedAt)}</td>
         <td>{item.acceptedBy}</td>
       </tr>)}</tbody>
     </table></div> : null}

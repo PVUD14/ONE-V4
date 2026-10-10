@@ -1,6 +1,7 @@
-import { Bell, CalendarDays, ChevronsLeft, Filter, Menu, MessageSquare, MoreVertical, Search, X } from 'lucide-react';
+import { Bell, CalendarDays, ChevronsLeft, ChevronsRight, Filter, Menu, MessageSquare, MoreVertical, Search, X } from 'lucide-react';
 import { BrandLogo } from './brand.js';
 import { ThemeToggle } from './themeToggle.js';
+import { NavIndicator } from './navIndicator.js';
 import { useEffect, useRef, useState, useId, type ReactNode } from 'react';
 import type { AuthStatus } from './auth.js';
 import { AuthControls } from './authControls.js';
@@ -46,12 +47,13 @@ export function StaffShell({ apiHealth, authStatus, authNotice, showDevelopmentI
 
 function StaffSidebar({ activePath, collapsed, drawerOpen, onNavigate, onCollapse, onClose }: { readonly activePath: string; readonly collapsed: boolean; readonly drawerOpen: boolean; readonly onNavigate: (path: string) => void; readonly onCollapse: () => void; readonly onClose: () => void }): React.ReactElement {
   return (
-    <aside className={`staff-sidebar ${drawerOpen ? 'drawer-open' : ''}`} aria-label="Institution placement navigation">
+    <aside className={`staff-sidebar momentum-sidebar ${drawerOpen ? 'drawer-open' : ''}`} aria-label="Institution placement navigation">
       <div className="staff-brand"><BrandLogo height={collapsed ? 34 : 46} compact={collapsed} /><span className="staff-brand-copy"><small>Institution Portal</small></span><button className="icon-button sidebar-close" type="button" aria-label="Close institution navigation" onClick={onClose} autoFocus={drawerOpen}><X size={18} /></button></div>
       <nav className="staff-nav" aria-label="Grouped Institution placement navigation">
-        {staffNavGroups.map((group) => <div className="staff-nav-group" key={group}><span>{group}</span>{staffNavItems.filter((item) => item.group === group).map((item) => { const Icon = item.icon; const active = activePath === item.path; return <button key={item.path} type="button" className={`staff-nav-item ${active ? 'active' : ''}`} aria-current={active ? 'page' : undefined} onClick={() => onNavigate(item.path)}><Icon size={16} aria-hidden="true" /><span>{item.label}</span></button>; })}</div>)}
+        <NavIndicator activeKey={activePath} layoutKey={`${collapsed}-${drawerOpen}`} />
+        {staffNavGroups.map((group) => <div className="staff-nav-group" key={group}><span>{group}</span>{staffNavItems.filter((item) => item.group === group).map((item) => { const Icon = item.icon; const active = activePath === item.path; return <button key={item.path} type="button" className={`staff-nav-item ${active ? 'active' : ''}`} aria-current={active ? 'page' : undefined} aria-label={item.label} title={item.label} onClick={() => onNavigate(item.path)}><Icon size={18} aria-hidden="true" /><span>{item.label}</span></button>; })}</div>)}
       </nav>
-      <button className="staff-collapse" type="button" onClick={onCollapse} aria-label={collapsed ? 'Expand institution sidebar' : 'Collapse institution sidebar'}><ChevronsLeft size={16} /><span>{collapsed ? 'Expand' : 'Collapse'}</span></button>
+      <button className="staff-collapse" type="button" onClick={onCollapse} aria-label={collapsed ? 'Expand institution sidebar' : 'Collapse institution sidebar'} title={collapsed ? 'Expand institution sidebar' : 'Collapse institution sidebar'}>{collapsed ? <ChevronsRight size={16} aria-hidden="true" /> : <ChevronsLeft size={16} aria-hidden="true" />}<span>{collapsed ? 'Expand' : 'Collapse'}</span></button>
     </aside>
   );
 }

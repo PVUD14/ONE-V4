@@ -74,7 +74,8 @@ import { portalFamilyIcons, rolePortals } from './rolePortalConfig.js';
 import { RolePreviewProvider, useRolePreviewState } from './rolePortalPreviewState.js';
 import { EmployerDashboardV3, InstitutionDashboardV3 } from './staffDashboardsV3.js';
 import { StatusBadge } from './studentComponents.js';
-import { Bell, ChevronDown, ChevronsLeft, ChevronsRight, Filter, Menu, MessageSquare, Search, X } from 'lucide-react';
+import { ArrowLeftRight, Bell, ChevronDown, ChevronsLeft, ChevronsRight, Filter, Menu, MessageSquare, Search, X } from 'lucide-react';
+import { NavIndicator } from './navIndicator.js';
 import { useEffect, useRef, useState } from 'react';
 import { roleLabel } from './labels.js';
 import { initialSidebarCollapsed, rememberSidebarCollapsed } from './sidebarPreference.js';
@@ -203,12 +204,13 @@ function RoleSidebar({ portal, workspace, activePath, collapsed, drawerOpen, onN
     && (!item.capabilities || workspaceHoldsAny(workspace, item.capabilities)));
   const groups = [...new Set(items.map((item) => item.group))];
   return (
-    <aside className={`role-sidebar ${drawerOpen ? 'drawer-open' : ''}`} aria-label={`${portal.roleName} navigation`}>
+    <aside className={`role-sidebar momentum-sidebar ${drawerOpen ? 'drawer-open' : ''}`} aria-label={`${portal.roleName} navigation`}>
       <div className="role-brand"><BrandLogo height={collapsed ? 34 : 46} compact={collapsed} /><span><small>{portal.subtitle}</small></span><button className="icon-button sidebar-close" type="button" aria-label={`Close ${portal.roleName} navigation`} onClick={onClose} autoFocus={drawerOpen}><X size={18} /></button></div>
       <nav className="role-nav" aria-label={`Grouped ${portal.roleName} navigation`}>
-        {groups.map((group) => <div className="role-nav-group" key={group}><span>{group}</span>{items.filter((item) => item.group === group).map((item) => { const Icon = item.icon; const active = activePath === item.path; return <button key={item.path} type="button" className={`role-nav-item ${active ? 'active' : ''}`} aria-current={active ? 'page' : undefined} aria-label={item.label} title={item.label} onClick={() => onNavigate(item.path)}><Icon size={16} aria-hidden="true" /><span>{item.label}</span></button>; })}</div>)}
+        <NavIndicator activeKey={activePath} layoutKey={`${collapsed}-${drawerOpen}`} />
+        {groups.map((group) => <div className="role-nav-group" key={group}><span>{group}</span>{items.filter((item) => item.group === group).map((item) => { const Icon = item.icon; const active = activePath === item.path; return <button key={item.path} type="button" className={`role-nav-item ${active ? 'active' : ''}`} aria-current={active ? 'page' : undefined} aria-label={item.label} title={item.label} onClick={() => onNavigate(item.path)}><Icon size={18} aria-hidden="true" /><span>{item.label}</span></button>; })}</div>)}
       </nav>
-      <button className="role-collapse" type="button" onClick={onCollapse} aria-label={collapsed ? 'Expand navigation' : 'Collapse navigation'} aria-expanded={!collapsed}>
+      <button className="role-collapse" type="button" onClick={onCollapse} aria-label={collapsed ? 'Expand navigation' : 'Collapse navigation'} title={collapsed ? 'Expand navigation' : 'Collapse navigation'} aria-expanded={!collapsed}>
         {collapsed ? <ChevronsRight size={16} aria-hidden="true" /> : <ChevronsLeft size={16} aria-hidden="true" />}
         <span>{collapsed ? 'Expand' : 'Collapse'}</span>
       </button>
@@ -235,7 +237,7 @@ function RoleTopbar({ portal, apiHealth, authStatus, authNotice, showDevelopment
   const displayRole = authenticatedWorkspace?.role ? roleLabel(authenticatedWorkspace.role) : portal.roleName;
   // Never surface the raw organization UUID to an end user; it is an internal identifier.
   const displayOrg = authenticatedWorkspace?.organizationId ? portal.subtitle : portal.organization;
-  return <header className="role-topbar"><button ref={menuButtonRef} className="icon-button mobile-menu-button" type="button" aria-label={`Open ${portal.roleName} navigation`} onClick={onOpenMenu}><Menu size={20} /></button><span className="topbar-brand"><BrandLogo height={28} /></span><RoleContextPill name={demoMode ? portal.roleName : workspaceRoleName(portal, authenticatedWorkspace)} /><span className="role-org">{displayOrg}</span><label className="role-search" role="search"><Search size={16} /><span className="sr-only">Search {portal.roleName} workspace</span><input placeholder={`Search ${portal.family.toLowerCase()} records...`} /></label><div className="role-topbar-actions"><button type="button" className="secondary" onClick={onSwitch}>{demoMode ? 'Switch preview portal' : 'Switch workspace'}</button><ThemeToggle /><button className="icon-button" type="button" aria-label="Messages" onClick={onMessages}><MessageSquare size={17} /></button><button className="icon-button notification" type="button" aria-label="Notifications" onClick={onNotifications}><Bell size={17} /></button><AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />{showDevelopmentIndicators ? <span className={`staff-api-dot ${apiHealth}`}>{apiHealth}</span> : null}<span className="role-profile"><span>{demoMode ? portal.initials : initialsFor(displayName)}</span><span><strong>{displayName}</strong><small>{displayRole}</small></span><ChevronDown size={14} /></span></div></header>;
+  return <header className="role-topbar"><button ref={menuButtonRef} className="icon-button mobile-menu-button" type="button" aria-label={`Open ${portal.roleName} navigation`} onClick={onOpenMenu}><Menu size={20} /></button><span className="topbar-brand"><BrandLogo height={28} /></span><RoleContextPill name={demoMode ? portal.roleName : workspaceRoleName(portal, authenticatedWorkspace)} /><span className="role-org">{displayOrg}</span><label className="role-search" role="search"><Search size={16} /><span className="sr-only">Search {portal.roleName} workspace</span><input placeholder={`Search ${portal.family.toLowerCase()} records...`} /></label><div className="role-topbar-actions"><button type="button" className="secondary role-switch" onClick={onSwitch}><ArrowLeftRight size={16} aria-hidden="true" /><span className="role-switch-label">{demoMode ? 'Switch preview portal' : 'Switch workspace'}</span></button><ThemeToggle /><button className="icon-button" type="button" aria-label="Messages" onClick={onMessages}><MessageSquare size={17} /></button><button className="icon-button notification" type="button" aria-label="Notifications" onClick={onNotifications}><Bell size={17} /></button><AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />{showDevelopmentIndicators ? <span className={`staff-api-dot ${apiHealth}`}>{apiHealth}</span> : null}<span className="role-profile"><span className="role-avatar">{demoMode ? portal.initials : initialsFor(displayName)}</span><span><strong>{displayName}</strong><small>{displayRole}</small></span><ChevronDown size={14} /></span></div></header>;
 }
 
 function normalizeRolePath(path: string, portal: RolePortalConfig): string {

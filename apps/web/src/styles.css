@@ -488,7 +488,8 @@ button {
 }
 
 :focus-visible {
-  outline: 3px solid rgb(var(--brand-rgb) / .22);
+  /* Momentum focus ring: a solid brand outline, visible on every surface in both themes. */
+  outline: 2px solid var(--brand);
   outline-offset: 2px;
 }
 
@@ -3110,11 +3111,6 @@ button.secondary {
   background: var(--surface);
 }
 
-.staff-sidebar .staff-collapse {
-  color: var(--text-2) !important;
-  background: var(--surface) !important;
-}
-
 .staff-sidebar-collapsed .staff-brand-copy,
 .staff-sidebar-collapsed .staff-nav-group > span,
 .staff-sidebar-collapsed .staff-nav-item span,
@@ -3156,8 +3152,6 @@ button.secondary {
   font-size: 12px;
 }
 
-.staff-topbar .staff-context-select,
-.staff-topbar .staff-college-select,
 .staff-filter-row .staff-filter-button,
 .staff-mini-action,
 .staff-icon-action {
@@ -3175,8 +3169,7 @@ button.secondary {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: var(--text) !important;
-  background: transparent !important;
+  color: var(--text);
 }
 
 .staff-college-select {
@@ -5072,7 +5065,6 @@ button.secondary {
 .role-topbar .auth-controls > span:has(+ span),
 .role-topbar .auth-controls > span + span,
 .student-topbar .auth-controls > span:has(+ span) { display: none; }
-.role-topbar .auth-controls:has(> span + span) { padding: 3px; }
 .auth-controls button { flex: 0 0 auto; }
 @media (max-width: 1599px) { .role-org { display: none; } }
 @media (min-width: 761px) and (max-width: 1365px) { .role-search { display: none; } }

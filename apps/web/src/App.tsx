@@ -1,4 +1,4 @@
-import { Bell, BookOpen, CircleHelp, BriefcaseBusiness, Building2, CalendarDays, ChevronDown, ClipboardCheck, FileText, Gauge, GraduationCap, Home, LayoutDashboard, MapPinned, Menu, MessageSquare, Search, Settings, ShieldCheck, Sparkles, Target, Trophy, UserRound, Wrench, X, type LucideIcon } from 'lucide-react';
+import { Bell, BookOpen, CircleHelp, BriefcaseBusiness, Building2, CalendarDays, ChevronDown, ChevronsLeft, ChevronsRight, ClipboardCheck, FileText, Gauge, GraduationCap, Home, LayoutDashboard, MapPinned, Menu, MessageSquare, Search, Settings, ShieldCheck, Sparkles, Target, Trophy, UserRound, Wrench, X, type LucideIcon } from 'lucide-react';
 import { BrandLogo } from './brand.js';
 import { ThemeToggle } from './themeToggle.js';
 import type { FormEvent } from 'react';
@@ -68,6 +68,7 @@ import { supportCodeSuffix } from './supportCode.js';
 import { formatDate } from './dates.js';
 import { roleLabel } from './labels.js';
 import { initialSidebarCollapsed, rememberSidebarCollapsed } from './sidebarPreference.js';
+import { NavIndicator } from './navIndicator.js';
 
 type RouteKey = 'dashboard' | 'career-path' | 'ai-coach' | 'readiness' | 'skills' | 'assessments' | 'learning' | 'experience' | 'opportunities' | 'applications' | 'interviews' | 'documents' | 'profile' | 'settings' | 'help' | 'practice' | 'company-prep' | 'career-tools' | 'scholarships' | 'resume-builder' | 'calendar';
 
@@ -842,13 +843,17 @@ function StudentPreviewStatus({ authenticated }: { readonly authenticated: boole
 
 function Sidebar({ path, collapsed, drawerOpen, onNavigate, onCollapse, onClose }: { readonly path: string; readonly collapsed: boolean; readonly drawerOpen: boolean; readonly onNavigate: (item: NavItem) => void; readonly onCollapse: () => void; readonly onClose: () => void }): React.ReactElement {
   const groups = ['Plan', 'Prepare', 'Apply', 'Account'] as const;
+  const current = normalizePath(path);
+  // The Momentum icon rail: each item is an icon tile over its label. Collapsed, the labels go
+  // and the item keeps its name through aria-label and the hover title.
   return (
-    <aside className={`student-sidebar ${drawerOpen ? 'drawer-open' : ''}`} aria-label="Student navigation">
-      <div className="sidebar-brand"><BrandLogo height={collapsed ? 34 : 46} compact={collapsed} /><span className="brand-copy"><small>LEARN | PREPARE | BUILD | GROW</small></span><button className="icon-button sidebar-close" type="button" aria-label="Close navigation" onClick={onClose} autoFocus={drawerOpen}><X size={18} /></button></div>
+    <aside className={`student-sidebar momentum-rail ${drawerOpen ? 'drawer-open' : ''}`} aria-label="Student navigation">
+      <div className="sidebar-brand"><BrandLogo height={collapsed ? 36 : 30} compact={collapsed} /><span className="brand-copy"><small>LEARN | PREPARE | BUILD | GROW</small></span><button className="icon-button sidebar-close" type="button" aria-label="Close navigation" onClick={onClose} autoFocus={drawerOpen}><X size={18} /></button></div>
       <nav className="sidebar-nav" aria-label="Grouped Student navigation">
-        {groups.map((group) => <div className="nav-group" key={group}><span className="nav-group-label">{group}</span>{navItems.filter((item) => item.group === group).map((item) => { const Icon = item.icon; const active = normalizePath(path) === item.path; return <button key={item.path} type="button" className={`side-nav-item ${active ? 'active' : ''}`} aria-current={active ? 'page' : undefined} onClick={() => onNavigate(item)}><Icon size={18} aria-hidden="true" /><span>{item.label}</span></button>; })}</div>)}
+        <NavIndicator activeKey={current} layoutKey={`${collapsed}-${drawerOpen}`} />
+        {groups.map((group) => <div className="nav-group" key={group}><span className="nav-group-label">{group}</span>{navItems.filter((item) => item.group === group).map((item) => { const Icon = item.icon; const active = current === item.path; return <button key={item.path} type="button" className={`side-nav-item ${active ? 'active' : ''}`} aria-current={active ? 'page' : undefined} aria-label={item.label} title={item.label} onClick={() => onNavigate(item)}><span className="rail-tile"><Icon size={20} aria-hidden="true" /></span><span className="rail-label">{item.label}</span></button>; })}</div>)}
       </nav>
-      <div className="sidebar-footer"><button className="collapse-button" type="button" onClick={onCollapse} aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>{collapsed ? 'Expand' : 'Collapse'}</button></div>
+      <div className="sidebar-footer"><button className="collapse-button" type="button" onClick={onCollapse} aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}><span className="rail-tile">{collapsed ? <ChevronsRight size={18} aria-hidden="true" /> : <ChevronsLeft size={18} aria-hidden="true" />}</span><span className="rail-label">{collapsed ? 'Expand' : 'Collapse'}</span></button></div>
     </aside>
   );
 }

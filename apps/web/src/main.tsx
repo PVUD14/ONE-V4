@@ -11,6 +11,8 @@ import { createRoot } from 'react-dom/client';
 import { App } from './App.js';
 import { SandboxMarker } from './sandboxMarker.js';
 import './styles.css';
+// The Momentum app shell (rail, sidebar, top bars) restyles the shell rules in styles.css, so it loads after it.
+import './styles/shell.css';
 import { applyStoredTheme } from './themePreference.js';
 
 // A theme chosen with the top-bar toggle is applied before the first paint; otherwise the OS decides.

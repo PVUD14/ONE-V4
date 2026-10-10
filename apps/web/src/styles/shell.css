@@ -1,0 +1,531 @@
+/*
+ * Momentum app shell (re-skin phase 2): the student icon rail, the labelled staff sidebar, and
+ * the top bars of every portal, matching the approved unified pages (student-home.html,
+ * college-admin.html) and the inventory's [unified] shell rules in components.css.
+ *
+ * It loads after styles.css and only restyles: every nav item, label, order, route, collapse
+ * preference and drawer keeps the markup and behaviour it had. Rules are scoped under the shell
+ * that owns them (.momentum-rail, .momentum-sidebar, the three top bars) so they win over the
+ * older shell rules without !important. Width rules sit in min-width queries so the drawer
+ * breakpoints in styles.css keep owning the small-screen layout.
+ *
+ * Rule 5: no per-role colours. Every role shows as one brand-soft pill and every active item
+ * uses brand-soft, whatever the portal.
+ */
+
+/* ---------- Sliding active indicator (navIndicator.tsx) ---------- */
+.nav-indicator {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 2;
+  width: 4px;
+  height: 24px;
+  border-radius: 2px;
+  background: var(--grad);
+  opacity: 0;
+  pointer-events: none;
+}
+.nav-indicator.on { opacity: 1; }
+.nav-indicator.settled { transition: top 480ms var(--e-out), height 300ms var(--e-out), opacity 300ms; }
+@media (prefers-reduced-motion: reduce) {
+  .nav-indicator.settled { transition: none; }
+}
+
+/* ---------- Student: collapsible icon rail ---------- */
+@media (min-width: 1221px) {
+  .student-shell { grid-template-columns: var(--rail-w) minmax(0, 1fr); transition: grid-template-columns 480ms var(--e-inout); }
+  .student-shell.sidebar-collapsed { grid-template-columns: var(--rail-w-col) minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .student-shell { transition: none; }
+}
+
+.student-sidebar.momentum-rail {
+  gap: 2px;
+  padding: 18px 10px 14px;
+  background: var(--rail);
+  border-right: 1px solid var(--line);
+  color: var(--text-2);
+}
+.momentum-rail .sidebar-brand {
+  position: relative;
+  justify-content: center;
+  min-height: 0;
+  margin: 0;
+  padding: 2px 0 10px;
+}
+.momentum-rail .brand-copy { display: none; }
+.momentum-rail .sidebar-nav {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: block;
+  margin: 0 -10px;
+  padding: 0 10px 4px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.momentum-rail .nav-group { display: grid; gap: 2px; }
+.momentum-rail .nav-group-label {
+  margin: 12px 0 4px;
+  padding: 0;
+  color: var(--text-3);
+  font: var(--fw-rail-group) var(--fs-rail-group) / var(--lh-rail-group) var(--font-sans);
+  letter-spacing: var(--ls-rail-group);
+  text-align: center;
+  text-transform: uppercase;
+}
+.student-sidebar.momentum-rail .nav-group:first-child .nav-group-label { margin-top: 2px; }
+
+.momentum-rail .side-nav-item,
+.momentum-rail .collapse-button {
+  width: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 6px 2px 5px;
+  border: 0;
+  border-radius: var(--r-xl);
+  background: transparent;
+  color: var(--text-2);
+  font-weight: var(--fw-rail);
+  text-align: center;
+}
+.momentum-rail .rail-tile {
+  width: 40px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: var(--r-lg);
+  transition: background var(--m-micro), transform var(--m-micro) var(--e-out);
+}
+.momentum-rail .rail-label {
+  max-width: 100%;
+  font: var(--fw-rail) var(--fs-rail) / 1.15 var(--font-sans);
+  overflow-wrap: anywhere;
+}
+.momentum-rail .side-nav-item:hover,
+.momentum-rail .collapse-button:hover { background: transparent; color: var(--text); }
+.momentum-rail .side-nav-item:hover .rail-tile,
+.momentum-rail .collapse-button:hover .rail-tile { background: var(--surface-2); }
+.momentum-rail .side-nav-item:active .rail-tile { transform: scale(.94); }
+.momentum-rail .side-nav-item.active { background: transparent; color: var(--text); font-weight: 700; }
+.momentum-rail .side-nav-item.active .rail-tile { background: var(--brand-soft); color: var(--brand); }
+.momentum-rail .side-nav-item.active .rail-label { font-weight: 700; color: var(--text); }
+.momentum-rail .side-nav-item:focus-visible,
+.momentum-rail .collapse-button:focus-visible { outline-offset: -2px; }
+@media (prefers-reduced-motion: reduce) {
+  .momentum-rail .rail-tile { transition: none; }
+  .momentum-rail .side-nav-item:active .rail-tile { transform: none; }
+}
+
+.momentum-rail .sidebar-footer {
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+.momentum-rail .collapse-button { color: var(--text-3); }
+
+/* Collapsed rail: icons only. The tile stays (styles.css hides every span in a collapsed
+   item); the label goes, and each item keeps its name through aria-label and its title. */
+.sidebar-collapsed .student-sidebar.momentum-rail { align-items: stretch; }
+.sidebar-collapsed .momentum-rail .side-nav-item .rail-tile { display: grid; }
+.sidebar-collapsed .momentum-rail .rail-label { display: none; }
+.sidebar-collapsed .momentum-rail .nav-group + .nav-group { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); }
+
+/* Below 1221px the rail is the off-canvas drawer: the same items as labelled rows. */
+@media (max-width: 1220px) {
+  .student-sidebar.momentum-rail { width: min(300px, 86vw); z-index: 40; padding: 16px 14px 14px; box-shadow: var(--shadow-pop, var(--shadow)); }
+  .momentum-rail .sidebar-brand { justify-content: space-between; padding: 2px 4px 10px; }
+  .momentum-rail .sidebar-nav { margin: 0 -14px; padding: 0 14px 4px; }
+  .momentum-rail .nav-group-label { margin: 14px 10px 6px; text-align: left; }
+  .momentum-rail .side-nav-item {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 10px;
+    min-height: 44px;
+    padding: 4px 8px 4px 4px;
+    text-align: left;
+  }
+  .momentum-rail .side-nav-item .rail-tile { width: 36px; height: 32px; }
+  .momentum-rail .side-nav-item .rail-label { font-size: var(--fs-body, 14px); font-weight: 500; }
+  .momentum-rail .side-nav-item.active { background: var(--brand-soft); }
+  .sidebar-collapsed .momentum-rail .side-nav-item .rail-label { display: block; }
+  /* Collapsing means nothing in the drawer, as before. */
+  .momentum-rail .sidebar-footer { display: none; }
+  .sidebar-collapsed .momentum-rail .nav-group + .nav-group { margin-top: 0; padding-top: 0; border-top: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .student-sidebar, .role-sidebar, .staff-sidebar { transition: none !important; }
+}
+
+/* ---------- Institution, employer, operations, growth: labelled sidebar ---------- */
+@media (min-width: 1181px) {
+  .role-shell { grid-template-columns: var(--sidebar-w) minmax(0, 1fr); }
+  .role-shell.role-sidebar-collapsed { grid-template-columns: var(--sidebar-w-col) minmax(0, 1fr); }
+}
+@media (min-width: 1221px) {
+  .staff-shell { grid-template-columns: var(--sidebar-w) minmax(0, 1fr); }
+  .staff-shell.staff-sidebar-collapsed { grid-template-columns: var(--sidebar-w-col) minmax(0, 1fr); }
+}
+
+.momentum-sidebar {
+  --side-pad: 14px;
+  gap: 2px;
+  padding: 22px var(--side-pad) 14px;
+  background: var(--rail);
+  border-right: 1px solid var(--line);
+  color: var(--text-2);
+}
+.momentum-sidebar :is(.role-brand, .staff-brand) {
+  position: relative;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 6px;
+  min-height: 0;
+  padding: 0 10px 14px;
+}
+.momentum-sidebar :is(.role-brand, .staff-brand) small {
+  color: var(--text-3);
+  font: 600 11.5px var(--font-sans);
+  letter-spacing: 0;
+}
+.momentum-sidebar .sidebar-close { position: absolute; top: 0; right: 4px; }
+.momentum-sidebar :is(.role-nav, .staff-nav) {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: block;
+  margin: 0 calc(-1 * var(--side-pad)) 12px;
+  padding: 0 var(--side-pad) 4px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.momentum-sidebar :is(.role-nav-group, .staff-nav-group) { display: grid; gap: 2px; margin: 0; }
+.momentum-sidebar :is(.role-nav-group, .staff-nav-group) > span {
+  margin: 16px 10px 6px;
+  padding: 0;
+  color: var(--text-3);
+  font: 700 10px / 1.2 var(--font-sans);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.momentum-sidebar :is(.role-nav-group, .staff-nav-group):first-child > span { margin-top: 2px; }
+
+.momentum-sidebar :is(.role-nav-item, .staff-nav-item, .role-collapse, .staff-collapse) {
+  position: relative;
+  width: 100%;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--text-2);
+  font: 500 14px / 1.2 var(--font-sans);
+  text-align: left;
+  transition: background var(--m-micro), color var(--m-micro);
+}
+.momentum-sidebar :is(.role-nav-item, .staff-nav-item) > span { flex: 1 1 auto; min-width: 0; }
+.momentum-sidebar :is(.role-nav-item, .staff-nav-item) svg { flex: 0 0 auto; color: var(--text-3); transition: color var(--m-micro), translate var(--m-micro) var(--e-out); }
+.momentum-sidebar :is(.role-nav-item, .staff-nav-item, .role-collapse, .staff-collapse):hover { background: var(--surface-2); color: var(--text); }
+.momentum-sidebar :is(.role-nav-item, .staff-nav-item):hover svg { color: var(--text-2); translate: 0 -1px; }
+.momentum-sidebar :is(.role-nav-item, .staff-nav-item).active { background: var(--brand-soft); color: var(--text); font-weight: 700; }
+.momentum-sidebar :is(.role-nav-item, .staff-nav-item).active svg { color: var(--brand); }
+.momentum-sidebar :is(.role-nav-item, .staff-nav-item, .role-collapse, .staff-collapse):focus-visible { outline-offset: -2px; }
+@media (prefers-reduced-motion: reduce) {
+  .momentum-sidebar :is(.role-nav-item, .staff-nav-item, .role-collapse, .staff-collapse),
+  .momentum-sidebar :is(.role-nav-item, .staff-nav-item) svg { transition: none; }
+  .momentum-sidebar :is(.role-nav-item, .staff-nav-item):hover svg { translate: none; }
+}
+
+/* The collapse control sits under a rule, as the approved sidebar's footer does. */
+.momentum-sidebar :is(.role-collapse, .staff-collapse) { margin-top: auto; color: var(--text-3); font-size: 13px; }
+.momentum-sidebar :is(.role-collapse, .staff-collapse)::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -7px;
+  height: 1px;
+  background: var(--line);
+}
+
+/* Collapsed: icons only, centred; the group headings give way to thin rules. */
+.role-sidebar-collapsed .momentum-sidebar,
+.staff-sidebar-collapsed .momentum-sidebar { --side-pad: 10px; padding: 22px 10px 14px; }
+@media (min-width: 1181px) {
+  .role-sidebar-collapsed .momentum-sidebar .role-brand { align-items: center; padding: 0 0 14px; }
+  .role-sidebar-collapsed .momentum-sidebar :is(.role-nav-item, .role-collapse) { justify-content: center; padding: 0; }
+  .role-sidebar-collapsed .momentum-sidebar .role-nav-group + .role-nav-group { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); }
+}
+.staff-sidebar-collapsed .momentum-sidebar .staff-brand { align-items: center; padding: 0 0 14px; }
+.staff-sidebar-collapsed .momentum-sidebar :is(.staff-nav-item, .staff-collapse) { justify-content: center; padding: 0; }
+.staff-sidebar-collapsed .momentum-sidebar .staff-nav-group + .staff-nav-group { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); }
+
+/* As drawers they cannot collapse, so the control is not offered there. */
+@media (max-width: 1180px) {
+  .role-sidebar.momentum-sidebar { z-index: 40; box-shadow: var(--shadow-pop, var(--shadow)); }
+  .momentum-sidebar .role-collapse { display: none; }
+}
+@media (max-width: 1220px) {
+  .staff-sidebar.momentum-sidebar { z-index: 40; box-shadow: var(--shadow-pop, var(--shadow)); }
+  .momentum-sidebar .staff-collapse { display: none; }
+}
+
+/* ---------- Top bars ---------- */
+.student-topbar,
+.role-topbar,
+.staff-topbar {
+  min-height: 0;
+  gap: 14px;
+  padding: 18px var(--page-x) 12px;
+  border-bottom: 0;
+  background: rgb(var(--bg-rgb) / .9);
+  backdrop-filter: blur(12px);
+}
+@media (min-width: 1221px) {
+  .student-topbar { grid-template-columns: minmax(220px, 440px) minmax(0, 1fr); gap: 16px; }
+}
+
+/* Search */
+.student-topbar .global-search,
+.role-topbar .role-search,
+.staff-topbar .staff-search {
+  height: var(--control-h);
+  min-height: 0;
+  gap: 10px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-2xl);
+  background: var(--surface);
+  color: var(--text-3);
+  font-size: 14px;
+  transition: border-color var(--m-micro), box-shadow var(--m-micro);
+}
+.role-topbar .role-search { flex: 0 1 380px; max-width: 380px; height: 42px; border-radius: 13px; }
+.student-topbar .global-search input,
+.role-topbar .role-search input,
+.staff-topbar .staff-search input { color: var(--text); font-size: 14px; outline: 0; }
+.student-topbar .global-search:focus-within,
+.role-topbar .role-search:focus-within,
+.staff-topbar .staff-search:focus-within { border-color: var(--brand); box-shadow: var(--ring-focus); }
+.student-topbar .global-search input:focus-visible,
+.role-topbar .role-search input:focus-visible,
+.staff-topbar .staff-search input:focus-visible { outline: 0; }
+
+/* Icon buttons: theme, messages, notifications, calendar, menu */
+:is(.student-topbar, .role-topbar, .staff-topbar) :is(.icon-button, .mobile-menu-button) {
+  width: var(--control-h);
+  height: var(--control-h);
+  border: 1px solid var(--line);
+  border-radius: var(--r-2xl);
+  background: var(--surface);
+  color: var(--text-2);
+  transition: border-color var(--m-micro), color var(--m-micro);
+}
+.role-topbar :is(.icon-button, .mobile-menu-button) { width: 42px; height: 42px; border-radius: 13px; }
+:is(.student-topbar, .role-topbar, .staff-topbar) :is(.icon-button, .mobile-menu-button):hover { border-color: var(--line-2); color: var(--text); }
+:is(.student-topbar, .role-topbar, .staff-topbar) .icon-button:disabled { opacity: .55; cursor: default; }
+.student-topbar .topbar-actions,
+.role-topbar .role-topbar-actions,
+.staff-topbar .staff-topbar-actions { gap: 10px; }
+
+/* The role a person is acting as: one brand-soft pill in every portal (rule 5). */
+/* No display here: the breakpoints in styles.css that hide these pills keep working. */
+.role-topbar .role-context,
+.staff-topbar .staff-context-select {
+  height: 38px;
+  min-height: 0;
+  align-items: center;
+  flex: 0 0 auto;
+  max-width: 260px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--r-xl);
+  background: var(--brand-soft);
+  color: var(--brand-ink);
+  font: 600 13px / 38px var(--font-sans);
+}
+.role-topbar .role-org,
+.staff-topbar .staff-college-select {
+  height: 38px;
+  min-height: 0;
+  align-items: center;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--text-3);
+  font: 600 13px / 38px var(--font-sans);
+}
+
+/* Switch workspace and Sign out: secondary buttons with their icon */
+.role-topbar .role-switch,
+:is(.student-topbar, .role-topbar, .staff-topbar) .auth-controls button {
+  height: 40px;
+  min-height: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 0 14px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-xl);
+  background: var(--surface);
+  color: var(--text);
+  font: 600 13.5px var(--font-sans);
+  white-space: nowrap;
+  transition: border-color var(--m-micro), background var(--m-micro);
+}
+.role-topbar .role-switch:hover,
+:is(.student-topbar, .role-topbar, .staff-topbar) .auth-controls button:hover:not(:disabled) { border-color: var(--brand); background: var(--surface); }
+:is(.student-topbar, .role-topbar, .staff-topbar) .auth-controls .auth-sign-out { color: var(--text-2); border-color: var(--line); }
+:is(.student-topbar, .role-topbar, .staff-topbar) .auth-controls {
+  max-width: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-3);
+}
+/* Signed in, the profile chip already names the person; the control is just Sign out. */
+:is(.student-topbar, .role-topbar, .staff-topbar) .auth-controls:has(.auth-sign-out) > span { display: none; }
+
+/* Profile chip */
+.student-topbar .profile-menu,
+.role-topbar .role-profile,
+.staff-topbar .staff-profile {
+  min-width: 0;
+  height: var(--control-h);
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 14px 4px 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-3xl);
+  background: var(--surface);
+  color: var(--text);
+  white-space: nowrap;
+}
+.role-topbar .role-profile { height: 42px; border-radius: var(--r-2xl); }
+.student-topbar .profile-menu:disabled { cursor: default; }
+.student-topbar .profile-menu strong,
+.role-topbar .role-profile strong,
+.staff-topbar .staff-profile strong { font-size: 13.5px; font-weight: 700; line-height: 1.2; }
+.student-topbar .profile-menu small,
+.role-topbar .role-profile small,
+.staff-topbar .staff-profile small { color: var(--text-3); font-size: 11.5px; }
+.student-topbar .profile-menu svg,
+.role-topbar .role-profile > svg { color: var(--text-3); flex: 0 0 auto; }
+/* The student avatar carries the brand gradient, as on the approved student home; staff
+   avatars use the ink fill, as on the approved institution home. */
+.student-topbar .profile-menu .avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  background: var(--grad);
+  color: var(--hero-ink);
+  font: 700 13px var(--font-display);
+}
+.role-topbar .role-profile > .role-avatar,
+.staff-topbar .staff-profile > span:first-child {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: var(--r-lg);
+  background: var(--logo-co);
+  color: var(--hero-ink);
+  font: 700 12.5px var(--font-display);
+}
+.staff-topbar .staff-profile > span + span { display: flex; flex-direction: column; min-width: 0; }
+
+/* Top-bar logo (shown once the sidebar is a drawer) */
+:is(.student-topbar, .role-topbar) .topbar-brand { padding: 0 2px; }
+
+/* The portal notice under the top bar reads as the approved page's quiet notice line. */
+.role-preview-notice { border-radius: var(--r-2xl); padding: 11px 16px; font-size: 13px; color: var(--text-2); box-shadow: none; }
+.role-preview-notice strong { color: var(--text); font-weight: 600; }
+
+/* Main column lines up with the top bar, as on the approved pages. */
+@media (min-width: 821px) {
+  .student-main { padding-left: var(--page-x); padding-right: var(--page-x); }
+}
+@media (min-width: 761px) {
+  .role-main { padding-left: var(--page-x); padding-right: var(--page-x); }
+}
+
+/* ---------- Phones (390px reference: logo, then the icon controls) ---------- */
+.auth-sign-out-label,
+.role-switch-label { white-space: nowrap; }
+
+@media (max-width: 760px) {
+  .student-topbar,
+  .role-topbar,
+  .staff-topbar {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 6px;
+    padding: 10px 12px;
+  }
+  :is(.student-topbar, .role-topbar, .staff-topbar) .topbar-brand { display: flex; margin-right: auto; }
+  :is(.student-topbar, .role-topbar, .staff-topbar) :is(.icon-button, .mobile-menu-button) { width: 38px; height: 38px; border-radius: var(--r-xl); }
+  .student-topbar .global-search,
+  .role-topbar .role-search,
+  .staff-topbar .staff-search,
+  .role-topbar .role-context,
+  .role-topbar .role-org,
+  .staff-topbar .staff-context-select,
+  .staff-topbar .staff-college-select { display: none; }
+  .student-topbar .topbar-actions,
+  .role-topbar .role-topbar-actions,
+  .staff-topbar .staff-topbar-actions { display: flex; flex: 0 0 auto; gap: 6px; margin-left: auto; }
+  /* Messages stay in the navigation; the bar keeps theme, notifications, sign out and you. */
+  .student-topbar .topbar-actions .notify-bell:has(> .icon-button:not(.notification)),
+  .role-topbar .role-topbar-actions > .icon-button:not(.notification, .theme-toggle),
+  .staff-topbar .staff-topbar-actions > .icon-button:not(.notification, .theme-toggle) { display: none; }
+  .student-topbar .topbar-actions .theme-toggle { display: grid; }
+  /* Text buttons become icon buttons; their text stays as the accessible name. */
+  .role-topbar .role-switch,
+  :is(.student-topbar, .role-topbar, .staff-topbar) .auth-controls .auth-sign-out {
+    width: 38px;
+    height: 38px;
+    justify-content: center;
+    padding: 0;
+    border-radius: var(--r-xl);
+  }
+  .auth-sign-out-label,
+  .role-switch-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .student-topbar .profile-menu,
+  .role-topbar .role-profile,
+  .staff-topbar .staff-profile { height: 38px; min-width: 0; padding: 0; border: 0; background: transparent; }
+  .student-topbar .profile-menu > span:not(.avatar),
+  .student-topbar .profile-menu > svg,
+  .role-topbar .role-profile > span:not(.role-avatar),
+  .role-topbar .role-profile > svg,
+  .staff-topbar .staff-profile > span + span { display: none; }
+  .student-topbar .profile-menu .avatar,
+  .role-topbar .role-profile > .role-avatar,
+  .staff-topbar .staff-profile > span:first-child { width: 38px; height: 38px; border-radius: var(--r-xl); }
+}

@@ -15,6 +15,9 @@
  * tagline (LEARN | PREPARE | BUILD | GROW) is drawn onto the sign-in backdrop
  * (/assets/login-background.png), which the same script builds.
  */
+import { useSyncExternalStore } from 'react';
+import { currentTheme, subscribeTheme } from './themePreference.js';
+
 export type BrandSurface = 'light' | 'dark';
 
 export const BRAND_NAME = 'ONE by AI8HT';
@@ -41,10 +44,14 @@ export function BrandLogo({ height = 30, surface = 'light', compact = false, cla
   readonly compact?: boolean;
   readonly className?: string;
 }): React.ReactElement {
+  // A logo placed on page surfaces (`light`) follows the theme: in the dark theme those
+  // surfaces are dark, so it takes the metal rendition drawn for dark grounds.
+  const theme = useSyncExternalStore(subscribeTheme, currentTheme, () => 'light' as const);
+  const resolved: BrandSurface = surface === 'light' && theme === 'dark' ? 'dark' : surface;
   return <img
     className={`brand-logo${compact ? ' brand-logo-compact' : ''}${className ? ` ${className}` : ''}`}
-    src={compact ? MARK[surface] : LOCKUP[surface]}
-    srcSet={compact ? undefined : `${LOCKUP[surface]} 1x, ${LOCKUP_HD[surface]} 2x`}
+    src={compact ? MARK[resolved] : LOCKUP[resolved]}
+    srcSet={compact ? undefined : `${LOCKUP[resolved]} 1x, ${LOCKUP_HD[resolved]} 2x`}
     alt={BRAND_NAME}
     draggable={false}
     style={{ height, width: 'auto', display: 'block', flex: '0 0 auto', userSelect: 'none' }}

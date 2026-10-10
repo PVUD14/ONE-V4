@@ -165,7 +165,7 @@ export function ReportFormatBody({ filenameBase, title, rows }: {
     if (!printable) { overlay.toast('Allow pop-ups to print the PDF.'); return; }
     const bodyRows = rows.map((row) => `<tr>${row.map((cell) => `<td>${cell.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</td>`).join('')}</tr>`).join('');
     printable.document.write(`<!doctype html><title>${title}</title><style>
-      body { font-family: Inter, "Segoe UI", sans-serif; color: #101828; padding: 32px; }
+      body { font-family: "DM Sans", "Segoe UI", sans-serif; color: #101828; padding: 32px; }
       h1 { font-size: 20px; margin: 0 0 4px; } p { color: #5d6b82; margin: 0 0 18px; font-size: 12px; }
       table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
       td { border-bottom: 1px solid #e5eaf2; padding: 8px 10px; text-align: left; }

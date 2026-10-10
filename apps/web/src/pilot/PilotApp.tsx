@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { Bell, BookOpen, Briefcase, Building2, CalendarDays, ClipboardCheck, FileText, GraduationCap, Home, MapPinned, MessageSquare, Route, Search, User, Users, Video, Wrench } from 'lucide-react';
 import './pilot.css';
 import { BrandLogo } from '../brand.js';
+import { ThemeToggle } from '../themeToggle.js';
 import { AssistantWidget } from '../assistantWidget.js';
 import { pilotCanon, pilotCompanies, pilotPersona, pilotPopularCourses } from './pilotData.js';
 import { pilotApplicants, pilotEmployerPersona, pilotEmployerRoles, pilotInstitutionPersona, pilotRoster } from './pilotStaffData.js';
@@ -72,6 +73,7 @@ function ShellMain({ config, identity, onSignOut, signOutLabel, email, children 
       <div className="pilot-search"><Search size={15} /> Search…</div>
       <div className="pilot-topbar-actions">
         <span className="pilot-sample-chip" title={`Signed in as ${email}`}>Demo — sample data</span>
+        <ThemeToggle className="pilot-icon-button" />
         <button type="button" className="pilot-icon-button" aria-label="Messages"><MessageSquare size={16} /></button>
         <button type="button" className="pilot-icon-button" aria-label="Notifications"><Bell size={16} />{unread > 0 ? <span className="pilot-dot">{unread}</span> : null}</button>
         <div className="pilot-user" role="button" tabIndex={0}>

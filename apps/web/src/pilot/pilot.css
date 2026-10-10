@@ -3,34 +3,12 @@
    otherwise carries its own tokens at sample fidelity. */
 
 .pilot {
-  --p-blue: #1f55e5;
-  --p-blue-soft: #eaf1ff;
-  --p-ink: #101828;
-  --p-ink-2: #344054;
-  --p-muted: #5d6b82;
-  --p-line: #e5eaf2;
-  --p-canvas: #f6f8fb;
-  --p-card: #ffffff;
-  --p-green: #0d6b4f;
-  --p-green-soft: #e4f6ee;
-  --p-amber: #92400e;
-  --p-amber-soft: #fdf1dc;
-  --p-purple: #5936cf;
-  --p-purple-soft: #efeafc;
-  --p-rose: #a81f4d;
-  --p-rose-soft: #fdeaf0;
-  --p-teal: #0b6669;
-  --p-teal-soft: #e2f5f5;
-  --p-indigo: #4438ca;
-  --p-indigo-soft: #eceafc;
-  --p-shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 8px 24px -14px rgba(16, 24, 40, .14);
-
   min-height: 100vh;
   display: grid;
   grid-template-columns: 236px minmax(0, 1fr);
   background: var(--p-canvas);
   color: var(--p-ink);
-  font-family: "Inter Variable", Inter, "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-sans);
   font-size: 13.5px;
   line-height: 1.5;
 }
@@ -44,7 +22,7 @@
 }
 .pilot-brand { display: flex; align-items: center; gap: 10px; padding: 2px 8px 16px; }
 .pilot-brand-mark {
-  width: 40px; height: 40px; border-radius: 12px; background: #0b0f1a; color: #fff;
+  width: 40px; height: 40px; border-radius: var(--r-2xl); background: var(--navy-950); color: var(--hero-ink);
   display: grid; place-items: center; font-weight: 700; font-size: 17px; letter-spacing: .02em;
 }
 .pilot-brand strong { font-size: 16px; letter-spacing: .01em; }
@@ -52,17 +30,17 @@
 
 .pilot .pilot-nav-item {
   display: flex; align-items: center; gap: 11px; width: 100%;
-  padding: 9px 12px; border: 0; border-radius: 10px; background: transparent;
+  padding: 9px 12px; border: 0; border-radius: var(--r-xl); background: transparent;
   color: var(--p-ink-2); font: inherit; font-weight: 500; text-align: left; cursor: pointer;
 }
 .pilot .pilot-nav-item:hover { background: var(--p-canvas); }
-.pilot .pilot-nav-item.active { background: var(--p-blue-soft); color: var(--p-blue); font-weight: 600; }
+.pilot .pilot-nav-item.active { background: var(--p-blue-soft); color: var(--brand-ink); font-weight: 600; }
 .pilot .pilot-nav-item .lucide { flex: 0 0 auto; }
 .pilot .pilot-nav-item small { margin-left: auto; color: var(--p-muted); font-size: 10px; }
 
 .pilot-side-note {
-  margin-top: auto; border: 1px solid var(--p-line); border-radius: 14px;
-  background: linear-gradient(180deg, #f8faff, #eef3fe); padding: 14px; text-align: center;
+  margin-top: auto; border: 1px solid var(--p-line); border-radius: var(--r-2xl);
+  background: var(--brand-soft); padding: 14px; text-align: center;
 }
 .pilot-side-note strong { display: block; margin-bottom: 4px; font-size: 13px; }
 .pilot-side-note p { margin: 0 0 10px; color: var(--p-muted); font-size: 12px; }
@@ -72,34 +50,34 @@
 .pilot-main { min-width: 0; display: flex; flex-direction: column; }
 .pilot-topbar {
   position: sticky; top: 0; z-index: 8; display: flex; align-items: center; gap: 14px;
-  padding: 12px 26px; background: rgba(246, 248, 251, .92); backdrop-filter: blur(10px);
+  padding: 12px 26px; background: rgb(var(--bg-rgb) / .92); backdrop-filter: blur(10px);
 }
 .pilot-search {
   flex: 1; max-width: 430px; display: flex; align-items: center; gap: 9px;
-  background: var(--p-card); border: 1px solid var(--p-line); border-radius: 12px;
+  background: var(--p-card); border: 1px solid var(--p-line); border-radius: var(--r-2xl);
   padding: 9px 13px; color: var(--p-muted);
 }
 .pilot-topbar-actions { margin-left: auto; display: flex; align-items: center; gap: 12px; }
 .pilot .pilot-icon-button {
   position: relative; display: grid; place-items: center; width: 38px; height: 38px;
-  border: 1px solid var(--p-line); border-radius: 11px; background: var(--p-card);
+  border: 1px solid var(--p-line); border-radius: var(--r-2xl); background: var(--p-card);
   color: var(--p-ink-2); cursor: pointer;
 }
 .pilot-dot {
   position: absolute; top: -5px; right: -5px; min-width: 17px; height: 17px; padding: 0 4px;
-  border-radius: 999px; background: #b91c1c; color: #fff; font-size: 10px; font-weight: 700;
+  border-radius: var(--r-pill); background: var(--danger); color: var(--hero-ink); font-size: 10px; font-weight: 700;
   display: grid; place-items: center;
 }
 .pilot-user { display: flex; align-items: center; gap: 10px; }
 .pilot-avatar {
-  width: 38px; height: 38px; border-radius: 50%; color: #fff; font-weight: 700; font-size: 13px;
-  display: grid; place-items: center; background: linear-gradient(135deg, #1d4ed8, #5936cf);
+  width: 38px; height: 38px; border-radius: 50%; color: var(--hero-ink); font-weight: 700; font-size: 13px;
+  display: grid; place-items: center; background: var(--grad);
 }
 .pilot-user strong { display: block; font-size: 13px; line-height: 1.2; }
 .pilot-user small { color: var(--p-muted); font-size: 11px; }
 .pilot-sample-chip {
   border: 1px solid var(--p-amber); color: var(--p-amber); background: var(--p-amber-soft);
-  border-radius: 999px; padding: 3px 10px; font-size: 10.5px; font-weight: 600; letter-spacing: .04em;
+  border-radius: var(--r-pill); padding: 3px 10px; font-size: 10.5px; font-weight: 600; letter-spacing: .04em;
 }
 .pilot .pilot-signout { border: 0; background: none; color: var(--p-muted); font: inherit; font-size: 12px; cursor: pointer; text-decoration: underline; }
 
@@ -111,7 +89,7 @@
 }
 .pilot .pilot-tab { padding: 8px 2px 10px; }
 .pilot .pilot-nav-item { background: transparent; color: var(--p-ink-2); font-size: 13px; min-height: 0; }
-.pilot .pilot-nav-item.active { background: var(--p-blue-soft); color: var(--p-blue); }
+.pilot .pilot-nav-item.active { background: var(--p-blue-soft); color: var(--brand-ink); }
 .pilot .pilot-icon-button { background: var(--p-card); color: var(--p-ink-2); min-height: 0; font-size: 12px; }
 
 /* --- Page scaffold --------------------------------------------------------- */
@@ -127,13 +105,13 @@
 .pilot-greeting p { margin: 0; color: var(--p-muted); }
 
 .pilot-card {
-  background: var(--p-card); border: 1px solid var(--p-line); border-radius: 16px;
+  background: var(--p-card); border: 1px solid var(--p-line); border-radius: var(--r-card);
   box-shadow: var(--p-shadow); padding: 16px 18px; min-width: 0;
 }
 .pilot-card h2 { margin: 0 0 12px; font-size: 15px; }
 .pilot-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
 .pilot-card-head h2 { margin: 0; }
-.pilot .pilot-link { border: 0; background: none; color: var(--p-blue); font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.pilot .pilot-link { border: 0; background: none; color: var(--brand-ink); font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
 
 .pilot-row { display: grid; gap: 14px; }
 .pilot-row.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -157,43 +135,40 @@
 
 .pilot .pilot-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-  border: 0; border-radius: 10px; background: var(--p-blue); color: #fff;
+  border: 0; border-radius: var(--r-xl); background: var(--blue-500); color: var(--hero-ink);
   font: inherit; font-size: 12.5px; font-weight: 600; padding: 9px 15px; cursor: pointer;
 }
-.pilot .pilot-btn.ghost { background: var(--p-card); color: var(--p-blue); border: 1px solid var(--p-line); }
-.pilot .pilot-btn.soft { background: var(--p-blue-soft); color: var(--p-blue); }
-.pilot .pilot-btn.small { padding: 6px 12px; font-size: 12px; }
+.pilot .pilot-btn.ghost { background: var(--p-card); color: var(--brand-ink); border: 1px solid var(--p-line); }
+.pilot .pilot-btn.soft { background: var(--p-blue-soft); color: var(--brand-ink); }
+.pilot .pilot-btn.small { padding: 6px 12px; font-size: 12px; border-radius: var(--r-lg); }
 .pilot .pilot-btn:disabled { opacity: .55; cursor: default; }
 
 .pilot-chip {
-  display: inline-flex; align-items: center; gap: 5px; border-radius: 999px;
+  display: inline-flex; align-items: center; gap: 5px; border-radius: var(--r-pill);
   padding: 3px 10px; font-size: 11px; font-weight: 600; white-space: nowrap;
 }
 .pilot-chip.green { background: var(--p-green-soft); color: var(--p-green); }
 .pilot-chip.amber { background: var(--p-amber-soft); color: var(--p-amber); }
-.pilot-chip.blue { background: var(--p-blue-soft); color: var(--p-blue); }
+.pilot-chip.blue { background: var(--p-blue-soft); color: var(--brand-ink); }
 .pilot-chip.purple { background: var(--p-purple-soft); color: var(--p-purple); }
 .pilot-chip.rose { background: var(--p-rose-soft); color: var(--p-rose); }
 .pilot-chip.teal { background: var(--p-teal-soft); color: var(--p-teal); }
 .pilot-chip.indigo { background: var(--p-indigo-soft); color: var(--p-indigo); }
-.pilot-chip.slate { background: #eef1f6; color: var(--p-ink-2); }
+.pilot-chip.slate { background: var(--surface-2); color: var(--p-ink-2); }
 
 .pilot-mark {
-  width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center;
-  font-weight: 700; font-size: 13px; color: #fff; flex: 0 0 auto;
+  width: 42px; height: 42px; border-radius: var(--r-2xl); display: grid; place-items: center;
+  font-weight: 700; font-size: 13px; color: var(--hero-ink); flex: 0 0 auto;
 }
-.pilot-mark.blue { background: linear-gradient(135deg, #1d4ed8, #1e3a8a); }
-.pilot-mark.indigo { background: linear-gradient(135deg, #4f46e5, #3730a3); }
-.pilot-mark.teal { background: linear-gradient(135deg, #0f766e, #115e59); }
-.pilot-mark.amber { background: linear-gradient(135deg, #b45309, #7c2d12); }
-.pilot-mark.rose { background: linear-gradient(135deg, #be185d, #9d174d); }
-.pilot-mark.green { background: linear-gradient(135deg, #15803d, #14532d); }
-.pilot-mark.slate { background: linear-gradient(135deg, #475569, #1e293b); }
+/* Company monograms: one neutral tile (--logo-co) for every tone. Momentum carries no
+   per-colour chips; white text on --logo-co clears 4.5:1 in both themes. */
+.pilot-mark.blue, .pilot-mark.indigo, .pilot-mark.teal, .pilot-mark.amber,
+.pilot-mark.rose, .pilot-mark.green, .pilot-mark.slate { background: var(--logo-co); }
 
 .pilot-tile {
-  width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; flex: 0 0 auto;
+  width: 40px; height: 40px; border-radius: var(--r-2xl); display: grid; place-items: center; flex: 0 0 auto;
 }
-.pilot-tile.blue { background: var(--p-blue-soft); color: var(--p-blue); }
+.pilot-tile.blue { background: var(--p-blue-soft); color: var(--brand-ink); }
 .pilot-tile.green { background: var(--p-green-soft); color: var(--p-green); }
 .pilot-tile.amber { background: var(--p-amber-soft); color: var(--p-amber); }
 .pilot-tile.purple { background: var(--p-purple-soft); color: var(--p-purple); }
@@ -203,12 +178,12 @@
 
 /* --- Meters ---------------------------------------------------------------- */
 
-.pilot-bar { height: 7px; border-radius: 999px; background: #edf1f7; overflow: hidden; }
-.pilot-bar i { display: block; height: 100%; border-radius: 999px; background: var(--p-blue); }
+.pilot-bar { height: 7px; border-radius: var(--r-pill); background: var(--surface-2); overflow: hidden; }
+.pilot-bar i { display: block; height: 100%; border-radius: var(--r-pill); background: var(--p-blue); }
 .pilot-bar.green i { background: var(--p-green); }
-.pilot-bar.amber i { background: #f59e0b; }
+.pilot-bar.amber i { background: var(--warn); }
 .pilot-bar.purple i { background: var(--p-purple); }
-.pilot-bar.rose i { background: #e5484d; }
+.pilot-bar.rose i { background: var(--danger); }
 .pilot-bar.indigo i { background: var(--p-indigo); }
 .pilot-bar.thin { height: 5px; }
 
@@ -227,13 +202,13 @@
   border: 0; background: none; font: inherit; font-size: 13px; color: var(--p-muted);
   padding: 8px 2px 10px; cursor: pointer; white-space: nowrap; border-bottom: 2px solid transparent;
 }
-.pilot .pilot-tab.active { color: var(--p-blue); font-weight: 600; border-bottom-color: var(--p-blue); }
+.pilot .pilot-tab.active { color: var(--brand-ink); font-weight: 600; border-bottom-color: var(--p-blue); }
 
 /* --- Specific compositions ------------------------------------------------- */
 
 .pilot-hero {
-  border: 1px solid var(--p-line); border-radius: 16px; padding: 18px 20px;
-  background: linear-gradient(120deg, #eef3ff 0%, #f7f9ff 55%, #f2ecff 100%);
+  border: 1px solid var(--p-line); border-radius: var(--r-card); padding: 18px 20px;
+  background: var(--brand-soft);
   display: flex; align-items: center; gap: 20px; justify-content: space-between; flex-wrap: wrap;
 }
 .pilot-hero h2 { margin: 0 0 4px; font-size: 17px; }
@@ -253,11 +228,11 @@
   width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
   background: var(--p-green-soft); color: var(--p-green); font-style: normal; font-size: 11px; font-weight: 700;
 }
-.pilot-streak-days i.off { background: #eef1f6; color: var(--p-muted); }
+.pilot-streak-days i.off { background: var(--surface-2); color: var(--p-muted); }
 
 .pilot-quote {
-  border-radius: 16px; padding: 20px; color: #fff;
-  background: linear-gradient(120deg, #4a63e7, #7a5cf0);
+  border-radius: var(--r-card); padding: 20px; color: var(--hero-ink);
+  background: var(--grad);
   font-size: 15px; font-weight: 600; font-style: italic;
 }
 
@@ -267,8 +242,8 @@
   font-size: 12.5px; font-weight: 700; border: 2px solid var(--p-line); color: var(--p-muted); background: var(--p-card);
   position: relative; z-index: 1;
 }
-.pilot-step.completed .pilot-step-no { background: var(--p-green); border-color: var(--p-green); color: #fff; }
-.pilot-step.current .pilot-step-no { background: var(--p-blue); border-color: var(--p-blue); color: #fff; }
+.pilot-step.completed .pilot-step-no { background: var(--p-green); border-color: var(--p-green); color: var(--hero-ink); }
+.pilot-step.current .pilot-step-no { background: var(--blue-500); border-color: var(--p-blue); color: var(--hero-ink); }
 .pilot-step-line { position: relative; }
 .pilot-step-line::before {
   content: ""; position: absolute; left: 14px; top: 34px; bottom: -12px; width: 2px; background: var(--p-line);
@@ -276,41 +251,41 @@
 .pilot-step:last-child .pilot-step-line::before { display: none; }
 .pilot-step-card {
   flex: 1; min-width: 0; display: flex; align-items: center; gap: 14px;
-  border: 1px solid var(--p-line); border-radius: 13px; padding: 12px 15px; margin-bottom: 12px;
+  border: 1px solid var(--p-line); border-radius: var(--r-2xl); padding: 12px 15px; margin-bottom: 12px;
   background: var(--p-card);
 }
-.pilot-step.current .pilot-step-card { border-color: #c4d4fb; background: #f5f8ff; }
+.pilot-step.current .pilot-step-card { border-color: color-mix(in srgb, var(--brand) 30%, var(--line)); background: var(--surface-2); }
 .pilot-step-card .grow { flex: 1; min-width: 0; }
 .pilot-step-card strong { display: block; font-size: 13.5px; }
 .pilot-step-card small { color: var(--p-muted); font-size: 11.5px; }
 
 .pilot-phase {
-  display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 12px;
+  display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: var(--r-2xl);
   border: 1px solid var(--p-line); background: var(--p-card); white-space: nowrap;
 }
 .pilot-phase strong { font-size: 12.5px; display: block; }
 .pilot-phase small { color: var(--p-muted); font-size: 11px; }
-.pilot-phase.active { border-color: #b9f0d7; background: #f0fbf6; }
+.pilot-phase.active { border-color: color-mix(in srgb, var(--ok) 30%, var(--line)); background: var(--ok-soft); }
 .pilot-phase.active strong { color: var(--p-green); }
 .pilot-phases { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 2px; }
 
 .pilot-course-card { display: flex; flex-direction: column; gap: 9px; }
-.pilot-course-art { height: 74px; border-radius: 12px; display: grid; place-items: center; color: #fff; }
+.pilot-course-art { height: 74px; border-radius: var(--r-2xl); display: grid; place-items: center; color: var(--hero-ink); }
 .pilot-course-card strong { font-size: 13px; line-height: 1.35; }
 .pilot-course-card small { color: var(--p-muted); font-size: 11px; }
 
 .pilot-cat {
   display: flex; align-items: center; gap: 10px; border: 1px solid var(--p-line);
-  border-radius: 12px; padding: 11px 13px; background: var(--p-card);
+  border-radius: var(--r-2xl); padding: 11px 13px; background: var(--p-card);
 }
 .pilot-cat strong { font-size: 12.5px; display: block; }
 .pilot-cat small { color: var(--p-muted); font-size: 11px; }
 
 .pilot-date {
-  width: 44px; border-radius: 10px; overflow: hidden; text-align: center; flex: 0 0 auto;
+  width: 44px; border-radius: var(--r-xl); overflow: hidden; text-align: center; flex: 0 0 auto;
   border: 1px solid var(--p-line); font-weight: 700;
 }
-.pilot-date b { display: block; background: var(--p-blue-soft); color: var(--p-blue); font-size: 9.5px; letter-spacing: .06em; padding: 2px 0; }
+.pilot-date b { display: block; background: var(--p-blue-soft); color: var(--brand-ink); font-size: 9.5px; letter-spacing: .06em; padding: 2px 0; }
 .pilot-date span { display: block; font-size: 15px; padding: 3px 0 4px; }
 
 .pilot-stat { display: flex; align-items: center; gap: 11px; }
@@ -330,10 +305,10 @@
 .pilot-two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 
 .pilot-banner {
-  border-radius: 14px; padding: 14px 16px; display: flex; align-items: center; gap: 12px;
+  border-radius: var(--r-2xl); padding: 14px 16px; display: flex; align-items: center; gap: 12px;
   background: var(--p-green-soft); color: var(--p-green); font-weight: 600; font-size: 12.5px;
 }
-.pilot-banner.blue { background: var(--p-blue-soft); color: var(--p-blue); }
+.pilot-banner.blue { background: var(--p-blue-soft); color: var(--brand-ink); }
 
 .pilot-coming {
   display: grid; place-items: center; min-height: 320px; text-align: center;
@@ -375,7 +350,7 @@
 
 .pilot-funnel { display: flex; flex-direction: column; gap: 9px; }
 .pilot-funnel-row { display: grid; grid-template-columns: 86px 1fr 44px; gap: 10px; align-items: center; font-size: 12px; }
-.pilot-funnel-row .pilot-bar { height: 16px; border-radius: 6px; }
+.pilot-funnel-row .pilot-bar { height: 16px; border-radius: var(--r-sm); }
 .pilot-funnel-row .num { text-align: right; font-weight: 700; }
 
 .pilot-kpi { display: flex; align-items: center; gap: 12px; }
@@ -385,12 +360,12 @@
 /* --- interaction layer: modal, toast, forms -------------------------------- */
 .pilot .pilot-modal-backdrop {
   position: fixed; inset: 0; z-index: 60; display: flex; align-items: flex-start;
-  justify-content: center; padding: 8vh 18px 18px; background: rgba(15, 23, 42, 0.44);
+  justify-content: center; padding: 8vh 18px 18px; background: color-mix(in srgb, var(--navy-950) 44%, transparent);
   animation: pilot-fade 0.16s ease-out;
 }
 .pilot .pilot-modal {
-  width: min(480px, 100%); background: #fff; border-radius: 16px;
-  border: 1px solid var(--p-line); box-shadow: 0 24px 64px rgba(15, 23, 42, 0.28);
+  width: min(480px, 100%); background: var(--surface); border-radius: var(--r-card);
+  border: 1px solid var(--p-line); box-shadow: var(--shadow-pop);
   animation: pilot-rise 0.18s ease-out; max-height: 82vh; display: flex; flex-direction: column;
 }
 .pilot .pilot-modal-head {
@@ -405,19 +380,19 @@
 .pilot .pilot-field { display: block; margin-bottom: 11px; }
 .pilot .pilot-field span { display: block; font-size: 11.5px; font-weight: 700; color: var(--p-ink-2); margin-bottom: 5px; }
 .pilot .pilot-field input, .pilot .pilot-field select, .pilot .pilot-field textarea {
-  width: 100%; border: 1px solid var(--p-line); border-radius: 10px; background: #fbfcfe;
+  width: 100%; border: 1px solid var(--p-line); border-radius: var(--r-xl); background: var(--surface);
   padding: 9px 11px; font: inherit; font-size: 13px; color: var(--p-ink); resize: vertical;
 }
 .pilot .pilot-field input:focus, .pilot .pilot-field select:focus, .pilot .pilot-field textarea:focus {
-  outline: 2px solid #1f55e5; outline-offset: 1px; background: #fff;
+  outline: 2px solid var(--brand); outline-offset: 1px; background: var(--surface);
 }
 .pilot .pilot-detail-rows { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; }
 .pilot .pilot-detail-rows small { display: block; font-size: 11px; color: var(--p-muted); font-weight: 600; }
 .pilot .pilot-detail-rows strong { font-size: 13px; color: var(--p-ink); }
 .pilot .pilot-toast {
   position: fixed; right: 22px; bottom: 22px; z-index: 70; max-width: 340px;
-  background: #10233f; color: #fff; font-size: 12.5px; font-weight: 600;
-  padding: 11px 15px; border-radius: 12px; box-shadow: 0 10px 30px rgba(15, 23, 42, 0.35);
+  background: var(--toast); color: var(--toast-ink); font-size: 12.5px; font-weight: 600;
+  padding: 11px 15px; border-radius: var(--r-3xl); box-shadow: var(--shadow-toast);
   animation: pilot-rise 0.18s ease-out;
 }
 @keyframes pilot-fade { from { opacity: 0; } to { opacity: 1; } }
@@ -446,30 +421,30 @@
    the card look so clickability never changes the visual. */
 .pilot button.pilot-cat, .pilot button.pilot-phase {
   font: inherit; text-align: left; cursor: pointer; border-width: 1px; min-height: 0;
-  background: var(--p-card); color: var(--p-ink); border-radius: 12px; padding: 10px 11px;
+  background: var(--p-card); color: var(--p-ink); border-radius: var(--r-2xl); padding: 10px 11px;
 }
 .pilot button.pilot-cat:hover, .pilot button.pilot-phase:hover { background: var(--p-canvas); }
-.pilot button.pilot-phase { padding: 10px 14px; border-radius: 12px; white-space: nowrap; display: flex; align-items: center; gap: 10px; }
-.pilot button.pilot-phase.active { border-color: #b9f0d7; background: #f0fbf6; }
+.pilot button.pilot-phase { padding: 10px 14px; border-radius: var(--r-2xl); white-space: nowrap; display: flex; align-items: center; gap: 10px; }
+.pilot button.pilot-phase.active { border-color: color-mix(in srgb, var(--ok) 30%, var(--line)); background: var(--ok-soft); }
 .pilot button.pilot-cat { display: flex; align-items: center; gap: 9px; }
-.pilot .pilot-user { cursor: pointer; border-radius: 12px; padding: 3px 6px; }
+.pilot .pilot-user { cursor: pointer; border-radius: var(--r-2xl); padding: 3px 6px; }
 .pilot .pilot-user:hover { background: var(--p-canvas); }
 /* Inline filter control (e.g. the Students batch filter). */
 .pilot .pilot-inline-filter { display: inline-flex; align-items: center; gap: 7px; }
 .pilot .pilot-inline-filter span { font-size: 11.5px; font-weight: 700; color: var(--p-ink-2); }
 .pilot .pilot-inline-filter select {
-  border: 1px solid var(--p-line); border-radius: 10px; background: var(--p-card);
+  border: 1px solid var(--p-line); border-radius: var(--r-xl); background: var(--p-card);
   padding: 8px 10px; font: inherit; font-size: 12.5px; color: var(--p-ink); cursor: pointer;
 }
 
 /* --- Public profile share + photo -------------------------------------------- */
-.pilot .pilot-qr { flex: 0 0 auto; border: 1px solid var(--p-line); border-radius: 12px; }
+.pilot .pilot-qr { flex: 0 0 auto; border: 1px solid var(--p-line); border-radius: var(--r-2xl); }
 .pilot .pilot-share-link {
   display: inline-flex; align-items: center; gap: 7px; max-width: 100%;
-  border: 1px solid var(--p-line); border-radius: 10px; background: var(--p-canvas);
+  border: 1px solid var(--p-line); border-radius: var(--r-xl); background: var(--p-canvas);
   padding: 7px 11px; font-size: 12px; font-weight: 600; color: var(--p-ink-2);
 }
 .pilot .pilot-share-link span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pilot img.pilot-avatar { border-radius: 50%; display: block; }
-.pilot button.pilot-tip-row { background: none; border: 0; width: 100%; font: inherit; text-align: left; cursor: pointer; min-height: 0; border-radius: 10px; color: inherit; }
+.pilot button.pilot-tip-row { background: none; border: 0; width: 100%; font: inherit; text-align: left; cursor: pointer; min-height: 0; border-radius: var(--r-xl); color: inherit; }
 .pilot button.pilot-tip-row:hover { background: var(--p-canvas); }

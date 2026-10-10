@@ -1,7 +1,7 @@
 /**
  * Script-aware text for lessons (ENG-16).
  *
- * Why this exists: a student may read lessons in Telugu, and the app's font stack (Inter, Segoe UI,
+ * Why this exists: a student may read lessons in Telugu, and the app's font stack (DM Sans, Segoe UI,
  * system UI) has no Telugu glyphs, so on a machine without a Telugu system font the text would show
  * as empty boxes. This registers the bundled Noto Sans Telugu (SIL Open Font License 1.1, licence in
  * public/fonts/NotoSansTelugu-OFL.txt) through the CSS Font Loading API — no stylesheet is added —
@@ -14,8 +14,8 @@ const TELUGU_FAMILY = 'ONE Telugu';
 const TELUGU_SOURCE = "url('/fonts/NotoSansTelugu-Regular.ttf') format('truetype')";
 /** The Telugu block, plus the joiners and the dotted circle Telugu shaping uses. */
 const TELUGU_RANGE = 'U+0C00-0C7F, U+200C-200D, U+25CC';
-/** The app's own stack after the script font, so Latin text inside a Telugu lesson keeps Inter. */
-const APP_STACK = 'Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif';
+/** The app's own stack after the script font, so Latin text inside a Telugu lesson keeps DM Sans. */
+const APP_STACK = '"DM Sans Variable", "DM Sans", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif';
 
 let registered = false;
 

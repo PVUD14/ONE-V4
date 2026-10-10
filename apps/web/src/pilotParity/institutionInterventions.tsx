@@ -8,7 +8,7 @@ import { ApiRequestError, apiBaseUrl, getProtectedAccessToken, listInstitutionEx
 import type { ExamNotAttemptedDto } from '../api.js';
 import { Ring } from '../pilot/pilotComponents.js';
 import { NaListCard, go } from './naWidgets.js';
-import { AlertTriangle, Plus } from 'lucide-react';
+import { Icon } from '../icons/Icon.js';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { bearerHeader } from '../sandbox.js';
 import { formatDate, formatDateTime } from '../dates.js';
@@ -113,7 +113,7 @@ function InterventionsWorkspace({ institutionId, basePath, token }: { readonly i
     <div className="pilot-content">
       <div className="pilot-page-head">
         <div><h1>Interventions</h1><p>Structured support for students who need attention before the placement season.</p></div>
-        <button type="button" className="pilot-btn" disabled={!token || !records || busy} onClick={() => setShowForm((value) => !value)}><Plus size={15} /> Assign Intervention</button>
+        <button type="button" className="pilot-btn" disabled={!token || !records || busy} onClick={() => setShowForm((value) => !value)}><Icon name="plus" size={16} /> Assign Intervention</button>
       </div>
       {!token ? <p role="alert">Sign in to an institution workspace to manage interventions.</p> : null}
       {error ? <p className="form-error" role="alert">{error}</p> : null}
@@ -137,7 +137,7 @@ function InterventionsWorkspace({ institutionId, basePath, token }: { readonly i
           {!token || queueError ? <p>NA — assessment queue unavailable.</p> : queue === null ? <p style={{ color: 'var(--p-muted)', margin: '8px 0' }}>Loading…</p>
             : queue.length ? queue.slice(0, 8).map((entry, index) => (
               <div key={`${entry.institutionStudentId}-${index}`} className="pilot-list-row">
-                <span className="pilot-tile rose"><AlertTriangle size={16} /></span>
+                <span className="pilot-tile rose"><Icon name="warning" size={16} /></span>
                 <div className="grow"><strong>{entry.studentName}</strong><small>{entry.inProgress ? `In progress now: ${entry.examTitle}` : `Has not attempted: ${entry.examTitle}`}</small></div>
                 <span className="pilot-chip amber">Due {formatDate(entry.endsAt)}</span>
                 <button type="button" className="pilot-btn ghost small" onClick={() => go(`${basePath}/assessments`)}>Review</button>

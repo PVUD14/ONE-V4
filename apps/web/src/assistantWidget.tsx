@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Send, Sparkles, ThumbsDown, ThumbsUp, X } from 'lucide-react';
+import { Icon } from './icons/Icon.js';
 import {
   ApiRequestError,
   getProtectedAccessToken,
@@ -108,8 +108,8 @@ export function AssistantWidget({ persona }: { readonly persona: AssistantPerson
       {open ? (
         <div className="assistant-panel" role="dialog" aria-label="ONE Assistant">
           <div className="assistant-head">
-            <span className="assistant-title"><Sparkles size={15} /> ONE Assistant</span>
-            <button type="button" className="assistant-close" aria-label="Close assistant" onClick={() => setOpen(false)}><X size={16} /></button>
+            <span className="assistant-title"><Icon name="coach" size={16} /> ONE Assistant</span>
+            <button type="button" className="assistant-close" aria-label="Close assistant" onClick={() => setOpen(false)}><Icon name="close" size={16} /></button>
           </div>
           <div className="assistant-log" ref={logRef}>
             {entries.length === 0 ? (
@@ -127,8 +127,8 @@ export function AssistantWidget({ persona }: { readonly persona: AssistantPerson
                   <p>{entry.content || '…'}</p>
                   {entry.role === 'assistant' && entry.done && !rated.has(index) ? (
                     <span className="assistant-rate">
-                      <button type="button" aria-label="Helpful" onClick={() => rate(index, true)}><ThumbsUp size={13} /></button>
-                      <button type="button" aria-label="Not helpful" onClick={() => rate(index, false)}><ThumbsDown size={13} /></button>
+                      <button type="button" aria-label="Helpful" onClick={() => rate(index, true)}><Icon name="check" size={16} /></button>
+                      <button type="button" aria-label="Not helpful" onClick={() => rate(index, false)}><Icon name="close" size={16} /></button>
                     </span>
                   ) : null}
                 </div>
@@ -148,7 +148,7 @@ export function AssistantWidget({ persona }: { readonly persona: AssistantPerson
               aria-label="Ask the assistant"
               onChange={(event) => setDraft(event.target.value)}
             />
-            <button type="submit" aria-label="Send" disabled={busy || draft.trim().length === 0}><Send size={15} /></button>
+            <button type="submit" aria-label="Send" disabled={busy || draft.trim().length === 0}><Icon name="arrow-right" size={16} /></button>
           </form>
           <p className="assistant-foot">Answers come from ONE’s help guide and can be wrong — conversations may be reviewed to improve help.</p>
         </div>
@@ -160,7 +160,7 @@ export function AssistantWidget({ persona }: { readonly persona: AssistantPerson
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
       >
-        <Sparkles size={19} />
+        <Icon name="coach" size={20} />
       </button>
     </div>
   );

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" class="ai ai-opportunities ai-loop" role="img" aria-label="Opportunities (animated)">
+<style>
+svg{color:#1554D6;fill:currentColor;overflow:visible}
+*{transform-box:view-box}
+.s{opacity:.42}.p-turn{opacity:0}.p-dB{opacity:0}.p-chk{stroke-dasharray:12;stroke-dashoffset:0}
+@keyframes aiNeedle{0%,28%,100%{transform:none}8%{transform:rotate(-55deg)}16%{transform:rotate(30deg)}22%{transform:rotate(-9deg)}}
+@media (prefers-reduced-motion: no-preference){
+.ai-loop .p-ndl{animation:aiNeedle 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:12px 12px}
+}
+</style>
+<defs><mask id="mk-op-x" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24"><rect width="24" height="24" fill="#fff"/><path class="p-ndl" fill="#000" d="M16.05 7.65Q16.6 7.4 16.35 7.95L13.95 13.15Q13.7 13.7 13.15 13.95L7.95 16.35Q7.4 16.6 7.65 16.05L10.05 10.85Q10.3 10.3 10.85 10.05Z"/></mask></defs><path class="f" mask="url(#mk-op-x)" d="M2.4 12a9.6 9.6 0 1 0 19.2 0a9.6 9.6 0 1 0 -19.2 0Z"/><path class="f " fill-rule="evenodd" d="M10.5 12a1.5 1.5 0 1 0 3 0a1.5 1.5 0 1 0 -3 0Z"/>
+</svg>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, ArrowRight, Briefcase, Building2, ClipboardCheck, Download, Plus, TrendingUp, Users, Video } from 'lucide-react';
+import { Icon } from './icons/Icon.js';
 import { MultiRing, Spark } from './pilot/pilotComponents.js';
 import { NaSlotStrip, NaValue, PilotKpi, SuppressedChart, allMissing } from './naState.js';
 import {
@@ -154,18 +154,18 @@ export function InstitutionDashboardV3({ institutionId, basePath }: { readonly i
           <h1>Placement Dashboard</h1>
           <p>Cohort readiness, placement activity and the students who need you this week.</p>
         </div>
-        <button type="button" className="pilot-btn ghost" onClick={() => go(`${basePath}/assessments`)}><Download size={15} /> Export Report</button>
+        <button type="button" className="pilot-btn ghost" onClick={() => go(`${basePath}/assessments`)}><Icon name="download" size={16} /> Export Report</button>
       </div>
 
       <div className="pilot-row cols-5">
         {([
-          ['Active Students', String(activeStudents), 'blue', Users],
-          ['Placement Eligible', data.placement ? countLabel(data.placement.overall.eligible) : 'NA', 'indigo', ClipboardCheck],
-          ['Students With Offers', data.placement ? countLabel(data.placement.overall.withOffer) : 'NA', 'green', TrendingUp],
-          ['Students Placed', data.placement ? countLabel(data.placement.overall.placed) : 'NA', 'teal', Building2],
-          ['Need Intervention', String(data.notAttempted.length), 'rose', AlertTriangle],
-        ] as const).map(([label, value, tone, Icon]) => (
-          <PilotKpi key={label} icon={<Icon size={17} />} tone={tone} value={value} label={label} reason={kpiReason(value)} />
+          ['Active Students', String(activeStudents), 'blue', 'students'],
+          ['Placement Eligible', data.placement ? countLabel(data.placement.overall.eligible) : 'NA', 'indigo', 'placement'],
+          ['Students With Offers', data.placement ? countLabel(data.placement.overall.withOffer) : 'NA', 'green', 'offers'],
+          ['Students Placed', data.placement ? countLabel(data.placement.overall.placed) : 'NA', 'teal', 'placement'],
+          ['Need Intervention', String(data.notAttempted.length), 'rose', 'warning'],
+        ] as const).map(([label, value, tone, glyph]) => (
+          <PilotKpi key={label} icon={<Icon name={glyph} size={16} />} tone={tone} value={value} label={label} reason={kpiReason(value)} />
         ))}
       </div>
 
@@ -209,7 +209,7 @@ export function InstitutionDashboardV3({ institutionId, basePath }: { readonly i
         <div className="pilot-list">
           {data.notAttempted.length ? data.notAttempted.slice(0, 5).map((entry) => (
             <div key={entry.institutionStudentId} className="pilot-list-row">
-              <span className="pilot-tile rose"><AlertTriangle size={16} /></span>
+              <span className="pilot-tile rose"><Icon name="warning" size={16} /></span>
               <div className="grow"><strong>{entry.studentName}</strong><small>{entry.inProgress ? `In progress now: ${entry.examTitle}` : `Has not attempted: ${entry.examTitle}`}</small></div>
               <span className="pilot-chip amber">Due {formatDate(entry.endsAt)}</span>
               <button type="button" className="pilot-btn ghost small" onClick={() => go(`${basePath}/assessments`)}>Review</button>
@@ -243,7 +243,7 @@ export function InstitutionDashboardV3({ institutionId, basePath }: { readonly i
         {!data.drives ? <p style={{ color: 'var(--p-muted)', margin: '4px 0' }}>Campus drives are not available to your role — NA.</p>
           : data.drives.upcoming.length ? <div className="pilot-list">{data.drives.upcoming.slice(0, 4).map((drive) => (
             <div key={drive.id} className="pilot-list-row">
-              <span className="pilot-tile blue"><Building2 size={16} /></span>
+              <span className="pilot-tile blue"><Icon name="company" size={16} /></span>
               <div className="grow"><strong>{drive.employerName}</strong><small>{drive.opportunityTitle ?? 'Untitled'} · {formatDate(drive.scheduledStartAt ?? '')}</small></div>
             </div>))}</div>
             : <p style={{ color: 'var(--p-muted)', margin: '4px 0' }}>No drive is scheduled yet.</p>}
@@ -342,21 +342,21 @@ export function EmployerDashboardV3({ basePath }: { readonly basePath: string })
           <h1>Recruiter Dashboard</h1>
           <p>Your open roles, pipeline health and the interviews coming up this week.</p>
         </div>
-        <button type="button" className="pilot-btn" onClick={() => go(`${basePath}/opportunities`)}><Plus size={15} /> Post a Role</button>
+        <button type="button" className="pilot-btn" onClick={() => go(`${basePath}/opportunities`)}><Icon name="plus" size={16} /> Post a Role</button>
       </div>
 
-      {!summary ? <div className="pilot-banner amber" role="status"><AlertTriangle size={17} /> Your hiring figures could not be loaded, so they read NA.</div> : null}
+      {!summary ? <div className="pilot-banner amber" role="status"><Icon name="warning" size={16} /> Your hiring figures could not be loaded, so they read NA.</div> : null}
 
       <div className="pilot-row cols-5">
         {([
-          ['Open Roles', figure(summary?.openJobs), 'blue', Briefcase, null],
-          ['Total Applicants', figure(summary?.applicationsTotal), 'indigo', Users, summary ? `${summary.newApplicantsLast7Days} new in 7 days` : null],
-          ['In Pipeline', figure(summary?.openApplications), 'purple', ClipboardCheck, null],
-          ['Offers Pending', figure(summary?.offersPending), 'amber', TrendingUp, null],
-          ['Hires', figure(summary?.hires), 'green', Building2, null],
-        ] as const).map(([label, value, tone, Icon, note]) => (
+          ['Open Roles', figure(summary?.openJobs), 'blue', 'opportunities', null],
+          ['Total Applicants', figure(summary?.applicationsTotal), 'indigo', 'applicants', summary ? `${summary.newApplicantsLast7Days} new in 7 days` : null],
+          ['In Pipeline', figure(summary?.openApplications), 'purple', 'pipeline', null],
+          ['Offers Pending', figure(summary?.offersPending), 'amber', 'offers', null],
+          ['Hires', figure(summary?.hires), 'green', 'placement', null],
+        ] as const).map(([label, value, tone, glyph, note]) => (
           <section key={label} className="pilot-card pilot-kpi">
-            <span className={`pilot-tile ${tone}`}><Icon size={17} /></span>
+            <span className={`pilot-tile ${tone}`}><Icon name={glyph} size={16} /></span>
             <div><b><NaValue value={value} /></b><small>{label}</small>{note ? <><br /><small>{note}</small></> : null}</div>
           </section>
         ))}
@@ -380,7 +380,7 @@ export function EmployerDashboardV3({ basePath }: { readonly basePath: string })
             : weekInterviews === null ? <p style={muted}>The interview list could not be loaded. Open Interviews to try again.</p>
               : weekInterviews.length ? <div className="pilot-list">{weekInterviews.slice(0, 5).map((item) => (
                 <div key={item.id} className="pilot-list-row">
-                  <span className="pilot-tile purple"><Video size={16} /></span>
+                  <span className="pilot-tile purple"><Icon name="meetings" size={16} /></span>
                   <div className="grow"><strong>{interviewCandidate(item)}</strong><small>Round {item.roundNumber} · {item.title || 'NA'}</small></div>
                   <small>{new Date(item.scheduledStart!).toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' })}</small>
                 </div>))}</div>
@@ -424,13 +424,13 @@ export function EmployerDashboardV3({ basePath }: { readonly basePath: string })
           : openDrives.length
             ? <div className="pilot-list">{openDrives.slice(0, 4).map((drive) => (
               <div key={drive.id} className="pilot-list-row">
-                <span className="pilot-tile indigo"><Building2 size={16} /></span>
+                <span className="pilot-tile indigo"><Icon name="company" size={16} /></span>
                 <div className="grow"><strong>{drive.institutionName}</strong><small>{drive.opportunityTitle ?? 'Untitled'}</small></div>
                 <span className="pilot-chip blue">{campusDriveStateLabels[drive.state]}</span>
               </div>))}</div>
             : <p style={muted}>No open campus drives. Request one from a job&apos;s Opportunity Detail.</p>}
       </section>
-      <div className="pilot-banner blue"><TrendingUp size={17} /> {!summary ? 'Open applications: NA.' : summary.openApplications > 0 ? `${summary.openApplications} open application${summary.openApplications === 1 ? '' : 's'} awaiting your review.` : 'No open applications right now.'}</div>
+      <div className="pilot-banner blue"><Icon name="analytics" size={16} /> {!summary ? 'Open applications: NA.' : summary.openApplications > 0 ? `${summary.openApplications} open application${summary.openApplications === 1 ? '' : 's'} awaiting your review.` : 'No open applications right now.'}</div>
     </aside>
   </div></div>;
 }

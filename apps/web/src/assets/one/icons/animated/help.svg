@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" class="ai ai-help ai-loop" role="img" aria-label="Help &amp; FAQ (animated)">
+<style>
+svg{color:#1554D6;fill:currentColor;overflow:visible}
+*{transform-box:view-box}
+.s{opacity:.42}.p-turn{opacity:0}.p-dB{opacity:0}.p-chk{stroke-dasharray:12;stroke-dashoffset:0}
+@keyframes aiPop{0%,24%,100%{transform:none}8%{transform:scale(.93)}16%{transform:scale(1.04)}}
+@media (prefers-reduced-motion: no-preference){
+.ai-loop .p-help{animation:aiPop 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:12px 12px}
+}
+</style>
+<g class="p-help"><path class="f " fill-rule="evenodd" d="M2.4 12a9.6 9.6 0 1 0 19.2 0a9.6 9.6 0 1 0 -19.2 0ZM11.3 7.4a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0 -3.2 0ZM10.71 10.99Q10.8 10.4 11.4 10.4L13.2 10.4Q13.8 10.4 13.71 10.99L12.79 16.81Q12.7 17.4 12.1 17.4L10.3 17.4Q9.7 17.4 9.79 16.81Z"/></g>
+</svg>

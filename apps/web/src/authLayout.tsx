@@ -9,7 +9,7 @@
  * shown; until then the slot is simply absent rather than filled with stand-ins.
  */
 import { useState, type ReactNode } from 'react';
-import { Eye, EyeOff } from 'lucide-react';
+import { Icon } from './icons/Icon.js';
 import { BrandLogo } from './brand.js';
 
 export const productTagline = 'LEARN | PREPARE | BUILD | GROW';
@@ -65,7 +65,7 @@ export function PasswordInput({ id, name, autoComplete, disabled, invalid, descr
   return <span className="password-field">
     <input id={id} name={name} type={visible ? 'text' : 'password'} autoComplete={autoComplete} disabled={disabled} aria-invalid={invalid || undefined} aria-describedby={describedBy} />
     <button type="button" className="password-toggle" onClick={() => setVisible((value) => !value)} disabled={disabled} aria-label={visible ? 'Hide password' : 'Show password'} aria-pressed={visible} aria-controls={id}>
-      {visible ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+      {visible ? <Icon name="eye-off" size={20} /> : <Icon name="eye" size={20} />}
     </button>
   </span>;
 }

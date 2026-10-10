@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" class="ai ai-talent-pool ai-loop" role="img" aria-label="Talent Pool (animated)">
+<style>
+svg{color:#1554D6;fill:currentColor;overflow:visible}
+*{transform-box:view-box}
+.s{opacity:.42}.p-turn{opacity:0}.p-dB{opacity:0}.p-chk{stroke-dasharray:12;stroke-dashoffset:0}
+@keyframes aiSpark{0%,26%,100%{transform:none}8%{transform:scale(.3) rotate(-45deg)}17%{transform:scale(1.3) rotate(20deg)}}
+@media (prefers-reduced-motion: no-preference){
+.ai-loop .p-star{animation:aiSpark 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:17.6px 7.4px}
+}
+</style>
+<path class="f " fill-rule="evenodd" d="M4.8 7.6a3.8 3.8 0 1 0 7.6 0a3.8 3.8 0 1 0 -7.6 0Z"/><path class="f " fill-rule="evenodd" d="M4.4 21Q2.4 21 2.91 19.07L3.69 16.13Q4.2 14.2 6.2 14.2L11 14.2Q13 14.2 13.51 16.13L14.29 19.07Q14.8 21 12.8 21Z"/><g class="s"><path class="f p-star" fill-rule="evenodd" d="M17.37 2.95Q17.6 2.4 17.83 2.95L18.6 4.75Q18.83 5.3 19.43 5.35L21.38 5.53Q21.97 5.58 21.52 5.97L20.05 7.25Q19.6 7.65 19.73 8.23L20.17 10.14Q20.3 10.72 19.79 10.41L18.11 9.41Q17.6 9.1 17.09 9.41L15.41 10.41Q14.9 10.72 15.03 10.14L15.47 8.23Q15.6 7.65 15.15 7.25L13.68 5.97Q13.23 5.58 13.82 5.53L15.77 5.35Q16.37 5.3 16.6 4.75Z"/></g>
+</svg>

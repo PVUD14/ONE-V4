@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { Bell, CalendarDays, CheckCircle2, MessageSquare, Search, X } from 'lucide-react';
+import { Icon } from '../icons/Icon.js';
 import { pilotTodayPlan, pilotUpcoming } from './pilotData.js';
 
 /**
@@ -70,7 +70,7 @@ export function PilotOverlayProvider({ children }: { readonly children: React.Re
               <h2>{modal.title}</h2>
               {modal.subtitle ? <small>{modal.subtitle}</small> : null}
             </div>
-            <button type="button" className="pilot-icon-button" aria-label="Close dialog" onClick={closeModal}><X size={16} /></button>
+            <button type="button" className="pilot-icon-button" aria-label="Close dialog" onClick={closeModal}><Icon name="close" size={16} /></button>
           </div>
           <div className="pilot-modal-body">{modal.body}</div>
         </div>
@@ -145,7 +145,7 @@ export function listModal(title: string, subtitle: string, rows: readonly ListRo
     title, subtitle, body: <div className="pilot-list">
       {rows.map((row) => (
         <div key={row.title} className="pilot-list-row" style={{ padding: '9px 2px' }}>
-          <CheckCircle2 size={15} color="#1f55e5" style={{ flexShrink: 0 }} />
+          <Icon name="check" size={16} style={{ color: "#1f55e5", flexShrink: 0 }} />
           <div className="grow"><strong style={{ fontSize: 12.5 }}>{row.title}</strong>{row.detail ? <small>{row.detail}</small> : null}</div>
           {row.trailing ? <small style={{ whiteSpace: 'nowrap' }}>{row.trailing}</small> : null}
         </div>
@@ -228,7 +228,7 @@ function SearchBody({ config }: { readonly config: PilotShellConfig }): React.Re
       <div className="pilot-list">
         {results.map((entry) => (
           <div key={`${entry.label}-${entry.detail}`} className="pilot-list-row" style={{ padding: '8px 2px' }}>
-            <Search size={14} color="#5d6b82" style={{ flexShrink: 0 }} />
+            <Icon name="search" size={16} style={{ color: "#5d6b82", flexShrink: 0 }} />
             <div className="grow"><strong style={{ fontSize: 12.5 }}>{entry.label}</strong><small>{entry.detail}</small></div>
             {entry.navKey && config.onNavigate ? (
               <button type="button" className="pilot-btn ghost small"
@@ -250,7 +250,7 @@ function shellModal(kind: 'notifications' | 'messages' | 'search', config: Pilot
       title: 'Messages', subtitle: `${config.messages.length} conversations`, body: <div className="pilot-list">
         {config.messages.map(([from, preview]) => (
           <div key={from} className="pilot-list-row" style={{ alignItems: 'flex-start' }}>
-            <span className="pilot-tile blue"><MessageSquare size={15} /></span>
+            <span className="pilot-tile blue"><Icon name="message" size={16} /></span>
             <div className="grow"><strong>{from}</strong><small>{preview}</small></div>
           </div>
         ))}
@@ -264,7 +264,7 @@ function shellModal(kind: 'notifications' | 'messages' | 'search', config: Pilot
     title: 'Notifications', subtitle: `${config.notifications.length} unread`, body: <div className="pilot-list">
       {config.notifications.map(([text, when]) => (
         <div key={text} className="pilot-list-row" style={{ alignItems: 'flex-start' }}>
-          <span className="pilot-tile amber"><Bell size={15} /></span>
+          <span className="pilot-tile amber"><Icon name="bell" size={16} /></span>
           <div className="grow"><strong style={{ fontWeight: 600, fontSize: 12.5 }}>{text}</strong><small>{when}</small></div>
         </div>
       ))}
@@ -350,7 +350,7 @@ function modalForAction(label: string, context: string): ModalState | { readonly
       title: "Today's Plan", subtitle: `${pilotTodayPlan.length} tasks · ${pilotTodayPlan.reduce((sum, task) => sum + task.minutes, 0)} min total`, body: <div className="pilot-list">
         {pilotTodayPlan.map((task) => (
           <div key={task.title} className="pilot-list-row" style={{ padding: '9px 2px' }}>
-            <CheckCircle2 size={15} color={task.done ? '#0d6b4f' : '#c2ccda'} style={{ flexShrink: 0 }} />
+            <Icon name="check" size={16} style={{ color: task.done ? '#0d6b4f' : '#c2ccda', flexShrink: 0 }} />
             <div className="grow"><strong style={{ fontSize: 12.5 }}>{task.title}</strong></div>
             <small>{task.minutes} min</small>
           </div>
@@ -363,7 +363,7 @@ function modalForAction(label: string, context: string): ModalState | { readonly
       title: 'Calendar', subtitle: 'Coming up this week', body: <div className="pilot-list">
         {pilotUpcoming.map((item) => (
           <div key={item.title} className="pilot-list-row">
-            <span className="pilot-tile blue"><CalendarDays size={15} /></span>
+            <span className="pilot-tile blue"><Icon name="calendar-small" size={16} /></span>
             <div className="grow"><strong>{item.title}</strong><small>{item.when}</small></div>
           </div>
         ))}

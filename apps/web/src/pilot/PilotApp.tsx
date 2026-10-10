@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { Bell, BookOpen, Briefcase, Building2, CalendarDays, ClipboardCheck, FileText, GraduationCap, Home, MapPinned, MessageSquare, Route, Search, User, Users, Video, Wrench } from 'lucide-react';
+import { Icon, type IconName } from '../icons/Icon.js';
 import './pilot.css';
 import { BrandLogo } from '../brand.js';
 import { ThemeToggle } from '../themeToggle.js';
@@ -54,7 +54,7 @@ export function pilotPersonaFor(email: string): PilotPersonaKind {
 export interface NavEntry {
   readonly key: string;
   readonly label: string;
-  readonly icon: typeof Home;
+  readonly icon: IconName;
 }
 
 function ShellMain({ config, identity, onSignOut, signOutLabel, email, children }: {
@@ -70,12 +70,12 @@ function ShellMain({ config, identity, onSignOut, signOutLabel, email, children 
   const unread = session.notifications.filter((entry) => !entry.read).length;
   return <div className="pilot-main" onClick={fallback}>
     <header className="pilot-topbar">
-      <div className="pilot-search"><Search size={15} /> Search…</div>
+      <div className="pilot-search"><Icon name="search" size={16} /> Search…</div>
       <div className="pilot-topbar-actions">
         <span className="pilot-sample-chip" title={`Signed in as ${email}`}>Demo — sample data</span>
         <ThemeToggle className="pilot-icon-button" />
-        <button type="button" className="pilot-icon-button" aria-label="Messages"><MessageSquare size={16} /></button>
-        <button type="button" className="pilot-icon-button" aria-label="Notifications"><Bell size={16} />{unread > 0 ? <span className="pilot-dot">{unread}</span> : null}</button>
+        <button type="button" className="pilot-icon-button" aria-label="Messages"><Icon name="message" size={16} /></button>
+        <button type="button" className="pilot-icon-button" aria-label="Notifications"><Icon name="bell" size={16} />{unread > 0 ? <span className="pilot-dot">{unread}</span> : null}</button>
         <div className="pilot-user" role="button" tabIndex={0}>
           <PilotAvatar initials={identity.initials} />
           <span><strong>{identity.name}</strong><small>{identity.subtitle}</small></span>
@@ -88,17 +88,17 @@ function ShellMain({ config, identity, onSignOut, signOutLabel, email, children 
 }
 
 const STUDENT_NAV: readonly NavEntry[] = [
-  { key: 'dashboard', label: 'Dashboard', icon: Home },
-  { key: 'roadmap', label: 'My Roadmap', icon: Route },
-  { key: 'learn', label: 'Learn', icon: BookOpen },
-  { key: 'assessments', label: 'Assessments', icon: ClipboardCheck },
-  { key: 'practice', label: 'Practice', icon: Wrench },
-  { key: 'company-prep', label: 'Company Prep', icon: Building2 },
-  { key: 'career-tools', label: 'Career Tools', icon: MapPinned },
-  { key: 'opportunities', label: 'Opportunities', icon: Briefcase },
-  { key: 'scholarships', label: 'Scholarships', icon: GraduationCap },
-  { key: 'resume', label: 'Resume Builder', icon: FileText },
-  { key: 'profile', label: 'Profile', icon: User },
+  { key: 'dashboard', label: 'Dashboard', icon: 'home' },
+  { key: 'roadmap', label: 'My Roadmap', icon: 'career' },
+  { key: 'learn', label: 'Learn', icon: 'learning' },
+  { key: 'assessments', label: 'Assessments', icon: 'assessments' },
+  { key: 'practice', label: 'Practice', icon: 'practice' },
+  { key: 'company-prep', label: 'Company Prep', icon: 'company' },
+  { key: 'career-tools', label: 'Career Tools', icon: 'tools' },
+  { key: 'opportunities', label: 'Opportunities', icon: 'opportunities' },
+  { key: 'scholarships', label: 'Scholarships', icon: 'scholarships' },
+  { key: 'resume', label: 'Resume Builder', icon: 'resume' },
+  { key: 'profile', label: 'Profile', icon: 'profile' },
 ];
 
 export function StudentPilot({ email, onSignOut, signOutLabel }: PilotPortalProps): React.ReactElement {
@@ -175,11 +175,11 @@ export function PilotShell({ identity, nav, page, onNavigate, onSignOut, signOut
           <span><small>LEARN | PREPARE | BUILD | GROW</small></span>
         </div>
         {nav.map((item) => {
-          const Icon = item.icon;
+          const glyph = item.icon;
           return (
-            <button key={item.key} type="button" className={`pilot-nav-item ${page === item.key ? 'active' : ''}`}
+            <button key={item.key} type="button" className={`pilot-nav-item one-icon-host ${page === item.key ? 'active' : ''}`}
               aria-current={page === item.key ? 'page' : undefined} onClick={() => onNavigate(item.key)}>
-              <Icon size={17} /> {item.label}
+              <Icon name={glyph} size={16} active={page === item.key} animated /> {item.label}
             </button>
           );
         })}
@@ -196,12 +196,12 @@ export function PilotShell({ identity, nav, page, onNavigate, onSignOut, signOut
 }
 
 const INSTITUTION_NAV: readonly NavEntry[] = [
-  { key: 'dashboard', label: 'Dashboard', icon: Home },
-  { key: 'students', label: 'Students', icon: Users },
-  { key: 'drives', label: 'Placement Drives', icon: Building2 },
-  { key: 'assessments', label: 'Assessments', icon: ClipboardCheck },
-  { key: 'interventions', label: 'Interventions', icon: CalendarDays },
-  { key: 'reports', label: 'Reports', icon: FileText },
+  { key: 'dashboard', label: 'Dashboard', icon: 'home' },
+  { key: 'students', label: 'Students', icon: 'students' },
+  { key: 'drives', label: 'Placement Drives', icon: 'placement' },
+  { key: 'assessments', label: 'Assessments', icon: 'assessments' },
+  { key: 'interventions', label: 'Interventions', icon: 'interventions' },
+  { key: 'reports', label: 'Reports', icon: 'reports' },
 ];
 
 export function InstitutionPilot({ email, onSignOut, signOutLabel }: PilotPortalProps): React.ReactElement {
@@ -230,12 +230,12 @@ export function InstitutionPilot({ email, onSignOut, signOutLabel }: PilotPortal
 }
 
 const EMPLOYER_NAV: readonly NavEntry[] = [
-  { key: 'dashboard', label: 'Dashboard', icon: Home },
-  { key: 'opportunities', label: 'Opportunities', icon: Briefcase },
-  { key: 'applicants', label: 'Applicants', icon: Users },
-  { key: 'interviews', label: 'Interviews', icon: Video },
-  { key: 'offers', label: 'Offers', icon: FileText },
-  { key: 'company', label: 'Company Profile', icon: Building2 },
+  { key: 'dashboard', label: 'Dashboard', icon: 'home' },
+  { key: 'opportunities', label: 'Opportunities', icon: 'opportunities' },
+  { key: 'applicants', label: 'Applicants', icon: 'applicants' },
+  { key: 'interviews', label: 'Interviews', icon: 'interviews' },
+  { key: 'offers', label: 'Offers', icon: 'offers' },
+  { key: 'company', label: 'Company Profile', icon: 'company' },
 ];
 
 export function EmployerPilot({ email, onSignOut, signOutLabel }: PilotPortalProps): React.ReactElement {

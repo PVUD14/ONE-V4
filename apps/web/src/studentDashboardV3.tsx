@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowRight, Award, BookOpen, Building2, CalendarDays, CheckCircle2, ClipboardCheck, Flame, Play, Star, Target, TrendingUp } from 'lucide-react';
+import { Icon, type IconName } from './icons/Icon.js';
 import { Spark, toneColor } from './pilot/pilotComponents.js';
 import { NaSlotChip, NaSlotStrip } from './naState.js';
 import { completeStudentStaffAction, getCurrentStudent, listStudentStaffActions, type StudentStaffActionDto } from './api/student.js';
@@ -360,10 +360,10 @@ export function StudentDashboardV3({ studentName }: { readonly studentName: stri
 
   // Practice, Resume Builder and Scholarships get their own pilot-parity pages
   // next; until those routes ship, their actions land on the nearest live page.
-  const quickActions: readonly [string, typeof Target, string][] = [
-    ['Take a Mock Test', ClipboardCheck, '/student/assessments'], ['Practice Questions', Target, '/student/assessments'],
-    ['Build Resume', BookOpen, '/student/documents'], ['Explore Roles', Building2, '/student/opportunities'],
-    ['Update Profile', Star, '/student/profile'], ['View Scholarships', Award, '/student/opportunities'],
+  const quickActions: readonly [string, IconName, string][] = [
+    ['Take a Mock Test', 'assessments', '/student/assessments'], ['Practice Questions', 'targets', '/student/assessments'],
+    ['Build Resume', 'resume', '/student/documents'], ['Explore Roles', 'opportunities', '/student/opportunities'],
+    ['Update Profile', 'profile', '/student/profile'], ['View Scholarships', 'scholarships', '/student/opportunities'],
   ];
 
   return <div className="pilot pilot-embed">
@@ -374,7 +374,7 @@ export function StudentDashboardV3({ studentName }: { readonly studentName: stri
             <h1>Good {daypart}, {firstName}! 👋</h1>
             <p>Let&apos;s continue your journey and get one step closer to your dream career.</p>
           </div>
-          <button type="button" className="pilot-btn ghost" onClick={() => go('/student/assessments')}><CalendarDays size={15} /> View Calendar</button>
+          <button type="button" className="pilot-btn ghost" onClick={() => go('/student/assessments')}><Icon name="calendar-small" size={16} /> View Calendar</button>
         </div>
 
         <StudentSupport key={token} token={token} />
@@ -431,7 +431,7 @@ export function StudentDashboardV3({ studentName }: { readonly studentName: stri
             <div className="pilot-list">
               {plan.length ? plan.map((task) => (
                 <div key={task.title} className="pilot-list-row" style={{ cursor: 'pointer' }} onClick={() => go(task.path)}>
-                  <CheckCircle2 size={17} color={task.done ? '#12996b' : '#c2ccda'} />
+                  <Icon name="check" size={16} style={{ color: task.done ? '#12996b' : '#c2ccda' }} />
                   <div className="grow"><strong style={task.done ? { color: 'var(--p-muted)' } : undefined}>{task.title}</strong></div>
                   <small>{task.minutes}</small>
                 </div>
@@ -443,7 +443,7 @@ export function StudentDashboardV3({ studentName }: { readonly studentName: stri
           <section className="pilot-card">
             <h2>Continue Learning</h2>
             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-              <span className="pilot-tile purple"><BookOpen size={19} /></span>
+              <span className="pilot-tile purple"><Icon name="learning" size={20} /></span>
               <div style={{ minWidth: 0, flex: 1 }}>
                 <strong style={{ fontSize: 13 }}>{modules[0]?.title ?? 'NA'}</strong>
                 <small style={{ display: 'block', color: 'var(--p-muted)' }}>{nextLesson?.title ?? (lessons.length ? 'All lessons completed' : 'No lessons assigned yet')}</small>
@@ -453,7 +453,7 @@ export function StudentDashboardV3({ studentName }: { readonly studentName: stri
               <div className="pilot-bar" style={{ flex: 1 }}><i style={{ width: `${lessonPercent}%` }} /></div>
               <small style={{ color: 'var(--p-muted)' }}>{lessonPercent}%</small>
             </div>
-            <button type="button" className="pilot-btn soft small" onClick={() => go('/student/learning')}><Play size={13} /> Resume Lesson</button>
+            <button type="button" className="pilot-btn soft small" onClick={() => go('/student/learning')}><Icon name="arrow-right" size={16} /> Resume Lesson</button>
           </section>
 
           <section className="pilot-card">
@@ -461,9 +461,9 @@ export function StudentDashboardV3({ studentName }: { readonly studentName: stri
             <div className="pilot-list">
               {upcoming.length ? upcoming.map((item) => (
                 <div key={item.title} className="pilot-list-row">
-                  <span className="pilot-tile blue"><CalendarDays size={17} /></span>
+                  <span className="pilot-tile blue"><Icon name="calendar" size={16} /></span>
                   <div className="grow"><strong>{item.title}</strong><small>{item.when}</small></div>
-                  <ArrowRight size={15} color="#98a5ba" />
+                  <Icon name="arrow-right" size={16} style={{ color: "#98a5ba" }} />
                 </div>
               )) : <p style={{ color: 'var(--p-muted)', margin: '8px 0' }}>NA — no scheduled windows.</p>}
             </div>
@@ -476,7 +476,7 @@ export function StudentDashboardV3({ studentName }: { readonly studentName: stri
             <div className="pilot-row cols-4">
               {modules.slice(0, 4).map((module, index) => (
                 <div key={module.id} className="pilot-course-card">
-                  <span className="pilot-tile" style={{ background: `${toneColor(NA_COURSE_TONES[index % 4]!)}1a`, color: toneColor(NA_COURSE_TONES[index % 4]!) }}><BookOpen size={18} /></span>
+                  <span className="pilot-tile" style={{ background: `${toneColor(NA_COURSE_TONES[index % 4]!)}1a`, color: toneColor(NA_COURSE_TONES[index % 4]!) }}><Icon name="learning" size={20} /></span>
                   <strong>{module.title}</strong>
                   <small>{module.lessons.length} Lessons</small>
                   <button type="button" className="pilot-btn soft small" onClick={() => go('/student/learning')}>Start</button>
@@ -491,9 +491,9 @@ export function StudentDashboardV3({ studentName }: { readonly studentName: stri
           <section className="pilot-card">
             <h2>Quick Actions</h2>
             <div className="pilot-row cols-2">
-              {quickActions.map(([label, Icon, path]) => (
+              {quickActions.map(([label, glyph, path]) => (
                 <button key={label} type="button" className="pilot-btn ghost" style={{ justifyContent: 'flex-start' }} onClick={() => go(path)}>
-                  <Icon size={15} />
+                  <Icon name={glyph} size={16} />
                   {label}
                 </button>
               ))}
@@ -507,7 +507,7 @@ export function StudentDashboardV3({ studentName }: { readonly studentName: stri
             <div className="pilot-list">
               {activityRows.length ? activityRows.map((entry) => (
                 <div key={entry.id} className="pilot-list-row">
-                  <span className="pilot-tile green"><TrendingUp size={16} /></span>
+                  <span className="pilot-tile green"><Icon name="analytics" size={16} /></span>
                   <div className="grow"><strong>{entry.title}</strong></div>
                   <small>{relativeWhen(entry.createdAt)}</small>
                 </div>
@@ -533,7 +533,7 @@ export function StudentDashboardV3({ studentName }: { readonly studentName: stri
       <aside className="pilot-rail">
         <section className="pilot-card">
           <div className="pilot-card-head">
-            <h2><Flame size={15} color="#f59e0b" style={{ verticalAlign: '-2px' }} /> {streak} Day Streak</h2>
+            <h2><Icon name="skills" size={16} style={{ color: "#f59e0b", verticalAlign: '-2px' }} /> {streak} Day Streak</h2>
             <small style={{ color: 'var(--p-muted)' }}>{streak > 0 ? 'Keep it up!' : 'Start today!'}</small>
           </div>
           <div className="pilot-streak-days">

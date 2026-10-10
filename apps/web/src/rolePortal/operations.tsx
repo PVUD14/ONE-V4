@@ -19,7 +19,6 @@ import type { RolePortalConfig } from '../rolePortalConfig.js';
 import { StatusBadge } from '../studentComponents.js';
 import { formatApiError, openPortalRecord, portalRecordFromHistory, RestrictedApiState } from './shared.js';
 import { RequestApprovalDialog } from './approvals.js';
-import { Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { SupportCode } from '../supportCode.js';
 import { formatDate, formatDateTime } from '../dates.js';

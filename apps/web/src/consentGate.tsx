@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ShieldCheck } from 'lucide-react';
+import { Icon } from './icons/Icon.js';
 import { getPrivacyConsentStatus, getProtectedAccessToken, grantPrivacyConsent } from './api.js';
 
 type GateState =
@@ -52,7 +52,7 @@ export function ConsentGate({ children }: { readonly children: React.ReactNode }
     return (
       <div className="consent-gate" role="alert" aria-label="Consent status unavailable">
         <div className="consent-card">
-          <span className="consent-icon"><ShieldCheck size={26} /></span>
+          <span className="consent-icon"><Icon name="trust-safety" size={24} /></span>
           <h1>We could not confirm your privacy consent</h1>
           <p className="consent-sub">ONE will not open your workspace until it can confirm your consent is on record. This is usually a temporary connection problem.</p>
           <button type="button" className="consent-accept" disabled={state.retrying} onClick={() => { setState({ phase: 'unavailable', retrying: true }); setAttempt((value) => value + 1); }}>
@@ -67,7 +67,7 @@ export function ConsentGate({ children }: { readonly children: React.ReactNode }
     return (
       <div className="consent-gate" role="status" aria-label="Checking privacy consent">
         <div className="consent-card">
-          <span className="consent-icon"><ShieldCheck size={26} /></span>
+          <span className="consent-icon"><Icon name="trust-safety" size={24} /></span>
           <p className="consent-sub">Checking your privacy consent…</p>
         </div>
       </div>
@@ -90,7 +90,7 @@ export function ConsentGate({ children }: { readonly children: React.ReactNode }
   return (
     <div className="consent-gate" role="dialog" aria-modal="true" aria-label="Privacy notice and consent">
       <div className="consent-card">
-        <span className="consent-icon"><ShieldCheck size={26} /></span>
+        <span className="consent-icon"><Icon name="trust-safety" size={24} /></span>
         <h1>Your data, your consent</h1>
         <p className="consent-sub">Before you continue, please read how ONE handles your personal data and confirm your consent. This takes one minute and is asked only once per notice version.</p>
         <div className="consent-summary">

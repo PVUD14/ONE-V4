@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AlertTriangle, ArrowRight, Building2, CalendarDays, CheckCircle2, ClipboardCheck, Download, TrendingUp, Upload, Users } from 'lucide-react';
+import { Icon, type IconName } from '../icons/Icon.js';
 import { MultiRing, Ring, Spark } from './pilotComponents.js';
 import { DetailRows, OverlayForm, downloadCsv, useOverlay } from './pilotOverlay.js';
 import { ReportFormatBody } from './pilotShare.js';
@@ -91,19 +91,19 @@ export function InstitutionDashboard(): React.ReactElement {
           <h1>Placement Dashboard</h1>
           <p>Cohort readiness, placement activity and the students who need you this week.</p>
         </div>
-        <button type="button" className="pilot-btn ghost" onClick={(event) => { event.stopPropagation(); exportReport(); }}><Download size={15} /> Export Report</button>
+        <button type="button" className="pilot-btn ghost" onClick={(event) => { event.stopPropagation(); exportReport(); }}><Icon name="download" size={16} /> Export Report</button>
       </div>
 
       <div className="pilot-row cols-5">
         {[
-          ['Active Students', pilotCohort.activeStudents, 'blue', Users],
-          ['Placement Eligible', pilotCohort.placementEligible, 'indigo', ClipboardCheck],
-          ['Offers This Season', pilotCohort.offersThisSeason, 'green', TrendingUp],
-          ['Students Placed', pilotCohort.placedSoFar, 'teal', Building2],
-          ['Need Intervention', pilotCohort.atRisk, 'rose', AlertTriangle],
-        ].map(([label, value, tone, Icon]) => (
+          ['Active Students', pilotCohort.activeStudents, 'blue', 'students'],
+          ['Placement Eligible', pilotCohort.placementEligible, 'indigo', 'placement'],
+          ['Offers This Season', pilotCohort.offersThisSeason, 'green', 'offers'],
+          ['Students Placed', pilotCohort.placedSoFar, 'teal', 'placement'],
+          ['Need Intervention', pilotCohort.atRisk, 'rose', 'warning'],
+        ].map(([label, value, tone, glyph]) => (
           <section key={label as string} className="pilot-card pilot-kpi">
-            {(() => { const Component = Icon as typeof Users; return <span className={`pilot-tile ${tone as string}`}><Component size={17} /></span>; })()}
+            <span className={`pilot-tile ${tone as string}`}><Icon name={glyph as IconName} size={16} /></span>
             <div><b>{value as number}</b><small>{label as string}</small></div>
           </section>
         ))}
@@ -135,7 +135,7 @@ export function InstitutionDashboard(): React.ReactElement {
         <div className="pilot-list">
           {pilotInterventions.map((item) => (
             <div key={item.student} className="pilot-list-row">
-              <span className={`pilot-tile ${item.tone}`}><AlertTriangle size={16} /></span>
+              <span className={`pilot-tile ${item.tone}`}><Icon name="warning" size={16} /></span>
               <div className="grow"><strong>{item.student}</strong><small>{item.action}</small></div>
               <span className="pilot-chip amber">{item.due}</span>
               <button type="button" className="pilot-btn ghost small" onClick={(event) => { event.stopPropagation(); openIntervention(item); }}>Review</button>
@@ -165,7 +165,7 @@ export function InstitutionDashboard(): React.ReactElement {
             <div key={drive.company.name} className="pilot-list-row">
               <div className="pilot-date"><b>{drive.date.split(' ')[0]}</b><span>{drive.date.split(' ')[1]}</span></div>
               <div className="grow"><strong style={{ fontSize: 12.5 }}>{drive.company.name}</strong><small>{drive.role} · {drive.mode}</small></div>
-              <ArrowRight size={14} color="#98a5ba" />
+              <Icon name="arrow-right" size={16} style={{ color: "#98a5ba" }} />
             </div>
           ))}
         </div>
@@ -200,8 +200,8 @@ function RosterUploadBody({ onImported }: { readonly onImported: (count: number)
         <button type="button" className="pilot-btn ghost" onClick={() => {
           downloadCsv('roster-template.csv', [['name', 'email', 'registration', 'department', 'batch'], ['Sample Student', 'sample.student@college.example', 'LIT2028-0001', 'CSE', '2028']]);
           overlay.toast('roster-template.csv downloaded.');
-        }}><Download size={14} /> Download Template</button>
-        <button type="button" className="pilot-btn" onClick={() => setStage('preview')}><Upload size={14} /> Use sample file: batch-2028-cse.csv</button>
+        }}><Icon name="download" size={16} /> Download Template</button>
+        <button type="button" className="pilot-btn" onClick={() => setStage('preview')}><Icon name="upload" size={16} /> Use sample file: batch-2028-cse.csv</button>
       </div>
     </div>;
   }
@@ -210,7 +210,7 @@ function RosterUploadBody({ onImported }: { readonly onImported: (count: number)
       <div className="pilot-row cols-3" style={{ marginBottom: 12 }}>
         {[['Rows read', '120', 'blue'], ['Ready to import', '117', 'green'], ['Need attention', '3', 'amber']].map(([label, value, tone]) => (
           <div key={label} className="pilot-stat" style={{ border: '1px solid var(--p-line)', borderRadius: 12, padding: '9px 11px' }}>
-            <span className={`pilot-tile ${tone}`} style={{ width: 30, height: 30 }}><Users size={14} /></span>
+            <span className={`pilot-tile ${tone}`} style={{ width: 30, height: 30 }}><Icon name="students" size={16} /></span>
             <div><b>{value}</b><small>{label}</small></div>
           </div>
         ))}
@@ -218,7 +218,7 @@ function RosterUploadBody({ onImported }: { readonly onImported: (count: number)
       <div className="pilot-list">
         {ROSTER_ISSUES.map(([row, issue]) => (
           <div key={row} className="pilot-list-row" style={{ padding: '7px 2px' }}>
-            <AlertTriangle size={15} color="#92400e" style={{ flexShrink: 0 }} />
+            <Icon name="warning" size={16} style={{ color: "#92400e", flexShrink: 0 }} />
             <div className="grow"><strong style={{ fontSize: 12.5 }}>{row}</strong><small>{issue}</small></div>
           </div>
         ))}
@@ -230,7 +230,7 @@ function RosterUploadBody({ onImported }: { readonly onImported: (count: number)
     </div>;
   }
   return <div>
-    <div className="pilot-banner"><CheckCircle2 size={17} /> 117 students added to Batch 2028 · CSE. Invitations are on their way.</div>
+    <div className="pilot-banner"><Icon name="check" size={16} /> 117 students added to Batch 2028 · CSE. Invitations are on their way.</div>
     <p className="pilot-modal-text" style={{ marginTop: 12 }}>Each student appears as <strong>Invited</strong> until they open the link and activate their account. Fix the 3 flagged rows and upload them again whenever you are ready.</p>
     <div className="pilot-modal-actions"><button type="button" className="pilot-btn" onClick={overlay.closeModal}>Done</button></div>
   </div>;
@@ -274,14 +274,14 @@ export function InstitutionStudents(): React.ReactElement {
               <option>All</option>
             </select>
           </label>
-          <button type="button" className="pilot-btn ghost" onClick={(event) => { event.stopPropagation(); exportStudents(); }}><Download size={15} /> Export</button>
+          <button type="button" className="pilot-btn ghost" onClick={(event) => { event.stopPropagation(); exportStudents(); }}><Icon name="download" size={16} /> Export</button>
           <button type="button" className="pilot-btn" onClick={(event) => {
             event.stopPropagation();
             overlay.openModal({ title: 'Upload Roster', subtitle: 'Add a batch of students from a CSV file', body: <RosterUploadBody onImported={setInvited} /> });
-          }}><Upload size={15} /> Upload Roster</button>
+          }}><Icon name="upload" size={16} /> Upload Roster</button>
         </div>
       </div>
-      {invited > 0 ? <div className="pilot-banner blue"><Users size={17} /> Batch 2028 · CSE: {invited} students invited, 0 activated so far. They join this list as they activate.</div> : null}
+      {invited > 0 ? <div className="pilot-banner blue"><Icon name="students" size={16} /> Batch 2028 · CSE: {invited} students invited, 0 activated so far. They join this list as they activate.</div> : null}
       <section className="pilot-card">
         <div className="pilot-table-wrap"><table className="pilot-table">
           <thead><tr><th>Student</th><th>Department</th><th>Readiness Band</th><th>Placement Status</th><th></th></tr></thead>
@@ -352,7 +352,7 @@ export function InstitutionDrives(): React.ReactElement {
     <div className="pilot-content">
       <div className="pilot-page-head">
         <div><h1>Placement Drives</h1><p>Company visits, eligibility and registration for the 2027 season.</p></div>
-        <button type="button" className="pilot-btn" onClick={(event) => { event.stopPropagation(); scheduleDrive(); }}><CalendarDays size={15} /> Schedule Drive</button>
+        <button type="button" className="pilot-btn" onClick={(event) => { event.stopPropagation(); scheduleDrive(); }}><Icon name="calendar-small" size={16} /> Schedule Drive</button>
       </div>
       <section className="pilot-card">
         <div className="pilot-table-wrap"><table className="pilot-table">
@@ -419,7 +419,7 @@ export function InstitutionReports(): React.ReactElement {
     <div className="pilot-content">
       <div className="pilot-page-head">
         <div><h1>Reports</h1><p>Placement outcomes and readiness for management and accreditation reviews.</p></div>
-        <button type="button" className="pilot-btn ghost" onClick={(event) => { event.stopPropagation(); downloadReport(); }}><Download size={15} /> Download Report</button>
+        <button type="button" className="pilot-btn ghost" onClick={(event) => { event.stopPropagation(); downloadReport(); }}><Icon name="download" size={16} /> Download Report</button>
       </div>
       <div className="pilot-row cols-2">
         <section className="pilot-card">
@@ -456,7 +456,7 @@ export function InstitutionReports(): React.ReactElement {
             '4 new companies visiting this season',
           ].map((highlight) => (
             <div key={highlight} className="pilot-list-row" style={{ padding: '8px 2px' }}>
-              <TrendingUp size={15} color="#0d6b4f" />
+              <Icon name="analytics" size={16} style={{ color: "#0d6b4f" }} />
               <small style={{ color: 'var(--p-ink-2)' }}>{highlight}</small>
             </div>
           ))}

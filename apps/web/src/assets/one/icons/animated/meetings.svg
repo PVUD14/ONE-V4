@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" class="ai ai-meetings ai-loop" role="img" aria-label="Meetings (animated)">
+<style>
+svg{color:#1554D6;fill:currentColor;overflow:visible}
+*{transform-box:view-box}
+.s{opacity:.42}.p-turn{opacity:0}.p-dB{opacity:0}.p-chk{stroke-dasharray:12;stroke-dashoffset:0}
+@keyframes aiTalkA{0%,13%,100%{transform:none}6%{transform:scale(1.1)}}
+@media (prefers-reduced-motion: no-preference){
+.ai-loop .p-lens{animation:aiTalkA 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:17.6px 12px}
+}
+</style>
+<path class="f " fill-rule="evenodd" d="M2.4 7.7Q2.4 6 4.1 6L11.7 6Q13.4 6 14.6 7.2L15 7.6Q16.2 8.8 16.2 10.5L16.2 16.3Q16.2 18 14.5 18L4.1 18Q2.4 18 2.4 16.3Z"/><g class="s"><path class="f p-lens" fill-rule="evenodd" d="M17.6 11.3Q17.6 10.4 18.34 9.88L20.86 8.12Q21.6 7.6 21.6 8.5L21.6 15.5Q21.6 16.4 20.86 15.88L18.34 14.12Q17.6 13.6 17.6 12.7Z"/></g>
+</svg>

@@ -5,7 +5,7 @@
  * Until it is pressed the app follows the OS, and the button keeps up if the OS changes.
  */
 import React, { useSyncExternalStore } from 'react';
-import { Moon, Sun } from 'lucide-react';
+import { Icon } from './icons/Icon.js';
 import { chooseTheme, currentTheme, subscribeTheme, type ThemeChoice } from './themePreference.js';
 
 export function ThemeToggle({ className = 'icon-button' }: { readonly className?: string }): React.ReactElement {
@@ -15,7 +15,7 @@ export function ThemeToggle({ className = 'icon-button' }: { readonly className?
   return (
     <button className={`${className} theme-toggle`} type="button" aria-label={label} title={label}
       onClick={() => chooseTheme(next)}>
-      {next === 'dark' ? <Moon size={17} aria-hidden="true" /> : <Sun size={17} aria-hidden="true" />}
+      {next === 'dark' ? <Icon name="moon" size={16} /> : <Icon name="sun" size={16} />}
     </button>
   );
 }

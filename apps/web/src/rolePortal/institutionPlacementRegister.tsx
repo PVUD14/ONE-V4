@@ -12,7 +12,7 @@
  * group under five reads <5, a student who shared nothing is "Not shared" (never unplaced), and pay
  * never appears. Categories are the college's internal labels and are never shown to employers.
  */
-import { Briefcase, ClipboardCheck, GraduationCap, Percent, Users } from 'lucide-react';
+import { Icon } from '../icons/Icon.js';
 import { useEffect, useState, type FormEvent } from 'react';
 import { getProtectedAccessToken, suppressedCountLabel } from '../api.js';
 import { campusDriveStateLabels, reasonLabel, venueModeLabels } from '../api/campusDrives.js';
@@ -92,11 +92,11 @@ export function PlacementStatisticsSection({ institutionId, title = 'Placement s
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {!data && !error ? <p role="status">Loading placement statistics…</p> : null}
     <Kpis items={[
-      ['Eligible', overall ? suppressedCountLabel(overall.eligible) : 'NA', 'blue', Users],
-      ['Applied (shared)', overall ? suppressedCountLabel(overall.applied) : 'NA', 'indigo', Briefcase],
-      ['With an offer', overall ? suppressedCountLabel(overall.withOffer) : 'NA', 'amber', ClipboardCheck],
-      ['Placed', overall ? suppressedCountLabel(overall.placed) : 'NA', 'green', GraduationCap],
-      ['Placed, of students sharing', percentLabel(overall), 'teal', Percent],
+      ['Eligible', overall ? suppressedCountLabel(overall.eligible) : 'NA', 'blue', 'students'],
+      ['Applied (shared)', overall ? suppressedCountLabel(overall.applied) : 'NA', 'indigo', 'opportunities'],
+      ['With an offer', overall ? suppressedCountLabel(overall.withOffer) : 'NA', 'amber', 'offers'],
+      ['Placed', overall ? suppressedCountLabel(overall.placed) : 'NA', 'green', 'placement'],
+      ['Placed, of students sharing', percentLabel(overall), 'teal', 'reports'],
     ]} />
     {data ? (data.groups ?? []).length === 0
       ? <p>No students in your scope yet.</p>

@@ -1,4 +1,4 @@
-import { Filter, Search, type LucideIcon } from 'lucide-react';
+import { Icon, type IconName } from './icons/Icon.js';
 import { useState, type ReactNode } from 'react';
 import { codeLabel } from './labels.js';
 
@@ -72,7 +72,7 @@ export function FilterBar({ labels, selected = [], onChange, resultLabel, onClea
   return (
     <div className="filter-block">
       <div className="filter-row" aria-label="Filters">
-        {labels.map((label) => <button key={label} type="button" className={current.includes(label) ? 'selected' : ''} aria-pressed={current.includes(label)} onClick={() => toggle(label)}><Filter size={14} />{label}</button>)}
+        {labels.map((label) => <button key={label} type="button" className={current.includes(label) ? 'selected' : ''} aria-pressed={current.includes(label)} onClick={() => toggle(label)}><Icon name="filter" size={16} />{label}</button>)}
         {current.length ? <button type="button" className="secondary clear-filters" onClick={clear}>Clear filters</button> : null}
       </div>
       {resultLabel ? <p className="result-count" role="status" aria-live="polite">{resultLabel}</p> : null}
@@ -84,15 +84,15 @@ export function SearchField({ label, placeholder, value, onChange }: { readonly 
   return (
     <label className="local-search">
       <span>{label}</span>
-      <span><Search size={15} aria-hidden="true" /><input placeholder={placeholder} value={value} onChange={(event) => onChange?.(event.target.value)} /></span>
+      <span><Icon name="search" size={16} /><input placeholder={placeholder} value={value} onChange={(event) => onChange?.(event.target.value)} /></span>
     </label>
   );
 }
 
-export function EmptyState({ icon: Icon, title, detail, action }: { readonly icon: LucideIcon; readonly title: string; readonly detail: string; readonly action?: string }): React.ReactElement {
+export function EmptyState({ icon: glyph, title, detail, action }: { readonly icon: IconName; readonly title: string; readonly detail: string; readonly action?: string }): React.ReactElement {
   return (
     <section className="empty-state">
-      <Icon size={24} aria-hidden="true" />
+      <Icon name={glyph} size={24} />
       <div><h3>{title}</h3><p>{detail}</p></div>
       {action ? <DemoAction label={action} variant="secondary" detail="This preview action is available in the local UI only. Completing it requires the configured secure backend workflow." /> : null}
     </section>

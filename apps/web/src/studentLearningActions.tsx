@@ -10,7 +10,7 @@
  * with its end date, and the card is headed "From your college" while one is among its items.
  */
 import React from 'react';
-import { BookOpen, ClipboardList, Compass, Users } from 'lucide-react';
+import { Icon } from './icons/Icon.js';
 import type { StudentLearningActionsDto } from './api.js';
 import { formatDate, formatDateTime } from './dates.js';
 
@@ -57,7 +57,7 @@ export function FromYourLecturerCard({ actions, status, busy, onStart }: {
     </div>
     {!actions ? <p style={muted}>{status}</p> : empty ? <p style={muted}>Nothing from your lecturers right now. Work they assign you appears here and comes up as your next step.</p> : <>
       {pending ? <div className="pilot-list-row" aria-label="Next step set by your lecturer">
-        <span className="pilot-tile purple"><Compass size={16} /></span>
+        <span className="pilot-tile purple"><Icon name="opportunities" size={16} /></span>
         <div className="grow">
           <strong>{`Your lecturer at ${pending.institutionName} set your next step: ${ACTION_WORD[pending.action] ?? 'Work on'} ${pending.title}`}</strong>
           <small>{LECTURER_REASON_TEXT[pending.reasonCode] ?? 'NA'}{pending.note ? ` “${pending.note}”` : ''} It starts when you plan your next step.</small>
@@ -65,7 +65,7 @@ export function FromYourLecturerCard({ actions, status, busy, onStart }: {
       </div> : null}
       {actions.assignments.length ? <div className="pilot-list" aria-label="Assigned to you">
         {actions.assignments.map((assignment) => <div key={assignment.id} className="pilot-list-row">
-          <span className={`pilot-tile ${assignment.kind === 'LESSON' ? 'teal' : 'blue'}`}>{assignment.kind === 'LESSON' ? <BookOpen size={16} /> : <ClipboardList size={16} />}</span>
+          <span className={`pilot-tile ${assignment.kind === 'LESSON' ? 'teal' : 'blue'}`}>{assignment.kind === 'LESSON' ? <Icon name="learning" size={16} /> : <Icon name="tasks" size={16} />}</span>
           <div className="grow">
             <strong>{assignment.title}</strong>
             <small>{assignment.sprint
@@ -77,7 +77,7 @@ export function FromYourLecturerCard({ actions, status, busy, onStart }: {
       </div> : null}
       {actions.sessions.length ? <div className="pilot-list" aria-label="Group sessions">
         {actions.sessions.map((session) => <div key={session.id} className="pilot-list-row">
-          <span className="pilot-tile green"><Users size={16} /></span>
+          <span className="pilot-tile green"><Icon name="students" size={16} /></span>
           <div className="grow">
             <strong>{session.title}</strong>
             <small>{`${when(session.scheduledStartAt)} – ${when(session.scheduledEndAt)} · ${session.institutionName}`}</small>

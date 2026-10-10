@@ -12,7 +12,6 @@ import { V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import type { RolePortalConfig } from '../rolePortalConfig.js';
 import { InstitutionWorkspaceError, RestrictedApiState, formatApiError, institutionWorkspaceRoles, isInstitutionStaffWorkspace, isInstitutionWorkspace, openPortalRecord } from './shared.js';
 import type { AuthenticatedWorkspaceSummary } from './shared.js';
-import { Search } from 'lucide-react';
 import { NaListCard } from '../pilotParity/naWidgets.js';
 import { TeachingAssignmentsPanel } from './institutionTeaching.js';
 import { AnalyticsAccessPanel } from './institutionAnalytics.js';

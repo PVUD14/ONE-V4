@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" class="ai ai-calendar ai-loop" role="img" aria-label="Calendar (animated)">
+<style>
+svg{color:#1554D6;fill:currentColor;overflow:visible}
+*{transform-box:view-box}
+.s{opacity:.42}.p-turn{opacity:0}.p-dB{opacity:0}.p-chk{stroke-dasharray:12;stroke-dashoffset:0}
+@keyframes aiDayA{0%,24.5%,100%{opacity:1}3%,24%{opacity:0}}
+@keyframes aiDayB{0%,3%{opacity:0;transform:translateX(-7.5px)}7%{opacity:1;transform:translateX(-7.5px)}20%{transform:translateX(.5px)}24%{opacity:1;transform:none}24.5%,100%{opacity:0;transform:none}}
+@keyframes aiRing{0%,20%,100%{transform:none}7%{transform:translateY(-1.2px)}13%{transform:translateY(.2px)}}
+@media (prefers-reduced-motion: no-preference){
+.ai-loop .p-dA{animation:aiDayA 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:0 0}
+.ai-loop .p-dB{animation:aiDayB 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:0 0}
+.ai-loop .p-rng{animation:aiRing 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:12px 4px}
+}
+</style>
+<defs><mask id="mk-ca-x" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24"><rect width="24" height="24" fill="#fff"/><path fill="#000" d="M5.6 9.6Q5.6 9.2 6 9.2L18 9.2Q18.4 9.2 18.4 9.6L18.4 10.2Q18.4 10.6 18 10.6L6 10.6Q5.6 10.6 5.6 10.2Z"/><path class="p-dA" fill="#000" d="M12.67 13.79Q12.8 13.2 13.4 13.2L16.8 13.2Q17.4 13.2 17.27 13.79L16.63 16.81Q16.5 17.4 15.9 17.4L12.5 17.4Q11.9 17.4 12.03 16.81Z"/><path class="p-dB" fill="#000" d="M12.67 13.79Q12.8 13.2 13.4 13.2L16.8 13.2Q17.4 13.2 17.27 13.79L16.63 16.81Q16.5 17.4 15.9 17.4L12.5 17.4Q11.9 17.4 12.03 16.81Z"/></mask></defs><path class="f" mask="url(#mk-ca-x)" d="M3 6.8Q3 5 4.8 5L15.8 5Q17.6 5 18.87 6.27L19.73 7.13Q21 8.4 21 10.2L21 19.4Q21 21.2 19.2 21.2L4.8 21.2Q3 21.2 3 19.4Z"/><g class="s"><path class="f p-rng" fill-rule="evenodd" d="M6.6 3.2Q6.6 2.2 7.6 2.2L8 2.2Q9 2.2 9 3.2L9 5.8Q9 6.8 8 6.8L7.6 6.8Q6.6 6.8 6.6 5.8ZM14.6 3.2Q14.6 2.2 15.6 2.2L16 2.2Q17 2.2 17 3.2L17 5.8Q17 6.8 16 6.8L15.6 6.8Q14.6 6.8 14.6 5.8Z"/></g>
+</svg>

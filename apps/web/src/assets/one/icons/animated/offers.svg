@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" class="ai ai-offers ai-loop" role="img" aria-label="Offers (animated)">
+<style>
+svg{color:#1554D6;fill:currentColor;overflow:visible}
+*{transform-box:view-box}
+.s{opacity:.42}.p-turn{opacity:0}.p-dB{opacity:0}.p-chk{stroke-dasharray:12;stroke-dashoffset:0}
+@keyframes aiSwingS{0%,30%,100%{transform:none}7%{transform:rotate(-10deg)}15%{transform:rotate(7deg)}22%{transform:rotate(-3deg)}}
+@media (prefers-reduced-motion: no-preference){
+.ai-loop .p-medal{animation:aiSwingS 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:12px 2.4px}
+}
+</style>
+<g class="p-medal"><g class="s"><path class="f " fill-rule="evenodd" d="M7.22 15.17Q7.4 14.6 7.94 14.87L10.46 16.13Q11 16.4 10.83 16.98L9.57 21.22Q9.4 21.8 8.99 21.36L8.21 20.54Q7.8 20.1 7.23 20.29L5.97 20.71Q5.4 20.9 5.58 20.33ZM18.42 20.33Q18.6 20.9 18.03 20.71L16.77 20.29Q16.2 20.1 15.79 20.54L15.01 21.36Q14.6 21.8 14.43 21.22L13.17 16.98Q13 16.4 13.54 16.13L16.06 14.87Q16.6 14.6 16.78 15.17Z"/></g><path class="f " fill-rule="evenodd" d="M5.2 9.2a6.8 6.8 0 1 0 13.6 0a6.8 6.8 0 1 0 -13.6 0ZM11.89 6.28Q12 6 12.11 6.28L12.77 7.91Q12.88 8.19 13.18 8.21L14.93 8.33Q15.23 8.35 15 8.54L13.66 9.67Q13.43 9.86 13.5 10.15L13.93 11.86Q14 12.15 13.74 11.99L12.25 11.06Q12 10.9 11.75 11.06L10.26 11.99Q10 12.15 10.07 11.86L10.5 10.15Q10.57 9.86 10.34 9.67L9 8.54Q8.77 8.35 9.07 8.33L10.82 8.21Q11.12 8.19 11.23 7.91Z"/></g>
+</svg>

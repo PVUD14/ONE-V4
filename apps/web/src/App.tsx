@@ -1,4 +1,4 @@
-import { Bell, BookOpen, CircleHelp, BriefcaseBusiness, Building2, CalendarDays, ChevronDown, ChevronsLeft, ChevronsRight, ClipboardCheck, FileText, Gauge, GraduationCap, Home, LayoutDashboard, MapPinned, Menu, MessageSquare, Search, Settings, ShieldCheck, Sparkles, Target, Trophy, UserRound, Wrench, X, type LucideIcon } from 'lucide-react';
+import { Icon, type IconName } from './icons/Icon.js';
 import { BrandLogo } from './brand.js';
 import { ThemeToggle } from './themeToggle.js';
 import type { FormEvent } from 'react';
@@ -75,33 +75,33 @@ type RouteKey = 'dashboard' | 'career-path' | 'ai-coach' | 'readiness' | 'skills
 interface NavItem {
   readonly label: string;
   readonly path: string;
-  readonly icon: LucideIcon;
+  readonly icon: IconName;
   readonly group: 'Plan' | 'Prepare' | 'Apply' | 'Account';
   readonly route: RouteKey;
 }
 
 const navItems: readonly NavItem[] = [
-  { label: 'Home', path: '/student', icon: Home, group: 'Plan', route: 'dashboard' },
-  { label: 'My Career', path: '/student/career-path', icon: Target, group: 'Plan', route: 'career-path' },
-  { label: 'AI Career Coach', path: '/student/ai-coach', icon: Sparkles, group: 'Plan', route: 'ai-coach' },
-  { label: 'Career Tools', path: '/student/career-tools', icon: MapPinned, group: 'Plan', route: 'career-tools' },
-  { label: 'Readiness', path: '/student/readiness', icon: Gauge, group: 'Prepare', route: 'readiness' },
-  { label: 'Skills', path: '/student/skills', icon: Sparkles, group: 'Prepare', route: 'skills' },
-  { label: 'Assessments', path: '/student/assessments', icon: ClipboardCheck, group: 'Prepare', route: 'assessments' },
-  { label: 'Learning', path: '/student/learning', icon: BookOpen, group: 'Prepare', route: 'learning' },
-  { label: 'Practice', path: '/student/practice', icon: Wrench, group: 'Prepare', route: 'practice' },
-  { label: 'Company Prep', path: '/student/company-prep', icon: Building2, group: 'Prepare', route: 'company-prep' },
-  { label: 'Experience', path: '/student/experience', icon: Trophy, group: 'Prepare', route: 'experience' },
-  { label: 'Opportunities', path: '/student/opportunities', icon: BriefcaseBusiness, group: 'Apply', route: 'opportunities' },
-  { label: 'Applications', path: '/student/applications', icon: LayoutDashboard, group: 'Apply', route: 'applications' },
-  { label: 'Interviews', path: '/student/interviews', icon: CalendarDays, group: 'Apply', route: 'interviews' },
-  { label: 'Calendar', path: '/student/calendar', icon: CalendarDays, group: 'Apply', route: 'calendar' },
-  { label: 'Scholarships', path: '/student/scholarships', icon: GraduationCap, group: 'Apply', route: 'scholarships' },
-  { label: 'Resume Builder', path: '/student/resume-builder', icon: FileText, group: 'Account', route: 'resume-builder' },
-  { label: 'Documents', path: '/student/documents', icon: FileText, group: 'Account', route: 'documents' },
-  { label: 'Profile', path: '/student/profile', icon: UserRound, group: 'Account', route: 'profile' },
-  { label: 'Settings', path: '/student/settings', icon: Settings, group: 'Account', route: 'settings' },
-  { label: 'Help & FAQ', path: '/student/help', icon: CircleHelp, group: 'Account', route: 'help' },
+  { label: 'Home', path: '/student', icon: 'home', group: 'Plan', route: 'dashboard' },
+  { label: 'My Career', path: '/student/career-path', icon: 'career', group: 'Plan', route: 'career-path' },
+  { label: 'AI Career Coach', path: '/student/ai-coach', icon: 'coach', group: 'Plan', route: 'ai-coach' },
+  { label: 'Career Tools', path: '/student/career-tools', icon: 'tools', group: 'Plan', route: 'career-tools' },
+  { label: 'Readiness', path: '/student/readiness', icon: 'readiness', group: 'Prepare', route: 'readiness' },
+  { label: 'Skills', path: '/student/skills', icon: 'skills', group: 'Prepare', route: 'skills' },
+  { label: 'Assessments', path: '/student/assessments', icon: 'assessments', group: 'Prepare', route: 'assessments' },
+  { label: 'Learning', path: '/student/learning', icon: 'learning', group: 'Prepare', route: 'learning' },
+  { label: 'Practice', path: '/student/practice', icon: 'practice', group: 'Prepare', route: 'practice' },
+  { label: 'Company Prep', path: '/student/company-prep', icon: 'company', group: 'Prepare', route: 'company-prep' },
+  { label: 'Experience', path: '/student/experience', icon: 'experience', group: 'Prepare', route: 'experience' },
+  { label: 'Opportunities', path: '/student/opportunities', icon: 'opportunities', group: 'Apply', route: 'opportunities' },
+  { label: 'Applications', path: '/student/applications', icon: 'applications', group: 'Apply', route: 'applications' },
+  { label: 'Interviews', path: '/student/interviews', icon: 'interviews', group: 'Apply', route: 'interviews' },
+  { label: 'Calendar', path: '/student/calendar', icon: 'calendar', group: 'Apply', route: 'calendar' },
+  { label: 'Scholarships', path: '/student/scholarships', icon: 'scholarships', group: 'Apply', route: 'scholarships' },
+  { label: 'Resume Builder', path: '/student/resume-builder', icon: 'resume', group: 'Account', route: 'resume-builder' },
+  { label: 'Documents', path: '/student/documents', icon: 'documents', group: 'Account', route: 'documents' },
+  { label: 'Profile', path: '/student/profile', icon: 'profile', group: 'Account', route: 'profile' },
+  { label: 'Settings', path: '/student/settings', icon: 'settings', group: 'Account', route: 'settings' },
+  { label: 'Help & FAQ', path: '/student/help', icon: 'help', group: 'Account', route: 'help' },
 ];
 
 const routeTitles: Record<RouteKey, PageMeta> = {
@@ -145,12 +145,12 @@ export function demoPortalEnabled(env: { readonly DEV: boolean; readonly VITE_EN
 const enableDemoPortal = import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEMO_PORTAL === 'true';
 const protectedPortalRoots = ['/student', '/institution', '/employer', '/operations', '/growth'] as const;
 const portalChoices = [
-  { family: 'Student', path: '/student', label: 'Student', detail: 'Learning, readiness, applications and personal growth.', icon: GraduationCap },
-  { family: 'Institution', path: '/institution/admin', label: 'Institution', detail: 'Institution administration and student support.', icon: Building2 },
-  { family: 'Employer', path: '/employer/recruiter', label: 'Employer', detail: 'Post jobs, review applicants and run your hiring.', icon: BriefcaseBusiness },
-  { family: 'Operations', path: '/operations/admin', label: 'Operations', detail: 'Platform administration and governance.', icon: ShieldCheck },
+  { family: 'Student', path: '/student', label: 'Student', detail: 'Learning, readiness, applications and personal growth.', icon: 'students' },
+  { family: 'Institution', path: '/institution/admin', label: 'Institution', detail: 'Institution administration and student support.', icon: 'company' },
+  { family: 'Employer', path: '/employer/recruiter', label: 'Employer', detail: 'Post jobs, review applicants and run your hiring.', icon: 'opportunities' },
+  { family: 'Operations', path: '/operations/admin', label: 'Operations', detail: 'Platform administration and governance.', icon: 'trust-safety' },
   // GROWTH-01 (ADR-040): AI8HT's partnerships field staff. Navigation approved (HG-3, 2026-09-30).
-  { family: 'Growth', path: '/growth', label: 'Growth', detail: 'College and employer partnerships: leads, field visits, territory, targets and commission.', icon: MapPinned },
+  { family: 'Growth', path: '/growth', label: 'Growth', detail: 'College and employer partnerships: leads, field visits, territory, targets and commission.', icon: 'territory' },
 ] as const;
 
 type WorkspaceFamily = typeof portalChoices[number]['family'];
@@ -159,7 +159,7 @@ interface PortalChoice {
   readonly path: string;
   readonly label: string;
   readonly detail: string;
-  readonly icon: LucideIcon;
+  readonly icon: IconName;
 }
 type AuthorizedWorkspace = PortalChoice & {
   readonly role: string;
@@ -574,7 +574,7 @@ function WorkspaceChooser({ authStatus, authNotice, workspaceResolution, onSignI
       {workspaceResolution.state === 'error' ? <p className="auth-boundary" role="alert">{workspaceResolution.message}</p> : null}
       {workspaceResolution.state === 'error' && workspaceResolution.retryable ? <button type="button" onClick={onRetryWorkspace}>Retry workspace</button> : null}
       {workspaceResolution.state === 'resolved' && choices.length === 0 ? <p className="auth-boundary" role="status">No active ONE workspace is available for this identity.</p> : null}
-      {choices.length > 0 ? <div className="workspace-grid">{choices.map((choice) => { const Icon = choice.icon; return <button key={choice.path} type="button" onClick={() => onNavigate(choice.path)}><Icon size={20} /><strong>{choice.label}</strong><span>{choice.detail}</span></button>; })}</div> : null}
+      {choices.length > 0 ? <div className="workspace-grid">{choices.map((choice) => { const glyph = choice.icon; return <button key={choice.path} type="button" onClick={() => onNavigate(choice.path)}><Icon name={glyph} size={20} /><strong>{choice.label}</strong><span>{choice.detail}</span></button>; })}</div> : null}
     </section>
   </main>;
 }
@@ -848,12 +848,12 @@ function Sidebar({ path, collapsed, drawerOpen, onNavigate, onCollapse, onClose 
   // and the item keeps its name through aria-label and the hover title.
   return (
     <aside className={`student-sidebar momentum-rail ${drawerOpen ? 'drawer-open' : ''}`} aria-label="Student navigation">
-      <div className="sidebar-brand"><BrandLogo height={collapsed ? 36 : 30} compact={collapsed} /><span className="brand-copy"><small>LEARN | PREPARE | BUILD | GROW</small></span><button className="icon-button sidebar-close" type="button" aria-label="Close navigation" onClick={onClose} autoFocus={drawerOpen}><X size={18} /></button></div>
+      <div className="sidebar-brand"><BrandLogo height={collapsed ? 36 : 30} compact={collapsed} /><span className="brand-copy"><small>LEARN | PREPARE | BUILD | GROW</small></span><button className="icon-button sidebar-close" type="button" aria-label="Close navigation" onClick={onClose} autoFocus={drawerOpen}><Icon name="close" size={20} /></button></div>
       <nav className="sidebar-nav" aria-label="Grouped Student navigation">
         <NavIndicator activeKey={current} layoutKey={`${collapsed}-${drawerOpen}`} />
-        {groups.map((group) => <div className="nav-group" key={group}><span className="nav-group-label">{group}</span>{navItems.filter((item) => item.group === group).map((item) => { const Icon = item.icon; const active = current === item.path; return <button key={item.path} type="button" className={`side-nav-item ${active ? 'active' : ''}`} aria-current={active ? 'page' : undefined} aria-label={item.label} title={item.label} onClick={() => onNavigate(item)}><span className="rail-tile"><Icon size={20} aria-hidden="true" /></span><span className="rail-label">{item.label}</span></button>; })}</div>)}
+        {groups.map((group) => <div className="nav-group" key={group}><span className="nav-group-label">{group}</span>{navItems.filter((item) => item.group === group).map((item) => { const glyph = item.icon; const active = current === item.path; return <button key={item.path} type="button" className={`side-nav-item one-icon-host ${active ? 'active' : ''}`} aria-current={active ? 'page' : undefined} aria-label={item.label} title={item.label} onClick={() => onNavigate(item)}><span className="rail-tile"><Icon name={glyph} size={20} active={active} animated /></span><span className="rail-label">{item.label}</span></button>; })}</div>)}
       </nav>
-      <div className="sidebar-footer"><button className="collapse-button" type="button" onClick={onCollapse} aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}><span className="rail-tile">{collapsed ? <ChevronsRight size={18} aria-hidden="true" /> : <ChevronsLeft size={18} aria-hidden="true" />}</span><span className="rail-label">{collapsed ? 'Expand' : 'Collapse'}</span></button></div>
+      <div className="sidebar-footer"><button className="collapse-button" type="button" onClick={onCollapse} aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}><span className="rail-tile">{collapsed ? <Icon name="collapse-rail" size={20} className="one-icon--flip" /> : <Icon name="collapse-rail" size={20} />}</span><span className="rail-label">{collapsed ? 'Expand' : 'Collapse'}</span></button></div>
     </aside>
   );
 }
@@ -862,10 +862,10 @@ function TopBar({ apiHealth, authNotice, authStatus, showDevelopmentIndicators, 
   const identity = studentIdentityFromAuth(authStatus, currentStudent);
   return (
     <header className="student-topbar">
-      <button ref={menuButtonRef} className="icon-button mobile-menu-button" type="button" onClick={onOpenMenu} aria-label="Open student navigation"><Menu size={20} /></button>
+      <button ref={menuButtonRef} className="icon-button mobile-menu-button" type="button" onClick={onOpenMenu} aria-label="Open student navigation"><Icon name="menu" size={20} /></button>
       <span className="topbar-brand"><BrandLogo height={28} /></span>
-      <label className="global-search" role="search"><Search size={17} aria-hidden="true" /><span className="sr-only">Search student workspace</span><input placeholder="Search opportunities, skills, assessments..." /></label>
-      <div className="topbar-actions"><ThemeToggle /><StudentMessagesFlyout /><StudentNotificationsBell /><AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />{showDevelopmentIndicators ? <span className={`api-dot ${apiHealth}`}>{apiHealth === 'online' ? 'API Online' : apiHealth === 'offline' ? 'API Offline' : 'Checking'}</span> : null}<button className="profile-menu" type="button" aria-label="Student profile menu" onClick={onProfile} disabled={profileActive}><span className="avatar">{identity.initials}</span><span><strong>{identity.name}</strong><small>{workspace ? `Role: ${roleLabel(workspace.role)}` : identity.detail}</small></span><ChevronDown size={15} aria-hidden="true" /></button></div>
+      <label className="global-search" role="search"><Icon name="search" size={16} /><span className="sr-only">Search student workspace</span><input placeholder="Search opportunities, skills, assessments..." /></label>
+      <div className="topbar-actions"><ThemeToggle /><StudentMessagesFlyout /><StudentNotificationsBell /><AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />{showDevelopmentIndicators ? <span className={`api-dot ${apiHealth}`}>{apiHealth === 'online' ? 'API Online' : apiHealth === 'offline' ? 'API Offline' : 'Checking'}</span> : null}<button className="profile-menu" type="button" aria-label="Student profile menu" onClick={onProfile} disabled={profileActive}><span className="avatar">{identity.initials}</span><span><strong>{identity.name}</strong><small>{workspace ? `Role: ${roleLabel(workspace.role)}` : identity.detail}</small></span><Icon name="chevron-down" size={16} /></button></div>
     </header>
   );
 }

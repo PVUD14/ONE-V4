@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowRight, Briefcase, Building2, CalendarDays, CheckCircle2, ClipboardCheck, EyeOff, Plus, TrendingUp, Users, Video } from 'lucide-react';
+import { Icon, type IconName } from '../icons/Icon.js';
 import { MultiRing } from './pilotComponents.js';
 import { DetailRows, OverlayForm, listModal, useOverlay } from './pilotOverlay.js';
 import { usePilotSession } from './pilotSession.js';
@@ -64,19 +64,19 @@ export function EmployerDashboard(): React.ReactElement {
           <h1>Recruiter Dashboard</h1>
           <p>Your open roles, pipeline health and the interviews coming up this week.</p>
         </div>
-        <button type="button" className="pilot-btn" onClick={(event) => { event.stopPropagation(); postRole(); }}><Plus size={15} /> Post a Role</button>
+        <button type="button" className="pilot-btn" onClick={(event) => { event.stopPropagation(); postRole(); }}><Icon name="plus" size={16} /> Post a Role</button>
       </div>
 
       <div className="pilot-row cols-5">
         {[
-          ['Open Roles', pilotEmployerStats.openRoles, 'blue', Briefcase],
-          ['Total Applicants', pilotEmployerStats.totalApplicants, 'indigo', Users],
-          ['In Pipeline', pilotEmployerStats.inPipeline, 'purple', ClipboardCheck],
-          ['Offers Extended', pilotEmployerStats.offersExtended, 'amber', TrendingUp],
-          ['Hires', pilotEmployerStats.hires, 'green', Building2],
-        ].map(([label, value, tone, Icon]) => (
+          ['Open Roles', pilotEmployerStats.openRoles, 'blue', 'opportunities'],
+          ['Total Applicants', pilotEmployerStats.totalApplicants, 'indigo', 'applicants'],
+          ['In Pipeline', pilotEmployerStats.inPipeline, 'purple', 'pipeline'],
+          ['Offers Extended', pilotEmployerStats.offersExtended, 'amber', 'offers'],
+          ['Hires', pilotEmployerStats.hires, 'green', 'placement'],
+        ].map(([label, value, tone, glyph]) => (
           <section key={label as string} className="pilot-card pilot-kpi">
-            {(() => { const Component = Icon as typeof Users; return <span className={`pilot-tile ${tone as string}`}><Component size={17} /></span>; })()}
+            <span className={`pilot-tile ${tone as string}`}><Icon name={glyph as IconName} size={16} /></span>
             <div><b>{value as number}</b><small>{label as string}</small></div>
           </section>
         ))}
@@ -92,7 +92,7 @@ export function EmployerDashboard(): React.ReactElement {
           <div className="pilot-list">
             {pilotEmployerInterviews.map((interview) => (
               <div key={`${interview.candidate}-${interview.when}`} className="pilot-list-row">
-                <span className="pilot-tile purple"><Video size={16} /></span>
+                <span className="pilot-tile purple"><Icon name="meetings" size={16} /></span>
                 <div className="grow"><strong>{interview.candidate}</strong><small>{interview.round} · {interview.role}</small></div>
                 <small>{interview.when}</small>
               </div>
@@ -141,12 +141,12 @@ export function EmployerDashboard(): React.ReactElement {
             <div key={drive.institution} className="pilot-list-row">
               <div className="pilot-date"><b>{drive.date.split(' ')[0]}</b><span>{drive.date.split(' ')[1]}</span></div>
               <div className="grow"><strong style={{ fontSize: 12.5 }}>{drive.institution}</strong><small>{drive.role} · {drive.registered} registered</small></div>
-              <ArrowRight size={14} color="#98a5ba" />
+              <Icon name="arrow-right" size={16} style={{ color: "#98a5ba" }} />
             </div>
           ))}
         </div>
       </section>
-      <div className="pilot-banner blue"><TrendingUp size={17} /> Applications up 32% since the Lakeview drive was announced.</div>
+      <div className="pilot-banner blue"><Icon name="analytics" size={16} /> Applications up 32% since the Lakeview drive was announced.</div>
     </aside>
   </div>;
 }
@@ -158,7 +158,7 @@ export function EmployerOpportunities(): React.ReactElement {
     <div className="pilot-content">
       <div className="pilot-page-head">
         <div><h1>Opportunities</h1><p>Roles {pilotEmployerPersona.company.name} is hiring for this season.</p></div>
-        <button type="button" className="pilot-btn" onClick={(event) => { event.stopPropagation(); postRole(); }}><Plus size={15} /> Post a Role</button>
+        <button type="button" className="pilot-btn" onClick={(event) => { event.stopPropagation(); postRole(); }}><Icon name="plus" size={16} /> Post a Role</button>
       </div>
       <section className="pilot-card">
         <div className="pilot-table-wrap"><table className="pilot-table">
@@ -227,12 +227,12 @@ export function EmployerApplicants(): React.ReactElement {
         <div className="pilot-list">
           {sharedEvidenceFor(applicant.name).map((evidence) => (
             <div key={evidence.item} className="pilot-list-row" style={{ padding: '7px 2px' }}>
-              <CheckCircle2 size={15} color="#0d6b4f" style={{ flexShrink: 0 }} />
+              <Icon name="check" size={16} style={{ color: "#0d6b4f", flexShrink: 0 }} />
               <div className="grow"><strong style={{ fontSize: 12.5 }}>{evidence.item}</strong><small>{evidence.verifiedBy}</small></div>
             </div>
           ))}
         </div>
-        <p className="pilot-modal-text" style={{ marginTop: 10 }}><EyeOff size={13} style={{ verticalAlign: '-2px' }} /> {applicant.name.split(' ')[0]} chose what to share when applying. Readiness bands, marks they did not share and counselling notes are never visible to employers.</p>
+        <p className="pilot-modal-text" style={{ marginTop: 10 }}><Icon name="eye-off" size={16} style={{ verticalAlign: '-2px' }} /> {applicant.name.split(' ')[0]} chose what to share when applying. Readiness bands, marks they did not share and counselling notes are never visible to employers.</p>
       </div>,
     });
   };
@@ -305,13 +305,13 @@ export function EmployerInterviews(): React.ReactElement {
     <div className="pilot-content">
       <div className="pilot-page-head">
         <div><h1>Interviews</h1><p>Scheduled rounds across your roles.</p></div>
-        <button type="button" className="pilot-btn ghost"><CalendarDays size={15} /> Sync Calendar</button>
+        <button type="button" className="pilot-btn ghost"><Icon name="calendar-small" size={16} /> Sync Calendar</button>
       </div>
       <section className="pilot-card">
         <div className="pilot-list">
           {pilotEmployerInterviews.map((interview) => (
             <div key={`${interview.candidate}-${interview.when}`} className="pilot-list-row">
-              <span className="pilot-tile purple"><Video size={17} /></span>
+              <span className="pilot-tile purple"><Icon name="meetings" size={16} /></span>
               <div className="grow"><strong>{interview.candidate}</strong><small>{interview.round} · {interview.role} · {interview.mode}</small></div>
               {times[interview.candidate] ? <span className="pilot-chip purple">{times[interview.candidate]}</span> : <small>{interview.when}</small>}
               <button type="button" className="pilot-btn ghost small" onClick={(event) => { event.stopPropagation(); reschedule(interview); }}>Reschedule</button>

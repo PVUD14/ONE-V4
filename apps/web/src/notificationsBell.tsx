@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Bell, MessageSquare } from 'lucide-react';
+import { Icon } from './icons/Icon.js';
 import { getProtectedAccessToken, listMyNotifications, listStudentExams, markAllNotificationsRead } from './api.js';
 import { formatDateTime } from './dates.js';
 
@@ -91,7 +91,7 @@ export function StudentNotificationsBell(): React.ReactElement {
     <div className="notify-bell" ref={containerRef}>
       <button className="icon-button notification" type="button" aria-label="Notifications" aria-expanded={open}
         onClick={() => setOpen((value) => !value)}>
-        <Bell size={18} />
+        <Icon name="bell" size={20} />
         {badgeCount > 0 ? <span>{badgeCount}</span> : null}
       </button>
       {open ? (
@@ -142,7 +142,7 @@ export function StudentMessagesFlyout(): React.ReactElement {
     <div className="notify-bell" ref={containerRef}>
       <button className="icon-button" type="button" aria-label="Messages" aria-expanded={open}
         onClick={() => setOpen((value) => !value)}>
-        <MessageSquare size={18} />
+        <Icon name="message" size={20} />
       </button>
       {open ? (
         <div className="notify-flyout" role="dialog" aria-label="Messages">

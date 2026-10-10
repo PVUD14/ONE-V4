@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowRight, BookOpen, CheckCircle2, ClipboardCheck, Sparkles } from 'lucide-react';
+import { Icon } from './icons/Icon.js';
 import { MultiRing, Ring } from './pilot/pilotComponents.js';
 import { codeLabel } from './labels.js';
 import {
@@ -74,11 +74,11 @@ export function StudentRoadmapV3({ children }: { readonly children: React.ReactN
     <section className="pilot-card">
       <h2>Recommended Next</h2>
       <div style={{ display: 'flex', gap: 12 }}>
-        <span className="pilot-tile purple"><Sparkles size={18} /></span>
+        <span className="pilot-tile purple"><Icon name="coach" size={20} /></span>
         <div>
           <strong style={{ fontSize: 13 }}>{actions.length ? codeLabel(actions[0]!.actionCode) : 'Complete a lesson'}</strong>
           <small style={{ display: 'block', color: 'var(--p-muted)', margin: '3px 0 8px' }}>{actions.length ? 'Your next advisory action from real evidence.' : 'Advisory actions appear as your evidence grows.'}</small>
-          <button type="button" className="pilot-btn soft small" onClick={() => go('/student/learning')}>Open Learning <ArrowRight size={13} /></button>
+          <button type="button" className="pilot-btn soft small" onClick={() => go('/student/learning')}>Open Learning <Icon name="arrow-right" size={16} /></button>
         </div>
       </div>
     </section>
@@ -87,7 +87,7 @@ export function StudentRoadmapV3({ children }: { readonly children: React.ReactN
       <div className="pilot-list">
         {['Finish lessons in order — prerequisites unlock later ones.', 'Attempt every assigned assessment; results feed your band.', 'Keep your profile current so guidance stays relevant.'].map((tip) => (
           <div key={tip} className="pilot-list-row" style={{ padding: '8px 2px' }}>
-            <CheckCircle2 size={15} color="#1f55e5" />
+            <Icon name="check" size={16} style={{ color: "#1f55e5" }} />
             <small style={{ color: 'var(--p-ink-2)' }}>{tip}</small>
           </div>
         ))}
@@ -128,7 +128,7 @@ export function StudentLearningV3({ children }: { readonly children: React.React
       <div className="pilot-list">
         {(learner?.catalog?.modules ?? []).slice(0, 3).map((module) => (
           <div key={module.id} className="pilot-list-row">
-            <span className="pilot-tile teal"><BookOpen size={16} /></span>
+            <span className="pilot-tile teal"><Icon name="learning" size={16} /></span>
             <div className="grow"><strong>{module.title}</strong><small>{module.lessons.length} lessons</small></div>
           </div>
         ))}
@@ -173,7 +173,7 @@ export function StudentAssessmentsV3({ children }: { readonly children: React.Re
       <div className="pilot-list">
         {results.length ? results.slice(0, 4).map((exam) => (
           <div key={exam.id} className="pilot-list-row">
-            <span className="pilot-tile indigo" style={{ width: 34, height: 34 }}><ClipboardCheck size={15} /></span>
+            <span className="pilot-tile indigo" style={{ width: 34, height: 34 }}><Icon name="assessments" size={16} /></span>
             <div className="grow"><strong style={{ fontSize: 12.5 }}>{exam.title}</strong><small>{exam.subjectName}</small></div>
             <span className={`pilot-chip ${exam.latestResult!.percentage >= 70 ? 'green' : exam.latestResult!.percentage >= 40 ? 'amber' : 'rose'}`}>{exam.latestResult!.percentage}%</span>
           </div>
@@ -205,7 +205,7 @@ export function StudentOpportunitiesV3({ children }: { readonly children: React.
       <div className="pilot-list">
         {['Apply early — deadlines close applications automatically.', 'Applying shares your profile for that role only.', 'You can withdraw any time; it ends the employer’s access.'].map((tip) => (
           <div key={tip} className="pilot-list-row" style={{ padding: '8px 2px' }}>
-            <CheckCircle2 size={15} color="#1f55e5" />
+            <Icon name="check" size={16} style={{ color: "#1f55e5" }} />
             <small style={{ color: 'var(--p-ink-2)' }}>{tip}</small>
           </div>
         ))}
@@ -238,7 +238,7 @@ export function StudentProfileV3({ children }: { readonly children: React.ReactN
       <div className="pilot-list">
         {['A clear target career anchors your roadmap.', 'Your headline is the first line recruiters read.', 'Sharing is always your explicit choice — QR or link.'].map((tip) => (
           <div key={tip} className="pilot-list-row" style={{ padding: '8px 2px' }}>
-            <CheckCircle2 size={15} color="#1f55e5" />
+            <Icon name="check" size={16} style={{ color: "#1f55e5" }} />
             <small style={{ color: 'var(--p-ink-2)' }}>{tip}</small>
           </div>
         ))}

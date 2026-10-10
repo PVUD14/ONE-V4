@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" class="ai ai-practice ai-loop" role="img" aria-label="Practice (animated)">
+<style>
+svg{color:#1554D6;fill:currentColor;overflow:visible}
+*{transform-box:view-box}
+.s{opacity:.42}.p-turn{opacity:0}.p-dB{opacity:0}.p-chk{stroke-dasharray:12;stroke-dashoffset:0}
+@keyframes aiArrow{0%,22%,100%{transform:none;opacity:1}3%{transform:translate(5px,-5px);opacity:0}12%{transform:translate(-.8px,.8px);opacity:1}16%{transform:translate(.3px,-.3px)}}
+@keyframes aiHit{0%,11%,22%,100%{transform:none}15%{transform:scale(.92)}}
+@media (prefers-reduced-motion: no-preference){
+.ai-loop .p-arw{animation:aiArrow 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:12px 12px}
+.ai-loop .p-tg{animation:aiHit 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:11px 13px}
+}
+</style>
+<path class="f p-tg" fill-rule="evenodd" d="M2 13a9 9 0 1 0 18 0a9 9 0 1 0 -18 0ZM4.7 13a6.3 6.3 0 1 0 12.6 0a6.3 6.3 0 1 0 -12.6 0ZM10.43 9.97Q11 9.4 11.57 9.97L14.03 12.43Q14.6 13 14.03 13.57L11.57 16.03Q11 16.6 10.43 16.03L7.97 13.57Q7.4 13 7.97 12.43Z"/><g class="s"><path class="f p-arw" fill-rule="evenodd" d="M12.68 10.48Q12.4 10.2 12.68 9.92L17.12 5.48Q17.4 5.2 17.12 4.92L16.18 3.98Q15.9 3.7 16.29 3.61L21.31 2.39Q21.7 2.3 21.61 2.69L20.39 7.71Q20.3 8.1 20.02 7.82L19.08 6.88Q18.8 6.6 18.52 6.88L14.08 11.32Q13.8 11.6 13.52 11.32Z"/></g>
+</svg>

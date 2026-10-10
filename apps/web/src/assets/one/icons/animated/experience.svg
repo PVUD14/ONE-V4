@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" class="ai ai-experience ai-loop" role="img" aria-label="Experience (animated)">
+<style>
+svg{color:#1554D6;fill:currentColor;overflow:visible}
+*{transform-box:view-box}
+.s{opacity:.42}.p-turn{opacity:0}.p-dB{opacity:0}.p-chk{stroke-dasharray:12;stroke-dashoffset:0}
+@keyframes aiLift{0%,24%,100%{transform:none}8%{transform:translateY(-1.5px) rotate(-5deg)}16%{transform:translateY(.2px) rotate(2deg)}}
+@media (prefers-reduced-motion: no-preference){
+.ai-loop .p-case{animation:aiLift 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:12px 20.6px}
+}
+</style>
+<g class="p-case"><path class="f " fill-rule="evenodd" d="M2.5 9.4Q2.5 7.6 4.3 7.6L17 7.6Q18.8 7.6 20.07 8.87L20.23 9.03Q21.5 10.3 21.5 12.1L21.5 18.8Q21.5 20.6 19.7 20.6L4.3 20.6Q2.5 20.6 2.5 18.8ZM10 12.69Q10.1 12.2 10.6 12.2L14 12.2Q14.5 12.2 14.4 12.69L14 14.51Q13.9 15 13.4 15L10 15Q9.5 15 9.6 14.51Z"/><g class="s"><path class="f " fill-rule="evenodd" d="M8.4 3.9Q8.4 3.2 9.1 3.2L14.9 3.2Q15.6 3.2 15.6 3.9L15.6 6.9Q15.6 7.6 14.9 7.6L14.3 7.6Q13.6 7.6 13.6 6.9L13.6 5.9Q13.6 5.2 12.9 5.2L11.1 5.2Q10.4 5.2 10.4 5.9L10.4 6.9Q10.4 7.6 9.7 7.6L9.1 7.6Q8.4 7.6 8.4 6.9Z"/></g></g>
+</svg>

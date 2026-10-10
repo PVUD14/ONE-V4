@@ -10,7 +10,7 @@
  * states plainly what is not available rather than inventing it. Everything works with every AI flag off.
  */
 import React, { useEffect, useState } from 'react';
-import { BookOpen, ClipboardCheck, Lightbulb, RotateCcw, SkipForward, Sparkles, Target } from 'lucide-react';
+import { Icon } from './icons/Icon.js';
 import { getAccessToken } from './auth.js';
 import {
   answerPlacementQuestion,
@@ -172,7 +172,7 @@ export function StudentLearningPlan(): React.ReactElement {
           : path.dueReviews.length === 0 ? <p style={muted}>Nothing is due for review right now.</p>
             : <div className="pilot-list">
               {path.dueReviews.map((review) => <div key={review.skillId} className="pilot-list-row">
-                <span className="pilot-tile blue"><RotateCcw size={16} /></span>
+                <span className="pilot-tile blue"><Icon name="refresh" size={16} /></span>
                 <div className="grow"><strong>{review.skillName}</strong><small>Due for review</small></div>
               </div>)}
             </div>}
@@ -192,7 +192,7 @@ function StepCard({ step, onStep }: { readonly step: LearningStepDto; readonly o
     {step.lessons.length ? <div style={{ marginBottom: 10 }}>
       <strong style={{ fontSize: 12 }}>Lessons on this skill</strong>
       <div className="pilot-list">{step.lessons.map((lesson) => <div key={lesson.id} className="pilot-list-row">
-        <span className="pilot-tile teal"><BookOpen size={16} /></span><div className="grow"><strong {...lessonTextProps(lesson.language)}>{lesson.title}</strong><small>Listed with your modules below</small></div>
+        <span className="pilot-tile teal"><Icon name="learning" size={16} /></span><div className="grow"><strong {...lessonTextProps(lesson.language)}>{lesson.title}</strong><small>Listed with your modules below</small></div>
       </div>)}</div>
     </div> : null}
     <StepPractice key={step.decisionId} step={step} onStep={onStep} />
@@ -231,11 +231,11 @@ function HintEntry({ entry }: { readonly entry: StepHintDto }): React.ReactEleme
   const label = <span className="pilot-chip amber">{hintLabel(entry.level - 1)}</span>;
   if (entry.source === 'LADDER') return <p style={{ margin: '4px 0' }}>{label} {entry.text}</p>;
   if (entry.state === 'PENDING') {
-    return <p role="status" style={{ margin: '4px 0' }}>{label} <span className="pilot-chip purple"><Sparkles size={12} /> AI hint</span> <span style={muted}>The AI tutor is writing this hint…</span></p>;
+    return <p role="status" style={{ margin: '4px 0' }}>{label} <span className="pilot-chip purple"><Icon name="coach" size={16} /> AI hint</span> <span style={muted}>The AI tutor is writing this hint…</span></p>;
   }
   if (entry.state === 'SHOWN') {
     return <div style={{ margin: '4px 0' }} aria-label={`AI hint ${entry.level}`}>
-      <p style={{ margin: 0 }}>{label} <span className="pilot-chip purple"><Sparkles size={12} /> AI hint</span> {entry.text}</p>
+      <p style={{ margin: 0 }}>{label} <span className="pilot-chip purple"><Icon name="coach" size={16} /> AI hint</span> {entry.text}</p>
       <small style={muted}>{AI_HINT_NOTE}</small>
     </div>;
   }
@@ -318,10 +318,10 @@ function StepPractice({ step, onStep }: { readonly step: LearningStepDto; readon
     <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
       <button type="button" className="pilot-btn small" disabled={busy || !choice} onClick={() => void answer()}>Check answer</button>
       {question.hintsAvailable && question.hints.length < 4
-        ? <button type="button" className="pilot-btn ghost small" disabled={busy || pending} onClick={() => void hint()}><Lightbulb size={14} /> Show {hintLabel(question.hints.length).replace('Hint', 'hint')}</button> : null}
+        ? <button type="button" className="pilot-btn ghost small" disabled={busy || pending} onClick={() => void hint()}><Icon name="coach" size={16} /> Show {hintLabel(question.hints.length).replace('Hint', 'hint')}</button> : null}
       {showTutor && question.hints.length < 4
         ? <button type="button" className="pilot-btn soft small" disabled={busy || pending || !tutor.available} onClick={() => void askTutor()}>
-          <Sparkles size={14} /> Ask the AI tutor for {hintLabel(question.hints.length).replace('Hint', 'hint')}
+          <Icon name="coach" size={16} /> Ask the AI tutor for {hintLabel(question.hints.length).replace('Hint', 'hint')}
         </button> : null}
     </div>
     {showTutor ? <p style={muted}>
@@ -363,9 +363,9 @@ function TutorPoll({ decisionId, onStep }: { readonly decisionId: string; readon
 // --- The path -----------------------------------------------------------------
 
 const GROUPS: readonly { key: 'skip' | 'review' | 'learn'; title: string; icon: React.ReactElement; tone: string; empty: string }[] = [
-  { key: 'review', title: 'Review', icon: <RotateCcw size={16} />, tone: 'blue', empty: 'Nothing to review.' },
-  { key: 'learn', title: 'Learn', icon: <BookOpen size={16} />, tone: 'purple', empty: 'Nothing new to learn.' },
-  { key: 'skip', title: 'Skip', icon: <SkipForward size={16} />, tone: 'green', empty: 'Nothing to skip yet.' },
+  { key: 'review', title: 'Review', icon: <Icon name="refresh" size={16} />, tone: 'blue', empty: 'Nothing to review.' },
+  { key: 'learn', title: 'Learn', icon: <Icon name="learning" size={16} />, tone: 'purple', empty: 'Nothing new to learn.' },
+  { key: 'skip', title: 'Skip', icon: <Icon name="chevron-right" size={16} />, tone: 'green', empty: 'Nothing to skip yet.' },
 ];
 
 function PathCard({ path, status }: { readonly path: LearningPathDto | null; readonly status: string }): React.ReactElement {
@@ -442,7 +442,7 @@ export function PlacementCard(): React.ReactElement {
         : 'Not open yet — there are not enough published aptitude questions for a placement test.'}</p>
         : placement.status === 'NOT_STARTED' ? <>
           <p style={muted}>Up to 25 questions and 25 minutes. It places you at a level so your plan starts in the right place. It does not count toward readiness.</p>
-          <button type="button" className="pilot-btn small" disabled={busy} onClick={() => void act(startPlacementTest)}><ClipboardCheck size={14} /> Start the placement test</button>
+          <button type="button" className="pilot-btn small" disabled={busy} onClick={() => void act(startPlacementTest)}><Icon name="assessments" size={16} /> Start the placement test</button>
         </>
           : placement.status === 'COMPLETED' ? <p style={muted}>Your placement level: <strong>{PLACEMENT_LEVEL[placement.placementLevel]}</strong> ({placement.questionsAnswered} questions answered).</p>
             : <div aria-label="Placement question">
@@ -484,7 +484,7 @@ export function PracticeBySkillCard(): React.ReactElement {
         : skills.length === 0 ? <p style={muted}>Nothing to practise: every requirement of your target is met.</p>
           : <div className="pilot-list">
             {skills.map((entry) => <div key={entry.skillId} className="pilot-list-row">
-              <span className="pilot-tile purple"><Target size={16} /></span>
+              <span className="pilot-tile purple"><Icon name="targets" size={16} /></span>
               <div className="grow"><strong>{entry.skillName}</strong><small>{entry.due ? 'Due for review' : BAND_LABEL[entry.band]}</small></div>
             </div>)}
           </div>}

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" class="ai ai-evidence ai-loop" role="img" aria-label="Evidence / Verified (animated)">
+<style>
+svg{color:#1554D6;fill:currentColor;overflow:visible}
+*{transform-box:view-box}
+.s{opacity:.42}.p-turn{opacity:0}.p-dB{opacity:0}.p-chk{stroke-dasharray:12;stroke-dashoffset:0}
+@keyframes aiPop{0%,24%,100%{transform:none}8%{transform:scale(.93)}16%{transform:scale(1.04)}}
+@keyframes aiBlink{0%,16%,100%{transform:none}5%{transform:scaleY(.08)}10%{transform:none}}
+@keyframes aiLook{0%,26%,100%{transform:none}5%{transform:scaleY(.08)}10%{transform:none}15%{transform:translateX(-1.1px)}21%{transform:translateX(1px)}}
+@media (prefers-reduced-motion: no-preference){
+.ai-loop .p-eye{animation:aiBlink 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:12px 12.2px}
+.ai-loop .p-pup{animation:aiLook 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:12px 12.2px}
+.ai-loop .p-sh{animation:aiPop 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:12px 20px}
+}
+</style>
+<defs><mask id="mk-ev-x" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24"><rect width="24" height="24" fill="#fff"/><path class="p-eye" fill="#000" d="M8.14 13.61Q6.2 12.2 8.14 10.79L10.06 9.41Q12 8 13.94 9.41L15.86 10.79Q17.8 12.2 15.86 13.61L13.94 14.99Q12 16.4 10.06 14.99Z"/></mask></defs><path class="f p-sh" mask="url(#mk-ev-x)" d="M10.5 2.96Q12 2.4 13.5 2.96L19.1 5.04Q20.6 5.6 20.6 7.2L20.6 10.8Q20.6 12.4 19.81 13.79L18.19 16.61Q17.4 18 16.07 18.89L13.33 20.71Q12 21.6 10.67 20.71L7.93 18.89Q6.6 18 5.81 16.61L4.19 13.79Q3.4 12.4 3.4 10.8L3.4 7.2Q3.4 5.6 4.9 5.04Z"/><path class="f p-pup" fill-rule="evenodd" d="M10 12.2a2 2 0 1 0 4 0a2 2 0 1 0 -4 0Z"/>
+</svg>

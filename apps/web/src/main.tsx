@@ -13,6 +13,9 @@ import { SandboxMarker } from './sandboxMarker.js';
 import './styles.css';
 // The Momentum app shell (rail, sidebar, top bars) restyles the shell rules in styles.css, so it loads after it.
 import './styles/shell.css';
+// Momentum icons: base two-tone rules, then the play-once hover cues for module icons.
+import './styles/icons.css';
+import './styles/icon-motion.css';
 import { applyStoredTheme } from './themePreference.js';
 
 // A theme chosen with the top-bar toggle is applied before the first paint; otherwise the OS decides.

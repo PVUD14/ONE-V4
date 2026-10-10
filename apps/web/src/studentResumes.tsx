@@ -8,7 +8,7 @@
  * else self-declared. Design: docs/architecture/student-resumes-table-design.md.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Circle, Plus, Trash2 } from 'lucide-react';
+import { Icon } from './icons/Icon.js';
 import {
   ApiRequestError, createResume, downloadResumePdf, previewResume, saveResumeVersion,
   type ResumeCheckDto, type ResumeContentDto, type ResumeDraftDto, type ResumeSourcesDto, type ResumeTemplateDto, type ResumeTemplateKey,
@@ -121,7 +121,7 @@ export function ResumeChecksList({ checks }: { readonly checks: readonly ResumeC
   return <div className="pilot-list">
     {checks.map((check) => (
       <div key={check.key} className="pilot-list-row">
-        <span className={`pilot-tile ${check.passed ? 'green' : 'amber'}`} style={{ width: 30, height: 30 }}>{check.passed ? <CheckCircle2 size={14} /> : <Circle size={14} />}</span>
+        <span className={`pilot-tile ${check.passed ? 'green' : 'amber'}`} style={{ width: 30, height: 30 }}>{check.passed ? <Icon name="check" size={16} /> : <Icon name="warning" size={16} />}</span>
         <div className="grow"><strong style={{ fontSize: 12.5 }}>{check.message}</strong><small>{check.passed ? 'Done' : 'Not yet'}</small></div>
       </div>
     ))}
@@ -226,10 +226,10 @@ export function ResumeBuilder({ token, sources, templates, initial, resumeId, on
           <div key={index} style={{ display: 'flex', gap: 6, alignItems: 'flex-end' }}>
             <label className="pilot-field" style={{ width: 110 }}><span>Link label</span><input value={link.label ?? ''} maxLength={60} onChange={(event) => setHeader({ links: draft.header.links.map((item, at) => (at === index ? { ...item, label: empty(event.target.value) } : item)) })} /></label>
             <label className="pilot-field" style={{ flex: 1 }}><span>https:// link</span><input value={link.url} maxLength={256} onChange={(event) => setHeader({ links: draft.header.links.map((item, at) => (at === index ? { ...item, url: event.target.value } : item)) })} /></label>
-            <button type="button" className="pilot-btn ghost small" aria-label="Remove link" style={{ marginBottom: 11 }} onClick={() => setHeader({ links: draft.header.links.filter((_, at) => at !== index) })}><Trash2 size={13} /></button>
+            <button type="button" className="pilot-btn ghost small" aria-label="Remove link" style={{ marginBottom: 11 }} onClick={() => setHeader({ links: draft.header.links.filter((_, at) => at !== index) })}><Icon name="trash" size={16} /></button>
           </div>
         ))}
-        {draft.header.links.length < 5 ? <button type="button" className="pilot-btn ghost small" onClick={() => setHeader({ links: [...draft.header.links, { label: null, url: 'https://' }] })}><Plus size={13} /> Add a link</button> : null}
+        {draft.header.links.length < 5 ? <button type="button" className="pilot-btn ghost small" onClick={() => setHeader({ links: [...draft.header.links, { label: null, url: 'https://' }] })}><Icon name="plus" size={16} /> Add a link</button> : null}
       </section>
 
       <section className="pilot-card">
@@ -262,10 +262,10 @@ export function ResumeBuilder({ token, sources, templates, initial, resumeId, on
             <label className="pilot-field"><span>Project title</span><input value={project.title} maxLength={120} onChange={(event) => set({ projects: draft.projects.map((item, at) => (at === index ? { ...item, title: event.target.value } : item)) })} /></label>
             <label className="pilot-field"><span>https:// link (optional)</span><input value={project.url ?? ''} maxLength={256} onChange={(event) => set({ projects: draft.projects.map((item, at) => (at === index ? { ...item, url: empty(event.target.value) } : item)) })} /></label>
             <label className="pilot-field"><span>What you did</span><textarea rows={3} maxLength={800} value={project.description ?? ''} onChange={(event) => set({ projects: draft.projects.map((item, at) => (at === index ? { ...item, description: empty(event.target.value) } : item)) })} /></label>
-            <button type="button" className="pilot-btn ghost small" style={{ marginBottom: 8 }} onClick={() => set({ projects: draft.projects.filter((_, at) => at !== index) })}><Trash2 size={13} /> Remove project</button>
+            <button type="button" className="pilot-btn ghost small" style={{ marginBottom: 8 }} onClick={() => set({ projects: draft.projects.filter((_, at) => at !== index) })}><Icon name="trash" size={16} /> Remove project</button>
           </div>
         ))}
-        {draft.projects.length < 10 ? <button type="button" className="pilot-btn ghost small" onClick={() => set({ projects: [...draft.projects, { title: '', description: null, url: null }] })}><Plus size={13} /> Add a project</button> : null}
+        {draft.projects.length < 10 ? <button type="button" className="pilot-btn ghost small" onClick={() => set({ projects: [...draft.projects, { title: '', description: null, url: null }] })}><Icon name="plus" size={16} /> Add a project</button> : null}
       </section>
 
       <section className="pilot-card">

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" class="ai ai-profile ai-loop" role="img" aria-label="Profile (animated)">
+<style>
+svg{color:#1554D6;fill:currentColor;overflow:visible}
+*{transform-box:view-box}
+.s{opacity:.42}.p-turn{opacity:0}.p-dB{opacity:0}.p-chk{stroke-dasharray:12;stroke-dashoffset:0}
+@keyframes aiNod{0%,24%,100%{transform:none}8%{transform:translateY(-1.3px)}16%{transform:translateY(.3px)}}
+@media (prefers-reduced-motion: no-preference){
+.ai-loop .p-hd{animation:aiNod 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:12px 12px}
+}
+</style>
+<path class="f p-hd" fill-rule="evenodd" d="M7.8 7.4a4.2 4.2 0 1 0 8.4 0a4.2 4.2 0 1 0 -8.4 0Z"/><path class="f " fill-rule="evenodd" d="M6.4 21Q4.2 21 4.86 18.9L5.74 16.1Q6.4 14 8.6 14L15.4 14Q17.6 14 18.26 16.1L19.14 18.9Q19.8 21 17.6 21Z"/>
+</svg>

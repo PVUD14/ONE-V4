@@ -35,7 +35,7 @@
 }
 .pilot .pilot-nav-item:hover { background: var(--p-canvas); }
 .pilot .pilot-nav-item.active { background: var(--p-blue-soft); color: var(--brand-ink); font-weight: 600; }
-.pilot .pilot-nav-item .lucide { flex: 0 0 auto; }
+.pilot .pilot-nav-item .one-icon { flex: 0 0 auto; }
 .pilot .pilot-nav-item small { margin-left: auto; color: var(--p-muted); font-size: 10px; }
 
 .pilot-side-note {

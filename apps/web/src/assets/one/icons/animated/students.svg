@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" class="ai ai-students ai-loop" role="img" aria-label="Students (animated)">
+<style>
+svg{color:#1554D6;fill:currentColor;overflow:visible}
+*{transform-box:view-box}
+.s{opacity:.42}.p-turn{opacity:0}.p-dB{opacity:0}.p-chk{stroke-dasharray:12;stroke-dashoffset:0}
+@keyframes aiPeek{0%,26%,100%{transform:none;opacity:1}5%{transform:translateY(2.2px);opacity:.15}15%{transform:translateY(-.8px);opacity:1}}
+@media (prefers-reduced-motion: no-preference){
+.ai-loop .p-b2{animation:aiPeek 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:16px 18px}
+}
+</style>
+<path class="f " fill-rule="evenodd" d="M5.2 8a3.8 3.8 0 1 0 7.6 0a3.8 3.8 0 1 0 -7.6 0ZM4.2 20.5Q2.2 20.5 2.79 18.59L3.61 15.91Q4.2 14 6.2 14L11.8 14Q13.8 14 14.39 15.91L15.21 18.59Q15.8 20.5 13.8 20.5Z"/><g class="s"><path class="f p-b2" fill-rule="evenodd" d="M13.2 6.6a3.2 3.2 0 1 0 6.4 0a3.2 3.2 0 1 0 -6.4 0ZM16.05 13.94Q15.6 12.4 17.2 12.4L18 12.4Q19.6 12.4 20.14 13.91L21.26 17.09Q21.8 18.6 20.2 18.6L19 18.6Q17.4 18.6 16.95 17.06Z"/></g>
+</svg>

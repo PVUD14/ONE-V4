@@ -9,7 +9,7 @@
  * institution screens use; a source that cannot be read shows NA in the same slot. The
  * placement officer keeps the Placement Dashboard.
  */
-import { AlertTriangle, BookOpen, Building2, ClipboardCheck, GraduationCap, Layers, ShieldCheck, Users } from 'lucide-react';
+import { Icon } from '../icons/Icon.js';
 import { useEffect, useState } from 'react';
 import {
   getDepartmentOverview,
@@ -69,7 +69,7 @@ function NeedsAttentionCard({ entries, onOpen }: { readonly entries: readonly No
       {entries === null ? <p style={muted}>NA</p>
         : entries.length ? entries.slice(0, 5).map((entry) => (
           <div key={entry.institutionStudentId} className="pilot-list-row">
-            <span className="pilot-tile rose"><AlertTriangle size={16} /></span>
+            <span className="pilot-tile rose"><Icon name="warning" size={16} /></span>
             <div className="grow"><strong>{entry.studentName}</strong><small>{entry.inProgress ? `In progress now: ${entry.examTitle}` : `Has not attempted: ${entry.examTitle}`}</small></div>
             <span className="pilot-chip amber">Due {formatDate(entry.endsAt)}</span>
           </div>))
@@ -143,11 +143,11 @@ export function InstitutionAdminHome({ authenticatedWorkspace, basePath, title }
       <PageHead title={title} summary="Your institution at a glance: the roster, its academic structure, your staff and the queues waiting on you." />
       {!data ? <p role="status">Loading your institution…</p> : null}
       <Kpis items={[
-        ['Students on roster', show(data?.students?.length), 'blue', Users],
-        ['Active students', show(active), 'teal', GraduationCap],
-        ['Academic units', show(data?.units?.length), 'indigo', Layers],
-        ['Staff members', show(activeStaff?.length), 'green', ShieldCheck],
-        ['Awaiting verification', show(data?.verification?.pending), 'rose', ClipboardCheck],
+        ['Students on roster', show(data?.students?.length), 'blue', 'students'],
+        ['Active students', show(active), 'teal', 'students'],
+        ['Academic units', show(data?.units?.length), 'indigo', 'batches'],
+        ['Staff members', show(activeStaff?.length), 'green', 'staff'],
+        ['Awaiting verification', show(data?.verification?.pending), 'rose', 'verification'],
       ]} />
       <div className="pilot-row cols-2">
         <section className="pilot-card">
@@ -225,11 +225,11 @@ export function FacultyTeachingHome({ authenticatedWorkspace, basePath, title }:
         scopeLabel={institutionStudentScopeLabel(data?.myStudents?.scope)} />
       {!data ? <p role="status">Loading your teaching…</p> : null}
       <Kpis items={[
-        ['My students', show(students?.length), 'blue', Users],
-        ['Teaching assignments', show(data?.myStudents?.assignments?.length), 'indigo', BookOpen],
-        ['Open tasks', show(openTasks), 'green', ClipboardCheck],
-        ['Awaiting verification', show(data?.verification?.pending), 'amber', ShieldCheck],
-        ['Need attention', show(data?.notAttempted?.length), 'rose', AlertTriangle],
+        ['My students', show(students?.length), 'blue', 'students'],
+        ['Teaching assignments', show(data?.myStudents?.assignments?.length), 'indigo', 'learning'],
+        ['Open tasks', show(openTasks), 'green', 'tasks'],
+        ['Awaiting verification', show(data?.verification?.pending), 'amber', 'verification'],
+        ['Need attention', show(data?.notAttempted?.length), 'rose', 'warning'],
       ]} />
       <section className="pilot-card">
         <div className="pilot-card-head"><h2>My Students</h2><button type="button" className="pilot-link" onClick={() => go(`${basePath}/my-students`)}>View My Students</button></div>
@@ -237,7 +237,7 @@ export function FacultyTeachingHome({ authenticatedWorkspace, basePath, title }:
           {students === null ? <p style={muted}>NA</p>
             : students.length ? students.slice(0, 6).map((student) => (
               <div key={student.profileId} className="pilot-list-row">
-                <span className="pilot-tile blue"><GraduationCap size={16} /></span>
+                <span className="pilot-tile blue"><Icon name="students" size={16} /></span>
                 <div className="grow"><strong>{student.fullName}</strong><small>{[student.units.section, student.units.batch].filter(Boolean).join(' · ') || 'NA'}</small></div>
                 <span className="pilot-chip slate">{student.recentAssessments.latestTitle ?? 'No submitted assessment'}</span>
               </div>))
@@ -250,7 +250,7 @@ export function FacultyTeachingHome({ authenticatedWorkspace, basePath, title }:
           {withTasks === null ? <p style={muted}>NA</p>
             : withTasks.length ? withTasks.slice(0, 5).map((student) => (
               <div key={student.profileId} className="pilot-list-row">
-                <span className="pilot-tile green"><ClipboardCheck size={16} /></span>
+                <span className="pilot-tile green"><Icon name="assessments" size={16} /></span>
                 <div className="grow"><strong>{student.fullName}</strong><small>{student.institutionStudentId}</small></div>
                 <span className="pilot-chip amber">{student.openTasks} open</span>
               </div>))
@@ -300,24 +300,24 @@ export function DepartmentHeadHome({ authenticatedWorkspace, basePath, title }: 
         scopeLabel={institutionStudentScopeLabel(overview?.scope)} />
       {!data ? <p role="status">Loading your department…</p> : null}
       <Kpis items={[
-        ['Currently enrolled', show(overview?.students.current), 'blue', GraduationCap],
-        ['Open interventions', show(overview?.staffActions.openInterventions), 'rose', AlertTriangle],
-        ['Open tasks', show(overview?.staffActions.openTasks), 'green', BookOpen],
-        ['Awaiting verification', show(data?.verification?.pending), 'amber', ShieldCheck],
-        ['Need attention', show(data?.notAttempted?.length), 'indigo', Users],
+        ['Currently enrolled', show(overview?.students.current), 'blue', 'students'],
+        ['Open interventions', show(overview?.staffActions.openInterventions), 'rose', 'warning'],
+        ['Open tasks', show(overview?.staffActions.openTasks), 'green', 'tasks'],
+        ['Awaiting verification', show(data?.verification?.pending), 'amber', 'verification'],
+        ['Need attention', show(data?.notAttempted?.length), 'indigo', 'students'],
       ]} />
       <NeedsAttentionCard entries={data?.notAttempted ?? null} onOpen={() => go(`${basePath}/assessments`)} />
       <section className="pilot-card">
         <div className="pilot-card-head"><h2>Your Department</h2></div>
         <div className="pilot-list">
           {([
-            ['Department Overview', 'Readiness bands, pipeline, activation and batches', 'department-overview', Building2],
-            ['Interventions', `${show(overview?.staffActions.openInterventions)} open`, 'interventions', AlertTriangle],
-            ['Placement Pipeline', 'Applications students shared, by stage', 'placement-pipeline', Layers],
-            ['Faculty and Staff', 'Who teaches in your department', 'faculty-and-staff', Users],
-          ] as const).map(([label, detail, slug, Icon]) => (
+            ['Department Overview', 'Readiness bands, pipeline, activation and batches', 'department-overview', 'departments'],
+            ['Interventions', `${show(overview?.staffActions.openInterventions)} open`, 'interventions', 'warning'],
+            ['Placement Pipeline', 'Applications students shared, by stage', 'placement-pipeline', 'pipeline'],
+            ['Faculty and Staff', 'Who teaches in your department', 'faculty-and-staff', 'staff'],
+          ] as const).map(([label, detail, slug, glyph]) => (
             <div key={slug} className="pilot-list-row">
-              <span className="pilot-tile blue"><Icon size={16} /></span>
+              <span className="pilot-tile blue"><Icon name={glyph} size={16} /></span>
               <div className="grow"><strong>{label}</strong><small>{detail}</small></div>
               <button type="button" className="pilot-btn ghost small" onClick={() => go(`${basePath}/${slug}`)}>Open</button>
             </div>))}

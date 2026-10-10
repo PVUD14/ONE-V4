@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" class="ai ai-career ai-loop" role="img" aria-label="My Career (animated)">
+<style>
+svg{color:#1554D6;fill:currentColor;overflow:visible}
+*{transform-box:view-box}
+.s{opacity:.42}.p-turn{opacity:0}.p-dB{opacity:0}.p-chk{stroke-dasharray:12;stroke-dashoffset:0}
+@keyframes aiFlag{0%,28%,100%{transform:none}6%{transform:skewY(-9deg) scaleX(.9)}12%{transform:skewY(6deg) scaleX(.96)}18%{transform:skewY(-3deg)}23%{transform:skewY(1deg)}}
+@media (prefers-reduced-motion: no-preference){
+.ai-loop .p-flag{animation:aiFlag 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:8.6px 8.6px}
+}
+</style>
+<path class="f p-flag" fill-rule="evenodd" d="M8.6 4.8Q8.6 3.6 9.8 3.6L19.3 3.6Q20.5 3.6 19.87 4.62L18.03 7.58Q17.4 8.6 18.03 9.62L19.87 12.58Q20.5 13.6 19.3 13.6L9.8 13.6Q8.6 13.6 8.6 12.4Z"/><g class="s"><path class="f " fill-rule="evenodd" d="M3.8 4Q3.8 2.8 5 2.8L5.6 2.8Q6.8 2.8 6.8 4L6.8 20.2Q6.8 21.4 5.6 21.4L5 21.4Q3.8 21.4 3.8 20.2Z"/></g>
+</svg>

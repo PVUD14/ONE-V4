@@ -10,7 +10,7 @@
  * readiness is bands only; offers show whether one exists and how the student answered,
  * never pay.
  */
-import { AlertTriangle, BookOpen, Briefcase, ClipboardCheck, GraduationCap, Layers, Users } from 'lucide-react';
+import { Icon, type IconName } from '../icons/Icon.js';
 import { useEffect, useState } from 'react';
 import {
   ApiRequestError,
@@ -102,9 +102,9 @@ export function PageHead({ title, summary, scopeLabel }: { readonly title: strin
   return <div className="pilot-page-head"><div className="pilot-greeting"><h1>{title}</h1><p>{summary}</p>{scopeLabel ? <p>Showing students in {scopeLabel}.</p> : null}</div></div>;
 }
 
-export function Kpis({ items }: { readonly items: readonly (readonly [string, string, string, typeof Users])[] }): React.ReactElement {
+export function Kpis({ items }: { readonly items: readonly (readonly [string, string, string, IconName])[] }): React.ReactElement {
   return <div className={`pilot-row cols-${items.length}`}>
-    {items.map(([label, value, tone, Icon]) => <PilotKpi key={label} icon={<Icon size={17} />} tone={tone} value={value} label={label} />)}
+    {items.map(([label, value, tone, glyph]) => <PilotKpi key={label} icon={<Icon name={glyph} size={16} />} tone={tone} value={value} label={label} />)}
   </div>;
 }
 
@@ -155,11 +155,11 @@ export function DepartmentOverviewPage({ authenticatedWorkspace, basePath }: Wor
       {overview.error ? <p className="form-error" role="alert">{overview.error}</p> : null}
       {!data && !overview.error ? <p role="status">Loading the department overview…</p> : null}
       <Kpis items={[
-        ['Students on roster', data ? String(data.students.onRoster) : 'NA', 'blue', Users],
-        ['Currently enrolled', data ? String(data.students.current) : 'NA', 'teal', GraduationCap],
-        ['Assessments in progress', data ? String(data.assessments.inProgress) : 'NA', 'indigo', ClipboardCheck],
-        ['Open interventions', data ? String(data.staffActions.openInterventions) : 'NA', 'rose', AlertTriangle],
-        ['Open tasks', data ? String(data.staffActions.openTasks) : 'NA', 'green', BookOpen],
+        ['Students on roster', data ? String(data.students.onRoster) : 'NA', 'blue', 'students'],
+        ['Currently enrolled', data ? String(data.students.current) : 'NA', 'teal', 'students'],
+        ['Assessments in progress', data ? String(data.assessments.inProgress) : 'NA', 'indigo', 'assessments'],
+        ['Open interventions', data ? String(data.staffActions.openInterventions) : 'NA', 'rose', 'warning'],
+        ['Open tasks', data ? String(data.staffActions.openTasks) : 'NA', 'green', 'tasks'],
       ]} />
       <div className="pilot-row cols-2">
         <section className="pilot-card">
@@ -185,7 +185,7 @@ export function DepartmentOverviewPage({ authenticatedWorkspace, basePath }: Wor
         <div className="pilot-list">
           {data && data.batches.length ? data.batches.slice(0, 6).map((batch) => (
             <div key={batch.id} className="pilot-list-row">
-              <span className="pilot-tile blue"><Layers size={16} /></span>
+              <span className="pilot-tile blue"><Icon name="batches" size={16} /></span>
               <div className="grow"><strong>{batch.name}</strong><small>{batch.parentName ?? 'NA'}</small></div>
               <span className="pilot-chip slate">{batch.current} enrolled · {batch.activated} activated</span>
             </div>
@@ -275,9 +275,9 @@ export function PlacementPipelinePage({ authenticatedWorkspace, basePath, statis
       {pipeline.error ? <p className="form-error" role="alert">{pipeline.error}</p> : null}
       {!data && !pipeline.error ? <p role="status">Loading the placement pipeline…</p> : null}
       <Kpis items={[
-        ['Students sharing applications', data ? suppressedCountLabel(data.studentsSharing) : 'NA', 'blue', Users],
-        ['Shared applications', data ? (data.stages.suppressed ? '<5' : suppressedCountLabel(data.stages.total)) : 'NA', 'indigo', Briefcase],
-        ['Offers', data ? (data.offers.suppressed ? '<5' : suppressedCountLabel(data.offers.total)) : 'NA', 'green', ClipboardCheck],
+        ['Students sharing applications', data ? suppressedCountLabel(data.studentsSharing) : 'NA', 'blue', 'applications'],
+        ['Shared applications', data ? (data.stages.suppressed ? '<5' : suppressedCountLabel(data.stages.total)) : 'NA', 'indigo', 'applications'],
+        ['Offers', data ? (data.offers.suppressed ? '<5' : suppressedCountLabel(data.offers.total)) : 'NA', 'green', 'offers'],
       ]} />
       <section className="pilot-card">
         <div className="pilot-card-head"><h2>Applications by stage</h2><button type="button" className="pilot-link" onClick={() => go(`${basePath}/opportunities-and-offers`)}>Opportunities and Offers</button></div>
@@ -470,10 +470,10 @@ export function FacultyAssessmentDetailPage({ authenticatedWorkspace }: Workspac
       </section> : null}
       {error ? <p className="form-error" role="alert">{error}</p> : null}
       {exam ? <Kpis items={[
-        ['Assigned', summary ? String(summary.assigned) : 'NA', 'blue', Users],
-        ['Results in', summary ? String(summary.attempts) : 'NA', 'green', ClipboardCheck],
-        ['Not attempted', summary ? String(summary.notAttemptedCount) : 'NA', 'rose', AlertTriangle],
-        ['Class average', summary ? (summary.attempts >= 5 ? `${summary.averagePercentage}%` : '<5 results') : 'NA', 'indigo', BookOpen],
+        ['Assigned', summary ? String(summary.assigned) : 'NA', 'blue', 'students'],
+        ['Results in', summary ? String(summary.attempts) : 'NA', 'green', 'assessments'],
+        ['Not attempted', summary ? String(summary.notAttemptedCount) : 'NA', 'rose', 'warning'],
+        ['Class average', summary ? (summary.attempts >= 5 ? `${summary.averagePercentage}%` : '<5 results') : 'NA', 'indigo', 'learning'],
       ]} /> : null}
       {detail && results.length === 0 ? <p>No results yet for this assessment among your students.</p> : null}
       {results.length ? <section className="pilot-card"><div className="pilot-card-head"><h2>Results</h2></div>

@@ -14,7 +14,7 @@
  * Pay never appears (ADR-024); readiness is not shown here at all. INST-12 adds the season
  * statistics and the placement register to the admin's Placement page.
  */
-import { Briefcase, ClipboardCheck, GraduationCap, Users } from 'lucide-react';
+import { Icon } from '../icons/Icon.js';
 import { useEffect, useState } from 'react';
 import { getPlacementPipeline, getProtectedAccessToken, institutionStudentScopeLabel, listPlacementStatus, suppressedCountLabel } from '../api.js';
 import type { PlacementPipelineDto, PlacementStatus, PlacementStatusRowDto } from '../api.js';
@@ -40,10 +40,10 @@ export function InstitutionPlacementPage({ authenticatedWorkspace }: { readonly 
       {pipeline.error ? <p className="form-error" role="alert">{pipeline.error}</p> : null}
       {!data && !pipeline.error ? <p role="status">Loading placement status…</p> : null}
       <Kpis items={[
-        ['Students sharing applications', data ? suppressedCountLabel(data.studentsSharing) : 'NA', 'blue', Users],
-        ['In process', data?.placementStatus ? (data.placementStatus.suppressed ? '<5' : suppressedCountLabel(statusCell('IN_PROCESS'))) : 'NA', 'indigo', Briefcase],
-        ['With an offer', data?.placementStatus ? (data.placementStatus.suppressed ? '<5' : suppressedCountLabel(statusCell('OFFER'))) : 'NA', 'amber', ClipboardCheck],
-        ['Accepted an offer', data?.placementStatus ? (data.placementStatus.suppressed ? '<5' : suppressedCountLabel(statusCell('ACCEPTED'))) : 'NA', 'green', GraduationCap],
+        ['Students sharing applications', data ? suppressedCountLabel(data.studentsSharing) : 'NA', 'blue', 'applications'],
+        ['In process', data?.placementStatus ? (data.placementStatus.suppressed ? '<5' : suppressedCountLabel(statusCell('IN_PROCESS'))) : 'NA', 'indigo', 'opportunities'],
+        ['With an offer', data?.placementStatus ? (data.placementStatus.suppressed ? '<5' : suppressedCountLabel(statusCell('OFFER'))) : 'NA', 'amber', 'offers'],
+        ['Accepted an offer', data?.placementStatus ? (data.placementStatus.suppressed ? '<5' : suppressedCountLabel(statusCell('ACCEPTED'))) : 'NA', 'green', 'offers'],
       ]} />
       <div className="pilot-row cols-2">
         <section className="pilot-card">

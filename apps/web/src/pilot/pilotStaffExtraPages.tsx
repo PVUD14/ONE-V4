@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AlertTriangle, Building2, CalendarDays, CheckCircle2, ClipboardCheck, Download, FileText, MapPin, PenTool, Plus, ShieldCheck, TrendingUp, Users } from 'lucide-react';
+import { Icon, type IconName } from '../icons/Icon.js';
 import { Ring } from './pilotComponents.js';
 import { DetailRows, OverlayForm, useOverlay } from './pilotOverlay.js';
 import { usePilotSession } from './pilotSession.js';
@@ -61,16 +61,16 @@ export function InstitutionAssessments(): React.ReactElement {
     <div className="pilot-content">
       <div className="pilot-page-head">
         <div><h1>Assessments</h1><p>Schedule cohort assessments and track participation and outcomes.</p></div>
-        <button type="button" className="pilot-btn" onClick={(event) => { event.stopPropagation(); createAssessment(); }}><Plus size={15} /> Create Assessment</button>
+        <button type="button" className="pilot-btn" onClick={(event) => { event.stopPropagation(); createAssessment(); }}><Icon name="plus" size={16} /> Create Assessment</button>
       </div>
 
       <div className="pilot-row cols-4">
         {[
-          ['Scheduled', 3, 'blue', CalendarDays], ['Completed This Term', 12, 'green', CheckCircle2],
-          ['Average Score', 64, 'amber', TrendingUp], ['Participation', '88%', 'purple', Users],
-        ].map(([label, value, tone, Icon]) => (
+          ['Scheduled', 3, 'blue', 'calendar'], ['Completed This Term', 12, 'green', 'check'],
+          ['Average Score', 64, 'amber', 'analytics'], ['Participation', '88%', 'purple', 'students'],
+        ].map(([label, value, tone, glyph]) => (
           <section key={label as string} className="pilot-card pilot-kpi">
-            {(() => { const Component = Icon as typeof Users; return <span className={`pilot-tile ${tone as string}`}><Component size={17} /></span>; })()}
+            <span className={`pilot-tile ${tone as string}`}><Icon name={glyph as IconName} size={16} /></span>
             <div><b>{value as number}</b><small>{label as string}</small></div>
           </section>
         ))}
@@ -122,7 +122,7 @@ export function InstitutionAssessments(): React.ReactElement {
             'Students below 40 are flagged automatically for intervention.',
           ].map((note) => (
             <div key={note} className="pilot-list-row" style={{ padding: '8px 2px' }}>
-              <ClipboardCheck size={15} color="#1f55e5" style={{ flexShrink: 0 }} />
+              <Icon name="assessments" size={16} style={{ color: "#1f55e5", flexShrink: 0 }} />
               <small style={{ color: 'var(--p-ink-2)' }}>{note}</small>
             </div>
           ))}
@@ -185,16 +185,16 @@ export function InstitutionInterventions(): React.ReactElement {
     <div className="pilot-content">
       <div className="pilot-page-head">
         <div><h1>Interventions</h1><p>Structured support for students who need attention before the placement season.</p></div>
-        <button type="button" className="pilot-btn" onClick={(event) => { event.stopPropagation(); assignIntervention(); }}><Plus size={15} /> Assign Intervention</button>
+        <button type="button" className="pilot-btn" onClick={(event) => { event.stopPropagation(); assignIntervention(); }}><Icon name="plus" size={16} /> Assign Intervention</button>
       </div>
 
       <div className="pilot-row cols-4">
         {[
-          ['Needing Support', pilotCohort.atRisk, 'rose', AlertTriangle], ['Open', 4, 'amber', PenTool],
-          ['In Progress', 2, 'blue', TrendingUp], ['Completed This Term', 18, 'green', CheckCircle2],
-        ].map(([label, value, tone, Icon]) => (
+          ['Needing Support', pilotCohort.atRisk, 'rose', 'warning'], ['Open', 4, 'amber', 'edit'],
+          ['In Progress', 2, 'blue', 'analytics'], ['Completed This Term', 18, 'green', 'check'],
+        ].map(([label, value, tone, glyph]) => (
           <section key={label as string} className="pilot-card pilot-kpi">
-            {(() => { const Component = Icon as typeof Users; return <span className={`pilot-tile ${tone as string}`}><Component size={17} /></span>; })()}
+            <span className={`pilot-tile ${tone as string}`}><Icon name={glyph as IconName} size={16} /></span>
             <div><b>{value as number}</b><small>{label as string}</small></div>
           </section>
         ))}
@@ -245,7 +245,7 @@ export function InstitutionInterventions(): React.ReactElement {
             'Counselling first, then a concrete practice plan with a due date.',
           ].map((note) => (
             <div key={note} className="pilot-list-row" style={{ padding: '8px 2px' }}>
-              <TrendingUp size={15} color="#0d6b4f" style={{ flexShrink: 0 }} />
+              <Icon name="analytics" size={16} style={{ color: "#0d6b4f", flexShrink: 0 }} />
               <small style={{ color: 'var(--p-ink-2)' }}>{note}</small>
             </div>
           ))}
@@ -318,16 +318,16 @@ export function EmployerOffers(): React.ReactElement {
     <div className="pilot-content">
       <div className="pilot-page-head">
         <div><h1>Offers</h1><p>Offers extended this season across your open roles.</p></div>
-        <button type="button" className="pilot-btn" onClick={(event) => { event.stopPropagation(); extendOffer(); }}><Plus size={15} /> Extend Offer</button>
+        <button type="button" className="pilot-btn" onClick={(event) => { event.stopPropagation(); extendOffer(); }}><Icon name="plus" size={16} /> Extend Offer</button>
       </div>
 
       <div className="pilot-row cols-4">
         {[
-          ['Offers Extended', pilotEmployerStats.offersExtended, 'blue', FileText], ['Accepted', pilotEmployerStats.hires, 'green', CheckCircle2],
-          ['Awaiting Response', 7, 'amber', CalendarDays], ['Declined', 2, 'rose', AlertTriangle],
-        ].map(([label, value, tone, Icon]) => (
+          ['Offers Extended', pilotEmployerStats.offersExtended, 'blue', 'offers'], ['Accepted', pilotEmployerStats.hires, 'green', 'check'],
+          ['Awaiting Response', 7, 'amber', 'calendar'], ['Declined', 2, 'rose', 'warning'],
+        ].map(([label, value, tone, glyph]) => (
           <section key={label as string} className="pilot-card pilot-kpi">
-            {(() => { const Component = Icon as typeof Users; return <span className={`pilot-tile ${tone as string}`}><Component size={17} /></span>; })()}
+            <span className={`pilot-tile ${tone as string}`}><Icon name={glyph as IconName} size={16} /></span>
             <div><b>{value as number}</b><small>{label as string}</small></div>
           </section>
         ))}
@@ -378,7 +378,7 @@ export function EmployerOffers(): React.ReactElement {
         <h2>Expiring Soon</h2>
         <div className="pilot-list">
           <div className="pilot-list-row" style={{ padding: '8px 2px' }}>
-            <span className="pilot-tile amber" style={{ width: 32, height: 32 }}><CalendarDays size={14} /></span>
+            <span className="pilot-tile amber" style={{ width: 32, height: 32 }}><Icon name="calendar-small" size={16} /></span>
             <div className="grow"><strong style={{ fontSize: 12.5 }}>Sana Sheikh</strong><small>Offer expires 1 Jun - consider a follow-up</small></div>
           </div>
         </div>
@@ -395,7 +395,7 @@ export function EmployerCompany(): React.ReactElement {
     <div className="pilot-content">
       <div className="pilot-page-head">
         <div><h1>Company Profile</h1><p>How {company.name} appears to students and placement cells.</p></div>
-        <button type="button" className="pilot-btn ghost"><PenTool size={15} /> Edit Profile</button>
+        <button type="button" className="pilot-btn ghost"><Icon name="edit" size={16} /> Edit Profile</button>
       </div>
 
       <section className="pilot-card">
@@ -434,7 +434,7 @@ export function EmployerCompany(): React.ReactElement {
               'Learning budget for certifications and conferences',
             ].map((point) => (
               <div key={point} className="pilot-list-row" style={{ padding: '8px 2px' }}>
-                <CheckCircle2 size={15} color="#0d6b4f" style={{ flexShrink: 0 }} />
+                <Icon name="check" size={16} style={{ color: "#0d6b4f", flexShrink: 0 }} />
                 <small style={{ color: 'var(--p-ink-2)' }}>{point}</small>
               </div>
             ))}
@@ -449,7 +449,7 @@ export function EmployerCompany(): React.ReactElement {
             ['Bengaluru', '4 open roles'], ['Hyderabad', '1 open role'], ['Chennai', '1 open role'],
           ].map(([city, roles]) => (
             <div key={city} className="pilot-cat">
-              <span className="pilot-tile indigo" style={{ width: 32, height: 32 }}><MapPin size={14} /></span>
+              <span className="pilot-tile indigo" style={{ width: 32, height: 32 }}><Icon name="field" size={16} /></span>
               <div><strong>{city}</strong><small>{roles}</small></div>
             </div>
           ))}
@@ -459,7 +459,7 @@ export function EmployerCompany(): React.ReactElement {
 
     <aside className="pilot-rail">
       <section className="pilot-card">
-        <div className="pilot-card-head"><h2>Organisation Verification</h2><span className="pilot-chip green"><ShieldCheck size={11} /> Verified</span></div>
+        <div className="pilot-card-head"><h2>Organisation Verification</h2><span className="pilot-chip green"><Icon name="trust-safety" size={16} /> Verified</span></div>
         <div className="pilot-list">
           {[
             ['Access requested', 'Work email on the company domain · 2 Mar 2026'],
@@ -467,7 +467,7 @@ export function EmployerCompany(): React.ReactElement {
             ['Verified', '4 Mar 2026 · roles can be published to colleges'],
           ].map(([step, detail]) => (
             <div key={step} className="pilot-list-row" style={{ padding: '8px 2px' }}>
-              <CheckCircle2 size={15} color="#0d6b4f" style={{ flexShrink: 0 }} />
+              <Icon name="check" size={16} style={{ color: "#0d6b4f", flexShrink: 0 }} />
               <div className="grow"><strong style={{ fontSize: 12.5 }}>{step}</strong><small>{detail}</small></div>
             </div>
           ))}
@@ -488,7 +488,7 @@ export function EmployerCompany(): React.ReactElement {
             ['Hillcrest University', 'Drive on 3 Jun · 72 registered'],
           ].map(([campus, detail]) => (
             <div key={campus} className="pilot-list-row" style={{ padding: '8px 2px' }}>
-              <span className="pilot-tile blue" style={{ width: 32, height: 32 }}><Building2 size={14} /></span>
+              <span className="pilot-tile blue" style={{ width: 32, height: 32 }}><Icon name="company" size={16} /></span>
               <div className="grow"><strong style={{ fontSize: 12.5 }}>{campus}</strong><small>{detail}</small></div>
             </div>
           ))}
@@ -497,8 +497,8 @@ export function EmployerCompany(): React.ReactElement {
       <section className="pilot-card">
         <h2>Quick Actions</h2>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <button type="button" className="pilot-btn ghost" style={{ justifyContent: 'flex-start' }}><Download size={15} /> Download Company Deck</button>
-          <button type="button" className="pilot-btn ghost" style={{ justifyContent: 'flex-start' }}><Users size={15} /> Invite a Teammate</button>
+          <button type="button" className="pilot-btn ghost" style={{ justifyContent: 'flex-start' }}><Icon name="download" size={16} /> Download Company Deck</button>
+          <button type="button" className="pilot-btn ghost" style={{ justifyContent: 'flex-start' }}><Icon name="students" size={16} /> Invite a Teammate</button>
         </div>
       </section>
     </aside>

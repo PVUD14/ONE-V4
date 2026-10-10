@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" class="ai ai-territory ai-loop" role="img" aria-label="Territory (animated)">
+<style>
+svg{color:#1554D6;fill:currentColor;overflow:visible}
+*{transform-box:view-box}
+.s{opacity:.42}.p-turn{opacity:0}.p-dB{opacity:0}.p-chk{stroke-dasharray:12;stroke-dashoffset:0}
+@keyframes aiFold{0%,24%,100%{transform:none}8%{transform:scaleX(.35)}16%{transform:scaleX(1.05)}}
+@media (prefers-reduced-motion: no-preference){
+.ai-loop .p-m1{animation:aiFold 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:7.8px 12px}
+.ai-loop .p-m2{animation:aiFold 2.8s cubic-bezier(.3,.7,.3,1) 80ms infinite;transform-origin:9.2px 12px}
+.ai-loop .p-m3{animation:aiFold 2.8s cubic-bezier(.3,.7,.3,1) 160ms infinite;transform-origin:16.2px 12px}
+}
+</style>
+<path class="f p-m1" fill-rule="evenodd" d="M2.4 6.8Q2.4 5.8 3.31 5.39L6.89 3.81Q7.8 3.4 7.8 4.4L7.8 17.4Q7.8 18.4 6.89 18.81L3.31 20.39Q2.4 20.8 2.4 19.8Z"/><g class="s"><path class="f p-m2" fill-rule="evenodd" d="M9.2 4.4Q9.2 3.4 10.12 3.79L13.88 5.41Q14.8 5.8 14.8 6.8L14.8 19.8Q14.8 20.8 13.88 20.41L10.12 18.79Q9.2 18.4 9.2 17.4Z"/></g><path class="f p-m3" fill-rule="evenodd" d="M16.2 6.8Q16.2 5.8 17.11 5.39L20.69 3.81Q21.6 3.4 21.6 4.4L21.6 17.4Q21.6 18.4 20.69 18.81L17.11 20.39Q16.2 20.8 16.2 19.8Z"/>
+</svg>

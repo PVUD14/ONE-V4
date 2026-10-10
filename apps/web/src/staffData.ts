@@ -1,11 +1,11 @@
-import { BarChart3, BellRing, BriefcaseBusiness, CalendarDays, ClipboardCheck, FileText, Megaphone, MessageSquare, PieChart, ShieldAlert, Target, Users, type LucideIcon } from 'lucide-react';
+import { type IconName } from './icons/Icon.js';
 
 export type StaffKpi = {
   readonly label: string;
   readonly value: string;
   readonly detail: string;
   readonly tone: 'green' | 'blue' | 'teal' | 'amber' | 'red' | 'purple';
-  readonly icon: LucideIcon;
+  readonly icon: IconName;
 };
 
 export type AttentionStudent = {
@@ -27,12 +27,12 @@ export const placementIdentity = {
 } as const;
 
 export const staffKpis: readonly StaffKpi[] = [
-  { label: 'Total Students', value: '4,286', detail: '+5.2% vs last month', tone: 'green', icon: Users },
-  { label: 'Placement Eligible', value: '1,084', detail: '25.3% of total', tone: 'blue', icon: Target },
-  { label: 'Placement Ready', value: '712', detail: '66% of eligible', tone: 'teal', icon: ClipboardCheck },
-  { label: 'Need Intervention', value: '269', detail: '24.8% of eligible', tone: 'amber', icon: BellRing },
-  { label: 'High Risk', value: '103', detail: '9.5% of eligible', tone: 'red', icon: ShieldAlert },
-  { label: 'Offers Received', value: '198', detail: '+18.1% vs last month', tone: 'purple', icon: BriefcaseBusiness },
+  { label: 'Total Students', value: '4,286', detail: '+5.2% vs last month', tone: 'green', icon: 'students' },
+  { label: 'Placement Eligible', value: '1,084', detail: '25.3% of total', tone: 'blue', icon: 'placement' },
+  { label: 'Placement Ready', value: '712', detail: '66% of eligible', tone: 'teal', icon: 'placement' },
+  { label: 'Need Intervention', value: '269', detail: '24.8% of eligible', tone: 'amber', icon: 'interventions' },
+  { label: 'High Risk', value: '103', detail: '9.5% of eligible', tone: 'red', icon: 'warning' },
+  { label: 'Offers Received', value: '198', detail: '+18.1% vs last month', tone: 'purple', icon: 'offers' },
 ];
 
 export const readinessTrend = [52, 61, 55, 60, 69, 59, 62, 70, 73, 76, 74, 78, 80, 89] as const;
@@ -81,12 +81,12 @@ export const announcements = [
 ] as const;
 
 export const actionCards = [
-  { label: 'Assessments', detail: 'Create, schedule and manage assessments', icon: ClipboardCheck },
-  { label: 'Interventions', detail: 'Assign and track student interventions', icon: Target },
-  { label: 'Opportunities', detail: 'Post and manage opportunities', icon: BriefcaseBusiness },
-  { label: 'Reports', detail: 'View placement and readiness reports', icon: FileText },
-  { label: 'Communications', detail: 'Send messages and notifications', icon: MessageSquare },
-  { label: 'Events', detail: 'Manage placement events', icon: CalendarDays },
+  { label: 'Assessments', detail: 'Create, schedule and manage assessments', icon: 'assessments' },
+  { label: 'Interventions', detail: 'Assign and track student interventions', icon: 'interventions' },
+  { label: 'Opportunities', detail: 'Post and manage opportunities', icon: 'opportunities' },
+  { label: 'Reports', detail: 'View placement and readiness reports', icon: 'reports' },
+  { label: 'Communications', detail: 'Send messages and notifications', icon: 'messages' },
+  { label: 'Events', detail: 'Manage placement events', icon: 'calendar' },
 ] as const;
 
 export const departmentReadiness = [
@@ -115,15 +115,15 @@ export const topRecruiters = [
 ] as const;
 
 export const quickActions = [
-  { label: 'Add New Opportunity', icon: BriefcaseBusiness },
-  { label: 'Schedule Assessment', icon: ClipboardCheck },
-  { label: 'Create Intervention', icon: Target },
-  { label: 'Send Announcement', icon: Megaphone },
-  { label: 'Generate Readiness Report', icon: BarChart3 },
+  { label: 'Add New Opportunity', icon: 'opportunities' },
+  { label: 'Schedule Assessment', icon: 'assessments' },
+  { label: 'Create Intervention', icon: 'interventions' },
+  { label: 'Send Announcement', icon: 'messages' },
+  { label: 'Generate Readiness Report', icon: 'reports' },
 ] as const;
 
 export const staffReports = [
-  { label: 'Placement readiness summary', icon: PieChart },
-  { label: 'Skill-gap report', icon: BarChart3 },
-  { label: 'Department comparison', icon: FileText },
+  { label: 'Placement readiness summary', icon: 'placement' },
+  { label: 'Skill-gap report', icon: 'reports' },
+  { label: 'Department comparison', icon: 'departments' },
 ] as const;

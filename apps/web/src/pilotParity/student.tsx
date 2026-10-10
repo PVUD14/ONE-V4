@@ -15,7 +15,7 @@ import { PilotTabs } from '../pilot/pilotOverlay.js';
 import { NaCourseTiles, NaListCard, NaRingRailCard, go } from './naWidgets.js';
 import { PublishedContentCard } from './publishedContent.js';
 import { PracticeBySkillCard } from '../studentLearning.js';
-import { Award, Building2, ClipboardCheck, Code2, Download, FileText, Flame, LineChart, Target, Trash2, Trophy, Wrench } from 'lucide-react';
+import { Icon } from '../icons/Icon.js';
 import { useEffect, useState, type ReactNode } from 'react';
 import { formatDate } from '../dates.js';
 
@@ -67,11 +67,11 @@ export function StudentPracticePage(): React.ReactElement {
 
       {tab === 0 ? <>
         <StatHero label="Practice figures" reason="Problem sets and contests are not live yet, so these read NA." stats={[
-          { icon: <Code2 size={17} />, tone: 'green', value: 'NA', label: 'Problems Solved' },
-          { icon: <Trophy size={17} />, tone: 'amber', value: 'NA', label: 'Contests Participated' },
-          { icon: <ClipboardCheck size={17} />, tone: 'blue', value: 'NA', label: 'Practice Time' },
-          { icon: <Flame size={17} />, tone: 'rose', value: streak ?? 'NA', label: 'Day Streak' },
-          { icon: <LineChart size={17} />, tone: 'teal', value: 'NA', label: 'Success Rate' },
+          { icon: <Icon name="practice" size={16} />, tone: 'green', value: 'NA', label: 'Problems Solved' },
+          { icon: <Icon name="offers" size={16} />, tone: 'amber', value: 'NA', label: 'Contests Participated' },
+          { icon: <Icon name="assessments" size={16} />, tone: 'blue', value: 'NA', label: 'Practice Time' },
+          { icon: <Icon name="skills" size={16} />, tone: 'rose', value: streak ?? 'NA', label: 'Day Streak' },
+          { icon: <Icon name="analytics" size={16} />, tone: 'teal', value: 'NA', label: 'Success Rate' },
         ]} />
         <NaCourseTiles title="Continue Practicing" slots={numbered('Practice set', 5)} reason="Practice sets are not live yet — NA. Timed practice runs through your institution's assessments." />
         <NaCourseTiles title="Recommended for You" slots={numbered('Recommendation', 5)} reason="Practice recommendations are not live yet — NA." />
@@ -103,9 +103,9 @@ export function StudentCompanyPrepPage(): React.ReactElement {
       <PilotTabs labels={['Overview', 'Companies', 'Interview Prep', 'Aptitude Prep', 'Mock Interviews', 'Saved']} active={tab} onChange={setTab} />
       {tab === 0 ? <>
         <StatHero label="Company prep figures" reason="Company prep is not live yet, so these read NA." stats={[
-          { icon: <Building2 size={17} />, tone: 'blue', value: 'NA', label: 'Target Companies' },
-          { icon: <ClipboardCheck size={17} />, tone: 'purple', value: 'NA', label: 'Prep Sets Completed' },
-          { icon: <Target size={17} />, tone: 'amber', value: 'NA', label: 'Mock Interviews' },
+          { icon: <Icon name="company" size={16} />, tone: 'blue', value: 'NA', label: 'Target Companies' },
+          { icon: <Icon name="assessments" size={16} />, tone: 'purple', value: 'NA', label: 'Prep Sets Completed' },
+          { icon: <Icon name="targets" size={16} />, tone: 'amber', value: 'NA', label: 'Mock Interviews' },
         ]} />
         <PublishedContentCard contentType="COMPANY_PREP" title="Company preparation" />
         <NaListCard title="Companies" note="Company prep guides are not live yet — NA. Real openings from real employers are under Opportunities." />
@@ -159,9 +159,9 @@ export function StudentScholarshipsPage(): React.ReactElement {
       <PilotTabs labels={labels} active={tab} onChange={setTab} />
       {tab === 0 ? (
         <StatHero label="Scholarship figures" reason="Scholarship listings are not connected yet, so these read NA." stats={[
-          { icon: <Award size={17} />, tone: 'amber', value: 'NA', label: 'Matched to You' },
-          { icon: <ClipboardCheck size={17} />, tone: 'blue', value: 'NA', label: 'Applications' },
-          { icon: <Flame size={17} />, tone: 'rose', value: 'NA', label: 'Closing Soon' },
+          { icon: <Icon name="offers" size={16} />, tone: 'amber', value: 'NA', label: 'Matched to You' },
+          { icon: <Icon name="assessments" size={16} />, tone: 'blue', value: 'NA', label: 'Applications' },
+          { icon: <Icon name="skills" size={16} />, tone: 'rose', value: 'NA', label: 'Closing Soon' },
         ]} />
       ) : null}
       <NaListCard title={labels[tab] ?? ''} note="Scholarship listings are not live yet — NA. They arrive when a scholarships content partner or institution feed is connected." />
@@ -263,7 +263,7 @@ export function StudentResumeBuilderPage(): React.ReactElement {
     <div className="pilot-content">
       <div className="pilot-page-head">
         <div><h1>Resume Builder</h1><p>Create professional resumes that showcase your skills and land your dream job.</p></div>
-        <button type="button" className="pilot-btn" disabled={!load} onClick={() => startNew()}><FileText size={15} /> Create New Resume</button>
+        <button type="button" className="pilot-btn" disabled={!load} onClick={() => startNew()}><Icon name="documents" size={16} /> Create New Resume</button>
       </div>
       <PilotTabs labels={['My Resumes', 'Templates', 'Examples', 'Resume Score']} active={tab} onChange={(index) => { setTab(index); setBuilder(null); }} />
       {status ? <p role="status" style={{ margin: '0 0 10px', fontSize: 12.5 }}>{status}</p> : null}
@@ -281,11 +281,11 @@ export function StudentResumeBuilderPage(): React.ReactElement {
           <div className="pilot-list">
             {generated.length ? generated.map((resume) => (
               <div key={resume.id} className="pilot-list-row">
-                <span className="pilot-tile blue" style={{ width: 34, height: 34 }}><FileText size={15} /></span>
+                <span className="pilot-tile blue" style={{ width: 34, height: 34 }}><Icon name="documents" size={16} /></span>
                 <div className="grow"><strong style={{ fontSize: 12.5 }}>{resume.title}</strong><small>{templateName(load, resume.template)} · version {resume.latestVersion} · saved {formatDay(resume.latestSavedAt)}</small></div>
-                <button type="button" className="pilot-btn soft small" onClick={() => void download(resume)}><Download size={13} /> PDF</button>
+                <button type="button" className="pilot-btn soft small" onClick={() => void download(resume)}><Icon name="download" size={16} /> PDF</button>
                 <button type="button" className="pilot-btn ghost small" disabled={!load} onClick={() => void startEdit(resume.id)}>Edit</button>
-                <button type="button" className="pilot-btn ghost small" aria-label={`Delete ${resume.title}`} onClick={() => void remove(resume)}><Trash2 size={13} /></button>
+                <button type="button" className="pilot-btn ghost small" aria-label={`Delete ${resume.title}`} onClick={() => void remove(resume)}><Icon name="trash" size={16} /></button>
               </div>
             )) : <p style={{ color: 'var(--p-muted)', margin: '8px 0' }}>{resumes === null ? 'Loading…' : 'No generated résumés yet. Create one from your ONE record.'}</p>}
           </div>
@@ -295,7 +295,7 @@ export function StudentResumeBuilderPage(): React.ReactElement {
           <div className="pilot-list">
             {uploaded.length ? uploaded.map((doc) => (
               <div key={doc.id} className="pilot-list-row">
-                <span className="pilot-tile teal" style={{ width: 34, height: 34 }}><FileText size={15} /></span>
+                <span className="pilot-tile teal" style={{ width: 34, height: 34 }}><Icon name="documents" size={16} /></span>
                 <div className="grow"><strong style={{ fontSize: 12.5 }}>{doc.title}</strong><small>{doc.file ? doc.file.filename : 'No file attached yet'} · {documentVerificationLabel(doc).toLowerCase()}</small></div>
                 <button type="button" className="pilot-btn ghost small" onClick={() => go('/student/documents')}>Open</button>
               </div>
@@ -356,7 +356,7 @@ export function StudentResumeBuilderPage(): React.ReactElement {
             ...uploaded.map((doc) => ({ id: doc.id, title: doc.title, note: `uploaded · ${documentVerificationLabel(doc).toLowerCase()}` })),
           ].slice(0, 3).map((row) => (
             <div key={row.id} className="pilot-list-row">
-              <span className="pilot-tile blue" style={{ width: 34, height: 34 }}><FileText size={15} /></span>
+              <span className="pilot-tile blue" style={{ width: 34, height: 34 }}><Icon name="documents" size={16} /></span>
               <div className="grow"><strong style={{ fontSize: 12.5 }}>{row.title}</strong><small>{row.note}</small></div>
             </div>
           )) : <p style={{ color: 'var(--p-muted)', margin: '8px 0' }}>None yet.</p>}

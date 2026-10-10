@@ -1,4 +1,5 @@
-import { BarChart3, BriefcaseBusiness, Building2, CalendarDays, ClipboardCheck, FileText, Flag, Gauge, Handshake, Home, IndianRupee, LayoutDashboard, MapPinned, MessageSquare, PieChart, Search, Settings, ShieldCheck, Target, Users, type LucideIcon } from 'lucide-react';
+import { type IconName } from './icons/Icon.js';
+import { navIconFor } from './icons/navIcons.js';
 
 export type PortalFamily = 'Student' | 'Institution' | 'Employer' | 'Operations' | 'Growth';
 export type EnforcementStatus = 'Backend enforced' | 'Partially backend enforced' | 'Domain-model only' | 'UI preview only';
@@ -21,7 +22,7 @@ export interface RoleNavItem {
   readonly label: string;
   readonly group: string;
   readonly path: string;
-  readonly icon: LucideIcon;
+  readonly icon: IconName;
   /** Shown only to these authenticated roles; every role when absent (GROWTH-01: Team). */
   readonly roles?: readonly string[];
   /**
@@ -81,25 +82,14 @@ export interface RolePortalConfig {
   readonly records: readonly RoleFixture[];
 }
 
-const iconFor = (label: string): LucideIcon => {
-  if (/student|candidate|applicant|team|users|faculty/i.test(label)) return Users;
-  if (/assessment|scorecard|evaluation|verification/i.test(label)) return ClipboardCheck;
-  if (/intervention|guidance|task|flag|safety/i.test(label)) return Target;
-  if (/opportun|requisition|offer|billing|employer|organization/i.test(label)) return BriefcaseBusiness;
-  if (/interview|calendar|session|meeting|schedule|event/i.test(label)) return CalendarDays;
-  if (/report|analysis|analytics|visual|dashboard|health/i.test(label)) return BarChart3;
-  if (/message|communication|note|support/i.test(label)) return MessageSquare;
-  if (/setting|profile|security|feature/i.test(label)) return Settings;
-  return FileText;
-};
-
 function nav(basePath: string, groups: readonly [string, readonly string[]][]): readonly RoleNavItem[] {
   return groups.flatMap(([group, labels]) => labels.map((label, index) => ({
     key: label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'dashboard',
     label,
     group,
     path: index === 0 && (label === 'Dashboard' || label === 'Overview') ? basePath : `${basePath}/${label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`,
-    icon: label === 'Dashboard' || label === 'Overview' ? Home : iconFor(label),
+    // Momentum nav icons come from the approved icon map (icons/navIcons.ts); detail pages share their parent's.
+    icon: navIconFor(label),
   })));
 }
 
@@ -215,13 +205,13 @@ export const growthPortal: RolePortalConfig = {
   dashboardTitle: 'Growth', dashboardSummary: 'College and employer partnerships: leads, field visits, territory, targets and commission.',
   allowedOperations: [], readOnlyData: [], forbiddenOperations: ['Verify or approve organisations', 'See student data', 'Set rates or record payments'],
   nav: [
-    { key: 'home', label: 'Home', group: 'Home', path: '/growth', icon: Home },
-    { key: 'leads', label: 'Leads', group: 'Pipeline', path: '/growth/leads', icon: Handshake },
-    { key: 'field', label: 'Field', group: 'Pipeline', path: '/growth/field', icon: CalendarDays },
-    { key: 'territory', label: 'Territory', group: 'Pipeline', path: '/growth/territory', icon: MapPinned },
-    { key: 'targets', label: 'Targets', group: 'Performance', path: '/growth/targets', icon: Target },
-    { key: 'commission', label: 'Commission', group: 'Performance', path: '/growth/commission', icon: IndianRupee },
-    { key: 'team', label: 'Team', group: 'Performance', path: '/growth/team', icon: Users, roles: ['GROWTH_MANAGER'] },
+    { key: 'home', label: 'Home', group: 'Home', path: '/growth', icon: 'home' },
+    { key: 'leads', label: 'Leads', group: 'Pipeline', path: '/growth/leads', icon: 'leads' },
+    { key: 'field', label: 'Field', group: 'Pipeline', path: '/growth/field', icon: 'field' },
+    { key: 'territory', label: 'Territory', group: 'Pipeline', path: '/growth/territory', icon: 'territory' },
+    { key: 'targets', label: 'Targets', group: 'Performance', path: '/growth/targets', icon: 'targets' },
+    { key: 'commission', label: 'Commission', group: 'Performance', path: '/growth/commission', icon: 'commission' },
+    { key: 'team', label: 'Team', group: 'Performance', path: '/growth/team', icon: 'team', roles: ['GROWTH_MANAGER'] },
   ],
   kpis: [], records: [],
 };
@@ -243,12 +233,12 @@ export function rolePortalFromPath(path: string): RolePortalConfig | undefined {
   return activeRolePortals.find((portal) => normalized === portal.basePath || normalized.startsWith(`${portal.basePath}/`));
 }
 
-export const portalFamilyIcons: Record<PortalFamily, LucideIcon> = {
-  Student: Users,
-  Institution: Building2,
-  Employer: BriefcaseBusiness,
-  Operations: ShieldCheck,
-  Growth: MapPinned,
+export const portalFamilyIcons: Record<PortalFamily, IconName> = {
+  Student: 'students',
+  Institution: 'company',
+  Employer: 'opportunities',
+  Operations: 'trust-safety',
+  Growth: 'territory',
 };
 
-export const moduleIcons = { Gauge, PieChart, Search, Flag, LayoutDashboard };
+export const moduleIcons = { Gauge: 'readiness', PieChart: 'reports', Search: 'search', Flag: 'feature-flags', LayoutDashboard: 'home' } as const satisfies Record<string, IconName>;

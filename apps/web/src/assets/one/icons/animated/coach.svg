@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" class="ai ai-coach ai-loop" role="img" aria-label="AI Career Coach (animated)">
+<style>
+svg{color:#1554D6;fill:currentColor;overflow:visible}
+*{transform-box:view-box}
+.s{opacity:.42}.p-turn{opacity:0}.p-dB{opacity:0}.p-chk{stroke-dasharray:12;stroke-dashoffset:0}
+@keyframes aiSpark{0%,26%,100%{transform:none}8%{transform:scale(.3) rotate(-45deg)}17%{transform:scale(1.3) rotate(20deg)}}
+@keyframes aiPop{0%,24%,100%{transform:none}8%{transform:scale(.93)}16%{transform:scale(1.04)}}
+@media (prefers-reduced-motion: no-preference){
+.ai-loop .p-spk{animation:aiSpark 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:12px 10.3px}
+.ai-loop .p-bub{animation:aiPop 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:6.5px 20px}
+}
+</style>
+<defs><mask id="mk-co-x" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24"><rect width="24" height="24" fill="#fff"/><path class="p-spk" fill="#000" d="M11.82 6.56Q12 6.2 12.18 6.56L13.22 8.54Q13.4 8.9 13.76 9.08L15.74 10.12Q16.1 10.3 15.74 10.48L13.76 11.52Q13.4 11.7 13.22 12.06L12.18 14.04Q12 14.4 11.82 14.04L10.78 12.06Q10.6 11.7 10.24 11.52L8.26 10.48Q7.9 10.3 8.26 10.12L10.24 9.08Q10.6 8.9 10.78 8.54Z"/></mask></defs><path class="f p-bub" mask="url(#mk-co-x)" d="M2.5 5.8Q2.5 4 4.3 4L15.7 4Q17.5 4 18.77 5.27L20.23 6.73Q21.5 8 21.5 9.8L21.5 14.7Q21.5 16.5 19.7 16.5L12.8 16.5Q11 16.5 9.73 17.77L7.77 19.73Q6.5 21 6.5 19.2L6.5 18.3Q6.5 16.5 4.7 16.5L4.3 16.5Q2.5 16.5 2.5 14.7Z"/>
+</svg>

@@ -226,7 +226,7 @@ export function FacultyTeachingHome({ authenticatedWorkspace, basePath, title }:
       {!data ? <p role="status">Loading your teaching…</p> : null}
       <Kpis items={[
         ['My students', show(students?.length), 'blue', Users],
-        ['Teaching assignments', show(data?.myStudents?.assignments.length), 'indigo', BookOpen],
+        ['Teaching assignments', show(data?.myStudents?.assignments?.length), 'indigo', BookOpen],
         ['Open tasks', show(openTasks), 'green', ClipboardCheck],
         ['Awaiting verification', show(data?.verification?.pending), 'amber', ShieldCheck],
         ['Need attention', show(data?.notAttempted?.length), 'rose', AlertTriangle],

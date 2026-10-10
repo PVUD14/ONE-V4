@@ -144,7 +144,7 @@ export function EmployerReportsPage({ employerId }: { readonly employerId: strin
       {reports ? <div className="role-record-table-wrap"><table className="role-record-table"><thead><tr><th>Step</th><th>Applications</th><th>Median days</th></tr></thead>
         <tbody>{reports.timeToStage.map((row) => <tr key={row.metric}><td>{metricLabels[row.metric] ?? row.metric}</td><td><NaValue value={count(row.applications)} /></td>
           <td><NaValue value={row.medianDays === null ? 'NA' : row.medianDays.toFixed(1)} /></td></tr>)}</tbody></table></div> : <p>NA</p>}
-      {reports?.timeToStage.some((row) => row.medianDays === null) ? <SuppressionNote>A median reads NA until at least 5 applications reach that stage; their count reads &quot;&lt;5&quot; until then.</SuppressionNote> : null}
+      {reports?.timeToStage?.some((row) => row.medianDays === null) ? <SuppressionNote>A median reads NA until at least 5 applications reach that stage; their count reads &quot;&lt;5&quot; until then.</SuppressionNote> : null}
     </section>
 
     <section className="role-card role-wide"><h2>Offer outcomes</h2>

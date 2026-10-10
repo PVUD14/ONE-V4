@@ -60,7 +60,7 @@ export function InstitutionStudentDetailPage({ authenticatedWorkspace }: { reado
   if (!isInstitutionStaffWorkspace(authenticatedWorkspace)) return <InstitutionWorkspaceError title="Student Detail" />;
 
   const unitName = (id: string | null | undefined): string => (data?.units ?? []).find((unit) => unit.id === id)?.name ?? 'NA';
-  const selected = data?.students.find((student) => student.id === selectedId) ?? null;
+  const selected = data?.students?.find((student) => student.id === selectedId) ?? null;
   const matches = (data?.students ?? []).filter((student) => `${student.fullName} ${student.institutionStudentId} ${student.email}`.toLowerCase().includes(query.trim().toLowerCase()));
   const choose = (id: string | null): void => {
     setSelectedId(id);

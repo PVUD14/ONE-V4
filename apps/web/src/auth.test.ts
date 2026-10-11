@@ -106,7 +106,7 @@ describe('Cognito Hosted UI browser authentication', () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true })));
     render(React.createElement(App));
     expect(screen.getByRole('button', { name: 'Sign in' })).toBeDisabled();
-    expect(screen.getByText('ONE PLATFORM')).toBeInTheDocument();
+    expect(screen.getByText('Welcome back')).toBeInTheDocument();
     expect(screen.getByLabelText('Email')).toBeDisabled();
     expect(screen.getByLabelText('Password')).toBeDisabled();
     expect(screen.getByText('Sign-in is not available right now. Please try again later.')).toBeInTheDocument();

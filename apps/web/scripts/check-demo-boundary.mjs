@@ -22,7 +22,8 @@ import { join } from 'node:path';
 // ASCII-only markers: the bundler may escape non-ASCII characters in string literals.
 const FICTION = ['Meera Nair', 'Arjun Reddy', 'Lakeview Institute', 'Zenvia Labs', 'ONE product demo', 'Kavitha Selvam'];
 const DEV_ONLY = ['pilot-preview'];
-const REAL_APP = ['Sign in to your verified ONE', 'Choose workspace'];
+// The sign-in card's lead line and the workspace chooser's title: present only in the real application.
+const REAL_APP = ['Pick up your loop where you left it', 'Choose workspace'];
 // The sandbox marker (src/sandboxMarker.tsx) and the header the sandbox sends its token in.
 const SANDBOX = ['data-one-sandbox', 'X-One-Authorization'];
 

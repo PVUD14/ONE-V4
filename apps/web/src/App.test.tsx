@@ -93,11 +93,11 @@ describe('All-role portal registry and preview workflows', () => {
       cleanup();
       window.history.pushState(null, '', path);
       render(<App />);
-      expect(screen.getByText('ONE PLATFORM')).toBeInTheDocument();
-      expect(screen.getByRole('img', { name: 'ONE by AI8HT' })).toHaveAttribute('src', '/assets/one-logo-dark.png');
+      expect(screen.getByText('Welcome back')).toBeInTheDocument();
+      expect(screen.getByRole('img', { name: 'ONE by AI8HT' })).toHaveAttribute('src', '/brand/one-lockup-full-color-on-dark.svg');
       expect(document.title).toBe('Sign in | ONE by AI8HT');
-      expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
-      expect(screen.getByText('LEARN | PREPARE | BUILD | GROW')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Sign in to ONE' })).toBeInTheDocument();
+      expect(screen.getByRole('list', { name: 'Learn, prepare, build, grow' })).toHaveTextContent('LEARNPREPAREBUILDGROW');
       expect(screen.getByLabelText('Email')).toHaveAttribute('autocomplete', 'username');
       expect(screen.getByLabelText('Password')).toHaveAttribute('autocomplete', 'current-password');
       expect(screen.getByRole('button', { name: 'Sign in' })).toBeDisabled();
@@ -116,7 +116,7 @@ describe('All-role portal registry and preview workflows', () => {
     expect(window.location.pathname).toBe('/employer-access');
     expect(screen.getByRole('heading', { name: 'Request employer access' })).toBeInTheDocument();
     const logo = screen.getByRole('img', { name: 'ONE by AI8HT' });
-    expect(logo).toHaveAttribute('src', '/assets/one-logo-dark.png');
+    expect(logo).toHaveAttribute('src', '/brand/one-lockup-full-color-on-dark.svg');
     expect(screen.getByLabelText('Work email')).toBeInTheDocument();
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/employer-access-requests'))).toBe(false);
   });

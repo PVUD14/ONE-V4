@@ -2,41 +2,32 @@
  * ONE · The frame every signed-out page sits in: sign-in, password reset, employer access and
  * the legal placeholders.
  *
- * The left panel says what ONE is before asking anyone to sign in, which the bare logo on a
- * black-to-white fade never did. It carries no product screenshot: any capture shows a sandbox
- * student and figures, and Divakar did not want a "Demo – sample data" label on the sign-in page,
- * so a picture would put fictional people in front of real users. Partner institution logos belong here too, but only once real partners have agreed to be
- * shown; until then the slot is simply absent rather than filled with stand-ins.
+ * It is the approved Infinity Loop sign-in, redrawn in Momentum (design inventory
+ * unified/sign-in.html, sign-in-mobile.html): an always-dark brand panel whose right edge runs
+ * on the 12° slant, carrying the ∞ ribbons, the logo, LEARN | PREPARE | BUILD | GROW and what ONE
+ * promises (authShowcase.tsx), beside the form card. On a phone the panel becomes a compact hero
+ * band and the card overlaps it. The panel carries no product screenshot or sample person: any
+ * capture shows a sandbox student and figures, which real users must never see. Partner
+ * institution logos belong here only once real partners have agreed to be shown.
  */
 import { useState, type ReactNode } from 'react';
 import { Icon } from './icons/Icon.js';
-import { BrandLogo } from './brand.js';
+import { AuthShowcase, useSignInPlay } from './authShowcase.js';
 
 export const productTagline = 'LEARN | PREPARE | BUILD | GROW';
 export const supportEmail = 'info@ai8ht.pro';
 
-const benefits: ReadonlyArray<{ readonly who: string; readonly what: string }> = [
-  { who: 'Students and graduates', what: 'An advisory readiness band built from verified evidence, and a plan to move it.' },
-  { who: 'Colleges', what: 'Cohorts, verification and placement drives run from one record.' },
-  { who: 'Employers', what: 'Verified candidates who chose to be seen, with every stage in one place.' },
-];
-
 export function AuthLayout({ children, onNavigate }: { readonly children: ReactNode; readonly onNavigate: (path: string) => void }): React.ReactElement {
-  return <div className="auth-split">
-    <aside className="auth-showcase" aria-label="About ONE">
-      <BrandLogo className="auth-showcase-logo" surface="dark" height={112} />
-      <h2 className="auth-showcase-title">One workspace from learning to landing the role.</h2>
-      <ul className="auth-benefits">
-        {benefits.map((benefit) => <li key={benefit.who}><strong>{benefit.who}</strong><span>{benefit.what}</span></li>)}
-      </ul>
-      <p className="auth-showcase-tagline">{productTagline}</p>
-    </aside>
+  const { motion, played } = useSignInPlay();
+  return <div className={`auth-split si${motion ? ' si-motion' : ''}${played ? ' is-played' : ''}`}>
+    <div className="si-side" aria-hidden="true" />
+    <AuthShowcase motion={motion} played={played} />
     <div className="auth-panel">
       <main className="auth-panel-main">
         {children}
       </main>
-      <AuthFooter onNavigate={onNavigate} />
     </div>
+    <AuthFooter onNavigate={onNavigate} />
   </div>;
 }
 
@@ -53,16 +44,19 @@ export function AuthFooter({ onNavigate }: { readonly onNavigate: (path: string)
 }
 
 /** A password input with a show/hide control, so a person can check what they typed on a phone. */
-export function PasswordInput({ id, name, autoComplete, disabled, invalid, describedBy }: {
+export function PasswordInput({ id, name, autoComplete, disabled, invalid, describedBy, leadingIcon = false }: {
   readonly id: string;
   readonly name: string;
   readonly autoComplete: 'current-password' | 'new-password';
   readonly disabled?: boolean | undefined;
   readonly invalid?: boolean | undefined;
   readonly describedBy?: string | undefined;
+  /** A lock glyph at the start of the field, as on the sign-in card. */
+  readonly leadingIcon?: boolean | undefined;
 }): React.ReactElement {
   const [visible, setVisible] = useState(false);
-  return <span className="password-field">
+  return <span className={`password-field${leadingIcon ? ' si-input' : ''}`}>
+    {leadingIcon ? <Icon name="lock" size={16} className="si-input-icon" /> : null}
     <input id={id} name={name} type={visible ? 'text' : 'password'} autoComplete={autoComplete} disabled={disabled} aria-invalid={invalid || undefined} aria-describedby={describedBy} />
     <button type="button" className="password-toggle" onClick={() => setVisible((value) => !value)} disabled={disabled} aria-label={visible ? 'Hide password' : 'Show password'} aria-pressed={visible} aria-controls={id}>
       {visible ? <Icon name="eye-off" size={20} /> : <Icon name="eye" size={20} />}

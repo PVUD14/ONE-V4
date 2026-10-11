@@ -20,7 +20,7 @@ describe('API base URL policy', () => {
     // every visitor's browser at their own machine.
     const original = window.location.hostname;
     try {
-      Object.defineProperty(window, 'location', { value: { ...window.location, hostname: 'one.ai8ht.pro' }, writable: true, configurable: true });
+      Object.defineProperty(window, 'location', { value: { ...window.location, hostname: 'oneby8.com' }, writable: true, configurable: true });
       expect(allowLoopbackApiFallback()).toBe(false);
       Object.defineProperty(window, 'location', { value: { ...window.location, hostname: '127.0.0.1' }, writable: true, configurable: true });
       expect(allowLoopbackApiFallback()).toBe(import.meta.env.DEV);

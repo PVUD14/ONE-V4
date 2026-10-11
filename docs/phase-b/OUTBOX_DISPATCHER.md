@@ -81,6 +81,13 @@ Phase B includes a deterministic in-memory publisher for tests. EventBridge/SQS 
 - failed effects can be retried because a successful receipt is never silently overwritten;
 - local database effects can run in the same transaction as the receipt.
 
+The seeded learner-content worker reuses this helper. A
+`content.generation.requested` event is its job record; the worker inserts the
+deterministic `SEEDED` content as `DRAFT` and writes
+`content.generation.completed` in the same transaction as the successful
+consumer receipt. Request-side code only writes the requested event and never
+waits for this worker.
+
 ## Replay
 
 `replayOutboxEvent` is an operator-safe service operation, not a public API.

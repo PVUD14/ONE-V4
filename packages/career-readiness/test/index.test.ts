@@ -3,6 +3,7 @@ import {
   assertAcyclicPrerequisites,
   assertContentTransition,
   assertReleaseManifestEligible,
+  CAREER_READINESS_MODEL,
   calculateAdvisoryReadiness,
   deterministicPackageIdentity,
   mayCreateNotificationCommand,
@@ -198,5 +199,13 @@ describe('career gap', () => {
 
   it('declines to state a percentage when nothing could be evaluated', () => {
     expect(careerTargetProgress(computeCareerGap(requirements, [])).percentOfEvaluated).toBeNull();
+  });
+});
+
+describe('readiness model identity (ADR-034 §2, reconciled in ENG-04)', () => {
+  it('names the readiness model the database has active, version 2, and the mastery algorithm it runs', () => {
+    expect(CAREER_READINESS_MODEL).toEqual({ stableKey: 'career-readiness-fundamentals', version: 2,
+      masteryAlgorithm: 'career-readiness-mastery-v1' });
+    expect(calculateAdvisoryReadiness([]).modelVersion).toBe('career-readiness-fundamentals-v2');
   });
 });

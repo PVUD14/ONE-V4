@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The full AI8HT wordmark, sized for the splash branding slot. -->
+<!-- Android 12+ splash branding slot (bottom): the ONE tagline, the one place
+     besides sign-in where it appears. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:width="160dp" android:height="68dp" android:gravity="center">
-        <bitmap android:src="@drawable/ai8ht_wordmark" android:gravity="fill" />
+    <item android:width="200dp" android:height="8dp" android:gravity="center">
+        <bitmap android:src="@drawable/one_tagline_dark" android:gravity="fill" />
     </item>
 </layer-list>

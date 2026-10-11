@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Inject, NotFoundException, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Inject, Logger, NotFoundException, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import type { PersistenceDb } from '@planthepath/persistence/src/repositories.js';
 import {
@@ -23,6 +23,8 @@ import {
   type ApiIdGenerator,
   type ProtectedHttpRequest,
 } from './api-security.js';
+import { recordExamResultEvidence } from '@planthepath/persistence/src/exam-evidence-bridge.js';
+import { drizzleAsPgClient, recordGradedAttemptSession } from '@planthepath/persistence/src/learning-attempts.js';
 import { recordNotification } from './notify.js';
 
 type QueryResult<T> = { rows: T[] };
@@ -57,6 +59,8 @@ interface AttemptRow {
  */
 @Controller('/api/v1/student')
 export class StudentAssessmentAttemptsController {
+  private readonly logger = new Logger('StudentAssessmentAttempts');
+
   constructor(
     @Inject(API_PERSISTENCE_DB) private readonly db: PersistenceDb,
     @Inject(API_ID_GENERATOR) private readonly ids: ApiIdGenerator,
@@ -354,7 +358,7 @@ export class StudentAssessmentAttemptsController {
   private async finalizeAttempt(attempt: AttemptRow, autoSubmitted: boolean): Promise<Record<string, unknown> | null> {
     const rows = await this.db.execute(sql`
       SELECT aq.question_id, aq.option_map, aq.marks, aq.negative_marks,
-             q.question_type, q.accepted_answers, q.case_sensitive,
+             q.question_type, q.accepted_answers, q.case_sensitive, q.version AS question_version,
              (SELECT jsonb_agg(jsonb_build_object('key', o.option_key, 'isCorrect', o.is_correct, 'matchKey', o.match_key))
                 FROM exam_question_options o WHERE o.question_id = q.id) AS options,
              a.response
@@ -377,7 +381,7 @@ export class StudentAssessmentAttemptsController {
       const response = mapDisplayedResponse(questionType, row['response'] as AttemptResponse | null, optionMap);
       const marks = Number(row['marks']);
       const outcome = gradeObjectiveAnswer({ questionType, answerKey, marks, negativeMarks: Number(row['negative_marks']) }, response);
-      return { ...outcome, marks };
+      return { ...outcome, marks, questionId: String(row['question_id']), questionVersion: Number(row['question_version']) };
     });
 
     const summary = summarizeAttempt(graded);
@@ -400,6 +404,37 @@ export class StudentAssessmentAttemptsController {
           (${resultId}::uuid, ${attempt.id}::uuid, ${summary.score}, ${summary.maxScore}, ${summary.percentage},
            ${summary.correct}, ${summary.wrong}, ${summary.notAttempted}, ${timeTaken}, ${published})
       `);
+      // The attempt log (ENG-03): one row per graded question on the paper, answered or
+      // not, in the same transaction as the result, whether or not the result is published
+      // -- publication gates evidence, not the record of what the student did. An exam
+      // question is authored against an institution subject, not a readiness topic, so the
+      // row carries no skill; the projection resolves it through the subject mapping.
+      await recordGradedAttemptSession(drizzleAsPgClient(tx), {
+        subjectUserId: attempt.student_user_id, institutionId: attempt.institution_id,
+        mode: 'ASSESSMENT', context: 'ASSESSMENT',
+        sourceAttemptType: 'exam_attempt', sourceAttemptId: attempt.id,
+        startedAt: attempt.started_at, contentVersion: 'institution-exam-v1',
+        responses: graded.map((entry) => ({
+          itemSource: 'INSTITUTION_EXAM_QUESTION' as const, itemId: entry.questionId, itemVersion: entry.questionVersion,
+          skillId: null, answered: entry.answered, correct: entry.isCorrect,
+          marksAwarded: entry.marksAwarded, marksPossible: entry.marks,
+        })),
+      });
+      // A published result is the institution's word about the student, so it becomes
+      // readiness evidence in the same transaction that records it -- never one without
+      // the other. An unmapped subject writes nothing and says so rather than guessing
+      // a topic, and re-publishing does not double-count.
+      if (published) {
+        const bridged = await recordExamResultEvidence(tx, { attemptId: attempt.id });
+        if (bridged.unmappedSubject) {
+          // Visible, not filled. Until the institution maps this subject onto readiness
+          // topics, its exams move no bands, and that should be findable in the log
+          // rather than discovered as "the feature is broken".
+          this.logger.warn(JSON.stringify({
+            event: 'exam.evidence.subject_unmapped', attemptId: attempt.id, definitionId: attempt.definition_id,
+          }));
+        }
+      }
     });
 
     if (published) {

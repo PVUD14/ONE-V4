@@ -3,19 +3,55 @@ import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import * as schema from './schema.js';
 import { N8nAutomationAdapter } from '@planthepath/automation/src/index.js';
-import { createEventBridgePublisher, createNotificationEventConsumer, dispatchAutomationOnce, publishOutboxOnce } from './automation-workers.js';
+import { createConfiguredInvitationMailSink } from './invitation-mail.js';
+import { createEventBridgePublisher, createLocalIntegrationEventPublisher, createNotificationEventConsumer, dispatchAutomationOnce, publishOutboxOnce } from './automation-workers.js';
+import { survivePoolErrors } from './pool-errors.js';
 
-type WorkerMode = 'outbox-publisher' | 'notification-consumer' | 'automation-dispatcher';
+/**
+ * `local-dispatcher` is the mode ADR-028 deploys: it drains the outbox in-process and
+ * invokes the workflow service, with no broker between the two. The three
+ * broker-shaped modes below it are kept and still work — they are the escape hatch
+ * for the day the worker has to run somewhere other than beside the database.
+ */
+type WorkerMode = 'local-dispatcher' | 'local-outbox' | 'outbox-publisher' | 'notification-consumer' | 'automation-dispatcher';
 
 async function main(): Promise<void> {
   const mode = requireMode(process.env.AUTOMATION_WORKER_MODE);
-  const pool = new Pool({ connectionString: requireValue('DATABASE_URL') });
+  const pool = survivePoolErrors(new Pool({ connectionString: requireValue('DATABASE_URL') }), 'automation-worker');
   const leaseOwner = `${mode}:${process.pid}`;
   let stopping = false;
   process.once('SIGTERM', () => { stopping = true; });
   process.once('SIGINT', () => { stopping = true; });
   try {
-    if (mode === 'outbox-publisher') {
+    if (mode === 'local-dispatcher') {
+      const db = drizzle(pool, { schema });
+      const invitationMailSink = createConfiguredInvitationMailSink();
+      const local = createLocalIntegrationEventPublisher({ pool, db, ...(invitationMailSink ? { invitationMailSink } : {}) });
+      const adapter = new N8nAutomationAdapter(requireValue('PTP_N8N_BASE_URL'));
+      const invocationSigningSecret = Buffer.from(requireValue('PTP_N8N_INVOCATION_SECRET'), 'utf8');
+      const callbackSigningSecret = Buffer.from(requireValue('AUTOMATION_SIGNING_SECRET'), 'utf8');
+      while (!stopping) {
+        const now = new Date();
+        const drained = await publishOutboxOnce({ db, publisher: local.publisher, leaseOwner, now });
+        const dispatched = await dispatchAutomationOnce({ pool, adapter, invocationSigningSecret,
+          callbackSigningSecret, leaseOwner, now });
+        log(mode, { outbox: drained, routing: local.counts(), automation: dispatched });
+        // Idle backoff only. A tick that did work loops straight into the next one, so
+        // a backlog drains at full speed rather than one batch per second.
+        if (!drained.claimed && !dispatched.claimed) await delay(1_000);
+      }
+    } else if (mode === 'local-outbox') {
+      // ENG-22: the outbox drained in-process with no workflow service — for a deployment that has no
+      // n8n (the demo sandbox, ADR-046), so its jobs (the tutor's among them) still run on the pipeline.
+      const db = drizzle(pool, { schema });
+      const invitationMailSink = createConfiguredInvitationMailSink();
+      const local = createLocalIntegrationEventPublisher({ pool, db, ...(invitationMailSink ? { invitationMailSink } : {}) });
+      while (!stopping) {
+        const drained = await publishOutboxOnce({ db, publisher: local.publisher, leaseOwner, now: new Date() });
+        log(mode, { outbox: drained, routing: local.counts() });
+        if (!drained.claimed) await delay(1_000);
+      }
+    } else if (mode === 'outbox-publisher') {
       const db = drizzle(pool, { schema });
       const publisher = createEventBridgePublisher(requireValue('PTP_EVENT_BUS_NAME'));
       while (!stopping) {
@@ -40,7 +76,7 @@ async function main(): Promise<void> {
 }
 
 function requireMode(value: string | undefined): WorkerMode {
-  if (value === 'outbox-publisher' || value === 'notification-consumer' || value === 'automation-dispatcher') return value;
+  if (value === 'local-dispatcher' || value === 'local-outbox' || value === 'outbox-publisher' || value === 'notification-consumer' || value === 'automation-dispatcher') return value;
   throw new Error('AUTOMATION_WORKER_MODE must select a supported worker');
 }
 

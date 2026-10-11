@@ -1,0 +1,15 @@
+# ENG-26: monthly recalibration. Written in the repository only — not installed by the agent.
+[Unit]
+Description=Run ONE recalibration monthly (proposals for Divakar to accept or reject)
+Documentation=https://github.com/PVUD14/planthepath-next
+
+[Timer]
+# The 1st of each month, 22:00 UTC (the 2nd, 03:30 IST): parameters move slowly, the export reads
+# the whole attempt log, and a month gives drift enough data to show. Nothing goes live until accepted.
+OnCalendar=*-*-01 22:00:00 UTC
+# A missed month runs on the next boot; live parameters are untouched meanwhile.
+Persistent=true
+RandomizedDelaySec=600
+
+[Install]
+WantedBy=timers.target

@@ -5,13 +5,16 @@ import {
   getCareerReadinessAccessToken,
   getCareerReadinessCatalog,
   getLearnerCareerReadinessState,
+  setLearnerLessonLanguage,
   startCareerReadinessAssessment,
   submitCareerReadinessAssessment,
   type AssessmentAttemptDto,
   type CareerReadinessCatalog,
   type LearnerCareerReadinessState,
+  type LearnerLessonLanguage,
 } from './api.js';
 import { V2EmptyState, V2Stat } from './dashboardsV2.js';
+import { lessonTextProps } from './lessonScript.js';
 
 type CareerRoute = 'readiness' | 'skills' | 'assessments' | 'learning' | 'roadmap' | 'notifications';
 
@@ -65,6 +68,25 @@ export function CareerReadinessApiPanel({ route }: { readonly route: CareerRoute
     }
   }
 
+  // ENG-16: the learner's lesson language. Lessons with no published version in it stay in English.
+  async function chooseLanguage(language: string): Promise<void> {
+    if (!token) return;
+    setBusy(true);
+    try {
+      const chosen = await setLearnerLessonLanguage(token, language);
+      await refresh();
+      const option = chosen.lessonLanguage.offered.find((entry) => entry.language === chosen.lessonLanguage.selected);
+      const name = option ? option.name : 'English';
+      setStatus(chosen.lessonLanguage.selected === 'en'
+        ? 'Lessons are shown in English.'
+        : `Lessons are shown in ${name} where a ${name} version is published. The rest are shown in English, and say so.`);
+    } catch {
+      setStatus('The lesson language could not be changed. Your lessons are unchanged.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function start(assessmentId: string): Promise<void> {
     if (!token) return;
     setBusy(true);
@@ -102,7 +124,8 @@ export function CareerReadinessApiPanel({ route }: { readonly route: CareerRoute
         <span className={`career-api-state ${catalog ? 'connected' : 'unavailable'}`}>{catalog ? 'API-backed' : 'API unavailable'}</span>
       </div>
       <p className="career-api-status" role="status" aria-live="polite">{status}</p>
-      {route === 'learning' ? <LearningApiView catalog={catalog} learner={learner} token={token} busy={busy} onComplete={complete} /> : null}
+      {route === 'learning' ? <LearningApiView catalog={learner ? learner.catalog : catalog} learner={learner} token={token} busy={busy}
+        onComplete={complete} onChooseLanguage={chooseLanguage} /> : null}
       {route === 'assessments' ? <AssessmentApiView catalog={catalog} learner={learner} token={token} busy={busy} attempt={attempt}
         selectedOptions={selectedOptions} onSelect={(questionId, optionId) => setSelectedOptions((current) => ({ ...current, [questionId]: optionId }))}
         onStart={start} onSubmit={submit} /> : null}
@@ -116,17 +139,48 @@ export function CareerReadinessApiPanel({ route }: { readonly route: CareerRoute
   );
 }
 
-function LearningApiView({ catalog, learner, token, busy, onComplete }: {
+function LearningApiView({ catalog, learner, token, busy, onComplete, onChooseLanguage }: {
   readonly catalog: CareerReadinessCatalog | null; readonly learner: LearnerCareerReadinessState | null; readonly token: string | null;
-  readonly busy: boolean; readonly onComplete: (lessonId: string) => void;
+  readonly busy: boolean; readonly onComplete: (lessonId: string) => void; readonly onChooseLanguage: (language: string) => void;
 }): React.ReactElement {
-  const completed = new Set(learner?.progress.filter((item) => item.state === 'COMPLETED').map((item) => item.lessonVersionId) ?? []);
-  return <div className="career-api-grid">{catalog?.modules.flatMap((module) => module.lessons).map((lesson) => (
-    <article key={lesson.id}><span>{completed.has(lesson.id) ? 'Completed with evidence' : 'Published lesson'}</span><h3>{lesson.title}</h3>
-      <p>{lesson.body.summary}</p><small>{lesson.prerequisiteLessonIds.length ? `${lesson.prerequisiteLessonIds.length} prerequisite` : 'No prerequisite'}</small>
-      <button type="button" disabled={!token || busy || completed.has(lesson.id)} onClick={() => onComplete(lesson.id)}>{completed.has(lesson.id) ? 'Completed' : 'Complete lesson'}</button>
-    </article>
-  )) ?? null}</div>;
+  const completed = new Set(learner?.progress?.filter((item) => item.state === 'COMPLETED').map((item) => item.lessonVersionId) ?? []);
+  const lessonLanguage = learner && learner.lessonLanguage ? learner.lessonLanguage : null;
+  const chosenName = lessonLanguageName(lessonLanguage);
+  return <>
+    {token && lessonLanguage ? <LessonLanguagePicker lessonLanguage={lessonLanguage} busy={busy} onChoose={onChooseLanguage} /> : null}
+    <div className="career-api-grid">{(catalog?.modules ?? []).flatMap((module) => module.lessons).map((lesson) => (
+      <article key={lesson.id}><span>{completed.has(lesson.id) ? 'Completed with evidence' : 'Published lesson'}</span>
+        <h3 {...lessonTextProps(lesson.language)}>{lesson.title}</h3>
+        <p {...lessonTextProps(lesson.language)}>{lesson.body.summary}</p>
+        {lesson.languageNotice === 'TRANSLATION_MISSING' ? <small role="note">Not yet available in {chosenName}. Shown in English.</small> : null}
+        {lesson.languageNotice === 'TRANSLATION_OUTDATED' ? <small role="note">The English lesson was updated after this {chosenName} version was written. Choose English to read the latest.</small> : null}
+        <small>{lesson.prerequisiteLessonIds.length ? `${lesson.prerequisiteLessonIds.length} prerequisite` : 'No prerequisite'}</small>
+        <button type="button" disabled={!token || busy || completed.has(lesson.id)} onClick={() => onComplete(lesson.id)}>{completed.has(lesson.id) ? 'Completed' : 'Complete lesson'}</button>
+      </article>
+    )) ?? null}</div>
+  </>;
+}
+
+function lessonLanguageName(lessonLanguage: LearnerLessonLanguage | null): string {
+  const option = lessonLanguage ? lessonLanguage.offered.find((entry) => entry.language === lessonLanguage.selected) : undefined;
+  return option ? option.name : 'English';
+}
+
+/**
+ * ENG-16: the learner chooses the language lessons are shown in. Each language is named in its own
+ * script beside its English name. Completing a lesson counts the same in any language.
+ */
+function LessonLanguagePicker({ lessonLanguage, busy, onChoose }: {
+  readonly lessonLanguage: LearnerLessonLanguage; readonly busy: boolean; readonly onChoose: (language: string) => void;
+}): React.ReactElement {
+  return <div className="career-api-heading">
+    <label><span>Lesson language</span>{' '}
+      <select aria-label="Lesson language" value={lessonLanguage.selected} disabled={busy} onChange={(event) => onChoose(event.target.value)}>
+        {lessonLanguage.offered.map((option) => <option key={option.language} value={option.language} {...lessonTextProps(option.language)}>
+          {option.nativeName === option.name ? option.name : `${option.nativeName} · ${option.name}`}</option>)}
+      </select></label>
+    <small>A lesson with no published version in your language is shown in English, and says so. Completing a lesson counts the same in any language.</small>
+  </div>;
 }
 
 function AssessmentApiView({ catalog, learner, token, busy, attempt, selectedOptions, onSelect, onStart, onSubmit }: {
@@ -141,14 +195,24 @@ function AssessmentApiView({ catalog, learner, token, busy, attempt, selectedOpt
         checked={selectedOptions[question.id] === option.id} onChange={() => onSelect(question.id, option.id)} />{option.text}</label>)}</fieldset>)}
     <button type="submit" disabled={busy || attempt.questions.some((question) => !selectedOptions[question.id])}>Submit assessment once</button>
   </form>;
-  return <div className="career-api-grid">{catalog?.assessments.map((assessment) => <article key={assessment.id}><span>Published assessment</span>
-    <h3>{assessment.title}</h3><p>{assessment.selectionCount} questions · {Math.round(assessment.timeLimitSeconds / 60)} minutes · one attempt</p>
-    <button type="button" disabled={!token || busy || Boolean(learner?.attempts.length)} onClick={() => onStart(assessment.id)}>Start assessment</button>
-  </article>) ?? null}</div>;
+  // The server allows one attempt per assessment. This previously disabled every
+  // assessment as soon as the learner had attempted any one of them, which is a
+  // stricter rule than the server's and made readiness effectively impossible to
+  // exercise or regression-test. Now each card reflects only its own assessment.
+  const attemptedAssessments = new Set((learner?.attempts ?? [])
+    .map((attempt) => attempt.assessmentDefinitionId).filter((id): id is string => Boolean(id)));
+  return <div className="career-api-grid">{(catalog?.assessments ?? []).map((assessment) => {
+    const alreadyAttempted = attemptedAssessments.has(assessment.id);
+    return <article key={assessment.id}><span>Published assessment</span>
+      <h3>{assessment.title}</h3><p>{assessment.selectionCount} questions · {Math.round(assessment.timeLimitSeconds / 60)} minutes · one attempt</p>
+      <button type="button" disabled={!token || busy || alreadyAttempted} onClick={() => onStart(assessment.id)}>
+        {alreadyAttempted ? 'Already attempted' : 'Start assessment'}</button>
+    </article>;
+  }) ?? null}</div>;
 }
 
 function CareerStatStrip({ learner, catalog }: { readonly learner: LearnerCareerReadinessState; readonly catalog: CareerReadinessCatalog | null }): React.ReactElement {
-  const lessons = catalog?.modules.flatMap((module) => module.lessons) ?? [];
+  const lessons = (catalog?.modules ?? []).flatMap((module) => module.lessons);
   const completed = learner.progress.filter((item) => item.state === 'COMPLETED').length;
   const scored = learner.attempts.filter((item) => typeof item.scoreCorrect === 'number');
   return (
@@ -169,12 +233,12 @@ function ReadinessApiView({ learner }: { readonly learner: LearnerCareerReadines
 }
 
 function SkillsApiView({ learner }: { readonly learner: LearnerCareerReadinessState | null }): React.ReactElement {
-  return <div className="career-api-grid">{learner?.mastery.map((mastery) => <article key={mastery.id}><span>Evidence-derived mastery</span>
+  return <div className="career-api-grid">{learner?.mastery?.map((mastery) => <article key={mastery.id}><span>Evidence-derived mastery</span>
     <h3>{formatBand(mastery.band)}</h3><p>{mastery.evidenceIds.length} active evidence record{mastery.evidenceIds.length === 1 ? '' : 's'}.</p></article>) ?? null}</div>;
 }
 
 function RoadmapApiView({ learner }: { readonly learner: LearnerCareerReadinessState | null }): React.ReactElement {
-  if (!learner?.roadmap.length) return <V2EmptyState icon="🗺️" title="No next action yet"
+  if (!learner?.roadmap?.length) return <V2EmptyState icon="🗺️" title="No next action yet"
     note="Advisory next actions appear here after your versioned evidence is evaluated — complete lessons and assessments to generate them." />;
   return <div className="career-api-grid">{learner.roadmap.map((action) => <article key={action.id}><span>Advisory next action</span>
     <h3>{formatBand(action.actionCode)}</h3><p>Reason: {formatBand(action.reasonCode)}. State: {formatBand(action.state)}.</p>
@@ -184,7 +248,7 @@ function RoadmapApiView({ learner }: { readonly learner: LearnerCareerReadinessS
 function NotificationsApiView({ learner }: { readonly learner: LearnerCareerReadinessState | null }): React.ReactElement {
   const preference = learner?.notificationPreferences;
   return <><p className="career-api-status">Email is {preference?.emailEnabled ? 'enabled' : 'not enabled'}; daily cap {preference?.dailyCap ?? 0}. Destinations stay server-side.</p>
-    <div className="career-api-grid">{learner?.notifications.map((notification) => <article key={notification.id}><span>Native email command</span>
+    <div className="career-api-grid">{learner?.notifications?.map((notification) => <article key={notification.id}><span>Native email command</span>
       <h3>{formatBand(notification.templateKey)}</h3><p>{notification.legalPurpose}</p><small>{formatBand(notification.state)}</small></article>) ?? null}</div></>;
 }
 

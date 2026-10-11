@@ -24,9 +24,31 @@ services:
     environment:
       API_HOST: 0.0.0.0
       API_PORT: 3000
-      API_CORS_ORIGIN: https://one.ai8ht.pro
+      API_CORS_ORIGIN: https://oneby8.com
+      PTP_INVITATION_BASE_URL: https://oneby8.com
+      PTP_MAIL_FROM: info@ai8ht.pro
+      # Sign-in and automation settings come from the server's .env (see .env.example).
+      COGNITO_USER_POOL_ID: ${COGNITO_USER_POOL_ID:-}
+      COGNITO_CLIENT_ID: ${COGNITO_CLIENT_ID:-}
+      COGNITO_STAFF_USER_POOL_ID: ${COGNITO_STAFF_USER_POOL_ID:-}
+      COGNITO_STAFF_CLIENT_ID: ${COGNITO_STAFF_CLIENT_ID:-}
+      AUTOMATION_SIGNING_SECRET: ${AUTOMATION_SIGNING_SECRET:-}
       DATABASE_URL: postgresql://${POSTGRES_USER:-planthepath_uat}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-planthepath_uat}
       NODE_ENV: ${NODE_ENV:-development}
+      # Outgoing mail (ADR-042, docs/ops/runbook-mail-sender.md). Blank = no mail is sent. The
+      # password is typed into this server's .env only; it is never committed.
+      PTP_SMTP_HOST: ${PTP_SMTP_HOST:-}
+      PTP_SMTP_PORT: ${PTP_SMTP_PORT:-}
+      PTP_SMTP_SECURITY: ${PTP_SMTP_SECURITY:-}
+      PTP_SMTP_USER: ${PTP_SMTP_USER:-}
+      PTP_SMTP_PASSWORD: ${PTP_SMTP_PASSWORD:-}
+      # AI inference endpoint (ADR-047, docs/ops/runbook-inference-endpoint.md). All blank = AI
+      # unavailable: every AI job fails PROVIDER_UNCONFIGURED and nothing crashes. The key is typed
+      # into this server's .env only; it is never committed. Used by AI jobs and `ai:probe` run in
+      # this container; the API itself only reports whether they are set.
+      ONE_AI_BASE_URL: ${ONE_AI_BASE_URL:-}
+      ONE_AI_API_KEY: ${ONE_AI_API_KEY:-}
+      ONE_AI_MODEL: ${ONE_AI_MODEL:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -39,11 +61,169 @@ services:
     build:
       context: ../..
       dockerfile: deploy/vps/Dockerfile.web
+      args:
+        VITE_API_BASE_URL: https://oneby8.com
+        VITE_COGNITO_DOMAIN: ${VITE_COGNITO_DOMAIN:-}
+        VITE_COGNITO_CLIENT_ID: ${VITE_COGNITO_CLIENT_ID:-}
+        VITE_COGNITO_USER_POOL_ID: ${VITE_COGNITO_USER_POOL_ID:-}
     restart: unless-stopped
     expose:
       - "8080"
     networks:
       - internal
+
+  # ---------------------------------------------------------------------------------
+  # demo.oneby8.com: the sandbox (ADR-046, docs/ops/runbook-demo-site.md).
+  #
+  # The real application - the same API image and a normal build of the web app - over
+  # its own database of fictional sample data. Nothing here is shared with production:
+  # its own Postgres and volume, its own Cognito user pool (DEMO_COGNITO_*), and its own
+  # networks. api-demo and postgres-demo sit on demo-db/demo-edge only, so they cannot
+  # resolve or reach the production api or postgres, and production cannot reach them.
+  # Caddy is the one container on both sides, because it serves both hosts.
+  # ---------------------------------------------------------------------------------
+  postgres-demo:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      # The database name must end in "_sandbox": the seed and the nightly reset refuse
+      # any other (packages/persistence/src/sandbox-guard.ts).
+      POSTGRES_DB: one_sandbox
+      POSTGRES_USER: one_sandbox
+      POSTGRES_PASSWORD: ${DEMO_POSTGRES_PASSWORD:-}
+    # Small by design: a few hundred sample rows. Caps keep it from crowding production.
+    command: ["postgres", "-c", "shared_buffers=64MB", "-c", "max_connections=40"]
+    volumes:
+      - postgres-demo-data:/var/lib/postgresql/data
+    networks:
+      - demo-db
+    mem_limit: 384m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U one_sandbox -d one_sandbox"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    profiles: ["sandbox"]
+
+  api-demo:
+    build:
+      context: ../..
+      dockerfile: deploy/vps/Dockerfile.api
+    image: one-api-sandbox:local
+    restart: unless-stopped
+    environment:
+      API_HOST: 0.0.0.0
+      API_PORT: 3000
+      API_CORS_ORIGIN: https://demo.oneby8.com
+      PTP_INVITATION_BASE_URL: https://demo.oneby8.com
+      # Sign-in through the sandbox's OWN Cognito pool, never production's. Blank until
+      # Divakar creates it (runbook step 3): the API then starts and refuses every sign-in.
+      COGNITO_USER_POOL_ID: ${DEMO_COGNITO_USER_POOL_ID:-}
+      COGNITO_CLIENT_ID: ${DEMO_COGNITO_CLIENT_ID:-}
+      DATABASE_URL: postgresql://one_sandbox:${DEMO_POSTGRES_PASSWORD:-}@postgres-demo:5432/one_sandbox
+      NODE_ENV: development
+      # The AI tutor and content drafts may only ever switch on here (ENG-22/23). The AI
+      # endpoint comes from DEMO_ONE_AI_*, never production's ONE_AI_*, so setting AI up for
+      # the demo cannot reach oneby8.com. Blank = AI unavailable.
+      ONE_SANDBOX: "true"
+      ONE_AI_TUTOR_AUDIENCE: sandbox
+      ONE_AI_BASE_URL: ${DEMO_ONE_AI_BASE_URL:-}
+      ONE_AI_API_KEY: ${DEMO_ONE_AI_API_KEY:-}
+      ONE_AI_MODEL: ${DEMO_ONE_AI_MODEL:-}
+      # Deliberately absent: SMTP (the sandbox sends no mail), the automation secret and
+      # the staff pool. Fictional people never get an email.
+    depends_on:
+      postgres-demo:
+        condition: service_healthy
+    expose:
+      - "3000"
+    networks:
+      - demo-db
+      - demo-edge
+    mem_limit: 512m
+    profiles: ["sandbox"]
+
+  # The sandbox's AI workers (ENG-22 tutor hints, ENG-23 content drafts). Model calls run
+  # here, never in a request handler. Both stay idle while the features are off, and refuse
+  # every job while the kill switch is engaged. They reach the pod over demo-edge.
+  worker-demo:
+    image: one-api-sandbox:local
+    restart: unless-stopped
+    working_dir: /app
+    command: ["pnpm", "--filter", "@planthepath/persistence", "worker:automation"]
+    environment: &sandbox-ai-env
+      AUTOMATION_WORKER_MODE: local-outbox
+      DATABASE_URL: postgresql://one_sandbox:${DEMO_POSTGRES_PASSWORD:-}@postgres-demo:5432/one_sandbox
+      NODE_ENV: development
+      ONE_SANDBOX: "true"
+      ONE_AI_TUTOR_AUDIENCE: sandbox
+      ONE_AI_BASE_URL: ${DEMO_ONE_AI_BASE_URL:-}
+      ONE_AI_API_KEY: ${DEMO_ONE_AI_API_KEY:-}
+      ONE_AI_MODEL: ${DEMO_ONE_AI_MODEL:-}
+    depends_on:
+      postgres-demo:
+        condition: service_healthy
+    networks:
+      - demo-db
+      - demo-edge
+    mem_limit: 384m
+    profiles: ["sandbox"]
+
+  ai-content-demo:
+    image: one-api-sandbox:local
+    restart: unless-stopped
+    working_dir: /app
+    command: ["pnpm", "--filter", "@planthepath/persistence", "ai:content-factory"]
+    environment: *sandbox-ai-env
+    depends_on:
+      postgres-demo:
+        condition: service_healthy
+    networks:
+      - demo-db
+      - demo-edge
+    mem_limit: 384m
+    profiles: ["sandbox"]
+
+  # The nightly reset and the first seed (runbook step 5): drops the sandbox database,
+  # migrates it and loads the sample data. A one-off job, never left running:
+  #   docker compose --profile sandbox --profile sandbox-tools run --rm sandbox-reset
+  sandbox-reset:
+    image: one-api-sandbox:local
+    environment:
+      ONE_SANDBOX: "true"
+      DATABASE_URL: postgresql://one_sandbox:${DEMO_POSTGRES_PASSWORD:-}@postgres-demo:5432/one_sandbox
+      # Each persona's Cognito "sub" from the sandbox pool, so each demo login lands in
+      # its own workspace. Identifiers, not passwords. Blank = accounts exist but no one
+      # can sign in as them yet.
+      DEMO_ACCOUNT_SUBJECTS: ${DEMO_ACCOUNT_SUBJECTS:-}
+    working_dir: /app
+    command: ["pnpm", "--filter", "@planthepath/persistence", "db:reset:sandbox"]
+    depends_on:
+      postgres-demo:
+        condition: service_healthy
+    networks:
+      - demo-db
+    restart: "no"
+    profiles: ["sandbox-tools"]
+
+  web-sandbox:
+    build:
+      context: ../..
+      dockerfile: deploy/vps/Dockerfile.web
+      args:
+        # A normal build of the real application, plus the "Demo - sample data" marker.
+        VITE_SANDBOX: "true"
+        VITE_API_BASE_URL: https://demo.oneby8.com
+        VITE_COGNITO_DOMAIN: ${DEMO_COGNITO_DOMAIN:-}
+        VITE_COGNITO_CLIENT_ID: ${DEMO_COGNITO_CLIENT_ID:-}
+        VITE_COGNITO_USER_POOL_ID: ${DEMO_COGNITO_USER_POOL_ID:-}
+    restart: unless-stopped
+    expose:
+      - "8080"
+    networks:
+      - demo-edge
+    mem_limit: 64m
+    profiles: ["sandbox"]
 
   reverse-proxy:
     image: caddy:2.8-alpine
@@ -56,16 +236,28 @@ services:
       - "443:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # A directory, not a single file, so replacing users.caddy reaches the running container.
+      - ./demo-access:/etc/caddy/demo-access:ro
       - caddy-data:/data
       - caddy-config:/config
     networks:
       - internal
+      - demo-edge
 
 networks:
   internal:
     driver: bridge
+  # The sandbox's own networks. demo-db carries only the sandbox API and its database and
+  # has no route out; demo-edge joins the sandbox API and web to Caddy (and lets the API
+  # fetch the sandbox pool's public signing keys from Cognito).
+  demo-db:
+    driver: bridge
+    internal: true
+  demo-edge:
+    driver: bridge
 
 volumes:
   postgres-data:
+  postgres-demo-data:
   caddy-data:
   caddy-config:

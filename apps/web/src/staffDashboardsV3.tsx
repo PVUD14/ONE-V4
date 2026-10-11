@@ -4,6 +4,7 @@ import { MultiRing, Spark } from './pilot/pilotComponents.js';
 import {
   getProtectedAccessToken,
   getSecurityContext,
+  getVerificationSummary,
   listEmployerApplicants,
   listEmployerOpportunities,
   listInstitutionExamResults,
@@ -16,7 +17,14 @@ import {
   type InstitutionExamDto,
   type InstitutionStudentDto,
   type InstitutionUnitDto,
+  type StudentActivationState,
+  type VerificationSummaryDto,
+  studentActivationLabels,
 } from './api.js';
+import { campusDriveStateLabels, listEmployerCampusDrives, listInstitutionCampusDrives, type CampusDriveDto } from './api/campusDrives.js';
+import { getPlacementStatistics, type PlacementStatisticsDto } from './api/placementRegister.js';
+import type { SuppressedCountDto } from './api/privacyOperations.js';
+import { getEmployerSummary, listEmployerInterviews, type EmployerInterviewDto, type EmployerSummaryDto } from './api/hiring.js';
 
 /**
  * Pilot-exact staff dashboards. Same rule as the student V3: the pilot's
@@ -30,26 +38,66 @@ function go(path: string): void {
   window.dispatchEvent(new PopStateEvent('popstate'));
 }
 
-function Funnel({ rows }: { readonly rows: readonly { readonly label: string; readonly value: number | null }[] }): React.ReactElement {
+function Funnel({ rows }: { readonly rows: readonly { readonly label: string; readonly value: number | null; readonly display?: string }[] }): React.ReactElement {
   const max = Math.max(...rows.map((row) => row.value ?? 0), 1);
   return <div className="pilot-funnel">
     {rows.map((row) => (
       <div key={row.label} className="pilot-funnel-row">
         <span>{row.label}</span>
         <div className="pilot-bar"><i style={{ width: `${((row.value ?? 0) / max) * 100}%` }} /></div>
-        <span className="num">{row.value ?? 'NA'}</span>
+        <span className="num">{row.display ?? row.value ?? 'NA'}</span>
       </div>
     ))}
   </div>;
 }
 
+/** INST-12: a suppressed count for the funnel: the bar only when published, <5 when withheld, NA without a source. */
+function funnelRow(label: string, count: SuppressedCountDto | null | undefined): { readonly label: string; readonly value: number | null; readonly display: string } {
+  if (!count) return { label, value: null, display: 'NA' };
+  return count.suppressed ? { label, value: null, display: '<5' } : { label, value: count.value, display: String(count.value) };
+}
+
 // --- Institution -------------------------------------------------------------
+
+function countLabel(count: SuppressedCountDto | null | undefined): string {
+  if (!count) return 'NA';
+  return count.suppressed ? '<5' : String(count.value);
+}
+
+/** Where each institution portal reaches the verification queue (existing labels only). */
+function verificationPath(basePath: string): string | null {
+  if (basePath.endsWith('/faculty')) return `${basePath}/academic-verification`;
+  if (basePath.endsWith('/admin') || basePath.endsWith('/department-head')) return `${basePath}/students`;
+  return null;
+}
 
 interface InstitutionV3Data {
   readonly students: readonly InstitutionStudentDto[] | null;
+  /** Server-computed over the same roster the Students page lists, so the two always agree. */
+  readonly activation: Readonly<Record<StudentActivationState, number>> | null;
   readonly exams: readonly InstitutionExamDto[] | null;
   readonly units: readonly InstitutionUnitDto[] | null;
   readonly notAttempted: readonly (ExamNotAttemptedDto & { readonly examTitle: string; readonly endsAt: string })[];
+  /** INST-04 verification backlog, counted server-side over the reader's scope; null reads NA. */
+  readonly verification: VerificationSummaryDto | null;
+  /** EMP-11: confirmed drives ahead and requests awaiting a decision; null (NA) when this role cannot read drives. */
+  readonly drives: { readonly upcoming: readonly CampusDriveDto[]; readonly waiting: number } | null;
+  /** INST-12: season statistics as of the last month end; null (NA) when this role cannot read them. */
+  readonly placement: PlacementStatisticsDto | null;
+}
+
+/** EMP-11: the college's scheduled drives still ahead, soonest first, and how many requests wait. */
+async function loadCollegeDrives(token: string, institutionId: string, signal: AbortSignal): Promise<InstitutionV3Data['drives']> {
+  const [scheduled, requested] = await Promise.all([
+    listInstitutionCampusDrives(token, institutionId, { state: 'SCHEDULED' }, signal),
+    listInstitutionCampusDrives(token, institutionId, { state: 'REQUESTED' }, signal),
+  ]);
+  const now = Date.now();
+  return {
+    upcoming: (scheduled.drives ?? []).filter((drive) => drive.scheduledStartAt && Date.parse(drive.scheduledStartAt) >= now)
+      .sort((a, b) => Date.parse(a.scheduledStartAt ?? '') - Date.parse(b.scheduledStartAt ?? '')),
+    waiting: (requested.drives ?? []).length,
+  };
 }
 
 export function InstitutionDashboardV3({ institutionId, basePath }: { readonly institutionId: string; readonly basePath: string }): React.ReactElement {
@@ -59,16 +107,21 @@ export function InstitutionDashboardV3({ institutionId, basePath }: { readonly i
     if (!token) return undefined;
     const controller = new AbortController();
     void Promise.all([
-      listInstitutionStudents(token, institutionId, controller.signal).then((response) => response.students).catch(() => null),
+      listInstitutionStudents(token, institutionId, controller.signal).catch(() => null),
       listInstitutionExams(token, institutionId, controller.signal).then((response) => response.assessments).catch(() => null),
       listInstitutionUnits(token, institutionId, controller.signal).then((response) => response.units).catch(() => null),
-    ]).then(async ([students, exams, units]) => {
+      getVerificationSummary(token, institutionId, controller.signal).then((response) => response.summary ?? null).catch(() => null),
+      loadCollegeDrives(token, institutionId, controller.signal).catch(() => null),
+      getPlacementStatistics(token, institutionId, controller.signal).then((response) => (response && response.overall ? response : null)).catch(() => null),
+    ]).then(async ([roster, exams, units, verification, drives, placement]) => {
+      const students = roster?.students ?? null;
+      const activation = roster?.activationSummary ?? null;
       const target = exams?.find((exam) => exam.lifecycleState === 'PUBLISHED' && exam.assignedCount > 0) ?? null;
       const notAttempted = target
         ? await listInstitutionExamResults(token, institutionId, target.id).then((response) =>
             response.notAttempted.map((entry) => ({ ...entry, examTitle: target.title, endsAt: target.endsAt }))).catch(() => [])
         : [];
-      setData({ students, exams, units, notAttempted });
+      setData({ students, activation, exams, units, notAttempted, verification, drives, placement });
     });
     return () => controller.abort();
   }, [token, institutionId]);
@@ -91,9 +144,9 @@ export function InstitutionDashboardV3({ institutionId, basePath }: { readonly i
       <div className="pilot-row cols-5">
         {([
           ['Active Students', String(activeStudents), 'blue', Users],
-          ['Placement Eligible', 'NA', 'indigo', ClipboardCheck],
-          ['Offers This Season', 'NA', 'green', TrendingUp],
-          ['Students Placed', 'NA', 'teal', Building2],
+          ['Placement Eligible', data.placement ? countLabel(data.placement.overall.eligible) : 'NA', 'indigo', ClipboardCheck],
+          ['Students With Offers', data.placement ? countLabel(data.placement.overall.withOffer) : 'NA', 'green', TrendingUp],
+          ['Students Placed', data.placement ? countLabel(data.placement.overall.placed) : 'NA', 'teal', Building2],
           ['Need Intervention', String(data.notAttempted.length), 'rose', AlertTriangle],
         ] as const).map(([label, value, tone, Icon]) => (
           <section key={label} className="pilot-card pilot-kpi">
@@ -116,13 +169,32 @@ export function InstitutionDashboardV3({ institutionId, basePath }: { readonly i
           </div>
         </section>
         <section className="pilot-card">
-          <div className="pilot-card-head"><h2>Placement Pipeline</h2><small style={{ color: 'var(--p-muted)' }}>This season</small></div>
+          <div className="pilot-card-head"><h2>Placement Pipeline</h2><small style={{ color: 'var(--p-muted)' }}>{data.placement ? `As of ${data.placement.asOf.lastDay}` : 'NA'}</small></div>
           <Funnel rows={[
-            { label: 'Eligible', value: null }, { label: 'Applied', value: null },
-            { label: 'Shortlisted', value: null }, { label: 'Offers', value: null }, { label: 'Placed', value: null },
+            funnelRow('Eligible', data.placement?.overall.eligible), funnelRow('Applied', data.placement?.overall.applied),
+            funnelRow('Shortlisted', data.placement?.overall.shortlisted), funnelRow('Offers', data.placement?.overall.withOffer), funnelRow('Placed', data.placement?.overall.placed),
           ]} />
+          <small style={{ color: 'var(--p-muted)' }}>From applications students shared with the college. A student who shared nothing is not counted as unplaced.</small>
         </section>
       </div>
+
+      <section className="pilot-card">
+        <div className="pilot-card-head"><h2>Student Activation</h2><button type="button" className="pilot-link" onClick={() => go(`${basePath}/students`)}>View Students</button></div>
+        <div className="pilot-legend">
+          {(['ACTIVATED', 'INVITED', 'EXPIRED', 'BOUNCED', 'NOT_INVITED'] as const).map((state) => (
+            <div key={state}><i style={{ background: '#e5eaf2' }} /> {studentActivationLabels[state]} <span className="num">{data.activation ? data.activation[state] : 'NA'}</span></div>
+          ))}
+        </div>
+      </section>
+
+      <section className="pilot-card">
+        <div className="pilot-card-head"><h2>Academic Verification</h2>{verificationPath(basePath)
+          ? <button type="button" className="pilot-link" onClick={() => go(verificationPath(basePath)!)}>Review Queue</button> : null}</div>
+        <div className="pilot-legend">
+          <div><i style={{ background: '#e5eaf2' }} /> Waiting for a decision <span className="num">{data.verification ? data.verification.pending : 'NA'}</span></div>
+          <div><i style={{ background: '#e5eaf2' }} /> From former students or people not on the roster <span className="num">{data.verification ? data.verification.notCurrent : 'NA'}</span></div>
+        </div>
+      </section>
 
       <section className="pilot-card">
         <div className="pilot-card-head"><h2>Students Needing Attention</h2><button type="button" className="pilot-link" onClick={() => go(`${basePath}/assessments`)}>View All</button></div>
@@ -141,12 +213,25 @@ export function InstitutionDashboardV3({ institutionId, basePath }: { readonly i
 
     <aside className="pilot-rail">
       <section className="pilot-card">
-        <div className="pilot-card-head"><h2>Offers Trend</h2><span className="pilot-chip slate">NA</span></div>
-        <Spark points={[0, 0, 0, 0, 0, 0, 0]} tone="green" />
+        <div className="pilot-card-head"><h2>Offers Trend</h2><span className="pilot-chip slate">{data.placement ? 'Last 6 months' : 'NA'}</span></div>
+        {data.placement && data.placement.offersByMonth.length && data.placement.offersByMonth.every((entry) => !entry.offers.suppressed)
+          ? <Spark points={data.placement.offersByMonth.map((entry) => entry.offers.value ?? 0)} tone="green" />
+          : <Spark points={[0, 0, 0, 0, 0, 0, 0]} tone="green" />}
+        {data.placement ? <div className="pilot-legend">{data.placement.offersByMonth.map((entry) => (
+          <div key={entry.month}><i style={{ background: '#e5eaf2' }} /> {entry.month} <span className="num">{countLabel(entry.offers)}</span></div>))}</div>
+          : <p style={{ color: 'var(--p-muted)', margin: '4px 0' }}>Offer figures are not available to your role — NA.</p>}
       </section>
       <section className="pilot-card">
-        <div className="pilot-card-head"><h2>Upcoming Drives</h2><span className="pilot-chip slate">NA</span></div>
-        <p style={{ color: 'var(--p-muted)', margin: '4px 0' }}>Placement drives are not built yet — NA.</p>
+        <div className="pilot-card-head"><h2>Upcoming Drives</h2>{data.drives
+          ? <span className={`pilot-chip ${data.drives.waiting ? 'amber' : 'slate'}`}>{data.drives.waiting} awaiting decision</span>
+          : <span className="pilot-chip slate">NA</span>}</div>
+        {!data.drives ? <p style={{ color: 'var(--p-muted)', margin: '4px 0' }}>Campus drives are not available to your role — NA.</p>
+          : data.drives.upcoming.length ? <div className="pilot-list">{data.drives.upcoming.slice(0, 4).map((drive) => (
+            <div key={drive.id} className="pilot-list-row">
+              <span className="pilot-tile blue"><Building2 size={16} /></span>
+              <div className="grow"><strong>{drive.employerName}</strong><small>{drive.opportunityTitle ?? 'Untitled'} · {new Date(drive.scheduledStartAt ?? '').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</small></div>
+            </div>))}</div>
+            : <p style={{ color: 'var(--p-muted)', margin: '4px 0' }}>No drive is scheduled yet.</p>}
       </section>
       <section className="pilot-card">
         <h2>Department Readiness</h2>
@@ -164,11 +249,32 @@ export function InstitutionDashboardV3({ institutionId, basePath }: { readonly i
 // --- Employer ----------------------------------------------------------------
 
 interface EmployerV3Data {
-  readonly opportunities: readonly EmployerOpportunityDto[];
+  /** EMP-15: the server-computed figures; null (NA in every slot) when they could not be read. */
+  readonly summary: EmployerSummaryDto | null;
+  /** EMP-15: the employer's interviews, for this week's list; null when the list could not be read. */
+  readonly interviews: readonly EmployerInterviewDto[] | null;
+  /** EMP-11: this employer's campus drives; null (NA) when they could not be read. */
+  readonly drives: readonly CampusDriveDto[] | null;
   readonly applicants: readonly (EmployerApplicantDto & { readonly opportunityTitle: string })[];
 }
 
 const STAGE_TONE: Readonly<Record<string, string>> = { SHORTLISTED: 'indigo', INTERVIEW: 'purple', APPLIED: 'blue', OFFER: 'amber', HIRED: 'green' };
+
+/** The interviews that count toward "this week": the server's window, not cancelled. */
+function interviewsInWeek(interviews: readonly EmployerInterviewDto[], summary: EmployerSummaryDto): readonly EmployerInterviewDto[] {
+  const start = new Date(summary.week.startsAt).getTime();
+  const end = new Date(summary.week.endsAt).getTime();
+  return interviews
+    .filter((item) => item.state !== 'CANCELLED' && item.scheduledStart !== null)
+    .filter((item) => { const at = new Date(item.scheduledStart!).getTime(); return at >= start && at < end; })
+    .sort((a, b) => a.scheduledStart!.localeCompare(b.scheduledStart!));
+}
+
+function interviewCandidate(item: EmployerInterviewDto): string {
+  if (item.consentRevoked) return 'Withdrawn — details no longer shared';
+  if (item.candidateAccess === false) return 'Details no longer shared';
+  return item.candidateName ?? 'Candidate';
+}
 
 export function EmployerDashboardV3({ basePath }: { readonly basePath: string }): React.ReactElement {
   const token = getProtectedAccessToken();
@@ -180,12 +286,21 @@ export function EmployerDashboardV3({ basePath }: { readonly basePath: string })
     void getSecurityContext(token, controller.signal).then(async (context) => {
       const membership = context.memberships.find((item) => ['EMPLOYER_OWNER', 'EMPLOYER_ADMIN', 'RECRUITER'].includes(item.role));
       if (!membership) { setError('This identity has no active employer-scoped membership.'); return; }
-      const opportunities = await listEmployerOpportunities(token, membership.organizationId, controller.signal).then((response) => response.opportunities).catch(() => [] as readonly EmployerOpportunityDto[]);
+      const employerId = membership.organizationId;
+      // EMP-15: every figure comes from the one summary the server computes in SQL. The lists below
+      // only feed the named rows (Recently Shortlisted, this week's interviews), each person shown
+      // only while their applicant-access grant is live.
+      const [summary, interviews, drives, opportunities] = await Promise.all([
+        getEmployerSummary(token, employerId, controller.signal).then((response) => response.summary).catch(() => null),
+        listEmployerInterviews(token, employerId, controller.signal).then((response) => response.interviews).catch(() => null),
+        listEmployerCampusDrives(token, employerId, undefined, controller.signal).then((response) => response.drives ?? []).catch(() => null),
+        listEmployerOpportunities(token, employerId, controller.signal).then((response) => response.opportunities).catch(() => [] as readonly EmployerOpportunityDto[]),
+      ]);
       const groups = await Promise.all(opportunities.filter((item) => item.applicationCount > 0).slice(0, 4).map((opportunity) =>
-        listEmployerApplicants(token, membership.organizationId, opportunity.id, controller.signal)
+        listEmployerApplicants(token, employerId, opportunity.id, controller.signal)
           .then((response) => response.applications.map((applicant) => ({ ...applicant, opportunityTitle: opportunity.title ?? opportunity.referenceCode })))
           .catch(() => [])));
-      setData({ opportunities, applicants: groups.flat() });
+      setData({ summary, interviews, drives, applicants: groups.flat() });
     }).catch(() => setError('Unable to resolve employer context.'));
     return () => controller.abort();
   }, [token]);
@@ -193,19 +308,21 @@ export function EmployerDashboardV3({ basePath }: { readonly basePath: string })
   if (error) return <section className="pilot-card"><h2>Recruiter Dashboard</h2><p style={{ color: 'var(--p-muted)' }}>{error}</p></section>;
   if (!data) return <section className="pilot-card"><h2>Recruiter Dashboard</h2><p style={{ color: 'var(--p-muted)' }}>Loading…</p></section>;
 
-  const openRoles = data.opportunities.filter((item) => item.lifecycleState === 'PUBLISHED').length;
-  const totalApplicants = data.opportunities.reduce((sum, item) => sum + item.applicationCount, 0);
-  const inPipeline = data.opportunities.reduce((sum, item) => sum + item.openApplicationCount, 0);
-  const byStage = (needle: string): number => data.applicants.filter((applicant) => applicant.state.includes(needle)).length;
-  const offers = data.applicants.filter((applicant) => applicant.offerState).length;
-  const hires = byStage('HIRED');
+  const summary = data.summary;
+  const figure = (value: number | undefined): string => (summary && value !== undefined ? String(value) : 'NA');
+  const stage = (key: string): number | null => (summary ? summary.currentStages[key] ?? 0 : null);
   const shortlistRows = data.applicants.filter((applicant) => ['SHORTLIST', 'INTERVIEW'].some((needle) => applicant.state.includes(needle))).slice(0, 5);
   const mix = [
-    { label: 'Applied', value: byStage('APPLIED') + byStage('SUBMITTED'), color: '#1f55e5' },
-    { label: 'Shortlisted', value: byStage('SHORTLIST'), color: '#4f46e5' },
-    { label: 'Interview', value: byStage('INTERVIEW'), color: '#5936cf' },
-    { label: 'Offer', value: offers, color: '#b45309' },
+    { label: 'Applied', value: stage('APPLIED'), color: '#1f55e5' },
+    { label: 'Screening', value: stage('SCREENING'), color: '#0e7490' },
+    { label: 'Shortlisted', value: stage('SHORTLISTED'), color: '#4f46e5' },
+    { label: 'Assessment', value: stage('ASSESSMENT'), color: '#0f766e' },
+    { label: 'Interview', value: stage('INTERVIEW'), color: '#5936cf' },
+    { label: 'Offer', value: stage('OFFER'), color: '#b45309' },
   ];
+  const weekInterviews = summary && data.interviews ? interviewsInWeek(data.interviews, summary) : null;
+  const openDrives = (data.drives ?? []).filter((drive) => !['REJECTED', 'COMPLETED', 'CANCELLED'].includes(drive.state));
+  const muted = { color: 'var(--p-muted)', margin: '4px 0' } as const;
 
   return <div className="pilot pilot-embed"><div className="pilot-page">
     <div className="pilot-content">
@@ -217,35 +334,47 @@ export function EmployerDashboardV3({ basePath }: { readonly basePath: string })
         <button type="button" className="pilot-btn" onClick={() => go(`${basePath}/opportunities`)}><Plus size={15} /> Post a Role</button>
       </div>
 
+      {!summary ? <div className="pilot-banner amber" role="status"><AlertTriangle size={17} /> Your hiring figures could not be loaded, so they read NA.</div> : null}
+
       <div className="pilot-row cols-5">
         {([
-          ['Open Roles', String(openRoles), 'blue', Briefcase],
-          ['Total Applicants', String(totalApplicants), 'indigo', Users],
-          ['In Pipeline', String(inPipeline), 'purple', ClipboardCheck],
-          ['Offers Extended', String(offers), 'amber', TrendingUp],
-          ['Hires', String(hires), 'green', Building2],
-        ] as const).map(([label, value, tone, Icon]) => (
+          ['Open Roles', figure(summary?.openJobs), 'blue', Briefcase, null],
+          ['Total Applicants', figure(summary?.applicationsTotal), 'indigo', Users, summary ? `${summary.newApplicantsLast7Days} new in 7 days` : null],
+          ['In Pipeline', figure(summary?.openApplications), 'purple', ClipboardCheck, null],
+          ['Offers Extended', figure(summary?.offersPending), 'amber', TrendingUp, summary ? 'Awaiting an answer' : null],
+          ['Hires', figure(summary?.hires), 'green', Building2, null],
+        ] as const).map(([label, value, tone, Icon, note]) => (
           <section key={label} className="pilot-card pilot-kpi">
             <span className={`pilot-tile ${tone}`}><Icon size={17} /></span>
-            <div><b>{value}</b><small>{label}</small></div>
+            <div><b>{value}</b><small>{label}</small>{note ? <><br /><small>{note}</small></> : null}</div>
           </section>
         ))}
       </div>
 
       <div className="pilot-row cols-2">
         <section className="pilot-card">
-          <div className="pilot-card-head"><h2>Hiring Funnel</h2><small style={{ color: 'var(--p-muted)' }}>All roles · this season</small></div>
+          <div className="pilot-card-head"><h2>Hiring Funnel</h2><small style={{ color: 'var(--p-muted)' }}>All roles · where applications are now</small></div>
           <Funnel rows={[
-            { label: 'Applied', value: totalApplicants },
-            { label: 'Shortlisted', value: byStage('SHORTLIST') },
-            { label: 'Interview', value: byStage('INTERVIEW') },
-            { label: 'Offer', value: offers },
-            { label: 'Hired', value: hires },
+            { label: 'Applied', value: summary ? summary.applicationsTotal : null },
+            { label: 'Shortlisted', value: stage('SHORTLISTED') },
+            { label: 'Interview', value: stage('INTERVIEW') },
+            { label: 'Offer', value: stage('OFFER') },
+            { label: 'Hired', value: summary ? summary.hires : null },
           ]} />
         </section>
         <section className="pilot-card">
-          <div className="pilot-card-head"><h2>This Week&apos;s Interviews</h2><span className="pilot-chip slate">NA</span></div>
-          <p style={{ color: 'var(--p-muted)', margin: '4px 0' }}>An interview calendar is not built yet — NA. Interviews are scheduled from the applicant row.</p>
+          <div className="pilot-card-head"><h2>This Week&apos;s Interviews</h2>
+            <span className="pilot-chip slate">{summary ? `${summary.interviewsThisWeek} this week` : 'NA'}</span></div>
+          {!summary ? <p style={muted}>Interviews this week could not be counted — NA.</p>
+            : weekInterviews === null ? <p style={muted}>The interview list could not be loaded. Open Interviews to try again.</p>
+              : weekInterviews.length ? <div className="pilot-list">{weekInterviews.slice(0, 5).map((item) => (
+                <div key={item.id} className="pilot-list-row">
+                  <span className="pilot-tile purple"><Video size={16} /></span>
+                  <div className="grow"><strong>{interviewCandidate(item)}</strong><small>Round {item.roundNumber} · {item.title || 'NA'}</small></div>
+                  <small>{new Date(item.scheduledStart!).toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' })}</small>
+                </div>))}</div>
+                : <p style={muted}>No interviews this week.</p>}
+          <button type="button" className="pilot-link" onClick={() => go(`${basePath}/interviews`)}>Open Interviews</button>
         </section>
       </div>
 
@@ -267,19 +396,30 @@ export function EmployerDashboardV3({ basePath }: { readonly basePath: string })
       <section className="pilot-card">
         <div className="pilot-card-head"><h2>Pipeline Mix</h2><small style={{ color: 'var(--p-muted)' }}>Active candidates</small></div>
         <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-          <MultiRing segments={mix.filter((entry) => entry.value > 0).map((entry) => ({ value: entry.value, color: entry.color }))}>
-            {inPipeline}<div style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--p-muted)' }}>In pipeline</div>
+          <MultiRing segments={mix.filter((entry) => (entry.value ?? 0) > 0).map((entry) => ({ value: entry.value ?? 0, color: entry.color }))}>
+            {figure(summary?.openApplications)}<div style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--p-muted)' }}>In pipeline</div>
           </MultiRing>
           <div className="pilot-legend" style={{ flex: 1 }}>
-            {mix.map((entry) => <div key={entry.label}><i style={{ background: entry.color }} /> {entry.label} <span className="num">{entry.value}</span></div>)}
+            {mix.map((entry) => <div key={entry.label}><i style={{ background: entry.color }} /> {entry.label} <span className="num">{entry.value ?? 'NA'}</span></div>)}
           </div>
         </div>
       </section>
       <section className="pilot-card">
-        <div className="pilot-card-head"><h2>Campus Drives</h2><span className="pilot-chip slate">NA</span></div>
-        <p style={{ color: 'var(--p-muted)', margin: '4px 0' }}>Structured campus drives are not built yet — NA.</p>
+        <div className="pilot-card-head"><h2>Campus Drives</h2>
+          <span className="pilot-chip slate">{summary ? `${summary.drivesAwaitingApproval} awaiting colleges` : 'NA'}</span></div>
+        {summary && summary.drivesChangesRequested > 0
+          ? <p style={muted}>{summary.drivesChangesRequested} drive{summary.drivesChangesRequested === 1 ? '' : 's'} need{summary.drivesChangesRequested === 1 ? 's' : ''} your changes.</p> : null}
+        {!data.drives ? <p style={muted}>Campus drives could not be loaded — NA.</p>
+          : openDrives.length
+            ? <div className="pilot-list">{openDrives.slice(0, 4).map((drive) => (
+              <div key={drive.id} className="pilot-list-row">
+                <span className="pilot-tile indigo"><Building2 size={16} /></span>
+                <div className="grow"><strong>{drive.institutionName}</strong><small>{drive.opportunityTitle ?? 'Untitled'}</small></div>
+                <span className="pilot-chip blue">{campusDriveStateLabels[drive.state]}</span>
+              </div>))}</div>
+            : <p style={muted}>No open campus drives. Request one from a job&apos;s Opportunity Detail.</p>}
       </section>
-      <div className="pilot-banner blue"><TrendingUp size={17} /> {inPipeline > 0 ? `${inPipeline} open application${inPipeline === 1 ? '' : 's'} awaiting your review.` : 'No open applications right now.'}</div>
+      <div className="pilot-banner blue"><TrendingUp size={17} /> {!summary ? 'Open applications: NA.' : summary.openApplications > 0 ? `${summary.openApplications} open application${summary.openApplications === 1 ? '' : 's'} awaiting your review.` : 'No open applications right now.'}</div>
     </aside>
   </div></div>;
 }

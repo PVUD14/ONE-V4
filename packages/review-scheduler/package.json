@@ -1,0 +1,23 @@
+{
+  "name": "@planthepath/review-scheduler",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./src/*": "./src/*"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@planthepath/learning-model": "workspace:*",
+    "ts-fsrs": "5.4.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.0",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

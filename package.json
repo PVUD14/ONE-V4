@@ -10,6 +10,8 @@
     "db:migrate": "corepack pnpm --filter @planthepath/persistence db:migrate",
     "test": "corepack pnpm -r --workspace-concurrency=1 test",
     "typecheck": "corepack pnpm -r typecheck",
-    "web:dev": "corepack pnpm --filter @planthepath/web dev"
+    "web:dev": "corepack pnpm --filter @planthepath/web dev",
+    "db:seed:sandbox": "corepack pnpm --filter @planthepath/persistence db:seed:sandbox",
+    "db:reset:sandbox": "corepack pnpm --filter @planthepath/persistence db:reset:sandbox"
   }
 }

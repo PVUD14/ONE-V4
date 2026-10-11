@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { and, eq, sql } from 'drizzle-orm';
 import * as schema from './schema.js';
 import { validateAuditWriteInput, validateOutboxWriteInput, type AuditWriteInput, type OutboxWriteInput, type PersistenceDb } from './repositories.js';
@@ -116,7 +117,8 @@ export async function acceptInvitationByTokenHashForVerifiedRecipientWithIdempot
 
     const invitationResult = await tx.execute(sql`
       SELECT id, email, organization_id, role, scope_organization_id, scope_institution_id,
-             scope_department_unit_id, scope_batch_unit_id, scope_employer_id
+             scope_department_unit_id, scope_batch_unit_id, scope_employer_id, kind, student_user_id,
+             growth_staff_type, invited_by_user_id
       FROM invitations
       WHERE token_hash = ${input.invitationTokenHash}
         AND lower(email) = ${input.normalizedRecipientEmail}
@@ -134,10 +136,15 @@ export async function acceptInvitationByTokenHashForVerifiedRecipientWithIdempot
       scope_department_unit_id: string | null;
       scope_batch_unit_id: string | null;
       scope_employer_id: string | null;
+      kind: 'STAFF' | 'STUDENT';
+      student_user_id: string | null;
+      growth_staff_type: string | null;
+      invited_by_user_id: string;
     }>;
 
     const [invitation] = invitationResult.rows;
     if (!invitation) throw new Error('invitation is not usable');
+    const studentInvitation = invitation.kind === 'STUDENT';
 
     const existingUsers = await tx.execute(sql`
       SELECT id, external_subject, email
@@ -153,6 +160,9 @@ export async function acceptInvitationByTokenHashForVerifiedRecipientWithIdempot
       throw new Error('invitation recipient identity is ambiguous');
     }
     const acceptedUserId = existingUsers.rows[0]?.id ?? input.userId;
+    // A student invitation binds exactly the roster row the college created, never another
+    // account that happens to share the address (INST-01).
+    if (studentInvitation && acceptedUserId !== invitation.student_user_id) throw new Error('invitation is not usable');
     if (existingUsers.rows[0]) {
       await tx.execute(sql`
         UPDATE users
@@ -181,6 +191,15 @@ export async function acceptInvitationByTokenHashForVerifiedRecipientWithIdempot
     `) as QueryResult<{ id: string }>;
     if (consumed.rows.length !== 1) throw new Error('invitation is not usable');
 
+    if (studentInvitation) {
+      // Activation: the roster profile becomes ACTIVE so staff actions, assessments and hiring
+      // can see the student. The relationship was created ACTIVE with the profile.
+      await tx.execute(sql`
+        UPDATE institution_student_profiles SET status = 'ACTIVE', updated_at = now()
+        WHERE institution_id = ${invitation.organization_id}::uuid AND student_user_id = ${acceptedUserId}::uuid AND status = 'INVITED'
+      `);
+    }
+
     if (invitation.organization_id && invitation.role && invitation.scope_organization_id) {
       if (!input.membershipId) throw new Error('membership id required for scoped invitation');
       await tx.insert(schema.organizationMemberships).values({
@@ -195,6 +214,39 @@ export async function acceptInvitationByTokenHashForVerifiedRecipientWithIdempot
         ...(invitation.scope_batch_unit_id ? { scopeBatchUnitId: invitation.scope_batch_unit_id } : {}),
         ...(invitation.scope_employer_id ? { scopeEmployerId: invitation.scope_employer_id } : {}),
       });
+
+      // GROWTH-01 (D13): a growth invitation carries the person's staff type, which the
+      // database requires of every growth invitation. The first type is recorded here, with
+      // the membership it belongs to, as set by the person who sent the invitation.
+      if (invitation.growth_staff_type) {
+        const staffTypeId = randomUUID();
+        await tx.execute(sql`
+          INSERT INTO growth_staff_types (id, membership_id, staff_type, set_by_user_id, reason_code)
+          VALUES (${staffTypeId}::uuid, ${input.membershipId}::uuid, ${invitation.growth_staff_type}, ${invitation.invited_by_user_id}::uuid, 'INITIAL_TYPE')
+        `);
+        await writeAuditEvent(tx, {
+          id: randomUUID(),
+          actorUserId: acceptedUserId,
+          action: 'growth.staff_type.set',
+          resourceType: 'organization_membership',
+          resourceId: input.membershipId,
+          organizationId: invitation.organization_id,
+          outcome: 'SUCCESS',
+          correlationId: input.correlationId,
+          context: { staffType: invitation.growth_staff_type, reasonCode: 'INITIAL_TYPE', source: 'INVITATION', invitationId: invitation.id, setByUserId: invitation.invited_by_user_id },
+        });
+        await writeOutboxEvent(tx, {
+          id: randomUUID(),
+          aggregateType: 'growth_staff_type',
+          aggregateId: staffTypeId,
+          eventType: 'growth.staff_type.set',
+          eventVersion: 1,
+          payload: { membershipId: input.membershipId, staffType: invitation.growth_staff_type },
+          actorUserId: acceptedUserId,
+          organizationId: invitation.organization_id,
+          correlationId: input.correlationId,
+        });
+      }
     }
 
     await writeAuditEvent(tx, {

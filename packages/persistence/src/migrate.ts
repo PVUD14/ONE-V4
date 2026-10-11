@@ -1,5 +1,5 @@
-import { readdir, readFile } from 'node:fs/promises';
 import { Pool } from 'pg';
+import { runMigrations } from './migration-runner.js';
 
 const databaseUrl = process.env.DATABASE_URL?.trim();
 if (!databaseUrl) throw new Error('DATABASE_URL is required');
@@ -15,14 +15,9 @@ if (process.env.NODE_ENV === 'production' && process.env.ALLOW_PRODUCTION_MIGRAT
 const pool = new Pool({ connectionString: databaseUrl });
 
 try {
-  const migrationDir = new URL('../drizzle/', import.meta.url);
-  const migrations = (await readdir(migrationDir)).filter((file) => file.endsWith('.sql')).sort();
-
-  for (const migrationName of migrations) {
-    const migration = await readFile(new URL(migrationName, migrationDir), 'utf8');
-    await pool.query(migration);
-    console.log(`applied ${migrationName}`);
-  }
+  // Each migration runs once and is recorded (ADR-035); see migration-runner.ts.
+  const result = await runMigrations(pool, new URL('../drizzle/', import.meta.url), (line) => console.log(line));
+  console.log(`migrations: ${result.applied.length} applied, ${result.skipped.length} already applied${result.bootstrapped ? ' (ledger created)' : ''}`);
 } finally {
   await pool.end();
 }

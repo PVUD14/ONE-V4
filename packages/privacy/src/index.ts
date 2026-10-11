@@ -52,7 +52,38 @@ export function exportExpiresAt(readyAt: Date, availabilityDays = EXPORT_AVAILAB
   return expires;
 }
 
-const TERMINAL_STATES: readonly PrivacyRequestState[] = ['COMPLETED', 'REJECTED', 'CANCELLED', 'FAILED'];
+/**
+ * The statutory period within which ONE must answer each request type, in days.
+ *
+ * Not defined yet, so every value is null and every statutory due date is "NA" on the
+ * operations console (OPS-06). The privacy notice draft leaves the response period as a
+ * TODO for legal review, and neither the DPDP Act text nor rules are encoded anywhere in
+ * the codebase. Guessing a number here would print a legal deadline nobody approved.
+ * When the period is decided, set it here: the console computes due dates from the real
+ * `requested_at` of each request and needs no other change.
+ *
+ * This is not the deletion grace period above: that is when an erasure is scheduled to
+ * run, a product safeguard, not the deadline for responding to the request.
+ */
+export const STATUTORY_RESPONSE_PERIOD_DAYS: Readonly<Record<PrivacyRequestType, number | null>> = {
+  EXPORT: null,
+  DELETION: null,
+};
+
+/** When a request must be answered by statute, or null when no period is defined. */
+export function statutoryResponseDueAt(
+  requestType: PrivacyRequestType,
+  requestedAt: Date,
+  periods: Readonly<Record<PrivacyRequestType, number | null>> = STATUTORY_RESPONSE_PERIOD_DAYS,
+): Date | null {
+  const days = periods[requestType];
+  if (days === null) return null;
+  const due = new Date(requestedAt.getTime());
+  due.setUTCDate(due.getUTCDate() + days);
+  return due;
+}
+
+const TERMINAL_STATES: readonly PrivacyRequestState[] =['COMPLETED', 'REJECTED', 'CANCELLED', 'FAILED'];
 
 export function isTerminalPrivacyState(state: PrivacyRequestState): boolean {
   return TERMINAL_STATES.includes(state);
@@ -142,7 +173,9 @@ export function assertExportDownloadable(input: {
 
 export type DeletionCategory =
   | 'IDENTITY' | 'STUDENT_PROFILE' | 'INSTITUTION_ROSTER' | 'DOCUMENTS'
-  | 'APPLICATIONS' | 'OFFERS' | 'ASSESSMENT_EVIDENCE' | 'NOTIFICATIONS' | 'AUDIT';
+  | 'APPLICATIONS' | 'OFFERS' | 'ASSESSMENT_EVIDENCE' | 'NOTIFICATIONS' | 'AUDIT' | 'SUPPORT_CASES'
+  | 'LEARNING_ACTIVITY' | 'COUNSELLING_NOTES' | 'APPLICATION_MESSAGES' | 'EMPLOYER_SCREENING'
+  | 'STAFF_ACTIONS' | 'CONSENT_RECORDS';
 
 export type DeletionDisposition = 'ERASED' | 'ANONYMISED' | 'RETAINED';
 
@@ -169,6 +202,34 @@ export const DELETION_POLICY: readonly DeletionPolicyEntry[] = [
   { category: 'APPLICATIONS', disposition: 'ANONYMISED', basis: 'Employers retain a record of applications and hiring decisions they lawfully made.' },
   { category: 'OFFERS', disposition: 'ANONYMISED', basis: 'Employers retain a record of offers they issued.' },
   { category: 'ASSESSMENT_EVIDENCE', disposition: 'ANONYMISED', basis: 'Aggregate assessment integrity depends on evidence remaining, detached from the person.' },
+  // OPS-05: the operator's service record survives with the person removed from it — the
+  // subject link, the typed summary and every note (docs/architecture/support-cases-table-design.md).
+  { category: 'SUPPORT_CASES', disposition: 'ANONYMISED', basis: 'Support records are kept as a history of the service given, with the person, the summary and the notes removed.' },
+  // Engine behavioural data — the attempt log, learning sessions, learning activity
+  // telemetry and the learner skill state projection (ENG-05) — is only about the person, so it
+  // is erased, not anonymised (ADR-034). It is append-only (or projector-only) for everyone
+  // else; only the deletion transaction may remove it. Since 2026-09-30 (Divakar's decision) it also
+  // covers the learning history: lesson progress, topic bands, readiness snapshots, roadmap actions and
+  // readiness checks (docs/architecture/privacy-export-coverage.md, D2).
+  { category: 'LEARNING_ACTIVITY', disposition: 'ERASED' },
+  // INST-11: counselling notes a college wrote about the person, and the list of staff on their
+  // counselling case, are erased with them (docs/architecture/counselling-notes-table-design.md).
+  { category: 'COUNSELLING_NOTES', disposition: 'ERASED' },
+  // Divakar, 2026-09-30 (privacy-export-coverage.md, D1): every other staff-only college action about the
+  // person loses all of its text; the row's skeleton stays because the college's counts and the rows that
+  // reference it (0082) need it, and nothing in it identifies the person once the account is anonymised.
+  { category: 'STAFF_ACTIONS', disposition: 'ERASED' },
+  // EMP-10: the text of every message in the person's application conversations, both sides — the
+  // whole conversation is about them. The rows stay without text so an employer's pipeline and a
+  // trust case's references remain valid (docs/architecture/application-messages-table-design.md).
+  { category: 'APPLICATION_MESSAGES', disposition: 'ERASED' },
+  // EMP-12 privacy fix: an employer screening attempt and its stored score are the employer's hiring
+  // record, like the application they belong to; what the candidate selected is erased
+  // (docs/architecture/employer-screening-privacy-design.md).
+  { category: 'EMPLOYER_SCREENING', disposition: 'ANONYMISED', basis: 'Employers retain the record that they sent you a screening test and the score it produced; your answers are erased.' },
+  // Divakar, 2026-09-30 (privacy-export-coverage.md, D3): consent grants and withdrawals are the proof that
+  // processing was agreed to, so they stay, on the anonymised account and nothing else.
+  { category: 'CONSENT_RECORDS', disposition: 'RETAINED', basis: 'Proof of what you agreed to is kept as a legal obligation: which notice and version, whether you granted or withdrew it, and when. It is linked only to the anonymised account; nothing else about you is kept with it.' },
   { category: 'AUDIT', disposition: 'RETAINED', basis: 'Security and access audit records are retained under the approved retention schedule.' },
 ];
 

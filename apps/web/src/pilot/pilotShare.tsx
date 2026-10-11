@@ -33,7 +33,7 @@ export function QrSvg({ value, size = 176 }: { readonly value: string; readonly 
   </svg>;
 }
 
-const PUBLIC_URL = 'https://one.ai8ht.pro/p/arjun-reddy';
+const PUBLIC_URL = 'https://oneby8.com/p/arjun-reddy';
 
 export function shareProfileModal(): ModalState {
   return {
@@ -67,7 +67,7 @@ function ShareProfileBody(): React.ReactElement {
       <div style={{ minWidth: 0, flex: 1 }}>
         <span className="pilot-chip green" style={{ marginBottom: 8 }}>Public link enabled</span>
         <p className="pilot-modal-text" style={{ margin: '8px 0' }}>Anyone who scans this code or opens the link sees {pilotPersona.firstName}&apos;s public profile - and nothing else.</p>
-        <div className="pilot-share-link"><Link2 size={13} /> <span>one.ai8ht.pro/p/arjun-reddy</span></div>
+        <div className="pilot-share-link"><Link2 size={13} /> <span>oneby8.com/p/arjun-reddy</span></div>
       </div>
     </div>
     <div style={{ margin: '14px 0 4px' }}>
@@ -76,7 +76,7 @@ function ShareProfileBody(): React.ReactElement {
         {['Name & photo', 'Institution (verified)', 'Education', 'Projects', 'Certificates', 'Skills'].map((item) => (
           <span key={item} className="pilot-chip blue"><CheckCircle2 size={11} /> {item}</span>
         ))}
-        <span className="pilot-chip slate"><EyeOff size={11} /> Readiness scores — never public</span>
+        <span className="pilot-chip slate"><EyeOff size={11} /> Readiness band — never public</span>
       </div>
     </div>
     <div className="pilot-modal-actions">
@@ -170,7 +170,7 @@ export function ReportFormatBody({ filenameBase, title, rows }: {
       table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
       td { border-bottom: 1px solid #e5eaf2; padding: 8px 10px; text-align: left; }
       tr:first-child td { font-weight: 700; }
-    </style><h1>${title}</h1><p>ONE by Ai8ht · sample data · use your browser's dialog to save as PDF</p><table>${bodyRows}</table>`);
+    </style><h1>${title}</h1><p>ONE by AI8HT · sample data · use your browser's dialog to save as PDF</p><table>${bodyRows}</table>`);
     printable.document.close();
     printable.focus();
     printable.print();

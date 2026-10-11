@@ -20,16 +20,35 @@ export interface IdentityTokenVerifier {
 export interface CognitoVerifierConfig {
   readonly userPoolId: string;
   readonly clientId: string;
+  /**
+   * ADR-025's staff pool. Each pool is verified against its own issuer, keys and client
+   * id: aws-jwt-verify selects the pool by the token's issuer and then requires that
+   * pool's client id, so a student-pool token cannot borrow the staff client id.
+   * Absent, the verifier is built exactly as before.
+   */
+  readonly additionalPools?: readonly { readonly userPoolId: string; readonly clientId: string }[];
 }
 
 export function createCognitoTokenVerifier(config: CognitoVerifierConfig): IdentityTokenVerifier {
   if (!config.userPoolId || !config.clientId) throw new Error('Cognito verifier configuration is incomplete');
+  const additionalPools = config.additionalPools ?? [];
+  const poolIds = new Set([config.userPoolId]);
+  for (const pool of additionalPools) {
+    if (!pool.userPoolId || !pool.clientId) throw new Error('Cognito verifier configuration is incomplete');
+    if (poolIds.has(pool.userPoolId)) throw new Error('Cognito verifier configuration repeats a user pool');
+    poolIds.add(pool.userPoolId);
+  }
 
-  const verifier = CognitoJwtVerifier.create({
-    userPoolId: config.userPoolId,
-    tokenUse: 'access',
-    clientId: config.clientId,
-  });
+  const verifier = additionalPools.length
+    ? CognitoJwtVerifier.create([
+      { userPoolId: config.userPoolId, tokenUse: 'access', clientId: config.clientId },
+      ...additionalPools.map((pool) => ({ userPoolId: pool.userPoolId, tokenUse: 'access' as const, clientId: pool.clientId })),
+    ])
+    : CognitoJwtVerifier.create({
+      userPoolId: config.userPoolId,
+      tokenUse: 'access',
+      clientId: config.clientId,
+    });
 
   return {
     async verifyAccessToken(token: string): Promise<VerifiedIdentityToken> {

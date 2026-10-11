@@ -45,6 +45,14 @@ export function PilotOverlayProvider({ children }: { readonly children: React.Re
   const openModal = useCallback((next: ModalState) => setModal(next), []);
   const closeModal = useCallback(() => setModal(null), []);
 
+  // A pending toast timer outlives the provider without this. In the browser that
+  // is a state update on an unmounted tree; under test it fires after teardown and
+  // reaches for a window that no longer exists.
+  useEffect(() => () => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = null;
+  }, []);
+
   useEffect(() => {
     if (!modal) return;
     const onKey = (event: KeyboardEvent): void => { if (event.key === 'Escape') setModal(null); };
@@ -155,7 +163,12 @@ export function downloadCsv(filename: string, rows: readonly (readonly string[])
   anchor.href = url;
   anchor.download = filename;
   anchor.click();
-  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  // Fire-and-forget by nature: the download has already started and there is no
+  // component to hang the cleanup on. Guarded so a teardown between the click and
+  // the revoke cannot turn a released object URL into an unhandled error.
+  setTimeout(() => {
+    try { URL.revokeObjectURL(url); } catch { /* the document is already gone */ }
+  }, 4000);
 }
 
 function LaunchBody({ context, action }: { readonly context: string; readonly action: string }): React.ReactElement {
@@ -280,7 +293,7 @@ function modalForAction(label: string, context: string): ModalState | { readonly
     return {
       title: `Apply — ${context}`, subtitle: 'Sample application', body: <OverlayForm
         fields={[
-          { label: 'Applying as', value: 'Arjun Reddy · VIT Chennai' },
+          { label: 'Applying as', value: 'Arjun Reddy · Lakeview Institute' },
           { label: 'Resume', type: 'select', value: 'Software Engineer Resume (score 78)', options: ['Software Engineer Resume (score 78)', 'Internship Resume (score 72)', 'Campus Placement Resume (score 68)'] },
           { label: 'Cover note', type: 'textarea', placeholder: 'A short note to the recruiter (optional)' },
         ]}
@@ -291,7 +304,7 @@ function modalForAction(label: string, context: string): ModalState | { readonly
     return {
       title: `Register — ${context}`, subtitle: 'Sample registration', body: <OverlayForm
         fields={[
-          { label: 'Registering as', value: 'Arjun Reddy · VIT2027-0412' },
+          { label: 'Registering as', value: 'Arjun Reddy · LIT2027-0412' },
           { label: 'Confirmation email', type: 'email', value: 'demo.student@uat.example.test' },
         ]}
         submitLabel="Confirm Registration" success={`Registered for ${context} (sample).`} />,
@@ -379,7 +392,7 @@ export function usePilotClickFallback(config: PilotShellConfig): (event: React.M
     if ('download' in result) {
       const filename = `${context.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-sample.csv`;
       downloadCsv(filename, [
-        ['ONE by Ai8ht — sample export', ''],
+        ['ONE by AI8HT — sample export', ''],
         ['Context', context],
         ['Generated from', 'Pilot preview (sample data only)'],
       ]);

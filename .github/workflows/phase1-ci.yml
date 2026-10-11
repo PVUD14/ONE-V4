@@ -52,6 +52,18 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+      # oneby8.com must ship no pilot sample data and no sandbox marker; the sandbox build
+      # for demo.oneby8.com must be the real application with the marker (ADR-046,
+      # apps/web/scripts/check-demo-boundary.mjs). Same check the web image build runs.
+      - name: Demo boundary (production and sandbox builds)
+        shell: bash
+        run: |
+          set -euo pipefail
+          node apps/web/scripts/check-demo-boundary.mjs apps/web/dist production
+          VITE_SANDBOX=true pnpm --filter @planthepath/web exec vite build --outDir "$RUNNER_TEMP/web-sandbox" --emptyOutDir
+          node apps/web/scripts/check-demo-boundary.mjs "$RUNNER_TEMP/web-sandbox" sandbox
+      - name: Production preflight cases (synthetic app.env only)
+        run: bash deploy/scripts/test-preflight-production.sh
       - run: pnpm db:migrate
       - name: Validate additive upgrade from Phase B migrations
         shell: bash
@@ -65,3 +77,28 @@ jobs:
           DATABASE_URL=postgresql://planthepath:planthepath_ci@127.0.0.1:5432/planthepath_upgrade pnpm db:migrate
       - name: Scan production dependencies
         run: pnpm audit --prod --audit-level=high
+
+  # ENG-21: the bake-off harness that runs on the inference pod (Python, standard library only), against
+  # a local fake endpoint. No dependencies to install and no network beyond 127.0.0.1.
+  bake-off-harness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Harness tests
+        shell: bash
+        run: python3 -m unittest discover -s deploy/ai-pod/bake-off/tests -v
+
+  # ENG-13: the offline calibration job (Python, jobs/calibration). Uses the runner's own
+  # python3 so no further action needs pinning; dependencies are pinned in requirements.txt.
+  calibration-job:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Parameter recovery on synthetic learners
+        working-directory: jobs/calibration
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/calibration-venv"
+          "$RUNNER_TEMP/calibration-venv/bin/python" -m pip install --quiet -r requirements-dev.txt
+          "$RUNNER_TEMP/calibration-venv/bin/python" -m pytest -q

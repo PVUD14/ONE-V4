@@ -29,6 +29,38 @@ The service then emails you when pings stop arriving (host dead) or when the fai
 endpoint is hit (host alive but broken). Without these URLs the monitor still runs
 and logs, but nobody is told.
 
+## Background jobs alert check
+
+Every five minutes, one pass of `jobs:alert-check` (OPS-04). It looks at the outbox and
+consumer receipts and raises **one alert per breach**: failed events at or above
+`JOBS_ALERT_FAILED_THRESHOLD` (default 10), a due event waiting at least
+`JOBS_ALERT_PENDING_STALL_MINUTES` (default 30), or a consumer listed in
+`JOBS_ALERT_CONSUMER_SILENCE_MINUTES` with no receipt in its interval. It clears the alert
+when the condition recovers. Operators see open and recent alerts in Operations →
+System Health. It runs apart from the automation worker, so a stopped worker still shows
+up as a stalled queue.
+
+An alert is emailed to platform staff only when the `ops-failure` workflow is registered
+active, outside its kill switch, and an approved `ops-failure` notification template
+exists. Otherwise the alert is recorded as not emailed, and the screen says so.
+
+```bash
+sudo cp /srv/planthepath-next/current/deploy/systemd/planthepath-jobs-alerts.* /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now planthepath-jobs-alerts.timer
+sudo systemctl start planthepath-jobs-alerts.service && journalctl -u planthepath-jobs-alerts.service -n 3 --no-pager
+```
+
+A run logs one line:
+
+```json
+{"event":"jobs.alert.check","raised":[{"condition":"PENDING_EVENTS_STALLED","subject":null,"notice":"NOT_DELIVERED"}],"cleared":[],"open":1,"ignoredConfig":[]}
+```
+
+Until the pre-dispatcher backlog is superseded (System Health → Supersede the backlog),
+expect a `PENDING_EVENTS_STALLED` alert on the first run. That alert is correct: those
+events are waiting and nothing is delivering them.
+
 ## Off-host backup copy
 
 The backup script copies each verified dump off the machine when either is set in
@@ -51,6 +83,11 @@ browser's, not the API's), and `AUTOMATION_SIGNING_SECRET` (≥32 bytes;
 `openssl rand -base64 48`). Release deploy scripts run the preflight before
 building, and pass `ALLOW_PRODUCTION_MIGRATIONS=true` to the migrate step per-run —
 that guard exists so production migrations are a conscious act, never ambient.
+
+The staff pool (ADR-025) is optional: `COGNITO_STAFF_USER_POOL_ID` and
+`COGNITO_STAFF_CLIENT_ID` are set together or not at all. Unset, the preflight warns;
+with `--require-staff-pool` it fails. Setting them up and turning them on is
+`docs/ops/runbook-staff-pool.md`.
 
 ## Database backup with restore verification
 
@@ -130,3 +167,70 @@ clean sweep.
 The unit runs as `aight` from `/srv/planthepath-next/current`, so it always uses the
 release currently serving traffic and needs no update when a new release is switched
 in. `ReadWritePaths` grants it the storage root and nothing else.
+
+## Monthly recalibration (ENG-26; replaces ENG-13's weekly calibration)
+
+Monthly (the 1st, 22:00 UTC), one pass per kind — 2PL items, then BKT skills: the TypeScript
+export writes a de-identified file from students holding the live `model-improvement` consent
+plus a baseline of the parameters a refit would replace; the Python job (`jobs/calibration`)
+fits and compares; the TypeScript `record` stores the result as a **PENDING proposal** and
+writes a markdown report. **Nothing is adopted by the timer**: Divakar accepts or rejects each
+run (`docs/ops/runbook-monthly-recalibration.md`). ENG-13's weekly `planthepath-calibration`
+units, which imported every fit straight into `item_calibrations`, are removed. Until the engine
+consent purposes are published (HG-6) the exports are empty and every run fits nothing — the
+intended fail-closed behaviour. Design: `docs/architecture/recalibration-runs-table-design.md`.
+
+**Written, not installed.** Installing it is a manual step:
+
+```bash
+# Python 3.11 or newer; the job's pinned dependencies in their own venv.
+python3 -m venv /srv/planthepath-next/shared/calibration-venv
+/srv/planthepath-next/shared/calibration-venv/bin/pip install -r /srv/planthepath-next/current/jobs/calibration/requirements.txt
+sudo install -d -o aight -g aight -m 0750 /srv/planthepath-next/shared/recalibration-reports
+sudo cp /srv/planthepath-next/current/deploy/systemd/planthepath-recalibration.* /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now planthepath-recalibration.timer
+```
+
+A run logs counts only — never a pseudonym, user, item or skill:
+
+```json
+{"event":"engine.recalibration.exported","kind":"ITEM_2PL","runId":"…","learners":0,"items":0,"responses":0,"baselineItems":0}
+{"event":"engine.calibration.fitted","runId":"…","learners":0,"responses":0,"items":0,"statuses":{}}
+{"event":"engine.recalibration.compared","kind":"ITEM_2PL","runId":"…","verdict":"NO_COMPARISON","counts":{…}}
+{"event":"engine.recalibration.recorded","runId":"…","kind":"ITEM_2PL","recorded":true,"verdict":"NO_COMPARISON","counts":{…}}
+{"event":"engine.recalibration.report-written","runId":"…","file":"/srv/planthepath-next/shared/recalibration-reports/…md"}
+```
+
+`CALIBRATION_MIN_RESPONSES` (default 200) and `RECALIBRATION_MIN_LEARNERS` (default 100) in
+`app.env` override the CALIBRATED / FITTED thresholds; `RECALIBRATION_KINDS` (default `items bkt`)
+limits a run to one kind.
+
+## Content embeddings (ENG-24)
+
+Nightly (21:30 UTC), one run of `ai:content-embeddings`: approved, current lesson text is chunked
+and embedded through ONE AI Orchestration into `content_embeddings`, which the tutor's retrieval
+reads. It does nothing, and logs why, while the `content.embeddings` feature is off (the default —
+it needs a chosen embedding model and a passing evaluation), the kill switch is engaged, or
+`ONE_AI_EMBEDDING_BASE_URL` / `ONE_AI_EMBEDDING_API_KEY` / `ONE_AI_EMBEDDING_MODEL` are blank.
+Archived or replaced content never waits for this job: retrieval re-checks approval on every query.
+Design: `docs/architecture/content-retrieval-design.md`; ADR-050.
+
+**Written, not installed.** Installing it is a manual step:
+
+```bash
+sudo cp /srv/planthepath-next/current/deploy/systemd/planthepath-content-embeddings.* /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now planthepath-content-embeddings.timer
+```
+
+A run logs one line of counts and codes — never content text, a vector or the key:
+
+```json
+{"event":"content-embeddings.unavailable","state":"UNAVAILABLE","reason":"FEATURE_DISABLED"}
+{"event":"content-embeddings.finished","state":"COMPLETED","mode":"INCREMENTAL","model":"…","embeddingVersion":"content-embedding@1","pruned":0,"embeddedRevisions":12,"chunksWritten":31,"skipped":{"empty":0,"tooLong":0,"withdrawnDuringRun":0},"stopReason":null,"failureClass":null}
+```
+
+A run that stopped early (cap reached, switched off mid-run, endpoint failing) exits 2 and shows as a
+failed unit; the next run resumes. `--rebuild` (by hand) empties the index and re-embeds approved
+content only.

@@ -6,6 +6,7 @@ import {
   loadActiveMembershipsForUser,
 } from '@planthepath/persistence/src/identity-authentication.js';
 import * as schema from '@planthepath/persistence/src/schema.js';
+import { survivePoolErrors } from '@planthepath/persistence/src/pool-errors.js';
 import type { InternalIdentityStore } from '@planthepath/identity/src/principal.js';
 import type { PersistenceDb } from '@planthepath/persistence/src/repositories.js';
 
@@ -30,7 +31,7 @@ export class PostgresRuntimeLifecycle implements OnModuleDestroy {
 }
 
 export function createDatabaseRuntime(databaseUrl: string): DatabaseRuntime {
-  const pool = new Pool({ connectionString: databaseUrl });
+  const pool = survivePoolErrors(new Pool({ connectionString: databaseUrl }), 'api');
   const db = drizzle(pool, { schema });
   return {
     pool,

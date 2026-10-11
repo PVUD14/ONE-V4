@@ -1,0 +1,14 @@
+# ENG-24: nightly content embeddings. Written in the repository only — not installed by the agent.
+[Unit]
+Description=Run ONE content embeddings nightly
+Documentation=https://github.com/PVUD14/planthepath-next
+
+[Timer]
+# 21:30 UTC (03:00 IST). Withdrawn content never waits for this: retrieval re-checks approval live.
+# A lesson published during the day is retrievable after the next run.
+OnCalendar=*-*-* 21:30:00 UTC
+Persistent=true
+RandomizedDelaySec=600
+
+[Install]
+WantedBy=timers.target

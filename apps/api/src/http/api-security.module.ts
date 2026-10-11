@@ -6,6 +6,7 @@ import {
   API_IDENTITY_VERIFIER,
   API_INTERNAL_IDENTITY_STORE,
   API_PERSISTENCE_DB,
+  API_STAFF_POOL_POLICY,
   Phase1ProtectedApiRoutes,
   ProtectedApiAuthenticationGuard,
   VerifiedIdentityAuthenticationGuard,
@@ -16,16 +17,82 @@ import { Phase1SecurityController } from './phase1-security.controller.js';
 import { API_INVITATION_MAIL_SINK, OperationsInstitutionOnboardingController, createConfiguredInvitationMailSink } from './operations-institution-onboarding.controller.js';
 import { StudentOperationalCoreController } from './student-operational-core.controller.js';
 import { StudentHiringController } from './student-hiring.controller.js';
+import { StudentResumesController } from './student-resumes.controller.js';
 import { EmployerHiringController } from './employer-hiring.controller.js';
 import { StudentDocumentsController } from './student-documents.controller.js';
 import { StudentPrivacyController } from './student-privacy.controller.js';
 import { InstitutionAssessmentsController } from './institution-assessments.controller.js';
+import { StaffActionsController } from './staff-actions.controller.js';
 import { StudentAssessmentAttemptsController } from './student-assessment-attempts.controller.js';
 import { AssistantController } from './assistant.controller.js';
 import { NotificationsController } from './notifications.controller.js';
 import { ConsentsController } from './consents.controller.js';
 import { HelpController } from './help.controller.js';
 import { StudentActivityController } from './student-activity.controller.js';
+import { OperationsOutboxController } from './operations-outbox.controller.js';
+import { OperationsPrivacyController } from './operations-privacy.controller.js';
+import { OperationsApprovalsController } from './operations-approvals.controller.js';
+import { OperationsSupportController } from './operations-support.controller.js';
+import { OperationsIncidentsController } from './operations-incidents.controller.js';
+import { OperationsCommunicationsController } from './operations-communications.controller.js';
+import { OperationsCareerCatalogueController } from './operations-career-catalogue.controller.js';
+import { OperationsSkillMapController } from './operations-skill-map.controller.js';
+import { OperationsQuestionBankController } from './operations-question-bank.controller.js';
+import { OperationsLessonsController } from './operations-lessons.controller.js';
+import { OperationsContentImportController } from './operations-content-import.controller.js';
+import { OperationsExternalReviewsController } from './operations-external-reviews.controller.js';
+import { InstitutionContentReviewsController } from './institution-content-reviews.controller.js';
+import { ExamTopicMappingController } from './exam-topic-mapping.controller.js';
+import { OperationsAuditController } from './operations-audit.controller.js';
+import { CalendarController } from './calendar.controller.js';
+import { EmployerAssessmentsController } from './employer-assessments.controller.js';
+import { EmployerTeamController } from './employer-team.controller.js';
+import { EmployerJobLifecycleController, StudentTermsChangeController } from './employer-job-lifecycle.controller.js';
+import { EmployerSkillCatalogueController } from './employer-skill-catalogue.controller.js';
+import { EmployerScorecardTemplatesController } from './employer-scorecard-templates.controller.js';
+import { EmployerCandidateViewController } from './employer-candidate-view.controller.js';
+import { SkillEvidenceController } from './skill-evidence.controller.js';
+import { TalentPoolController } from './talent-pool.controller.js';
+import { EmployerApplicantExportController } from './employer-applicant-export.controller.js';
+import { ApplicationMessagesController } from './application-messages.controller.js';
+import { InstitutionTeachingAssignmentsController } from './institution-teaching-assignments.controller.js';
+import { InstitutionAnnouncementsController } from './institution-announcements.controller.js';
+import { EmployerCompanyProfileController } from './employer-company-profile.controller.js';
+import { EmployerAccessRequestsController } from './employer-access-requests.controller.js';
+import { OperationsJobsController } from './operations-jobs.controller.js';
+import { OperationsOverviewController } from './operations-overview.controller.js';
+import { OperationsAnalyticsController } from './operations-analytics.controller.js';
+import { OperationsCollegeAccountsController, OperationsCollegeHealthController } from './operations-college-health.controller.js';
+import { InstitutionSettingsController } from './institution-settings.controller.js';
+import { InstitutionDepartmentWorkspaceController } from './institution-department-workspace.controller.js';
+import { InstitutionRelationshipBatchesController } from './institution-relationship-batches.controller.js';
+import { CounsellingNotesController } from './counselling-notes.controller.js';
+import { InstitutionLearningCohortController } from './institution-learning-cohort.controller.js';
+import { InstitutionLearningActionsController } from './institution-learning-actions.controller.js';
+import { InstitutionCohortReadinessController } from './institution-cohort-readiness.controller.js';
+import { PlacementTestController } from './placement-test.controller.js';
+import { LearningExperienceController } from './learning-experience.controller.js';
+import { CodeSubmissionsController } from './code-submissions.controller.js';
+import { EmployerCampusDrivesController, InstitutionCampusDrivesController } from './campus-drives.controller.js';
+import { InstitutionPlacementRegisterController } from './institution-placement-register.controller.js';
+import { EmployerReportsController } from './employer-reports.controller.js';
+import { EmployerSettingsController } from './employer-settings.controller.js';
+import { OperationsEmployerTermsController } from './operations-employer-terms.controller.js';
+import { OperationsAiController } from './operations-ai.controller.js';
+import { OperationsContentFactoryController } from './operations-content-factory.controller.js';
+import { ExplainTopicController } from './explain-topic.controller.js';
+import { OperationsExplainLessonsController } from './operations-explain-lessons.controller.js';
+import { InstitutionNominationsController, StudentNominationsController } from './campus-drive-nominations.controller.js';
+import { StudentOutcomeDeclarationsController } from './student-outcome-declarations.controller.js';
+import { OperationsGrowthTeamController } from './operations-growth-team.controller.js';
+import { OperationsGrowthTerritoriesController } from './operations-growth-territories.controller.js';
+import { GrowthLeadsController } from './growth-leads.controller.js';
+import { OperationsGrowthContactsPrivacyController, OperationsGrowthLeadsController } from './operations-growth-leads.controller.js';
+import { GrowthWorkspaceController } from './growth-workspace.controller.js';
+import { GrowthFieldController } from './growth-field.controller.js';
+import { GrowthPipelineController, OperationsGrowthHandoffsController } from './growth-pipeline.controller.js';
+import { GrowthReferralCodesController, OperationsGrowthEmployerController } from './growth-employer.controller.js';
+import { GrowthAttributionController, OperationsGrowthAttributionController } from './growth-attribution.controller.js';
 
 @Module({})
 export class Phase1ApiSecurityModule {
@@ -39,6 +106,7 @@ export class Phase1ApiSecurityModule {
       ...(configuredInvitationMailSink ? [{ provide: API_INVITATION_MAIL_SINK, useValue: configuredInvitationMailSink }] : []),
       ...(dependencies.fileStorage ? [{ provide: API_FILE_STORAGE, useValue: dependencies.fileStorage }] : []),
       ...(dependencies.fileScanner ? [{ provide: API_FILE_SCANNER, useValue: dependencies.fileScanner }] : []),
+      ...(dependencies.staffPoolPolicy ? [{ provide: API_STAFF_POOL_POLICY, useValue: dependencies.staffPoolPolicy }] : []),
       ProtectedApiAuthenticationGuard,
       VerifiedIdentityAuthenticationGuard,
       Phase1ProtectedApiRoutes,
@@ -46,12 +114,13 @@ export class Phase1ApiSecurityModule {
 
     return {
       module: Phase1ApiSecurityModule,
-      controllers: [Phase1SecurityController, OperationsInstitutionOnboardingController, StudentOperationalCoreController, StudentHiringController, EmployerHiringController, StudentDocumentsController, StudentPrivacyController, InstitutionAssessmentsController, StudentAssessmentAttemptsController, AssistantController, NotificationsController, ConsentsController, HelpController, StudentActivityController],
+      controllers: [StaffActionsController, Phase1SecurityController, OperationsInstitutionOnboardingController, StudentOperationalCoreController, StudentHiringController, StudentResumesController, EmployerHiringController, StudentDocumentsController, StudentPrivacyController, InstitutionAssessmentsController, StudentAssessmentAttemptsController, AssistantController, NotificationsController, ConsentsController, HelpController, StudentActivityController, OperationsAuditController, OperationsOutboxController, OperationsPrivacyController, OperationsApprovalsController, ExamTopicMappingController, CalendarController, EmployerAssessmentsController, EmployerTeamController, EmployerJobLifecycleController, StudentTermsChangeController, InstitutionTeachingAssignmentsController, EmployerCompanyProfileController, EmployerAccessRequestsController, OperationsSupportController, OperationsJobsController, InstitutionSettingsController, InstitutionAnnouncementsController, OperationsOverviewController, OperationsCareerCatalogueController, OperationsSkillMapController, OperationsAnalyticsController, InstitutionDepartmentWorkspaceController, EmployerSkillCatalogueController, EmployerScorecardTemplatesController, EmployerCandidateViewController, SkillEvidenceController, TalentPoolController, InstitutionRelationshipBatchesController, CounsellingNotesController, OperationsQuestionBankController, PlacementTestController, LearningExperienceController, CodeSubmissionsController, OperationsLessonsController, OperationsContentImportController, OperationsExternalReviewsController, InstitutionContentReviewsController, ApplicationMessagesController, EmployerCampusDrivesController, InstitutionCampusDrivesController, InstitutionPlacementRegisterController, InstitutionLearningCohortController, EmployerReportsController, OperationsCollegeHealthController, OperationsCollegeAccountsController, InstitutionNominationsController, StudentNominationsController, OperationsIncidentsController, OperationsCommunicationsController, StudentOutcomeDeclarationsController, InstitutionLearningActionsController, InstitutionCohortReadinessController, EmployerSettingsController, OperationsEmployerTermsController, EmployerApplicantExportController, OperationsAiController, OperationsGrowthTeamController, GrowthWorkspaceController, OperationsGrowthTerritoriesController, GrowthLeadsController, OperationsGrowthLeadsController, OperationsGrowthContactsPrivacyController, GrowthFieldController, GrowthPipelineController, OperationsGrowthHandoffsController, OperationsContentFactoryController, ExplainTopicController, OperationsExplainLessonsController, GrowthReferralCodesController, OperationsGrowthEmployerController, GrowthAttributionController, OperationsGrowthAttributionController],
       providers,
       exports: [
         API_IDENTITY_VERIFIER,
         API_INTERNAL_IDENTITY_STORE,
         API_PERSISTENCE_DB,
+        ...(dependencies.staffPoolPolicy ? [API_STAFF_POOL_POLICY] : []),
         ProtectedApiAuthenticationGuard,
         VerifiedIdentityAuthenticationGuard,
         Phase1ProtectedApiRoutes,

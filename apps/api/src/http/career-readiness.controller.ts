@@ -10,6 +10,7 @@ import {
   Inject,
   Param,
   Post,
+  Put,
   Query,
   Req,
   UseGuards,
@@ -26,8 +27,11 @@ import {
   startAssessmentAttempt,
   submitAssessmentAttempt,
 } from '@planthepath/persistence/src/career-readiness.js';
+import { LessonLanguageNotOffered, setLearnerLessonLanguage } from '@planthepath/persistence/src/lesson-languages.js';
 import { PG_POOL } from '../persistence.provider.js';
 import { ProtectedApiAuthenticationGuard, type ProtectedHttpRequest } from './api-security.js';
+import { resolveInstitutionStudentScope } from '@planthepath/persistence/src/institution-scope.js';
+import { institutionReportingMonth } from '@planthepath/authorization/src/index.js';
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const idempotencyKeyPattern = /^[A-Za-z0-9._:-]{8,128}$/;
@@ -61,6 +65,29 @@ export class CareerReadinessController {
     return getLearnerCareerReadinessState(this.pool, requireLearnerId(request));
   }
 
+  /**
+   * ENG-16: the language the learner reads lessons in. Only an offered language (English, Telugu,
+   * or one with a published lesson variant) may be chosen; lessons without a published rendering
+   * in it are served in English with a notice. Returns the choice and the languages offered.
+   */
+  @Put('/career-readiness/me/lesson-language')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async setLessonLanguage(@Req() request: ProtectedHttpRequest, @Body() body: unknown): Promise<Record<string, unknown>> {
+    const learnerId = requireLearnerId(request);
+    const correlationId = requireCorrelationId(request);
+    if (!body || typeof body !== 'object' || Array.isArray(body)) throw safeBadRequest();
+    const raw = body as Record<string, unknown>;
+    if (Object.keys(raw).some((key) => key !== 'language') || typeof raw.language !== 'string') throw safeBadRequest();
+    try {
+      return { lessonLanguage: await setLearnerLessonLanguage(this.pool, { userId: learnerId, language: raw.language, correlationId }) };
+    } catch (error) {
+      if (error instanceof LessonLanguageNotOffered) {
+        throw new BadRequestException({ error: { code: 'LESSON_LANGUAGE_NOT_OFFERED', message: 'Lessons are not offered in that language yet' } });
+      }
+      throw safeBadRequest();
+    }
+  }
+
   @Post('/career-readiness/lessons/:lessonVersionId/complete')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async completeLesson(
@@ -89,7 +116,9 @@ export class CareerReadinessController {
       const attempt = await startAssessmentAttempt(this.pool, { subjectUserId: learnerId,
         assessmentDefinitionId: requireUuid(assessmentDefinitionId), correlationId: requireCorrelationId(request),
         selectionSeed: randomUUID() });
-      await this.recordActivity(learnerId, 'EXAM_ATTEMPT_STARTED');
+      // Reopening an attempt already in progress is not a new start. Recording one would
+      // let closing and reopening the app inflate a learner's activity streak.
+      if (attempt.resumed !== true) await this.recordActivity(learnerId, 'EXAM_ATTEMPT_STARTED');
       return attempt;
     } catch (error) {
       throw mapDomainError(error);
@@ -152,8 +181,14 @@ export class CareerReadinessController {
     const membership = request.planThePath?.authorization?.selectedMembership;
     if (!membership || membership.organizationId !== id || !institutionReportRoles.includes(membership.role)) throw safeForbidden();
     if (!isIsoDate(periodStart) || !isIsoDate(periodEnd) || periodEnd < periodStart) throw safeBadRequest();
+    // INST-SR-01: one whole calendar month that has ended, so two reports can never be
+    // differenced to isolate one student (overlapping windows, or a window still filling).
+    if (!institutionReportingMonth(periodStart, periodEnd, new Date().toISOString().slice(0, 10))) throw reportPeriodInvalid();
+    const studentScope = await resolveInstitutionStudentScope(this.pool, id, [{
+      role: membership.role, membershipId: membership.id, departmentUnitId: membership.scope.departmentId ?? null, batchUnitId: membership.scope.batchId ?? null,
+    }]);
     try {
-      return await generateInstitutionAggregateReport(this.pool, { institutionId: id, periodStart, periodEnd });
+      return await generateInstitutionAggregateReport(this.pool, { institutionId: id, periodStart, periodEnd, studentScope });
     } catch {
       throw safeBadRequest();
     }
@@ -202,8 +237,21 @@ function isIsoDate(value: string): boolean {
 
 function mapDomainError(error: unknown): BadRequestException | ConflictException {
   const message = error instanceof Error ? error.message : '';
-  if (/already submitted|attempt limit|idempotency/i.test(message)) {
-    return new ConflictException({ error: { code: 'CONFLICT', message: 'Request conflicts with current state' } });
+  // "Request conflicts with current state" is API wording, and it reached the screen.
+  // A learner who cannot start the check needs to know which of these it is: they have
+  // used their attempts, or the one they had has run out of time. Neither sentence
+  // exposes anything internal, and both tell them what is actually true.
+  if (/attempt limit/i.test(message)) {
+    return new ConflictException({ error: { code: 'ATTEMPT_LIMIT_REACHED', message:
+      'You have used all your attempts at this check. Your results so far still count towards your band.' } });
+  }
+  if (/has expired/i.test(message)) {
+    return new ConflictException({ error: { code: 'ATTEMPT_EXPIRED', message:
+      'Time ran out on that attempt, so it could not be submitted.' } });
+  }
+  if (/already submitted|idempotency/i.test(message)) {
+    return new ConflictException({ error: { code: 'ALREADY_SUBMITTED', message:
+      'That attempt has already been submitted.' } });
   }
   // Prerequisite refusals name the missing lessons (their titles are the
   // learner's own published curriculum, safe to echo).
@@ -215,6 +263,10 @@ function mapDomainError(error: unknown): BadRequestException | ConflictException
     } });
   }
   return safeBadRequest();
+}
+
+function reportPeriodInvalid(): BadRequestException {
+  return new BadRequestException({ error: { code: 'REPORT_PERIOD_INVALID', message: 'A report covers one whole calendar month that has ended' } });
 }
 
 function safeBadRequest(): BadRequestException {

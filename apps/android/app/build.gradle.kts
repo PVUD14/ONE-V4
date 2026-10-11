@@ -13,13 +13,13 @@ android {
         applicationId = "pro.ai8ht.one"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
 
         // The production API origin. Debug builds may override via the in-app
         // developer settings; the /api/v1 contract is additive-only once this
         // app ships (see docs/architecture/MOBILE_FOUNDATION.md).
-        buildConfigField("String", "API_BASE_URL", "\"https://one.ai8ht.pro\"")
+        buildConfigField("String", "API_BASE_URL", "\"https://oneby8.com\"")
         // Cognito mobile app client — empty until the operator registers it
         // (AWS console, pool ap-south-1_nPl3qFkvB). The sign-in screen explains
         // itself while this is blank and offers the UAT token path instead.
@@ -29,6 +29,9 @@ android {
         buildConfigField("String", "COGNITO_SPA_CLIENT_ID", "\"1i2kqvh3hknfq6ntf1eph6nt5t\"")
         buildConfigField("String", "COGNITO_REGION", "\"ap-south-1\"")
         buildConfigField("String", "COGNITO_CLIENT_ID", "\"\"")
+        // A private app-link scheme, not a web address: it stays one.ai8ht.pro so
+        // the redirect already registered with Cognito keeps working after the
+        // site moved to oneby8.com.
         buildConfigField("String", "OAUTH_REDIRECT_URI", "\"one.ai8ht.pro://signin\"")
     }
 
@@ -59,6 +62,7 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation("androidx.browser:browser:1.8.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     // SRP sign-in against the existing Cognito client - same flow the web uses,

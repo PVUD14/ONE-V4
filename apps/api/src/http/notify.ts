@@ -3,7 +3,10 @@ import { sql } from 'drizzle-orm';
 import type { PersistenceDb } from '@planthepath/persistence/src/repositories.js';
 import type { ApiIdGenerator } from './api-security.js';
 
-export type NotificationKind = 'EXAM_ASSIGNED' | 'EXAM_REOPENED' | 'RESULT_PUBLISHED' | 'SYSTEM';
+export type NotificationKind = 'EXAM_ASSIGNED' | 'EXAM_REOPENED' | 'RESULT_PUBLISHED' | 'SYSTEM' | 'ANNOUNCEMENT'
+  // EMP-08 (0059): written by the hiring notification consumer, never from a request handler.
+  | 'APPLICATION_STAGE_CHANGED' | 'APPLICATION_TERMS_CHANGED' | 'INTERVIEW_SCHEDULED' | 'INTERVIEW_CHANGED'
+  | 'OFFER_EXTENDED' | 'OFFER_WITHDRAWN' | 'OFFER_EXPIRING' | 'OFFER_RESPONDED';
 
 const logger = new Logger('notify');
 

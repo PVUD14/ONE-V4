@@ -3,6 +3,7 @@ import {
   DELETION_GRACE_PERIOD_DAYS,
   DELETION_POLICY,
   PrivacyRuleError,
+  STATUTORY_RESPONSE_PERIOD_DAYS,
   anonymisedIdentity,
   assertExportDownloadable,
   assertPrivacyTransition,
@@ -11,6 +12,7 @@ import {
   deletionScheduledFor,
   exportExpiresAt,
   isDeletionDue,
+  statutoryResponseDueAt,
   type PrivacyRequestState,
 } from '../src/index.js';
 
@@ -126,9 +128,18 @@ describe('deletion policy', () => {
   });
 
   it('erases what is only about the person', () => {
-    for (const category of ['STUDENT_PROFILE', 'DOCUMENTS', 'NOTIFICATIONS'] as const) {
+    for (const category of ['STUDENT_PROFILE', 'DOCUMENTS', 'NOTIFICATIONS', 'LEARNING_ACTIVITY', 'COUNSELLING_NOTES', 'APPLICATION_MESSAGES', 'STAFF_ACTIONS'] as const) {
       expect(deletionPolicyFor(category).disposition).toBe('ERASED');
     }
+  });
+
+  it('keeps consent records only as proof, and says so', () => {
+    // Divakar, 2026-09-30: what the person agreed to is kept as proof, linked to the anonymised account.
+    const consent = deletionPolicyFor('CONSENT_RECORDS');
+    expect(consent.disposition).toBe('RETAINED');
+    expect(consent.basis).toMatch(/proof/i);
+    expect(consent.basis).toMatch(/legal obligation/i);
+    expect(consent.basis).toMatch(/nothing else about you/i);
   });
 
   it('detaches rather than destroys another party record', () => {
@@ -137,12 +148,22 @@ describe('deletion policy', () => {
       expect(deletionPolicyFor(category).disposition).toBe('ANONYMISED');
     }
     expect(deletionPolicyFor('AUDIT').disposition).toBe('RETAINED');
+    // OPS-05: support cases keep the service record and lose the person.
+    expect(deletionPolicyFor('SUPPORT_CASES').disposition).toBe('ANONYMISED');
+    // Employer screening attempts keep their score for the employer; the candidate's answers are erased.
+    expect(deletionPolicyFor('EMPLOYER_SCREENING').disposition).toBe('ANONYMISED');
+    expect(deletionPolicyFor('EMPLOYER_SCREENING').basis).toMatch(/answers are erased/i);
   });
 
   it('covers every declared category exactly once', () => {
     const categories = DELETION_POLICY.map((entry) => entry.category);
     expect(new Set(categories).size).toBe(categories.length);
-    expect(categories).toHaveLength(9);
+    // OPS-05 added SUPPORT_CASES, ENG-03 LEARNING_ACTIVITY, INST-11 COUNSELLING_NOTES, EMP-10
+    // APPLICATION_MESSAGES, the EMP-12 privacy fix EMPLOYER_SCREENING, and Divakar's 2026-09-30 deletion
+    // decisions STAFF_ACTIONS and CONSENT_RECORDS: all must be declared.
+    expect(categories).toHaveLength(16);
+    expect(categories).toEqual(expect.arrayContaining(['SUPPORT_CASES', 'LEARNING_ACTIVITY', 'COUNSELLING_NOTES', 'APPLICATION_MESSAGES', 'EMPLOYER_SCREENING',
+      'STAFF_ACTIONS', 'CONSENT_RECORDS']));
   });
 
   it('produces a deterministic, non-routable replacement identity', () => {
@@ -150,5 +171,20 @@ describe('deletion policy', () => {
     expect(first).toEqual(anonymisedIdentity('11111111-1111-4111-8111-111111111111'));
     expect(first.email).toMatch(/@deleted\.invalid$/);
     expect(first.email).not.toEqual(anonymisedIdentity('22222222-2222-4222-8222-222222222222').email);
+  });
+});
+
+// OPS-06: the operations console prints a statutory due date only when a period is defined in
+// code. None is yet, so the answer is null (shown as NA), never a guessed deadline.
+describe('statutory response due dates', () => {
+  it('are not defined for any request type yet', () => {
+    expect(STATUTORY_RESPONSE_PERIOD_DAYS).toEqual({ EXPORT: null, DELETION: null });
+    expect(statutoryResponseDueAt('EXPORT', new Date('2026-03-01T10:00:00Z'))).toBeNull();
+    expect(statutoryResponseDueAt('DELETION', new Date('2026-03-01T10:00:00Z'))).toBeNull();
+  });
+
+  it('count from the real request time once a period exists', () => {
+    const due = statutoryResponseDueAt('EXPORT', new Date('2026-03-01T10:00:00Z'), { EXPORT: 30, DELETION: null });
+    expect(due?.toISOString()).toBe('2026-03-31T10:00:00.000Z');
   });
 });

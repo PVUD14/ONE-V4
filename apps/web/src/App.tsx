@@ -1,5 +1,5 @@
 import { Bell, BookOpen, CircleHelp, BriefcaseBusiness, Building2, CalendarDays, ChevronDown, ClipboardCheck, FileText, Gauge, GraduationCap, Home, LayoutDashboard, MapPinned, Menu, MessageSquare, Search, Settings, ShieldCheck, Sparkles, Target, Trophy, UserRound, Wrench, X, type LucideIcon } from 'lucide-react';
-import { BrandWordmark } from './brand.js';
+import { BrandLogo } from './brand.js';
 import type { FormEvent } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -9,6 +9,8 @@ import {
   ApiRequestError,
   archiveStudentDocument,
   createStudentDocument,
+  documentVerificationLabel,
+  isDocumentVerified,
   downloadDocumentFile,
   uploadDocumentFile,
   getApiHealth,
@@ -38,6 +40,7 @@ import { StudentPreviewProvider, useStudentPreview } from './studentPreviewState
 import { PlacementOfficerPortal } from './staffPages.js';
 import { StudentApplicationsPage, StudentOpportunitiesPage } from './hiringPages.js';
 import { StudentPrivacyPanel } from './privacyPanel.js';
+import { StudentOutcomesCard } from './studentOutcomes.js';
 import { PilotApp } from './pilot/PilotApp.js';
 import { isPilotIdentity } from './pilot/pilotIdentity.js';
 import { CareerReadinessApiPanel } from './careerReadinessApiPanel.js';
@@ -46,12 +49,21 @@ import { StudentMessagesFlyout, StudentNotificationsBell } from './notifications
 import { AssistantWidget } from './assistantWidget.js';
 import { ConsentGate } from './consentGate.js';
 import { HelpFaqPanel } from './helpFaqPanel.js';
+import { CalendarPage } from './calendarPage.js';
+import { PublicProfilePage } from './publicProfilePage.js';
+import { PublicEmployerAccessPage } from './publicEmployerAccessPage.js';
+import { ShareProfilePanel } from './shareProfilePanel.js';
+import { StudentTalentPoolCard } from './talentPool.js';
+import { ScreeningAssessmentsPage } from './screeningAssessmentsPage.js';
 import { V2EmptyState, V2Stat } from './dashboardsV2.js';
 import { StudentDashboardV3 } from './studentDashboardV3.js';
+import { StudentGoalsPanel } from './studentGoals.js';
+import { StudentLearningPlan } from './studentLearning.js';
 import { StudentCareerToolsPage, StudentCompanyPrepPage, StudentPracticePage, StudentResumeBuilderPage, StudentScholarshipsPage } from './pilotParityPages.js';
-import { StudentAssessmentsV3, StudentLearningV3, StudentOpportunitiesV3, StudentProfileV3, StudentRoadmapV3 } from './parityWraps.js';
+import { StudentAssessmentsV3, StudentExplainV3, StudentLearningV3, StudentOpportunitiesV3, StudentProfileV3, StudentRoadmapV3 } from './parityWraps.js';
+import { StudentExplainPage } from './studentExplain.js';
 
-type RouteKey = 'dashboard' | 'career-path' | 'ai-coach' | 'readiness' | 'skills' | 'assessments' | 'learning' | 'experience' | 'opportunities' | 'applications' | 'interviews' | 'documents' | 'profile' | 'settings' | 'help' | 'practice' | 'company-prep' | 'career-tools' | 'scholarships' | 'resume-builder';
+type RouteKey = 'dashboard' | 'career-path' | 'ai-coach' | 'readiness' | 'skills' | 'assessments' | 'learning' | 'experience' | 'opportunities' | 'applications' | 'interviews' | 'documents' | 'profile' | 'settings' | 'help' | 'practice' | 'company-prep' | 'career-tools' | 'scholarships' | 'resume-builder' | 'calendar' | 'explain';
 
 interface NavItem {
   readonly label: string;
@@ -73,9 +85,12 @@ const navItems: readonly NavItem[] = [
   { label: 'Practice', path: '/student/practice', icon: Wrench, group: 'Prepare', route: 'practice' },
   { label: 'Company Prep', path: '/student/company-prep', icon: Building2, group: 'Prepare', route: 'company-prep' },
   { label: 'Experience', path: '/student/experience', icon: Trophy, group: 'Prepare', route: 'experience' },
+  // ADR-052: appended at the end of Prepare; nothing above or below moves.
+  { label: 'Ask ONE to explain', path: '/student/explain', icon: Sparkles, group: 'Prepare', route: 'explain' },
   { label: 'Opportunities', path: '/student/opportunities', icon: BriefcaseBusiness, group: 'Apply', route: 'opportunities' },
   { label: 'Applications', path: '/student/applications', icon: LayoutDashboard, group: 'Apply', route: 'applications' },
   { label: 'Interviews', path: '/student/interviews', icon: CalendarDays, group: 'Apply', route: 'interviews' },
+  { label: 'Calendar', path: '/student/calendar', icon: CalendarDays, group: 'Apply', route: 'calendar' },
   { label: 'Scholarships', path: '/student/scholarships', icon: GraduationCap, group: 'Apply', route: 'scholarships' },
   { label: 'Resume Builder', path: '/student/resume-builder', icon: FileText, group: 'Account', route: 'resume-builder' },
   { label: 'Documents', path: '/student/documents', icon: FileText, group: 'Account', route: 'documents' },
@@ -91,6 +106,7 @@ const routeTitles: Record<RouteKey, PageMeta> = {
   'career-tools': { title: 'Career Tools', eyebrow: 'Plan', description: 'Everything you need to plan, build and accelerate your career.' },
   scholarships: { title: 'Scholarships', eyebrow: 'Apply', description: 'Discover and apply for scholarships to support your education journey.' },
   'resume-builder': { title: 'Resume Builder', eyebrow: 'Account', description: 'Create professional resumes that showcase your skills and land your dream job.' },
+  calendar: { title: 'Calendar', eyebrow: 'Apply', description: 'Interviews, exam windows, assigned tasks and deadlines already recorded across ONE.' },
   'career-path': { title: 'My Career Path', eyebrow: 'Target career', description: 'Milestones, skill gaps, learning, and experience needed for your goal.' },
   'ai-coach': { title: 'AI Career Coach', eyebrow: 'Preview guidance', description: 'Explainable, non-authoritative recommendations using demo-only Student data.' },
   readiness: { title: 'Readiness', eyebrow: 'Employability model', description: 'Category scores, blockers, history, interventions, and supporting evidence.' },
@@ -105,9 +121,10 @@ const routeTitles: Record<RouteKey, PageMeta> = {
   profile: { title: 'Profile', eyebrow: 'Student-owned identity', description: 'Academic profile, career objective, consent, visibility, and evidence status.' },
   settings: { title: 'Settings', eyebrow: 'Account and privacy', description: 'Preferences, notifications, privacy, consent, accessibility, and security overview.' },
   help: { title: 'Help & FAQ', eyebrow: 'Guidance', description: 'Answers for students, from the same guide that powers the ONE Assistant.' },
+  explain: { title: 'Ask ONE to explain', eyebrow: 'Prepare', description: 'AI-written lessons on any topic you name — AI-generated, not checked by a person, and never counted toward anything.' },
 };
 
-const productName = 'ONE';
+const productName = 'ONE by AI8HT';
 const productTagline = 'LEARN | PREPARE | BUILD | GROW';
 const showDevelopmentIndicators = import.meta.env.DEV;
 /**
@@ -117,13 +134,19 @@ const showDevelopmentIndicators = import.meta.env.DEV;
 export function demoPortalEnabled(env: { readonly DEV: boolean; readonly VITE_ENABLE_DEMO_PORTAL?: string } = import.meta.env): boolean {
   return env.DEV || env.VITE_ENABLE_DEMO_PORTAL === 'true';
 }
-const enableDemoPortal = demoPortalEnabled();
-const protectedPortalRoots = ['/student', '/institution', '/employer', '/operations'] as const;
+// Written out rather than calling demoPortalEnabled() so the bundler sees a build-time
+// literal: with the flag off, every branch guarded by it - and the pilot's fictional
+// dataset it would pull in - is dropped from the production bundle, not merely hidden.
+// deploy/vps/Dockerfile.web proves this on every image build (scripts/check-demo-boundary.mjs).
+const enableDemoPortal = import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEMO_PORTAL === 'true';
+const protectedPortalRoots = ['/student', '/institution', '/employer', '/operations', '/growth'] as const;
 const portalChoices = [
   { family: 'Student', path: '/student', label: 'Student', detail: 'Learning, readiness, applications and personal growth.', icon: GraduationCap },
   { family: 'Institution', path: '/institution/admin', label: 'Institution', detail: 'Institution administration and student support.', icon: Building2 },
   { family: 'Employer', path: '/employer/recruiter', label: 'Employer', detail: 'Hiring workflows where backend support exists.', icon: BriefcaseBusiness },
   { family: 'Operations', path: '/operations/admin', label: 'Operations', detail: 'Platform administration and governance.', icon: ShieldCheck },
+  // GROWTH-01 (ADR-040): AI8HT's partnerships field staff. Navigation approved (HG-3, 2026-09-30).
+  { family: 'Growth', path: '/growth', label: 'Growth', detail: 'College and employer partnerships: leads, field visits, territory, targets and commission.', icon: MapPinned },
 ] as const;
 
 type WorkspaceFamily = typeof portalChoices[number]['family'];
@@ -282,7 +305,7 @@ export function App(): React.ReactElement {
   const activeWorkspace = workspaceResolution.state === 'resolved' ? workspaceForPath(path, workspaceResolution.choices) : null;
 
   useEffect(() => {
-    if (path === '/' || path === '/login' || path === '/demo' || effectivePath.startsWith('/institution/placement-officer') || rolePortal) return;
+    if (path === '/' || path === '/login' || path === '/demo' || path === '/employer-access' || effectivePath.startsWith('/institution/placement-officer') || rolePortal) return;
     const title = route === 'dashboard' ? 'Student Dashboard' : routeTitles[route].title;
     document.title = route === 'dashboard' ? `${title} | ${productName}` : `${title} - Student | ${productName}`;
   }, [effectivePath, path, rolePortal, route]);
@@ -293,7 +316,9 @@ export function App(): React.ReactElement {
 
   // Demo identities render the pilot experience and nothing else; every other
   // signed-in user falls through to the real application untouched.
-  if (authenticated && isPilotIdentity(authenticatedEmail)) {
+  // Only in a build with the demo flag on (local development, or the demo host): the
+  // production build of oneby8.com carries no pilot at all - demos live on demo.oneby8.com.
+  if (enableDemoPortal && authenticated && isPilotIdentity(authenticatedEmail)) {
     return <PilotApp email={authenticatedEmail ?? ''} onSignOut={handleSignOut} />;
   }
 
@@ -303,6 +328,23 @@ export function App(): React.ReactElement {
   if (import.meta.env.DEV && path.startsWith('/pilot-preview')) {
     const previewPersona = path.endsWith('/institution') ? 'demo.institution' : path.endsWith('/employer') ? 'demo.employer' : 'demo.student';
     return <PilotApp email={`${previewPersona}@dev.local`} onSignOut={handleSignOut} />;
+  }
+
+  // The one route that renders without a session. It must be checked before anything that
+  // looks at authStatus, or a signed-out visitor would be sent to the login screen instead
+  // of the page they were given a link to.
+  if (path.startsWith('/p/')) {
+    const shareToken = path.slice(3);
+    if (shareToken) return <PublicProfilePage token={shareToken} />;
+  }
+
+  // EMP-04: the public employer access request. Like /p/, it renders without a session and
+  // creates nothing but a pending request for operations to review.
+  if (path === '/employer-access') {
+    return <PublicEmployerAccessPage onNavigate={(nextPath) => {
+      window.history.pushState(null, '', nextPath);
+      setPath(currentPath());
+    }} />;
   }
 
   if (path === '/' || path === '/login') {
@@ -450,7 +492,7 @@ function LoginEntry({ authStatus, authNotice, workspaceResolution, onSignIn, onH
   }
   return <main className="login-shell">
     <section className="login-card" aria-labelledby="one-login-title">
-      <BrandWordmark className="login-logo" height={44} />
+      <BrandLogo className="login-logo" height={72} />
       <p className="auth-eyebrow">ONE PLATFORM</p>
       <h1 id="one-login-title">Sign in</h1>
       <p className="auth-subtitle">Sign in to your verified ONE career-readiness workspace.</p>
@@ -466,6 +508,7 @@ function LoginEntry({ authStatus, authNotice, workspaceResolution, onSignIn, onH
       <p className="auth-footnote">{productTagline}</p>
       {!signInUnavailable ? <button type="button" className="secondary" onClick={onHostedSignIn}>Use hosted sign-in fallback</button> : null}
       {enableDemoPortal ? <button type="button" className="secondary" onClick={() => onNavigate('/demo')}>Open demo previews</button> : null}
+      <p className="auth-footnote">Hiring graduates? <a href="/employer-access" onClick={(event) => { event.preventDefault(); onNavigate('/employer-access'); }}>Request employer access</a></p>
     </section>
   </main>;
 }
@@ -490,7 +533,7 @@ function WorkspaceChooser({ authStatus, authNotice, workspaceResolution, onSignI
   const choices = workspaceResolution.state === 'resolved' ? workspaceResolution.choices : [];
   return <main className="login-shell">
     <section className="login-card workspace-card">
-      <BrandWordmark className="login-logo" height={44} />
+      <BrandLogo className="login-logo" height={72} />
       <span className="eyebrow">{productTagline}</span>
       <h1>Choose your ONE workspace</h1>
       <p>Workspace access is populated only from server-authorized active memberships. This chooser does not grant roles or bypass server authorization.</p>
@@ -507,10 +550,31 @@ function WorkspaceChooser({ authStatus, authNotice, workspaceResolution, onSignI
 function resolveAuthorizedWorkspaces(context: SecurityContextDto): readonly AuthorizedWorkspace[] {
   const workspaces: AuthorizedWorkspace[] = [];
   const pushUnique = (workspace: AuthorizedWorkspace): void => {
+    if (workspace.family === 'Growth') {
+      // One Growth entry: a person who is both a manager and an executive works as the manager.
+      const existing = workspaces.findIndex((item) => item.family === 'Growth');
+      if (existing >= 0) {
+        if (workspace.role === 'GROWTH_MANAGER') workspaces[existing] = workspace;
+        return;
+      }
+    }
+    if (workspace.family === 'Employer') {
+      // One employer entry per organisation, as on Android: a person who is both owner and
+      // recruiter of the same employer opens one portal, labelled with the broader role.
+      const existing = workspaces.findIndex((item) => item.family === 'Employer' && item.organizationId === workspace.organizationId);
+      if (existing >= 0) {
+        if (employerRoleRank(workspace.role) < employerRoleRank(workspaces[existing]!.role)) workspaces[existing] = workspace;
+        return;
+      }
+    }
     if (!workspaces.some((item) => item.path === workspace.path && item.role === workspace.role && item.organizationId === workspace.organizationId)) workspaces.push(workspace);
   };
   if ((context.studentRelationships?.length ?? 0) > 0) {
     pushUnique({ ...portalChoices[0], role: 'STUDENT', organizationId: context.studentRelationships?.[0]?.institutionId ?? null });
+  } else if ((context.formerStudentRelationships?.length ?? 0) > 0) {
+    // INST-10: someone who graduated, transferred or left keeps their student workspace for their
+    // own data. No college is attached to it: they have left, and nothing may scope by it.
+    pushUnique({ ...portalChoices[0], role: 'STUDENT', organizationId: null });
   }
   for (const membership of context.memberships) {
     const workspace = workspaceForMembership(membership);
@@ -542,16 +606,30 @@ function workspaceError(reason: WorkspaceResolutionFailureReason, correlationId?
   };
 }
 
+const employerRoleOrder = ['EMPLOYER_OWNER', 'EMPLOYER_ADMIN', 'RECRUITER'] as const;
+function employerRoleRank(role: string): number {
+  const rank = employerRoleOrder.indexOf(role as typeof employerRoleOrder[number]);
+  return rank < 0 ? employerRoleOrder.length : rank;
+}
+
 function workspaceForMembership(membership: SecurityContextDto['memberships'][number]): AuthorizedWorkspace | null {
   const organizationId = membership.organizationId;
   if (membership.role === 'INSTITUTION_OWNER' || membership.role === 'INSTITUTION_ADMIN') return { ...portalChoices[1], role: membership.role, organizationId };
   if (membership.role === 'PLACEMENT_ADMIN') return { ...portalChoices[1], path: '/institution/placement-officer', label: 'Placement Admin', detail: 'Placement operations for the authorized institution.', role: membership.role, organizationId };
   if (membership.role === 'FACULTY_LECTURER') return { ...portalChoices[1], path: '/institution/faculty', label: 'Faculty', detail: 'Faculty workspace for assigned academic support.', role: membership.role, organizationId };
   if (membership.role === 'DEPARTMENT_HEAD') return { ...portalChoices[1], path: '/institution/department-head', label: 'Department Head', detail: 'Department workspace for authorized academic oversight.', role: membership.role, organizationId };
+  // Owners and admins run the same employer portal as recruiters; the server decides what each
+  // role may do, and owner/admin-only screens check the role for display only (EMP-01).
+  if (membership.role === 'EMPLOYER_OWNER') return { ...portalChoices[2], label: 'Employer Owner', detail: 'Employer workspace: hiring, team and company settings.', role: membership.role, organizationId };
+  if (membership.role === 'EMPLOYER_ADMIN') return { ...portalChoices[2], label: 'Employer Admin', detail: 'Employer workspace: hiring, recruiters and reports.', role: membership.role, organizationId };
   if (membership.role === 'RECRUITER') return { ...portalChoices[2], role: membership.role, organizationId };
   if (membership.role === 'OPERATIONS_ADMIN') return { ...portalChoices[3], role: membership.role, organizationId };
   if (membership.role === 'PLATFORM_SUPER_ADMIN') return { ...portalChoices[3], label: 'Platform Super Admin', detail: 'Platform operations workspace; distinct super-admin UI is not yet implemented.', role: membership.role, organizationId };
   if (membership.role === 'SECURITY_ADMIN') return { ...portalChoices[3], label: 'Security Admin', detail: 'Operations workspace available; dedicated security-admin surface is not yet implemented.', role: membership.role, organizationId };
+  // GROWTH-01: growth roles open the Growth portal only. They hold no internal capability, so
+  // no Operations workspace is offered to them.
+  if (membership.role === 'GROWTH_EXECUTIVE') return { ...portalChoices[4], label: 'Growth Executive', role: membership.role, organizationId };
+  if (membership.role === 'GROWTH_MANAGER') return { ...portalChoices[4], label: 'Growth Manager', role: membership.role, organizationId };
   return null;
 }
 
@@ -703,7 +781,7 @@ function StudentShell({ apiHealth, authNotice, authStatus, currentStudent, demoM
           {demoMode && showDevelopmentIndicators ? <PreviewBadge apiHealth={apiHealth} /> : null}
           {demoMode ? <StudentPreviewStatus authenticated={false} /> : <AuthenticatedStudentStatus currentStudent={currentStudent} />}
           {/* Pilot-exact pages carry their own pilot page head. */}
-          {['dashboard', 'practice', 'company-prep', 'career-tools', 'scholarships', 'resume-builder', 'career-path', 'learning', 'assessments', 'opportunities', 'profile'].includes(route) && authStatus.state === 'authenticated' ? null : <PageHeader meta={routeTitles[route]} />}
+          {['dashboard', 'practice', 'company-prep', 'career-tools', 'scholarships', 'resume-builder', 'career-path', 'learning', 'assessments', 'opportunities', 'profile', 'explain'].includes(route) && authStatus.state === 'authenticated' ? null : <PageHeader meta={routeTitles[route]} />}
           <RouteScreen route={route} authenticated={authStatus.state === 'authenticated'} currentStudent={currentStudent} />
         </main>
       </div>
@@ -730,7 +808,7 @@ function Sidebar({ path, collapsed, drawerOpen, onNavigate, onCollapse, onClose 
   const groups = ['Plan', 'Prepare', 'Apply', 'Account'] as const;
   return (
     <aside className={`student-sidebar ${drawerOpen ? 'drawer-open' : ''}`} aria-label="Student navigation">
-      <div className="sidebar-brand"><BrandWordmark height={30} /><span className="brand-copy"><strong>ONE</strong><small>LEARN | PREPARE | BUILD | GROW</small></span><button className="icon-button sidebar-close" type="button" aria-label="Close navigation" onClick={onClose} autoFocus={drawerOpen}><X size={18} /></button></div>
+      <div className="sidebar-brand"><BrandLogo height={collapsed ? 34 : 46} compact={collapsed} /><span className="brand-copy"><small>LEARN | PREPARE | BUILD | GROW</small></span><button className="icon-button sidebar-close" type="button" aria-label="Close navigation" onClick={onClose} autoFocus={drawerOpen}><X size={18} /></button></div>
       <nav className="sidebar-nav" aria-label="Grouped Student navigation">
         {groups.map((group) => <div className="nav-group" key={group}><span className="nav-group-label">{group}</span>{navItems.filter((item) => item.group === group).map((item) => { const Icon = item.icon; const active = normalizePath(path) === item.path; return <button key={item.path} type="button" className={`side-nav-item ${active ? 'active' : ''}`} aria-current={active ? 'page' : undefined} onClick={() => onNavigate(item)}><Icon size={18} aria-hidden="true" /><span>{item.label}</span></button>; })}</div>)}
       </nav>
@@ -760,9 +838,26 @@ function AuthenticatedStudentStatus({ currentStudent }: { readonly currentStuden
   if (currentStudent.state !== 'resolved') {
     return <section className="student-preview-status" role="status" aria-live="polite"><div><strong>Loading real Student identity</strong><span>ONE is loading your protected Student profile from the API.</span></div></section>;
   }
+  // INST-10: a former student is told plainly where they stand and what they keep.
+  if (currentStudent.student.formerStudent) return <FormerStudentNotice student={currentStudent.student} />;
   // Resolved: render nothing. The top bar already shows the user's name and
   // role; repeating email and account state here read as debug output (UAT #18).
   return <></>;
+}
+
+const formerStudentWords: Readonly<Record<string, string>> = { GRADUATED: 'Graduated from', TRANSFERRED: 'Transferred from', ENDED: 'Left' };
+
+/** What an alumnus sees above their workspace: where they stand, and what they keep (INST-10). */
+export function FormerStudentNotice({ student }: { readonly student: CurrentStudentDto }): React.ReactElement {
+  const college = student.institutionName ?? 'your college';
+  const state = student.relationship?.state ?? student.academicStatus;
+  const when = student.relationship?.effectiveTo
+    ? new Date(student.relationship.effectiveTo).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'long', year: 'numeric' })
+    : null;
+  return <section className="student-preview-status" role="status" aria-live="polite"><div>
+    <strong>{formerStudentWords[state] ?? 'Left'} {college}{when ? ` on ${when}` : ''}</strong>
+    <span>Your ONE account, your records and your choices stay yours. {college} now sees only what happened before that date. You can still ask it to verify past results from Academic record.</span>
+  </div></section>;
 }
 
 function studentIdentityFromAuth(authStatus: AuthStatus, currentStudent: CurrentStudentState): { readonly name: string; readonly initials: string; readonly detail: string } {
@@ -809,20 +904,23 @@ function RouteScreen({ route, authenticated, currentStudent }: { readonly route:
   if (route === 'career-tools') return <StudentCareerToolsPage />;
   if (route === 'scholarships') return <StudentScholarshipsPage />;
   if (route === 'resume-builder') return <StudentResumeBuilderPage />;
+  if (route === 'calendar') return <CalendarPage />;
+  // No sample lesson is shown in the preview: the screen needs a signed-in student and the real feature.
+  if (route === 'explain') return <V2EmptyState icon="💡" title="Ask ONE to explain needs you signed in" note="Sign in to ask ONE to explain a topic. Nothing is shown here in the preview." />;
   return <SettingsPage />;
 }
 
 function AuthenticatedStudentRoute({ route, currentStudent }: { readonly route: RouteKey; readonly currentStudent: CurrentStudentState }): React.ReactElement {
   if (route === 'dashboard') return <AuthenticatedStudentDashboard currentStudent={currentStudent} />;
-  if (route === 'profile') return <StudentProfileV3><AuthenticatedStudentProfile /></StudentProfileV3>;
+  if (route === 'profile') return <StudentProfileV3><AuthenticatedStudentProfile /><ShareProfilePanel /><StudentTalentPoolCard /><StudentOutcomesCard /></StudentProfileV3>;
   if (route === 'documents') return <AuthenticatedStudentDocuments />;
   if (route === 'opportunities') return <StudentOpportunitiesV3><StudentOpportunitiesPage /><AuthenticatedStudentSavedOpportunities /></StudentOpportunitiesV3>;
   if (route === 'applications') return <StudentApplicationsPage />;
-  if (route === 'career-path') return <StudentRoadmapV3><CareerReadinessApiPanel route="roadmap" /></StudentRoadmapV3>;
+  if (route === 'career-path') return <StudentRoadmapV3><StudentGoalsPanel /><CareerReadinessApiPanel route="roadmap" /></StudentRoadmapV3>;
   if (route === 'readiness') return <CareerReadinessApiPanel route="readiness" />;
   if (route === 'skills') return <CareerReadinessApiPanel route="skills" />;
-  if (route === 'assessments') return <StudentAssessmentsV3><ExamAttemptPanel /><CareerReadinessApiPanel route="assessments" /></StudentAssessmentsV3>;
-  if (route === 'learning') return <StudentLearningV3><CareerReadinessApiPanel route="learning" /></StudentLearningV3>;
+  if (route === 'assessments') return <StudentAssessmentsV3><ExamAttemptPanel /><ScreeningAssessmentsPage /><CareerReadinessApiPanel route="assessments" /></StudentAssessmentsV3>;
+  if (route === 'learning') return <StudentLearningV3><StudentLearningPlan /><CareerReadinessApiPanel route="learning" /></StudentLearningV3>;
   if (route === 'settings') return <><CareerReadinessApiPanel route="notifications" /><StudentPrivacyPanel /></>;
   if (route === 'help') return <HelpFaqPanel persona="student" />;
   if (route === 'practice') return <StudentPracticePage />;
@@ -830,6 +928,7 @@ function AuthenticatedStudentRoute({ route, currentStudent }: { readonly route: 
   if (route === 'career-tools') return <StudentCareerToolsPage />;
   if (route === 'scholarships') return <StudentScholarshipsPage />;
   if (route === 'resume-builder') return <StudentResumeBuilderPage />;
+  if (route === 'explain') return <StudentExplainV3><StudentExplainPage /></StudentExplainV3>;
   return <AuthenticatedStudentUnavailable route={route} />;
 }
 
@@ -867,7 +966,9 @@ function AuthenticatedStudentProfile(): React.ReactElement {
       profileSummary: String(form.get('profileSummary') ?? '').trim(),
       portfolioUrl: String(form.get('portfolioUrl') ?? '').trim(),
       visibilityState: String(form.get('visibilityState') ?? 'PRIVATE'),
-      employerDiscoveryEnabled: form.get('employerDiscoveryEnabled') === 'on',
+      // EMP-14: being found by employers is joined and left only through the Talent pool card below,
+      // which also records the consent; this form keeps whatever that set.
+      employerDiscoveryEnabled: profile?.employerDiscoveryEnabled ?? false,
       careerInterests: String(form.get('careerInterests') ?? '').split(',').map((item) => item.trim()).filter(Boolean),
     };
     try {
@@ -883,11 +984,10 @@ function AuthenticatedStudentProfile(): React.ReactElement {
     <form className="card wide-card student-form" onSubmit={(event) => { void submit(event); }}>
       <label className="student-form-field"><span>Target career</span><input name="targetCareer" defaultValue={profile?.targetCareer ?? ''} maxLength={120} /></label>
       <label className="student-form-field"><span>Headline</span><input name="profileHeadline" defaultValue={profile?.profileHeadline ?? ''} maxLength={160} /></label>
-      <label className="student-form-field"><span>Career interests, comma separated</span><input name="careerInterests" defaultValue={profile?.careerInterests.join(', ') ?? ''} /></label>
+      <label className="student-form-field"><span>Career interests, comma separated</span><input name="careerInterests" defaultValue={(profile?.careerInterests ?? []).join(', ')} /></label>
       <label className="student-form-field"><span>Portfolio URL</span><input name="portfolioUrl" defaultValue={profile?.portfolioUrl ?? ''} placeholder="https://..." /></label>
       <label className="student-form-field"><span>Summary</span><textarea name="profileSummary" defaultValue={profile?.profileSummary ?? ''} maxLength={2000} /></label>
-      <label className="student-form-field"><span>Visibility</span><select name="visibilityState" defaultValue={profile?.visibilityState ?? 'PRIVATE'}><option>PRIVATE</option><option>INSTITUTION_VISIBLE</option><option>EMPLOYER_DISCOVERY</option></select></label>
-      <label className="setting-row preference-row"><span>Employer discovery</span><input name="employerDiscoveryEnabled" type="checkbox" defaultChecked={profile?.employerDiscoveryEnabled ?? false} /></label>
+      <label className="student-form-field"><span>Visibility</span><select key={profile?.visibilityState ?? 'PRIVATE'} name="visibilityState" defaultValue={profile?.visibilityState ?? 'PRIVATE'}><option>PRIVATE</option><option>INSTITUTION_VISIBLE</option>{profile?.visibilityState === 'EMPLOYER_DISCOVERY' ? <option>EMPLOYER_DISCOVERY</option> : null}</select></label>
       <button type="submit">Save profile</button>
     </form>
   </div>;
@@ -924,7 +1024,7 @@ function AuthenticatedStudentDocuments(): React.ReactElement {
       setStatus('Document metadata save failed.');
     }
   }
-  const verifiedCount = documents.filter((doc) => /verified/i.test(doc.verificationState ?? '')).length;
+  const verifiedCount = documents.filter(isDocumentVerified).length;
   const withFileCount = documents.filter((doc) => doc.file).length;
   return <div className="workspace-grid">
     <section className="card wide-card"><span className="eyebrow">Your documents</span><h2>Documents</h2><p role="status">{status}</p>
@@ -1009,7 +1109,7 @@ function StudentDocumentRow({ document: doc, onChanged, onStatus }: {
     <td>{doc.file
       ? <><strong>{doc.file.filename}</strong><br /><span className="hiring-meta">v{doc.file.versionNumber} · {Math.round(doc.file.byteSize / 1024)} KB · scanned clean</span></>
       : <span className="hiring-meta">No file attached</span>}</td>
-    <td>{doc.verificationState}</td>
+    <td>{documentVerificationLabel(doc)}</td>
     <td><div className="hiring-actions">
       <input ref={inputRef} type="file" accept={ACCEPTED_DOCUMENT_TYPES} className="visually-hidden-file"
         aria-label={`Attach a file to ${doc.title}`} disabled={busy || Boolean(doc.archivedAt)}

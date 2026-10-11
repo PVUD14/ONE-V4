@@ -103,14 +103,23 @@ export async function createAutomationCommandForNotificationEvent(pool: Pool, ev
        WHERE n.id=$1`, [event.payload.commandId],
     );
     const item = notification.rows[0];
-    if (!item || item.state !== 'PENDING' || item.stable_key !== 'assessment-due') throw new Error('notification is not eligible for the approved workflow');
+    if (!item || item.state !== 'PENDING') throw new Error('notification is not eligible for the approved workflow');
+    // The template's stable key selects the workflow, and the registry decides whether
+    // that workflow may run. Previously this was hardcoded to 'assessment-due', which
+    // meant five of the six authored workflows -- every invitation among them -- had no
+    // path from a notification command to an automation command.
+    //
+    // This generalises to the allowlist, never to a passthrough: an unregistered key,
+    // an inactive workflow or one behind the kill switch is still refused, and hash
+    // pinning is unchanged. The registry remains the control; it simply becomes the
+    // only control rather than being shadowed by a constant.
     const workflow = await client.query<{
       id: string; allowlist_id: string; version: number; operation: string; destination_class: 'EMAIL';
     }>(
       `SELECT id,allowlist_id,version,operation,destination_class FROM automation_workflow_registry
-       WHERE allowlist_id='assessment-due' AND active AND NOT kill_switch ORDER BY version DESC LIMIT 1`,
+       WHERE allowlist_id=$1 AND active AND NOT kill_switch ORDER BY version DESC LIMIT 1`, [item.stable_key],
     );
-    if (!workflow.rows[0]) throw new Error('approved assessment-due workflow is disabled');
+    if (!workflow.rows[0]) throw new Error('no approved workflow is enabled for this notification');
     const idempotencyId = `event:${eventId}:workflow:${workflow.rows[0].id}`;
     const existing = await client.query<{ id: string }>('SELECT id FROM automation_commands WHERE idempotency_id=$1', [idempotencyId]);
     if (existing.rows[0]) return { commandId: existing.rows[0].id, idempotentReplay: true };

@@ -1,8 +1,12 @@
-import { createConnection } from 'node:net';
 import { BadRequestException, Body, ConflictException, Controller, ForbiddenException, Get, Inject, Optional, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { digestInvitationToken, generateInvitationToken } from '@planthepath/identity/src/invitation-token.js';
 import { validateOutboxWriteInput, type PersistenceDb } from '@planthepath/persistence/src/repositories.js';
+import { institutionStudentScopeSql } from '@planthepath/persistence/src/institution-scope.js';
+import { buildInvitationUrl, mailProviderKind, type InvitationMailSink } from '@planthepath/persistence/src/invitation-mail.js';
+import { createStudentInvitation, loadStudentActivations, resendStudentInvitations, revokePendingStudentInvitations, summariseActivations } from '@planthepath/persistence/src/student-invitations.js';
+import { describeInstitutionStudentScope, institutionStudentScopeFor } from './institution-student-scope.js';
+import { readStaffUnitScope, validateStaffUnitScope } from './institution-staff-scope.js';
 import {
   API_ID_GENERATOR,
   API_PERSISTENCE_DB,
@@ -12,6 +16,12 @@ import {
   type ApiIdGenerator,
   type ProtectedHttpRequest,
 } from './api-security.js';
+import { callerHasInternalCapability, dbCapabilityGrantLoader } from './internal-capability-guard.js';
+import { isHighRiskVerificationTransition } from '@planthepath/authorization/src/index.js';
+import { consumeOperationApproval } from '@planthepath/persistence/src/operation-approvals.js';
+import { InstitutionContractError, assertInstitutionRosterIntakeAllowed } from '@planthepath/persistence/src/institution-contract.js';
+import { approvalHttpError, approvalNotRequired, approvalPayloads, approvalRequired, readApprovalId } from './operation-approval-gate.js';
+import { refuseSelfDealing } from './growth-attribution-service.js';
 
 type QueryResult<T> = { rows: T[] };
 type OrganizationKind = 'INSTITUTION' | 'EMPLOYER';
@@ -19,56 +29,17 @@ type VerificationState = 'PENDING' | 'UNDER_REVIEW' | 'VERIFIED' | 'REJECTED' | 
 type InstitutionType = 'UNIVERSITY' | 'ENGINEERING_COLLEGE' | 'ARTS_SCIENCE_COLLEGE' | 'BUSINESS_SCHOOL' | 'POLYTECHNIC' | 'OTHER';
 type UnitKind = 'DEPARTMENT' | 'PROGRAM' | 'BATCH' | 'SECTION' | 'CAMPUS';
 type RelationshipEndState = 'TRANSFERRED' | 'GRADUATED' | 'ENDED' | 'REVOKED';
-type InvitationRole = 'INSTITUTION_ADMIN' | 'EMPLOYER_ADMIN' | 'PLACEMENT_ADMIN' | 'DEPARTMENT_HEAD' | 'FACULTY_LECTURER';
+type InvitationRole = 'INSTITUTION_ADMIN' | 'EMPLOYER_OWNER' | 'EMPLOYER_ADMIN' | 'PLACEMENT_ADMIN' | 'DEPARTMENT_HEAD' | 'FACULTY_LECTURER';
 
 export const API_INVITATION_MAIL_SINK = Symbol('API_INVITATION_MAIL_SINK');
 
-export interface InvitationMailSink {
-  send(input: {
-    readonly toEmail: string;
-    readonly subject: string;
-    readonly textBody: string;
-    readonly invitationId: string;
-    readonly correlationId: string;
-  }): Promise<{ readonly providerReference?: string }>;
-}
-
-export class LoopbackSmtpInvitationMailSink implements InvitationMailSink {
-  constructor(readonly host = process.env.PTP_LOCAL_MAILPIT_HOST ?? '127.0.0.1', readonly port = Number(process.env.PTP_LOCAL_MAILPIT_SMTP_PORT ?? '1025')) {
-    if (!['127.0.0.1', 'localhost'].includes(host) || !Number.isInteger(port) || port < 1 || port > 65_535) {
-      throw new Error('local invitation mail sink must be loopback-bound');
-    }
-  }
-
-  async send(input: { readonly toEmail: string; readonly subject: string; readonly textBody: string; readonly invitationId: string; readonly correlationId: string }): Promise<{ readonly providerReference?: string }> {
-    const transcript = await smtpSend({
-      host: this.host,
-      port: this.port,
-      from: 'no-reply@one.local',
-      to: input.toEmail,
-      message: [
-        `From: ONE <no-reply@one.local>`,
-        `To: ${input.toEmail}`,
-        `Subject: ${sanitizeHeader(input.subject)}`,
-        `X-ONE-Correlation-Id: ${sanitizeHeader(input.correlationId)}`,
-        'Content-Type: text/plain; charset=utf-8',
-        '',
-        input.textBody,
-      ].join('\r\n'),
-    });
-    return { providerReference: `mailpit:${input.invitationId}:${transcript}`.slice(0, 256) };
-  }
-}
-
-export function createConfiguredInvitationMailSink(): InvitationMailSink | undefined {
-  if (process.env.PTP_LOCAL_INVITATION_MAILPIT_ENABLED !== 'true') return undefined;
-  return new LoopbackSmtpInvitationMailSink();
-}
+// Delivery moved to packages/persistence so the outbox worker can send student invitations;
+// re-exported so existing API callers keep their imports.
+export { createConfiguredInvitationMailSink, LoopbackSmtpInvitationMailSink, type InvitationMailSink } from '@planthepath/persistence/src/invitation-mail.js';
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const emailPattern = /^[^@ \t\r\n]+@[^@ \t\r\n]+\.[^@ \t\r\n]+$/;
 const countryPattern = /^[A-Z]{2}$/;
-const platformMutationRoles: readonly string[] = ['PLATFORM_SUPER_ADMIN', 'OPERATIONS_ADMIN'];
 const institutionAdminRoles: readonly string[] = ['INSTITUTION_OWNER', 'INSTITUTION_ADMIN'];
 const institutionStaffRoles: readonly string[] = ['INSTITUTION_OWNER', 'INSTITUTION_ADMIN', 'PLACEMENT_ADMIN', 'DEPARTMENT_HEAD', 'FACULTY_LECTURER'];
 const institutionAssignableRoles = ['PLACEMENT_ADMIN', 'DEPARTMENT_HEAD', 'FACULTY_LECTURER'] as const;
@@ -86,7 +57,7 @@ export class OperationsInstitutionOnboardingController {
   @Get('/operations/organizations')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async listOrganizations(@Req() request: ProtectedHttpRequest, @Query('q') q?: string, @Query('kind') kind?: string, @Query('verification') verification?: string): Promise<Record<string, unknown>> {
-    const context = requireOperations(request);
+    const context = await requireOperations(request, this.db, 'OPS_ORG_MANAGE');
     const rows = await this.db.execute(sql`
       SELECT o.id, o.kind, o.legal_name, o.verification_state, o.active, o.created_at, o.updated_at,
              p.display_name, p.website_url, p.country_code, p.state_or_province, p.city, p.postal_code,
@@ -115,7 +86,7 @@ export class OperationsInstitutionOnboardingController {
   @Post('/operations/organizations')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async createOrganization(@Req() request: ProtectedHttpRequest, @Body() body: unknown): Promise<Record<string, unknown>> {
-    const context = requireOperations(request);
+    const context = await requireOperations(request, this.db, 'OPS_ORG_MANAGE');
     const input = readOrganizationInput(body, true, context.correlationId);
     const organizationId = this.ids.uuid();
     await this.db.transaction(async (tx) => {
@@ -151,8 +122,17 @@ export class OperationsInstitutionOnboardingController {
   @Get('/operations/organizations/:targetOrganizationId')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async getOrganizationById(@Req() request: ProtectedHttpRequest, @Param('targetOrganizationId') organizationId: string): Promise<Record<string, unknown>> {
-    const context = requireOperations(request);
-    const id = requireUuid(organizationId, context.correlationId);
+    const context = await requireOperations(request, this.db, 'OPS_ORG_MANAGE');
+    return this.loadOrganization(requireUuid(organizationId, context.correlationId), context.correlationId);
+  }
+
+  /**
+   * The organisation read shared by the GET route and the writes that answer with the
+   * updated record. Split from the route so a caller holding only OPS_VERIFY is not
+   * refused the answer to a transition it was allowed to make.
+   */
+  private async loadOrganization(id: string, correlationId: string): Promise<Record<string, unknown>> {
+    const context = { correlationId };
     const result = await this.db.execute(sql`
       SELECT o.id, o.kind, o.legal_name, o.verification_state, o.active, o.created_at, o.updated_at,
              p.display_name, p.website_url, p.country_code, p.state_or_province, p.city, p.postal_code,
@@ -176,7 +156,7 @@ export class OperationsInstitutionOnboardingController {
   @Patch('/operations/organizations/:targetOrganizationId')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async updateOrganization(@Req() request: ProtectedHttpRequest, @Param('targetOrganizationId') organizationId: string, @Body() body: unknown): Promise<Record<string, unknown>> {
-    const context = requireOperations(request);
+    const context = await requireOperations(request, this.db, 'OPS_ORG_MANAGE');
     const id = requireUuid(organizationId, context.correlationId);
     const input = readOrganizationInput(body, false, context.correlationId);
     await this.db.transaction(async (tx) => {
@@ -215,36 +195,72 @@ export class OperationsInstitutionOnboardingController {
   @Post('/operations/organizations/:targetOrganizationId/verification')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async transitionVerification(@Req() request: ProtectedHttpRequest, @Param('targetOrganizationId') organizationId: string, @Body() body: unknown): Promise<Record<string, unknown>> {
-    const context = requireOperations(request);
+    const context = await requireOperations(request, this.db, 'OPS_VERIFY');
     const id = requireUuid(organizationId, context.correlationId);
     const toState = readEnum(readString(body, 'toState', context.correlationId), ['UNDER_REVIEW', 'VERIFIED', 'REJECTED', 'SUSPENDED'], context.correlationId);
     const reasonCode = readOptionalString(body, 'reasonCode') ?? 'OPERATIONS_REVIEW';
     if (!/^[A-Z0-9_:-]{3,64}$/.test(reasonCode)) throw forbidden(context.correlationId);
-    await this.db.transaction(async (tx) => {
+    // OPS-02: suspension (the only way out of VERIFIED) is dual-controlled. The approval is
+    // consumed inside this transaction, bound to exactly this organisation and reason.
+    const approvalId = readApprovalId(body, context.correlationId);
+    const highRisk = isHighRiskVerificationTransition(toState);
+    if (highRisk && !approvalId) throw approvalRequired(context.correlationId);
+    if (!highRisk && approvalId) throw approvalNotRequired(context.correlationId);
+    try { await this.db.transaction(async (tx) => {
       const current = await tx.execute(sql`SELECT verification_state FROM organizations WHERE id = ${id}::uuid AND kind IN ('INSTITUTION','EMPLOYER') FOR UPDATE`) as QueryResult<{ verification_state: VerificationState }>;
       const [row] = current.rows;
       if (!row || !isAllowedVerificationTransition(row.verification_state, toState)) throw new Error('invalid verification transition');
+      // GROWTH-07 self-dealing guard (design §8.6): never on an organisation credited to the operator or
+      // in dispute with them as a party; checked on the person across memberships (and by 0110's trigger).
+      await refuseSelfDealing(tx, context.authorization.principal.userId, id, context.correlationId);
+      const approval = approvalId ? await consumeOperationApproval(tx, {
+        approvalId, actionKey: 'ORGANIZATION_SUSPEND', payload: approvalPayloads.ORGANIZATION_SUSPEND({ organizationId: id, reasonCode }),
+        executorUserId: context.authorization.principal.userId, correlationId: context.correlationId,
+      }) : null;
       await tx.execute(sql`UPDATE organizations SET verification_state = ${toState}::verification_state, active = ${toState !== 'SUSPENDED'}, updated_at = now() WHERE id = ${id}::uuid`);
       await tx.execute(sql`
         INSERT INTO organization_verification_events (id, organization_id, from_state, to_state, reason_code, actor_user_id, correlation_id)
         VALUES (${this.ids.uuid()}::uuid, ${id}::uuid, ${row.verification_state}::verification_state, ${toState}::verification_state, ${reasonCode}, ${context.authorization.principal.userId}::uuid, ${context.correlationId})
       `);
-      await writeAudit(tx, { id: this.ids.uuid(), actorUserId: context.authorization.principal.userId, action: 'organization.verification_transitioned', resourceType: 'organization', resourceId: id, organizationId: id, correlationId: context.correlationId, context: { toState, reasonCode } });
+      await writeAudit(tx, { id: this.ids.uuid(), actorUserId: context.authorization.principal.userId, action: 'organization.verification_transitioned', resourceType: 'organization', resourceId: id, organizationId: id, correlationId: context.correlationId, context: { toState, reasonCode, ...(approval ? { approval } : {}) } });
       await writeOutbox(tx, { id: this.ids.uuid(), aggregateType: 'organization', aggregateId: id, eventType: 'organization.verification_transitioned', payload: { organizationId: id, toState }, actorUserId: context.authorization.principal.userId, organizationId: id, correlationId: context.correlationId });
-    });
-    return this.getOrganizationById(request, id);
+      if (toState === 'SUSPENDED') await this.pauseEmployerJobs(tx, id, reasonCode, context.authorization.principal.userId, context.correlationId);
+    }); } catch (error) {
+      throw approvalHttpError(error, context.correlationId) ?? error;
+    }
+    return this.loadOrganization(id, context.correlationId);
+  }
+
+  /**
+   * Decision 10.2 #3: suspension moves every published job of the organisation to PAUSED
+   * in the same transaction as the verification change, with an audit row and an outbox
+   * event per job. Reinstatement does not republish: the jobs stay paused until the
+   * employer publishes them again, so nothing reappears to students unreviewed.
+   */
+  private async pauseEmployerJobs(tx: PersistenceDb, organizationId: string, reasonCode: string, actorUserId: string, correlationId: string): Promise<void> {
+    const paused = await tx.execute(sql`
+      UPDATE opportunities SET lifecycle_state = 'PAUSED', updated_at = now()
+      WHERE employer_id = ${organizationId}::uuid AND lifecycle_state = 'PUBLISHED'
+      RETURNING id
+    `) as QueryResult<{ id: string }>;
+    for (const { id: opportunityId } of paused.rows) {
+      await writeAudit(tx, { id: this.ids.uuid(), actorUserId, action: 'opportunity.paused', resourceType: 'opportunity', resourceId: opportunityId, organizationId, correlationId, context: { reasonCode, cause: 'ORGANIZATION_SUSPENDED' } });
+      await writeOutbox(tx, { id: this.ids.uuid(), aggregateType: 'opportunity', aggregateId: opportunityId, eventType: 'opportunity.paused', payload: { opportunityId, employerId: organizationId, cause: 'ORGANIZATION_SUSPENDED' }, actorUserId, organizationId, correlationId });
+    }
   }
 
   @Post('/operations/organizations/:targetOrganizationId/initial-admin-invitations')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async inviteInitialAdmin(@Req() request: ProtectedHttpRequest, @Param('targetOrganizationId') organizationId: string, @Body() body: unknown): Promise<Record<string, unknown>> {
-    const context = requireOperations(request);
+    const context = await requireOperations(request, this.db, 'OPS_ORG_MANAGE');
     const id = requireUuid(organizationId, context.correlationId);
     const email = normalizeEmail(readString(body, 'email', context.correlationId), context.correlationId);
     const org = await this.db.execute(sql`SELECT kind FROM organizations WHERE id = ${id}::uuid AND kind IN ('INSTITUTION','EMPLOYER')`) as QueryResult<{ kind: OrganizationKind }>;
     const [row] = org.rows;
     if (!row) throw forbidden(context.correlationId);
-    const role = row.kind === 'INSTITUTION' ? 'INSTITUTION_ADMIN' : 'EMPLOYER_ADMIN';
+    // An employer's first user is its owner (decision 10.2 #1), because only an owner can add
+    // admins; invitations already issued as EMPLOYER_ADMIN keep their role.
+    const role = row.kind === 'INSTITUTION' ? 'INSTITUTION_ADMIN' : 'EMPLOYER_OWNER';
     const invitation = await this.createScopedInvitation({
       actorUserId: context.authorization.principal.userId,
       organizationId: id,
@@ -263,7 +279,7 @@ export class OperationsInstitutionOnboardingController {
   @Get('/operations/users-access')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async listUsersAccess(@Req() request: ProtectedHttpRequest, @Query('q') q?: string): Promise<Record<string, unknown>> {
-    const context = requireOperations(request);
+    const context = await requireOperations(request, this.db, 'OPS_ORG_MANAGE');
     const search = q?.trim() || null;
     const rows = await this.db.execute(sql`
       SELECT u.id, u.email, u.external_subject IS NOT NULL AS identity_linked, u.state, u.created_at, u.updated_at,
@@ -303,7 +319,7 @@ export class OperationsInstitutionOnboardingController {
   @Get('/operations/invitations')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async listInvitationInventory(@Req() request: ProtectedHttpRequest, @Query('q') q?: string): Promise<Record<string, unknown>> {
-    const context = requireOperations(request);
+    const context = await requireOperations(request, this.db, 'OPS_ORG_MANAGE');
     const search = q?.trim() || null;
     const rows = await this.db.execute(sql`
       SELECT i.id, i.email, i.organization_id, o.legal_name AS organization_legal_name, o.kind AS organization_kind,
@@ -333,7 +349,7 @@ export class OperationsInstitutionOnboardingController {
   @Get('/operations/organizations/:targetOrganizationId/onboarding-status')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async onboardingStatus(@Req() request: ProtectedHttpRequest, @Param('targetOrganizationId') organizationId: string): Promise<Record<string, unknown>> {
-    const context = requireOperations(request);
+    const context = await requireOperations(request, this.db, 'OPS_ORG_MANAGE');
     const id = requireUuid(organizationId, context.correlationId);
     const result = await this.db.execute(sql`
       SELECT o.verification_state,
@@ -352,7 +368,7 @@ export class OperationsInstitutionOnboardingController {
   @Get('/institutions/:institutionId/units')
   @UseGuards(ProtectedApiAuthenticationGuard)
   async listUnits(@Req() request: ProtectedHttpRequest, @Param('institutionId') institutionId: string): Promise<Record<string, unknown>> {
-    const context = requireInstitutionAdmin(request, institutionId);
+    const context = requireInstitutionStaff(request, institutionId);
     const id = requireUuid(institutionId, context.correlationId);
     const units = await this.db.execute(sql`SELECT id, institution_id, kind, name, parent_unit_id, created_at, updated_at FROM institution_units WHERE institution_id=${id}::uuid ORDER BY kind, name`) as QueryResult<Record<string, unknown>>;
     return { units: units.rows.map(mapUnitRow), correlationId: context.correlationId };
@@ -365,6 +381,7 @@ export class OperationsInstitutionOnboardingController {
     const id = requireUuid(institutionId, context.correlationId);
     const invitations = await this.db.execute(sql`
       SELECT i.id, i.email, i.role, i.state, i.created_at, i.expires_at, i.accepted_at, i.revoked_at,
+             i.scope_department_unit_id, i.scope_batch_unit_id,
              nc.id AS notification_command_id, nc.state AS notification_state,
              nda.provider_kind, nda.provider_reference, nda.outcome AS delivery_outcome
       FROM invitations i
@@ -381,7 +398,7 @@ export class OperationsInstitutionOnboardingController {
       LIMIT 200
     `) as QueryResult<Record<string, unknown>>;
     const memberships = await this.db.execute(sql`
-      SELECT m.id, m.user_id, u.email, m.role, m.state, m.created_at, m.updated_at
+      SELECT m.id, m.user_id, u.email, m.role, m.state, m.created_at, m.updated_at, m.scope_department_unit_id, m.scope_batch_unit_id
       FROM organization_memberships m
       JOIN users u ON u.id = m.user_id
       WHERE m.organization_id = ${id}::uuid
@@ -415,6 +432,7 @@ export class OperationsInstitutionOnboardingController {
   async listStudents(@Req() request: ProtectedHttpRequest, @Param('institutionId') institutionId: string, @Query('q') q?: string): Promise<Record<string, unknown>> {
     const context = requireInstitutionStaff(request, institutionId);
     const id = requireUuid(institutionId, context.correlationId);
+    const scope = await institutionStudentScopeFor(this.db, request, id, institutionStaffRoles);
     const rows = await this.db.execute(sql`
       SELECT sp.*, u.email, ir.id AS relationship_id, ir.state AS relationship_state, ir.effective_from, ir.effective_to
       FROM institution_student_profiles sp
@@ -427,11 +445,20 @@ export class OperationsInstitutionOnboardingController {
         LIMIT 1
       ) ir ON true
       WHERE sp.institution_id=${id}::uuid
+        AND ${institutionStudentScopeSql(scope, 'sp')}
         AND (${q ?? null}::text IS NULL OR lower(sp.full_name) LIKE '%' || lower(${q ?? null}) || '%' OR lower(sp.institution_student_id) LIKE '%' || lower(${q ?? null}) || '%' OR lower(u.email) LIKE '%' || lower(${q ?? null}) || '%')
       ORDER BY sp.updated_at DESC, sp.full_name
       LIMIT 500
     `) as QueryResult<Record<string, unknown>>;
-    return { students: rows.rows.map(mapStudentRow), correlationId: context.correlationId };
+    const activations = await loadStudentActivations(this.db, id, rows.rows.map((row) => String(row.student_user_id)));
+    const students = rows.rows.map((row) => ({ ...mapStudentRow(row), activation: activations.get(String(row.student_user_id)) ?? null }));
+    return {
+      students,
+      // Server-computed over the same rows, so the Dashboard's counts cannot disagree with this list.
+      activationSummary: summariseActivations([...activations.values()]),
+      scope: await describeInstitutionStudentScope(this.db, request, id, institutionStaffRoles, scope),
+      correlationId: context.correlationId,
+    };
   }
 
   @Post('/institutions/:institutionId/students')
@@ -444,6 +471,8 @@ export class OperationsInstitutionOnboardingController {
     const profileId = this.ids.uuid();
     const relationshipId = this.ids.uuid();
     await this.db.transaction(async (tx) => {
+      // INST-18: rostering is refused while the college is leaving, or until it accepts current data terms.
+      await requireRosterIntake(tx, id, context.correlationId);
       const existing = await tx.execute(sql`SELECT id FROM users WHERE lower(email)=lower(${input.email}) FOR UPDATE`) as QueryResult<{ id: string }>;
       if (existing.rows[0]) throw conflict('STUDENT_EMAIL_ALREADY_EXISTS', context.correlationId, 'email');
       const existingStudentId = await tx.execute(sql`SELECT id FROM institution_student_profiles WHERE institution_id=${id}::uuid AND lower(institution_student_id)=lower(${input.institutionStudentId}) FOR UPDATE`) as QueryResult<{ id: string }>;
@@ -459,8 +488,11 @@ export class OperationsInstitutionOnboardingController {
       await writeAudit(tx, { id: this.ids.uuid(), actorUserId: context.authorization.principal.userId, action: 'institution.student_profile.created', resourceType: 'institution_student_profile', resourceId: profileId, organizationId: id, correlationId: context.correlationId });
       await writeOutbox(tx, { id: this.ids.uuid(), aggregateType: 'institution_student_profile', aggregateId: profileId, eventType: 'institution.student_profile.created', payload: { profileId }, actorUserId: context.authorization.principal.userId, organizationId: id, correlationId: context.correlationId });
       await writeOutbox(tx, { id: this.ids.uuid(), aggregateType: 'institution_relationship', aggregateId: relationshipId, eventType: 'institution.relationship.created', payload: { relationshipId }, actorUserId: context.authorization.principal.userId, organizationId: id, correlationId: context.correlationId });
+      // INST-01: the student is invited in the same transaction; the email is sent off the request path.
+      await createStudentInvitation(tx, { invitationId: this.ids.uuid(), institutionId: id, studentUserId: userId, email: input.email,
+        invitedByUserId: context.authorization.principal.userId, outboxEventId: this.ids.uuid(), auditId: this.ids.uuid(), correlationId: context.correlationId });
     });
-    return { student: { id: profileId, institutionId: id, institutionStudentId: input.institutionStudentId, fullName: input.fullName, relationshipId }, correlationId: context.correlationId };
+    return { student: { id: profileId, institutionId: id, institutionStudentId: input.institutionStudentId, fullName: input.fullName, relationshipId, activation: 'INVITED' }, correlationId: context.correlationId };
   }
 
   @Patch('/institutions/:institutionId/units/:unitId')
@@ -485,6 +517,7 @@ export class OperationsInstitutionOnboardingController {
     const context = requireInstitutionStaff(request, institutionId);
     const id = requireUuid(institutionId, context.correlationId);
     const profileId = requireUuid(studentProfileId, context.correlationId);
+    const scope = await institutionStudentScopeFor(this.db, request, id, institutionStaffRoles);
     const rows = await this.db.execute(sql`
       SELECT sp.*, u.email, ir.id AS relationship_id, ir.state AS relationship_state, ir.effective_from, ir.effective_to
       FROM institution_student_profiles sp
@@ -495,6 +528,7 @@ export class OperationsInstitutionOnboardingController {
         ORDER BY effective_from DESC LIMIT 1
       ) ir ON true
       WHERE sp.institution_id=${id}::uuid AND sp.id=${profileId}::uuid
+        AND ${institutionStudentScopeSql(scope, 'sp')}
     `) as QueryResult<Record<string, unknown>>;
     const [row] = rows.rows;
     if (!row) throw forbidden(context.correlationId);
@@ -548,14 +582,17 @@ export class OperationsInstitutionOnboardingController {
     const id = requireUuid(institutionId, context.correlationId);
     const profileId = requireUuid(studentProfileId, context.correlationId);
     const state = readEnum(readString(body, 'state', context.correlationId), ['TRANSFERRED', 'GRADUATED', 'ENDED', 'REVOKED'], context.correlationId);
-    const effectiveTo = readOptionalDateTime(body, 'effectiveTo', context.correlationId) ?? new Date().toISOString();
+    // With no explicit end, the database stamps it: the relationship's start was stamped by the
+    // database too, and this process's clock can trail it by a few ms, which would put the end
+    // before the start and fail institution_relationship_window_ck.
+    const effectiveTo = readOptionalDateTime(body, 'effectiveTo', context.correlationId) ?? null;
     await this.db.transaction(async (tx) => {
       const profile = await tx.execute(sql`SELECT student_user_id FROM institution_student_profiles WHERE id=${profileId}::uuid AND institution_id=${id}::uuid FOR UPDATE`) as QueryResult<{ student_user_id: string }>;
       const studentUserId = profile.rows[0]?.student_user_id;
       if (!studentUserId) throw new Error('student profile not found');
       const rel = await tx.execute(sql`
         UPDATE institution_relationships
-        SET state=${state}::relationship_state, effective_to=${effectiveTo}, updated_at=now()
+        SET state=${state}::relationship_state, effective_to=COALESCE(${effectiveTo}::timestamptz, now()), updated_at=now()
         WHERE id = (
           SELECT id FROM institution_relationships
           WHERE institution_id=${id}::uuid AND student_user_id=${studentUserId}::uuid AND effective_to IS NULL
@@ -566,10 +603,47 @@ export class OperationsInstitutionOnboardingController {
       const relationshipId = rel.rows[0]?.id;
       if (!relationshipId) throw new Error('current relationship not found');
       await tx.execute(sql`UPDATE institution_student_profiles SET status=${state}::roster_student_status, updated_at=now() WHERE id=${profileId}::uuid`);
+      // A student whose relationship ended must not be able to activate into it afterwards.
+      await revokePendingStudentInvitations(tx, { institutionId: id, studentUserId, reasonCode: `RELATIONSHIP_${state}` });
       await writeAudit(tx, { id: this.ids.uuid(), actorUserId: context.authorization.principal.userId, action: 'institution.relationship.ended', resourceType: 'institution_relationship', resourceId: relationshipId, organizationId: id, correlationId: context.correlationId, context: { state } });
       await writeOutbox(tx, { id: this.ids.uuid(), aggregateType: 'institution_relationship', aggregateId: relationshipId, eventType: 'institution.relationship.ended', payload: { relationshipId, state }, actorUserId: context.authorization.principal.userId, organizationId: id, correlationId: context.correlationId });
     });
     return this.getStudent(request, id, profileId);
+  }
+
+  /**
+   * Resend student invitations (INST-01): one student, several, or every student still waiting
+   * (INVITED, EXPIRED, BOUNCED or never invited). Requires a reason code; activated students and
+   * students without a current relationship are skipped, never re-invited.
+   */
+  @Post('/institutions/:institutionId/student-invitations/resend')
+  @UseGuards(ProtectedApiAuthenticationGuard)
+  async resendStudentInvitations(@Req() request: ProtectedHttpRequest, @Param('institutionId') institutionId: string, @Body() body: unknown): Promise<Record<string, unknown>> {
+    const context = requireInstitutionAdmin(request, institutionId);
+    const id = requireUuid(institutionId, context.correlationId);
+    const input = requireObject(body, 'request');
+    const reasonCode = typeof input.reasonCode === 'string' ? input.reasonCode : '';
+    if (!/^[A-Z0-9_:-]{3,64}$/.test(reasonCode)) throw badRequest('INVALID_REASON_CODE', context.correlationId, 'reasonCode');
+    const all = input.all === true;
+    const rawIds = input.studentUserIds;
+    if (all === Array.isArray(rawIds)) throw badRequest('INVALID_RESEND_TARGET', context.correlationId, 'studentUserIds');
+    let studentUserIds: string[];
+    if (all) {
+      const waiting = await this.db.execute(sql`
+        SELECT p.student_user_id FROM institution_student_profiles p JOIN users u ON u.id = p.student_user_id
+        WHERE p.institution_id = ${id}::uuid AND u.state = 'INVITED' LIMIT 2000
+      `) as QueryResult<{ student_user_id: string }>;
+      studentUserIds = waiting.rows.map((row) => row.student_user_id);
+    } else {
+      const list = rawIds as unknown[];
+      if (list.length === 0 || list.length > 500) throw badRequest('INVALID_RESEND_TARGET', context.correlationId, 'studentUserIds');
+      studentUserIds = [...new Set(list.map((value) => requireUuid(typeof value === 'string' ? value : '', context.correlationId)))];
+    }
+    const result = await this.db.transaction((tx) => resendStudentInvitations(tx, {
+      institutionId: id, studentUserIds, actorUserId: context.authorization.principal.userId, reasonCode,
+      correlationId: context.correlationId, newId: () => this.ids.uuid(),
+    }));
+    return { resend: result, correlationId: context.correlationId };
   }
 
   @Post('/institutions/:institutionId/staff-role-assignments')
@@ -589,6 +663,9 @@ export class OperationsInstitutionOnboardingController {
     const actorEmail = actor.rows[0]?.email ? normalizeEmail(actor.rows[0].email, context.correlationId) : null;
     if (!actorEmail || email === actorEmail) throw forbidden(context.correlationId);
     const role = readEnum(readString(body, 'role', context.correlationId), institutionAssignableRoles, context.correlationId);
+    // INST-03: an admin may scope the invitation to a department and/or batch; acceptance copies it onto the membership.
+    const unitScope = readStaffUnitScope(body, context.correlationId);
+    await validateStaffUnitScope(this.db, id, role, unitScope, context.correlationId);
     const pendingInvitation = await this.db.execute(sql`
       SELECT id, state, role, expires_at
       FROM invitations
@@ -617,6 +694,8 @@ export class OperationsInstitutionOnboardingController {
       role,
       scopeInstitutionId: id,
       scopeEmployerId: null,
+      scopeDepartmentUnitId: unitScope.departmentUnitId,
+      scopeBatchUnitId: unitScope.batchUnitId,
       templateId: staffInvitationTemplateId,
       legalPurpose: 'transactional institution staff invitation',
       dedupePrefix: 'institution-staff',
@@ -632,6 +711,8 @@ export class OperationsInstitutionOnboardingController {
     readonly role: InvitationRole;
     readonly scopeInstitutionId: string | null;
     readonly scopeEmployerId: string | null;
+    readonly scopeDepartmentUnitId?: string | null;
+    readonly scopeBatchUnitId?: string | null;
     readonly templateId: string;
     readonly legalPurpose: string;
     readonly dedupePrefix: string;
@@ -642,7 +723,7 @@ export class OperationsInstitutionOnboardingController {
     const invitationId = this.ids.uuid();
     const notificationCommandId = this.ids.uuid();
     const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1_000);
-    const subject = input.role === 'EMPLOYER_ADMIN' ? 'ONE employer administrator invitation' : 'ONE institution administrator invitation';
+    const subject = input.role === 'EMPLOYER_OWNER' || input.role === 'EMPLOYER_ADMIN' ? 'ONE employer administrator invitation' : 'ONE institution administrator invitation';
     const invitationUrl = buildInvitationUrl(token);
     const textBody = [
       'You have been invited to administer a ONE organization.',
@@ -652,9 +733,10 @@ export class OperationsInstitutionOnboardingController {
     ].join('\n\n');
     await this.db.transaction(async (tx) => {
       await tx.execute(sql`
-        INSERT INTO invitations (id, email, token_hash, invited_by_user_id, organization_id, role, scope_organization_id, scope_institution_id, scope_employer_id, expires_at)
+        INSERT INTO invitations (id, email, token_hash, invited_by_user_id, organization_id, role, scope_organization_id, scope_institution_id, scope_employer_id,
+                                 scope_department_unit_id, scope_batch_unit_id, expires_at)
         VALUES (${invitationId}::uuid, ${input.email}, ${tokenHash}, ${input.actorUserId}::uuid, ${input.organizationId}::uuid, ${input.role}, ${input.organizationId}::uuid,
-                ${input.scopeInstitutionId}::uuid, ${input.scopeEmployerId}::uuid, ${expiresAt})
+                ${input.scopeInstitutionId}::uuid, ${input.scopeEmployerId}::uuid, ${input.scopeDepartmentUnitId ?? null}::uuid, ${input.scopeBatchUnitId ?? null}::uuid, ${expiresAt})
       `);
       await ensureInvitationNotificationTemplate(tx, input.templateId, input.actorUserId, subject);
       await tx.execute(sql`
@@ -666,6 +748,11 @@ export class OperationsInstitutionOnboardingController {
       `);
       await writeAudit(tx, { id: this.ids.uuid(), actorUserId: input.actorUserId, action: 'identity.invitation.created', resourceType: 'invitation', resourceId: invitationId, organizationId: input.organizationId, correlationId: input.correlationId });
       await writeOutbox(tx, { id: this.ids.uuid(), aggregateType: 'invitation', aggregateId: invitationId, eventType: 'identity.invitation.created', payload: { invitationId }, actorUserId: input.actorUserId, organizationId: input.organizationId, correlationId: input.correlationId });
+      // The command above is what the automation worker delivers, and the worker is
+      // driven by this event -- not by identity.invitation.created, which announces
+      // that an invitation exists and has no delivery consumer. Without this line the
+      // worker runs, drains the outbox and delivers no invitation at all.
+      await writeOutbox(tx, { id: this.ids.uuid(), aggregateType: 'notification_command', aggregateId: notificationCommandId, eventType: 'notification.delivery.requested', payload: { commandId: notificationCommandId, templateId: input.templateId, channel: 'EMAIL' }, actorUserId: input.actorUserId, organizationId: input.organizationId, correlationId: input.correlationId });
     });
     if (this.invitationMailSink) {
       const delivered = await this.invitationMailSink.send({ toEmail: input.email, subject, textBody, invitationId, correlationId: input.correlationId });
@@ -677,7 +764,7 @@ export class OperationsInstitutionOnboardingController {
       `);
       await this.db.execute(sql`
         INSERT INTO notification_delivery_attempts (id, command_id, attempt, provider_kind, provider_reference, outcome)
-        VALUES (${this.ids.uuid()}::uuid, ${notificationCommandId}::uuid, 1, 'MAILPIT', ${delivered.providerReference ?? null}, 'SUCCEEDED')
+        VALUES (${this.ids.uuid()}::uuid, ${notificationCommandId}::uuid, 1, ${mailProviderKind(this.invitationMailSink)}, ${delivered.providerReference ?? null}, 'SUCCEEDED')
       `);
     }
     return { id: invitationId, notificationCommandId };
@@ -724,6 +811,7 @@ export class OperationsInstitutionOnboardingController {
     const importId = requireUuid(importIdParam, context.correlationId);
     let committed = 0;
     await this.db.transaction(async (tx) => {
+      await requireRosterIntake(tx, id, context.correlationId);
       const importRows = await tx.execute(sql`
         SELECT row_number, institution_student_id, full_name, email, department_unit_id, program_unit_id, batch_unit_id, section_unit_id
         FROM student_roster_import_rows r
@@ -744,6 +832,9 @@ export class OperationsInstitutionOnboardingController {
         await tx.execute(sql`INSERT INTO institution_relationships (id, institution_id, student_user_id, state, effective_from) VALUES (${relationshipId}::uuid, ${id}::uuid, ${userId}::uuid, 'ACTIVE', now())`);
         await tx.execute(sql`UPDATE student_roster_import_rows SET state='COMMITTED', created_profile_id=${profileId}::uuid WHERE import_id=${importId}::uuid AND row_number=${row.row_number}`);
         await writeOutbox(tx, { id: this.ids.uuid(), aggregateType: 'institution_student_profile', aggregateId: profileId, eventType: 'institution.student_profile.created', payload: { profileId }, actorUserId: context.authorization.principal.userId, organizationId: id, correlationId: context.correlationId });
+        // One invitation and one delivery event per committed row; nothing is sent inside the import.
+        await createStudentInvitation(tx, { invitationId: this.ids.uuid(), institutionId: id, studentUserId: userId, email: row.email,
+          invitedByUserId: context.authorization.principal.userId, outboxEventId: this.ids.uuid(), auditId: this.ids.uuid(), correlationId: context.correlationId });
         committed += 1;
       }
       await tx.execute(sql`UPDATE student_roster_imports SET state='COMMITTED', committed_at=now() WHERE id=${importId}::uuid AND institution_id=${id}::uuid AND state='VALIDATED'`);
@@ -754,9 +845,18 @@ export class OperationsInstitutionOnboardingController {
   }
 }
 
-function requireOperations(request: ProtectedHttpRequest): ReturnType<typeof requireTrustedAuthorization> {
+/**
+ * OPS_ORG_MANAGE for organisations, users and invitations; OPS_VERIFY for verification
+ * transitions (OPS-01). Both are baseline for PLATFORM_SUPER_ADMIN and OPERATIONS_ADMIN
+ * only — the two roles this controller admitted before — so SECURITY_ADMIN stays out.
+ */
+async function requireOperations(
+  request: ProtectedHttpRequest,
+  db: PersistenceDb,
+  capability: 'OPS_ORG_MANAGE' | 'OPS_VERIFY',
+): Promise<ReturnType<typeof requireTrustedAuthorization>> {
   const context = requireTrustedAuthorization(request);
-  if (!context.authorization.memberships.some((membership) => membership.state === 'ACTIVE' && platformMutationRoles.includes(membership.role))) throw forbidden(context.correlationId);
+  if (!await callerHasInternalCapability(context.authorization, dbCapabilityGrantLoader(db), capability)) throw forbidden(context.correlationId);
   return context;
 }
 
@@ -779,6 +879,16 @@ function requireInstitutionRole(request: ProtectedHttpRequest, institutionId: st
     && roles.includes(membership.role)
   ))) throw forbidden(context.correlationId);
   return context;
+}
+
+/** INST-18's gate on bringing students in, as this controller's error shape (403, a plain code). */
+async function requireRosterIntake(tx: PersistenceDb, institutionId: string, correlationId: string): Promise<void> {
+  try {
+    await assertInstitutionRosterIntakeAllowed(tx, institutionId);
+  } catch (error) {
+    if (error instanceof InstitutionContractError) throw new ForbiddenException(safeOperationError(error.code, correlationId));
+    throw error;
+  }
 }
 
 function forbidden(correlationId: string): ForbiddenException {
@@ -884,18 +994,6 @@ async function ensureInvitationNotificationTemplate(db: PersistenceDb, templateI
             1, 'en-IN', ${subject}, 'Invitation link is rendered only in the ephemeral local/test delivery sink.', ${actorUserId}::uuid, now())
     ON CONFLICT (stable_key, version, locale) DO NOTHING
   `);
-}
-
-function buildInvitationUrl(token: string): string {
-  const configured = process.env.PTP_INVITATION_BASE_URL ?? 'http://127.0.0.1:5173';
-  const base = new URL(configured);
-  const localHttp = base.protocol === 'http:' && ['127.0.0.1', 'localhost'].includes(base.hostname);
-  if (base.username || base.password || base.search || base.hash || (base.protocol !== 'https:' && !localHttp)) {
-    throw new Error('invitation base URL must be HTTPS or loopback HTTP');
-  }
-  const invitationUrl = new URL('/invitations/accept', base);
-  invitationUrl.searchParams.set('token', token);
-  return invitationUrl.toString();
 }
 
 async function writeAudit(db: PersistenceDb, input: { id: string; actorUserId: string; action: string; resourceType: string; resourceId: string; organizationId: string; correlationId: string; context?: Record<string, unknown> }): Promise<void> {
@@ -1171,56 +1269,6 @@ function normalizeEmail(value: string, correlationId: string): string {
   return normalized;
 }
 
-async function smtpSend(input: { readonly host: string; readonly port: number; readonly from: string; readonly to: string; readonly message: string }): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const socket = createConnection({ host: input.host, port: input.port });
-    let buffer = '';
-    let lastResponse = '';
-    const commands = [
-      `HELO planthepath.local\r\n`,
-      `MAIL FROM:<${input.from}>\r\n`,
-      `RCPT TO:<${input.to}>\r\n`,
-      'DATA\r\n',
-      `${input.message.replace(/\r?\n\./g, '\r\n..')}\r\n.\r\n`,
-      'QUIT\r\n',
-    ];
-    let commandIndex = 0;
-    const timeout = setTimeout(() => {
-      socket.destroy();
-      reject(new Error('local invitation mail sink timed out'));
-    }, 5_000);
-    socket.setEncoding('utf8');
-    socket.on('data', (chunk) => {
-      buffer += chunk;
-      if (!buffer.endsWith('\n')) return;
-      const lines = buffer.trimEnd().split(/\r?\n/);
-      buffer = '';
-      lastResponse = lines.at(-1) ?? '';
-      const code = Number(lastResponse.slice(0, 3));
-      if (!Number.isInteger(code) || code >= 500) {
-        clearTimeout(timeout);
-        socket.destroy();
-        reject(new Error('local invitation mail sink rejected message'));
-        return;
-      }
-      if (commandIndex < commands.length) socket.write(commands[commandIndex++]!);
-      else {
-        clearTimeout(timeout);
-        socket.end();
-        resolve(lastResponse.replace(/[^A-Za-z0-9._:-]/g, '').slice(0, 80) || 'accepted');
-      }
-    });
-    socket.on('error', (error) => {
-      clearTimeout(timeout);
-      reject(error);
-    });
-  });
-}
-
-function sanitizeHeader(value: string): string {
-  return value.replace(/[\r\n]+/g, ' ').slice(0, 160);
-}
-
 function mapOrganizationRow(row: Record<string, unknown>): Record<string, unknown> {
   return {
     id: row.id,
@@ -1315,6 +1363,7 @@ function mapStaffInvitationRow(row: Record<string, unknown>): Record<string, unk
     expiresAt: row.expires_at,
     acceptedAt: row.accepted_at,
     revokedAt: row.revoked_at,
+    scope: { departmentUnitId: row.scope_department_unit_id ?? null, batchUnitId: row.scope_batch_unit_id ?? null },
     delivery: row.notification_command_id ? {
       commandId: row.notification_command_id,
       state: row.notification_state,
@@ -1334,5 +1383,6 @@ function mapStaffMembershipRow(row: Record<string, unknown>): Record<string, unk
     state: row.state,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    scope: { departmentUnitId: row.scope_department_unit_id ?? null, batchUnitId: row.scope_batch_unit_id ?? null },
   };
 }

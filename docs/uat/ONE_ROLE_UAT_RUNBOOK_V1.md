@@ -6,7 +6,7 @@ Credentials are not in Git. Retrieve them from the operator-local file: `E:\8-PT
 
 Phase 1.1 was not accepted: manual UAT found the visible ONE form was not real credential authentication, refresh lost the authenticated session, and failed authentication could leave a demo Student screen visible. Phase 1.2 changes the normal login path to the visible ONE email/password form backed by Cognito SRP, persists only session-scoped Cognito token data, restores/refreshes the session on startup, and keeps demo routes isolated under `/demo/*`.
 
-1. Open `https://one.ai8ht.pro`.
+1. Open `https://oneby8.com`.
 2. Enter the persona email and password directly in the ONE form.
 3. Submit Sign in. Hosted UI may exist only as fallback/reference; the visible form is the normal UAT login path.
 4. Confirm route and workspace are server-authorized.

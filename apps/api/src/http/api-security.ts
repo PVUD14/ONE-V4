@@ -22,6 +22,7 @@ import {
   type IdentityTokenVerifier,
   type VerifiedIdentityToken,
 } from '@planthepath/identity/src/cognito.js';
+import type { StaffPoolPolicy } from '@planthepath/identity/src/staff-pool.js';
 import {
   digestInvitationToken,
   requireVerifiedRecipientEmail,
@@ -45,6 +46,10 @@ export const API_ID_GENERATOR = Symbol('API_ID_GENERATOR');
 // rather than degrading to an unscanned or unstored file path.
 export const API_FILE_STORAGE = Symbol('API_FILE_STORAGE');
 export const API_FILE_SCANNER = Symbol('API_FILE_SCANNER');
+// Optional: ADR-025's staff-pool policy. Absent (no staff pool configured) means
+// memberships are used exactly as loaded; present, staff-only roles count only for a
+// token the staff pool issued.
+export const API_STAFF_POOL_POLICY = Symbol('API_STAFF_POOL_POLICY');
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const correlationIdPattern = /^[A-Za-z0-9._:-]{8,128}$/;
@@ -89,6 +94,7 @@ export interface ApiSecurityDependencies {
   readonly db: PersistenceDb;
   readonly ids?: ApiIdGenerator;
   readonly invitationMailSink?: unknown;
+  readonly staffPoolPolicy?: StaffPoolPolicy;
 }
 
 @Injectable()
@@ -107,11 +113,12 @@ export class ProtectedApiAuthenticationGuard implements CanActivate {
   constructor(
     @Inject(API_IDENTITY_VERIFIER) private readonly verifier: IdentityTokenVerifier,
     @Inject(API_INTERNAL_IDENTITY_STORE) private readonly identityStore: InternalIdentityStore,
+    @Optional() @Inject(API_STAFF_POOL_POLICY) private readonly staffPoolPolicy?: StaffPoolPolicy,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<ProtectedHttpRequest>();
-    request.planThePath = await authenticateProtectedRequest(request, this.verifier, this.identityStore);
+    request.planThePath = await authenticateProtectedRequest(request, this.verifier, this.identityStore, this.staffPoolPolicy);
     return true;
   }
 }
@@ -134,13 +141,14 @@ export async function authenticateProtectedRequest(
   request: ProtectedHttpRequest,
   verifier: IdentityTokenVerifier,
   identityStore: InternalIdentityStore,
+  staffPoolPolicy?: StaffPoolPolicy,
 ): Promise<TrustedApiRequestContext> {
   const correlationId = resolveCorrelationId(request.headers['x-correlation-id']);
   const rawToken = extractAuthorizedBearerToken(request.headers.authorization, correlationId);
   const requestedOrganizationId = extractCandidateOrganizationId(request, correlationId);
 
   try {
-    const authorization = await resolveAuthorizationContext(rawToken, verifier, identityStore);
+    const authorization = await resolveAuthorizationContext(rawToken, verifier, identityStore, staffPoolPolicy ? { staffPool: staffPoolPolicy } : {});
     const selectedMembership = requestedOrganizationId
       ? selectCurrentMembership(authorization.memberships, requestedOrganizationId)
       : undefined;
@@ -175,6 +183,18 @@ export class Phase1ProtectedApiRoutes {
       ORDER BY effective_from DESC
       LIMIT 25
     `) as QueryResult<{ institution_id: string; state: string; effective_from: Date; effective_to: Date | null }>;
+    // INST-10: someone who has left college (graduated, transferred, ended) keeps the student
+    // workspace for their own data. Listed apart from studentRelationships, which stays "current"
+    // so nothing that scopes by it widens to a college the student has left. REVOKED is not here:
+    // it is the college withdrawing a roster link made in error.
+    const formerRelationships = await this.db.execute(sql`
+      SELECT institution_id, state::text AS state, effective_from, effective_to
+      FROM institution_relationships
+      WHERE student_user_id = ${context.authorization.principal.userId}::uuid
+        AND state IN ('GRADUATED','TRANSFERRED','ENDED')
+      ORDER BY effective_to DESC NULLS LAST, effective_from DESC
+      LIMIT 25
+    `) as QueryResult<{ institution_id: string; state: string; effective_from: Date; effective_to: Date | null }>;
     return {
       userId: context.authorization.principal.userId,
       selectedOrganizationId: context.authorization.selectedMembership?.organizationId ?? null,
@@ -184,6 +204,12 @@ export class Phase1ProtectedApiRoutes {
         scope: membership.scope,
       })),
       studentRelationships: studentRelationships.rows.map((relationship) => ({
+        institutionId: relationship.institution_id,
+        state: relationship.state,
+        effectiveFrom: relationship.effective_from,
+        effectiveTo: relationship.effective_to,
+      })),
+      formerStudentRelationships: formerRelationships.rows.map((relationship) => ({
         institutionId: relationship.institution_id,
         state: relationship.state,
         effectiveFrom: relationship.effective_from,
@@ -199,28 +225,35 @@ export class Phase1ProtectedApiRoutes {
       SELECT sp.id, sp.institution_id, sp.student_user_id, sp.institution_student_id, sp.full_name,
              sp.status, u.email,
              dept.name AS department, program.name AS program, batch.name AS batch, section.name AS section,
-             ir.id AS relationship_id, ir.state AS relationship_state, ir.effective_from, ir.effective_to
+             ir.id AS relationship_id, ir.state AS relationship_state, ir.effective_from, ir.effective_to,
+             ir.is_current, org.legal_name AS institution_name
       FROM institution_student_profiles sp
       JOIN users u ON u.id = sp.student_user_id
       JOIN LATERAL (
-        SELECT id, state, effective_from, effective_to
+        -- The current relationship; failing that (INST-10), the latest one the student left by
+        -- graduating, transferring or ending — a former student still has their own record.
+        SELECT id, state, effective_from, effective_to,
+               (state IN ('ACTIVE','VERIFIED') AND effective_from <= now() AND (effective_to IS NULL OR effective_to > now())) AS is_current
         FROM institution_relationships
         WHERE institution_id = sp.institution_id
           AND student_user_id = sp.student_user_id
-          AND state IN ('ACTIVE','VERIFIED')
-          AND effective_from <= now()
-          AND (effective_to IS NULL OR effective_to > now())
-        ORDER BY effective_from DESC
+          AND (
+            (state IN ('ACTIVE','VERIFIED') AND effective_from <= now() AND (effective_to IS NULL OR effective_to > now()))
+            OR state IN ('GRADUATED','TRANSFERRED','ENDED')
+          )
+        ORDER BY is_current DESC, effective_from DESC
         LIMIT 1
       ) ir ON true
+      JOIN organizations org ON org.id = sp.institution_id
       LEFT JOIN institution_units dept ON dept.id = sp.department_unit_id AND dept.institution_id = sp.institution_id
       LEFT JOIN institution_units program ON program.id = sp.program_unit_id AND program.institution_id = sp.institution_id
       LEFT JOIN institution_units batch ON batch.id = sp.batch_unit_id AND batch.institution_id = sp.institution_id
       LEFT JOIN institution_units section ON section.id = sp.section_unit_id AND section.institution_id = sp.institution_id
       WHERE sp.student_user_id = ${context.authorization.principal.userId}::uuid
-      ORDER BY ir.effective_from DESC, sp.updated_at DESC
+      ORDER BY ir.is_current DESC, ir.effective_from DESC, sp.updated_at DESC
       LIMIT 1
     `) as QueryResult<{
+      is_current: boolean; institution_name: string;
       id: string; institution_id: string; student_user_id: string; institution_student_id: string; full_name: string; status: string; email: string | null;
       department: string | null; program: string | null; batch: string | null; section: string | null;
       relationship_id: string; relationship_state: string; effective_from: Date; effective_to: Date | null;
@@ -234,7 +267,9 @@ export class Phase1ProtectedApiRoutes {
         fullName: row.full_name,
         institutionStudentId: row.institution_student_id,
         institutionId: row.institution_id,
+        institutionName: row.institution_name,
         academicStatus: row.status,
+        formerStudent: !row.is_current,
         department: row.department,
         program: row.program,
         batch: row.batch,

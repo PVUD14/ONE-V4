@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import {
+  ApiRequestError,
   getLearnerCareerReadinessState,
+  getOperationsOverview,
   getProtectedAccessToken,
   getSecurityContext,
   getStudentActivity,
@@ -15,9 +17,6 @@ import {
   listInstitutionStudents,
   listInstitutionUnits,
   listMyNotifications,
-  listOperationsInvitations,
-  listOperationsOrganizations,
-  listOperationsUsersAccess,
   listStudentExams,
   type EmployerApplicantDto,
   type EmployerOpportunityDto,
@@ -28,9 +27,9 @@ import {
   type InstitutionStudentDto,
   type InstitutionUnitDto,
   type LearnerCareerReadinessState,
-  type OperationsInvitationDto,
-  type OperationsUserAccessDto,
-  type OrganizationManagementDto,
+  type OperationsOverviewDto,
+  type OverviewCountDto,
+  type OverviewPeopleCountDto,
   type StudentActivityDto,
   type StudentExamDto,
   type StudentProfileDto,
@@ -149,7 +148,7 @@ export function StudentDashboardV2({ studentName }: { readonly studentName: stri
   const now = Date.now();
   const exams = data.exams ?? [];
   const lessons = data.learner?.catalog?.modules?.flatMap((module) => module.lessons ?? []) ?? [];
-  const completedLessonIds = new Set(data.learner?.progress.filter((item) => item.state === 'COMPLETED').map((item) => item.lessonVersionId) ?? []);
+  const completedLessonIds = new Set(data.learner?.progress?.filter((item) => item.state === 'COMPLETED').map((item) => item.lessonVersionId) ?? []);
   const openExams = exams.filter((exam) => exam.openAttemptId !== null || (now >= Date.parse(exam.startsAt) && now <= Date.parse(exam.endsAt) && exam.attemptsUsed < exam.attemptsAllowed));
   const results = exams.filter((exam) => exam.latestResult !== null);
   const bestScore = results.length ? Math.max(...results.map((exam) => exam.latestResult!.percentage)) : null;
@@ -291,7 +290,7 @@ export function StudentDashboardV2({ studentName }: { readonly studentName: stri
           <button type="button" onClick={() => go('/student/help')}>How do I take an assessment?</button>
           <button type="button" onClick={() => go('/student/help')}>Why can&apos;t I start my assessment?</button>
         </section>
-        {data.notifications?.notifications.length ? (
+        {data.notifications?.notifications?.length ? (
           <section className="v2-card">
             <div className="v2-card-head"><h2>Notifications</h2>{data.notifications.unreadCount > 0 ? <V2Chip tone="amber">{data.notifications.unreadCount} new</V2Chip> : null}</div>
             <div className="v2-list">
@@ -623,39 +622,141 @@ export function EmployerDashboardV2({ basePath }: { readonly basePath: string })
 }
 
 // --- Operations --------------------------------------------------------------
+//
+// OPS-03: the Overview renders one server-side summary (GET /operations/overview) whose
+// counts are computed in bounded SQL — it no longer fetches the organisation, invitation
+// and user lists and counts them here (each list stopped at 200 rows, so the numbers were
+// wrong above that). Every widget stays on the page: a section the caller's capabilities
+// do not cover arrives as null and shows NA in the same slot, a count of fewer than 5
+// people shows <5, and each queue links to the screen that works it. No names, emails or
+// other personal data are in the summary.
 
-interface OperationsDashboardData {
-  readonly organizations: readonly OrganizationManagementDto[] | null;
-  readonly invitations: readonly OperationsInvitationDto[] | null;
-  readonly users: readonly OperationsUserAccessDto[] | null;
+const NA = 'NA';
+
+export function formatOverviewCount(count: OverviewCountDto | null | undefined): string {
+  if (!count) return NA;
+  return count.capped ? `${count.value.toLocaleString()}+` : count.value.toLocaleString();
 }
+
+export function formatOverviewPeople(count: OverviewPeopleCountDto | null | undefined): string {
+  if (!count) return NA;
+  if (count.suppressed) return '<5';
+  return count.capped ? `${count.value.toLocaleString()}+` : count.value.toLocaleString();
+}
+
+/** A share for a bar or ring, or 0 when either side is unknown or suppressed. */
+function share(part: number | null | undefined, whole: number | null | undefined): number {
+  return part != null && whole ? (part / whole) * 100 : 0;
+}
+
+interface OperationsQueue {
+  readonly key: string;
+  readonly icon: string;
+  readonly tone: string;
+  readonly title: string;
+  readonly count: OverviewCountDto | null;
+  readonly detail: string | null;
+  readonly screen: string;
+  readonly path: string;
+}
+
+function operationsQueues(overview: OperationsOverviewDto): readonly OperationsQueue[] {
+  const { verification, employerAccessRequests, invitations, trustSafety, jobs, privacyRequests, privacyHolds, approvals, support } = overview;
+  return [
+    {
+      key: 'verification', icon: '🛂', tone: 'blue', title: 'Organizations awaiting verification', count: verification?.awaitingDecision ?? null,
+      detail: verification ? `${formatOverviewCount(verification.underReview)} under review` : null, screen: 'Verification', path: '/verification',
+    },
+    {
+      key: 'employer-access', icon: '📨', tone: 'amber', title: 'Employer access requests', count: employerAccessRequests?.pending ?? null,
+      detail: employerAccessRequests
+        ? (employerAccessRequests.oldestPendingAt ? `Oldest waiting since ${new Date(employerAccessRequests.oldestPendingAt).toLocaleDateString()}` : 'None waiting')
+        : null,
+      screen: 'Organizations', path: '/organizations',
+    },
+    {
+      key: 'stale-invitations', icon: '⏰', tone: 'amber', title: 'Invitations pending over 72 hours', count: invitations?.staff.pendingOver72Hours ?? null,
+      detail: invitations ? `${formatOverviewCount(invitations.staff.expiredUnaccepted)} expired without being accepted` : null, screen: 'Users', path: '/users',
+    },
+    {
+      key: 'student-invitations', icon: '🎓', tone: 'purple', title: 'Student invitations not delivered', count: invitations?.student.notDelivered ?? null,
+      detail: invitations
+        ? `Of ${formatOverviewCount(invitations.student.pending)} pending · ${formatOverviewCount(invitations.student.byDelivery.FAILED)} failed · ${formatOverviewCount(invitations.student.byDelivery.BOUNCED)} bounced · ${formatOverviewCount(invitations.student.pendingOver72Hours)} over 72 hours`
+        : null,
+      screen: 'Users', path: '/users',
+    },
+    {
+      key: 'trust', icon: '🛡️', tone: 'purple', title: 'Open trust and safety cases', count: trustSafety?.open ?? null,
+      detail: trustSafety
+        ? `Critical ${formatOverviewCount(trustSafety.bySeverity.CRITICAL)} · high ${formatOverviewCount(trustSafety.bySeverity.HIGH)} · unassigned ${formatOverviewCount(trustSafety.unassigned)}`
+        : null,
+      screen: 'Trust and Safety', path: '/trust-and-safety',
+    },
+    {
+      key: 'jobs', icon: '⛔', tone: 'amber', title: 'Failed background events', count: jobs?.failedEvents ?? null,
+      detail: jobs ? `${formatOverviewCount(jobs.openAlerts)} open health alerts` : null, screen: 'System Health', path: '/system-health',
+    },
+    {
+      key: 'privacy', icon: '🔏', tone: 'teal', title: 'Open privacy requests', count: privacyRequests?.open ?? null,
+      detail: privacyRequests
+        ? `${formatOverviewCount(privacyRequests.deletionsDueWithin7Days)} deletions scheduled within 7 days · ${formatOverviewCount(privacyRequests.failed)} failed`
+        : null,
+      screen: 'Security', path: '/security',
+    },
+    {
+      key: 'holds', icon: '⚖️', tone: 'teal', title: 'Active legal holds', count: privacyHolds?.active ?? null,
+      detail: privacyHolds ? 'Releasing a hold needs a second person’s approval' : null, screen: 'Security', path: '/security',
+    },
+    {
+      key: 'approvals', icon: '✅', tone: 'green', title: 'Approvals awaiting a decision', count: approvals?.pending ?? null,
+      detail: approvals ? `${formatOverviewCount(approvals.awaitingExecution)} approved, awaiting execution` : null, screen: 'Settings', path: '/settings',
+    },
+    {
+      key: 'support', icon: '🎧', tone: 'blue', title: 'Open support cases', count: support?.open ?? null,
+      detail: support ? `${formatOverviewCount(support.overdue)} past their SLA · ${formatOverviewCount(support.unassigned)} unassigned` : null,
+      screen: 'Support', path: '/support',
+    },
+  ];
+}
+
+type OperationsOverviewState =
+  | { readonly kind: 'loading' }
+  | { readonly kind: 'ready'; readonly overview: OperationsOverviewDto }
+  | { readonly kind: 'forbidden'; readonly reference: string }
+  | { readonly kind: 'error'; readonly reference: string | null };
 
 export function OperationsDashboardV2({ basePath }: { readonly basePath: string }): React.ReactElement {
   const token = getProtectedAccessToken();
-  const [data, setData] = useState<OperationsDashboardData | null>(null);
+  const [state, setState] = useState<OperationsOverviewState>({ kind: 'loading' });
   useEffect(() => {
     if (!token) return undefined;
     const controller = new AbortController();
-    void Promise.all([
-      listOperationsOrganizations(token, {}, controller.signal).then((response) => response.organizations).catch(() => null),
-      listOperationsInvitations(token, '', controller.signal).then((response) => response.invitations).catch(() => null),
-      listOperationsUsersAccess(token, '', controller.signal).then((response) => response.users).catch(() => null),
-    ]).then(([organizations, invitations, users]) => setData({ organizations, invitations, users }));
+    setState({ kind: 'loading' });
+    getOperationsOverview(token, controller.signal)
+      .then((response) => setState({ kind: 'ready', overview: response.overview }))
+      .catch((cause: unknown) => {
+        if (controller.signal.aborted) return;
+        if (cause instanceof ApiRequestError && cause.status === 403) setState({ kind: 'forbidden', reference: cause.correlationId });
+        else setState({ kind: 'error', reference: cause instanceof ApiRequestError ? cause.correlationId : null });
+      });
     return () => controller.abort();
   }, [token]);
 
-  if (!data) return <section className="v2-card"><h2>Overview</h2><p className="v2-empty">Loading the operations workspace…</p></section>;
+  if (state.kind === 'loading') return <section className="v2-card"><h2>Overview</h2><p className="v2-empty">Loading the operations workspace…</p></section>;
+  if (state.kind === 'forbidden') {
+    return <V2EmptyState icon="🔐" title="Not permitted" note="The operations overview is for AI8HT operations staff. Your access has not changed." hint={`Reference: ${state.reference}`} />;
+  }
+  if (state.kind === 'error') {
+    return <V2EmptyState icon="⚠️" title="The overview could not be loaded" note="Nothing on this page is shown until the server's counts load. Try again shortly."
+      {...(state.reference ? { hint: `Reference: ${state.reference}` } : {})} />;
+  }
 
-  const organizations = data.organizations ?? [];
-  const institutions = organizations.filter((organization) => organization.kind === 'INSTITUTION');
-  const employers = organizations.filter((organization) => organization.kind === 'EMPLOYER');
-  const invitations = data.invitations ?? [];
-  const pendingInvitations = invitations.filter((invitation) => invitation.state === 'PENDING');
-  const acceptedInvitations = invitations.filter((invitation) => invitation.state === 'ACCEPTED');
-  const users = data.users ?? [];
-  const studentAccounts = users.filter((user) => user.studentRelationshipCount > 0);
-  const orgAccounts = users.filter((user) => user.memberships.length > 0);
-  const recentInvitations = [...invitations].sort((left, right) => right.createdAt.localeCompare(left.createdAt)).slice(0, 4);
+  const { overview } = state;
+  const { organizations, invitations, accounts } = overview;
+  const staff = invitations?.staff ?? null;
+  const pending = staff?.pending.value ?? null;
+  const queues = operationsQueues(overview);
+  const open = (path: string) => () => go(`${basePath}${path}`);
 
   return (
     <div className="v2-page">
@@ -664,82 +765,101 @@ export function OperationsDashboardV2({ basePath }: { readonly basePath: string 
           <div>
             <p className="v2-hero-over">ONE Platform · Operations workspace</p>
             <h1>{greeting()} 👋</h1>
-            <p>{pendingInvitations.length ? <><b>{pendingInvitations.length} invitation{pendingInvitations.length === 1 ? '' : 's'}</b> pending acceptance.</> : 'No invitations are pending.'}</p>
+            <p>{staff === null ? 'Invitation counts are NA for your access.'
+              : pending ? <><b>{formatOverviewCount(staff.pending)} invitation{pending === 1 ? '' : 's'}</b> pending acceptance.</> : 'No invitations are pending.'}</p>
             <div className="v2-hero-chips"><V2Chip tone="green">Backend enforced</V2Chip><V2Chip tone="slate">Full mutations on web · view-only in app</V2Chip></div>
           </div>
-          {invitations.length ? <V2Ring percent={(acceptedInvitations.length / invitations.length) * 100} value={`${acceptedInvitations.length}/${invitations.length}`} label="INVITATIONS ACCEPTED" tone="#475569" /> : null}
+          <V2Ring percent={share(staff?.accepted.value, staff?.total.value)}
+            value={staff ? `${formatOverviewCount(staff.accepted)}/${formatOverviewCount(staff.total)}` : NA} label="INVITATIONS ACCEPTED" tone="#475569" />
         </div>
 
         <div className="v2-row v2-cols-4">
-          <V2Stat icon="🏛️" tone="blue" value={organizations.length} label="Organizations" />
-          {data.users ? <V2Stat icon="👥" tone="teal" value={users.length} label="Accounts" /> : null}
-          <V2Stat icon="✉️" tone="amber" value={pendingInvitations.length} label="Pending invitations" />
-          <V2Stat icon="🏢" tone="purple" value={<>{institutions.length} <span className="v2-stat-extra">inst</span> · {employers.length} <span className="v2-stat-extra">emp</span></>} label="By kind" />
+          <V2Stat icon="🏛️" tone="blue" value={formatOverviewCount(organizations?.total)} label="Organizations" />
+          <V2Stat icon="👥" tone="teal" value={formatOverviewPeople(accounts?.total)} label="Accounts" />
+          <V2Stat icon="✉️" tone="amber" value={formatOverviewCount(staff?.pending)} label="Pending invitations" />
+          <V2Stat icon="🏢" tone="purple" value={<>{formatOverviewCount(organizations?.institutions.total)} <span className="v2-stat-extra">inst</span> · {formatOverviewCount(organizations?.employers.total)} <span className="v2-stat-extra">emp</span></>} label="By kind" />
         </div>
 
-        {organizations.length ? (
-          <section className="v2-card">
-            <div className="v2-card-head"><h2>Organizations</h2><button type="button" className="v2-link" onClick={() => go(`${basePath}/organizations`)}>Open Organizations</button></div>
-            <div className="v2-list">
-              {organizations.slice(0, 5).map((organization) => (
-                <div key={organization.id} className="v2-list-row">
-                  <span className={`v2-tile ${organization.kind === 'INSTITUTION' ? 'blue' : 'amber'}`} aria-hidden="true">{organization.kind === 'INSTITUTION' ? '🏛️' : '🏢'}</span>
-                  <div className="grow"><strong>{organization.profile.displayName ?? organization.legalName}</strong><small>{prettify(organization.kind)} · {prettify(organization.verificationState)}</small></div>
-                  <V2Chip tone={organization.active ? 'green' : 'slate'}>{organization.active ? 'ACTIVE' : 'INACTIVE'}</V2Chip>
-                </div>
-              ))}
-            </div>
-          </section>
-        ) : null}
+        <section className="v2-card" aria-label="Operator queues">
+          <div className="v2-card-head"><h2>Operator queues</h2><V2Chip tone="slate">Counted on the server</V2Chip></div>
+          <div className="v2-list">
+            {queues.map((queue) => (
+              <div key={queue.key} className="v2-list-row" data-queue={queue.key}>
+                <span className={`v2-tile ${queue.tone}`} aria-hidden="true">{queue.icon}</span>
+                <div className="grow"><strong>{queue.title}</strong><small>{queue.detail ?? 'NA — not available with your access.'}</small></div>
+                <V2Chip tone={queue.count ? (queue.count.value > 0 ? 'amber' : 'green') : 'slate'}>{formatOverviewCount(queue.count)}</V2Chip>
+                <button type="button" className="v2-link" onClick={open(queue.path)}>Open {queue.screen}</button>
+              </div>
+            ))}
+          </div>
+          <p className="v2-boundary">A queue you cannot open shows NA. Counts stop at 10,000 and then read 10,000+.</p>
+        </section>
 
-        <div className="v2-row v2-cols-2">
-          {invitations.length ? (
-            <section className="v2-card">
-              <div className="v2-card-head"><h2>Invitations</h2>{pendingInvitations.length ? <V2Chip tone="amber">{pendingInvitations.length} pending</V2Chip> : null}</div>
+        <section className="v2-card">
+          <div className="v2-card-head"><h2>Organizations</h2><button type="button" className="v2-link" onClick={open('/organizations')}>Open Organizations</button></div>
+          {organizations === null ? <p className="v2-empty">NA — organization management is not part of your access.</p>
+            : organizations.recent.length ? (
               <div className="v2-list">
-                {recentInvitations.map((invitation) => (
-                  <div key={invitation.id} className="v2-list-row">
-                    <div className="grow"><strong>{invitation.recipientEmail}</strong><small>{prettify(invitation.role)}{invitation.organization ? ` · ${invitation.organization.legalName}` : ''}</small></div>
-                    <V2Chip tone={chipToneForState(invitation.state)}>{invitation.state}</V2Chip>
+                {organizations.recent.map((organization) => (
+                  <div key={organization.id} className="v2-list-row">
+                    <span className={`v2-tile ${organization.kind === 'INSTITUTION' ? 'blue' : 'amber'}`} aria-hidden="true">{organization.kind === 'INSTITUTION' ? '🏛️' : '🏢'}</span>
+                    <div className="grow"><strong>{organization.name}</strong><small>{prettify(organization.kind)} · {prettify(organization.verificationState)}</small></div>
+                    <V2Chip tone={organization.active ? 'green' : 'slate'}>{organization.active ? 'ACTIVE' : 'INACTIVE'}</V2Chip>
                   </div>
                 ))}
               </div>
-              <p className="v2-boundary">Membership is created only after the verified recipient accepts.</p>
-            </section>
-          ) : null}
-          {data.users ? (
-            <section className="v2-card">
-              <div className="v2-card-head"><h2>Accounts</h2><button type="button" className="v2-link" onClick={() => go(`${basePath}/users`)}>Open Users</button></div>
-              <div className="v2-list">
-                <div className="v2-list-row"><div className="grow"><strong>Student accounts</strong><V2Bar percent={(studentAccounts.length / Math.max(1, users.length)) * 100} /></div><V2Chip tone="blue">{studentAccounts.length}</V2Chip></div>
-                <div className="v2-list-row"><div className="grow"><strong>With organization roles</strong><V2Bar percent={(orgAccounts.length / Math.max(1, users.length)) * 100} tone="green" /></div><V2Chip tone="green">{orgAccounts.length}</V2Chip></div>
-                <div className="v2-list-row"><div className="grow"><strong>All accounts</strong><V2Bar percent={100} tone="" /></div><V2Chip tone="slate">{users.length}</V2Chip></div>
-              </div>
-            </section>
-          ) : null}
+            ) : <p className="v2-empty">No organizations onboarded yet.</p>}
+        </section>
+
+        <div className="v2-row v2-cols-2">
+          <section className="v2-card">
+            <div className="v2-card-head"><h2>Invitations</h2>{staff ? <V2Chip tone="amber">{formatOverviewCount(staff.pending)} pending</V2Chip> : <V2Chip tone="slate">NA</V2Chip>}</div>
+            {invitations === null ? <p className="v2-empty">NA — invitation tracking is not part of your access.</p>
+              : invitations.recent.length ? (
+                <div className="v2-list">
+                  {invitations.recent.map((invitation) => (
+                    <div key={invitation.id} className="v2-list-row">
+                      <div className="grow"><strong>{invitation.role ? prettify(invitation.role) : 'Invitation'}</strong><small>{invitation.organizationName ?? 'No organization'} · sent {new Date(invitation.createdAt).toLocaleDateString()}</small></div>
+                      <V2Chip tone={chipToneForState(invitation.state)}>{invitation.state}</V2Chip>
+                    </div>
+                  ))}
+                </div>
+              ) : <p className="v2-empty">No invitations sent yet.</p>}
+            <p className="v2-boundary">Membership is created only after the verified recipient accepts. Recipients are listed on the Users screen, not here.</p>
+          </section>
+          <section className="v2-card">
+            <div className="v2-card-head"><h2>Accounts</h2><button type="button" className="v2-link" onClick={open('/users')}>Open Users</button></div>
+            <div className="v2-list">
+              <div className="v2-list-row"><div className="grow"><strong>Student accounts</strong><V2Bar percent={share(accounts?.students.value, accounts?.total.value)} /></div><V2Chip tone="blue">{formatOverviewPeople(accounts?.students)}</V2Chip></div>
+              <div className="v2-list-row"><div className="grow"><strong>With organization roles</strong><V2Bar percent={share(accounts?.withOrganizationRoles.value, accounts?.total.value)} tone="green" /></div><V2Chip tone="green">{formatOverviewPeople(accounts?.withOrganizationRoles)}</V2Chip></div>
+              <div className="v2-list-row"><div className="grow"><strong>All accounts</strong><V2Bar percent={accounts && !accounts.total.suppressed ? 100 : 0} tone="" /></div><V2Chip tone="slate">{formatOverviewPeople(accounts?.total)}</V2Chip></div>
+            </div>
+            <p className="v2-boundary">{accounts === null ? 'NA — aggregate analytics is not part of your access.' : 'Counts of fewer than 5 people show <5.'}</p>
+          </section>
         </div>
       </div>
 
       <div className="v2-rail">
-        {pendingInvitations.length ? (
-          <section className="v2-card">
-            <div className="v2-card-head"><h2>Needs attention</h2><V2Chip tone="amber">{pendingInvitations.length}</V2Chip></div>
-            <div className="v2-list">
-              {pendingInvitations.slice(0, 3).map((invitation) => {
-                const date = shortDate(invitation.expiresAt);
-                return (
-                  <div key={invitation.id} className="v2-list-row">
-                    <span className="v2-date"><b>{date.month}</b><span>{date.day}</span></span>
-                    <div className="grow"><strong>Invitation expires</strong><small>{invitation.recipientEmail} · {prettify(invitation.role)}</small></div>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        ) : null}
+        <section className="v2-card">
+          <div className="v2-card-head"><h2>Needs attention</h2>{staff ? <V2Chip tone="amber">{formatOverviewCount(staff.pending)}</V2Chip> : <V2Chip tone="slate">NA</V2Chip>}</div>
+          {invitations === null ? <p className="v2-empty">NA — invitation tracking is not part of your access.</p>
+            : invitations.expiringSoon.length ? (
+              <div className="v2-list">
+                {invitations.expiringSoon.map((invitation) => {
+                  const date = shortDate(invitation.expiresAt);
+                  return (
+                    <div key={invitation.id} className="v2-list-row">
+                      <span className="v2-date"><b>{date.month}</b><span>{date.day}</span></span>
+                      <div className="grow"><strong>Invitation expires</strong><small>{invitation.role ? prettify(invitation.role) : 'Invitation'}{invitation.organizationName ? ` · ${invitation.organizationName}` : ''}</small></div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : <p className="v2-empty">No pending invitation is waiting to expire.</p>}
+        </section>
         <section className="v2-card">
           <div className="v2-card-head"><h2>Protected boundaries</h2></div>
-          <p className="v2-empty">Operations never sees student private readiness state, employer hiring records beyond scope, or secrets. The mobile app is view-only for this role by policy.</p>
+          <p className="v2-empty">Operations never sees student private readiness state, employer hiring records beyond scope, or secrets. The overview carries counts only — no names or contact details. The mobile app is view-only for this role by policy.</p>
         </section>
       </div>
     </div>

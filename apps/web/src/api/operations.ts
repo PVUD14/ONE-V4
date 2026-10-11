@@ -1,0 +1,446 @@
+/**
+ * ONE · API client — Stream E — Core
+ *
+ * Platform governance: organizations, verification, users and invitations.
+ *
+ * Split out of the single api.ts client so each stream appends to its own
+ * file. `api.ts` re-exports every public module, so importers are unchanged.
+ */
+import { requestJson } from './http.js';
+
+export interface OrganizationManagementDto {
+  readonly id: string;
+  readonly kind: 'INSTITUTION' | 'EMPLOYER';
+  readonly legalName: string;
+  readonly verificationState: string;
+  readonly active: boolean;
+  readonly updatedAt: string;
+  readonly profile: {
+    readonly displayName?: string | null; readonly countryCode?: string | null; readonly stateOrProvince?: string | null; readonly city?: string | null; readonly postalCode?: string | null;
+    readonly addressLine1?: string | null; readonly addressLine2?: string | null;
+    readonly websiteUrl?: string | null; readonly institutionType?: string | null; readonly primaryContactEmail?: string | null;
+  };
+  readonly initialAdminInvitation?: { readonly id: string; readonly email: string; readonly state: string } | null;
+}
+
+export interface OperationsUserAccessDto {
+  readonly id: string;
+  readonly email: string;
+  readonly verifiedEmail: string | null;
+  readonly identityLinkStatus: string;
+  readonly state: string;
+  readonly memberships: readonly Record<string, unknown>[];
+  readonly studentRelationshipCount: number;
+  readonly studentRelationships: readonly Record<string, unknown>[];
+}
+
+export interface OperationsInvitationDto {
+  readonly id: string;
+  readonly recipientEmail: string;
+  readonly organization: { readonly id: string; readonly legalName: string; readonly kind: string } | null;
+  readonly role: string;
+  readonly state: string;
+  readonly createdAt: string;
+  readonly expiresAt: string;
+  readonly acceptedAt?: string | null;
+  readonly revokedAt?: string | null;
+  readonly delivery?: { readonly commandId: string; readonly state: string; readonly destinationRef?: string; readonly providerKind?: string | null; readonly providerReference?: string | null; readonly outcome?: string | null } | null;
+}
+
+export function listOperationsOrganizations(token: string, filters: { readonly q?: string; readonly kind?: string; readonly verification?: string } = {}, signal?: AbortSignal): Promise<{ readonly organizations: readonly OrganizationManagementDto[] }> {
+  const query = new URLSearchParams();
+  if (filters.q?.trim()) query.set('q', filters.q.trim());
+  if (filters.kind?.trim()) query.set('kind', filters.kind.trim());
+  if (filters.verification?.trim()) query.set('verification', filters.verification.trim());
+  const suffix = query.toString() ? `?${query.toString()}` : '';
+  return requestJson(`/api/v1/operations/organizations${suffix}`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function listOperationsUsersAccess(token: string, q = '', signal?: AbortSignal): Promise<{ readonly users: readonly OperationsUserAccessDto[] }> {
+  const query = q.trim() ? `?q=${encodeURIComponent(q.trim())}` : '';
+  return requestJson(`/api/v1/operations/users-access${query}`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function listOperationsInvitations(token: string, q = '', signal?: AbortSignal): Promise<{ readonly invitations: readonly OperationsInvitationDto[] }> {
+  const query = q.trim() ? `?q=${encodeURIComponent(q.trim())}` : '';
+  return requestJson(`/api/v1/operations/invitations${query}`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function createOperationsOrganization(token: string, body: unknown): Promise<{ readonly organization: OrganizationManagementDto }> {
+  return requestJson('/api/v1/operations/organizations', { token, method: 'POST', body });
+}
+
+export function updateOperationsOrganization(token: string, organizationId: string, body: unknown): Promise<{ readonly organization: OrganizationManagementDto }> {
+  return requestJson(`/api/v1/operations/organizations/${encodeURIComponent(organizationId)}`, { token, method: 'PATCH', body });
+}
+
+/**
+ * Suspension is dual-controlled (OPS-02): it is performed with the reason code and
+ * approvalId of an approved request, never with the default reason.
+ */
+export function transitionOrganizationVerification(
+  token: string, organizationId: string, toState: string, approval?: { readonly reasonCode: string; readonly approvalId: string },
+): Promise<{ readonly organization: OrganizationManagementDto }> {
+  const body = approval ? { toState, reasonCode: approval.reasonCode, approvalId: approval.approvalId } : { toState, reasonCode: 'OPERATIONS_UAT' };
+  return requestJson(`/api/v1/operations/organizations/${encodeURIComponent(organizationId)}/verification`, { token, method: 'POST', body });
+}
+
+export function inviteInitialOrganizationAdmin(token: string, organizationId: string, email: string): Promise<Record<string, unknown>> {
+  return requestJson(`/api/v1/operations/organizations/${encodeURIComponent(organizationId)}/initial-admin-invitations`, { token, method: 'POST', body: { email } });
+}
+
+export function getOperationsOrganizationOnboardingStatus(token: string, organizationId: string): Promise<{ readonly status: Record<string, unknown> }> {
+  return requestJson(`/api/v1/operations/organizations/${encodeURIComponent(organizationId)}/onboarding-status`, { token });
+}
+
+export interface AuditEventDto {
+  readonly id: string;
+  readonly actorUserId: string;
+  readonly action: string;
+  readonly resourceType: string;
+  readonly resourceId: string;
+  readonly organizationId: string | null;
+  readonly outcome: 'SUCCESS' | 'DENIED';
+  readonly correlationId: string;
+  readonly occurredAt: string;
+  readonly context: Record<string, unknown>;
+}
+
+export interface AuditSearchFilters {
+  readonly action?: string;
+  readonly outcome?: string;
+  readonly correlationId?: string;
+  readonly actorUserId?: string;
+  readonly organizationId?: string;
+  readonly from?: string;
+  readonly to?: string;
+  readonly limit?: number;
+  readonly cursor?: string;
+}
+
+/**
+ * Keyset-paginated audit and security event search. The server bounds the page size
+ * and rejects an unparseable cursor, so the caller passes `nextCursor` back verbatim
+ * rather than constructing a position of its own.
+ */
+export function searchAuditEvents(
+  token: string,
+  filters: AuditSearchFilters = {},
+  signal?: AbortSignal,
+): Promise<{ readonly events: readonly AuditEventDto[]; readonly nextCursor: string | null; readonly correlationId: string }> {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    const text = typeof value === 'number' ? String(value) : value?.trim();
+    if (text) query.set(key, text);
+  }
+  const suffix = query.toString() ? `?${query.toString()}` : '';
+  return requestJson(`/api/v1/operations/audit-events${suffix}`, { token, ...(signal ? { signal } : {}) });
+}
+
+export interface FeatureFlagDto {
+  readonly key: string;
+  readonly description: string;
+  readonly enabled: boolean;
+  readonly cap: { readonly kind: string; readonly value: number; readonly window: string } | null;
+  readonly overrides: number;
+  readonly lastChangedAt: string | null;
+  /** OPS-02: the change that needs a second person's approval, or null. */
+  readonly highRiskDirection?: 'ENABLE' | 'DISABLE' | null;
+}
+
+export function listFeatureFlags(token: string, signal?: AbortSignal): Promise<{ readonly flags: readonly FeatureFlagDto[] }> {
+  return requestJson('/api/v1/operations/feature-flags', { token, ...(signal ? { signal } : {}) });
+}
+
+/**
+ * A reason code is required by the server, not optional here: flipping a flag that
+ * gates a safety behaviour is a high-risk action and the record of why is the point.
+ */
+export function setFeatureFlagState(token: string, key: string, enabled: boolean, reasonCode: string, approvalId?: string): Promise<{ readonly flags: readonly FeatureFlagDto[] }> {
+  return requestJson(`/api/v1/operations/feature-flags/${encodeURIComponent(key)}/state`, { token, method: 'POST', body: { enabled, reasonCode, ...(approvalId ? { approvalId } : {}) } });
+}
+
+export interface TrustCaseDto {
+  readonly id: string;
+  readonly caseType: string;
+  readonly subjectKind: string;
+  readonly state: string;
+  readonly severity: string;
+  readonly organizationId: string | null;
+  readonly organizationName: string | null;
+  readonly reportedByUserId: string | null;
+  readonly openedAt: string;
+  readonly closedAt: string | null;
+  readonly evidenceCount: number;
+  readonly liveActions: number;
+}
+
+export interface ReviewSignalDto {
+  readonly id: string;
+  readonly opportunityVersionId: string;
+  readonly signalCode: string;
+  readonly detectorVersion: string;
+  readonly firstDetectedAt: string;
+}
+
+export function listTrustCases(token: string, includeClosed = false, signal?: AbortSignal): Promise<{
+  readonly cases: readonly TrustCaseDto[]; readonly pendingSignals: readonly ReviewSignalDto[];
+}> {
+  return requestJson(`/api/v1/operations/trust-safety/cases?includeClosed=${includeClosed}`, { token, ...(signal ? { signal } : {}) });
+}
+
+/** Opening a case is not a penalty: enforcement is a separate act on a decided case. */
+export function openTrustCaseFromSignal(token: string, body: unknown): Promise<{ readonly id: string; readonly cases: readonly TrustCaseDto[] }> {
+  return requestJson('/api/v1/operations/trust-safety/cases', { token, method: 'POST', body });
+}
+
+/** EMP-10: a reported application conversation, as evidence on a case. Operators only; audited. */
+export interface TrustCaseMessageThreadDto {
+  readonly employerName: string;
+  readonly opportunityTitle: string;
+  readonly startedAt: string;
+  readonly messages: readonly {
+    readonly from: 'EMPLOYER' | 'STUDENT'; readonly body: string | null; readonly containsLink: boolean; readonly sentAt: string;
+    readonly erasedAt: string | null; readonly reported: boolean; readonly reportReasonCode: string | null;
+  }[];
+}
+
+export function getTrustCaseMessageThreads(token: string, caseId: string, signal?: AbortSignal): Promise<{ readonly threads: readonly TrustCaseMessageThreadDto[] }> {
+  return requestJson(`/api/v1/operations/trust-safety/cases/${encodeURIComponent(caseId)}/message-threads`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function transitionTrustCase(token: string, caseId: string, toState: string, reasonCode: string): Promise<Record<string, unknown>> {
+  return requestJson(`/api/v1/operations/trust-safety/cases/${encodeURIComponent(caseId)}/transition`, { token, method: 'POST', body: { toState, reasonCode } });
+}
+
+// --- Staff and capabilities (OPS-01, ADR-032) -------------------------------
+
+export interface StaffCapabilityGrantDto {
+  readonly capability: string;
+  readonly grantedAt: string;
+  readonly reasonCode: string;
+  readonly highRisk: boolean;
+}
+
+export interface StaffMemberDto {
+  readonly membershipId: string;
+  readonly email: string;
+  readonly role: string;
+  readonly state: string;
+  readonly isSelf: boolean;
+  readonly baseline: readonly string[];
+  readonly grants: readonly StaffCapabilityGrantDto[];
+  readonly effective: readonly string[];
+}
+
+export interface StaffCapabilityCatalogueEntryDto {
+  readonly capability: string;
+  readonly highRisk: boolean;
+  readonly grantableHere: boolean;
+  /** GROWTH-01: the platform roles a grant of this capability can land on. */
+  readonly grantableToRoles?: readonly string[];
+}
+
+export interface StaffDirectoryDto {
+  readonly staff: readonly StaffMemberDto[];
+  readonly nextCursor: string | null;
+  readonly capabilities: readonly StaffCapabilityCatalogueEntryDto[];
+  readonly grantReasons: readonly string[];
+  readonly revokeReasons: readonly string[];
+  /** OPS-02: every high-risk grant goes through an approval, whoever asks. */
+  readonly highRiskGrantsNeedApproval: boolean;
+  readonly correlationId: string;
+}
+
+export function listOperationsStaff(token: string, cursor?: string | null, signal?: AbortSignal): Promise<StaffDirectoryDto> {
+  const suffix = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
+  return requestJson(`/api/v1/operations/staff${suffix}`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function grantStaffCapability(
+  token: string, membershipId: string, body: { readonly capability: string; readonly reasonCode: string; readonly note?: string; readonly approvalId?: string },
+): Promise<{ readonly member: StaffMemberDto; readonly correlationId: string }> {
+  return requestJson(`/api/v1/operations/staff/${encodeURIComponent(membershipId)}/capabilities`, { token, method: 'POST', body });
+}
+
+export function revokeStaffCapability(
+  token: string, membershipId: string, capability: string, body: { readonly reasonCode: string; readonly note?: string },
+): Promise<{ readonly member: StaffMemberDto; readonly correlationId: string }> {
+  return requestJson(`/api/v1/operations/staff/${encodeURIComponent(membershipId)}/capabilities/${encodeURIComponent(capability)}/revoke`, { token, method: 'POST', body });
+}
+
+// --- Approvals for high-risk actions (OPS-02) -------------------------------
+
+export type HighRiskActionKey = 'ORGANIZATION_SUSPEND' | 'FEATURE_FLAG_HIGH_RISK_CHANGE' | 'OUTBOX_BACKLOG_SUPERSEDE' | 'PRIVACY_HOLD_RELEASE' | 'CAPABILITY_GRANT_HIGH_RISK'
+  | 'CAREER_REQUIREMENT_SET_PUBLISH' | 'CONTENT_SKILL_PUBLISH' | 'CONTENT_QUESTION_PUBLISH' | 'CONTENT_LESSON_PUBLISH'
+  | 'COMMS_TEMPLATE_PUBLISH' | 'AI_FEATURE_ENABLE' | 'AI_FEATURE_LIMITS_RAISE' | 'INSTITUTION_DATA_PURGE' | 'AI_TUTOR_COLLEGE_ENABLE';
+
+export interface ApprovalDecisionReasonsDto {
+  readonly APPROVE: readonly string[];
+  readonly REJECT: readonly string[];
+}
+
+export interface ApprovalPolicyDto {
+  readonly actions: readonly { readonly actionKey: HighRiskActionKey; readonly label: string; readonly reasons: readonly string[] }[];
+  readonly decisionReasons: ApprovalDecisionReasonsDto;
+  readonly approverCount: number;
+  readonly soloSafeguardActive: boolean;
+  readonly correlationId: string;
+}
+
+export interface OperationApprovalDto {
+  readonly id: string;
+  readonly actionKey: HighRiskActionKey;
+  readonly actionLabel: string;
+  readonly state: 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXECUTED' | 'EXPIRED';
+  /** Identifiers the Execute button needs; never displayed. */
+  readonly payload: Record<string, unknown>;
+  readonly summary: {
+    readonly organizationName: string | null; readonly flagKey: string | null; readonly enabled: boolean | null;
+    readonly capability: string | null; readonly memberEmail: string | null; readonly holdReason: string | null;
+    readonly olderThan: string | null; readonly limit: number | null;
+    /** OPS-08: a requirement-set publish names its role, version and the label it sets. */
+    readonly careerRoleTitle?: string | null; readonly careerRoleCatalogueCode?: string | null;
+    readonly careerSetVersion?: number | null; readonly releaseLabel?: string | null;
+    /** OPS-09a: a skill publish names the skill, its key and the revision. */
+    readonly skillName?: string | null; readonly skillKey?: string | null; readonly skillRevision?: number | null;
+    /** OPS-09b: a question publish names the question's key and revision — never its answer. */
+    readonly questionKey?: string | null; readonly questionRevision?: number | null;
+    /** OPS-09c: a lesson publish names the lesson's key, its variant (language/level/style) and revision. */
+    readonly lessonKey?: string | null; readonly lessonVariant?: string | null; readonly lessonRevision?: number | null;
+    /** OPS-16: a status notice template publish names the template key and version. */
+    readonly commsTemplateKey?: string | null; readonly commsTemplateVersion?: number | null;
+    /** OPS-12: switching an AI feature on names the model and prompt version; widening names the new limits. */
+    readonly aiFeatureKey?: string | null; readonly aiModel?: string | null; readonly aiPromptKey?: string | null; readonly aiPromptVersion?: number | null;
+    readonly aiCap?: number | null; readonly aiCapWindow?: string | null; readonly aiMaxInputChars?: number | null;
+  };
+  readonly reasonCode: string;
+  readonly note: string | null;
+  readonly requestedBy: { readonly email: string; readonly isSelf: boolean };
+  readonly requestedAt: string;
+  readonly expiresAt: string;
+  readonly coolingOffEndsAt: string;
+  readonly decidedBy: { readonly email: string; readonly isSelf: boolean } | null;
+  readonly decidedAt: string | null;
+  readonly decisionReasonCode: string | null;
+  readonly mode: 'DUAL' | 'SOLO' | null;
+  readonly soloNotice: 'QUEUED' | 'NOT_DELIVERED' | null;
+  readonly executedAt: string | null;
+  readonly canApprove: boolean;
+  readonly canReject: boolean;
+  readonly approveRefusal: string | null;
+  readonly canExecute: boolean;
+}
+
+export interface OperationApprovalQueueDto {
+  readonly approvals: readonly OperationApprovalDto[];
+  readonly nextCursor: string | null;
+  readonly decisionReasons: ApprovalDecisionReasonsDto;
+  readonly approverCount: number;
+  readonly soloSafeguardActive: boolean;
+  readonly viewerIsApprover: boolean;
+  readonly correlationId: string;
+}
+
+export function getApprovalPolicy(token: string, signal?: AbortSignal): Promise<ApprovalPolicyDto> {
+  return requestJson('/api/v1/operations/approvals/policy', { token, ...(signal ? { signal } : {}) });
+}
+
+export function listOperationApprovals(token: string, state?: string, cursor?: string | null, signal?: AbortSignal): Promise<OperationApprovalQueueDto> {
+  const query = new URLSearchParams();
+  if (state) query.set('state', state);
+  if (cursor) query.set('cursor', cursor);
+  const suffix = query.toString() ? `?${query.toString()}` : '';
+  return requestJson(`/api/v1/operations/approvals${suffix}`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function requestOperationApproval(
+  token: string, body: { readonly actionKey: HighRiskActionKey; readonly payload: Record<string, unknown>; readonly note?: string },
+): Promise<{ readonly approval: OperationApprovalDto; readonly correlationId: string }> {
+  return requestJson('/api/v1/operations/approvals', { token, method: 'POST', body });
+}
+
+export function decideOperationApproval(
+  token: string, approvalId: string, body: { readonly decision: 'APPROVE' | 'REJECT'; readonly reasonCode: string; readonly note?: string },
+): Promise<{ readonly approval: OperationApprovalDto; readonly correlationId: string }> {
+  return requestJson(`/api/v1/operations/approvals/${encodeURIComponent(approvalId)}/decision`, { token, method: 'POST', body });
+}
+
+export function supersedeOutboxBacklog(
+  token: string, body: { readonly olderThan: string; readonly limit: number; readonly reasonCode: string; readonly approvalId: string },
+): Promise<{ readonly superseded: number; readonly correlationId: string }> {
+  return requestJson('/api/v1/operations/outbox/backlog/supersede', { token, method: 'POST', body });
+}
+
+export function releasePrivacyHold(
+  token: string, holdId: string, body: { readonly reasonCode: string; readonly approvalId: string },
+): Promise<{ readonly released: boolean; readonly correlationId: string }> {
+  return requestJson(`/api/v1/operations/privacy/holds/${encodeURIComponent(holdId)}/release`, { token, method: 'POST', body });
+}
+
+// --- Employer access requests (EMP-04) -----------------------------------------
+
+export interface EmployerAccessRequestInput {
+  readonly requesterName: string;
+  readonly companyName: string;
+  readonly workEmail: string;
+  readonly websiteUrl: string;
+  /** GROWTH-05: the referral code from the link the company followed, if any. Never changes the answer. */
+  readonly ref?: string;
+}
+
+/** Public: no token. The answer is the same whatever exists on ONE. */
+export function submitEmployerAccessRequest(input: EmployerAccessRequestInput): Promise<{ readonly received: true }> {
+  return requestJson('/api/v1/employer-access-requests', { method: 'POST', body: input });
+}
+
+export interface EmployerAccessRequestDto {
+  readonly id: string;
+  readonly requesterName: string;
+  readonly companyName: string;
+  readonly workEmail: string;
+  readonly emailDomain: string;
+  readonly websiteUrl: string;
+  readonly emailMatchesWebsite: boolean;
+  readonly freeMail: boolean;
+  readonly emailConfirmed: boolean;
+  readonly state: 'PENDING' | 'ONBOARDED' | 'DECLINED' | 'SPAM';
+  readonly organizationId: string | null;
+  readonly decisionReasonCode: string | null;
+  readonly decidedAt: string | null;
+  readonly submissionCount: number;
+  readonly createdAt: string;
+  readonly lastSubmittedAt: string;
+  readonly possibleMatches: readonly { readonly organizationId: string; readonly legalName: string; readonly verificationState: string }[];
+  /** GROWTH-05: the growth referral the request arrived with, its linked employer lead, and other open leads that look like it. */
+  readonly growthReferral?: { readonly referrerEmail: string; readonly codeRevoked: boolean; readonly recordedAt: string | null } | null;
+  readonly growthLead?: EmployerAccessRequestGrowthLeadDto | null;
+  readonly growthLeadCandidates?: readonly EmployerAccessRequestGrowthLeadDto[];
+}
+
+export interface EmployerAccessRequestGrowthLeadDto {
+  readonly leadId: string;
+  readonly name: string;
+  readonly websiteDomain: string | null;
+  readonly stage: string;
+  readonly ownerEmail: string | null;
+  readonly basis?: 'DOMAIN_MATCH' | 'OPERATOR_LINKED';
+}
+
+export interface EmployerAccessRequestQueueDto {
+  readonly requests: readonly EmployerAccessRequestDto[];
+  readonly nextCursor: string | null;
+  readonly reasonCodes: Readonly<Record<'ONBOARDED' | 'DECLINED' | 'SPAM', readonly string[]>>;
+}
+
+export function listEmployerAccessRequests(token: string, filters: { readonly state?: string; readonly cursor?: string } = {}, signal?: AbortSignal): Promise<EmployerAccessRequestQueueDto> {
+  const query = new URLSearchParams();
+  if (filters.state) query.set('state', filters.state);
+  if (filters.cursor) query.set('cursor', filters.cursor);
+  const suffix = query.toString() ? `?${query.toString()}` : '';
+  return requestJson(`/api/v1/operations/employer-access-requests${suffix}`, { token, ...(signal ? { signal } : {}) });
+}
+
+export function decideEmployerAccessRequest(token: string, requestId: string, decision: { readonly decision: 'ONBOARDED' | 'DECLINED' | 'SPAM'; readonly reasonCode: string; readonly organizationId?: string }): Promise<{ readonly request: { readonly id: string; readonly state: string } }> {
+  return requestJson(`/api/v1/operations/employer-access-requests/${encodeURIComponent(requestId)}/decision`, { token, method: 'POST', body: decision });
+}

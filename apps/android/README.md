@@ -1,6 +1,6 @@
 # ONE Android (v0.1)
 
-Kotlin + Jetpack Compose client for one.ai8ht.pro, scoped per
+Kotlin + Jetpack Compose client for oneby8.com, scoped per
 `docs/architecture/MOBILE_FOUNDATION.md`: assessments & results, the
 notification inbox, DPDP consent gate, and sign-in. Exam *taking* stays on the
 web in v1 by design.

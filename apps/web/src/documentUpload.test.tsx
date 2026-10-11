@@ -13,15 +13,18 @@ const student = { userId: 'student-1', fullName: 'Aanya Student', verifiedEmail:
 // studentRelationships is what routes an identity with no org membership to /student.
 const securityContext = { userId: 'student-1', memberships: [], studentRelationships: [{ institutionId: 'inst-1', state: 'ACTIVE', effectiveFrom: '2026-08-01T00:00:00.000Z' }] };
 
+/** Extra rows a test adds beside the default one, to check how verification is labelled. */
+let extraDocuments: readonly Record<string, unknown>[] = [];
+
 function documentsPayload(file: unknown) {
   return {
     documents: [{
       id: '11111111-1111-4111-8111-111111111111',
       title: 'My CV', documentType: 'RESUME', description: null,
-      verificationState: 'SELF_REPORTED', archivedAt: null,
+      verificationState: 'SELF_REPORTED', verifiedAt: null, archivedAt: null,
       createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
       file,
-    }],
+    }, ...extraDocuments],
     storage: { fileStorage: 'AVAILABLE', message: 'Files are scanned for malware before they are stored.' },
   };
 }
@@ -34,6 +37,7 @@ beforeEach(() => {
   vi.stubEnv('VITE_COGNITO_CLIENT_ID', 'uat-client');
   vi.stubEnv('VITE_COGNITO_REDIRECT_URI', 'http://127.0.0.1:5173/auth/callback');
   attachedFile = null;
+  extraDocuments = [];
   vi.stubGlobal('fetch', vi.fn(async (url: string, init?: { method?: string }) => {
     if (url.endsWith('/oauth2/token')) return { ok: true, status: 200, json: async () => ({ access_token: 'test-access-token' }) };
     if (url.endsWith('/health')) return { ok: true, status: 200 };
@@ -125,5 +129,40 @@ describe('student document upload', () => {
     const input = document.querySelector('input[type="file"]') as HTMLInputElement;
     expect(input.accept).toContain('application/pdf');
     expect(input.accept).not.toContain('application/x-msdownload');
+  });
+});
+
+describe('student document verification labels', () => {
+  const row = (id: string, title: string, verificationState: string, verifiedAt: string | null) => ({
+    id, title, documentType: 'CERTIFICATE', description: null, verificationState, verifiedAt, archivedAt: null,
+    createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z', file: null,
+  });
+
+  it('never calls a document verified without an institution decision, and offers no verification choice', async () => {
+    extraDocuments = [
+      row('22222222-2222-4222-8222-222222222222', 'Asked', 'PENDING_VERIFICATION', null),
+      // A VERIFIED state with no decision time is a self-assertion an older server could still return.
+      row('33333333-3333-4333-8333-333333333333', 'Claimed', 'VERIFIED', null),
+    ];
+    await openDocuments();
+    const cells = (title: string) => screen.getByRole('cell', { name: title }).closest('tr') as HTMLTableRowElement;
+    await screen.findByRole('cell', { name: 'Claimed' });
+    expect(cells('My CV')).toHaveTextContent('Self-reported');
+    expect(cells('Asked')).toHaveTextContent('Verification requested');
+    expect(cells('Claimed')).toHaveTextContent('Self-reported');
+    expect(cells('Claimed')).not.toHaveTextContent(/\bVerified\b/);
+    const verifiedStat = screen.getByText('Verified', { selector: 'small' }).closest('.v2-stat') as HTMLElement;
+    expect(verifiedStat).toHaveTextContent('0');
+    const form = screen.getByRole('heading', { name: 'Add a document' }).closest('form') as HTMLFormElement;
+    expect(form.querySelector('[name="verificationState"]')).toBeNull();
+  });
+
+  it('shows Verified only when an institution decided', async () => {
+    extraDocuments = [row('44444444-4444-4444-8444-444444444444', 'Checked', 'VERIFIED', '2026-09-30T10:00:00.000Z')];
+    await openDocuments();
+    await screen.findByRole('cell', { name: 'Checked' });
+    expect(screen.getByRole('cell', { name: 'Checked' }).closest('tr')).toHaveTextContent('Verified');
+    const verifiedStat = screen.getByText('Verified', { selector: 'small' }).closest('.v2-stat') as HTMLElement;
+    expect(verifiedStat).toHaveTextContent('1');
   });
 });

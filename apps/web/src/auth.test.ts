@@ -12,6 +12,13 @@ function jwtWithEmailAndExpiry(email: string): string {
   return `header.${payload}.signature`;
 }
 
+// Every test here calls vi.resetModules() and then re-imports the whole App module tree,
+// so each one pays a full transform-and-evaluate before it asserts anything. That is
+// inherent to testing sign-in against the real app, and under a parallel suite run it sat
+// close enough to the 5s default to fail intermittently. The assertions are unchanged;
+// only the time allowed for the import is.
+vi.setConfig({ testTimeout: 30000 });
+
 beforeEach(() => {
   cleanup();
   window.sessionStorage.clear();
@@ -72,6 +79,7 @@ describe('Cognito Hosted UI browser authentication', () => {
     vi.stubEnv('VITE_COGNITO_USER_POOL_ID', 'ap-south-1_uatpool');
     vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
       if (url.endsWith('/health')) return { ok: true };
+      if (url.endsWith('/api/v1/me/consents/privacy-notice')) return { ok: true, json: async () => ({ requiredVersion: null, grantedVersion: null, required: false }) };
       if (url.endsWith('/api/v1/security/context')) {
         expect((init?.headers as Record<string, string>).Authorization).toMatch(/^Bearer /);
         return { ok: true, json: async () => ({ userId: 'student-user', memberships: [], studentRelationships: [{ institutionId: 'institution-1', state: 'ACTIVE', effectiveFrom: '2026-08-21T00:00:00.000Z' }] }) };
@@ -87,7 +95,7 @@ describe('Cognito Hosted UI browser authentication', () => {
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'student.aanya@uat.example.test' } });
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'Correct-Horse-1' } });
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
-    await waitFor(() => expect(window.location.pathname).toBe('/student'));
+    await waitFor(() => expect(window.location.pathname).toBe('/student'), { timeout: 15000 });
     expect(captured).toMatchObject({ username: 'student.aanya@uat.example.test', password: 'Correct-Horse-1', flow: 'USER_SRP_AUTH' });
     expect(JSON.stringify(window.sessionStorage)).not.toContain('Correct-Horse-1');
     expect(window.localStorage.length).toBe(0);
@@ -134,6 +142,7 @@ describe('Cognito Hosted UI browser authentication', () => {
     vi.stubEnv('VITE_COGNITO_USER_POOL_ID', 'ap-south-1_uatpool');
     vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
       if (url.endsWith('/health')) return { ok: true };
+      if (url.endsWith('/api/v1/me/consents/privacy-notice')) return { ok: true, json: async () => ({ requiredVersion: null, grantedVersion: null, required: false }) };
       if (url.endsWith('/api/v1/security/context')) return { ok: true, json: async () => ({ userId: 'student-user', memberships: [], studentRelationships: [{ institutionId: 'institution-1', state: 'ACTIVE', effectiveFrom: '2026-08-21T00:00:00.000Z' }] }) };
       if (url.endsWith('/api/v1/students/me')) return { ok: true, json: async () => ({ student: { userId: 'student-user', verifiedEmail: 'student.aanya@uat.example.test', fullName: 'Aanya Rao', institutionStudentId: 'UAT-S-001', institutionId: 'institution-1', academicStatus: 'ACTIVE' } }) };
       if (url.endsWith('/api/v1/students/me/profile') && (!init?.method || init.method === 'GET')) return { ok: true, json: async () => ({ profile: { userId: 'student-user', verifiedEmail: 'student.aanya@uat.example.test', targetCareer: null, careerInterests: [], profileHeadline: null, profileSummary: null, portfolioUrl: null, visibilityState: 'PRIVATE', employerDiscoveryEnabled: false, updatedAt: null } }) };
@@ -150,7 +159,7 @@ describe('Cognito Hosted UI browser authentication', () => {
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'student.aanya@uat.example.test' } });
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'Correct-Horse-1' } });
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
-    await waitFor(() => expect(window.location.pathname).toBe('/student'));
+    await waitFor(() => expect(window.location.pathname).toBe('/student'), { timeout: 15000 });
     window.history.pushState(null, '', '/student/profile');
     window.dispatchEvent(new PopStateEvent('popstate'));
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Your career profile' })).toBeInTheDocument());
@@ -178,6 +187,7 @@ describe('Cognito Hosted UI browser authentication', () => {
         return { ok: true, json: async () => ({ access_token: 'uat-access-token', id_token: jwtWithEmail('aanya.student01@example.test') }) };
       }
       if (url.endsWith('/health')) return { ok: true };
+      if (url.endsWith('/api/v1/me/consents/privacy-notice')) return { ok: true, json: async () => ({ requiredVersion: null, grantedVersion: null, required: false }) };
       if (url.endsWith('/api/v1/security/context')) {
         expect((init?.headers as Record<string, string>).Authorization).toBe('Bearer uat-access-token');
         return { ok: true, json: async () => ({ userId: 'student-user-1', memberships: [], studentRelationships: [{ institutionId: 'institution-1', state: 'ACTIVE', effectiveFrom: '2026-08-21T00:00:00.000Z' }] }) };
@@ -198,7 +208,7 @@ describe('Cognito Hosted UI browser authentication', () => {
     render(React.createElement(App));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument());
     expect(screen.getByText('aanya.student01@example.test')).toBeInTheDocument();
-    await waitFor(() => expect(window.location.pathname).toBe('/student'));
+    await waitFor(() => expect(window.location.pathname).toBe('/student'), { timeout: 15000 });
     await waitFor(() => expect(screen.getByRole('button', { name: 'Student profile menu' })).toHaveTextContent('Aanya Rao'));
     // UAT #18: the resolved workspace shows no auth/debug banner; identity
     // lives in the top bar only.
@@ -206,11 +216,11 @@ describe('Cognito Hosted UI browser authentication', () => {
     await waitFor(() => expect(screen.getByText('Quick Actions')).toBeInTheDocument());
     expect(screen.queryByText('Rahul Kumar')).not.toBeInTheDocument();
     expect(screen.queryByText('DEMO PREVIEW')).not.toBeInTheDocument();
-    // Pilot-parity rule (2026-08-27): score widgets render in the same slots as
-    // the pilot but show an explicit NA until a real scoring engine exists -
-    // "/100" may appear, a fabricated numeric score may not.
-    expect(screen.getAllByText('/100').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('NA').length).toBeGreaterThan(0);
+    // The protected readiness engine is banded, so authenticated UI must keep
+    // the visual slot without presenting a fabricated numeric score.
+    expect(screen.getByRole('heading', { name: 'Career Readiness Band' })).toBeInTheDocument();
+    expect(screen.getByText('No advisory band yet')).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain('/100');
     window.history.pushState(null, '', '/student/readiness');
     render(React.createElement(App));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/api/v1/career-readiness/me'), expect.objectContaining({
@@ -255,6 +265,7 @@ describe('Cognito Hosted UI browser authentication', () => {
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
       if (url === 'https://uat-auth.example.test/oauth2/token') return { ok: true, json: async () => ({ access_token: 'institution-token', id_token: jwtWithEmail('institution.admin@uat.example.test') }) };
       if (url.endsWith('/health')) return { ok: true };
+      if (url.endsWith('/api/v1/me/consents/privacy-notice')) return { ok: true, json: async () => ({ requiredVersion: null, grantedVersion: null, required: false }) };
       if (url.endsWith('/api/v1/security/context')) return { ok: true, json: async () => ({
         userId: 'institution-user',
         memberships: [{ organizationId: 'institution-1', role: 'INSTITUTION_ADMIN', scope: {} }],
@@ -285,6 +296,7 @@ describe('Cognito Hosted UI browser authentication', () => {
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
       if (url === 'https://uat-auth.example.test/oauth2/token') return { ok: true, json: async () => ({ access_token: 'placement-token', id_token: jwtWithEmail('placement.admin@uat.example.test') }) };
       if (url.endsWith('/health')) return { ok: true };
+      if (url.endsWith('/api/v1/me/consents/privacy-notice')) return { ok: true, json: async () => ({ requiredVersion: null, grantedVersion: null, required: false }) };
       if (url.endsWith('/api/v1/security/context')) return { ok: true, json: async () => ({
         userId: 'placement-user',
         memberships: [{ organizationId: 'institution-1', role: 'PLACEMENT_ADMIN', scope: {} }],
@@ -308,6 +320,7 @@ describe('Cognito Hosted UI browser authentication', () => {
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
       if (url === 'https://uat-auth.example.test/oauth2/token') return { ok: true, json: async () => ({ access_token: 'recruiter-token', id_token: jwtWithEmail('recruiter@uat.example.test') }) };
       if (url.endsWith('/health')) return { ok: true };
+      if (url.endsWith('/api/v1/me/consents/privacy-notice')) return { ok: true, json: async () => ({ requiredVersion: null, grantedVersion: null, required: false }) };
       if (url.endsWith('/api/v1/security/context')) return { ok: true, json: async () => ({
         userId: 'recruiter-user',
         memberships: [{ organizationId: 'employer-1', role: 'RECRUITER', scope: {} }],
@@ -318,14 +331,14 @@ describe('Cognito Hosted UI browser authentication', () => {
     const { App } = await import('./App.js');
     render(React.createElement(App));
     await waitFor(() => expect(window.location.pathname).toBe('/employer/recruiter'));
-    expect(screen.getAllByText('recruiter@uat.example.test').length).toBeGreaterThan(0);
+    expect((await screen.findAllByText('recruiter@uat.example.test')).length).toBeGreaterThan(0);
     expect(screen.queryByText('Rohan Shah')).not.toBeInTheDocument();
     expect(screen.queryByText(/role selection here does not authenticate/i)).not.toBeInTheDocument();
 
     cleanup();
     window.history.pushState(null, '', '/demo/employer/recruiter');
     render(React.createElement(App));
-    expect(screen.getByText('Rohan Shah')).toBeInTheDocument();
+    expect(await screen.findByText('Rohan Shah')).toBeInTheDocument();
     expect(screen.getAllByText('DEMO PREVIEW').length).toBeGreaterThan(0);
   });
 
@@ -339,6 +352,7 @@ describe('Cognito Hosted UI browser authentication', () => {
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
       if (url === 'https://uat-auth.example.test/oauth2/token') return { ok: true, json: async () => ({ access_token: 'operations-token', id_token: jwtWithEmail('operations.admin@uat.example.test') }) };
       if (url.endsWith('/health')) return { ok: true };
+      if (url.endsWith('/api/v1/me/consents/privacy-notice')) return { ok: true, json: async () => ({ requiredVersion: null, grantedVersion: null, required: false }) };
       if (url.endsWith('/api/v1/security/context')) return { ok: true, json: async () => ({
         userId: 'operations-user',
         memberships: [{ organizationId: 'operations-org', role: 'OPERATIONS_ADMIN', scope: {} }],
@@ -349,7 +363,7 @@ describe('Cognito Hosted UI browser authentication', () => {
     const { App } = await import('./App.js');
     render(React.createElement(App));
     await waitFor(() => expect(window.location.pathname).toBe('/operations/admin'));
-    expect(screen.getByText('OPERATIONS_ADMIN')).toBeInTheDocument();
+    expect(await screen.findByText('OPERATIONS_ADMIN')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Student Dashboard' })).not.toBeInTheDocument();
     expect(screen.queryByText('Rahul Kumar')).not.toBeInTheDocument();
   });
@@ -364,6 +378,7 @@ describe('Cognito Hosted UI browser authentication', () => {
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
       if (url === 'https://uat-auth.example.test/oauth2/token') return { ok: true, json: async () => ({ access_token: 'rejected-token', id_token: jwtWithEmail('unmapped@uat.example.test') }) };
       if (url.endsWith('/health')) return { ok: true };
+      if (url.endsWith('/api/v1/me/consents/privacy-notice')) return { ok: true, json: async () => ({ requiredVersion: null, grantedVersion: null, required: false }) };
       if (url.endsWith('/api/v1/security/context')) return {
         ok: false,
         status: 403,
@@ -391,6 +406,7 @@ describe('Cognito Hosted UI browser authentication', () => {
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
       if (url === 'https://uat-auth.example.test/oauth2/token') return { ok: true, json: async () => ({ access_token: 'student-token', id_token: jwtWithEmail('student.aanya@uat.example.test') }) };
       if (url.endsWith('/health')) return { ok: true };
+      if (url.endsWith('/api/v1/me/consents/privacy-notice')) return { ok: true, json: async () => ({ requiredVersion: null, grantedVersion: null, required: false }) };
       if (url.endsWith('/api/v1/security/context')) return { ok: true, json: async () => ({
         userId: 'student-user',
         memberships: [],
@@ -404,8 +420,10 @@ describe('Cognito Hosted UI browser authentication', () => {
     Object.defineProperty(window, 'location', { configurable: true, value: { ...window.location, assign, origin: 'http://127.0.0.1:5173', pathname: '/student', search: '' } });
     const { App } = await import('./App.js');
     render(React.createElement(App));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    // After the callback the app navigates and the consent gate remounts, re-checking consent
+    // (it never shows the workspace before it knows). The button can therefore vanish between
+    // being found and being clicked, so find-and-click is retried as one step.
+    await waitFor(() => fireEvent.click(screen.getByRole('button', { name: 'Sign out' })), { timeout: 10_000 });
     expect(assign).toHaveBeenCalledWith('https://uat-auth.example.test/logout?client_id=uat-client&logout_uri=http%3A%2F%2F127.0.0.1%3A5173%2Flogin');
     const { getAccessToken } = await import('./auth.js');
     expect(getAccessToken()).toBeNull();

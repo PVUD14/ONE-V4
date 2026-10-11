@@ -44,6 +44,7 @@ import { StatusTag } from '../momentum/statusTag.js';
 import { CandidateIdentity } from '../hiringPages.js';
 import { employerManagesOrganisation } from './employer.js';
 import { IhAvatar, IhCard, IhInsight, IhKpis, IhNote, IhPage, IhTiles, RecordCount, go, shortDate, shortTime } from './institutionMomentum.js';
+import { Loading } from '../momentum/loader.js';
 
 type NamedApplicant = EmployerApplicantDto & { readonly opportunityTitle: string };
 
@@ -312,7 +313,7 @@ export function EmployerHome({ basePath }: { readonly basePath: string }): React
   return <IhPage className="bh" title="Hiring overview" summary="Your open roles, where every applicant is, and the interviews coming up this week."
     actions={<button type="button" className="pilot-btn" onClick={open('/opportunities')}><Icon name="plus" size={16} /> Post a role</button>}>
     {error ? <p role="alert" className="ih-empty">{error}</p> : null}
-    {!data && !error ? <p role="status" className="ih-empty">Loading your hiring overview…</p> : null}
+    {!data && !error ? <Loading className="ih-empty">Loading your hiring overview…</Loading> : null}
     {data && !summary ? <p className="bh-banner" role="status"><Icon name="warning" size={16} /> Your hiring figures could not be loaded just now, so they are left out. Try again shortly.</p> : null}
     {summary ? <IhKpis items={[
       { key: 'roles', icon: 'opportunities', value: <RecordCount value={summary.openJobs} />, label: summary.openJobs === 1 ? 'Open role' : 'Open roles' },

@@ -52,5 +52,6 @@ export function NavIndicator({ activeKey, layoutKey }: {
   }, [activeKey, layoutKey]);
 
   return <span ref={barRef} className={`nav-indicator${position ? ' on' : ''}${settled ? ' settled' : ''}`} aria-hidden="true"
-    style={position ? { top: `${position.top}px`, height: `${position.height}px` } : undefined} />;
+    // Positioned with `translate`, not `top`, so the slide is a compositor transform (phase 11).
+    style={position ? { translate: `0 ${position.top}px`, height: `${position.height}px` } : undefined} />;
 }

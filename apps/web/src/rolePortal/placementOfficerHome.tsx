@@ -31,6 +31,7 @@ import { getPlacementRegister, getPlacementStatistics, type PlacementRegisterDto
 import { formatDate, formatMonth } from '../dates.js';
 import { SmallCount, SuppressedLegend, isSmallCount, partitionNeedsRanges, shownCount } from '../momentum/smallCount.js';
 import { StatusTag } from '../momentum/statusTag.js';
+import { Loading } from '../momentum/loader.js';
 import {
   CohortBandsCard, IhAvatar, IhCard, IhKpis, IhNote, IhPage, IhTiles, NeedsAttentionCard, PeopleCount, RecordCount, go, shortDate, shortTime, validOverview,
 } from './institutionMomentum.js';
@@ -213,7 +214,7 @@ export function PlacementOfficerHome({ institutionId, basePath, title = 'Placeme
   const asOf = data?.placement ? `As of ${formatDate(data.placement.asOf.lastDay)}` : null;
 
   return <IhPage title={title} summary="Campus drives, who is eligible, and where the cohort stands before the season opens.">
-    {!data ? <p role="status" className="ih-empty">Loading the placement dashboard…</p> : null}
+    {!data ? <Loading className="ih-empty">Loading the placement dashboard…</Loading> : null}
     <IhKpis items={[
       students !== null && active !== null && { key: 'active', icon: 'students', value: <PeopleCount value={active} range={activeRanged} />, label: 'Active students', note: <>of <SmallCount value={students.length} /> on the roster</> },
       overall && { key: 'eligible', icon: 'student-search', value: <SmallCount value={overall.eligible} />, label: 'Placement eligible', note: isSmallCount(overall.eligible) ? 'Too few to show' : asOf },

@@ -27,7 +27,7 @@
   pointer-events: none;
 }
 .nav-indicator.on { opacity: 1; }
-.nav-indicator.settled { transition: top 480ms var(--e-out), height 300ms var(--e-out), opacity 300ms; }
+.nav-indicator.settled { transition: translate 480ms var(--e-out), height 300ms var(--e-out), opacity 300ms; }
 @media (prefers-reduced-motion: reduce) {
   .nav-indicator.settled { transition: none; }
 }

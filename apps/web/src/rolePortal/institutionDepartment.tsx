@@ -49,6 +49,7 @@ import { NaValue, PilotKpi } from '../naState.js';
 import { MISSING_TEXT } from '../labels.js';
 import { SmallCount, SuppressedBlock, SuppressedLegend, SMALL_COUNT_TEXT, isSmallCountText, partitionNeedsRanges } from '../momentum/smallCount.js';
 import { BandClimb } from '../momentum/bandClimb.js';
+import { Loading } from '../momentum/loader.js';
 import {
   ActivationCard, BatchTable, CohortBandsCard, IhCard, IhKpis, IhNote, IhPage, IhRows, IhTiles, PeopleCount, RecordCount, VerificationBlock, validOverview,
 } from './institutionMomentum.js';
@@ -157,7 +158,7 @@ export function DepartmentOverviewPage({ authenticatedWorkspace, basePath }: Wor
   return <IhPage eyebrow={institutionStudentScopeLabel(data?.scope) ?? null} title="Department Overview"
     summary="Your department's students, activation, assessments, readiness and open work, counted by the server for your scope.">
     {overview.error ? <p className="form-error" role="alert">{overview.error}</p> : null}
-    {!data && !overview.error ? <p role="status" className="ih-empty">Loading the department overview…</p> : null}
+    {!data && !overview.error ? <Loading className="ih-empty">Loading the department overview…</Loading> : null}
     {data ? <IhKpis items={[
       { key: 'roster', icon: 'students', value: <PeopleCount value={data.students.onRoster} />, label: 'Students on roster', note: data.batches.length ? `${data.batches.length} ${data.batches.length === 1 ? 'batch' : 'batches'}` : null },
       { key: 'current', icon: 'students', value: <PeopleCount value={data.students.current} range={currentRanged} />, label: 'Enrolled now', note: 'Current relationship' },

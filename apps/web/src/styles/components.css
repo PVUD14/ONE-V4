@@ -493,11 +493,11 @@ button.secondary:not(:disabled):hover { border-color: var(--brand); filter: none
 .mb i.c { opacity: 1; }
 .rb-mini-lock { display: inline-flex; color: var(--text-3); }
 .rb-mini-lock svg { width: 13px; height: 13px; }
-@keyframes rbCurGlowP { 0%, 100% { box-shadow: 0 10px 24px -10px var(--c); } 50% { box-shadow: 0 10px 30px -6px var(--c); } }
 @keyframes rbStripes { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+/* The climb's loops start once the marker has landed (`.live`); the current step's glow is an
+   opacity layer in styles/motion.css, with the rest of the climb. */
 @media (prefers-reduced-motion: no-preference) {
-  .rb .rb-s.cur .rb-cur { animation: rbCurGlowP var(--loop-breathe) ease-in-out infinite; }
-  .rb .rb-s.next .rb-next::before { animation: rbStripes var(--loop-breathe) ease-in-out infinite; }
+  .rb.live .rb-s.next .rb-next::before { animation: rbStripes var(--loop-breathe) ease-in-out infinite; }
 }
 
 /* The lesson the learning page was opened on ("Resume lesson", approved 2026-10-11): the same

@@ -49,7 +49,7 @@
 
 /* ---------- Card ---------- */
 .ih-card { min-width: 0; padding: 22px; border-radius: var(--r-card); background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow); transition: transform var(--m-base) var(--e-out), box-shadow var(--m-base) var(--e-out); }
-.ih-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lift); }
+.ih-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lift); }
 .ih-ch { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
 .ih-ch h2 { flex: 1; display: flex; align-items: center; gap: 10px; margin: 0; font-size: 16px; font-weight: 600; color: var(--text); }
 .ih-ch h2::before { content: ''; flex: none; width: 5px; height: 16px; border-radius: 2px; background: var(--grad); transform: skewX(var(--slant)); }
@@ -219,18 +219,35 @@
   .ih-li { flex-wrap: wrap; }
 }
 
-/* ---------- Motion (once per mount; nothing under reduced motion) ---------- */
+/* ---------- Motion (MOTION-NOTES "College admin (calmer)"; once, when in view; nothing under reduced motion) ----------
+   The title, the KPI strip and every card are `.m-io` hosts (momentum/motion.ts). `--m-load` drops
+   the opening wait (380ms, after the KPIs) for a card that is scrolled into view later. */
 @keyframes ihRise { from { opacity: 0; translate: 0 14px; } }
 @keyframes ihGrowX { from { transform: scaleX(0); } }
 @keyframes ihGrowY { from { clip-path: inset(100% -40px -40px -40px); } to { clip-path: inset(-40px -40px -40px -40px); } }
 @keyframes ihFade { from { opacity: 0; } }
+@keyframes ihPop { 0% { opacity: 0; scale: .6; } 60% { opacity: 1; scale: 1.08; } 100% { scale: 1; } }
+@keyframes ihRing { 0% { opacity: .8; scale: 1; } 100% { opacity: 0; scale: 1.7; } }
+@keyframes ihBreathe { 0%, 100% { opacity: 0; } 50% { opacity: 1; } }
+/* The "all clear" check: one ring, then a slow 6s breathe (opacity-only layers). */
+.ih-cbx { position: relative; }
+.ih-cbx::before, .ih-cbx::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; }
+.ih-cbx::before { box-shadow: 0 0 0 6px color-mix(in srgb, var(--ok) 16%, transparent); }
+.ih-cbx::after { border: 2px solid var(--ok); }
 @media (prefers-reduced-motion: no-preference) {
-  .ih-a { animation: ihRise var(--m-enter) var(--e-out) both; animation-delay: calc(120ms + var(--k, 0) * var(--st-tight)); }
-  .ih-grid .ih-a { animation-delay: 380ms; }
-  .ih-title::after { animation: ihGrowX var(--m-slow) var(--e-out) both 150ms; }
-  .bclimb-bar { animation: ihGrowY var(--m-slow) var(--e-out) both; animation-delay: calc(600ms + var(--k, 0) * 120ms); }
-  .bclimb-l, .bclimb-n { animation: ihFade var(--m-base) var(--e-out) both; animation-delay: calc(760ms + var(--k, 0) * 120ms); }
-  .bclimb-stack i { animation: ihFade var(--m-base) var(--e-out) both 1100ms; }
+  /* KPI tiles rise with a 70ms stagger; cards follow the KPIs, the second card of a row 90ms later. */
+  .ih-a { animation: ihRise var(--m-enter) var(--e-out) both; animation-delay: calc(120ms + var(--k, 0) * var(--st)); }
+  .ih-grid .ih-a { animation-delay: calc(var(--m-load, 1) * 380ms); }
+  .ih-grid > :nth-child(even) > .ih-a, .ih-grid > .ih-a:nth-child(even), .ih-col > .ih-a:nth-child(even) { animation-delay: calc(var(--m-load, 1) * 380ms + 90ms); }
+  .ih-title::after { animation: ihGrowX var(--m-slow) var(--e-out) both 350ms; }
+  /* Cohort climb: bars rise on the 12° slant, 900ms with a 120ms stagger, counts follow. */
+  .bclimb-bar { animation: ihGrowY var(--m-slow) var(--e-out) both; animation-delay: calc(var(--m-load, 1) * 380ms + 220ms + var(--k, 0) * 120ms); }
+  .bclimb-l, .bclimb-n { animation: ihFade var(--m-base) var(--e-out) both; animation-delay: calc(var(--m-load, 1) * 380ms + 380ms + var(--k, 0) * 120ms); }
+  .bclimb-stack i { animation: ihFade var(--m-base) var(--e-out) both; animation-delay: calc(var(--m-load, 1) * 380ms + 720ms); }
+  .ih-cbx .one-icon { animation: ihPop var(--m-base) var(--e-out) both; animation-delay: calc(var(--m-load, 1) * 380ms + 320ms); }
+  .ih-cbx::after { animation: ihRing 900ms var(--e-out) both; animation-delay: calc(var(--m-load, 1) * 380ms + 870ms); }
+  .ih-cbx::before { animation: ihBreathe var(--loop-nudge) ease-in-out infinite; animation-delay: calc(var(--m-load, 1) * 380ms + 1820ms); }
+}
 }
 
 /* Cohort readiness card: climb beside its insights */
@@ -270,7 +287,7 @@
 .ih-calm small { max-width: 280px; font-size: 12.5px; color: var(--text-2); }
 .ih-calm .pilot-btn { margin-top: 8px; }
 @media (prefers-reduced-motion: no-preference) {
-  .ih-trend i { animation: ihGrowY var(--m-enter) var(--e-out) both; animation-delay: calc(700ms + var(--k, 0) * var(--st-tight)); }
+  .ih-trend i { animation: ihGrowY var(--m-enter) var(--e-out) both; animation-delay: calc(var(--m-load, 1) * 380ms + 320ms + var(--k, 0) * var(--st-tight)); }
 }
 
 /* Phone: a card header wraps so its tag and link never clip */

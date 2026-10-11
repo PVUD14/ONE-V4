@@ -24,10 +24,16 @@ import './styles/student-home.css';
 import './styles/institution-home.css';
 // The employer, operations and growth homes (phase 7) build on the institution-home blocks.
 import './styles/business-home.css';
+// Momentum motion (phase 11): entrance gating, loop pausing, the band climb, toasts and the loader.
+// Loaded last so its gating rules apply to every sheet above; the runtime is installed below.
+import './styles/motion.css';
+import { installMotion } from './momentum/motion.js';
 import { applyStoredTheme } from './themePreference.js';
 
 // A theme chosen with the top-bar toggle is applied before the first paint; otherwise the OS decides.
 applyStoredTheme();
+// The in-view entrance runtime: plays each block's entrance once, when it is first seen.
+installMotion();
 
 const root = createRoot(document.getElementById('root') as HTMLElement);
 // One application, two hosts (ADR-046). The sandbox build for demo.oneby8.com is the same

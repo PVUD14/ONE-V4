@@ -119,13 +119,26 @@
   .bh-board { grid-template-columns: repeat(var(--n, 5), minmax(170px, 1fr)); }
 }
 
-/* ---------- Motion (once per mount; nothing under reduced motion) ---------- */
+/* ---------- Motion (once, when in view; nothing under reduced motion) ----------
+   Cards are `.m-io` hosts (see institution-home.css). The growth hero carries the student hero's
+   ambient motion (06-screens/growth.html "hero (from student-home, energetic)"): the 12s gradient
+   drift and the 12° light sweep, paused while it is off-screen (`.m-loop`). */
 @keyframes bhGrowY { from { clip-path: inset(100% -40px -40px -40px); } to { clip-path: inset(-40px -40px -40px -40px); } }
 @keyframes bhGrowX { from { transform: scaleX(0); } }
 @keyframes bhIn { from { opacity: 0; translate: 0 8px; } }
+@keyframes bhHeroFlow { 0% { background-position: 0% 50%; } 100% { background-position: 100% 50%; } }
+@keyframes bhHeroSweep { 0% { translate: -320px 0; } 24%, 100% { translate: 1700px 0; } }
+.bh-hero { isolation: isolate; }
+.bh-hero::after { z-index: -1; }
+.bh-hflow { position: absolute; inset: 0; z-index: -2; background: var(--grad); background-size: 140% 100%; background-position: 0% 50%; pointer-events: none; }
+.bh-hero > .bh-hflow, .bh-hero > .bh-hsweep { position: absolute; z-index: -1; min-width: 0; }
+.bh-hero > .bh-hflow { z-index: -2; }
+.bh-hsweep { top: -30%; bottom: -30%; left: 0; width: 240px; background: linear-gradient(90deg, transparent, rgb(255 255 255 / .14) 50%, transparent); transform: skewX(var(--slant)); translate: -320px 0; pointer-events: none; }
 @media (prefers-reduced-motion: no-preference) {
-  .bh-climb-bar { animation: bhGrowY var(--m-slow) var(--e-out) both; animation-delay: calc(560ms + var(--k, 0) * 90ms); }
-  .bh-track i { transform-origin: left; animation: bhGrowX var(--m-slow) var(--e-out) both 600ms; }
-  .bh-lead { animation: bhIn var(--m-base) var(--e-out) both; animation-delay: calc(560ms + var(--k, 0) * 70ms); }
+  .bh-climb-bar { animation: bhGrowY var(--m-slow) var(--e-out) both; animation-delay: calc(var(--m-load, 1) * 380ms + 180ms + var(--k, 0) * 90ms); }
+  .bh-track i { transform-origin: left; animation: bhGrowX var(--m-slow) var(--e-out) both; animation-delay: calc(var(--m-load, 1) * 380ms + 220ms); }
+  .bh-lead { animation: bhIn var(--m-base) var(--e-out) both; animation-delay: calc(var(--m-load, 1) * 380ms + 180ms + var(--k, 0) * 70ms); }
   .bh-hero { animation: ihRise var(--m-enter) var(--e-out) both 80ms; }
+  .bh-hflow { animation: bhHeroFlow var(--loop-flow) ease-in-out infinite alternate; }
+  .bh-hsweep { animation: bhHeroSweep var(--loop-sweep) var(--e-inout) infinite 2.4s; }
 }

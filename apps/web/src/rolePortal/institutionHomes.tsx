@@ -55,6 +55,7 @@ import type { AuthenticatedWorkspaceSummary } from './shared.js';
 import { SmallCount, partitionNeedsRanges, isSmallCount } from '../momentum/smallCount.js';
 import { bandCount } from '../momentum/bandClimb.js';
 import { codeLabel, roleLabel } from '../labels.js';
+import { Loading } from '../momentum/loader.js';
 import {
   ActivationCard, BatchTable, CohortBandsCard, IhAvatar, IhCard, IhKpis, IhNote, IhPage, IhRows, IhTiles, NeedsAttentionCard, OPEN_ACTION_STATES,
   PeopleCount, RecordCount, VerificationBlock, go, shortDate, shortTime, validOverview,
@@ -153,7 +154,7 @@ export function InstitutionAdminHome({ authenticatedWorkspace, basePath, title }
   return <IhPage eyebrow={institutionStudentScopeLabel(overview?.scope) ?? null} title={title}
     summary="Your roster, academic structure, staff and the queues waiting on you."
     actions={<button type="button" className="pilot-btn ghost" onClick={() => go(`${basePath}/students`)}><Icon name="plus" size={16} /> Invite students</button>}>
-    {!data ? <p role="status" className="ih-empty">Loading your institution…</p> : null}
+    {!data ? <Loading className="ih-empty">Loading your institution…</Loading> : null}
     <IhKpis items={[
       students !== null && { key: 'roster', icon: 'students', value: <PeopleCount value={students.length} />, label: 'Students on roster', note: batches.length ? `${batches.length} ${plural(batches.length, 'batch', 'batches')}` : null },
       active !== null && { key: 'active', icon: 'students', value: <PeopleCount value={active} range={activeRanged} />, label: 'Active students', note: 'Current relationship' },
@@ -312,7 +313,7 @@ export function FacultyTeachingHome({ authenticatedWorkspace, basePath, title }:
   return <IhPage eyebrow={institutionStudentScopeLabel(data?.myStudents?.scope) ?? null} title={title}
     summary="The students you teach, the tasks you set them and what is coming up this week."
     actions={<button type="button" className="pilot-btn" onClick={() => go(`${basePath}/assigned-tasks`)}><Icon name="plus" size={16} /> Assign a task</button>}>
-    {!data ? <p role="status" className="ih-empty">Loading your teaching…</p> : null}
+    {!data ? <Loading className="ih-empty">Loading your teaching…</Loading> : null}
     <IhKpis items={[
       students !== null && { key: 'students', icon: 'students', value: <PeopleCount value={students.length} />, label: 'My students', note: batchNames.length && batchNames.length <= 2 ? batchNames.join(' · ') : null },
       openTasks !== null && { key: 'tasks', icon: 'tasks', value: <RecordCount value={openTasks} />, label: 'Open tasks', note: openTasks ? null : 'Nothing open' },
@@ -422,7 +423,7 @@ export function DepartmentHeadHome({ authenticatedWorkspace, basePath, title }: 
       <button type="button" className="pilot-btn ghost" onClick={() => go(`${basePath}/department-overview`)}><Icon name="departments" size={16} /> Department Overview</button>
       <button type="button" className="pilot-btn" onClick={() => go(`${basePath}/meetings`)}><Icon name="meetings" size={16} /> Schedule a meeting</button>
     </>}>
-    {!data ? <p role="status" className="ih-empty">Loading your department…</p> : null}
+    {!data ? <Loading className="ih-empty">Loading your department…</Loading> : null}
     <IhKpis items={[
       overview && { key: 'students', icon: 'students', value: <PeopleCount value={overview.students.onRoster} />, label: 'Students', note: overview.batches.length ? `${overview.batches.length} ${plural(overview.batches.length, 'batch', 'batches')}` : null },
       overview && { key: 'current', icon: 'students', value: <PeopleCount value={overview.students.current} range={currentRanged} />, label: 'Enrolled now', note: 'Current relationship' },

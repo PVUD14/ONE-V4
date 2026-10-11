@@ -257,7 +257,7 @@ function Hero({ firstName, data, derived, now }: { readonly firstName: string; r
   const then = climb ? derived.plan.find((item) => !item.done && item.key !== climb.item.key) : undefined;
   const hasActivity = Boolean(data.activity && Array.isArray(data.activity.last7));
   const hasRight = hasActivity || climb !== null;
-  return <section className={`sh-hero sh-a sh-rise${hasRight ? '' : ' sh-hero--solo'}`} style={{ '--d0': '120ms', '--dur': '800ms' } as React.CSSProperties} aria-labelledby="sh-greeting">
+  return <section className={`sh-hero m-io m-loop sh-a sh-rise${hasRight ? '' : ' sh-hero--solo'}`} style={{ '--d0': '120ms', '--dur': '800ms' } as React.CSSProperties} aria-labelledby="sh-greeting">
     <div className="sh-hflow" aria-hidden="true" /><div className="sh-hdeco" aria-hidden="true" /><div className="sh-hsweep" aria-hidden="true" />
     <div className="sh-hl">
       <div className="sh-heb sh-a sh-rise-sm" style={{ '--d0': '320ms' } as React.CSSProperties}><ClimbMark size={13} /> Momentum · {today}</div>
@@ -298,7 +298,7 @@ function BuildingYourBand({ learner, factorText }: { readonly learner: LearnerCa
   const lastAdded = evidence.map((item) => validTime(item.occurredAt)).filter((time): time is number => time !== null).sort((a, b) => b - a)[0];
   // Band history only when there is a change to show: the latest three snapshots, oldest first.
   const history = (learner.readinessHistory ?? []).filter((entry) => toReadinessBand(entry.band) && validTime(entry.generatedAt) !== null).slice(0, 3).reverse();
-  return <article className="sh-card sh-a sh-rise" style={{ '--w': 5 } as React.CSSProperties} aria-labelledby="sh-building">
+  return <article className="sh-card m-io sh-a sh-rise" style={{ '--w': 5 } as React.CSSProperties} aria-labelledby="sh-building">
     <CardHead id="sh-building" title="What’s building your band"><CardLink label="Readiness report" href="#student-reports-title" /></CardHead>
     {evidence.length ? <div className="sh-evt">
       <div className="sh-evn"><CountUp value={evidence.length} delay={250} duration={700} />
@@ -321,7 +321,7 @@ function BuildingYourBand({ learner, factorText }: { readonly learner: LearnerCa
     {history.length >= 2 ? <div className="sh-hist">
       <span className="eyebrow">Band history</span>
       <ol className="sh-hrow" aria-label="Band history, oldest first">
-        {history.map((entry) => <li key={entry.id}>
+        {history.map((entry, index) => <li key={entry.id} style={{ '--k': index } as React.CSSProperties}>
           <small><time dateTime={entry.generatedAt}>{shortDate(validTime(entry.generatedAt)!)}</time></small>
           <ReadinessBand band={toReadinessBand(entry.band)} variant="mini" />
         </li>)}
@@ -333,7 +333,7 @@ function BuildingYourBand({ learner, factorText }: { readonly learner: LearnerCa
 function TodaysPlan({ plan }: { readonly plan: readonly PlanItem[] }): React.ReactElement | null {
   if (!plan.length) return null;
   const open = plan.filter((item) => !item.done).length;
-  return <article className="sh-card sh-a sh-rise" style={{ '--w': 4, '--d0': '90ms' } as React.CSSProperties} aria-labelledby="sh-plan">
+  return <article className="sh-card m-io sh-a sh-rise" style={{ '--w': 4, '--d0': '90ms' } as React.CSSProperties} aria-labelledby="sh-plan">
     <CardHead id="sh-plan" title="Today’s plan"><span className="tag t-band"><i aria-hidden="true" />{open} task{open === 1 ? '' : 's'}</span></CardHead>
     <ul className="sh-tasks">
       {plan.map((task, index) => <li key={task.key}>
@@ -376,7 +376,7 @@ function UpNext({ entries, now }: { readonly entries: readonly UpcomingEntry[]; 
   const date = new Date(next.startsAt);
   const time = date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
   const interview = next.kind === 'INTERVIEW';
-  return <article className="sh-card sh-upc sh-a sh-rise" style={{ '--w': 3, '--d0': '180ms' } as React.CSSProperties} aria-labelledby="sh-upnext">
+  return <article className="sh-card m-io sh-upc sh-a sh-rise" style={{ '--w': 3, '--d0': '180ms' } as React.CSSProperties} aria-labelledby="sh-upnext">
     <CardHead id="sh-upnext" title="Up next" />
     <div className="sh-dateb" aria-hidden="true">
       <span>{date.toLocaleDateString(undefined, { weekday: 'short' })}</span><b className="num">{date.getDate()}</b><span>{date.toLocaleDateString(undefined, { month: 'short' })}</span>
@@ -402,7 +402,7 @@ function ContinueLearning({ derived }: { readonly derived: Derived }): React.Rea
   const current = lessons.find((lesson) => !derived.completed.has(lesson.id));
   const percent = lessons.length ? Math.round((done / lessons.length) * 100) : null;
   const others = derived.modules.filter((module) => module.id !== course.id).slice(0, 3);
-  return <article className="sh-card sh-a sh-rise" style={{ '--w': 4 } as React.CSSProperties} aria-labelledby="sh-learning">
+  return <article className="sh-card m-io sh-a sh-rise" style={{ '--w': 4 } as React.CSSProperties} aria-labelledby="sh-learning">
     <CardHead id="sh-learning" title="Continue learning"><CardLink label="Learning" path="/student/learning" /></CardHead>
     <div className="sh-course"><span className="sh-cth"><Icon name="learning" size={24} /></span>
       <div><b>{course.title}</b><small>{lessons.length} lesson{lessons.length === 1 ? '' : 's'} · {done} complete</small></div></div>
@@ -470,7 +470,7 @@ function Applications({ applications, streakLit = false }: { readonly applicatio
   if (!applications.length) return null;
   const rank = (item: StudentApplicationDto) => (CLOSED.has(item.state.toUpperCase()) ? 1 : 0);
   const shown = [...applications].sort((a, b) => rank(a) - rank(b) || (validTime(b.updatedAt) ?? 0) - (validTime(a.updatedAt) ?? 0)).slice(0, 3);
-  return <article className="sh-card sh-a sh-rise" style={{ '--w': 5, '--d0': '90ms' } as React.CSSProperties} aria-labelledby="sh-applications">
+  return <article className="sh-card m-io sh-a sh-rise" style={{ '--w': 5, '--d0': '90ms' } as React.CSSProperties} aria-labelledby="sh-applications">
     <CardHead id="sh-applications" title="Applications"><CardLink label="All applications" path="/student/applications" /></CardHead>
     <ul className="sh-apps">{shown.map((item) => <ApplicationRow key={item.id} item={item} streakLit={streakLit} />)}</ul>
   </article>;
@@ -484,7 +484,7 @@ function ThisWeek({ activity }: { readonly activity: StudentActivityDto }): Reac
   const active = days.filter((day) => day.count > 0).length;
   // A week with no recorded learning has nothing to chart; the streak card already says so.
   if (total === 0) return null;
-  return <article className="sh-card sh-a sh-rise" style={{ '--w': 3, '--d0': '180ms' } as React.CSSProperties} aria-labelledby="sh-week">
+  return <article className="sh-card m-io sh-a sh-rise" style={{ '--w': 3, '--d0': '180ms' } as React.CSSProperties} aria-labelledby="sh-week">
     <CardHead id="sh-week" title="This week" />
     <div className="sh-wk-t"><CountUp value={total} delay={200} duration={1100} /><small>learning action{total === 1 ? '' : 's'} · lessons and assessments</small></div>
     <ol className="sh-wks" aria-label="Learning actions per day, last seven days">
@@ -515,7 +515,7 @@ const QUICK_ACTIONS: readonly (readonly [string, IconName, string, string])[] = 
 ];
 
 function QuickActions(): React.ReactElement {
-  return <article className="sh-card sh-qcard sh-a sh-rise" style={{ '--w': 5 } as React.CSSProperties} aria-labelledby="sh-quick">
+  return <article className="sh-card m-io sh-qcard sh-a sh-rise" style={{ '--w': 5 } as React.CSSProperties} aria-labelledby="sh-quick">
     <CardHead id="sh-quick" title="Quick actions" />
     <ul className="sh-qa">{QUICK_ACTIONS.map(([label, icon, path, where], index) => <li key={label} style={{ '--k': index } as React.CSSProperties}>
       <button type="button" className="sh-qi one-icon-host" onClick={() => go(path)}>
@@ -527,7 +527,7 @@ function QuickActions(): React.ReactElement {
 
 function RecentActivity({ rows, now }: { readonly rows: readonly UserNotificationDto[]; readonly now: number }): React.ReactElement | null {
   if (!rows.length) return null;
-  return <article className="sh-card sh-a sh-rise" style={{ '--w': 7, '--d0': '90ms' } as React.CSSProperties} aria-labelledby="sh-activity">
+  return <article className="sh-card m-io sh-a sh-rise" style={{ '--w': 7, '--d0': '90ms' } as React.CSSProperties} aria-labelledby="sh-activity">
     <CardHead id="sh-activity" title="Recent activity" />
     <ul className="sh-acts">{rows.map((entry) => {
       const when = relativeWhen(entry.createdAt, now);
@@ -574,7 +574,7 @@ export function StudentHomeView({ studentName, data, now, factorText, support }:
         <RecentActivity rows={notifications} now={now} />
       </div>
       <div className="sh-row sh-row--full">{support}</div>
-      <div className="sh-privacy sh-a sh-fade">
+      <div className="sh-privacy m-io sh-a sh-fade">
         <Icon name="lock" size={20} />
         <p><b>Your data is yours.</b> Readiness is advisory and comes only from verified evidence. It is never a score, and it is never shared with employers. Your college sees only what you permit.</p>
         <CardLink label="Privacy & sharing" path="/student/settings" />

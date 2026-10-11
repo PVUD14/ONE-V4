@@ -51,7 +51,7 @@ export function IhPage({ eyebrow, title, summary, actions, children, className, 
   readonly head?: React.ReactNode;
 }): React.ReactElement {
   return <div className={`pilot pilot-embed ih${className ? ` ${className}` : ''}`}>
-    {head ?? <header className="ih-title">
+    {head ?? <header className="ih-title m-io">
       <div className="ih-title-text">
         <div className="ih-eyebrow">{[eyebrow, todayLabel()].filter(Boolean).join(' · ')}</div>
         <h1>{title}</h1>
@@ -75,7 +75,7 @@ export interface IhKpiItem {
 export function IhKpis({ items }: { readonly items: readonly (IhKpiItem | null | false)[] }): React.ReactElement | null {
   const shown = items.filter((item): item is IhKpiItem => Boolean(item));
   if (!shown.length) return null;
-  return <div className="ih-kpis" style={{ '--n': shown.length } as React.CSSProperties}>
+  return <div className="ih-kpis m-io" style={{ '--n': shown.length } as React.CSSProperties}>
     {shown.map((item, index) => <div key={item.key} className={`ih-kpi ih-a ih-rise${item.tone === 'ok' ? ' ok' : ''}`} style={{ '--k': index } as React.CSSProperties}>
       <span className="ih-ki"><Icon name={item.icon} size={20} /></span>
       <div><b className="ih-kv">{item.value}</b><span className="ih-kl">{item.label}</span>{item.note ? <small>{item.note}</small> : null}</div>
@@ -92,7 +92,7 @@ export function IhCard({ title, link, aside, className, children, labelledBy }: 
   readonly className?: string; readonly children: React.ReactNode; readonly labelledBy?: string;
 }): React.ReactElement {
   const id = labelledBy ?? `ih-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
-  return <section className={`ih-card ih-a ih-rise${className ? ` ${className}` : ''}`} aria-labelledby={id}>
+  return <section className={`ih-card m-io ih-a ih-rise${className ? ` ${className}` : ''}`} aria-labelledby={id}>
     <div className="ih-ch"><h2 id={id}>{title}</h2>{aside ? <span className="ih-ch-aside">{aside}</span> : null}{link ? <IhLink label={link.label} onClick={link.onClick} /> : null}</div>
     {children}
   </section>;
@@ -110,7 +110,7 @@ export function IhRows({ rows }: { readonly rows: readonly (readonly [string, Re
 
 /** The calm "nothing waiting" state (the approved `.clear`). */
 export function IhClear({ title, line }: { readonly title: string; readonly line: React.ReactNode }): React.ReactElement {
-  return <div className="ih-clear"><span className="ih-cbx" aria-hidden="true"><Icon name="check" size={20} /></span><div><b>{title}</b><small>{line}</small></div></div>;
+  return <div className="ih-clear m-loop"><span className="ih-cbx" aria-hidden="true"><Icon name="check" size={20} /></span><div><b>{title}</b><small>{line}</small></div></div>;
 }
 
 /** Figure tiles with no size cue (pipeline stages, structure counts). */

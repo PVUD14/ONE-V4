@@ -32,6 +32,7 @@ import { codeLabel, roleLabel } from '../labels.js';
 import { SmallCount, SuppressedBlock, SuppressedLegend, isSmallCount, partitionNeedsRanges } from '../momentum/smallCount.js';
 import { StatusTag } from '../momentum/statusTag.js';
 import { IhCard, IhClear, IhKpis, IhNote, IhPage, IhRows, IhTiles, go, shortDate } from './institutionMomentum.js';
+import { Loading } from '../momentum/loader.js';
 
 /** A count of records: the number, with "+" once the server's cap is reached. */
 export function overviewCountText(count: OverviewCountDto): string {
@@ -238,7 +239,7 @@ export function OperationsHome({ basePath }: { readonly basePath: string }): Rea
       <button type="button" className="pilot-btn ghost" onClick={open('/audit-logs')}><Icon name="audit-logs" size={16} /> Open audit log</button>
       {organizations ? <button type="button" className="pilot-btn" onClick={open('/organizations')}><Icon name="plus" size={16} /> Add an organization</button> : null}
     </>}>
-    {!overview ? <p role="status" className="ih-empty">Loading the operations workspace…</p> : <>
+    {!overview ? <Loading className="ih-empty">Loading the operations workspace…</Loading> : <>
       <IhKpis items={[
         organizations && { key: 'orgs', icon: 'organizations', value: <RecordFigure count={organizations.total} />, label: 'Organizations',
           note: `${overviewCountText(organizations.institutions.total)} ${plural(organizations.institutions.total.value, 'college', 'colleges')} · ${overviewCountText(organizations.employers.total)} ${plural(organizations.employers.total.value, 'employer', 'employers')}` },

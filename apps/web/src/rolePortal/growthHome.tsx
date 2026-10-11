@@ -35,6 +35,7 @@ import { SupportCode } from '../supportCode.js';
 import { formatDate } from '../dates.js';
 import { growthCodeLabel } from './growthLeads.js';
 import { IhCard, IhClear, IhKpis, IhNote, IhPage, RecordCount, go, shortDate, todayLabel } from './institutionMomentum.js';
+import { Loading } from '../momentum/loader.js';
 
 const teamLabels: Readonly<Record<string, string>> = {
   COLLEGE_PARTNERSHIPS: 'College partnerships',
@@ -100,7 +101,8 @@ function GrowthHero({ me, field, onField }: { readonly me: GrowthMeDto; readonly
   const next = field ? [...field.followUps].filter((item) => item.state === 'OPEN').sort((a, b) => a.dueOn.localeCompare(b.dueOn))[0] ?? null : null;
   const openLeads = typeof me.openLeads === 'number' ? me.openLeads : null;
   const due = typeof me.followUpsDue === 'number' ? me.followUpsDue : null;
-  return <header className="bh-hero" aria-labelledby="growth-hero-title">
+  return <header className="bh-hero m-io m-loop" aria-labelledby="growth-hero-title">
+    <div className="bh-hflow" aria-hidden="true" /><div className="bh-hsweep" aria-hidden="true" />
     <div>
       <div className="bh-hero-eyebrow"><Icon name="territory" size={16} />{[roleLabels[me.role] ?? growthCodeLabel(me.role), todayLabel()].join(' · ')}</div>
       <h1 id="growth-hero-title">{greeting()}.</h1>
@@ -221,7 +223,7 @@ export function GrowthHome(): React.ReactElement {
   }
   const open = (path: string) => () => go(`/growth${path}`);
   if (state.kind === 'loading') {
-    return <IhPage className="bh" title="Home" summary=""><p role="status" className="ih-empty">Loading your growth details…</p></IhPage>;
+    return <IhPage className="bh" title="Home" summary=""><Loading className="ih-empty">Loading your growth details…</Loading></IhPage>;
   }
   const { me, field, leads, vocabulary, territory } = state.data;
   const unowned = territory && territory.regions.some((region) => typeof region.unownedLeads === 'number')

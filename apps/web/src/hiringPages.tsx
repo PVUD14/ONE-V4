@@ -30,6 +30,7 @@ import * as dates from './dates.js';
 import { MISSING_TEXT, applicationStageLabel } from './labels.js';
 import { StatusTag } from './momentum/statusTag.js';
 import { openPortalRecord } from './rolePortal/shared.js';
+import { EmptyState } from './momentum/emptyState.js';
 import {
   ApiRequestError,
   addOpportunityAudience,
@@ -558,7 +559,7 @@ export function StudentApplicationsPage(): React.ReactElement {
       <p>Applications submitted through ONE. External declarations are listed separately below.</p>
       {status ? <p role="status">{status}</p> : null}
       {applications.length === 0
-        ? <p>When you apply to an opportunity it will appear here, with the stage it has reached.</p>
+        ? <EmptyState id="no-applications" bare primary={{ to: '/student/opportunities', icon: 'opportunities' }} />
         : <div className="data-table-wrap"><table>
           <thead><tr><th>Role</th><th>Company</th><th>Stage</th><th>Applied</th><th>Messages</th><th>Feedback</th><th>Institution sharing</th><th>Action</th></tr></thead>
           <tbody>{applications.map((item) => <tr key={item.id}>
@@ -900,7 +901,7 @@ export function StudentInterviewsPanel(): React.ReactElement {
     {interviews === null ? <p>Loading your interviews…</p> : <>
       <h3>Upcoming</h3>
       {upcoming.length ? <ul className="hiring-list" aria-label="Upcoming interviews">{upcoming.map(row)}</ul>
-        : <p>No upcoming interviews. When an employer schedules one, it appears here with the time and how to join.</p>}
+        : <EmptyState id="no-interviews" bare body="No upcoming interviews. When an employer schedules one, it appears here with the time and how to join." secondary={{ to: '/student/applications' }} />}
       <h3>Past</h3>
       {past.length ? <ul className="hiring-list" aria-label="Past interviews">{past.map(row)}</ul> : <p>No past interviews yet.</p>}
     </>}
@@ -1387,7 +1388,7 @@ export function EmployerInterviewsPage({ employerId }: { readonly employerId: st
     <div className="role-page-heading"><div><h1>Interviews</h1><p>Scheduled interviews, in start-time order. Times are shown in your local timezone.</p></div></div>
     <section className="role-card role-wide">
       {status ? <p role="status">{status}</p> : null}
-      {!loading && !status && rows.length === 0 ? <p>No interviews are scheduled.</p> : null}
+      {!loading && !status && rows.length === 0 ? <EmptyState id="no-interviews" bare title="No interviews are scheduled." body="Interviews you schedule with applicants appear here, in start-time order." /> : null}
       {rows.length ? <div className="role-record-table-wrap"><table className="role-record-table">
         <thead><tr>{['Candidate', 'Opportunity', 'Round', 'Mode', 'Start', 'End', 'State', 'Last change', 'Outcomes', 'Actions'].map((title) => <th key={title}>{title}</th>)}</tr></thead>
         <tbody>{interviews.map((item) => <tr key={item.id}>
@@ -1668,7 +1669,7 @@ export function EmployerApplicantsPage({ employerId, applicationStateFilter, can
 
     <section className="role-card role-wide">
       {visibleApplicants.length === 0
-        ? <p>No applications to show.</p>
+        ? <EmptyState id="no-applicants" bare title="No applications to show." />
         : <div className="role-record-table-wrap"><table className="role-record-table">
           <thead><tr><th>Candidate</th><th>Stage</th><th>Eligibility</th><th>Applied</th><th>Interviews</th><th>Offer</th><th>Next step</th></tr></thead>
           <tbody>{visibleApplicants.map((item) => <tr key={item.id}>

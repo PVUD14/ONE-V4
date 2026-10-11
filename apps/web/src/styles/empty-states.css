@@ -1,0 +1,70 @@
+/*
+ * Momentum empty states and system pages (re-skin phase 8), after the approved empty-state cards
+ * (inventory 03-illustrations/index.html, unified/empty-states.html) and their layout notes: the
+ * illustration above the title (300–440px wide, min 260px), the title in Sora 20–24/700, one line
+ * of DM Sans body, the CTA row, then an optional privacy note.
+ *
+ * Its own sheet because <EmptyState>, the illustrated V2 empty state and the system pages share one
+ * composition that no component sheet has. Motion: the art racks in on its own (styles/
+ * illustrations.css); the words rise 8px after it (+700–1060ms, ~75ms apart), once, when the state
+ * is in view (`.m-io`); nothing moves under reduced motion.
+ */
+.es { display: flex; flex-direction: column; align-items: center; gap: 0; min-width: 0; margin: 0 auto; padding: 28px 24px 30px; border-radius: var(--r-card); background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow); text-align: center; color: var(--text); }
+.es--bare { padding: 8px 0 4px; background: none; border: 0; box-shadow: none; }
+.es-art { position: relative; display: flex; justify-content: center; width: min(380px, 100%); min-width: min(260px, 100%); aspect-ratio: 440 / 300; margin-bottom: 4px; }
+.es-art::before { content: ''; position: absolute; inset: auto 18% 2% 18%; height: 20px; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--brand) 14%, transparent), transparent); pointer-events: none; }
+.es-art > svg { position: relative; width: 100%; height: auto; max-width: 100%; }
+.es-title { margin: 4px 0 6px; font: 700 22px/1.25 var(--font-display); letter-spacing: -.025em; color: var(--text); text-wrap: balance; }
+h1.es-title { font-size: 24px; }
+.es-body { max-width: 380px; margin: 0; font-size: 14px; line-height: 1.5; color: var(--text-2); text-wrap: pretty; }
+.es-count { display: flex; align-items: baseline; justify-content: center; gap: 8px; margin: 0 0 4px; }
+.es-count .num { padding-right: 2px; font-size: 28px; font-weight: 700; line-height: 1; background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.es-count span { font-size: 13.5px; font-weight: 500; color: var(--text-2); }
+.es-helper { display: inline-flex; align-items: flex-start; gap: 8px; max-width: 380px; margin-top: 12px; padding: 8px 12px 8px 10px; border-radius: var(--r-xl); background: var(--ok-soft); color: var(--text); font-size: 12.5px; text-align: left; }
+.es-helper .one-icon { flex: none; margin-top: 1px; color: var(--ok-ink); }
+.es-ctas { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 16px; }
+.es-note { display: flex; align-items: flex-start; justify-content: center; gap: 7px; max-width: 380px; margin: 14px 0 0; font-size: 12.5px; color: var(--text-3); text-align: left; }
+.es-note .one-icon { flex: none; width: 14px; height: 14px; margin-top: 1px; color: var(--brand-ink); }
+.es :is(.pilot-btn):focus-visible { outline: none; box-shadow: var(--ring-focus); }
+/* The primary action carries the 6s next-step shimmer (MOTION-NOTES "Primary button shine"). */
+.es .es-primary { position: relative; overflow: hidden; }
+.es .es-primary::after { content: ''; position: absolute; top: -20%; bottom: -20%; left: 0; width: 46%; background: linear-gradient(90deg, transparent, rgb(255 255 255 / .42), transparent); transform: skewX(var(--slant)); translate: -140% 0; pointer-events: none; }
+
+/* The existing V2 empty state, with the illustration in place of its emoji tile. */
+.v2-empty-state .es-art { width: min(300px, 100%); }
+.v2-empty-state.has-art { padding-top: 24px; }
+
+/* ---------- System pages: one centred state on the app background ---------- */
+.sys-page { min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; padding: 32px 16px; background: var(--bg); color: var(--text); }
+.sys-page .es { width: min(560px, 100%); }
+.sys-inline { display: grid; place-items: center; padding: 24px 0; }
+.sys-inline .es { width: min(620px, 100%); }
+.sys-controls { display: flex; justify-content: center; margin-top: 16px; }
+.sys-ref { margin: 12px 0 0; font-size: 12px; color: var(--text-3); }
+
+/* ---------- Offline banner ---------- */
+.offline-banner { position: fixed; left: 50%; bottom: 20px; z-index: var(--z-toast); display: flex; align-items: center; gap: 12px; width: min(560px, calc(100% - 32px)); padding: 12px 14px 12px 16px; border-radius: var(--r-xl); background: var(--toast); color: var(--toast-ink); box-shadow: var(--shadow-toast); translate: -50% 0; }
+.offline-banner .one-icon { flex: none; }
+.offline-banner div { flex: 1; min-width: 0; }
+.offline-banner b { display: block; font-size: 14px; }
+.offline-banner small { display: block; font-size: 12.5px; opacity: .85; }
+:is(.pilot, body) .offline-banner .pilot-btn { flex: none; }
+
+@keyframes esRise { from { opacity: 0; translate: 0 8px; } }
+@keyframes esShine { 0%, 80% { translate: -140% 0; } 96%, 100% { translate: 260% 0; } }
+@keyframes esBannerIn { from { opacity: 0; translate: -50% 24px; } }
+@media (prefers-reduced-motion: no-preference) {
+  .es .es-a { animation: esRise var(--m-base) var(--e-out) both; }
+  .es .es-title { animation-delay: 700ms; }
+  .es .es-count { animation-delay: 775ms; }
+  .es .es-body { animation-delay: 850ms; }
+  .es .es-helper { animation-delay: 925ms; }
+  .es .es-ctas { animation-delay: 1000ms; }
+  .es .es-note { animation-delay: 1060ms; }
+  .es .es-primary::after { animation: esShine var(--loop-nudge) var(--e-inout) infinite 1.2s; }
+  .offline-banner { animation: esBannerIn var(--m-base) var(--e-out) both; }
+}
+@media (max-width: 720px) {
+  .es { padding: 22px 16px 24px; }
+  .es-title { font-size: 20px; }
+}

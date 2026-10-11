@@ -141,7 +141,7 @@ export function OperationsSystemHealthPage(): React.ReactElement {
 
   if (forbiddenReference) {
     return <section className="role-module role-module--dense">{heading}
-      <div className="role-wide"><V2EmptyState icon="🔐" title="Not permitted"
+      <div className="role-wide"><V2EmptyState illustration="no-access" icon="🔐" title="Not permitted"
         note="The background jobs console is for staff who can replay failed events. Your access has not changed."
         hint={<SupportCode reference={forbiddenReference} />} /></div></section>;
   }
@@ -252,7 +252,7 @@ export function OperationsSystemHealthPage(): React.ReactElement {
       </div>
       {failedError ? <p className="form-error" role="alert">{failedError}</p> : null}
       {failedLoading && !failed.length ? <p>Loading failed events…</p> : null}
-      {!failedLoading && !failedError && !failed.length ? <V2EmptyState icon="✅" title="No failed events" note={eventType || age ? 'No failed events match these filters.' : 'Nothing is in the dead letter.'} /> : null}
+      {!failedLoading && !failedError && !failed.length ? <V2EmptyState illustration="all-systems-healthy" icon="✅" title="No failed events" note={eventType || age ? 'No failed events match these filters.' : 'Nothing is in the dead letter.'} /> : null}
       {failed.length ? <div className="role-record-table-wrap"><table className="role-record-table">
         <thead><tr><th>Event type</th><th>Failure</th><th>Attempts</th><th>Occurred</th><th>Failed</th><th>Actions</th></tr></thead>
         <tbody>{failed.map((event) => <tr key={event.eventId}>

@@ -112,7 +112,7 @@ export function OperationsQuestionBankPage(): React.ReactElement | null {
 
   if (forbiddenReference) {
     return <section className="role-module role-module--dense">{heading}
-      <div className="role-wide"><V2EmptyState icon="🔐" title="Not permitted"
+      <div className="role-wide"><V2EmptyState illustration="no-access" icon="🔐" title="Not permitted"
         note="The question bank is for staff who hold Content Edit, Content Review or Content Publish. Your access has not changed; the rest of Content Management is unaffected."
         hint={<SupportCode reference={forbiddenReference} />} /></div></section>;
   }
@@ -153,7 +153,7 @@ export function OperationsQuestionBankPage(): React.ReactElement | null {
         <button type="submit" className="pilot-btn">Search</button>
       </form>
       {loading && !list ? <p>Loading the question bank…</p> : null}
-      {!loading && list && !questions.length ? <V2EmptyState icon="🔎" title="No questions match" note="No question matches this search. Questions appear here once drafted in this editor or published by the readiness pilot." /> : null}
+      {!loading && list && !questions.length ? <V2EmptyState illustration="search-no-results" icon="🔎" title="No questions match" note="No question matches this search. Questions appear here once drafted in this editor or published by the readiness pilot." /> : null}
       {questions.length ? <div className="role-record-table-wrap"><table className="role-record-table">
         <thead><tr><th>Key</th><th>Question</th><th>Skill</th><th>Status</th><th>Current version</th><th>Revision on its way</th><th>Difficulty</th><th>Tagged options</th><th>Hints</th><th>Actions</th></tr></thead>
         <tbody>{questions.map((question) => <tr key={question.questionId}>

@@ -30,7 +30,7 @@ import {
   type StudentProfileDto,
   type StudentSavedOpportunityDto,
 } from './api.js';
-import { completeHostedLoginFromLocation, getAccessToken, getAuthStatus, hasStoredAuthSession, restoreAuthenticatedSession, signInWithPassword, signOut, type AuthStatus } from './auth.js';
+import { completeHostedLoginFromLocation, getAccessToken, getAuthStatus, hasExpiredStoredSession, hasStoredAuthSession, restoreAuthenticatedSession, signInWithPassword, signOut, type AuthStatus } from './auth.js';
 import { AuthControls } from './authControls.js';
 import { PageHeader, type PageMeta } from './studentComponents.js';
 import { rolePortalFromPath } from './rolePortalConfig.js';
@@ -70,6 +70,8 @@ import { formatDate } from './dates.js';
 import { roleLabel } from './labels.js';
 import { initialSidebarCollapsed, rememberSidebarCollapsed } from './sidebarPreference.js';
 import { NavIndicator } from './navIndicator.js';
+import { NoAccessPage, NotFoundPage, OfflineBanner, PageErrorBoundary, SessionExpiredPage } from './systemPages.js';
+import { EmptyState } from './momentum/emptyState.js';
 
 type RouteKey = 'dashboard' | 'career-path' | 'ai-coach' | 'readiness' | 'skills' | 'assessments' | 'learning' | 'experience' | 'opportunities' | 'applications' | 'interviews' | 'documents' | 'profile' | 'settings' | 'help' | 'practice' | 'company-prep' | 'career-tools' | 'scholarships' | 'resume-builder' | 'calendar' | 'explain';
 
@@ -189,13 +191,27 @@ type CurrentStudentState =
   | { readonly state: 'resolved'; readonly student: CurrentStudentDto }
   | { readonly state: 'error'; readonly message: string };
 
+/**
+ * The application root: every route below, inside the 500 error boundary, with the offline banner
+ * (re-skin phase 8, systemPages.tsx).
+ */
 export function App(): React.ReactElement {
+  return <PageErrorBoundary>
+    <AppRoutes />
+    <OfflineBanner />
+  </PageErrorBoundary>;
+}
+
+function AppRoutes(): React.ReactElement {
   const [path, setPath] = useState(currentPath());
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(initialSidebarCollapsed);
   const [apiHealth, setApiHealth] = useState<ApiHealth>('checking');
   const [authStatus, setAuthStatus] = useState<AuthStatus>(() => (hasStoredAuthSession() && !currentPath().startsWith('/demo') ? { state: 'restoring' } : getAuthStatus()));
   const [authNotice, setAuthNotice] = useState('');
+  // A saved sign-in that ran out shows "Your session has expired" instead of a plain sign-in prompt.
+  const expiredAtLoad = useRef(hasExpiredStoredSession());
+  const [sessionExpired, setSessionExpired] = useState(false);
   const [workspaceResolution, setWorkspaceResolution] = useState<WorkspaceResolution>({ state: 'loading' });
   const [workspaceRetryNonce, setWorkspaceRetryNonce] = useState(0);
   const [currentStudent, setCurrentStudent] = useState<CurrentStudentState>({ state: 'idle' });
@@ -217,6 +233,7 @@ export function App(): React.ReactElement {
       const restored = completed ? getAuthStatus() : await restoreAuthenticatedSession();
       if (!mounted) return;
       setAuthStatus(restored);
+      if (!completed && restored.state === 'anonymous' && expiredAtLoad.current) setSessionExpired(true);
       if (completed) setAuthNotice('Signed in with the configured non-production identity provider.');
       else if (restored.state === 'authenticated') setAuthNotice('Restored your ONE session.');
     })()
@@ -229,6 +246,17 @@ export function App(): React.ReactElement {
       });
     return () => { mounted = false; };
   }, []);
+
+  // While signed in, notice when the access token runs out, so the next protected page says why.
+  useEffect(() => {
+    if (authStatus.state !== 'authenticated') return undefined;
+    const timer = window.setInterval(() => {
+      if (getAccessToken()) return;
+      setSessionExpired(true);
+      setAuthStatus(getAuthStatus());
+    }, 30_000);
+    return () => window.clearInterval(timer);
+  }, [authStatus.state]);
 
   useEffect(() => {
     if (authStatus.state !== 'authenticated') {
@@ -367,6 +395,12 @@ export function App(): React.ReactElement {
     }} />;
   }
 
+  // 404: a path no part of the app answers. (Unknown pages inside a portal show the 404 inside
+  // that portal's shell, so its navigation stays.)
+  if (!demoPath && !isKnownAppPath(path)) {
+    return <NotFoundPage home={{ label: authenticated ? 'Go to home' : 'Go to sign in', onClick: () => { window.history.pushState(null, '', authenticated ? '/' : '/login'); setPath(currentPath()); } }} />;
+  }
+
   if (path === '/' || path === '/login') {
     return <LoginEntry authStatus={authStatus} authNotice={authNotice} workspaceResolution={workspaceResolution} onSignIn={handleSignIn} onHostedSignIn={handleHostedSignIn} onSignOut={handleSignOut} onRetryWorkspace={handleRetryWorkspace} onNavigate={(nextPath) => {
       window.history.pushState(null, '', nextPath);
@@ -379,6 +413,10 @@ export function App(): React.ReactElement {
       window.history.pushState(null, '', nextPath);
       setPath(currentPath());
     }} />;
+  }
+
+  if (isProtectedPortalPath(path) && !demoPath && !authenticated && sessionExpired && authStatus.state === 'anonymous') {
+    return <SessionExpiredPage onSignIn={handleHostedSignIn} />;
   }
 
   if (isProtectedPortalPath(path) && !demoPath && !authenticated) {
@@ -467,6 +505,7 @@ export function App(): React.ReactElement {
   async function handleSignIn(email: string, password: string): Promise<void> {
     const result = await signInWithPassword(email, password);
     if (result.state === 'success') {
+      setSessionExpired(false);
       setAuthStatus(getAuthStatus());
       setAuthNotice('Signed in to ONE.');
       window.history.replaceState(null, '', '/');
@@ -716,15 +755,12 @@ function WorkspaceResolutionPage({ authStatus, authNotice, onSignIn, onSignOut }
 
 function AccessDeniedPage({ requestedPath, authStatus, authNotice, message, retryable = false, onRetryWorkspace, onSignIn, onSignOut }: { readonly requestedPath: string; readonly authStatus: AuthStatus; readonly authNotice: string; readonly message?: string; readonly retryable?: boolean; readonly onRetryWorkspace?: () => void; readonly onSignIn: () => void; readonly onSignOut: () => void }): React.ReactElement {
   useEffect(() => { document.title = `Workspace unavailable | ${productName}`; }, []);
-  return <main className="login-shell">
-    <section className="login-card">
-      <span className="eyebrow">{productTagline}</span>
-      <h1>You do not have access to this workspace</h1>
-      <p>{message ?? `Your verified identity is not authorized for ${requestedPath}. ONE did not mount the requested portal UI.`}</p>
-      {retryable && onRetryWorkspace ? <button type="button" onClick={onRetryWorkspace}>Retry workspace</button> : null}
-      <AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />
-    </section>
-  </main>;
+  // The no-access system page (re-skin phase 8), with the account controls beneath it.
+  return <NoAccessPage title="You do not have access to this workspace"
+    body={message ?? `Your verified identity is not authorized for ${requestedPath}. ONE did not mount the requested portal UI.`}
+    {...(retryable && onRetryWorkspace ? { primary: { label: 'Retry workspace', onClick: onRetryWorkspace, icon: 'refresh' as const } } : {})}>
+    <div className="sys-controls"><AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} /></div>
+  </NoAccessPage>;
 }
 
 function DemoDisabledPage({ onNavigate }: { readonly onNavigate: (path: string) => void }): React.ReactElement {
@@ -829,7 +865,11 @@ function StudentShell({ apiHealth, authNotice, authStatus, currentStudent, demoM
           {demoMode ? <StudentPreviewStatus authenticated={false} /> : <AuthenticatedStudentStatus currentStudent={currentStudent} />}
           {/* Pilot-exact pages carry their own pilot page head. */}
           {['dashboard', 'practice', 'company-prep', 'career-tools', 'scholarships', 'resume-builder', 'career-path', 'learning', 'assessments', 'opportunities', 'profile', 'explain'].includes(route) && authStatus.state === 'authenticated' ? null : <PageHeader meta={routeTitles[route]} />}
-          <RouteScreen route={route} authenticated={authStatus.state === 'authenticated'} currentStudent={currentStudent} />
+          <PageErrorBoundary resetKey={path} inline>
+            {isKnownStudentPath(path)
+              ? <RouteScreen route={route} authenticated={authStatus.state === 'authenticated'} currentStudent={currentStudent} />
+              : <NotFoundPage inline home={{ to: demoMode ? '/demo/student' : '/student' }} help={{ to: demoMode ? '/demo/student/help' : '/student/help' }} />}
+          </PageErrorBoundary>
         </main>
       </div>
       {phone ? <StudentTabBar path={path} onNavigate={navigate} onMore={() => setDrawerOpen(true)} moreOpen={drawerOpen} /> : null}
@@ -1278,9 +1318,11 @@ function AuthenticatedStudentSavedOpportunities(): React.ReactElement {
 }
 
 function AuthenticatedStudentUnavailable({ route }: { readonly route: RouteKey }): React.ReactElement {
-  return <V2EmptyState icon="🧭" title={`${routeTitles[route].title} is not built yet`}
-    note="This section is planned but not available yet."
-    hint="Your Home dashboard shows everything that is live for you today." />;
+  // The AI Career Coach has its own approved state; every other unbuilt page says so plainly.
+  if (route === 'ai-coach') return <EmptyState id="coach" note />;
+  return <EmptyState id="coming-soon" title={`${routeTitles[route].title} is not built yet`}
+    body="This section is planned but not available yet. Your Home dashboard shows everything that is live for you today."
+    primary={{ label: 'Go to Home', to: '/student', icon: 'home' }} />;
 }
 
 function currentPath(): string {
@@ -1294,6 +1336,23 @@ function normalizePath(path: string): string {
 function routeFromPath(path: string): RouteKey {
   const normalized = normalizePath(path);
   return navItems.find((item) => item.path === normalized)?.route ?? 'dashboard';
+}
+
+/** A student page the app has (the student navigation); anything else under /student is a 404. */
+function isKnownStudentPath(path: string): boolean {
+  const normalized = normalizePath(path);
+  return !normalized.startsWith('/student') || navItems.some((item) => item.path === normalized);
+}
+
+/** Paths the app answers outside the portals; a path matching none of these (or a portal) is a 404. */
+function isKnownAppPath(path: string): boolean {
+  const normalized = normalizePath(path);
+  if (isProtectedPortalPath(normalized)) return true;
+  if (['/', '/login', '/auth/callback', '/invitations/accept', '/forgot-password', '/privacy', '/terms', '/employer-access'].includes(normalized)) return true;
+  if (normalized.startsWith('/p/')) return true;
+  if (normalized === '/demo' || normalized.startsWith('/demo/')) return true;
+  if (import.meta.env.DEV && normalized.startsWith('/pilot-preview')) return true;
+  return false;
 }
 
 function isProtectedPortalPath(path: string): boolean {

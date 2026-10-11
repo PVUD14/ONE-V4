@@ -43,7 +43,7 @@ export function GrowthHomePage(): React.ReactElement {
 export function GrowthModulePage({ route, role }: { readonly route: RoleNavItem; readonly role?: string | undefined }): React.ReactElement {
   // A page limited to some roles (Team, for managers) is not shown to anyone else, even by URL.
   if (route.roles && (role === undefined || !route.roles.includes(role))) {
-    return <V2EmptyState icon="🔐" title={`${route.label} is for regional managers`} note="This page is not part of your role. Your access has not changed." />;
+    return <V2EmptyState illustration="no-access" icon="🔐" title={`${route.label} is for regional managers`} note="This page is not part of your role. Your access has not changed." />;
   }
   if (route.label === 'Territory') return <GrowthTerritoryPage />;
   if (route.label === 'Leads') return <GrowthLeadsPage role={role} />;
@@ -84,7 +84,7 @@ export function GrowthTerritoryPage(): React.ReactElement {
   }, [token]);
 
   if (state.kind === 'forbidden') {
-    return <V2EmptyState icon="🔐" title="Not permitted" note="Territory is for AI8HT's partnerships staff. Your access has not changed."
+    return <V2EmptyState illustration="no-access" icon="🔐" title="Not permitted" note="Territory is for AI8HT's partnerships staff. Your access has not changed."
       {...(state.reference ? { hint: <SupportCode reference={state.reference} /> } : {})} />;
   }
   const territory = state.kind === 'ready' ? state.territory : null;
@@ -120,7 +120,7 @@ export function GrowthTerritoryPage(): React.ReactElement {
 
         {state.kind === 'loading' ? <section className="v2-card"><p className="v2-empty">Loading…</p></section> : null}
         {state.kind === 'error' ? <section className="v2-card"><p className="v2-empty">Your territory could not be loaded.</p></section> : null}
-        {territory && !regions.length ? <V2EmptyState icon="🗺️" title="No region assigned" note="You see your own leads anywhere; unowned leads appear once operations assigns you a region." /> : null}
+        {territory && !regions.length ? <V2EmptyState illustration="no-leads" icon="🗺️" title="No region assigned" note="You see your own leads anywhere; unowned leads appear once operations assigns you a region." /> : null}
         {regions.map((region) => (
           <section key={region.id} className="v2-card" aria-label={`Region ${region.name}`}>
             <div className="v2-card-head"><h2>{region.name}</h2>

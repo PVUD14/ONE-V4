@@ -183,7 +183,7 @@ export function GrowthLeadsPage({ role }: { readonly role?: string | undefined }
                 {lead.stale ? <V2Chip tone="purple">Stale</V2Chip> : null}
               </button>
             ))}
-          </div> : <V2EmptyState icon="🤝" title="No leads here" note={view === 'MINE' ? 'You own no leads of this kind yet. Create one, or claim an unowned lead in your region.' : 'No lead of this kind matches. Leads appear here as your team adds them.'} />}
+          </div> : <V2EmptyState illustration="no-leads" icon="🤝" title="No leads here" note={view === 'MINE' ? 'You own no leads of this kind yet. Create one, or claim an unowned lead in your region.' : 'No lead of this kind matches. Leads appear here as your team adds them.'} />}
           {nextCursor ? <button type="button" className="pilot-btn" onClick={() => void loadMore()}>Load more</button> : null}
         </section>
 

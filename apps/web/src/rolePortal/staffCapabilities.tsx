@@ -61,7 +61,7 @@ export function OperationsStaffCapabilitiesPage(): React.ReactElement {
 
   if (forbiddenReference) {
     return <section className="role-module role-module--dense">{heading}
-      <div className="role-wide"><V2EmptyState icon="🔐" title="Not permitted"
+      <div className="role-wide"><V2EmptyState illustration="no-access" icon="🔐" title="Not permitted"
         note="Managing staff capabilities needs the Capability Admin capability. Your access has not changed."
         hint={<SupportCode reference={forbiddenReference} />} /></div></section>;
   }

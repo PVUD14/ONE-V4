@@ -75,7 +75,7 @@ export function TutorHintsPanel({ token }: { readonly token: string }): React.Re
     {notice ? <p role="status">{notice}</p> : null}
     {unavailable ? <p>Tutor hints could not be read right now.</p> : null}
     {list === null && !error && !unavailable ? <p>Loading tutor hints…</p> : null}
-    {list && !list.hints.length ? <V2EmptyState icon="🧑‍🏫" title="No tutor hints here" note="The AI tutor is off by default and runs only in the demo sandbox. Hints appear here once students there ask for them." /> : null}
+    {list && !list.hints.length ? <V2EmptyState illustration="tasks-all-done" icon="🧑‍🏫" title="No tutor hints here" note="The AI tutor is off by default and runs only in the demo sandbox. Hints appear here once students there ask for them." /> : null}
     {list && list.hints.length ? <div className="role-record-table-wrap"><table className="role-record-table">
       <thead><tr><th>Question</th><th>Hint</th><th>Outcome</th><th>Provenance</th><th>Review</th></tr></thead>
       <tbody>{list.hints.map((hint) => <tr key={hint.id}>

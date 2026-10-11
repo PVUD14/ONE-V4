@@ -227,7 +227,7 @@ function TalentPoolNotAvailable(): React.ReactElement {
       <h1>Talent Pool</h1>
       <p>You can see people who applied to your jobs under Applicants and Candidate Detail.</p>
     </div></div>
-    <div className="role-wide"><V2EmptyState icon="🧭" title="Not available yet"
+    <div className="role-wide"><V2EmptyState illustration="coming-soon" icon="🧭" title="Not available yet"
       note="Talent Pool will list students who have chosen to be discoverable by employers. That choice does not exist in ONE yet, so nobody is listed here."
       hint="Nothing is hidden: students appear only after they opt in." /></div>
   </section>;

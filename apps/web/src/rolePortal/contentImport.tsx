@@ -152,7 +152,7 @@ export function OperationsContentImportPage(): React.ReactElement | null {
 
   if (forbiddenReference) {
     return <section className="role-module role-module--dense">{heading}
-      <div className="role-wide"><V2EmptyState icon="🔐" title="Not permitted"
+      <div className="role-wide"><V2EmptyState illustration="no-access" icon="🔐" title="Not permitted"
         note="Bulk import is for staff who hold Content Edit. Your access has not changed; the rest of Content Management is unaffected."
         hint={<SupportCode reference={forbiddenReference} />} /></div></section>;
   }
@@ -251,7 +251,7 @@ export function OperationsContentImportPage(): React.ReactElement | null {
 
     <section className="role-card role-wide" aria-label="Validation report"><div className="role-section-title"><h2>Validation report</h2>
       {committable ? <button type="button" className="pilot-btn" onClick={() => setConfirming(true)}>Import {report ? report.counts.create : 0} as drafts…</button> : null}</div>
-      {!report ? <V2EmptyState icon="📄" title="No file previewed yet" note="Choose what the file holds, pick a CSV or JSON file and preview it. The preview checks every row and writes nothing." /> : null}
+      {!report ? <V2EmptyState illustration="no-documents" icon="📄" title="No file previewed yet" note="Choose what the file holds, pick a CSV or JSON file and preview it. The preview checks every row and writes nothing." /> : null}
       {report && report.fileProblems.length ? <div role="alert"><p><strong>The file cannot be imported.</strong> Nothing was written.</p>
         <ul>{report.fileProblems.map((problem) => <li key={problem}>{describeIssue(problem, fileWords)}</li>)}</ul></div> : null}
       {report && !report.fileProblems.length && report.counts.invalid ? <p role="note">{report.counts.invalid} {report.counts.invalid === 1 ? 'row has' : 'rows have'} problems. Nothing can be imported until every row is fixed; nothing was written.</p> : null}

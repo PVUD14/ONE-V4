@@ -83,7 +83,7 @@ export function OperationsGrowthLeadsPanel(): React.ReactElement | null {
         <button type="button" className="pilot-btn" aria-pressed={selected === lead.id} onClick={() => setSelected(lead.id)}>{lead.name}</button>
         {' '}<small>{[lead.area.districtName, lead.area.stateName].filter(Boolean).join(', ') || 'Area not set'} · {growthCodeLabel(lead.stage)} · {lead.owner ? lead.owner.email ?? 'owner not recorded' : 'unowned'}</small>
         {lead.doNotContact ? <> <V2Chip tone="red">Do not contact</V2Chip></> : null}
-      </li>)}</ul> : <V2EmptyState icon="🤝" title="No leads" note="No growth lead of this kind matches." />}
+      </li>)}</ul> : <V2EmptyState illustration="no-leads" icon="🤝" title="No leads" note="No growth lead of this kind matches." />}
       {more ? <p>Showing the newest 50. Narrow the search to find older leads.</p> : null}
     </section>
     {selected && vocabulary ? <LeadDetailPanel key={selected} leadId={selected} vocabulary={vocabulary} token={token} mode="operations" manager={false}

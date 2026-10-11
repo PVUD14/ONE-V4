@@ -111,7 +111,7 @@ export function OperationsRoleDemandPage(): React.ReactElement {
 
   if (forbiddenReference) {
     return <section className="role-module role-module--dense">{heading}
-      <div className="role-wide"><V2EmptyState icon="🔐" title="Not permitted"
+      <div className="role-wide"><V2EmptyState illustration="no-access" icon="🔐" title="Not permitted"
         note="Role demand is for staff who hold aggregate analytics access. Your access has not changed."
         hint={<SupportCode reference={forbiddenReference} />} /></div></section>;
   }
@@ -155,7 +155,7 @@ export function OperationsRoleDemandPage(): React.ReactElement {
           <option value="NONE">Not in catalogue</option>
         </select></label>
       </div>
-      {demand && !demand.roles.length ? <V2EmptyState icon="🗂️" title="No career roles loaded" note="The job-role catalogue has not been loaded in this environment, so there is no demand to show." /> : null}
+      {demand && !demand.roles.length ? <V2EmptyState illustration="no-reports" icon="🗂️" title="No career roles loaded" note="The job-role catalogue has not been loaded in this environment, so there is no demand to show." /> : null}
       {demand && demand.roles.length && !visibleRoles.length ? <p>No roles carry this release label.</p> : null}
       {demand?.rolesCapped ? <p>Showing the first 1,000 roles only.</p> : null}
       {visibleRoles.length ? <div className="role-record-table-wrap"><table className="role-record-table" aria-label="Roles ranked by demand">

@@ -299,7 +299,7 @@ function SprintList({ sprints, token, institutionId, onChanged }: {
     <h3>Preparation sprints</h3>
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {!sprints ? <p role="status">Loading preparation sprints…</p> : sprints.sprints.length === 0
-      ? <V2EmptyState icon="🏃" title="No sprints yet" note="Sprints you and your colleagues start appear here with their progress." />
+      ? <V2EmptyState illustration="no-interventions" icon="🏃" title="No sprints yet" note="Sprints you and your colleagues start appear here with their progress." />
       : <div className="role-record-table-wrap"><table className="role-record-table"><caption className="sr-only">Preparation sprints</caption>
         <thead><tr><th scope="col">Sprint</th><th scope="col">When</th><th scope="col">Reached</th>
           {Object.values(SPRINT_CELL_LABELS).map((label) => <th key={label} scope="col">{label}</th>)}

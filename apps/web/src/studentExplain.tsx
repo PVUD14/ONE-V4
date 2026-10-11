@@ -118,7 +118,7 @@ export function StudentExplainPage(): React.ReactElement {
   if (loadError) return <section className="pilot-card" aria-label="Ask ONE to explain"><p role="alert" className="form-error">{loadError}</p></section>;
   if (!availability) return <section className="pilot-card" aria-label="Ask ONE to explain"><p role="status" style={muted}>Loading…</p></section>;
   if (availability.reason === 'OFF') {
-    return <V2EmptyState icon="💡" title="Ask ONE to explain is not available yet"
+    return <V2EmptyState illustration="coming-soon" icon="💡" title="Ask ONE to explain is not available yet"
       note="When it is switched on, you will be able to ask ONE to explain any topic and read an AI-written lesson about it."
       hint="Your Learning page has the lessons and practice that are live today." />;
   }

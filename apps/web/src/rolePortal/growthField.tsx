@@ -125,7 +125,7 @@ export function GrowthFieldPage({ role }: { readonly role?: string | undefined }
         <section className="v2-card" aria-label="Follow-ups">
           <div className="v2-card-head"><h2>Follow-ups</h2>{counts ? <V2Chip tone="slate">{`${counts.followUpsOpen} open`}</V2Chip> : null}</div>
           {!field && !error ? <p className="v2-empty">Loading…</p> : null}
-          {field && !followUps.length ? <V2EmptyState icon="📅" title="No open follow-ups" note={team ? 'Nobody on your team has an open follow-up.' : 'Add a follow-up from a lead when there is something to do next.'} /> : null}
+          {field && !followUps.length ? <V2EmptyState illustration="no-meetings" icon="📅" title="No open follow-ups" note={team ? 'Nobody on your team has an open follow-up.' : 'Add a follow-up from a lead when there is something to do next.'} /> : null}
           {field && token ? <>
             <FollowUpGroup title="Overdue" items={overdue} token={token} vocabulary={field.vocabulary} team={team} onChanged={() => setReload((value) => value + 1)} />
             <FollowUpGroup title="Due today" items={today} token={token} vocabulary={field.vocabulary} team={team} onChanged={() => setReload((value) => value + 1)} />
@@ -137,7 +137,7 @@ export function GrowthFieldPage({ role }: { readonly role?: string | undefined }
           <div className="v2-card-head"><h2>Recent field work</h2>{counts ? <V2Chip tone="slate">{`${counts.activitiesThisMonth} this month`}</V2Chip> : null}</div>
           {field && token ? (field.activities.length
             ? <ActivityList items={field.activities} token={token} showLead onChanged={() => setReload((value) => value + 1)} />
-            : <V2EmptyState icon="📍" title="No field work logged yet" note="Visits, calls, meetings and notes appear here once they are logged on a lead." />)
+            : <V2EmptyState illustration="no-meetings" icon="📍" title="No field work logged yet" note="Visits, calls, meetings and notes appear here once they are logged on a lead." />)
             : error ? null : <p className="v2-empty">Loading…</p>}
         </section>
       </div>

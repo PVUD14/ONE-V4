@@ -132,7 +132,7 @@ export function OperationsAiOperationsPage(): React.ReactElement | null {
 
   if (forbiddenReference) {
     return <section className="role-module role-module--dense">{heading}
-      <div className="role-wide"><V2EmptyState icon="🔐" title="Not permitted" note="AI Operations is for staff who hold AI Operations View. Your access has not changed." hint={<SupportCode reference={forbiddenReference} />} /></div></section>;
+      <div className="role-wide"><V2EmptyState illustration="no-access" icon="🔐" title="Not permitted" note="AI Operations is for staff who hold AI Operations View. Your access has not changed." hint={<SupportCode reference={forbiddenReference} />} /></div></section>;
   }
 
   const viewer = policy?.viewer ?? { canStop: false, canConfigure: false };
@@ -579,7 +579,7 @@ function AiEvaluationsPanel({ token, canRecord, reload, onRecord }: { readonly t
     <p>A feature is switched on only with a passing evaluation for its current model and prompt version. The latest record for a combination is its verdict.</p>
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {rows === null && !error ? <p>Loading evaluations…</p> : null}
-    {rows && !rows.length ? <V2EmptyState icon="🧪" title="No evaluations recorded" note="No model has been benchmarked for any feature yet." /> : null}
+    {rows && !rows.length ? <V2EmptyState illustration="no-reports" icon="🧪" title="No evaluations recorded" note="No model has been benchmarked for any feature yet." /> : null}
     {rows?.length ? <div className="role-record-table-wrap"><table className="role-record-table">
       <thead><tr><th>Feature</th><th>Model and prompt</th><th>Evaluation set</th><th>Metrics</th><th>Decision</th><th>Recorded</th></tr></thead>
       <tbody>{rows.map((row) => <tr key={row.id}>

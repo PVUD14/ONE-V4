@@ -77,21 +77,21 @@ export function InstitutionWorkspaceError({ title, unauthorized = false }: { rea
 
 export function AuthenticatedReadOnlyModule({ title, detail }: { readonly title: string; readonly detail: string }): React.ReactElement {
   return <section className="role-module"><div className="role-page-heading"><div><span className="eyebrow">Read-only</span><h1>{title}</h1><p>{detail}</p></div></div>
-    <div className="role-wide"><V2EmptyState icon="🔎" title="View-only for your role"
+    <div className="role-wide"><V2EmptyState illustration="no-access" icon="🔎" title="View-only for your role"
       note="You can see authorized context here, but changes for this module are not switched on yet for your role."
       hint="Assessments and Help & FAQ are fully live — use the sidebar to reach them." /></div></section>;
 }
 
 export function AuthenticatedNotYetAvailable({ title, detail }: { readonly title: string; readonly detail: string }): React.ReactElement {
   return <section className="role-module"><div className="role-page-heading"><div><span className="eyebrow">Coming later</span><h1>{title}</h1><p>{detail}</p></div></div>
-    <div className="role-wide"><V2EmptyState icon="🧭" title="Not built yet"
+    <div className="role-wide"><V2EmptyState illustration="coming-soon" icon="🧭" title="Not built yet"
       note="This section is planned but not available yet."
       hint="Your dashboard shows everything that is live for your role today." /></div></section>;
 }
 
 export function RestrictedApiState({ title, message }: { readonly title: string; readonly message: string }): React.ReactElement {
   return <section className="role-module"><div className="role-page-heading"><div><span className="eyebrow">Protected</span><h1>{title}</h1><p>{message}</p></div></div>
-    <div className="role-wide"><V2EmptyState icon="🔐" title="Sign-in required"
+    <div className="role-wide"><V2EmptyState illustration="no-access" icon="🔐" title="Sign-in required"
       note="Sign in with an account that has access to see this page." /></div></section>;
 }
 

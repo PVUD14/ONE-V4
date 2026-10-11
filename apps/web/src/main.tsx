@@ -27,6 +27,9 @@ import './styles/business-home.css';
 // Momentum motion (phase 11): entrance gating, loop pausing, the band climb, toasts and the loader.
 // Loaded last so its gating rules apply to every sheet above; the runtime is installed below.
 import './styles/motion.css';
+// Empty states and system pages (phase 8): the Lens illustrations' shared CSS, then the layouts.
+import './styles/illustrations.css';
+import './styles/empty-states.css';
 import { installMotion } from './momentum/motion.js';
 import { applyStoredTheme } from './themePreference.js';
 

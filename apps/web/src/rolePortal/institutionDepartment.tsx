@@ -221,7 +221,7 @@ export function DepartmentBatchesPage({ authenticatedWorkspace }: WorkspaceProps
     </div>
     {overview.error ? <p className="form-error" role="alert">{overview.error}</p> : null}
     {!overview.data && !overview.error ? <p role="status">Loading batches…</p> : null}
-    {overview.data && batches.length === 0 ? <div className="role-wide"><V2EmptyState icon="🗂️" title="No batches yet"
+    {overview.data && batches.length === 0 ? <div className="role-wide"><V2EmptyState illustration="no-students-roster" icon="🗂️" title="No batches yet"
       note="Your department has no batch units. Your institution administrator adds them under Academic Structure." /></div> : null}
     {batches.length ? <div className="role-record-table-wrap"><table className="role-record-table"><caption className="sr-only">Department batches</caption>
       <thead><tr><th scope="col">Batch</th><th scope="col">Programme or department</th><th scope="col">On roster</th><th scope="col">Currently enrolled</th><th scope="col">Activated</th></tr></thead>
@@ -336,7 +336,7 @@ export function OpportunitiesAndOffersPage({ authenticatedWorkspace }: Workspace
     </div>
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {!rows && !error ? <p role="status">Loading shared applications…</p> : null}
-    {rows && rows.length === 0 ? <div className="role-wide"><V2EmptyState icon="📨" title="No shared applications"
+    {rows && rows.length === 0 ? <div className="role-wide"><V2EmptyState illustration="no-applications" icon="📨" title="No shared applications"
       note="None of your department's students has shared an application with the college yet. Students choose, per application, whether the college may see it." /></div> : null}
     {rows && rows.length > 0 ? <div className="role-record-table-wrap"><table className="role-record-table"><caption className="sr-only">Shared applications</caption>
       <thead><tr><th scope="col">Student</th><th scope="col">Employer</th><th scope="col">Opportunity</th><th scope="col">Stage</th><th scope="col">Offer</th><th scope="col">Last update</th></tr></thead>
@@ -450,7 +450,7 @@ export function FacultyAssessmentDetailPage({ authenticatedWorkspace }: Workspac
     <div className="pilot-content">
       <PageHead title="Assessment Detail" summary="Results for one assessment, for the students you teach." />
       {exams.error ? <p className="form-error" role="alert">{exams.error}</p> : null}
-      {exams.data && choices.length === 0 ? <V2EmptyState icon="📝" title="No published assessments yet" note="Publish an assessment under Assessments to see its results here." /> : null}
+      {exams.data && choices.length === 0 ? <V2EmptyState illustration="no-assessments" icon="📝" title="No published assessments yet" note="Publish an assessment under Assessments to see its results here." /> : null}
       {choices.length ? <section className="pilot-card role-management-form">
         <label><span>Assessment</span><select value={current} onChange={(event) => setSelected(event.target.value)}>
           {choices.map((entry) => <option key={entry.id} value={entry.id}>{entry.title} · {entry.subjectName}</option>)}</select></label>
@@ -496,7 +496,7 @@ export function FacultyClassReportsPage({ authenticatedWorkspace }: WorkspacePro
       {data?.mode === 'MEMBERSHIP' ? <p>Your college has not started recording teaching assignments, so these follow the department and batch on your staff account.</p> : null}</div></div>
     {reports.error ? <p className="form-error" role="alert">{reports.error}</p> : null}
     {!data && !reports.error ? <p role="status">Loading your class reports…</p> : null}
-    {data && data.classes.length === 0 ? <div className="role-wide"><V2EmptyState icon="📚" title="No classes to report on"
+    {data && data.classes.length === 0 ? <div className="role-wide"><V2EmptyState illustration="no-reports" icon="📚" title="No classes to report on"
       note={data.mode === 'ASSIGNMENTS' ? 'You have no active teaching assignment right now.' : 'Your staff account has no department or batch, so there is no class to summarise.'}
       hint="Ask your institution admin or department head to assign you to a section or batch." /></div> : null}
     {(data?.classes ?? []).map((entry) => <section key={entry.unit.id} className="role-card role-wide" aria-label={entry.unit.name}>

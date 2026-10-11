@@ -88,7 +88,7 @@ function EmployerManagementRealityPage({ portal, routeLabel }: { readonly portal
         <h1>{routeLabel}</h1>
         <p>{routeLabel} is managed by your employer's owner or admin.</p>
       </div></div>
-      <div className="role-wide"><V2EmptyState icon="🔒" title="Managed by your owner or admin"
+      <div className="role-wide"><V2EmptyState illustration="no-access" icon="🔒" title="Managed by your owner or admin"
         note={`Recruiters do not change ${routeLabel.toLowerCase()}. Ask your employer's owner or admin if something here needs to change.`}
         hint="Opportunities, Applicants, Interviews and Offers are all yours to run." /></div>
     </section>;
@@ -120,7 +120,7 @@ function EmployerManagementRealityPage({ portal, routeLabel }: { readonly portal
       <h1>{routeLabel}</h1>
       <p>Opportunities and Applicants carry your live pipeline today.</p>
     </div></div>
-    <div className="role-wide"><V2EmptyState icon="🧭" title="Not built yet"
+    <div className="role-wide"><V2EmptyState illustration="coming-soon" icon="🧭" title="Not built yet"
       note={`${routeLabel} is planned but not available yet.`}
       hint="Interviews and offers are managed from the applicant row on the Applicants page." /></div>
   </section>;

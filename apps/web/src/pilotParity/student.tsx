@@ -58,7 +58,7 @@ export function StudentPracticePage(): React.ReactElement {
       </div>
       <PilotTabs labels={PRACTICE_TABS} active={tab} onChange={setTab} />
 
-      {tab > 0 ? <V2EmptyState icon="🧩" title={`${tabLabel} problem sets are not live yet`} note="Institution assessments are live under Assessments." /> : null}
+      {tab > 0 ? <V2EmptyState illustration="practice-start" icon="🧩" title={`${tabLabel} problem sets are not live yet`} note="Institution assessments are live under Assessments." /> : null}
 
       {/* Problem sets, contests, practice time, success rate, practice tiles and recommendations have no
           source yet, so only the day streak (real activity) is drawn. */}
@@ -95,8 +95,8 @@ export function StudentCompanyPrepPage(): React.ReactElement {
       <PilotTabs labels={['Overview', 'Companies', 'Interview Prep', 'Aptitude Prep', 'Mock Interviews', 'Saved']} active={tab} onChange={setTab} />
       {tab === 0 ? <>
         <PublishedContentCard contentType="COMPANY_PREP" title="Company preparation" />
-        <V2EmptyState icon="🏢" title="Company prep guides are not live yet" note="Real openings from real employers are under Opportunities." />
-      </> : <V2EmptyState icon="🏢" title={`${['Overview', 'Companies', 'Interview Prep', 'Aptitude Prep', 'Mock Interviews', 'Saved'][tab] ?? 'This prep content'} is not live yet`} note="Real openings from real employers are under Opportunities." />}
+        <V2EmptyState illustration="coming-soon" icon="🏢" title="Company prep guides are not live yet" note="Real openings from real employers are under Opportunities." />
+      </> : <V2EmptyState illustration="coming-soon" icon="🏢" title={`${['Overview', 'Companies', 'Interview Prep', 'Aptitude Prep', 'Mock Interviews', 'Saved'][tab] ?? 'This prep content'} is not live yet`} note="Real openings from real employers are under Opportunities." />}
     </div>
   </div></div>;
 }
@@ -115,7 +115,7 @@ export function StudentCareerToolsPage(): React.ReactElement {
         <div><h1>Career Tools</h1><p>Everything you need to plan, build and accelerate your career.</p></div>
       </div>
       <PilotTabs labels={TOOL_TABS} active={tab} onChange={setTab} />
-      <V2EmptyState icon="🧰" title={`${TOOL_TABS[tab] ?? 'Overview'} tools are not live yet`}
+      <V2EmptyState illustration="coming-soon" icon="🧰" title={`${TOOL_TABS[tab] ?? 'Overview'} tools are not live yet`}
         note="The path planner (roles you can grow into), the skill gap analyzer (your skills against a target role) and salary insights (ranges by role and city) are not live yet."
         hint="What is live today: your readiness band and roadmap under My Career, and real skills evidence under Skills." />
       {tab === 0 ? <PublishedContentCard contentType="CAREER_TOOL" title="Career tools" /> : null}
@@ -137,7 +137,7 @@ export function StudentScholarshipsPage(): React.ReactElement {
       </div>
       <PilotTabs labels={labels} active={tab} onChange={setTab} />
       {tab === 0 ? <PublishedContentCard contentType="SCHOLARSHIP" title="Scholarships" /> : null}
-      <V2EmptyState icon="🎓" title="Scholarship listings are not live yet" note="They arrive when a scholarships content partner or institution feed is connected." />
+      <V2EmptyState illustration="no-scholarships" icon="🎓" title="Scholarship listings are not live yet" note="They arrive when a scholarships content partner or institution feed is connected." />
     </div>
   </div></div>;
 }

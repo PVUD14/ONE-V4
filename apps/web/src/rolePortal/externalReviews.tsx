@@ -154,7 +154,7 @@ export function OperationsExternalReviewsPage(): React.ReactElement | null {
 
   if (forbiddenReference) {
     return <section className="role-module role-module--dense">{heading}
-      <div className="role-wide"><V2EmptyState icon="🔐" title="Not permitted"
+      <div className="role-wide"><V2EmptyState illustration="no-access" icon="🔐" title="Not permitted"
         note="Faculty review is for content staff and capability administrators. Your access has not changed; the rest of Content Management is unaffected."
         hint={<SupportCode reference={forbiddenReference} />} /></div></section>;
   }
@@ -247,7 +247,7 @@ export function OperationsExternalReviewsPage(): React.ReactElement | null {
     </section> : null}
 
     {policy && policy.viewer.assign ? <section className="role-card role-wide" aria-label="Assign drafts"><div className="role-section-title"><h2>Assign drafts in review</h2></div>
-      {revisions && !revisions.length ? <V2EmptyState icon="📭" title="No drafts in review" note="Drafts appear here once their editor submits them for review in the editors above." /> : null}
+      {revisions && !revisions.length ? <V2EmptyState illustration="queue-clear" icon="📭" title="No drafts in review" note="Drafts appear here once their editor submits them for review in the editors above." /> : null}
       {revisions && revisions.length ? <>
         <div className="role-record-table-wrap"><table className="role-record-table" aria-label="Drafts in review">
           <thead><tr><th /><th>Draft</th><th>Kind</th><th>Revision</th><th>Faculty so far</th></tr></thead>
@@ -274,7 +274,7 @@ export function OperationsExternalReviewsPage(): React.ReactElement | null {
     </section> : null}
 
     {policy ? <section className="role-card role-wide" aria-label="Assignments"><div className="role-section-title"><h2>Assignments and faculty decisions</h2></div>
-      {assignments && !assignments.length ? <V2EmptyState icon="🗂️" title="No assignments yet" note="Assigned drafts and what faculty said about them appear here." /> : null}
+      {assignments && !assignments.length ? <V2EmptyState illustration="tasks-all-done" icon="🗂️" title="No assignments yet" note="Assigned drafts and what faculty said about them appear here." /> : null}
       {assignments && assignments.length ? <div className="role-record-table-wrap"><table className="role-record-table" aria-label="Assignment list">
         <thead><tr><th>Draft</th><th>Reviewer</th><th>Status</th><th>Until</th><th>Faculty decision</th><th /></tr></thead>
         <tbody>{assignments.map((assignment) => <tr key={assignment.id}>
@@ -374,7 +374,7 @@ export function FacultyContentReviewsPage({ institutionId, hideWhenForbidden = f
 
   if (forbidden) {
     return <section className="role-module role-module--dense">{heading}
-      <div className="role-wide"><V2EmptyState icon="🎓" title="No content review access"
+      <div className="role-wide"><V2EmptyState illustration="no-access" icon="🎓" title="No content review access"
         note="ONE grants content review to faculty their college has agreed to lend. Nothing has been assigned to you." /></div></section>;
   }
 
@@ -414,7 +414,7 @@ export function FacultyContentReviewsPage({ institutionId, hideWhenForbidden = f
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {notice ? <p role="status">{notice}</p> : null}
     {!assignments && !error ? <p>Loading your content reviews…</p> : null}
-    {assignments && !assignments.length ? <div className="role-wide"><V2EmptyState icon="📭" title="Nothing assigned yet" note="When ONE assigns you a draft to review, it appears here." /></div> : null}
+    {assignments && !assignments.length ? <div className="role-wide"><V2EmptyState illustration="tasks-all-done" icon="📭" title="Nothing assigned yet" note="When ONE assigns you a draft to review, it appears here." /></div> : null}
     {assignments && assignments.length ? <section className="role-card role-wide"><div className="role-record-table-wrap"><table className="role-record-table" aria-label="Your assignments">
       <thead><tr><th>Draft</th><th>Kind</th><th>Status</th><th>Until</th><th>Your decision</th><th /></tr></thead>
       <tbody>{assignments.map((assignment) => <tr key={assignment.id}>

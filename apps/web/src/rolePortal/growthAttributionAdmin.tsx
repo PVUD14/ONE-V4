@@ -79,7 +79,7 @@ export function OperationsGrowthAttributionPanel(): React.ReactElement | null {
       <h2>Open disputes</h2>
       {disputes.length ? disputes.map((dispute) => <DisputeCard key={dispute.disputeId} dispute={dispute} token={token}
         reasons={data?.vocabulary.decisionReasons ?? []} onDone={refresh} onError={setError} />)
-        : <V2EmptyState icon="⚖️" title="No open disputes" note="A dispute appears here when a growth person claims credit, or when an employer's referral and lead owner differ at onboarding." />}
+        : <V2EmptyState illustration="no-flagged-items" icon="⚖️" title="No open disputes" note="A dispute appears here when a growth person claims credit, or when an employer's referral and lead owner differ at onboarding." />}
     </section>
 
     <section className="role-card role-wide" aria-label="Attributions">
@@ -92,7 +92,7 @@ export function OperationsGrowthAttributionPanel(): React.ReactElement | null {
       </div>
       {data && data.attributions.length ? <ul className="role-check-list">{data.attributions.map((row) => <AttributionRow key={row.attributionId} row={row} token={token}
         reassignReasons={data.vocabulary.reassignReasons} endReasons={data.vocabulary.endReasons} onDone={refresh} onError={setError} />)}</ul>
-        : <V2EmptyState icon="🤝" title="No attributions" note="Nothing in this view." />}
+        : <V2EmptyState illustration="no-leads" icon="🤝" title="No attributions" note="Nothing in this view." />}
     </section>
   </section>;
 }

@@ -1,0 +1,200 @@
+{
+  "coach": {
+    "title": "Your coach is coming into focus",
+    "body": "Soon you can ask what to do next and rehearse interviews, with every answer grounded in your own verified evidence.",
+    "primary": "Notify me when it’s live",
+    "secondary": "Practice questions instead",
+    "note": "Grounded only in evidence you choose to share. Never shared with employers."
+  },
+  "no-applications": {
+    "title": "No applications yet",
+    "body": "When you apply for a role, you’ll follow every stage here, from applied and screening to interview and offer.",
+    "primary": "Explore roles",
+    "helper": "Your verified profile is ready. Employers see only the evidence you choose to send, never your readiness band."
+  },
+  "no-interviews": {
+    "title": "No interviews scheduled",
+    "body": "When an employer invites you, the round, time and a prep checklist will appear here and in your calendar.",
+    "primary": "Practise an interview",
+    "secondary": "View applications"
+  },
+  "no-assessments": {
+    "title": "No assessments assigned yet",
+    "body": "Assessments from Lakeview or employers will show up here. Each one you complete becomes a verified evidence record.",
+    "primary": "Take a mock test"
+  },
+  "learning-not-started": {
+    "title": "Your learning path is ready",
+    "body": "Start Career Readiness Fundamentals: three short lessons that build evidence for your goal.",
+    "primary": "Start lesson 1"
+  },
+  "no-scholarships": {
+    "title": "No scholarships match yet",
+    "body": "We’ll list scholarships that fit your programme and goal as institutions publish them.",
+    "primary": "Turn on scholarship alerts",
+    "secondary": "Update profile"
+  },
+  "no-documents": {
+    "title": "No documents yet",
+    "body": "Keep certificates and transcripts in one place. You decide what each employer can see.",
+    "primary": "Upload a document",
+    "note": "Documents stay private until you attach them to an application."
+  },
+  "no-messages": {
+    "title": "No messages yet",
+    "body": "Messages from Lakeview staff and employers you’ve applied to will appear here.",
+    "primary": "Explore roles"
+  },
+  "search-no-results": {
+    "title": "No results for that search",
+    "body": "Try a broader role title, fewer filters or a nearby city.",
+    "primary": "Clear filters",
+    "secondary": "Save this search"
+  },
+  "resume-empty": {
+    "title": "Start your resume from your evidence",
+    "body": "We’ll pre-fill sections from your verified records. You review every line before anything is shared.",
+    "primary": "Build resume"
+  },
+  "practice-start": {
+    "title": "Warm up with a practice set",
+    "body": "Ten questions, no time pressure. Practice answers are visible only to you.",
+    "primary": "Start practising"
+  },
+  "queue-clear": {
+    "title": "Verification queue clear",
+    "body": "New evidence submitted by Lakeview students will appear here for review.",
+    "count": "0 records waiting for a decision",
+    "primary": "View verification history"
+  },
+  "no-students-roster": {
+    "title": "Add your first students",
+    "body": "Import your roster as a CSV or invite students by email. They activate their own accounts.",
+    "primary": "Import roster (CSV)",
+    "secondary": "Invite by email"
+  },
+  "no-interventions": {
+    "title": "No interventions open",
+    "body": "When a student needs extra support, plan an intervention here and track each follow-up.",
+    "primary": "Plan an intervention"
+  },
+  "no-placement-drives": {
+    "title": "No placement drives scheduled",
+    "body": "Schedule a drive to invite employers. Student profiles are shared only with each student’s consent.",
+    "primary": "Schedule a drive"
+  },
+  "no-reports": {
+    "title": "No reports yet",
+    "body": "Build a report on cohort bands, activation or placement. Any count under five shows as <5.",
+    "primary": "Create a report"
+  },
+  "no-meetings": {
+    "title": "No meetings this week",
+    "body": "Schedule department reviews or student check-ins. Agendas and notes stay attached.",
+    "primary": "Schedule a meeting"
+  },
+  "tasks-all-done": {
+    "title": "All tasks done",
+    "body": "New verification requests and reviews will appear here as they arrive.",
+    "count": "0 tasks left today",
+    "primary": "View completed tasks"
+  },
+  "no-applicants": {
+    "title": "No applicants yet",
+    "body": "Graduate Software Engineer is live. Applicants appear here with the evidence they choose to share.",
+    "primary": "Share role link",
+    "secondary": "Edit opportunity"
+  },
+  "talent-pool-empty": {
+    "title": "Your talent pool is empty",
+    "body": "Save candidates from any role to revisit later. They stay here only while their consent is active.",
+    "primary": "Browse applicants"
+  },
+  "no-offers": {
+    "title": "No offers sent yet",
+    "body": "When you extend an offer, track acceptance and joining dates here.",
+    "primary": "Create an offer"
+  },
+  "no-opportunities-posted": {
+    "title": "Post your first opportunity",
+    "body": "Describe the role and the evidence you’d like to see. Corvane Labs roles reach students at partner institutions.",
+    "primary": "Post an opportunity"
+  },
+  "all-systems-healthy": {
+    "title": "All systems healthy",
+    "body": "API, assessments, AI services and email delivery are operating normally.",
+    "primary": "View status history"
+  },
+  "no-flagged-items": {
+    "title": "Nothing flagged",
+    "body": "Reported content and accounts will appear here for a decision.",
+    "count": "0 items waiting for review",
+    "primary": "View review history"
+  },
+  "audit-log-empty": {
+    "title": "No audit events in this range",
+    "body": "Try a wider date range or remove the actor filter.",
+    "primary": "Reset filters"
+  },
+  "no-leads": {
+    "title": "No leads in this territory yet",
+    "body": "Add an institution you met in the field or import a list to start your pipeline.",
+    "primary": "Add a lead",
+    "secondary": "Import list"
+  },
+  "target-achieved": {
+    "title": "Target achieved",
+    "body": "You’ve hit this quarter’s target. Commission is calculated at month end.",
+    "primary": "View commission"
+  },
+  "404-not-found": {
+    "title": "We can’t find that page",
+    "body": "The link may be out of date or the page has moved. Your data is safe.",
+    "primary": "Go to home",
+    "secondary": "Help & FAQ"
+  },
+  "500-something-went-wrong": {
+    "title": "Something went wrong on our side",
+    "body": "We couldn’t load this page. Your saved work is safe; please try again in a moment.",
+    "primary": "Try again",
+    "secondary": "Contact support"
+  },
+  "offline": {
+    "title": "You’re offline",
+    "body": "Check your connection. We’ll reconnect automatically when you’re back online.",
+    "primary": "Retry now"
+  },
+  "no-access": {
+    "title": "You don’t have access to this page",
+    "body": "This area isn’t part of your role. Ask your administrator if you need it.",
+    "primary": "Go to dashboard",
+    "secondary": "Request access"
+  },
+  "maintenance": {
+    "title": "We’re making ONE better",
+    "body": "Scheduled maintenance is under way. Your data and progress are safe.",
+    "primary": "Check status"
+  },
+  "coming-soon": {
+    "title": "Coming soon",
+    "body": "We’re building this next. We’ll let you know as soon as it’s ready.",
+    "primary": "Notify me"
+  },
+  "session-expired": {
+    "title": "Your session has expired",
+    "body": "For your security we sign you out after a period of inactivity. Sign in again to continue.",
+    "primary": "Sign in again"
+  },
+  "onboarding-welcome": {
+    "title": "Welcome to ONE, Arjun",
+    "body": "One workspace from learning to landing the role. Set your goal and add your first evidence.",
+    "primary": "Get started",
+    "secondary": "Take the tour"
+  },
+  "success-generic": {
+    "title": "Submitted for verification",
+    "body": "Your evidence record was sent to Lakeview. We’ll notify you when it’s reviewed.",
+    "primary": "Done",
+    "secondary": "View record"
+  }
+}

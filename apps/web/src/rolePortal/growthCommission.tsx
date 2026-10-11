@@ -66,7 +66,7 @@ export function GrowthCommissionPage(): React.ReactElement {
   }, [token]);
 
   if (state.kind === 'forbidden') {
-    return <V2EmptyState icon="🔐" title="Not permitted" note="Commission is for AI8HT's partnerships staff. Your access has not changed."
+    return <V2EmptyState illustration="no-access" icon="🔐" title="Not permitted" note="Commission is for AI8HT's partnerships staff. Your access has not changed."
       {...(state.reference ? { hint: <SupportCode reference={state.reference} /> } : {})} />;
   }
   const data = state.kind === 'ready' ? state.data : null;

@@ -191,7 +191,7 @@ export function InstitutionAnnouncementsPanel({ token, institutionId, noAudience
         <button type="submit" disabled={busy}>{form.schedule ? 'Schedule announcement' : 'Send announcement'}</button>
       </form>
     </section> : null}
-    {data && !data.canSend ? <div className="role-wide"><V2EmptyState icon="📣" title="You have nobody to send announcements to yet" note={noAudienceNote}
+    {data && !data.canSend ? <div className="role-wide"><V2EmptyState illustration="no-students-roster" icon="📣" title="You have nobody to send announcements to yet" note={noAudienceNote}
       hint="Ask your institution admin if this is not what you expected." /></div> : null}
     {data ? <section className="role-card role-wide">
       <h2>Sent and scheduled</h2>

@@ -1,0 +1,49 @@
+/* Momentum badges: the shelf, the three states and the one-shot unlock.
+ * Ported from design inventory 04-badges/badge-shelf.css (taken from the approved student home)
+ * and scoped under .one-badge / .one-badge-shelf. Imported by Badge.tsx, so it ships only with a
+ * screen that shows badges. The unlock plays once, only under prefers-reduced-motion:
+ * no-preference; otherwise the earned art shows at once. --bk is the badge's shelf index
+ * (140ms stagger); the chevrons carry their own --k.
+ */
+.one-badge-shelf { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
+.one-badge-shelf > li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 14px 6px 12px;
+  border-radius: var(--r-3xl);
+  background: var(--surface-2);
+  text-align: center;
+}
+.one-badge-shelf .one-badge-name { margin-top: 8px; color: var(--text); font: 600 13.5px/1.3 var(--font-display); }
+.one-badge-shelf .one-badge-detail { color: var(--text-2); font-size: 12px; line-height: 1.4; }
+.one-badge-shelf .one-badge-when { margin-top: 4px; color: var(--text-3); font-size: 11px; font-style: normal; }
+
+.one-badge { display: inline-block; flex: none; line-height: 0; }
+.one-badge svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.one-badge-shelf .one-badge svg { filter: drop-shadow(0 10px 14px rgba(10, 16, 48, .2)); }
+.one-badge .bd * { transform-box: view-box; }
+.one-badge .bd-rim { stroke-dasharray: 100; stroke-dashoffset: 0; }
+.one-badge .bd-glyph { transform-origin: 62px 56px; }
+.one-badge .bd-sheen { transform: translateX(0); }
+
+@keyframes oneBdLock { from { filter: grayscale(1) brightness(1.08); opacity: .5; } }
+@keyframes oneBdBack { from { transform: translate(10px, 12px); opacity: 0; } }
+@keyframes oneBdFace { 0% { transform: translate(-9px, -11px) scale(.9); opacity: 0; } 60% { transform: translate(1px, 1px) scale(1.03); opacity: 1; } 100% { transform: none; } }
+@keyframes oneBdRim { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
+@keyframes oneBdGlyph { 0% { transform: scale(.4); opacity: 0; } 65% { transform: scale(1.1); opacity: 1; } 100% { transform: none; } }
+@keyframes oneBdChev { from { transform: translateY(7px); opacity: 0; } }
+@keyframes oneBdSheen { from { transform: translateX(0); } to { transform: translateX(230px); } }
+
+@media (prefers-reduced-motion: no-preference) {
+  .one-badge.is-unlocking :is(.bd-all, .bd-back, .bd-face, .bd-rim, .bd-glyph, .bd-chev, .bd-sheen) { animation-fill-mode: both; animation-timing-function: var(--e-out); }
+  .one-badge.is-unlocking .bd-all { animation-name: oneBdLock; animation-duration: 700ms; animation-delay: calc(var(--bk, 0) * 140ms + 100ms); }
+  .one-badge.is-unlocking .bd-back { animation-name: oneBdBack; animation-duration: 550ms; animation-delay: calc(var(--bk, 0) * 140ms + 150ms); }
+  .one-badge.is-unlocking .bd-face { animation-name: oneBdFace; animation-duration: 650ms; animation-delay: calc(var(--bk, 0) * 140ms + 230ms); }
+  .one-badge.is-unlocking .bd-rim { animation-name: oneBdRim; animation-duration: 700ms; animation-delay: calc(var(--bk, 0) * 140ms + 420ms); }
+  .one-badge.is-unlocking .bd-glyph { animation-name: oneBdGlyph; animation-duration: 520ms; animation-delay: calc(var(--bk, 0) * 140ms + 450ms); }
+  .one-badge.is-unlocking .bd-chev { animation-name: oneBdChev; animation-duration: 380ms; animation-delay: calc(var(--bk, 0) * 140ms + 700ms + var(--k) * 90ms); }
+  .one-badge.is-unlocking .bd-sheen { animation-name: oneBdSheen; animation-duration: 800ms; animation-timing-function: var(--e-inout); animation-delay: calc(var(--bk, 0) * 140ms + 980ms); }
+  .one-badge-shelf > li { transition: transform var(--m-base) var(--e-out); }
+  .one-badge-shelf > li:hover { transform: translateY(-3px); }
+}

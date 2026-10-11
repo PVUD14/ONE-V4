@@ -107,36 +107,37 @@ export function EmployerReportsPage({ employerId }: { readonly employerId: strin
         and a total reads &quot;Withheld&quot; when it would let a small group be worked out.</p></div></div>
     {status ? <p role={failed ? 'alert' : 'status'}>{status}</p> : null}
 
-    <div className="v2-row v2-cols-4 career-stat-strip role-wide">
-      <V2Stat icon="📨" tone="blue" label="Applications" value={reports ? total(reports.overall) : 'NA'} reason={reports ? 'Too few to show' : 'Not loaded'} />
-      <V2Stat icon="⏱" tone="amber" label="Median days to first offer" value={!offerDays ? 'NA' : offerDays.medianDays === null ? 'Too few offers' : offerDays.medianDays.toFixed(1)}
-        reason={offerDays ? 'Shown at 5+ offers' : 'Not loaded'} />
-      <V2Stat icon="🤝" tone="green" label="Offer acceptance" value={!reports ? 'NA' : reports.offers.acceptanceRate === null ? 'Too few answers' : `${(reports.offers.acceptanceRate * 100).toFixed(0)}%`}
-        reason={reports ? 'Shown at 5+ answers each way' : 'Not loaded'} />
-      <V2Stat icon="🏫" tone="indigo" label="Campus drives" value={reports ? reports.byDrive.length : 'NA'} />
-    </div>
+    {/* Re-skin phase 7: the figures show once the reports have loaded; nothing stands in for them before. */}
+    {reports ? <div className={`v2-row v2-cols-${offerDays ? 4 : 3} career-stat-strip role-wide`}>
+      <V2Stat icon="📨" tone="blue" label="Applications" value={total(reports.overall)} reason="Too few to show" />
+      {offerDays ? <V2Stat icon="⏱" tone="amber" label="Median days to first offer" value={offerDays.medianDays === null ? 'Too few offers' : offerDays.medianDays.toFixed(1)}
+        reason="Shown at 5+ offers" /> : null}
+      <V2Stat icon="🤝" tone="green" label="Offer acceptance" value={reports.offers.acceptanceRate === null ? 'Too few answers' : `${(reports.offers.acceptanceRate * 100).toFixed(0)}%`}
+        reason="Shown at 5+ answers each way" />
+      <V2Stat icon="🏫" tone="indigo" label="Campus drives" value={reports.byDrive.length} />
+    </div> : null}
 
     <section className="role-card role-wide"><h2>Where applications are now</h2>
       <p>Open applications by their current stage, hires, and — for rejected or withdrawn applications — the stage they left at.</p>
       {reports ? <StageTable caption="All applications" groupHeading="All jobs" empty="No applications yet."
-        rows={[{ key: 'overall', label: 'All jobs', table: reports.overall }]} /> : <p>NA</p>}
+        rows={[{ key: 'overall', label: 'All jobs', table: reports.overall }]} /> : null}
     </section>
 
     <section className="role-card role-wide"><h2>Funnel by job</h2>
       {reports ? <StageTable caption="Funnel by job" groupHeading="Job" empty="No published jobs yet."
-        rows={reports.byJob.map((job) => ({ key: job.opportunityId, label: <>{job.title ?? 'Untitled'}{job.referenceCode ? <span className="hiring-meta"> · {job.referenceCode}</span> : null}</>, table: job.table }))} /> : <p>NA</p>}
+        rows={reports.byJob.map((job) => ({ key: job.opportunityId, label: <>{job.title ?? 'Untitled'}{job.referenceCode ? <span className="hiring-meta"> · {job.referenceCode}</span> : null}</>, table: job.table }))} /> : null}
       {reports?.byJobTruncated ? <p>Showing your 200 most recent jobs.</p> : null}
     </section>
 
     <section className="role-card role-wide"><h2>Funnel by college</h2>
       <p>The college each student named in the application they chose to share with you. A college is named only when at least 5 applications name it; the rest are grouped.</p>
       {reports ? <StageTable caption="Funnel by college" groupHeading="College" empty="No applications yet."
-        rows={reports.byCollege.map((group, index) => ({ key: group.collegeName ?? `other-${index}`, label: group.collegeName ?? 'Other colleges or not stated', table: group.table }))} /> : <p>NA</p>}
+        rows={reports.byCollege.map((group, index) => ({ key: group.collegeName ?? `other-${index}`, label: group.collegeName ?? 'Other colleges or not stated', table: group.table }))} /> : null}
     </section>
 
     <section className="role-card role-wide"><h2>Funnel by campus drive</h2>
       {reports ? <StageTable caption="Funnel by campus drive" groupHeading="Drive" empty="No campus drives yet. Request one from a job's Opportunity Detail."
-        rows={reports.byDrive.map((drive) => ({ key: drive.driveId, label: <>{drive.institutionName}<span className="hiring-meta"> · {drive.opportunityTitle ?? 'Untitled'} · {driveStateLabels[drive.state] ?? drive.state}</span></>, table: drive.table }))} /> : <p>NA</p>}
+        rows={reports.byDrive.map((drive) => ({ key: drive.driveId, label: <>{drive.institutionName}<span className="hiring-meta"> · {drive.opportunityTitle ?? 'Untitled'} · {driveStateLabels[drive.state] ?? drive.state}</span></>, table: drive.table }))} /> : null}
       {reports?.byDriveTruncated ? <p>Showing your 200 most recent drives.</p> : null}
     </section>
 
@@ -144,8 +145,8 @@ export function EmployerReportsPage({ employerId }: { readonly employerId: strin
       <p>Median days from submission, over applications that reached the stage. Shown only when at least 5 did.</p>
       {reports ? <div className="role-record-table-wrap"><table className="role-record-table"><thead><tr><th>Step</th><th>Applications</th><th>Median days</th></tr></thead>
         <tbody>{reports.timeToStage.map((row) => <tr key={row.metric}><td>{metricLabels[row.metric] ?? row.metric}</td><td><NaValue value={count(row.applications)} /></td>
-          <td><NaValue value={row.medianDays === null ? 'NA' : row.medianDays.toFixed(1)} /></td></tr>)}</tbody></table></div> : <p>NA</p>}
-      {reports?.timeToStage?.some((row) => row.medianDays === null) ? <SuppressionNote>A median reads NA until at least 5 applications reach that stage; their count reads &quot;&lt;5&quot; until then.</SuppressionNote> : null}
+          <td>{row.medianDays === null ? <span className="hiring-meta">Too few</span> : row.medianDays.toFixed(1)}</td></tr>)}</tbody></table></div> : null}
+      {reports?.timeToStage?.some((row) => row.medianDays === null) ? <SuppressionNote>A median reads “Too few” until at least 5 applications reach that stage; their count reads &quot;&lt;5&quot; until then.</SuppressionNote> : null}
     </section>
 
     <section className="role-card role-wide"><h2>Offer outcomes</h2>
@@ -154,7 +155,7 @@ export function EmployerReportsPage({ employerId }: { readonly employerId: strin
         <tbody>{reports.offers.table.suppressed
           ? <tr><td colSpan={2} className="na-row-note">Fewer than 5 applications have an offer — not broken down.</td></tr>
           : offerLabels.map(([key, label]) => <tr key={key}><td>{label}</td><td><NaValue value={cellValue(reports.offers.table, key)} /></td></tr>)}
-        <tr><td>All offers</td><td><NaValue value={total(reports.offers.table)} /></td></tr></tbody></table></div> : <p>NA</p>}
+        <tr><td>All offers</td><td><NaValue value={total(reports.offers.table)} /></td></tr></tbody></table></div> : null}
     </section>
   </section>;
 }

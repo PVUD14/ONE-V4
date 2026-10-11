@@ -107,9 +107,10 @@ describe('AI Operations: learning engine panels', () => {
     const { unmount } = render(<EngineBehaviourPanels token="t" />);
     expect(await screen.findByText('Not offered yet')).toBeInTheDocument();
     expect(screen.getByText('No planner decisions in this window')).toBeInTheDocument();
-    // An idle planner has no rate at all: NA in the same slot, not a dropped tile.
-    expect(screen.getByText('Faculty override rate', { selector: 'small' }).previousSibling).toHaveTextContent('NA');
-    expect(screen.getByText('Planner policy in use', { selector: 'small' }).previousSibling).toHaveTextContent('NA');
+    // An idle planner has no rate: it says so in words; a policy that was never used has no tile (re-skin phase 7).
+    expect(screen.getByText('Faculty override rate', { selector: 'small' }).previousSibling).toHaveTextContent('No decisions');
+    expect(screen.queryByText('Planner policy in use', { selector: 'small' })).toBeNull();
+    expect(document.body.textContent).not.toMatch(/(^|[^A-Za-z])NA([^A-Za-z]|$)/);
     unmount();
 
     behaviourResponse = () => ok(behaviour({ masteryShadow: { ...behaviour().masteryShadow, suppressed: true, studentsInScope: withheld, coverage: null, c3Adoption: null, bkt: null } }));
@@ -118,12 +119,13 @@ describe('AI Operations: learning engine panels', () => {
     expect(screen.getByText('Students in the mastery shadow', { selector: 'small' }).previousSibling).toHaveTextContent('<5');
   });
 
-  it('shows NA in every slot when the server sends nothing usable', async () => {
+  it('shows no figure, and no NA, when the server sends nothing usable', async () => {
     behaviourResponse = () => ok({});
     render(<EngineBehaviourPanels token="t" />);
     await waitFor(() => expect(screen.queryByText('Loading learning engine health…')).not.toBeInTheDocument());
-    expect(screen.getByText('Planner decisions, last 14 days', { selector: 'small' }).previousSibling).toHaveTextContent('NA');
-    expect(screen.getByText('Faculty override rate', { selector: 'small' }).previousSibling).toHaveTextContent('NA');
+    expect(screen.queryByText('Planner decisions, last 14 days', { selector: 'small' })).toBeNull();
+    expect(screen.queryByText('Faculty override rate', { selector: 'small' })).toBeNull();
+    expect(document.body.textContent).not.toMatch(/(^|[^A-Za-z])NA([^A-Za-z]|$)/);
   });
 
   it('shows loading, then an error with its reference', async () => {

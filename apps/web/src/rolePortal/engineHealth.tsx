@@ -87,12 +87,13 @@ export function EngineBehaviourPanels({ token }: { readonly token: string }): Re
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {loading && !data ? <p>Loading learning engine health…</p> : null}
 
-    <div className="v2-row v2-cols-4 career-stat-strip">
-      <V2Stat icon="🧭" tone="blue" value={planner ? engineCount(planner.decisions) : NA} label={`Planner decisions, last ${planner?.windowDays ?? days} days`} />
-      <V2Stat icon="✋" tone="amber" value={overrideRateText(planner)} label="Faculty override rate" />
-      <V2Stat icon="🧪" tone="purple" value={shadow ? engineCount(shadow.studentsInScope) : NA} label="Students in the mastery shadow" />
-      <V2Stat icon="📐" tone="teal" value={planner && planner.policyVersions.length ? planner.policyVersions.join(', ') : NA} label="Planner policy in use" />
-    </div>
+    {/* Re-skin phase 7: a figure shows only once its panel has loaded; nothing stands in for a missing one. */}
+    {planner || shadow ? <div className={`v2-row v2-cols-${[planner, planner, shadow, planner && planner.policyVersions.length].filter(Boolean).length} career-stat-strip`}>
+      {planner ? <V2Stat icon="🧭" tone="blue" value={engineCount(planner.decisions)} label={`Planner decisions, last ${planner.windowDays} days`} /> : null}
+      {planner ? <V2Stat icon="✋" tone="amber" value={overrideRateText(planner)} label="Faculty override rate" /> : null}
+      {shadow ? <V2Stat icon="🧪" tone="purple" value={engineCount(shadow.studentsInScope)} label="Students in the mastery shadow" /> : null}
+      {planner && planner.policyVersions.length ? <V2Stat icon="📐" tone="teal" value={planner.policyVersions.join(', ')} label="Planner policy in use" /> : null}
+    </div> : null}
 
     <div className="v2-row v2-cols-2">
       <section className="role-card" aria-label="Planner decisions per day"><h3>Planner decisions per day</h3>
@@ -102,21 +103,20 @@ export function EngineBehaviourPanels({ token }: { readonly token: string }): Re
               {windowChoices.map((choice) => <option key={choice} value={choice}>Last {choice} days</option>)}
             </select></label>
         </div>
-        {planner ? <PlannerTable planner={planner} /> : <p>{NA}</p>}
+        {planner ? <PlannerTable planner={planner} /> : null}
         <p><small>Source: learning_decisions. A day shows &lt;5 when fewer than 5 students stand behind it, a day with none included; the total is withheld while a small day could be worked out from it.</small></p>
       </section>
       <section className="role-card" aria-label="Mastery shadow comparison"><h3>Mastery shadow comparison</h3>
-        {shadow ? <ShadowSummary shadow={shadow} /> : <p>{NA}</p>}
+        {shadow ? <ShadowSummary shadow={shadow} /> : null}
         <p><small>Source: learner_skill_state against the live mastery bands (mastery_projections), for students who hold adaptive learning. The full shadow report, with its predictions, stays an offline command.</small></p>
       </section>
     </div>
   </section>;
 }
 
-function overrideRateText(planner: PlannerHealthDto | null): string {
-  if (!planner) return NA;
+function overrideRateText(planner: PlannerHealthDto): string {
   if (planner.overrideRate !== null) return `${(planner.overrideRate * 100).toFixed(1)}%`;
-  return planner.active ? SMALL_COUNT_TEXT : NA;
+  return planner.active ? SMALL_COUNT_TEXT : 'No decisions';
 }
 
 function PlannerTable({ planner }: { readonly planner: PlannerHealthDto }): React.ReactElement {
@@ -152,7 +152,7 @@ const comparisonRows: readonly [keyof ShadowComparisonDto, string][] = [
 
 function ShadowSummary({ shadow }: { readonly shadow: MasteryShadowHealthDto }): React.ReactElement {
   if (!shadow.consentOffered) {
-    return <p><StatusBadge label="Not offered yet" tone="neutral" /> Students have not been asked for adaptive learning, so nobody is in the shadow and every figure is NA.</p>;
+    return <p><StatusBadge label="Not offered yet" tone="neutral" /> Students have not been asked for adaptive learning, so nobody is in the shadow and there are no figures to compare.</p>;
   }
   if (shadow.suppressed || !shadow.c3Adoption || !shadow.bkt) {
     return <p><StatusBadge label="Withheld" tone="neutral" /> Fewer than 5 students who hold adaptive learning have engine records, so the comparison is withheld (&lt;5).</p>;
@@ -165,9 +165,11 @@ function ShadowSummary({ shadow }: { readonly shadow: MasteryShadowHealthDto }):
       <tbody>{comparisonRows.map(([key, label]) => <tr key={key}><th scope="row">{label}</th><td><NaValue value={engineCount(c3[key])} /></td><td><NaValue value={engineCount(bkt[key])} /></td></tr>)}</tbody>
     </table></div>
     <dl>
-      <div><dt>Engine rows needing a rebuild</dt><dd><NaValue value={engineCount(shadow.coverage?.engineRowsOnOlderProjector)} /></dd></div>
-      <div><dt>Live bands without an engine row</dt><dd><NaValue value={engineCount(shadow.coverage?.livePairsWithoutEngineRow)} /></dd></div>
-      <div><dt>Engine rows without a live band</dt><dd><NaValue value={engineCount(shadow.coverage?.engineRowsWithoutLiveBand)} /></dd></div>
+      {shadow.coverage ? <>
+        <div><dt>Engine rows needing a rebuild</dt><dd><NaValue value={engineCount(shadow.coverage.engineRowsOnOlderProjector)} /></dd></div>
+        <div><dt>Live bands without an engine row</dt><dd><NaValue value={engineCount(shadow.coverage.livePairsWithoutEngineRow)} /></dd></div>
+        <div><dt>Engine rows without a live band</dt><dd><NaValue value={engineCount(shadow.coverage.engineRowsWithoutLiveBand)} /></dd></div>
+      </> : null}
       <div><dt>Models</dt><dd>{shadow.algorithms.live} (live) · {shadow.algorithms.engineBand} · {shadow.algorithms.shadow} (shadow)</dd></div>
     </dl>
   </>;

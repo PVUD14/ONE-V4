@@ -1,8 +1,8 @@
 /**
- * The Operations Overview (OPS-03): it renders from one server-side summary and makes no
- * full-list fetches; a section the caller cannot access shows NA in the same slot and
- * no widget is dropped; counts of fewer than 5 people show <5; capped counts read "+";
- * every queue tile opens its own screen; and loading, error and forbidden are honest.
+ * The Operations Overview (OPS-03, re-skin phase 7): it renders from one server-side summary and
+ * makes no full-list fetches; a section the caller cannot access is left out and nothing reads
+ * NA; counts of fewer than 5 people show <5 with no bar; capped counts read "+"; each block
+ * opens its own screen; and loading, error and forbidden are honest.
  */
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -74,13 +74,17 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
-const queueRow = (key: string): HTMLElement => document.querySelector(`[data-queue="${key}"]`)!;
-const statValue = (label: string): string | null => screen.getByText(label, { selector: 'small' }).previousSibling?.textContent ?? null;
+const kpi = (label: string): HTMLElement => screen.getByText(label, { selector: '.ih-kl' }).closest('.ih-kpi') as HTMLElement;
+const card = (title: string): HTMLElement => screen.getByRole('heading', { name: title }).closest('section') as HTMLElement;
+const noNa = (): void => {
+  const text = document.body.textContent ?? '';
+  expect(text).not.toMatch(/(^|[^A-Za-z])NA([^A-Za-z]|$)/);
+};
 
 describe('Operations Overview', () => {
   it('renders from one summary request and fetches no full lists', async () => {
     render(<OperationsDashboardV2 basePath={basePath} />);
-    expect(await screen.findByText('Riverside College', { selector: 'strong' })).toBeInTheDocument();
+    expect(await screen.findByText('Riverside College')).toBeInTheDocument();
     const urls = fetchMock.mock.calls.map(([url]) => String(url));
     expect(urls).toHaveLength(1);
     expect(urls[0]).toContain('/api/v1/operations/overview');
@@ -91,50 +95,54 @@ describe('Operations Overview', () => {
 
   it('shows the server counts, capped counts with a plus, and people below 5 as <5', async () => {
     render(<OperationsDashboardV2 basePath={basePath} />);
-    await screen.findByText('Operator queues');
-    expect(statValue('Organizations')).toBe('12,000');
-    expect(statValue('Accounts')).toBe('10,000+');
-    expect(statValue('Pending invitations')).toBe('3');
-    expect(screen.getByRole('img', { name: '6/10 INVITATIONS ACCEPTED' })).toBeInTheDocument();
-    expect(within(queueRow('jobs')).getByText('10,000+')).toBeInTheDocument();
-    expect(within(queueRow('support')).getByText('5')).toBeInTheDocument();
-    expect(within(queueRow('support')).getByText('2 past their SLA · 1 unassigned')).toBeInTheDocument();
-    expect(within(queueRow('student-invitations')).getByText(/Of 40 pending · 3 failed · 1 bounced · 9 over 72 hours/)).toBeInTheDocument();
-    const accounts = screen.getByRole('heading', { name: 'Accounts' }).closest('section')!;
-    expect(within(accounts).getByText('<5')).toBeInTheDocument();
-    expect(within(accounts).getByText('Counts of fewer than 5 people show <5.')).toBeInTheDocument();
+    await screen.findByRole('heading', { name: 'Platform overview' });
+    expect(within(kpi('Organizations')).getByText('12,000')).toBeInTheDocument();
+    expect(within(kpi('Organizations')).getByText('7 colleges · 5 employers')).toBeInTheDocument();
+    expect(within(kpi('People on ONE')).getByText('10,000+')).toBeInTheDocument();
+    expect(within(kpi('To verify')).getByText('3')).toBeInTheDocument();
+    expect(within(kpi('Open safety cases')).getByText('1 critical · 0 high')).toBeInTheDocument();
+    expect(within(kpi('Open support cases')).getByText('2 past their SLA')).toBeInTheDocument();
+    expect(within(card('System health')).getByText('10,000+')).toBeInTheDocument();
+    expect(within(card('Invitations')).getByText('6 of 10 staff accepted')).toBeInTheDocument();
+    // People: the students count is withheld by the server, so it reads <5 with the hatched block and no bar.
+    const people = card('People on ONE');
+    expect(within(people).getByText('<5')).toBeInTheDocument();
+    expect(people.querySelector('.sc-hatch')).not.toBeNull();
+    // A withheld part sits beside the others, so they read as ranges; the capped total stays as sent.
+    expect(within(people).getByText('25–29')).toBeInTheDocument();
+    expect(within(people).getByText('10,000+')).toBeInTheDocument();
+    expect(people.querySelector('.bh-track')).toBeNull();
+    noNa();
   });
 
-  it('shows NA in every slot the caller cannot access, and drops no widget', async () => {
+  it('leaves out every block the caller cannot access, and prints no NA', async () => {
     overviewResponse = () => ok({ overview: securityOverview, viewer: { sections: ['trustSafety', 'jobs', 'privacyRequests', 'privacyHolds'] }, correlationId: 'corr-security' });
     render(<OperationsDashboardV2 basePath={basePath} />);
-    await screen.findByText('Operator queues');
-    for (const label of ['Organizations', 'Accounts', 'Pending invitations']) expect(statValue(label), label).toBe('NA');
-    expect(screen.getByRole('img', { name: 'NA INVITATIONS ACCEPTED' })).toBeInTheDocument();
-    for (const heading of ['Organizations', 'Invitations', 'Accounts', 'Needs attention', 'Protected boundaries', 'Operator queues']) {
+    await screen.findByRole('heading', { name: 'Platform overview' });
+    for (const heading of ['Trust & safety', 'System health', 'Privacy', 'Protected boundaries']) {
       expect(screen.getByRole('heading', { name: heading }), heading).toBeInTheDocument();
     }
-    for (const key of ['verification', 'employer-access', 'stale-invitations', 'student-invitations', 'approvals', 'support']) {
-      expect(within(queueRow(key)).getByText('NA'), key).toBeInTheDocument();
-      expect(within(queueRow(key)).getByText(/not available with your access/), key).toBeInTheDocument();
+    for (const heading of ['Organizations', 'Invitations', 'People on ONE', 'Verification queue', 'Support']) {
+      expect(screen.queryByRole('heading', { name: heading }), heading).toBeNull();
     }
-    for (const key of ['trust', 'jobs', 'privacy', 'holds']) expect(within(queueRow(key)).queryByText('NA'), key).toBeNull();
-    const accounts = screen.getByRole('heading', { name: 'Accounts' }).closest('section')!;
-    expect(within(accounts).getAllByText('NA')).toHaveLength(3);
+    for (const label of ['Organizations', 'People on ONE', 'To verify']) expect(screen.queryByText(label, { selector: '.ih-kl' }), label).toBeNull();
+    expect(screen.queryByRole('button', { name: /Add an organization/ })).toBeNull();
+    noNa();
   });
 
-  it('opens the matching screen from every queue tile', async () => {
+  it('opens the matching screen from each block', async () => {
     const nav = rolePortals.find((portal) => portal.key === 'operations-admin')!.nav;
     const pathFor = (label: string) => nav.find((item) => item.label === label)!.path;
-    const expected: Record<string, string> = {
-      verification: 'Verification', 'employer-access': 'Organizations', 'stale-invitations': 'Users', 'student-invitations': 'Users',
-      trust: 'Trust and Safety', jobs: 'System Health', privacy: 'Security', holds: 'Security', approvals: 'Settings', support: 'Support',
-    };
     render(<OperationsDashboardV2 basePath={basePath} />);
-    await screen.findByText('Operator queues');
-    for (const [key, label] of Object.entries(expected)) {
-      fireEvent.click(within(queueRow(key)).getByRole('button', { name: `Open ${label}` }));
-      expect(window.location.pathname, key).toBe(pathFor(label));
+    await screen.findByRole('heading', { name: 'Platform overview' });
+    const expected: [string, string, string][] = [
+      ['Verification queue', 'Open Verification', 'Verification'], ['Verification queue', 'Open Organizations', 'Organizations'], ['Verification queue', 'Open Settings', 'Settings'],
+      ['Trust & safety', 'Open cases', 'Trust and Safety'], ['System health', 'System Health', 'System Health'], ['Privacy', 'Security', 'Security'],
+      ['Organizations', 'Organizations', 'Organizations'], ['Invitations', 'Users', 'Users'], ['Support', 'Support', 'Support'],
+    ];
+    for (const [title, button, label] of expected) {
+      fireEvent.click(within(card(title)).getByRole('button', { name: new RegExp(`^${button}`) }));
+      expect(window.location.pathname, `${title} → ${button}`).toBe(pathFor(label));
     }
   });
 

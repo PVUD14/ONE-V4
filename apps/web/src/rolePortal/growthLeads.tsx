@@ -41,10 +41,9 @@ import { LeadPipelinePanel } from './growthPipeline.js';
 import { GrowthReferralLinksCard } from './growthReferrals.js';
 import { formatDate } from '../dates.js';
 
-const NA = 'NA';
 
 export function growthCodeLabel(code: string | null | undefined): string {
-  if (!code) return NA;
+  if (!code) return 'Not recorded';
   return code.replaceAll('_', ' ').toLowerCase().replace(/^\w/, (char) => char.toUpperCase());
 }
 
@@ -149,11 +148,12 @@ export function GrowthLeadsPage({ role }: { readonly role?: string | undefined }
           </div>
         </div>
 
-        <div className="v2-row v2-cols-4" role="region" aria-label="Leads summary">
-          <V2Stat icon="🤝" tone="blue" value={counts.open ?? NA} label="Your open leads" />
-          <V2Stat icon="📍" tone="teal" value={counts.unowned ?? NA} label="Unowned in your regions" />
-          <V2Stat icon="📋" tone="amber" value={leads ? `${shown.length}${nextCursor ? '+' : ''}` : NA} label="In this list" />
-          <V2Stat icon="⏳" tone="purple" value={leads ? shown.filter((lead) => lead.stale).length : NA} label="Stale in this list (90 days)" />
+        {/* Re-skin phase 7: a count shows only once it has been read; nothing stands in for one that was not. */}
+        <div className={`v2-row v2-cols-${[counts.open, counts.unowned, leads, leads].filter((value) => value !== null && value !== undefined).length || 1}`} role="region" aria-label="Leads summary">
+          {counts.open !== null && counts.open !== undefined ? <V2Stat icon="🤝" tone="blue" value={counts.open} label="Your open leads" /> : null}
+          {counts.unowned !== null && counts.unowned !== undefined ? <V2Stat icon="📍" tone="teal" value={counts.unowned} label="Unowned in your regions" /> : null}
+          {leads ? <V2Stat icon="📋" tone="amber" value={`${shown.length}${nextCursor ? '+' : ''}`} label="In this list" /> : null}
+          {leads ? <V2Stat icon="⏳" tone="purple" value={shown.filter((lead) => lead.stale).length} label="Stale in this list (90 days)" /> : null}
         </div>
 
         {creating && vocabulary && token ? <NewLeadForm vocabulary={vocabulary} token={token} defaultKind={kind}
@@ -178,7 +178,7 @@ export function GrowthLeadsPage({ role }: { readonly role?: string | undefined }
                 <span className="v2-tile teal" aria-hidden="true">{lead.kind === 'COLLEGE' ? '🏛️' : '🏢'}</span>
                 <div className="grow"><strong>{lead.name}</strong><small>{areaText(lead)} · {growthCodeLabel(lead.stage)}</small></div>
                 {lead.doNotContact ? <V2Chip tone="red">Do not contact</V2Chip>
-                  : lead.owner ? <V2Chip tone={lead.owner.isMe ? 'green' : 'slate'}>{lead.owner.isMe ? 'Yours' : lead.owner.email ?? NA}</V2Chip>
+                  : lead.owner ? <V2Chip tone={lead.owner.isMe ? 'green' : 'slate'}>{lead.owner.isMe ? 'Yours' : lead.owner.email ?? 'Another colleague'}</V2Chip>
                     : <V2Chip tone="amber">{lead.needsNewOwner ? 'Needs a new owner' : 'Unowned'}</V2Chip>}
                 {lead.stale ? <V2Chip tone="purple">Stale</V2Chip> : null}
               </button>
@@ -195,11 +195,11 @@ export function GrowthLeadsPage({ role }: { readonly role?: string | undefined }
         {token ? <GrowthReferralLinksCard token={token} /> : null}
         <section className="v2-card">
           <div className="v2-card-head"><h2>Contact details are personal data</h2></div>
-          <p className="v2-empty">{vocabulary?.purpose ?? NA} Add only details the person gave you, that their organisation published for enquiries, or that a colleague of theirs passed on. Never purchased lists, scraped data, or personal mobile numbers from anywhere else. They are erased 24 months after the lead&apos;s last activity.</p>
+          <p className="v2-empty">{vocabulary?.purpose ? `${vocabulary.purpose} ` : ''}Add only details the person gave you, that their organisation published for enquiries, or that a colleague of theirs passed on. Never purchased lists, scraped data, or personal mobile numbers from anywhere else. They are erased 24 months after the lead&apos;s last activity.</p>
         </section>
         <section className="v2-card">
           <div className="v2-card-head"><h2>Contact notice</h2><V2Chip tone="amber">Draft wording, pending approval</V2Chip></div>
-          {vocabulary ? <>{vocabulary.notice.text.map((line) => <p key={line} className="v2-empty">{line}</p>)}<small>Version {vocabulary.notice.version}</small></> : <p className="v2-empty">{NA}</p>}
+          {vocabulary ? <>{vocabulary.notice.text.map((line) => <p key={line} className="v2-empty">{line}</p>)}<small>Version {vocabulary.notice.version}</small></> : <p className="v2-empty">The contact notice could not be loaded.</p>}
         </section>
       </div>
     </div>
@@ -314,7 +314,7 @@ export function LeadDetailPanel({ leadId, vocabulary, token, mode, manager, onCh
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {notice ? <p role="status">{notice}</p> : null}
     <p>{lead.kind === 'COLLEGE' ? 'College' : 'Employer'} · {areaText(lead)}{lead.aisheCode ? ` · AISHE ${lead.aisheCode}` : ''}{lead.websiteDomain ? ` · ${lead.websiteDomain}` : ''}</p>
-    <p>Owner: {lead.owner ? (owner ? 'you' : lead.owner.email ?? NA) : lead.needsNewOwner ? 'nobody — the previous owner left' : 'nobody (unowned)'} · Found by {growthCodeLabel(lead.source)} · Last activity {lead.lastActivityAt ? formatDate(lead.lastActivityAt) : NA}</p>
+    <p>Owner: {lead.owner ? (owner ? 'you' : lead.owner.email ?? 'another colleague') : lead.needsNewOwner ? 'nobody — the previous owner left' : 'nobody (unowned)'} · Found by {growthCodeLabel(lead.source)} · {lead.lastActivityAt ? `Last activity ${formatDate(lead.lastActivityAt)}` : 'No activity yet'}</p>
     <div className="v2-hero-chips">
       {lead.doNotContact ? <V2Chip tone="red">Do not contact ({growthCodeLabel(lead.doNotContact.reasonCode)})</V2Chip> : null}
       {lead.possibleDuplicate ? <V2Chip tone="amber">Possible duplicate — check with your manager</V2Chip> : null}
@@ -333,7 +333,7 @@ export function LeadDetailPanel({ leadId, vocabulary, token, mode, manager, onCh
       return <li key={contact.id} aria-label={`Contact ${contact.fullName}`}>
         <strong>{contact.fullName}</strong> · {growthCodeLabel(contact.role)}
         <div>{email ? (owner && !contact.masked ? <a href={`mailto:${email}`}>{email}</a> : email) : null}{email && phone ? ' · ' : ''}{phone ? (owner && !contact.masked ? <a href={`tel:${phone.replace(/[^0-9+]/g, '')}`}>{phone}</a> : phone) : null}</div>
-        <small>{basisLabels[contact.permissionBasis] ?? growthCodeLabel(contact.permissionBasis)} ({growthCodeLabel(contact.source)}) · {contact.notice ? `Notice given ${contact.notice.givenAt ? formatDate(contact.notice.givenAt) : ''} (${contact.notice.version ?? NA})` : 'Notice not yet given'}</small>
+        <small>{basisLabels[contact.permissionBasis] ?? growthCodeLabel(contact.permissionBasis)} ({growthCodeLabel(contact.source)}) · {contact.notice ? `Notice given ${contact.notice.givenAt ? formatDate(contact.notice.givenAt) : ''} ${contact.notice.version ? ` (${contact.notice.version})` : ''}` : 'Notice not yet given'}</small>
         <span className="role-actions">
           {owner && !contact.notice && !lead.doNotContact ? <button type="button" className="pilot-btn" disabled={busy}
             onClick={() => void act(() => recordGrowthContactNotice(token, lead.id, contact.id), 'Notice recorded.')}>Record notice given</button> : null}
@@ -375,7 +375,7 @@ export function LeadDetailPanel({ leadId, vocabulary, token, mode, manager, onCh
     {!operations ? <LeadFieldPanel leadId={lead.id} token={token} contacts={lead.contacts} /> : null}
 
     <h3>Owner history</h3>
-    <ul>{lead.ownerHistory.map((entry, index) => <li key={`${entry.at ?? ''}-${index}`}>{entry.at ? formatDate(entry.at) : NA}: {growthCodeLabel(entry.reasonCode)} — {entry.from ?? 'nobody'} → {entry.to ?? 'nobody'}</li>)}</ul>
+    <ul>{lead.ownerHistory.map((entry, index) => <li key={`${entry.at ?? ''}-${index}`}>{entry.at ? `${formatDate(entry.at)}: ` : ''}{growthCodeLabel(entry.reasonCode)} — {entry.from ?? 'nobody'} → {entry.to ?? 'nobody'}</li>)}</ul>
   </section>;
 }
 

@@ -92,7 +92,7 @@ describe('Tutor by college panel', () => {
     expect(screen.getByText(/No — set on the server by Divakar/)).toBeInTheDocument();
   });
 
-  it('a viewer sees the state and no controls; a malformed reply shows NA', async () => {
+  it('a viewer sees the state and no controls; a malformed reply says so plainly', async () => {
     response = () => ok(listing({ viewer: { canStop: false, canConfigure: false } }));
     render(<TutorCollegesPanel token="t" />);
     await screen.findByText('Synthetic Pilot College');
@@ -100,6 +100,6 @@ describe('Tutor by college panel', () => {
     cleanup();
     response = () => ok({ colleges: 'nope' });
     render(<TutorCollegesPanel token="t" />);
-    expect(await screen.findByText('NA — the tutor by college could not be read right now.')).toBeInTheDocument();
+    expect(await screen.findByText('The tutor by college could not be read right now.')).toBeInTheDocument();
   });
 });

@@ -1,6 +1,6 @@
 /**
  * Operations AI Operations console (OPS-12): renders the server's features, switches, usage and
- * evaluations; cost is NA; organisation rows under 5 people show <5; stopping needs only a reason
+ * evaluations; cost has no slot (no price table); organisation rows under 5 people show <5; stopping needs only a reason
  * and takes effect at once; switching on and widening file an approval; loading / empty / error /
  * forbidden states are honest; navigation labels are unchanged.
  */
@@ -92,33 +92,38 @@ const featureRow = async (key: string) => {
 };
 
 describe('AI Operations console', () => {
-  it('renders the server features, usage, tokens, prompts and evaluations, with cost NA', async () => {
+  it('renders the server features, usage, tokens, prompts and evaluations, and no cost slot', async () => {
     render(<OperationsAiOperationsPage />);
     const row = await featureRow('career.summary');
     expect(within(row).getByText('37 of 100 this day')).toBeInTheDocument();
     expect(within(row).getByText('12,345 / 6,789')).toBeInTheDocument();
     expect(within(row).getByText('Pass')).toBeInTheDocument();
-    expect(within(row).getByText('NA')).toBeInTheDocument();
-    expect(screen.getByText('Cost (no price table)').previousSibling?.textContent).toBe('NA');
+    // Re-skin phase 7: cost has no source (no price table), so it has no tile or column and nothing reads NA.
+    expect(within(row).queryByText('NA')).toBeNull();
+    expect(screen.queryByText('Cost (no price table)')).toBeNull();
+    expect(screen.queryByRole('columnheader', { name: 'Cost' })).toBeNull();
     expect(screen.getByText('1 of 2')).toBeInTheDocument();
     expect(screen.getByText('Cap exceeded')).toBeInTheDocument();
-    expect(screen.getByText(costText)).toBeInTheDocument();
+    expect(screen.getByText('ONE has no price table for any model, so cost is not estimated. Tokens are shown instead.')).toBeInTheDocument();
+    expect(costText.startsWith('NA')).toBe(true);
     expect(await screen.findByText('Current verdict')).toBeInTheDocument();
-    expect(screen.getByText('Prompt: NA (not declared)')).toBeInTheDocument();
+    expect(screen.getByText('No prompt declared')).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/(^|[^A-Za-z])NA([^A-Za-z]|$)/);
   });
 
-  it('shows average latency per feature, and NA when none was recorded', async () => {
+  it('shows average latency per feature, and leaves it out when none was recorded', async () => {
     render(<OperationsAiOperationsPage />);
     expect(within(await featureRow('career.summary')).getByText('Average latency 1,840 ms')).toBeInTheDocument();
   });
 
-  it('shows the inference endpoint as unconfigured, with NA, when the server has no endpoint', async () => {
+  it('shows the inference endpoint as unconfigured, leaving out what the server has not set', async () => {
     render(<OperationsAiOperationsPage />);
     expect(await screen.findByText('Inference endpoint')).toBeInTheDocument();
     expect(screen.getByText('No — no endpoint address is set')).toBeInTheDocument();
     expect(screen.getByText('Not probed yet')).toBeInTheDocument();
-    expect(screen.getByText('Endpoint host').nextSibling?.textContent).toBe('NA');
-    expect(screen.getByText('Model served (last probe)').nextSibling?.textContent).toBe('NA');
+    expect(screen.queryByText('Endpoint host')).toBeNull();
+    expect(screen.queryByText('Model served (last probe)')).toBeNull();
+    expect(screen.getByText('No probe recorded')).toBeInTheDocument();
   });
 
   it('shows a configured endpoint with its latest probe, and never a key', async () => {
@@ -221,11 +226,12 @@ describe('AI Operations console', () => {
     expect(screen.queryByRole('button', { name: /Engage kill switch|Switch off|Change limits|Record evaluation/ })).not.toBeInTheDocument();
   });
 
-  it('says plainly when no feature is registered, and shows NA while loading', async () => {
+  it('says plainly when no feature is registered, and shows no figures while loading', async () => {
     summaryResponse = () => new Promise(() => undefined);
     render(<OperationsAiOperationsPage />);
     expect(screen.getByText('Loading AI Operations…')).toBeInTheDocument();
-    expect(screen.getAllByText('NA').length).toBeGreaterThanOrEqual(4);
+    expect(screen.queryByText('NA')).toBeNull();
+    expect(screen.queryByText('AI features running')).toBeNull();
     cleanup();
     summaryResponse = () => ok(summary({ features: [], failureClasses: [] }));
     evaluationsResponse = () => ok({ evaluations: [], nextCursor: null });

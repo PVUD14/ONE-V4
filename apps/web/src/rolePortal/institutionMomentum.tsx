@@ -43,18 +43,22 @@ export function RecordCount({ value }: { readonly value: number }): React.ReactE
   return <CountUp value={value} />;
 }
 
-export function IhPage({ eyebrow, title, summary, actions, children }: {
+export function IhPage({ eyebrow, title, summary, actions, children, className, head }: {
   readonly eyebrow?: string | null; readonly title: string; readonly summary: React.ReactNode; readonly actions?: React.ReactNode; readonly children: React.ReactNode;
+  /** Extra classes on the page root (the business homes add `bh`). */
+  readonly className?: string;
+  /** Replaces the title block (the growth home opens with its hero instead). */
+  readonly head?: React.ReactNode;
 }): React.ReactElement {
-  return <div className="pilot pilot-embed ih">
-    <header className="ih-title">
+  return <div className={`pilot pilot-embed ih${className ? ` ${className}` : ''}`}>
+    {head ?? <header className="ih-title">
       <div className="ih-title-text">
         <div className="ih-eyebrow">{[eyebrow, todayLabel()].filter(Boolean).join(' · ')}</div>
         <h1>{title}</h1>
         <p className="ih-sub">{summary}</p>
       </div>
       {actions ? <div className="ih-ta">{actions}</div> : null}
-    </header>
+    </header>}
     {children}
   </div>;
 }

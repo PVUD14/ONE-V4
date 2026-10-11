@@ -28,7 +28,7 @@ import { formatApiError } from './shared.js';
 import { smallCountText } from '../momentum/smallCountRule.js';
 import { NaValue } from '../naState.js';
 
-const when = (value: string | null | undefined): string => (value ? new Date(value).toLocaleString() : 'NA');
+const when = (value: string | null | undefined): string => (value ? new Date(value).toLocaleString() : 'not recorded');
 const METRIC_LABELS: readonly (readonly [TutorPilotMetricKey, string])[] = [
   ['STEPS_STARTED', 'Steps started'], ['QUESTIONS_ANSWERED', 'Questions answered'], ['QUESTIONS_CORRECT', 'Answered right'],
   ['ANSWERS_ASSISTED', 'Right after hint 3 or 4'], ['STEPS_COMPLETED', 'Steps completed'], ['WRITTEN_HINTS_SHOWN', 'Written hints shown'],
@@ -90,13 +90,13 @@ export function TutorCollegesPanel({ token }: { readonly token: string }): React
     <p>For real students the AI tutor is a pilot, switched on one college at a time. In a switched-on college, each student who agrees to AI tutoring is placed once, at random, in the tutor group or the no-tutor group, so the pilot can compare them. The no-tutor group sees ONE exactly as it is with AI off. Groups of fewer than five students are shown as &lt;5 with their counts withheld; no student is ever named here.</p>
     {status ? <dl>
       <div><dt>This server serves the tutor pilot</dt><dd>{status.pilotAudience ? 'Yes' : 'No — set on the server by Divakar (ONE_AI_TUTOR_AUDIENCE=pilot)'}</dd></div>
-      <div><dt>Tutor feature (tutor.hint)</dt><dd>{status.featureRegistered ? (status.featureEnabled ? 'On' : 'Off') : 'NA — not registered'}</dd></div>
+      <div><dt>Tutor feature (tutor.hint)</dt><dd>{status.featureRegistered ? (status.featureEnabled ? 'On' : 'Off') : 'Not registered'}</dd></div>
       <div><dt>Passing evaluation</dt><dd>{status.evaluationPasses ? 'Recorded' : 'None recorded'}</dd></div>
     </dl> : null}
     {blockers.length ? <p><small>No college can be switched on while {blockers.join(', and ')}.</small></p> : null}
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {notice ? <p role="status">{notice}</p> : null}
-    {unavailable ? <p>NA — the tutor by college could not be read right now.</p> : null}
+    {unavailable ? <p>The tutor by college could not be read right now.</p> : null}
     {list === null && !error && !unavailable ? <p>Loading the tutor by college…</p> : null}
     {list && !list.colleges.length ? <V2EmptyState icon="🏫" title="No colleges yet" note="Colleges appear here once they are added in Operations → Organizations." /> : null}
     {list && list.colleges.length ? <div className="role-record-table-wrap"><table className="role-record-table">
@@ -105,8 +105,8 @@ export function TutorCollegesPanel({ token }: { readonly token: string }): React
         <td><strong>{college.institutionName}</strong>{college.rollout ? <><br /><small>Experiment since {when(college.rollout.createdAt)} · {college.rollout.tutorSharePercent}% tutor group · {college.rollout.assignmentMethod}</small></> : null}</td>
         <td><StatusBadge label={college.rollout?.enabled ? 'On' : 'Off'} tone={college.rollout?.enabled ? 'success' : 'neutral'} />
           {college.rollout ? <><br /><small>Last changed {when(college.rollout.changedAt)}{college.rollout.lastReasonCode ? ` · ${college.rollout.lastReasonCode}` : ''}</small>
-            {college.rollout.enabledModel ? <><br /><small>Approved for {college.rollout.enabledModel}, prompt {college.rollout.enabledPrompt ?? 'NA'}</small></> : null}</> : <><br /><small>Never switched on</small></>}</td>
-        {(['TUTOR', 'NO_TUTOR'] as const).map((name) => <td key={name}>{college.rollout ? <GroupCell group={college.rollout.groups[name]} days={list.days} /> : 'NA'}</td>)}
+            {college.rollout.enabledModel ? <><br /><small>Approved for {college.rollout.enabledModel}{college.rollout.enabledPrompt ? `, prompt ${college.rollout.enabledPrompt}` : ''}</small></> : null}</> : <><br /><small>Never switched on</small></>}</td>
+        {(['TUTOR', 'NO_TUTOR'] as const).map((name) => <td key={name}>{college.rollout ? <GroupCell group={college.rollout.groups[name]} days={list.days} /> : <small>Not started</small>}</td>)}
         <td><div className="role-actions">
           {viewer.canStop && college.rollout?.enabled ? <button type="button" className="pilot-btn" onClick={() => setDialog({ kind: 'off', college })}>Switch off…</button> : null}
           {viewer.canConfigure && !college.rollout?.enabled ? <button type="button" className="secondary" disabled={blockers.length > 0}

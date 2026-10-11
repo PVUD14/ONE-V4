@@ -1,8 +1,9 @@
 /**
  * The Growth portal shell (GROWTH-01, ADR-040): a growth person signs in to their own
  * workspace at /growth with the ONE logo and the approved navigation (HG-3,
- * 2026-09-30), every page says plainly what is not built yet, no figure is invented, and
- * the Operations workspace stays closed to them.
+ * 2026-09-30), every page says plainly what is not built yet, no figure is invented (the home
+ * leaves out a figure with no source rather than printing NA), and the Operations workspace
+ * stays closed to them.
  */
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -85,7 +86,7 @@ describe('the Growth portal navigation (HG-3 approved 2026-09-30)', () => {
 });
 
 describe('a growth executive signing in', () => {
-  it('lands on the Growth home with the ONE logo, their own team, and NA where no source exists', async () => {
+  it('lands on the Growth home with the ONE logo and their own team, leaving out every figure with no source', async () => {
     signInAs('GROWTH_EXECUTIVE', {
       role: 'GROWTH_EXECUTIVE', staffType: 'CONTRACTOR', correlationId: 'corr-me',
       teams: [{ team: 'COLLEGE_PARTNERSHIPS', joinedAt: '2026-09-30T10:00:00.000Z', manager: { email: 'region.manager@uat.example.test' } }],
@@ -103,15 +104,15 @@ describe('a growth executive signing in', () => {
     expect(await screen.findByText('College partnerships')).toBeInTheDocument();
     expect(screen.getByText(/region\.manager@uat\.example\.test/)).toBeInTheDocument();
     expect(screen.getByText('Contractor')).toBeInTheDocument();
+    // The workspace read carries no lead, visit or follow-up figure here, so no figure is drawn:
+    // no NA, no zero standing in for a missing source, and no target or commission block at all.
     const stats = screen.getByLabelText('Growth summary');
-    for (const label of ['Open leads', 'Visits this month', 'Target progress', 'Commission this month']) {
-      expect(within(stats).getByText(label)).toBeInTheDocument();
-    }
-    // Every figure slot is NA until its source exists: nothing is invented.
-    expect(within(stats).getAllByText('NA')).toHaveLength(4);
     expect(within(stats).queryByText(/\d/)).not.toBeInTheDocument();
-    // GROWTH-06 built Field; GROWTH-07 built credit; targets and commission amounts still say plainly they are not built.
-    expect(screen.getByText(/Targets and commission amounts are not built yet/i)).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/(^|[^A-Za-z])NA([^A-Za-z]|$)/);
+    for (const heading of ['Targets vs achieved', 'Commission', 'Target progress']) expect(screen.queryByRole('heading', { name: heading })).toBeNull();
+    // The field log did load: this week's follow-ups card is there, calm.
+    expect(screen.getByRole('heading', { name: 'Field this week' })).toBeInTheDocument();
+    expect(screen.getByText('No follow-ups open')).toBeInTheDocument();
   });
 
   it('shows an honest empty state on every other page', async () => {
@@ -149,7 +150,7 @@ describe('Growth → Field (GROWTH-06)', () => {
     signInAs('GROWTH_EXECUTIVE', { role: 'GROWTH_EXECUTIVE', staffType: 'EMPLOYEE', teams: [], openLeads: 1, visitsThisMonth: 2, followUpsDue: 0, correlationId: 'corr-me' });
     render(<App />);
     const sidebar = await screen.findByLabelText('Growth navigation');
-    const stats = screen.getByLabelText('Growth summary');
+    const stats = await screen.findByLabelText('Growth summary');
     expect(await within(stats).findByText('2')).toBeInTheDocument();
     expect(screen.getByText(/Nothing is due today/)).toBeInTheDocument();
     fireEvent.click(within(sidebar).getByRole('button', { name: 'Field' }));

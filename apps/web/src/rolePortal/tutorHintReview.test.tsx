@@ -69,10 +69,10 @@ describe('Tutor hints panel', () => {
     expect(String(fetchMock.mock.calls.at(-1)?.[0])).toContain('view=refused');
   });
 
-  it('says NA on a reply it cannot read, and explains an empty list', async () => {
+  it('says plainly when it cannot read a reply, and explains an empty list', async () => {
     response = () => ok({});
     render(<TutorHintsPanel token="t" />);
-    expect(await screen.findByText('NA — tutor hints could not be read right now.')).toBeInTheDocument();
+    expect(await screen.findByText('Tutor hints could not be read right now.')).toBeInTheDocument();
     cleanup();
     response = () => ok(list([]));
     render(<TutorHintsPanel token="t" />);

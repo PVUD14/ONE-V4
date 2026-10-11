@@ -19,12 +19,12 @@ import { formatDateTime } from '../dates.js';
 const VIEWS: readonly { readonly key: TutorHintReviewView; readonly label: string }[] = [
   { key: 'sample', label: 'Today’s sample' }, { key: 'refused', label: 'Refused by the guard' }, { key: 'reviewed', label: 'Reviewed' },
 ];
-const when = (value: string | null | undefined): string => (value ? formatDateTime(value) : 'NA');
+const when = (value: string | null | undefined): string => (value ? formatDateTime(value) : 'not recorded');
 
 function outcome(hint: TutorHintReviewDto): string {
   if (hint.status === 'SHOWN') return 'Shown to the student';
   if (hint.fallbackReason === 'GUARD_REFUSED') return 'Refused — written hint shown';
-  return `Not shown (${hint.fallbackReason ?? 'NA'}) — written hint shown`;
+  return hint.fallbackReason ? `Not shown (${hint.fallbackReason}) — written hint shown` : 'Not shown — written hint shown';
 }
 
 export function TutorHintsPanel({ token }: { readonly token: string }): React.ReactElement {
@@ -67,22 +67,22 @@ export function TutorHintsPanel({ token }: { readonly token: string }): React.Re
   const counts = list?.counts;
   return <section className="role-card role-wide" aria-label="Tutor hints"><h2>Tutor hints</h2>
     <p>The AI tutor’s hints are shown to students after ONE’s code checks, while still a draft; this is where a person reviews them. Each row shows the question and the hint, never the student.</p>
-    <p><small>Last 7 days: {counts ? counts.shown7d.toLocaleString() : 'NA'} shown · {counts ? counts.fallback7d.toLocaleString() : 'NA'} replaced by the written hint · reviewed fine {counts ? counts.published.toLocaleString() : 'NA'} · should not have been shown {counts ? counts.rejected.toLocaleString() : 'NA'}</small></p>
+    {counts ? <p><small>Last 7 days: {counts.shown7d.toLocaleString()} shown · {counts.fallback7d.toLocaleString()} replaced by the written hint · reviewed fine {counts.published.toLocaleString()} · should not have been shown {counts.rejected.toLocaleString()}</small></p> : null}
     <div className="role-actions" role="group" aria-label="Tutor hint list">
       {VIEWS.map((entry) => <button key={entry.key} type="button" className={view === entry.key ? 'pilot-btn' : 'secondary'} aria-pressed={view === entry.key} onClick={() => setView(entry.key)}>{entry.label}</button>)}
     </div>
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {notice ? <p role="status">{notice}</p> : null}
-    {unavailable ? <p>NA — tutor hints could not be read right now.</p> : null}
+    {unavailable ? <p>Tutor hints could not be read right now.</p> : null}
     {list === null && !error && !unavailable ? <p>Loading tutor hints…</p> : null}
     {list && !list.hints.length ? <V2EmptyState icon="🧑‍🏫" title="No tutor hints here" note="The AI tutor is off by default and runs only in the demo sandbox. Hints appear here once students there ask for them." /> : null}
     {list && list.hints.length ? <div className="role-record-table-wrap"><table className="role-record-table">
       <thead><tr><th>Question</th><th>Hint</th><th>Outcome</th><th>Provenance</th><th>Review</th></tr></thead>
       <tbody>{list.hints.map((hint) => <tr key={hint.id}>
         <td>{hint.questionPrompt}<br /><small>Level {hint.level} · {hint.language} · {when(hint.requestedAt)}</small></td>
-        <td>{hint.generatedText ?? 'NA'}</td>
+        <td>{hint.generatedText ?? <small>No hint text was kept</small>}</td>
         <td>{outcome(hint)}{hint.guardFindings.length ? <><br /><small>Found: {hint.guardFindings.join(', ')}</small></> : null}</td>
-        <td><small>{hint.model ?? 'NA'} · {hint.promptVersion} · {hint.guardVersion ?? 'no guard run'}</small></td>
+        <td><small>{hint.model ? `${hint.model} · ` : ''}{hint.promptVersion} · {hint.guardVersion ?? 'no guard run'}</small></td>
         <td>{hint.reviewState === 'DRAFT'
           ? (list.viewer.canReview && hint.generatedText ? <div className="role-actions">
             <button type="button" className="secondary" onClick={() => void decide(hint, 'APPROVE')}>Reviewed — fine</button>

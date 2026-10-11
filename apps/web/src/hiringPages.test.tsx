@@ -165,6 +165,36 @@ describe('employer applicant pipeline', () => {
     expect(screen.getByText('Withdrawn — details no longer shared')).toBeInTheDocument();
   });
 
+  it('never shows an applicant email before Shortlisted: a nameless candidate is "Candidate" with the application reference', async () => {
+    const row = (id: string, state: string, candidateName: string | null, candidateEmail: string) => ({
+      id, state, consentRevoked: false, candidateName, candidateEmail, institutionStudentId: null,
+      submittedAt: '2026-08-10T00:00:00.000Z', closedAt: null, interviewCount: 0, offerState: null, updatedAt: '2026-08-10T00:00:00.000Z',
+    });
+    stubFetch({
+      [`/api/v1/employers/${employerId}/opportunities`]: { opportunities: [employerOpportunity] },
+      [`/api/v1/employers/${employerId}/opportunities/${opportunity.id}/applications`]: { applications: [
+        row('9f1c2d3e-0000-4000-8000-000000000001', 'APPLIED', null, 'graduate.applied@uat.example.test'),
+        row('7a6b5c4d-0000-4000-8000-000000000002', 'SCREENING', '  ', 'graduate.screening@uat.example.test'),
+        row('5e4d3c2b-0000-4000-8000-000000000003', 'REJECTED', null, 'graduate.rejected@uat.example.test'),
+        row('3c2b1a09-0000-4000-8000-000000000004', 'SHORTLISTED', null, 'graduate.shortlisted@uat.example.test'),
+        row('1b2c3d4e-0000-4000-8000-000000000005', 'APPLIED', 'Mira Named', 'mira.named@uat.example.test'),
+      ] },
+    });
+    await authenticate();
+    render(<EmployerApplicantsPage employerId={employerId} />);
+    expect(await screen.findByText('Mira Named')).toBeInTheDocument();
+    const table = screen.getByRole('table');
+    for (const email of ['graduate.applied@uat.example.test', 'graduate.screening@uat.example.test', 'graduate.rejected@uat.example.test', 'mira.named@uat.example.test']) {
+      expect(table.textContent, email).not.toContain(email);
+    }
+    expect(within(table).getAllByText(/^Candidate$/, { selector: 'td' })).toHaveLength(3);
+    expect(within(table).getByText('· Application 9F1C2D3E')).toBeInTheDocument();
+    expect(within(table).getByText('· Application 7A6B5C4D')).toBeInTheDocument();
+    // From Shortlisted on, contact details may be shown, so a nameless candidate reads as their email.
+    expect(within(table).getByText('graduate.shortlisted@uat.example.test')).toBeInTheDocument();
+    expect(table.textContent).not.toMatch(/(^|[^A-Za-z])NA([^A-Za-z]|$)/);
+  });
+
   it('says the details are no longer shared once the applicant-access grant ends, and offers no pipeline move', async () => {
     stubFetch({
       [`/api/v1/employers/${employerId}/opportunities`]: { opportunities: [employerOpportunity] },
@@ -321,14 +351,16 @@ describe('interview and offer management', () => {
     expect(JSON.parse(postsTo('/state')[0]![1]!.body as string)).toEqual({ toState: 'RESCHEDULED', ...expectedWindow(), reasonCode: 'CANDIDATE_REQUESTED' });
   });
 
-  it('confirms offer withdrawal, preserves missing slots and withholds revoked identity', async () => {
+  it('confirms offer withdrawal, names missing slots plainly and withholds revoked identity', async () => {
     stubFetch({ [`${base}/offers`]: { offers: [offer, { ...offer, id: 'offer-b', consentRevoked: true, candidateName: 'Secret Candidate' }] } });
     const confirm = vi.fn().mockReturnValue(false); vi.stubGlobal('confirm', confirm);
     await authenticate(); render(<EmployerOffersPage employerId={employerId} />);
     fireEvent.click(await screen.findByRole('button', { name: 'Withdraw offer' }));
     expect(postsTo('/withdraw')).toHaveLength(0);
     expect(document.body.textContent).not.toMatch(/Secret Candidate|99999/);
-    expect(screen.getAllByText('NA').length).toBeGreaterThan(0);
+    // A missing slot says what it is in words ("Not set"), never NA (re-skin phase 7).
+    expect(screen.getAllByText('Not set').length).toBeGreaterThan(0);
+    expect(screen.queryByText('NA')).toBeNull();
     expect(screen.getAllByText('Awaiting response')).toHaveLength(2);
     confirm.mockReturnValue(true); fireEvent.click(screen.getByRole('button', { name: 'Withdraw offer' }));
     await waitFor(() => expect(postsTo('/withdraw')).toHaveLength(1));

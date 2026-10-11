@@ -1137,17 +1137,49 @@ function ApplicantEligibility({ item }: { readonly item: EmployerApplicantDto })
   </ul>;
 }
 
-// Shared verbatim consent redaction from the Applicants table.
-export function CandidateIdentity({ item }: { readonly item: Pick<EmployerApplicantDto, 'consentRevoked' | 'candidateAccess' | 'candidateName' | 'candidateEmail' | 'institutionStudentId'> }): React.ReactElement {
-  return item.consentRevoked
-    ? <span className="hiring-meta">Withdrawn — details no longer shared</span>
-    : item.candidateAccess === false
-      ? <span className="hiring-meta">Details no longer shared</span>
-      : <>{item.candidateName ?? item.candidateEmail ?? 'NA'}{item.institutionStudentId ? <span className="hiring-meta"> · {item.institutionStudentId}</span> : null}</>;
+/**
+ * The application stages from which an employer may see a candidate's contact details. Before
+ * Shortlisted a candidate is a name only (the export and the snapshot follow the same line).
+ */
+const CONTACT_VISIBLE_STAGES: ReadonlySet<string> = new Set(['SHORTLISTED', 'ASSESSMENT', 'INTERVIEW', 'OFFER', 'HIRED']);
+
+/** Whether an application at this stage may show the candidate's email. Unknown stages may not. */
+export function contactVisibleAt(stage: string | null | undefined): boolean {
+  return typeof stage === 'string' && CONTACT_VISIBLE_STAGES.has(stage.trim().toUpperCase());
+}
+
+/** A short, neutral handle for an application whose candidate has no name on record. */
+export function applicationReference(applicationId: string): string {
+  return `Application ${applicationId.replace(/[^A-Za-z0-9]/g, '').slice(0, 8).toUpperCase()}`;
+}
+
+type IdentityItem = Pick<EmployerApplicantDto, 'consentRevoked' | 'candidateAccess' | 'candidateName' | 'candidateEmail' | 'institutionStudentId'> & {
+  /** An applicant row: its id and stage. */
+  readonly id?: string; readonly state?: string;
+  /** An interview or offer row: the application it belongs to, and that application's stage. */
+  readonly applicationId?: string; readonly applicationState?: string;
+};
+
+/**
+ * Shared verbatim consent redaction from the Applicants table. The candidate is shown by name. A
+ * candidate with no name (a graduate who has not given one) is "Candidate" with the application's
+ * reference until the application reaches Shortlisted; only from then on may the email stand in
+ * for the name. Interview and offer rows carry the application's stage, not their own state.
+ */
+export function CandidateIdentity({ item }: { readonly item: IdentityItem }): React.ReactElement {
+  if (item.consentRevoked) return <span className="hiring-meta">Withdrawn — details no longer shared</span>;
+  if (item.candidateAccess === false) return <span className="hiring-meta">Details no longer shared</span>;
+  const stage = item.applicationId !== undefined ? item.applicationState : item.applicationState ?? item.state;
+  const reference = item.applicationId ?? item.id;
+  const name = item.candidateName?.trim()
+    ? item.candidateName
+    : contactVisibleAt(stage) && item.candidateEmail ? item.candidateEmail : null;
+  return <>{name ?? <>Candidate{reference ? <span className="hiring-meta"> · {applicationReference(reference)}</span> : null}</>}
+    {item.institutionStudentId ? <span className="hiring-meta"> · {item.institutionStudentId}</span> : null}</>;
 }
 
 function formatDateTime(value: string | null): string {
-  if (!value || !Number.isFinite(Date.parse(value))) return 'NA';
+  if (!value || !Number.isFinite(Date.parse(value))) return 'Not set';
   return dates.formatDateTime(value);
 }
 
@@ -1352,7 +1384,7 @@ export function EmployerInterviewsPage({ employerId }: { readonly employerId: st
       {rows.length ? <div className="role-record-table-wrap"><table className="role-record-table">
         <thead><tr>{['Candidate', 'Opportunity', 'Round', 'Mode', 'Start', 'End', 'State', 'Last change', 'Outcomes', 'Actions'].map((title) => <th key={title}>{title}</th>)}</tr></thead>
         <tbody>{interviews.map((item) => <tr key={item.id}>
-          <td><CandidateIdentity item={item} /></td><td>{item.title || 'NA'}{item.stageLabel ? <span className="hiring-meta"> · {item.stageLabel}</span> : null}</td><td>{item.roundNumber}</td><td>{humanise(item.mode)}</td>
+          <td><CandidateIdentity item={item} /></td><td>{item.title}{item.stageLabel ? <span className="hiring-meta"> · {item.stageLabel}</span> : null}</td><td>{item.roundNumber}</td><td>{humanise(item.mode)}</td>
           <td>{formatDateTime(item.scheduledStart)}</td><td>{formatDateTime(item.scheduledEnd)}</td><td><StatusTag state={item.state} label={humanise(item.state)} /></td>
           <td>{lastChangeText(item.lastChange)}</td><td>{item.outcomeCount}</td>
           <td>{!item.consentRevoked && !item.closedAt ? <div className="hiring-actions">
@@ -1457,10 +1489,10 @@ export function EmployerOffersPage({ employerId }: { readonly employerId: string
       {rows.length ? <div className="role-record-table-wrap"><table className="role-record-table">
         <thead><tr>{['Candidate', 'Opportunity', 'State', 'Joining date', 'Expiry', 'Response state', 'Actions'].map((title) => <th key={title}>{title}</th>)}</tr></thead>
         <tbody>{rows.map((item) => <tr key={item.id}>
-          <td><CandidateIdentity item={item} /></td><td>{item.title || 'NA'}</td><td><StatusTag kind="offer" state={item.state} label={humanise(item.state)} /></td>
-          <td>{item.joiningDate ? formatDate(item.joiningDate.slice(0, 10) + 'T00:00:00') : 'NA'}</td><td>{formatDateTime(item.offerExpiresAt)}</td><td>{offerResponse(item)}</td>
+          <td><CandidateIdentity item={item} /></td><td>{item.title}</td><td><StatusTag kind="offer" state={item.state} label={humanise(item.state)} /></td>
+          <td>{item.joiningDate ? formatDate(item.joiningDate.slice(0, 10) + 'T00:00:00') : 'Not set'}</td><td>{formatDateTime(item.offerExpiresAt)}</td><td>{offerResponse(item)}</td>
           <td>{!item.consentRevoked && !item.closedAt && ['DRAFT', 'EXTENDED'].includes(item.state)
-            ? <button className="secondary" disabled={busy} onClick={() => { void withdraw(item.id); }}>Withdraw offer</button> : 'NA'}</td>
+            ? <button className="secondary" disabled={busy} onClick={() => { void withdraw(item.id); }}>Withdraw offer</button> : null}</td>
         </tr>)}</tbody>
       </table></div> : null}
     </section>

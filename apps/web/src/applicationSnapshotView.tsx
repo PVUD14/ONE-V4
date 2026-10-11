@@ -32,17 +32,18 @@ function humanise(value: string): string {
   return codeLabel(value);
 }
 function formatDate(value: string | null | undefined, withTime = false): string {
-  if (!value) return 'NA';
+  if (!value) return 'not recorded';
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'NA';
+  if (Number.isNaN(date.getTime())) return 'not recorded';
   return withTime ? dates.formatDateTime(date) : dates.formatDate(date);
 }
 function fileSize(bytes: number): string {
   return bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 }
 function years(start: number | null, end: number | null): string {
-  if (!start && !end) return 'NA';
-  return `${start ?? 'NA'} – ${end ?? 'present'}`;
+  if (!start && !end) return '';
+  if (!start) return `until ${end}`;
+  return `${start} – ${end ?? 'present'}`;
 }
 
 /** The snapshot itself. `audience` only changes the wording of the contact line. */
@@ -50,19 +51,22 @@ export function SnapshotSummary({ snapshot, audience }: { readonly snapshot: App
   const education = snapshot.education;
   const contactHidden = audience === 'employer' && snapshot.candidate.contactVisibleFrom;
   return <div aria-label="Shared profile">
-    <h3>{snapshot.candidate.fullName ?? 'NA'}</h3>
+    <h3>{snapshot.candidate.fullName?.trim() ? snapshot.candidate.fullName : 'Candidate'}</h3>
     <p className="hiring-meta">
       {contactHidden
         ? 'Contact details are shown once you shortlist this candidate.'
-        : <>Email: {snapshot.candidate.email ?? 'NA'} · Phone: {snapshot.candidate.phone ?? (audience === 'student' ? 'not shared' : 'NA')}</>}
+        : [snapshot.candidate.email ? `Email: ${snapshot.candidate.email}` : null,
+          snapshot.candidate.phone ? `Phone: ${snapshot.candidate.phone}` : audience === 'student' ? 'Phone: not shared' : null].filter(Boolean).join(' · ') || 'No contact details were shared.'}
     </p>
-    <p>{education?.programmeName ?? 'NA'}{education?.departmentName ? `, ${education.departmentName}` : ''} · {education?.institutionName ?? 'NA'} · Graduating {education?.expectedGraduationYear ?? 'NA'}</p>
+    {education && (education.programmeName || education.institutionName || education.expectedGraduationYear)
+      ? <p>{[education.programmeName ? `${education.programmeName}${education.departmentName ? `, ${education.departmentName}` : ''}` : null,
+        education.institutionName, education.expectedGraduationYear ? `Graduating ${education.expectedGraduationYear}` : null].filter(Boolean).join(' · ')}</p> : null}
     {snapshot.profile.headline ? <p><strong>{snapshot.profile.headline}</strong></p> : null}
     {snapshot.profile.summary ? <p>{snapshot.profile.summary}</p> : null}
     <h4>Qualifications</h4>
     {snapshot.qualifications.length
       ? <ul className="hiring-stages" aria-label="Qualifications">{snapshot.qualifications.map((q, index) => <li key={`${q.qualificationType}-${index}`}>
-        {q.programmeName} ({q.qualificationType}) · {q.institutionName ?? 'NA'} · {years(q.startedYear, q.completedYear)}{q.awarded ? ' · awarded' : ''}
+        {[`${q.programmeName} (${q.qualificationType})`, q.institutionName, years(q.startedYear, q.completedYear) || null].filter(Boolean).join(' · ')}{q.awarded ? ' · awarded' : ''}
         {' '}<span className={q.verification === 'VERIFIED' ? 'hiring-tag' : 'hiring-tag warn'}>{verificationLabels[q.verification] ?? humanise(q.verification)}</span>
       </li>)}</ul>
       : <p className="hiring-meta">No qualifications recorded.</p>}
@@ -134,7 +138,7 @@ export function CandidateDetailPanel({ employerId, applicationId, onClose }: { r
         <V2Stat icon="📌" tone="blue" value={humanise(candidate.application.state)} label="Stage" />
         <V2Stat icon="🗓️" tone="purple" value={formatDate(candidate.application.submittedAt)} label="Applied" />
         <V2Stat icon="📅" tone="amber" value={candidate.interviews.length} label="Interviews" />
-        <V2Stat icon="🏁" tone="green" value={candidate.offer ? humanise(candidate.offer.state) : 'NA'} label="Offer" />
+        <V2Stat icon="🏁" tone="green" value={candidate.offer ? humanise(candidate.offer.state) : 'None yet'} label="Offer" />
       </div>
       <p className="hiring-meta">{candidate.application.title} · applied under version {candidate.application.appliedVersionNumber}
         {candidate.application.currentVersionNumber && candidate.application.currentVersionNumber !== candidate.application.appliedVersionNumber

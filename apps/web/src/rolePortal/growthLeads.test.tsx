@@ -82,12 +82,14 @@ describe('Growth → Leads', () => {
     expect(within(screen.getByLabelText('Which leads')).queryByRole('option', { name: 'Needs a new owner' })).not.toBeInTheDocument();
   });
 
-  it('says plainly when there are no leads, with NA where a count could not be read', async () => {
+  it('says plainly when there are no leads, and leaves out a count that could not be read', async () => {
     routes = (url) => url.includes('/api/v1/growth/leads?') ? ok({ leads: [], nextCursor: null })
       : url.endsWith('/api/v1/growth/me') ? failure(500, 'BROKEN') : null;
     render(<GrowthLeadsPage role="GROWTH_EXECUTIVE" />);
     expect(await screen.findByText('No leads here')).toBeInTheDocument();
-    expect(within(screen.getByLabelText('Leads summary')).getByText('Your open leads').parentElement).toHaveTextContent('NA');
+    expect(within(screen.getByLabelText('Leads summary')).queryByText('Your open leads')).toBeNull();
+    expect(within(screen.getByLabelText('Leads summary')).getByText('In this list').parentElement).toHaveTextContent('0');
+    expect(document.body.textContent).not.toMatch(/(^|[^A-Za-z])NA([^A-Za-z]|$)/);
   });
 
   it('shows the server\'s duplicate answer, which names nobody it was not allowed to', async () => {

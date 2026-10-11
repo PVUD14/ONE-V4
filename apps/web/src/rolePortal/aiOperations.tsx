@@ -5,7 +5,8 @@
  * navigation change). Shows every AI feature with its switch, model, prompt version, cap and usage,
  * outcomes and failure classes, tokens in and out, usage over time and by organisation (groups under
  * 5 people withheld), prompt versions, and evaluation records — every figure from ONE AI
- * Orchestration's own tables, or NA. Cost is always NA: no price table exists.
+ * Orchestration's own tables; a figure the server did not record is left out or says so. Cost has
+ * no column: no price table exists (re-skin phase 7 removed the NA cost slots).
  *
  * Stopping — a feature, the assistant, or everything through the global kill switch — is immediate
  * and needs only a reason. Switching on and widening a limit file an approval (Settings → Approvals)
@@ -56,8 +57,13 @@ import { NaValue } from '../naState.js';
 import { SMALL_COUNT_TEXT } from '../momentum/smallCountRule.js';
 
 const noteLimit = 500;
-const number = (value: number | null | undefined): string => (value === null || value === undefined ? 'NA' : value.toLocaleString());
-const when = (value: string | null | undefined): string => (value ? formatDateTime(value) : 'NA');
+const number = (value: number | null | undefined): string => (value === null || value === undefined ? 'not recorded' : value.toLocaleString());
+const when = (value: string | null | undefined): string => (value ? formatDateTime(value) : 'not recorded');
+/** The server's cost note without its leading "NA —" slot marker (the sentence after it says why). */
+export function plainCostText(text: string): string {
+  const rest = text.replace(/^\s*NA\s*[—–-]\s*/, '');
+  return rest.charAt(0).toUpperCase() + rest.slice(1);
+}
 const windowLabel = (window: AiPeriod): string => (window === 'DAY' ? 'day' : 'month');
 const unconfiguredText: Record<NonNullable<AiInferenceStatusDto['reason']>, string> = {
   BASE_URL_MISSING: 'no endpoint address is set',
@@ -136,12 +142,12 @@ export function OperationsAiOperationsPage(): React.ReactElement | null {
 
   return <section className="role-module role-module--dense" aria-label="AI Operations">
     {heading}
-    <div className="v2-row v2-cols-4 career-stat-strip role-wide">
-      <V2Stat icon="🛑" tone="amber" value={summary ? (summary.killSwitch ? (killEngaged ? 'Engaged' : 'Released') : 'NA') : 'NA'} label="Global AI kill switch" />
-      <V2Stat icon="🤖" tone="teal" value={summary ? `${features.filter((feature) => feature.effectiveEnabled).length} of ${features.length}` : 'NA'} label="AI features running" />
-      <V2Stat icon="✅" tone="blue" value={summary ? number(summary.totals.succeeded) : 'NA'} label={`Generations this ${windowLabel(period)}`} />
-      <V2Stat icon="💸" tone="purple" value="NA" label="Cost (no price table)" />
-    </div>
+    {/* Re-skin phase 7: the figures show once the summary has loaded; cost has no source (no price table), so it has no tile. */}
+    {summary ? <div className={`v2-row v2-cols-${summary.killSwitch ? 3 : 2} career-stat-strip role-wide`}>
+      {summary.killSwitch ? <V2Stat icon="🛑" tone="amber" value={killEngaged ? 'Engaged' : 'Released'} label="Global AI kill switch" /> : null}
+      <V2Stat icon="🤖" tone="teal" value={`${features.filter((feature) => feature.effectiveEnabled).length} of ${features.length}`} label="AI features running" />
+      <V2Stat icon="✅" tone="blue" value={number(summary.totals.succeeded)} label={`Generations this ${windowLabel(period)}`} />
+    </div> : null}
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {notice ? <p role="status">{notice}</p> : null}
 
@@ -181,18 +187,17 @@ export function OperationsAiOperationsPage(): React.ReactElement | null {
       {summary && !features.length ? <V2EmptyState icon="🤖" title="No AI feature is registered"
         note="No feature has been built on ONE AI Orchestration yet. Each one appears here when it is registered — switched off, with its own cap." /> : null}
       {features.length ? <div className="role-record-table-wrap"><table className="role-record-table">
-        <thead><tr><th>Feature</th><th>State</th><th>Model and prompt</th><th>Cap</th><th>Evaluation</th><th>Outcomes</th><th>Tokens in / out</th><th>Cost</th><th>Actions</th></tr></thead>
+        <thead><tr><th>Feature</th><th>State</th><th>Model and prompt</th><th>Cap</th><th>Evaluation</th><th>Outcomes</th><th>Tokens in / out</th><th>Actions</th></tr></thead>
         <tbody>{features.map((feature) => <tr key={feature.featureKey}>
           <td><strong>{feature.featureKey}</strong><br /><small>{feature.description}</small></td>
           <td><StatusBadge label={feature.effectiveEnabled ? 'On' : feature.enabled ? 'Stopped by kill switch' : 'Off'} tone={feature.effectiveEnabled ? 'success' : 'neutral'} /></td>
-          <td>{feature.model}<br /><small>{feature.prompt ? `Prompt ${feature.prompt.key} v${feature.prompt.version}` : 'Prompt: NA (not declared)'}</small></td>
+          <td>{feature.model}<br /><small>{feature.prompt ? `Prompt ${feature.prompt.key} v${feature.prompt.version}` : 'No prompt declared'}</small></td>
           <td>{number(feature.usedInWindow)} of {number(feature.cap)} this {windowLabel(feature.capWindow)}<br /><small>Input up to {number(feature.maxInputChars)} characters</small></td>
           <td><StatusBadge label={feature.evaluation.state === 'NONE' ? 'None recorded' : feature.evaluation.state} tone={feature.evaluation.state === 'PASS' ? 'success' : feature.evaluation.state === 'FAIL' ? 'danger' : 'neutral'} />
             <br /><small>{when(feature.evaluation.decidedAt)}</small></td>
           <td>{number(feature.outcomes.succeeded)} succeeded<br />{number(feature.outcomes.refused)} refused · {number(feature.outcomes.failed)} failed
-            <br /><small>Average latency {feature.averageLatencyMs === null || feature.averageLatencyMs === undefined ? 'NA' : `${number(feature.averageLatencyMs)} ms`}</small></td>
+            {feature.averageLatencyMs === null || feature.averageLatencyMs === undefined ? null : <><br /><small>Average latency {number(feature.averageLatencyMs)} ms</small></>}</td>
           <td>{number(feature.tokens.input)} / {number(feature.tokens.output)}</td>
-          <td>NA</td>
           <td><div className="role-actions">
             {viewer.canStop && feature.enabled ? <button type="button" className="pilot-btn" onClick={() => setDialog({ kind: 'feature-off', feature })}>Switch off…</button> : null}
             {viewer.canConfigure && !feature.enabled ? <button type="button" className="secondary" disabled={killEngaged || feature.evaluation.state !== 'PASS'}
@@ -202,7 +207,7 @@ export function OperationsAiOperationsPage(): React.ReactElement | null {
             {viewer.canConfigure ? <button type="button" className="secondary" onClick={() => setDialog({ kind: 'limits', feature })}>Change limits…</button> : null}
           </div></td>
         </tr>)}</tbody></table></div> : null}
-      {summary ? <p><small>{summary.cost.text}</small></p> : null}
+      {summary ? <p><small>{plainCostText(summary.cost.text)}</small></p> : null}
     </section>
 
     <section className="role-card role-wide"><h2>Refusals and failures by class</h2>
@@ -272,7 +277,7 @@ function AiDialogs({ token, dialog, policy, features, onCancel, onDone, onLimits
     case 'feature-on':
       return <RequestApprovalDialog token={token} actionKey="AI_FEATURE_ENABLE" payload={{ featureKey: dialog.feature.featureKey }} reasons={policy.reasons.enable}
         title={`Switch on ${dialog.feature.featureKey}`}
-        details={[['Model', dialog.feature.model], ['Prompt', dialog.feature.prompt ? `${dialog.feature.prompt.key} v${dialog.feature.prompt.version}` : 'NA'],
+        details={[['Model', dialog.feature.model], ['Prompt', dialog.feature.prompt ? `${dialog.feature.prompt.key} v${dialog.feature.prompt.version}` : 'No prompt declared'],
           ['Evaluation', `PASS recorded ${when(dialog.feature.evaluation.decidedAt)} — the approval is bound to this model, prompt and evaluation`]]}
         onCancel={onCancel} onFiled={onDone} />;
     case 'limits':
@@ -479,15 +484,15 @@ function InferenceEndpointPanel({ inference, loaded }: { readonly inference: AiI
     : probe.reachable ? { label: 'Reachable', tone: 'success' as const } : { label: 'Unreachable', tone: 'danger' as const };
   return <section className="role-card role-wide"><h2>Inference endpoint</h2>
     <p>AI features run in background jobs against the endpoint set on the server (ONE_AI_BASE_URL, ONE_AI_API_KEY and ONE_AI_MODEL). The key is never shown. Reachability is the latest check recorded by the server&apos;s probe job; this screen never contacts the endpoint.</p>
-    {loaded && !inference ? <p>NA</p> : null}
+    {loaded && !inference ? <p>The server did not report its inference endpoint.</p> : null}
     {inference ? <dl>
-      <div><dt>Configured</dt><dd>{inference.configured ? 'Yes' : `No — ${inference.reason ? unconfiguredText[inference.reason] : 'NA'}`}</dd></div>
-      <div><dt>Endpoint host</dt><dd>{inference.endpointHost ?? 'NA'}</dd></div>
-      <div><dt>Model</dt><dd>{inference.model ?? 'NA'}</dd></div>
+      <div><dt>Configured</dt><dd>{inference.configured ? 'Yes' : inference.reason ? `No — ${unconfiguredText[inference.reason]}` : 'No'}</dd></div>
+      {inference.endpointHost ? <div><dt>Endpoint host</dt><dd>{inference.endpointHost}</dd></div> : null}
+      {inference.model ? <div><dt>Model</dt><dd>{inference.model}</dd></div> : null}
       <div><dt>Key set on the server</dt><dd>{inference.keyConfigured ? 'Yes' : 'No'}</dd></div>
       <div><dt>Reachable (last probe)</dt><dd><StatusBadge label={reachable.label} tone={reachable.tone} />{' '}
-        <small>Probed {when(probe?.probedAt)}{probe && probe.latencyMs !== null ? ` · ${number(probe.latencyMs)} ms` : ''}{probe?.failureClass ? ` · ${probe.failureClass}` : ''}</small></dd></div>
-      <div><dt>Model served (last probe)</dt><dd>{!probe || probe.modelServed === null ? 'NA' : probe.modelServed ? 'Yes' : 'No'}</dd></div>
+        <small>{probe?.probedAt ? `Probed ${when(probe.probedAt)}` : 'No probe recorded'}{probe && probe.latencyMs !== null ? ` · ${number(probe.latencyMs)} ms` : ''}{probe?.failureClass ? ` · ${probe.failureClass}` : ''}</small></dd></div>
+      {probe && probe.modelServed !== null ? <div><dt>Model served (last probe)</dt><dd>{probe.modelServed ? 'Yes' : 'No'}</dd></div> : null}
     </dl> : null}
     {probe && !probe.matchesConfiguration ? <p role="note">The last probe was for a different endpoint or model than the one configured now. Run the probe again before relying on it.</p> : null}
   </section>;
@@ -516,9 +521,9 @@ function AiUsagePanel({ token, features }:{ readonly token: string; readonly fea
     {points === null && !error ? <p>Loading usage…</p> : null}
     {points && !points.length ? <p>No generations in this period.</p> : null}
     {points?.length ? <div className="role-record-table-wrap"><table className="role-record-table">
-      <thead><tr><th>Period</th><th>Feature</th><th>Succeeded</th><th>Refused</th><th>Failed</th><th>Tokens in</th><th>Tokens out</th><th>Cost</th></tr></thead>
+      <thead><tr><th>Period</th><th>Feature</th><th>Succeeded</th><th>Refused</th><th>Failed</th><th>Tokens in</th><th>Tokens out</th></tr></thead>
       <tbody>{points.map((point) => <tr key={`${point.period}-${point.featureKey}`}><td>{point.period}</td><td>{point.featureKey}</td><td>{number(point.succeeded)}</td>
-        <td>{number(point.refused)}</td><td>{number(point.failed)}</td><td>{number(point.inputTokens)}</td><td>{number(point.outputTokens)}</td><td>NA</td></tr>)}</tbody></table></div> : null}
+        <td>{number(point.refused)}</td><td>{number(point.failed)}</td><td>{number(point.inputTokens)}</td><td>{number(point.outputTokens)}</td></tr>)}</tbody></table></div> : null}
   </section>;
 }
 
@@ -542,7 +547,7 @@ function AiOrganizationUsagePanel({ token, period }: { readonly token: string; r
       <thead><tr><th>Organisation</th><th>People</th><th>Succeeded</th><th>Refused</th><th>Failed</th><th>Tokens in / out</th></tr></thead>
       <tbody>{rows.map((row, index) => <tr key={`${row.organizationName ?? 'none'}-${index}`}>
         <td>{row.noSubject ? 'Not about a person' : row.organizationName ?? 'No organisation'}</td>
-        <td><NaValue value={row.noSubject ? 'NA' : cell(row, row.people)} /></td><td><NaValue value={cell(row, row.succeeded)} /></td><td><NaValue value={cell(row, row.refused)} /></td><td><NaValue value={cell(row, row.failed)} /></td>
+        <td>{row.noSubject ? null : <NaValue value={cell(row, row.people)} />}</td><td><NaValue value={cell(row, row.succeeded)} /></td><td><NaValue value={cell(row, row.refused)} /></td><td><NaValue value={cell(row, row.failed)} /></td>
         <td><NaValue value={row.suppressed ? SMALL_COUNT_TEXT : `${number(row.inputTokens)} / ${number(row.outputTokens)}`} /></td>
       </tr>)}</tbody></table></div> : null}
   </section>;

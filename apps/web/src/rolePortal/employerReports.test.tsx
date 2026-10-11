@@ -1,15 +1,12 @@
 /**
- * The employer Dashboard and Reports on the web (EMP-15). The Dashboard's figures come from the
- * server's summary and nowhere else (checked by giving the lists different numbers), this week's
- * interviews are the server's window without cancelled ones, and every figure reads NA when the
- * summary cannot be read. Reports shows the server's suppressed figures as "<5" / "Withheld",
- * never a candidate, and a plain error with a reference. Navigation labels are unchanged (HG-3).
+ * The employer Reports on the web (EMP-15). Reports shows the server's suppressed figures as
+ * "<5" / "Withheld", never a candidate, and a plain error with a reference. Navigation labels are
+ * unchanged (HG-3). The Dashboard's tests moved to employerHome.test.tsx with re-skin phase 7.
  */
 import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getProtectedAccessToken, getSecurityContext } from '../api.js';
 import { rolePortals } from '../rolePortalConfig.js';
-import { EmployerDashboardV3 } from '../staffDashboardsV3.js';
 import { EmployerRecruiterRealityPage } from './employer.js';
 
 vi.mock('../api.js', async (original) => ({
@@ -97,46 +94,6 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.clearAllMocks(); vi.unstubAllGlobals(); });
 
-const kpi = (label: string) => screen.getByText(label, { selector: '.pilot-kpi small' }).closest('.pilot-kpi') as HTMLElement;
-
-describe('EMP-15 employer Dashboard', () => {
-  it('shows the server summary in every figure, not counts of the lists it also reads', async () => {
-    routes();
-    render(<EmployerDashboardV3 basePath="/employer/recruiter" />);
-    await screen.findByText('Recruiter Dashboard');
-    await screen.findByText('Open Roles');
-    expect(within(kpi('Open Roles')).getByText('3')).toBeInTheDocument();
-    expect(within(kpi('Total Applicants')).getByText('41')).toBeInTheDocument();
-    expect(within(kpi('Total Applicants')).getByText('4 new in 7 days')).toBeInTheDocument();
-    expect(within(kpi('In Pipeline')).getByText('30')).toBeInTheDocument();
-    expect(within(kpi('Offers Pending')).getByText('1')).toBeInTheDocument();
-    expect(within(kpi('Hires')).getByText('6')).toBeInTheDocument();
-    expect(screen.getByText('2 awaiting colleges')).toBeInTheDocument();
-    expect(screen.getByText('1 drive needs your changes.')).toBeInTheDocument();
-    // The NA interviews widget is now real: the server's count, and the week's interviews listed.
-    const card = screen.getByRole('heading', { name: "This Week's Interviews" }).closest('section') as HTMLElement;
-    expect(within(card).getByText('2 this week')).toBeInTheDocument();
-    expect(within(card).getByText('Asha Synthetic')).toBeInTheDocument();
-    expect(within(card).getByText('Details no longer shared')).toBeInTheDocument();
-    expect(within(card).queryByText('Cancelled Person')).toBeNull();
-    expect(within(card).queryByText('Next Week Person')).toBeNull();
-    expect(within(card).queryByText(/not built yet/i)).toBeNull();
-    // Recently Shortlisted still names people only through the applicant list (live grant).
-    expect(screen.getByText('Bala Synthetic')).toBeInTheDocument();
-  });
-
-  it('keeps every widget and says NA in each figure when the summary cannot be read', async () => {
-    routes({ summaryStatus: 500 });
-    render(<EmployerDashboardV3 basePath="/employer/recruiter" />);
-    expect(await screen.findByText('Your hiring figures could not be loaded, so they read NA.')).toBeInTheDocument();
-    for (const label of ['Open Roles', 'Total Applicants', 'In Pipeline', 'Offers Pending', 'Hires']) expect(within(kpi(label)).getByText('NA')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Hiring Funnel' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Pipeline Mix' })).toBeInTheDocument();
-    expect(screen.getByText('Interviews this week could not be counted — NA.')).toBeInTheDocument();
-    expect(screen.queryByText('41')).toBeNull();
-  });
-});
-
 describe('EMP-15 employer Reports', () => {
   const portal = rolePortals.find((item) => item.key === 'recruiter')!;
 
@@ -149,7 +106,8 @@ describe('EMP-15 employer Reports', () => {
     render(<EmployerRecruiterRealityPage portal={portal} routeLabel="Reports" />);
     expect(await screen.findByRole('heading', { name: 'Hiring reports' })).toBeInTheDocument();
     const byJob = (await screen.findByRole('heading', { name: 'Funnel by job' })).closest('section') as HTMLElement;
-    const engineer = within(byJob).getByRole('row', { name: /Graduate engineer/ });
+    // The section heading renders before the figures arrive; wait for the row itself.
+    const engineer = await within(byJob).findByRole('row', { name: /Graduate engineer/ });
     expect(within(engineer).getByText('9')).toBeInTheDocument();
     expect(within(engineer).getByText('Withheld')).toBeInTheDocument();
     // Every stage except Applied is <5 in every broken-down job, so those twelve columns fold into
@@ -171,7 +129,8 @@ describe('EMP-15 employer Reports', () => {
 
     const timing = screen.getByRole('heading', { name: 'Time to each stage' }).closest('section') as HTMLElement;
     expect(within(within(timing).getByRole('row', { name: /Submission to shortlist/ })).getByText('2.5')).toBeInTheDocument();
-    expect(within(within(timing).getByRole('row', { name: /Submission to interview/ })).getByText('NA')).toBeInTheDocument();
+    expect(within(within(timing).getByRole('row', { name: /Submission to interview/ })).getByText('Too few')).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/(^|[^A-Za-z])NA([^A-Za-z]|$)/);
     expect(screen.getByText('Too few answers')).toBeInTheDocument();
     expect(within(screen.getByText('Median days to first offer').closest('.v2-stat') as HTMLElement).getByText('10.0')).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/Synthetic(?! Drive College)|@|readiness/i);

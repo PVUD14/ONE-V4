@@ -38,9 +38,9 @@ import { StaffPilotWrap } from './parityWraps.js';
 import * as dates from './dates.js';
 
 function formatDate(value: string | null | undefined): string {
-  if (!value) return 'NA';
+  if (!value) return 'not recorded';
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? 'NA' : dates.formatDate(date);
+  return Number.isNaN(date.getTime()) ? 'not recorded' : dates.formatDate(date);
 }
 
 const invitationStateLabels: Readonly<Record<string, string>> = {
@@ -378,14 +378,15 @@ export function EmployerTalentPoolWorkspace({ employerId }: { readonly employerI
             </select></label>
           <div className="hiring-actions"><button type="button" disabled={busy || !jobId || overview.invitationsLeftToday === 0} onClick={() => { void invite(); }}>Send invitation</button></div>
         </>}
-      <p className="hiring-meta">Invitations left today: {overview.invitationsLeftToday ?? 'NA'} of {overview.dailyInvitationLimit ?? 'NA'}. The student is told in ONE; you learn who they are only if they apply.</p>
+      <p className="hiring-meta">{typeof overview.invitationsLeftToday === 'number' && typeof overview.dailyInvitationLimit === 'number'
+        ? `Invitations left today: ${overview.invitationsLeftToday} of ${overview.dailyInvitationLimit}. ` : ''}The student is told in ONE; you learn who they are only if they apply.</p>
     </section> : null}
 
     <section className="role-card role-wide" aria-label="Your invitations">
       <h3>Your invitations</h3>
       {(overview.invitations ?? []).length === 0 ? <p className="hiring-meta">You have not invited anyone yet.</p>
         : <ul className="hiring-list">{(overview.invitations ?? []).map((item, index) => <li key={index} className="hiring-list-item">
-          <div><h4>{item.title ?? 'NA'}</h4><p className="hiring-meta">Sent {formatDate(item.sentAt)} · open until {formatDate(item.expiresAt)}</p></div>
+          <div><h4>{item.title ?? 'A role you posted'}</h4><p className="hiring-meta">Sent {formatDate(item.sentAt)} · open until {formatDate(item.expiresAt)}</p></div>
           <span className="hiring-tag">{item.status === 'APPLIED' ? 'Applied — see Applicants' : item.status === 'PENDING' ? 'No answer yet' : 'Closed'}</span>
         </li>)}</ul>}
     </section>

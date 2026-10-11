@@ -116,7 +116,7 @@ export function PlacementStatusList({ token, institutionId }: { readonly token: 
     <div className="pilot-card-head"><h2>Placement status by student</h2></div>
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {!rows && !error ? <p role="status">Loading students…</p> : null}
-    {rows && rows.length === 0 ? <V2EmptyState icon="🎓" title="No students in your scope" note="Students appear here once they are on the roster with a current relationship." /> : null}
+    {rows && rows.length === 0 ? <V2EmptyState illustration="no-students-roster" icon="🎓" title="No students in your scope" note="Students appear here once they are on the roster with a current relationship." /> : null}
     {rows && rows.length > 0 ? <div className="role-record-table-wrap"><table className="role-record-table"><caption className="sr-only">Placement status by student</caption>
       <thead><tr><th scope="col">Student</th><th scope="col">Department</th><th scope="col">Batch</th><th scope="col">Placement status</th><th scope="col">Shared</th><th scope="col">Last shared update</th><th scope="col">Applications</th></tr></thead>
       <tbody>{rows.map((row) => <tr key={row.studentUserId} className="role-record-row">

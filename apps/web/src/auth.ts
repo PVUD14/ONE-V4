@@ -70,6 +70,16 @@ export function getAuthStatus(): AuthStatus {
   return { state: 'anonymous', config };
 }
 
+/**
+ * True when this tab holds a saved session whose access token has run out. Read it before
+ * restoreAuthenticatedSession (which clears such a session): when the restore then ends signed
+ * out, the app shows "Your session has expired" rather than a plain sign-in prompt (re-skin phase 8).
+ */
+export function hasExpiredStoredSession(): boolean {
+  const persisted = readPersistedSession();
+  return Boolean(persisted && persisted.accessTokenExpiresAt <= Date.now() + 30_000);
+}
+
 export function hasStoredAuthSession(): boolean {
   return window.sessionStorage.getItem(sessionKey) !== null;
 }

@@ -1,0 +1,992 @@
+[
+  {
+    "id": "coach",
+    "file": "svg/coach.svg",
+    "static": "svg/coach-static.svg",
+    "type": "illustration",
+    "variants": [
+      "animated",
+      "static",
+      "light",
+      "dark",
+      "reduced-motion"
+    ],
+    "roles": [
+      "student",
+      "graduate"
+    ],
+    "portal": "Student & Graduate",
+    "module": "AI Career Coach",
+    "usage": "Rail → AI Coach, until the coach launches",
+    "approved": true,
+    "label": "A lens-shaped coach racking into focus while a reply is being typed",
+    "copy": {
+      "title": "Your coach is coming into focus",
+      "body": "Soon you can ask what to do next and rehearse interviews, with every answer grounded in your own verified evidence.",
+      "primary": "Notify me when it’s live",
+      "secondary": "Practice questions instead",
+      "note": "Grounded only in evidence you choose to share. Never shared with employers."
+    }
+  },
+  {
+    "id": "no-applications",
+    "file": "svg/no-applications.svg",
+    "static": "svg/no-applications-static.svg",
+    "type": "illustration",
+    "variants": [
+      "animated",
+      "static",
+      "light",
+      "dark",
+      "reduced-motion"
+    ],
+    "roles": [
+      "student",
+      "graduate"
+    ],
+    "portal": "Student & Graduate",
+    "module": "Applications",
+    "usage": "Apply → Applications, before the first application",
+    "approved": true,
+    "label": "A lens scanning a row of opportunity cards and bringing one into focus",
+    "copy": {
+      "title": "No applications yet",
+      "body": "When you apply for a role, you’ll follow every stage here, from applied and screening to interview and offer.",
+      "primary": "Explore roles",
+      "helper": "Your verified profile is ready. Employers see only the evidence you choose to send, never your readiness band."
+    }
+  },
+  {
+    "id": "no-interviews",
+    "file": "svg/no-interviews.svg",
+    "static": "svg/no-interviews-static.svg",
+    "type": "illustration",
+    "variants": [
+      "animated",
+      "static",
+      "light",
+      "dark",
+      "reduced-motion"
+    ],
+    "roles": [
+      "student",
+      "graduate"
+    ],
+    "portal": "Student & Graduate",
+    "module": "Interviews",
+    "usage": "Apply → Interviews, when nothing is scheduled",
+    "approved": false,
+    "label": "A lens focused on an empty calendar, with a video-interview card waiting for its first booking",
+    "copy": {
+      "title": "No interviews scheduled",
+      "body": "When an employer invites you, the round, time and a prep checklist will appear here and in your calendar.",
+      "primary": "Practise an interview",
+      "secondary": "View applications"
+    }
+  },
+  {
+    "id": "no-assessments",
+    "file": "svg/no-assessments.svg",
+    "static": "svg/no-assessments-static.svg",
+    "type": "illustration",
+    "variants": [
+      "animated",
+      "static",
+      "light",
+      "dark",
+      "reduced-motion"
+    ],
+    "roles": [
+      "student",
+      "graduate"
+    ],
+    "portal": "Student & Graduate",
+    "module": "Assessments",
+    "usage": "Prepare → Assessments, before any are assigned",
+    "approved": false,
+    "label": "A lens over a clipboard with an unanswered question card and an evidence card waiting to be earned",
+    "copy": {
+      "title": "No assessments assigned yet",
+      "body": "Assessments from Lakeview or employers will show up here. Each one you complete becomes a verified evidence record.",
+      "primary": "Take a mock test"
+    }
+  },
+  {
+    "id": "learning-not-started",
+    "file": "svg/learning-not-started.svg",
+    "static": "svg/learning-not-started-static.svg",
+    "type": "illustration",
+    "variants": [
+      "animated",
+      "static",
+      "light",
+      "dark",
+      "reduced-motion"
+    ],
+    "roles": [
+      "student",
+      "graduate"
+    ],
+    "portal": "Student & Graduate",
+    "module": "Learning",
+    "usage": "Prepare → Learning, before the first lesson",
+    "approved": false,
+    "label": "A lens over an open book, with the first lesson card ready and a three-step lesson path starting below",
+    "copy": {
+      "title": "Your learning path is ready",
+      "body": "Start Career Readiness Fundamentals: three short lessons that build evidence for your goal.",
+      "primary": "Start lesson 1"
+    }
+  },
+  {
+    "id": "no-scholarships",
+    "file": "svg/no-scholarships.svg",
+    "static": "svg/no-scholarships-static.svg",
+    "type": "illustration",
+    "variants": [
+      "animated",
+      "static",
+      "light",
+      "dark",
+      "reduced-motion"
+    ],
+    "roles": [
+      "student",
+      "graduate"
+    ],
+    "portal": "Student & Graduate",
+    "module": "Scholarships",
+    "usage": "Apply → Scholarships, when nothing matches",
+    "approved": false,
+    "label": "A lens over a graduation cap, an award card and an empty dashed slot where matching scholarships will appear",
+    "copy": {
+      "title": "No scholarships match yet",
+      "body": "We’ll list scholarships that fit your programme and goal as institutions publish them.",
+      "primary": "Turn on scholarship alerts",
+      "secondary": "Update profile"
+    }
+  },
+  {
+    "id": "no-documents",
+    "file": "svg/no-documents.svg",
+    "static": "svg/no-documents-static.svg",
+    "type": "illustration",
+    "variants": [
+      "animated",
+      "static",
+      "light",
+      "dark",
+      "reduced-motion"
+    ],
+    "roles": [
+      "student",
+      "graduate"
+    ],
+    "portal": "Student & Graduate",
+    "module": "Documents",
+    "usage": "Profile → Documents, before the first upload",
+    "approved": false,
+    "label": "A lens over a folder, a certificate and a dashed upload zone with an arrow rising into it",
+    "copy": {
+      "title": "No documents yet",
+      "body": "Keep certificates and transcripts in one place. You decide what each employer can see.",
+      "primary": "Upload a document",
+      "note": "Documents stay private until you attach them to an application."
+    }
+  },
+  {
+    "id": "no-messages",
+    "file": "svg/no-messages.svg",
+    "static": "svg/no-messages-static.svg",
+    "type": "illustration",
+    "variants": [
+      "animated",
+      "static",
+      "light",
+      "dark",
+      "reduced-motion"
+    ],
+    "roles": [
+      "student",
+      "graduate"
+    ],
+    "portal": "Student & Graduate",
+    "module": "Messages",
+    "usage": "Top bar → Messages, before the first conversation",
+    "approved": false,
+    "label": "A lens over a chat bubble, an empty dashed message bubble and a quiet conversation list",
+    "copy": {
+      "title": "No messages yet",
+      "body": "Messages from Lakeview staff and employers you’ve applied to will appear here.",
+      "primary": "Explore roles"
+    }
+  },
+  {
+    "id": "search-no-results",
+    "file": "svg/search-no-results.svg",
+    "static": "svg/search-no-results-static.svg",
+    "type": "illustration",
+    "variants": [
+      "animated",
+      "static",
+      "light",
+      "dark",
+      "reduced-motion"
+    ],
+    "roles": [
+      "student",
+      "graduate"
+    ],
+    "portal": "Student & Graduate",
+    "module": "Opportunities",
+    "usage": "Any search or filtered list with zero results",
+    "approved": false,
+    "label": "A lens with an empty dashed result inside, a search field with a blinking caret and a row of filter chips",
+    "copy": {
+      "title": "No results for that search",
+      "body": "Try a broader role title, fewer filters or a nearby city.",
+      "primary": "Clear filters",
+      "secondary": "Save this search"
+    }
+  },
+  {
+    "id": "resume-empty",
+    "file": "svg/resume-empty.svg",
+    "static": "svg/resume-empty-static.svg",
+    "type": "illustration",
+    "variants": [
+      "animated",
+      "static",
+      "light",
+      "dark",
+      "reduced-motion"
+    ],
+    "roles": [
+      "student",
+      "graduate"
+    ],
+    "portal": "Student & Graduate",
+    "module": "Resume Builder",
+    "usage": "Career Tools → Resume Builder, first visit",
+    "approved": false,
+    "label": "A lens over a blank resume page, fed by a verified profile card along a dotted path into a resume with dashed lines",
+    "copy": {
+      "title": "Start your resume from your evidence",
+      "body": "We’ll pre-fill sections from your verified records. You review every line before anything is shared.",
+      "primary": "Build resume"
+    }
+  },
+  {
+    "id": "practice-start",
+    "file": "svg/practice-start.svg",
+    "static": "svg/practice-start-static.svg",
+    "type": "illustration",
+    "variants": [
+      "animated",
+      "static",
+      "light",
+      "dark",
+      "reduced-motion"
+    ],
+    "roles": [
+      "student",
+      "graduate"
+    ],
+    "portal": "Student & Graduate",
+    "module": "Practice",
+    "usage": "Prepare → Practice, before the first set",
+    "approved": false,
+    "label": "A lens with a play button at its centre, a practice question card and a ten-step question track ready to start",
+    "copy": {
+      "title": "Warm up with a practice set",
+      "body": "Ten questions, no time pressure. Practice answers are visible only to you.",
+      "primary": "Start practising"
+    }
+  },
+  {
+    "id": "queue-clear",
+    "file": "svg/queue-clear.svg",
+    "static": "svg/queue-clear-static.svg",
+    "type": "illustration",
+    "variants": [
+      "animated",
+      "static",
+      "light",
+      "dark",
+      "reduced-motion"
+    ],
+    "roles": [
+      "institution-admin",
+      "placement",
+      "lecturer",
+      "department-head"
+    ],
+    "portal": "Institution",
+    "module": "Verification queue",
+    "usage": "Admin / Lecturer → Verification, when nothing is waiting",
+    "approved": true,
+    "label": "A lens settled on a verified check seal: the verification queue is clear",
+    "copy": {
+      "title": "Verification queue clear",
+      "body": "New evidence submitted by Lakeview students will appear here for review.",
+      "count": "0 records waiting for a decision",
+      "primary": "View verification history"
+    }
+  },
+  {
+    "id": "no-students-roster",
+    "file": "svg/no-students-roster.svg",
+    "static": "svg/no-students-roster-static.svg",
+    "type": "illustration",
+    "variants": [
+      "animated",
+      "static",
+      "light",
+      "dark",
+      "reduced-motion"
+    ],
+    "roles": [
+      "institution-admin",
+      "placement",
+      "lecturer",
+      "department-head"
+    ],
+    "portal": "Institution",
+    "module": "Students",
+    "usage": "Admin → Students, before the roster is imported",
+    "approved": false,
+    "label": "A lens with an add-person mark, a CSV roster sheet flowing in and an empty roster list with dashed avatars",
+    "copy": {
+      "title": "Add your first students",
+      "body": "Import your roster as a CSV or invite students by email. They activate their own accounts.",
+      "primary": "Import roster (CSV)",
+      "secondary": "Invite by email"
+    }
+  },
+  {
+    "id": "no-interventions",
+    "file": "svg/no-interventions.svg",
+    "static": "svg/no-interventions-static.svg",
+    "type": "illustration",
+    "variants": [
+      "animated",
+      "static",
+      "light",
+      "dark",
+      "reduced-motion"
+    ],
+    "roles": [
+      "institution-admin",
+      "placement",
+      "lecturer",
+      "department-head"
+    ],
+    "portal": "Institution",
+    "module": "Interventions",
+    "usage": "Admin / Lecturer / HOD → Interventions, none open",
+    "approved": false,
+    "label": "A lens around a support flag, a student card with a partial climb meter and an empty intervention plan",
+    "copy": {
+      "title": "No interventions open",
+      "body": "When a student needs extra support, plan an intervention here and track each follow-up.",
+      "primary": "Plan an intervention"
+    }
+  },
+  {
+    "id": "no-placement-drives",
+    "file": "svg/no-placement-drives.svg",
+    "static": "svg/no-placement-drives-static.svg",
+    "type": "illustration",
+    "variants": [
+      "animated",
+      "static",
+      "light",
+      "dark",
+      "reduced-motion"
+    ],
+    "roles": [
+      "institution-admin",
+      "placement",
+      "lecturer",
+      "department-head"
+    ],
+    "portal": "Institution",
+    "module": "Placement",
+    "usage": "Placement / HOD → Placement Pipeline, no drives",
+    "approved": false,
+    "label": "A lens around a briefcase, a drive date card with an open dashed slot and a row of employer tiles with one place still open",
+    "copy": {
+      "title": "No placement drives scheduled",
+      "body": "Schedule a drive to invite employers. Student profiles are shared only with each student’s consent.",
+      "primary": "Schedule a drive"
+    }
+  },
+  {
+    "id": "no-reports",
+    "file": "svg/no-reports.svg",
+    "static": "svg/no-reports-static.svg",
+    "type": "illustration",
+    "variants": [
+      "animated",
+      "static",
+      "light",
+      "dark",
+      "reduced-motion"
+    ],
+    "roles": [
+      "institution-admin",
+      "placement",
+      "lecturer",
+      "department-head"
+    ],
+    "portal": "Institution",
+    "module": "Reports",
+    "usage": "Admin / Lecturer / HOD → Reports, none saved",
+    "approved": false,
+    "label": "A lens around slanted chart bars, a cohort band-mix report card and an empty chart waiting for data",
+    "copy": {
+      "title": "No reports yet",
+      "body": "Build a report on cohort bands, activation or placement. Any count under five shows as <5.",
+      "primary": "Create a report"
+    }
+  },
+  {
+    "id": "no-meetings",
+    "file": "svg/no-meetings.svg",
+    "static": "svg/no-meetings-static.svg",
+    "type": "illustration",
+    "variants": [
+      "animated",
+      "static",
+      "light",
+      "dark",
+      "reduced-motion"
+    ],
+    "roles": [
+      "institution-admin",
+      "placement",
+      "lecturer",
+      "department-head"
+    ],
+    "portal": "Institution",
+    "module": "Meetings",
+    "usage": "Department Head → Meetings, nothing this week",
+    "approved": false,
+    "label": "A lens around a video camera, an agenda card and a quiet week strip with no meetings booked",
+    "copy": {
+      "title": "No meetings this week",
+      "body": "Schedule department reviews or student check-ins. Agendas and notes stay attached.",
+      "primary": "Schedule a meeting"
+    }
+  },
+  {
+    "id": "tasks-all-done",
+    "file": "svg/tasks-all-done.svg",
+    "static": "svg/tasks-all-done-static.svg",
+    "type": "illustration",
+    "variants": [
+      "animated",
+      "static",
+      "light",
+      "dark",
+      "reduced-motion"
+    ],
+    "roles": [
+      "institution-admin",
+      "placement",
+      "lecturer",
+      "department-head"
+    ],
+    "portal": "Institution",
+    "module": "Assigned Tasks",
+    "usage": "Lecturer → Assigned Tasks, all complete",
+    "approved": false,
+    "label": "A lens settled on a completed checklist, with every task card ticked off and chevrons rising",
+    "copy": {
+      "title": "All tasks done",
+      "body": "New verification requests and reviews will appear here as they arrive.",
+      "count": "0 tasks left today",
+      "primary": "View completed tasks"
+    }
+  },
+  {
+    "id": "no-applicants",
+    "file": "svg/no-applicants.svg",
+    "static": "svg/no-applicants-static.svg",
+    "type": "illustration",
+    "variants": [
+      "animated",
+      "static",
+      "light",
+      "dark",
+      "reduced-motion"
+    ],
+    "roles": [
+      "employer",
+      "employer-owner"
+    ],
+    "portal": "Employer",
+    "module": "Applicants",
+    "usage": "Opportunity Detail → Applicants, role live with no applicants",
+    "approved": false,
+    "label": "A lens around an inbox tray, a live job posting and an applicants card with dashed, empty places",
+    "copy": {
+      "title": "No applicants yet",
+      "body": "Graduate Software Engineer is live. Applicants appear here with the evidence they choose to share.",
+      "primary": "Share role link",
+      "secondary": "Edit opportunity"
+    }
+  },
+  {
+    "id": "talent-pool-empty",
+    "file": "svg/talent-pool-empty.svg",
+    "static": "svg/talent-pool-empty-static.svg",
+    "type": "illustration",
+    "variants": [
+      "animated",
+      "static",
+      "light",
+      "dark",
+      "reduced-motion"
+    ],
+    "roles": [
+      "employer",
+      "employer-owner"
+    ],
+    "portal": "Employer",
+    "module": "Talent Pool",
+    "usage": "Employer → Talent Pool, nobody saved",
+    "approved": false,
+    "label": "A lens magnifying an empty pool of dashed candidate places, with a bookmark card and a consent card",
+    "copy": {
+      "title": "Your talent pool is empty",
+      "body": "Save candidates from any role to revisit later. They stay here only while their consent is active.",
+      "primary": "Browse applicants"
+    }
+  },
+  {
+    "id": "no-offers",
+    "file": "svg/no-offers.svg",
+    "static": "svg/no-offers-static.svg",
+    "type": "illustration",
+    "variants": [
+      "animated",
+      "static",
+      "light",
+      "dark",
+      "reduced-motion"
+    ],
+    "roles": [
+      "employer",
+      "employer-owner"
+    ],
+    "portal": "Employer",
+    "module": "Offers",
+    "usage": "Employer → Offers, none extended",
+    "approved": false,
+    "label": "A lens around an envelope, an unsigned offer letter and a hiring pipeline whose final offer stage is still dashed",
+    "copy": {
+      "title": "No offers sent yet",
+      "body": "When you extend an offer, track acceptance and joining dates here.",
+      "primary": "Create an offer"
+    }
+  },
+  {
+    "id": "no-opportunities-posted",
+    "file": "svg/no-opportunities-posted.svg",
+    "static": "svg/no-opportunities-posted-static.svg",
+    "type": "illustration",
+    "variants": [
+      "animated",
+      "static",
+      "light",
+      "dark",
+      "reduced-motion"
+    ],
+    "roles": [
+      "employer",
+      "employer-owner"
+    ],
+    "portal": "Employer",
+    "module": "Opportunities",
+    "usage": "Employer → Opportunities, before the first post",
+    "approved": false,
+    "label": "A lens around a megaphone, a blank job form with a plus button and partner campuses waiting to be reached",
+    "copy": {
+      "title": "Post your first opportunity",
+      "body": "Describe the role and the evidence you’d like to see. Corvane Labs roles reach students at partner institutions.",
+      "primary": "Post an opportunity"
+    }
+  },
+  {
+    "id": "all-systems-healthy",
+    "file": "svg/all-systems-healthy.svg",
+    "static": "svg/all-systems-healthy-static.svg",
+    "type": "illustration",
+    "variants": [
+      "animated",
+      "static",
+      "light",
+      "dark",
+      "reduced-motion"
+    ],
+    "roles": [
+      "operations"
+    ],
+    "portal": "Operations",
+    "module": "System Health",
+    "usage": "Operations → System Health, no incidents",
+    "approved": false,
+    "label": "A lens around a steady heartbeat line, a service list with every check green and an uptime strip",
+    "copy": {
+      "title": "All systems healthy",
+      "body": "API, assessments, AI services and email delivery are operating normally.",
+      "primary": "View status history"
+    }
+  },
+  {
+    "id": "no-flagged-items",
+    "file": "svg/no-flagged-items.svg",
+    "static": "svg/no-flagged-items-static.svg",
+    "type": "illustration",
+    "variants": [
+      "animated",
+      "static",
+      "light",
+      "dark",
+      "reduced-motion"
+    ],
+    "roles": [
+      "operations"
+    ],
+    "portal": "Operations",
+    "module": "Trust and Safety",
+    "usage": "Operations → Trust and Safety, queue empty",
+    "approved": false,
+    "label": "A lens settled on a shield with a check, an empty dashed flag and a content card being scanned clean",
+    "copy": {
+      "title": "Nothing flagged",
+      "body": "Reported content and accounts will appear here for a decision.",
+      "count": "0 items waiting for review",
+      "primary": "View review history"
+    }
+  },
+  {
+    "id": "audit-log-empty",
+    "file": "svg/audit-log-empty.svg",
+    "static": "svg/audit-log-empty-static.svg",
+    "type": "illustration",
+    "variants": [
+      "animated",
+      "static",
+      "light",
+      "dark",
+      "reduced-motion"
+    ],
+    "roles": [
+      "operations"
+    ],
+    "portal": "Operations",
+    "module": "Audit Logs",
+    "usage": "Operations → Audit Logs, filter returns nothing",
+    "approved": false,
+    "label": "A lens around a history clock, a date-range filter and an empty audit timeline with dashed rows",
+    "copy": {
+      "title": "No audit events in this range",
+      "body": "Try a wider date range or remove the actor filter.",
+      "primary": "Reset filters"
+    }
+  },
+  {
+    "id": "no-leads",
+    "file": "svg/no-leads.svg",
+    "static": "svg/no-leads-static.svg",
+    "type": "illustration",
+    "variants": [
+      "animated",
+      "static",
+      "light",
+      "dark",
+      "reduced-motion"
+    ],
+    "roles": [
+      "growth"
+    ],
+    "portal": "Growth",
+    "module": "Leads",
+    "usage": "Growth → Leads / Field, territory empty",
+    "approved": false,
+    "label": "A lens with a map pin over a territory map with no leads marked yet and a dashed add-lead card",
+    "copy": {
+      "title": "No leads in this territory yet",
+      "body": "Add an institution you met in the field or import a list to start your pipeline.",
+      "primary": "Add a lead",
+      "secondary": "Import list"
+    }
+  },
+  {
+    "id": "target-achieved",
+    "file": "svg/target-achieved.svg",
+    "static": "svg/target-achieved-static.svg",
+    "type": "illustration",
+    "variants": [
+      "animated",
+      "static",
+      "light",
+      "dark",
+      "reduced-motion"
+    ],
+    "roles": [
+      "growth"
+    ],
+    "portal": "Growth",
+    "module": "Targets",
+    "usage": "Growth → Targets, quarter target reached (celebration)",
+    "approved": false,
+    "label": "A celebrating lens with a target hit dead centre, rising steps, confetti and a commission card",
+    "copy": {
+      "title": "Target achieved",
+      "body": "You’ve hit this quarter’s target. Commission is calculated at month end.",
+      "primary": "View commission"
+    }
+  },
+  {
+    "id": "404-not-found",
+    "file": "svg/404-not-found.svg",
+    "static": "svg/404-not-found-static.svg",
+    "type": "illustration",
+    "variants": [
+      "animated",
+      "static",
+      "light",
+      "dark",
+      "reduced-motion"
+    ],
+    "roles": [
+      "all"
+    ],
+    "portal": "System",
+    "module": "Page not found",
+    "usage": "Any portal · unknown route",
+    "approved": false,
+    "label": "A lens following a dotted route that ends at a missing step, a broken link card and a signpost with a dashed arm",
+    "copy": {
+      "title": "We can’t find that page",
+      "body": "The link may be out of date or the page has moved. Your data is safe.",
+      "primary": "Go to home",
+      "secondary": "Help & FAQ"
+    }
+  },
+  {
+    "id": "500-something-went-wrong",
+    "file": "svg/500-something-went-wrong.svg",
+    "static": "svg/500-something-went-wrong-static.svg",
+    "type": "illustration",
+    "variants": [
+      "animated",
+      "static",
+      "light",
+      "dark",
+      "reduced-motion"
+    ],
+    "roles": [
+      "all"
+    ],
+    "portal": "System",
+    "module": "Something went wrong",
+    "usage": "Any portal · server error",
+    "approved": false,
+    "label": "A lens around an unplugged connector, a server rack with one row out and a retry card turning slowly",
+    "copy": {
+      "title": "Something went wrong on our side",
+      "body": "We couldn’t load this page. Your saved work is safe; please try again in a moment.",
+      "primary": "Try again",
+      "secondary": "Contact support"
+    }
+  },
+  {
+    "id": "offline",
+    "file": "svg/offline.svg",
+    "static": "svg/offline-static.svg",
+    "type": "illustration",
+    "variants": [
+      "animated",
+      "static",
+      "light",
+      "dark",
+      "reduced-motion"
+    ],
+    "roles": [
+      "all"
+    ],
+    "portal": "System",
+    "module": "Offline",
+    "usage": "Any portal · no network connection",
+    "approved": false,
+    "label": "A lens around a crossed-out signal with fading waves, a cloud waiting to sync and a phone with a dashed gap",
+    "copy": {
+      "title": "You’re offline",
+      "body": "Check your connection. We’ll reconnect automatically when you’re back online.",
+      "primary": "Retry now"
+    }
+  },
+  {
+    "id": "no-access",
+    "file": "svg/no-access.svg",
+    "static": "svg/no-access-static.svg",
+    "type": "illustration",
+    "variants": [
+      "animated",
+      "static",
+      "light",
+      "dark",
+      "reduced-motion"
+    ],
+    "roles": [
+      "all"
+    ],
+    "portal": "System",
+    "module": "No access",
+    "usage": "Any portal · route outside the user’s role",
+    "approved": false,
+    "label": "A lens around a padlock, an ID card and a permissions card with this page switched off",
+    "copy": {
+      "title": "You don’t have access to this page",
+      "body": "This area isn’t part of your role. Ask your administrator if you need it.",
+      "primary": "Go to dashboard",
+      "secondary": "Request access"
+    }
+  },
+  {
+    "id": "maintenance",
+    "file": "svg/maintenance.svg",
+    "static": "svg/maintenance-static.svg",
+    "type": "illustration",
+    "variants": [
+      "animated",
+      "static",
+      "light",
+      "dark",
+      "reduced-motion"
+    ],
+    "roles": [
+      "all"
+    ],
+    "portal": "System",
+    "module": "Maintenance",
+    "usage": "Global · scheduled maintenance window",
+    "approved": false,
+    "label": "A lens around a wrench, turning gears on a status card and a striped barrier on the slant",
+    "copy": {
+      "title": "We’re making ONE better",
+      "body": "Scheduled maintenance is under way. Your data and progress are safe.",
+      "primary": "Check status"
+    }
+  },
+  {
+    "id": "coming-soon",
+    "file": "svg/coming-soon.svg",
+    "static": "svg/coming-soon-static.svg",
+    "type": "illustration",
+    "variants": [
+      "animated",
+      "static",
+      "light",
+      "dark",
+      "reduced-motion"
+    ],
+    "roles": [
+      "all"
+    ],
+    "portal": "System",
+    "module": "Coming soon",
+    "usage": "Any module not yet released",
+    "approved": false,
+    "label": "A lens with the “You” sphere and an orbiting glint, three steps built and a dashed fourth step still coming",
+    "copy": {
+      "title": "Coming soon",
+      "body": "We’re building this next. We’ll let you know as soon as it’s ready.",
+      "primary": "Notify me"
+    }
+  },
+  {
+    "id": "session-expired",
+    "file": "svg/session-expired.svg",
+    "static": "svg/session-expired-static.svg",
+    "type": "illustration",
+    "variants": [
+      "animated",
+      "static",
+      "light",
+      "dark",
+      "reduced-motion"
+    ],
+    "roles": [
+      "all"
+    ],
+    "portal": "System",
+    "module": "Session expired",
+    "usage": "Any portal · auth token expired",
+    "approved": false,
+    "label": "A lens around a turning hourglass, a sign-in card waiting for you and a security shield card",
+    "copy": {
+      "title": "Your session has expired",
+      "body": "For your security we sign you out after a period of inactivity. Sign in again to continue.",
+      "primary": "Sign in again"
+    }
+  },
+  {
+    "id": "onboarding-welcome",
+    "file": "svg/onboarding-welcome.svg",
+    "static": "svg/onboarding-welcome-static.svg",
+    "type": "illustration",
+    "variants": [
+      "animated",
+      "static",
+      "light",
+      "dark",
+      "reduced-motion"
+    ],
+    "roles": [
+      "all"
+    ],
+    "portal": "Student & Graduate",
+    "module": "Welcome",
+    "usage": "First sign-in hero (shown once)",
+    "approved": false,
+    "label": "A welcoming lens with the glowing “You” sphere above four rising steps, a new profile card and a goal card",
+    "copy": {
+      "title": "Welcome to ONE, Arjun",
+      "body": "One workspace from learning to landing the role. Set your goal and add your first evidence.",
+      "primary": "Get started",
+      "secondary": "Take the tour"
+    }
+  },
+  {
+    "id": "success-generic",
+    "file": "svg/success-generic.svg",
+    "static": "svg/success-generic-static.svg",
+    "type": "illustration",
+    "variants": [
+      "animated",
+      "static",
+      "light",
+      "dark",
+      "reduced-motion"
+    ],
+    "roles": [
+      "all"
+    ],
+    "portal": "System",
+    "module": "Submitted",
+    "usage": "Any submit / save confirmation",
+    "approved": false,
+    "label": "A lens settled on a check seal with a single ripple, an evidence card sent along a dotted trail and a saved toast",
+    "copy": {
+      "title": "Submitted for verification",
+      "body": "Your evidence record was sent to Lakeview. We’ll notify you when it’s reviewed.",
+      "primary": "Done",
+      "secondary": "View record"
+    }
+  }
+]

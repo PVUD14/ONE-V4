@@ -77,7 +77,7 @@ function useSupportPolicy(token: string | null): { readonly policy: SupportPolic
 
 function Forbidden({ heading, note, reference }: { readonly heading: React.ReactElement; readonly note: string; readonly reference: string }): React.ReactElement {
   return <section className="role-module role-module--dense">{heading}
-    <div className="role-wide"><V2EmptyState icon="🔐" title="Not permitted" note={note} hint={<SupportCode reference={reference} />} /></div></section>;
+    <div className="role-wide"><V2EmptyState illustration="no-access" icon="🔐" title="Not permitted" note={note} hint={<SupportCode reference={reference} />} /></div></section>;
 }
 
 // ---------------------------------------------------------------------------
@@ -174,7 +174,7 @@ export function OperationsSupportDeskPage(): React.ReactElement {
         <label><input type="checkbox" checked={filters.overdue} onChange={(event) => setFilters({ ...filters, overdue: event.target.checked })} /> Past SLA target only</label>
       </div>
       {loading && !queue ? <p>Loading cases…</p> : null}
-      {!loading && queue && !cases.length ? <V2EmptyState icon="✅" title="No cases here" note="No support case matches this view." /> : null}
+      {!loading && queue && !cases.length ? <V2EmptyState illustration="tasks-all-done" icon="✅" title="No cases here" note="No support case matches this view." /> : null}
       {cases.length ? <div className="role-record-table-wrap"><table className="role-record-table">
         <thead><tr><th>Case</th><th>Summary</th><th>Category</th><th>Severity</th><th>State</th><th>SLA target</th><th>Assigned</th><th>Actions</th></tr></thead>
         <tbody>{cases.map((item) => <tr key={item.id}>
@@ -487,7 +487,7 @@ export function OperationsAccountLookupPage({ mode = 'directory' }: { readonly m
         <button type="submit" disabled={searching}>{searching ? 'Searching…' : 'Search'}</button>
       </form>
       {error ? <p className="form-error" role="alert">{error}</p> : null}
-      {results && !results.length ? <V2EmptyState icon="🔎" title="No matching account" note="No ONE account matches this search." /> : null}
+      {results && !results.length ? <V2EmptyState illustration="search-no-results" icon="🔎" title="No matching account" note="No ONE account matches this search." /> : null}
       {results?.length ? <div className="role-record-table-wrap"><table className="role-record-table">
         <thead><tr><th>Email (masked)</th><th>State</th><th>Sign-in linked</th><th>Memberships</th><th>Created</th><th>Actions</th></tr></thead>
         <tbody>{results.map((account) => <tr key={account.userId}>

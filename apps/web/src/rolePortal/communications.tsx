@@ -86,7 +86,7 @@ export function OperationsCommunicationsPage(): React.ReactElement | null {
 
   if (forbiddenReference) {
     return <section className="role-module role-module--dense">{heading}
-      <div className="role-wide"><V2EmptyState icon="🔐" title="Not permitted" note="Status communications are for staff who hold Communications Templates. Your access has not changed." hint={<SupportCode reference={forbiddenReference} />} /></div></section>;
+      <div className="role-wide"><V2EmptyState illustration="no-access" icon="🔐" title="Not permitted" note="Status communications are for staff who hold Communications Templates. Your access has not changed." hint={<SupportCode reference={forbiddenReference} />} /></div></section>;
   }
   if (!policy?.reasons || !templates || !notices) {
     return <section className="role-module role-module--dense">{heading}
@@ -151,7 +151,7 @@ export function OperationsCommunicationsPage(): React.ReactElement | null {
             {template.canPublish ? <button type="button" className="secondary" onClick={() => setAction({ kind: 'publish', template })}>Publish…</button> : null}
             {template.state === 'DRAFT' ? <button type="button" className="secondary" onClick={() => setAction({ kind: 'withdrawTemplate', template })}>Withdraw…</button> : null}
           </td>
-        </tr>)}</tbody></table></div> : <V2EmptyState icon="📝" title="No templates yet" note="Draft the first status notice template below." />}
+        </tr>)}</tbody></table></div> : <V2EmptyState illustration="no-documents" icon="📝" title="No templates yet" note="Draft the first status notice template below." />}
       <form onSubmit={(event) => void submitTemplate(event)} noValidate aria-label="Draft a template version">
         <h3>Draft a template version</h3>
         <p>Using an existing key drafts its next version. The wording is sent exactly as written.</p>
@@ -189,7 +189,7 @@ export function OperationsCommunicationsPage(): React.ReactElement | null {
                 : <small>You drafted this notice, so another person approves it.</small>}
             <button type="button" className="secondary" onClick={() => setAction({ kind: 'withdrawNotice', notice: item })}>Withdraw…</button>
           </> : null}</td>
-        </tr>)}</tbody></table></div> : <V2EmptyState icon="📤" title="No notices yet" note="Draft a notice for an open incident below." />}
+        </tr>)}</tbody></table></div> : <V2EmptyState illustration="no-messages" icon="📤" title="No notices yet" note="Draft a notice for an open incident below." />}
       <form onSubmit={(event) => void submitNotice(event)} noValidate aria-label="Draft a notice">
         <h3>Draft a notice</h3>
         {!published.length ? <p>No template version is published yet. A notice can only use a published version.</p> : null}

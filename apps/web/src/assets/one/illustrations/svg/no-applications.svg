@@ -1,0 +1,162 @@
+<svg xmlns="http://www.w3.org/2000/svg" class="lx go" viewBox="0 0 440 300" width="440" height="300" role="img" aria-label="A lens scanning a row of opportunity cards and bringing one into focus"><style>
+svg{--m-base:450ms;--m-enter:700ms;--m-slow:900ms;--m-cele:1000ms;--m-focus:1100ms;--e-out:cubic-bezier(.2,.8,.2,1);--e-inout:cubic-bezier(.65,0,.35,1);--e-settle:cubic-bezier(.34,1.36,.64,1);--loop-breathe:4s;--loop-nudge:6s;--loop-flow:12s;--loop-loader:1.2s;--brand:#1E6BFF;--indigo:#2B1BB8;--cyan:#18C8E8;--orange:#FF8A1F;--ok:#0C8A65;--lx-card:#FFFFFF;--lx-edge:#DCE3EF;--lx-edge-2:#C9D3E4;--lx-edge-3:#E2E8F3;--lx-ink:#5F6987;--lx-chip:#E6EEFF;--lx-plate:rgba(30,107,255,.05);--lx-hole:#FFFFFF;--lx-shadow:rgba(10,16,48,.13);--lx-glow-a:.24;--lx-glow-b:.08;--lx-soft:.78}
+@media (prefers-color-scheme: dark){svg{--brand:#4F8DFF;--indigo:#5B4BF0;--cyan:#3FD9F2;--orange:#FF9A3D;--ok:#46D6A4;--lx-card:#18213F;--lx-edge:#2C3762;--lx-edge-2:#34406E;--lx-edge-3:#232C52;--lx-ink:#8F99BA;--lx-chip:#1B2A5C;--lx-plate:rgba(79,141,255,.08);--lx-hole:#0D1227;--lx-shadow:rgba(0,0,0,.5);--lx-glow-a:.34;--lx-glow-b:.12;--lx-soft:.6}}
+
+.lx{overflow:visible;color:var(--lx-ink);display:block}
+.lx *{transform-box:view-box}
+.lx .lx-shadow{--lx-card:var(--lx-shadow);--lx-edge:transparent;opacity:.55}.lx .lx-shadow .gfill{fill:var(--lx-shadow)}
+.lx.paused,.lx.paused *{animation-play-state:paused!important}
+.lx .lx-soft{filter:blur(1.4px);opacity:var(--lx-soft,.72)}
+@keyframes lxRack{from{filter:blur(9px);opacity:0;transform:scale(.96)}60%{opacity:1}to{filter:blur(0);transform:none}}
+@keyframes lxTicks{from{transform:rotate(-26deg);opacity:0}}
+@keyframes lxDraw{from{stroke-dashoffset:1}}
+@keyframes lxFade{from{opacity:0}}
+@keyframes lxIris{from{transform:rotate(-70deg) scale(1.3);opacity:0}}
+@keyframes lxBloom{from{transform:scale(.4);opacity:0}}
+@keyframes lxPop{0%{transform:scale(.6);opacity:0}60%{transform:scale(1.05);opacity:1}100%{transform:none}}
+@keyframes lxSlant{from{transform:translate(8px,36px);opacity:0}}
+@keyframes lxRow{from{transform:translateX(48px);opacity:0}}
+@keyframes lxFile{from{transform:translate(3px,-16px);opacity:0}}
+@keyframes lxRipple{0%{transform:scale(1);opacity:.7}100%{transform:scale(1.95);opacity:0}}
+@keyframes lxBreathe{0%,100%{transform:scale(1)}50%{transform:scale(var(--sc,1.05))}}
+@keyframes lxGlow{0%,100%{opacity:1}50%{opacity:.62}}
+@keyframes lxSpin{to{transform:rotate(360deg)}}
+@keyframes lxSpinR{to{transform:rotate(-360deg)}}
+@keyframes lxFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(var(--amp,-4px))}}
+@keyframes lxTwinkle{0%,100%{transform:scale(1) rotate(0deg);opacity:1}40%{transform:scale(.55) rotate(45deg);opacity:.6}}
+@keyframes lxType{0%,56%,100%{transform:translateY(0);opacity:.38}22%{transform:translateY(-3px);opacity:1}}
+@keyframes lxBrk{0%,100%{transform:scale(1)}50%{transform:scale(.95)}}
+@keyframes lxScan{0%,30%{transform:translateX(0)}50%,80%{transform:translateX(-128px)}100%{transform:translateX(0)}}
+@keyframes lxSlot{0%,100%{opacity:1}50%{opacity:.55}}
+.lx .en-ripple{opacity:0}
+@media (prefers-reduced-motion: no-preference){
+ .lx.go{animation:lxRack var(--m-focus,1100ms) var(--e-out) backwards}
+ .lx.go .en-ticks{animation:lxTicks var(--m-focus,1100ms) var(--e-out) backwards var(--d,0ms)}
+ .lx.go .en-draw{animation:lxDraw var(--dur,var(--m-slow)) var(--e-out) backwards var(--d,0ms)}
+ .lx.go .en-fade{animation:lxFade var(--dur,var(--m-base)) var(--e-out) backwards var(--d,0ms)}
+ .lx.go .en-iris{animation:lxIris var(--m-slow) var(--e-out) backwards var(--d,0ms)}
+ .lx.go .en-bloom{animation:lxBloom var(--m-enter) var(--e-settle) backwards var(--d,0ms)}
+ .lx.go .en-pop{animation:lxPop var(--m-base) var(--e-out) backwards var(--d,0ms)}
+ .lx.go .en-slant{animation:lxSlant var(--m-slow) var(--e-out) backwards var(--d,0ms)}
+ .lx.go .en-row{animation:lxRow var(--m-slow) var(--e-out) backwards var(--d,0ms)}
+ .lx.go .en-file{animation:lxFile var(--m-enter) var(--e-out) backwards var(--d,0ms)}
+ .lx.go .en-ripple{animation:lxRipple var(--m-cele) var(--e-out) var(--d,0ms)}
+ .lx.go .lp-glow{animation:lxGlow var(--loop-breathe) ease-in-out 1.6s infinite}
+ .lx.go .lp-spin{animation:lxSpin var(--lp,90s) linear infinite}
+ .lx.go .lp-spinr{animation:lxSpinR var(--lp,60s) linear infinite}
+ .lx.go .lp-breathe{animation:lxBreathe var(--lp,var(--loop-breathe)) ease-in-out 1.8s infinite}
+ .lx.go .lp-float{animation:lxFloat var(--lp,6s) ease-in-out var(--ld,2s) infinite}
+ .lx.go .lp-twinkle{animation:lxTwinkle var(--lp,var(--loop-breathe)) ease-in-out var(--ld,1.8s) infinite}
+ .lx.go .lp-type{animation:lxType var(--loop-loader) ease-in-out var(--ld,1.6s) infinite}
+ .lx.go .lp-brk{animation:lxBrk var(--loop-breathe) ease-in-out 1.8s infinite}
+ .lx.go .lp-scan{animation:lxScan var(--loop-flow) var(--e-inout) 2s infinite}
+ .lx.go .lp-slot{animation:lxSlot var(--loop-nudge) ease-in-out 2s infinite}
+}
+</style>
+  <defs>
+  <radialGradient id="noapplications-glow" cx="220" cy="140" r="138" gradientUnits="userSpaceOnUse"><stop offset="0" style="stop-color:var(--brand);stop-opacity:var(--lx-glow-a)"/><stop offset=".55" style="stop-color:var(--cyan);stop-opacity:var(--lx-glow-b)"/><stop offset="1" style="stop-color:var(--cyan);stop-opacity:0"/></radialGradient>
+  <radialGradient id="noapplications-core" cx=".38" cy=".34" r=".78"><stop offset="0" stop-color="#B8F1FF"/><stop offset=".14" stop-color="#7FD8FF"/><stop offset=".42" stop-color="#1E6BFF"/><stop offset=".78" stop-color="#2B1BB8"/><stop offset="1" stop-color="#0B1A6B"/></radialGradient>
+  <linearGradient id="noapplications-ring" x1="120" y1="240" x2="320" y2="40" gradientUnits="userSpaceOnUse"><stop offset="0" style="stop-color:var(--indigo)"/><stop offset=".55" style="stop-color:var(--brand)"/><stop offset="1" style="stop-color:var(--cyan)"/></linearGradient>
+  <linearGradient id="noapplications-grad" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#2B1BB8"/><stop offset=".55" stop-color="#1E6BFF"/><stop offset="1" stop-color="#18C8E8"/></linearGradient>
+  <linearGradient id="noapplications-fade" x1="0" y1="0" x2="440" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".2" stop-color="#fff" stop-opacity="1"/><stop offset=".8" stop-color="#fff" stop-opacity="1"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+  <mask id="noapplications-m" maskUnits="userSpaceOnUse" x="0" y="0" width="440" height="300"><rect width="440" height="300" fill="url(#noapplications-fade)"/></mask>
+  <clipPath id="noapplications-glass"><circle cx="220" cy="140" r="58"/></clipPath></defs>
+  
+  <g class="en-fade" style="--d:0ms;--dur:900ms"><circle class="lp-glow" cx="220" cy="140" r="138" fill="url(#noapplications-glow)"/></g>
+  <g class="en-ticks" style="transform-origin:220px 140px"><g class="lp-spin" style="transform-origin:220px 140px;--lp:90s"><g stroke="currentColor" stroke-linecap="round"><line x1="220" y1="28" x2="220" y2="18" stroke-width="1.5" opacity="0.5"/><line x1="230.2" y1="23.45" x2="230.63" y2="18.46" stroke-width="1" opacity="0.26"/><line x1="240.32" y1="24.78" x2="241.19" y2="19.85" stroke-width="1" opacity="0.26"/><line x1="250.28" y1="26.99" x2="251.58" y2="22.16" stroke-width="1" opacity="0.26"/><line x1="260.02" y1="30.06" x2="261.73" y2="25.36" stroke-width="1" opacity="0.26"/><line x1="269.45" y1="33.96" x2="271.56" y2="29.43" stroke-width="1" opacity="0.26"/><line x1="276" y1="43.01" x2="281" y2="34.34" stroke-width="1.5" opacity="0.5"/><line x1="287.11" y1="44.16" x2="289.98" y2="40.06" stroke-width="1" opacity="0.26"/><line x1="295.21" y1="50.37" x2="298.42" y2="46.54" stroke-width="1" opacity="0.26"/><line x1="302.73" y1="57.27" x2="306.27" y2="53.73" stroke-width="1" opacity="0.26"/><line x1="309.63" y1="64.79" x2="313.46" y2="61.58" stroke-width="1" opacity="0.26"/><line x1="315.84" y1="72.89" x2="319.94" y2="70.02" stroke-width="1" opacity="0.26"/><line x1="316.99" y1="84" x2="325.66" y2="79" stroke-width="1.5" opacity="0.5"/><line x1="326.04" y1="90.55" x2="330.57" y2="88.44" stroke-width="1" opacity="0.26"/><line x1="329.94" y1="99.98" x2="334.64" y2="98.27" stroke-width="1" opacity="0.26"/><line x1="333.01" y1="109.72" x2="337.84" y2="108.42" stroke-width="1" opacity="0.26"/><line x1="335.22" y1="119.68" x2="340.15" y2="118.81" stroke-width="1" opacity="0.26"/><line x1="336.55" y1="129.8" x2="341.54" y2="129.37" stroke-width="1" opacity="0.26"/><line x1="332" y1="140" x2="342" y2="140" stroke-width="1.5" opacity="0.5"/><line x1="336.55" y1="150.2" x2="341.54" y2="150.63" stroke-width="1" opacity="0.26"/><line x1="335.22" y1="160.32" x2="340.15" y2="161.19" stroke-width="1" opacity="0.26"/><line x1="333.01" y1="170.28" x2="337.84" y2="171.58" stroke-width="1" opacity="0.26"/><line x1="329.94" y1="180.02" x2="334.64" y2="181.73" stroke-width="1" opacity="0.26"/><line x1="326.04" y1="189.45" x2="330.57" y2="191.56" stroke-width="1" opacity="0.26"/><line x1="316.99" y1="196" x2="325.66" y2="201" stroke-width="1.5" opacity="0.5"/><line x1="315.84" y1="207.11" x2="319.94" y2="209.98" stroke-width="1" opacity="0.26"/><line x1="309.63" y1="215.21" x2="313.46" y2="218.42" stroke-width="1" opacity="0.26"/><line x1="302.73" y1="222.73" x2="306.27" y2="226.27" stroke-width="1" opacity="0.26"/><line x1="295.21" y1="229.63" x2="298.42" y2="233.46" stroke-width="1" opacity="0.26"/><line x1="287.11" y1="235.84" x2="289.98" y2="239.94" stroke-width="1" opacity="0.26"/><line x1="276" y1="236.99" x2="281" y2="245.66" stroke-width="1.5" opacity="0.5"/><line x1="269.45" y1="246.04" x2="271.56" y2="250.57" stroke-width="1" opacity="0.26"/><line x1="260.02" y1="249.94" x2="261.73" y2="254.64" stroke-width="1" opacity="0.26"/><line x1="250.28" y1="253.01" x2="251.58" y2="257.84" stroke-width="1" opacity="0.26"/><line x1="240.32" y1="255.22" x2="241.19" y2="260.15" stroke-width="1" opacity="0.26"/><line x1="230.2" y1="256.55" x2="230.63" y2="261.54" stroke-width="1" opacity="0.26"/><line x1="220" y1="252" x2="220" y2="262" stroke-width="1.5" opacity="0.5"/><line x1="209.8" y1="256.55" x2="209.37" y2="261.54" stroke-width="1" opacity="0.26"/><line x1="199.68" y1="255.22" x2="198.81" y2="260.15" stroke-width="1" opacity="0.26"/><line x1="189.72" y1="253.01" x2="188.42" y2="257.84" stroke-width="1" opacity="0.26"/><line x1="179.98" y1="249.94" x2="178.27" y2="254.64" stroke-width="1" opacity="0.26"/><line x1="170.55" y1="246.04" x2="168.44" y2="250.57" stroke-width="1" opacity="0.26"/><line x1="164" y1="236.99" x2="159" y2="245.66" stroke-width="1.5" opacity="0.5"/><line x1="152.89" y1="235.84" x2="150.02" y2="239.94" stroke-width="1" opacity="0.26"/><line x1="144.79" y1="229.63" x2="141.58" y2="233.46" stroke-width="1" opacity="0.26"/><line x1="137.27" y1="222.73" x2="133.73" y2="226.27" stroke-width="1" opacity="0.26"/><line x1="130.37" y1="215.21" x2="126.54" y2="218.42" stroke-width="1" opacity="0.26"/><line x1="124.16" y1="207.11" x2="120.06" y2="209.98" stroke-width="1" opacity="0.26"/><line x1="123.01" y1="196" x2="114.34" y2="201" stroke-width="1.5" opacity="0.5"/><line x1="113.96" y1="189.45" x2="109.43" y2="191.56" stroke-width="1" opacity="0.26"/><line x1="110.06" y1="180.02" x2="105.36" y2="181.73" stroke-width="1" opacity="0.26"/><line x1="106.99" y1="170.28" x2="102.16" y2="171.58" stroke-width="1" opacity="0.26"/><line x1="104.78" y1="160.32" x2="99.85" y2="161.19" stroke-width="1" opacity="0.26"/><line x1="103.45" y1="150.2" x2="98.46" y2="150.63" stroke-width="1" opacity="0.26"/><line x1="108" y1="140" x2="98" y2="140" stroke-width="1.5" opacity="0.5"/><line x1="103.45" y1="129.8" x2="98.46" y2="129.37" stroke-width="1" opacity="0.26"/><line x1="104.78" y1="119.68" x2="99.85" y2="118.81" stroke-width="1" opacity="0.26"/><line x1="106.99" y1="109.72" x2="102.16" y2="108.42" stroke-width="1" opacity="0.26"/><line x1="110.06" y1="99.98" x2="105.36" y2="98.27" stroke-width="1" opacity="0.26"/><line x1="113.96" y1="90.55" x2="109.43" y2="88.44" stroke-width="1" opacity="0.26"/><line x1="123.01" y1="84" x2="114.34" y2="79" stroke-width="1.5" opacity="0.5"/><line x1="124.16" y1="72.89" x2="120.06" y2="70.02" stroke-width="1" opacity="0.26"/><line x1="130.37" y1="64.79" x2="126.54" y2="61.58" stroke-width="1" opacity="0.26"/><line x1="137.27" y1="57.27" x2="133.73" y2="53.73" stroke-width="1" opacity="0.26"/><line x1="144.79" y1="50.37" x2="141.58" y2="46.54" stroke-width="1" opacity="0.26"/><line x1="152.89" y1="44.16" x2="150.02" y2="40.06" stroke-width="1" opacity="0.26"/><line x1="164" y1="43.01" x2="159" y2="34.34" stroke-width="1.5" opacity="0.5"/><line x1="170.55" y1="33.96" x2="168.44" y2="29.43" stroke-width="1" opacity="0.26"/><line x1="179.98" y1="30.06" x2="178.27" y2="25.36" stroke-width="1" opacity="0.26"/><line x1="189.72" y1="26.99" x2="188.42" y2="22.16" stroke-width="1" opacity="0.26"/><line x1="199.68" y1="24.78" x2="198.81" y2="19.85" stroke-width="1" opacity="0.26"/><line x1="209.8" y1="23.45" x2="209.37" y2="18.46" stroke-width="1" opacity="0.26"/></g></g></g>
+  <g class="en-fade" style="--d:300ms"><circle class="lp-spinr" style="transform-origin:220px 140px;--lp:60s" cx="220" cy="140" r="104" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".38" stroke-dasharray="2 6"/></g>
+  <circle class="en-draw" style="--d:150ms" cx="220" cy="140" r="90" fill="none" stroke="url(#noapplications-ring)" stroke-width="2.2" pathLength="1" stroke-dasharray="1 1" transform="rotate(-90 220 140)"/>
+  <circle class="en-draw" style="--d:240ms;stroke:var(--brand)" cx="220" cy="140" r="78" fill="none" opacity=".28" stroke-width="1.2" pathLength="1" stroke-dasharray="1 1" transform="rotate(90 220 140)"/>
+  <g class="en-row" style="--d:420ms"><g mask="url(#noapplications-m)"><g class="lx-soft"><g transform="translate(-36 140)">
+      <rect x="-54" y="-29" width="108" height="58" rx="12" style="fill:var(--lx-card);stroke:var(--lx-edge)" stroke-width="1" transform="skewX(-12)"/>
+      <rect x="-40" y="-18" width="22" height="22" rx="6" style="fill:var(--lx-edge-2)" transform="skewX(-12)" />
+      <rect x="-12" y="-16" width="46" height="6.5" rx="3.25" style="fill:var(--lx-ink)" opacity="0.6" transform="translate(11 -12.75) skewX(-12) translate(-11 12.75)"/><rect x="-12" y="-5" width="30" height="5.5" rx="2.75" style="fill:var(--lx-edge-2)" opacity="1" transform="translate(3 -2.25) skewX(-12) translate(-3 2.25)"/>
+      <rect x="-42" y="11" width="34" height="10" rx="5" style="fill:var(--lx-chip)" opacity="1" transform="translate(-25 16) skewX(-12) translate(25 -16)"/><rect x="-2" y="11" width="26" height="10" rx="5" style="fill:var(--lx-edge-3)" opacity="1" transform="translate(11 16) skewX(-12) translate(-11 -16)"/>
+      
+    </g><g transform="translate(92 140)">
+      <rect x="-54" y="-29" width="108" height="58" rx="12" style="fill:var(--lx-card);stroke:var(--lx-edge)" stroke-width="1" transform="skewX(-12)"/>
+      <rect x="-40" y="-18" width="22" height="22" rx="6" style="fill:var(--brand)" transform="skewX(-12)" />
+      <rect x="-12" y="-16" width="46" height="6.5" rx="3.25" style="fill:var(--lx-ink)" opacity="0.6" transform="translate(11 -12.75) skewX(-12) translate(-11 12.75)"/><rect x="-12" y="-5" width="30" height="5.5" rx="2.75" style="fill:var(--lx-edge-2)" opacity="1" transform="translate(3 -2.25) skewX(-12) translate(-3 2.25)"/>
+      <rect x="-42" y="11" width="34" height="10" rx="5" style="fill:var(--lx-chip)" opacity="1" transform="translate(-25 16) skewX(-12) translate(25 -16)"/><rect x="-2" y="11" width="26" height="10" rx="5" style="fill:var(--lx-edge-3)" opacity="1" transform="translate(11 16) skewX(-12) translate(-11 -16)"/>
+      
+    </g><g transform="translate(220 140)">
+      <rect x="-54" y="-29" width="108" height="58" rx="12" style="fill:var(--lx-card);stroke:var(--lx-edge)" stroke-width="1" transform="skewX(-12)"/>
+      <rect x="-40" y="-18" width="22" height="22" rx="6" style="fill:url(#noapplications-grad)" transform="skewX(-12)" />
+      <rect x="-12" y="-16" width="46" height="6.5" rx="3.25" style="fill:var(--lx-ink)" opacity="0.6" transform="translate(11 -12.75) skewX(-12) translate(-11 12.75)"/><rect x="-12" y="-5" width="30" height="5.5" rx="2.75" style="fill:var(--lx-edge-2)" opacity="1" transform="translate(3 -2.25) skewX(-12) translate(-3 2.25)"/>
+      <rect x="-42" y="11" width="34" height="10" rx="5" style="fill:var(--lx-chip)" opacity="1" transform="translate(-25 16) skewX(-12) translate(25 -16)"/><rect x="-2" y="11" width="26" height="10" rx="5" style="fill:var(--lx-edge-3)" opacity="1" transform="translate(11 16) skewX(-12) translate(-11 -16)"/>
+      <g class="lp-twinkle" style="transform-origin:40px -26px;transform-box:fill-box;transform-origin:center"><path d="M40 -33Q41.19 -27.19 47 -26Q41.19 -24.81 40 -19Q38.81 -24.81 33 -26Q38.81 -27.19 40 -33Z" style="fill:var(--orange)"/></g>
+    </g><g transform="translate(348 140)">
+      <rect x="-54" y="-29" width="108" height="58" rx="12" style="fill:var(--lx-card);stroke:var(--lx-edge)" stroke-width="1" transform="skewX(-12)"/>
+      <rect x="-40" y="-18" width="22" height="22" rx="6" style="fill:var(--lx-edge-2)" transform="skewX(-12)" />
+      <rect x="-12" y="-16" width="46" height="6.5" rx="3.25" style="fill:var(--lx-ink)" opacity="0.6" transform="translate(11 -12.75) skewX(-12) translate(-11 12.75)"/><rect x="-12" y="-5" width="30" height="5.5" rx="2.75" style="fill:var(--lx-edge-2)" opacity="1" transform="translate(3 -2.25) skewX(-12) translate(-3 2.25)"/>
+      <rect x="-42" y="11" width="34" height="10" rx="5" style="fill:var(--lx-chip)" opacity="1" transform="translate(-25 16) skewX(-12) translate(25 -16)"/><rect x="-2" y="11" width="26" height="10" rx="5" style="fill:var(--lx-edge-3)" opacity="1" transform="translate(11 16) skewX(-12) translate(-11 -16)"/>
+      
+    </g><g transform="translate(476 140)">
+      <rect x="-54" y="-29" width="108" height="58" rx="12" style="fill:var(--lx-card);stroke:var(--lx-edge)" stroke-width="1" transform="skewX(-12)"/>
+      <rect x="-40" y="-18" width="22" height="22" rx="6" style="fill:var(--indigo)" transform="skewX(-12)" />
+      <rect x="-12" y="-16" width="46" height="6.5" rx="3.25" style="fill:var(--lx-ink)" opacity="0.6" transform="translate(11 -12.75) skewX(-12) translate(-11 12.75)"/><rect x="-12" y="-5" width="30" height="5.5" rx="2.75" style="fill:var(--lx-edge-2)" opacity="1" transform="translate(3 -2.25) skewX(-12) translate(-3 2.25)"/>
+      <rect x="-42" y="11" width="34" height="10" rx="5" style="fill:var(--lx-chip)" opacity="1" transform="translate(-25 16) skewX(-12) translate(25 -16)"/><rect x="-2" y="11" width="26" height="10" rx="5" style="fill:var(--lx-edge-3)" opacity="1" transform="translate(11 16) skewX(-12) translate(-11 -16)"/>
+      
+    </g><g transform="translate(604 140)">
+      <rect x="-54" y="-29" width="108" height="58" rx="12" style="fill:var(--lx-card);stroke:var(--lx-edge)" stroke-width="1" transform="skewX(-12)"/>
+      <rect x="-40" y="-18" width="22" height="22" rx="6" style="fill:var(--cyan)" transform="skewX(-12)" />
+      <rect x="-12" y="-16" width="46" height="6.5" rx="3.25" style="fill:var(--lx-ink)" opacity="0.6" transform="translate(11 -12.75) skewX(-12) translate(-11 12.75)"/><rect x="-12" y="-5" width="30" height="5.5" rx="2.75" style="fill:var(--lx-edge-2)" opacity="1" transform="translate(3 -2.25) skewX(-12) translate(-3 2.25)"/>
+      <rect x="-42" y="11" width="34" height="10" rx="5" style="fill:var(--lx-chip)" opacity="1" transform="translate(-25 16) skewX(-12) translate(25 -16)"/><rect x="-2" y="11" width="26" height="10" rx="5" style="fill:var(--lx-edge-3)" opacity="1" transform="translate(11 16) skewX(-12) translate(-11 -16)"/>
+      
+    </g></g></g></g>
+  <g class="en-iris" style="transform-origin:220px 140px;--d:380ms"><circle cx="220" cy="140" r="72" style="fill:var(--lx-plate)"/><path d="M260.82 180.82L254.89 202.98A72 72 0 0 1 182.9 201.71Z" style="fill:var(--brand)" opacity="0.09"/><path d="M205.06 195.77L182.9 201.71A72 72 0 0 1 148.01 138.72Z" style="fill:var(--brand)" opacity="0.16"/><path d="M164.23 154.94L148.01 138.72A72 72 0 0 1 185.11 77.02Z" style="fill:var(--brand)" opacity="0.09"/><path d="M179.18 99.18L185.11 77.02A72 72 0 0 1 257.1 78.29Z" style="fill:var(--brand)" opacity="0.16"/><path d="M234.94 84.23L257.1 78.29A72 72 0 0 1 291.99 141.28Z" style="fill:var(--brand)" opacity="0.09"/><path d="M275.77 125.06L291.99 141.28A72 72 0 0 1 254.89 202.98Z" style="fill:var(--brand)" opacity="0.16"/>
+   <g style="stroke:var(--brand)" stroke-width="1.1" opacity=".55" stroke-linecap="round"><line x1="275.77" y1="125.06" x2="254.89" y2="202.98"/><line x1="260.82" y1="180.82" x2="182.9" y2="201.71"/><line x1="205.06" y1="195.77" x2="148.01" y2="138.72"/><line x1="164.23" y1="154.94" x2="185.11" y2="77.02"/><line x1="179.18" y1="99.18" x2="257.1" y2="78.29"/><line x1="234.94" y1="84.23" x2="291.99" y2="141.28"/></g>
+   <circle cx="220" cy="140" r="72" fill="none" style="stroke:var(--brand)" stroke-width="1.2" opacity=".35"/>
+   </g>
+  <g class="en-bloom" style="transform-origin:220px 140px;--d:520ms">
+    <circle cx="220" cy="140" r="58" style="fill:var(--lx-hole)"/>
+    <g clip-path="url(#noapplications-glass)"><g><g transform="translate(220 140) scale(1.12) translate(-220 -140)"><g class="lp-scan"><g transform="translate(-36 140)">
+      <rect x="-54" y="-29" width="108" height="58" rx="12" style="fill:var(--lx-card);stroke:var(--lx-edge)" stroke-width="1" transform="skewX(-12)"/>
+      <rect x="-40" y="-18" width="22" height="22" rx="6" style="fill:var(--lx-edge-2)" transform="skewX(-12)" />
+      <rect x="-12" y="-16" width="46" height="6.5" rx="3.25" style="fill:var(--lx-ink)" opacity="0.6" transform="translate(11 -12.75) skewX(-12) translate(-11 12.75)"/><rect x="-12" y="-5" width="30" height="5.5" rx="2.75" style="fill:var(--lx-edge-2)" opacity="1" transform="translate(3 -2.25) skewX(-12) translate(-3 2.25)"/>
+      <rect x="-42" y="11" width="34" height="10" rx="5" style="fill:var(--lx-chip)" opacity="1" transform="translate(-25 16) skewX(-12) translate(25 -16)"/><rect x="-2" y="11" width="26" height="10" rx="5" style="fill:var(--lx-edge-3)" opacity="1" transform="translate(11 16) skewX(-12) translate(-11 -16)"/>
+      
+    </g><g transform="translate(92 140)">
+      <rect x="-54" y="-29" width="108" height="58" rx="12" style="fill:var(--lx-card);stroke:var(--lx-edge)" stroke-width="1" transform="skewX(-12)"/>
+      <rect x="-40" y="-18" width="22" height="22" rx="6" style="fill:var(--brand)" transform="skewX(-12)" />
+      <rect x="-12" y="-16" width="46" height="6.5" rx="3.25" style="fill:var(--lx-ink)" opacity="0.6" transform="translate(11 -12.75) skewX(-12) translate(-11 12.75)"/><rect x="-12" y="-5" width="30" height="5.5" rx="2.75" style="fill:var(--lx-edge-2)" opacity="1" transform="translate(3 -2.25) skewX(-12) translate(-3 2.25)"/>
+      <rect x="-42" y="11" width="34" height="10" rx="5" style="fill:var(--lx-chip)" opacity="1" transform="translate(-25 16) skewX(-12) translate(25 -16)"/><rect x="-2" y="11" width="26" height="10" rx="5" style="fill:var(--lx-edge-3)" opacity="1" transform="translate(11 16) skewX(-12) translate(-11 -16)"/>
+      
+    </g><g transform="translate(220 140)">
+      <rect x="-54" y="-29" width="108" height="58" rx="12" style="fill:var(--lx-card);stroke:var(--lx-edge)" stroke-width="1" transform="skewX(-12)"/>
+      <rect x="-40" y="-18" width="22" height="22" rx="6" style="fill:url(#noapplications-grad)" transform="skewX(-12)" />
+      <rect x="-12" y="-16" width="46" height="6.5" rx="3.25" style="fill:var(--lx-ink)" opacity="0.6" transform="translate(11 -12.75) skewX(-12) translate(-11 12.75)"/><rect x="-12" y="-5" width="30" height="5.5" rx="2.75" style="fill:var(--lx-edge-2)" opacity="1" transform="translate(3 -2.25) skewX(-12) translate(-3 2.25)"/>
+      <rect x="-42" y="11" width="34" height="10" rx="5" style="fill:var(--lx-chip)" opacity="1" transform="translate(-25 16) skewX(-12) translate(25 -16)"/><rect x="-2" y="11" width="26" height="10" rx="5" style="fill:var(--lx-edge-3)" opacity="1" transform="translate(11 16) skewX(-12) translate(-11 -16)"/>
+      <g class="lp-twinkle" style="transform-origin:40px -26px;transform-box:fill-box;transform-origin:center"><path d="M40 -33Q41.19 -27.19 47 -26Q41.19 -24.81 40 -19Q38.81 -24.81 33 -26Q38.81 -27.19 40 -33Z" style="fill:var(--orange)"/></g>
+    </g><g transform="translate(348 140)">
+      <rect x="-54" y="-29" width="108" height="58" rx="12" style="fill:var(--lx-card);stroke:var(--lx-edge)" stroke-width="1" transform="skewX(-12)"/>
+      <rect x="-40" y="-18" width="22" height="22" rx="6" style="fill:var(--lx-edge-2)" transform="skewX(-12)" />
+      <rect x="-12" y="-16" width="46" height="6.5" rx="3.25" style="fill:var(--lx-ink)" opacity="0.6" transform="translate(11 -12.75) skewX(-12) translate(-11 12.75)"/><rect x="-12" y="-5" width="30" height="5.5" rx="2.75" style="fill:var(--lx-edge-2)" opacity="1" transform="translate(3 -2.25) skewX(-12) translate(-3 2.25)"/>
+      <rect x="-42" y="11" width="34" height="10" rx="5" style="fill:var(--lx-chip)" opacity="1" transform="translate(-25 16) skewX(-12) translate(25 -16)"/><rect x="-2" y="11" width="26" height="10" rx="5" style="fill:var(--lx-edge-3)" opacity="1" transform="translate(11 16) skewX(-12) translate(-11 -16)"/>
+      
+    </g><g transform="translate(476 140)">
+      <rect x="-54" y="-29" width="108" height="58" rx="12" style="fill:var(--lx-card);stroke:var(--lx-edge)" stroke-width="1" transform="skewX(-12)"/>
+      <rect x="-40" y="-18" width="22" height="22" rx="6" style="fill:var(--indigo)" transform="skewX(-12)" />
+      <rect x="-12" y="-16" width="46" height="6.5" rx="3.25" style="fill:var(--lx-ink)" opacity="0.6" transform="translate(11 -12.75) skewX(-12) translate(-11 12.75)"/><rect x="-12" y="-5" width="30" height="5.5" rx="2.75" style="fill:var(--lx-edge-2)" opacity="1" transform="translate(3 -2.25) skewX(-12) translate(-3 2.25)"/>
+      <rect x="-42" y="11" width="34" height="10" rx="5" style="fill:var(--lx-chip)" opacity="1" transform="translate(-25 16) skewX(-12) translate(25 -16)"/><rect x="-2" y="11" width="26" height="10" rx="5" style="fill:var(--lx-edge-3)" opacity="1" transform="translate(11 16) skewX(-12) translate(-11 -16)"/>
+      
+    </g><g transform="translate(604 140)">
+      <rect x="-54" y="-29" width="108" height="58" rx="12" style="fill:var(--lx-card);stroke:var(--lx-edge)" stroke-width="1" transform="skewX(-12)"/>
+      <rect x="-40" y="-18" width="22" height="22" rx="6" style="fill:var(--cyan)" transform="skewX(-12)" />
+      <rect x="-12" y="-16" width="46" height="6.5" rx="3.25" style="fill:var(--lx-ink)" opacity="0.6" transform="translate(11 -12.75) skewX(-12) translate(-11 12.75)"/><rect x="-12" y="-5" width="30" height="5.5" rx="2.75" style="fill:var(--lx-edge-2)" opacity="1" transform="translate(3 -2.25) skewX(-12) translate(-3 2.25)"/>
+      <rect x="-42" y="11" width="34" height="10" rx="5" style="fill:var(--lx-chip)" opacity="1" transform="translate(-25 16) skewX(-12) translate(25 -16)"/><rect x="-2" y="11" width="26" height="10" rx="5" style="fill:var(--lx-edge-3)" opacity="1" transform="translate(11 16) skewX(-12) translate(-11 -16)"/>
+      
+    </g></g></g></g></g>
+    <circle cx="220" cy="140" r="58" fill="none" stroke="url(#noapplications-ring)" stroke-width="2.4"/>
+    <path d="M173.02 122.9A50 50 0 0 1 202.9 93.02" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".75"/>
+  </g>
+  <g class="en-pop" style="transform-origin:220px 140px;--d:900ms"><g class="lp-brk" style="transform-origin:220px 140px;stroke:var(--brand)" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M152 88V74H166" style="stroke:var(--brand)"/><path d="M288 88V74H274" style="stroke:var(--brand)"/><path d="M152 192V206H166" style="stroke:var(--brand)"/><path d="M288 192V206H274" style="stroke:var(--brand)"/>
+  </g></g>
+  <g class="en-slant" style="--d:820ms"><g class="lp-float" style="--lp:7s;--ld:2.4s;--amp:-4px">
+    <g class="lx-shadow" transform="translate(2 7)"><rect class="" x="34" y="229" width="128" height="46" rx="12" style="fill:var(--lx-card);stroke:var(--lx-edge)" stroke-width="1" transform="translate(98 252) skewX(-12) translate(-98 -252)"/></g><rect class="" x="34" y="229" width="128" height="46" rx="12" style="fill:var(--lx-card);stroke:var(--lx-edge)" stroke-width="1" transform="translate(98 252) skewX(-12) translate(-98 -252)"/>
+    <circle cx="64" cy="252" r="10" fill="url(#noapplications-grad)"/><path d="M59.8 252.2l3 3 5.5 -5.8" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="82" y="244" width="48" height="6" rx="3" style="fill:var(--lx-ink)" opacity="0.55" transform="translate(106 247) skewX(-12) translate(-106 -247)"/><rect x="82" y="255" width="28" height="5.5" rx="2.75" style="fill:var(--lx-edge-2)" opacity="1" transform="translate(96 257.75) skewX(-12) translate(-96 -257.75)"/>
+    <rect x="124" y="257" width="6.5" height="5" rx="1.8" style="fill:var(--brand)" opacity="0.5" transform="translate(127 259.5) skewX(-12) translate(-127 -259.5)"/><rect x="133" y="254" width="6.5" height="8" rx="1.8" style="fill:var(--brand)" opacity="0.5" transform="translate(136 258) skewX(-12) translate(-136 -258)"/><rect x="142" y="251" width="6.5" height="11" rx="1.8" style="fill:var(--brand)" opacity="1" transform="translate(145 256.5) skewX(-12) translate(-145 -256.5)"/><rect x="151" y="248" width="6.5" height="14" rx="1.8" style="fill:var(--lx-edge-2)" opacity="1" transform="translate(154 255) skewX(-12) translate(-154 -255)"/>
+  </g></g>
+</svg>

@@ -80,6 +80,7 @@ import { NavIndicator } from './navIndicator.js';
 import { useEffect, useRef, useState } from 'react';
 import { roleLabel } from './labels.js';
 import { initialSidebarCollapsed, rememberSidebarCollapsed } from './sidebarPreference.js';
+import { NotFoundPage, PageErrorBoundary } from './systemPages.js';
 
 export function DemoPortalLauncher({ onNavigate }: { readonly onNavigate: (path: string) => void }): React.ReactElement {
   const groups = ['Student', 'Institution', 'Employer', 'Operations'] as const;
@@ -185,8 +186,12 @@ function RolePortalInner({ portal, apiHealth, authStatus, authNotice, showDevelo
           {demoMode ? <section className="demo-boundary" role="note"><strong>DEMO PREVIEW</strong><span>Fictional data. This route is not authenticated and does not authorize a user.</span></section> : null}
           <PortalModeNotice portal={portal} notice={topbarNotice} demoMode={demoMode} authenticatedWorkspace={authenticatedWorkspace} />
           {/* GROWTH-01: the Growth portal has no demo preview; it renders the same honest pages in every mode. */}
-          {portal.family === 'Growth' ? (activeRoute?.path === portal.basePath ? <GrowthHomePage /> : <GrowthModulePage route={activeRoute ?? portal.nav[0]!} role={authenticatedWorkspace?.role} />)
+          {/* Phase 8: an unknown page shows the 404 inside the portal; a page that fails to draw shows the 500. */}
+          <PageErrorBoundary resetKey={path} inline>
+          {!portal.nav.some((item) => item.path === normalize(path)) ? <NotFoundPage inline home={{ onClick: () => navigate(portal.basePath) }} />
+            : portal.family === 'Growth' ? (activeRoute?.path === portal.basePath ? <GrowthHomePage /> : <GrowthModulePage route={activeRoute ?? portal.nav[0]!} role={authenticatedWorkspace?.role} />)
             : !demoMode && activeRoute?.path === portal.basePath ? <AuthenticatedDashboardChooser portal={portal} routeLabel={activeRoute?.label ?? 'Dashboard'} onNavigate={navigate} authenticatedWorkspace={authenticatedWorkspace} /> : activeRoute?.path === portal.basePath ? <RoleDashboard portal={portal} onNavigate={navigate} /> : <RoleModulePage key={(activeRoute ?? portal.nav[0]!).path} portal={portal} route={activeRoute ?? portal.nav[0]!} demoMode={demoMode} authenticatedWorkspace={authenticatedWorkspace} />}
+          </PageErrorBoundary>
         </main>
       </div>
       {/* The assistant has no growth persona; a student answer would mislead field staff (GROWTH-01). */}

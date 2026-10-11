@@ -3,6 +3,7 @@ import { NaReason, NaValue, isMissing, isUnrecorded } from './naState.js';
 import { OperationsHome } from './rolePortal/operationsHome.js';
 import { formatDate } from './dates.js';
 import { codeLabel } from './labels.js';
+import { IllustrationArt, type IllustrationId } from './momentum/emptyState.js';
 import {
   ApiRequestError,
   getLearnerCareerReadinessState,
@@ -111,12 +112,18 @@ function chipToneForState(state: string): string {
   return 'blue';
 }
 
-export function V2EmptyState({ icon, title, note, hint }: {
+/**
+ * The shared empty state. With `illustration` (re-skin phase 8) the matching Lens illustration
+ * replaces the emoji tile; the caller's own title and note stay, because they describe the real
+ * state of that list (see momentum/emptyState.tsx for the copy.json-driven <EmptyState>).
+ */
+export function V2EmptyState({ icon, title, note, hint, illustration }: {
   readonly icon: string; readonly title: string; readonly note: string; readonly hint?: React.ReactNode;
+  readonly illustration?: IllustrationId;
 }): React.ReactElement {
   return (
-    <section className="v2-card v2-empty-state">
-      <span className="v2-empty-icon" aria-hidden="true">{icon}</span>
+    <section className={`v2-card v2-empty-state${illustration ? ' has-art es-host m-io' : ''}`} {...(illustration ? { 'data-empty-state': illustration } : {})}>
+      {illustration ? <IllustrationArt id={illustration} /> : <span className="v2-empty-icon" aria-hidden="true">{icon}</span>}
       <h2>{title}</h2>
       <p>{note}</p>
       {hint ? <p className="v2-empty-hint">{hint}</p> : null}

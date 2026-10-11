@@ -106,7 +106,7 @@ export function OperationsCareerCataloguePage(): React.ReactElement | null {
 
   if (forbiddenReference) {
     return <section className="role-module role-module--dense">{heading}
-      <div className="role-wide"><V2EmptyState icon="🔐" title="Not permitted"
+      <div className="role-wide"><V2EmptyState illustration="no-access" icon="🔐" title="Not permitted"
         note="The job-role catalogue is for staff who hold Catalogue Manage, Content Review or Content Publish. Your access has not changed; the content studio below is unaffected."
         hint={<SupportCode reference={forbiddenReference} />} /></div></section>;
   }
@@ -157,7 +157,7 @@ export function OperationsCareerCataloguePage(): React.ReactElement | null {
         <button type="submit" className="pilot-btn">Search</button>
       </form>
       {loading && !list ? <p>Loading the catalogue…</p> : null}
-      {!loading && list && !roles.length ? <V2EmptyState icon="🔎" title="No roles match" note="No catalogue role matches this search. The catalogue itself is loaded by the catalogue seed; if it is empty here, it has not been loaded yet." /> : null}
+      {!loading && list && !roles.length ? <V2EmptyState illustration="search-no-results" icon="🔎" title="No roles match" note="No catalogue role matches this search. The catalogue itself is loaded by the catalogue seed; if it is empty here, it has not been loaded yet." /> : null}
       {roles.length ? <div className="role-record-table-wrap"><table className="role-record-table">
         <thead><tr><th>Code</th><th>Role</th><th>Family</th><th>Typical branches</th><th>Plan</th><th>Label</th><th>Live requirements</th><th>Requirement set</th><th>Actions</th></tr></thead>
         <tbody>{roles.map((role) => <tr key={role.id}>

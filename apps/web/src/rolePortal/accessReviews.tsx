@@ -108,7 +108,7 @@ export function OperationsAccessReviewsPage(): React.ReactElement | null {
 
   if (forbiddenReference) {
     return <section className="role-module role-module--dense">{heading}
-      <div className="role-wide"><V2EmptyState icon="🔐" title="Not permitted"
+      <div className="role-wide"><V2EmptyState illustration="no-access" icon="🔐" title="Not permitted"
         note="Access reviews are run by staff who hold the access review capability. Your access has not changed."
         hint={<SupportCode reference={forbiddenReference} />} /></div></section>;
   }
@@ -163,7 +163,7 @@ export function OperationsAccessReviewsPage(): React.ReactElement | null {
         <button type="button" className="secondary" onClick={() => setExporting(open)}>Export CSV…</button>
       </div>
       {undecided > 0 ? <p>{undecided} item{undecided === 1 ? '' : 's'} still to decide before the review can close.</p> : null}
-      {items && !items.length ? <V2EmptyState icon="✅" title="Nothing here" note={filter ? 'No items match this view.' : 'This review has no items: no standing internal access existed when it opened.'} /> : null}
+      {items && !items.length ? <V2EmptyState illustration="tasks-all-done" icon="✅" title="Nothing here" note={filter ? 'No items match this view.' : 'This review has no items: no standing internal access existed when it opened.'} /> : null}
       {items?.length ? <div className="role-record-table-wrap"><table className="role-record-table">
         <thead><tr><th>Person</th><th>Access</th><th>Granted</th><th>Decision</th><th>Actions</th></tr></thead>
         <tbody>{items.map((item) => <tr key={item.id}>
@@ -188,7 +188,7 @@ export function OperationsAccessReviewsPage(): React.ReactElement | null {
     </section> : null}
 
     <section className="role-card role-wide"><h2>Review history</h2>
-      {overview && !overview.campaigns.length ? <V2EmptyState icon="📜" title="No reviews yet" note="No access review has been opened in this environment." /> : null}
+      {overview && !overview.campaigns.length ? <V2EmptyState illustration="no-reports" icon="📜" title="No reviews yet" note="No access review has been opened in this environment." /> : null}
       {overview && overview.campaigns.length ? <div className="role-record-table-wrap"><table className="role-record-table">
         <thead><tr><th>Period</th><th>State</th><th>Opened</th><th>Closed</th><th>Items</th><th>Outcome</th><th>Evidence</th></tr></thead>
         <tbody>{overview.campaigns.map((campaign) => <tr key={campaign.id}>

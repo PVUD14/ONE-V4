@@ -136,7 +136,7 @@ export function EmployerOpportunityDetailPage({ employerId }: { readonly employe
   if (!jobs) return <StaffPilotWrap title="Opportunity Detail" subtitle={subtitle}><p role="status">Loading your jobs…</p></StaffPilotWrap>;
   if (!jobs.length || !selected) {
     return <StaffPilotWrap title="Opportunity Detail" subtitle={subtitle}>
-      <div className="role-wide"><V2EmptyState icon="💼" title="No jobs yet" note="Create a job under Opportunities; its details, versions and actions appear here." /></div>
+      <div className="role-wide"><V2EmptyState illustration="no-opportunities-posted" icon="💼" title="No jobs yet" note="Create a job under Opportunities; its details, versions and actions appear here." /></div>
     </StaffPilotWrap>;
   }
   return <StaffPilotWrap title="Opportunity Detail" subtitle={subtitle}>

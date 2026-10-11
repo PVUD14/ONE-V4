@@ -97,7 +97,7 @@ export function OperationsSkillMapPage(): React.ReactElement | null {
 
   if (forbiddenReference) {
     return <section className="role-module role-module--dense">{heading}
-      <div className="role-wide"><V2EmptyState icon="🔐" title="Not permitted"
+      <div className="role-wide"><V2EmptyState illustration="no-access" icon="🔐" title="Not permitted"
         note="The skill map is for staff who hold Content Edit, Content Review, Content Publish or Catalogue Manage. Your access has not changed; the rest of Content Management is unaffected."
         hint={<SupportCode reference={forbiddenReference} />} /></div></section>;
   }
@@ -138,7 +138,7 @@ export function OperationsSkillMapPage(): React.ReactElement | null {
         <button type="submit" className="pilot-btn">Search</button>
       </form>
       {loading && !list ? <p>Loading the skill map…</p> : null}
-      {!loading && list && !skills.length ? <V2EmptyState icon="🔎" title="No skills match" note="No skill matches this search. Skills appear here once drafted in this editor or imported as drafts." /> : null}
+      {!loading && list && !skills.length ? <V2EmptyState illustration="search-no-results" icon="🔎" title="No skills match" note="No skill matches this search. Skills appear here once drafted in this editor or imported as drafts." /> : null}
       {skills.length ? <div className="role-record-table-wrap"><table className="role-record-table">
         <thead><tr><th>Key</th><th>Skill</th><th>Status</th><th>Published</th><th>Revision on its way</th><th>Prerequisites</th><th>Levels</th><th>Live requirements</th><th>Actions</th></tr></thead>
         <tbody>{skills.map((skill) => <tr key={skill.topicId}>

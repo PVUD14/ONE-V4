@@ -188,7 +188,7 @@ export function EmployerMessagesPage({ employerId }: { readonly employerId: stri
       <div className="v2-card-head"><h2>Conversations</h2><V2Chip tone="slate">{threads.length}</V2Chip></div>
       {status ? <p role="status">{status}</p> : null}
       {!status && threads.length === 0
-        ? <V2EmptyState icon="💬" title="No conversations yet"
+        ? <V2EmptyState illustration="no-messages" icon="💬" title="No conversations yet"
           note="Start one from Candidate Detail once you shortlist a candidate. Conversations appear here while the candidate shares their details."
           hint="Messages stay inside ONE; nobody needs to share a personal number." />
         : <div className="v2-list">

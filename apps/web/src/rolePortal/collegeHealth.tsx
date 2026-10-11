@@ -143,7 +143,7 @@ export function OperationsCollegeHealthPanel(): React.ReactElement | null {
   const title = <div className="role-section-title"><h2>College health</h2></div>;
   if (forbidden) {
     return <section className="role-card role-wide" aria-label="College health">{title}
-      <V2EmptyState icon="🔐" title="Not permitted" note="College health is for staff who hold aggregate analytics access. Your access has not changed." hint={<SupportCode reference={forbidden} />} />
+      <V2EmptyState illustration="no-access" icon="🔐" title="Not permitted" note="College health is for staff who hold aggregate analytics access. Your access has not changed." hint={<SupportCode reference={forbidden} />} />
     </section>;
   }
 
@@ -292,7 +292,7 @@ export function OperationsCollegeAccountPanel(): React.ReactElement | null {
   const heading = <div className="role-section-title"><h2>College account</h2></div>;
   if (forbidden) {
     return <section className="role-card role-wide" aria-label="College account">{heading}
-      <V2EmptyState icon="🔐" title="Not permitted" note="College account fields are for staff who hold account management access. Your access has not changed." hint={<SupportCode reference={forbidden} />} />
+      <V2EmptyState illustration="no-access" icon="🔐" title="Not permitted" note="College account fields are for staff who hold account management access. Your access has not changed." hint={<SupportCode reference={forbidden} />} />
     </section>;
   }
 

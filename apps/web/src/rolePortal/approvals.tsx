@@ -163,7 +163,7 @@ export function OperationsApprovalsPanel(): React.ReactElement | null {
 
   if (forbiddenReference) {
     return <section className="role-module role-module--dense">{heading}
-      <div className="role-wide"><V2EmptyState icon="🔐" title="Not permitted"
+      <div className="role-wide"><V2EmptyState illustration="no-access" icon="🔐" title="Not permitted"
         note="The approvals queue is for staff who can perform or approve high-risk actions. Your access has not changed."
         hint={<SupportCode reference={forbiddenReference} />} /></div></section>;
   }
@@ -200,7 +200,7 @@ export function OperationsApprovalsPanel(): React.ReactElement | null {
           {states.map((option) => <option key={option.label} value={option.value}>{option.label}</option>)}
         </select></label>
       {loading && !queue ? <p>Loading approvals…</p> : null}
-      {!loading && queue && !approvals.length ? <V2EmptyState icon="✅" title="Nothing here"
+      {!loading && queue && !approvals.length ? <V2EmptyState illustration="queue-clear" icon="✅" title="Nothing here"
         note={state === 'PENDING' ? 'No high-risk action is waiting for a decision.' : 'No requests match this view.'} /> : null}
       {approvals.length ? <div className="role-record-table-wrap"><table className="role-record-table">
         <thead><tr><th>Action</th><th>Requested by</th><th>Reason</th><th>State</th><th>Expires</th><th>Decision</th><th>Actions</th></tr></thead>

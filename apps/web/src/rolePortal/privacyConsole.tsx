@@ -130,7 +130,7 @@ export function OperationsPrivacyConsolePage(): React.ReactElement {
 
   if (forbiddenReference) {
     return <section className="role-module role-module--dense">{heading}
-      <div className="role-wide"><V2EmptyState icon="🔐" title="Not permitted"
+      <div className="role-wide"><V2EmptyState illustration="no-access" icon="🔐" title="Not permitted"
         note="The privacy console is for staff who work privacy requests. Your access has not changed."
         hint={<SupportCode reference={forbiddenReference} />} /></div>
       <OperationsCareerReadinessPanel /></section>;
@@ -174,7 +174,7 @@ export function OperationsPrivacyConsolePage(): React.ReactElement {
       </div>
       {queueError ? <p className="form-error" role="alert">{queueError}</p> : null}
       {queueLoading && !queue ? <p>Loading privacy requests…</p> : null}
-      {!queueLoading && queue && !requests.length ? <V2EmptyState icon="✅" title="No requests here"
+      {!queueLoading && queue && !requests.length ? <V2EmptyState illustration="tasks-all-done" icon="✅" title="No requests here"
         note={view === 'OPEN' && !type ? 'Nobody has an open export or deletion request.' : 'No requests match this view.'} /> : null}
       {requests.length ? <div className="role-record-table-wrap"><table className="role-record-table">
         <thead><tr><th>Request</th><th>Person</th><th>State</th><th>Received</th><th>Erasure scheduled</th><th>Statutory deadline</th><th>Holds</th><th>Actions</th></tr></thead>
@@ -235,7 +235,7 @@ export function OperationsPrivacyConsolePage(): React.ReactElement {
       <p>A hold stops an erasure from completing while a legal obligation, investigation or dispute needs the record. Place one from a request above. Releasing one lets a waiting erasure run, so it needs a second person&apos;s approval; once approved, carry it out from Settings → Approvals.</p>
       {holdsError ? <p className="form-error" role="alert">{holdsError}</p> : null}
       {!holds && !holdsError ? <p>Loading legal holds…</p> : null}
-      {holds && !holds.holds.length ? <V2EmptyState icon="⚖️" title="No holds in force" note="No person's erasure is suspended." /> : null}
+      {holds && !holds.holds.length ? <V2EmptyState illustration="no-flagged-items" icon="⚖️" title="No holds in force" note="No person's erasure is suspended." /> : null}
       {holds?.holds?.length ? <div className="role-record-table-wrap"><table className="role-record-table">
         <thead><tr><th>Person</th><th>Reason</th><th>Context</th><th>Placed</th><th>Blocks</th><th>Release</th></tr></thead>
         <tbody>{holds.holds.map((hold) => <tr key={hold.id}>
@@ -303,7 +303,7 @@ function ConsentCoverageSection({ coverage, error }: { readonly coverage: Consen
     {coverage?.keys?.some((key) => key.status === 'NOT_PUBLISHED')
       ? <p>Not published: the learning-engine consents are drafted but their wording waits for legal approval, so nobody has been asked yet and there is no coverage to report.</p> : null}
     <h3>Definitions and versions</h3>
-    {coverage && !coverage.definitions.length ? <V2EmptyState icon="📜" title="No consent definitions" note="The consent registry has no definitions in this environment." /> : null}
+    {coverage && !coverage.definitions.length ? <V2EmptyState illustration="no-documents" icon="📜" title="No consent definitions" note="The consent registry has no definitions in this environment." /> : null}
     {coverage?.definitions?.length ? <div className="role-record-table-wrap"><table className="role-record-table">
       <thead><tr><th>Consent</th><th>Version</th><th>Status</th><th>Enforcement</th><th>Withdrawable</th><th>In force from</th><th>Retired</th></tr></thead>
       <tbody>{coverage.definitions.map((definition) => <tr key={`${definition.consentKey}:${definition.version}`}>

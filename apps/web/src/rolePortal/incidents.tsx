@@ -124,7 +124,7 @@ export function OperationsIncidentRegisterPage(): React.ReactElement | null {
 
   if (forbiddenReference) {
     return <section className="role-module role-module--dense">{heading}
-      <div className="role-wide"><V2EmptyState icon="🔐" title="Not permitted" note="The incident register is for staff who hold Incident Manage. Your access has not changed." hint={<SupportCode reference={forbiddenReference} />} /></div></section>;
+      <div className="role-wide"><V2EmptyState illustration="no-access" icon="🔐" title="Not permitted" note="The incident register is for staff who hold Incident Manage. Your access has not changed." hint={<SupportCode reference={forbiddenReference} />} /></div></section>;
   }
 
   const incidents = [...(list?.incidents ?? []), ...more];
@@ -159,7 +159,7 @@ export function OperationsIncidentRegisterPage(): React.ReactElement | null {
           </select></label>
       </div>
       {loading && !list ? <p>Loading incidents…</p> : null}
-      {!loading && list && !incidents.length ? <V2EmptyState icon="✅" title="No incidents here" note="No incident matches this view." /> : null}
+      {!loading && list && !incidents.length ? <V2EmptyState illustration="no-flagged-items" icon="✅" title="No incidents here" note="No incident matches this view." /> : null}
       {incidents.length ? <div className="role-record-table-wrap"><table className="role-record-table">
         <thead><tr><th>Incident</th><th>Title</th><th>Category</th><th>Severity</th><th>State</th><th>Board deadline</th><th>Affected organisations</th><th>Actions</th></tr></thead>
         <tbody>{incidents.map((item) => <tr key={item.id}>

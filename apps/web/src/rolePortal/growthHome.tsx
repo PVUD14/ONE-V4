@@ -214,11 +214,11 @@ export function GrowthHome(): React.ReactElement {
   }, [token]);
 
   if (state.kind === 'forbidden') {
-    return <V2EmptyState icon="🔐" title="Not permitted" note="The Growth workspace is for AI8HT's partnerships staff. Your access has not changed."
+    return <V2EmptyState illustration="no-access" icon="🔐" title="Not permitted" note="The Growth workspace is for AI8HT's partnerships staff. Your access has not changed."
       {...(state.reference ? { hint: <SupportCode reference={state.reference} /> } : {})} />;
   }
   if (state.kind === 'error') {
-    return <V2EmptyState icon="⚠️" title="Your growth details could not be loaded" note="Nothing on this page is shown until they load. Try again shortly."
+    return <V2EmptyState illustration="500-something-went-wrong" icon="⚠️" title="Your growth details could not be loaded" note="Nothing on this page is shown until they load. Try again shortly."
       {...(state.reference ? { hint: <SupportCode reference={state.reference} /> } : {})} />;
   }
   const open = (path: string) => () => go(`/growth${path}`);

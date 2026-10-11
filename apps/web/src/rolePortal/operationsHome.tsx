@@ -220,10 +220,10 @@ export function OperationsHome({ basePath }: { readonly basePath: string }): Rea
   }, [token]);
 
   if (state.kind === 'forbidden') {
-    return <V2EmptyState icon="🔐" title="Not permitted" note="The operations overview is for AI8HT operations staff. Your access has not changed." hint={<SupportCode reference={state.reference} />} />;
+    return <V2EmptyState illustration="no-access" icon="🔐" title="Not permitted" note="The operations overview is for AI8HT operations staff. Your access has not changed." hint={<SupportCode reference={state.reference} />} />;
   }
   if (state.kind === 'error') {
-    return <V2EmptyState icon="⚠️" title="The overview could not be loaded" note="Nothing on this page is shown until the server's counts load. Try again shortly."
+    return <V2EmptyState illustration="500-something-went-wrong" icon="⚠️" title="The overview could not be loaded" note="Nothing on this page is shown until the server's counts load. Try again shortly."
       {...(state.reference ? { hint: <SupportCode reference={state.reference} /> } : {})} />;
   }
 

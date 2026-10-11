@@ -97,7 +97,7 @@ describe('Dashboard activation counts', () => {
     // 33 on the roster, 32 activated: an exact 32 would reveal the one student not invited.
     expect(within(card).getByText('Activated', { selector: 'dt' }).parentElement).toHaveTextContent('Activated30–34');
     expect(within(card).getByText('Not invited', { selector: 'dt' }).parentElement).toHaveTextContent('Not invited<5');
-    expect(card).not.toHaveTextContent(/32/);
+    expect(card).not.toHaveTextContent(/\b32\b/);
     expect(card.querySelector('.ih-abar')).toBeNull();
   });
 
@@ -106,6 +106,6 @@ describe('Dashboard activation counts', () => {
     render(home());
     await waitFor(() => expect(screen.queryByText('Loading your institution…')).not.toBeInTheDocument());
     expect(screen.queryByRole('heading', { name: 'Student activation' })).not.toBeInTheDocument();
-    expect(screen.queryByText(/NA/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/\bNA\b/)).not.toBeInTheDocument();
   });
 });

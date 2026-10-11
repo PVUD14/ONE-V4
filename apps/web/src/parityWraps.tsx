@@ -96,6 +96,12 @@ export function StudentRoadmapV3({ children }: { readonly children: React.ReactN
   </>}>{children}</PilotShell>;
 }
 
+// --- Student: Ask ONE to explain (ADR-052) ------------------------------------
+
+export function StudentExplainV3({ children }: { readonly children: React.ReactNode }): React.ReactElement {
+  return <PilotShell title="Ask ONE to explain" subtitle="AI-written lessons on any topic you name — AI-generated, not checked by a person." wide>{children}</PilotShell>;
+}
+
 // --- Student: Learn ----------------------------------------------------------
 
 export function StudentLearningV3({ children }: { readonly children: React.ReactNode }): React.ReactElement {

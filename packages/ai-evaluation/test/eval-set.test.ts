@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { onePromptRegistry, promptFingerprint, oneAiFeatures } from '@planthepath/ai-orchestration/src/index.js';
 import { hintLadderFindings } from '@planthepath/career-readiness/src/index.js';
-import { buildEvaluationSet, committedSetPath, contentSha256, repositoryEvaluationSet, serialiseEvaluationSet, type AptitudeBankPack, type CareerTargetPack } from '../src/index.js';
+import { buildEvaluationSet, committedSetPath, contentSha256, repositoryEvaluationSet, serialiseEvaluationSet, taskBinding, type AptitudeBankPack, type CareerTargetPack } from '../src/index.js';
 
 const bank = JSON.parse(readFileSync(new URL('../../../data/engine/aptitude-bank-v1.draft.json', import.meta.url), 'utf8')) as AptitudeBankPack;
 const soc = JSON.parse(readFileSync(new URL('../../../data/engine/soc-analyst-l1-target-v1.draft.json', import.meta.url), 'utf8')) as CareerTargetPack;
@@ -63,7 +63,7 @@ describe('one-ai-bakeoff v1', () => {
       expect(oneAiFeatures.find((feature) => feature.featureKey === binding.featureKey)?.prompt).toBe(prompt);
     }
     for (const entry of set.cases) {
-      const prompt = registry.get(set.tasks[entry.task].promptKey, set.tasks[entry.task].promptVersion);
+      const prompt = registry.get(taskBinding(set, entry.task).promptKey, taskBinding(set, entry.task).promptVersion);
       expect(entry.request.max_tokens).toBe(prompt.maxOutputTokens);
       expect(entry.request.temperature).toBe(prompt.temperature);
       expect(entry.request.messages.map((message) => message.role)).toEqual(['system', 'user']);

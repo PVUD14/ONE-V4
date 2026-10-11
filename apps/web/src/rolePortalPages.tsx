@@ -26,6 +26,7 @@ import { OperationsSkillMapPage } from './rolePortal/skillMap.js';
 import { OperationsQuestionBankPage } from './rolePortal/questionBank.js';
 import { OperationsLessonsPage } from './rolePortal/lessons.js';
 import { OperationsContentImportPage } from './rolePortal/contentImport.js';
+import { OperationsExplainLessonsPage } from './rolePortal/explainLessonsReview.js';
 import { FacultyContentReviewsPage, OperationsExternalReviewsPage } from './rolePortal/externalReviews.js';
 import { InstitutionReportsPage } from './institutionReportsPage.js';
 import { InstitutionExportsPanel } from './rolePortal/institutionAnalytics.js';
@@ -343,7 +344,7 @@ function RoleModulePage({ portal, route, demoMode, authenticatedWorkspace }: { r
     if (!workspaceHoldsAny(authenticatedWorkspace, operationsScreenCapabilities.contentManagement)) {
       return <AuthenticatedNotYetAvailable title="Content Management" detail="Content Management is for staff who hold a content capability (catalogue, edit, review or publish). Your access does not include one; an administrator who holds Capability Admin can grant it." />;
     }
-    return <><OperationsCareerCataloguePage /><OperationsSkillMapPage /><OperationsQuestionBankPage /><OperationsLessonsPage /><OperationsContentImportPage /><OperationsExternalReviewsPage /><LearnerContentStudio /><OperationsContentReadOnlyPage /></>;
+    return <><OperationsCareerCataloguePage /><OperationsSkillMapPage /><OperationsQuestionBankPage /><OperationsLessonsPage /><OperationsContentImportPage /><OperationsExternalReviewsPage /><LearnerContentStudio /><OperationsExplainLessonsPage /><OperationsContentReadOnlyPage /></>;
   }
   // Audit Logs leaves the shared technical panel: the audit-event search endpoint is
   // complete and role-gated, and pointing this item at the generic status page was the

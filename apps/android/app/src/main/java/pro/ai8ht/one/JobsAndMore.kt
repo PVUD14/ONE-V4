@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Insights
+import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Person
@@ -638,6 +639,8 @@ internal enum class MoreDest(val title: String) {
     Profile("Profile"), Calendar("Calendar"), Screening("Screening tests"), Resources("Resources"), Share("Public profile"), Career("Career readiness"), Target("Career target"),
     Academics("Academic record"), Support("Support"), Documents("Documents"),
     Privacy("Privacy & data"), Help("Help & FAQ"), Settings("Settings"),
+    // ADR-052: appended; the menu rows, not this order, are what the student sees.
+    Explain("Ask ONE to explain"),
 }
 
 @Composable
@@ -716,6 +719,9 @@ internal fun MoreMenuScreen(
                     "Your results, and what employers can actually see") { onOpen(MoreDest.Academics) }
                 MenuRow(Icons.Filled.Person, pro.ai8ht.one.ui.Tone.Violet, "Support",
                     "Tasks your institution has assigned you") { onOpen(MoreDest.Support) }
+                // ADR-052: after the learning rows; nothing above or below moves.
+                MenuRow(Icons.Filled.Lightbulb, pro.ai8ht.one.ui.Tone.Violet, "Ask ONE to explain",
+                    "AI lessons on any topic — not checked by a person") { onOpen(MoreDest.Explain) }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline)
                 MenuRow(Icons.Filled.Description, pro.ai8ht.one.ui.Tone.Violet, "Documents",
                     "Résumés, certificates and verification") { onOpen(MoreDest.Documents) }

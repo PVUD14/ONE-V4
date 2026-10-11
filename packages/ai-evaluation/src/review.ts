@@ -26,13 +26,15 @@ export class BakeOffReviewError extends Error {
 }
 
 /** How many of each kind the sheet asks a person to score. */
-const samplePlan: Readonly<Record<'tutor-hint' | 'lesson-draft', Readonly<Record<EvaluationLanguage, number>>>> = {
+const samplePlan: Readonly<Record<'tutor-hint' | 'lesson-draft' | 'explain-topic', Readonly<Record<EvaluationLanguage, number>>>> = {
   'tutor-hint': { en: 18, te: 8, hi: 4 },
   'lesson-draft': { en: 10, te: 3, hi: 2 },
+  // ADR-052: English only; 15 of the 40 topics, read by a person before the feature may switch on.
+  'explain-topic': { en: 15, te: 0, hi: 0 },
 };
 
 export type ReviewedTask = keyof typeof samplePlan;
-export const reviewedTasks: readonly ReviewedTask[] = ['tutor-hint', 'lesson-draft'];
+export const reviewedTasks: readonly ReviewedTask[] = ['tutor-hint', 'lesson-draft', 'explain-topic'];
 
 export interface ReviewScores {
   /** 1–5, the rubric's teaching-quality scale. */
@@ -144,6 +146,7 @@ export function readReviewSheet(raw: unknown, set: EvaluationSet, results: BakeO
   const byTask: Record<ReviewedTask, { teaching: number[]; language: number[]; errors: number }> = {
     'tutor-hint': { teaching: [], language: [], errors: 0 },
     'lesson-draft': { teaching: [], language: [], errors: 0 },
+    'explain-topic': { teaching: [], language: [], errors: 0 },
   };
   const caseById = new Map(set.cases.map((entry) => [entry.id, entry]));
   for (const item of items as ReviewItem[]) {
@@ -170,7 +173,7 @@ export function readReviewSheet(raw: unknown, set: EvaluationSet, results: BakeO
       factualErrorRate: bucket.teaching.length ? Math.round((bucket.errors / bucket.teaching.length) * 10000) / 10000 : 1,
     };
   };
-  return { 'tutor-hint': summary('tutor-hint'), 'lesson-draft': summary('lesson-draft') };
+  return { 'tutor-hint': summary('tutor-hint'), 'lesson-draft': summary('lesson-draft'), 'explain-topic': summary('explain-topic') };
 }
 
 export function isReviewedTask(task: EvaluationTask): task is ReviewedTask {

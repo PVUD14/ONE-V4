@@ -256,6 +256,35 @@ class HarnessTest(unittest.TestCase):
         data = run_bakeoff.load_set(os.path.join(os.path.dirname(HERE), "eval-set-v1.json"))
         self.assertEqual((data["setKey"], data["setVersion"], len(data["cases"])), ("one-ai-bakeoff", 1, 200))
 
+    def test_the_committed_explain_set_loads(self):
+        data = run_bakeoff.load_set(os.path.join(os.path.dirname(HERE), "eval-set-explain-v1.json"))
+        self.assertEqual((data["setKey"], data["setVersion"], len(data["cases"])), ("one-ai-explain", 1, 55))
+        self.assertEqual({case["task"] for case in data["cases"]}, {"explain-topic"})
+
+    def test_by_default_every_committed_set_runs_and_only_picks_the_explain_set(self):
+        here = os.path.dirname(HERE)
+        default = run_bakeoff.parse_args(["--model", "m"])
+        self.assertEqual(default.set, [os.path.join(here, "eval-set-v1.json"), os.path.join(here, "eval-set-explain-v1.json")])
+        only = run_bakeoff.parse_args(["--model", "m", "--only", "explain-topic"])
+        self.assertEqual(only.set, [os.path.join(here, "eval-set-explain-v1.json")])
+
+    def test_writes_one_results_file_per_set(self):
+        second = os.path.join(self.dir, "explain.json")
+        tiny = tiny_set()
+        tiny["setKey"] = "tiny-explain"
+        for case in tiny["cases"]:
+            case["task"] = "explain-topic"
+        with open(second, "w", encoding="utf-8") as handle:
+            json.dump(tiny, handle)
+        code = self.run_harness(lambda path, body, index: (200, completion("ok")), extra=("--set", second))
+        self.assertEqual(code, 0)
+        files = sorted(name for name in os.listdir(self.out) if name.endswith(".json"))
+        self.assertEqual(len(files), 2)
+        self.assertTrue(any(name.startswith("results-tiny-explain-") for name in files))
+        with open(os.path.join(self.out, [name for name in files if name.startswith("results-tiny-explain-")][0]), encoding="utf-8") as handle:
+            data = json.load(handle)
+        self.assertEqual([batch["task"] for batch in data["batches"]], ["explain-topic"])
+
 
 if __name__ == "__main__":
     unittest.main()

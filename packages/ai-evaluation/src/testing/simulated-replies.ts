@@ -8,7 +8,7 @@
 import { lessonDraftHeadings } from '@planthepath/ai-orchestration/src/index.js';
 import { contentSha256 } from '../build-set.js';
 import type { BakeOffResults, CaseResult } from '../results.js';
-import { evaluationTasks, type EvaluationCase, type EvaluationLanguage, type EvaluationSet } from '../set-format.js';
+import { setTasks, type EvaluationCase, type EvaluationLanguage, type EvaluationSet } from '../set-format.js';
 
 const hintText: Readonly<Record<EvaluationLanguage, string>> = {
   en: 'Look again at what the question asks you to work out, and take one step at a time from the information given.',
@@ -44,6 +44,8 @@ export function goodReply(entry: EvaluationCase): string {
       return entry.expect.accept === 'REFUSED' ? 'REFUSED: the note asks for something the drafting rules forbid.' : lesson(entry.language);
     case 'answer-check':
       return JSON.stringify({ option: entry.expect.correctOptionId, working: 'Solved it step by step.' });
+    case 'explain-topic':
+      return entry.expect.accept === 'REFUSED' ? 'REFUSED: ONE cannot help with that request.' : lesson('en');
   }
 }
 
@@ -78,7 +80,7 @@ export function simulatedResults(set: EvaluationSet, setText: string, reply: (en
     model, providerKey: 'openai-compatible',
     options: { concurrency: 8, timeoutSeconds: 120, maxAttempts: 3, chatTemplateKwargs: null },
     partial: false, startedAt: '2026-10-01T10:00:00.000Z', finishedAt: '2026-10-01T10:05:00.000Z',
-    batches: evaluationTasks.map((task) => ({ task, cases: set.cases.filter((entry) => entry.task === task).length, wallSeconds: 20, concurrency: 8 })),
+    batches: setTasks(set).map((task) => ({ task, cases: set.cases.filter((entry) => entry.task === task).length, wallSeconds: 20, concurrency: 8 })),
     cases,
   };
 }

@@ -514,6 +514,17 @@ describe('Student portal completion', () => {
     expect(screen.getByRole('dialog', { name: 'Notifications' })).toHaveTextContent(/caught up/);
   });
 
+  it('adds Ask ONE to explain at the end of Prepare without moving any other item (ADR-052)', () => {
+    fetchMock.mockResolvedValue({ ok: true });
+    render(<App />);
+    const nav = screen.getByRole('complementary', { name: 'Student navigation' });
+    const labels = within(nav).getAllByRole('button').map((button) => button.textContent?.trim() ?? '');
+    const at = (label: string) => labels.findIndex((text) => text.includes(label));
+    expect(at('Ask ONE to explain')).toBeGreaterThan(at('Experience'));
+    expect(at('Ask ONE to explain')).toBeLessThan(at('Opportunities'));
+    expect(at('Experience')).toBeGreaterThan(at('Company Prep'));
+  });
+
   it('keeps Experience in grouped navigation and supports drawer keyboard behavior', () => {
     fetchMock.mockResolvedValue({ ok: true });
     render(<App />);

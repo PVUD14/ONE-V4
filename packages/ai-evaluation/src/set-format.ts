@@ -1,6 +1,6 @@
 /**
  * The shape of ONE's AI evaluation set (ENG-21): what the pod's harness sends and what the scorer
- * expects back. One JSON file, versioned, committed at deploy/ai-pod/bake-off/eval-set-v1.json.
+ * expects back. One JSON file, versioned, committed at deploy/ai-pod/bake-off/eval-set-v1.json (and, for ADR-052, eval-set-explain-v1.json).
  *
  * Why this exists: the harness (Python, on the pod) and the scorer (TypeScript, in the repository)
  * must agree on one format without sharing code, so the format is written down once, here.
@@ -11,8 +11,14 @@ export const EVALUATION_SET_FORMAT = 'one-bakeoff-set';
 export const EVALUATION_SET_FORMAT_VERSION = 1;
 export const EVALUATION_SET_KEY = 'one-ai-bakeoff';
 export const EVALUATION_SET_VERSION = 1;
+/**
+ * ADR-052: "Ask ONE to explain" is evaluated in its own set, so `one-ai-bakeoff` v1 stays byte for byte
+ * what earlier results were scored against. Same file format; its own key and version.
+ */
+export const EXPLAIN_EVALUATION_SET_KEY = 'one-ai-explain';
+export const EXPLAIN_EVALUATION_SET_VERSION = 1;
 
-export const evaluationTasks = ['tutor-hint', 'lesson-draft', 'answer-check'] as const;
+export const evaluationTasks = ['tutor-hint', 'lesson-draft', 'answer-check', 'explain-topic'] as const;
 export type EvaluationTask = (typeof evaluationTasks)[number];
 
 /** The plan's four blocks: 80 English STEM and cybersecurity, 60 Indian-language, 30 grading, 30 abuse. */
@@ -66,7 +72,14 @@ export interface AnswerCheckExpectation {
   readonly correctOptionId: string;
 }
 
-export type CaseExpectation = TutorExpectation | LessonExpectation | AnswerCheckExpectation;
+/** ADR-052: a lesson for a legitimate topic; one `REFUSED:` line for weapons, cheating, personal data, self-harm or chit-chat. */
+export interface ExplainExpectation {
+  readonly kind: 'explain-topic';
+  readonly accept: 'LESSON' | 'REFUSED';
+  readonly unsafePatterns: readonly string[];
+}
+
+export type CaseExpectation = TutorExpectation | LessonExpectation | AnswerCheckExpectation | ExplainExpectation;
 
 export interface EvaluationCase {
   readonly id: string;
@@ -97,6 +110,19 @@ export interface EvaluationSet {
   readonly setVersion: number;
   readonly notice: string;
   readonly builtFrom: Readonly<Record<string, string>>;
-  readonly tasks: Readonly<Record<EvaluationTask, TaskBinding>>;
+  /** The tasks this set evaluates, and only those (v1: the first three; one-ai-explain: explain-topic). */
+  readonly tasks: Readonly<Partial<Record<EvaluationTask, TaskBinding>>>;
   readonly cases: readonly EvaluationCase[];
+}
+
+/** The tasks a set evaluates, in `evaluationTasks` order. */
+export function setTasks(set: Pick<EvaluationSet, 'tasks'>): readonly EvaluationTask[] {
+  return evaluationTasks.filter((task) => set.tasks[task] !== undefined);
+}
+
+/** A task's binding in a set; throws for a task the set does not evaluate. */
+export function taskBinding(set: Pick<EvaluationSet, 'tasks'>, task: EvaluationTask): TaskBinding {
+  const binding = set.tasks[task];
+  if (!binding) throw new Error(`the set does not evaluate ${task}`);
+  return binding;
 }

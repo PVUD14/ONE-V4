@@ -1583,6 +1583,18 @@ export const eventSchemas = {
     schemaRef: 'registry://tutor.hint.requested/1',
     payload: { tutorHintId: { kind: 'uuid' } },
   },
+  // ADR-052: a student asked ONE to explain a topic and no cached lesson existed; the worker writes it through
+  // ONE AI Orchestration (no model call in the request). Carries only the lesson's id: the lesson names no one.
+  explainLessonRequestedV1: {
+    eventType: 'explain.lesson.requested',
+    eventVersion: 1,
+    producer: 'learning-engine',
+    aggregateType: 'explain_lesson',
+    purpose: 'ai-explanation',
+    dataClassification: 'internal',
+    schemaRef: 'registry://explain.lesson.requested/1',
+    payload: { explainLessonId: { kind: 'uuid' } },
+  },
   // ENG-12: a student sent a program to the code sandbox; the worker runs it on the isolated VM (no
   // sandbox call in the request). Carries only the submission's id: the worker reads the rest itself.
   codeSubmissionRequestedV1: {

@@ -38,6 +38,8 @@ export const approvedNavIcons: Readonly<Record<string, IconName>> = {
 export const extraNavIcons: Readonly<Record<string, IconName>> = {
   // Operations
   'Content Management': 'documents',
+  // Student: Ask ONE to explain (ADR-052) is the AI coach's sibling, so it shares the coach icon.
+  'Ask ONE to explain': 'coach',
   // Career counselor preview
   'Counselor Sessions': 'meetings', 'Student Cases': 'students', 'Counseling Notes': 'documents',
   'Career Guidance': 'career', Resources: 'resources',

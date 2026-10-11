@@ -8,7 +8,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { buildEvaluationSet, contentSha256, serialiseEvaluationSet, type AptitudeBankPack, type CareerTargetPack } from './build-set.js';
+import { buildEvaluationSet, buildExplainEvaluationSet, contentSha256, serialiseEvaluationSet, type AptitudeBankPack, type CareerTargetPack } from './build-set.js';
 import type { CostAssumptions } from './cost.js';
 import { matchResultsToSet, readBakeOffResults, type BakeOffResults } from './results.js';
 import { readReviewSheet } from './review.js';
@@ -19,6 +19,8 @@ import { BakeOffResultsError } from './results.js';
 const repositoryRoot = new URL('../../../', import.meta.url);
 
 export const committedSetPath = fileURLToPath(new URL('deploy/ai-pod/bake-off/eval-set-v1.json', repositoryRoot));
+/** ADR-052: the `one-ai-explain` v1 set, a file of its own so `one-ai-bakeoff` v1 never changes. */
+export const committedExplainSetPath = fileURLToPath(new URL('deploy/ai-pod/bake-off/eval-set-explain-v1.json', repositoryRoot));
 
 function readJson<T>(relative: string): T {
   return JSON.parse(readFileSync(new URL(relative, repositoryRoot), 'utf8')) as T;
@@ -45,7 +47,30 @@ export function repositoryEvaluationSet(): RepositorySet {
   return cached;
 }
 
+let explainCached: RepositorySet | undefined;
+
+/** ADR-052: the `one-ai-explain` set, built from explain-cases.ts. */
+export function repositoryExplainEvaluationSet(): RepositorySet {
+  if (!explainCached) {
+    const set = buildExplainEvaluationSet();
+    const text = serialiseEvaluationSet(set);
+    explainCached = { set, text, sha256: contentSha256(text) };
+  }
+  return explainCached;
+}
+
+/** Every set this repository builds, with the file each is committed as. */
+export function repositoryEvaluationSets(): readonly (RepositorySet & { readonly path: string })[] {
+  return [{ ...repositoryEvaluationSet(), path: committedSetPath }, { ...repositoryExplainEvaluationSet(), path: committedExplainSetPath }];
+}
+
+/** The repository's set a results file names by key (an unknown key falls to v1, whose check then refuses it). */
+export function repositorySetFor(setKey: unknown): RepositorySet {
+  return repositoryEvaluationSets().find((entry) => entry.set.setKey === setKey) ?? repositoryEvaluationSet();
+}
+
 export interface EvaluatedRun {
+  readonly set: EvaluationSet;
   readonly results: BakeOffResults;
   readonly resultsSha256: string;
   readonly scorecard: Scorecard;
@@ -59,7 +84,6 @@ export function evaluateResultsText(input: {
   readonly cost?: CostAssumptions | undefined;
   readonly featureKeys?: Partial<Readonly<Record<EvaluationTask, string>>> | undefined;
 }): EvaluatedRun {
-  const { set, text } = repositoryEvaluationSet();
   let raw: unknown;
   try {
     raw = JSON.parse(input.resultsText);
@@ -67,6 +91,7 @@ export function evaluateResultsText(input: {
     throw new BakeOffResultsError('RESULTS_MALFORMED', 'the results file is not JSON');
   }
   const results = readBakeOffResults(raw);
+  const { set, text } = repositorySetFor(results.set.key);
   matchResultsToSet(results, set, text);
   const resultsSha256 = contentSha256(input.resultsText);
   let human;
@@ -84,5 +109,5 @@ export function evaluateResultsText(input: {
     ...(human ? { human } : {}),
     ...(input.featureKeys ? { featureKeys: input.featureKeys } : {}),
   });
-  return { results, resultsSha256, scorecard, reviewed: human !== undefined };
+  return { set, results, resultsSha256, scorecard, reviewed: human !== undefined };
 }

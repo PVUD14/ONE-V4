@@ -63,14 +63,15 @@ import { StudentDashboardV3 } from './studentDashboardV3.js';
 import { StudentGoalsPanel } from './studentGoals.js';
 import { StudentLearningPlan } from './studentLearning.js';
 import { StudentCareerToolsPage, StudentCompanyPrepPage, StudentPracticePage, StudentResumeBuilderPage, StudentScholarshipsPage } from './pilotParityPages.js';
-import { StudentAssessmentsV3, StudentLearningV3, StudentOpportunitiesV3, StudentProfileV3, StudentRoadmapV3 } from './parityWraps.js';
+import { StudentAssessmentsV3, StudentExplainV3, StudentLearningV3, StudentOpportunitiesV3, StudentProfileV3, StudentRoadmapV3 } from './parityWraps.js';
+import { StudentExplainPage } from './studentExplain.js';
 import { supportCodeSuffix } from './supportCode.js';
 import { formatDate } from './dates.js';
 import { roleLabel } from './labels.js';
 import { initialSidebarCollapsed, rememberSidebarCollapsed } from './sidebarPreference.js';
 import { NavIndicator } from './navIndicator.js';
 
-type RouteKey = 'dashboard' | 'career-path' | 'ai-coach' | 'readiness' | 'skills' | 'assessments' | 'learning' | 'experience' | 'opportunities' | 'applications' | 'interviews' | 'documents' | 'profile' | 'settings' | 'help' | 'practice' | 'company-prep' | 'career-tools' | 'scholarships' | 'resume-builder' | 'calendar';
+type RouteKey = 'dashboard' | 'career-path' | 'ai-coach' | 'readiness' | 'skills' | 'assessments' | 'learning' | 'experience' | 'opportunities' | 'applications' | 'interviews' | 'documents' | 'profile' | 'settings' | 'help' | 'practice' | 'company-prep' | 'career-tools' | 'scholarships' | 'resume-builder' | 'calendar' | 'explain';
 
 interface NavItem {
   readonly label: string;
@@ -92,6 +93,8 @@ const navItems: readonly NavItem[] = [
   { label: 'Practice', path: '/student/practice', icon: 'practice', group: 'Prepare', route: 'practice' },
   { label: 'Company Prep', path: '/student/company-prep', icon: 'company', group: 'Prepare', route: 'company-prep' },
   { label: 'Experience', path: '/student/experience', icon: 'experience', group: 'Prepare', route: 'experience' },
+  // ADR-052: appended at the end of Prepare; nothing above or below moves.
+  { label: 'Ask ONE to explain', path: '/student/explain', icon: 'coach', group: 'Prepare', route: 'explain' },
   { label: 'Opportunities', path: '/student/opportunities', icon: 'opportunities', group: 'Apply', route: 'opportunities' },
   { label: 'Applications', path: '/student/applications', icon: 'applications', group: 'Apply', route: 'applications' },
   { label: 'Interviews', path: '/student/interviews', icon: 'interviews', group: 'Apply', route: 'interviews' },
@@ -126,6 +129,7 @@ const routeTitles: Record<RouteKey, PageMeta> = {
   profile: { title: 'Profile', eyebrow: 'Student-owned identity', description: 'Academic profile, career objective, consent, visibility, and evidence status.' },
   settings: { title: 'Settings', eyebrow: 'Account and privacy', description: 'Preferences, notifications, privacy, consent, accessibility, and security overview.' },
   help: { title: 'Help & FAQ', eyebrow: 'Guidance', description: 'Answers for students, from the same guide that powers the ONE Assistant.' },
+  explain: { title: 'Ask ONE to explain', eyebrow: 'Prepare', description: 'AI-written lessons on any topic you name — AI-generated, not checked by a person, and never counted toward anything.' },
 };
 
 const productName = 'ONE by AI8HT';
@@ -818,7 +822,7 @@ function StudentShell({ apiHealth, authNotice, authStatus, currentStudent, demoM
           {demoMode && showDevelopmentIndicators ? <PreviewBadge apiHealth={apiHealth} /> : null}
           {demoMode ? <StudentPreviewStatus authenticated={false} /> : <AuthenticatedStudentStatus currentStudent={currentStudent} />}
           {/* Pilot-exact pages carry their own pilot page head. */}
-          {['dashboard', 'practice', 'company-prep', 'career-tools', 'scholarships', 'resume-builder', 'career-path', 'learning', 'assessments', 'opportunities', 'profile'].includes(route) && authStatus.state === 'authenticated' ? null : <PageHeader meta={routeTitles[route]} />}
+          {['dashboard', 'practice', 'company-prep', 'career-tools', 'scholarships', 'resume-builder', 'career-path', 'learning', 'assessments', 'opportunities', 'profile', 'explain'].includes(route) && authStatus.state === 'authenticated' ? null : <PageHeader meta={routeTitles[route]} />}
           <RouteScreen route={route} authenticated={authStatus.state === 'authenticated'} currentStudent={currentStudent} />
         </main>
       </div>
@@ -947,6 +951,8 @@ function RouteScreen({ route, authenticated, currentStudent }: { readonly route:
   if (route === 'scholarships') return <StudentScholarshipsPage />;
   if (route === 'resume-builder') return <StudentResumeBuilderPage />;
   if (route === 'calendar') return <CalendarPage />;
+  // No sample lesson is shown in the preview: the screen needs a signed-in student and the real feature.
+  if (route === 'explain') return <V2EmptyState icon="💡" title="Ask ONE to explain needs you signed in" note="Sign in to ask ONE to explain a topic. Nothing is shown here in the preview." />;
   return <SettingsPage />;
 }
 
@@ -972,6 +978,7 @@ function AuthenticatedStudentRoute({ route, currentStudent }: { readonly route: 
   // shows (EMP-08) and the one calendar every role reads (/api/v1/me/calendar).
   if (route === 'interviews') return <StudentInterviewsPanel />;
   if (route === 'calendar') return <CalendarPage />;
+  if (route === 'explain') return <StudentExplainV3><StudentExplainPage /></StudentExplainV3>;
   return <AuthenticatedStudentUnavailable route={route} />;
 }
 

@@ -641,6 +641,10 @@ export const institutionPurgeOutOfScope: Readonly<Record<string, string>> = {
   learning_step_items: "the student's own learning record",
   tutor_hints: "the student's own learning record",
   tutor_group_assignments: "the student's own learning record (their tutor pilot group)",
+  // ADR-052: no institution_id at all (never the college's); listed so the decision is written down.
+  explain_topic_requests: "the student's own record (what they asked ONE to explain); carries no institution_id",
+  explain_lesson_reports: "the student's own record (mistakes they reported); carries no institution_id",
+  explain_lessons: "AI8HT's shared AI content, naming no one; carries no institution_id",
   tutor_college_rollouts: "AI8HT's AI operations record (the college's tutor experiment)",
   code_submissions: "the student's own learning record",
   placement_tests: "the student's own learning record",

@@ -66,6 +66,7 @@ export {
   contentItemDraftPromptV1,
   contentLessonDraftPromptV1,
   contentLessonDraftPromptV2,
+  explainTopicPromptV1,
   firstFeaturePrompts,
   hintLevelMeanings,
   lessonDraftHeadings,

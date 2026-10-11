@@ -14,6 +14,10 @@ in its stock python3 with nothing to install.
 Usage (on the pod, as root):
     python3 run_bakeoff.py --model qwen2.5-14b-instruct
     python3 run_bakeoff.py --model qwen2.5-7b-instruct --model other-name --out results/
+    python3 run_bakeoff.py --model qwen2.5-14b-instruct --only explain-topic
+
+By default every committed set runs (one-ai-bakeoff v1 and, for ADR-052, one-ai-explain v1), one results
+file per set and model. --set picks set files (repeatable); --only explain-topic runs only the explain set.
 
 The key is read from --key-file (default /root/one-ai/api-key). It is never accepted on the
 command line or from the environment, never printed and never written to the results file.
@@ -45,7 +49,9 @@ RESULTS_FORMAT_VERSION = 1
 SET_FORMAT = "one-bakeoff-set"
 SET_FORMAT_VERSION = 1
 PROVIDER_KEY = "openai-compatible"  # ENG-20 records the venue as configuration, the model by name
-TASK_ORDER = ("answer-check", "tutor-hint", "lesson-draft")
+# explain-topic (ADR-052) lives in its own set, eval-set-explain-v1.json; the order is per set.
+TASK_ORDER = ("answer-check", "tutor-hint", "lesson-draft", "explain-topic")
+DEFAULT_SETS = ("eval-set-v1.json", "eval-set-explain-v1.json")
 RETRY_STATUSES = (429, 500, 502, 503, 504)
 LOOPBACK_HOSTS = ("127.0.0.1", "localhost", "::1")
 DEFAULT_BASE_URL = "http://127.0.0.1:8888/v1"
@@ -296,7 +302,10 @@ def parse_args(argv):
     here = os.path.dirname(os.path.abspath(__file__))
     parser = argparse.ArgumentParser(description="Run ONE's AI evaluation set against served models (ENG-21).")
     parser.add_argument("--model", action="append", required=True, help="served model name; repeat for several")
-    parser.add_argument("--set", default=os.path.join(here, "eval-set-v1.json"), help="the evaluation set file")
+    parser.add_argument("--set", action="append", default=None,
+                        help="an evaluation set file; repeat for several (default: every committed set)")
+    parser.add_argument("--only", choices=("explain-topic",), default=None,
+                        help="run only the sets for this task (explain-topic: eval-set-explain-v1.json)")
     parser.add_argument("--base-url", default=DEFAULT_BASE_URL, help="OpenAI-compatible base ending in /v1")
     parser.add_argument("--key-file", default=DEFAULT_KEY_FILE, help="file holding the bearer key (never printed)")
     parser.add_argument("--out", default=os.path.join(here, "results"), help="directory for results files")
@@ -319,6 +328,12 @@ def parse_args(argv):
     for model in options.model:
         if not model or model != model.strip() or len(model) > 200:
             parser.error("a model name must be 1-200 characters with no surrounding spaces")
+    if options.only and options.set:
+        parser.error("--only and --set cannot be combined")
+    if options.only == "explain-topic":
+        options.set = [os.path.join(here, "eval-set-explain-v1.json")]
+    elif not options.set:
+        options.set = [os.path.join(here, name) for name in DEFAULT_SETS]
     return options
 
 
@@ -327,8 +342,7 @@ def main(argv=None, log=None):
     options = parse_args(sys.argv[1:] if argv is None else argv)
     try:
         base_url = check_base_url(options.base_url)
-        data = load_set(options.set)
-        set_sha = file_sha256(options.set)
+        sets = [(load_set(path), file_sha256(path)) for path in options.set]
         key = read_key(options.key_file)
     except (ConfigurationError, OSError, ValueError) as error:
         log("[bake-off] FAILED: %s" % error)
@@ -344,16 +358,19 @@ def main(argv=None, log=None):
         log("[bake-off] FAILED: not served here: %s (served: %s)" % (", ".join(missing), ", ".join(str(name) for name in served)))
         return 2
     os.makedirs(options.out, exist_ok=True)
-    log("[bake-off] set %s v%s, %d cases, sha256 %s" % (data.get("setKey"), data.get("setVersion"), len(data["cases"]), set_sha))
+    for data, set_sha in sets:
+        log("[bake-off] set %s v%s, %d cases, sha256 %s" % (data.get("setKey"), data.get("setVersion"), len(data["cases"]), set_sha))
     for model in options.model:
-        results = run_model(client, model, data, set_sha, options, log)
-        stamp = results["startedAt"].replace(":", "").replace("-", "").replace(".", "")
-        name = "results-%s-%s.json" % (re.sub(r"[^A-Za-z0-9._-]", "_", model), stamp)
-        path = os.path.join(options.out, name)
-        with open(path, "w", encoding="utf-8", newline="\n") as handle:
-            json.dump(results, handle, ensure_ascii=False, indent=2)
-            handle.write("\n")
-        log("[bake-off] wrote %s%s" % (path, " (PARTIAL: smoke run, not recordable)" if results["partial"] else ""))
+        for data, set_sha in sets:
+            results = run_model(client, model, data, set_sha, options, log)
+            stamp = results["startedAt"].replace(":", "").replace("-", "").replace(".", "")
+            safe = lambda value: re.sub(r"[^A-Za-z0-9._-]", "_", str(value))
+            name = "results-%s-%s-%s.json" % (safe(data.get("setKey")), safe(model), stamp)
+            path = os.path.join(options.out, name)
+            with open(path, "w", encoding="utf-8", newline="\n") as handle:
+                json.dump(results, handle, ensure_ascii=False, indent=2)
+                handle.write("\n")
+            log("[bake-off] wrote %s%s" % (path, " (PARTIAL: smoke run, not recordable)" if results["partial"] else ""))
     return 0
 
 

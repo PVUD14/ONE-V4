@@ -171,7 +171,7 @@ export function PilotShell({ identity, nav, page, onNavigate, onSignOut, signOut
     <PilotOverlayProvider>
       <aside className="pilot-sidebar" aria-label="Pilot navigation">
         <div className="pilot-brand">
-          <BrandLogo height={46} />
+          <BrandLogo width={96} />
           <span><small>LEARN | PREPARE | BUILD | GROW</small></span>
         </div>
         {nav.map((item) => {

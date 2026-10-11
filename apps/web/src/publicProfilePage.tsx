@@ -77,7 +77,7 @@ export function PublicProfilePage({ token }: { readonly token: string }): React.
     return <div className="pilot pilot-embed"><div className="pilot-page" style={{ gridTemplateColumns: '1fr' }}>
       <div className="pilot-content">
         <section className="pilot-card" style={{ maxWidth: 560 }}>
-          <BrandLogo height={40} />
+          <BrandLogo width={140} clearSpace="none" />
           <h2 style={{ marginTop: 14 }}>This profile link is no longer live</h2>
           <p style={muted}>
             The person who shared it may have switched it off, or it may have expired.
@@ -95,7 +95,7 @@ export function PublicProfilePage({ token }: { readonly token: string }): React.
 
       {/* Brand band. The ONE logo is the brand on every surface, including this one. */}
       <div style={{ background: '#0b0d10', borderRadius: '12px 12px 0 0', padding: '13px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <BrandLogo height={30} surface="dark" />
+        <BrandLogo width={88} surface="dark" clearSpace="none" />
         <span style={{ color: '#99a2b0', fontSize: 11.5 }}>Verified career profile</span>
       </div>
 

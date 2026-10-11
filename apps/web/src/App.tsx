@@ -568,28 +568,34 @@ function SignInCard({ signInUnavailable, authNotice, onSignIn, onNavigate }: { r
   const go = (path: string) => (event: React.MouseEvent<HTMLAnchorElement>) => { event.preventDefault(); onNavigate(path); };
   const noticeIsError = /failed|incorrect|required|expired|could not|not available/i.test(authNotice);
   return <AuthLayout onNavigate={onNavigate}>
-    <section className="login-card" aria-labelledby="one-login-title">
-      <p className="auth-eyebrow">ONE PLATFORM</p>
-      <h1 id="one-login-title">Sign in</h1>
-      <p className="auth-subtitle">Sign in to your verified ONE career-readiness workspace.</p>
+    <section className="login-card sign-in-card" aria-labelledby="one-login-title">
+      <p className="auth-eyebrow"><Icon name="chevron-up" size={16} />Welcome back</p>
+      <h1 id="one-login-title">Sign in to ONE</h1>
+      <p className="auth-subtitle">Pick up your loop where you left it.</p>
       <form className="login-form" onSubmit={(event) => void submitLogin(event)} noValidate>
         <label htmlFor="one-login-email">Email</label>
-        <input id="one-login-email" name="email" type="email" autoComplete="username" inputMode="email" disabled={signInUnavailable} aria-invalid={fieldErrors.email ? true : undefined} aria-describedby={signInUnavailable ? 'one-auth-unavailable' : fieldErrors.email ? 'one-login-email-error' : undefined} />
+        <span className="si-input"><MailGlyph /><input id="one-login-email" name="email" type="email" autoComplete="username" inputMode="email" disabled={signInUnavailable} aria-invalid={fieldErrors.email ? true : undefined} aria-describedby={signInUnavailable ? 'one-auth-unavailable' : fieldErrors.email ? 'one-login-email-error' : undefined} /></span>
         {fieldErrors.email ? <p id="one-login-email-error" className="field-error">{fieldErrors.email}</p> : null}
         <span className="login-label-row">
           <label htmlFor="one-login-password">Password</label>
           <a href="/forgot-password" onClick={go('/forgot-password')}>Forgot password?</a>
         </span>
-        <PasswordInput id="one-login-password" name="password" autoComplete="current-password" disabled={signInUnavailable} invalid={Boolean(fieldErrors.password)} describedBy={signInUnavailable ? 'one-auth-unavailable' : fieldErrors.password ? 'one-login-password-error' : undefined} />
+        <PasswordInput id="one-login-password" name="password" autoComplete="current-password" leadingIcon disabled={signInUnavailable} invalid={Boolean(fieldErrors.password)} describedBy={signInUnavailable ? 'one-auth-unavailable' : fieldErrors.password ? 'one-login-password-error' : undefined} />
         {fieldErrors.password ? <p id="one-login-password-error" className="field-error">{fieldErrors.password}</p> : null}
-        <button type="submit" disabled={signInUnavailable || busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
+        <button type="submit" className="si-go" disabled={signInUnavailable || busy}>{busy ? 'Signing in…' : 'Sign in'}{busy ? null : <Icon name="arrow-right" size={16} className="si-go-arrow" />}</button>
       </form>
       {signInUnavailable ? <p id="one-auth-unavailable" className="auth-boundary" role="status">Sign-in is not available right now. Please try again later.</p> : null}
       {!signInUnavailable && authNotice ? <p className={noticeIsError ? 'auth-boundary auth-error' : 'auth-boundary'} role={noticeIsError ? 'alert' : 'status'}>{authNotice}</p> : null}
       {enableDemoPortal ? <button type="button" className="secondary" onClick={() => onNavigate('/demo')}>Open demo previews</button> : null}
-      <p className="auth-footnote">Hiring graduates? <a href="/employer-access" onClick={go('/employer-access')}>Request employer access</a></p>
+      <p className="auth-footnote">Hiring graduates? <a href="/employer-access" onClick={go('/employer-access')}>Request employer access<Icon name="arrow-right" size={16} /></a></p>
+      <p className="auth-privacy"><Icon name="lock" size={16} />Your readiness band is advisory and never shared with employers.</p>
     </section>
   </AuthLayout>;
+}
+
+/** The envelope glyph of the approved sign-in card; the Momentum icon set has no mail icon. */
+function MailGlyph(): React.ReactElement {
+  return <svg className="si-input-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 7.2Q3 5 5.2 5H18.8Q21 5 21 7.2V16.8Q21 19 18.8 19H5.2Q3 19 3 16.8Z" fill="none" stroke="currentColor" strokeWidth="1.8" /><path d="M4 7l8 6 8-6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" /></svg>;
 }
 
 function loginNoticeFor(state: string): string {
@@ -612,7 +618,7 @@ function WorkspaceChooser({ authStatus, authNotice, workspaceResolution, onSignI
   const choices = workspaceResolution.state === 'resolved' ? workspaceResolution.choices : [];
   return <main className="login-shell">
     <section className="login-card workspace-card">
-      <BrandLogo className="login-logo" height={72} />
+      <BrandLogo className="login-logo" width={160} clearSpace="none" />
       <span className="eyebrow">{productTagline}</span>
       <h1>Choose your ONE workspace</h1>
       <p>Workspace access is populated only from server-authorized active memberships. This chooser does not grant roles or bypass server authorization.</p>
@@ -911,7 +917,7 @@ function Sidebar({ path, collapsed, drawerOpen, onNavigate, onCollapse, onClose 
   // and the item keeps its name through aria-label and the hover title.
   return (
     <aside className={`student-sidebar momentum-rail ${drawerOpen ? 'drawer-open' : ''}`} aria-label="Student navigation">
-      <div className="sidebar-brand"><BrandLogo height={collapsed ? 36 : 30} compact={collapsed} /><span className="brand-copy"><small>LEARN | PREPARE | BUILD | GROW</small></span><button className="icon-button sidebar-close" type="button" aria-label="Close navigation" onClick={onClose} autoFocus={drawerOpen}><Icon name="close" size={20} /></button></div>
+      <div className="sidebar-brand"><BrandLogo width={collapsed ? 40 : 64} compact={collapsed} /><span className="brand-copy"><small>LEARN | PREPARE | BUILD | GROW</small></span><button className="icon-button sidebar-close" type="button" aria-label="Close navigation" onClick={onClose} autoFocus={drawerOpen}><Icon name="close" size={20} /></button></div>
       <nav className="sidebar-nav" aria-label="Grouped Student navigation">
         <NavIndicator activeKey={current} layoutKey={`${collapsed}-${drawerOpen}`} />
         {groups.map((group) => <div className="nav-group" key={group}><span className="nav-group-label">{group}</span>{navItems.filter((item) => item.group === group && !footerRoutes.has(item.route)).map((item) => <RailItem key={item.path} item={item} active={current === item.path} onNavigate={onNavigate} />)}</div>)}
@@ -965,7 +971,7 @@ function TopBar({ apiHealth, authNotice, authStatus, showDevelopmentIndicators, 
   return (
     <header className="student-topbar">
       <button ref={menuButtonRef} className="icon-button mobile-menu-button" type="button" onClick={onOpenMenu} aria-label="Open student navigation"><Icon name="menu" size={20} /></button>
-      <span className="topbar-brand"><BrandLogo height={28} /></span>
+      <span className="topbar-brand"><BrandLogo width={64} /></span>
       <label className="global-search" role="search"><Icon name="search" size={16} /><span className="sr-only">Search student workspace</span><input placeholder="Search opportunities, skills, assessments..." /></label>
       <div className="topbar-actions">{onSwitchWorkspace ? <button type="button" className="secondary role-switch" onClick={onSwitchWorkspace}><Icon name="switch-workspace" size={16} /><span className="role-switch-label">Switch workspace</span></button> : null}<ThemeToggle /><StudentMessagesFlyout /><StudentNotificationsBell /><AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />{showDevelopmentIndicators ? <span className={`api-dot ${apiHealth}`}>{apiHealth === 'online' ? 'API Online' : apiHealth === 'offline' ? 'API Offline' : 'Checking'}</span> : null}<button className="profile-menu" type="button" aria-label="Student profile menu" onClick={onProfile} disabled={profileActive}><span className="avatar">{identity.initials}</span><span><strong>{identity.name}</strong><small>{workspace ? `Role: ${roleLabel(workspace.role)}` : identity.detail}</small></span><Icon name="chevron-down" size={16} /></button></div>
     </header>

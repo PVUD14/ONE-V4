@@ -28,7 +28,7 @@ describe('top bar brand', () => {
     expect(topbar).not.toBeNull();
     const brand = topbar!.querySelector('.topbar-brand');
     expect(brand).not.toBeNull();
-    expect(within(brand as HTMLElement).getByRole('img', { name: BRAND_NAME })).toHaveAttribute('src', '/assets/one-logo-light.png');
+    expect(within(brand as HTMLElement).getByRole('img', { name: BRAND_NAME })).toHaveAttribute('src', '/brand/one-wordmark-full-color-on-light.svg');
   });
 
   it.each(['placement-officer', 'recruiter', 'operations-admin'])('puts the ONE logo in the %s portal top bar and keeps its controls', (key) => {

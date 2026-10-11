@@ -54,11 +54,11 @@ describe('theme preference', () => {
   it('toggles between themes with a label that says what pressing it does, and the logo follows', async () => {
     osPrefersDark(false);
     render(<><ThemeToggle /><BrandLogo /></>);
-    expect(screen.getByRole('img', { name: 'ONE by AI8HT' }).getAttribute('src')).toBe('/assets/one-logo-light.png');
+    expect(screen.getByRole('img', { name: 'ONE by AI8HT' }).getAttribute('src')).toBe('/brand/one-wordmark-full-color-on-light.svg');
     fireEvent.click(screen.getByRole('button', { name: 'Switch to dark theme' }));
     expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
     // The toggle and logo hear about the change through a MutationObserver, which runs async.
     expect(await screen.findByRole('button', { name: 'Switch to light theme' })).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: 'ONE by AI8HT' }).getAttribute('src')).toBe('/assets/one-logo-dark.png');
+    expect(screen.getByRole('img', { name: 'ONE by AI8HT' }).getAttribute('src')).toBe('/brand/one-wordmark-full-color-on-dark.svg');
   });
 });

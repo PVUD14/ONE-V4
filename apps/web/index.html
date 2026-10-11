@@ -3,18 +3,117 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="ONE by AI8HT — the campus-to-career platform" />
+    <meta name="description" content="ONE by AI8HT — one workspace from learning to landing the role." />
     <meta name="application-name" content="ONE by AI8HT" />
-    <meta name="theme-color" content="#0B0C0F" />
-    <link rel="icon" type="image/png" sizes="64x64" href="/one-favicon.png" />
-    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="alternate icon" href="/favicon.ico" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-    <link rel="manifest" href="/manifest.webmanifest" />
+    <!-- ONE by ai8ht: favicon, app icons and link-sharing tags (design inventory 05-brand/head-snippet.html), on the production address. -->
+    <link rel="icon" href="/favicon.ico" sizes="48x48" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+    <link rel="icon" href="/favicon-16.png" type="image/png" sizes="16x16" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon-180.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <meta name="theme-color" content="#F3F6FB" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#070A18" media="(prefers-color-scheme: dark)" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="ONE by ai8ht" />
+    <meta property="og:title" content="ONE: one workspace from learning to landing the role" />
+    <meta property="og:description" content="Build verified evidence, see your readiness as an advisory band, and walk into interviews prepared. Your record stays yours." />
+    <meta property="og:url" content="https://oneby8.com/" />
+    <meta property="og:image" content="https://oneby8.com/og-image-1200x630.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="ONE by ai8ht. One workspace from learning to landing the role." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="https://oneby8.com/og-image-1200x630.png" />
     <title>ONE by AI8HT</title>
+    <script>
+      /* A theme chosen with the in-app toggle (themePreference.ts, key "one.theme") applies before
+         the first paint, so the boot screen matches the app that follows it. */
+      try { var t = localStorage.getItem('one.theme'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}
+    </script>
+    <style>
+      /* The boot screen (design inventory 05-brand/splash.html): the ∞ ribbons with the lens at the
+         crossing, the lockup and the chevron step-climb loader, shown until the app has mounted;
+         bootSplash.ts then fades it out over 450ms. Reduced motion: a static frame. */
+      #one-boot { position: fixed; inset: 0; z-index: 2147483000; overflow: hidden; color-scheme: light;
+        --b-text-2: #434D69; --b-text-3: #5F6987; --b-brand: #1E6BFF; --b-lines: rgba(10,16,48,.035); --b-halo: rgba(30,107,255,.20); --b-glow: .5;
+        background: radial-gradient(60% 60% at 50% 46%, rgba(30,107,255,.12) 0%, rgba(24,200,232,.06) 45%, transparent 72%), radial-gradient(40% 40% at 100% 0%, rgba(24,200,232,.10), transparent 70%), radial-gradient(40% 40% at 0% 100%, rgba(43,27,184,.07), transparent 70%), #F3F6FB;
+        font-family: 'DM Sans Variable', 'DM Sans', ui-sans-serif, sans-serif; transition: opacity 450ms cubic-bezier(.2,.8,.2,1); }
+      #one-boot.is-done { opacity: 0; pointer-events: none; }
+      #one-boot .b-dark { display: none; }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) #one-boot { color-scheme: dark; --b-text-2: #B3BBD6; --b-text-3: #8F99BA; --b-brand: #4F8DFF; --b-lines: rgba(255,255,255,.03); --b-halo: rgba(63,160,255,.42); --b-glow: 1;
+          background: radial-gradient(64% 70% at 50% 46%, rgba(43,27,184,.42) 0%, rgba(30,107,255,.12) 50%, transparent 74%), radial-gradient(50% 45% at 8% 100%, rgba(24,200,232,.12), transparent 70%), linear-gradient(160deg, #0B1236 0%, #070A18 58%, #050816 100%); }
+        :root:not([data-theme="light"]) #one-boot .b-light { display: none; }
+        :root:not([data-theme="light"]) #one-boot .b-dark { display: block; }
+      }
+      :root[data-theme="dark"] #one-boot { color-scheme: dark; --b-text-2: #B3BBD6; --b-text-3: #8F99BA; --b-brand: #4F8DFF; --b-lines: rgba(255,255,255,.03); --b-halo: rgba(63,160,255,.42); --b-glow: 1;
+        background: radial-gradient(64% 70% at 50% 46%, rgba(43,27,184,.42) 0%, rgba(30,107,255,.12) 50%, transparent 74%), radial-gradient(50% 45% at 8% 100%, rgba(24,200,232,.12), transparent 70%), linear-gradient(160deg, #0B1236 0%, #070A18 58%, #050816 100%); }
+      :root[data-theme="dark"] #one-boot .b-light { display: none; }
+      :root[data-theme="dark"] #one-boot .b-dark { display: block; }
+      #one-boot::before { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(102deg, transparent 0 118px, var(--b-lines) 118px 119px); -webkit-mask-image: linear-gradient(180deg, transparent, #000 30%, #000 70%, transparent); mask-image: linear-gradient(180deg, transparent, #000 30%, #000 70%, transparent); }
+      #one-boot .b-stage { position: absolute; left: 50%; top: 44%; --u: min(1px, calc(100vw / 980)); width: calc(900 * var(--u)); height: calc(560 * var(--u)); translate: -50% -50%; }
+      #one-boot .b-ribbons { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+      #one-boot .b-rb { transform-box: view-box; transform-origin: 450px 280px; }
+      #one-boot .b-glowl { opacity: calc(var(--o) * var(--b-glow)); }
+      #one-boot .b-lens { position: absolute; left: 50%; top: 50%; width: calc(132 * var(--u)); height: calc(132 * var(--u)); translate: -50% -50%; }
+      #one-boot .b-halo { position: absolute; inset: -45%; border-radius: 50%; background: radial-gradient(circle, var(--b-halo) 0, transparent 66%); }
+      #one-boot .b-lens img { position: absolute; inset: 0; width: 100%; height: 100%; }
+      #one-boot .b-foot { position: absolute; left: 0; right: 0; top: calc(44% + 215px); display: flex; flex-direction: column; align-items: center; gap: 22px; }
+      #one-boot .b-logo { width: 150px; height: auto; }
+      #one-boot .b-load { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+      #one-boot .b-ld { position: relative; width: 44px; height: 28px; }
+      #one-boot .b-ld i { position: absolute; left: calc(var(--k) * 12px); bottom: calc(var(--k) * 7px); color: var(--b-brand); opacity: .25; line-height: 0; }
+      #one-boot .b-ld i:last-child { color: #FF8A1F; }
+      #one-boot .b-ld svg { width: 16px; height: 16px; }
+      #one-boot .b-msg { margin: 0; font: 500 14px/20px 'DM Sans Variable', 'DM Sans', ui-sans-serif, sans-serif; color: var(--b-text-2); }
+      #one-boot .b-priv { position: absolute; left: 0; right: 0; bottom: 28px; margin: 0; padding: 0 16px; text-align: center; font-size: 12px; color: var(--b-text-3); }
+      @media (max-width: 520px) {
+        #one-boot .b-stage { top: 42%; --u: calc(100vw / 950); }
+        #one-boot .b-lens { width: 64px; height: 64px; }
+        #one-boot .b-foot { top: calc(42% + 112px); }
+        #one-boot .b-logo { width: 140px; }
+      }
+      @keyframes bFlow { to { stroke-dashoffset: -100; } }
+      @keyframes bComet { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -100; } }
+      @keyframes bBreathe { 0%, 100% { opacity: .7; scale: .92; } 50% { opacity: 1; scale: 1.08; } }
+      @keyframes bLd { 0%, 100% { opacity: .22; translate: 0 0; } 30% { opacity: 1; translate: 0 -5px; } 60% { opacity: .22; translate: 0 0; } }
+      @keyframes bIn { from { opacity: 0; } }
+      @media (prefers-reduced-motion: no-preference) {
+        #one-boot .b-flow { animation: bFlow var(--dur) linear infinite; }
+        #one-boot .b-comet { animation: bComet 7.5s linear infinite; }
+        #one-boot .b-halo { animation: bBreathe 4s ease-in-out infinite; }
+        #one-boot .b-ld i { animation: bLd 1.2s cubic-bezier(.65,0,.35,1) infinite; animation-delay: calc(var(--k) * 160ms); }
+        #one-boot .b-stage, #one-boot .b-foot { animation: bIn 700ms cubic-bezier(.2,.8,.2,1) backwards; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #one-boot .b-comet { display: none; }
+        #one-boot .b-ld i { opacity: 1; }
+        #one-boot { transition: none; }
+      }
+    </style>
   </head>
   <body>
+    <div id="one-boot" role="status" aria-label="Loading ONE">
+      <div class="b-stage" aria-hidden="true">
+        <svg class="b-ribbons" viewBox="0 0 900 560" fill="none" focusable="false">
+          <defs><linearGradient id="b-rg" gradientUnits="userSpaceOnUse" x1="30" y1="150" x2="870" y2="420"><stop offset="0" stop-color="#2B1BB8" stop-opacity=".25"/><stop offset=".22" stop-color="#4A3BF0"/><stop offset=".5" stop-color="#1E6BFF"/><stop offset=".62" stop-color="#5FB0FF" stop-opacity=".55"/><stop offset=".8" stop-color="#18C8E8"/><stop offset="1" stop-color="#18C8E8" stop-opacity=".3"/></linearGradient></defs>
+          <g class="b-rb" style="--dur:26s;transform:rotate(-7deg)"><path class="b-flow b-glowl" style="--o:.07" d="M450.0 280.0L436.5 263.5L422.9 247.0L409.1 230.7L394.9 214.6L380.2 198.9L365.0 183.6L349.1 168.9L332.4 155.0L314.8 142.0L296.2 130.2L276.6 119.9L256.0 111.5L234.3 105.4L211.7 101.9L188.5 101.6L164.8 104.9L141.2 112.3L118.3 124.2L96.7 140.6L77.4 161.6L61.1 186.8L48.8 215.7L41.0 247.2L38.4 280.0L41.0 312.8L48.8 344.3L61.1 373.2L77.4 398.4L96.7 419.4L118.3 435.8L141.2 447.7L164.8 455.1L188.5 458.4L211.7 458.1L234.3 454.6L256.0 448.5L276.6 440.1L296.2 429.8L314.8 418.0L332.4 405.0L349.1 391.1L365.0 376.4L380.2 361.1L394.9 345.4L409.1 329.3L422.9 313.0L436.5 296.5L450.0 280.0L463.5 263.5L477.1 247.0L490.9 230.7L505.1 214.6L519.8 198.9L535.0 183.6L550.9 168.9L567.6 155.0L585.2 142.0L603.8 130.2L623.4 119.9L644.0 111.5L665.7 105.4L688.3 101.9L711.5 101.6L735.2 104.9L758.8 112.3L781.7 124.2L803.3 140.6L822.6 161.6L838.9 186.8L851.2 215.7L859.0 247.2L861.6 280.0L859.0 312.8L851.2 344.3L838.9 373.2L822.6 398.4L803.3 419.4L781.7 435.8L758.8 447.7L735.2 455.1L711.5 458.4L688.3 458.1L665.7 454.6L644.0 448.5L623.4 440.1L603.8 429.8L585.2 418.0L567.6 405.0L550.9 391.1L535.0 376.4L519.8 361.1L505.1 345.4L490.9 329.3L477.1 313.0L463.5 296.5L450.0 280.0Z" pathLength="100" stroke="url(#b-rg)" stroke-width="18.7" stroke-dasharray="34 10 6 50" stroke-linecap="round"/><path class="b-flow" d="M450.0 280.0L436.5 263.5L422.9 247.0L409.1 230.7L394.9 214.6L380.2 198.9L365.0 183.6L349.1 168.9L332.4 155.0L314.8 142.0L296.2 130.2L276.6 119.9L256.0 111.5L234.3 105.4L211.7 101.9L188.5 101.6L164.8 104.9L141.2 112.3L118.3 124.2L96.7 140.6L77.4 161.6L61.1 186.8L48.8 215.7L41.0 247.2L38.4 280.0L41.0 312.8L48.8 344.3L61.1 373.2L77.4 398.4L96.7 419.4L118.3 435.8L141.2 447.7L164.8 455.1L188.5 458.4L211.7 458.1L234.3 454.6L256.0 448.5L276.6 440.1L296.2 429.8L314.8 418.0L332.4 405.0L349.1 391.1L365.0 376.4L380.2 361.1L394.9 345.4L409.1 329.3L422.9 313.0L436.5 296.5L450.0 280.0L463.5 263.5L477.1 247.0L490.9 230.7L505.1 214.6L519.8 198.9L535.0 183.6L550.9 168.9L567.6 155.0L585.2 142.0L603.8 130.2L623.4 119.9L644.0 111.5L665.7 105.4L688.3 101.9L711.5 101.6L735.2 104.9L758.8 112.3L781.7 124.2L803.3 140.6L822.6 161.6L838.9 186.8L851.2 215.7L859.0 247.2L861.6 280.0L859.0 312.8L851.2 344.3L838.9 373.2L822.6 398.4L803.3 419.4L781.7 435.8L758.8 447.7L735.2 455.1L711.5 458.4L688.3 458.1L665.7 454.6L644.0 448.5L623.4 440.1L603.8 429.8L585.2 418.0L567.6 405.0L550.9 391.1L535.0 376.4L519.8 361.1L505.1 345.4L490.9 329.3L477.1 313.0L463.5 296.5L450.0 280.0Z" pathLength="100" stroke="url(#b-rg)" stroke-width="1.8" opacity=".75" stroke-dasharray="34 10 6 50" stroke-linecap="round"/></g>
+          <g class="b-rb" style="--dur:20s;transform:rotate(-3deg)"><path class="b-flow b-glowl" style="--o:.16" d="M450.0 280.0L437.3 265.2L424.6 250.4L411.6 235.8L398.3 221.4L384.6 207.3L370.3 193.6L355.4 180.4L339.7 167.9L323.2 156.3L305.7 145.8L287.4 136.6L268.0 129.0L247.7 123.5L226.5 120.4L204.7 120.1L182.5 123.1L160.4 129.7L138.8 140.3L118.6 155.0L100.5 173.9L85.2 196.5L73.6 222.4L66.3 250.6L63.9 280.0L66.3 309.4L73.6 337.6L85.2 363.5L100.5 386.1L118.6 405.0L138.8 419.7L160.4 430.3L182.5 436.9L204.7 439.9L226.5 439.6L247.7 436.5L268.0 431.0L287.4 423.4L305.7 414.2L323.2 403.7L339.7 392.1L355.4 379.6L370.3 366.4L384.6 352.7L398.3 338.6L411.6 324.2L424.6 309.6L437.3 294.8L450.0 280.0L462.7 265.2L475.4 250.4L488.4 235.8L501.7 221.4L515.4 207.3L529.7 193.6L544.6 180.4L560.3 167.9L576.8 156.3L594.3 145.8L612.6 136.6L632.0 129.0L652.3 123.5L673.5 120.4L695.3 120.1L717.5 123.1L739.6 129.7L761.2 140.3L781.4 155.0L799.5 173.9L814.8 196.5L826.4 222.4L833.7 250.6L836.1 280.0L833.7 309.4L826.4 337.6L814.8 363.5L799.5 386.1L781.4 405.0L761.2 419.7L739.6 430.3L717.5 436.9L695.3 439.9L673.5 439.6L652.3 436.5L632.0 431.0L612.6 423.4L594.3 414.2L576.8 403.7L560.3 392.1L544.6 379.6L529.7 366.4L515.4 352.7L501.7 338.6L488.4 324.2L475.4 309.6L462.7 294.8L450.0 280.0Z" pathLength="100" stroke="url(#b-rg)" stroke-width="15.6" stroke-dasharray="46 8 18 28" stroke-linecap="round"/><path class="b-flow" d="M450.0 280.0L437.3 265.2L424.6 250.4L411.6 235.8L398.3 221.4L384.6 207.3L370.3 193.6L355.4 180.4L339.7 167.9L323.2 156.3L305.7 145.8L287.4 136.6L268.0 129.0L247.7 123.5L226.5 120.4L204.7 120.1L182.5 123.1L160.4 129.7L138.8 140.3L118.6 155.0L100.5 173.9L85.2 196.5L73.6 222.4L66.3 250.6L63.9 280.0L66.3 309.4L73.6 337.6L85.2 363.5L100.5 386.1L118.6 405.0L138.8 419.7L160.4 430.3L182.5 436.9L204.7 439.9L226.5 439.6L247.7 436.5L268.0 431.0L287.4 423.4L305.7 414.2L323.2 403.7L339.7 392.1L355.4 379.6L370.3 366.4L384.6 352.7L398.3 338.6L411.6 324.2L424.6 309.6L437.3 294.8L450.0 280.0L462.7 265.2L475.4 250.4L488.4 235.8L501.7 221.4L515.4 207.3L529.7 193.6L544.6 180.4L560.3 167.9L576.8 156.3L594.3 145.8L612.6 136.6L632.0 129.0L652.3 123.5L673.5 120.4L695.3 120.1L717.5 123.1L739.6 129.7L761.2 140.3L781.4 155.0L799.5 173.9L814.8 196.5L826.4 222.4L833.7 250.6L836.1 280.0L833.7 309.4L826.4 337.6L814.8 363.5L799.5 386.1L781.4 405.0L761.2 419.7L739.6 430.3L717.5 436.9L695.3 439.9L673.5 439.6L652.3 436.5L632.0 431.0L612.6 423.4L594.3 414.2L576.8 403.7L560.3 392.1L544.6 379.6L529.7 366.4L515.4 352.7L501.7 338.6L488.4 324.2L475.4 309.6L462.7 294.8L450.0 280.0Z" pathLength="100" stroke="url(#b-rg)" stroke-width="3" stroke-dasharray="46 8 18 28" stroke-linecap="round"/><path class="b-comet" d="M450.0 280.0L437.3 265.2L424.6 250.4L411.6 235.8L398.3 221.4L384.6 207.3L370.3 193.6L355.4 180.4L339.7 167.9L323.2 156.3L305.7 145.8L287.4 136.6L268.0 129.0L247.7 123.5L226.5 120.4L204.7 120.1L182.5 123.1L160.4 129.7L138.8 140.3L118.6 155.0L100.5 173.9L85.2 196.5L73.6 222.4L66.3 250.6L63.9 280.0L66.3 309.4L73.6 337.6L85.2 363.5L100.5 386.1L118.6 405.0L138.8 419.7L160.4 430.3L182.5 436.9L204.7 439.9L226.5 439.6L247.7 436.5L268.0 431.0L287.4 423.4L305.7 414.2L323.2 403.7L339.7 392.1L355.4 379.6L370.3 366.4L384.6 352.7L398.3 338.6L411.6 324.2L424.6 309.6L437.3 294.8L450.0 280.0L462.7 265.2L475.4 250.4L488.4 235.8L501.7 221.4L515.4 207.3L529.7 193.6L544.6 180.4L560.3 167.9L576.8 156.3L594.3 145.8L612.6 136.6L632.0 129.0L652.3 123.5L673.5 120.4L695.3 120.1L717.5 123.1L739.6 129.7L761.2 140.3L781.4 155.0L799.5 173.9L814.8 196.5L826.4 222.4L833.7 250.6L836.1 280.0L833.7 309.4L826.4 337.6L814.8 363.5L799.5 386.1L781.4 405.0L761.2 419.7L739.6 430.3L717.5 436.9L695.3 439.9L673.5 439.6L652.3 436.5L632.0 431.0L612.6 423.4L594.3 414.2L576.8 403.7L560.3 392.1L544.6 379.6L529.7 366.4L515.4 352.7L501.7 338.6L488.4 324.2L475.4 309.6L462.7 294.8L450.0 280.0Z" pathLength="100" stroke="#FF9A3D" stroke-width="5" stroke-linecap="round" stroke-dasharray="2.2 97.8" opacity=".75"/></g>
+          <g class="b-rb" style="--dur:23s;transform:rotate(2deg)"><path class="b-flow" d="M450.0 280.0L438.2 266.7L426.3 253.6L414.1 240.5L401.7 227.6L388.9 215.0L375.5 202.7L361.6 190.9L347.0 179.7L331.5 169.3L315.3 159.9L298.1 151.7L280.0 144.9L261.0 140.0L241.2 137.2L220.9 137.0L200.1 139.6L179.5 145.5L159.4 155.0L140.5 168.2L123.5 185.0L109.3 205.3L98.4 228.4L91.7 253.7L89.4 280.0L91.7 306.3L98.4 331.6L109.3 354.7L123.5 375.0L140.5 391.8L159.4 405.0L179.5 414.5L200.1 420.4L220.9 423.0L241.2 422.8L261.0 420.0L280.0 415.1L298.1 408.3L315.3 400.1L331.5 390.7L347.0 380.3L361.6 369.1L375.5 357.3L388.9 345.0L401.7 332.4L414.1 319.5L426.3 306.4L438.2 293.3L450.0 280.0L461.8 266.7L473.7 253.6L485.9 240.5L498.3 227.6L511.1 215.0L524.5 202.7L538.4 190.9L553.0 179.7L568.5 169.3L584.7 159.9L601.9 151.7L620.0 144.9L639.0 140.0L658.8 137.2L679.1 137.0L699.9 139.6L720.5 145.5L740.6 155.0L759.5 168.2L776.5 185.0L790.7 205.3L801.6 228.4L808.3 253.7L810.6 280.0L808.3 306.3L801.6 331.6L790.7 354.7L776.5 375.0L759.5 391.8L740.6 405.0L720.5 414.5L699.9 420.4L679.1 423.0L658.8 422.8L639.0 420.0L620.0 415.1L601.9 408.3L584.7 400.1L568.5 390.7L553.0 380.3L538.4 369.1L524.5 357.3L511.1 345.0L498.3 332.4L485.9 319.5L473.7 306.4L461.8 293.3L450.0 280.0Z" pathLength="100" stroke="url(#b-rg)" stroke-width="2" opacity=".9" stroke-dasharray="28 14 40 18" stroke-linecap="round"/></g>
+        </svg>
+        <div class="b-lens"><span class="b-halo"></span><img class="b-light" src="/brand/lens-mark-on-light.svg" alt="" /><img class="b-dark" src="/brand/lens-mark-on-dark.svg" alt="" /></div>
+      </div>
+      <div class="b-foot">
+        <img class="b-logo b-light" src="/brand/one-lockup-full-color-on-light.svg" alt="ONE by AI8HT" width="150" height="68" />
+        <img class="b-logo b-dark" src="/brand/one-lockup-full-color-on-dark.svg" alt="ONE by AI8HT" width="150" height="68" />
+        <div class="b-load">
+          <div class="b-ld" aria-hidden="true"><i style="--k:0"><svg viewBox="0 0 24 24"><path d="M5 15L12 8l7 7" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg></i><i style="--k:1"><svg viewBox="0 0 24 24"><path d="M5 15L12 8l7 7" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg></i><i style="--k:2"><svg viewBox="0 0 24 24"><path d="M5 15L12 8l7 7" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg></i></div>
+          <p class="b-msg">Getting ONE ready</p>
+        </div>
+      </div>
+      <p class="b-priv">Your record stays yours · Readiness is a band, never a score</p>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

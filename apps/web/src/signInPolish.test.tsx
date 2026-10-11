@@ -2,7 +2,7 @@
  * The signed-out pages: what the sign-in card checks before it calls Cognito, the password
  * reset it now offers, and the internal wording and broken Hosted UI route it no longer shows.
  */
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { normalizeWebsite } from './publicEmployerAccessPage.js';
@@ -68,14 +68,22 @@ describe('sign-in card', () => {
     await renderAt('/login');
     expect(screen.queryByText(/\bUAT\b|Cognito|configured/)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /hosted sign-in/i })).not.toBeInTheDocument();
-    expect(screen.getAllByText('LEARN | PREPARE | BUILD | GROW')).toHaveLength(1);
+    // The tagline is the four stage chips, shown once.
+    const stages = screen.getAllByRole('list', { name: 'Learn, prepare, build, grow' });
+    expect(stages).toHaveLength(1);
+    expect(within(stages[0]!).getAllByRole('listitem').map((item) => item.textContent)).toEqual(['LEARN', 'PREPARE', 'BUILD', 'GROW']);
+    expect(screen.queryByText('LEARN | PREPARE | BUILD | GROW')).not.toBeInTheDocument();
     // No sandbox capture on a page real users reach: no sample-data label and no product picture.
     expect(screen.queryByText(/sample data/i)).not.toBeInTheDocument();
     expect(document.querySelector('img[src*="sign-in-product"]')).toBeNull();
-    // The ONE by AI8HT lockup is large on the panel, so it also offers the full-resolution file.
+    // The panel is always dark, so it carries the vector lockup drawn for dark grounds.
     const logo = screen.getByRole('img', { name: 'ONE by AI8HT' });
-    expect(logo).toHaveAttribute('srcset', '/assets/one-logo-dark.png 1x, /assets/one-logo-dark@2x.webp 2x');
+    expect(logo).toHaveAttribute('src', '/brand/one-lockup-full-color-on-dark.svg');
     expect(document.querySelector('.auth-eight')).toBeNull();
+    // No SSO and no self sign-up exist, so the card offers neither.
+    expect(screen.queryByRole('button', { name: /SSO/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Create your account/i)).not.toBeInTheDocument();
+    expect(screen.getByText('Your readiness band is advisory and never shared with employers.')).toBeInTheDocument();
   });
 
   it('asks for the missing fields itself instead of sending an empty sign-in to Cognito', async () => {

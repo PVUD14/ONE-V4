@@ -1,0 +1,31 @@
+<svg class="bd" xmlns="http://www.w3.org/2000/svg" width="124" height="138.00" viewBox="0 0 124 138" role="img" aria-label="Peer Mentor badge"><style>
+.bd *{transform-box:view-box}
+.bd-rim{stroke-dasharray:100;stroke-dashoffset:0}
+.bd-glyph{transform-origin:62px 56px}
+@keyframes L{0%{opacity:0;filter:grayscale(1) brightness(1.08)}4%{opacity:.55;filter:grayscale(1) brightness(1.08)}16%{opacity:1;filter:grayscale(0) brightness(1)}92%{opacity:1;filter:grayscale(0) brightness(1)}100%{opacity:0;filter:grayscale(0) brightness(1)}}
+@keyframes B{0%,3%{transform:translate(10px,12px);opacity:0}13%,100%{transform:none;opacity:1}}
+@keyframes F{0%,5%{transform:translate(-9px,-11px) scale(.9);opacity:0}12%{transform:translate(1px,1px) scale(1.03);opacity:1}17%,100%{transform:none;opacity:1}}
+@keyframes R{0%,9%{stroke-dashoffset:100}21%,100%{stroke-dashoffset:0}}
+@keyframes G{0%,10%{transform:scale(.4);opacity:0}16%{transform:scale(1.1);opacity:1}20%,100%{transform:none;opacity:1}}
+@keyframes V{0%,17%{transform:translateY(7px);opacity:0}23%,100%{transform:none}}
+@keyframes S{0%,38%{transform:translateX(0)}52%,100%{transform:translateX(230px)}}
+@media (prefers-reduced-motion: no-preference){
+.bd-all{animation:L 6s cubic-bezier(.2,.8,.2,1) infinite}
+.bd-back{animation:B 6s cubic-bezier(.2,.8,.2,1) infinite}
+.bd-face{animation:F 6s cubic-bezier(.2,.8,.2,1) infinite}
+.bd-rim{animation:R 6s cubic-bezier(.2,.8,.2,1) infinite}
+.bd-glyph{animation:G 6s cubic-bezier(.2,.8,.2,1) infinite}
+.bd-chev{animation:V 6s cubic-bezier(.2,.8,.2,1) infinite;animation-delay:calc(var(--k) * 90ms)}
+.bd-sheen{animation:S 6s cubic-bezier(.65,0,.35,1) infinite}
+}</style>
+<defs><linearGradient id="g-peer-mentor-15" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0B5F86"/><stop offset=".55" stop-color="#0FA3C9"/><stop offset="1" stop-color="#5FE3F5"/></linearGradient>
+<linearGradient id="r-peer-mentor-15" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".7"/><stop offset="1" stop-color="#fff" stop-opacity=".08"/></linearGradient>
+<clipPath id="c-peer-mentor-15"><path d="M6 18Q6 6 18 6L80 6Q92 6 100.49 14.49L105.51 19.51Q114 28 114 40L114 74Q114 86 104.36 93.14L69.64 118.86Q60 126 50.36 118.86L15.64 93.14Q6 86 6 74Z"/></clipPath><linearGradient id="sh-peer-mentor-15" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".5" stop-color="#fff" stop-opacity=".75"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient></defs>
+<g class="bd-all"><path class="bd-back" d="M10 24Q10 12 22 12L84 12Q96 12 104.49 20.49L109.51 25.51Q118 34 118 46L118 80Q118 92 108.36 99.14L73.64 124.86Q64 132 54.36 124.86L19.64 99.14Q10 92 10 80Z" fill="#063B52"/>
+<g class="bd-face"><path class="bd-front" d="M6 18Q6 6 18 6L80 6Q92 6 100.49 14.49L105.51 19.51Q114 28 114 40L114 74Q114 86 104.36 93.14L69.64 118.86Q60 126 50.36 118.86L15.64 93.14Q6 86 6 74Z" fill="url(#g-peer-mentor-15)"/>
+<g class="bd-hl" clip-path="url(#c-peer-mentor-15)"><path d="M-10 70 L70 -10 L92 -10 L-10 92Z" fill="#fff" opacity=".14"/><path d="M40 140 L140 40 L140 52 L52 140Z" fill="#fff" opacity=".08"/></g>
+<path class="bd-rim" pathLength="100" d="M15 24Q15 15 24 15L79 15Q88 15 94.36 21.36L98.64 25.64Q105 32 105 41L105 72.5Q105 81.5 97.78 86.87L67.22 109.63Q60 115 52.78 109.63L22.22 86.87Q15 81.5 15 72.5Z" fill="none" stroke="url(#r-peer-mentor-15)" stroke-width="1.6"/>
+<g class="bd-glyph"><g transform="translate(35 29) scale(2.25)" fill="#fff"><defs><mask id="m-peer-mentor-15a" maskUnits="userSpaceOnUse" x="-2" y="-2" width="28" height="28"><rect x="-2" y="-2" width="28" height="28" fill="#fff"/><path d="M5.6 8.8a3.4 3.4 0 1 0 6.8 0a3.4 3.4 0 1 0 -6.8 0ZM2.8 20.4Q2.8 13.6 9 13.6Q15.2 13.6 15.2 20.4Q15.2 21.6 14 21.6L4 21.6Q2.8 21.6 2.8 20.4Z" fill="#000" stroke="#000" stroke-width="2.6"/></mask></defs><g mask="url(#m-peer-mentor-15a)"><path fill-rule="evenodd" opacity="0.6" d="M12.8 5.6a3 3 0 1 0 6 0a3 3 0 1 0 -6 0ZM10.3 15.8Q10.3 10 15.8 10Q21.3 10 21.3 15.8Q21.3 17 20.1 17L11.5 17Q10.3 17 10.3 15.8Z"/></g><path fill-rule="evenodd" d="M5.6 8.8a3.4 3.4 0 1 0 6.8 0a3.4 3.4 0 1 0 -6.8 0ZM2.8 20.4Q2.8 13.6 9 13.6Q15.2 13.6 15.2 20.4Q15.2 21.6 14 21.6L4 21.6Q2.8 21.6 2.8 20.4Z"/></g></g>
+<g class="bd-chevs"><path class="bd-chev" style="--k:0" d="M46.42 104.42Q46 104 46.33 103.5L49.67 98.5Q50 98 50.33 98.5L53.67 103.5Q54 104 53.58 104.42L52.42 105.58Q52 106 51.67 105.5L50.33 103.5Q50 103 49.67 103.5L48.33 105.5Q48 106 47.58 105.58Z" fill="#fff" opacity="0.95"/><path class="bd-chev" style="--k:1" d="M56.42 104.42Q56 104 56.33 103.5L59.67 98.5Q60 98 60.33 98.5L63.67 103.5Q64 104 63.58 104.42L62.42 105.58Q62 106 61.67 105.5L60.33 103.5Q60 103 59.67 103.5L58.33 105.5Q58 106 57.58 105.58Z" fill="#fff" opacity="0.95"/><path class="bd-chev" style="--k:2" d="M66.42 104.42Q66 104 66.33 103.5L69.67 98.5Q70 98 70.33 98.5L73.67 103.5Q74 104 73.58 104.42L72.42 105.58Q72 106 71.67 105.5L70.33 103.5Q70 103 69.67 103.5L68.33 105.5Q68 106 67.58 105.58Z" fill="#fff" opacity="0.3"/></g>
+<g clip-path="url(#c-peer-mentor-15)"><g class="bd-sheen"><rect x="-70" y="-20" width="46" height="180" fill="url(#sh-peer-mentor-15)" transform="skewX(-20)"/></g></g></g></g>
+</svg>

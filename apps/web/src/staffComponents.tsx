@@ -48,7 +48,7 @@ export function StaffShell({ apiHealth, authStatus, authNotice, showDevelopmentI
 function StaffSidebar({ activePath, collapsed, drawerOpen, onNavigate, onCollapse, onClose }: { readonly activePath: string; readonly collapsed: boolean; readonly drawerOpen: boolean; readonly onNavigate: (path: string) => void; readonly onCollapse: () => void; readonly onClose: () => void }): React.ReactElement {
   return (
     <aside className={`staff-sidebar momentum-sidebar ${drawerOpen ? 'drawer-open' : ''}`} aria-label="Institution placement navigation">
-      <div className="staff-brand"><BrandLogo height={collapsed ? 34 : 46} compact={collapsed} /><span className="staff-brand-copy"><small>Institution Portal</small></span><button className="icon-button sidebar-close" type="button" aria-label="Close institution navigation" onClick={onClose} autoFocus={drawerOpen}><Icon name="close" size={20} /></button></div>
+      <div className="staff-brand"><BrandLogo width={collapsed ? 40 : 96} compact={collapsed} /><span className="staff-brand-copy"><small>Institution Portal</small></span><button className="icon-button sidebar-close" type="button" aria-label="Close institution navigation" onClick={onClose} autoFocus={drawerOpen}><Icon name="close" size={20} /></button></div>
       <nav className="staff-nav" aria-label="Grouped Institution placement navigation">
         <NavIndicator activeKey={activePath} layoutKey={`${collapsed}-${drawerOpen}`} />
         {staffNavGroups.map((group) => <div className="staff-nav-group" key={group}><span>{group}</span>{staffNavItems.filter((item) => item.group === group).map((item) => { const glyph = item.icon; const active = activePath === item.path; return <button key={item.path} type="button" className={`staff-nav-item one-icon-host ${active ? 'active' : ''}`} aria-current={active ? 'page' : undefined} aria-label={item.label} title={item.label} onClick={() => onNavigate(item.path)}><Icon name={glyph} size={20} active={active} animated /><span>{item.label}</span></button>; })}</div>)}
@@ -62,6 +62,7 @@ function StaffTopBar({ apiHealth, authStatus, authNotice, showDevelopmentIndicat
   return (
     <header className="staff-topbar">
       <button ref={menuButtonRef} className="icon-button mobile-menu-button" type="button" aria-label="Open institution navigation" onClick={onOpenMenu}><Icon name="menu" size={20} /></button>
+      <span className="topbar-brand"><BrandLogo width={64} /></span>
       <span className="staff-context-select" aria-label="Active staff role">{placementIdentity.role}</span>
       <span className="staff-college-select" aria-label="Active institution">{placementIdentity.organization}</span>
       <label className="staff-search" role="search"><Icon name="search" size={16} /><span className="sr-only">Search institution placement workspace</span><input placeholder="Search students, assessments, opportunities..." /></label>

@@ -46,6 +46,17 @@ describe('<StatusTag>', () => {
     expect(container.querySelector('svg')).not.toBeNull();
   });
 
+  it('always reads a REJECTED hiring stage as "Not selected", whatever label was passed', () => {
+    render(<StatusTag kind="application" state="REJECTED" label="Rejected" />);
+    expect(screen.getByText('Not selected')).toHaveClass('t-mute');
+    expect(screen.queryByText('Rejected')).toBeNull();
+  });
+
+  it('draws the gold celebration variant when a view asks for it', () => {
+    render(<StatusTag kind="application" state="OFFER" tone="gold" label="Offer" />);
+    expect(screen.getByText('Offer')).toHaveClass('tag', 't-gold');
+  });
+
   it('lets a screen with no approved mapping pass its tone', () => {
     render(<StatusTag kind="verification" state="CONFLICT" tone="danger" label="Conflicts" />);
     expect(screen.getByText('Conflicts')).toHaveClass('t-danger');

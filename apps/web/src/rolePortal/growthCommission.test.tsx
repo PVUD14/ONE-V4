@@ -1,6 +1,6 @@
 /**
  * Credit and disputes on the web (GROWTH-07): Growth → Commission shows only the server's credit,
- * with NA in every amount slot and employers on hold, the person's disputes (their own statement only)
+ * with no amount shown (no rate is set) and employers on hold, the person's disputes (their own statement only)
  * and a dispute form limited to what the server says they may dispute; Operations → Settings → Growth
  * attribution decides a dispute and reassigns credit only with a reason, and shows the server's refusal.
  */
@@ -51,18 +51,20 @@ const mine = {
 };
 
 describe('Growth → Commission', () => {
-  it('shows the server\'s credit with NA for every amount and employers on hold', async () => {
+  it('shows the server\'s credit with no amount anywhere and employers on hold', async () => {
     routes = (url) => (url.endsWith('/api/v1/growth/attributions') ? ok(mine) : null);
     render(<GrowthCommissionPage />);
     const credited = await screen.findByLabelText('Credited to you');
     expect(within(credited).getByText('Sri Venkateswara College')).toBeInTheDocument();
     expect(within(credited).getByText('Employer commission on hold — not decided')).toBeInTheDocument();
-    expect(within(credited).getByText(/Commission: NA — not built yet/)).toBeInTheDocument();
+    expect(within(credited).getByText(/Commission not built yet; no rate has been set/)).toBeInTheDocument();
     expect(within(credited).getByText('Dispute open')).toBeInTheDocument();
     expect(within(credited).getByText('Old College')).toBeInTheDocument();
     expect(within(credited).getByText(/Reassigned to someone else/)).toBeInTheDocument();
     const stats = screen.getByLabelText('Credit summary');
-    expect(within(stats).getAllByText('NA')).toHaveLength(1);
+    // No commission figure is shown at all until a rate is set — never NA, never a number.
+    expect(within(stats).queryByText('Commission this month')).not.toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/(^|[^A-Za-z])NA([^A-Za-z]|$)/);
     expect(screen.queryByText(/INR|Rs\.|₹\s*\d/)).not.toBeInTheDocument();
     // The respondent is told a dispute exists, never what it says.
     expect(within(screen.getByLabelText('Your disputes')).getByText(/Someone disputes credit/)).toBeInTheDocument();
@@ -90,7 +92,7 @@ describe('Growth → Commission', () => {
   it('says plainly when nothing can be loaded', async () => {
     routes = (url) => (url.endsWith('/api/v1/growth/attributions') ? failure(500, 'INTERNAL') : null);
     render(<GrowthCommissionPage />);
-    expect(await screen.findByText(/NA — your credit could not be loaded/)).toBeInTheDocument();
+    expect(await screen.findByText('Your credit could not be loaded.')).toBeInTheDocument();
   });
 });
 

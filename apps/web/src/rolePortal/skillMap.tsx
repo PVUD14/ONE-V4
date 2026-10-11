@@ -9,7 +9,8 @@
  * measured against files an approval request instead (Settings → Approvals).
  *
  * The server decides everything: capabilities, reason codes, who wrote a revision, and whether
- * a publish needs an approval. Levels are descriptors, never numbers. Missing values read NA.
+ * a publish needs an approval. Levels are descriptors, never numbers. A missing value hides its
+ * row, or reads in plain words where a column must stay.
  */
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -32,10 +33,10 @@ import { RequestApprovalDialog } from './approvals.js';
 import { formatApiError } from './shared.js';
 import { SupportCode } from '../supportCode.js';
 import { formatDateTime } from '../dates.js';
-import { codeLabel } from '../labels.js';
+import { MISSING_TEXT, codeLabel } from '../labels.js';
 
 const label = (value: string): string => value.split('_').map((word) => word.charAt(0) + word.slice(1).toLowerCase()).join(' ');
-const when = (value: string | null | undefined): string => (value ? formatDateTime(value) : 'NA');
+const when = (value: string | null | undefined): string => (value ? formatDateTime(value) : MISSING_TEXT);
 const statusText = (status: string): string => (status === 'LIVE' ? 'Live' : status === 'PENDING' ? 'Not yet published' : status === 'RETIRED' ? 'Retired' : 'Unknown');
 const statusTone = (status: string): 'success' | 'warning' | 'neutral' | 'info' => (status === 'LIVE' ? 'success' : status === 'PENDING' ? 'warning' : 'neutral');
 const stateTone = (state: SkillRevisionState): 'success' | 'warning' | 'neutral' | 'info' =>
@@ -118,10 +119,10 @@ export function OperationsSkillMapPage(): React.ReactElement | null {
   return <section className="role-module role-module--dense" aria-label="Skill map">
     {heading}
     <div className="v2-row v2-cols-4 career-stat-strip role-wide">
-      <V2Stat icon="🧩" tone="teal" value={summary ? summary.live : 'NA'} label="Live skills" />
-      <V2Stat icon="📝" tone="purple" value={summary ? summary.pending : 'NA'} label="Not yet published" />
-      <V2Stat icon="🔍" tone="amber" value={summary ? summary.awaitingReview : 'NA'} label="Awaiting review" />
-      <V2Stat icon="🚀" tone="blue" value={summary ? summary.awaitingPublish : 'NA'} label="Approved, awaiting publish" />
+      <V2Stat icon="🧩" tone="teal" value={summary ? summary.live : null} label="Live skills" />
+      <V2Stat icon="📝" tone="purple" value={summary ? summary.pending : null} label="Not yet published" />
+      <V2Stat icon="🔍" tone="amber" value={summary ? summary.awaitingReview : null} label="Awaiting review" />
+      <V2Stat icon="🚀" tone="blue" value={summary ? summary.awaitingPublish : null} label="Approved, awaiting publish" />
     </div>
     {summary && summary.agentDraftedPending > 0 ? <p role="note">{summary.agentDraftedPending} unpublished skills were drafted by the coding agent. Each needs its levels written and checked against its basis before review.</p> : null}
     {error ? <p className="form-error" role="alert">{error}</p> : null}
@@ -144,7 +145,7 @@ export function OperationsSkillMapPage(): React.ReactElement | null {
           <td><strong>{skill.stableKey}</strong>{skill.source === 'AGENT_DRAFTED' ? <><br /><StatusBadge label="Agent-drafted" tone="warning" /></> : null}</td>
           <td>{skill.name}</td>
           <td><StatusBadge label={statusText(skill.status)} tone={statusTone(skill.status)} /></td>
-          <td>{skill.publishedRevision ? `Revision ${skill.publishedRevision}` : 'NA'}</td>
+          <td>{skill.publishedRevision ? `Revision ${skill.publishedRevision}` : 'Not published'}</td>
           <td>{skill.openRevision ? `Revision ${skill.openRevision.revision} · ${label(skill.openRevision.state)}` : 'None'}</td>
           <td>{skill.prerequisites.length ? skill.prerequisites.join(', ') : 'None'}</td>
           <td>{skill.levelsComplete ? 'All four described' : 'Incomplete'}</td>
@@ -203,9 +204,9 @@ function SkillPanel({ token, topicId, policy, onChanged, onClose }: {
     <dl>
       <div><dt>Key</dt><dd>{skill.stableKey}</dd></div>
       <div><dt>Status</dt><dd><StatusBadge label={statusText(skill.status)} tone={statusTone(skill.status)} /></dd></div>
-      <div><dt>Published revision</dt><dd>{skill.publishedRevision ?? 'NA'}</dd></div>
+      {skill.publishedRevision !== null && skill.publishedRevision !== undefined ? <div><dt>Published revision</dt><dd>{skill.publishedRevision}</dd></div> : null}
       <div><dt>Written by</dt><dd>{skill.source === 'AGENT_DRAFTED'
-        ? `The coding agent (${skill.provenance.generatorVersion ?? 'NA'}, ${skill.provenance.promptVersion ?? 'NA'}, ${when(skill.provenance.generatedAt)}) — check it against its basis`
+        ? `The coding agent (${[skill.provenance.generatorVersion, skill.provenance.promptVersion, when(skill.provenance.generatedAt)].filter((entry) => entry && entry !== MISSING_TEXT).join(', ')}) — check it against its basis`
         : 'A person, in this editor or a seed'}</dd></div>
       <div><dt>Required by</dt><dd>{skill.requiredBy.length ? skill.requiredBy.map((entry) => `${entry.catalogueCode ?? entry.roleTitle} (${label(entry.level)})`).join(', ') : 'No live requirement'}</dd></div>
       <div><dt>Draft requirement sets naming it</dt><dd>{skill.openSetCount}</dd></div>
@@ -255,7 +256,7 @@ function SkillPanel({ token, topicId, policy, onChanged, onClose }: {
       onSubmit={async (reasonCode) => { apply((await startSkillRevision(token, skill.topicId, { reasonCode })).skill, 'Revision started.'); setDialog(null); }} /> : null}
     {dialog?.kind === 'transition' ? <ReasonDialog title={transitionTitle(dialog.toState, dialog.revision.revision)}
       approvalNote={dialog.toState === 'APPROVED'
-        ? `Not required to approve. Approving also records your rights review of the ${dialog.revision.fields.licenceLabel ?? 'NA'} licence the author declared.`
+        ? `Not required to approve. Approving also records your rights review of the ${dialog.revision.fields.licenceLabel ? `${dialog.revision.fields.licenceLabel} ` : ''}licence the author declared.`
         : 'Not required: recorded with your reason.'}
       reasons={policy.reasons.transition[dialog.toState] ?? []}
       rightsReasons={dialog.toState === 'APPROVED' ? policy.reasons.rights : null}
@@ -275,7 +276,7 @@ function SkillPanel({ token, topicId, policy, onChanged, onClose }: {
       title={`Publish revision ${dialog.revision.revision} of ${skill.stableKey}`}
       details={[['Skill', `${skill.name} (${skill.stableKey})`],
         ['Effect', skill.status === 'LIVE'
-          ? `Changes a skill live requirements name (${skill.requiredBy.map((entry) => entry.catalogueCode ?? entry.roleTitle).join(', ') || 'NA'}).`
+          ? skill.requiredBy.length ? `Changes a skill live requirements name (${skill.requiredBy.map((entry) => entry.catalogueCode ?? entry.roleTitle).join(', ')}).` : 'Changes a live skill; no live requirement names it yet.'
           : 'Makes the skill live: evidence can be recorded against it and requirement sets naming it can be published.']]}
       onCancel={() => setDialog(null)} onFiled={(message) => { setDialog(null); setNotice(message); }} /> : null}
   </section>;
@@ -293,18 +294,18 @@ function RevisionView({ revision, policy, skill }: { readonly revision: SkillRev
   const fields = revision.fields;
   const prerequisiteStatus = new Map(skill.prerequisiteSkills.map((entry) => [entry.stableKey, entry.status]));
   return <div>
-    <p>{fields.description || 'NA'}</p>
+    {fields.description ? <p>{fields.description}</p> : null}
     <div className="role-record-table-wrap"><table className="role-record-table">
       <thead><tr><th>Level</th><th>What a learner can do</th></tr></thead>
-      <tbody>{policy.levels.map((entry) => <tr key={entry.level}><td>{label(entry.level)}<br /><small>{entry.meaning}</small></td><td>{fields.levels[entry.level] || 'NA'}</td></tr>)}</tbody>
+      <tbody>{policy.levels.map((entry) => <tr key={entry.level}><td>{label(entry.level)}<br /><small>{entry.meaning}</small></td><td>{fields.levels[entry.level] || 'Not written yet'}</td></tr>)}</tbody>
     </table></div>
     <dl>
       <div><dt>Prerequisites</dt><dd>{fields.prerequisites.length ? fields.prerequisites.map((key) => {
         const status = prerequisiteStatus.get(key);
         return `${key}${status && status !== 'LIVE' ? ` (${statusText(status).toLowerCase()})` : ''}`;
       }).join(', ') : 'None'}</dd></div>
-      <div><dt>Licence</dt><dd>{fields.licenceLabel ?? 'NA'}{fields.attribution ? ` — ${fields.attribution}` : ''}</dd></div>
-      <div><dt>Basis</dt><dd>{fields.basis ?? 'NA'}</dd></div>
+      {fields.licenceLabel || fields.attribution ? <div><dt>Licence</dt><dd>{fields.licenceLabel ?? MISSING_TEXT}{fields.attribution ? ` — ${fields.attribution}` : ''}</dd></div> : null}
+      {fields.basis ? <div><dt>Basis</dt><dd>{fields.basis}</dd></div> : null}
       {revision.expertCheck ? <div><dt>For the subject expert</dt><dd>{revision.expertCheck}</dd></div> : null}
       <div><dt>Rights review</dt><dd>{revision.rightsReview
         ? `${revision.rightsReview.licenceLabel} confirmed by ${revision.rightsReview.reviewerEmail} (${revision.rightsReview.reasonCode}) · ${when(revision.rightsReview.reviewedAt)}`

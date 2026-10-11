@@ -2,7 +2,7 @@
  * Operations Content Management — the job-role catalogue (OPS-08): the list renders the
  * server's roles and counts with honest labels, search sends the filters, catalogue writes
  * need a reason code, the author is never offered their own review, a publish only files
- * an approval request (and the Approvals queue carries it out), and the loading / NA /
+ * an approval request (and the Approvals queue carries it out), and the loading / missing-value /
  * empty / error / forbidden states are honest. Navigation labels are unchanged.
  */
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -110,11 +110,12 @@ describe('job-role catalogue', () => {
     expect(screen.getByRole('note')).toHaveTextContent('the starter roles only');
   });
 
-  it('shows NA in the counts and a loading state until the list arrives', async () => {
+  it('hides the counts and shows a loading state until the list arrives', async () => {
     listResponse = () => new Promise(() => undefined);
     render(<OperationsCareerCataloguePage />);
     expect(screen.getByText('Loading the catalogue…')).toBeInTheDocument();
-    expect(screen.getAllByText('NA').length).toBeGreaterThanOrEqual(4);
+    expect(document.querySelectorAll('.v2-stat')).toHaveLength(0);
+    expect(screen.queryByText('NA')).not.toBeInTheDocument();
   });
 
   it('says so plainly when nothing matches', async () => {

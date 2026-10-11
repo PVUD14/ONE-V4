@@ -50,6 +50,8 @@ internal fun PilotHomeScreen(
     onInbox: () -> Unit,
     onChat: () -> Unit,
     onSection: (MoreDest) -> Unit,
+    /** "Resume lesson" opens the lesson itself, as on the web (approved 2026-10-11). */
+    onOpenLesson: (String) -> Unit = { onOpen(Screen.Learning) },
 ) {
     val now = Instant.now()
     val lessons = data.learner?.catalog?.modules?.flatMap { it.lessons } ?: emptyList()
@@ -157,7 +159,7 @@ internal fun PilotHomeScreen(
 
         // Continue Learning - real module progress.
         SectionTitle("Continue Learning")
-        PilotCard(Modifier.clickable { onOpen(Screen.Learning) }) {
+        PilotCard(Modifier.clickable { nextLesson?.let { onOpenLesson(it.id) } ?: onOpen(Screen.Learning) }) {
             Column(Modifier.padding(14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconBubble(Icons.Filled.MenuBook, Tone.Violet)

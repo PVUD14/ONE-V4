@@ -9,7 +9,8 @@
  *
  * The server decides everything — capabilities, reason codes, who may review, and whether
  * a publish may run. Planned releases are shown as the plan they are; a role reads "Not
- * yet verified" until an approved publish says otherwise. Missing values read NA.
+ * yet verified" until an approved publish says otherwise. A missing value hides its row, or
+ * reads in plain words where a column must stay.
  */
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -41,16 +42,16 @@ import { RequestApprovalDialog } from './approvals.js';
 import { formatApiError } from './shared.js';
 import { SupportCode } from '../supportCode.js';
 import { formatDateTime } from '../dates.js';
-import { codeLabel } from '../labels.js';
+import { MISSING_TEXT, codeLabel } from '../labels.js';
 import { SmallCount } from '../momentum/smallCount.js';
 
 const noteLimit = 500;
 const label = (value: string): string => value.split('_').map((word) => word.charAt(0) + word.slice(1).toLowerCase()).join(' ');
-const when = (value: string | null | undefined): string => (value ? formatDateTime(value) : 'NA');
+const when = (value: string | null | undefined): string => (value ? formatDateTime(value) : MISSING_TEXT);
 
-/** A role's honest label: nothing is verified until an approved publish says so. */
+/** A role's honest label: nothing is verified until an approved publish says so. Empty (no badge) when unknown. */
 export function releaseLabelText(releaseLabel: string | null): string {
-  return releaseLabel === 'VERIFIED' ? 'Verified' : releaseLabel === 'SELECTABLE' ? 'Not yet verified' : 'NA';
+  return releaseLabel === 'VERIFIED' ? 'Verified' : releaseLabel === 'SELECTABLE' ? 'Not yet verified' : '';
 }
 const plannedText = (planned: string | null): string => (planned ? `${planned} (planned)` : 'Selectable (no plan)');
 const setTone = (state: CareerRequirementSetState): 'success' | 'warning' | 'neutral' | 'info' =>
@@ -127,12 +128,12 @@ export function OperationsCareerCataloguePage(): React.ReactElement | null {
   return <section className="role-module role-module--dense" aria-label="Job-role catalogue">
     {heading}
     <div className="v2-row v2-cols-4 career-stat-strip role-wide">
-      <V2Stat icon="🗂️" tone="blue" value={summary ? summary.totalRoles : 'NA'} label="Roles in the catalogue" />
-      <V2Stat icon="✅" tone="teal" value={summary ? summary.verified : 'NA'} label="Verified" />
-      <V2Stat icon="🧭" tone="purple" value={summary ? summary.selectable : 'NA'} label="Not yet verified" />
-      <V2Stat icon="📝" tone="amber" value={summary ? summary.setsInReview + summary.setsReviewed : 'NA'} label="Sets awaiting review or publish" />
+      <V2Stat icon="🗂️" tone="blue" value={summary ? summary.totalRoles : null} label="Roles in the catalogue" />
+      <V2Stat icon="✅" tone="teal" value={summary ? summary.verified : null} label="Verified" />
+      <V2Stat icon="🧭" tone="purple" value={summary ? summary.selectable : null} label="Not yet verified" />
+      <V2Stat icon="📝" tone="amber" value={summary ? summary.setsInReview + summary.setsReviewed : null} label="Sets awaiting review or publish" />
     </div>
-    <p role="note">Students see: {policy ? (policy.studentFlag.enabled ? 'the full catalogue, each role with its label' : 'the starter roles only — the full catalogue is behind the career-catalogue.selectable-roles flag, which is off') : 'NA'}.</p>
+    {policy ? <p role="note">Students see: {policy.studentFlag.enabled ? 'the full catalogue, each role with its label' : 'the starter roles only — the full catalogue is behind the career-catalogue.selectable-roles flag, which is off'}.</p> : null}
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     <section className="role-card role-wide"><h2>Roles</h2>
       <form className="role-actions" aria-label="Search the catalogue" onSubmit={(event) => { event.preventDefault(); setFilters(draftFilters); }}>
@@ -160,10 +161,10 @@ export function OperationsCareerCataloguePage(): React.ReactElement | null {
       {roles.length ? <div className="role-record-table-wrap"><table className="role-record-table">
         <thead><tr><th>Code</th><th>Role</th><th>Family</th><th>Typical branches</th><th>Plan</th><th>Label</th><th>Live requirements</th><th>Requirement set</th><th>Actions</th></tr></thead>
         <tbody>{roles.map((role) => <tr key={role.id}>
-          <td><strong>{role.catalogueCode ?? 'NA'}</strong>{role.origin === 'STARTER' ? <><br /><small>{role.code}</small></> : null}</td>
+          <td><strong>{role.catalogueCode ?? 'Not set'}</strong>{role.origin === 'STARTER' ? <><br /><small>{role.code}</small></> : null}</td>
           <td>{role.title}{role.catalogueTitle && role.catalogueTitle !== role.title ? <><br /><small>Catalogue: {role.catalogueTitle}</small></> : null}</td>
-          <td>{role.catalogueFamily ?? 'NA'}</td>
-          <td>{role.eligibleBranches.length ? role.eligibleBranches.join(', ') : 'NA'}</td>
+          <td>{role.catalogueFamily ?? 'Not set'}</td>
+          <td>{role.eligibleBranches.length ? role.eligibleBranches.join(', ') : 'None listed'}</td>
           <td>{plannedText(role.plannedRelease)}</td>
           <td><StatusBadge label={releaseLabelText(role.releaseLabel)} tone={role.releaseLabel === 'VERIFIED' ? 'success' : 'neutral'} /></td>
           <td>{role.liveRequirementCount}</td>
@@ -225,12 +226,12 @@ function CatalogueRolePanel({ token, roleId, policy, onChanged, onClose }: {
   return <section className="role-card role-wide" aria-label={`Catalogue role ${code}`}>
     <div className="role-section-title"><h2>{code} · {role.title}</h2><button type="button" className="secondary" onClick={onClose}>Close role</button></div>
     <dl>
-      <div><dt>Catalogue name</dt><dd>{role.catalogueTitle ?? 'NA'}</dd></div>
-      <div><dt>Starter code</dt><dd>{role.origin === 'STARTER' ? role.code : 'NA (catalogue role)'}</dd></div>
+      {role.catalogueTitle ? <div><dt>Catalogue name</dt><dd>{role.catalogueTitle}</dd></div> : null}
+      <div><dt>Starter code</dt><dd>{role.origin === 'STARTER' ? role.code : 'None (catalogue role)'}</dd></div>
       <div><dt>Family</dt><dd>{role.catalogueFamily ? `${role.catalogueFamily} · ${role.family}` : role.family}</dd></div>
-      <div><dt>Typical branches</dt><dd>{role.eligibleBranches.length ? role.eligibleBranches.join(', ') : 'NA'}</dd></div>
-      <div><dt>Core skill areas (draft)</dt><dd>{role.coreSkillAreas ?? 'NA'}</dd></div>
-      <div><dt>Main evidence</dt><dd>{role.mainEvidence ?? 'NA'}</dd></div>
+      {role.eligibleBranches.length ? <div><dt>Typical branches</dt><dd>{role.eligibleBranches.join(', ')}</dd></div> : null}
+      {role.coreSkillAreas ? <div><dt>Core skill areas (draft)</dt><dd>{role.coreSkillAreas}</dd></div> : null}
+      {role.mainEvidence ? <div><dt>Main evidence</dt><dd>{role.mainEvidence}</dd></div> : null}
       <div><dt>Plan</dt><dd>{plannedText(role.plannedRelease)}</dd></div>
       <div><dt>Label</dt><dd><StatusBadge label={releaseLabelText(role.releaseLabel)} tone={role.releaseLabel === 'VERIFIED' ? 'success' : 'neutral'} /></dd></div>
       <div><dt>Students targeting it</dt><dd><SmallCount value={role.liveTargetCount} /></dd></div>
@@ -261,10 +262,10 @@ function CatalogueRolePanel({ token, roleId, policy, onChanged, onClose }: {
     {role.requirementSets.length ? role.requirementSets.map((set) => <article key={set.id} className="role-card" aria-label={`Requirement set v${set.version}`}>
       <div className="role-section-title"><h4>Version {set.version}</h4><StatusBadge label={label(set.state)} tone={setTone(set.state)} /></div>
       <p><small>Drafted by {set.author.email} ({codeLabel(set.reasonCode)}, from {set.basedOn === 'LIVE' ? 'the live requirements' : set.basedOn === 'SET' ? 'the published set' : 'nothing'}) · {when(set.createdAt)}
-        {set.reviewer ? ` · reviewed by ${set.reviewer.email}` : ''}{set.publishedAt ? ` · published ${when(set.publishedAt)} as ${releaseLabelText(set.releaseLabelAtPublish)}` : ''}</small></p>
+        {set.reviewer ? ` · reviewed by ${set.reviewer.email}` : ''}{set.publishedAt ? ` · published ${when(set.publishedAt)}${releaseLabelText(set.releaseLabelAtPublish) ? ` as ${releaseLabelText(set.releaseLabelAtPublish)}` : ''}` : ''}</small></p>
       {set.provenance?.source === 'AGENT_DRAFTED' ? <p><StatusBadge label="Agent-drafted" tone="warning" />{' '}
-        <small>Written by {set.provenance.generatorVersion ?? 'NA'} ({set.provenance.promptVersion ?? 'NA'}){set.provenance.generatedAt ? ` · ${when(set.provenance.generatedAt)}` : ''}.
-          Check every requirement against its basis before passing review. Basis: {set.provenance.sourceBasis ?? 'NA'}</small></p> : null}
+        <small>Written by {set.provenance.generatorVersion ?? 'the coding agent'}{set.provenance.promptVersion ? ` (${set.provenance.promptVersion})` : ''}{set.provenance.generatedAt ? ` · ${when(set.provenance.generatedAt)}` : ''}.
+          Check every requirement against its basis before passing review.{set.provenance.sourceBasis ? ` Basis: ${set.provenance.sourceBasis}` : ''}</small></p> : null}
       {set.items.some((item) => item.topicLive === false) ? <p><small>{set.items.filter((item) => item.topicLive === false).length} of these topics are not yet published. This set cannot be published until they are.</small></p> : null}
       {set.reviewReasonCode && set.state !== 'PUBLISHED' && set.state !== 'SUPERSEDED' ? <p>Last review: {set.reviewReasonCode}{set.reviewNote ? ` — ${set.reviewNote}` : ''}</p> : null}
       {set.state === 'DRAFT' && policy.viewer.manage
@@ -325,12 +326,12 @@ function RequirementTable({ items, empty }: { readonly items: readonly Requireme
   return <div className="role-record-table-wrap"><table className="role-record-table">
     <thead><tr><th>Topic</th><th>Level</th><th>Target depth</th><th>Required evidence</th><th>Rationale</th></tr></thead>
     <tbody>{items.map((item) => <tr key={item.topicId}>
-      <td>{item.topicTitle ?? 'NA'}{item.topicKey ? <><br /><small>{item.topicKey}</small></> : null}
+      <td>{item.topicTitle ?? (item.topicKey ? null : MISSING_TEXT)}{item.topicKey ? <><br /><small>{item.topicKey}</small></> : null}
         {item.topicLive === false ? <><br /><StatusBadge label="Topic not yet published" tone="warning" /></> : null}</td>
       <td>{label(item.requirementLevel)}</td>
       <td>{item.targetMastery.toFixed(2)}</td>
       <td>{item.requiredEvidenceTypes.length ? item.requiredEvidenceTypes.map(label).join(', ') : 'None'}</td>
-      <td>{item.rationale ?? 'NA'}</td>
+      <td>{item.rationale ?? 'None given'}</td>
     </tr>)}</tbody></table></div>;
 }
 
@@ -340,7 +341,7 @@ function RequirementEditor({ token, set, policy, onSaved }: {
   readonly token: string; readonly set: RequirementSetDto; readonly policy: CareerCataloguePolicyDto; readonly onSaved: (role: CatalogueRoleDetailDto) => void;
 }): React.ReactElement {
   const [items, setItems] = useState<EditableItem[]>(() => set.items.map((item) => ({
-    topicId: item.topicId, topicTitle: item.topicTitle ?? item.topicKey ?? 'NA', requirementLevel: item.requirementLevel,
+    topicId: item.topicId, topicTitle: item.topicTitle ?? item.topicKey ?? MISSING_TEXT, requirementLevel: item.requirementLevel,
     targetMastery: String(item.targetMastery), rationale: item.rationale ?? '', requiredEvidenceTypes: [...item.requiredEvidenceTypes],
   })));
   const [query, setQuery] = useState('');

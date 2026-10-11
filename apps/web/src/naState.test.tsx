@@ -1,9 +1,10 @@
 /**
- * The shared "no data" presentation (naState.tsx): a missing figure keeps its exact text (NA,
- * <5, Withheld, Too few answers) in a muted style; an all-missing group keeps every slot visible
- * and labelled; a chart with any withheld point draws no line; a series with no shown count
- * becomes a labelled strip; and the student Practice page uses the compact strip rather than a
- * wall of empty tiles while still saying NA in each slot.
+ * The shared "no data" presentation (naState.tsx), Momentum re-skin rule (owner decision
+ * 2026-10-11): a figure with no source is hidden - a tile, chip or strip that would only say NA
+ * is not drawn, and a missing value in a sentence reads "Not recorded" - while real suppression
+ * (<5, Withheld, Too few answers) keeps its exact text, muted. A chart with any withheld point
+ * draws no line; a series with no shown count becomes a labelled strip; and the student Practice
+ * and Company Prep pages never say NA.
  */
 import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -33,15 +34,16 @@ describe('missing values', () => {
     expect(allMissing(['NA', '1'])).toBe(false);
   });
 
-  it('keeps the exact text and only mutes it', () => {
+  it('keeps a suppressed value muted with its exact text, and says "Not recorded" for no source', () => {
     render(<p><NaValue value="<5" /> <NaValue value="12" /> <NaValue value={null} /></p>);
     expect(screen.getByText('<5')).toHaveClass('na-value');
     expect(screen.getByText('<5')).toHaveAttribute('data-na', 'suppressed');
-    expect(screen.getByText('NA')).toHaveAttribute('data-na', 'na');
+    expect(screen.getByText('Not recorded')).toHaveAttribute('data-na', 'na');
+    expect(screen.queryByText('NA')).toBeNull();
     expect(screen.getByText(/12/)).not.toHaveClass('na-value');
   });
 
-  it('gives a missing stat tile its muted value and one reason line; a real value has no reason', () => {
+  it('gives a suppressed stat tile its muted value and one reason line; hides a tile with no source', () => {
     render(<>
       <V2Stat icon="x" tone="blue" value="Too few answers" label="Offer acceptance" reason="Shown at 5+ answers each way" />
       <V2Stat icon="x" tone="blue" value={12} label="Applications" reason="Too few to show" />
@@ -50,18 +52,25 @@ describe('missing values', () => {
     expect(screen.getByText('Too few answers')).toHaveClass('na-value');
     expect(screen.getByText('Shown at 5+ answers each way')).toHaveClass('na-reason');
     expect(screen.queryByText('Too few to show')).toBeNull();
-    expect(screen.getByText('Students Placed').parentElement).toHaveTextContent('NAStudents PlacedNot for your role');
+    expect(screen.queryByText('Students Placed')).toBeNull();
+    expect(screen.queryByText('Not for your role')).toBeNull();
   });
 });
 
 describe('an all-missing group', () => {
-  it('keeps every slot visible and labelled, each with its value, under one explanation', () => {
+  it('keeps every suppressed slot labelled under one explanation, and leaves out slots with no source', () => {
     render(<NaSlotStrip title="Company prep" slots={[{ label: 'Target Companies' }, { label: 'Mock Interviews' }, { label: 'Offers', value: '<5' }]}
-      reason="Company prep is not live yet." />);
+      reason="Fewer than 5 offers so far." />);
     const slots = within(screen.getByRole('list', { name: 'Company prep' })).getAllByRole('listitem');
-    expect(slots.map((slot) => slot.textContent)).toEqual(['Target Companies NA', 'Mock Interviews NA', 'Offers <5']);
+    expect(slots.map((slot) => slot.textContent)).toEqual(['Offers <5']);
     expect(screen.getByRole('heading', { name: 'Company prep' })).toBeInTheDocument();
-    expect(screen.getAllByText('Company prep is not live yet.')).toHaveLength(1);
+    expect(screen.getAllByText('Fewer than 5 offers so far.')).toHaveLength(1);
+  });
+
+  it('is not drawn at all when no slot has a source', () => {
+    const { container } = render(<NaSlotStrip title="Company prep" slots={[{ label: 'Target Companies' }, { label: 'Mock Interviews', value: 'NA' }]}
+      reason="Company prep is not live yet." />);
+    expect(container).toBeEmptyDOMElement();
   });
 });
 
@@ -106,23 +115,18 @@ describe('a short series', () => {
 });
 
 describe('student pages with no source yet', () => {
-  it('Practice keeps every stat and tile slot, each saying NA, as compact strips', () => {
-    render(<StudentPracticePage />);
-    const stats = within(screen.getByRole('list', { name: 'Practice figures' })).getAllByRole('listitem');
-    expect(stats.map((slot) => slot.textContent)).toEqual(['Problems Solved NA', 'Contests Participated NA', 'Practice Time NA', 'Day Streak NA', 'Success Rate NA']);
-    for (const title of ['Continue Practicing', 'Recommended for You']) {
-      const slots = within(screen.getByRole('list', { name: title })).getAllByRole('listitem');
-      expect(slots).toHaveLength(5);
-      for (const slot of slots) expect(slot).toHaveTextContent(/NA$/);
+  it('Practice hides every figure that has no source, and never says NA or invents a figure', () => {
+    const { container } = render(<StudentPracticePage />);
+    for (const name of ['Practice figures', 'Continue Practicing', 'Recommended for You', 'Practice Overview']) {
+      expect(screen.queryByRole('list', { name })).toBeNull();
     }
-    expect(within(screen.getByRole('list', { name: 'Practice Overview' })).getAllByRole('listitem').map((slot) => slot.textContent))
-      .toEqual(['Attempts NA', 'Solved NA', 'Attempted NA', 'Bookmarked NA']);
+    expect(container.textContent).not.toMatch(/(^|[^A-Za-z])NA([^A-Za-z]|$)/);
     expect(document.querySelector('.pilot-course-card')).toBeNull();
   });
 
-  it('Company Prep names each of its figures as NA in one strip', () => {
-    render(<StudentCompanyPrepPage />);
-    expect(within(screen.getByRole('list', { name: 'Company prep figures' })).getAllByRole('listitem').map((slot) => slot.textContent))
-      .toEqual(['Target Companies NA', 'Prep Sets Completed NA', 'Mock Interviews NA']);
+  it('Company Prep hides its figures that have no source, and never says NA', () => {
+    const { container } = render(<StudentCompanyPrepPage />);
+    expect(screen.queryByRole('list', { name: 'Company prep figures' })).toBeNull();
+    expect(container.textContent).not.toMatch(/(^|[^A-Za-z])NA([^A-Za-z]|$)/);
   });
 });

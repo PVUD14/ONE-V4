@@ -1,10 +1,10 @@
 /**
  * Published learner content on the five pilot-parity pages.
  *
- * These pages are pilot-exact shells whose slots read NA because no content source
- * existed. This adds a card that appears **only** when something has actually been
- * published for that page — it never replaces an NA widget and never invents an example,
- * so a page with no content looks exactly as honest as it did before.
+ * These pages are pilot-exact shells whose slots had no content source (and are hidden
+ * in the re-skin rather than shown as "NA"). This adds a card that appears **only** when
+ * something has actually been published for that page — it never invents an example, so
+ * a page with no content looks exactly as honest as it did before.
  */
 import { useEffect, useState } from 'react';
 import { getProtectedAccessToken, listLearnerContent } from '../api.js';

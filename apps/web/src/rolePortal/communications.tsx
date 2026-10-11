@@ -34,8 +34,9 @@ import { formatApiError } from './shared.js';
 import { emailSummary } from './incidents.js';
 import { SupportCode, supportCodeSuffix } from '../supportCode.js';
 import { formatDateTime } from '../dates.js';
+import { MISSING_TEXT } from '../labels.js';
 
-const when = (value: string | null | undefined): string => (value ? formatDateTime(value) : 'NA');
+const when = (value: string | null | undefined): string => (value ? formatDateTime(value) : MISSING_TEXT);
 const label = (value: string): string => value.split('_').map((word) => word.charAt(0) + word.slice(1).toLowerCase()).join(' ');
 
 type Action =
@@ -144,7 +145,7 @@ export function OperationsCommunicationsPage(): React.ReactElement | null {
           <td>{template.subject}<br /><small>{template.body}</small></td>
           <td><StatusBadge label={label(template.state)} tone={template.state === 'PUBLISHED' ? 'success' : template.state === 'DRAFT' ? 'warning' : 'neutral'} /></td>
           <td>{when(template.draftedAt)}<br /><small>{template.draftedBy.email}{template.draftedBy.isSelf ? ' (you)' : ''}</small></td>
-          <td>{template.state === 'PUBLISHED' ? `Approved by ${template.approvedBy ?? 'NA'}${template.publishMode === 'SOLO' ? ' (solo)' : ''}` : template.approval ? label(template.approval.state) : 'Not requested'}</td>
+          <td>{template.state === 'PUBLISHED' ? `Approved${template.approvedBy ? ` by ${template.approvedBy}` : ''}${template.publishMode === 'SOLO' ? ' (solo)' : ''}` : template.approval ? label(template.approval.state) : 'Not requested'}</td>
           <td>
             {template.canRequestApproval ? <button type="button" className="secondary" onClick={() => setAction({ kind: 'requestApproval', template })}>Ask for approval…</button> : null}
             {template.canPublish ? <button type="button" className="secondary" onClick={() => setAction({ kind: 'publish', template })}>Publish…</button> : null}
@@ -176,10 +177,10 @@ export function OperationsCommunicationsPage(): React.ReactElement | null {
           <td><strong>{item.incident.reference}</strong><br /><small>{item.incident.title}</small></td>
           <td>{item.template.subject}<br /><small>{item.template.templateKey} v{item.template.version}</small></td>
           <td><StatusBadge label={label(item.state)} tone={item.state === 'SENT' ? 'success' : item.state === 'WITHDRAWN' ? 'neutral' : 'warning'} /></td>
-          <td>{item.approvedAt ? `${when(item.approvedAt)} by ${item.approvedBy ?? 'NA'}${item.approveMode === 'SOLO' ? ' (solo)' : ''}` : 'NA'}</td>
-          <td>{when(item.sentAt)}</td>
-          <td>{item.recipientCount === null ? 'NA' : `${item.recipientCount} admins in ${item.organizationCount ?? 0} organisations`}</td>
-          <td>{item.state === 'SENT' ? emailSummary(item.email) : 'NA'}</td>
+          <td>{item.approvedAt ? `${when(item.approvedAt)}${item.approvedBy ? ` by ${item.approvedBy}` : ''}${item.approveMode === 'SOLO' ? ' (solo)' : ''}` : 'Not approved'}</td>
+          <td>{item.sentAt ? when(item.sentAt) : 'Not sent'}</td>
+          <td>{item.recipientCount === null ? 'None yet' : `${item.recipientCount} admins${item.organizationCount !== null && item.organizationCount !== undefined ? ` in ${item.organizationCount} organisations` : ''}`}</td>
+          <td>{item.state === 'SENT' ? emailSummary(item.email) : 'Not sent'}</td>
           <td>{item.state === 'DRAFT' ? <>
             {!item.draftedBySelf
               ? <button type="button" className="secondary" onClick={() => setAction({ kind: 'approveNotice', notice: item })}>Approve for sending…</button>

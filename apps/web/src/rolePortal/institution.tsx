@@ -12,7 +12,6 @@ import { V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import type { RolePortalConfig } from '../rolePortalConfig.js';
 import { InstitutionWorkspaceError, RestrictedApiState, formatApiError, institutionWorkspaceRoles, isInstitutionStaffWorkspace, isInstitutionWorkspace, openPortalRecord } from './shared.js';
 import type { AuthenticatedWorkspaceSummary } from './shared.js';
-import { NaListCard } from '../pilotParity/naWidgets.js';
 import { TeachingAssignmentsPanel } from './institutionTeaching.js';
 import { AnalyticsAccessPanel } from './institutionAnalytics.js';
 import { PlacementStatusChip, useRosterPlacementStatus } from './institutionPlacementStatus.js';
@@ -20,7 +19,7 @@ import { YearEndBatchPanel } from './institutionBatchLifecycle.js';
 import { useEffect, useRef, useState } from 'react';
 import { bearerHeader } from '../sandbox.js';
 import { formatDate, formatDateTime } from '../dates.js';
-import { codeLabel, roleLabel } from '../labels.js';
+import { applicationStageLabel, codeLabel, roleLabel } from '../labels.js';
 
 /** Why an invitation is being sent again; recorded with the resend (INST-01). */
 const invitationResendReasons = [
@@ -241,7 +240,7 @@ export function InstitutionStaffPage({ portal: _portal, authenticatedWorkspace }
       setError(formatApiError(error, 'Staff invitation failed.'));
     }
   }
-  const unitName = (id: string | null | undefined): string | null => (id ? units.find((unit) => unit.id === id)?.name ?? 'NA' : null);
+  const unitName = (id: string | null | undefined): string | null => (id ? units.find((unit) => unit.id === id)?.name ?? 'Unknown unit' : null);
   const scopeLabel = (scope: StaffUnitScopeDto | undefined): string => [unitName(scope?.departmentUnitId), unitName(scope?.batchUnitId)].filter(Boolean).join(' · ') || 'Whole institution';
   const departmentChoices = (role: string): readonly InstitutionUnitDto[] => units.filter((unit) => unit.kind === 'DEPARTMENT' || (role === 'PLACEMENT_ADMIN' && unit.kind === 'CAMPUS'));
   const batchChoices = units.filter((unit) => unit.kind === 'BATCH');
@@ -507,8 +506,11 @@ function StaffActionWorkflow({ token, institutionId, type, title, routeLabel }: 
         </> : null}
       </article>)}
   </section></div><aside className="pilot-rail">
-    <NaListCard title="Recorded outcomes" note={records ? actions.filter((action) => action.state === 'COMPLETED').length + ' of ' + actions.length + ' visible records completed.' : 'Records could not be loaded.'} />
-    {type === 'ACADEMIC_VERIFICATION' ? <NaListCard title="Evidence document" note="The college cannot open a student's evidence documents here. A verification record does not grant document access." /> : null}
+    {/* Real counts only: with no records loaded the card is left out (never an "NA" chip). */}
+    {records ? <section className="pilot-card"><div className="pilot-card-head"><h2>Recorded outcomes</h2></div>
+      <p style={{ color: 'var(--p-muted)', margin: '4px 0' }}>{actions.filter((action) => action.state === 'COMPLETED').length} of {actions.length} visible records completed.</p></section> : null}
+    {type === 'ACADEMIC_VERIFICATION' ? <section className="pilot-card"><div className="pilot-card-head"><h2>Evidence document</h2></div>
+      <p style={{ color: 'var(--p-muted)', margin: '4px 0' }}>The college cannot open a student&apos;s evidence documents here. A verification record does not grant document access.</p></section> : null}
   </aside></div></div>;
 }
 
@@ -626,11 +628,11 @@ export function StudentApplicationRecords({ token, institutionId, studentUserId,
             throw new Error('Invalid external declaration response');
           }
           setRows(result.externalApplications.map((row) => ({ id: row.id, company: row.companyName, title: row.roleTitle,
-            stage: codeLabel(row.stage) + ' (student-declared)', date: row.appliedOn, detail: codeLabel(row.sourceKind) })));
+            stage: applicationStageLabel(row.stage) + ' (student-declared)', date: row.appliedOn, detail: codeLabel(row.sourceKind) })));
         } else {
           if (!Array.isArray(result.applications)) throw new Error('Invalid native application response');
           setRows(result.applications.map((row) => ({ id: row.id, company: row.employer.name, title: row.opportunityTitle,
-            stage: codeLabel(row.state), date: row.submittedAt ?? row.createdAt,
+            stage: applicationStageLabel(row.state), date: row.submittedAt ?? row.createdAt,
             detail: row.offer.exists ? codeLabel(row.offer.responseState) : 'No offer' })));
         }
       })

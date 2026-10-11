@@ -118,7 +118,7 @@ export function EmployerReportsPage({ employerId }: { readonly employerId: strin
     </div> : null}
 
     <section className="role-card role-wide"><h2>Where applications are now</h2>
-      <p>Open applications by their current stage, hires, and — for rejected or withdrawn applications — the stage they left at.</p>
+      <p>Open applications by their current stage, hires, and — for applications not selected or withdrawn — the stage they left at.</p>
       {reports ? <StageTable caption="All applications" groupHeading="All jobs" empty="No applications yet."
         rows={[{ key: 'overall', label: 'All jobs', table: reports.overall }]} /> : null}
     </section>

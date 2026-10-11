@@ -33,7 +33,9 @@ export function MetricCard({ label, value, suffix, detail, tone = 'student' }: {
   return <section className={`card metric-card ${tone}`}><span>{label}</span><strong>{value}{suffix ? <small>{suffix}</small> : null}</strong><p>{detail}</p></section>;
 }
 
-export function StatusBadge({ label, tone = 'neutral' }: { readonly label: string; readonly tone?: 'success' | 'warning' | 'neutral' | 'info' | 'danger' }): React.ReactElement {
+export function StatusBadge({ label, tone = 'neutral' }: { readonly label: string; readonly tone?: 'success' | 'warning' | 'neutral' | 'info' | 'danger' }): React.ReactElement | null {
+  // A badge with no state to show is hidden, never drawn as "NA".
+  if (!label || label === 'NA') return null;
   // A raw code (ACTIVE, UNDER_REVIEW) reads as words; any other label is shown as written.
   return <span className={`status-pill ${tone}`}>{codeLabel(label)}</span>;
 }

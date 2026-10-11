@@ -34,7 +34,9 @@ const roleNames: Readonly<Record<string, string>> = {
 /** Words that keep their capitals when a code is humanised. */
 const acronyms = new Set(['AI', 'API', 'CGPA', 'CSV', 'GD', 'HR', 'ID', 'MRO', 'NA', 'ONE', 'PDF', 'URL']);
 
-const NA = 'NA';
+/** Momentum re-skin: a missing code is said plainly, never as "NA". */
+export const MISSING_TEXT = 'Not recorded';
+const NA = MISSING_TEXT;
 
 /** A role code as a job title: "PLACEMENT_ADMIN" → "Placement Officer". */
 export function roleLabel(code: string | null | undefined): string {
@@ -54,6 +56,15 @@ export function codeLabel(code: string | null | undefined): string {
   const [first, ...rest] = words;
   if (!first) return NA;
   return [first.charAt(0).toUpperCase() + first.slice(1), ...rest].join(' ');
+}
+
+/**
+ * A hiring stage as plain words. The API keeps REJECTED; people read "Not selected" (approved
+ * wording, 2026-10-11), which says what happened without the harsher word.
+ */
+export function applicationStageLabel(code: string | null | undefined): string {
+  if (code === 'REJECTED' || code === 'NOT_SELECTED') return 'Not selected';
+  return codeLabel(code);
 }
 
 function titleCase(code: string): string {

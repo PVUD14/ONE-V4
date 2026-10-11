@@ -1,6 +1,6 @@
 /**
  * Web tests for the Tutor hints panel on AI Operations (ENG-22): the sample, the refused list with the
- * guard's findings, a verdict with a reason, no student identity, and NA (not a crash) on a malformed reply.
+ * guard's findings, a verdict with a reason, no student identity, and a plain "could not be read" (not a crash) on a malformed reply.
  */
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';

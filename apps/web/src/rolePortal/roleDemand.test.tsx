@@ -1,7 +1,7 @@
 /**
  * Operations Analytics — role demand (OPS-11): the dashboard renders the server's summary,
- * shows <5 and "Withheld" exactly where the server suppressed, keeps the employer-demand
- * slot as NA, gives suppressed roles no rank, drills into a role's colleges, and its
+ * shows <5 and "Withheld" exactly where the server suppressed, says employer demand is not
+ * recorded (never "NA"), gives suppressed roles no rank, drills into a role's colleges, and its
  * loading, empty, error and forbidden states are honest. Navigation labels are unchanged.
  */
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
@@ -104,11 +104,12 @@ describe('role demand dashboard', () => {
     expect(within(trend).getByRole('row', { name: /2026-09/ })).toHaveTextContent('52');
   });
 
-  it('keeps the employer-demand slot and says NA instead of dropping it', async () => {
+  it('says employer demand is not recorded, with no tile and no NA', async () => {
     render(<OperationsRoleDemandPage />);
     await screen.findByRole('table', { name: 'Roles ranked by demand' });
-    expect(screen.getByText('Employer demand (not recorded)').parentElement).toHaveTextContent('NA');
-    expect(screen.getByText(/Employer demand is NA/)).toBeInTheDocument();
+    expect(screen.queryByText('Employer demand (not recorded)')).toBeNull();
+    expect(screen.getByText(/Employer demand is not recorded/)).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/(^|[^A-Za-z])NA([^A-Za-z]|$)/);
   });
 
   it('filters by release label without refetching', async () => {
@@ -151,7 +152,8 @@ describe('role demand dashboard', () => {
     summaryResponse = () => failure(500, 'ROLE_DEMAND_UNAVAILABLE', 'corr-broken');
     render(<OperationsRoleDemandPage />);
     expect(await screen.findByRole('alert')).toHaveTextContent('Support code: corrbrok');
-    expect(screen.getByText('Students with a career target').parentElement).toHaveTextContent('NA');
+    expect(screen.queryByText('Students with a career target')).toBeNull();
+    expect(document.body.textContent).not.toMatch(/(^|[^A-Za-z])NA([^A-Za-z]|$)/);
   });
 
   it('shows the forbidden state with its reference', async () => {
@@ -175,7 +177,7 @@ describe('role demand dashboard', () => {
   });
 
   it('formats counts exactly as the server suppressed them', () => {
-    expect(formatPeople(undefined)).toBe('NA');
+    expect(formatPeople(undefined)).toBeUndefined();
     expect(formatPeople(suppressed)).toBe('<5');
     expect(formatPeople(shown(12), true)).toBe('Withheld');
     expect(formatPeople(shown(10_000))).toBe('10,000');

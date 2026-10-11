@@ -106,7 +106,9 @@ describe('an employer lead\'s pipeline', () => {
     expect(within(list).getByText('2 published now')).toBeInTheDocument();
     expect(within(list).getByText('1 requested · 3 scheduled')).toBeInTheDocument();
     expect(within(list).getByText('No employer terms are published yet.')).toBeInTheDocument();
-    expect(within(list).getAllByText('NA')).toHaveLength(1);
+    // A milestone with no source shows no state chip, never "NA".
+    expect(list).not.toHaveTextContent(/(^|[^A-Za-z])NA([^A-Za-z]|$)/);
+    expect(within(list).getByText('No employer terms are published yet.').closest('.v2-list-row')?.querySelector('.v2-chip')).toBeNull();
     const requests = screen.getByLabelText('Access requests');
     expect(requests).toHaveTextContent('Onboarded · through your referral link');
     expect(requests).toHaveTextContent("Waiting for operations · through another team member's referral link");

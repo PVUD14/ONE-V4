@@ -6,8 +6,8 @@
  * it: the placement test (after the onboarding question in My Career), one next step with its reasons, practice
  * on that step with the hint ladder, the path in skip / review / learn groups, and what is due for review. It uses
  * the pilot design system and the existing navigation only (no item added, renamed or moved), shows labels and
- * reasons — never a readiness value, a score, a likelihood, a due date or any other model number — and says NA or
- * states plainly what is not available rather than inventing it. Everything works with every AI flag off.
+ * reasons — never a readiness value, a score, a likelihood, a due date or any other model number — and hides a block
+ * or states plainly what is not available rather than inventing it. Everything works with every AI flag off.
  */
 import React, { useEffect, useState } from 'react';
 import { Icon } from './icons/Icon.js';
@@ -106,7 +106,7 @@ export function StudentLearningPlan(): React.ReactElement {
     if (!token) { setStatus('You are not signed in.'); setLecturerStatus('You are not signed in.'); return; }
     getMyLearningActions(token, signal)
       .then((loaded) => { if (!isStudentLearningActions(loaded)) throw new Error('unexpected learning actions response'); setLecturer(loaded); setLecturerStatus(''); })
-      .catch(() => { if (!signal?.aborted) setLecturerStatus('NA — what your lecturers set could not be loaded right now.'); });
+      .catch(() => { if (!signal?.aborted) setLecturerStatus('What your lecturers set could not be loaded right now.'); });
     getLearningPath(token, signal)
       .then((loaded) => {
         const value = loaded?.path;
@@ -116,7 +116,7 @@ export function StudentLearningPlan(): React.ReactElement {
         // A refresh after acting keeps the step the student is on; only the first load takes the latest one.
         setStep((current) => current ?? value.latestStep);
       })
-      .catch(() => { if (!signal?.aborted) setStatus('NA — your learning plan could not be loaded right now.'); });
+      .catch(() => { if (!signal?.aborted) setStatus('Your learning plan could not be loaded right now.'); });
   }
 
   useEffect(() => {
@@ -146,7 +146,7 @@ export function StudentLearningPlan(): React.ReactElement {
     <section className="pilot-card" aria-labelledby="next-step-heading">
       <div className="pilot-card-head">
         <h2 id="next-step-heading">Your next step</h2>
-        {step ? <span className="pilot-chip purple">{ACTION_LABEL[step.action]}</span> : <span className="pilot-chip slate">NA</span>}
+        {step ? <span className="pilot-chip purple">{ACTION_LABEL[step.action]}</span> : null}
       </div>
       {notice ? <p role="alert" className="pilot-chip rose" style={{ display: 'inline-block' }}>{notice}</p> : null}
       {!path ? <p style={muted}>{status}</p> : !path.target && !lecturerWork ? <>
@@ -163,20 +163,19 @@ export function StudentLearningPlan(): React.ReactElement {
       </>}
     </section>
     <PathCard path={path} status={status} />
-    <section className="pilot-card" aria-labelledby="due-heading">
+    {/* Reviews are scheduled only under adaptive learning; without it there is nothing to show, so the card is not drawn. */}
+    {path?.adaptive ? <section className="pilot-card" aria-labelledby="due-heading">
       <div className="pilot-card-head"><h2 id="due-heading">Due for review</h2>
-        {path?.adaptive ? <span className="pilot-chip blue">{path.dueReviews.length ? 'Due now' : 'Nothing due'}</span> : <span className="pilot-chip slate">NA</span>}
+        <span className="pilot-chip blue">{path.dueReviews.length ? 'Due now' : 'Nothing due'}</span>
       </div>
-      {!path ? <p style={muted}>{status}</p>
-        : !path.adaptive ? <p style={muted}>NA — reviews are scheduled from your answers once adaptive learning is available to you.</p>
-          : path.dueReviews.length === 0 ? <p style={muted}>Nothing is due for review right now.</p>
-            : <div className="pilot-list">
-              {path.dueReviews.map((review) => <div key={review.skillId} className="pilot-list-row">
-                <span className="pilot-tile blue"><Icon name="refresh" size={16} /></span>
-                <div className="grow"><strong>{review.skillName}</strong><small>Due for review</small></div>
-              </div>)}
-            </div>}
-    </section>
+      {path.dueReviews.length === 0 ? <p style={muted}>Nothing is due for review right now.</p>
+        : <div className="pilot-list">
+          {path.dueReviews.map((review) => <div key={review.skillId} className="pilot-list-row">
+            <span className="pilot-tile blue"><Icon name="refresh" size={16} /></span>
+            <div className="grow"><strong>{review.skillName}</strong><small>Due for review</small></div>
+          </div>)}
+        </div>}
+    </section> : null}
   </>;
 }
 
@@ -371,12 +370,12 @@ const GROUPS: readonly { key: 'skip' | 'review' | 'learn'; title: string; icon: 
 function PathCard({ path, status }: { readonly path: LearningPathDto | null; readonly status: string }): React.ReactElement {
   return <section className="pilot-card" aria-labelledby="path-heading">
     <div className="pilot-card-head"><h2 id="path-heading">Your path</h2>
-      <span className="pilot-chip slate">{path?.target ? path.target.title : 'NA'}</span>
+      {path?.target ? <span className="pilot-chip slate">{path.target.title}</span> : null}
     </div>
-    {!path ? <p style={muted}>{status}</p> : !path.target ? <p style={muted}>NA — choose your target role in My Career to see what to skip, review and learn.</p> : <>
+    {!path ? <p style={muted}>{status}</p> : !path.target ? <p style={muted}>Choose your target role in My Career to see what to skip, review and learn.</p> : <>
       <p style={muted}>{path.requirements
         ? `${path.requirements.met} of ${path.requirements.total} requirements met · ${path.requirements.notMeasured} not measured yet`
-        : 'Requirements: NA — not measured yet.'}</p>
+        : 'Requirements are not measured yet.'}</p>
       <div className="pilot-row cols-3">
         {GROUPS.map((group) => {
           const entries = path.groups[group.key];
@@ -421,7 +420,7 @@ export function PlacementCard(): React.ReactElement {
     const controller = new AbortController();
     getPlacementTest(token, controller.signal)
       .then((loaded) => { if (!loaded?.placement?.status) throw new Error('unexpected placement response'); setPlacement(loaded.placement); setStatus(''); })
-      .catch(() => { if (!controller.signal.aborted) setStatus('NA — the placement test could not be loaded right now.'); });
+      .catch(() => { if (!controller.signal.aborted) setStatus('The placement test could not be loaded right now.'); });
     return () => controller.abort();
   }, []);
 
@@ -464,7 +463,7 @@ export function PlacementCard(): React.ReactElement {
 /** "Practice by Skill" on the Practice page: the path's review and learn skills, practised from the Learning page. */
 export function PracticeBySkillCard(): React.ReactElement {
   const [path, setPath] = useState<LearningPathDto | null>(null);
-  const [status, setStatus] = useState('NA — sign in to see the skills your plan practises.');
+  const [status, setStatus] = useState('Sign in to see the skills your plan practises.');
 
   useEffect(() => {
     const token = getAccessToken();
@@ -472,15 +471,15 @@ export function PracticeBySkillCard(): React.ReactElement {
     const controller = new AbortController();
     getLearningPath(token, controller.signal)
       .then((loaded) => { if (!Array.isArray(loaded?.path?.groups?.review)) throw new Error('unexpected path response'); setPath(loaded.path); })
-      .catch(() => { if (!controller.signal.aborted) setStatus('NA — your practice skills could not be loaded right now.'); });
+      .catch(() => { if (!controller.signal.aborted) setStatus('Your practice skills could not be loaded right now.'); });
     return () => controller.abort();
   }, []);
 
   const skills = path ? [...path.groups.review, ...path.groups.learn] : [];
   return <section className="pilot-card" aria-labelledby="practice-by-skill">
-    <div className="pilot-card-head"><h2 id="practice-by-skill">Practice by Skill</h2><span className={`pilot-chip ${skills.length ? 'blue' : 'slate'}`}>{path ? skills.length : 'NA'}</span></div>
+    <div className="pilot-card-head"><h2 id="practice-by-skill">Practice by Skill</h2>{path ? <span className={`pilot-chip ${skills.length ? 'blue' : 'slate'}`}>{skills.length}</span> : null}</div>
     {!path ? <p style={muted}>{status}</p>
-      : !path.target ? <p style={muted}>NA — choose your target role in My Career; practice follows your path.</p>
+      : !path.target ? <p style={muted}>Choose your target role in My Career; practice follows your path.</p>
         : skills.length === 0 ? <p style={muted}>Nothing to practise: every requirement of your target is met.</p>
           : <div className="pilot-list">
             {skills.map((entry) => <div key={entry.skillId} className="pilot-list-row">

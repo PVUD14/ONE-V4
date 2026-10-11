@@ -2,7 +2,7 @@
  * Web tests for the student learning experience (ENG-18): the path in skip / review / learn groups (C1) with
  * "not enough evidence" labels (C3), due reviews first and shown without a date (C7), one next step with its
  * reasons in plain words (C4), practice with the hint ladder and the assisted warning, the placement test, the
- * Practice page's skill card, and honest NA / empty / error states. The API is stubbed with synthetic rows; no
+ * Practice page's skill card, and honest hidden / empty / error states. The API is stubbed with synthetic rows; no
  * readiness value, score or model number is ever rendered.
  */
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -86,8 +86,9 @@ describe('student learning plan', () => {
     expect(screen.queryByText('Developing')).not.toBeInTheDocument();
     expect(screen.getByText('1 of 4 requirements met · 2 not measured yet')).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/%|readiness score|likelihood/i);
-    // Not adaptive: due reviews are NA, stated plainly; the placement test says why it is not open.
-    expect(screen.getByText(/reviews are scheduled from your answers once adaptive learning is available/)).toBeInTheDocument();
+    // Not adaptive: there are no due reviews to show, so that card is not drawn; the placement test says why it is not open.
+    expect(screen.queryByRole('region', { name: 'Due for review' })).toBeNull();
+    expect(document.body.textContent).not.toMatch(/(^|[^A-Za-z])NA([^A-Za-z]|$)/);
     expect(await screen.findByText(/Not open yet — the placement test adapts to your answers/)).toBeInTheDocument();
   });
 
@@ -186,15 +187,17 @@ describe('student learning plan', () => {
     render(<StudentLearningPlan />);
     expect(await screen.findByText(/Choose the job you want first/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Go to My Career' })).toBeInTheDocument();
-    expect(screen.getByText(/NA — choose your target role in My Career/)).toBeInTheDocument();
+    expect(screen.getByText('Choose your target role in My Career to see what to skip, review and learn.')).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/(^|[^A-Za-z])NA([^A-Za-z]|$)/);
   });
 
-  it('shows NA, not a guess, when the plan cannot be loaded', async () => {
+  it('says plainly, not a guess, when the plan cannot be loaded', async () => {
     stub({ '/api/v1/learning/path': { status: 500, body: { error: { code: 'INTERNAL', correlationId: 'c-1' } } }, '/api/v1/learning/placement-test': { status: 500, body: {} } });
     await authenticate();
     render(<StudentLearningPlan />);
-    expect((await screen.findAllByText('NA — your learning plan could not be loaded right now.')).length).toBeGreaterThan(0);
-    expect(await screen.findByText('NA — the placement test could not be loaded right now.')).toBeInTheDocument();
+    expect((await screen.findAllByText('Your learning plan could not be loaded right now.')).length).toBeGreaterThan(0);
+    expect(await screen.findByText('The placement test could not be loaded right now.')).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/(^|[^A-Za-z])NA([^A-Za-z]|$)/);
   });
 });
 

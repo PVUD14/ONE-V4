@@ -143,7 +143,8 @@ describe('Staff and capabilities', () => {
     fetchMock.mockImplementation(() => new Promise(() => undefined));
     render(<OperationsStaffCapabilitiesPage />);
     expect(screen.getByText('Loading staff…')).toBeInTheDocument();
-    expect(screen.getByText('Staff memberships').previousSibling).toHaveTextContent('NA');
+    expect(screen.queryByText('Staff memberships')).toBeNull();
+    expect(document.body.textContent).not.toMatch(/(^|[^A-Za-z])NA([^A-Za-z]|$)/);
   });
 
   it('shows a forbidden state with the reference when the caller lacks CAPABILITY_ADMIN', async () => {

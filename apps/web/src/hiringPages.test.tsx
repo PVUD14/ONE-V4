@@ -188,8 +188,10 @@ describe('employer applicant pipeline', () => {
       expect(table.textContent, email).not.toContain(email);
     }
     expect(within(table).getAllByText(/^Candidate$/, { selector: 'td' })).toHaveLength(3);
-    expect(within(table).getByText('· Application 9F1C2D3E')).toBeInTheDocument();
-    expect(within(table).getByText('· Application 7A6B5C4D')).toBeInTheDocument();
+    // A nameless candidate is told apart by the date they applied, never by an internal id.
+    expect(within(table).getAllByText('· applied 10 Aug 2026')).toHaveLength(3);
+    expect(table.textContent).not.toMatch(/Application [0-9A-F]{8}/);
+    expect(table.textContent).not.toMatch(/9F1C2D3E|7A6B5C4D|5E4D3C2B/i);
     // From Shortlisted on, contact details may be shown, so a nameless candidate reads as their email.
     expect(within(table).getByText('graduate.shortlisted@uat.example.test')).toBeInTheDocument();
     expect(table.textContent).not.toMatch(/(^|[^A-Za-z])NA([^A-Za-z]|$)/);
@@ -222,7 +224,7 @@ describe('employer applicant pipeline', () => {
     await authenticate();
     render(<EmployerApplicantsPage employerId={employerId} />);
     expect(await screen.findByRole('button', { name: 'Offer' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Rejected' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Not selected' })).toBeInTheDocument();
     // Moving backwards is not offered at all, so the rule cannot be reached by clicking.
     expect(screen.queryByRole('button', { name: 'Screening' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Shortlisted' })).not.toBeInTheDocument();
@@ -484,14 +486,15 @@ describe('institution consent and reports', () => {
     expect(postsTo('/withdraw')).toHaveLength(0);
     expect(await screen.findByText(/Shared with your institution: employer, role, stage, key dates and offer response — never pay/)).toBeInTheDocument();
   });
-  it('keeps analytics widgets present with NA when data cannot be loaded', async () => {
+  it('keeps the analytics sections, with no figures and no NA, when data cannot be loaded', async () => {
     stubFetch({}, { '/api/v1/employers/employer/hiring-analytics': { status: 500, body: {} } });
     await authenticate(); render(<EmployerHiringAnalyticsPage employerId="employer" />);
     await screen.findByText('Hiring analytics could not be loaded.');
     expect(screen.getByRole('heading', { name: 'Applications by stage' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Stage conversion' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Per-opportunity funnel' })).toBeInTheDocument();
-    expect(screen.getAllByText('NA').length).toBeGreaterThan(5);
+    expect(document.body.textContent).not.toMatch(/(^|[^A-Za-z])NA([^A-Za-z]|$)/);
+    expect(screen.queryByRole('table')).toBeNull();
   });
 });
 
@@ -512,7 +515,7 @@ describe('student-declared external application UI', () => {
     fireEvent.click(within(table).getAllByRole('button', { name: 'View external application' })[0]!);
     expect(await screen.findByText('Declared stage: Hired · Unverified')).toBeInTheDocument();
     expect(screen.getAllByText('Student-declared · Unverified')).toHaveLength(9);
-    expect(screen.getByText('Application link: NA')).toBeInTheDocument();
+    expect(screen.getByText('Application link: None')).toBeInTheDocument();
     expect(document.body.textContent).not.toContain(external.id);
   });
 
@@ -819,7 +822,7 @@ describe('EMP-08 the student sees their interviews inside Applications', () => {
     expect(document.body.textContent).not.toMatch(/readiness|score/i);
   });
 
-  it('says NA when the employer gave nothing to prepare, and says plainly when there are no interviews', async () => {
+  it('says so when the employer gave nothing to prepare, and says plainly when there are no interviews', async () => {
     stubFetch(routes({ interviews: [{ ...upcoming, preparationNote: null }] }));
     await authenticate();
     render(<StudentApplicationsPage />);

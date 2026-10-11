@@ -10,7 +10,7 @@
  *
  * Whether the viewer may edit is always the server's answer (canEdit); nothing is filtered or
  * decided here. The details AI8HT operations verified are shown read-only. A programme
- * without a grading scale reads NA — never a guessed scale. Real data only.
+ * without a grading scale reads "Not set" — never a guessed scale. Real data only.
  */
 import { useEffect, useState } from 'react';
 import {
@@ -68,10 +68,10 @@ export const academicTermArchiveReasons = [
   ['CORRECTION', 'Entered in error'],
 ] as const;
 
-function formatDate(value: string | null | undefined): string {
-  if (!value) return 'NA';
+function formatDate(value: string | null | undefined): string | null {
+  if (!value) return null;
   const date = new Date(value.length === 10 ? value + 'T00:00:00' : value);
-  return Number.isNaN(date.getTime()) ? 'NA' : dates.formatDate(date);
+  return Number.isNaN(date.getTime()) ? null : dates.formatDate(date);
 }
 
 function minutesToTime(minutes: number): string {
@@ -90,7 +90,7 @@ function location(profile: InstitutionSettingsDto['profile']): string {
 }
 
 function scaleLabel(scale: InstitutionResultScale | null | undefined): string {
-  return scale ? institutionResultScaleLabels[scale] : 'NA';
+  return scale ? institutionResultScaleLabels[scale] : 'Not set';
 }
 
 // --- College settings -------------------------------------------------------------------
@@ -200,7 +200,7 @@ function CollegeSettingsSections({ token, institutionId }: { readonly token: str
     try {
       await removeProgrammeGradingScale(token, institutionId, programUnitId, removeReason);
       await reload();
-      setNotice(`Grading scale removed for ${programName}. It now reads NA until a scale is set.`);
+      setNotice(`Grading scale removed for ${programName}. It now reads Not set until a scale is set.`);
     } catch (cause) {
       setError(formatApiError(cause, 'The grading scale could not be removed.'));
     } finally {
@@ -216,8 +216,8 @@ function CollegeSettingsSections({ token, institutionId }: { readonly token: str
 
   return <>
     <div className="v2-row v2-cols-4 career-stat-strip role-wide">
-      <V2Stat icon="🛡️" tone="teal" value={verificationLabels[profile.verificationState] ?? 'NA'} label="Verification" />
-      <V2Stat icon="🏫" tone="blue" value={profile.institutionType ? institutionTypeLabels[profile.institutionType] ?? 'NA' : 'NA'} label="Institution type" />
+      <V2Stat icon="🛡️" tone="teal" value={verificationLabels[profile.verificationState] ?? null} label="Verification" />
+      <V2Stat icon="🏫" tone="blue" value={profile.institutionType ? institutionTypeLabels[profile.institutionType] ?? null : null} label="Institution type" />
       <V2Stat icon="📏" tone="amber" value={settings.programmes.length ? `${withScale} of ${settings.programmes.length}` : '0'} label="Programmes with a grading scale" />
       <V2Stat icon="🕒" tone="purple" value={formatDate(college.updatedAt)} label="Profile last updated" />
     </div>
@@ -253,7 +253,7 @@ function CollegeSettingsSections({ token, institutionId }: { readonly token: str
 
     <section className="role-card role-wide" aria-label="Grading scales">
       <h2>Grading scales</h2>
-      <p>The scale each programme's results are issued on, and its pass mark. A programme without a scale shows NA wherever a scale is needed — ONE never assumes one.</p>
+      <p>The scale each programme's results are issued on, and its pass mark. A programme without a scale shows Not set wherever a scale is needed — ONE never assumes one.</p>
       {settings.programmes.length === 0 ? <p>No programmes are set up yet. Add programmes under Academic Structure, then set their grading scales here.</p> : null}
       {settings.canEdit && settings.programmes.some((programme) => programme.gradingScale) ? <label><span>Reason for removing a scale</span>
         <select value={removeReason} onChange={(event) => setRemoveReason(event.target.value)}>{gradingScaleRemoveReasons.map(([code, label]) => <option key={code} value={code}>{label}</option>)}</select></label> : null}
@@ -265,7 +265,7 @@ function CollegeSettingsSections({ token, institutionId }: { readonly token: str
           return <tr key={programme.programUnitId}>
             <th scope="row"><strong>{programme.programName}</strong>{programme.parentName ? <span>{programme.parentName}</span> : null}</th>
             <td>{scaleLabel(programme.gradingScale?.scale)}</td>
-            <td>{programme.gradingScale?.passThreshold ?? 'NA'}</td>
+            <td>{programme.gradingScale?.passThreshold ?? 'Not set'}</td>
             {settings.canEdit ? <td><div className="role-record-actions">
               <label><span className="sr-only">Scale for {programme.programName}</span>
                 <select aria-label={`Scale for ${programme.programName}`} value={entry.scale}
@@ -372,8 +372,8 @@ export function AcademicCalendarPanel({ token, institutionId }: { readonly token
       <thead><tr><th>Name</th><th>Kind</th><th>Dates</th><th>Applies to</th>{data?.canEdit ? <th>Actions</th> : null}</tr></thead>
       <tbody>{terms.map((term) => <tr key={term.id}>
         <th scope="row"><strong>{term.name}</strong>{term.current ? <span>Now</span> : null}</th>
-        <td>{academicTermKindLabels[term.kind] ?? 'NA'}</td>
-        <td>{formatDate(term.startsOn)} – {formatDate(term.endsOn)}</td>
+        <td>{academicTermKindLabels[term.kind] ?? 'Not set'}</td>
+        <td>{formatDate(term.startsOn) ?? 'Not set'} – {formatDate(term.endsOn) ?? 'Not set'}</td>
         <td>{term.unit ? term.unit.name : 'Whole college'}</td>
         {data?.canEdit ? <td><div className="role-record-actions">
           <button type="button" className="secondary" onClick={() => edit(term)}>Edit</button>
@@ -421,7 +421,7 @@ function StaffProfileSection({ token, institutionId }: { readonly token: string;
     {profile.roles.some((role) => role.role === 'FACULTY_LECTURER') ? <>
       <h3>Teaching</h3>
       {profile.teachingAssignments.length ? <ul className="role-check-list">{profile.teachingAssignments.map((assignment, index) =>
-        <li key={index}>{assignment.subject ?? 'NA'} · {assignment.unit} · {assignment.academicTerm}</li>)}</ul>
+        <li key={index}>{[assignment.subject, assignment.unit, assignment.academicTerm].filter(Boolean).join(' · ')}</li>)}</ul>
         : <p>No active teaching assignment.</p>}
     </> : null}
     <p className="hiring-meta">Your email and roles are managed by your institution's admins.</p>

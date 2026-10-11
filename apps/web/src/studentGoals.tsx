@@ -6,7 +6,7 @@
  * survey and 3–5 suggested roles), then shows the student's goals: one primary role, any number of topics, and
  * exam or company goals where the catalogue is open. Skills needed by several goals are listed once. It uses
  * the pilot design system, adds no navigation, shows statuses and reasons only (never a readiness value or a
- * score), and says NA when something cannot be loaded rather than inventing it.
+ * score), and says plainly when something cannot be loaded rather than inventing it.
  */
 import React, { useEffect, useState } from 'react';
 import { getAccessToken } from './auth.js';
@@ -61,7 +61,7 @@ export function StudentGoalsPanel(): React.ReactElement {
         if (!Array.isArray(loaded?.goals) || !Array.isArray(loaded?.skills?.skills)) throw new Error('unexpected goals response');
         setGoals(loaded); setStatus('');
       })
-      .catch(() => { if (!controller.signal.aborted) setStatus('NA — your goals could not be loaded right now.'); });
+      .catch(() => { if (!controller.signal.aborted) setStatus('Your goals could not be loaded right now.'); });
     return () => controller.abort();
   }, []);
 
@@ -89,7 +89,7 @@ export function StudentGoalsPanel(): React.ReactElement {
   }
 
   if (!goals) {
-    return <section className="pilot-card"><div className="pilot-card-head"><h2>Your goals</h2><span className="pilot-chip slate">NA</span></div><p style={{ color: 'var(--p-muted)' }}>{status}</p></section>;
+    return <section className="pilot-card"><div className="pilot-card-head"><h2>Your goals</h2></div><p style={{ color: 'var(--p-muted)' }}>{status}</p></section>;
   }
 
   const hasPrimary = goals.goals.some((goal) => goal.priority === 'PRIMARY');
@@ -142,7 +142,7 @@ export function StudentGoalsPanel(): React.ReactElement {
     {!goals.onboarding ? <section className="pilot-card">
       <div className="pilot-card-head"><h2>Skills across your goals</h2><span className="pilot-chip slate">Each skill once</span></div>
       {goals.skills.skills.length === 0
-        ? <p style={{ color: 'var(--p-muted)' }}>NA — none of your goals lists skills yet. Exam and company goals get skills when their tracks are published.</p>
+        ? <p style={{ color: 'var(--p-muted)' }}>None of your goals lists skills yet. Exam and company goals get skills when their tracks are published.</p>
         : <div className="pilot-list">
           {goals.skills.skills.map((skill) => <div key={skill.topicId} className="pilot-list-row" style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
             <div>
@@ -196,7 +196,7 @@ function GoalSearch({ purpose, onChooseRole, onChooseTopic, onChooseCatalogueGoa
       <span>{purpose === 'role' ? 'Search by job title' : 'Search roles and topics'}</span>
       <input value={query} maxLength={80} onChange={(event) => setQuery(event.target.value)} placeholder={purpose === 'role' ? 'For example: analyst, developer, design' : 'For example: SQL, communication'} />
     </label>
-    {failed ? <p style={{ color: 'var(--p-muted)' }}>NA — the list could not be loaded right now.</p> : null}
+    {failed ? <p style={{ color: 'var(--p-muted)' }}>The list could not be loaded right now.</p> : null}
     {options === null && !failed ? <p style={{ color: 'var(--p-muted)' }}>Loading…</p> : null}
     {nothing ? <p style={{ color: 'var(--p-muted)' }}>{query.trim() ? `Nothing matches “${query.trim()}”.` : 'Nothing is available to choose yet.'}</p> : null}
     {roles.length ? <div className="pilot-list" aria-label="Roles">
@@ -265,7 +265,7 @@ function DiscoveryPanel({ origin, onChoose }: { readonly origin: GoalOrigin; rea
     return () => controller.abort();
   }, []);
 
-  if (failed) return <p style={{ color: 'var(--p-muted)' }}>NA — the survey could not be loaded right now.</p>;
+  if (failed) return <p style={{ color: 'var(--p-muted)' }}>The survey could not be loaded right now.</p>;
   if (!discovery) return <p style={{ color: 'var(--p-muted)' }}>Loading…</p>;
 
   const toggle = (list: string[], set: (next: string[]) => void, code: string): void => {

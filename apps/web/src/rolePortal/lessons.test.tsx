@@ -5,7 +5,7 @@
  * variant), approving also asks for the rights reason, whoever wrote a revision is never offered
  * its review or publish and whoever approved it is never offered its publish, a publish that
  * needs an approval only files a request (and the Approvals queue carries it out) while a wording
- * or variant publish goes straight through, and the loading / NA / empty / error / forbidden
+ * or variant publish goes straight through, and the loading / missing-value / empty / error / forbidden
  * states are honest. Navigation labels are unchanged.
  */
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -118,14 +118,16 @@ describe('lesson editor', () => {
     expect(within(variantRow).getByText('Variant')).toBeInTheDocument();
     expect(within(variantRow).getByText('As its lesson')).toBeInTheDocument();
     const baseRow = screen.getByText('Write a clear follow-up').closest('tr')!;
-    expect(within(baseRow).getByText('NA')).toBeInTheDocument();
+    expect(within(baseRow).getByText('Not published')).toBeInTheDocument();
+    expect(within(baseRow).queryByText('NA')).not.toBeInTheDocument();
   });
 
-  it('shows NA in the counts and a loading state until the list arrives', () => {
+  it('hides the counts and shows a loading state until the list arrives', () => {
     listResponse = () => new Promise(() => undefined);
     render(<OperationsLessonsPage />);
     expect(screen.getByText('Loading lessons…')).toBeInTheDocument();
-    expect(screen.getAllByText('NA').length).toBeGreaterThanOrEqual(4);
+    expect(document.querySelectorAll('.v2-stat')).toHaveLength(0);
+    expect(screen.queryByText('NA')).not.toBeInTheDocument();
   });
 
   it('says so plainly when nothing matches', async () => {
@@ -323,16 +325,18 @@ describe('lesson editor', () => {
     expect(JSON.parse(String(posts()[0]![1].body))).toEqual({ language: 'hi', level: 'STANDARD', style: 'EXPLANATION', title: 'Hindi title', reasonCode: 'NEW_LANGUAGE' });
   });
 
-  it('shows NA where nothing is set and marks an agent-drafted variant for the expert', async () => {
+  it('leaves out rows where nothing is set and marks an agent-drafted variant for the expert', async () => {
     detailBody = detail({ topic: null, moduleKey: null, open: revision({
       state: 'IN_REVIEW', fields: fields({ basis: null, practice: null }),
       agentDraft: { generatorVersion: 'claude-opus-5-5', promptVersion: 'eng-16-variants-v1', generatedAt: '2026-09-28T00:00:00.000Z' },
       expertCheck: 'A native Telugu speaker must check this translation.',
     }) });
     const region = await openLesson();
-    expect(within(region).getByText('Basis').nextSibling?.textContent).toBe('NA');
-    expect(within(region).getByText('Practice').nextSibling?.textContent).toBe('NA');
-    expect(within(region).getAllByText('Module')[0]!.nextSibling?.textContent).toBe('NA');
+    expect(within(region).queryByText('Basis')).not.toBeInTheDocument();
+    expect(within(region).queryByText('Practice')).not.toBeInTheDocument();
+    // The lesson has no module recorded, so its row is left out; the revision's own module stays.
+    expect(within(region).getAllByText('Module')).toHaveLength(1);
+    expect(within(region).queryByText('NA')).not.toBeInTheDocument();
     expect(within(region).getByText('Drafted by').nextSibling?.textContent).toMatch(/^The coding agent \(claude-opus-5-5, eng-16-variants-v1, .+\) — check it against its basis$/);
     expect(within(region).getByText('For the subject expert').nextSibling?.textContent).toBe('A native Telugu speaker must check this translation.');
   });

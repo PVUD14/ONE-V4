@@ -112,7 +112,11 @@ describe('EMP-05 employer Opportunity Detail screen', () => {
     const terms = screen.getByRole('region', { name: 'Current terms' });
     expect(within(terms).getByText(`INR ${Number(1000000).toLocaleString()} / year`)).toBeInTheDocument();
     expect(within(terms).getByText('No deadline')).toBeInTheDocument();
-    expect(within(terms).getAllByText('NA').length).toBeGreaterThan(0);
+    // Duration and joining conditions were never set: their rows are left out, never shown as NA.
+    expect(within(terms).queryByText('Duration')).not.toBeInTheDocument();
+    expect(within(terms).queryByText('Joining conditions')).not.toBeInTheDocument();
+    expect(within(terms).getByText('Pune')).toBeInTheDocument();
+    expect(terms).not.toHaveTextContent(/(^|[^A-Za-z])NA([^A-Za-z]|$)/);
     const history = screen.getByRole('region', { name: 'Version history' });
     const rows = within(history).getAllByRole('row').slice(1).map((row) => within(row).getAllByRole('cell').map((cell) => cell.textContent));
     expect(rows.map((row) => [row[0], row[3]])).toEqual([['2 · current', 'Pay'], ['1', 'First version']]);

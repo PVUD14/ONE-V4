@@ -7,7 +7,8 @@
  * sorted by renewal date or by activity, and one college's view with a four-week trend,
  * assessments taken and the readiness band distribution (bands only). Counts of people
  * arrive suppressed: below 5 shows "<5", and a total withheld so a smaller cell cannot be
- * worked out shows "Withheld". A figure with no source says NA in its slot.
+ * worked out shows "Withheld". A figure with no source is hidden, or reads "Not recorded" /
+ * "Not set" where a table column or an editable field must keep its slot.
  *
  * Organization Detail: a college's renewal date, contract reference, AI8HT account owner
  * and contacts. Every change asks for a reason code; contacts show masked, and the full
@@ -44,19 +45,18 @@ import { StatusTag } from '../momentum/statusTag.js';
 import { formatApiError } from './shared.js';
 import { SupportCode, supportCodeSuffix } from '../supportCode.js';
 import { formatDate, formatDateTime } from '../dates.js';
-import { codeLabel } from '../labels.js';
+import { MISSING_TEXT, codeLabel } from '../labels.js';
 import { SmallCount, SuppressedBlock, SMALL_COUNT_TEXT, isSmallCount, smallCountText } from '../momentum/smallCount.js';
 
-const NA = 'NA';
-
-export function formatCollegePeople(count: CollegePeopleCountDto | undefined): string {
-  if (!count) return NA;
+/** Null when there is no count at all: a stat tile hides, a table cell reads "Not recorded" (NaValue). */
+export function formatCollegePeople(count: CollegePeopleCountDto | undefined): string | null {
+  if (!count) return null;
   return smallCountText(count, (value) => value.toLocaleString());
 }
 
 /** A split total: "<5" when the whole split is small, "Withheld" when only the total is hidden. */
-export function formatSplitTotal(split: CollegeSplitDto | undefined): string {
-  if (!split) return NA;
+export function formatSplitTotal(split: CollegeSplitDto | undefined): string | null {
+  if (!split) return null;
   if (!split.total.suppressed) return split.total.value.toLocaleString();
   return split.yes.suppressed && split.no.suppressed ? SMALL_COUNT_TEXT : 'Withheld';
 }
@@ -73,7 +73,7 @@ function words(value: string): string {
 }
 
 function dateText(value: string | null | undefined): string {
-  if (!value) return NA;
+  if (!value) return 'Not set';
   return formatDate(`${value}T00:00:00Z`, { utc: true });
 }
 
@@ -157,10 +157,10 @@ export function OperationsCollegeHealthPanel(): React.ReactElement | null {
     {loading && !list ? <p>Loading college health…</p> : null}
 
     <div className="v2-row v2-cols-4 career-stat-strip role-wide">
-      <V2Stat icon="🏫" tone="blue" value={list ? list.totals.colleges.toLocaleString() : NA} label="Colleges in ONE" />
-      <V2Stat icon="📅" tone="amber" value={list ? list.totals.renewingWithin90Days.toLocaleString() : NA} label="Renewing within 90 days" />
-      <V2Stat icon="❔" tone="purple" value={list ? list.totals.withoutRenewalDate.toLocaleString() : NA} label="No renewal date recorded" />
-      <V2Stat icon="🎧" tone="teal" value={list ? list.totals.openSupportCases.toLocaleString() : NA} label="Open support cases" />
+      <V2Stat icon="🏫" tone="blue" value={list ? list.totals.colleges.toLocaleString() : null} label="Colleges in ONE" />
+      <V2Stat icon="📅" tone="amber" value={list ? list.totals.renewingWithin90Days.toLocaleString() : null} label="Renewing within 90 days" />
+      <V2Stat icon="❔" tone="purple" value={list ? list.totals.withoutRenewalDate.toLocaleString() : null} label="No renewal date recorded" />
+      <V2Stat icon="🎧" tone="teal" value={list ? list.totals.openSupportCases.toLocaleString() : null} label="Open support cases" />
     </div>
 
     <section className="role-card role-wide"><h2>Colleges</h2>
@@ -223,7 +223,7 @@ function CollegeHealthDetail({ detail }: { readonly detail: CollegeHealthDetailR
           ? <p>Fewer than 5 students had a readiness update in {detail.windows.month}, so no bands are shown.</p>
           : <dl>{bands.bands.map((band) => <div key={band.band}><dt>{bandLabel[band.band] ?? words(band.band)}</dt><dd><SmallCount value={band} format={(value) => value.toLocaleString()} /></dd></div>)}
               <div><dt>Students with an update</dt><dd>{bands.cohortSizeSuppressed || bands.cohortSize === null ? 'Withheld' : bands.cohortSize.toLocaleString()}</dd></div></dl>}
-        <p>Readiness band movement: {NA}. Movement per student is not computed; each month&apos;s distribution stands on its own.</p>
+        <p>Readiness band movement is not shown: movement per student is not computed, and each month&apos;s distribution stands on its own.</p>
       </section>
     </div>
     <dl>
@@ -315,8 +315,8 @@ export function OperationsCollegeAccountPanel(): React.ReactElement | null {
         <div className="role-actions"><button type="button" onClick={() => setDialog({ kind: 'fields' })} disabled={!policy}>Edit account fields…</button></div></div>
       <dl>
         <div><dt>Renewal date</dt><dd>{dateText(fields?.renewalDate)}</dd></div>
-        <div><dt>Contract reference</dt><dd>{fields?.contractReference ?? NA}</dd></div>
-        <div><dt>AI8HT account owner</dt><dd>{fields?.accountOwner ? `${fields.accountOwner.email} (${words(fields.accountOwner.role)})${fields.accountOwner.active ? '' : ' — no longer active'}` : NA}</dd></div>
+        <div><dt>Contract reference</dt><dd>{fields?.contractReference ?? 'Not set'}</dd></div>
+        <div><dt>AI8HT account owner</dt><dd>{fields?.accountOwner ? `${fields.accountOwner.email} (${words(fields.accountOwner.role)})${fields.accountOwner.active ? '' : ' — no longer active'}` : 'Not set'}</dd></div>
         <div><dt>Verification</dt><dd>{words(account.institution.verificationState)}</dd></div>
         <div><dt>Last changed</dt><dd>{fields ? formatDateTime(fields.updatedAt) : 'Never'}</dd></div>
       </dl>
@@ -329,8 +329,8 @@ export function OperationsCollegeAccountPanel(): React.ReactElement | null {
           return <tr key={contact.id}>
             <td>{words(contact.role)}</td>
             <th scope="row">{contact.name}</th>
-            <td>{full ? full.email ?? NA : contact.email ?? NA}{full ? ' (revealed, recorded)' : ''}</td>
-            <td>{full ? full.phone ?? NA : contact.phone ?? NA}</td>
+            <td>{full ? full.email ?? MISSING_TEXT : contact.email ?? MISSING_TEXT}{full ? ' (revealed, recorded)' : ''}</td>
+            <td>{full ? full.phone ?? MISSING_TEXT : contact.phone ?? MISSING_TEXT}</td>
             <td><div className="role-record-actions">
               {full ? null : <button type="button" className="secondary" onClick={() => setDialog({ kind: 'reveal', contact })} aria-label={`Reveal contact for ${contact.name}`}>Reveal…</button>}
               <button type="button" className="secondary" onClick={() => setDialog({ kind: 'remove', contact })} aria-label={`Remove ${contact.name}`}>Remove…</button>

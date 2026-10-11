@@ -2,7 +2,7 @@
  * Institution settings, the academic calendar and staff profile screens (INST-05): the
  * admin's Settings edits the college profile, grading scales and calendar; department
  * heads read them under their own profile and preferences; faculty Profile, Settings and
- * Calendar show real data. A programme without a scale reads NA. Navigation is unchanged.
+ * Calendar show real data. A programme without a scale reads Not set. Navigation is unchanged.
  */
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -98,7 +98,9 @@ describe('admin Settings', () => {
     expect(screen.getByText(/Managed by AI8HT operations/)).toBeInTheDocument();
     const scales = screen.getByRole('table', { name: 'Programme grading scales' });
     const bcom = within(scales).getByRole('row', { name: /BCom/ });
-    expect(within(bcom).getAllByText('NA')).toHaveLength(2);
+    expect(within(bcom).getAllByText('Not set')).toHaveLength(2);
+    expect(within(bcom).queryByText('NA')).not.toBeInTheDocument();
+    expect(screen.queryByText(/shows NA/)).not.toBeInTheDocument();
     expect(within(within(scales).getByRole('row', { name: /BTech Computer Science/ })).getAllByRole('cell')[0]).toHaveTextContent('CGPA out of 10');
     expect(await screen.findByText('2026-27 Odd semester')).toBeInTheDocument();
     // EMP-11 built placement policies: the section is real, and says plainly that none is in force.

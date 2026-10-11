@@ -127,11 +127,12 @@ describe('student onboarding and goals', () => {
     expect(document.body.textContent).not.toMatch(/score|readiness|%/i);
   });
 
-  it('says NA when the goals cannot be loaded, and invents nothing', async () => {
+  it('says plainly when the goals cannot be loaded, and invents nothing', async () => {
     stub({ '/api/v1/students/me/goals:GET': { status: 503, body: { error: { code: 'UNAVAILABLE' } } } });
     await authenticate();
     render(<StudentGoalsPanel />);
-    expect(await screen.findByText('NA — your goals could not be loaded right now.')).toBeInTheDocument();
+    expect(await screen.findByText('Your goals could not be loaded right now.')).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/(^|[^A-Za-z])NA([^A-Za-z]|$)/);
     expect(screen.queryByRole('button', { name: /Choose/ })).not.toBeInTheDocument();
   });
 });

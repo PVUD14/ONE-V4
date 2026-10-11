@@ -58,7 +58,7 @@ export function TutorCollegesPanel({ token }: { readonly token: string }): React
     const controller = new AbortController();
     setUnavailable(false);
     listTutorColleges(token, controller.signal)
-      // A response without the list is shown as NA, never guessed at.
+      // A response without the list is reported as unreadable, never guessed at.
       .then((loaded) => { if (!Array.isArray(loaded?.colleges) || !loaded.status) throw new Error('unexpected tutor colleges response'); setList(loaded); setError(''); })
       .catch((cause) => {
         if (controller.signal.aborted) return;

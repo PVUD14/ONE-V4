@@ -146,7 +146,8 @@ describe('Approvals queue', () => {
     fetchMock.mockImplementation(() => new Promise(() => undefined));
     render(<OperationsApprovalsPanel />);
     expect(screen.getByText('Loading approvals…')).toBeInTheDocument();
-    expect(screen.getByText('People who can approve').previousSibling).toHaveTextContent('NA');
+    expect(screen.queryByText('People who can approve')).toBeNull();
+    expect(document.body.textContent).not.toMatch(/(^|[^A-Za-z])NA([^A-Za-z]|$)/);
     cleanup();
 
     fetchMock.mockImplementation(() => failure(500, 'INTERNAL', 'corr-appr-error'));

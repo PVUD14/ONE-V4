@@ -5,7 +5,7 @@
  *
  * Why it exists: faculty actions are constraints the planner honours, so a student must be able to see where a
  * step came from and what is waiting. The lecturer is named by role and college only (ONE stores no staff
- * names). Nothing here is a score or a number about the student; missing data reads NA. The card lives inside
+ * names). Nothing here is a score or a number about the student; missing data is left out. The card lives inside
  * the existing Learning page — no navigation change (HG-3). INST-17: a preparation sprint from the college shows
  * with its end date, and the card is headed "From your college" while one is among its items.
  */
@@ -53,14 +53,14 @@ export function FromYourLecturerCard({ actions, status, busy, onStart }: {
   return <section className="pilot-card" aria-labelledby="lecturer-heading">
     <div className="pilot-card-head">
       <h2 id="lecturer-heading">{heading}</h2>
-      <span className={`pilot-chip ${actions ? (open || pending ? 'purple' : 'slate') : 'slate'}`}>{actions ? (pending ? 'Next step set' : `${open} open`) : 'NA'}</span>
+      {actions ? <span className={`pilot-chip ${open || pending ? 'purple' : 'slate'}`}>{pending ? 'Next step set' : `${open} open`}</span> : null}
     </div>
     {!actions ? <p style={muted}>{status}</p> : empty ? <p style={muted}>Nothing from your lecturers right now. Work they assign you appears here and comes up as your next step.</p> : <>
       {pending ? <div className="pilot-list-row" aria-label="Next step set by your lecturer">
         <span className="pilot-tile purple"><Icon name="opportunities" size={16} /></span>
         <div className="grow">
           <strong>{`Your lecturer at ${pending.institutionName} set your next step: ${ACTION_WORD[pending.action] ?? 'Work on'} ${pending.title}`}</strong>
-          <small>{LECTURER_REASON_TEXT[pending.reasonCode] ?? 'NA'}{pending.note ? ` “${pending.note}”` : ''} It starts when you plan your next step.</small>
+          <small>{[LECTURER_REASON_TEXT[pending.reasonCode], pending.note ? `“${pending.note}”` : null, 'It starts when you plan your next step.'].filter(Boolean).join(' ')}</small>
         </div>
       </div> : null}
       {actions.assignments.length ? <div className="pilot-list" aria-label="Assigned to you">
@@ -81,7 +81,7 @@ export function FromYourLecturerCard({ actions, status, busy, onStart }: {
           <div className="grow">
             <strong>{session.title}</strong>
             <small>{`${when(session.scheduledStartAt)} – ${when(session.scheduledEndAt)} · ${session.institutionName}`}</small>
-            <small>{session.content.length ? `Covers: ${session.content.map((item) => item.title).join(', ')}` : 'Covers: NA'}</small>
+            {session.content.length ? <small>{`Covers: ${session.content.map((item) => item.title).join(', ')}`}</small> : null}
           </div>
           <span className="pilot-chip green">Group session</span>
         </div>)}

@@ -77,7 +77,7 @@ export function LearnerContentStudio(): React.ReactElement {
   return <div className="workspace-grid">
     <section className="card wide-card">
       <h2>Learner content</h2>
-      <p>Practice, Company Prep, Career Tools, Scholarships and Resume Builder read from here. Until something is published, those pages show NA.</p>
+      <p>Practice, Company Prep, Career Tools, Scholarships and Resume Builder read from here. Until something is published, those pages say there is nothing to show yet.</p>
       <p className="hiring-meta"><strong>Approving needs a reviewer other than the author, and publishing needs somebody other than the approver.</strong> ONE will not allow either step otherwise.</p>
       <label className="student-form-field"><span>Page</span>
         <select value={filter} onChange={(event) => setFilter(event.target.value as LearnerContentType | '')}>
@@ -104,7 +104,7 @@ export function LearnerContentStudio(): React.ReactElement {
           <td><span className={`hiring-state state-${item.reviewState.toLowerCase()}`}>{codeLabel(item.reviewState)}</span></td>
           <td>{item.source.toLowerCase()}</td>
           <td>{item.generatorVersion
-            ? <>{item.generatorVersion}<br /><span className="hiring-meta">prompt {item.promptVersion ?? 'NA'}</span></>
+            ? <>{item.generatorVersion}{item.promptVersion ? <><br /><span className="hiring-meta">prompt {item.promptVersion}</span></> : null}</>
             : <span className="hiring-meta">No — written by a person</span>}</td>
           <td><div className="hiring-actions">
             {(NEXT_STATES[item.reviewState] ?? []).map((next) => <button

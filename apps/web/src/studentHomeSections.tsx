@@ -35,6 +35,11 @@ export interface StudentHomeData {
   readonly calendar: readonly CalendarEntryDto[] | null;
 }
 
+/** The learning page opened on one lesson (approved 2026-10-11): "Resume lesson" goes to the lesson itself. */
+export function lessonPath(lessonId: string): string {
+  return `/student/learning?lesson=${encodeURIComponent(lessonId)}`;
+}
+
 export function go(path: string): void {
   window.history.pushState(null, '', path);
   window.dispatchEvent(new PopStateEvent('popstate'));
@@ -150,7 +155,7 @@ export function deriveStudentHome(data: StudentHomeData, now: number): Derived {
       meta: exam.durationSeconds > 0 ? `Assessments · ${Math.round(exam.durationSeconds / 60)} min` : 'Assessments',
       icon: 'assessments' as const, path: '/student/assessments', done: false,
     })),
-    ...(nextLesson ? [{ key: `lesson-${nextLesson.id}`, title: `Complete lesson: ${nextLesson.title}`, meta: 'Learning', icon: 'learning' as const, path: '/student/learning', done: false }] : []),
+    ...(nextLesson ? [{ key: `lesson-${nextLesson.id}`, title: `Complete lesson: ${nextLesson.title}`, meta: 'Learning', icon: 'learning' as const, path: lessonPath(nextLesson.id), done: false }] : []),
     ...(data.profile?.targetCareer
       ? [{ key: 'profile', title: 'Keep your profile current', meta: 'Profile · 5 min', icon: 'profile' as const, path: '/student/profile', done: false }]
       : [{ key: 'target', title: 'Set your target career', meta: 'Profile · 2 min', icon: 'profile' as const, path: '/student/profile', done: false }]),
@@ -417,8 +422,8 @@ function ContinueLearning({ derived }: { readonly derived: Derived }): React.Rea
       </div>
       <CountUp value={percent} format={(value) => `${value}%`} delay={500} /><span className="sh-muted">course progress</span>
     </div> : null}
-    {/* The learning page lists every lesson; it has no per-lesson address yet, so this opens it. */}
-    <button type="button" className="pilot-btn soft small" onClick={() => go('/student/learning')}>
+    {/* "Resume lesson" opens the lesson itself; with every lesson done it opens the learning page. */}
+    <button type="button" className="pilot-btn soft small" onClick={() => go(current ? lessonPath(current.id) : '/student/learning')}>
       <Icon name="arrow-right" size={16} /> {current ? (done > 0 ? 'Resume lesson' : 'Start lesson') : 'Review lessons'}
     </button>
     {others.length ? <div className="sh-more-courses">
@@ -438,7 +443,7 @@ const PIPELINE_STEP: Readonly<Record<string, number>> = {
 };
 const CLOSED = new Set(['WITHDRAWN', 'REJECTED', 'NOT_SELECTED']);
 
-function ApplicationRow({ item }: { readonly item: StudentApplicationDto }): React.ReactElement {
+function ApplicationRow({ item, streakLit }: { readonly item: StudentApplicationDto; readonly streakLit: boolean }): React.ReactElement {
   const state = item.state.toUpperCase();
   const step = PIPELINE_STEP[state];
   const submitted = validTime(item.submittedAt);
@@ -450,7 +455,8 @@ function ApplicationRow({ item }: { readonly item: StudentApplicationDto }): Rea
     <div className="sh-ar-h">
       {mark ? <span className="sh-logo-co" aria-hidden="true">{mark}</span> : null}
       <div><b>{item.title}</b>{sub ? <small>{sub}</small> : null}</div>
-      <StatusTag state={state} kind="application" label={sentence(state === 'REJECTED' ? 'NOT_SELECTED' : state)} />
+      {/* One warm accent per view: with the streak already orange, an Offer celebrates in gold. */}
+      <StatusTag state={state} kind="application" label={sentence(state === 'REJECTED' ? 'NOT_SELECTED' : state)} {...(streakLit && state === 'OFFER' ? { tone: 'gold' as const } : {})} />
     </div>
     {step !== undefined && !muted ? <ol className="sh-pipe" aria-label={`Stage: ${PIPELINE[step]}`}>
       {PIPELINE.map((label, index) => <li key={label} className={index < step ? 'd' : index === step ? 'c' : undefined} style={{ '--k': index } as React.CSSProperties}>{label}</li>)}
@@ -460,13 +466,13 @@ function ApplicationRow({ item }: { readonly item: StudentApplicationDto }): Rea
   </li>;
 }
 
-function Applications({ applications }: { readonly applications: readonly StudentApplicationDto[] }): React.ReactElement | null {
+function Applications({ applications, streakLit = false }: { readonly applications: readonly StudentApplicationDto[]; readonly streakLit?: boolean }): React.ReactElement | null {
   if (!applications.length) return null;
   const rank = (item: StudentApplicationDto) => (CLOSED.has(item.state.toUpperCase()) ? 1 : 0);
   const shown = [...applications].sort((a, b) => rank(a) - rank(b) || (validTime(b.updatedAt) ?? 0) - (validTime(a.updatedAt) ?? 0)).slice(0, 3);
   return <article className="sh-card sh-a sh-rise" style={{ '--w': 5, '--d0': '90ms' } as React.CSSProperties} aria-labelledby="sh-applications">
     <CardHead id="sh-applications" title="Applications"><CardLink label="All applications" path="/student/applications" /></CardHead>
-    <ul className="sh-apps">{shown.map((item) => <ApplicationRow key={item.id} item={item} />)}</ul>
+    <ul className="sh-apps">{shown.map((item) => <ApplicationRow key={item.id} item={item} streakLit={streakLit} />)}</ul>
   </article>;
 }
 
@@ -560,7 +566,7 @@ export function StudentHomeView({ studentName, data, now, factorText, support }:
       </div>
       <div className="sh-row">
         <ContinueLearning derived={derived} />
-        <Applications applications={data.applications ?? []} />
+        <Applications applications={data.applications ?? []} streakLit={Boolean(activity && Math.trunc(activity.currentStreakDays) > 0)} />
         {activity ? <ThisWeek activity={activity} /> : null}
       </div>
       <div className="sh-row">

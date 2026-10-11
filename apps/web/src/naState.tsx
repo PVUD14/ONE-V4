@@ -1,11 +1,11 @@
 /**
  * ONE · Shared — how a missing or withheld figure looks, on every portal.
  *
- * The product rule is that a widget never disappears because its data is missing: its slot
- * says NA (no source yet), "<5" (a group too small to show), "Withheld" (a total that would
- * reveal a small group) or "Too few answers". Rendered as big bold values those slots read as
- * a broken page. These components keep every slot — and its exact honest text — but present
- * it calmly:
+ * Momentum re-skin (owner decision, 2026-10-11): a figure with no source yet is hidden, never
+ * shown as "NA". A tile, chip or strip whose only content is a missing value renders nothing;
+ * a missing value inside a sentence or table reads "Not recorded". Real suppression stays as
+ * it was: "<5" (a group too small to show), "Withheld" (a total that would reveal a small
+ * group) and "Too few answers" are honest values and keep their slot:
  *
  *  - NaValue / NaReason: a missing value in a muted, smaller style with a one-line reason;
  *  - PilotStat / PilotKpi: the pilot's stat tiles, using NaValue for a missing value;
@@ -22,6 +22,7 @@
  */
 import type { ReactNode } from 'react';
 import { SmallCount, SuppressedBlock, isSmallCountText } from './momentum/smallCount.js';
+import { MISSING_TEXT } from './labels.js';
 
 export type MissingKind = 'na' | 'suppressed' | 'withheld' | 'few';
 
@@ -46,13 +47,18 @@ export function allMissing(values: readonly unknown[]): boolean {
   return values.length > 0 && values.every(isMissing);
 }
 
-/** A value as sent; a missing one is muted and keeps its exact text (null reads NA). */
+/** A value as sent; a missing one is muted. A value with no source reads "Not recorded", never "NA". */
 export function NaValue({ value }: { readonly value: ReactNode }): React.ReactElement {
   const kind = missingKind(value);
   if (!kind) return <>{value}</>;
   // A small count is drawn by <SmallCount>, the one place "<5" is rendered.
   if (kind === 'suppressed' && isSmallCountText(value)) return <SmallCount value={null} className="na-value" data-na={kind} />;
-  return <span className="na-value" data-na={kind}>{value ?? 'NA'}</span>;
+  return <span className="na-value" data-na={kind}>{kind === 'na' ? MISSING_TEXT : value}</span>;
+}
+
+/** True when a value has no source at all (as opposed to a suppressed or withheld one): its block is hidden. */
+export function isUnrecorded(value: unknown): boolean {
+  return missingKind(value) === 'na';
 }
 
 /** The one muted line that says why a slot is empty. */
@@ -60,10 +66,11 @@ export function NaReason({ children }: { readonly children: ReactNode }): React.
   return <small className="na-reason">{children}</small>;
 }
 
-/** A pilot hero stat (icon tile, value, label); a missing value is muted and may carry a reason. */
+/** A pilot hero stat (icon tile, value, label). With no source it is hidden; a suppressed value is muted. */
 export function PilotStat({ icon, tone, value, label, reason }: {
   readonly icon: ReactNode; readonly tone: string; readonly value: ReactNode; readonly label: string; readonly reason?: string;
-}): React.ReactElement {
+}): React.ReactElement | null {
+  if (isUnrecorded(value)) return null;
   const missing = isMissing(value);
   return <div className="pilot-stat" data-na={missing ? 'true' : undefined}>
     <span className={`pilot-tile ${missing ? 'na-tile' : tone}`}>{icon}</span>
@@ -71,10 +78,11 @@ export function PilotStat({ icon, tone, value, label, reason }: {
   </div>;
 }
 
-/** A pilot KPI card (the staff dashboards' top row); a missing value is muted with a reason. */
+/** A pilot KPI card (the staff dashboards' top row). With no source it is hidden; a suppressed value is muted. */
 export function PilotKpi({ icon, tone, value, label, reason }: {
   readonly icon: ReactNode; readonly tone: string; readonly value: ReactNode; readonly label: string; readonly reason?: string;
-}): React.ReactElement {
+}): React.ReactElement | null {
+  if (isUnrecorded(value)) return null;
   const missing = isMissing(value);
   return <section className="pilot-card pilot-kpi" data-na={missing ? 'true' : undefined}>
     <span className={`pilot-tile ${missing ? 'na-tile' : tone}`}>{icon}</span>
@@ -84,22 +92,24 @@ export function PilotKpi({ icon, tone, value, label, reason }: {
 
 export interface NaSlot {
   readonly label: string;
-  /** What the slot would show; defaults to NA. Pass the server's text ("<5", "Withheld"). */
+  /** What the slot shows: the server's text ("<5", "Withheld"). A slot with no value has no source and is hidden. */
   readonly value?: ReactNode;
 }
 
 /**
- * One labelled slot as a chip: "Mock Interviews · NA". The dot is drawn by CSS, so the text is
- * the label, a space and the value exactly as sent.
+ * One labelled slot as a chip: "Mock Interviews · <5". The dot is drawn by CSS, so the text is
+ * the label, a space and the value exactly as sent. A slot with no source renders nothing.
  */
-export function NaSlotChip({ label, value }: NaSlot): React.ReactElement {
-  return <li className="na-slot"><span className="na-slot-label">{label}</span>{' '}<span className="na-slot-value"><NaValue value={value ?? 'NA'} /></span></li>;
+export function NaSlotChip({ label, value }: NaSlot): React.ReactElement | null {
+  if (isUnrecorded(value)) return null;
+  return <li className="na-slot"><span className="na-slot-label">{label}</span>{' '}<span className="na-slot-value"><NaValue value={value} /></span></li>;
 }
 
 /**
- * A group of slots with nothing to show, as one compact strip: every slot stays visible and
- * labelled, and one line explains why. With `title` it is a whole card (heading and NA chip);
- * without, it sits inside an existing card in place of the empty widgets.
+ * A group of slots with nothing to show, as one compact strip: every suppressed slot stays
+ * visible and labelled, and one line explains why. Slots with no source are left out, and a
+ * strip left with no slot is not drawn at all (the re-skin hides blocks without data). With
+ * `title` it is a whole card; without, it sits inside an existing card.
  */
 export function NaSlotStrip({ title, slots, reason, label, card = true, className = '', action }: {
   readonly title?: string;
@@ -111,12 +121,14 @@ export function NaSlotStrip({ title, slots, reason, label, card = true, classNam
   readonly card?: boolean;
   readonly className?: string;
   readonly action?: ReactNode;
-}): React.ReactElement {
+}): React.ReactElement | null {
+  const shown = slots.filter((slot) => !isUnrecorded(slot.value));
+  if (!shown.length) return null;
   const listLabel = label ?? title ?? 'Unavailable figures';
   const body = <>
-    {title ? <div className="pilot-card-head"><h2>{title}</h2>{action ?? <span className="pilot-chip slate">NA</span>}</div> : null}
+    {title ? <div className="pilot-card-head"><h2>{title}</h2>{action ?? null}</div> : null}
     <ul className="na-strip-slots" aria-label={listLabel}>
-      {slots.map((slot, index) => <NaSlotChip key={`${slot.label}:${index}`} label={slot.label} value={slot.value} />)}
+      {shown.map((slot, index) => <NaSlotChip key={`${slot.label}:${index}`} label={slot.label} value={slot.value} />)}
     </ul>
     <p className="na-reason">{reason}</p>
   </>;
@@ -147,7 +159,7 @@ export function SuppressedChart({ points, note, label, height = 96, children }: 
 
 export interface CountBarRow {
   readonly label: string;
-  /** The text the server sent: a number as a string, "<5", "Withheld" or "NA". */
+  /** The text the server sent: a number as a string, "<5", "Withheld", or "NA" when there is no source (hidden). */
   readonly display: string;
   /** The shown count, or null when it is suppressed or missing (no bar is drawn). */
   readonly value: number | null;
@@ -161,7 +173,7 @@ export interface CountBarRow {
 export function CountBars({ rows, label, labelHeading, valueHeading, emptyReason }: {
   readonly rows: readonly CountBarRow[]; readonly label: string; readonly labelHeading: string; readonly valueHeading: string;
   readonly emptyReason: string;
-}): React.ReactElement {
+}): React.ReactElement | null {
   if (rows.length && rows.every((row) => row.value === null)) {
     return <NaSlotStrip card={false} label={label} slots={rows.map((row) => ({ label: row.label, value: row.display }))} reason={emptyReason} />;
   }

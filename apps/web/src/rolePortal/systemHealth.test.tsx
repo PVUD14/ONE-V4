@@ -1,6 +1,6 @@
 /**
  * Operations System Health (OPS-04): the console renders the server's summary and
- * failed events, a missing source shows NA in its slot, replay needs a reason code,
+ * failed events, a missing source hides its slot (never "NA"), replay needs a reason code,
  * supersede files an approval request instead of acting, and the loading, empty, error
  * and forbidden states are honest.
  */
@@ -76,16 +76,20 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 const posts = () => fetchMock.mock.calls.filter(([, init]) => init?.method === 'POST');
 
 describe('System Health console', () => {
-  it('renders the server summary, and NA where a source has nothing', async () => {
+  it('renders the server summary, and hides a slot whose source has nothing', async () => {
     render(<OperationsSystemHealthPage />);
     expect(await screen.findByText('45 min')).toBeInTheDocument();
     expect(screen.getByText('Failed events', { selector: 'small' }).previousSibling).toHaveTextContent('2');
     expect(screen.getByText('10,000+')).toBeInTheDocument();
     expect(screen.getByText('Stalled')).toBeInTheDocument();
-    // No delivery has happened: NA in the same slot, not a dropped tile.
-    expect(screen.getByText('Last event delivered', { selector: 'small' }).previousSibling).toHaveTextContent('NA');
+    // No delivery has happened: the tile is hidden rather than reading NA.
+    expect(screen.queryByText('Last event delivered', { selector: 'small' })).toBeNull();
     const consumers = screen.getByRole('heading', { name: 'Consumers' }).closest('section')!;
-    expect(within(consumers).getAllByText('NA').length).toBeGreaterThanOrEqual(2);
+    expect(within(consumers).getAllByText('Never')).toHaveLength(2);
+    expect(within(consumers).getByText('Not judged')).toBeInTheDocument();
+    const automation = screen.getByRole('heading', { name: 'Automation workflows and commands' }).closest('section')!;
+    expect(within(automation).getByText('Last command created').nextSibling).toHaveTextContent('Never');
+    expect(document.body.textContent).not.toMatch(/(^|[^A-Za-z])NA([^A-Za-z]|$)/);
     expect(within(consumers).getByText('Not configured')).toBeInTheDocument();
     expect(screen.getByText(/An event waited past the limit: 45 minutes, limit 30/)).toBeInTheDocument();
     expect(screen.getByText(/recorded here but not emailed/)).toBeInTheDocument();
@@ -148,11 +152,12 @@ describe('System Health console', () => {
     expect(screen.getByText('Loading background job health…')).toBeInTheDocument();
   });
 
-  it('shows an error with its reference, and NA in every tile', async () => {
+  it('shows an error with its reference, and hides every tile', async () => {
     summaryResponse = () => failure(500, 'INTERNAL', 'corr-broken');
     render(<OperationsSystemHealthPage />);
     expect(await screen.findByText(/Support code: corrbrok/)).toBeInTheDocument();
-    expect(screen.getByText('Failed events', { selector: 'small' }).previousSibling).toHaveTextContent('NA');
+    expect(screen.queryByText('Failed events', { selector: 'small' })).toBeNull();
+    expect(document.body.textContent).not.toMatch(/(^|[^A-Za-z])NA([^A-Za-z]|$)/);
   });
 
   it('says plainly when the caller may not use the console', async () => {

@@ -7,7 +7,7 @@
  * coverage per consent key. The Career Readiness governance status this label showed
  * before is kept below it.
  *
- * Nothing here is invented. A statutory due date is NA because no response period is
+ * Nothing here is invented. A statutory due date reads "Not defined" because no response period is
  * defined in code yet; an engine consent purpose that is not published says "Not
  * published", not 0; any count of fewer than 5 people arrives from the server already
  * suppressed and renders "<5". Subjects are shown masked; the reason a person typed when
@@ -39,13 +39,12 @@ import { RequestApprovalDialog } from './approvals.js';
 import { formatApiError, RestrictedApiState } from './shared.js';
 import { SupportCode } from '../supportCode.js';
 import { formatDateTime } from '../dates.js';
-import { codeLabel } from '../labels.js';
+import { codeLabel, MISSING_TEXT } from '../labels.js';
 import { NaValue } from '../naState.js';
 import { smallCountText } from '../momentum/smallCountRule.js';
 
-const NA = 'NA';
 const detailLimit = 2000;
-const when = (value: string | null | undefined): string => (value ? formatDateTime(value) : NA);
+const when = (value: string | null | undefined, missing: string = MISSING_TEXT): string => (value ? formatDateTime(value) : missing);
 
 const views = [
   { value: 'OPEN', label: 'Open' },
@@ -65,14 +64,16 @@ const typeLabel = { EXPORT: 'Data export', DELETION: 'Deletion' } as const;
 const stateTone = (state: string): 'success' | 'warning' | 'neutral' | 'info' | 'danger' =>
   state === 'COMPLETED' ? 'success' : state === 'FAILED' ? 'danger' : state === 'CANCELLED' || state === 'REJECTED' ? 'neutral' : state === 'READY' ? 'info' : 'warning';
 
-/** A people count as the server sent it: suppressed counts have no value to show. */
-export function formatSuppressed(count: SuppressedCountDto | undefined): string {
-  if (!count) return NA;
+/** A people count as the server sent it: suppressed counts have no value to show; an absent one is undefined. */
+export function formatSuppressed(count: SuppressedCountDto): string;
+export function formatSuppressed(count: SuppressedCountDto | undefined): string | undefined;
+export function formatSuppressed(count: SuppressedCountDto | undefined): string | undefined {
+  if (!count) return undefined;
   return smallCountText(count, (value) => value.toLocaleString());
 }
 
 const subjectLabel = (subject: { readonly maskedEmail: string | null; readonly erased: boolean }): string =>
-  subject.erased ? 'Erased person' : subject.maskedEmail ?? NA;
+  subject.erased ? 'Erased person' : subject.maskedEmail ?? 'No email on record';
 
 export function OperationsPrivacyConsolePage(): React.ReactElement {
   const token = getProtectedAccessToken();
@@ -153,15 +154,15 @@ export function OperationsPrivacyConsolePage(): React.ReactElement {
     {notice ? <p className="role-api-success" role="status">{notice}</p> : null}
 
     <div className="v2-row v2-cols-4 career-stat-strip role-wide">
-      <V2Stat icon="📦" tone="blue" value={summary ? summary.open.EXPORT : NA} label="Open data exports" />
-      <V2Stat icon="🗑️" tone="purple" value={summary ? summary.open.DELETION : NA} label="Open deletions" />
-      <V2Stat icon="⏳" tone="amber" value={summary ? summary.deletionsDueWithinSevenDays : NA} label="Erasures due in 7 days" />
-      <V2Stat icon="⚖️" tone="teal" value={summary ? summary.activeHolds : NA} label="Legal holds in force" />
+      <V2Stat icon="📦" tone="blue" value={summary ? summary.open.EXPORT : undefined} label="Open data exports" />
+      <V2Stat icon="🗑️" tone="purple" value={summary ? summary.open.DELETION : undefined} label="Open deletions" />
+      <V2Stat icon="⏳" tone="amber" value={summary ? summary.deletionsDueWithinSevenDays : undefined} label="Erasures due in 7 days" />
+      <V2Stat icon="⚖️" tone="teal" value={summary ? summary.activeHolds : undefined} label="Legal holds in force" />
     </div>
 
     <section className="role-card role-wide"><h2>Privacy requests</h2>
-      <p>Requests people made from their Privacy settings. A deletion runs when its {queue?.policy.deletionGracePeriodDays ?? NA}-day grace period ends, unless a legal hold stops it.
-        {statutoryDefined ? '' : ' Statutory response deadlines show NA: no DPDP response period is defined in ONE yet.'}</p>
+      <p>Requests people made from their Privacy settings. A deletion runs when its {queue?.policy.deletionGracePeriodDays != null ? `${queue.policy.deletionGracePeriodDays}-day ` : ''}grace period ends, unless a legal hold stops it.
+        {statutoryDefined ? '' : ' Statutory response deadlines read "Not defined": no DPDP response period is defined in ONE yet.'}</p>
       {summary ? <p>{summary.deletionsPastSchedule} deletion{summary.deletionsPastSchedule === 1 ? ' is' : 's are'} past the scheduled erasure without completing · {summary.failed} failed · {summary.releasesInFlight} hold release{summary.releasesInFlight === 1 ? '' : 's'} awaiting approval or execution.</p> : null}
       <div className="role-management-form">
         <label><span>Show</span><select aria-label="Request state" value={view} onChange={(event) => { setView(event.target.value); setCursors([]); }}>
@@ -182,8 +183,8 @@ export function OperationsPrivacyConsolePage(): React.ReactElement {
           <td>{subjectLabel(request.subject)}</td>
           <td><StatusBadge label={request.state} tone={stateTone(request.state)} /></td>
           <td>{when(request.requestedAt)}</td>
-          <td>{request.requestType === 'DELETION' ? when(request.deletionScheduledFor) : NA}</td>
-          <td>{when(request.statutoryDueAt)}</td>
+          <td>{request.requestType === 'DELETION' ? when(request.deletionScheduledFor, 'Not scheduled') : 'Not applicable'}</td>
+          <td>{when(request.statutoryDueAt, statutoryDefined ? MISSING_TEXT : 'Not defined')}</td>
           <td>{request.activeHolds ? <StatusBadge label={`${request.activeHolds} in force`} tone="warning" /> : 'None'}</td>
           <td><button type="button" className="secondary" onClick={() => void openDetail(request.id)}>View</button></td>
         </tr>)}</tbody></table></div> : null}
@@ -200,24 +201,24 @@ export function OperationsPrivacyConsolePage(): React.ReactElement {
         <div><dt>Person</dt><dd>{subjectLabel(detail.subject)}</dd></div>
         <div><dt>State</dt><dd><StatusBadge label={detail.state} tone={stateTone(detail.state)} /></dd></div>
         <div><dt>Received</dt><dd>{when(detail.requestedAt)}</dd></div>
-        <div><dt>Statutory deadline</dt><dd>{when(detail.statutoryDueAt)}</dd></div>
-        {detail.requestType === 'DELETION' ? <div><dt>Erasure scheduled</dt><dd>{when(detail.deletionScheduledFor)}</dd></div> : null}
+        <div><dt>Statutory deadline</dt><dd>{when(detail.statutoryDueAt, statutoryDefined ? MISSING_TEXT : 'Not defined')}</dd></div>
+        {detail.requestType === 'DELETION' ? <div><dt>Erasure scheduled</dt><dd>{when(detail.deletionScheduledFor, 'Not scheduled')}</dd></div> : null}
         {detail.requestType === 'EXPORT' ? <div><dt>Download available until</dt><dd>{when(detail.exportExpiresAt)}</dd></div> : null}
-        <div><dt>Completed</dt><dd>{when(detail.completedAt)}</dd></div>
+        <div><dt>Completed</dt><dd>{when(detail.completedAt, 'Not yet')}</dd></div>
         {detail.cancelledAt ? <div><dt>Cancelled by the person</dt><dd>{when(detail.cancelledAt)}</dd></div> : null}
         {detail.rejectionReasonCode ? <div><dt>Rejection reason</dt><dd>{detail.rejectionReasonCode}</dd></div> : null}
       </dl>
       <h3>State history</h3>
       {detail.history.length
         ? <ol className="role-check-list">{detail.history.map((entry, index) => <li key={`${entry.occurredAt}:${index}`}>
-            {entry.fromState ? `${entry.fromState} → ${entry.toState}` : `Received as ${entry.toState}`} · {entry.actorRole === 'SUBJECT' ? 'by the person' : entry.actorRole === 'SYSTEM' ? 'by ONE' : entry.actorRole === 'OPERATIONS' ? 'by operations' : NA} · {when(entry.occurredAt)}
+            {entry.fromState ? `${entry.fromState} → ${entry.toState}` : `Received as ${entry.toState}`}{entry.actorRole === 'SUBJECT' ? ' · by the person' : entry.actorRole === 'SYSTEM' ? ' · by ONE' : entry.actorRole === 'OPERATIONS' ? ' · by operations' : ''} · {when(entry.occurredAt)}
           </li>)}</ol>
         : <p>No state changes are recorded for this request.</p>}
       {detail.requestType === 'DELETION' ? <>
         <h3>What the deletion did</h3>
         {detail.deletionOutcome.length ? <div className="role-record-table-wrap"><table className="role-record-table">
           <thead><tr><th>Category</th><th>Outcome</th><th>Records</th><th>Basis for keeping</th></tr></thead>
-          <tbody>{detail.deletionOutcome.map((row) => <tr key={row.category}><th scope="row">{row.category}</th><td>{row.disposition}</td><td>{row.recordCount ?? NA}</td><td>{row.basis ?? NA}</td></tr>)}</tbody>
+          <tbody>{detail.deletionOutcome.map((row) => <tr key={row.category}><th scope="row">{row.category}</th><td>{row.disposition}</td><td>{row.recordCount ?? MISSING_TEXT}</td><td>{row.basis ?? 'None'}</td></tr>)}</tbody>
         </table></div> : <p>Nothing has been erased yet.</p>}
       </> : null}
       <h3>Legal holds on this person</h3>
@@ -240,7 +241,7 @@ export function OperationsPrivacyConsolePage(): React.ReactElement {
         <tbody>{holds.holds.map((hold) => <tr key={hold.id}>
           <th scope="row">{subjectLabel(hold.subject)}</th>
           <td>{codeLabel(hold.reasonCode)}</td>
-          <td>{hold.detail ?? NA}</td>
+          <td>{hold.detail ?? 'None'}</td>
           <td>{when(hold.placedAt)}<br /><small>{hold.placedBy.email}</small></td>
           <td>{hold.openDeletion ? <>Deletion {hold.openDeletion.reference}<br /><small>scheduled {when(hold.openDeletion.scheduledFor)}</small></> : 'No open deletion'}</td>
           <td>{hold.releaseRequest
@@ -279,7 +280,7 @@ export function OperationsPrivacyConsolePage(): React.ReactElement {
 
 function coverageCell(key: ConsentKeyCoverageDto, pick: (counts: NonNullable<ConsentKeyCoverageDto['counts']>) => SuppressedCountDto): string {
   if (key.status === 'NOT_PUBLISHED') return 'Not published';
-  if (!key.counts) return NA;
+  if (!key.counts) return 'Not counted';
   return formatSuppressed(pick(key.counts));
 }
 
@@ -294,7 +295,7 @@ function ConsentCoverageSection({ coverage, error }: { readonly coverage: Consen
         <th scope="row">{key.title ? <>{key.title}<br /><small>{key.consentKey}</small></> : key.consentKey}</th>
         <td>{key.status === 'LIVE' ? key.liveVersion
           : <StatusBadge label={key.status === 'NOT_PUBLISHED' ? 'Not published' : 'No version in force'} tone="neutral" />}</td>
-        <td>{key.enforcement ?? NA}</td>
+        <td>{key.enforcement ?? 'Not set'}</td>
         <td><NaValue value={coverageCell(key, (counts) => counts.consentedToLiveVersion)} /></td>
         <td><NaValue value={coverageCell(key, (counts) => counts.withdrawn)} /></td>
         <td><NaValue value={coverageCell(key, (counts) => counts.onOlderVersion)} /></td>
@@ -312,7 +313,7 @@ function ConsentCoverageSection({ coverage, error }: { readonly coverage: Consen
         <td>{definition.enforcement}</td>
         <td>{definition.withdrawable ? 'Yes' : 'No'}</td>
         <td>{when(definition.effectiveFrom)}</td>
-        <td>{when(definition.retiredAt)}</td>
+        <td>{when(definition.retiredAt, 'Not retired')}</td>
       </tr>)}</tbody></table></div> : null}
   </section>;
 }

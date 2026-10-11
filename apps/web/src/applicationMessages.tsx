@@ -31,7 +31,7 @@ import {
 import { V2Chip, V2EmptyState } from './dashboardsV2.js';
 import { supportCodeSuffix } from './supportCode.js';
 import { formatDateTime } from './dates.js';
-import { codeLabel } from './labels.js';
+import { codeLabel, MISSING_TEXT } from './labels.js';
 
 export const MESSAGE_MAX_LENGTH = 2000;
 
@@ -52,9 +52,9 @@ function explain(error: unknown, fallback: string): string {
 }
 
 function when(value: string | null): string {
-  if (!value) return 'NA';
+  if (!value) return MISSING_TEXT;
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? 'NA' : formatDateTime(date);
+  return Number.isNaN(date.getTime()) ? MISSING_TEXT : formatDateTime(date);
 }
 
 function humanise(value: string): string {
@@ -195,8 +195,8 @@ export function EmployerMessagesPage({ employerId }: { readonly employerId: stri
           {threads.map((thread) => <div key={thread.applicationId} className="v2-list-row">
             <span className="v2-tile blue" aria-hidden="true">💬</span>
             <div className="grow">
-              <strong>{thread.candidateName ?? 'NA'} · {thread.title}{thread.referenceCode ? ` (${thread.referenceCode})` : ''}</strong>
-              <small>{humanise(thread.applicationState)} · {thread.messageCount} {thread.messageCount === 1 ? 'message' : 'messages'} · last {when(thread.lastMessageAt)}{thread.lastFrom === 'STUDENT' ? ' from the candidate' : ''}</small>
+              <strong>{thread.candidateName ?? 'Candidate'} · {thread.title}{thread.referenceCode ? ` (${thread.referenceCode})` : ''}</strong>
+              <small>{humanise(thread.applicationState)} · {thread.messageCount} {thread.messageCount === 1 ? 'message' : 'messages'}{thread.lastMessageAt ? ` · last ${when(thread.lastMessageAt)}${thread.lastFrom === 'STUDENT' ? ' from the candidate' : ''}` : ''}</small>
             </div>
             {thread.unreadCount > 0 ? <V2Chip tone="blue">{thread.unreadCount} unread</V2Chip> : null}
             <button type="button" className="v2-btn small" aria-pressed={selected?.applicationId === thread.applicationId}

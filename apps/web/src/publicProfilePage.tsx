@@ -34,8 +34,15 @@ function year(iso: string | null): string | null {
   return iso ? String(new Date(iso).getFullYear()) : null;
 }
 
-function formatDate(iso: string | null): string {
-  return iso ? dates.formatDate(iso) : 'NA';
+/** A date in words, or null when none is recorded (the date is then left out). */
+function formatDate(iso: string | null): string | null {
+  return iso ? dates.formatDate(iso) : null;
+}
+
+/** "Completed 3 Jun 2026", or just "Completed" when the date is not recorded. */
+function withDate(prefix: string, iso: string | null): string {
+  const day = formatDate(iso);
+  return day ? `${prefix} ${day}` : prefix;
 }
 
 const muted = { color: 'var(--p-muted)', fontSize: 12.5 } as const;
@@ -154,7 +161,7 @@ export function PublicProfilePage({ token }: { readonly token: string }): React.
             {entry.terms.map((term) => <div key={term.label} style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
               <span style={{ fontSize: 12.8 }}>{term.label}{term.result ? ` · ${term.result}` : ''}</span>
               {term.verified
-                ? <span className="pilot-chip green">Confirmed {formatDate(term.verifiedAt)}</span>
+                ? <span className="pilot-chip green">{withDate('Confirmed', term.verifiedAt)}</span>
                 : <span className="pilot-chip amber">Self-reported</span>}
             </div>)}
           </div>
@@ -167,7 +174,7 @@ export function PublicProfilePage({ token }: { readonly token: string }): React.
         {profile.assessments.map((entry, index) => <div className="pilot-list-row" key={`${entry.title}-${index}`}>
           <div style={{ flex: 1 }}>
             <strong style={{ fontSize: 13.5 }}>{entry.title}</strong>
-            <small style={{ display: 'block', ...muted }}>{formatDate(entry.takenAt)}</small>
+            {formatDate(entry.takenAt) ? <small style={{ display: 'block', ...muted }}>{formatDate(entry.takenAt)}</small> : null}
           </div>
           <b style={{ fontSize: 16 }}>{entry.percentage}%</b>
         </div>)}
@@ -178,7 +185,7 @@ export function PublicProfilePage({ token }: { readonly token: string }): React.
         {profile.learning.map((entry, index) => <div className="pilot-list-row" key={`${entry.title}-${index}`}>
           <div style={{ flex: 1 }}>
             <strong style={{ fontSize: 13.5 }}>{entry.title}</strong>
-            <small style={{ display: 'block', ...muted }}>Completed {formatDate(entry.completedAt)}</small>
+            <small style={{ display: 'block', ...muted }}>{withDate('Completed', entry.completedAt)}</small>
           </div>
         </div>)}
       </section> : null}
@@ -230,7 +237,7 @@ export function PublicProfilePage({ token }: { readonly token: string }): React.
 
       <p style={{ display: 'flex', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap', marginTop: 4, ...muted }}>
         <span>Shared by {profile.name ?? 'this person'}, who can switch this link off at any time.</span>
-        <span>Link expires {formatDate(profile.expiresAt)} · &copy; AI8HT</span>
+        <span>{formatDate(profile.expiresAt) ? `Link expires ${formatDate(profile.expiresAt)} · ` : ''}&copy; AI8HT</span>
       </p>
     </div>
   </div></div>;

@@ -6,7 +6,7 @@
  * who has reviews due. Everything comes from the server, already scoped to the lecturer's active
  * teaching assignments and to students who hold the adaptive-learning consent; nothing is
  * filtered here. Until students have been asked for that consent the section says so and shows
- * NA. No number about a student's learning is shown — names, skill names and counts of students,
+ * no figures. No number about a student's learning is shown — names, skill names and counts of students,
  * with counts under 5 shown as "<5" or withheld by the server. Each item opens the lecturer's INST-16
  * actions on Learning Resources: assign practice, plan a group session, set a student's next step.
  */
@@ -85,11 +85,11 @@ export function FacultyLearningCohortSection({ authenticatedWorkspace, basePath 
     <p>From the practice your students have done in ONE, for students in your teaching assignments who have chosen to share their learning data.</p>
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {!cohort && !error ? <p role="status">Loading learning across your students…</p> : null}
-    {cohort ? <div className="v2-row v2-cols-4 career-stat-strip">
-      <V2Stat icon="🤝" tone="blue" value={offered ? suppressedCountLabel(cohort.studentsSharing) : 'NA'} label="Sharing learning data" />
-      <V2Stat icon="🧗" tone="amber" value={offered ? String(stuckStudents ?? 0) : 'NA'} label="Stuck on a skill" />
-      <V2Stat icon="🧩" tone="purple" value={offered ? cohort.misconceptions.length : 'NA'} label="Common misconceptions" />
-      <V2Stat icon="🔁" tone="green" value={offered && due ? (due.nextCursor ? `${due.students.length}+` : due.students.length) : 'NA'} label="Reviews due" />
+    {cohort && offered ? <div className="v2-row v2-cols-4 career-stat-strip">
+      <V2Stat icon="🤝" tone="blue" value={suppressedCountLabel(cohort.studentsSharing)} label="Sharing learning data" />
+      <V2Stat icon="🧗" tone="amber" value={String(stuckStudents ?? 0)} label="Stuck on a skill" />
+      <V2Stat icon="🧩" tone="purple" value={cohort.misconceptions.length} label="Common misconceptions" />
+      <V2Stat icon="🔁" tone="green" value={due ? (due.nextCursor ? `${due.students.length}+` : due.students.length) : null} label="Reviews due" />
     </div> : null}
     {cohort && !offered ? <V2EmptyState icon="🔒" title="No learning data to show yet"
       note="Students have not yet been asked whether to share their learning data, so nothing from their practice is shown here."
@@ -116,7 +116,7 @@ export function FacultyLearningCohortSection({ authenticatedWorkspace, basePath 
       {due && due.students.length ? <div className="role-record-table-wrap"><table className="role-record-table"><caption className="sr-only">Students with reviews due</caption>
         <thead><tr><th scope="col">Student</th><th scope="col">Skills due</th><th scope="col">Action</th></tr></thead>
         <tbody>{due.students.map((student) => <tr key={student.profileId}><th scope="row"><strong>{student.fullName}</strong><span>{student.rollNumber}</span></th>
-          <td>{student.dueSkills.join(', ') || 'NA'}</td><td>{setNextStep(student.profileId)}</td></tr>)}</tbody></table></div>
+          <td>{student.dueSkills.join(', ') || 'None listed'}</td><td>{setNextStep(student.profileId)}</td></tr>)}</tbody></table></div>
         : due ? <p>No student has a review due right now.</p> : null}
       {due?.nextCursor ? <div className="role-record-actions"><button type="button" className="secondary" onClick={() => void moreDue()}>Load more students</button></div> : null}
     </> : null}

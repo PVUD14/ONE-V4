@@ -7,7 +7,7 @@
 import { ApiRequestError, apiBaseUrl, getProtectedAccessToken, listInstitutionExamResults, listInstitutionExams } from '../api.js';
 import type { ExamNotAttemptedDto } from '../api.js';
 import { Ring } from '../pilot/pilotComponents.js';
-import { NaListCard, go } from './naWidgets.js';
+import { go } from './naWidgets.js';
 import { Icon } from '../icons/Icon.js';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { bearerHeader } from '../sandbox.js';
@@ -134,7 +134,7 @@ function InterventionsWorkspace({ institutionId, basePath, token }: { readonly i
       <section className="pilot-card">
         <div className="pilot-card-head"><h2>Needs attention now</h2><span className="pilot-chip blue">Live — from assessment data</span></div>
         <div className="pilot-list">
-          {!token || queueError ? <p>NA — assessment queue unavailable.</p> : queue === null ? <p style={{ color: 'var(--p-muted)', margin: '8px 0' }}>Loading…</p>
+          {!token || queueError ? <p>The assessment queue is unavailable right now.</p> : queue === null ? <p style={{ color: 'var(--p-muted)', margin: '8px 0' }}>Loading…</p>
             : queue.length ? queue.slice(0, 8).map((entry, index) => (
               <div key={`${entry.institutionStudentId}-${index}`} className="pilot-list-row">
                 <span className="pilot-tile rose"><Icon name="warning" size={16} /></span>
@@ -148,12 +148,12 @@ function InterventionsWorkspace({ institutionId, basePath, token }: { readonly i
 
       <section className="pilot-card">
         <div className="pilot-card-head"><h2>Tracked interventions</h2><button type="button" className="pilot-btn ghost small" disabled={!token || busy} onClick={() => { setError(''); setRefresh((value) => value + 1); }}>Refresh records</button></div>
-        {!records ? <p>{error || !token ? 'NA — intervention records unavailable.' : 'Loading intervention records…'}</p> :
+        {!records ? <p>{error || !token ? 'Intervention records are unavailable right now.' : 'Loading intervention records…'}</p> :
           !actions.length ? <p>No tracked interventions in your scope yet.</p> : <div className="pilot-list">
             {actions.map((action) => <article className="pilot-card" key={action.id}>
               <h3>{action.title}</h3><p>{action.studentName} · Owner: {action.ownerName}</p>
               <span className="pilot-chip blue">{codeLabel(action.state)}</span>
-              <p>Due: {action.dueAt ? formatDateTime(action.dueAt) : 'NA'}</p>
+              {action.dueAt ? <p>Due: {formatDateTime(action.dueAt)}</p> : null}
               {action.note ? <p>{action.note}</p> : null}{action.outcomeNote ? <p>Outcome: {action.outcomeNote}</p> : null}
               {action.allowedTransitions.length ? <>
                 <label>Review or outcome note for {action.title}<textarea maxLength={2000} disabled={busy} value={reasons[action.id] ?? ''} onChange={(event) => setReasons({ ...reasons, [action.id]: event.target.value })} /></label>
@@ -167,12 +167,14 @@ function InterventionsWorkspace({ institutionId, basePath, token }: { readonly i
       </section>
     </div>
     <aside className="pilot-rail">
-      <NaListCard title="Why Interventions Work" note={records ? `${completed} of ${actions.length} visible interventions completed. Recorded outcomes appear on each intervention.` : 'NA — intervention outcomes unavailable.'} />
-      <section className="pilot-card" style={{ textAlign: 'center' }}>
+      {/* Both rail cards are drawn from the loaded records; without them they are left out (never "NA"). */}
+      {records ? <section className="pilot-card"><div className="pilot-card-head"><h2>Why Interventions Work</h2></div>
+        <p style={{ color: 'var(--p-muted)', margin: '4px 0' }}>{completed} of {actions.length} visible interventions completed. Recorded outcomes appear on each intervention.</p></section> : null}
+      {records ? <section className="pilot-card" style={{ textAlign: 'center' }}>
         <h2 style={{ textAlign: 'left' }}>Completion Rate</h2>
-        <Ring value={rate} size={104} stroke={11} tone="blue"><span style={{ fontSize: 16, color: 'var(--p-muted)' }}>{records ? `${rate}%` : 'NA'}</span></Ring>
-        <small style={{ display: 'block', marginTop: 8, color: 'var(--p-muted)' }}>{records ? `${completed} of ${actions.length} visible interventions complete` : 'NA — intervention records unavailable'}</small>
-      </section>
+        <Ring value={rate} size={104} stroke={11} tone="blue"><span style={{ fontSize: 16, color: 'var(--p-muted)' }}>{rate}%</span></Ring>
+        <small style={{ display: 'block', marginTop: 8, color: 'var(--p-muted)' }}>{completed} of {actions.length} visible interventions complete</small>
+      </section> : null}
     </aside>
   </div></div>;
 }

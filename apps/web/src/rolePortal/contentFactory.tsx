@@ -7,7 +7,7 @@
  * editors that already own lessons and questions. Asking only queues a job — the worker drafts it
  * later — so the card shows each job's state and links to the draft once it lands. A draft is the
  * requester's, so the editors' own rules keep them from approving or publishing it; this file says so
- * plainly and never offers a shortcut. Missing figures read NA; nothing here is invented.
+ * plainly and never offers a shortcut. A figure the server does not send is left out; nothing here is invented.
  */
 import { useEffect, useState } from 'react';
 import {
@@ -20,8 +20,9 @@ import type { AiDraftDto, ContentDraftDto, ContentDraftKind, ContentDraftRequest
 import { StatusBadge } from '../studentComponents.js';
 import { formatApiError } from './shared.js';
 import { formatDateTime } from '../dates.js';
+import { MISSING_TEXT } from '../labels.js';
 
-const when = (value: string | null | undefined): string => (value ? formatDateTime(value) : 'NA');
+const when = (value: string | null | undefined): string => (value ? formatDateTime(value) : MISSING_TEXT);
 const label = (value: string): string => value.split('_').map((word) => word.charAt(0) + word.slice(1).toLowerCase()).join(' ');
 const keyPattern = /^[a-z0-9][a-z0-9-]{2,79}$/;
 
@@ -80,7 +81,7 @@ export function aiRequestError(cause: unknown, fallback: string): string {
 function outcomeLine(draft: ContentDraftDto): string {
   if (draft.state === 'REJECTED') {
     const found = draft.findings.map((finding) => findingText[finding] ?? label(finding)).join(', ');
-    return `${outcomeText.GUARD_REJECTED} Found: ${found || 'NA'}.`;
+    return found ? `${outcomeText.GUARD_REJECTED} Found: ${found}.` : `${outcomeText.GUARD_REJECTED}`;
   }
   if (draft.outcomeCode) return outcomeText[draft.outcomeCode] ?? label(draft.outcomeCode);
   if (draft.state === 'SUCCEEDED' && draft.kind === 'ANSWER_CHECK') return 'Checked — see the question.';
@@ -90,18 +91,18 @@ function outcomeLine(draft: ContentDraftDto): string {
 
 function targetLine(draft: ContentDraftDto): string {
   const target = draft.target;
-  if (draft.kind === 'LESSON_VARIANT') return `${target.baseLesson ? target.baseLesson.stableKey : 'NA'} → ${target.language}`;
+  if (draft.kind === 'LESSON_VARIANT') return target.baseLesson ? `${target.baseLesson.stableKey} → ${target.language}` : `A lesson → ${target.language}`;
   if (draft.kind === 'ANSWER_CHECK') return 'A question under review';
-  return `${target.stableKey ?? 'NA'} · ${target.topic ? target.topic.name : 'NA'}`;
+  return [target.stableKey, target.topic ? target.topic.name : null].filter(Boolean).join(' · ') || MISSING_TEXT;
 }
 
 function featureFor(status: ContentFactoryStatusDto | null, kind: ContentDraftKind) {
   return status ? status.features.find((feature) => feature.kinds.includes(kind)) ?? null : null;
 }
 
-function FeatureState({ status, kind }: { readonly status: ContentFactoryStatusDto | null; readonly kind: ContentDraftKind }): React.ReactElement {
+function FeatureState({ status, kind }: { readonly status: ContentFactoryStatusDto | null; readonly kind: ContentDraftKind }): React.ReactElement | null {
   const feature = featureFor(status, kind);
-  if (!status || !feature) return <StatusBadge label="NA" tone="neutral" />;
+  if (!status || !feature) return null;
   if (status.killSwitchEngaged) return <StatusBadge label="Stopped by the kill switch" tone="danger" />;
   if (!feature.registered) return <StatusBadge label="Not set up" tone="neutral" />;
   if (!feature.switchedOn) return <StatusBadge label="Off" tone="neutral" />;
@@ -156,17 +157,17 @@ export function AiDraftsCard({ token, scope, vocabulary, onOpenLesson, onOpenQue
   const feature = featureFor(status, draftKind);
   const mayRequest = status ? status.viewer.mayRequest[draftKind] : false;
   const available = Boolean(status && feature && feature.available);
-  const used = feature && feature.usedInWindow !== null && feature.cap !== null ? `${feature.usedInWindow} of ${feature.cap} ${feature.window === 'MONTH' ? 'this month' : 'today'}` : 'NA';
+  const used = feature && feature.usedInWindow !== null && feature.cap !== null ? `${feature.usedInWindow} of ${feature.cap} ${feature.window === 'MONTH' ? 'this month' : 'today'}` : null;
 
   return <section className="role-card role-wide" aria-label="AI drafts">
     <div className="role-section-title"><h2>AI drafts</h2>
       {mayRequest ? <button type="button" className="secondary" disabled={!available} onClick={() => setAsking(true)}>Draft with AI…</button> : null}</div>
     <p>ONE&apos;s AI can write a first draft{scope === 'LESSONS' ? ' of a lesson for a skill, or a translation of a published lesson' : ' of a practice question with its four hints, and check the answer key of a question under review'}. A draft appears here and in the list marked <strong>AI draft</strong>, written in your name, and goes through the same review as anything a person writes: you cannot approve or publish it yourself, and no student sees it until a second person publishes it.</p>
     <dl>
-      <div><dt>Status</dt><dd><FeatureState status={status} kind={draftKind} /></dd></div>
-      <div><dt>Used</dt><dd>{used}</dd></div>
-      <div><dt>Waiting or drafting</dt><dd>{feature && feature.openJobs !== null ? feature.openJobs : 'NA'}</dd></div>
-      <div><dt>Model</dt><dd>{feature && feature.model ? feature.model : 'NA'}</dd></div>
+      {status && feature ? <div><dt>Status</dt><dd><FeatureState status={status} kind={draftKind} /></dd></div> : null}
+      {used ? <div><dt>Used</dt><dd>{used}</dd></div> : null}
+      {feature && feature.openJobs !== null ? <div><dt>Waiting or drafting</dt><dd>{feature.openJobs}</dd></div> : null}
+      {feature && feature.model ? <div><dt>Model</dt><dd>{feature.model}</dd></div> : null}
     </dl>
     {status && feature && !available ? <p role="note"><small>{status.killSwitchEngaged
       ? 'AI is stopped by the kill switch, so nothing can be drafted now.'
@@ -184,7 +185,7 @@ export function AiDraftsCard({ token, scope, vocabulary, onOpenLesson, onOpenQue
         <td>{draft.produced && draft.produced.lessonId && onOpenLesson
           ? <button type="button" className="secondary" onClick={() => onOpenLesson(draft.produced!.lessonId!)}>Open draft</button>
           : draft.produced && draft.produced.questionId && onOpenQuestion
-            ? <button type="button" className="secondary" onClick={() => onOpenQuestion(draft.produced!.questionId!)}>Open draft</button> : 'NA'}</td>
+            ? <button type="button" className="secondary" onClick={() => onOpenQuestion(draft.produced!.questionId!)}>Open draft</button> : 'None'}</td>
       </tr>)}</tbody></table></div> : null}
     <button type="button" className="secondary" onClick={() => setTick((value) => value + 1)}>Refresh</button>
     {asking && status ? <DraftWithAiDialog token={token} kind={draftKind} status={status} {...(vocabulary ? { vocabulary } : {})}
@@ -340,7 +341,7 @@ export function AiDraftProvenance({ aiDraft, author }: { readonly aiDraft: AiDra
     {aiDraft.fitted ? <p role="note"><small>The model&apos;s text was longer than a lesson allows, so it was shortened at a sentence to fit. The full text is below.</small></p> : null}
     {aiDraft.sections ? <details><summary>The model&apos;s full text</summary>
       {Object.entries(aiDraft.sections).map(([heading, text]) => <div key={heading}><h5>{heading}</h5>
-        {(text ? text.split(/\n{2,}/u) : ['NA']).map((part, index) => <p key={index}>{part}</p>)}</div>)}
+        {(text ? text.split(/\n{2,}/u) : ['This section was empty.']).map((part, index) => <p key={index}>{part}</p>)}</div>)}
     </details> : null}
   </div>;
 }
@@ -393,8 +394,8 @@ export function AnswerKeyCheck({ token, revisionId, editable }: { readonly token
     {latest && latest.check ? <p role="status">
       <StatusBadge label={latest.check.agreesWithKey ? 'Agrees with the key' : 'Disagrees with the key'} tone={latest.check.agreesWithKey ? 'success' : 'danger'} />{' '}
       The AI chose option {latest.check.option}. {latest.check.working}
-      {latest.check.stale ? ' (The question has been edited since this check.)' : ''} <small>{when(latest.finishedAt)} · {latest.generation ? latest.generation.model : 'NA'}</small></p>
-      : latest ? <p>{stateText[latest.state] ?? label(latest.state)}: {outcomeLine(latest) || 'NA'}</p> : <p>No check yet.</p>}
+      {latest.check.stale ? ' (The question has been edited since this check.)' : ''} <small>{when(latest.finishedAt)}{latest.generation ? ` · ${latest.generation.model}` : ''}</small></p>
+      : latest ? <p>{stateText[latest.state] ?? label(latest.state)}{outcomeLine(latest) ? `: ${outcomeLine(latest)}` : ''}</p> : <p>No check yet.</p>}
     {status.viewer.mayRequest.ANSWER_CHECK && editable ? <div className="role-actions">
       <label><span>Reason code</span><select aria-label="Check reason" value={reasonCode} onChange={(event) => setReasonCode(event.target.value)}>
         <option value="">Choose a reason…</option>

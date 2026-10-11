@@ -134,13 +134,13 @@ describe('EMP-06 employer: stage template and eligibility flags on Applicants', 
     render(<EmployerApplicantsPage employerId={employerId} />);
     expect(await screen.findByText('Selection stages: 1. Résumé screen → 2. Group discussion → 3. Technical interview → 4. HR interview')).toBeInTheDocument();
     const declaredRow = screen.getByText('Synthetic declared').closest('tr')!;
-    expect(within(declaredRow).getAllByRole('button').map((button) => button.textContent)).toEqual(['Résumé screen', 'Group discussion', 'Technical interview', 'Shortlist', 'Rejected']);
+    expect(within(declaredRow).getAllByRole('button').map((button) => button.textContent)).toEqual(['Résumé screen', 'Group discussion', 'Technical interview', 'Shortlist', 'Not selected']);
     expect(within(declaredRow).getByRole('list', { name: 'Eligibility flags' })).toHaveTextContent('Minimum CGPA 7 (10-point scale): met');
     expect(within(declaredRow).getByText('Self-reported')).toBeInTheDocument();
     const verifiedRow = screen.getByText('Synthetic verified').closest('tr')!;
     expect(within(verifiedRow).getByText('Résumé screen')).toBeInTheDocument();
     expect(within(verifiedRow).getByText('Meets every rule (college records)')).toBeInTheDocument();
-    expect(within(verifiedRow).getAllByRole('button').map((button) => button.textContent)).toEqual(['Group discussion', 'Technical interview', 'Shortlist', 'Rejected']);
+    expect(within(verifiedRow).getAllByRole('button').map((button) => button.textContent)).toEqual(['Group discussion', 'Technical interview', 'Shortlist', 'Not selected']);
     expect(document.body.textContent).not.toMatch(/readiness|mastery/i);
   });
 
@@ -153,7 +153,7 @@ describe('EMP-06 employer: stage template and eligibility flags on Applicants', 
     render(<EmployerApplicantsPage employerId={employerId} />);
     const row = (await screen.findByText('Synthetic plain')).closest('tr')!;
     expect(screen.getByText(/This job has no selection stages yet/)).toBeInTheDocument();
-    expect(within(row).getAllByRole('button').map((button) => button.textContent)).toEqual(['Screening', 'Shortlisted', 'Rejected']);
+    expect(within(row).getAllByRole('button').map((button) => button.textContent)).toEqual(['Screening', 'Shortlisted', 'Not selected']);
     expect(within(row).getByText('No rules')).toBeInTheDocument();
   });
 });

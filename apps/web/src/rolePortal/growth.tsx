@@ -8,8 +8,8 @@
  * GROWTH-06: Field is built (growthField.tsx); Home's "Visits this month" and the follow-ups-due
  * card come from the field log.
  *
- * GROWTH-07: Commission shows the person's credit and disputes (growthCommission.tsx); every amount
- * still reads NA.
+ * GROWTH-07: Commission shows the person's credit and disputes (growthCommission.tsx); no amount
+ * is shown, because no rate has been set.
  */
 import { useEffect, useState } from 'react';
 import { ApiRequestError, getGrowthTerritory, getProtectedAccessToken, type GrowthTerritoryDto } from '../api.js';
@@ -23,8 +23,6 @@ import { AuthenticatedNotYetAvailable } from './shared.js';
 import { SupportCode } from '../supportCode.js';
 import { formatDate } from '../dates.js';
 
-const NA = 'NA';
-
 const roleLabels: Readonly<Record<string, string>> = { GROWTH_EXECUTIVE: 'Growth executive', GROWTH_MANAGER: 'Regional manager' };
 
 /** What each page will hold once built, said plainly (design §16.1). */
@@ -35,7 +33,7 @@ const notBuilt: Readonly<Record<string, string>> = {
 
 /**
  * The Growth Home. Re-skin phase 7 moved it to the approved Momentum composition in
- * rolePortal/growthHome.tsx, which leaves out every block with no source instead of printing NA.
+ * rolePortal/growthHome.tsx, which leaves out every block with no source instead of printing a placeholder.
  * This name stays so the portal's route table does not change.
  */
 export function GrowthHomePage(): React.ReactElement {
@@ -107,28 +105,28 @@ export function GrowthTerritoryPage(): React.ReactElement {
                 : regions.length ? 'The regions you work today, as set by AI8HT operations. A change by operations shows here at once.'
                   : 'You are not assigned to a region yet. Operations assigns regions in Settings → Growth set-up.'}</p>
             <div className="v2-hero-chips">
-              <V2Chip tone="blue">{territory ? roleLabels[territory.role] ?? territory.role : NA}</V2Chip>
+              {territory ? <V2Chip tone="blue">{roleLabels[territory.role] ?? territory.role}</V2Chip> : null}
               <V2Chip tone="slate">Set by operations</V2Chip>
             </div>
           </div>
         </div>
 
         <div className="v2-row v2-cols-4" role="region" aria-label="Territory summary">
-          <V2Stat icon="🗺️" tone="blue" value={territory ? regions.length : NA} label="Regions you work" />
-          <V2Stat icon="📍" tone="teal" value={territory ? areaCount : NA} label="Areas covered" />
-          <V2Stat icon="👥" tone="amber" value={territory ? peopleCount : NA} label={managing ? 'People in your regions' : 'Managers in your regions'} />
-          <V2Stat icon="🤝" tone="purple" value={territory && regions.every((region) => typeof region.unownedLeads === 'number') ? regions.reduce((total, region) => total + (region.unownedLeads ?? 0), 0) : NA} label="Unowned leads" />
+          <V2Stat icon="🗺️" tone="blue" value={territory ? regions.length : null} label="Regions you work" />
+          <V2Stat icon="📍" tone="teal" value={territory ? areaCount : null} label="Areas covered" />
+          <V2Stat icon="👥" tone="amber" value={territory ? peopleCount : null} label={managing ? 'People in your regions' : 'Managers in your regions'} />
+          <V2Stat icon="🤝" tone="purple" value={territory && regions.every((region) => typeof region.unownedLeads === 'number') ? regions.reduce((total, region) => total + (region.unownedLeads ?? 0), 0) : null} label="Unowned leads" />
         </div>
 
         {state.kind === 'loading' ? <section className="v2-card"><p className="v2-empty">Loading…</p></section> : null}
-        {state.kind === 'error' ? <section className="v2-card"><p className="v2-empty">{NA} — your territory could not be loaded.</p></section> : null}
+        {state.kind === 'error' ? <section className="v2-card"><p className="v2-empty">Your territory could not be loaded.</p></section> : null}
         {territory && !regions.length ? <V2EmptyState icon="🗺️" title="No region assigned" note="You see your own leads anywhere; unowned leads appear once operations assigns you a region." /> : null}
         {regions.map((region) => (
           <section key={region.id} className="v2-card" aria-label={`Region ${region.name}`}>
             <div className="v2-card-head"><h2>{region.name}</h2>
               <V2Chip tone={region.myRole === 'MANAGER' ? 'purple' : 'teal'}>{region.myRole === 'MANAGER' ? 'You manage this region' : 'You work this region'}</V2Chip>
-              <V2Chip tone="amber">{typeof region.unownedLeads === 'number' ? `${region.unownedLeads} unowned lead${region.unownedLeads === 1 ? '' : 's'}` : `${NA} unowned leads`}</V2Chip></div>
-            <p className="v2-empty">{region.since ? `Since ${formatDate(region.since)}` : NA}</p>
+              {typeof region.unownedLeads === 'number' ? <V2Chip tone="amber">{`${region.unownedLeads} unowned lead${region.unownedLeads === 1 ? '' : 's'}`}</V2Chip> : null}</div>
+            {region.since ? <p className="v2-empty">Since {formatDate(region.since)}</p> : null}
             <div className="v2-hero-chips" aria-label={`Areas of ${region.name}`}>
               {region.areas.length ? region.areas.map((area) => <V2Chip key={`${area.stateCode}-${area.districtCode ?? 'all'}`} tone="slate">{areaLabel(area)}</V2Chip>)
                 : <span className="v2-empty">No areas yet — operations has not added any state or district to this region.</span>}

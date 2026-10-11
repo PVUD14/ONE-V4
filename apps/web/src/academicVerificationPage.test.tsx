@@ -76,11 +76,12 @@ describe('academic verification queue', () => {
     expect(await screen.findByText(/Nothing is waiting/)).toBeInTheDocument();
   });
 
-  it('renders NA for a result recorded on no scale rather than a bare number', async () => {
+  it('says no result is recorded, rather than a bare number or NA, for a result on no scale', async () => {
     stub({ [queuePath]: { queue: [{ ...current, resultValue: null, resultScale: null }] } });
     await authenticate();
     render(<AcademicVerificationPage institutionId={institutionId} />);
-    expect(await screen.findByText('NA')).toBeInTheDocument();
+    expect(await screen.findByText('No result recorded')).toBeInTheDocument();
+    expect(screen.queryByText('NA')).not.toBeInTheDocument();
   });
 });
 

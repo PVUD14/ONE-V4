@@ -100,11 +100,12 @@ describe('support desk', () => {
     expect(screen.getByText('Waiting on customer', { selector: 'small' }).previousSibling?.textContent).toBe('1');
   });
 
-  it('shows NA in the counts while nothing has loaded, then the loading state', async () => {
+  it('shows no count tiles while nothing has loaded, then the loading state', async () => {
     casesResponse = () => new Promise(() => undefined);
     render(<OperationsSupportDeskPage />);
     expect(screen.getByText('Loading cases…')).toBeInTheDocument();
-    expect(screen.getAllByText('NA').length).toBeGreaterThanOrEqual(4);
+    expect(screen.queryByText('Past SLA target')).toBeNull();
+    expect(document.body.textContent).not.toMatch(/(^|[^A-Za-z])NA([^A-Za-z]|$)/);
   });
 
   it('says so plainly when the view is empty', async () => {
@@ -177,11 +178,12 @@ describe('account lookup', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Search' }));
   };
 
-  it('shows the account with its contact masked and NA for the missing phone', async () => {
+  it('shows the account with its contact masked and says the phone is not on record', async () => {
     await search();
     const summary = await screen.findByRole('region', { name: 'Account summary' });
     expect(within(summary).getByText('a***@college.edu')).toBeInTheDocument();
-    expect(within(summary).getByText('NA')).toBeInTheDocument();
+    expect(within(summary).getByText('No phone on record')).toBeInTheDocument();
+    expect(summary.textContent).not.toMatch(/(^|[^A-Za-z])NA([^A-Za-z]|$)/);
     expect(screen.queryByText('asha.rao@college.edu')).not.toBeInTheDocument();
     expect(screen.getByText('invitation.accepted')).toBeInTheDocument();
     expect(screen.getByText(/SC-1A2B3C4D/)).toBeInTheDocument();

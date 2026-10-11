@@ -61,7 +61,7 @@ private val pipelineMoves = listOf(
     "ASSESSMENT" to "Move to assessment",
     "INTERVIEW" to "Move to interview",
     "OFFER" to "Make an offer",
-    "REJECTED" to "Reject",
+    "REJECTED" to "Not selected",
 )
 
 /**
@@ -79,7 +79,7 @@ internal fun applicantMoves(stages: List<SelectionStageDto>, currentState: Strin
         if (pipelineOrder.indexOf(target) <= current || !seen.add(target)) null else target to "Move to ${stage.label}"
     }
     val shortlist = if ((currentState == "APPLIED" || currentState == "SCREENING") && ahead.none { it.first == "SHORTLISTED" }) listOf("SHORTLISTED" to "Shortlist") else emptyList()
-    return ahead + shortlist + listOf("REJECTED" to "Reject")
+    return ahead + shortlist + listOf("REJECTED" to "Not selected")
 }
 
 @Composable
@@ -109,7 +109,7 @@ internal fun ApplicantActionsPage(
                     Text("Current stage", style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(4.dp))
-                    StatusChip(prettify(currentState), ChipKind.Accent)
+                    StatusChip(applicationStageLabel(currentState), ChipKind.Accent)
                     stages.filter { it.applicationState == currentState }.map { it.label }.takeIf { it.isNotEmpty() }?.let {
                         Spacer(Modifier.height(4.dp))
                         Text(it.joinToString(" / "), style = MaterialTheme.typography.bodySmall)
@@ -183,14 +183,14 @@ internal fun ApplicantActionsPage(
         AlertDialog(
             onDismissRequest = { confirming = null },
             title = { Text("$label?") },
-            text = { Text("$applicantName moves to ${prettify(state).lowercase()}. They may be notified.") },
+            text = { Text("$applicantName moves to ${applicationStageLabel(state).lowercase()}. They may be notified.") },
             confirmButton = {
                 TextButton(onClick = {
                     confirming = null
                     busy = true
                     scope.launch {
                         runCatching { Api.transitionApplication(context, employerId, applicationId, state) }
-                            .onSuccess { notice = "Moved to ${prettify(state)}."; shared++; onChanged() }
+                            .onSuccess { notice = "Moved to ${applicationStageLabel(state)}."; shared++; onChanged() }
                             .onFailure { notice = (it as? Api.ApiException)?.detail ?: "That move was not allowed." }
                         busy = false
                     }

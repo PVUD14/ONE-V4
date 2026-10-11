@@ -529,3 +529,91 @@
   .role-topbar .role-profile > .role-avatar,
   .staff-topbar .staff-profile > span:first-child { width: 38px; height: 38px; border-radius: var(--r-xl); }
 }
+
+/* =====================================================================================
+   Integration decisions (approved 2026-10-11)
+   ===================================================================================== */
+
+/* (a) Short rail labels: the desktop rail shows the approved short label; the drawer shows the
+   full one. Both are in the markup; the button's accessible name is always the full label. */
+.momentum-rail .rail-label.has-short .rail-full { display: none; }
+@media (max-width: 1220px) {
+  .momentum-rail .rail-label.has-short .rail-short { display: none; }
+  .momentum-rail .rail-label.has-short .rail-full { display: inline; }
+}
+
+/* (c) Settings and Help & FAQ live in the sidebar footer, above the collapse control. */
+.momentum-rail .sidebar-footer { display: grid; gap: 2px; }
+.momentum-rail .sidebar-footer-links { display: grid; gap: 2px; padding-bottom: 4px; }
+@media (max-width: 1220px) {
+  /* In the drawer the footer stays (it now holds Settings and Help & FAQ); only collapsing goes. */
+  .momentum-rail .sidebar-footer { display: grid; margin-top: 6px; padding-top: 8px; }
+  .momentum-rail .sidebar-footer .collapse-button { display: none; }
+}
+.momentum-sidebar .sidebar-foot {
+  display: grid;
+  gap: 2px;
+  margin: auto 0 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+.momentum-sidebar .sidebar-foot :is(.role-collapse, .staff-collapse) { margin-top: 0; }
+.momentum-sidebar .sidebar-foot :is(.role-collapse, .staff-collapse)::before { display: none; }
+
+/* (b) Student phones: the bottom tab bar from unified/mobile.html, beside the drawer. */
+.student-tabbar { display: none; }
+@media (max-width: 760px) {
+  .student-tabbar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    padding: 8px 6px calc(10px + env(safe-area-inset-bottom, 0px));
+    background: var(--surface);
+    border-top: 1px solid var(--line);
+    box-shadow: 0 -6px 18px -14px rgb(10 16 48 / .35);
+  }
+  .student-tabbar .tabbar-item {
+    position: relative;
+    min-height: 48px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 4px 2px;
+    border: 0;
+    border-radius: var(--r-lg);
+    background: transparent;
+    color: var(--text-2);
+    font: 500 11px / 1.1 var(--font-sans);
+    box-shadow: none;
+  }
+  .student-tabbar .tabbar-item:hover { background: transparent; color: var(--text); filter: none; }
+  .student-tabbar .tabbar-item.active { color: var(--text); font-weight: 700; }
+  /* The active tab carries the slanted gradient tick above it, as in the approved page. */
+  .student-tabbar .tabbar-item.active::before {
+    content: '';
+    position: absolute;
+    top: -9px;
+    left: 50%;
+    width: 34px;
+    height: 3px;
+    margin-left: -17px;
+    border-radius: 2px;
+    background: var(--grad);
+    transform: skewX(var(--slant));
+  }
+  .student-tabbar .tabbar-item:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+  /* Content and the assistant launcher clear the bar. */
+  .student-shell.has-tabbar .student-main { padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+  .student-shell.has-tabbar .assistant-widget { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
+}
+
+/* (d) A student who holds more than one workspace gets the same switch control on phones. */
+@media (max-width: 760px) {
+  .student-topbar .role-switch { width: 38px; height: 38px; justify-content: center; padding: 0; border-radius: var(--r-xl); }
+}

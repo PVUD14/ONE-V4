@@ -77,7 +77,7 @@ export function EmployerTermsSection(): React.ReactElement | null {
       <thead><tr><th>Version</th><th>Title</th><th>Legal review</th><th>Needs acceptance</th><th>Published</th><th>Employers accepted</th></tr></thead>
       <tbody>{versions.map((item) => <tr key={item.version}>
         <td>{item.version}</td><td>{item.title}</td>
-        <td>{item.legalReviewState === 'DRAFT_FOR_LEGAL_REVIEW' ? <StatusBadge label="Draft — pending legal review" tone="warning" /> : <StatusBadge label={`Reviewed: ${item.legalReviewReference ?? 'NA'}`} tone="success" />}</td>
+        <td>{item.legalReviewState === 'DRAFT_FOR_LEGAL_REVIEW' ? <StatusBadge label="Draft — pending legal review" tone="warning" /> : <StatusBadge label={item.legalReviewReference ? `Reviewed: ${item.legalReviewReference}` : 'Reviewed'} tone="success" />}</td>
         <td>{item.requiresReacceptance ? 'Yes' : 'No'}</td>
         <td>{formatDate(item.publishedAt)}</td>
         <td>{item.acceptedBy}</td>

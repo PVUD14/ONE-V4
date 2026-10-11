@@ -91,6 +91,44 @@ describe('API-backed Career Readiness surfaces', () => {
     expect(await screen.findByText('Lessons are shown in English.')).toBeInTheDocument();
   });
 
+  it('opens the page on the lesson the address names, first and focused, without listing it twice ("Resume lesson")', async () => {
+    const lesson = (id: string, title: string) => ({ id, stableKey: id, version: 1, topicId: 'topic-1', prerequisiteLessonIds: [], title, body: { summary: `${title} summary` } });
+    const withLessons = { ...catalog, modules: [{ id: 'module-1', stableKey: 'module-1', version: 1, title: 'Synthetic module', description: '', lessons: [
+      lesson('lesson-a', 'Synthetic first lesson'), lesson('lesson-b', 'Synthetic second lesson'),
+    ] }] };
+    const state = { ...learner, catalog: withLessons };
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => ({ ok: true, json: async () => {
+      if (url.endsWith('/oauth2/token')) return { access_token: 'test-access-token' };
+      if (url.endsWith('/catalog')) return withLessons;
+      return state;
+    } })));
+    await authenticateThroughHostedUiCallback();
+    window.history.pushState(null, '', '/student/learning?lesson=lesson-b');
+    render(<CareerReadinessApiPanel route="learning" />);
+    const opened = await screen.findByRole('article', { name: 'Your lesson: Synthetic second lesson' });
+    expect(within(opened).getByRole('heading', { name: 'Synthetic second lesson' })).toBeInTheDocument();
+    expect(within(opened).getByRole('button', { name: 'Complete lesson' })).toBeInTheDocument();
+    await waitFor(() => expect(document.activeElement).toBe(opened));
+    expect(screen.getAllByRole('heading', { name: 'Synthetic second lesson' })).toHaveLength(1);
+    expect(screen.getByRole('heading', { name: 'Synthetic first lesson' })).toBeInTheDocument();
+  });
+
+  it('lists every lesson as before when the address names none, or one that is not in the catalogue', async () => {
+    const withLessons = { ...catalog, modules: [{ id: 'module-1', stableKey: 'module-1', version: 1, title: 'Synthetic module', description: '', lessons: [
+      { id: 'lesson-a', stableKey: 'lesson-a', version: 1, topicId: 'topic-1', prerequisiteLessonIds: [], title: 'Synthetic only lesson', body: { summary: 'S' } },
+    ] }] };
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => ({ ok: true, json: async () => {
+      if (url.endsWith('/oauth2/token')) return { access_token: 'test-access-token' };
+      if (url.endsWith('/catalog')) return withLessons;
+      return { ...learner, catalog: withLessons };
+    } })));
+    await authenticateThroughHostedUiCallback();
+    window.history.pushState(null, '', '/student/learning?lesson=not-a-lesson');
+    render(<CareerReadinessApiPanel route="learning" />);
+    expect(await screen.findByRole('heading', { name: 'Synthetic only lesson' })).toBeInTheDocument();
+    expect(screen.queryByRole('article', { name: /^Your lesson/ })).toBeNull();
+  });
+
   it('renders the restricted operations governance and automation summary from real APIs', async () => {
     const imports = [{ id: 'run-1', packageIdentity: 'v4-frozen-package', sourceRepository: 'https://github.com/PVUD14/V4--Database',
       sourceCommit: '0c067ce24f92662daa933edf0fc8b75636d99469', manifestHash: 'a'.repeat(64), transformVersion: 'v1', status: 'STAGED', blockedRecords: 11 }];

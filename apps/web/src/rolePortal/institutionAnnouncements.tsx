@@ -23,6 +23,7 @@ import { InstitutionWorkspaceError, RestrictedApiState, formatApiError, isInstit
 import type { AuthenticatedWorkspaceSummary } from './shared.js';
 import { supportCodeSuffix } from '../supportCode.js';
 import { formatDateTime } from '../dates.js';
+import { MISSING_TEXT } from '../labels.js';
 
 /** Why a scheduled announcement is cancelled; recorded with it. */
 export const announcementCancelReasons = [
@@ -37,25 +38,27 @@ const unitKindLabels: Readonly<Record<string, string>> = {
 
 export function audienceLabel(audience: AnnouncementAudienceDto): string {
   if (audience.unitId === null) return 'Whole institution';
-  return `${unitKindLabels[audience.kind] ?? 'Unit'}: ${audience.name ?? 'NA'}`;
+  const kind = unitKindLabels[audience.kind] ?? 'Unit';
+  return audience.name ? `${kind}: ${audience.name}` : kind;
 }
 
+/** " 12 Oct 2026, 10:00" when the time is recorded; nothing when it is not. */
 function when(value: string | null): string {
-  return value ? formatDateTime(value) : 'NA';
+  return value ? ` ${formatDateTime(value)}` : '';
 }
 
 export function announcementStateLabel(announcement: InstitutionAnnouncementDto): string {
-  if (announcement.state === 'SENT') return `Sent ${when(announcement.sentAt)}`;
+  if (announcement.state === 'SENT') return `Sent${when(announcement.sentAt)}`;
   if (announcement.state === 'CANCELLED') return announcement.cancelReasonCode === 'SENDER_ACCESS_ENDED'
-    ? 'Not sent: the sender no longer teaches this group' : `Cancelled ${when(announcement.cancelledAt)}`;
-  return `Scheduled for ${when(announcement.scheduledFor)}`;
+    ? 'Not sent: the sender no longer teaches this group' : `Cancelled${when(announcement.cancelledAt)}`;
+  return announcement.scheduledFor ? `Scheduled for${when(announcement.scheduledFor)}` : 'Scheduled';
 }
 
 /** The email outcome as it really is; never claims a send that did not happen. */
 export function announcementEmailSummary(announcement: InstitutionAnnouncementDto): string {
   if (!announcement.channels.includes('EMAIL')) return 'Not requested';
   const email = announcement.delivery?.email;
-  if (!email) return announcement.state === 'SCHEDULED' ? 'Will be attempted when sent' : 'NA';
+  if (!email) return announcement.state === 'SCHEDULED' ? 'Will be attempted when sent' : MISSING_TEXT;
   const parts = [
     email.sent ? `${email.sent} sent` : '',
     email.notConfigured ? `${email.notConfigured} not sent: no sender is set up yet` : '',
@@ -163,10 +166,10 @@ export function InstitutionAnnouncementsPanel({ token, institutionId, noAudience
   const reached = sent.reduce((sum, entry) => sum + (entry.delivery?.recipients ?? 0), 0);
   return <>
     <div className="v2-row v2-cols-4 career-stat-strip role-wide">
-      <V2Stat icon="📣" tone="blue" value={data ? sent.length : 'NA'} label="Announcements sent" />
-      <V2Stat icon="⏰" tone="purple" value={data ? scheduled.length : 'NA'} label="Scheduled" />
-      <V2Stat icon="🎓" tone="green" value={data ? reached : 'NA'} label="Students reached" />
-      <V2Stat icon="✉️" tone="amber" value={data ? (data.emailConfigured ? 'On' : 'Not set up') : 'NA'} label="Email delivery" />
+      <V2Stat icon="📣" tone="blue" value={data ? sent.length : null} label="Announcements sent" />
+      <V2Stat icon="⏰" tone="purple" value={data ? scheduled.length : null} label="Scheduled" />
+      <V2Stat icon="🎓" tone="green" value={data ? reached : null} label="Students reached" />
+      <V2Stat icon="✉️" tone="amber" value={data ? (data.emailConfigured ? 'On' : 'Not set up') : null} label="Email delivery" />
     </div>
     {notice ? <p className="role-api-success role-wide" role="status">{notice}</p> : null}
     {error ? <p className="form-error role-wide" role="alert">{error}</p> : null}
@@ -199,9 +202,9 @@ export function InstitutionAnnouncementsPanel({ token, institutionId, noAudience
           <th scope="row"><strong>{announcement.title}</strong><span>{announcement.body}</span></th>
           <td>{audienceLabel(announcement.audience)}</td>
           <td>{announcementStateLabel(announcement)}</td>
-          <td>{announcement.delivery ? announcement.delivery.recipients : 'NA'}</td>
+          <td>{announcement.delivery ? announcement.delivery.recipients : announcement.state === 'SENT' ? MISSING_TEXT : 'None'}</td>
           <td>{announcementEmailSummary(announcement)}</td>
-          <td>{announcement.state === 'SCHEDULED' ? <button type="button" className="secondary" onClick={() => void cancel(announcement)}>Cancel</button> : 'NA'}</td>
+          <td>{announcement.state === 'SCHEDULED' ? <button type="button" className="secondary" onClick={() => void cancel(announcement)}>Cancel</button> : 'None'}</td>
         </tr>)}</tbody></table></div>}
       {data.nextCursor ? <div className="role-record-actions"><button type="button" className="secondary" onClick={() => void more()}>Load more announcements</button></div> : null}
     </section> : null}

@@ -95,7 +95,7 @@ export function OpportunityRequirementsSection({ requirements, canEdit, editing,
     {skills.length ? <ul className="hiring-chips">{skills.map((skill) => <li key={skill.name} className={skill.level === 'REQUIRED' ? 'hiring-chip required' : 'hiring-chip'}>
       {skill.name}{skill.level === 'PREFERRED' ? ' (preferred)' : ' (required)'}{skill.catalogue ? '' : ' · not in the ONE catalogue'}
     </li>)}</ul> : <p>No skills listed.</p>}
-    <p className="hiring-meta">Catalogue role: {requirements?.careerRole ? `${requirements.careerRole.title} (${requirements.careerRole.code})` : 'NA'}</p>
+    <p className="hiring-meta">Catalogue role: {requirements?.careerRole ? `${requirements.careerRole.title} (${requirements.careerRole.code})` : 'None linked'}</p>
     <h3>Selection stages</h3>
     {stages.length ? <ol className="hiring-stages">{stages.map((stage) => <li key={stage.order}>{stage.label} <span className="hiring-meta">({stageKindLabels[stage.kind] ?? stage.kind}){stage.detail ? ` — ${stage.detail}` : ''}</span></li>)}</ol>
       : <p>No stages set. Applicants move through the standard pipeline until you add them.</p>}

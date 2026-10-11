@@ -79,24 +79,27 @@ interface NavItem {
   readonly icon: IconName;
   readonly group: 'Plan' | 'Prepare' | 'Apply' | 'Account';
   readonly route: RouteKey;
+  /** The rail's short label, from the approved student-home rail (approved 2026-10-11). Only the
+   *  desktop rail shows it; the full label stays the accessible name, the tooltip and the drawer text. */
+  readonly short?: string;
 }
 
 const navItems: readonly NavItem[] = [
   { label: 'Home', path: '/student', icon: 'home', group: 'Plan', route: 'dashboard' },
   { label: 'My Career', path: '/student/career-path', icon: 'career', group: 'Plan', route: 'career-path' },
-  { label: 'AI Career Coach', path: '/student/ai-coach', icon: 'coach', group: 'Plan', route: 'ai-coach' },
-  { label: 'Career Tools', path: '/student/career-tools', icon: 'tools', group: 'Plan', route: 'career-tools' },
+  { label: 'AI Career Coach', short: 'AI Coach', path: '/student/ai-coach', icon: 'coach', group: 'Plan', route: 'ai-coach' },
+  { label: 'Career Tools', short: 'Tools', path: '/student/career-tools', icon: 'tools', group: 'Plan', route: 'career-tools' },
   { label: 'Readiness', path: '/student/readiness', icon: 'readiness', group: 'Prepare', route: 'readiness' },
   { label: 'Skills', path: '/student/skills', icon: 'skills', group: 'Prepare', route: 'skills' },
-  { label: 'Assessments', path: '/student/assessments', icon: 'assessments', group: 'Prepare', route: 'assessments' },
+  { label: 'Assessments', short: 'Assess', path: '/student/assessments', icon: 'assessments', group: 'Prepare', route: 'assessments' },
   { label: 'Learning', path: '/student/learning', icon: 'learning', group: 'Prepare', route: 'learning' },
   { label: 'Practice', path: '/student/practice', icon: 'practice', group: 'Prepare', route: 'practice' },
-  { label: 'Company Prep', path: '/student/company-prep', icon: 'company', group: 'Prepare', route: 'company-prep' },
+  { label: 'Company Prep', short: 'Company', path: '/student/company-prep', icon: 'company', group: 'Prepare', route: 'company-prep' },
   { label: 'Experience', path: '/student/experience', icon: 'experience', group: 'Prepare', route: 'experience' },
   // ADR-052: appended at the end of Prepare; nothing above or below moves.
   { label: 'Ask ONE to explain', path: '/student/explain', icon: 'coach', group: 'Prepare', route: 'explain' },
-  { label: 'Opportunities', path: '/student/opportunities', icon: 'opportunities', group: 'Apply', route: 'opportunities' },
-  { label: 'Applications', path: '/student/applications', icon: 'applications', group: 'Apply', route: 'applications' },
+  { label: 'Opportunities', short: 'Explore', path: '/student/opportunities', icon: 'opportunities', group: 'Apply', route: 'opportunities' },
+  { label: 'Applications', short: 'Applied', path: '/student/applications', icon: 'applications', group: 'Apply', route: 'applications' },
   { label: 'Interviews', path: '/student/interviews', icon: 'interviews', group: 'Apply', route: 'interviews' },
   { label: 'Calendar', path: '/student/calendar', icon: 'calendar', group: 'Apply', route: 'calendar' },
   { label: 'Scholarships', path: '/student/scholarships', icon: 'scholarships', group: 'Apply', route: 'scholarships' },
@@ -429,7 +432,7 @@ export function App(): React.ReactElement {
   }
 
   if (rolePortal) {
-    return <RolePortal portal={rolePortal} apiHealth={apiHealth} authStatus={authStatus} authNotice={authNotice} onSignIn={handleHostedSignIn} onSignOut={handleSignOut} showDevelopmentIndicators={showDevelopmentIndicators} onNavigate={() => setPath(currentPath())} demoMode={Boolean(demoPath)} authenticatedWorkspace={activeWorkspace ? { role: activeWorkspace.role, organizationId: activeWorkspace.organizationId, ...(activeWorkspace.capabilities ? { capabilities: activeWorkspace.capabilities } : {}) } : undefined} />;
+    return <RolePortal portal={rolePortal} apiHealth={apiHealth} authStatus={authStatus} authNotice={authNotice} onSignIn={handleHostedSignIn} onSignOut={handleSignOut} showDevelopmentIndicators={showDevelopmentIndicators} onNavigate={() => setPath(currentPath())} demoMode={Boolean(demoPath)} authenticatedWorkspace={activeWorkspace ? { role: activeWorkspace.role, organizationId: activeWorkspace.organizationId, ...(activeWorkspace.capabilities ? { capabilities: activeWorkspace.capabilities } : {}), ...(workspaceResolution.state === 'resolved' ? { workspaceCount: workspaceResolution.choices.length } : {}) } : undefined} />;
   }
 
   if (!demoPath && authenticated) {
@@ -450,6 +453,7 @@ export function App(): React.ReactElement {
       onSignIn={handleHostedSignIn}
       onSignOut={handleSignOut}
       workspace={activeWorkspace ?? undefined}
+      workspaceCount={workspaceResolution.state === 'resolved' ? workspaceResolution.choices.length : 0}
     />;
   }
 
@@ -782,7 +786,7 @@ function DemoStudentShell(props: Parameters<typeof StudentShell>[0]): React.Reac
   />;
 }
 
-function StudentShell({ apiHealth, authNotice, authStatus, currentStudent, demoMode, drawerOpen, menuButtonRef, path, route, setDrawerOpen, setPath, setSidebarCollapsed, sidebarCollapsed, onSignIn, onSignOut, workspace, onMessages, onNotifications }: { readonly apiHealth: ApiHealth; readonly authNotice: string; readonly authStatus: AuthStatus; readonly currentStudent: CurrentStudentState; readonly demoMode: boolean; readonly drawerOpen: boolean; readonly menuButtonRef: React.RefObject<HTMLButtonElement | null>; readonly path: string; readonly route: RouteKey; readonly setDrawerOpen: React.Dispatch<React.SetStateAction<boolean>>; readonly setPath: React.Dispatch<React.SetStateAction<string>>; readonly setSidebarCollapsed: React.Dispatch<React.SetStateAction<boolean>>; readonly sidebarCollapsed: boolean; readonly onSignIn: () => void; readonly onSignOut: () => void; readonly workspace?: AuthorizedWorkspace | undefined; readonly onMessages?: () => void; readonly onNotifications?: () => void }): React.ReactElement {
+function StudentShell({ apiHealth, authNotice, authStatus, currentStudent, demoMode, drawerOpen, menuButtonRef, path, route, setDrawerOpen, setPath, setSidebarCollapsed, sidebarCollapsed, onSignIn, onSignOut, workspace, workspaceCount = 0, onMessages, onNotifications }: { readonly apiHealth: ApiHealth; readonly authNotice: string; readonly authStatus: AuthStatus; readonly currentStudent: CurrentStudentState; readonly demoMode: boolean; readonly drawerOpen: boolean; readonly menuButtonRef: React.RefObject<HTMLButtonElement | null>; readonly path: string; readonly route: RouteKey; readonly setDrawerOpen: React.Dispatch<React.SetStateAction<boolean>>; readonly setPath: React.Dispatch<React.SetStateAction<string>>; readonly setSidebarCollapsed: React.Dispatch<React.SetStateAction<boolean>>; readonly sidebarCollapsed: boolean; readonly onSignIn: () => void; readonly onSignOut: () => void; readonly workspace?: AuthorizedWorkspace | undefined; readonly workspaceCount?: number; readonly onMessages?: () => void; readonly onNotifications?: () => void }): React.ReactElement {
   function navigate(item: NavItem): void {
     const nextPath = demoMode ? demoRouteFor(item.path) : item.path;
     window.history.pushState(null, '', nextPath);
@@ -794,10 +798,11 @@ function StudentShell({ apiHealth, authNotice, authStatus, currentStudent, demoM
     setDrawerOpen(false);
     menuButtonRef.current?.focus();
   }
+  const phone = usePhoneLayout();
 
   return (
     <ConsentGate>
-    <div className={`student-shell ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+    <div className={`student-shell ${sidebarCollapsed ? 'sidebar-collapsed' : ''}${phone ? ' has-tabbar' : ''}`}>
       <a className="skip-link" href="#main-content">Skip to content</a>
       <Sidebar path={path} collapsed={sidebarCollapsed} drawerOpen={drawerOpen} onNavigate={navigate} onCollapse={() => { rememberSidebarCollapsed(!sidebarCollapsed); setSidebarCollapsed(!sidebarCollapsed); }} onClose={closeDrawer} />
       {drawerOpen ? <button className="drawer-scrim" type="button" aria-label="Close navigation" onClick={closeDrawer} /> : null}
@@ -817,6 +822,7 @@ function StudentShell({ apiHealth, authNotice, authStatus, currentStudent, demoM
           onSignOut={onSignOut}
           workspace={workspace}
           currentStudent={currentStudent}
+          onSwitchWorkspace={!demoMode && workspaceCount > 1 ? () => { window.history.pushState(null, '', '/'); setPath('/'); } : undefined}
         />
         <main id="main-content" className="student-main">
           {demoMode && showDevelopmentIndicators ? <PreviewBadge apiHealth={apiHealth} /> : null}
@@ -826,6 +832,7 @@ function StudentShell({ apiHealth, authNotice, authStatus, currentStudent, demoM
           <RouteScreen route={route} authenticated={authStatus.state === 'authenticated'} currentStudent={currentStudent} />
         </main>
       </div>
+      {phone ? <StudentTabBar path={path} onNavigate={navigate} onMore={() => setDrawerOpen(true)} moreOpen={drawerOpen} /> : null}
       <AssistantWidget persona="student" />
     </div>
     </ConsentGate>
@@ -845,6 +852,18 @@ function StudentPreviewStatus({ authenticated }: { readonly authenticated: boole
   );
 }
 
+/** Settings and Help & FAQ sit in the sidebar footer (approved 2026-10-11), with their labels and routes. */
+const footerRoutes: ReadonlySet<RouteKey> = new Set<RouteKey>(['settings', 'help']);
+
+function RailItem({ item, active, onNavigate }: { readonly item: NavItem; readonly active: boolean; readonly onNavigate: (item: NavItem) => void }): React.ReactElement {
+  // A short rail label is drawn beside the full one; CSS shows the short one on the desktop rail
+  // and the full one in the drawer. The accessible name is always the full label.
+  return <button type="button" className={`side-nav-item one-icon-host ${active ? 'active' : ''}`} aria-current={active ? 'page' : undefined} aria-label={item.label} title={item.label} onClick={() => onNavigate(item)}>
+    <span className="rail-tile"><Icon name={item.icon} size={20} active={active} animated /></span>
+    {item.short ? <span className="rail-label has-short"><span className="rail-short" aria-hidden="true">{item.short}</span><span className="rail-full">{item.label}</span></span> : <span className="rail-label">{item.label}</span>}
+  </button>;
+}
+
 function Sidebar({ path, collapsed, drawerOpen, onNavigate, onCollapse, onClose }: { readonly path: string; readonly collapsed: boolean; readonly drawerOpen: boolean; readonly onNavigate: (item: NavItem) => void; readonly onCollapse: () => void; readonly onClose: () => void }): React.ReactElement {
   const groups = ['Plan', 'Prepare', 'Apply', 'Account'] as const;
   const current = normalizePath(path);
@@ -855,21 +874,60 @@ function Sidebar({ path, collapsed, drawerOpen, onNavigate, onCollapse, onClose 
       <div className="sidebar-brand"><BrandLogo height={collapsed ? 36 : 30} compact={collapsed} /><span className="brand-copy"><small>LEARN | PREPARE | BUILD | GROW</small></span><button className="icon-button sidebar-close" type="button" aria-label="Close navigation" onClick={onClose} autoFocus={drawerOpen}><Icon name="close" size={20} /></button></div>
       <nav className="sidebar-nav" aria-label="Grouped Student navigation">
         <NavIndicator activeKey={current} layoutKey={`${collapsed}-${drawerOpen}`} />
-        {groups.map((group) => <div className="nav-group" key={group}><span className="nav-group-label">{group}</span>{navItems.filter((item) => item.group === group).map((item) => { const glyph = item.icon; const active = current === item.path; return <button key={item.path} type="button" className={`side-nav-item one-icon-host ${active ? 'active' : ''}`} aria-current={active ? 'page' : undefined} aria-label={item.label} title={item.label} onClick={() => onNavigate(item)}><span className="rail-tile"><Icon name={glyph} size={20} active={active} animated /></span><span className="rail-label">{item.label}</span></button>; })}</div>)}
+        {groups.map((group) => <div className="nav-group" key={group}><span className="nav-group-label">{group}</span>{navItems.filter((item) => item.group === group && !footerRoutes.has(item.route)).map((item) => <RailItem key={item.path} item={item} active={current === item.path} onNavigate={onNavigate} />)}</div>)}
       </nav>
-      <div className="sidebar-footer"><button className="collapse-button" type="button" onClick={onCollapse} aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}><span className="rail-tile">{collapsed ? <Icon name="collapse-rail" size={20} className="one-icon--flip" /> : <Icon name="collapse-rail" size={20} />}</span><span className="rail-label">{collapsed ? 'Expand' : 'Collapse'}</span></button></div>
+      <div className="sidebar-footer">
+        <div className="sidebar-footer-links" role="group" aria-label="Settings and help">{navItems.filter((item) => footerRoutes.has(item.route)).map((item) => <RailItem key={item.path} item={item} active={current === item.path} onNavigate={onNavigate} />)}</div>
+        <button className="collapse-button" type="button" onClick={onCollapse} aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}><span className="rail-tile">{collapsed ? <Icon name="collapse-rail" size={20} className="one-icon--flip" /> : <Icon name="collapse-rail" size={20} />}</span><span className="rail-label">{collapsed ? 'Expand' : 'Collapse'}</span></button>
+      </div>
     </aside>
   );
 }
 
-function TopBar({ apiHealth, authNotice, authStatus, showDevelopmentIndicators, menuButtonRef, onOpenMenu, onMessages, onNotifications, onProfile, profileActive, onSignIn, onSignOut, workspace, currentStudent }: { readonly apiHealth: ApiHealth; readonly authNotice: string; readonly authStatus: AuthStatus; readonly showDevelopmentIndicators: boolean; readonly menuButtonRef: React.RefObject<HTMLButtonElement | null>; readonly onOpenMenu: () => void; readonly onMessages: () => void; readonly onNotifications: () => void; readonly onProfile: () => void; readonly profileActive: boolean; readonly onSignIn: () => void; readonly onSignOut: () => void; readonly workspace?: AuthorizedWorkspace | undefined; readonly currentStudent: CurrentStudentState }): React.ReactElement {
+/** The phone tab bar (unified/mobile.html), beside the drawer: four destinations and "More", which opens the full drawer. */
+const tabBarItems: readonly { readonly label: string; readonly route: RouteKey }[] = [
+  { label: 'Home', route: 'dashboard' }, { label: 'Readiness', route: 'readiness' }, { label: 'Learning', route: 'learning' },
+  // Explore is the approved tab name for Opportunities.
+  { label: 'Explore', route: 'opportunities' },
+];
+
+/** Phones only: true while the viewport is 760px or narrower. Without matchMedia (tests, old browsers) it stays false. */
+const PHONE_QUERY = '(max-width: 760px)';
+function usePhoneLayout(): boolean {
+  const [phone, setPhone] = useState(() => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia(PHONE_QUERY).matches);
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return undefined;
+    const query = window.matchMedia(PHONE_QUERY);
+    const update = (): void => setPhone(query.matches);
+    update();
+    query.addEventListener?.('change', update);
+    return () => query.removeEventListener?.('change', update);
+  }, []);
+  return phone;
+}
+
+function StudentTabBar({ path, onNavigate, onMore, moreOpen }: { readonly path: string; readonly onNavigate: (item: NavItem) => void; readonly onMore: () => void; readonly moreOpen: boolean }): React.ReactElement {
+  const current = normalizePath(path);
+  return <nav className="student-tabbar" aria-label="Student quick navigation">
+    {tabBarItems.map((tab) => {
+      const item = navItems.find((entry) => entry.route === tab.route)!;
+      const active = current === item.path;
+      return <button key={tab.route} type="button" className={`tabbar-item one-icon-host ${active ? 'active' : ''}`} aria-current={active ? 'page' : undefined} aria-label={item.label} title={item.label} onClick={() => onNavigate(item)}>
+        <Icon name={item.icon} size={24} active={active} animated /><span>{tab.label}</span>
+      </button>;
+    })}
+    <button type="button" className="tabbar-item" aria-label="More navigation" aria-expanded={moreOpen} onClick={onMore}><Icon name="more-horizontal" size={24} /><span>More</span></button>
+  </nav>;
+}
+
+function TopBar({ apiHealth, authNotice, authStatus, showDevelopmentIndicators, menuButtonRef, onOpenMenu, onMessages, onNotifications, onProfile, profileActive, onSignIn, onSignOut, workspace, currentStudent, onSwitchWorkspace }: { readonly apiHealth: ApiHealth; readonly authNotice: string; readonly authStatus: AuthStatus; readonly showDevelopmentIndicators: boolean; readonly menuButtonRef: React.RefObject<HTMLButtonElement | null>; readonly onOpenMenu: () => void; readonly onMessages: () => void; readonly onNotifications: () => void; readonly onProfile: () => void; readonly profileActive: boolean; readonly onSignIn: () => void; readonly onSignOut: () => void; readonly workspace?: AuthorizedWorkspace | undefined; readonly currentStudent: CurrentStudentState; readonly onSwitchWorkspace?: (() => void) | undefined }): React.ReactElement {
   const identity = studentIdentityFromAuth(authStatus, currentStudent);
   return (
     <header className="student-topbar">
       <button ref={menuButtonRef} className="icon-button mobile-menu-button" type="button" onClick={onOpenMenu} aria-label="Open student navigation"><Icon name="menu" size={20} /></button>
       <span className="topbar-brand"><BrandLogo height={28} /></span>
       <label className="global-search" role="search"><Icon name="search" size={16} /><span className="sr-only">Search student workspace</span><input placeholder="Search opportunities, skills, assessments..." /></label>
-      <div className="topbar-actions"><ThemeToggle /><StudentMessagesFlyout /><StudentNotificationsBell /><AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />{showDevelopmentIndicators ? <span className={`api-dot ${apiHealth}`}>{apiHealth === 'online' ? 'API Online' : apiHealth === 'offline' ? 'API Offline' : 'Checking'}</span> : null}<button className="profile-menu" type="button" aria-label="Student profile menu" onClick={onProfile} disabled={profileActive}><span className="avatar">{identity.initials}</span><span><strong>{identity.name}</strong><small>{workspace ? `Role: ${roleLabel(workspace.role)}` : identity.detail}</small></span><Icon name="chevron-down" size={16} /></button></div>
+      <div className="topbar-actions">{onSwitchWorkspace ? <button type="button" className="secondary role-switch" onClick={onSwitchWorkspace}><Icon name="switch-workspace" size={16} /><span className="role-switch-label">Switch workspace</span></button> : null}<ThemeToggle /><StudentMessagesFlyout /><StudentNotificationsBell /><AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />{showDevelopmentIndicators ? <span className={`api-dot ${apiHealth}`}>{apiHealth === 'online' ? 'API Online' : apiHealth === 'offline' ? 'API Offline' : 'Checking'}</span> : null}<button className="profile-menu" type="button" aria-label="Student profile menu" onClick={onProfile} disabled={profileActive}><span className="avatar">{identity.initials}</span><span><strong>{identity.name}</strong><small>{workspace ? `Role: ${roleLabel(workspace.role)}` : identity.detail}</small></span><Icon name="chevron-down" size={16} /></button></div>
     </header>
   );
 }

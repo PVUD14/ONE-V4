@@ -6,7 +6,8 @@
  * Faculty and Staff, and the lecturer's Assessment Detail and class Reports. Each is a
  * department-scoped version of an admin module: the server decides whose students are
  * counted (the INST-02 scope helper) and suppresses small groups, and nothing is filtered
- * or counted for security here. Missing sources read NA; a group under five reads <5;
+ * or counted for security here. A figure with no source is hidden (or reads "Not recorded" in a
+ * table cell); a group under five reads <5;
  * readiness is bands only; offers show whether one exists and how the student answered,
  * never pay.
  */
@@ -45,6 +46,7 @@ import { InstitutionWorkspaceError, RestrictedApiState, formatApiError, isInstit
 import type { AuthenticatedWorkspaceSummary } from './shared.js';
 import { supportCodeSuffix } from '../supportCode.js';
 import { NaValue, PilotKpi } from '../naState.js';
+import { MISSING_TEXT } from '../labels.js';
 import { SmallCount, SuppressedBlock, SuppressedLegend, SMALL_COUNT_TEXT, isSmallCountText, partitionNeedsRanges } from '../momentum/smallCount.js';
 import { BandClimb } from '../momentum/bandClimb.js';
 import {
@@ -99,7 +101,8 @@ export function PageHead({ title, summary, scopeLabel }: { readonly title: strin
   return <div className="pilot-page-head"><div className="pilot-greeting"><h1>{title}</h1><p>{summary}</p>{scopeLabel ? <p>Showing students in {scopeLabel}.</p> : null}</div></div>;
 }
 
-export function Kpis({ items }: { readonly items: readonly (readonly [string, string, string, IconName])[] }): React.ReactElement {
+/** A KPI row; a null value has no source yet (still loading, or not sent) and its card is hidden. */
+export function Kpis({ items }: { readonly items: readonly (readonly [string, string | null, string, IconName])[] }): React.ReactElement {
   return <div className={`pilot-row cols-${items.length}`}>
     {items.map(([label, value, tone, glyph]) => <PilotKpi key={label} icon={<Icon name={glyph} size={16} />} tone={tone} value={value} label={label} />)}
   </div>;
@@ -113,13 +116,13 @@ export function SuppressedFunnel({ table, labels }: { readonly table: Suppressed
   return <div className="pilot-funnel">
     {keys.map((key) => {
       const cell = cells.get(key);
-      const value = !table ? 'NA' : table.suppressed ? SMALL_COUNT_TEXT : suppressedCountLabel(cell ?? null);
+      const value = !table ? null : table.suppressed ? SMALL_COUNT_TEXT : suppressedCountLabel(cell ?? null);
       return <div key={key} className="pilot-funnel-row">
         <span>{labels[key]}</span>
         {isSmallCountText(value)
           ? <div className="sc-slot" aria-hidden="true"><SuppressedBlock /></div>
           : <div className="pilot-bar"><i style={{ width: `${((cell && !cell.suppressed ? cell.count ?? 0 : 0) / max) * 100}%` }} /></div>}
-        <span className="num"><NaValue value={value} /></span>
+        {value === null ? null : <span className="num"><NaValue value={value} /></span>}
       </div>;
     })}
     {keys.some((key) => table && (table.suppressed || isSmallCountText(suppressedCountLabel(cells.get(key) ?? null)))) ? <SuppressedLegend /> : null}
@@ -193,7 +196,7 @@ export function VerificationCard({ summary, onOpen }: { readonly summary: Verifi
   return <section className="pilot-card">
     <div className="pilot-card-head"><h2>Academic Verification</h2><button type="button" className="pilot-link" onClick={onOpen}>Review Queue</button></div>
     <div className="pilot-legend">
-      <div><i /> Waiting for a decision <span className="num">{summary ? summary.pending : 'NA'}</span></div>
+      <div><i /> Waiting for a decision {summary ? <span className="num">{summary.pending}</span> : null}</div>
     </div>
   </section>;
 }
@@ -210,10 +213,10 @@ export function DepartmentBatchesPage({ authenticatedWorkspace }: WorkspaceProps
       <p>The batches of your department as your institution has structured them. The structure is read-only here; your institution administrator changes it.</p>
       {institutionStudentScopeLabel(overview.data?.scope) ? <p>Showing students in {institutionStudentScopeLabel(overview.data?.scope)}.</p> : null}</div></div>
     <div className="v2-row v2-cols-4 career-stat-strip role-wide">
-      <V2Stat icon="🗂️" tone="blue" value={overview.data ? batches.length : 'NA'} label="Batches" />
-      <V2Stat icon="🎓" tone="purple" value={overview.data ? overview.data.students.onRoster : 'NA'} label="Students on roster" />
-      <V2Stat icon="✅" tone="green" value={overview.data ? overview.data.students.current : 'NA'} label="Currently enrolled" />
-      <V2Stat icon="✉️" tone="amber" value={overview.data ? overview.data.activation.ACTIVATED : 'NA'} label="Activated" />
+      <V2Stat icon="🗂️" tone="blue" value={overview.data ? batches.length : null} label="Batches" />
+      <V2Stat icon="🎓" tone="purple" value={overview.data ? overview.data.students.onRoster : null} label="Students on roster" />
+      <V2Stat icon="✅" tone="green" value={overview.data ? overview.data.students.current : null} label="Currently enrolled" />
+      <V2Stat icon="✉️" tone="amber" value={overview.data ? overview.data.activation.ACTIVATED : null} label="Activated" />
     </div>
     {overview.error ? <p className="form-error" role="alert">{overview.error}</p> : null}
     {!overview.data && !overview.error ? <p role="status">Loading batches…</p> : null}
@@ -221,7 +224,7 @@ export function DepartmentBatchesPage({ authenticatedWorkspace }: WorkspaceProps
       note="Your department has no batch units. Your institution administrator adds them under Academic Structure." /></div> : null}
     {batches.length ? <div className="role-record-table-wrap"><table className="role-record-table"><caption className="sr-only">Department batches</caption>
       <thead><tr><th scope="col">Batch</th><th scope="col">Programme or department</th><th scope="col">On roster</th><th scope="col">Currently enrolled</th><th scope="col">Activated</th></tr></thead>
-      <tbody>{batches.map((batch) => <tr key={batch.id} className="role-record-row"><th scope="row">{batch.name}</th><td>{batch.parentName ?? 'NA'}</td>
+      <tbody>{batches.map((batch) => <tr key={batch.id} className="role-record-row"><th scope="row">{batch.name}</th><td>{batch.parentName ?? MISSING_TEXT}</td>
         <td>{batch.students}</td><td>{batch.current}</td><td>{batch.activated}</td></tr>)}</tbody></table></div> : null}
   </section>;
 }
@@ -236,7 +239,7 @@ export function DepartmentReadinessPage({ authenticatedWorkspace, children }: Wo
     <PageHead title="Readiness" summary="Readiness bands for your department — advisory bands, never scores. A band with fewer than five students reads <5." scopeLabel={institutionStudentScopeLabel(overview.data?.scope)} />
     {overview.error ? <p className="form-error" role="alert">{overview.error}</p> : null}
     <section className="pilot-card">
-      <div className="pilot-card-head"><h2>Last month</h2><small style={{ color: 'var(--p-muted)' }}>{overview.data?.readiness.month ?? 'NA'}</small></div>
+      <div className="pilot-card-head"><h2>Last month</h2>{overview.data?.readiness.month ? <small style={{ color: 'var(--p-muted)' }}>{overview.data.readiness.month}</small> : null}</div>
       <ReadinessBands month={overview.data?.readiness.month ?? null} aggregate={overview.data?.readiness.aggregate ?? null} />
     </section>
     <InstitutionReportsPage key={authenticatedWorkspace?.organizationId ?? ''} institutionId={authenticatedWorkspace?.organizationId ?? ''} />
@@ -258,9 +261,9 @@ export function PlacementPipelinePage({ authenticatedWorkspace, basePath, statis
       {pipeline.error ? <p className="form-error" role="alert">{pipeline.error}</p> : null}
       {!data && !pipeline.error ? <p role="status">Loading the placement pipeline…</p> : null}
       <Kpis items={[
-        ['Students sharing applications', data ? suppressedCountLabel(data.studentsSharing) : 'NA', 'blue', 'applications'],
-        ['Shared applications', data ? (data.stages.suppressed ? SMALL_COUNT_TEXT : suppressedCountLabel(data.stages.total)) : 'NA', 'indigo', 'applications'],
-        ['Offers', data ? (data.offers.suppressed ? SMALL_COUNT_TEXT : suppressedCountLabel(data.offers.total)) : 'NA', 'green', 'offers'],
+        ['Students sharing applications', data ? suppressedCountLabel(data.studentsSharing) : null, 'blue', 'applications'],
+        ['Shared applications', data ? (data.stages.suppressed ? SMALL_COUNT_TEXT : suppressedCountLabel(data.stages.total)) : null, 'indigo', 'applications'],
+        ['Offers', data ? (data.offers.suppressed ? SMALL_COUNT_TEXT : suppressedCountLabel(data.offers.total)) : null, 'green', 'offers'],
       ]} />
       <section className="pilot-card">
         <div className="pilot-card-head"><h2>Applications by stage</h2><button type="button" className="pilot-link" onClick={() => go(`${basePath}/opportunities-and-offers`)}>Opportunities and Offers</button></div>
@@ -325,10 +328,10 @@ export function OpportunitiesAndOffersPage({ authenticatedWorkspace }: Workspace
     <div className="role-page-heading"><div><span className="eyebrow">Your department</span><h1>Opportunities and Offers</h1>
       <p>The opportunities your students have applied to and shared with the college, with whether an offer was made and how the student answered. Offer pay and terms are never shown to the college.</p></div></div>
     <div className="v2-row v2-cols-4 career-stat-strip role-wide">
-      <V2Stat icon="📨" tone="blue" value={rows ? rows.length + (nextCursor ? '+' : '') : 'NA'} label="Shared applications loaded" />
-      <V2Stat icon="🤝" tone="green" value={rows ? offers.length : 'NA'} label="With an offer" />
-      <V2Stat icon="✅" tone="teal" value={rows ? offers.filter((row) => row.offer.responseState === 'ACCEPTED').length : 'NA'} label="Offers accepted" />
-      <V2Stat icon="🏢" tone="purple" value={rows ? new Set(rows.map((row) => row.employer.name)).size : 'NA'} label="Employers" />
+      <V2Stat icon="📨" tone="blue" value={rows ? rows.length + (nextCursor ? '+' : '') : null} label="Shared applications loaded" />
+      <V2Stat icon="🤝" tone="green" value={rows ? offers.length : null} label="With an offer" />
+      <V2Stat icon="✅" tone="teal" value={rows ? offers.filter((row) => row.offer.responseState === 'ACCEPTED').length : null} label="Offers accepted" />
+      <V2Stat icon="🏢" tone="purple" value={rows ? new Set(rows.map((row) => row.employer.name)).size : null} label="Employers" />
     </div>
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {!rows && !error ? <p role="status">Loading shared applications…</p> : null}
@@ -338,8 +341,8 @@ export function OpportunitiesAndOffersPage({ authenticatedWorkspace }: Workspace
       <thead><tr><th scope="col">Student</th><th scope="col">Employer</th><th scope="col">Opportunity</th><th scope="col">Stage</th><th scope="col">Offer</th><th scope="col">Last update</th></tr></thead>
       <tbody>{rows.map((row) => <tr key={row.id} className="role-record-row">
         <th scope="row"><strong>{row.student.fullName}</strong><span>{row.student.institutionStudentId}</span></th>
-        <td>{row.employer.name}</td><td>{row.opportunityTitle}</td><td>{applicationStageLabels[row.state] ?? 'NA'}</td>
-        <td>{row.offer.exists ? offerResponseLabels[row.offer.responseState ?? ''] ?? 'NA' : 'No offer'}</td>
+        <td>{row.employer.name}</td><td>{row.opportunityTitle}</td><td>{applicationStageLabels[row.state] ?? MISSING_TEXT}</td>
+        <td>{row.offer.exists ? offerResponseLabels[row.offer.responseState ?? ''] ?? 'Not answered yet' : 'No offer'}</td>
         <td>{row.updatedAt.slice(0, 10)}</td>
       </tr>)}</tbody></table></div> : null}
     {nextCursor ? <div className="role-record-actions"><button type="button" className="secondary" onClick={() => void more()}>Load more applications</button></div> : null}
@@ -360,7 +363,7 @@ export function DepartmentReportsAnalyticsPage({ authenticatedWorkspace }: Works
       <p>Department summaries, counted by the server for your scope. Readiness is shown only as bands; any group under five reads &lt;5.</p>
       {institutionStudentScopeLabel(data?.scope) ? <p>Showing students in {institutionStudentScopeLabel(data?.scope)}.</p> : null}</div></div>
     {overview.error ? <p className="form-error" role="alert">{overview.error}</p> : null}
-    <section className="role-card role-wide"><h2>Department summary</h2>
+    {data ? <section className="role-card role-wide"><h2>Department summary</h2>
       <div className="role-record-table-wrap"><table className="role-record-table"><caption className="sr-only">Department summary</caption>
         <thead><tr><th scope="col">Measure</th><th scope="col">Value</th></tr></thead>
         <tbody>
@@ -375,16 +378,16 @@ export function DepartmentReportsAnalyticsPage({ authenticatedWorkspace }: Works
             ['Of them, completed', data?.assessments.completedStudents],
             ['Open interventions', data?.staffActions.openInterventions],
             ['Open tasks', data?.staffActions.openTasks],
-          ] as const).map(([label, value]) => <tr key={label}><th scope="row">{label}</th><td>{value ?? 'NA'}</td></tr>)}
+          ] as const).map(([label, value]) => <tr key={label}><th scope="row">{label}</th><td>{value ?? MISSING_TEXT}</td></tr>)}
         </tbody></table></div>
-    </section>
-    <section className="role-card role-wide"><h2>Shared applications by stage</h2>
-      {!stages ? <p>NA</p> : stages.suppressed ? <p>Withheld: fewer than five shared applications in your scope.</p>
+    </section> : null}
+    {stages ? <section className="role-card role-wide"><h2>Shared applications by stage</h2>
+      {stages.suppressed ? <p>Withheld: fewer than five shared applications in your scope.</p>
         : <div className="role-record-table-wrap"><table className="role-record-table"><caption className="sr-only">Applications by stage</caption>
           <thead><tr><th scope="col">Stage</th><th scope="col">Applications</th></tr></thead>
           <tbody>{stages.cells.map((cell) => <tr key={cell.key}><th scope="row">{applicationStageLabels[cell.key] ?? cell.key}</th><td><NaValue value={suppressedCountLabel(cell)} /></td></tr>)}
             <tr><th scope="row">Total</th><td><NaValue value={stages.total.suppressed ? 'withheld' : suppressedCountLabel(stages.total)} /></td></tr></tbody></table></div>}
-    </section>
+    </section> : null}
     {authenticatedWorkspace?.organizationId ? <InstitutionExportsPanel institutionId={authenticatedWorkspace.organizationId} /> : null}
     <InstitutionReportsPage key={authenticatedWorkspace?.organizationId ?? ''} institutionId={authenticatedWorkspace?.organizationId ?? ''} />
   </section>;
@@ -408,9 +411,9 @@ export function DepartmentStaffSection({ authenticatedWorkspace }: WorkspaceProp
     {rows.length ? <div className="role-record-table-wrap"><table className="role-record-table"><caption className="sr-only">Department staff</caption>
       <thead><tr><th scope="col">Staff member</th><th scope="col">Role</th><th scope="col">Scope</th><th scope="col">Teaching now</th></tr></thead>
       <tbody>{rows.map((member) => <tr key={member.email + member.role} className="role-record-row">
-        <th scope="row">{member.email}</th><td>{staffRoleLabels[member.role] ?? 'NA'}</td>
+        <th scope="row">{member.email}</th><td>{staffRoleLabels[member.role] ?? MISSING_TEXT}</td>
         <td>{[member.department, member.batch].filter(Boolean).join(' · ') || 'Whole institution'}</td>
-        <td>{member.assignments.length ? member.assignments.map((entry) => `${entry.subject ?? 'NA'} · ${entry.unitName} · ${entry.academicTerm}`).join('; ') : 'None'}</td>
+        <td>{member.assignments.length ? member.assignments.map((entry) => [entry.subject, entry.unitName, entry.academicTerm].filter(Boolean).join(' · ')).join('; ') : 'None'}</td>
       </tr>)}</tbody></table></div> : null}
   </section>;
 }
@@ -453,10 +456,10 @@ export function FacultyAssessmentDetailPage({ authenticatedWorkspace }: Workspac
       </section> : null}
       {error ? <p className="form-error" role="alert">{error}</p> : null}
       {exam ? <Kpis items={[
-        ['Assigned', summary ? String(summary.assigned) : 'NA', 'blue', 'students'],
-        ['Results in', summary ? String(summary.attempts) : 'NA', 'green', 'assessments'],
-        ['Not attempted', summary ? String(summary.notAttemptedCount) : 'NA', 'rose', 'warning'],
-        ['Class average', summary ? (summary.attempts >= 5 ? `${summary.averagePercentage}%` : '<5 results') : 'NA', 'indigo', 'learning'],
+        ['Assigned', summary ? String(summary.assigned) : null, 'blue', 'students'],
+        ['Results in', summary ? String(summary.attempts) : null, 'green', 'assessments'],
+        ['Not attempted', summary ? String(summary.notAttemptedCount) : null, 'rose', 'warning'],
+        ['Class average', summary ? (summary.attempts >= 5 ? `${summary.averagePercentage}%` : '<5 results') : null, 'indigo', 'learning'],
       ]} /> : null}
       {detail && results.length === 0 ? <p>No results yet for this assessment among your students.</p> : null}
       {results.length ? <section className="pilot-card"><div className="pilot-card-head"><h2>Results</h2></div>
@@ -468,11 +471,11 @@ export function FacultyAssessmentDetailPage({ authenticatedWorkspace }: Workspac
           </tr>)}</tbody></table></div></section> : null}
     </div>
     <aside className="pilot-rail">
-      <section className="pilot-card"><div className="pilot-card-head"><h2>Not attempted yet</h2></div>
-        {detail ? (detail.notAttempted.length ? <div className="pilot-list">{detail.notAttempted.slice(0, 12).map((entry) => <div key={entry.institutionStudentId} className="pilot-list-row">
+      {detail ? <section className="pilot-card"><div className="pilot-card-head"><h2>Not attempted yet</h2></div>
+        {detail.notAttempted.length ? <div className="pilot-list">{detail.notAttempted.slice(0, 12).map((entry) => <div key={entry.institutionStudentId} className="pilot-list-row">
           <div className="grow"><strong>{entry.studentName}</strong><small>{entry.inProgress ? 'In progress now' : 'Not started'}</small></div></div>)}</div>
-          : <p style={{ color: 'var(--p-muted)', margin: '4px 0' }}>Everyone assigned has a result.</p>) : <p style={{ color: 'var(--p-muted)', margin: '4px 0' }}>NA</p>}
-      </section>
+          : <p style={{ color: 'var(--p-muted)', margin: '4px 0' }}>Everyone assigned has a result.</p>}
+      </section> : null}
       {exam ? <section className="pilot-card"><div className="pilot-card-head"><h2>Window</h2></div>
         <p style={{ margin: '4px 0' }}>{exam.startsAt.slice(0, 10)} – {exam.endsAt.slice(0, 10)}</p></section> : null}
     </aside>
@@ -497,7 +500,7 @@ export function FacultyClassReportsPage({ authenticatedWorkspace }: WorkspacePro
       hint="Ask your institution admin or department head to assign you to a section or batch." /></div> : null}
     {(data?.classes ?? []).map((entry) => <section key={entry.unit.id} className="role-card role-wide" aria-label={entry.unit.name}>
       <h2>{entry.unit.name}</h2>
-      <p>{entry.subjects.length ? entry.subjects.join(', ') : 'Subject: NA'}</p>
+      {entry.subjects.length ? <p>{entry.subjects.join(', ')}</p> : null}
       <div className="v2-row v2-cols-4 career-stat-strip">
         <V2Stat icon="🎓" tone="blue" value={entry.students} label="Students" />
         <V2Stat icon="✅" tone="green" value={entry.activated} label="Activated" />

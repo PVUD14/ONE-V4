@@ -48,10 +48,16 @@ export const exitReasonLabels: Readonly<Record<string, string>> = {
   COLLEGE_RECORDS_POLICY: 'The college’s records policy',
 };
 
-function formatDate(value: string | null | undefined): string {
-  if (!value) return 'NA';
+function formatDate(value: string | null | undefined): string | null {
+  if (!value) return null;
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? 'NA' : dates.formatDate(date);
+  return Number.isNaN(date.getTime()) ? null : dates.formatDate(date);
+}
+
+/** " on 12 Oct 2026" when the date is recorded; nothing when it is not (never "NA"). */
+function on(value: string | null | undefined): string {
+  const text = formatDate(value);
+  return text ? ` on ${text}` : '';
 }
 
 function saveFile(filename: string, csv: string): void {
@@ -110,25 +116,25 @@ export function InstitutionDataTermsSection({ token, institutionId }: { readonly
     <h2>Data-processing terms</h2>
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {!terms && !error ? <p role="status">Loading the data-processing terms…</p> : null}
-    {terms ? <p><strong>Status:</strong> {termsStatusLabels[terms.status] ?? 'NA'}</p> : null}
+    {terms && termsStatusLabels[terms.status] ? <p><strong>Status:</strong> {termsStatusLabels[terms.status]}</p> : null}
     {terms && !current ? <p>AI8HT has not published data-processing terms yet, so there is nothing to accept. Nothing has been accepted on your college’s behalf, and adding students works as it does today.</p> : null}
     {current ? <>
       <p>
-        <strong>{current.title}</strong> · version {current.version} · published {formatDate(current.publishedAt)}{' '}
+        <strong>{current.title}</strong> · version {current.version}{formatDate(current.publishedAt) ? ` · published ${formatDate(current.publishedAt)}` : ''}{' '}
         {current.legalReviewState === 'DRAFT_FOR_LEGAL_REVIEW'
           ? <StatusBadge label="Draft — pending legal review" tone="warning" />
           : <StatusBadge label="Reviewed" tone="success" />}
       </p>
       {current.legalReviewState === 'DRAFT_FOR_LEGAL_REVIEW'
         ? <p className="hiring-meta">This text is a draft that has not finished legal review. It is not final.</p>
-        : <p className="hiring-meta">Legal review: {current.legalReviewReference ?? 'NA'}</p>}
+        : current.legalReviewReference ? <p className="hiring-meta">Legal review: {current.legalReviewReference}</p> : null}
       {current.changeSummary ? <p><strong>What changed:</strong> {current.changeSummary}</p> : null}
       <div style={{ whiteSpace: 'pre-wrap' }} aria-label="Terms text">{current.body}</div>
       <p role="status">{terms?.status === 'ACCEPTED'
         ? terms.currentVersionAccepted ? 'Your college has accepted these terms.' : 'Your college has accepted the terms it needs to; this latest version changed nothing that needs accepting again.'
         : 'An owner of your college must accept these terms before more students are added. Students already on ONE are not affected.'}</p>
       <p className="hiring-meta">{terms?.latestAcceptance
-        ? `Last accepted: version ${terms.latestAcceptance.version} on ${formatDate(terms.latestAcceptance.acceptedAt)} by ${terms.latestAcceptance.acceptedBy ?? 'NA'}.`
+        ? `Last accepted: version ${terms.latestAcceptance.version}${on(terms.latestAcceptance.acceptedAt)}${terms.latestAcceptance.acceptedBy ? ` by ${terms.latestAcceptance.acceptedBy}` : ''}.`
         : 'Not accepted yet.'}</p>
       {canAccept && !terms?.currentVersionAccepted
         ? <button type="button" disabled={busy} onClick={() => void accept(current.version)}>Accept version {current.version} for my college</button>
@@ -142,10 +148,10 @@ export function InstitutionDataTermsSection({ token, institutionId }: { readonly
 function exitStatus(exit: InstitutionExitDto | null): string {
   if (!exit) return 'Your college is using ONE. To leave, contact AI8HT operations; the exit export opens here once AI8HT records the notice.';
   switch (exit.state) {
-    case 'NOTICE': return `AI8HT recorded on ${formatDate(exit.noticeAt)} that your college’s agreement is ending. Take the exit export below before your college’s use of ONE ends.`;
-    case 'ENDED': return `Your college stopped using ONE on ${formatDate(exit.endedAt)}. Its records are kept until ${formatDate(exit.retentionEndsAt)} and can be restored until then.`;
-    case 'CANCELLED': return `The exit recorded on ${formatDate(exit.noticeAt)} was cancelled on ${formatDate(exit.cancelledAt)}. Your college is using ONE.`;
-    case 'PURGED': return `Your college’s records were deleted on ${formatDate(exit.purgedAt)}, after the retention period.`;
+    case 'NOTICE': return `AI8HT recorded${on(exit.noticeAt)} that your college’s agreement is ending. Take the exit export below before your college’s use of ONE ends.`;
+    case 'ENDED': return `Your college stopped using ONE${on(exit.endedAt)}. ${formatDate(exit.retentionEndsAt) ? `Its records are kept until ${formatDate(exit.retentionEndsAt)} and can be restored until then.` : 'Its records are kept for the retention period and can be restored until it ends.'}`;
+    case 'CANCELLED': return `The exit recorded${on(exit.noticeAt)} was cancelled${on(exit.cancelledAt)}. Your college is using ONE.`;
+    case 'PURGED': return `Your college’s records were deleted${on(exit.purgedAt)}, after the retention period.`;
   }
 }
 

@@ -1,6 +1,6 @@
 /**
  * The faculty cohort view (INST-15) on the lecturer's My Students page: real server data only,
- * NA with a plain explanation while students have not been asked for adaptive-learning consent,
+ * no figures, with a plain explanation, while students have not been asked for adaptive-learning consent,
  * safe error and forbidden states, actions that open the lecturer's existing screens, and the
  * faculty navigation unchanged (HG-3).
  */
@@ -76,7 +76,9 @@ describe('Learning across your students', () => {
     route({ cohort: { ...cohort, consent: { offered: false }, stuckSkills: [], misconceptions: [], misconceptionsWithheld: false }, due: { ...due, students: [] } });
     render(section());
     expect(await screen.findByText('No learning data to show yet')).toBeInTheDocument();
-    expect(screen.getAllByText('NA')).toHaveLength(4);
+    expect(screen.queryByText('Sharing learning data')).not.toBeInTheDocument();
+    expect(screen.queryByText('Reviews due')).not.toBeInTheDocument();
+    expect(screen.queryByText('NA')).not.toBeInTheDocument();
     expect(screen.queryByText('Stuck on the same skill')).not.toBeInTheDocument();
   });
 

@@ -19,6 +19,8 @@ export interface AuthenticatedWorkspaceSummary {
    * them (ADR-032). Undefined means the server did not say, and nothing is withheld on it.
    */
   readonly capabilities?: readonly string[];
+  /** How many workspaces the signed-in person may open. "Switch workspace" shows only above one. */
+  readonly workspaceCount?: number;
 }
 
 /**

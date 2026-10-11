@@ -50,33 +50,38 @@ const states = [
   { value: '', label: 'All' },
 ] as const;
 
-/** A plain sentence for the action; identifiers are never shown. */
+/** A plain sentence for the action; identifiers are never shown. A part the summary does not carry is left out, never "NA". */
 export function describeApproval(approval: OperationApprovalDto): string {
   const summary = approval.summary;
+  // " <before><value><after>" when the value is recorded, else nothing.
+  const part = (value: string | number | null | undefined, before = '', after = ''): string =>
+    (value === null || value === undefined || value === '' ? '' : `${before}${value}${after}`);
+  const org = summary.organizationName ?? 'an organisation';
+  const model = [part(summary.aiModel, 'model '), part(summary.aiPromptKey, 'prompt ') + part(summary.aiPromptVersion, ' v')].filter(Boolean).join(', ');
   switch (approval.actionKey) {
-    case 'ORGANIZATION_SUSPEND': return `Suspend ${summary.organizationName ?? 'NA'}`;
-    case 'FEATURE_FLAG_HIGH_RISK_CHANGE': return `${summary.enabled ? 'Enable' : 'Disable'} flag ${summary.flagKey ?? 'NA'}`;
-    case 'OUTBOX_BACKLOG_SUPERSEDE': return `Supersede pending events older than ${summary.olderThan ? formatDateTime(summary.olderThan) : 'NA'} (up to ${summary.limit ?? 'NA'})`;
-    case 'PRIVACY_HOLD_RELEASE': return `Release a legal hold (${summary.holdReason ?? 'NA'})`;
-    case 'CAPABILITY_GRANT_HIGH_RISK': return `Grant ${summary.capability ?? 'NA'} to ${summary.memberEmail ?? 'NA'}`;
+    case 'ORGANIZATION_SUSPEND': return `Suspend ${org}`;
+    case 'FEATURE_FLAG_HIGH_RISK_CHANGE': return `${summary.enabled ? 'Enable' : 'Disable'} ${summary.flagKey ? `flag ${summary.flagKey}` : 'a feature flag'}`;
+    case 'OUTBOX_BACKLOG_SUPERSEDE': return `Supersede pending events${summary.olderThan ? ` older than ${formatDateTime(summary.olderThan)}` : ''}${part(summary.limit, ' (up to ', ')')}`;
+    case 'PRIVACY_HOLD_RELEASE': return `Release a legal hold${part(summary.holdReason, ' (', ')')}`;
+    case 'CAPABILITY_GRANT_HIGH_RISK': return `Grant ${summary.capability ?? 'a capability'}${part(summary.memberEmail, ' to ')}`;
     case 'CAREER_REQUIREMENT_SET_PUBLISH':
-      return `Publish requirement set v${summary.careerSetVersion ?? 'NA'} for ${summary.careerRoleCatalogueCode ? `${summary.careerRoleCatalogueCode} ` : ''}${summary.careerRoleTitle ?? 'NA'} as ${summary.releaseLabel === 'VERIFIED' ? 'Verified' : 'Not yet verified'}`;
+      return `Publish requirement set${part(summary.careerSetVersion, ' v')}${summary.careerRoleCatalogueCode || summary.careerRoleTitle ? ` for ${[summary.careerRoleCatalogueCode, summary.careerRoleTitle].filter(Boolean).join(' ')}` : ''} as ${summary.releaseLabel === 'VERIFIED' ? 'Verified' : 'Not yet verified'}`;
     case 'CONTENT_SKILL_PUBLISH':
-      return `Publish revision ${summary.skillRevision ?? 'NA'} of the skill ${summary.skillName ?? 'NA'} (${summary.skillKey ?? 'NA'})`;
+      return `Publish ${summary.skillRevision != null ? `revision ${summary.skillRevision}` : 'a revision'} of the skill${part(summary.skillName, ' ')}${part(summary.skillKey, ' (', ')')}`;
     case 'CONTENT_QUESTION_PUBLISH':
-      return `Publish revision ${summary.questionRevision ?? 'NA'} of the question ${summary.questionKey ?? 'NA'} to the readiness check`;
+      return `Publish ${summary.questionRevision != null ? `revision ${summary.questionRevision}` : 'a revision'} of the question${part(summary.questionKey, ' ')} to the readiness check`;
     case 'CONTENT_LESSON_PUBLISH':
-      return `Publish revision ${summary.lessonRevision ?? 'NA'} of the lesson ${summary.lessonKey ?? 'NA'} (${summary.lessonVariant ?? 'NA'})`;
+      return `Publish ${summary.lessonRevision != null ? `revision ${summary.lessonRevision}` : 'a revision'} of the lesson${part(summary.lessonKey, ' ')}${part(summary.lessonVariant, ' (', ')')}`;
     case 'COMMS_TEMPLATE_PUBLISH':
-      return `Publish version ${summary.commsTemplateVersion ?? 'NA'} of the status notice template ${summary.commsTemplateKey ?? 'NA'}`;
+      return `Publish ${summary.commsTemplateVersion != null ? `version ${summary.commsTemplateVersion}` : 'a version'} of the status notice template${part(summary.commsTemplateKey, ' ')}`;
     case 'AI_FEATURE_ENABLE':
-      return `Switch on the AI feature ${summary.aiFeatureKey ?? 'NA'} (model ${summary.aiModel ?? 'NA'}, prompt ${summary.aiPromptKey ?? 'NA'} v${summary.aiPromptVersion ?? 'NA'})`;
+      return `Switch on the AI feature${part(summary.aiFeatureKey, ' ')}${model ? ` (${model})` : ''}`;
     case 'AI_FEATURE_LIMITS_RAISE':
-      return `Raise the limits of the AI feature ${summary.aiFeatureKey ?? 'NA'} to ${summary.aiCap ?? 'NA'} per ${summary.aiCapWindow === 'MONTH' ? 'month' : 'day'}, input up to ${summary.aiMaxInputChars ?? 'NA'} characters`;
+      return `Raise the limits of the AI feature${part(summary.aiFeatureKey, ' ')}${part(summary.aiCap, ' to ', ` per ${summary.aiCapWindow === 'MONTH' ? 'month' : 'day'}`)}${part(summary.aiMaxInputChars, ', input up to ', ' characters')}`;
     case 'INSTITUTION_DATA_PURGE':
-      return `Delete the records of ${summary.organizationName ?? 'NA'}, which has left ONE`;
+      return `Delete the records of ${org}, which has left ONE`;
     case 'AI_TUTOR_COLLEGE_ENABLE':
-      return `Switch the AI tutor on for ${summary.organizationName ?? 'NA'} (model ${summary.aiModel ?? 'NA'}, prompt ${summary.aiPromptKey ?? 'NA'} v${summary.aiPromptVersion ?? 'NA'})`;
+      return `Switch the AI tutor on for ${org}${model ? ` (${model})` : ''}`;
   }
 }
 
@@ -181,10 +186,10 @@ export function OperationsApprovalsPanel(): React.ReactElement | null {
   return <section className="role-module role-module--dense">
     {heading}
     <div className="v2-row v2-cols-4 career-stat-strip role-wide">
-      <V2Stat icon="🛡️" tone="teal" value={queue ? queue.approverCount : 'NA'} label="People who can approve" />
-      <V2Stat icon="⏳" tone="amber" value={queue ? (queue.soloSafeguardActive ? 'On' : 'Off') : 'NA'} label="Solo safeguard" />
-      <V2Stat icon="📋" tone="blue" value={queue ? approvals.length : 'NA'} label="Requests in this view" />
-      <V2Stat icon="👤" tone="purple" value={queue ? (queue.viewerIsApprover ? 'Approver' : 'Requester') : 'NA'} label="Your part" />
+      <V2Stat icon="🛡️" tone="teal" value={queue ? queue.approverCount : undefined} label="People who can approve" />
+      <V2Stat icon="⏳" tone="amber" value={queue ? (queue.soloSafeguardActive ? 'On' : 'Off') : undefined} label="Solo safeguard" />
+      <V2Stat icon="📋" tone="blue" value={queue ? approvals.length : undefined} label="Requests in this view" />
+      <V2Stat icon="👤" tone="purple" value={queue ? (queue.viewerIsApprover ? 'Approver' : 'Requester') : undefined} label="Your part" />
     </div>
     {queue?.soloSafeguardActive ? <p className="role-wide">Only one person can approve right now, so they may approve their own request 15 minutes after filing it. Each such approval is marked SOLO in the audit record; this switches off by itself when a second approver exists.</p> : null}
     {error ? <p className="form-error" role="alert">{error}</p> : null}

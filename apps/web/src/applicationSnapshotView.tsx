@@ -4,7 +4,8 @@
  * One rendering of "what the student shared", used twice: the student reviews it before applying
  * (StudentOpportunitiesPage), and the employer reads it on Candidate Detail and from a row on
  * Applicants (CandidateDetailPanel). Showing both sides the same layout is the point — the employer
- * sees what the student saw, and nothing else. Missing facts say NA; nothing is filled in.
+ * sees what the student saw, and nothing else. Missing facts are left out or say "not recorded";
+ * nothing is filled in.
  *
  * Built only from existing pilot and hiring classes; no new styles.
  */
@@ -17,7 +18,7 @@ import { downloadCandidateResume, getEmployerCandidate, type ApplicationSnapshot
 import { EmployerEvidencePanel } from './skillEvidence.js';
 import { supportCodeSuffix } from './supportCode.js';
 import * as dates from './dates.js';
-import { codeLabel } from './labels.js';
+import { applicationStageLabel, codeLabel } from './labels.js';
 
 const verificationLabels: Readonly<Record<string, string>> = {
   VERIFIED: 'verified by the college', SELF_REPORTED: 'self-reported', PENDING_VERIFICATION: 'awaiting the college',
@@ -135,7 +136,7 @@ export function CandidateDetailPanel({ employerId, applicationId, onClose }: { r
     {status ? <p role="status">{status}</p> : null}
     {candidate ? <>
       <div className="v2-row v2-cols-4 career-stat-strip">
-        <V2Stat icon="📌" tone="blue" value={humanise(candidate.application.state)} label="Stage" />
+        <V2Stat icon="📌" tone="blue" value={applicationStageLabel(candidate.application.state)} label="Stage" />
         <V2Stat icon="🗓️" tone="purple" value={formatDate(candidate.application.submittedAt)} label="Applied" />
         <V2Stat icon="📅" tone="amber" value={candidate.interviews.length} label="Interviews" />
         <V2Stat icon="🏁" tone="green" value={candidate.offer ? humanise(candidate.offer.state) : 'None yet'} label="Offer" />
@@ -168,7 +169,7 @@ export function CandidateDetailPanel({ employerId, applicationId, onClose }: { r
 
       <h3>Timeline</h3>
       <ol className="hiring-stages" aria-label="Stage timeline">{candidate.timeline.map((entry, index) => <li key={`${entry.toState}-${index}`}>
-        {humanise(entry.toState)} · {formatDate(entry.occurredAt, true)}{entry.actor ? ` · by ${entry.actor === 'STUDENT' ? 'the candidate' : 'your team'}` : ''}
+        {applicationStageLabel(entry.toState)} · {formatDate(entry.occurredAt, true)}{entry.actor ? ` · by ${entry.actor === 'STUDENT' ? 'the candidate' : 'your team'}` : ''}
       </li>)}</ol>
 
       <h3>Interviews</h3>

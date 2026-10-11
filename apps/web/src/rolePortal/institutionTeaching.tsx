@@ -5,7 +5,7 @@
  * assignments, as the server scopes them — nothing is filtered here. The teaching
  * assignments panel lets an institution admin (on Staff) or a department head (on
  * Faculty and Staff) assign faculty to sections and batches per subject and term, and end
- * an assignment, each with a reason code. Real data only; missing values read NA.
+ * an assignment, each with a reason code. Real data only; a missing value reads in plain words (never "NA").
  */
 import { ApiRequestError, createTeachingAssignment, endTeachingAssignment, getProtectedAccessToken, listMyStudents, listTeachingAssignments, studentActivationLabels, studentInvitationDeliveryNote } from '../api.js';
 import type { MyStudentsDto, TeachingAssignmentDto, TeachingAssignmentListDto } from '../api.js';
@@ -15,6 +15,7 @@ import { DepartmentStaffSection } from './institutionDepartment.js';
 import type { AuthenticatedWorkspaceSummary } from './shared.js';
 import { useEffect, useState } from 'react';
 import { supportCodeSuffix } from '../supportCode.js';
+import { MISSING_TEXT } from '../labels.js';
 
 /** Why an assignment is created; recorded with it. */
 export const teachingAssignmentReasons = [
@@ -33,8 +34,8 @@ export const teachingAssignmentEndReasons = [
 ] as const;
 
 function assignmentLabel(assignment: TeachingAssignmentDto): string {
-  const subject = assignment.subject ? assignment.subject.name : assignment.subjectCode ?? 'NA';
-  return `${subject} · ${assignment.unit.name} · ${assignment.academicTerm}`;
+  const subject = assignment.subject ? assignment.subject.name : assignment.subjectCode;
+  return [subject, assignment.unit.name, assignment.academicTerm].filter(Boolean).join(' · ');
 }
 
 function loadError(error: unknown, fallback: string): string {
@@ -78,10 +79,10 @@ export function FacultyMyStudentsPage({ authenticatedWorkspace, children }: { re
       <p>The students in the sections and batches you are assigned to teach.</p>
       {data?.mode === 'MEMBERSHIP' ? <p>Your college has not started recording teaching assignments yet, so this list follows the department and batch on your staff account.</p> : null}</div></div>
     <div className="v2-row v2-cols-4 career-stat-strip role-wide">
-      <V2Stat icon="🎓" tone="blue" value={data ? students.length : 'NA'} label="Students" />
-      <V2Stat icon="📚" tone="purple" value={data ? data.assignments.length : 'NA'} label="Teaching assignments" />
-      <V2Stat icon="✉️" tone="amber" value={data ? notActivated : 'NA'} label="Not yet activated" />
-      <V2Stat icon="📝" tone="green" value={data ? openTasks : 'NA'} label="Open tasks" />
+      <V2Stat icon="🎓" tone="blue" value={data ? students.length : null} label="Students" />
+      <V2Stat icon="📚" tone="purple" value={data ? data.assignments.length : null} label="Teaching assignments" />
+      <V2Stat icon="✉️" tone="amber" value={data ? notActivated : null} label="Not yet activated" />
+      <V2Stat icon="📝" tone="green" value={data ? openTasks : null} label="Open tasks" />
     </div>
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {!data && !error ? <p role="status">Loading your students…</p> : null}
@@ -95,9 +96,9 @@ export function FacultyMyStudentsPage({ authenticatedWorkspace, children }: { re
       <thead><tr><th>Student</th><th>Section / batch</th><th>Invitation</th><th>Recent assessments</th><th>Open tasks</th></tr></thead>
       <tbody>{students.map((student) => <tr key={student.profileId} className="role-record-row">
         <th scope="row"><strong>{student.fullName}</strong><span>{student.institutionStudentId}</span></th>
-        <td>{[student.units.section, student.units.batch].filter(Boolean).join(' · ') || 'NA'}</td>
-        <td>{student.activation ? studentActivationLabels[student.activation.state] : 'NA'}{studentInvitationDeliveryNote(student.activation) ? <span>{studentInvitationDeliveryNote(student.activation)}</span> : null}</td>
-        <td>{student.recentAssessments.submitted > 0 ? `${student.recentAssessments.submitted} in 30 days · latest ${student.recentAssessments.latestTitle ?? 'NA'}` : 'None in 30 days'}</td>
+        <td>{[student.units.section, student.units.batch].filter(Boolean).join(' · ') || 'Not assigned'}</td>
+        <td>{student.activation ? studentActivationLabels[student.activation.state] : MISSING_TEXT}{studentInvitationDeliveryNote(student.activation) ? <span>{studentInvitationDeliveryNote(student.activation)}</span> : null}</td>
+        <td>{student.recentAssessments.submitted > 0 ? `${student.recentAssessments.submitted} in 30 days${student.recentAssessments.latestTitle ? ` · latest ${student.recentAssessments.latestTitle}` : ''}` : 'None in 30 days'}</td>
         <td>{student.openTasks}</td>
       </tr>)}</tbody></table></div> : null}
     {data && students.length === 0 && !(data.mode === 'ASSIGNMENTS' && data.assignments.length === 0) ? <p className="role-wide">No students are enrolled in your assigned sections yet.</p> : null}
@@ -179,11 +180,11 @@ export function TeachingAssignmentsPanel({ token, institutionId }: { readonly to
       <tbody>{assignments.map((assignment) => <tr key={assignment.id}>
         <td>{assignment.facultyEmail}</td>
         <td>{assignment.unit.name}</td>
-        <td>{assignment.subject ? assignment.subject.name : assignment.subjectCode ?? 'NA'}</td>
+        <td>{assignment.subject ? assignment.subject.name : assignment.subjectCode ?? 'Not set'}</td>
         <td>{assignment.academicTerm}</td>
         <td>{assignment.startsOn} – {assignment.endsOn ?? 'open'}</td>
         <td>{assignment.state === 'ENDED' ? 'Ended' : assignment.active ? 'Active' : 'Not in effect today'}</td>
-        <td>{data?.canAssign && assignment.state === 'ACTIVE' ? <button type="button" className="secondary" onClick={() => void end(assignment)}>End assignment</button> : 'NA'}</td>
+        <td>{data?.canAssign && assignment.state === 'ACTIVE' ? <button type="button" className="secondary" onClick={() => void end(assignment)}>End assignment</button> : 'None'}</td>
       </tr>)}</tbody></table></div> : null}
   </section>;
 }

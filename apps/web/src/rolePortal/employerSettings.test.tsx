@@ -108,7 +108,7 @@ describe('EMP-16 employer Settings', () => {
     expect(screen.queryByText('Not built yet')).not.toBeInTheDocument();
   });
 
-  it('tells an admin that only an owner can accept, and says NA where nothing was accepted', async () => {
+  it('tells an admin that only an owner can accept, and leaves the accepted version out where nothing was accepted', async () => {
     role = 'EMPLOYER_ADMIN';
     routes[`GET ${base}/settings`] = () => ({ body: { settings: settingsFor({ canAccept: false }) } });
     routes[`GET ${base}/trust-cases`] = () => ({ body: { cases: [] } });
@@ -116,7 +116,10 @@ describe('EMP-16 employer Settings', () => {
     const terms = await screen.findByRole('region', { name: 'Employer terms' });
     expect(within(terms).getByText('Only an owner can accept the terms for the organisation.')).toBeInTheDocument();
     expect(within(terms).queryByRole('button')).not.toBeInTheDocument();
-    expect(screen.getByText('NA')).toBeInTheDocument();
+    // Nothing accepted: the "Version accepted" tile is left out, never shown as NA.
+    expect(screen.queryByText('Version accepted')).not.toBeInTheDocument();
+    expect(within(terms).getByText('Not accepted yet.')).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/(^|[^A-Za-z])NA([^A-Za-z]|$)/);
     expect(await screen.findByText('There are no trust and safety cases about your organisation.')).toBeInTheDocument();
   });
 

@@ -142,14 +142,15 @@ describe('Assign and plan learning', () => {
     expect(typeof body.scheduledStartAt).toBe('string');
   });
 
-  it('sets one student\'s next step with a listed reason; their plan is NA without their consent', async () => {
+  it('sets one student\'s next step with a listed reason; their plan is not shown without their consent', async () => {
     window.history.replaceState(null, '', `/institution/faculty/learning-resources?override=${ravi.profileId}`);
     route();
     render(page());
-    expect(await screen.findByText(/this student has not chosen to share their learning data/)).toBeInTheDocument();
+    expect(await screen.findByText(/this student has not chosen to share their learning data/i)).toBeInTheDocument();
+    expect(screen.queryByText(/\bNA\b/)).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Resource'), { target: { value: `PRACTICE:${skillB}:` } });
     await screen.findByText('Ports', { selector: 'form strong' });
-    await screen.findByText(/this student has not chosen to share their learning data/);
+    await screen.findByText(/this student has not chosen to share their learning data/i);
     fireEvent.change(screen.getByLabelText('Reason'), { target: { value: 'UPCOMING_ASSESSMENT' } });
     fireEvent.click(screen.getByText('Set next step', { selector: 'form button' }));
     await screen.findByText(/Next step set. The student has been told/);

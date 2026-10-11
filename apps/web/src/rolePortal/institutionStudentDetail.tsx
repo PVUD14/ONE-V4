@@ -59,7 +59,8 @@ export function InstitutionStudentDetailPage({ authenticatedWorkspace }: { reado
   if (!token) return <RestrictedApiState title="Student Detail" message="Sign in to your institution staff workspace." />;
   if (!isInstitutionStaffWorkspace(authenticatedWorkspace)) return <InstitutionWorkspaceError title="Student Detail" />;
 
-  const unitName = (id: string | null | undefined): string => (data?.units ?? []).find((unit) => unit.id === id)?.name ?? 'NA';
+  // A unit that is not recorded (or not in the loaded structure) leaves its row out.
+  const unitName = (id: string | null | undefined): string | null => (id ? (data?.units ?? []).find((unit) => unit.id === id)?.name ?? null : null);
   const selected = data?.students?.find((student) => student.id === selectedId) ?? null;
   const matches = (data?.students ?? []).filter((student) => `${student.fullName} ${student.institutionStudentId} ${student.email}`.toLowerCase().includes(query.trim().toLowerCase()));
   const choose = (id: string | null): void => {
@@ -77,17 +78,21 @@ export function InstitutionStudentDetailPage({ authenticatedWorkspace }: { reado
         <div className="role-section-title"><h2>{selected.fullName}</h2><button type="button" className="secondary" onClick={() => choose(null)}>Choose another student</button></div>
         <div className="role-record-table-wrap"><table className="role-record-table"><caption className="sr-only">{`Record of ${selected.fullName}`}</caption><tbody>
           <tr><th scope="row">Institution ID</th><td>{selected.institutionStudentId}</td></tr>
-          <tr><th scope="row">Email</th><td>{selected.email || 'NA'}</td></tr>
-          {unitLabels.map(([key, label]) => <tr key={key}><th scope="row">{label}</th><td>{unitName(selected.units?.[key])}</td></tr>)}
+          {selected.email ? <tr><th scope="row">Email</th><td>{selected.email}</td></tr> : null}
+          {unitLabels.map(([key, label]) => {
+            const name = unitName(selected.units?.[key]);
+            return name ? <tr key={key}><th scope="row">{label}</th><td>{name}</td></tr> : null;
+          })}
           <tr><th scope="row">Relationship</th><td>{codeLabel(selected.relationship?.state ?? selected.status)}</td></tr>
-          <tr><th scope="row">Relationship since</th><td>{selected.relationship?.effectiveFrom?.slice(0, 10) ?? 'NA'}</td></tr>
-          <tr><th scope="row">Invitation</th><td>{selected.activation ? studentActivationLabels[selected.activation.state] : 'NA'}</td></tr>
-          <tr><th scope="row">Placement status</th><td>{shared ? <PlacementStatusChip status={shared.status} /> : placement.byStudent === null && !placement.failed ? '…' : 'NA'}</td></tr>
+          {selected.relationship?.effectiveFrom ? <tr><th scope="row">Relationship since</th><td>{selected.relationship.effectiveFrom.slice(0, 10)}</td></tr> : null}
+          {selected.activation ? <tr><th scope="row">Invitation</th><td>{studentActivationLabels[selected.activation.state]}</td></tr> : null}
+          {shared || (placement.byStudent === null && !placement.failed)
+            ? <tr><th scope="row">Placement status</th><td>{shared ? <PlacementStatusChip status={shared.status} /> : '…'}</td></tr> : null}
         </tbody></table></div>
       </section>
       {selected.studentUserId
         ? [false, true].map((external) => <StudentApplicationRecords key={`${selected.studentUserId}:${external}`} token={token} institutionId={institutionId} studentUserId={selected.studentUserId!} external={external} />)
-        : <section className="role-card role-wide"><h2>Shared applications</h2><p>NA — this student has not activated their ONE account, so nothing has been shared.</p></section>}
+        : <section className="role-card role-wide"><h2>Shared applications</h2><p>This student has not activated their ONE account, so nothing has been shared.</p></section>}
     </> : <>
       <div className="role-wide"><V2EmptyState icon="🎓" title="Choose a student to see their detail"
         note="Pick a student from your roster below, or use Open detail on the Students list." /></div>

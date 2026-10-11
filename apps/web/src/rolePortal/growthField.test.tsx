@@ -87,12 +87,13 @@ describe('Growth → Field', () => {
     expect(await screen.findByText(/teammate@example\.test/)).toBeInTheDocument();
   });
 
-  it('shows NA, never a figure, when the field work cannot be loaded', async () => {
+  it('leaves every figure out, never NA or a number, when the field work cannot be loaded', async () => {
     routes = (url) => (url.includes('/api/v1/growth/field') ? failure(500, 'INTERNAL') : null);
     render(<GrowthFieldPage role="GROWTH_EXECUTIVE" />);
     expect(await screen.findByRole('alert')).toBeInTheDocument();
     const stats = screen.getByLabelText('Field summary');
-    expect(within(stats).getAllByText('NA')).toHaveLength(4);
+    expect(within(stats).queryByText('NA')).not.toBeInTheDocument();
+    expect(within(stats).queryByText('Visits this month')).not.toBeInTheDocument();
     expect(within(stats).queryByText(/\d/)).not.toBeInTheDocument();
   });
 

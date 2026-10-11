@@ -2,7 +2,7 @@
  * Operations Security — access reviews (OPS-15): the screen renders the server's review,
  * shows an overdue review plainly, never offers a decision on the viewer's own access
  * (except the marked solo keep), requires a reason code for every write, and has honest
- * loading / NA / empty / error / forbidden states. Navigation labels are unchanged.
+ * loading / missing-source / empty / error / forbidden states. Navigation labels are unchanged.
  */
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -87,15 +87,16 @@ describe('Access reviews', () => {
     expect(row.textContent).not.toContain(campaignId);
   });
 
-  it('shows NA where a source is missing and says plainly that no review has been completed', async () => {
+  it('hides a slot whose source is missing and says plainly that no review has been completed', async () => {
     render(<OperationsAccessReviewsPage />);
     await screen.findByText('INCIDENT_MANAGE on OPERATIONS_ADMIN');
-    expect(screen.getByText('Last completed review').previousSibling).toHaveTextContent('NA');
+    expect(screen.queryByText('Last completed review')).toBeNull();
     expect(screen.getByText('Next review due').previousSibling).toHaveTextContent('Now');
     expect(screen.getAllByRole('alert').some((node) => /No access review has been completed yet/.test(node.textContent ?? ''))).toBe(true);
-    // A role with no invitation on record has no known grantor.
+    // A role with no invitation on record has no known grantor: the "By ..." clause is left out.
     const own = screen.getByText('Role SECURITY_ADMIN (2 capabilities)').closest('tr')!;
-    expect(within(own).getByText(/By NA/)).toBeInTheDocument();
+    expect(within(own).queryByText(/^By /)).toBeNull();
+    expect(document.body.textContent).not.toMatch(/(^|[^A-Za-z])NA([^A-Za-z]|$)/);
   });
 
   it('shows an overdue quarterly review with its due date', async () => {

@@ -12,6 +12,7 @@ import type { InstitutionUnitDto, RelationshipBatchPreviewDto, RelationshipBatch
 import { formatApiError } from './shared.js';
 import { supportCodeSuffix } from '../supportCode.js';
 import { formatDate } from '../dates.js';
+import { MISSING_TEXT } from '../labels.js';
 
 const actions: readonly (readonly [RelationshipBatchState, string, string])[] = [
   ['GRADUATED', 'Graduate', 'graduated'],
@@ -154,7 +155,7 @@ export function YearEndBatchPanel({ token, institutionId, units, onChanged }: {
         <caption className="sr-only">Year-end preview</caption>
         <thead><tr><th>Roll number</th><th>Student</th><th>Now</th><th>Outcome</th><th>Issues</th></tr></thead>
         <tbody>{preview.batch.rows.map((row) => <tr key={row.institutionStudentId}>
-          <td>{row.institutionStudentId}</td><td>{row.fullName ?? 'NA'}</td><td>{row.currentState ? stateLabels[row.currentState] ?? row.currentState : 'NA'}</td>
+          <td>{row.institutionStudentId}</td><td>{row.fullName ?? 'Not found'}</td><td>{row.currentState ? stateLabels[row.currentState] ?? row.currentState : MISSING_TEXT}</td>
           <td>{outcomeLabels[row.outcome] ?? row.outcome}</td><td>{row.issues.map((issue) => issueLabels[issue] ?? issue).join(', ') || 'None'}</td>
         </tr>)}</tbody>
       </table></div>}

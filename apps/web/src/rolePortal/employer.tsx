@@ -23,7 +23,7 @@ import type { RolePortalConfig } from '../rolePortalConfig.js';
 import { RestrictedApiState } from './shared.js';
 import { useEffect, useState } from 'react';
 import { formatDateTime } from '../dates.js';
-import { codeLabel } from '../labels.js';
+import { codeLabel, MISSING_TEXT } from '../labels.js';
 
 const participantRouteLabels = ['My Interviews', 'Candidate Brief', 'Scorecards'];
 const ownerAdminOnlyLabels = ['Team', 'Settings'];
@@ -216,7 +216,7 @@ function AssignedInterviewWorkspace({ employerIds, routeLabel }: { readonly empl
   const current = detail && selectedListItem && detail.id === selectedListItem.id
     ? { ...detail, consentRevoked: detail.consentRevoked || selectedListItem.consentRevoked,
       canRecordOutcome: detail.canRecordOutcome && selectedListItem.canRecordOutcome } : null;
-  const label = (item: AssignedInterview) => `${item.title || 'NA'} · Round ${item.roundNumber} · ${formatDateTime(item.scheduledStart)}`;
+  const label = (item: AssignedInterview) => `${item.title ? `${item.title} · ` : ''}Round ${item.roundNumber} · ${formatDateTime(item.scheduledStart)}`;
   return <section className="role-module role-module--dense">
     <div className="role-page-heading"><div><h1>{routeLabel}</h1><p>Only your active interview assignments appear here. Times are local.</p></div></div>
     <section className="role-card role-wide">
@@ -225,8 +225,8 @@ function AssignedInterviewWorkspace({ employerIds, routeLabel }: { readonly empl
       {!status && active.length === 0 ? <p>No interviews are assigned to you.</p> : null}
       {routeLabel === 'My Interviews' ? <div className="role-record-table-wrap"><table className="role-record-table">
         <thead><tr><th>Candidate</th><th>Opportunity</th><th>Round</th><th>Mode</th><th>Start</th><th>End</th><th>Action</th></tr></thead>
-        <tbody>{active.map((item) => <tr key={`${item.employerId}-${item.id}`}><td><CandidateIdentity item={item} /></td><td>{item.title || 'NA'}</td><td>{item.roundNumber}</td><td>{codeLabel(item.mode)}</td>
-          <td>{formatDateTime(item.scheduledStart)}</td><td>{item.scheduledEnd ? formatDateTime(item.scheduledEnd) : 'NA'}</td>
+        <tbody>{active.map((item) => <tr key={`${item.employerId}-${item.id}`}><td><CandidateIdentity item={item} /></td><td>{item.title || MISSING_TEXT}</td><td>{item.roundNumber}</td><td>{codeLabel(item.mode)}</td>
+          <td>{formatDateTime(item.scheduledStart)}</td><td>{item.scheduledEnd ? formatDateTime(item.scheduledEnd) : MISSING_TEXT}</td>
           <td><button type="button" onClick={() => { setDetail(null); setSelected(item); }}>Candidate brief</button></td></tr>)}</tbody>
       </table></div> : <label className="student-form-field"><span>Assigned interview</span>
         <select value={selectedListItem?.id ?? ''} onChange={(event) => { setDetail(null); setSelected(active.find((item) => item.id === event.target.value) ?? null); }}>
@@ -237,14 +237,14 @@ function AssignedInterviewWorkspace({ employerIds, routeLabel }: { readonly empl
       <h2>{routeLabel === 'Scorecards' ? 'Your scorecard' : 'Candidate brief'}</h2>
       <p><CandidateIdentity item={current} /></p>
       {current.consentRevoked || current.candidateAccess === false ? null : <>
-        <p>Email: {current.candidateEmail ?? 'NA'}</p><p>Location or phone arrangements: {current.locationDetail ?? 'NA'}</p>
-        <p>Joining link: {current.joiningLink && /^https:\/\//i.test(current.joiningLink) ? <a href={current.joiningLink} target="_blank" rel="noopener noreferrer">Open interview meeting</a> : 'NA'}</p>
+        {current.candidateEmail ? <p>Email: {current.candidateEmail}</p> : null}{current.locationDetail ? <p>Location or phone arrangements: {current.locationDetail}</p> : null}
+        {current.joiningLink && /^https:\/\//i.test(current.joiningLink) ? <p>Joining link: <a href={current.joiningLink} target="_blank" rel="noopener noreferrer">Open interview meeting</a></p> : null}
       </>}
       {/* EMP-09: the stage, its scorecard guidance, and the invite for the panellist's own calendar. */}
-      <p>Stage: {current.stageLabel ?? 'NA'} · Scorecard: {current.scorecardTemplate ? current.scorecardTemplate.name : 'Free-text scorecard (no stage template)'}</p>
+      <p>{current.stageLabel ? `Stage: ${current.stageLabel} · ` : ''}Scorecard: {current.scorecardTemplate ? current.scorecardTemplate.name : 'Free-text scorecard (no stage template)'}</p>
       {current.scorecardTemplate?.guidance ? <p className="hiring-meta">{current.scorecardTemplate.guidance}</p> : null}
       <AddToCalendarButton download={(accessToken) => downloadMyInterviewCalendar(accessToken, current.employerId, current.id)} />
-      <h3>{current.title || 'NA'}</h3><p>{current.summary ?? 'NA'}</p><p>{current.responsibilities ?? 'NA'}</p>
+      {current.title ? <h3>{current.title}</h3> : null}{current.summary ? <p>{current.summary}</p> : null}{current.responsibilities ? <p>{current.responsibilities}</p> : null}
       {routeLabel === 'Scorecards' ? current.canRecordOutcome && !current.consentRevoked
         ? <InterviewActionForm key={`${current.employerId}-${current.id}`} kind="outcome" template={current.scorecardTemplate ?? null} onCancel={() => { setDetail(null); setSelected(null); }} onSave={async (body) => {
           if (!token) throw new Error('Unavailable');

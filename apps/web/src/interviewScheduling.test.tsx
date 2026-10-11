@@ -102,7 +102,9 @@ describe('EMP-09 interviews for employers', () => {
     const panel = await screen.findByRole('region', { name: 'Interview scorecards' });
     expect(await within(panel).findByText('Problem solving: 5 of 5')).toBeInTheDocument();
     expect(within(panel).getByText('Communication: 4 of 5 — Clear.')).toBeInTheDocument();
-    expect(within(panel).getByText(/Overall rating: NA/)).toBeInTheDocument();
+    // No overall rating was given: the clause is left out, never shown as NA or a computed figure.
+    expect(panel.textContent).not.toMatch(/Overall rating/);
+    expect(panel.textContent).not.toMatch(/(^|[^A-Za-z])NA([^A-Za-z]|$)/);
     expect(panel.textContent).not.toMatch(/average|total|score of|rank/i);
   });
 

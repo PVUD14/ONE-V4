@@ -3,7 +3,7 @@
  * reviewers, drafts and faculty decisions, grants and assigns only through dialogs that require a
  * reason code, and offers withdrawal only to assigners; the faculty queue shows only what the server
  * returns, never an answer key, requires a comment for a request for changes, and has honest
- * loading / NA / empty / error / forbidden states. Navigation labels are unchanged.
+ * loading / empty / error / forbidden states (never "NA"). Navigation labels are unchanged.
  */
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -80,9 +80,10 @@ const posts = (suffix: string) => fetchMock.mock.calls.filter(([url, init]) => i
 const bodyOf = (call: unknown[]) => JSON.parse(String((call[1] as { body: string }).body)) as Record<string, unknown>;
 
 describe('the operator panel', () => {
-  it('shows NA while loading, then real reviewers, drafts and the faculty decisions', async () => {
+  it('shows no count tiles while loading, then real reviewers, drafts and the faculty decisions', async () => {
     render(<OperationsExternalReviewsPage />);
-    expect(screen.getAllByText('NA').length).toBeGreaterThanOrEqual(4);
+    expect(screen.queryByText('Faculty approvals')).toBeNull();
+    expect(document.body.textContent).not.toMatch(/(^|[^A-Za-z])NA([^A-Za-z]|$)/);
     expect(await screen.findByText('Synthetic: the GUIDED level is too advanced.', { exact: false })).toBeInTheDocument();
     expect(screen.getByText('Faculty approvals').previousSibling).toHaveTextContent('3');
     const reviewers = screen.getByRole('table', { name: 'Reviewers' });

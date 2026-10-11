@@ -28,6 +28,7 @@ import { V2Stat } from '../dashboardsV2.js';
 import { StaffPilotWrap } from '../parityWraps.js';
 import { formatApiError } from './shared.js';
 import * as dates from '../dates.js';
+import { MISSING_TEXT } from '../labels.js';
 
 export const employerTeamRoleLabels: Readonly<Record<EmployerTeamRole, string>> = {
   EMPLOYER_OWNER: 'Owner',
@@ -62,9 +63,9 @@ type PendingAction =
   | { readonly kind: 'revoke' | 'resend'; readonly invitation: EmployerTeamInvitationDto };
 
 function formatDate(value: string | null): string {
-  if (!value) return 'NA';
+  if (!value) return MISSING_TEXT;
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? 'NA' : dates.formatDate(date);
+  return Number.isNaN(date.getTime()) ? MISSING_TEXT : dates.formatDate(date);
 }
 
 function deliveryNote(state: string): string {
@@ -217,7 +218,7 @@ export function EmployerTeamPage({ employerId }: { readonly employerId: string }
           <td>{employerTeamRoleLabels[member.role]}</td>
           <td>{member.state === 'ACTIVE' ? 'Active' : 'Suspended'}</td>
           <td>{formatDate(member.since)}</td>
-          <td>{member.canEnd ? <button type="button" className="secondary" disabled={busy} onClick={() => startAction({ kind: 'end', member })}>End membership</button> : 'NA'}</td>
+          <td>{member.canEnd ? <button type="button" className="secondary" disabled={busy} onClick={() => startAction({ kind: 'end', member })}>End membership</button> : 'None'}</td>
         </tr>)}</tbody>
       </table></div> : <p>No members yet.</p>}
       {nextCursor ? <button type="button" className="secondary" onClick={() => void loadMore()}>Show more members</button> : null}
@@ -230,12 +231,12 @@ export function EmployerTeamPage({ employerId }: { readonly employerId: string }
           <td>{invitation.email}</td>
           <td>{employerTeamRoleLabels[invitation.role]}</td>
           <td>{invitation.state === 'EXPIRED' ? 'Expired' : 'Pending'}</td>
-          <td>{deliveryLabels[invitation.delivery.state] ?? 'NA'}</td>
+          <td>{deliveryLabels[invitation.delivery.state] ?? MISSING_TEXT}</td>
           <td>{formatDate(invitation.expiresAt)}</td>
           <td>{invitation.canResend || invitation.canRevoke ? <div className="hiring-actions">
             {invitation.canResend ? <button type="button" className="secondary" disabled={busy} onClick={() => startAction({ kind: 'resend', invitation })}>Resend</button> : null}
             {invitation.canRevoke ? <button type="button" className="secondary" disabled={busy} onClick={() => startAction({ kind: 'revoke', invitation })}>Revoke</button> : null}
-          </div> : 'NA'}</td>
+          </div> : 'None'}</td>
         </tr>)}</tbody>
       </table></div> : <p>No pending invitations.</p>}
       {team.invitationsTruncated ? <p>Showing the 200 most recent pending invitations.</p> : null}

@@ -16,10 +16,10 @@ describe('roleLabel', () => {
     expect(roleLabel('OPERATIONS_ADMIN')).toBe('Operations Admin');
   });
 
-  it('humanises an unknown role code in title case, and reads NA for none', () => {
+  it('humanises an unknown role code in title case, and reads "Not recorded" for none', () => {
     expect(roleLabel('CAMPUS_AMBASSADOR')).toBe('Campus Ambassador');
-    expect(roleLabel(null)).toBe('NA');
-    expect(roleLabel('')).toBe('NA');
+    expect(roleLabel(null)).toBe('Not recorded');
+    expect(roleLabel('')).toBe('Not recorded');
   });
 });
 
@@ -32,11 +32,11 @@ describe('codeLabel', () => {
     expect(codeLabel('REVIEW_EVIDENCE')).toBe('Review evidence');
   });
 
-  it('keeps acronyms, leaves ordinary text alone, and reads NA for none', () => {
+  it('keeps acronyms, leaves ordinary text alone, and reads "Not recorded" for none', () => {
     expect(codeLabel('AI_FEATURE_ENABLE')).toBe('AI feature enable');
     expect(codeLabel('NA')).toBe('NA');
     expect(codeLabel('Withdrawn by you')).toBe('Withdrawn by you');
-    expect(codeLabel(undefined)).toBe('NA');
+    expect(codeLabel(undefined)).toBe('Not recorded');
   });
 });
 
@@ -59,9 +59,9 @@ describe('date display', () => {
     expect(formatDate('2026-09-30T23:30:00Z', { utc: true })).toBe('30 Sep 2026');
   });
 
-  it('reads NA, or the fallback asked for, when there is no usable date', () => {
-    expect(formatDate(null)).toBe('NA');
-    expect(formatDateTime('not a date')).toBe('NA');
+  it('reads "Not recorded", or the fallback asked for, when there is no usable date', () => {
+    expect(formatDate(null)).toBe('Not recorded');
+    expect(formatDateTime('not a date')).toBe('Not recorded');
     expect(formatDate(undefined, { fallback: 'Never' })).toBe('Never');
   });
 });

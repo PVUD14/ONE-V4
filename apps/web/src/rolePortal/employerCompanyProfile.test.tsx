@@ -80,7 +80,11 @@ describe('EMP-04 employer Company Profile screen', () => {
     expect(within(verified).queryByRole('textbox')).not.toBeInTheDocument();
     const preview = screen.getByRole('region', { name: 'How students see you' });
     expect(within(preview).getByText('No description yet.')).toBeInTheDocument();
-    expect(screen.getAllByText('NA').length).toBeGreaterThanOrEqual(2);
+    // No industry or size recorded: those tiles are left out, never filled with NA or a guess.
+    const strip = document.querySelector('.career-stat-strip') as HTMLElement;
+    expect(strip).toHaveTextContent('Verification');
+    expect(strip).not.toHaveTextContent(/Industry|Company size/);
+    expect(document.body.textContent).not.toMatch(/(^|[^A-Za-z])NA([^A-Za-z]|$)/);
     expect(screen.queryByText('Not built yet')).not.toBeInTheDocument();
   });
 

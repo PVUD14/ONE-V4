@@ -81,7 +81,7 @@ export function OperationsGrowthLeadsPanel(): React.ReactElement | null {
       </div>
       {shown.length ? <ul className="role-check-list">{shown.map((lead) => <li key={lead.id}>
         <button type="button" className="pilot-btn" aria-pressed={selected === lead.id} onClick={() => setSelected(lead.id)}>{lead.name}</button>
-        {' '}<small>{[lead.area.districtName, lead.area.stateName].filter(Boolean).join(', ') || 'Area not set'} · {growthCodeLabel(lead.stage)} · {lead.owner ? lead.owner.email ?? 'NA' : 'unowned'}</small>
+        {' '}<small>{[lead.area.districtName, lead.area.stateName].filter(Boolean).join(', ') || 'Area not set'} · {growthCodeLabel(lead.stage)} · {lead.owner ? lead.owner.email ?? 'owner not recorded' : 'unowned'}</small>
         {lead.doNotContact ? <> <V2Chip tone="red">Do not contact</V2Chip></> : null}
       </li>)}</ul> : <V2EmptyState icon="🤝" title="No leads" note="No growth lead of this kind matches." />}
       {more ? <p>Showing the newest 50. Narrow the search to find older leads.</p> : null}
@@ -144,7 +144,7 @@ export function OperationsGrowthContactsPrivacyPanel(): React.ReactElement | nul
       <ul className="role-check-list">{live.map((match) => <li key={match.contactId}>
         <strong>{match.organisation}</strong> ({match.kind === 'COLLEGE' ? 'college' : 'employer'}) · {growthCodeLabel(match.contactRole)}
         <div>{match.fullName} · {match.email ?? '—'} · {match.phone ?? '—'}</div>
-        <small>How we got it: {growthCodeLabel(match.permissionBasis)} ({growthCodeLabel(match.source)}) · added {formatDate(match.addedAt)} · {match.noticeGivenAt ? `notice given ${formatDate(match.noticeGivenAt)} (${match.noticeVersion ?? 'NA'})` : 'no notice recorded'}{match.leadDoNotContact ? ' · organisation marked do not contact' : ''}</small>
+        <small>How we got it: {growthCodeLabel(match.permissionBasis)} ({growthCodeLabel(match.source)}) · added {formatDate(match.addedAt)} · {match.noticeGivenAt ? `notice given ${formatDate(match.noticeGivenAt)}${match.noticeVersion ? ` (${match.noticeVersion})` : ''}` : 'no notice recorded'}{match.leadDoNotContact ? ' · organisation marked do not contact' : ''}</small>
       </li>)}</ul>
       <label><input type="checkbox" checked={stopContact} onChange={(event) => setStopContact(event.target.checked)} /> They asked not to be contacted at all: mark their organisations do not contact</label>
       <label><input type="checkbox" checked={confirm} onChange={(event) => setConfirm(event.target.checked)} /> I understand erasure cannot be undone</label>

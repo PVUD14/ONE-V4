@@ -104,13 +104,15 @@ describe('C4 Institution Interventions', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps unavailable widgets as NA and does not display upstream error text', async () => {
+  it('leaves out widgets without data, never NA, and does not display upstream error text', async () => {
     fetchMock.mockResolvedValue({ ok: false, status: 403, json: async () => ({ error: 'private upstream detail' }) });
     vi.mocked(listInstitutionExams).mockRejectedValue(new Error('unavailable'));
     render(page());
     expect(await screen.findByRole('alert')).toHaveTextContent('current institution scope');
-    expect(screen.getByText('NA — intervention records unavailable.')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Completion Rate' })).toBeInTheDocument();
+    expect(screen.getByText('Intervention records are unavailable right now.')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Completion Rate' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Why Interventions Work' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/\bNA\b/)).not.toBeInTheDocument();
     expect(screen.queryByText(/private upstream detail/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Nobody needs attention/)).not.toBeInTheDocument();
   });

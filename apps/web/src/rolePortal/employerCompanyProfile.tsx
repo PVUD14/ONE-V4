@@ -36,10 +36,11 @@ const verificationLabels: Readonly<Record<string, string>> = {
   SUSPENDED: 'Suspended',
 };
 
-function formatDate(value: string | null): string {
-  if (!value) return 'NA';
+/** A date as local words, or null with no usable date (the tile that shows it is then left out). */
+function formatDate(value: string | null): string | null {
+  if (!value) return null;
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? 'NA' : dates.formatDate(date);
+  return Number.isNaN(date.getTime()) ? null : dates.formatDate(date);
 }
 
 function location(profile: EmployerCompanyProfileDto): string {
@@ -107,9 +108,9 @@ export function EmployerCompanyProfilePage({ employerId }: { readonly employerId
 
   return <StaffPilotWrap title="Company Profile" subtitle={subtitle}>
     <div className="v2-row v2-cols-4 career-stat-strip role-wide">
-      <V2Stat icon="🛡️" tone="teal" value={verificationLabels[profile.verificationState] ?? 'NA'} label="Verification" />
-      <V2Stat icon="🏭" tone="blue" value={industry ?? 'NA'} label="Industry" />
-      <V2Stat icon="👥" tone="amber" value={profile.companySizeBand ?? 'NA'} label="Company size" />
+      <V2Stat icon="🛡️" tone="teal" value={verificationLabels[profile.verificationState] ?? null} label="Verification" />
+      <V2Stat icon="🏭" tone="blue" value={industry} label="Industry" />
+      <V2Stat icon="👥" tone="amber" value={profile.companySizeBand} label="Company size" />
       <V2Stat icon="🕒" tone="purple" value={formatDate(profile.updatedAt)} label="Last updated" />
     </div>
     {notice ? <p className="role-api-success" role="status">{notice}</p> : null}

@@ -1,7 +1,7 @@
 /**
  * "From your lecturer" on the student's Learning page (INST-16): assigned practice and lessons with their
  * status, group sessions, and a next step a lecturer chose with the reason in plain words; lecturers named by
- * role and college only; NA when it cannot be loaded; and planning a step works before a target role is chosen
+ * role and college only; a plain message when it cannot be loaded; and planning a step works before a target role is chosen
  * when a lecturer has set work. Synthetic data only; no score or model number is ever rendered.
  */
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
@@ -48,13 +48,14 @@ describe('From your lecturer card', () => {
     expect(document.body.textContent ?? '').not.toMatch(/score|readiness|gap|%/i);
   });
 
-  it('says plainly when there is nothing, and NA when it cannot be loaded', () => {
+  it('says plainly when there is nothing, and when it cannot be loaded', () => {
     render(<FromYourLecturerCard actions={{ assignments: [], sessions: [], pendingOverride: null }} status="" busy={false} onStart={vi.fn()} />);
     expect(screen.getByText(/Nothing from your lecturers right now/)).toBeInTheDocument();
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
     cleanup();
-    render(<FromYourLecturerCard actions={null} status="NA — what your lecturers set could not be loaded right now." busy={false} onStart={vi.fn()} />);
-    expect(screen.getByText('NA — what your lecturers set could not be loaded right now.')).toBeInTheDocument();
+    const { container } = render(<FromYourLecturerCard actions={null} status="What your lecturers set could not be loaded right now." busy={false} onStart={vi.fn()} />);
+    expect(screen.getByText('What your lecturers set could not be loaded right now.')).toBeInTheDocument();
+    expect(container.textContent).not.toMatch(/(^|[^A-Za-z])NA([^A-Za-z]|$)/);
   });
 });
 

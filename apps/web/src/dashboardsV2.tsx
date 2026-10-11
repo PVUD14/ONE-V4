@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { NaReason, NaValue, isMissing } from './naState.js';
+import { NaReason, NaValue, isMissing, isUnrecorded } from './naState.js';
 import { OperationsHome } from './rolePortal/operationsHome.js';
 import { formatDate } from './dates.js';
 import { codeLabel } from './labels.js';
@@ -86,13 +86,16 @@ export function V2Ring({ percent, label, value, tone = 'var(--brand)' }: {
 /** A stat tile. A missing value (NA, <5, Withheld, Too few answers) keeps its text, muted, with an optional reason. */
 export function V2Stat({ icon, tone, value, label, reason }: {
   readonly icon: string; readonly tone: string; readonly value: React.ReactNode; readonly label: string; readonly reason?: string;
-}): React.ReactElement {
+}): React.ReactElement | null {
+  // Momentum re-skin: a tile with no source is hidden, never shown as "NA". Suppressed values stay.
+  if (isUnrecorded(value)) return null;
   const missing = isMissing(value);
   return <div className="v2-card v2-stat" data-na={missing ? 'true' : undefined}><span className={`v2-tile ${missing ? 'na-tile' : tone}`} aria-hidden="true">{icon}</span>
     <div><b><NaValue value={value} /></b><small>{label}</small>{missing && reason ? <NaReason>{reason}</NaReason> : null}</div></div>;
 }
 
-export function V2Chip({ tone, children }: { readonly tone: string; readonly children: React.ReactNode }): React.ReactElement {
+export function V2Chip({ tone, children }: { readonly tone: string; readonly children: React.ReactNode }): React.ReactElement | null {
+  if (children === 'NA') return null;
   // A raw code passed as the whole label (ACTIVE, UNDER_REVIEW) reads as words.
   return <span className={`v2-chip ${tone}`}>{typeof children === 'string' ? codeLabel(children) : children}</span>;
 }

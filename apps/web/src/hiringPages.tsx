@@ -27,7 +27,7 @@ import { venueModeLabels, type StudentCampusDriveDto } from './api/campusDrives.
 import { StudentNominationsCard } from './studentNominations.js';
 import { EmployerApplicantExportPanel } from './rolePortal/employerApplicantExport.js';
 import * as dates from './dates.js';
-import { codeLabel } from './labels.js';
+import { MISSING_TEXT, applicationStageLabel } from './labels.js';
 import { StatusTag } from './momentum/statusTag.js';
 import { openPortalRecord } from './rolePortal/shared.js';
 import {
@@ -135,8 +135,9 @@ function formatDate(value: string | null | undefined): string {
   return Number.isNaN(parsed.getTime()) ? '—' : dates.formatDate(parsed);
 }
 
+/** Codes as words. In this file REJECTED is only ever a hiring stage, so it reads "Not selected". */
 function humanise(value: string): string {
-  return codeLabel(value);
+  return applicationStageLabel(value);
 }
 
 // ---------------------------------------------------------------------------
@@ -637,14 +638,14 @@ export function StudentTermsChangeCard({ change, onAnswer, onClose }: {
   readonly onClose: () => void;
 }): React.ReactElement {
   const changed = new Set(change.changedTerms.map((term) => termNames[term] ?? term));
-  const months = (value: number | null) => value ? `${value} months` : 'NA';
+  const months = (value: number | null) => value ? `${value} months` : 'Not set';
   const rows: readonly [string, string, string][] = [
     ['Employment type', humanise(change.appliedTerms.employmentType), humanise(change.newTerms.employmentType)],
     ['Work mode', humanise(change.appliedTerms.workMode), humanise(change.newTerms.workMode)],
-    ['Location', change.appliedTerms.locationCity ?? 'NA', change.newTerms.locationCity ?? 'NA'],
+    ['Location', change.appliedTerms.locationCity ?? 'Not set', change.newTerms.locationCity ?? 'Not set'],
     ['Pay', termsPay(change.appliedTerms), termsPay(change.newTerms)],
     ['Duration', months(change.appliedTerms.durationMonths), months(change.newTerms.durationMonths)],
-    ['Joining conditions', change.appliedTerms.joiningConditions ?? 'NA', change.newTerms.joiningConditions ?? 'NA'],
+    ['Joining conditions', change.appliedTerms.joiningConditions ?? 'None', change.newTerms.joiningConditions ?? 'None'],
     ['Eligibility', termsEligibility(change.appliedTerms), termsEligibility(change.newTerms)],
     ['Deadline', formatDate(change.appliedTerms.applicationDeadline), formatDate(change.newTerms.applicationDeadline)],
   ];
@@ -708,7 +709,7 @@ const externalConsentNotice = 'Share this external application’s company, role
 
 export function StudentExternalApplicationsPanel(): React.ReactElement {
   const token = getAccessToken();
-  if (!token) return <section className="card wide-card"><h2>External applications</h2><p>Sign in to record applications made outside ONE.</p><p>Records: NA of 500</p></section>;
+  if (!token) return <section className="card wide-card"><h2>External applications</h2><p>Sign in to record applications made outside ONE.</p></section>;
   return <ExternalApplicationsWorkspace key={token} token={token} />;
 }
 
@@ -769,7 +770,7 @@ function ExternalApplicationsWorkspace({ token }: { readonly token: string }): R
   return <section className="card wide-card">
     <h2>External applications</h2>
     <p>Record applications you made outside ONE. These declarations are unverified and do not count toward placement or conversion metrics.</p>
-    <p>Records: {total ?? 'NA'} of 500</p>
+    {total !== null ? <p>Records: {total} of 500</p> : null}
     <div className="hiring-actions">
       <button type="button" disabled={busy || total === 500} onClick={() => { closeDetail(); setEditor('new'); }}>Record external application</button>
       <button type="button" className="secondary" disabled={busy || loading} onClick={() => { closeDetail(); setRefresh((value) => value + 1); }}>Refresh external applications</button>
@@ -781,8 +782,8 @@ function ExternalApplicationsWorkspace({ token }: { readonly token: string }): R
     <div className="data-table-wrap"><table aria-label="Student-declared external applications">
       <thead><tr><th>Role</th><th>Company</th><th>Source</th><th>Declared stage</th><th>Date applied</th><th>Institution sharing</th><th>Actions</th></tr></thead>
       <tbody>{rows.map((row) => <tr key={row.id}>
-        <td>{row.roleTitle || 'NA'}<div className="hiring-meta">{externalLabel}</div></td><td>{row.companyName || 'NA'}</td><td>{humanise(row.sourceKind)}</td>
-        <td>{humanise(row.stage)}<span className="hiring-meta"> · Unverified</span></td><td>{row.appliedOn || 'NA'}</td><td>{sharing(row)}</td>
+        <td>{row.roleTitle || MISSING_TEXT}<div className="hiring-meta">{externalLabel}</div></td><td>{row.companyName || MISSING_TEXT}</td><td>{humanise(row.sourceKind)}</td>
+        <td>{humanise(row.stage)}<span className="hiring-meta"> · Unverified</span></td><td>{row.appliedOn || MISSING_TEXT}</td><td>{sharing(row)}</td>
         <td><div className="hiring-actions">
           <button type="button" disabled={busy} onClick={() => { void openDetail(row); }}>View external application</button>
           <button type="button" disabled={busy} onClick={() => { closeDetail(); setEditor(row); }}>Edit external application</button>
@@ -795,9 +796,9 @@ function ExternalApplicationsWorkspace({ token }: { readonly token: string }): R
       <button type="button" disabled={loading || busy || total == null || offset + 50 >= total} onClick={() => { closeDetail(); setRows([]); setOffset((value) => value + 50); }}>Next external applications</button>
     </div>
     {detail ? <section className="role-card">
-      <h3>{detail.roleTitle || 'NA'}</h3><p>{externalLabel}</p><p>Company: {detail.companyName || 'NA'}</p>
-      <p>Source: {humanise(detail.sourceKind)}</p><p>Declared stage: {humanise(detail.stage)} · Unverified</p><p>Date applied: {detail.appliedOn || 'NA'}</p>
-      <p>Application link: {detail.applicationUrl && /^https:\/\//i.test(detail.applicationUrl) ? <a href={detail.applicationUrl} target="_blank" rel="noopener noreferrer">Open application link</a> : 'NA'}</p>
+      <h3>{detail.roleTitle || 'Role not recorded'}</h3><p>{externalLabel}</p><p>Company: {detail.companyName || MISSING_TEXT}</p>
+      <p>Source: {humanise(detail.sourceKind)}</p><p>Declared stage: {humanise(detail.stage)} · Unverified</p><p>Date applied: {detail.appliedOn || MISSING_TEXT}</p>
+      <p>Application link: {detail.applicationUrl && /^https:\/\//i.test(detail.applicationUrl) ? <a href={detail.applicationUrl} target="_blank" rel="noopener noreferrer">Open application link</a> : 'None'}</p>
       <p>Institution sharing: {sharing(detail)}</p>
       <p>{externalConsentNotice}</p>
       <button type="button" disabled={busy} onClick={() => { void changeSharing(detail, detail.institutionVisibilityGrantedAt && !detail.institutionVisibilityRevokedAt ? 'revoke' : 'grant'); }}>
@@ -1115,7 +1116,7 @@ function nextSteps(stages: readonly SelectionStageDto[], state: string): { reado
   // Shortlisting is a decision, not a stage; it stays available before the first stage past it.
   const shortlist = (state === 'APPLIED' || state === 'SCREENING') && !ahead.some((step) => step.state === 'SHORTLISTED') ? [{ state: 'SHORTLISTED', label: 'Shortlist' }] : [];
   const hire = state === 'OFFER' ? [{ state: 'HIRED', label: 'Hired' }] : [];
-  return [...ahead, ...shortlist, ...hire, { state: 'REJECTED', label: 'Rejected' }];
+  return [...ahead, ...shortlist, ...hire, { state: 'REJECTED', label: 'Not selected' }];
 }
 
 /**
@@ -1149,32 +1150,38 @@ export function contactVisibleAt(stage: string | null | undefined): boolean {
 }
 
 /** A short, neutral handle for an application whose candidate has no name on record. */
-export function applicationReference(applicationId: string): string {
-  return `Application ${applicationId.replace(/[^A-Za-z0-9]/g, '').slice(0, 8).toUpperCase()}`;
+/**
+ * A nameless candidate, told apart without exposing an internal identifier: "Candidate · applied
+ * 10 Aug 2026" from the application's submitted date, or plain "Candidate" when there is none.
+ */
+export function candidateAppliedSuffix(submittedAt: string | null | undefined): string | null {
+  const day = dates.formatDate(submittedAt, { fallback: '' });
+  return day ? `applied ${day}` : null;
 }
 
 type IdentityItem = Pick<EmployerApplicantDto, 'consentRevoked' | 'candidateAccess' | 'candidateName' | 'candidateEmail' | 'institutionStudentId'> & {
   /** An applicant row: its id and stage. */
-  readonly id?: string; readonly state?: string;
+  readonly id?: string; readonly state?: string; readonly submittedAt?: string | null;
   /** An interview or offer row: the application it belongs to, and that application's stage. */
   readonly applicationId?: string; readonly applicationState?: string;
 };
 
 /**
  * Shared verbatim consent redaction from the Applicants table. The candidate is shown by name. A
- * candidate with no name (a graduate who has not given one) is "Candidate" with the application's
- * reference until the application reaches Shortlisted; only from then on may the email stand in
- * for the name. Interview and offer rows carry the application's stage, not their own state.
+ * candidate with no name (a graduate who has not given one) is "Candidate" with the date they
+ * applied (never an internal id) until the application reaches Shortlisted; only from then on may
+ * the email stand in for the name. Interview and offer rows carry the application's stage, not their own state.
  */
 export function CandidateIdentity({ item }: { readonly item: IdentityItem }): React.ReactElement {
   if (item.consentRevoked) return <span className="hiring-meta">Withdrawn — details no longer shared</span>;
   if (item.candidateAccess === false) return <span className="hiring-meta">Details no longer shared</span>;
   const stage = item.applicationId !== undefined ? item.applicationState : item.applicationState ?? item.state;
-  const reference = item.applicationId ?? item.id;
+  // Applicant rows carry the application's submitted date; interview and offer rows do not.
+  const applied = item.applicationId === undefined ? candidateAppliedSuffix(item.submittedAt) : null;
   const name = item.candidateName?.trim()
     ? item.candidateName
     : contactVisibleAt(stage) && item.candidateEmail ? item.candidateEmail : null;
-  return <>{name ?? <>Candidate{reference ? <span className="hiring-meta"> · {applicationReference(reference)}</span> : null}</>}
+  return <>{name ?? <>Candidate{applied ? <span className="hiring-meta"> · {applied}</span> : null}</>}
     {item.institutionStudentId ? <span className="hiring-meta"> · {item.institutionStudentId}</span> : null}</>;
 }
 
@@ -1516,25 +1523,27 @@ export function EmployerHiringAnalyticsPage({ employerId }: { readonly employerI
     <div className="role-page-heading"><div><h1>Hiring reports</h1><p>All submitted applications for your employer. No candidate identities are included.</p></div></div>
     {status ? <p role="status">{status}</p> : null}
     <div className="v2-row v2-cols-4 career-stat-strip role-wide">
-      <V2Stat icon="📨" tone="blue" label="Applications" value={analytics?.applicationCount ?? 'NA'} />
-      <V2Stat icon="⏱" tone="amber" label="Mean days to first offer" value={analytics?.meanTimeToOfferDays == null ? 'NA' : analytics.meanTimeToOfferDays.toFixed(1)} />
-      <V2Stat icon="📄" tone="green" label="Applications with timed offers" value={analytics?.timedOfferCount ?? 'NA'} />
+      {/* A figure that has not loaded is passed as null, and V2Stat does not draw it. */}
+      <V2Stat icon="📨" tone="blue" label="Applications" value={analytics?.applicationCount ?? null} />
+      <V2Stat icon="⏱" tone="amber" label="Mean days to first offer" value={analytics?.meanTimeToOfferDays == null ? null : analytics.meanTimeToOfferDays.toFixed(1)} />
+      <V2Stat icon="📄" tone="green" label="Applications with timed offers" value={analytics?.timedOfferCount ?? null} />
     </div>
     <section className="role-card role-wide"><h2>Applications by stage</h2>
-      <div className="role-record-table-wrap"><table className="role-record-table"><thead><tr><th>Stage</th><th>Current applications</th><th>Ever reached</th></tr></thead>
-        <tbody>{(analytics?.stages ?? ['APPLIED', 'SCREENING', 'SHORTLISTED', 'ASSESSMENT', 'INTERVIEW', 'OFFER', 'HIRED', 'REJECTED', 'WITHDRAWN'].map((stage) => ({ stage, count: 'NA', reached: 'NA' }))).map((item) => <tr key={item.stage}><td>{humanise(item.stage)}</td><td>{item.count}</td><td>{item.reached}</td></tr>)}</tbody>
-      </table></div>
+      {/* Until the figures load there is nothing to tabulate, so the table is not drawn (the status line says why). */}
+      {analytics ? <div className="role-record-table-wrap"><table className="role-record-table"><thead><tr><th>Stage</th><th>Current applications</th><th>Ever reached</th></tr></thead>
+        <tbody>{analytics.stages.map((item) => <tr key={item.stage}><td>{humanise(item.stage)}</td><td>{item.count}</td><td>{item.reached}</td></tr>)}</tbody>
+      </table></div> : null}
     </section>
     <section className="role-card role-wide"><h2>Stage conversion</h2><p>Among applications that entered a stage, the share that also reached the next named stage. Skipped stages are not inferred; these are lifetime figures, not a forecast.</p>
       {analytics ? <div className="role-record-table-wrap"><table className="role-record-table"><thead><tr><th>From</th><th>To</th><th>Entered</th><th>Progressed</th><th>Conversion</th></tr></thead>
-        <tbody>{analytics.conversions.map((item) => <tr key={item.from}><td>{humanise(item.from)}</td><td>{humanise(item.to)}</td><td>{item.entrants}</td><td>{item.progressed}</td><td>{item.rate === null ? 'NA' : `${(item.rate * 100).toFixed(1)}%`}</td></tr>)}</tbody>
-      </table></div> : <p>NA</p>}
+        <tbody>{analytics.conversions.map((item) => <tr key={item.from}><td>{humanise(item.from)}</td><td>{humanise(item.to)}</td><td>{item.entrants}</td><td>{item.progressed}</td><td>{item.rate === null ? 'No entrants' : `${(item.rate * 100).toFixed(1)}%`}</td></tr>)}</tbody>
+      </table></div> : null}
       <p>Time-to-offer runs from application submission to the first extended offer, using records with valid timestamps.</p>
     </section>
     <section className="role-card role-wide"><h2>Per-opportunity funnel</h2>
       {analytics?.opportunities?.length ? <div className="role-record-table-wrap"><table className="role-record-table"><thead><tr><th>Opportunity</th><th>Applications</th>{analytics.opportunities[0]?.funnel?.map((item) => <th key={item.stage}>{humanise(item.stage)}</th>)}</tr></thead>
         <tbody>{analytics.opportunities.map((item, index) => <tr key={index}><td>{item.title}</td><td>{item.applicationCount}</td>{item.funnel.map((stage) => <td key={stage.stage}>{stage.count}</td>)}</tr>)}</tbody>
-      </table></div> : <p>{analytics ? 'No opportunities to report yet.' : 'NA'}</p>}
+      </table></div> : analytics ? <p>No opportunities to report yet.</p> : null}
     </section>
   </section>;
 }

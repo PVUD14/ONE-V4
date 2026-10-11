@@ -25,11 +25,12 @@ import { V2Chip, V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { growthCodeLabel } from './growthLeads.js';
 import { formatApiError } from './shared.js';
 import { formatDate } from '../dates.js';
+import { MISSING_TEXT } from '../labels.js';
 
 type View = 'LIVE' | 'LEFT' | 'ENDED';
 
 function day(value: string | null | undefined): string {
-  return value ? formatDate(value) : 'NA';
+  return value ? formatDate(value) : MISSING_TEXT;
 }
 
 export function OperationsGrowthAttributionPanel(): React.ReactElement | null {
@@ -66,10 +67,10 @@ export function OperationsGrowthAttributionPanel(): React.ReactElement | null {
     <div className="role-page-heading"><div><span className="eyebrow">Settings</span><h1 id="growth-attribution-heading">Growth attribution</h1>
       <p>Who is credited for each college and employer. Decide disputes you are not party to, and reassign or end credit with a reason. Every change ends one record and writes another, so who was credited on any date stays answerable.</p></div></div>
     <div className="v2-row v2-cols-4 career-stat-strip role-wide" role="region" aria-label="Growth attribution summary">
-      <V2Stat icon="🤝" tone="blue" value={data ? data.counts.live : 'NA'} label="Live credits" />
-      <V2Stat icon="⚖️" tone="amber" value={data ? data.counts.openDisputes : 'NA'} label="Open disputes" />
-      <V2Stat icon="🚪" tone="teal" value={data ? data.counts.beneficiaryLeft : 'NA'} label="Credited person left" />
-      <V2Stat icon="🗂️" tone="purple" value={data ? data.counts.ended : 'NA'} label="Ended" />
+      <V2Stat icon="🤝" tone="blue" value={data ? data.counts.live : null} label="Live credits" />
+      <V2Stat icon="⚖️" tone="amber" value={data ? data.counts.openDisputes : null} label="Open disputes" />
+      <V2Stat icon="🚪" tone="teal" value={data ? data.counts.beneficiaryLeft : null} label="Credited person left" />
+      <V2Stat icon="🗂️" tone="purple" value={data ? data.counts.ended : null} label="Ended" />
     </div>
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {notice ? <p role="status">{notice}</p> : null}
@@ -107,7 +108,7 @@ function DisputeCard({ dispute, token, reasons, onDone, onError }: {
   const conflict = dispute.origin === 'ONBOARDING_CONFLICT';
   return <article className="role-card" aria-label={`Dispute about ${dispute.organizationName}`}>
     <h3>{dispute.organizationName} <V2Chip tone="slate">{dispute.organizationKind === 'INSTITUTION' ? 'College' : 'Employer'}</V2Chip> <V2Chip tone="amber">{conflict ? 'Onboarding conflict' : 'Claim'}</V2Chip></h3>
-    <p>{conflict ? `Referral by ${dispute.claimant.email}; lead owned by ${dispute.respondent?.email ?? 'NA'}.`
+    <p>{conflict ? `Referral by ${dispute.claimant.email}; ${dispute.respondent?.email ? `lead owned by ${dispute.respondent.email}` : 'lead owner not recorded'}.`
       : `${dispute.claimant.email} claims credit${dispute.respondent ? ` now held by ${dispute.respondent.email}` : ' (nobody is credited)'}.`}</p>
     {dispute.statement ? <blockquote>{dispute.statement}</blockquote> : null}
     <small>Opened {day(dispute.openedAt)} by {dispute.openedBy} · handed off {day(dispute.evidence.handedOffAt)}{dispute.evidence.leadName ? ` · lead ${dispute.evidence.leadName}` : ''}{dispute.evidence.onboardingCandidate ? ` · onboarding candidate ${growthCodeLabel(dispute.evidence.onboardingCandidate)}` : ''}</small>

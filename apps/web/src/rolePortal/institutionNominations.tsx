@@ -30,6 +30,7 @@ import {
 } from '../api/nominations.js';
 import { formatApiError } from './shared.js';
 import { formatDate } from '../dates.js';
+import { MISSING_TEXT } from '../labels.js';
 
 const skippedWords: Readonly<Record<string, string>> = {
   ALREADY_NOMINATED: 'already nominated', NOT_ELIGIBLE: 'not eligible', NOT_IN_SCOPE: 'not a current student in your scope',
@@ -125,10 +126,10 @@ export function DriveNominationsPanel({ institutionId, driveId }: { readonly ins
         ? <div className="role-record-table-wrap"><table className="role-record-table" aria-label="Nominated students">
           <thead><tr><th>Student</th><th>College ID</th><th>Response</th><th>Reason</th><th>Nominated</th><th>Action</th></tr></thead>
           <tbody>{data.nominations.map((row) => <tr key={row.id}>
-            <td>{row.studentName}</td><td>{row.institutionStudentId ?? 'NA'}</td>
+            <td>{row.studentName}</td><td>{row.institutionStudentId ?? MISSING_TEXT}</td>
             <td><span className="hiring-tag">{collegeResponseLabels[row.response]}</span>{row.cancelReasonCode ? <span className="hiring-meta"> · {reasonLabel(row.cancelReasonCode)}</span> : null}</td>
             <td>{reasonLabel(row.reasonCode)}</td>
-            <td>{row.nominatedAt ? formatDate(row.nominatedAt) : 'NA'}</td>
+            <td>{row.nominatedAt ? formatDate(row.nominatedAt) : MISSING_TEXT}</td>
             <td>{row.canCancel ? <button type="button" className="secondary" disabled={busy} onClick={() => { setCancelling(row); setError(''); }}>Withdraw nomination</button> : <span className="hiring-meta">—</span>}</td>
           </tr>)}</tbody>
         </table></div>
@@ -158,7 +159,7 @@ export function DriveNominationsPanel({ institutionId, driveId }: { readonly ins
           const canChoose = row.eligibility === 'ELIGIBLE' && !row.nomination;
           return <tr key={row.studentUserId}>
             <td><input type="checkbox" aria-label={`Nominate ${row.fullName}`} disabled={!canChoose || busy} checked={chosen.has(row.studentUserId)} onChange={() => toggle(row.studentUserId)} /></td>
-            <td>{row.fullName}</td><td>{row.institutionStudentId ?? 'NA'}</td><td>{row.department ?? 'NA'}</td><td>{row.batch ?? 'NA'}</td>
+            <td>{row.fullName}</td><td>{row.institutionStudentId ?? MISSING_TEXT}</td><td>{row.department ?? 'No department'}</td><td>{row.batch ?? 'No batch'}</td>
             <td>{nominationEligibilityLabels[row.eligibility]}</td>
             <td>{row.nomination ? collegeResponseLabels[row.nomination.response] : '—'}</td>
           </tr>;

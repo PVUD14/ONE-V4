@@ -1,7 +1,7 @@
 /**
  * Cohort readiness by career role and preparation sprints (INST-17) on the admin's Career Readiness, the placement
  * officer's Readiness and the department head's Readiness: real server data only, bands and "<5" (never a score),
- * NA and empty states, starting and ending a sprint, safe errors with a reference, and navigation unchanged (HG-3).
+ * missing-value and empty states, starting and ending a sprint, safe errors with a reference, and navigation unchanged (HG-3).
  */
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -91,7 +91,7 @@ async function chooseRole(value: string) {
 }
 
 describe('Cohort readiness by career role', () => {
-  it('shows bands, gaps and unknowns per essential requirement from the server, with <5 and NA, and no score', async () => {
+  it('shows bands, gaps and unknowns per essential requirement from the server, with <5 and no score', async () => {
     route();
     render(<CohortReadinessByRoleSection institutionId={institutionId} />);
     expect(await screen.findByText('Choose a role')).toBeInTheDocument();

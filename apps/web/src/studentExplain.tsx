@@ -131,7 +131,7 @@ export function StudentExplainPage(): React.ReactElement {
         <label className="pilot-field"><span>Topic (English, {availability.limits.topicMin}–{availability.limits.topicMax} characters)</span>
           <input value={topic} maxLength={availability.limits.topicMax} onChange={(event) => setTopic(event.target.value)} aria-label="Topic to explain" placeholder="e.g. how photosynthesis works" />
         </label>
-        <button type="submit" className="pilot-btn" disabled={busy || !availability.available || topic.trim().length < availability.limits.topicMin}>Explain</button>
+        <button type="submit" className="pilot-btn primary" disabled={busy || !availability.available || topic.trim().length < availability.limits.topicMin}>Explain</button>
         <small style={{ ...muted, marginLeft: 8 }}>
           {availability.reason === 'PREPARING' ? 'Your last lesson is still being prepared.' : availability.reason === 'DAILY_LIMIT' ? 'You have asked for 10 lessons today. You can ask again tomorrow.'
             : availability.remainingToday === null || availability.remainingToday === undefined ? null : `${availability.remainingToday} of ${availability.limits.perDay} left today.`}

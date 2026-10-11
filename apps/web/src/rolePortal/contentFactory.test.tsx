@@ -1,6 +1,6 @@
 /**
  * The content factory on the web (ENG-23): the AI drafts card shows the feature's real state and
- * today's use against the cap (NA when unknown), lists jobs with their outcome in words, asks for a
+ * today's use against the cap (left out when unknown), lists jobs with their outcome in words, asks for a
  * draft only with a skill, a key, a title and a reason, and shows a typed refusal plainly; when the
  * feature is off or the kill switch is engaged nothing can be asked for; an AI draft carries its
  * label and provenance; a translation request is a LESSON_VARIANT; the answer-key check is shown
@@ -132,13 +132,16 @@ describe('the AI drafts card', () => {
     expect(within(card).getByText(/This AI feature is off/)).toBeInTheDocument();
   });
 
-  it('says the kill switch stopped AI, and reads NA where the server has no figure', async () => {
+  it('says the kill switch stopped AI, and leaves out figures the server does not have', async () => {
     statusBody = status({ killSwitchEngaged: true, features: [feature('content.lesson-draft', ['LESSON', 'LESSON_VARIANT'], { available: false, cap: null, usedInWindow: null, openJobs: null, model: null })] });
     draftsBody = [];
     render(<AiDraftsCard token={token} scope="LESSONS" vocabulary={vocabulary} />);
     const card = await screen.findByRole('region', { name: 'AI drafts' });
     expect(await within(card).findByText('Stopped by the kill switch')).toBeInTheDocument();
-    expect(within(card).getAllByText('NA').length).toBeGreaterThanOrEqual(3);
+    expect(within(card).queryByText('Used')).toBeNull();
+    expect(within(card).queryByText('Waiting or drafting')).toBeNull();
+    expect(within(card).queryByText('Model')).toBeNull();
+    expect(card.textContent).not.toMatch(/(^|[^A-Za-z])NA([^A-Za-z]|$)/);
     expect(within(card).getByText('No AI drafts yet.')).toBeInTheDocument();
     expect(within(card).getByRole('button', { name: 'Draft with AI…' })).toBeDisabled();
   });
@@ -183,7 +186,8 @@ describe('an AI draft in the editor', () => {
     expect(screen.getByText('content-lesson-draft@1')).toBeInTheDocument();
     expect(screen.getByText(/shortened at a sentence to fit/)).toBeInTheDocument();
     expect(screen.getByText('Second paragraph.')).toBeInTheDocument();
-    expect(screen.getByText('NA')).toBeInTheDocument();
+    expect(screen.getByText('This section was empty.')).toBeInTheDocument();
+    expect(screen.queryByText('NA')).toBeNull();
   });
 });
 

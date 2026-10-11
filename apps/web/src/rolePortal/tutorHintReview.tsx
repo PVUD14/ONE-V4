@@ -41,7 +41,7 @@ export function TutorHintsPanel({ token }: { readonly token: string }): React.Re
     setList(null);
     setUnavailable(false);
     listTutorHintsForReview(token, view, controller.signal)
-      // A response without the list is shown as NA, never guessed at.
+      // A response without the list is reported as unreadable, never guessed at.
       .then((loaded) => { if (!Array.isArray(loaded?.hints) || !loaded.counts || !loaded.reasons) throw new Error('unexpected tutor hints response'); setList(loaded); setError(''); })
       .catch((cause) => {
         if (controller.signal.aborted) return;

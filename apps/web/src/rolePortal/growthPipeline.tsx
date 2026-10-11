@@ -5,7 +5,7 @@
  * On a lead: the stage, the moves the server allows (a backward move, a hold and a loss each need a
  * reason), the handoff request once the agreement is reported (the contract reference the college
  * gave, and which contacts to hand over), the requests so far, and — once operations has linked the
- * college — the milestones read from Operations' own records. A milestone with no source says NA;
+ * college — the milestones read from Operations' own records. A milestone with no source shows no state;
  * the student-activation count says "<5" below five. No student, amount or contract text appears.
  *
  * GROWTH-05: on an employer lead, the employer's own milestones from the start — its access request,
@@ -39,8 +39,7 @@ import { formatApiError } from './shared.js';
 import { formatDate } from '../dates.js';
 import { smallCountText } from '../momentum/smallCountRule.js';
 import { NaValue } from '../naState.js';
-
-const NA = 'NA';
+import { MISSING_TEXT } from '../labels.js';
 
 const milestoneLabels: Readonly<Record<string, string>> = {
   HANDED_OFF: 'Handed off to operations',
@@ -83,8 +82,9 @@ function pipelineError(cause: unknown, fallback: string): string {
   return formatApiError(cause, fallback);
 }
 
-function milestoneValue(milestone: GrowthMilestoneDto): string {
-  if (milestone.state === 'NA') return NA;
+/** The milestone's state in words, or null when it has no source (its chip is then left out). */
+function milestoneValue(milestone: GrowthMilestoneDto): string | null {
+  if (milestone.state === 'NA') return null;
   if (milestone.code === 'STUDENTS_ACTIVATING' && milestone.count) return smallCountText(milestone.count);
   if (milestone.state === 'REACHED') return milestone.at ? formatDate(milestone.at) : 'Reached';
   return 'Not yet';
@@ -170,7 +170,7 @@ export function LeadPipelinePanel({ leadId, token, contacts, onChanged }: {
     {pipeline.handoffRequests.length ? <>
       <h4>Handoff requests</h4>
       <ul>{pipeline.handoffRequests.map((item) => <li key={item.id}>
-        {item.requestedAt ? formatDate(item.requestedAt) : NA}: {growthCodeLabel(item.state)} · reference {item.contractReferenceReported}
+        {item.requestedAt ? `${formatDate(item.requestedAt)}: ` : ''}{growthCodeLabel(item.state)} · reference {item.contractReferenceReported}
         {item.declineReasonCode ? ` · declined: ${growthCodeLabel(item.declineReasonCode)}` : ''}
         {item.state === 'LINKED' ? ` · ${item.contactsCarried ?? 0} contact(s) moved to the college's account` : ''}
       </li>)}</ul>
@@ -178,8 +178,8 @@ export function LeadPipelinePanel({ leadId, token, contacts, onChanged }: {
 
     {pipeline.kind === 'EMPLOYER' ? <>
       <h4>Access requests</h4>
-      {(pipeline.accessRequests ?? []).length ? <ul aria-label="Access requests">{(pipeline.accessRequests ?? []).map((item, index) => <li key={`${item.receivedAt ?? NA}-${index}`}>
-        {item.receivedAt ? formatDate(item.receivedAt) : NA}: {requestStateLabels[item.state] ?? growthCodeLabel(item.state)}
+      {(pipeline.accessRequests ?? []).length ? <ul aria-label="Access requests">{(pipeline.accessRequests ?? []).map((item, index) => <li key={`${item.receivedAt ?? 'none'}-${index}`}>
+        {item.receivedAt ? `${formatDate(item.receivedAt)}: ` : ''}{requestStateLabels[item.state] ?? growthCodeLabel(item.state)}
         {item.referral === 'YOU' ? ' · through your referral link' : item.referral === 'ANOTHER_TEAM_MEMBER' ? " · through another team member's referral link" : ''}
       </li>)}</ul> : <p className="v2-empty">No access request from this company yet. Share your referral link, or ask them to use the request form with their work email.</p>}
     </> : null}
@@ -191,7 +191,7 @@ export function LeadPipelinePanel({ leadId, token, contacts, onChanged }: {
           <span className="v2-tile teal" aria-hidden="true">{milestone.state === 'REACHED' ? '✓' : milestone.state === 'NA' ? '–' : '…'}</span>
           <div className="grow"><strong>{milestone.code === 'VERIFIED' && pipeline.kind === 'EMPLOYER' ? employerVerifiedLabel : milestoneLabels[milestone.code] ?? growthCodeLabel(milestone.code)}</strong>
             {milestone.note ? <small>{milestone.note}</small> : null}{milestoneCounts(milestone) ? <small>{milestoneCounts(milestone)}</small> : null}</div>
-          <V2Chip tone={milestone.code === 'SUSPENDED' && milestone.state === 'REACHED' ? 'red' : milestone.state === 'REACHED' ? 'green' : milestone.state === 'NA' ? 'slate' : 'amber'}><NaValue value={milestoneValue(milestone)} /></V2Chip>
+          {milestone.state === 'NA' ? null : <V2Chip tone={milestone.code === 'SUSPENDED' && milestone.state === 'REACHED' ? 'red' : milestone.state === 'REACHED' ? 'green' : 'amber'}><NaValue value={milestoneValue(milestone)} /></V2Chip>}
         </div>
       ))}</div>
       <small>{pipeline.kind === 'EMPLOYER'
@@ -256,7 +256,7 @@ export function GrowthHandoffsSection({ organizations, onLinked }: { readonly or
         return <tr key={item.id} className="role-record-row">
           <th scope="row"><strong>{item.leadName}</strong><span>{[item.area.city, item.area.districtName, item.area.stateName].filter(Boolean).join(', ') || 'Area not set'}</span>
             <small>{item.aisheCode ? `AISHE ${item.aisheCode} · ` : ''}Owner {item.owner ?? 'none'}</small></th>
-          <td>{item.requestedAt ? formatDate(item.requestedAt) : NA}<br /><small>{item.requestedBy ?? NA}</small></td>
+          <td>{item.requestedAt ? formatDate(item.requestedAt) : MISSING_TEXT}{item.requestedBy ? <><br /><small>{item.requestedBy}</small></> : null}</td>
           <td>{item.contractReferenceReported}<br /><small>Confirm it by recording it on the college&apos;s account.</small></td>
           <td>{item.contacts.length ? item.contacts.map((contact) => <div key={contact.id}>{contact.fullName} · {growthCodeLabel(contact.accountRole)}<br /><small>{[contact.email, contact.phone].filter(Boolean).join(' · ')}</small></div>) : 'None'}</td>
           <td><div className="role-record-actions">

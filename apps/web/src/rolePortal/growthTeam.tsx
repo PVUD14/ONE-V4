@@ -86,10 +86,10 @@ export function OperationsGrowthTeamPanel(): React.ReactElement | null {
     <div className="role-page-heading"><div><span className="eyebrow">Settings</span><h1 id="growth-team-heading">Growth team</h1>
       <p>AI8HT&apos;s partnerships field staff: who they are, which team they work in, who they report to, and whether they are an employee or a contractor. Growth people hold no Operations access. ONE records the staff type only; it computes nothing from it.</p></div></div>
     <div className="v2-row v2-cols-4 career-stat-strip role-wide">
-      <V2Stat icon="🧭" tone="teal" value={directory ? members.filter((member) => member.state === 'ACTIVE').length : 'NA'} label="Active growth people" />
-      <V2Stat icon="✉️" tone="amber" value={directory ? directory.invitations.length : 'NA'} label="Pending invitations" />
-      <V2Stat icon="🏛️" tone="blue" value={directory ? members.filter((member) => member.teams.some((team) => team.team === 'COLLEGE_PARTNERSHIPS')).length : 'NA'} label="College team" />
-      <V2Stat icon="🏢" tone="purple" value={directory ? members.filter((member) => member.teams.some((team) => team.team === 'EMPLOYER_PARTNERSHIPS')).length : 'NA'} label="Employer team" />
+      <V2Stat icon="🧭" tone="teal" value={directory ? members.filter((member) => member.state === 'ACTIVE').length : null} label="Active growth people" />
+      <V2Stat icon="✉️" tone="amber" value={directory ? directory.invitations.length : null} label="Pending invitations" />
+      <V2Stat icon="🏛️" tone="blue" value={directory ? members.filter((member) => member.teams.some((team) => team.team === 'COLLEGE_PARTNERSHIPS')).length : null} label="College team" />
+      <V2Stat icon="🏢" tone="purple" value={directory ? members.filter((member) => member.teams.some((team) => team.team === 'EMPLOYER_PARTNERSHIPS')).length : null} label="Employer team" />
     </div>
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {notice ? <p role="status">{notice}</p> : null}
@@ -172,7 +172,7 @@ function GrowthPerson({ member, directory, busy, onStaffType, onTeam, onLeaveTea
     <p><span>{roleLabels[member.role] ?? member.role}</span> · <StatusBadge label={member.state} tone={member.state === 'ACTIVE' ? 'success' : 'neutral'} />
       {' '}· <span>{current ? typeLabels[current] ?? current : 'Staff type not set'}</span></p>
     {member.teams.length ? <ul>{member.teams.map((entry) => <li key={entry.team}>
-      {teamLabels[entry.team] ?? entry.team} — {entry.manager ? `manager ${entry.manager.email ?? 'NA'}` : 'no manager recorded'}
+      {teamLabels[entry.team] ?? entry.team} — {entry.manager ? (entry.manager.email ? `manager ${entry.manager.email}` : 'manager email not recorded') : 'no manager recorded'}
       {editable ? <button type="button" className="pilot-btn" disabled={!leaveReason || busy} onClick={() => onLeaveTeam(entry.team, leaveReason)}>Remove from {teamLabels[entry.team] ?? entry.team}</button> : null}
     </li>)}</ul> : <p>Not on a team yet.</p>}
     {!editable ? <small>{member.isSelf ? 'Your own growth membership is changed by another operator.' : 'Only an active membership can be changed.'}</small> : <>

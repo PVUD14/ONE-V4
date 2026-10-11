@@ -39,7 +39,7 @@ import {
   type MessageThreadSummaryDto,
 } from '../api/hiring.js';
 import { formatDate } from '../dates.js';
-import { codeLabel } from '../labels.js';
+import { applicationStageLabel, codeLabel } from '../labels.js';
 import { StatusTag } from '../momentum/statusTag.js';
 import { CandidateIdentity } from '../hiringPages.js';
 import { employerManagesOrganisation } from './employer.js';
@@ -194,7 +194,7 @@ function ShortlistCard({ applicants, onOpen }: { readonly applicants: readonly N
     <ul className="ih-list">{applicants.map((applicant) => <li key={applicant.id} className="ih-li">
       <IhAvatar name={applicant.candidateName ?? 'Candidate'} />
       <div className="ih-li-t"><b><CandidateIdentity item={applicant} /></b><small>{applicant.opportunityTitle}</small></div>
-      <StatusTag kind="application" state={applicant.state} label={codeLabel(applicant.state)} />
+      <StatusTag kind="application" state={applicant.state} label={applicationStageLabel(applicant.state)} />
     </li>)}</ul>
     <IhNote>Candidates choose what you see: the evidence, badges and résumé they share with an application. Anything they keep private never reaches you.</IhNote>
   </IhCard>;

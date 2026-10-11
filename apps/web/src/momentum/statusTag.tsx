@@ -16,7 +16,8 @@
 import React from 'react';
 import { Icon, type IconName } from '../icons/Icon.js';
 
-export type StatusTone = 'band' | 'cyan' | 'hot' | 'ok' | 'warn' | 'danger' | 'mute' | 'line';
+/** `gold` is the celebration variant for a view whose one orange is already a streak (approved 2026-10-11). */
+export type StatusTone = 'band' | 'cyan' | 'hot' | 'gold' | 'ok' | 'warn' | 'danger' | 'mute' | 'line';
 export type StatusKind = 'application' | 'offer' | 'verification' | 'general';
 
 const APPLICATION: Readonly<Record<string, StatusTone>> = {
@@ -87,6 +88,9 @@ function sentence(code: string): string {
 }
 
 export function StatusTag({ state, label, kind = 'general', tone, size = 'md', className }: StatusTagProps): React.ReactElement {
+  // A hiring stage the API calls REJECTED always reads "Not selected", whatever label was passed.
+  const code = state.trim().toUpperCase();
+  if (kind === 'application' && (code === 'REJECTED' || code === 'NOT_SELECTED')) label = 'Not selected';
   const resolved = tone ?? statusTone(state, kind);
   const slug = state.trim().toLowerCase().replace(/[\s_]+/g, '-');
   const classes = ['tag', `t-${resolved}`, 'hiring-state', `state-${state.trim().toLowerCase()}`, `state-${slug}`, size === 'lg' ? 'lg' : '', className ?? '']

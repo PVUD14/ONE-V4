@@ -11,7 +11,8 @@
  * The trust-case panel is also shown on the plain status page of a suspended or rejected employer,
  * because answering a case is the one thing such an employer can still do (Appendix 2 §5.1).
  * Whether the viewer may accept, respond or appeal is the server's answer; this page decides
- * nothing about authority. Nothing is invented: a missing value says NA.
+ * nothing about authority. Nothing is invented: a missing value is left out, or said plainly
+ * ("Not yet", "Not recorded") where a table cell must stay.
  */
 import { useEffect, useState } from 'react';
 import { ApiRequestError, getProtectedAccessToken } from '../api.js';
@@ -33,10 +34,15 @@ import { formatApiError } from './shared.js';
 import { supportCodeSuffix } from '../supportCode.js';
 import * as dates from '../dates.js';
 
-function formatDate(value: string | null | undefined): string {
-  if (!value) return 'NA';
+function formatDate(value: string | null | undefined, missing = 'Not recorded'): string {
+  if (!value) return missing;
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? 'NA' : dates.formatDate(date);
+  return Number.isNaN(date.getTime()) ? missing : dates.formatDate(date);
+}
+
+/** " Title (version N)" for a job, leaving out whichever part was not recorded. */
+function jobAndVersion(title: string | null | undefined, version: number | string | null | undefined): string {
+  return `${title ? ` ${title}` : ''}${version !== null && version !== undefined ? ` (version ${version})` : ''}`;
 }
 
 const termsStatusLabels: Readonly<Record<string, string>> = {
@@ -118,8 +124,8 @@ export function EmployerSettingsPage({ employerId }: { readonly employerId: stri
 
   return <StaffPilotWrap title="Settings" subtitle={subtitle}>
     <div className="v2-row v2-cols-4 career-stat-strip role-wide">
-      <V2Stat icon="📜" tone="teal" value={termsStatusLabels[terms.status] ?? 'NA'} label="Employer terms" />
-      <V2Stat icon="✅" tone="blue" value={terms.latestAcceptance?.version ?? 'NA'} label="Version accepted" />
+      <V2Stat icon="📜" tone="teal" value={termsStatusLabels[terms.status] ?? null} label="Employer terms" />
+      <V2Stat icon="✅" tone="blue" value={terms.latestAcceptance?.version ?? null} label="Version accepted" />
       <V2Stat icon="💬" tone="amber" value={`${retention.messageRetentionDaysAfterAccessEnds} days`} label="Messages kept after access ends" />
       <V2Stat icon="📄" tone="purple" value={`${retention.resumeLinkSeconds} s`} label="Résumé link lifetime" />
     </div>
@@ -137,14 +143,14 @@ export function EmployerSettingsPage({ employerId }: { readonly employerId: stri
         </p>
         {current.legalReviewState === 'DRAFT_FOR_LEGAL_REVIEW'
           ? <p className="hiring-meta">This text is a draft that has not finished legal review. It is not final.</p>
-          : <p className="hiring-meta">Legal review: {current.legalReviewReference ?? 'NA'}</p>}
+          : current.legalReviewReference ? <p className="hiring-meta">Legal review: {current.legalReviewReference}</p> : null}
         {current.changeSummary ? <p><strong>What changed:</strong> {current.changeSummary}</p> : null}
         <div style={{ whiteSpace: 'pre-wrap' }} aria-label="Terms text">{current.body}</div>
         <p role="status">{terms.status === 'ACCEPTED'
           ? terms.currentVersionAccepted ? 'Your organisation has accepted these terms.' : 'Your organisation has accepted the terms it needs to; this latest version changed nothing that needs accepting again.'
           : 'An owner of your organisation must accept these terms before your organisation publishes another job. Jobs already live stay live.'}</p>
         <p className="hiring-meta">{terms.latestAcceptance
-          ? `Last accepted: version ${terms.latestAcceptance.version} on ${formatDate(terms.latestAcceptance.acceptedAt)} by ${terms.latestAcceptance.acceptedBy ?? 'NA'}.`
+          ? `Last accepted: version ${terms.latestAcceptance.version} on ${formatDate(terms.latestAcceptance.acceptedAt)}${terms.latestAcceptance.acceptedBy ? ` by ${terms.latestAcceptance.acceptedBy}` : ''}.`
           : 'Not accepted yet.'}</p>
         {terms.canAccept
           ? <button type="button" disabled={busy} onClick={() => void accept()}>Accept version {current.version} for my organisation</button>
@@ -202,7 +208,7 @@ const actionLabels: Readonly<Record<string, string>> = {
 };
 
 function subjectLabel(record: EmployerTrustCaseDto): string {
-  return record.subject.kind === 'JOB' ? `Job: ${record.subject.jobTitle ?? 'NA'} (version ${record.subject.jobVersion ?? 'NA'})` : 'Your organisation';
+  return record.subject.kind === 'JOB' ? `${record.subject.jobTitle ? 'Job:' : 'A job'}${jobAndVersion(record.subject.jobTitle, record.subject.jobVersion)}` : 'Your organisation';
 }
 
 /** Trust and safety cases about the employer that operations have disclosed. */
@@ -272,8 +278,8 @@ export function EmployerTrustCasesPanel({ employerId }: { readonly employerId: s
         <td>{caseTypeLabels[record.caseType] ?? record.caseType}</td>
         <td>{subjectLabel(record)}</td>
         <td><StatusBadge label={caseStatusLabels[record.status] ?? record.status} tone={record.status === 'RESPONSE_REQUESTED' ? 'warning' : 'neutral'} /></td>
-        <td>{formatDate(record.responseRequestedAt)}</td>
-        <td>{formatDate(record.decidedAt)}</td>
+        <td>{formatDate(record.responseRequestedAt, 'Not requested')}</td>
+        <td>{formatDate(record.decidedAt, 'Not yet')}</td>
         <td><button type="button" className="pilot-btn" disabled={busy} onClick={() => void openCase(record.id)}>Open</button></td>
       </tr>)}</tbody>
     </table></div> : null}
@@ -287,8 +293,8 @@ export function EmployerTrustCasesPanel({ employerId }: { readonly employerId: s
       </div>)}
       <p><strong>Evidence shared with you:</strong> {open.evidence.shared.length
         ? open.evidence.shared.map((item) => item.kind === 'DETECTOR_SIGNAL'
-          ? `Automatic check "${item.signalCode ?? 'NA'}" on ${item.jobTitle ?? 'NA'} (version ${item.jobVersion ?? 'NA'})`
-          : `Your job ${item.jobTitle ?? 'NA'} (version ${item.jobVersion ?? 'NA'})`).join('; ')
+          ? `Automatic check${item.signalCode ? ` "${item.signalCode}"` : ''}${item.jobTitle ? ' on' : ''}${jobAndVersion(item.jobTitle, item.jobVersion)}`
+          : `Your job${jobAndVersion(item.jobTitle, item.jobVersion)}`).join('; ')
         : 'None'}{open.evidence.withheldCount ? `. ${open.evidence.withheldCount} further item(s) are held by AI8HT operations and not shared.` : '.'}</p>
       {open.actions.length ? <p><strong>Actions:</strong> {open.actions.map((action) =>
         `${actionLabels[action.action] ?? action.action} from ${formatDate(action.effectiveFrom)}${action.effectiveTo ? ` to ${formatDate(action.effectiveTo)}` : ''}${action.reversed ? ' (reversed)' : ''}`).join('; ')}</p> : <p><strong>Actions:</strong> None</p>}

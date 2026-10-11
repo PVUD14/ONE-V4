@@ -39,7 +39,12 @@ import { codeLabel } from '../labels.js';
 type Tone = 'success' | 'warning' | 'neutral' | 'info' | 'danger';
 
 const label = (value: string): string => value.split('_').map((word) => word.charAt(0) + word.slice(1).toLowerCase()).join(' ');
-const when = (value: string | null | undefined): string => (value ? formatDateTime(value) : 'NA');
+/** A recorded moment; one that has not happened reads "Not yet" (never "NA"). */
+const when = (value: string | null | undefined): string => (value ? formatDateTime(value) : 'Not yet');
+/** A change between two codes in words; a side that was not recorded is left out. */
+const change = (from: string | null | undefined, to: string | null | undefined): string =>
+  (from && to ? `${label(from)} → ${label(to)}` : to ? `set to ${label(to)}` : from ? `changed from ${label(from)}` : 'changed');
+const capitalise = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);
 const textGuidance = 'No names, email addresses or phone numbers: describe what happened, not who it happened to.';
 
 const stateTone = (state: string): Tone => (state === 'CLOSED' || state === 'RESOLVED' ? 'success' : state === 'CONTAINED' ? 'info' : 'warning');
@@ -49,9 +54,9 @@ const clockLabel: Readonly<Record<BreachClockDto['status'], string>> = {
   RUNNING: 'Clock running', OVERDUE: 'Deadline passed — Board not yet notified', MET: 'Board notified in time', MET_LATE: 'Board notified after the deadline',
 };
 
-/** "41 h 12 min left" from seconds the server computed. */
-export function formatRemaining(seconds: number | null): string {
-  if (seconds === null) return 'NA';
+/** "41 h 12 min left" from seconds the server computed; null when the server sent none. */
+export function formatRemaining(seconds: number | null): string | null {
+  if (seconds === null) return null;
   if (seconds <= 0) return 'Deadline passed';
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
@@ -138,10 +143,10 @@ export function OperationsIncidentRegisterPage(): React.ReactElement | null {
   return <section className="role-module role-module--dense" aria-label="Incident register">
     {heading}
     <div className="v2-row v2-cols-4 career-stat-strip role-wide">
-      <V2Stat icon="🚨" tone="amber" value={list?.summary ? list.summary.open : 'NA'} label="Open incidents" />
-      <V2Stat icon="🛡️" tone="purple" value={list?.summary ? list.summary.openBreaches : 'NA'} label="Open personal data breaches" />
-      <V2Stat icon="⏱️" tone="blue" value={list?.summary ? list.summary.breachClocksRunning : 'NA'} label="Breach clocks running" />
-      <V2Stat icon="⏰" tone="teal" value={list?.summary ? list.summary.breachClocksOverdue : 'NA'} label="Past the Board deadline, not reported" />
+      <V2Stat icon="🚨" tone="amber" value={list?.summary ? list.summary.open : undefined} label="Open incidents" />
+      <V2Stat icon="🛡️" tone="purple" value={list?.summary ? list.summary.openBreaches : undefined} label="Open personal data breaches" />
+      <V2Stat icon="⏱️" tone="blue" value={list?.summary ? list.summary.breachClocksRunning : undefined} label="Breach clocks running" />
+      <V2Stat icon="⏰" tone="teal" value={list?.summary ? list.summary.breachClocksOverdue : undefined} label="Past the Board deadline, not reported" />
     </div>
     {policy?.breachClock ? <p className="role-wide"><small>{policy.breachClock.basisText}</small></p> : null}
     {error ? <p className="form-error" role="alert">{error}</p> : null}
@@ -164,8 +169,8 @@ export function OperationsIncidentRegisterPage(): React.ReactElement | null {
           <td><StatusBadge label={label(item.severity)} tone={severityTone(item.severity)} /></td>
           <td><StatusBadge label={label(item.state)} tone={stateTone(item.state)} /></td>
           <td>{item.breachClock
-            ? <><StatusBadge label={clockLabel[item.breachClock.status]} tone={clockTone(item.breachClock.status)} /><br /><small>{when(item.breachClock.deadlineAt)} · {formatRemaining(item.breachClock.remainingSeconds)}</small></>
-            : 'NA'}</td>
+            ? <><StatusBadge label={clockLabel[item.breachClock.status]} tone={clockTone(item.breachClock.status)} /><br /><small>{[when(item.breachClock.deadlineAt), formatRemaining(item.breachClock.remainingSeconds)].filter(Boolean).join(' · ')}</small></>
+            : 'Not a breach'}</td>
           <td>{item.affectedOrganizationsCount}</td>
           <td><button type="button" className="secondary" onClick={() => setSelectedId(item.id)}>Open {item.reference}</button></td>
         </tr>)}</tbody></table></div> : null}
@@ -238,8 +243,8 @@ function IncidentPanel({ token, incidentId, policy, onChanged, onClose }: {
       <p><StatusBadge label={clockLabel[clock.status]} tone={clockTone(clock.status)} /> Deadline {when(clock.deadlineAt)} — {clock.hours} hours from detection. {clock.status === 'RUNNING' || clock.status === 'OVERDUE' ? formatRemaining(clock.remainingSeconds) : null}</p>
       <p><small>{policy.breachClock.basisText}</small></p>
       <dl>
-        <div><dt>Data Protection Board</dt><dd>{clock.boardNotifiedAt ? `Reported ${when(clock.boardNotifiedAt)}, recorded by ${clock.boardNotifiedBy ?? 'NA'}${clock.boardReference ? ` · reference ${clock.boardReference}` : ''}` : 'Not yet reported'}</dd></div>
-        <div><dt>Affected people</dt><dd>{clock.usersNotifiedAt ? `Told ${when(clock.usersNotifiedAt)}, recorded by ${clock.usersNotifiedBy ?? 'NA'}` : 'Not yet told'}</dd></div>
+        <div><dt>Data Protection Board</dt><dd>{clock.boardNotifiedAt ? `Reported ${when(clock.boardNotifiedAt)}${clock.boardNotifiedBy ? `, recorded by ${clock.boardNotifiedBy}` : ''}${clock.boardReference ? ` · reference ${clock.boardReference}` : ''}` : 'Not yet reported'}</dd></div>
+        <div><dt>Affected people</dt><dd>{clock.usersNotifiedAt ? `Told ${when(clock.usersNotifiedAt)}${clock.usersNotifiedBy ? `, recorded by ${clock.usersNotifiedBy}` : ''}` : 'Not yet told'}</dd></div>
       </dl>
       {!closed ? <div className="role-actions">
         {!clock.boardNotifiedAt ? <button type="button" className="secondary" onClick={() => setAction({ kind: 'board' })}>Record Board report…</button> : null}
@@ -267,10 +272,10 @@ function IncidentPanel({ token, incidentId, policy, onChanged, onClose }: {
       <tbody>{detail.notices.map((notice) => <tr key={notice.id}>
         <td>{notice.subject}<br /><small>{notice.templateKey} v{notice.templateVersion}</small></td>
         <td><StatusBadge label={label(notice.state)} tone={notice.state === 'SENT' ? 'success' : notice.state === 'WITHDRAWN' ? 'neutral' : 'warning'} /></td>
-        <td>{notice.approvedAt ? `${when(notice.approvedAt)} by ${notice.approvedBy ?? 'NA'}${notice.approveMode === 'SOLO' ? ' (solo)' : ''}` : 'NA'}</td>
+        <td>{notice.approvedAt ? `${when(notice.approvedAt)}${notice.approvedBy ? ` by ${notice.approvedBy}` : ''}${notice.approveMode === 'SOLO' ? ' (solo)' : ''}` : 'Not yet'}</td>
         <td>{when(notice.sentAt)}</td>
-        <td>{notice.recipientCount === null ? 'NA' : `${notice.recipientCount} admins in ${notice.organizationCount ?? 0} organisations`}</td>
-        <td>{notice.state === 'SENT' ? emailSummary(notice.email) : 'NA'}</td>
+        <td>{notice.recipientCount === null ? 'Not counted yet' : `${notice.recipientCount} admins in ${notice.organizationCount ?? 0} organisations`}</td>
+        <td>{notice.state === 'SENT' ? emailSummary(notice.email) : 'Not sent'}</td>
       </tr>)}</tbody></table></div> : <p>No status notice for this incident yet. Notices are drafted and sent from Settings → Status communications.</p>}
 
     <h3>Timeline</h3>
@@ -306,12 +311,12 @@ export function emailSummary(email: IncidentDetailDto['notices'][number]['email'
 function describeEntry(entry: IncidentDetailDto['timeline'][number]): string {
   switch (entry.kind) {
     case 'DECLARED': return 'Declared';
-    case 'STATE_CHANGED': return `${label(entry.fromValue ?? 'NA')} → ${label(entry.toValue ?? 'NA')}`;
-    case 'SEVERITY_CHANGED': return `Severity ${label(entry.fromValue ?? 'NA')} → ${label(entry.toValue ?? 'NA')}`;
-    case 'CATEGORY_CHANGED': return `Reclassified ${label(entry.fromValue ?? 'NA')} → ${label(entry.toValue ?? 'NA')}`;
+    case 'STATE_CHANGED': return capitalise(change(entry.fromValue, entry.toValue));
+    case 'SEVERITY_CHANGED': return `Severity ${change(entry.fromValue, entry.toValue)}`;
+    case 'CATEGORY_CHANGED': return entry.fromValue && entry.toValue ? `Reclassified ${change(entry.fromValue, entry.toValue)}` : `Category ${change(entry.fromValue, entry.toValue)}`;
     case 'NOTE': return 'Note';
-    case 'ORGANIZATION_ADDED': return `Affected: ${entry.organizationName ?? 'NA'}`;
-    case 'ORGANIZATION_REMOVED': return `No longer affected: ${entry.organizationName ?? 'NA'}`;
+    case 'ORGANIZATION_ADDED': return entry.organizationName ? `Affected: ${entry.organizationName}` : 'An organisation was marked affected';
+    case 'ORGANIZATION_REMOVED': return entry.organizationName ? `No longer affected: ${entry.organizationName}` : 'An organisation was no longer marked affected';
     case 'BOARD_NOTIFIED': return 'Board report recorded';
     case 'USERS_NOTIFIED': return 'Affected people told — recorded';
     case 'NOTICE_DRAFTED': return 'Status notice drafted';

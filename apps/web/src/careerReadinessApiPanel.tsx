@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ApiRequestError,
   completeCareerReadinessLesson,
@@ -16,6 +16,7 @@ import {
 import { V2EmptyState, V2Stat } from './dashboardsV2.js';
 import { lessonTextProps } from './lessonScript.js';
 import { formatDate, formatDateTime } from './dates.js';
+import { MISSING_TEXT } from './labels.js';
 import { ReadinessBand, toReadinessBand } from './momentum/readinessBand.js';
 
 type CareerRoute = 'readiness' | 'skills' | 'assessments' | 'learning' | 'roadmap' | 'notifications';
@@ -142,6 +143,42 @@ export function CareerReadinessApiPanel({ route }: { readonly route: CareerRoute
   );
 }
 
+/** The lesson the address asks for (/student/learning?lesson=<id>), if any. */
+function requestedLessonId(): string | null {
+  if (typeof window === 'undefined') return null;
+  return new URLSearchParams(window.location.search).get('lesson');
+}
+
+type CatalogLesson = NonNullable<CareerReadinessCatalog['modules']>[number]['lessons'][number];
+
+/** One published lesson: the same card in the list and when the page is opened on it. */
+function LessonCard({ lesson, done, token, busy, chosenName, onComplete }: {
+  readonly lesson: CatalogLesson; readonly done: boolean; readonly token: string | null; readonly busy: boolean;
+  readonly chosenName: string; readonly onComplete: (lessonId: string) => void;
+}): React.ReactElement {
+  return <>
+    <span>{done ? 'Completed with evidence' : 'Published lesson'}</span>
+    <h3 {...lessonTextProps(lesson.language)}>{lesson.title}</h3>
+    <p {...lessonTextProps(lesson.language)}>{lesson.body.summary}</p>
+    {lesson.languageNotice === 'TRANSLATION_MISSING' ? <small role="note">Not yet available in {chosenName}. Shown in English.</small> : null}
+    {lesson.languageNotice === 'TRANSLATION_OUTDATED' ? <small role="note">The English lesson was updated after this {chosenName} version was written. Choose English to read the latest.</small> : null}
+    <small>{lesson.prerequisiteLessonIds.length ? `${lesson.prerequisiteLessonIds.length} prerequisite` : 'No prerequisite'}</small>
+    <button type="button" disabled={!token || busy || done} onClick={() => onComplete(lesson.id)}>{done ? 'Completed' : 'Complete lesson'}</button>
+  </>;
+}
+
+/** The lesson the page was opened on, first and in view, so "Resume lesson" lands on it. */
+function OpenedLesson({ children, title }: { readonly children: React.ReactNode; readonly title: string }): React.ReactElement {
+  const ref = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+    node.focus({ preventScroll: true });
+    if (typeof node.scrollIntoView === 'function') node.scrollIntoView({ block: 'start', behavior: 'auto' });
+  }, []);
+  return <article ref={ref} tabIndex={-1} className="career-api-opened" aria-label={`Your lesson: ${title}`}>{children}</article>;
+}
+
 function LearningApiView({ catalog, learner, token, busy, onComplete, onChooseLanguage }: {
   readonly catalog: CareerReadinessCatalog | null; readonly learner: LearnerCareerReadinessState | null; readonly token: string | null;
   readonly busy: boolean; readonly onComplete: (lessonId: string) => void; readonly onChooseLanguage: (language: string) => void;
@@ -149,18 +186,17 @@ function LearningApiView({ catalog, learner, token, busy, onComplete, onChooseLa
   const completed = new Set(learner?.progress?.filter((item) => item.state === 'COMPLETED').map((item) => item.lessonVersionId) ?? []);
   const lessonLanguage = learner && learner.lessonLanguage ? learner.lessonLanguage : null;
   const chosenName = lessonLanguageName(lessonLanguage);
+  const lessons = (catalog?.modules ?? []).flatMap((module) => module.lessons);
+  const wanted = requestedLessonId();
+  const opened = wanted ? lessons.find((lesson) => lesson.id === wanted) ?? null : null;
   return <>
+    {opened ? <OpenedLesson title={opened.title}>
+      <LessonCard lesson={opened} done={completed.has(opened.id)} token={token} busy={busy} chosenName={chosenName} onComplete={onComplete} />
+    </OpenedLesson> : null}
     {token && lessonLanguage ? <LessonLanguagePicker lessonLanguage={lessonLanguage} busy={busy} onChoose={onChooseLanguage} /> : null}
-    <div className="career-api-grid">{(catalog?.modules ?? []).flatMap((module) => module.lessons).map((lesson) => (
-      <article key={lesson.id}><span>{completed.has(lesson.id) ? 'Completed with evidence' : 'Published lesson'}</span>
-        <h3 {...lessonTextProps(lesson.language)}>{lesson.title}</h3>
-        <p {...lessonTextProps(lesson.language)}>{lesson.body.summary}</p>
-        {lesson.languageNotice === 'TRANSLATION_MISSING' ? <small role="note">Not yet available in {chosenName}. Shown in English.</small> : null}
-        {lesson.languageNotice === 'TRANSLATION_OUTDATED' ? <small role="note">The English lesson was updated after this {chosenName} version was written. Choose English to read the latest.</small> : null}
-        <small>{lesson.prerequisiteLessonIds.length ? `${lesson.prerequisiteLessonIds.length} prerequisite` : 'No prerequisite'}</small>
-        <button type="button" disabled={!token || busy || completed.has(lesson.id)} onClick={() => onComplete(lesson.id)}>{completed.has(lesson.id) ? 'Completed' : 'Complete lesson'}</button>
-      </article>
-    )) ?? null}</div>
+    <div className="career-api-grid">{lessons.filter((lesson) => lesson.id !== opened?.id).map((lesson) => (
+      <article key={lesson.id}><LessonCard lesson={lesson} done={completed.has(lesson.id)} token={token} busy={busy} chosenName={chosenName} onComplete={onComplete} /></article>
+    ))}</div>
   </>;
 }
 
@@ -229,7 +265,7 @@ function CareerStatStrip({ learner, catalog }: { readonly learner: LearnerCareer
 }
 
 function topicName(catalog: CareerReadinessCatalog | null, topicId: string): string {
-  return catalog?.topics?.find((topic) => topic.id === topicId)?.name ?? 'NA';
+  return catalog?.topics?.find((topic) => topic.id === topicId)?.name ?? MISSING_TEXT;
 }
 
 /** Readiness: the advisory band, what it rests on, and the bands it has been before. Bands only, never a number. */
@@ -244,10 +280,10 @@ function ReadinessApiView({ learner, catalog }: { readonly learner: LearnerCaree
       <p>Based on {learner.evidence.length} immutable evidence record{learner.evidence.length === 1 ? '' : 's'}.</p></div>
     <div className="career-api-grid">{factors.length ? factors.map((factor) => <article key={factor.topicId}><span>What this band rests on</span>
       <h3>{topicName(catalog, factor.topicId)}</h3><p>{formatBand(factor.masteryBand)}. {factor.explanation}</p></article>)
-      : <article><span>What this band rests on</span><h3>NA</h3><p>No topic-level explanation was recorded with this band.</p></article>}</div>
+      : <article><span>What this band rests on</span><p>No topic-level explanation was recorded with this band.</p></article>}</div>
     <div className="career-api-grid">{history.length ? history.slice(0, 6).map((entry) => <article key={entry.id}><span>Band on {new Date(entry.generatedAt).toLocaleDateString()}</span>
       <h3>{formatBand(entry.band)}</h3></article>)
-      : <article><span>Band history</span><h3>NA</h3><p>No earlier band has been recorded for you yet.</p></article>}</div>
+      : <article><span>Band history</span><p>No earlier band has been recorded for you yet.</p></article>}</div>
   </>;
 }
 
@@ -257,10 +293,11 @@ function SkillsApiView({ learner, catalog }: { readonly learner: LearnerCareerRe
   const topics = catalog?.topics ?? [];
   return <>
     <div className="v2-row v2-cols-4 career-stat-strip">
-      <V2Stat icon="🧩" tone="purple" value={catalog ? topics.length : 'NA'} label="Skills in this pathway" />
-      <V2Stat icon="🎯" tone="green" value={learner ? mastery.length : 'NA'} label="Skills with evidence" />
-      <V2Stat icon="🧾" tone="blue" value={learner ? learner.evidence.length : 'NA'} label="Evidence records" />
-      <V2Stat icon="📌" tone="amber" value={catalog && learner ? Math.max(topics.length - mastery.length, 0) : 'NA'} label="Skills not yet evidenced" />
+      {/* A figure whose source has not loaded is passed as null, and V2Stat does not draw it. */}
+      <V2Stat icon="🧩" tone="purple" value={catalog ? topics.length : null} label="Skills in this pathway" />
+      <V2Stat icon="🎯" tone="green" value={learner ? mastery.length : null} label="Skills with evidence" />
+      <V2Stat icon="🧾" tone="blue" value={learner ? learner.evidence.length : null} label="Evidence records" />
+      <V2Stat icon="📌" tone="amber" value={catalog && learner ? Math.max(topics.length - mastery.length, 0) : null} label="Skills not yet evidenced" />
     </div>
     {mastery.length ? <div className="career-api-grid">{mastery.map((entry) => <article key={entry.id}><span>{topicName(catalog, entry.topicId)}</span>
       <h3>{formatBand(entry.band)}</h3><p>{entry.evidenceIds.length} active evidence record{entry.evidenceIds.length === 1 ? '' : 's'}.</p></article>)}</div>

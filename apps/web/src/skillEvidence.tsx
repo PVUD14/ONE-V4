@@ -35,15 +35,17 @@ const sourceLabels: Readonly<Record<string, string>> = {
   ONE_RECORD: 'ONE record',
 };
 
-function formatDate(value: string | null | undefined): string {
-  if (!value) return 'NA';
+/** A date in words, or null when none is recorded (it is then left out of the description). */
+function formatDate(value: string | null | undefined): string | null {
+  if (!value) return null;
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? 'NA' : dates.formatDate(date);
+  return Number.isNaN(date.getTime()) ? null : dates.formatDate(date);
 }
 
 /** One item in words, the same for the student and the employer. */
 export function describeEvidence(item: EvidenceItemDto): string {
-  return `${typeLabels[item.type] ?? 'Evidence'} · ${sourceLabels[item.source] ?? 'ONE record'} · ${formatDate(item.occurredAt)} · ${item.unaided ? 'unaided' : 'aided (hint or tutor)'}`;
+  return [typeLabels[item.type] ?? 'Evidence', sourceLabels[item.source] ?? 'ONE record', formatDate(item.occurredAt), item.unaided ? 'unaided' : 'aided (hint or tutor)']
+    .filter((part): part is string => Boolean(part)).join(' · ');
 }
 
 function skillHeading(skill: EvidenceSkillDto<unknown>): string {

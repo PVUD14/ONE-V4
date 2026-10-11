@@ -11,7 +11,7 @@
  * The server decides who may act (institution-wide owners, admins and placement admins; the
  * list says `canDecide`) and which actions exist per drive. Results show suppressed counts once a
  * drive is complete, and names only for students who shared that application with the college.
- * Nothing is invented: a missing date reads NA; pay never appears. INST-12 adds the college's own
+ * Nothing is invented: a missing value is left out or reads "Not recorded"; pay never appears. INST-12 adds the college's own
  * category label on each drive (college staff only).
  */
 import { useEffect, useState, type FormEvent } from 'react';
@@ -44,6 +44,7 @@ import { formatApiError } from './shared.js';
 import { DriveCategoryCell, useActiveDriveCategories } from './institutionPlacementRegister.js';
 import { DriveNominationsPanel } from './institutionNominations.js';
 import { formatDateTime } from '../dates.js';
+import { MISSING_TEXT } from '../labels.js';
 
 function formatWhen(value: string | null | undefined): string {
   if (!value) return 'Not set';
@@ -242,9 +243,9 @@ function DriveResults({ results }: { readonly results: CampusDriveResultsDto }):
       ? <div className="role-record-table-wrap"><table className="role-record-table" aria-label="Shared drive applications">
         <thead><tr><th>Student</th><th>College ID</th><th>Stage</th><th>Offer</th></tr></thead>
         <tbody>{results.named.map((row, index) => <tr key={index}>
-          <td>{row.fullName}</td><td>{row.institutionStudentId ?? 'NA'}</td>
+          <td>{row.fullName}</td><td>{row.institutionStudentId ?? MISSING_TEXT}</td>
           <td>{applicationStageLabels[row.applicationState as keyof typeof applicationStageLabels] ?? row.applicationState}</td>
-          <td>{row.offerState ? offerResponseLabels[row.offerState as keyof typeof offerResponseLabels] ?? row.offerState : 'NA'}</td>
+          <td>{row.offerState ? offerResponseLabels[row.offerState as keyof typeof offerResponseLabels] ?? row.offerState : 'No offer'}</td>
         </tr>)}</tbody>
       </table></div>
       : <p>No student has shared an application from this drive with the college.</p>}

@@ -3,7 +3,7 @@
  * server's skills and counts honestly, search sends the filters, writes need a reason code,
  * approving also asks for the rights reason, whoever wrote a revision is never offered its
  * review or publish, a publish that changes readiness inputs only files an approval request
- * (and the Approvals queue carries it out), and the loading / NA / empty / error / forbidden
+ * (and the Approvals queue carries it out), and the loading / missing-value / empty / error / forbidden
  * states are honest. Navigation labels are unchanged.
  */
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -112,11 +112,12 @@ describe('skill map', () => {
     expect(screen.getByText('Incomplete')).toBeInTheDocument();
   });
 
-  it('shows NA in the counts and a loading state until the list arrives', () => {
+  it('hides the counts and shows a loading state until the list arrives', () => {
     listResponse = () => new Promise(() => undefined);
     render(<OperationsSkillMapPage />);
     expect(screen.getByText('Loading the skill map…')).toBeInTheDocument();
-    expect(screen.getAllByText('NA').length).toBeGreaterThanOrEqual(4);
+    expect(document.querySelectorAll('.v2-stat')).toHaveLength(0);
+    expect(screen.queryByText('NA')).not.toBeInTheDocument();
   });
 
   it('says so plainly when nothing matches', async () => {
@@ -233,13 +234,14 @@ describe('skill map', () => {
     expect(JSON.parse(String(posts()[0]![1].body))).toEqual({ reasonCode: 'SKILL_REVISION' });
   });
 
-  it('shows a reviewer without edit rights the draft read-only, with NA where nothing is set', async () => {
+  it('shows a reviewer without edit rights the draft read-only, leaving out rows where nothing is set', async () => {
     policyResponse = () => ok(policy({ edit: false, publish: false }));
     detailBody = detail({ current: revision({ fields: { ...revision().fields, basis: null, licenceLabel: null } }) });
     const region = await openSkill();
     expect(within(region).queryByRole('form', { name: 'Edit revision 1' })).not.toBeInTheDocument();
-    expect(within(region).getByText('Licence').nextSibling?.textContent).toBe('NA');
-    expect(within(region).getByText('Basis').nextSibling?.textContent).toBe('NA');
+    expect(within(region).queryByText('Licence')).not.toBeInTheDocument();
+    expect(within(region).queryByText('Basis')).not.toBeInTheDocument();
+    expect(within(region).queryByText('NA')).not.toBeInTheDocument();
     expect(within(region).getByText('Knows what an alert is')).toBeInTheDocument();
   });
 

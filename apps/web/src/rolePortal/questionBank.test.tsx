@@ -4,7 +4,7 @@
  * the editor sends options, the answer key, misconception tags and all four hints, approving also
  * asks for the rights reason, whoever wrote a revision is never offered its review or publish, a
  * publish only files an approval request (and the Approvals queue carries it out), a
- * publisher-only reader sees the answer key withheld, and the loading / NA / empty / error /
+ * publisher-only reader sees the answer key withheld, and the loading / missing-value / empty / error /
  * forbidden states are honest. Navigation labels are unchanged.
  */
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -128,15 +128,18 @@ describe('question bank', () => {
     expect(screen.getAllByText('Incomplete').length).toBe(2);
     // The live pilot question has no difficulty band yet.
     const pilotRow = screen.getByText('crf-q1').closest('tr')!;
-    expect(within(pilotRow).getByText('NA')).toBeInTheDocument();
+    expect(within(pilotRow).getByText('Not set')).toBeInTheDocument();
+    expect(within(pilotRow).queryByText('NA')).not.toBeInTheDocument();
     expect(screen.queryByRole('note')).not.toBeInTheDocument();
   });
 
-  it('shows NA in the counts and a loading state until the list arrives', () => {
+  it('hides the counts and shows a loading state until the list arrives', () => {
     listResponse = () => new Promise(() => undefined);
     render(<OperationsQuestionBankPage />);
     expect(screen.getByText('Loading the question bank…')).toBeInTheDocument();
-    expect(screen.getAllByText('NA').length).toBeGreaterThanOrEqual(4);
+    expect(screen.queryByText('Live questions')).not.toBeInTheDocument();
+    expect(document.querySelectorAll('.v2-stat')).toHaveLength(0);
+    expect(screen.queryByText('NA')).not.toBeInTheDocument();
   });
 
   it('says so plainly when nothing matches', async () => {
@@ -294,7 +297,7 @@ describe('question bank', () => {
     expect(within(withOpen).queryByRole('button', { name: 'Archive…' })).not.toBeInTheDocument();
   });
 
-  it('shows a publisher-only reader the question with the answer key withheld, and NA where nothing is set', async () => {
+  it('shows a publisher-only reader the question with the answer key withheld, and no row where nothing is set', async () => {
     policyResponse = () => ok(policy({ edit: false, review: false, answerKeys: false }));
     detailBody = detail({ open: revision({
       state: 'APPROVED', answerKeyWithheld: true,
@@ -306,7 +309,8 @@ describe('question bank', () => {
     expect(within(region).getByText(/shown only to staff with Content Edit or Content Review/)).toBeInTheDocument();
     expect(within(region).queryByText('Correct')).not.toBeInTheDocument();
     expect(within(region).getAllByText('Withheld').length).toBeGreaterThanOrEqual(3);
-    expect(within(region).getByText('Basis').nextSibling?.textContent).toBe('NA');
+    expect(within(region).queryByText('Basis')).not.toBeInTheDocument();
+    expect(within(region).queryByText('NA')).not.toBeInTheDocument();
     expect(within(region).getByText('Only one option has a deadline.')).toBeInTheDocument();
   });
 

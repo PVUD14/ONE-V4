@@ -1,7 +1,7 @@
 /**
  * Adaptive engine health panels (OPS-13): the AI Operations panels render the planner and mastery
- * shadow figures the server sends, withheld counts as <5 and absent ones as NA; the System Health
- * panels render the calibration job's status and the sandbox as NA; loading, error (with its
+ * shadow figures the server sends, withheld counts as <5 and absent ones hidden; the System Health
+ * panels render the calibration job's status and hide the sandbox figures it has no source for; loading, error (with its
  * reference) and forbidden states are honest; the window choice asks the server again; navigation
  * labels are unchanged.
  */
@@ -63,9 +63,9 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe('engine counts', () => {
-  it('shows NA for an absent figure, <5 for a withheld one, and the value otherwise', () => {
-    expect(engineCount(null)).toBe('NA');
-    expect(engineCount(undefined)).toBe('NA');
+  it('gives no text for an absent figure, <5 for a withheld one, and the value otherwise', () => {
+    expect(engineCount(null)).toBeUndefined();
+    expect(engineCount(undefined)).toBeUndefined();
     expect(engineCount(withheld)).toBe('<5');
     expect(engineCount(shown(1200))).toBe((1200).toLocaleString());
   });
@@ -147,7 +147,7 @@ describe('AI Operations: learning engine panels', () => {
 });
 
 describe('System Health: learning engine jobs panels', () => {
-  it('renders the last calibration run and its status, and the sandbox as NA', async () => {
+  it('renders the last calibration run and its status, and hides the sandbox figures', async () => {
     render(<EngineJobsPanels token="t" />);
     expect(await screen.findByText('Overdue')).toBeInTheDocument();
     const calibration = screen.getByRole('heading', { name: 'Item calibration job' }).closest('section')!;
@@ -158,17 +158,19 @@ describe('System Health: learning engine jobs panels', () => {
     expect(within(calibration).getByText('Too few responses: 2')).toBeInTheDocument();
     const sandbox = screen.getByRole('heading', { name: 'Code sandbox' }).closest('section')!;
     expect(within(sandbox).getByText('Not built')).toBeInTheDocument();
-    expect(within(sandbox).getByText('Available').nextSibling).toHaveTextContent('NA');
-    expect(within(sandbox).getByText('Rejected executions').nextSibling).toHaveTextContent('NA');
+    expect(within(sandbox).queryByText('Available')).toBeNull();
+    expect(within(sandbox).queryByText('Rejected executions')).toBeNull();
+    expect(document.body.textContent).not.toMatch(/(^|[^A-Za-z])NA([^A-Za-z]|$)/);
   });
 
-  it('shows a run that never happened as NA, and a small run\'s learners as <5', async () => {
+  it('hides the figures of a run that never happened, and a small run\'s learners as <5', async () => {
     jobsResponse = () => ok(jobs({ calibration: { status: 'NO_RUN', expectedIntervalDays: 31, overdueAfterDays: 38, runsRecorded: 0, lastRun: null } }));
     const { unmount } = render(<EngineJobsPanels token="t" />);
     expect(await screen.findByText('No run recorded')).toBeInTheDocument();
     const calibration = screen.getByRole('heading', { name: 'Item calibration job' }).closest('section')!;
-    expect(within(calibration).getByText('Items calibrated').nextSibling).toHaveTextContent('NA');
-    expect(within(calibration).getByText('Last run imported').nextSibling).toHaveTextContent('NA');
+    expect(within(calibration).queryByText('Items calibrated')).toBeNull();
+    expect(within(calibration).queryByText('Last run imported')).toBeNull();
+    expect(document.body.textContent).not.toMatch(/(^|[^A-Za-z])NA([^A-Za-z]|$)/);
     expect(within(calibration).getByText('Runs recorded').nextSibling).toHaveTextContent('0');
     unmount();
 

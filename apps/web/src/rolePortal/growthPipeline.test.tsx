@@ -1,7 +1,7 @@
 /**
  * The college pipeline on a lead and the Operations growth handoff queue (GROWTH-04): a move sends
  * the stage the person saw, a hold or a loss cannot be sent without a reason, the handoff request
- * carries the reported reference and the chosen contacts, milestones show NA where there is no
+ * carries the reported reference and the chosen contacts, milestones show no state where there is no
  * source and "<5" for a small count, and the Operations section renders nothing without the
  * capability and offers only institutions to link.
  */
@@ -86,7 +86,7 @@ describe('the pipeline on a lead', () => {
     expect(await screen.findByText(/Waiting for operations to onboard the college/)).toBeInTheDocument();
   });
 
-  it('shows milestones from the server: NA without a source, <5 for a small count, never a figure invented', async () => {
+  it('shows milestones from the server: no state without a source, <5 for a small count, never a figure invented', async () => {
     routes = (url) => (url.endsWith('/pipeline') ? ok(pipeline({ stage: 'HANDOFF_REQUESTED', nextStages: [], milestones: [
       { code: 'HANDED_OFF', state: 'REACHED', at: '2026-09-20T10:00:00.000Z' },
       { code: 'DATA_TERMS_ACCEPTED', state: 'NA', at: null, note: 'No data-processing terms are published yet.' },
@@ -96,7 +96,9 @@ describe('the pipeline on a lead', () => {
     render(<LeadPipelinePanel leadId="lead-1" token="token" contacts={[]} onChanged={() => undefined} />);
     const list = await screen.findByLabelText('Onboarding milestones');
     expect(within(list).getByText('Students activating').closest('.v2-list-row')).toHaveTextContent('<5');
-    expect(within(list).getByText('First payment cleared').closest('.v2-list-row')).toHaveTextContent('NA');
+    const unsourced = within(list).getByText('First payment cleared').closest('.v2-list-row') as HTMLElement;
+    expect(unsourced).not.toHaveTextContent(/(^|[^A-Za-z])NA([^A-Za-z]|$)/);
+    expect(unsourced.querySelector('.v2-chip')).toBeNull();
     expect(within(list).getByText('No data-processing terms are published yet.')).toBeInTheDocument();
   });
 });

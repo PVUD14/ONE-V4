@@ -90,7 +90,9 @@ describe('Year-end actions', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
     const table = await screen.findByRole('table');
     expect(within(table).getByText('Not on your roster')).toBeInTheDocument();
-    expect(within(table).getAllByText('NA')).toHaveLength(2);
+    expect(within(table).getByText('Not found')).toBeInTheDocument();
+    expect(within(table).getByText('Not recorded')).toBeInTheDocument();
+    expect(within(table).queryByText('NA')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Commit 1 change' })).toBeDisabled();
     expect(screen.getByText(/Nothing is saved while any row cannot change/)).toBeInTheDocument();
   });

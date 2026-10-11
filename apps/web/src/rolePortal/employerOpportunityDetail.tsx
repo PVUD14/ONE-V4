@@ -9,8 +9,8 @@
  *
  * The server decides everything: which actions exist in this state (availableActions), whether
  * an edit moved a term applicants applied under, and who must accept it. This page only says
- * what happened. Nothing is invented: a job with no deadline says "No deadline", a missing
- * value says "NA".
+ * what happened. Nothing is invented: a job with no deadline says "No deadline", and a term
+ * with no value is left out of the table.
  *
  * EMP-06 adds the job's eligibility rules, skills and selection stages, shown here and edited as
  * a new version like every other change (employerOpportunityRequirements.tsx).
@@ -37,7 +37,7 @@ import { OpportunityRequirementsEditor, OpportunityRequirementsSection } from '.
 import { EmployerCampusDrivesSection } from './employerCampusDrives.js';
 import { supportCodeSuffix } from '../supportCode.js';
 import { formatDateTime } from '../dates.js';
-import { codeLabel } from '../labels.js';
+import { codeLabel, MISSING_TEXT } from '../labels.js';
 
 const actionLabels: Readonly<Record<OpportunityLifecycleAction, string>> = {
   PAUSE: 'Pause', CLOSE: 'Close', REOPEN: 'Reopen', WITHDRAW: 'Withdraw',
@@ -78,9 +78,9 @@ function humanise(value: string): string {
   return codeLabel(value);
 }
 function formatDate(value: string | null | undefined): string {
-  if (!value) return 'NA';
+  if (!value) return MISSING_TEXT;
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? 'NA' : formatDateTime(date);
+  return Number.isNaN(date.getTime()) ? MISSING_TEXT : formatDateTime(date);
 }
 function pay(version: OpportunityVersionTermsDto): string {
   if (!version.compensationDisclosed || !version.compensationMin || !version.compensationCurrency) return 'Not disclosed';
@@ -250,7 +250,7 @@ function OpportunityDetail({ employerId, opportunityId, token, onChanged }: {
       <div className="role-section-title"><h2>{currentVersion?.title ?? 'Untitled'}</h2>
         <span className={`hiring-state state-${opportunity.lifecycleState.toLowerCase()}`}>{humanise(opportunity.lifecycleState)}</span></div>
       <p>{stateNotes[opportunity.lifecycleState] ?? humanise(opportunity.lifecycleState)}</p>
-      <p className="hiring-meta">Reference {opportunity.referenceCode} · Published {formatDate(opportunity.publishedAt)}{opportunity.closedAt ? ` · Closed ${formatDate(opportunity.closedAt)}` : ''}</p>
+      <p className="hiring-meta">Reference {opportunity.referenceCode}{opportunity.publishedAt ? ` · Published ${formatDate(opportunity.publishedAt)}` : ''}{opportunity.closedAt ? ` · Closed ${formatDate(opportunity.closedAt)}` : ''}</p>
       {last ? <p className="hiring-meta">Last change: {humanise(last.action.replace('opportunity.', ''))} on {formatDate(last.occurredAt)}
         {last.reasonCode ? ` — ${reasonLabels[last.reasonCode] ?? humanise(last.reasonCode)}` : ''}{last.trigger === 'DEADLINE' ? ' (automatically, at the deadline)' : ''}</p> : null}
       <p className="hiring-meta">Audience: {opportunity.audiences.length
@@ -320,11 +320,11 @@ function OpportunityDetail({ employerId, opportunityId, token, onChanged }: {
       <div className="role-record-table-wrap"><table className="role-record-table"><tbody>
         <tr><th scope="row">Employment type</th><td>{humanise(currentVersion.employmentType)}</td></tr>
         <tr><th scope="row">Work mode</th><td>{humanise(currentVersion.workMode)}</td></tr>
-        <tr><th scope="row">Location</th><td>{currentVersion.locationCity ?? 'NA'}</td></tr>
+        {currentVersion.locationCity ? <tr><th scope="row">Location</th><td>{currentVersion.locationCity}</td></tr> : null}
         <tr><th scope="row">Pay</th><td>{pay(currentVersion)}</td></tr>
-        <tr><th scope="row">Duration</th><td>{currentVersion.durationMonths ? `${currentVersion.durationMonths} months` : 'NA'}</td></tr>
+        {currentVersion.durationMonths ? <tr><th scope="row">Duration</th><td>{`${currentVersion.durationMonths} months`}</td></tr> : null}
         <tr><th scope="row">Deadline</th><td>{currentVersion.applicationDeadline ? formatDate(currentVersion.applicationDeadline) : 'No deadline'}</td></tr>
-        <tr><th scope="row">Joining conditions</th><td>{currentVersion.joiningConditions ?? 'NA'}</td></tr>
+        {currentVersion.joiningConditions ? <tr><th scope="row">Joining conditions</th><td>{currentVersion.joiningConditions}</td></tr> : null}
       </tbody></table></div>
     </section> : null}
 

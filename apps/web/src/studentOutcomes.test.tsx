@@ -71,11 +71,12 @@ describe('After college (student Profile)', () => {
     expect(screen.getByText('Nothing shared')).toBeInTheDocument();
   });
 
-  it('shows a current student when they will be counted, and NA for a missing date', async () => {
+  it('shows a current student when they will be counted, and leaves out a missing date', async () => {
     fetchMock.mockResolvedValue(ok({ colleges: [college(null, { relationship: 'CURRENT', graduatedOn: null }), college(null, { institutionId: crypto.randomUUID(), institutionName: 'Second College', graduatedOn: null })] }));
     render(<StudentOutcomesCard />);
     expect(await screen.findByText('Studying here now — counted once your graduation is recorded')).toBeInTheDocument();
-    expect(screen.getByText('Graduated NA')).toBeInTheDocument();
+    expect(screen.getByText('Graduated')).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/(^|[^A-Za-z])NA([^A-Za-z]|$)/);
   });
 
   it('stays out of the way with no college, and explains a refusal without upstream text', async () => {

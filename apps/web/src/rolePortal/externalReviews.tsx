@@ -15,7 +15,7 @@
  *   reads an open one (never an answer key), and approves or requests changes with a comment. The
  *   decision is advice to ONE's reviewers; it never publishes anything.
  *
- * The server decides everything. Missing counts read NA; no data is invented.
+ * The server decides everything. A count not yet loaded is left out; no data is invented.
  */
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -49,7 +49,7 @@ import { V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { StatusBadge } from '../studentComponents.js';
 import { formatApiError } from './shared.js';
 import { SupportCode, supportCodeSuffix } from '../supportCode.js';
-import { codeLabel } from '../labels.js';
+import { codeLabel, MISSING_TEXT } from '../labels.js';
 
 const statusWords: Readonly<Record<ExternalReviewStatus, { readonly label: string; readonly tone: 'success' | 'warning' | 'neutral' | 'info' | 'danger' }>> = {
   OPEN: { label: 'Open', tone: 'info' },
@@ -87,7 +87,7 @@ function reviewError(cause: unknown, fallback: string): string {
 
 const day = (value: string): string => {
   const parsed = new Date(value);
-  return Number.isFinite(parsed.getTime()) ? parsed.toISOString().slice(0, 10) : 'NA';
+  return Number.isFinite(parsed.getTime()) ? parsed.toISOString().slice(0, 10) : MISSING_TEXT;
 };
 
 // ---------------------------------------------------------------------------
@@ -213,10 +213,10 @@ export function OperationsExternalReviewsPage(): React.ReactElement | null {
   return <section className="role-module role-module--dense" aria-label="Faculty review">
     {heading}
     <div className="v2-row v2-cols-4 career-stat-strip role-wide">
-      <V2Stat icon="🎓" tone="teal" value={summary ? summary.reviewers : 'NA'} label="Faculty holding review" />
-      <V2Stat icon="📝" tone="blue" value={summary ? summary.open : 'NA'} label="Open assignments" />
-      <V2Stat icon="✅" tone="purple" value={summary ? summary.approved : 'NA'} label="Faculty approvals" />
-      <V2Stat icon="✏️" tone="amber" value={summary ? summary.changesRequested : 'NA'} label="Changes requested" />
+      <V2Stat icon="🎓" tone="teal" value={summary ? summary.reviewers : undefined} label="Faculty holding review" />
+      <V2Stat icon="📝" tone="blue" value={summary ? summary.open : undefined} label="Open assignments" />
+      <V2Stat icon="✅" tone="purple" value={summary ? summary.approved : undefined} label="Faculty approvals" />
+      <V2Stat icon="✏️" tone="amber" value={summary ? summary.changesRequested : undefined} label="Changes requested" />
     </div>
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {notice ? <p role="status">{notice}</p> : null}
@@ -240,7 +240,7 @@ export function OperationsExternalReviewsPage(): React.ReactElement | null {
           <td>{reviewer.email}{reviewer.state !== 'ACTIVE' ? <> <StatusBadge label="Membership not active" tone="warning" /></> : null}</td>
           <td>{reviewer.institutionName}</td>
           <td>{roleWords[reviewer.role] ?? reviewer.role}</td>
-          <td>{reviewer.grant ? day(reviewer.grant.grantedAt) : 'NA'}</td>
+          <td>{reviewer.grant ? day(reviewer.grant.grantedAt) : MISSING_TEXT}</td>
           <td>{reviewer.openAssignments}</td>
           <td>{policy.viewer.administer ? <button type="button" className="secondary" onClick={() => setDialog({ kind: 'revoke', reviewer })}>Revoke…</button> : null}</td>
         </tr>)}</tbody></table></div> : null}
@@ -282,7 +282,7 @@ export function OperationsExternalReviewsPage(): React.ReactElement | null {
           <td>{assignment.reviewer.email}<br /><small>{assignment.reviewer.institutionName}{assignment.reviewer.eligible ? '' : ' · no longer eligible'}</small></td>
           <td><StatusBadge label={statusWords[assignment.status].label} tone={statusWords[assignment.status].tone} /></td>
           <td>{day(assignment.expiresAt)}</td>
-          <td>{assignment.decision ? <><strong>{decisionWords[assignment.decision.decision]}</strong> ({codeLabel(assignment.decision.reasonCode)}){assignment.decision.comment ? <><br /><q>{assignment.decision.comment}</q></> : null}</> : 'NA'}</td>
+          <td>{assignment.decision ? <><strong>{decisionWords[assignment.decision.decision]}</strong> ({codeLabel(assignment.decision.reasonCode)}){assignment.decision.comment ? <><br /><q>{assignment.decision.comment}</q></> : null}</> : 'Not yet'}</td>
           <td>{policy.viewer.assign && assignment.status === 'OPEN' ? <button type="button" className="secondary" onClick={() => setDialog({ kind: 'withdraw', assignment })}>Withdraw…</button> : null}</td>
         </tr>)}</tbody></table></div> : null}
     </section> : null}
@@ -408,8 +408,8 @@ export function FacultyContentReviewsPage({ institutionId, hideWhenForbidden = f
   return <section className="role-module role-module--dense" aria-label="Content review">
     {heading}
     <div className="v2-row v2-cols-4 career-stat-strip role-wide">
-      <V2Stat icon="📝" tone="blue" value={openCount ?? 'NA'} label="Waiting for your review" />
-      <V2Stat icon="✅" tone="teal" value={decidedCount ?? 'NA'} label="Reviewed by you" />
+      <V2Stat icon="📝" tone="blue" value={openCount ?? undefined} label="Waiting for your review" />
+      <V2Stat icon="✅" tone="teal" value={decidedCount ?? undefined} label="Reviewed by you" />
     </div>
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {notice ? <p role="status">{notice}</p> : null}
@@ -418,11 +418,11 @@ export function FacultyContentReviewsPage({ institutionId, hideWhenForbidden = f
     {assignments && assignments.length ? <section className="role-card role-wide"><div className="role-record-table-wrap"><table className="role-record-table" aria-label="Your assignments">
       <thead><tr><th>Draft</th><th>Kind</th><th>Status</th><th>Until</th><th>Your decision</th><th /></tr></thead>
       <tbody>{assignments.map((assignment) => <tr key={assignment.id}>
-        <td>{assignment.title ?? 'NA'}<br /><small>{assignment.stableKey}</small></td>
+        <td>{assignment.title ?? 'Untitled'}<br /><small>{assignment.stableKey}</small></td>
         <td>{kindWords[assignment.kind] ?? assignment.kind}</td>
         <td><StatusBadge label={statusWords[assignment.status].label} tone={statusWords[assignment.status].tone} /></td>
         <td>{day(assignment.expiresAt)}</td>
-        <td>{assignment.decision ? `${decisionWords[assignment.decision.decision]} (${assignment.decision.reasonCode})` : 'NA'}</td>
+        <td>{assignment.decision ? `${decisionWords[assignment.decision.decision]} (${assignment.decision.reasonCode})` : 'Not yet'}</td>
         <td>{assignment.status === 'OPEN' ? <button type="button" className="secondary" onClick={() => void openOne(assignment.id)}>Review…</button> : null}</td>
       </tr>)}</tbody></table></div></section> : null}
     {open ? <FacultyReviewPanel review={open} decisions={decisions} commentMax={commentMax} onClose={() => setOpen(null)} onSubmit={submitDecision} /> : null}
@@ -433,16 +433,16 @@ function DraftContent({ content }: { readonly content: FacultyReviewContentDto }
   if (content.kind === 'SKILL') {
     return <dl>
       <div><dt>Skill</dt><dd>{content.name}</dd></div>
-      <div><dt>Description</dt><dd>{content.description || 'NA'}</dd></div>
-      {content.levels.map((level) => <div key={level.level}><dt>{level.level}</dt><dd>{level.descriptor || 'NA'}</dd></div>)}
+      <div><dt>Description</dt><dd>{content.description || 'Not written'}</dd></div>
+      {content.levels.map((level) => <div key={level.level}><dt>{level.level}</dt><dd>{level.descriptor || 'Not written'}</dd></div>)}
       <div><dt>Prerequisites</dt><dd>{content.prerequisites.length ? content.prerequisites.join(', ') : 'None'}</dd></div>
-      <div><dt>Basis</dt><dd>{content.basis ?? 'NA'}</dd></div>
+      {content.basis ? <div><dt>Basis</dt><dd>{content.basis}</dd></div> : null}
     </dl>;
   }
   if (content.kind === 'QUESTION') {
     return <dl>
-      <div><dt>Skill</dt><dd>{content.skill ?? 'NA'}</dd></div>
-      <div><dt>Difficulty</dt><dd>{content.difficulty ?? 'NA'}</dd></div>
+      {content.skill ? <div><dt>Skill</dt><dd>{content.skill}</dd></div> : null}
+      {content.difficulty ? <div><dt>Difficulty</dt><dd>{content.difficulty}</dd></div> : null}
       <div><dt>Question</dt><dd>{content.prompt}</dd></div>
       <div><dt>Options</dt><dd><ol type="a">{content.options.map((option) => <li key={option.id}>{option.text}</li>)}</ol></dd></div>
       <div><dt>Answer key</dt><dd>Not shown to external reviewers.</dd></div>
@@ -451,10 +451,10 @@ function DraftContent({ content }: { readonly content: FacultyReviewContentDto }
   return <dl>
     <div><dt>Lesson</dt><dd>{content.title}</dd></div>
     {content.variant ? <div><dt>Variant</dt><dd>{content.variant.language} · {content.variant.level} · {content.variant.style}</dd></div> : null}
-    <div><dt>Summary</dt><dd>{content.summary || 'NA'}</dd></div>
-    <div><dt>Practice</dt><dd>{content.practice ?? 'NA'}</dd></div>
+    <div><dt>Summary</dt><dd>{content.summary || 'Not written'}</dd></div>
+    <div><dt>Practice</dt><dd>{content.practice ?? 'None'}</dd></div>
     <div><dt>Prerequisites</dt><dd>{content.prerequisites.length ? content.prerequisites.join(', ') : 'None'}</dd></div>
-    <div><dt>Basis</dt><dd>{content.basis ?? 'NA'}</dd></div>
+    {content.basis ? <div><dt>Basis</dt><dd>{content.basis}</dd></div> : null}
   </dl>;
 }
 

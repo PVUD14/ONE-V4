@@ -44,6 +44,7 @@ import type { AuthenticatedWorkspaceSummary } from './shared.js';
 import { supportCodeSuffix } from '../supportCode.js';
 import { formatDateTime } from '../dates.js';
 import { NaValue } from '../naState.js';
+import { MISSING_TEXT } from '../labels.js';
 
 export const OVERRIDE_REASON_LABELS: Readonly<Record<string, string>> = {
   CLASS_TOPIC_ALIGNMENT: 'Matches what the class is working on now',
@@ -194,10 +195,10 @@ export function FacultyLearningActionsPage({ authenticatedWorkspace }: {
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {notice ? <p role="status">{notice}</p> : null}
     <div className="v2-row v2-cols-4 career-stat-strip">
-      <V2Stat icon="📚" tone="blue" value={resources ? `${resources.resources.length}${resources.nextCursor ? '+' : ''}` : 'NA'} label="Resources available" />
-      <V2Stat icon="📝" tone="purple" value={open ?? 'NA'} label="Open assignments" />
-      <V2Stat icon="👥" tone="green" value={upcoming ?? 'NA'} label="Upcoming group sessions" />
-      <V2Stat icon="🧭" tone="amber" value={pending ?? 'NA'} label="Next steps waiting" />
+      <V2Stat icon="📚" tone="blue" value={resources ? `${resources.resources.length}${resources.nextCursor ? '+' : ''}` : null} label="Resources available" />
+      <V2Stat icon="📝" tone="purple" value={open ?? null} label="Open assignments" />
+      <V2Stat icon="👥" tone="green" value={upcoming ?? null} label="Upcoming group sessions" />
+      <V2Stat icon="🧭" tone="amber" value={pending ?? null} label="Next steps waiting" />
     </div>
     {actions && !canAct ? <p>You need an active teaching assignment to assign work or change a student’s next step. Ask your institution administrator to assign your classes.</p> : null}
 
@@ -375,13 +376,13 @@ function OverrideFields({ panel, actions, students, token, institutionId, onChan
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {plan ? <div aria-label="Current plan">
       <h4>Their current next step</h4>
-      {!plan.consent.offered ? <p>NA — students have not yet been asked whether to share their learning data, so their plan is not shown.</p>
-        : !plan.consent.held ? <p>NA — this student has not chosen to share their learning data, so their plan is not shown.</p>
+      {!plan.consent.offered ? <p>Students have not yet been asked whether to share their learning data, so their plan is not shown.</p>
+        : !plan.consent.held ? <p>This student has not chosen to share their learning data, so their plan is not shown.</p>
           : plan.latestStep ? <p><strong>{ACTION_LABELS[plan.latestStep.action] ?? 'Step'}{plan.latestStep.skillName ? `: ${plan.latestStep.skillName}` : ''}</strong>
             {' — '}{plan.latestStep.reasonCodes.map((code) => REASON_TEXT[code] ?? 'A rule of their plan chose it.').join(' ')}</p>
             : <p>No step planned yet.</p>}
       {plan.pendingOverride ? <div>
-        <p>A next step set by a lecturer is waiting: {ACTION_LABELS[plan.pendingOverride.action]} {plan.pendingOverride.resource.title} — {OVERRIDE_REASON_LABELS[plan.pendingOverride.reasonCode] ?? 'NA'}.</p>
+        <p>A next step set by a lecturer is waiting: {ACTION_LABELS[plan.pendingOverride.action]} {plan.pendingOverride.resource.title}{OVERRIDE_REASON_LABELS[plan.pendingOverride.reasonCode] ? ` — ${OVERRIDE_REASON_LABELS[plan.pendingOverride.reasonCode]}` : ''}.</p>
         <label><span>Withdraw it</span><select aria-label="Withdraw the waiting next step" defaultValue="" onChange={(event) => { void lift(event.target.value); }}>
           <option value="">Choose a reason to withdraw</option>
           {actions.withdrawReasonCodes.map((code) => <option key={code} value={code}>{WITHDRAW_LABELS[code] ?? code}</option>)}
@@ -458,7 +459,7 @@ function YourActions({ actions, token, institutionId, onChanged }: {
         <tbody>{actions.sessions.map((session) => <tr key={session.id}>
           <th scope="row">{session.title}{session.state === 'CANCELLED' ? <span>Cancelled</span> : null}</th>
           <td>{when(session.scheduledStartAt)}</td>
-          <td>{session.content.map((item) => item.title).join(', ') || 'NA'}</td>
+          <td>{session.content.map((item) => item.title).join(', ') || 'Nothing listed'}</td>
           <td>{session.attendees}</td>
         </tr>)}</tbody></table></div>}
 
@@ -469,7 +470,7 @@ function YourActions({ actions, token, institutionId, onChanged }: {
         <tbody>{actions.overrides.map((override) => <tr key={override.id}>
           <th scope="row">{override.student ? `${override.student.fullName} (${override.student.rollNumber})` : 'No longer in your classes'}</th>
           <td>{ACTION_LABELS[override.action]} {override.resource.title}</td>
-          <td>{OVERRIDE_REASON_LABELS[override.reasonCode] ?? 'NA'}</td>
+          <td>{OVERRIDE_REASON_LABELS[override.reasonCode] ?? MISSING_TEXT}</td>
           <td>{STATE_LABELS[override.state] ?? override.state}
             {override.state === 'PENDING' && override.student ? <> {withdrawSelect('override', override.id, `Withdraw next step for ${override.student.fullName}`)}</> : null}</td>
         </tr>)}</tbody></table></div>}

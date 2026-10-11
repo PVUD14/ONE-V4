@@ -23,10 +23,17 @@ import {
   type SelfReportedOutcome,
 } from './api/outcomes.js';
 
-function formatDay(value: string | null): string {
-  if (!value) return 'NA';
+/** A day in words, or null when none is recorded (the clause that carries it is then left out). */
+function formatDay(value: string | null): string | null {
+  if (!value) return null;
   const date = new Date(value + (value.length === 10 ? 'T00:00:00Z' : ''));
-  return Number.isNaN(date.getTime()) ? 'NA' : formatDate(date, { utc: true });
+  return Number.isNaN(date.getTime()) ? null : formatDate(date, { utc: true });
+}
+
+/** "Graduated 3 Jun 2026", or just "Graduated" when the day is not recorded. */
+function withDay(prefix: string, value: string | null): string {
+  const day = formatDay(value);
+  return day ? `${prefix} ${day}` : prefix;
 }
 
 function failure(error: unknown, fallback: string): string {
@@ -96,8 +103,8 @@ export function StudentOutcomesCard(): React.ReactElement | null {
         return <li key={college.institutionId} className="hiring-list-item">
           <div>
             <h3>{college.institutionName}</h3>
-            <p className="hiring-meta">{college.relationship === 'GRADUATED' ? `Graduated ${formatDay(college.graduatedOn)}` : 'Studying here now — counted once your graduation is recorded'}</p>
-            <p className="hiring-meta">{college.declaration ? `Shared: ${selfReportedOutcomeLabels[college.declaration.outcome]} · since ${formatDay(college.declaration.declaredAt)}` : 'Nothing shared'}</p>
+            <p className="hiring-meta">{college.relationship === 'GRADUATED' ? withDay('Graduated', college.graduatedOn) : 'Studying here now — counted once your graduation is recorded'}</p>
+            <p className="hiring-meta">{college.declaration ? `Shared: ${selfReportedOutcomeLabels[college.declaration.outcome]}${formatDay(college.declaration.declaredAt) ? ` · ${withDay('since', college.declaration.declaredAt)}` : ''}` : 'Nothing shared'}</p>
             <label className="student-form-field"><span>What did you go on to do?</span>
               <select value={selected} disabled={busy} onChange={(event) => setChoice((current) => ({ ...current, [college.institutionId]: event.target.value as SelfReportedOutcome | '' }))}>
                 <option value="">Choose</option>

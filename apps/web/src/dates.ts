@@ -8,14 +8,15 @@
  */
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
-const NA = 'NA';
+/** Momentum re-skin: a missing value is said plainly, never as "NA". */
+const NA = 'Not recorded';
 
 export type DateInput = string | number | Date | null | undefined;
 
 export interface DateFormatOptions {
   /** Read the instant in UTC rather than local time — for values that are a calendar day, not a moment. */
   readonly utc?: boolean;
-  /** What to show when there is no usable date. Defaults to "NA". */
+  /** What to show when there is no usable date. Defaults to "Not recorded". */
   readonly fallback?: string;
 }
 

@@ -2,7 +2,7 @@
  * Placement register and statistics on the web (INST-12): the admin's Placement page, the placement
  * officer's Dashboard, the department head's Placement Pipeline, the dashboard KPIs and Settings'
  * drive categories. Rendered through the real route dispatcher with the API stubbed at fetch.
- * Checks real data, <5 for withheld groups, "Not shared" never counted as unplaced, NA without a
+ * Checks real data, <5 for withheld groups, "Not shared" never counted as unplaced, figures hidden (never NA) without a
  * source, a safe forbidden state, the category writes, no pay, and navigation labels unchanged.
  */
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -129,12 +129,13 @@ describe('admin Placement: statistics and register', () => {
     expect(document.body.textContent).not.toMatch(/salary|compensation|ctc|package|₹/i);
   });
 
-  it('shows NA and a safe message with the reference when the statistics are forbidden', async () => {
+  it('hides the figures and shows a safe message with the reference when the statistics are forbidden', async () => {
     routes({ [`${base}/placement-statistics`]: 'FORBIDDEN', [`${base}/placement-register`]: 'FORBIDDEN' });
     open('institution-admin', 'Placement', 'INSTITUTION_ADMIN');
     const section = await screen.findByRole('region', { name: 'Placement statistics' });
     expect(await within(section).findByRole('alert')).toHaveTextContent('Support code: corr403');
-    expect(within(section).getAllByText('NA').length).toBe(5);
+    expect(section.querySelectorAll('.pilot-kpi')).toHaveLength(0);
+    expect(within(section).queryByText('NA')).not.toBeInTheDocument();
     expect(document.body.textContent).not.toContain('upstream private detail');
   });
 });
@@ -203,7 +204,7 @@ describe('dashboard placement widgets', () => {
     await waitFor(() => expect(screen.queryByText('Loading the placement dashboard…')).not.toBeInTheDocument());
     expect(screen.queryByText('Placement eligible')).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Placement pipeline' })).not.toBeInTheDocument();
-    expect(screen.queryByText(/NA/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/\bNA\b/)).not.toBeInTheDocument();
     expect(document.body.textContent).not.toContain('upstream private detail');
   });
 });

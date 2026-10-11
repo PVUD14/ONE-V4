@@ -3,7 +3,7 @@
  *
  * What exists today is credit, not money: the colleges and employers credited to the person, the
  * disputes they are party to, and the organisations they may still dispute within 90 days of a
- * handoff. Every amount slot reads NA — commission amounts are later goals and no rate has been set —
+ * handoff. No amount is shown — commission amounts are later goals and no rate has been set —
  * and employers say "Employer commission on hold — not decided" (D11). Nothing is invented.
  */
 import { useEffect, useState } from 'react';
@@ -18,8 +18,7 @@ import { V2Chip, V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { formatApiError } from './shared.js';
 import { SupportCode } from '../supportCode.js';
 import { formatDate } from '../dates.js';
-
-const NA = 'NA';
+import { MISSING_TEXT } from '../labels.js';
 
 const basisLabels: Readonly<Record<string, string>> = {
   LEAD_OWNER_AT_HANDOFF: 'You owned the lead at handoff',
@@ -36,7 +35,7 @@ const endedLabels: Readonly<Record<string, string>> = {
 const stateLabels: Readonly<Record<string, string>> = { OPEN: 'Open', UPHELD: 'Upheld', REJECTED: 'Rejected' };
 
 function day(value: string | null | undefined): string {
-  return value ? formatDate(value) : NA;
+  return value ? formatDate(value) : MISSING_TEXT;
 }
 
 type State =
@@ -110,16 +109,15 @@ export function GrowthCommissionPage(): React.ReactElement {
         </div>
 
         <div className="v2-row v2-cols-4" role="region" aria-label="Credit summary">
-          <V2Stat icon="🏛️" tone="blue" value={data ? live.filter((credit) => credit.organizationKind === 'INSTITUTION').length : NA} label="Colleges credited" />
-          <V2Stat icon="🏢" tone="teal" value={data ? live.filter((credit) => credit.organizationKind === 'EMPLOYER').length : NA} label="Employers credited" />
-          <V2Stat icon="⚖️" tone="amber" value={data ? openDisputes : NA} label="Open disputes" />
-          <V2Stat icon="₹" tone="purple" value={NA} label="Commission this month" />
+          <V2Stat icon="🏛️" tone="blue" value={data ? live.filter((credit) => credit.organizationKind === 'INSTITUTION').length : null} label="Colleges credited" />
+          <V2Stat icon="🏢" tone="teal" value={data ? live.filter((credit) => credit.organizationKind === 'EMPLOYER').length : null} label="Employers credited" />
+          <V2Stat icon="⚖️" tone="amber" value={data ? openDisputes : null} label="Open disputes" />
         </div>
 
         <section className="v2-card" aria-label="Credited to you">
           <div className="v2-card-head"><h2>Credited to you</h2><V2Chip tone="slate">Recorded at handoff</V2Chip></div>
           {state.kind === 'loading' ? <p className="v2-empty">Loading…</p>
-            : state.kind === 'error' ? <p className="v2-empty">{NA} — your credit could not be loaded.</p>
+            : state.kind === 'error' ? <p className="v2-empty">Your credit could not be loaded.</p>
               : live.length ? (
                 <div className="v2-list">
                   {live.map((credit) => (
@@ -127,7 +125,7 @@ export function GrowthCommissionPage(): React.ReactElement {
                       <span className="v2-tile teal" aria-hidden="true">{credit.organizationKind === 'INSTITUTION' ? '🏛️' : '🏢'}</span>
                       <div className="grow"><strong>{credit.organizationName}</strong>
                         <small>{basisLabels[credit.basis] ?? credit.basis} · since {day(credit.since)}</small>
-                        <small>{credit.commission === 'EMPLOYER_ON_HOLD' ? 'Employer commission on hold — not decided' : 'Commission: NA — not built yet; no rate has been set'}</small></div>
+                        <small>{credit.commission === 'EMPLOYER_ON_HOLD' ? 'Employer commission on hold — not decided' : 'Commission not built yet; no rate has been set'}</small></div>
                       {credit.disputeOpen ? <V2Chip tone="amber">Dispute open</V2Chip> : <V2Chip tone="green">Credited</V2Chip>}
                     </div>
                   ))}
@@ -136,7 +134,7 @@ export function GrowthCommissionPage(): React.ReactElement {
           {ended.length ? <>
             <h3>No longer credited</h3>
             <ul className="role-check-list">{ended.map((credit) => <li key={credit.attributionId}>
-              <strong>{credit.organizationName}</strong> <small>{day(credit.since)} to {day(credit.endedAt)} · {endedLabels[credit.endedReasonCode ?? ''] ?? NA}</small>
+              <strong>{credit.organizationName}</strong> <small>{day(credit.since)} to {day(credit.endedAt)}{endedLabels[credit.endedReasonCode ?? ''] ? ` · ${endedLabels[credit.endedReasonCode ?? '']}` : ''}</small>
             </li>)}</ul>
           </> : null}
         </section>
@@ -155,11 +153,11 @@ export function GrowthCommissionPage(): React.ReactElement {
                 </div>
               ))}
             </div>
-          ) : <p className="v2-empty">{data ? 'You are not party to any dispute.' : NA}</p>}
+          ) : data ? <p className="v2-empty">You are not party to any dispute.</p> : null}
         </section>
 
         <section className="v2-card" aria-label="Dispute a credit">
-          <div className="v2-card-head"><h2>Dispute a credit</h2><V2Chip tone="slate">{data ? `Within ${data.windowDays} days of handoff` : NA}</V2Chip></div>
+          <div className="v2-card-head"><h2>Dispute a credit</h2>{data ? <V2Chip tone="slate">{`Within ${data.windowDays} days of handoff`}</V2Chip> : null}</div>
           {error ? <p className="form-error" role="alert">{error}</p> : null}
           {notice ? <p role="status">{notice}</p> : null}
           {choosable.length ? <div className="role-actions">
@@ -169,7 +167,7 @@ export function GrowthCommissionPage(): React.ReactElement {
             </select></label>
             <label>What you did, and why the credit should be yours<textarea aria-label="Dispute statement" value={statement} maxLength={2000} rows={4} onChange={(event) => setStatement(event.target.value)} /></label>
             <button type="button" className="pilot-btn" disabled={!ready || busy} onClick={() => void submit()}>Open dispute</button>
-          </div> : <p className="v2-empty">{data ? 'There is nothing you can dispute right now. You can dispute an organisation you had a lead or referral for, within 90 days of its handoff.' : NA}</p>}
+          </div> : data ? <p className="v2-empty">There is nothing you can dispute right now. You can dispute an organisation you had a lead or referral for, within 90 days of its handoff.</p> : null}
         </section>
       </div>
 
@@ -180,7 +178,7 @@ export function GrowthCommissionPage(): React.ReactElement {
         </section>
         <section className="v2-card">
           <div className="v2-card-head"><h2>Commission amounts</h2><V2Chip tone="slate">Not built yet</V2Chip></div>
-          <p className="v2-empty">Amounts come only from rates operations set, and no rate has been set, so every amount reads NA. Employer commission is on hold until it is decided.</p>
+          <p className="v2-empty">Amounts come only from rates operations set, and no rate has been set, so no amount is shown yet. Employer commission is on hold until it is decided.</p>
         </section>
         <section className="v2-card">
           <div className="v2-card-head"><h2>If you leave</h2></div>

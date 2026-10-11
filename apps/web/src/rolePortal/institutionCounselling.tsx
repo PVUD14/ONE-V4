@@ -11,6 +11,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ApiRequestError, getProtectedAccessToken } from '../api.js';
 import { supportCodeSuffix } from '../supportCode.js';
 import { formatDate } from '../dates.js';
+import { MISSING_TEXT } from '../labels.js';
 import {
   addCounsellingParticipant, eraseCounsellingNote, listCounsellingCases, listCounsellingNotes, removeCounsellingParticipant,
   setCounsellingNoteVisibility, writeCounsellingNote, type CounsellingCasesDto, type CounsellingNotesDto,
@@ -39,7 +40,7 @@ export function counsellingError(cause: unknown): string {
 }
 
 function dateOf(value: string | null | undefined): string {
-  if (!value || !Number.isFinite(Date.parse(value))) return 'NA';
+  if (!value || !Number.isFinite(Date.parse(value))) return MISSING_TEXT;
   return formatDate(value);
 }
 
@@ -118,7 +119,7 @@ function CounsellingWorkspace({ institutionId, token }: { readonly institutionId
       {!token ? <p role="alert">Sign in to an institution workspace to use counselling notes.</p> : null}
       {error ? <p className="form-error" role="alert">{error}</p> : null}
       {notice ? <p role="status">{notice}</p> : null}
-      {!cases ? <p role="status">{error || !token ? 'NA — counselling notes unavailable.' : 'Loading counselling cases…'}</p> : <>
+      {!cases ? <p role="status">{error || !token ? 'Counselling notes are unavailable.' : 'Loading counselling cases…'}</p> : <>
         {cases.cases.length ? <div className="pilot-list" aria-label="Counselling cases">
           {cases.cases.map((entry) => <div className="pilot-list-row" key={entry.studentUserId}>
             <div className="grow"><strong>{entry.studentName}</strong><small>{entry.notes} {entry.notes === 1 ? 'note' : 'notes'} you can read · Last note {dateOf(entry.lastNoteAt)}</small></div>
@@ -143,7 +144,7 @@ function CounsellingWorkspace({ institutionId, token }: { readonly institutionId
     {selected ? <section className="pilot-card" aria-labelledby="counselling-case-title">
       <div className="pilot-card-head"><h2 id="counselling-case-title">{detail ? 'Notes for ' + detail.student.name : 'Counselling case'}</h2>
         <button type="button" className="pilot-btn ghost small" disabled={busy} onClick={() => setSelected('')}>Close case</button></div>
-      {!detail ? <p role="status">{error ? 'NA — this case is unavailable.' : 'Loading notes…'}</p> : <>
+      {!detail ? <p role="status">{error ? 'This case is unavailable.' : 'Loading notes…'}</p> : <>
         {detail.notes.length ? <div className="pilot-list">{detail.notes.map((note) => <article className="pilot-card" key={note.id}>
           <h3>{note.title}</h3>
           <p>{note.note}</p>

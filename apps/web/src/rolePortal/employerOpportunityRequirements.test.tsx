@@ -105,7 +105,7 @@ describe('EMP-06 eligibility, skills and stages on Opportunity Detail', () => {
     expect(within(section).getByText('(shown to students; does not stop anyone applying)')).toBeInTheDocument();
     expect(within(section).getByText('SQL querying (required)')).toBeInTheDocument();
     expect(within(section).getByText('Excel (preferred) · not in the ONE catalogue')).toBeInTheDocument();
-    expect(within(section).getByText('Catalogue role: NA')).toBeInTheDocument();
+    expect(within(section).getByText('Catalogue role: None linked')).toBeInTheDocument();
     expect(within(section).getAllByRole('listitem').map((item) => item.textContent)).toContain('Panel interview (Interview) — One hour');
     const history = screen.getByRole('region', { name: 'Version history' });
     expect(within(history).getByText('Skills, Selection stages')).toBeInTheDocument();

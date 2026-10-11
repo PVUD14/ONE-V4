@@ -196,6 +196,8 @@ function RolePortalInner({ portal, apiHealth, authStatus, authNotice, showDevelo
   );
 }
 
+const footerLabels: ReadonlySet<string> = new Set(['Settings', 'Help & FAQ']);
+
 function RoleSidebar({ portal, workspace, activePath, collapsed, drawerOpen, onNavigate, onCollapse, onClose }: { readonly portal: RolePortalConfig; readonly workspace?: AuthenticatedWorkspaceSummary | undefined; readonly activePath: string; readonly collapsed: boolean; readonly drawerOpen: boolean; readonly onNavigate: (path: string) => void; readonly onCollapse: () => void; readonly onClose: () => void }): React.ReactElement {
   const role = workspace?.role;
   // An item limited to some roles (GROWTH-01: Team, for managers) is shown only to them. An item
@@ -203,18 +205,25 @@ function RoleSidebar({ portal, workspace, activePath, collapsed, drawerOpen, onN
   // one (ADR-032) — the same decision the screen's endpoints make, not a hidden unfinished page.
   const items = portal.nav.filter((item) => (!item.roles || (role !== undefined && item.roles.includes(role)))
     && (!item.capabilities || workspaceHoldsAny(workspace, item.capabilities)));
-  const groups = [...new Set(items.map((item) => item.group))];
+  // Settings and Help & FAQ sit in the sidebar footer (approved 2026-10-11), keeping their labels and routes.
+  const footer = items.filter((item) => footerLabels.has(item.label));
+  const main = items.filter((item) => !footerLabels.has(item.label));
+  const groups = [...new Set(main.map((item) => item.group))];
+  const navButton = (item: RolePortalConfig['nav'][number]): React.ReactElement => { const active = activePath === item.path; return <button key={item.path} type="button" className={`role-nav-item one-icon-host ${active ? 'active' : ''}`} aria-current={active ? 'page' : undefined} aria-label={item.label} title={item.label} onClick={() => onNavigate(item.path)}><Icon name={item.icon} size={20} active={active} animated /><span>{item.label}</span></button>; };
   return (
     <aside className={`role-sidebar momentum-sidebar ${drawerOpen ? 'drawer-open' : ''}`} aria-label={`${portal.roleName} navigation`}>
       <div className="role-brand"><BrandLogo height={collapsed ? 34 : 46} compact={collapsed} /><span><small>{portal.subtitle}</small></span><button className="icon-button sidebar-close" type="button" aria-label={`Close ${portal.roleName} navigation`} onClick={onClose} autoFocus={drawerOpen}><Icon name="close" size={20} /></button></div>
       <nav className="role-nav" aria-label={`Grouped ${portal.roleName} navigation`}>
         <NavIndicator activeKey={activePath} layoutKey={`${collapsed}-${drawerOpen}`} />
-        {groups.map((group) => <div className="role-nav-group" key={group}><span>{group}</span>{items.filter((item) => item.group === group).map((item) => { const glyph = item.icon; const active = activePath === item.path; return <button key={item.path} type="button" className={`role-nav-item one-icon-host ${active ? 'active' : ''}`} aria-current={active ? 'page' : undefined} aria-label={item.label} title={item.label} onClick={() => onNavigate(item.path)}><Icon name={glyph} size={20} active={active} animated /><span>{item.label}</span></button>; })}</div>)}
+        {groups.map((group) => <div className="role-nav-group" key={group}><span>{group}</span>{main.filter((item) => item.group === group).map(navButton)}</div>)}
       </nav>
+      <div className="sidebar-foot">
+      {footer.length ? <div className="sidebar-foot-links" role="group" aria-label="Settings and help">{footer.map(navButton)}</div> : null}
       <button className="role-collapse" type="button" onClick={onCollapse} aria-label={collapsed ? 'Expand navigation' : 'Collapse navigation'} title={collapsed ? 'Expand navigation' : 'Collapse navigation'} aria-expanded={!collapsed}>
         {collapsed ? <Icon name="collapse-rail" size={16} className="one-icon--flip" /> : <Icon name="collapse-rail" size={16} />}
         <span>{collapsed ? 'Expand' : 'Collapse'}</span>
       </button>
+      </div>
     </aside>
   );
 }
@@ -238,7 +247,7 @@ function RoleTopbar({ portal, apiHealth, authStatus, authNotice, showDevelopment
   const displayRole = authenticatedWorkspace?.role ? roleLabel(authenticatedWorkspace.role) : portal.roleName;
   // Never surface the raw organization UUID to an end user; it is an internal identifier.
   const displayOrg = authenticatedWorkspace?.organizationId ? portal.subtitle : portal.organization;
-  return <header className="role-topbar"><button ref={menuButtonRef} className="icon-button mobile-menu-button" type="button" aria-label={`Open ${portal.roleName} navigation`} onClick={onOpenMenu}><Icon name="menu" size={20} /></button><span className="topbar-brand"><BrandLogo height={28} /></span><RoleContextPill name={demoMode ? portal.roleName : workspaceRoleName(portal, authenticatedWorkspace)} /><span className="role-org">{displayOrg}</span><label className="role-search" role="search"><Icon name="search" size={16} /><span className="sr-only">Search {portal.roleName} workspace</span><input placeholder={`Search ${portal.family.toLowerCase()} records...`} /></label><div className="role-topbar-actions"><button type="button" className="secondary role-switch" onClick={onSwitch}><Icon name="switch-workspace" size={16} /><span className="role-switch-label">{demoMode ? 'Switch preview portal' : 'Switch workspace'}</span></button><ThemeToggle /><button className="icon-button" type="button" aria-label="Messages" onClick={onMessages}><Icon name="message" size={16} /></button><button className="icon-button notification" type="button" aria-label="Notifications" onClick={onNotifications}><Icon name="bell" size={16} /></button><AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />{showDevelopmentIndicators ? <span className={`staff-api-dot ${apiHealth}`}>{apiHealth}</span> : null}<span className="role-profile"><span className="role-avatar">{demoMode ? portal.initials : initialsFor(displayName)}</span><span><strong>{displayName}</strong><small>{displayRole}</small></span><Icon name="chevron-down" size={16} /></span></div></header>;
+  return <header className="role-topbar"><button ref={menuButtonRef} className="icon-button mobile-menu-button" type="button" aria-label={`Open ${portal.roleName} navigation`} onClick={onOpenMenu}><Icon name="menu" size={20} /></button><span className="topbar-brand"><BrandLogo height={28} /></span><RoleContextPill name={demoMode ? portal.roleName : workspaceRoleName(portal, authenticatedWorkspace)} /><span className="role-org">{displayOrg}</span><label className="role-search" role="search"><Icon name="search" size={16} /><span className="sr-only">Search {portal.roleName} workspace</span><input placeholder={`Search ${portal.family.toLowerCase()} records...`} /></label><div className="role-topbar-actions">{demoMode || (authenticatedWorkspace?.workspaceCount ?? 0) > 1 ? <button type="button" className="secondary role-switch" onClick={onSwitch}><Icon name="switch-workspace" size={16} /><span className="role-switch-label">{demoMode ? 'Switch preview portal' : 'Switch workspace'}</span></button> : null}<ThemeToggle /><button className="icon-button" type="button" aria-label="Messages" onClick={onMessages}><Icon name="message" size={16} /></button><button className="icon-button notification" type="button" aria-label="Notifications" onClick={onNotifications}><Icon name="bell" size={16} /></button><AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />{showDevelopmentIndicators ? <span className={`staff-api-dot ${apiHealth}`}>{apiHealth}</span> : null}<span className="role-profile"><span className="role-avatar">{demoMode ? portal.initials : initialsFor(displayName)}</span><span><strong>{displayName}</strong><small>{displayRole}</small></span><Icon name="chevron-down" size={16} /></span></div></header>;
 }
 
 function normalizeRolePath(path: string, portal: RolePortalConfig): string {

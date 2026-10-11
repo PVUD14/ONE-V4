@@ -142,9 +142,9 @@ export function StudentTalentPoolCard(): React.ReactElement | null {
 
     <h3>What your card shows</h3>
     <label className="hiring-checkbox"><input type="checkbox" checked={showBranch} disabled={busy} onChange={(event) => setShowBranch(event.target.checked)} />
-      <span>My branch: {pool.roster?.branch ?? 'NA (your college has not recorded one)'}</span></label>
+      <span>My branch: {pool.roster?.branch ?? 'not recorded by your college'}</span></label>
     <label className="hiring-checkbox"><input type="checkbox" checked={showYear} disabled={busy} onChange={(event) => setShowYear(event.target.checked)} />
-      <span>My graduation year: {pool.roster?.graduationYear ?? 'NA (your college has not recorded one)'}</span></label>
+      <span>My graduation year: {pool.roster?.graduationYear ?? 'not recorded by your college'}</span></label>
     <label className="student-form-field"><span>Cities I would like to work in (up to five, comma separated)</span>
       <input value={cities} disabled={busy} maxLength={320} onChange={(event) => setCities(event.target.value)} placeholder="Chennai, Hyderabad" /></label>
     <h3>Verified skill evidence to show</h3>
@@ -165,7 +165,7 @@ export function StudentTalentPoolCard(): React.ReactElement | null {
     <section aria-label="Your card, as employers see it">
       <h3>Your card, as employers see it</h3>
       <ul className="hiring-chips">{shownSkills.length ? shownSkills.map((name) => <li key={name} className="hiring-chip">{name}</li>) : <li className="hiring-chip">No skills shown</li>}</ul>
-      <p className="hiring-meta">Branch: {showBranch ? pool.roster?.branch ?? 'NA' : 'hidden'} · Graduation year: {showYear ? pool.roster?.graduationYear ?? 'NA' : 'hidden'} · Cities: {listingInput.preferredCities.join(', ') || 'none'}</p>
+      <p className="hiring-meta">Branch: {showBranch ? pool.roster?.branch ?? 'not recorded' : 'hidden'} · Graduation year: {showYear ? pool.roster?.graduationYear ?? 'not recorded' : 'hidden'} · Cities: {listingInput.preferredCities.join(', ') || 'none'}</p>
     </section>
 
     <div className="hiring-actions">
@@ -182,7 +182,7 @@ export function StudentTalentPoolCard(): React.ReactElement | null {
     {pool.invitations.length === 0 ? <p className="hiring-meta">No invitations yet.</p>
       : <ul className="hiring-list" aria-label="Invitations">{pool.invitations.map((invitation) => <li key={invitation.id} className="hiring-list-item">
         <div>
-          <h4>{invitation.title ?? 'NA'}</h4>
+          {invitation.title ? <h4>{invitation.title}</h4> : null}
           <p className="hiring-meta">{invitation.employerName} · sent {formatDate(invitation.sentAt)} · {invitation.state === 'SENT' ? `open until ${formatDate(invitation.expiresAt)}` : invitationStateLabels[invitation.state] ?? invitation.state}</p>
         </div>
         {invitation.state === 'SENT' ? <div className="hiring-actions">

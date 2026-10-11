@@ -66,6 +66,7 @@ function ReportDates({ dates }: { readonly dates: readonly (readonly [string, st
 }
 
 function reportState(value: string | undefined, allowed: readonly string[]): string {
+  if (value === 'REJECTED' && allowed.includes('HIRED')) return 'Not selected';
   return value && allowed.includes(value) ? prettify(value) : 'Status unavailable';
 }
 
@@ -251,7 +252,7 @@ function StudentSupport({ token }: { readonly token: string | null }): React.Rea
               <textarea maxLength={2000} rows={3} value={notes[action.id] ?? ''} disabled={busy}
                 onChange={(event) => setNotes((previous) => ({ ...previous, [action.id]: event.target.value }))} />
             </label>
-            <button type="submit" className="pilot-btn primary small" disabled={busy}>{busy ? 'Saving…' : 'Mark complete'}</button>
+            <button type="submit" className="pilot-btn small" disabled={busy}>{busy ? 'Saving…' : 'Mark complete'}</button>
           </form> : <p>Read-only — no student action is available for this item.</p>}
         </div></li>;
       })}

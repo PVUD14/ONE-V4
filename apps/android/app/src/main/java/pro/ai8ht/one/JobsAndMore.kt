@@ -329,7 +329,7 @@ internal fun JobsScreen() {
                                         Text(app.employerName, style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
-                                    StatusChip(prettify(app.state), when (app.state) {
+                                    StatusChip(applicationStageLabel(app.state), when (app.state) {
                                         "OFFERED", "ACCEPTED", "SELECTED" -> ChipKind.Positive
                                         "REJECTED", "WITHDRAWN" -> ChipKind.Muted
                                         else -> ChipKind.Accent

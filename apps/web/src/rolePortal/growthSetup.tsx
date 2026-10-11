@@ -30,6 +30,7 @@ import {
 import { V2Chip, V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { formatApiError } from './shared.js';
 import { formatDate } from '../dates.js';
+import { MISSING_TEXT } from '../labels.js';
 
 const roleLabels: Readonly<Record<string, string>> = { EXECUTIVE: 'Executive', MANAGER: 'Manager', GROWTH_EXECUTIVE: 'Growth executive', GROWTH_MANAGER: 'Regional manager' };
 const statusLabels: Readonly<Record<string, string>> = { NEW: 'New', UNCHANGED: 'Unchanged', RENAMED: 'Renamed', ERROR: 'Error' };
@@ -100,10 +101,10 @@ export function OperationsGrowthSetupPanel(): React.ReactElement | null {
     <div className="role-page-heading"><div><span className="eyebrow">Settings</span><h1 id="growth-setup-heading">Growth set-up</h1>
       <p>Regions, the states and districts each covers, and who works them. Territory decides which unowned leads a growth person sees, so every change asks for a reason and is kept in the history.</p></div></div>
     <div className="v2-row v2-cols-4 career-stat-strip role-wide" role="region" aria-label="Growth set-up summary">
-      <V2Stat icon="🗺️" tone="teal" value={setup ? live.length : 'NA'} label="Live regions" />
-      <V2Stat icon="📍" tone="blue" value={setup ? live.reduce((total, region) => total + region.areas.length, 0) : 'NA'} label="Areas covered" />
-      <V2Stat icon="👥" tone="amber" value={setup ? new Set(live.flatMap((region) => region.assignments.map((assignment) => assignment.membershipId))).size : 'NA'} label="People assigned" />
-      <V2Stat icon="🏙️" tone="purple" value={setup ? districtTotal : 'NA'} label="Districts imported" />
+      <V2Stat icon="🗺️" tone="teal" value={setup ? live.length : null} label="Live regions" />
+      <V2Stat icon="📍" tone="blue" value={setup ? live.reduce((total, region) => total + region.areas.length, 0) : null} label="Areas covered" />
+      <V2Stat icon="👥" tone="amber" value={setup ? new Set(live.flatMap((region) => region.assignments.map((assignment) => assignment.membershipId))).size : null} label="People assigned" />
+      <V2Stat icon="🏙️" tone="purple" value={setup ? districtTotal : null} label="Districts imported" />
     </div>
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {notice ? <p role="status">{notice}</p> : null}
@@ -124,7 +125,7 @@ export function OperationsGrowthSetupPanel(): React.ReactElement | null {
       {setup?.truncated ? <p>Showing the first 200 regions.</p> : null}
       {live.map((region) => <RegionCard key={region.id} region={region} setup={setup!} token={token} busy={busy} run={run} />)}
       {retired.length ? <details><summary>Retired regions ({retired.length})</summary><ul>
-        {retired.map((region) => <li key={region.id}>{region.name} — retired {region.retiredAt ? formatDate(region.retiredAt) : 'NA'} ({reasonLabel(region.retiredReasonCode ?? 'NA')})</li>)}
+        {retired.map((region) => <li key={region.id}>{region.name} — retired{region.retiredAt ? ` ${formatDate(region.retiredAt)}` : ''}{region.retiredReasonCode ? ` (${reasonLabel(region.retiredReasonCode)})` : ''}</li>)}
       </ul></details> : null}
     </section>
   </section>;
@@ -172,8 +173,8 @@ function DistrictImport({ setup, token, busy, run }: { readonly setup: GrowthSet
       {preview.fileProblems.length ? <p className="form-error">File problems: {preview.fileProblems.join(', ')}</p> : null}
       {preview.rows.some((row) => row.status !== 'UNCHANGED') ? <div className="role-record-table-wrap"><table className="role-record-table"><thead><tr><th>Line</th><th>Code</th><th>District</th><th>State</th><th>Result</th></tr></thead><tbody>
         {preview.rows.filter((row) => row.status !== 'UNCHANGED').slice(0, 50).map((row) => <tr key={row.line}>
-          <td>{row.line}</td><td>{row.districtCode ?? 'NA'}</td><td>{row.districtName ?? 'NA'}{row.previousName ? ` (was ${row.previousName})` : ''}</td>
-          <td>{row.stateCode ?? 'NA'}</td><td>{statusLabels[row.status] ?? row.status}{row.issues.length ? `: ${row.issues.map(reasonLabel).join(', ')}` : ''}</td>
+          <td>{row.line}</td><td>{row.districtCode ?? MISSING_TEXT}</td><td>{row.districtName ?? MISSING_TEXT}{row.previousName ? ` (was ${row.previousName})` : ''}</td>
+          <td>{row.stateCode ?? MISSING_TEXT}</td><td>{statusLabels[row.status] ?? row.status}{row.issues.length ? `: ${row.issues.map(reasonLabel).join(', ')}` : ''}</td>
         </tr>)}
       </tbody></table></div> : null}
       {preview.committable ? <div className="role-actions">

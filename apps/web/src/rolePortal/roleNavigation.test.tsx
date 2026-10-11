@@ -246,3 +246,31 @@ describe('screens read with an internal capability', () => {
       'Reports', 'Calendar', 'Messages', 'Profile', 'Settings', 'Help & FAQ']);
   });
 });
+
+describe('sidebar footer and workspace switch (approved 2026-10-11)', () => {
+  function openWith(workspaceCount: number): void {
+    const portal = rolePortals.find((item) => item.key === 'recruiter')!;
+    window.history.replaceState(null, '', portal.basePath);
+    render(<RolePortal portal={portal} apiHealth="online" authStatus={{ state: 'unconfigured' }} authNotice=""
+      showDevelopmentIndicators={false} onNavigate={vi.fn()} onSignIn={vi.fn()} onSignOut={vi.fn()}
+      authenticatedWorkspace={{ organizationId: institutionId, role: 'RECRUITER', workspaceCount }} />);
+  }
+
+  it('moves Settings and Help & FAQ to the sidebar footer, keeping their labels and routes', () => {
+    openWith(1);
+    const sidebar = screen.getByRole('complementary', { name: /navigation/ });
+    const grouped = within(screen.getByRole('navigation', { name: /Grouped .* navigation/ })).getAllByRole('button').map((button) => button.getAttribute('aria-label'));
+    expect(grouped).not.toContain('Settings');
+    expect(grouped).not.toContain('Help & FAQ');
+    const footer = within(sidebar).getByRole('group', { name: 'Settings and help' });
+    expect(within(footer).getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual(['Settings', 'Help & FAQ']);
+  });
+
+  it('offers "Switch workspace" only to someone with more than one workspace', () => {
+    openWith(1);
+    expect(screen.queryByRole('button', { name: 'Switch workspace' })).toBeNull();
+    cleanup();
+    openWith(2);
+    expect(screen.getByRole('button', { name: 'Switch workspace' })).toBeInTheDocument();
+  });
+});

@@ -19,12 +19,12 @@ import { CandidateDetailPanel } from '../applicationSnapshotView.js';
 import { EmployerConversationPanel } from '../applicationMessages.js';
 import { EmployerCandidateAssessmentsPanel } from '../employerAssessmentsPage.js';
 import { EmployerTalentPoolWorkspace } from '../talentPool.js';
-import { codeLabel } from '../labels.js';
-import { applicationReference } from '../hiringPages.js';
+import { applicationStageLabel } from '../labels.js';
+import { candidateAppliedSuffix } from '../hiringPages.js';
 import { portalRecordFromHistory } from './shared.js';
 
 function humanise(value: string): string {
-  return codeLabel(value);
+  return applicationStageLabel(value);
 }
 
 export function EmployerCandidateDetailPage({ employerId }: { readonly employerId: string }): React.ReactElement {
@@ -83,7 +83,7 @@ export function EmployerCandidateDetailPage({ employerId }: { readonly employerI
       {opportunityId ? <label className="student-form-field"><span>Candidate</span>
         <select value={applicationId} onChange={(event) => setApplicationId(event.target.value)}>
           <option value="">Select a candidate</option>
-          {shared.map((item) => <option key={item.id} value={item.id}>{item.candidateName?.trim() ? item.candidateName : `Candidate · ${applicationReference(item.id)}`} · {humanise(item.state)}</option>)}
+          {shared.map((item) => <option key={item.id} value={item.id}>{item.candidateName?.trim() ? item.candidateName : ['Candidate', candidateAppliedSuffix(item.submittedAt)].filter(Boolean).join(' · ')} · {humanise(item.state)}</option>)}
         </select>
       </label> : null}
       {withheld > 0 ? <p className="hiring-meta">{withheld} {withheld === 1 ? 'applicant is' : 'applicants are'} no longer sharing their details and cannot be opened.</p> : null}

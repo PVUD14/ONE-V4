@@ -93,7 +93,7 @@ export function InstitutionDataTermsOperationsSection(): React.ReactElement | nu
       <thead><tr><th>Version</th><th>Title</th><th>Legal review</th><th>Needs acceptance</th><th>Published</th><th>Colleges accepted</th></tr></thead>
       <tbody>{versions.map((item) => <tr key={item.version}>
         <td>{item.version}</td><td>{item.title}</td>
-        <td>{item.legalReviewState === 'DRAFT_FOR_LEGAL_REVIEW' ? <StatusBadge label="Draft — pending legal review" tone="warning" /> : <StatusBadge label={`Reviewed: ${item.legalReviewReference ?? 'NA'}`} tone="success" />}</td>
+        <td>{item.legalReviewState === 'DRAFT_FOR_LEGAL_REVIEW' ? <StatusBadge label="Draft — pending legal review" tone="warning" /> : <StatusBadge label={item.legalReviewReference ? `Reviewed: ${item.legalReviewReference}` : 'Reviewed'} tone="success" />}</td>
         <td>{item.requiresReacceptance ? 'Yes' : 'No'}</td>
         <td>{formatDate(item.publishedAt)}</td>
         <td>{item.acceptedBy}</td>
@@ -126,7 +126,7 @@ const reasonLabels: Readonly<Record<string, string>> = {
   NOTICE_PERIOD_COMPLETE: 'Notice period complete', COLLEGE_CONFIRMED_EXIT: 'The college confirmed its exit',
   COLLEGE_RENEWED: 'The college renewed', COLLEGE_WITHDREW_NOTICE: 'The college withdrew its notice', ENTERED_IN_ERROR: 'Recorded in error',
 };
-const day = (value: string | null): string => (value ? formatDate(value) : 'NA');
+const day = (value: string | null, missing = 'Not yet'): string => (value ? formatDate(value) : missing);
 
 export function CollegeExitsSection({ organizations }: { readonly organizations: readonly OrganizationManagementDto[] }): React.ReactElement | null {
   const token = getProtectedAccessToken();
@@ -204,7 +204,7 @@ export function CollegeExitsSection({ organizations }: { readonly organizations:
     <h2>College exits</h2>
     {notice ? <p className="role-api-success" role="status">{notice}</p> : null}
     {error ? <p className="form-error" role="alert">{error}</p> : null}
-    <p className="hiring-meta">Ending an exit ends every current student link and staff membership and takes the college out of the directory; it can be reversed for {policy?.retentionDays ?? 'NA'} days. Students keep their accounts and their own records. Deleting the college’s records needs a second person’s approval and waits for the retention period.</p>
+    <p className="hiring-meta">Ending an exit ends every current student link and staff membership and takes the college out of the directory; it can be reversed {policy?.retentionDays != null ? `for ${policy.retentionDays} days` : 'during the retention period'}. Students keep their accounts and their own records. Deleting the college’s records needs a second person’s approval and waits for the retention period.</p>
     <form className="role-management-form" aria-label="Record an exit notice" onSubmit={recordNotice}>
       <label><span>College</span><select value={form.institutionId} required onChange={(event) => setForm((value) => ({ ...value, institutionId: event.target.value }))}>
         <option value="">Choose a college</option>
@@ -222,7 +222,7 @@ export function CollegeExitsSection({ organizations }: { readonly organizations:
       <tbody>{exits.map((exit) => <tr key={exit.id}>
         <th scope="row">{exit.institutionName}</th>
         <td><StatusBadge label={stateLabels[exit.state] ?? exit.state} tone={exit.state === 'PURGED' ? 'neutral' : exit.state === 'CANCELLED' ? 'info' : 'warning'} /></td>
-        <td>{day(exit.noticeAt)}</td><td>{day(exit.endedAt)}</td><td>{day(exit.retentionEndsAt)}</td><td>{day(exit.exitExportLastTakenAt)}</td>
+        <td>{day(exit.noticeAt)}</td><td>{day(exit.endedAt)}</td><td>{day(exit.retentionEndsAt)}</td><td>{day(exit.exitExportLastTakenAt, 'Not taken')}</td>
         <td>{exit.changes.relationships} student links, {exit.changes.memberships} staff{exit.changes.restored ? `, ${exit.changes.restored} restored` : ''}</td>
         <td><div className="role-record-actions">
           {exit.state === 'NOTICE' ? <button type="button" className="secondary" disabled={busy} onClick={() => setPending({ exit, step: 'end', reasonCode: '' })}>End…</button> : null}

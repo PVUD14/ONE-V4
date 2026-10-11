@@ -5,13 +5,13 @@
  *
  * Separate from hiringPages.tsx so the Interviews screen, the participant workspace and the
  * student's Applications screen share one implementation. Everything shown comes from the API; a
- * missing value renders NA, an empty list says so, and nothing sums or ranks ratings.
+ * missing value is left out or said plainly ("Not recorded", "None"), an empty list says so, and nothing sums or ranks ratings.
  */
 import { useEffect, useState } from 'react';
 import { getAccessToken } from './auth.js';
 import { supportCodeSuffix } from './supportCode.js';
 import { formatDateTime } from './dates.js';
-import { codeLabel } from './labels.js';
+import { codeLabel, MISSING_TEXT } from './labels.js';
 import {
   ApiRequestError,
   createScorecardTemplate,
@@ -43,7 +43,7 @@ const changeLabels: Readonly<Record<string, string>> = {
 const modeLabels: Readonly<Record<string, string>> = { VIDEO: 'Video', PHONE: 'Phone', ONSITE: 'On site' };
 
 function when(value: string | null): string {
-  if (!value || !Number.isFinite(Date.parse(value))) return 'NA';
+  if (!value || !Number.isFinite(Date.parse(value))) return MISSING_TEXT;
   return formatDateTime(value);
 }
 
@@ -54,7 +54,7 @@ function failure(error: unknown, fallback: string): string {
 
 /** The latest change as one line for a table cell: "Rescheduled — The candidate asked". */
 export function lastChangeText(change: { readonly kind: string; readonly reasonCode: string | null } | null | undefined): string {
-  if (!change) return 'NA';
+  if (!change) return 'None';
   const label = changeLabels[change.kind] ?? change.kind;
   return change.reasonCode ? `${label} — ${interviewReasonLabels[change.reasonCode] ?? change.reasonCode}` : label;
 }
@@ -107,11 +107,11 @@ export function InterviewScorecardsPanel({ employerId, interviewId, onClose }: {
     <p>Each interviewer's own judgement, criterion by criterion, exactly as given. A person decides; ONE never combines them into one number.</p>
     {status ? <p role="status">{status}</p> : null}
     {data ? <>
-      <p>Scorecard template: {data.template ? data.template.name : 'NA — this interview has no stage template.'}</p>
+      <p>{data.template ? `Scorecard template: ${data.template.name}` : 'This interview has no stage template.'}</p>
       {(data.scorecards ?? []).length === 0 ? <p>No scorecards recorded yet.</p> : <ul className="hiring-list">
         {(data.scorecards ?? []).map((card) => <li key={`${card.submittedBy}-${card.submittedAt ?? ''}`} className="hiring-list-item"><div>
           <h3>{card.submittedBy}</h3>
-          <p className="hiring-meta">Recommendation: {codeLabel(card.recommendation)} · Overall rating: {card.overallRating ?? 'NA'} · {when(card.submittedAt)}</p>
+          <p className="hiring-meta">Recommendation: {codeLabel(card.recommendation)}{card.overallRating !== null && card.overallRating !== undefined ? ` · Overall rating: ${card.overallRating}` : ''} · {when(card.submittedAt)}</p>
           {card.ratings.length ? <ul>{card.ratings.map((rating) => <li key={rating.criterionId}>{rating.label}: {rating.rating} of 5{rating.note ? ` — ${rating.note}` : ''}</li>)}</ul> : null}
           {card.strengths ? <p>Strengths: {card.strengths}</p> : null}
           {card.concerns ? <p>Concerns: {card.concerns}</p> : null}

@@ -157,7 +157,7 @@ function BriefPanel({ brief, onStart, onBack }: {
       <p>{brief.questionCount} {brief.questionCount === 1 ? 'question' : 'questions'}, {brief.totalMarks} marks in total:{' '}
         {brief.questionFormats.map((format) => `${format.count} ${FORMAT_LABELS[format.questionType] ?? format.questionType.toLowerCase()}`).join(', ')}.</p>
       <p>Time allowed: {fullMinutes} minutes.{' '}
-        {minutes === null ? 'NA' : resuming ? `You have ${minutes} minutes left.` : minutes < fullMinutes
+        {minutes === null ? '' : resuming ? `You have ${minutes} minutes left.` : minutes < fullMinutes
           ? `The test closes soon, so if you start now you have ${minutes} minutes.`
           : `If you start now you have the full ${minutes} minutes.`}</p>
       <p className="hiring-meta">Closes {formatDateTime(brief.closesAt)}.</p>

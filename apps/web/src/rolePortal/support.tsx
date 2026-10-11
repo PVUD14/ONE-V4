@@ -42,13 +42,14 @@ import { StatusBadge } from '../studentComponents.js';
 import { formatApiError, openPortalRecord, portalRecordFromHistory, RestrictedApiState } from './shared.js';
 import { SupportCode } from '../supportCode.js';
 import { formatDateTime } from '../dates.js';
-import { codeLabel } from '../labels.js';
+import { codeLabel, MISSING_TEXT } from '../labels.js';
 
 const noteLimit = 2000;
 const summaryLimit = 500;
 
 const label = (value: string): string => value.split('_').map((word) => word.charAt(0) + word.slice(1).toLowerCase()).join(' ');
-const when = (value: string | null | undefined): string => (value ? formatDateTime(value) : 'NA');
+const when = (value: string | null | undefined, missing: string = MISSING_TEXT): string => (value ? formatDateTime(value) : missing);
+const noEmail = 'No email on record';
 
 const stateTone = (state: string): 'success' | 'warning' | 'neutral' | 'info' | 'danger' =>
   state === 'RESOLVED' || state === 'CLOSED' ? 'success' : state === 'WAITING_ON_CUSTOMER' ? 'info' : state === 'OPEN' ? 'warning' : 'neutral';
@@ -148,10 +149,10 @@ export function OperationsSupportDeskPage(): React.ReactElement {
   return <section className="role-module role-module--dense">
     {heading}
     <div className="v2-row v2-cols-4 career-stat-strip role-wide">
-      <V2Stat icon="📥" tone="amber" value={queue ? queue.summary.open : 'NA'} label="Open" />
-      <V2Stat icon="🛠️" tone="blue" value={queue ? queue.summary.inProgress : 'NA'} label="In progress" />
-      <V2Stat icon="⏳" tone="purple" value={queue ? queue.summary.waitingOnCustomer : 'NA'} label="Waiting on customer" />
-      <V2Stat icon="⏰" tone="teal" value={queue ? queue.summary.overdue : 'NA'} label="Past SLA target" />
+      <V2Stat icon="📥" tone="amber" value={queue ? queue.summary.open : undefined} label="Open" />
+      <V2Stat icon="🛠️" tone="blue" value={queue ? queue.summary.inProgress : undefined} label="In progress" />
+      <V2Stat icon="⏳" tone="purple" value={queue ? queue.summary.waitingOnCustomer : undefined} label="Waiting on customer" />
+      <V2Stat icon="⏰" tone="teal" value={queue ? queue.summary.overdue : undefined} label="Past SLA target" />
     </div>
     {error || policyError ? <p className="form-error" role="alert">{error || policyError}</p> : null}
     {notice ? <p role="status">{notice}</p> : null}
@@ -178,7 +179,7 @@ export function OperationsSupportDeskPage(): React.ReactElement {
         <thead><tr><th>Case</th><th>Summary</th><th>Category</th><th>Severity</th><th>State</th><th>SLA target</th><th>Assigned</th><th>Actions</th></tr></thead>
         <tbody>{cases.map((item) => <tr key={item.id}>
           <td><strong>{item.reference}</strong><br /><small>{label(item.channel)} · {when(item.openedAt)}</small></td>
-          <td>{item.summary}{item.organization ? <><br /><small>{item.organization.name}</small></> : null}{item.subject ? <><br /><small>{item.subject.maskedEmail ?? 'NA'}</small></> : null}</td>
+          <td>{item.summary}{item.organization ? <><br /><small>{item.organization.name}</small></> : null}{item.subject?.maskedEmail ? <><br /><small>{item.subject.maskedEmail}</small></> : null}</td>
           <td>{label(item.category)}</td>
           <td><StatusBadge label={label(item.severity)} tone={severityTone(item.severity)} /></td>
           <td><StatusBadge label={label(item.state)} tone={stateTone(item.state)} /></td>
@@ -255,11 +256,11 @@ function SupportCasePanel({ token, caseId, policy, onChanged, onClose }: {
       <div><dt>State</dt><dd><StatusBadge label={label(item.state)} tone={stateTone(item.state)} /></dd></div>
       <div><dt>Severity</dt><dd><StatusBadge label={label(item.severity)} tone={severityTone(item.severity)} /> · SLA target {when(item.slaDueAt)}{item.overdue ? ' (past target)' : ''}</dd></div>
       <div><dt>Channel · category</dt><dd>{label(item.channel)} · {label(item.category)}</dd></div>
-      <div><dt>Organisation</dt><dd>{item.organization?.name ?? 'NA'}</dd></div>
-      <div><dt>Person</dt><dd>{item.subjectDetached ? 'Removed on privacy deletion' : item.subject ? item.subject.maskedEmail ?? 'NA' : 'None linked'}</dd></div>
+      <div><dt>Organisation</dt><dd>{item.organization?.name ?? 'None linked'}</dd></div>
+      <div><dt>Person</dt><dd>{item.subjectDetached ? 'Removed on privacy deletion' : item.subject ? item.subject.maskedEmail ?? noEmail : 'None linked'}</dd></div>
       <div><dt>Assigned</dt><dd>{item.assignee ? `${item.assignee.email}${item.assignee.isSelf ? ' (you)' : ''}` : 'Unassigned'}</dd></div>
       <div><dt>Opened</dt><dd>{when(item.openedAt)} by {item.openedBy.email}</dd></div>
-      <div><dt>Resolved · closed</dt><dd>{when(item.resolvedAt)} · {when(item.closedAt)}</dd></div>
+      <div><dt>Resolved · closed</dt><dd>{when(item.resolvedAt, 'Not yet')} · {when(item.closedAt, 'Not yet')}</dd></div>
     </dl>
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {item.allowedTransitions.length ? <div className="role-actions">{item.allowedTransitions.map((state) =>
@@ -305,7 +306,8 @@ function SupportCasePanel({ token, caseId, policy, onChanged, onClose }: {
 function describeEvent(event: SupportCaseDetailDto['events'][number]): string {
   switch (event.kind) {
     case 'OPENED': return 'Opened';
-    case 'STATE_CHANGED': return `${label(event.fromState ?? 'NA')} → ${label(event.toState ?? 'NA')}`;
+    case 'STATE_CHANGED': return event.fromState && event.toState ? `${label(event.fromState)} → ${label(event.toState)}`
+      : event.toState ? `Set to ${label(event.toState)}` : event.fromState ? `Changed from ${label(event.fromState)}` : 'State changed';
     case 'NOTE': return 'Note';
     case 'ASSIGNED': return event.assignee ? `Assigned to ${event.assignee.email}` : 'Unassigned';
   }
@@ -386,7 +388,7 @@ export function OpenCaseDialog({ token, policy, subject, onCancel, onOpened }: {
   return <div className="role-modal-backdrop" role="presentation">
     <section className="role-modal" role="dialog" aria-modal="true" aria-labelledby="support-open-title">
       <h2 id="support-open-title">Log a support case</h2>
-      {subject ? <dl><div><dt>Person</dt><dd>{subject.maskedEmail ?? 'NA'}</dd></div></dl> : null}
+      {subject ? <dl><div><dt>Person</dt><dd>{subject.maskedEmail ?? noEmail}</dd></div></dl> : null}
       <form onSubmit={(event) => void submit(event)} noValidate>
         <label><span>Category <em>required</em></span>
           <select ref={firstFieldRef} value={form.category} onChange={pick('category')}>
@@ -395,7 +397,7 @@ export function OpenCaseDialog({ token, policy, subject, onCancel, onOpened }: {
           </select></label>
         <label><span>Severity <em>required</em></span>
           <select value={form.severity} onChange={pick('severity')}>
-            {policy.severities.map((severity) => <option key={severity} value={severity}>{label(severity)} — resolve within {policy.slaHours[severity] ?? 'NA'} h</option>)}
+            {policy.severities.map((severity) => <option key={severity} value={severity}>{label(severity)}{policy.slaHours[severity] != null ? ` — resolve within ${policy.slaHours[severity]} h` : ''}</option>)}
           </select></label>
         <label><span>Channel <em>required</em></span>
           <select value={form.channel} onChange={pick('channel')}>
@@ -489,7 +491,7 @@ export function OperationsAccountLookupPage({ mode = 'directory' }: { readonly m
       {results?.length ? <div className="role-record-table-wrap"><table className="role-record-table">
         <thead><tr><th>Email (masked)</th><th>State</th><th>Sign-in linked</th><th>Memberships</th><th>Created</th><th>Actions</th></tr></thead>
         <tbody>{results.map((account) => <tr key={account.userId}>
-          <td>{account.maskedEmail ?? 'NA'}{account.deleted ? <><br /><small>Deleted account</small></> : null}</td>
+          <td>{account.maskedEmail ?? noEmail}{account.deleted ? <><br /><small>Deleted account</small></> : null}</td>
           <td><StatusBadge label={label(account.state)} tone={account.state === 'ACTIVE' ? 'success' : 'neutral'} /></td>
           <td>{account.identityLinked ? 'Yes' : 'No'}</td>
           <td>{account.membershipCount}</td>
@@ -539,8 +541,8 @@ function SupportAccountPanel({ token, userId, policy }: { readonly token: string
           {view.canOpenCase && policy?.viewer.cases ? <button type="button" className="pilot-btn" onClick={() => setOpening(true)}>Open case</button> : null}
         </div></div>
       <dl>
-        <div><dt>Email</dt><dd>{revealed ? revealed.email : account.maskedEmail ?? 'NA'}{revealed ? ' (revealed, recorded)' : ''}</dd></div>
-        <div><dt>Phone</dt><dd>{revealed ? revealed.phone ?? 'NA' : account.maskedPhone ?? 'NA'}</dd></div>
+        <div><dt>Email</dt><dd>{revealed ? revealed.email : account.maskedEmail ?? noEmail}{revealed ? ' (revealed, recorded)' : ''}</dd></div>
+        <div><dt>Phone</dt><dd>{revealed ? revealed.phone ?? 'No phone on record' : account.maskedPhone ?? 'No phone on record'}</dd></div>
         <div><dt>Sign-in linked</dt><dd>{account.identityLinked ? 'Yes' : 'No'}</dd></div>
         <div><dt>Created</dt><dd>{when(account.createdAt)}</dd></div>
         {account.deleted ? <div><dt>Privacy</dt><dd>This account was deleted at the person&apos;s request.</dd></div> : null}
@@ -552,11 +554,11 @@ function SupportAccountPanel({ token, userId, policy }: { readonly token: string
         <tbody>{view.memberships.map((membership, index) => <tr key={`${membership.organizationId}-${membership.role}-${index}`}><td>{membership.organizationName}</td><td>{label(membership.organizationKind)}</td><td>{label(membership.role)}</td><td>{label(membership.state)}</td></tr>)}</tbody></table>
         : <p>No organisation memberships.</p>}
       {view.studentRelationships.length ? <><h3>Student relationships</h3><table className="role-record-table"><thead><tr><th>Institution</th><th>State</th><th>From</th><th>To</th></tr></thead>
-        <tbody>{view.studentRelationships.map((relationship, index) => <tr key={index}><td>{relationship.institutionName}</td><td>{label(relationship.state)}</td><td>{when(relationship.effectiveFrom)}</td><td>{when(relationship.effectiveTo)}</td></tr>)}</tbody></table></> : null}
+        <tbody>{view.studentRelationships.map((relationship, index) => <tr key={index}><td>{relationship.institutionName}</td><td>{label(relationship.state)}</td><td>{when(relationship.effectiveFrom)}</td><td>{when(relationship.effectiveTo, 'Not ended')}</td></tr>)}</tbody></table></> : null}
     </section>
     <section className="role-card role-wide"><h2>Invitations</h2>
       {view.invitations.length ? <table className="role-record-table"><thead><tr><th>Organisation</th><th>Kind · role</th><th>State</th><th>Delivery</th><th>Expires</th></tr></thead>
-        <tbody>{view.invitations.map((invitation, index) => <tr key={index}><td>{invitation.organizationName ?? 'NA'}</td><td>{label(invitation.kind)}{invitation.role ? ` · ${label(invitation.role)}` : ''}</td><td>{label(invitation.state)}</td><td>{invitation.deliveryState ? label(invitation.deliveryState) : 'NA'}</td><td>{when(invitation.expiresAt)}</td></tr>)}</tbody></table>
+        <tbody>{view.invitations.map((invitation, index) => <tr key={index}><td>{invitation.organizationName ?? MISSING_TEXT}</td><td>{label(invitation.kind)}{invitation.role ? ` · ${label(invitation.role)}` : ''}</td><td>{label(invitation.state)}</td><td>{invitation.deliveryState ? label(invitation.deliveryState) : MISSING_TEXT}</td><td>{when(invitation.expiresAt)}</td></tr>)}</tbody></table>
         : <p>No invitations.</p>}
     </section>
     <section className="role-card role-wide"><h2>Support cases</h2>

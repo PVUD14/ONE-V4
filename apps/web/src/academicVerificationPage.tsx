@@ -44,7 +44,7 @@ function scaleSuffix(scale: string | null): string {
 
 function result(entry: { readonly resultValue: string | number | null; readonly resultScale: string | null; readonly resultLetter: string | null }): string {
   if (entry.resultLetter) return entry.resultLetter;
-  if (entry.resultValue === null) return 'NA';
+  if (entry.resultValue === null) return 'No result recorded';
   return `${entry.resultValue}${scaleSuffix(entry.resultScale)}`;
 }
 
@@ -279,12 +279,12 @@ export function AcademicResultsUpload({ institutionId }: { readonly institutionI
         <thead><tr><th>Row</th><th>Student</th><th>Term</th><th>Result</th><th>Outcome</th><th>Student entered / existing record</th></tr></thead>
         <tbody>{preview.rows.map((row) => <tr key={row.rowNumber}>
           <td>{row.rowNumber}</td>
-          <td>{row.studentName ?? <span className="hiring-meta">Not found</span>}<br /><span className="hiring-meta">{row.institutionStudentId || 'NA'}</span></td>
-          <td>{row.termLabel || 'NA'}{row.termSequence !== null ? <><br /><span className="hiring-meta">Term {row.termSequence}</span></> : null}</td>
-          <td>{row.result || 'NA'} {row.scale}{row.backlogs !== null ? <><br /><span className="hiring-meta">{row.backlogs} backlog</span></> : null}</td>
+          <td>{row.studentName ?? <span className="hiring-meta">Not found</span>}{row.institutionStudentId ? <><br /><span className="hiring-meta">{row.institutionStudentId}</span></> : null}</td>
+          <td>{row.termLabel || 'No term'}{row.termSequence !== null ? <><br /><span className="hiring-meta">Term {row.termSequence}</span></> : null}</td>
+          <td>{row.result ? <>{row.result} {row.scale}</> : 'No result'}{row.backlogs !== null ? <><br /><span className="hiring-meta">{row.backlogs} backlog</span></> : null}</td>
           <td><StatusTag kind="verification" state={row.outcome} tone={OUTCOME_TONE[row.outcome]} label={OUTCOME_LABEL[row.outcome]} />
             {row.issues.map((issue) => <React.Fragment key={issue}><br /><span className="hiring-meta">{ISSUE_LABEL[issue] ?? issue}</span></React.Fragment>)}</td>
-          <td>{row.studentReported ? <>Student entered {reported(row.studentReported)}</> : row.verifiedRecord ? <>Verified record: {reported(row.verifiedRecord)}</> : 'NA'}</td>
+          <td>{row.studentReported ? <>Student entered {reported(row.studentReported)}</> : row.verifiedRecord ? <>Verified record: {reported(row.verifiedRecord)}</> : 'None'}</td>
         </tr>)}</tbody>
       </table></div>
       {preview.counts.invalid > 0

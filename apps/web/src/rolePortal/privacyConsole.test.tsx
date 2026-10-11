@@ -1,6 +1,6 @@
 /**
  * Operations Security → Privacy and consent (OPS-06): the console renders the server's
- * queue, holds and coverage; a statutory deadline with no period in code is NA; engine
+ * queue, holds and coverage; a statutory deadline with no period in code reads "Not defined"; engine
  * purposes that are not published say so instead of 0; suppressed counts render <5;
  * placing a hold needs a reason; releasing one files an approval request instead of
  * acting; and the loading, empty, error and forbidden states are honest.
@@ -97,14 +97,14 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 const posts = () => fetchMock.mock.calls.filter(([, init]) => init?.method === 'POST');
 
 describe('Security: privacy and consent console', () => {
-  it('renders the queue with a masked person and NA for a statutory deadline no rule defines', async () => {
+  it('renders the queue with a masked person and "Not defined" for a statutory deadline no rule defines', async () => {
     render(<OperationsPrivacyConsolePage />);
     const table = (await screen.findByText('PR-1A2B3C4D')).closest('table')!;
     const row = within(table).getByText('PR-1A2B3C4D').closest('tr')!;
     expect(within(row).getByText('l***@college.example')).toBeInTheDocument();
     expect(within(row).getByText('Received')).toBeInTheDocument();
-    // Statutory deadline column: NA, because no DPDP period is defined in code.
-    expect(within(row).getAllByRole('cell')[4]).toHaveTextContent('NA');
+    // Statutory deadline column: "Not defined", because no DPDP period is defined in code.
+    expect(within(row).getAllByRole('cell')[4]).toHaveTextContent('Not defined');
     expect(screen.getByText(/no DPDP response period is defined in ONE yet/)).toBeInTheDocument();
     expect(screen.getByText('Open deletions', { selector: 'small' }).previousSibling).toHaveTextContent('1');
     expect(screen.getByText('Legal holds in force', { selector: 'small' }).previousSibling).toHaveTextContent('1');
@@ -125,7 +125,8 @@ describe('Security: privacy and consent console', () => {
     expect(within(engine).queryByText(/%/)).not.toBeInTheDocument();
     const retired = within(table).getByText('old-terms').closest('tr')!;
     expect(within(retired).getByText('No version in force')).toBeInTheDocument();
-    expect(within(retired).getAllByText('NA').length).toBe(3);
+    expect(within(retired).getAllByText('Not counted').length).toBe(3);
+    expect(section.textContent).not.toMatch(/(^|[^A-Za-z])NA([^A-Za-z]|$)/);
     expect(within(section).getByText('Retired', { selector: 'span' })).toBeInTheDocument();
   });
 
@@ -189,14 +190,15 @@ describe('Security: privacy and consent console', () => {
     queueResponse = () => new Promise(() => undefined);
     render(<OperationsPrivacyConsolePage />);
     expect(screen.getByText('Loading privacy requests…')).toBeInTheDocument();
-    expect(screen.getByText('Open deletions', { selector: 'small' }).previousSibling).toHaveTextContent('NA');
+    expect(screen.queryByText('Open deletions', { selector: 'small' })).toBeNull();
   });
 
-  it('shows an error with its reference, and NA in every tile', async () => {
+  it('shows an error with its reference, and hides every tile', async () => {
     queueResponse = () => failure(500, 'INTERNAL', 'corr-broken');
     render(<OperationsPrivacyConsolePage />);
     expect(await screen.findByText(/Support code: corrbrok/)).toBeInTheDocument();
-    expect(screen.getByText('Erasures due in 7 days', { selector: 'small' }).previousSibling).toHaveTextContent('NA');
+    expect(screen.queryByText('Erasures due in 7 days', { selector: 'small' })).toBeNull();
+    expect(document.body.textContent).not.toMatch(/(^|[^A-Za-z])NA([^A-Za-z]|$)/);
   });
 
   it('says plainly when the caller may not use the console', async () => {

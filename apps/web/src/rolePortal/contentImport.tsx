@@ -9,7 +9,7 @@
  * importer wrote, so the importer never reviews or publishes it; it continues in the editors above.
  *
  * The server decides everything. The report never shows a row's text (so never an answer key), only
- * its row number, key and problems. Missing counts read NA.
+ * its row number, key and problems. A count not yet known is left out.
  */
 import { useEffect, useState } from 'react';
 import {
@@ -220,10 +220,10 @@ export function OperationsContentImportPage(): React.ReactElement | null {
   return <section className="role-module role-module--dense" aria-label="Bulk import">
     {heading}
     <div className="v2-row v2-cols-4 career-stat-strip role-wide">
-      <V2Stat icon="🧾" tone="teal" value={report ? report.rowCount : 'NA'} label="Rows in the file" />
-      <V2Stat icon="✅" tone="blue" value={report ? report.counts.create : 'NA'} label="Ready to import as drafts" />
-      <V2Stat icon="⚠️" tone="amber" value={report ? report.counts.invalid : 'NA'} label="Rows with problems" />
-      <V2Stat icon="📏" tone="purple" value={policy ? policy.limits.rows : 'NA'} label="Rows allowed per file" />
+      <V2Stat icon="🧾" tone="teal" value={report ? report.rowCount : undefined} label="Rows in the file" />
+      <V2Stat icon="✅" tone="blue" value={report ? report.counts.create : undefined} label="Ready to import as drafts" />
+      <V2Stat icon="⚠️" tone="amber" value={report ? report.counts.invalid : undefined} label="Rows with problems" />
+      <V2Stat icon="📏" tone="purple" value={policy ? policy.limits.rows : undefined} label="Rows allowed per file" />
     </div>
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {notice ? <p role="status">{notice}</p> : null}
@@ -245,7 +245,7 @@ export function OperationsContentImportPage(): React.ReactElement | null {
       {fields ? <dl>
         <div><dt>Required fields</dt><dd>{fields.required.join(', ')}</dd></div>
         <div><dt>Optional fields</dt><dd>{fields.optional.length ? fields.optional.join(', ') : 'None'}</dd></div>
-        <div><dt>Limits</dt><dd>{policy ? `${policy.limits.rows} rows and ${policy.limits.characters.toLocaleString()} characters per file. CSV has a header row; JSON is a list of rows with the same field names. Prerequisites are keys separated by semicolons. Any other column or field is refused.` : 'NA'}</dd></div>
+        {policy ? <div><dt>Limits</dt><dd>{`${policy.limits.rows} rows and ${policy.limits.characters.toLocaleString()} characters per file. CSV has a header row; JSON is a list of rows with the same field names. Prerequisites are keys separated by semicolons. Any other column or field is refused.`}</dd></div> : null}
       </dl> : null}
     </section>
 
@@ -260,7 +260,7 @@ export function OperationsContentImportPage(): React.ReactElement | null {
         <thead><tr><th>Row</th><th>Key</th><th>Result</th><th>Problems</th></tr></thead>
         <tbody>{report.rows.map((row) => <tr key={row.rowNumber}>
           <td>{row.rowNumber}</td>
-          <td>{row.key || 'NA'}</td>
+          <td>{row.key || 'No key'}</td>
           <td><StatusBadge label={row.outcome === 'CREATE' ? 'Ready' : 'Problem'} tone={row.outcome === 'CREATE' ? 'success' : 'warning'} /></td>
           <td>{row.issues.length ? <ul>{row.issues.map((issue) => <li key={issue}>{describeIssue(issue, issueWords)}</li>)}</ul> : 'None'}</td>
         </tr>)}</tbody></table></div> : null}

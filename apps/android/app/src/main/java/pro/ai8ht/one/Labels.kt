@@ -58,6 +58,13 @@ internal fun codeLabel(code: String?): String {
     return (listOf(first.replaceFirstChar { it.uppercase() }) + words.drop(1)).joinToString(" ")
 }
 
+/**
+ * A hiring stage as plain words, as on the web (approved 2026-10-11): the API keeps REJECTED,
+ * people read "Not selected".
+ */
+internal fun applicationStageLabel(code: String?): String =
+    if (code == "REJECTED" || code == "NOT_SELECTED") "Not selected" else codeLabel(code)
+
 private fun titleCase(code: String): String {
     if (!codeShape.matches(code)) return code
     return code.split('_').filter { it.isNotEmpty() }

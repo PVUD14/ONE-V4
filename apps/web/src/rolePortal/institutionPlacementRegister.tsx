@@ -45,15 +45,18 @@ function monthLabel(month: string): string {
   const date = new Date(`${month}-01T00:00:00Z`);
   return Number.isNaN(date.getTime()) ? month : dates.formatMonth(date, { utc: true });
 }
-/** A percentage as shown: withheld reads <5 (a group under five is behind it), no source reads NA. */
-export function percentLabel(row: PlacementStatisticsRowDto | null | undefined): string {
-  if (!row) return 'NA';
+/**
+ * A percentage as shown: withheld reads <5 (a group under five is behind it). With no source it is
+ * null, so a KPI card hides and a table cell reads "Not recorded" (NaValue) — never "NA".
+ */
+export function percentLabel(row: PlacementStatisticsRowDto | null | undefined): string | null {
+  if (!row) return null;
   if (row.placementPercentage !== null && row.placementPercentage !== undefined) return `${row.placementPercentage}%`;
-  return row.placed?.suppressed || row.applied?.suppressed ? SMALL_COUNT_TEXT : 'NA';
+  return row.placed?.suppressed || row.applied?.suppressed ? SMALL_COUNT_TEXT : null;
 }
-function ratioLabel(row: PlacementStatisticsRowDto): string {
+function ratioLabel(row: PlacementStatisticsRowDto): string | null {
   if (row.offersPerPlacedStudent !== null && row.offersPerPlacedStudent !== undefined) return String(row.offersPerPlacedStudent);
-  return row.placed?.suppressed ? SMALL_COUNT_TEXT : 'NA';
+  return row.placed?.suppressed ? SMALL_COUNT_TEXT : null;
 }
 
 /** Load the statistics once; null while loading or on failure (with the error). */
@@ -94,10 +97,10 @@ export function PlacementStatisticsSection({ institutionId, title = 'Placement s
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {!data && !error ? <p role="status">Loading placement statistics…</p> : null}
     <Kpis items={[
-      ['Eligible', overall ? suppressedCountLabel(overall.eligible) : 'NA', 'blue', 'students'],
-      ['Applied (shared)', overall ? suppressedCountLabel(overall.applied) : 'NA', 'indigo', 'opportunities'],
-      ['With an offer', overall ? suppressedCountLabel(overall.withOffer) : 'NA', 'amber', 'offers'],
-      ['Placed', overall ? suppressedCountLabel(overall.placed) : 'NA', 'green', 'placement'],
+      ['Eligible', overall ? suppressedCountLabel(overall.eligible) : null, 'blue', 'students'],
+      ['Applied (shared)', overall ? suppressedCountLabel(overall.applied) : null, 'indigo', 'opportunities'],
+      ['With an offer', overall ? suppressedCountLabel(overall.withOffer) : null, 'amber', 'offers'],
+      ['Placed', overall ? suppressedCountLabel(overall.placed) : null, 'green', 'placement'],
       ['Placed, of students sharing', percentLabel(overall), 'teal', 'reports'],
     ]} />
     {data ? (data.groups ?? []).length === 0

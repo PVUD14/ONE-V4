@@ -2,43 +2,38 @@
  * ONE · Pilot-parity — Stream D — Learner
  *
  * Practice, Company Prep, Career Tools, Scholarships and Resume Builder: the five
- * pilot-exact pages. Real data is used wherever it exists; every other slot is NA. The Resume
- * Builder generates résumés from the student's own record (RESUME-GEN).
+ * pilot-exact pages. Real data is used wherever it exists; a block with no source is hidden, and a
+ * view left with nothing says plainly that it is not live yet. The Resume Builder generates
+ * résumés from the student's own record (RESUME-GEN).
  */
 import { deleteResume, documentVerificationLabel, getProtectedAccessToken, getResume, getResumeSources, getStudentActivity, listResumes, listStudentDocuments, previewResume } from '../api.js';
 import type {
   ResumeCheckDto, ResumeContentDto, ResumeDraftDto, ResumeSourcesDto, ResumeSummaryDto, ResumeTemplateDto, ResumeTemplateKey, StudentDocumentDto,
 } from '../api.js';
-import { NaSlotStrip, PilotStat, allMissing } from '../naState.js';
+import { PilotStat, isUnrecorded } from '../naState.js';
+import { V2EmptyState } from '../dashboardsV2.js';
 import { ResumeBuilder, ResumeChecksList, ResumePaper, defaultResumeDraft, downloadVersion } from '../studentResumes.js';
 import { PilotTabs } from '../pilot/pilotOverlay.js';
-import { NaCourseTiles, NaListCard, NaRingRailCard, go } from './naWidgets.js';
+import { NaListCard, go } from './naWidgets.js';
 import { PublishedContentCard } from './publishedContent.js';
 import { PracticeBySkillCard } from '../studentLearning.js';
 import { Icon } from '../icons/Icon.js';
 import { useEffect, useState, type ReactNode } from 'react';
 import { formatDate } from '../dates.js';
 
-/** Numbered slot labels for a row of widgets that has no source yet ("Practice set 1", ...). */
-function numbered(label: string, count: number): readonly string[] {
-  return Array.from({ length: count }, (_, index) => `${label} ${index + 1}`);
-}
-
 type HeroStat = { readonly icon: ReactNode; readonly tone: string; readonly value: ReactNode; readonly label: string };
 
 /**
- * The pilot's hero stat row. When every stat is NA it collapses into one compact strip that
- * still names each stat; when some are real, the missing ones are muted and one line says why.
+ * The pilot's hero stat row, holding only the stats that have a source. A stat with no
+ * source is not drawn, and a row left with none is not drawn at all.
  */
-function StatHero({ stats, reason, label }: { readonly stats: readonly HeroStat[]; readonly reason: string; readonly label: string }): React.ReactElement {
-  if (allMissing(stats.map((stat) => stat.value))) {
-    return <NaSlotStrip label={label} slots={stats.map((stat) => ({ label: stat.label, value: stat.value }))} reason={reason} />;
-  }
+function StatHero({ stats, label }: { readonly stats: readonly HeroStat[]; readonly label: string }): React.ReactElement | null {
+  const shown = stats.filter((stat) => !isUnrecorded(stat.value));
+  if (!shown.length) return null;
   return <section className="pilot-hero" aria-label={label}>
     <div style={{ display: 'flex', gap: 26, flexWrap: 'wrap' }}>
-      {stats.map((stat) => <PilotStat key={stat.label} icon={stat.icon} tone={stat.tone} value={stat.value} label={stat.label} />)}
+      {shown.map((stat) => <PilotStat key={stat.label} icon={stat.icon} tone={stat.tone} value={stat.value} label={stat.label} />)}
     </div>
-    <p className="na-reason" style={{ marginTop: 10 }}>{reason}</p>
   </section>;
 }
 
@@ -63,25 +58,20 @@ export function StudentPracticePage(): React.ReactElement {
       </div>
       <PilotTabs labels={PRACTICE_TABS} active={tab} onChange={setTab} />
 
-      {tab > 0 ? <NaListCard title={tabLabel} note={`${tabLabel} problem sets are not live yet — NA. Institution assessments are live under Assessments.`} /> : null}
+      {tab > 0 ? <V2EmptyState icon="🧩" title={`${tabLabel} problem sets are not live yet`} note="Institution assessments are live under Assessments." /> : null}
 
+      {/* Problem sets, contests, practice time, success rate, practice tiles and recommendations have no
+          source yet, so only the day streak (real activity) is drawn. */}
       {tab === 0 ? <>
-        <StatHero label="Practice figures" reason="Problem sets and contests are not live yet, so these read NA." stats={[
-          { icon: <Icon name="practice" size={16} />, tone: 'green', value: 'NA', label: 'Problems Solved' },
-          { icon: <Icon name="offers" size={16} />, tone: 'amber', value: 'NA', label: 'Contests Participated' },
-          { icon: <Icon name="assessments" size={16} />, tone: 'blue', value: 'NA', label: 'Practice Time' },
-          { icon: <Icon name="skills" size={16} />, tone: 'rose', value: streak ?? 'NA', label: 'Day Streak' },
-          { icon: <Icon name="analytics" size={16} />, tone: 'teal', value: 'NA', label: 'Success Rate' },
+        <StatHero label="Practice figures" stats={[
+          { icon: <Icon name="skills" size={16} />, tone: 'rose', value: streak, label: 'Day Streak' },
         ]} />
-        <NaCourseTiles title="Continue Practicing" slots={numbered('Practice set', 5)} reason="Practice sets are not live yet — NA. Timed practice runs through your institution's assessments." />
-        <NaCourseTiles title="Recommended for You" slots={numbered('Recommendation', 5)} reason="Practice recommendations are not live yet — NA." />
         <PublishedContentCard contentType="PRACTICE" title="Practice resources" />
         <PracticeBySkillCard />
       </> : null}
     </div>
 
     {tab === 0 ? <aside className="pilot-rail">
-      <NaRingRailCard title="Practice Overview" center="Attempts" legend={['Solved', 'Attempted', 'Bookmarked']} reason="Practice attempts are not recorded yet." />
       <section className="pilot-card">
         <h2>Live today</h2>
         <p style={{ color: 'var(--p-muted)', margin: '4px 0' }}>Timed practice happens through your institution&apos;s assessments.</p>
@@ -95,26 +85,19 @@ export function StudentPracticePage(): React.ReactElement {
 
 export function StudentCompanyPrepPage(): React.ReactElement {
   const [tab, setTab] = useState(0);
-  return <div className="pilot pilot-embed"><div className="pilot-page" style={tab === 0 ? undefined : { gridTemplateColumns: '1fr' }}>
+  // Company prep figures, preparation progress and an interview schedule have no source yet, so none
+  // of them is drawn; published company-prep content shows when there is some.
+  return <div className="pilot pilot-embed"><div className="pilot-page" style={{ gridTemplateColumns: '1fr' }}>
     <div className="pilot-content">
       <div className="pilot-page-head">
         <div><h1>Company Preparation</h1><p>Prepare for your dream companies with tailored resources and practice.</p></div>
       </div>
       <PilotTabs labels={['Overview', 'Companies', 'Interview Prep', 'Aptitude Prep', 'Mock Interviews', 'Saved']} active={tab} onChange={setTab} />
       {tab === 0 ? <>
-        <StatHero label="Company prep figures" reason="Company prep is not live yet, so these read NA." stats={[
-          { icon: <Icon name="company" size={16} />, tone: 'blue', value: 'NA', label: 'Target Companies' },
-          { icon: <Icon name="assessments" size={16} />, tone: 'purple', value: 'NA', label: 'Prep Sets Completed' },
-          { icon: <Icon name="targets" size={16} />, tone: 'amber', value: 'NA', label: 'Mock Interviews' },
-        ]} />
         <PublishedContentCard contentType="COMPANY_PREP" title="Company preparation" />
-        <NaListCard title="Companies" note="Company prep guides are not live yet — NA. Real openings from real employers are under Opportunities." />
-      </> : <NaListCard title={['Overview', 'Companies', 'Interview Prep', 'Aptitude Prep', 'Mock Interviews', 'Saved'][tab] ?? ''} note="This prep content is not live yet — NA." />}
+        <V2EmptyState icon="🏢" title="Company prep guides are not live yet" note="Real openings from real employers are under Opportunities." />
+      </> : <V2EmptyState icon="🏢" title={`${['Overview', 'Companies', 'Interview Prep', 'Aptitude Prep', 'Mock Interviews', 'Saved'][tab] ?? 'This prep content'} is not live yet`} note="Real openings from real employers are under Opportunities." />}
     </div>
-    {tab === 0 ? <aside className="pilot-rail">
-      <NaRingRailCard title="Preparation Progress" center="Overall" legend={['Completed', 'In Progress', 'Not Started', 'Saved']} reason="Preparation progress is not tracked yet." />
-      <NaListCard title="Upcoming Interviews" note="No interview schedule yet — NA." />
-    </aside> : null}
   </div></div>;
 }
 
@@ -124,25 +107,19 @@ export const TOOL_TABS = ['Overview', 'Planning', 'Building', 'Acceleration'] as
 
 export function StudentCareerToolsPage(): React.ReactElement {
   const [tab, setTab] = useState(0);
-  return <div className="pilot pilot-embed"><div className="pilot-page" style={tab === 0 ? undefined : { gridTemplateColumns: '1fr' }}>
+  // Tool usage and tool recommendations have no source yet, so they are not drawn; published
+  // career-tool content shows on the Overview tab when there is some.
+  return <div className="pilot pilot-embed"><div className="pilot-page" style={{ gridTemplateColumns: '1fr' }}>
     <div className="pilot-content">
       <div className="pilot-page-head">
         <div><h1>Career Tools</h1><p>Everything you need to plan, build and accelerate your career.</p></div>
       </div>
       <PilotTabs labels={TOOL_TABS} active={tab} onChange={setTab} />
-      <section className="pilot-card">
-        <div className="pilot-card-head"><h2>{TOOL_TABS[tab]}</h2><span className="pilot-chip slate">NA</span></div>
-        <NaSlotStrip card={false} label={`${TOOL_TABS[tab] ?? 'Overview'} tools`}
-          slots={[{ label: 'Career Path Planner' }, { label: 'Skill Gap Analyzer' }, { label: 'Salary Insights' }]}
-          reason="Not live yet: the path planner (roles you can grow into), the skill gap analyzer (your skills against a target role) and salary insights (ranges by role and city)." />
-        <p style={{ color: 'var(--p-muted)', marginTop: 12 }}>What is live today: your readiness band and roadmap under My Career, and real skills evidence under Skills.</p>
-      </section>
+      <V2EmptyState icon="🧰" title={`${TOOL_TABS[tab] ?? 'Overview'} tools are not live yet`}
+        note="The path planner (roles you can grow into), the skill gap analyzer (your skills against a target role) and salary insights (ranges by role and city) are not live yet."
+        hint="What is live today: your readiness band and roadmap under My Career, and real skills evidence under Skills." />
+      {tab === 0 ? <PublishedContentCard contentType="CAREER_TOOL" title="Career tools" /> : null}
     </div>
-    {tab === 0 ? <aside className="pilot-rail">
-      <NaRingRailCard title="Tools Usage Overview" center="Tools Used" legend={['Resume & Docs', 'Skill Tools', 'Planning', 'Job Search']} reason="Tool usage is not recorded yet." />
-      <PublishedContentCard contentType="CAREER_TOOL" title="Career tools" />
-        <NaListCard title="Recommended for You" note="Tool recommendations are not live yet — NA." />
-    </aside> : null}
   </div></div>;
 }
 
@@ -151,26 +128,17 @@ export function StudentCareerToolsPage(): React.ReactElement {
 export function StudentScholarshipsPage(): React.ReactElement {
   const [tab, setTab] = useState(0);
   const labels = ['Overview', 'Recommended', 'Merit Based', 'Need Based', 'Deadlines'] as const;
-  return <div className="pilot pilot-embed"><div className="pilot-page" style={tab === 0 ? undefined : { gridTemplateColumns: '1fr' }}>
+  // Scholarship figures, insights and deadlines have no source until a feed is connected, so none of
+  // them is drawn; published scholarship content shows on the Overview tab when there is some.
+  return <div className="pilot pilot-embed"><div className="pilot-page" style={{ gridTemplateColumns: '1fr' }}>
     <div className="pilot-content">
       <div className="pilot-page-head">
         <div><h1>Scholarships</h1><p>Discover and apply for scholarships to support your education journey.</p></div>
       </div>
       <PilotTabs labels={labels} active={tab} onChange={setTab} />
-      {tab === 0 ? (
-        <StatHero label="Scholarship figures" reason="Scholarship listings are not connected yet, so these read NA." stats={[
-          { icon: <Icon name="offers" size={16} />, tone: 'amber', value: 'NA', label: 'Matched to You' },
-          { icon: <Icon name="assessments" size={16} />, tone: 'blue', value: 'NA', label: 'Applications' },
-          { icon: <Icon name="skills" size={16} />, tone: 'rose', value: 'NA', label: 'Closing Soon' },
-        ]} />
-      ) : null}
-      <NaListCard title={labels[tab] ?? ''} note="Scholarship listings are not live yet — NA. They arrive when a scholarships content partner or institution feed is connected." />
+      {tab === 0 ? <PublishedContentCard contentType="SCHOLARSHIP" title="Scholarships" /> : null}
+      <V2EmptyState icon="🎓" title="Scholarship listings are not live yet" note="They arrive when a scholarships content partner or institution feed is connected." />
     </div>
-    {tab === 0 ? <aside className="pilot-rail">
-      <NaRingRailCard title="Scholarship Insights" center="Available" legend={['Merit Based', 'Need Based', 'Corporate', 'Private']} reason="No scholarship feed is connected yet." />
-      <PublishedContentCard contentType="SCHOLARSHIP" title="Scholarships" />
-        <NaListCard title="Upcoming Deadlines" note="No scholarship deadlines yet — NA." />
-    </aside> : null}
   </div></div>;
 }
 
@@ -326,14 +294,14 @@ export function StudentResumeBuilderPage(): React.ReactElement {
         </section>
         {example ? <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 14 }}>
           {(load?.templates ?? []).map((template) => <div key={template.key}><h3 style={{ fontSize: 13, margin: '0 0 6px' }}>{template.name}</h3><ResumePaper content={example.content} template={template.key} compact /></div>)}
-        </div> : <p style={{ color: 'var(--p-muted)' }}>{loadFailed ? 'NA — your record could not be loaded.' : 'Preparing examples…'}</p>}
+        </div> : <p style={{ color: 'var(--p-muted)' }}>{loadFailed ? 'Your record could not be loaded.' : 'Preparing examples…'}</p>}
       </> : null}
 
       {!builder && tab === 3 ? (
         <section className="pilot-card" style={{ maxWidth: 720 }}>
           <div className="pilot-card-head"><h2>Resume checks</h2><span className="pilot-chip slate">Checklist</span></div>
           <p style={{ color: 'var(--p-muted)', marginTop: 0 }}>ONE does not give résumés a number. These are plain checks on your record as a first résumé would show it; each says what to add.</p>
-          {checks ? <ResumeChecksList checks={checks} /> : <p style={{ color: 'var(--p-muted)' }}>{loadFailed ? 'NA — your record could not be loaded.' : 'Checking…'}</p>}
+          {checks ? <ResumeChecksList checks={checks} /> : <p style={{ color: 'var(--p-muted)' }}>{loadFailed ? 'Your record could not be loaded.' : 'Checking…'}</p>}
         </section>
       ) : null}
     </div>
@@ -341,10 +309,11 @@ export function StudentResumeBuilderPage(): React.ReactElement {
       <section className="pilot-card">
         <div className="pilot-card-head"><h2>Resume Overview</h2><span className="pilot-chip blue">Live</span></div>
         <div className="pilot-detail-rows">
-          <div><small>Generated</small><strong>{resumes === null ? 'NA' : generated.length}</strong></div>
-          <div><small>Saved versions</small><strong>{resumes === null ? 'NA' : generated.reduce((sum, resume) => sum + resume.versionCount, 0)}</strong></div>
-          <div><small>Uploaded</small><strong>{documents === null ? 'NA' : uploaded.length}</strong></div>
-          <div><small>Verified education</small><strong>{load ? load.sources.qualifications.filter((q) => q.verified).length : 'NA'}</strong></div>
+          {/* A count that has not loaded is not drawn rather than shown as a figure. */}
+          {resumes !== null ? <div><small>Generated</small><strong>{generated.length}</strong></div> : null}
+          {resumes !== null ? <div><small>Saved versions</small><strong>{generated.reduce((sum, resume) => sum + resume.versionCount, 0)}</strong></div> : null}
+          {documents !== null ? <div><small>Uploaded</small><strong>{uploaded.length}</strong></div> : null}
+          {load ? <div><small>Verified education</small><strong>{load.sources.qualifications.filter((q) => q.verified).length}</strong></div> : null}
         </div>
         <small style={{ display: 'block', marginTop: 10, color: 'var(--p-muted)' }}>Counts of your own records. ONE does not grade résumés.</small>
       </section>
@@ -362,13 +331,13 @@ export function StudentResumeBuilderPage(): React.ReactElement {
           )) : <p style={{ color: 'var(--p-muted)', margin: '8px 0' }}>None yet.</p>}
         </div>
       </section>
-      <section className="pilot-card">
+      {checks ? <section className="pilot-card">
         <div className="pilot-card-head"><h2>Still to add</h2><span className="pilot-chip slate">Checklist</span></div>
-        {checks ? (checks.some((check) => !check.passed)
+        {checks.some((check) => !check.passed)
           ? <ResumeChecksList checks={checks.filter((check) => !check.passed).slice(0, 4)} />
-          : <p style={{ margin: 0 }}>Every check passes.</p>) : <p style={{ color: 'var(--p-muted)', margin: 0 }}>NA</p>}
-      </section>
-      <NaListCard title="Resume Tips" note="Curated resume tips are not live yet — NA." />
+          : <p style={{ margin: 0 }}>Every check passes.</p>}
+      </section> : null}
+      {/* Curated resume tips have no source yet, so no tips card is drawn. */}
     </aside> : null}
   </div></div>;
 }

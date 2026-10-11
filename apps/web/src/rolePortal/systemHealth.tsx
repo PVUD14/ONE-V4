@@ -10,7 +10,7 @@
  * (engineHealth.tsx) above it.
  *
  * Every number comes from one server-side summary computed in bounded SQL. A source
- * that has no data renders NA in its slot. No event payload, failure text or internal
+ * that has no data hides its slot, or says "Never" in a table cell. No event payload, failure text or internal
  * identifier is shown; the reference printed is the correlation ID an operator searches
  * the audit log by.
  */
@@ -27,15 +27,26 @@ import { SupportCode } from '../supportCode.js';
 import { formatDateTime } from '../dates.js';
 import { codeLabel } from '../labels.js';
 
-const NA = 'NA';
 const dayMs = 24 * 60 * 60 * 1000;
 
-export function formatCapped(count: CappedCountDto | undefined): string {
-  if (!count) return NA;
+/** A capped server count; undefined when there is no count, so its slot is hidden. */
+export function formatCapped(count: CappedCountDto): string;
+export function formatCapped(count: CappedCountDto | undefined): string | undefined;
+export function formatCapped(count: CappedCountDto | undefined): string | undefined {
+  if (!count) return undefined;
   return count.capped ? `${count.value.toLocaleString()}+` : count.value.toLocaleString();
 }
 
-const when = (value: string | null | undefined): string => (value ? formatDateTime(value) : NA);
+function when(value: string): string;
+function when(value: string | null | undefined): string | undefined;
+function when(value: string | null | undefined): string | undefined {
+  return value ? formatDateTime(value) : undefined;
+}
+
+/** A <dl> row, omitted when its value has no source. */
+function Row({ term, value }: { readonly term: string; readonly value: string | undefined }): React.ReactElement | null {
+  return value === undefined ? null : <div><dt>{term}</dt><dd>{value}</dd></div>;
+}
 
 const verdictText = {
   DRAINING: { label: 'Draining', tone: 'success', note: 'Events that are due are being delivered within the alert limit.' },
@@ -167,19 +178,19 @@ export function OperationsSystemHealthPage(): React.ReactElement {
     <div className="v2-row v2-cols-4 career-stat-strip role-wide">
       <V2Stat icon="⛔" tone="amber" value={formatCapped(summary?.outbox.counts.FAILED)} label="Failed events" />
       <V2Stat icon="⏳" tone="blue" value={formatCapped(summary?.outbox.counts.PENDING)} label="Waiting events" />
-      <V2Stat icon="🕰️" tone="purple" value={summary?.outbox.oldestDueWaitingMinutes != null ? `${summary.outbox.oldestDueWaitingMinutes} min` : NA} label="Oldest due event waiting" />
-      <V2Stat icon="📬" tone="teal" value={summary?.worker.lastDeliveredAt ? formatDateTime(summary.worker.lastDeliveredAt) : NA} label="Last event delivered" />
+      <V2Stat icon="🕰️" tone="purple" value={summary?.outbox.oldestDueWaitingMinutes != null ? `${summary.outbox.oldestDueWaitingMinutes} min` : undefined} label="Oldest due event waiting" />
+      <V2Stat icon="📬" tone="teal" value={when(summary?.worker.lastDeliveredAt)} label="Last event delivered" />
     </div>
 
     <div className="v2-row v2-cols-2 role-wide">
       <section className="role-card"><h2>Worker</h2>
-        <p><StatusBadge label={verdict?.label ?? NA} tone={verdict?.tone ?? 'neutral'} /></p>
+        {verdict ? <p><StatusBadge label={verdict.label} tone={verdict.tone} /></p> : null}
         <p>{verdict?.note ?? 'Worker state is not available.'}</p>
         <dl>
-          <div><dt>Events being processed</dt><dd>{formatCapped(summary?.worker.activeLeases)}</dd></div>
-          <div><dt>Claims left by a stopped worker</dt><dd>{formatCapped(summary?.worker.expiredLeases)}</dd></div>
-          <div><dt>Delivered (all time)</dt><dd>{formatCapped(summary?.outbox.counts.PUBLISHED)}</dd></div>
-          <div><dt>Oldest waiting event occurred</dt><dd>{when(summary?.outbox.oldestPendingAt)}</dd></div>
+          <Row term="Events being processed" value={formatCapped(summary?.worker.activeLeases)} />
+          <Row term="Claims left by a stopped worker" value={formatCapped(summary?.worker.expiredLeases)} />
+          <Row term="Delivered (all time)" value={formatCapped(summary?.outbox.counts.PUBLISHED)} />
+          <Row term="Oldest waiting event occurred" value={when(summary?.outbox.oldestPendingAt)} />
         </dl>
       </section>
       <section className="role-card"><h2>Alerts</h2>
@@ -192,8 +203,8 @@ export function OperationsSystemHealthPage(): React.ReactElement {
           {summary.alerts.open.length
             ? <ul className="role-check-list">{summary.alerts.open.map((alert) => <li key={alert.id}><StatusBadge label="Open" tone="warning" /> {alertLine(alert, consumerLabel)} · since {when(alert.raisedAt)}{alert.notice === 'NOT_DELIVERED' ? ' · not emailed' : ' · emailed'}</li>)}</ul>
             : <p><StatusBadge label="No open alerts" tone="success" /></p>}
-          {summary.alerts.recent.length ? <details><summary>Recent alerts</summary><ul className="role-check-list">{summary.alerts.recent.map((alert) => <li key={alert.id}>{alertLine(alert, consumerLabel)} · {alert.state === 'OPEN' ? 'open' : `cleared ${when(alert.clearedAt)}`}</li>)}</ul></details> : null}
-        </> : <p>{NA}</p>}
+          {summary.alerts.recent.length ? <details><summary>Recent alerts</summary><ul className="role-check-list">{summary.alerts.recent.map((alert) => <li key={alert.id}>{alertLine(alert, consumerLabel)} · {alert.state === 'OPEN' ? 'open' : alert.clearedAt ? `cleared ${when(alert.clearedAt)}` : 'cleared'}</li>)}</ul></details> : null}
+        </> : null}
       </section>
     </div>
 
@@ -203,13 +214,13 @@ export function OperationsSystemHealthPage(): React.ReactElement {
         <thead><tr><th>Consumer</th><th>Last activity</th><th>Last success</th><th>Failed receipts</th><th>Expected interval</th><th>State</th></tr></thead>
         <tbody>{(summary?.consumers ?? []).map((consumer) => <tr key={consumer.name}>
           <th scope="row">{consumer.label}</th>
-          <td>{when(consumer.lastActivityAt)}</td>
-          <td>{when(consumer.lastSucceededAt)}</td>
+          <td>{when(consumer.lastActivityAt) ?? 'Never'}</td>
+          <td>{when(consumer.lastSucceededAt) ?? 'Never'}</td>
           <td>{formatCapped(consumer.failedReceipts)}</td>
           <td>{consumer.silenceMinutes ? `${consumer.silenceMinutes} min` : 'Not configured'}</td>
-          <td>{consumer.silent === null ? NA : <StatusBadge label={consumer.silent ? 'Silent' : 'Active'} tone={consumer.silent ? 'warning' : 'success'} />}</td>
+          <td>{consumer.silent === null ? 'Not judged' : <StatusBadge label={consumer.silent ? 'Silent' : 'Active'} tone={consumer.silent ? 'warning' : 'success'} />}</td>
         </tr>)}</tbody></table></div>
-      {summary && !summary.consumers.length ? <p>{NA}</p> : null}
+      {summary && !summary.consumers.length ? <p>No consumer has written a receipt yet.</p> : null}
     </section>
 
     <section className="role-card role-wide"><h2>Automation workflows and commands</h2>
@@ -223,8 +234,8 @@ export function OperationsSystemHealthPage(): React.ReactElement {
         </tr>)}</tbody></table></div> : null}
       <dl>
         {Object.entries(summary?.automation.commandCounts ?? {}).map(([state, count]) => <div key={state}><dt>Commands {codeLabel(state).toLowerCase()}</dt><dd>{formatCapped(count)}</dd></div>)}
-        <div><dt>Last command created</dt><dd>{when(summary?.automation.lastCommandAt)}</dd></div>
-        <div><dt>Last workflow callback</dt><dd>{when(summary?.automation.lastCallbackAt)}</dd></div>
+        {summary ? <div><dt>Last command created</dt><dd>{when(summary.automation.lastCommandAt) ?? 'Never'}</dd></div> : null}
+        {summary ? <div><dt>Last workflow callback</dt><dd>{when(summary.automation.lastCallbackAt) ?? 'Never'}</dd></div> : null}
       </dl>
       <p>Workflow activation and the kill switch are changed outside this screen.</p>
     </section>

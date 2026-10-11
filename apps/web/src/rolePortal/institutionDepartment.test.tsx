@@ -1,7 +1,7 @@
 /**
  * Department head and faculty workspaces (INST-07): the department head's remaining items
  * and the lecturer's Assessment Detail and Reports render the server's scoped, suppressed
- * numbers — NA where there is no source, <5 for a small group, bands never scores, offers
+ * numbers — hidden (never "NA") where there is no source, <5 for a small group, bands never scores, offers
  * never pay — and the navigation labels stay exactly as they were.
  */
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -235,6 +235,13 @@ describe('faculty workspace', () => {
     expect(within(section).getAllByText('38')).toHaveLength(3);
     expect(within(section).getByText('71.5%')).toBeInTheDocument();
     expect(within(section).getByText('<5 results')).toBeInTheDocument();
+  });
+
+  it('Reports leaves out the subject line for a class with no subject recorded', async () => {
+    routes({ [`${base}/class-reports`]: { mode: 'ASSIGNMENTS', classes: [{ unit: { id: crypto.randomUUID(), kind: 'SECTION', name: 'CSE 3B' }, subjects: [], students: 12, activated: 9, openTasks: 0, assessments: [] }] } });
+    open('faculty', 'Reports', 'FACULTY_LECTURER');
+    const section = await screen.findByRole('region', { name: 'CSE 3B' });
+    expect(section.textContent).not.toMatch(/Subject|\bNA\b/);
   });
 
   it('Reports says plainly when the lecturer has no class', async () => {

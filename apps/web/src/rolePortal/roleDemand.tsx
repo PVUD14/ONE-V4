@@ -9,8 +9,8 @@
  *
  * Every number comes from one server-side summary; counts of people arrive already
  * suppressed. Below 5 shows "<5"; a cell withheld only so a smaller one cannot be worked
- * out by subtraction shows "Withheld". Employer demand has no source and says NA in its
- * slot rather than disappearing. No student is ever named here.
+ * out by subtraction shows "Withheld". Employer demand has no source, so it has no tile; the
+ * promotion-rule card says in words that it is not recorded. No student is ever named here.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { ApiRequestError, getProtectedAccessToken, getRoleDemandDetail, getRoleDemandSummary } from '../api.js';
@@ -22,12 +22,14 @@ import { StatusBadge } from '../studentComponents.js';
 import { formatApiError, RestrictedApiState } from './shared.js';
 import { SupportCode } from '../supportCode.js';
 
-const NA = 'NA';
 /** Roles listed before "Show all": the ranked head of the list; the rest stay one click away. */
 const ROLE_PAGE = 25;
 
-export function formatPeople(count: RoleDemandPeopleCountDto | undefined, complementary = false): string {
-  if (!count) return NA;
+/** A people count as the server suppressed it; undefined when there is no count, so its slot is hidden. */
+export function formatPeople(count: RoleDemandPeopleCountDto, complementary?: boolean): string;
+export function formatPeople(count: RoleDemandPeopleCountDto | undefined, complementary?: boolean): string | undefined;
+export function formatPeople(count: RoleDemandPeopleCountDto | undefined, complementary = false): string | undefined {
+  if (!count) return undefined;
   if (complementary) return 'Withheld';
   return smallCountText(count, (value) => value.toLocaleString());
 }
@@ -121,18 +123,17 @@ export function OperationsRoleDemandPage(): React.ReactElement {
 
     <div className="v2-row v2-cols-4 career-stat-strip role-wide">
       <V2Stat icon="🎯" tone="blue" value={formatPeople(demand?.totals.studentsWithTarget)} label="Students with a career target" reason={demand ? 'Too few to show' : 'Not loaded'} />
-      <V2Stat icon="🗂️" tone="purple" value={demand ? demand.totals.catalogueRoles.toLocaleString() : NA} label="Roles in the catalogue" />
-      <V2Stat icon="🚀" tone="teal" value={demand ? demand.totals.rolesMeetingPromotionRule.toLocaleString() : NA} label="Roles meeting the promotion rule" />
-      <V2Stat icon="🏢" tone="amber" value={NA} label="Employer demand (not recorded)" reason="No employer request is linked to a role yet" />
+      <V2Stat icon="🗂️" tone="purple" value={demand ? demand.totals.catalogueRoles.toLocaleString() : undefined} label="Roles in the catalogue" />
+      <V2Stat icon="🚀" tone="teal" value={demand ? demand.totals.rolesMeetingPromotionRule.toLocaleString() : undefined} label="Roles meeting the promotion rule" />
     </div>
 
     <div className="v2-row v2-cols-2 role-wide">
       <section className="role-card"><h2>Demand by release label</h2>
         {demand?.byReleaseLabel?.length
           ? <dl>{demand.byReleaseLabel.map((row) => <div key={row.releaseLabel}><dt>{releaseLabelText[row.releaseLabel] ?? row.releaseLabel} ({row.roles} roles)</dt><dd><NaValue value={formatPeople(row.students, row.complementary)} /></dd></div>)}</dl>
-          : <p>{NA}</p>}
+          : demand ? <p>No student has chosen a career target yet.</p> : null}
         <p>{ruleText}</p>
-        <p>Employer demand is NA: no job opportunity or employer request is linked to a career role in ONE yet, so the employer part of the rule cannot be read. &quot;Not met&quot; means not met on students alone.</p>
+        <p>Employer demand is not recorded: no job opportunity or employer request is linked to a career role in ONE yet, so the employer part of the rule cannot be read. &quot;Not met&quot; means not met on students alone.</p>
       </section>
       <section className="role-card"><h2>New target selections by month</h2>
         <p>Students who chose a career target in each month (UTC), whether or not they kept it.</p>
@@ -141,7 +142,7 @@ export function OperationsRoleDemandPage(): React.ReactElement {
             emptyReason="Every month had fewer than 5 new selections, so there is no trend to draw yet."
             rows={demand.trend.map((month) => ({ label: month.month, display: formatPeople(month.students), value: shownCount(month.students) }))} />
           {demand.trend.some((month) => month.students.suppressed) && demand.trend.some((month) => !month.students.suppressed) ? <SuppressionNote>A month with fewer than 5 new selections reads &quot;&lt;5&quot; and shows the hatched block, never a bar.</SuppressionNote> : null}
-        </> : <p>{NA}</p>}
+        </> : demand ? <p>No target selections are recorded yet.</p> : null}
       </section>
     </div>
 
@@ -163,7 +164,7 @@ export function OperationsRoleDemandPage(): React.ReactElement {
           <td>{ranks.get(role.id) ?? '—'}</td>
           <th scope="row">{role.catalogueCode ? `${role.catalogueCode} · ` : ''}{role.title}{role.active ? null : <><br /><small>Inactive</small></>}</th>
           <td>{releaseLabelText[role.releaseLabel ?? 'NONE']}</td>
-          <td>{role.plannedRelease ?? NA}</td>
+          <td>{role.plannedRelease ?? 'Not set'}</td>
           <td><NaValue value={formatPeople(role.students)} /></td>
           <td><NaValue value={role.colleges === null ? 'Withheld' : role.colleges.toLocaleString()} /></td>
           <td><PromotionBadge role={role} /></td>
@@ -191,7 +192,7 @@ export function OperationsRoleDemandPage(): React.ReactElement {
           <tbody>{detail.colleges.map((college, index) => <tr key={`${college.label}:${index}`}>
             <th scope="row">{college.label}</th>
             <td><NaValue value={formatPeople(college.students, college.complementary)} /></td>
-            <td>{college.departments ? <CellList cells={college.departments} empty={NA} /> : 'Not shown for a withheld count'}</td>
+            <td>{college.departments ? <CellList cells={college.departments} empty="No departments recorded" /> : 'Not shown for a withheld count'}</td>
           </tr>)}</tbody></table></div>
       </> : null}
     </section> : null}

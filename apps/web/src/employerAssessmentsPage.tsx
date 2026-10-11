@@ -550,9 +550,9 @@ function ResultsPanel({ employerId, assessmentId }: { readonly employerId: strin
     {results && results.length > 0 ? <div className="role-record-table-wrap"><table className="role-record-table">
       <thead><tr><th>Candidate</th><th>State</th><th>Score</th><th>Submitted</th><th>Ended</th></tr></thead>
       <tbody>{results.map((result) => <tr key={result.invitationId}>
-        <td>{result.candidateName ?? result.candidateEmail ?? 'NA'}</td>
+        <td>{result.candidateName ?? result.candidateEmail ?? 'Candidate'}</td>
         <td><span className={`hiring-state state-${result.state.toLowerCase()}`}>{result.state.toLowerCase()}</span></td>
-        <td>{result.percentage === null ? <span className="hiring-meta">NA</span> : `${result.percentage}%`}
+        <td>{result.percentage === null ? <span className="hiring-meta">No score yet</span> : `${result.percentage}%`}
           {result.score !== null ? <><br /><span className="hiring-meta">{result.score} / {result.maxScore}</span></> : null}</td>
         <td>{result.submittedAt ? formatDate(result.submittedAt) : <span className="hiring-meta">Not yet</span>}</td>
         <td>{result.endedBy === 'TIME_LIMIT' ? 'Time ran out' : result.endedBy === 'CANDIDATE' ? 'Submitted by candidate'
@@ -601,7 +601,7 @@ export function EmployerCandidateAssessmentsPanel({ employerId, applicationId }:
         {' '}· window {formatDateTime(item.opensAt)} – {formatDateTime(item.closesAt)}
         {' '}· {Math.round(item.durationSeconds / 60)} min
       </p>
-      <p>{item.percentage === null ? 'Score: NA' : `Score: ${item.percentage}% (${item.score} / ${item.maxScore})`}
+      <p>{item.percentage === null ? 'No score yet' : `Score: ${item.percentage}% (${item.score} / ${item.maxScore})`}
         {item.endedBy === 'TIME_LIMIT' ? ' · time ran out' : item.endedBy === 'CANDIDATE' ? ' · submitted by the candidate' : ''}</p>
       {item.questions.length > 0 ? <table className="role-record-table">
         <thead><tr><th>#</th><th>Question</th><th>Marks</th><th>Answered</th></tr></thead>

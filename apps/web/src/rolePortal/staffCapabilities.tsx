@@ -87,10 +87,10 @@ export function OperationsStaffCapabilitiesPage(): React.ReactElement {
   return <section className="role-module role-module--dense">
     {heading}
     <div className="v2-row v2-cols-4 career-stat-strip role-wide">
-      <V2Stat icon="👥" tone="teal" value={directory ? staff.length : 'NA'} label="Staff memberships" />
-      <V2Stat icon="✅" tone="blue" value={directory ? staff.filter((member) => member.state === 'ACTIVE').length : 'NA'} label="Active" />
-      <V2Stat icon="🔑" tone="purple" value={directory ? liveGrants : 'NA'} label="Live explicit grants" />
-      <V2Stat icon="⚠️" tone="amber" value={directory ? highRiskGrants : 'NA'} label="High-risk grants" />
+      <V2Stat icon="👥" tone="teal" value={directory ? staff.length : undefined} label="Staff memberships" />
+      <V2Stat icon="✅" tone="blue" value={directory ? staff.filter((member) => member.state === 'ACTIVE').length : undefined} label="Active" />
+      <V2Stat icon="🔑" tone="purple" value={directory ? liveGrants : undefined} label="Live explicit grants" />
+      <V2Stat icon="⚠️" tone="amber" value={directory ? highRiskGrants : undefined} label="High-risk grants" />
     </div>
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {notice ? <p role="status">{notice}</p> : null}

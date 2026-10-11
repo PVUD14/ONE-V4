@@ -24,9 +24,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -351,6 +353,8 @@ private fun MainScaffold(
     val context = LocalContext.current
     val palette = pro.ai8ht.one.ui.LocalOnePalette.current
     var screen by remember { mutableStateOf(Screen.Home) }
+    // The lesson "Resume lesson" asked for; Learning scrolls to it and marks it.
+    var focusLesson by remember { mutableStateOf<String?>(null) }
     var data by remember { mutableStateOf<StudentData?>(null) }
     var loadError by remember { mutableStateOf(false) }
     var reloadKey by remember { mutableIntStateOf(0) }
@@ -583,12 +587,13 @@ private fun MainScaffold(
                                 onInbox = { showInbox = true },
                                 onChat = { showChat = true },
                                 onSection = { moreDest = it },
+                                onOpenLesson = { focusLesson = it; screen = Screen.Learning },
                             )
                             Screen.Assessments -> AssessmentsScreen(
                                 data!!.assessments,
                                 onOpenReadiness = { readinessOpen = true },
                             )
-                            Screen.Learning -> LearningScreen(data!!.learner, onChanged = { reloadKey += 1 }, onOpenCareer = { moreDest = MoreDest.Target })
+                            Screen.Learning -> LearningScreen(data!!.learner, onChanged = { reloadKey += 1 }, onOpenCareer = { moreDest = MoreDest.Target }, focusLessonId = focusLesson)
                             Screen.Jobs -> JobsScreen()
                             Screen.More -> MoreMenuScreen(data!!.student, avatarVersion, onOpen = { moreDest = it }, onSignOut = onSignOut)
                         }
@@ -944,7 +949,7 @@ private fun AssessmentCard(exam: AssessmentDto) {
 // --- Learning -----------------------------------------------------------------
 
 @Composable
-private fun LearningScreen(learner: LearnerStateDto?, onChanged: () -> Unit, onOpenCareer: () -> Unit) {
+private fun LearningScreen(learner: LearnerStateDto?, onChanged: () -> Unit, onOpenCareer: () -> Unit, focusLessonId: String? = null) {
     val context = LocalContext.current
     val palette = pro.ai8ht.one.ui.LocalOnePalette.current
     val scope = rememberCoroutineScope()
@@ -977,8 +982,15 @@ private fun LearningScreen(learner: LearnerStateDto?, onChanged: () -> Unit, onO
     val done = learner.progress.filter { it.state == "COMPLETED" }.map { it.lessonVersionId }.toSet()
     val allLessons = learner.catalog.modules.flatMap { it.lessons }
     val doneCount = allLessons.count { done.contains(it.id) }
+    // "Resume lesson": scroll to the module holding the asked-for lesson (plan, progress and the
+    // optional language card come first), and mark that lesson's row.
+    val listState = rememberLazyListState()
+    val focusModule = focusLessonId?.let { id -> learner.catalog.modules.indexOfFirst { module -> module.lessons.any { it.id == id } } } ?: -1
+    LaunchedEffect(focusLessonId, focusModule) {
+        if (focusModule >= 0) listState.scrollToItem(2 + (if (learner.lessonLanguage != null) 1 else 0) + focusModule)
+    }
 
-    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
+    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 18.dp), state = listState) {
         item { LearningPlanSection(onOpenCareer) }
         item {
             Spacer(Modifier.height(10.dp))
@@ -1040,7 +1052,13 @@ private fun LearningScreen(learner: LearnerStateDto?, onChanged: () -> Unit, onO
                     Spacer(Modifier.height(6.dp))
                     module.lessons.forEach { lesson ->
                         val isDone = done.contains(lesson.id)
-                        Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        val focused = lesson.id == focusLessonId
+                        Row(
+                            Modifier.fillMaxWidth()
+                                .then(if (focused) Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(10.dp)).padding(horizontal = 8.dp) else Modifier)
+                                .padding(vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
                             Icon(
                                 if (isDone) Icons.Filled.CheckCircle else Icons.Outlined.Circle,
                                 contentDescription = null,

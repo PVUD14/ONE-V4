@@ -7,7 +7,7 @@
  * and — before they answer — exactly what opting in would share with the employer (the same
  * preview as applying, EMP-07). Opting in is applying, with that reviewed snapshot; declining is
  * recorded and never shown to the employer, and the college sees only "not opted in". Withdrawing
- * the application later withdraws the consent. Nothing is invented: a missing date reads NA.
+ * the application later withdraws the consent. Nothing is invented: a missing date is left out or reads "Not set".
  */
 import { useEffect, useState } from 'react';
 import { getAccessToken } from './auth.js';
@@ -40,10 +40,11 @@ function messageFor(error: unknown, fallback: string): string {
   if (error instanceof ApiRequestError && error.code && nominationErrors[error.code]) return nominationErrors[error.code]!;
   return fallback;
 }
-function formatWhen(value: string | null | undefined): string {
-  if (!value) return 'NA';
+/** A date and time in words, or null when none is recorded. */
+function formatWhen(value: string | null | undefined): string | null {
+  if (!value) return null;
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? 'NA' : formatDateTime(date);
+  return Number.isNaN(date.getTime()) ? null : formatDateTime(date);
 }
 
 export function StudentNominationsCard({ onChanged }: { readonly onChanged?: () => void }): React.ReactElement | null {
@@ -116,9 +117,9 @@ export function StudentNominationsCard({ onChanged }: { readonly onChanged?: () 
       {(nominations ?? []).map((nomination) => <li key={nomination.id} className="hiring-list-item">
         <div>
           <h3>{nomination.opportunity.title ?? 'Untitled role'} · {nomination.opportunity.employerName}</h3>
-          <p className="hiring-meta">Nominated by {nomination.nominatedBy.label}, {nomination.institutionName} · {formatWhen(nomination.nominatedAt)}</p>
+          <p className="hiring-meta">Nominated by {nomination.nominatedBy.label}, {nomination.institutionName}{formatWhen(nomination.nominatedAt) ? ` · ${formatWhen(nomination.nominatedAt)}` : ''}</p>
           <p className="hiring-meta">Why: {reasonWords[nomination.reasonCode] ?? 'Chosen by your placement office'}{nomination.note ? ` · "${nomination.note}"` : ''}</p>
-          <p className="hiring-meta">Drive: {formatWhen(nomination.drive.scheduledStartAt)}{nomination.drive.venueMode ? ` · ${venueModeLabels[nomination.drive.venueMode]}` : ''} · applications close {formatWhen(nomination.opportunity.applicationDeadline)}</p>
+          <p className="hiring-meta">Drive: {formatWhen(nomination.drive.scheduledStartAt) ?? 'Date not set'}{nomination.drive.venueMode ? ` · ${venueModeLabels[nomination.drive.venueMode]}` : ''}{formatWhen(nomination.opportunity.applicationDeadline) ? ` · applications close ${formatWhen(nomination.opportunity.applicationDeadline)}` : ''}</p>
           {nomination.blocksYou ? <p className="hiring-tag warn">Your college's one-offer policy stops you applying through this drive, because you already hold an accepted offer.</p> : null}
           {nomination.alreadyApplied ? <p className="hiring-tag">You have already applied to this role yourself.</p> : null}
         </div>

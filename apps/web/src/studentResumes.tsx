@@ -80,7 +80,7 @@ export function ResumePaper({ content, template, compact = false }: { readonly c
   const muted = { color: '#4b5563', fontSize: size - 1.5 } as const;
   return <article aria-label="Résumé preview" style={{ background: '#fff', color: '#111827', border: '1px solid var(--p-line)', borderRadius: 10, overflow: 'hidden', fontSize: size, lineHeight: 1.45, boxShadow: '0 1px 2px rgba(15,23,42,.06)' }}>
     <header style={{ padding: compact ? '14px 16px 10px' : '22px 26px 14px', background: style.band ? '#1e3a8a' : 'transparent', color: style.band ? '#fff' : '#111827', textAlign: style.centre ? 'center' : 'left', borderBottom: style.centre ? '1px solid #9ca3af' : 'none' }}>
-      <div style={{ fontSize: size + 9, fontWeight: 800 }}>{content.header.fullName ?? 'NA'}</div>
+      {content.header.fullName ? <div style={{ fontSize: size + 9, fontWeight: 800 }}>{content.header.fullName}</div> : null}
       {content.header.headline ? <div style={{ fontSize: size + 0.5, opacity: 0.9 }}>{content.header.headline}</div> : null}
       {contact ? <div style={{ fontSize: size - 1.5, marginTop: 4, color: style.band ? '#dbeafe' : '#4b5563', overflowWrap: 'anywhere' }}>{contact}</div> : null}
     </header>
@@ -238,7 +238,7 @@ export function ResumeBuilder({ token, sources, templates, initial, resumeId, on
       </section>
 
       <section className="pilot-card">
-        <div className="pilot-card-head"><h2>Education</h2><span className="pilot-chip slate">{sources.qualifications.length || 'NA'}</span></div>
+        <div className="pilot-card-head"><h2>Education</h2>{sources.qualifications.length ? <span className="pilot-chip slate">{sources.qualifications.length}</span> : null}</div>
         {sources.qualifications.length ? sources.qualifications.map((q) => <div key={q.id}>
           {check(draft.qualificationIds.includes(q.id), () => toggle('qualificationIds', q.id),
             <><strong>{q.title}</strong><br /><small style={{ color: 'var(--p-muted)' }}>{[q.institution, q.period].filter(Boolean).join(' · ')}</small></>, verificationChip(q.verification, q.verified))}
@@ -251,7 +251,7 @@ export function ResumeBuilder({ token, sources, templates, initial, resumeId, on
       <section className="pilot-card">
         <div className="pilot-card-head"><h2>Skills</h2></div>
         {sources.skills.length ? sources.skills.map((s) => <div key={s.topicId}>{check(draft.skillTopicIds.includes(s.topicId), () => toggle('skillTopicIds', s.topicId), <><strong>{s.name}</strong><br /><small style={{ color: 'var(--p-muted)' }}>{s.basis}</small></>)}</div>)
-          : <p style={{ color: 'var(--p-muted)', margin: '0 0 8px' }}>No skills shown in graded work yet — NA. They appear here once your skill checks show them.</p>}
+          : <p style={{ color: 'var(--p-muted)', margin: '0 0 8px' }}>No skills shown in graded work yet. They appear here once your skill checks show them.</p>}
         <label className="pilot-field"><span>Self-declared skills (comma-separated)</span><input value={skillsText} onChange={(event) => setSkillsText(event.target.value)} /></label>
       </section>
 
@@ -271,7 +271,7 @@ export function ResumeBuilder({ token, sources, templates, initial, resumeId, on
       <section className="pilot-card">
         <div className="pilot-card-head"><h2>Certificates, objective and languages</h2></div>
         {sources.certificates.length ? sources.certificates.map((c) => <div key={c.id}>{check(draft.certificateIds.includes(c.id), () => toggle('certificateIds', c.id), <strong>{c.title}</strong>, verificationChip(c.verification, false))}</div>)
-          : <p style={{ color: 'var(--p-muted)', margin: '0 0 6px' }}>No certificate documents — NA.</p>}
+          : <p style={{ color: 'var(--p-muted)', margin: '0 0 6px' }}>No certificate documents yet.</p>}
         {sources.careerTargets.map((t) => <div key={t.id}>{check(draft.careerTargetIds.includes(t.id), () => toggle('careerTargetIds', t.id), <>Career objective: <strong>{t.roleTitle}</strong></>)}</div>)}
         <label className="pilot-field"><span>Languages you speak (comma-separated)</span><input value={languagesText} onChange={(event) => setLanguagesText(event.target.value)} /></label>
       </section>

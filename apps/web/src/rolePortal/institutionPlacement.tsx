@@ -41,10 +41,10 @@ export function InstitutionPlacementPage({ authenticatedWorkspace }: { readonly 
       {pipeline.error ? <p className="form-error" role="alert">{pipeline.error}</p> : null}
       {!data && !pipeline.error ? <p role="status">Loading placement status…</p> : null}
       <Kpis items={[
-        ['Students sharing applications', data ? suppressedCountLabel(data.studentsSharing) : 'NA', 'blue', 'applications'],
-        ['In process', data?.placementStatus ? (data.placementStatus.suppressed ? SMALL_COUNT_TEXT : suppressedCountLabel(statusCell('IN_PROCESS'))) : 'NA', 'indigo', 'opportunities'],
-        ['With an offer', data?.placementStatus ? (data.placementStatus.suppressed ? SMALL_COUNT_TEXT : suppressedCountLabel(statusCell('OFFER'))) : 'NA', 'amber', 'offers'],
-        ['Accepted an offer', data?.placementStatus ? (data.placementStatus.suppressed ? SMALL_COUNT_TEXT : suppressedCountLabel(statusCell('ACCEPTED'))) : 'NA', 'green', 'offers'],
+        ['Students sharing applications', data ? suppressedCountLabel(data.studentsSharing) : null, 'blue', 'applications'],
+        ['In process', data?.placementStatus ? (data.placementStatus.suppressed ? SMALL_COUNT_TEXT : suppressedCountLabel(statusCell('IN_PROCESS'))) : null, 'indigo', 'opportunities'],
+        ['With an offer', data?.placementStatus ? (data.placementStatus.suppressed ? SMALL_COUNT_TEXT : suppressedCountLabel(statusCell('OFFER'))) : null, 'amber', 'offers'],
+        ['Accepted an offer', data?.placementStatus ? (data.placementStatus.suppressed ? SMALL_COUNT_TEXT : suppressedCountLabel(statusCell('ACCEPTED'))) : null, 'green', 'offers'],
       ]} />
       <div className="pilot-row cols-2">
         <section className="pilot-card">
@@ -121,10 +121,10 @@ export function PlacementStatusList({ token, institutionId }: { readonly token: 
       <thead><tr><th scope="col">Student</th><th scope="col">Department</th><th scope="col">Batch</th><th scope="col">Placement status</th><th scope="col">Shared</th><th scope="col">Last shared update</th><th scope="col">Applications</th></tr></thead>
       <tbody>{rows.map((row) => <tr key={row.studentUserId} className="role-record-row">
         <th scope="row"><strong>{row.fullName}</strong><span>{row.institutionStudentId}</span></th>
-        <td>{row.department ?? 'NA'}</td><td>{row.batch ?? 'NA'}</td>
+        <td>{row.department ?? 'No department'}</td><td>{row.batch ?? 'No batch'}</td>
         <td><PlacementStatusChip status={row.status} /></td>
         <td>{row.sharedApplications} on ONE{row.sharedExternalDeclarations ? ` · ${row.sharedExternalDeclarations} declared elsewhere` : ''}</td>
-        <td>{row.lastSharedActivityAt?.slice(0, 10) ?? 'NA'}</td>
+        <td>{row.lastSharedActivityAt?.slice(0, 10) ?? 'Never'}</td>
         <td>{row.sharedApplications || row.sharedExternalDeclarations
           ? <button type="button" className="secondary" aria-label={'View shared applications for ' + row.fullName} onClick={() => setSelected(row)}>View shared applications</button>
           : 'Not shared'}</td>

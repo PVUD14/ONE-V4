@@ -75,7 +75,9 @@ describe('admin Placement', () => {
     const raviRow = within(list).getByRole('row', { name: /Ravi Local/ });
     expect(within(raviRow).getByText('Nothing shared')).toBeInTheDocument();
     expect(within(raviRow).getByText('Not shared')).toBeInTheDocument();
-    expect(within(raviRow).getAllByText('NA')).toHaveLength(2);   // no batch, no shared update
+    expect(within(raviRow).getByText('No batch')).toBeInTheDocument();
+    expect(within(raviRow).getByText('Never')).toBeInTheDocument();   // no shared update
+    expect(within(raviRow).queryByText('NA')).not.toBeInTheDocument();
     expect(document.body.textContent).toContain('<5');
     expect(screen.queryByText(/^not applied$/i)).not.toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/compensation|salary|stipend|CTC/i);
@@ -114,13 +116,14 @@ describe('admin Placement', () => {
     expect(screen.queryByRole('button', { name: 'Load more students' })).not.toBeInTheDocument();
   });
 
-  it('shows NA and a safe forbidden message, never the upstream text', async () => {
+  it('hides the figures and shows a safe forbidden message, never the upstream text', async () => {
     routes({ [`${base}/placement-pipeline`]: 'FORBIDDEN', [`${base}/placement-status`]: 'FORBIDDEN' });
     open('institution-admin', 'Placement', 'INSTITUTION_ADMIN');
     const alerts = await screen.findAllByRole('alert');
     expect(alerts[0]).toHaveTextContent('You do not have permission to view this.');
     expect(document.body.textContent).not.toContain('upstream private detail');
-    expect(screen.getAllByText('NA').length).toBeGreaterThan(3);
+    expect(document.querySelectorAll('.pilot-kpi')).toHaveLength(0);
+    expect(screen.queryByText('NA')).not.toBeInTheDocument();
   });
 
   it('shows an honest empty list when nobody is in scope', async () => {

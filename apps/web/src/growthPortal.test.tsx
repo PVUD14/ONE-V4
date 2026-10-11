@@ -129,7 +129,7 @@ describe('a growth executive signing in', () => {
     // Commission never shows an amount: rates are not set.
     fireEvent.click(within(sidebar).getByRole('button', { name: 'Commission' }));
     expect(await screen.findByRole('heading', { name: 'Credit and commission' })).toBeInTheDocument();
-    expect(screen.getByText(/no amount is shown/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/no amount is shown/i)[0]).toBeInTheDocument();
     expect(screen.queryByText(/INR|Rs\./)).not.toBeInTheDocument();
   });
 
@@ -179,7 +179,7 @@ describe('a growth manager signing in', () => {
 describe('Growth → Territory (GROWTH-02)', () => {
   const since = new Date(Date.now() - 86_400_000).toISOString();
 
-  it('shows an executive the regions they work, the areas, and the region managers, with unowned leads NA', async () => {
+  it('shows an executive the regions they work, the areas, and the region managers, with no unowned-leads tile until it has a source', async () => {
     territoryResponse = {
       role: 'GROWTH_EXECUTIVE', correlationId: 'corr-territory',
       regions: [{
@@ -200,9 +200,9 @@ describe('Growth → Territory (GROWTH-02)', () => {
     const stats = screen.getByLabelText('Territory summary');
     expect(within(stats).getAllByText('1')).toHaveLength(2); // one region, one manager
     expect(within(stats).getByText('2')).toBeInTheDocument(); // two areas
-    // The unowned-lead count has no source yet: NA in its slot, never a number.
-    expect(within(stats).getAllByText('NA')).toHaveLength(1);
-    expect(within(stats).getByText('Unowned leads')).toBeInTheDocument();
+    // The unowned-lead count has no source yet: its tile is hidden, never NA and never a number.
+    expect(within(stats).queryByText('NA')).toBeNull();
+    expect(within(stats).queryByText('Unowned leads')).toBeNull();
     expect(screen.queryByText(/Territory is not built yet/i)).not.toBeInTheDocument();
   });
 

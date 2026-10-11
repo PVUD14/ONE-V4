@@ -25,9 +25,9 @@ import { StatusBadge } from '../studentComponents.js';
 import { formatApiError } from './shared.js';
 import { SupportCode } from '../supportCode.js';
 import * as dates from '../dates.js';
+import { MISSING_TEXT } from '../labels.js';
 
 const noteLimit = 500;
-const NA = 'NA';
 
 const statusLabel: Readonly<Record<AccessReviewScheduleStatus, string>> = {
   NEVER_REVIEWED: 'Never reviewed',
@@ -44,13 +44,13 @@ const refusalText: Readonly<Record<string, string>> = {
   ACCESS_REVIEW_NOT_OPEN: 'Review closed.',
 };
 
-const formatDate = (value: string | null | undefined): string => (value ? dates.formatDate(value) : NA);
-const formatDateTime = (value: string | null | undefined): string => (value ? dates.formatDateTime(value) : NA);
+const formatDate = (value: string | null | undefined): string => (value ? dates.formatDate(value) : MISSING_TEXT);
+const formatDateTime = (value: string | null | undefined): string => (value ? dates.formatDateTime(value) : MISSING_TEXT);
 
 /** What the item grants, in words: a role with its capability set, or one capability. */
 export function describeAccessReviewItem(item: AccessReviewItemDto): string {
   if (item.kind === 'PLATFORM_ROLE') return `Role ${item.role} (${item.capabilities.length} capabilities)`;
-  return `${item.capability ?? NA} on ${item.role}`;
+  return item.capability ? `${item.capability} on ${item.role}` : `A capability on ${item.role} (not recorded)`;
 }
 
 function overdueSentence(summary: AccessReviewOverviewDto['summary']): string | null {
@@ -135,10 +135,10 @@ export function OperationsAccessReviewsPage(): React.ReactElement | null {
   return <section className="role-module role-module--dense">
     {heading}
     <div className="v2-row v2-cols-4 career-stat-strip role-wide">
-      <V2Stat icon="🛡️" tone={summary?.overdue ? 'amber' : 'teal'} value={summary ? statusLabel[summary.status] : NA} label="Review status" />
-      <V2Stat icon="✅" tone="blue" value={summary?.lastClosed ? `${summary.lastClosed.periodLabel} · ${formatDate(summary.lastClosed.closedAt)}` : NA} label="Last completed review" />
-      <V2Stat icon="📅" tone="purple" value={summary ? (summary.nextDueAt ? formatDate(summary.nextDueAt) : 'Now') : NA} label="Next review due" />
-      <V2Stat icon="📋" tone="green" value={summary ? (open ? `${open.counts.decided} / ${open.itemCount}` : 'None open') : NA} label="Open review decided" />
+      <V2Stat icon="🛡️" tone={summary?.overdue ? 'amber' : 'teal'} value={summary ? statusLabel[summary.status] : undefined} label="Review status" />
+      <V2Stat icon="✅" tone="blue" value={summary?.lastClosed ? `${summary.lastClosed.periodLabel} · ${formatDate(summary.lastClosed.closedAt)}` : undefined} label="Last completed review" />
+      <V2Stat icon="📅" tone="purple" value={summary ? (summary.nextDueAt ? formatDate(summary.nextDueAt) : 'Now') : undefined} label="Next review due" />
+      <V2Stat icon="📋" tone="green" value={summary ? (open ? `${open.counts.decided} / ${open.itemCount}` : 'None open') : undefined} label="Open review decided" />
     </div>
     {overdue ? <p className="form-error role-wide" role="alert">{overdue}</p> : null}
     {summary?.soloSafeguardActive ? <p className="role-wide">Only one person can review right now, so they may keep their own access {overview?.policy.soloCoolingOffMinutes ?? 15} minutes after a review opens. Each such decision is marked SOLO in the review, the audit log and the export; this switches off by itself when a second reviewer exists.</p> : null}
@@ -170,11 +170,11 @@ export function OperationsAccessReviewsPage(): React.ReactElement | null {
           <td>{item.subject.email}{item.subject.isSelf ? <><br /><small>You</small></> : null}<br /><small>{item.organizationName}</small></td>
           <td><strong>{describeAccessReviewItem(item)}</strong>{item.highRisk ? <><br /><StatusBadge label="High risk" tone="warning" /></> : null}
             {item.kind === 'PLATFORM_ROLE' && item.capabilities.length ? <><br /><small>{item.capabilities.join(', ')}</small></> : null}</td>
-          <td>By {item.grantedBy?.email ?? NA}<br /><small>{formatDate(item.grantedAt)}{item.grantReasonCode ? ` · ${item.grantReasonCode}` : ''}</small></td>
+          <td>{item.grantedBy ? <>By {item.grantedBy.email}<br /></> : null}<small>{formatDate(item.grantedAt)}{item.grantReasonCode ? ` · ${item.grantReasonCode}` : ''}</small></td>
           <td>{item.decision
             ? <><StatusBadge label={item.decision} tone={item.decision === 'KEEP' ? 'success' : 'danger'} /> {item.decisionReasonCode}
               {item.mode === 'SOLO' ? <><br /><StatusBadge label="SOLO" tone="warning" /></> : null}
-              <br /><small>{item.decidedBy?.email ?? NA} · {formatDateTime(item.decidedAt)}</small>
+              {item.decidedBy || item.decidedAt ? <><br /><small>{[item.decidedBy?.email, item.decidedAt ? formatDateTime(item.decidedAt) : null].filter(Boolean).join(' · ')}</small></> : null}
               {item.revocationOutcome === 'APPLIED' ? <><br /><small>Access removed.</small></> : null}
               {item.revocationOutcome === 'ALREADY_ENDED' ? <><br /><small>Access had already ended.</small></> : null}</>
             : 'Not yet decided'}</td>
@@ -195,7 +195,7 @@ export function OperationsAccessReviewsPage(): React.ReactElement | null {
           <td>{campaign.periodLabel}</td>
           <td><StatusBadge label={campaign.state} tone={campaign.state === 'CLOSED' ? 'success' : 'info'} /></td>
           <td>{campaign.openedBy.email}<br /><small>{formatDateTime(campaign.openedAt)}</small></td>
-          <td>{campaign.closedBy ? <>{campaign.closedBy.email}<br /><small>{formatDateTime(campaign.closedAt)}</small></> : NA}</td>
+          <td>{campaign.closedBy ? <>{campaign.closedBy.email}<br /><small>{formatDateTime(campaign.closedAt)}</small></> : 'Not closed'}</td>
           <td>{campaign.itemCount}</td>
           <td>{campaign.counts.kept} kept · {campaign.counts.revoked} revoked{campaign.counts.solo ? ` · ${campaign.counts.solo} solo` : ''}</td>
           <td><button type="button" className="secondary" onClick={() => setExporting(campaign)}>Export CSV…</button></td>
@@ -213,7 +213,7 @@ export function OperationsAccessReviewsPage(): React.ReactElement | null {
       reasons={reasons.decision[deciding.decision]} withNote confirmLabel={deciding.decision === 'KEEP' ? 'Confirm keep' : 'Revoke now'}
       details={[
         ['Access', describeAccessReviewItem(deciding.item)],
-        ['Granted', `By ${deciding.item.grantedBy?.email ?? NA} on ${formatDate(deciding.item.grantedAt)}`],
+        ['Granted', deciding.item.grantedBy ? `By ${deciding.item.grantedBy.email} on ${formatDate(deciding.item.grantedAt)}` : `On ${formatDate(deciding.item.grantedAt)}`],
         ...(deciding.decision === 'REVOKE' ? [['Effect', deciding.item.kind === 'PLATFORM_ROLE'
           ? 'The staff membership is suspended now and its capability grants are revoked. This is recorded in the audit log with this review.'
           : 'The grant is revoked now. This is recorded in the audit log with this review.'] as const] : []),

@@ -2,7 +2,7 @@
  * Operations college health (Analytics) and college account fields (Organization Detail),
  * OPS-14: the health table renders the server's figures with <5 and "Withheld" exactly
  * where the server suppressed, sorts by activity without ranking suppressed colleges by
- * size, opens a college's view with bands only and an NA movement slot; the account panel
+ * size, opens a college's view with bands only and no band-movement figure; the account panel
  * shows masked contacts, needs a reason code for every change and reveal, and every screen
  * has honest loading, empty, error and forbidden states. Navigation labels are unchanged.
  */
@@ -127,7 +127,7 @@ describe('college health on Analytics', () => {
     const alpha = within(rows[0]!).getAllByRole('cell').map((cell) => cell.textContent);
     expect(alpha.slice(1, 8)).toEqual(['30 Nov 2026', 'Withheld', '10', '<5', '6', '5 of Withheld', '2 (1 overdue)']);
     const beta = within(rows[1]!).getAllByRole('cell').map((cell) => cell.textContent);
-    expect(beta.slice(1, 7)).toEqual(['NA', '<5', '<5', '<5', '<5', '<5 of <5']);
+    expect(beta.slice(1, 7)).toEqual(['Not set', '<5', '<5', '<5', '<5', '<5 of <5']);
     expect(screen.getByText('Renewing within 90 days').parentElement).toHaveTextContent('1');
     expect(screen.getByText(/last complete week/)).toBeInTheDocument();
   });
@@ -141,7 +141,7 @@ describe('college health on Analytics', () => {
     expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/analytics/colleges'))).toHaveLength(1);
   });
 
-  it('opens a college: trend, assessments, bands only, and NA for band movement', async () => {
+  it('opens a college: trend, assessments, bands only, and no figure for band movement', async () => {
     render(<OperationsCollegeHealthPanel />);
     fireEvent.click(await screen.findByRole('button', { name: 'Health of Alpha College' }));
     const section = await screen.findByRole('region', { name: 'College health detail' });
@@ -152,7 +152,8 @@ describe('college health on Analytics', () => {
     expect(within(section).getByText('Developing').nextSibling).toHaveTextContent('5');
     expect(within(section).getByText('Progressing').nextSibling).toHaveTextContent('<5');
     expect(within(section).getByText('Students with an update').nextSibling).toHaveTextContent('Withheld');
-    expect(within(section).getByText(/Readiness band movement: NA/)).toBeInTheDocument();
+    expect(within(section).getByText(/Readiness band movement is not shown/)).toBeInTheDocument();
+    expect(section.textContent).not.toMatch(/\bNA\b/);
     expect(within(section).getByText(/7 attempts by 6 students/)).toBeInTheDocument();
     expect(section.textContent).not.toMatch(/%|score/i);
     expect(String(fetchMock.mock.calls.at(-1)?.[0])).toContain(`/analytics/colleges/${alphaId}`);
@@ -164,12 +165,13 @@ describe('college health on Analytics', () => {
     expect(await screen.findByText('No colleges yet')).toBeInTheDocument();
   });
 
-  it('shows an error with its reference and NA in every stat slot', async () => {
+  it('shows an error with its reference and hides every stat tile', async () => {
     listResponse = () => failure(500, 'COLLEGE_HEALTH_UNAVAILABLE', 'corr-broken');
     render(<OperationsCollegeHealthPanel />);
     expect(await screen.findByRole('alert')).toHaveTextContent('Support code: corrbrok');
-    expect(screen.getByText('Colleges in ONE').parentElement).toHaveTextContent('NA');
-    expect(screen.getByText('Open support cases').parentElement).toHaveTextContent('NA');
+    expect(screen.queryByText('Colleges in ONE')).not.toBeInTheDocument();
+    expect(screen.queryByText('Open support cases')).not.toBeInTheDocument();
+    expect(screen.queryByText('NA')).not.toBeInTheDocument();
   });
 
   it('shows the forbidden state with its reference, and loading first', async () => {
@@ -190,7 +192,7 @@ describe('college health on Analytics', () => {
   });
 
   it('formats counts exactly as the server suppressed them', () => {
-    expect(formatCollegePeople(undefined)).toBe('NA');
+    expect(formatCollegePeople(undefined)).toBeNull();
     expect(formatCollegePeople(suppressed)).toBe('<5');
     expect(formatCollegePeople(shown(1200))).toBe('1,200');
     expect(formatSplitTotal({ total: suppressed, yes: suppressed, no: suppressed })).toBe('<5');
@@ -219,15 +221,15 @@ describe('college account fields on Organization Detail', () => {
     expect(panel.textContent).not.toContain('meera.iyer@alpha.edu');
   });
 
-  it('shows NA for a college with no account yet', async () => {
+  it('shows Not set for a college with no account yet', async () => {
     accountResponse = () => ok(account({ account: null, contacts: [] }));
     render(<OperationsCollegeAccountPanel />);
     const select = await screen.findByLabelText('College');
     await within(select).findByText('Alpha College');
     fireEvent.change(select, { target: { value: alphaId } });
     expect(await screen.findByText('No contacts recorded for this college.')).toBeInTheDocument();
-    expect(screen.getByText('Renewal date').nextSibling).toHaveTextContent('NA');
-    expect(screen.getByText('Contract reference').nextSibling).toHaveTextContent('NA');
+    expect(screen.getByText('Renewal date').nextSibling).toHaveTextContent('Not set');
+    expect(screen.getByText('Contract reference').nextSibling).toHaveTextContent('Not set');
   });
 
   it('needs a reason code to save account fields and sends only what changed', async () => {

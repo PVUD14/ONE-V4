@@ -3,7 +3,7 @@
  * renders the server's incidents and counts, a breach shows its Board deadline labelled as the
  * plan's period pending legal confirmation and who recorded the Board report, every write dialog
  * needs a reason code, a notice can only be drafted from a published template version with no
- * free-text field, and loading / NA / empty / error / forbidden states are honest. Navigation
+ * free-text field, and loading / missing-source / empty / error / forbidden states are honest. Navigation
  * labels are unchanged.
  */
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -126,11 +126,12 @@ describe('incident register', () => {
     expect(await screen.findByText(basisText)).toBeInTheDocument();
   });
 
-  it('shows NA in the counts while nothing has loaded, then the loading state', () => {
+  it('shows no count tiles while nothing has loaded, then the loading state', () => {
     listResponse = () => new Promise(() => undefined);
     render(<OperationsIncidentRegisterPage />);
     expect(screen.getByText('Loading incidents…')).toBeInTheDocument();
-    expect(screen.getAllByText('NA').length).toBeGreaterThanOrEqual(4);
+    expect(screen.queryByText('Open incidents')).toBeNull();
+    expect(document.body.textContent).not.toMatch(/(^|[^A-Za-z])NA([^A-Za-z]|$)/);
   });
 
   it('says so plainly when the view is empty', async () => {
@@ -152,11 +153,11 @@ describe('incident register', () => {
     expect(screen.getByText('Support code: corrdeni')).toBeInTheDocument();
   });
 
-  it('shows NA for the clock of an incident that is not a breach', async () => {
+  it('says an incident that is not a breach has no Board clock', async () => {
     listResponse = () => ok(list([incident({ category: 'SERVICE_OUTAGE', breachClock: null })]));
     render(<OperationsIncidentRegisterPage />);
     const row = (await screen.findByText('INC-1A2B3C4D')).closest('tr')!;
-    expect(within(row).getByText('NA')).toBeInTheDocument();
+    expect(within(row).getByText('Not a breach')).toBeInTheDocument();
   });
 
   it('opens an incident with its deadline, who reported to the Board and when, and the notices sent', async () => {
@@ -233,7 +234,7 @@ describe('incident register', () => {
   it('formats the remaining time from the server seconds', () => {
     expect(formatRemaining(250_000)).toBe('69 h 26 min left');
     expect(formatRemaining(0)).toBe('Deadline passed');
-    expect(formatRemaining(null)).toBe('NA');
+    expect(formatRemaining(null)).toBeNull();
   });
 });
 

@@ -31,6 +31,7 @@ import {
 } from '../api.js';
 import { formatApiError } from './shared.js';
 import * as dates from '../dates.js';
+import { MISSING_TEXT } from '../labels.js';
 
 type Decision = 'ONBOARDED' | 'DECLINED' | 'SPAM';
 
@@ -48,9 +49,9 @@ const reasonLabels: Readonly<Record<string, string>> = {
 const decisionLabels: Readonly<Record<Decision, string>> = { ONBOARDED: 'Mark onboarded', DECLINED: 'Decline', SPAM: 'Mark as spam' };
 
 function formatDate(value: string | null): string {
-  if (!value) return 'NA';
+  if (!value) return MISSING_TEXT;
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? 'NA' : dates.formatDate(date);
+  return Number.isNaN(date.getTime()) ? MISSING_TEXT : dates.formatDate(date);
 }
 
 export function EmployerAccessRequestsSection({ organizations }: { readonly organizations: readonly OrganizationManagementDto[] }): React.ReactElement | null {

@@ -78,7 +78,7 @@ describe('published content on a learner page', () => {
     stub({ '/api/v1/learner-content': { items: [] } });
     await authenticate();
     const { container } = render(<PublishedContentCard contentType="PRACTICE" title="Practice resources" />);
-    // The page's own NA widgets already say there is nothing; an empty card would add noise.
+    // The page's own empty states already say there is nothing; an empty card would add noise.
     await waitFor(() => expect(container.firstChild).toBeNull());
   });
 

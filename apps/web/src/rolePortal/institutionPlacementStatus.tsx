@@ -17,14 +17,17 @@ const placementStatusTones: Readonly<Record<PlacementStatus, string>> = {
   NOT_SHARED: 'slate', APPLIED: 'blue', IN_PROCESS: 'indigo', OFFER: 'amber', ACCEPTED: 'green',
 };
 
-export function PlacementStatusChip({ status }: { readonly status: PlacementStatus }): React.ReactElement {
-  return <span className={`pilot-chip ${placementStatusTones[status] ?? 'slate'}`}>{placementStatusLabels[status] ?? 'NA'}</span>;
+/** A status the vocabulary does not know draws no chip (never "NA"). */
+export function PlacementStatusChip({ status }: { readonly status: PlacementStatus }): React.ReactElement | null {
+  const label = placementStatusLabels[status];
+  if (!label) return null;
+  return <span className={`pilot-chip ${placementStatusTones[status] ?? 'slate'}`}>{label}</span>;
 }
 
 /**
  * Placement status for a whole roster, keyed by student: every audited page, up to a cap.
  * Null while loading; an empty map with `failed` when the read is refused, so the roster
- * shows NA rather than an error in a column.
+ * shows a plain word rather than an error in a column.
  */
 export function useRosterPlacementStatus(token: string, institutionId: string, refresh: number): { readonly byStudent: ReadonlyMap<string, PlacementStatusRowDto> | null; readonly failed: boolean } {
   const [state, setState] = useState<{ readonly byStudent: ReadonlyMap<string, PlacementStatusRowDto> | null; readonly failed: boolean }>({ byStudent: null, failed: false });

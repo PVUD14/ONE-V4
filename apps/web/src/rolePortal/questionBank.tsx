@@ -11,7 +11,7 @@
  *
  * The server decides everything: capabilities, reason codes, who wrote a revision, and whether
  * this viewer may see answer keys (only Content Edit or Content Review). Difficulty is a band,
- * never a number. Missing values read NA.
+ * never a number. A missing value hides its row, or reads in plain words where a column must stay.
  */
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -42,10 +42,15 @@ import { AiDraftProvenance, AiDraftsCard, AnswerKeyCheck } from './contentFactor
 import { formatApiError } from './shared.js';
 import { SupportCode } from '../supportCode.js';
 import { formatDateTime } from '../dates.js';
-import { codeLabel } from '../labels.js';
+import { MISSING_TEXT, codeLabel } from '../labels.js';
 
 const label = (value: string): string => value.split('_').map((word) => word.charAt(0) + word.slice(1).toLowerCase()).join(' ');
-const when = (value: string | null | undefined): string => (value ? formatDateTime(value) : 'NA');
+const when = (value: string | null | undefined): string => (value ? formatDateTime(value) : MISSING_TEXT);
+/** " (v1, p2)" from the versions that are recorded; nothing when none is. */
+const versionsNote = (...versions: readonly (string | null | undefined)[]): string => {
+  const known = versions.filter((entry): entry is string => Boolean(entry));
+  return known.length ? ` (${known.join(', ')})` : '';
+};
 const statusText = (status: string): string => (status === 'LIVE' ? 'Live' : status === 'PENDING' ? 'Not yet published' : status === 'RETIRED' ? 'Retired' : status === 'ARCHIVED' ? 'Archived' : 'Unknown');
 const statusTone = (status: string): 'success' | 'warning' | 'neutral' | 'info' => (status === 'LIVE' ? 'success' : status === 'PENDING' ? 'warning' : 'neutral');
 const stateTone = (state: BankQuestionRevisionState): 'success' | 'warning' | 'neutral' | 'info' =>
@@ -129,10 +134,10 @@ export function OperationsQuestionBankPage(): React.ReactElement | null {
   return <section className="role-module role-module--dense" aria-label="Question bank">
     {heading}
     <div className="v2-row v2-cols-4 career-stat-strip role-wide">
-      <V2Stat icon="❓" tone="teal" value={summary ? summary.live : 'NA'} label="Live questions" />
-      <V2Stat icon="📝" tone="purple" value={summary ? summary.pending : 'NA'} label="Not yet published" />
-      <V2Stat icon="🔍" tone="amber" value={summary ? summary.awaitingReview : 'NA'} label="Awaiting review" />
-      <V2Stat icon="🚀" tone="blue" value={summary ? summary.awaitingPublish : 'NA'} label="Approved, awaiting publish" />
+      <V2Stat icon="❓" tone="teal" value={summary ? summary.live : null} label="Live questions" />
+      <V2Stat icon="📝" tone="purple" value={summary ? summary.pending : null} label="Not yet published" />
+      <V2Stat icon="🔍" tone="amber" value={summary ? summary.awaitingReview : null} label="Awaiting review" />
+      <V2Stat icon="🚀" tone="blue" value={summary ? summary.awaitingPublish : null} label="Approved, awaiting publish" />
     </div>
     {policy && !policy.viewer.answerKeys ? <p role="note">You hold Content Publish only, so answer keys, explanations and misconception tags are withheld from you. The reviewer who approved each question checked them.</p> : null}
     {error ? <p className="form-error" role="alert">{error}</p> : null}
@@ -153,12 +158,12 @@ export function OperationsQuestionBankPage(): React.ReactElement | null {
         <thead><tr><th>Key</th><th>Question</th><th>Skill</th><th>Status</th><th>Current version</th><th>Revision on its way</th><th>Difficulty</th><th>Tagged options</th><th>Hints</th><th>Actions</th></tr></thead>
         <tbody>{questions.map((question) => <tr key={question.questionId}>
           <td><strong>{question.stableKey}</strong>{question.aiDrafted ? <><br /><StatusBadge label="AI draft" tone="warning" /></> : null}</td>
-          <td>{question.promptExcerpt || 'NA'}</td>
-          <td>{question.topic ? question.topic.stableKey : 'NA'}</td>
+          <td>{question.promptExcerpt || 'Not written yet'}</td>
+          <td>{question.topic ? question.topic.stableKey : 'Not set'}</td>
           <td><StatusBadge label={statusText(question.status)} tone={statusTone(question.status)} /></td>
-          <td>{question.publishedVersion ? `Version ${question.publishedVersion}` : 'NA'}</td>
+          <td>{question.publishedVersion ? `Version ${question.publishedVersion}` : 'Not published'}</td>
           <td>{question.openRevision ? `Revision ${question.openRevision.revision} · ${label(question.openRevision.state)}` : 'None'}</td>
-          <td>{question.difficulty ? label(question.difficulty) : 'NA'}</td>
+          <td>{question.difficulty ? label(question.difficulty) : 'Not set'}</td>
           <td>{question.taggedOptionCount} of {question.optionCount}</td>
           <td>{question.hintsComplete ? 'All four written' : 'Incomplete'}</td>
           <td><button type="button" className="secondary" onClick={() => setSelectedId(question.questionId)}>Open {question.stableKey}</button></td>
@@ -214,8 +219,8 @@ function QuestionPanel({ token, questionId, policy, onChanged, onClose }: {
     <div className="role-section-title"><h2>{question.stableKey}</h2><button type="button" className="secondary" onClick={onClose}>Close question</button></div>
     <dl>
       <div><dt>Status</dt><dd><StatusBadge label={statusText(question.status)} tone={statusTone(question.status)} /></dd></div>
-      <div><dt>Skill</dt><dd>{question.topic ? `${question.topic.name} (${question.topic.stableKey}) · ${statusText(question.topic.status)}` : 'NA'}</dd></div>
-      <div><dt>Current version</dt><dd>{question.publishedVersion ?? 'NA'}</dd></div>
+      {question.topic ? <div><dt>Skill</dt><dd>{`${question.topic.name} (${question.topic.stableKey}) · ${statusText(question.topic.status)}`}</dd></div> : null}
+      {question.publishedVersion !== null && question.publishedVersion !== undefined ? <div><dt>Current version</dt><dd>{question.publishedVersion}</dd></div> : null}
       <div><dt>Published versions</dt><dd>{question.versions.length
         ? question.versions.map((entry) => `v${entry.version} ${entry.superseded ? '(replaced)' : '(in the readiness check)'} · ${when(entry.publishedAt)}`).join('; ')
         : 'None yet'}</dd></div>
@@ -266,7 +271,7 @@ function QuestionPanel({ token, questionId, policy, onChanged, onClose }: {
       onSubmit={async (reasonCode) => { apply((await startBankQuestionRevision(token, question.questionId, { reasonCode })).question, 'Revision started.'); setDialog(null); }} /> : null}
     {dialog?.kind === 'transition' ? <ReasonDialog title={transitionTitle(dialog.toState, dialog.revision.revision)}
       approvalNote={dialog.toState === 'APPROVED'
-        ? `Not required to approve. Approving also records your rights review of the ${dialog.revision.fields.licenceLabel ?? 'NA'} licence the author declared, and approves the hints and misconception tags with the question.`
+        ? `Not required to approve. Approving also records your rights review of the ${dialog.revision.fields.licenceLabel ? `${dialog.revision.fields.licenceLabel} ` : ''}licence the author declared, and approves the hints and misconception tags with the question.`
         : dialog.toState === 'IN_REVIEW' ? 'Not required: submitting records the hints and misconception tags for review with your reason.' : 'Not required: recorded with your reason.'}
       reasons={policy.reasons.transition[dialog.toState] ?? []}
       rightsReasons={dialog.toState === 'APPROVED' ? policy.reasons.rights : null}
@@ -286,7 +291,7 @@ function QuestionPanel({ token, questionId, policy, onChanged, onClose }: {
       title={`Publish revision ${dialog.revision.revision} of ${question.stableKey}`}
       details={[['Question', question.stableKey],
         ['Effect', question.status === 'LIVE'
-          ? `Replaces version ${question.publishedVersion ?? 'NA'} in the readiness check; attempts already holding it keep it.`
+          ? `Replaces ${question.publishedVersion ? `version ${question.publishedVersion}` : 'the published version'} in the readiness check; attempts already holding it keep it.`
           : 'Adds the question to the readiness check that students take.']]}
       onCancel={() => setDialog(null)} onFiled={(message) => { setDialog(null); setNotice(message); }} /> : null}
   </section>;
@@ -305,14 +310,14 @@ function QuestionView({ revision, policy }: { readonly revision: BankQuestionRev
   const tagFor = (optionId: string) => revision.tags.find((tag) => tag.optionId === optionId);
   return <div>
     {revision.answerKeyWithheld ? <p role="note">The answer key, explanation and misconception tags are withheld: they are shown only to staff with Content Edit or Content Review.</p> : null}
-    <p>{fields.prompt || 'NA'}</p>
+    {fields.prompt ? <p>{fields.prompt}</p> : null}
     <div className="role-record-table-wrap"><table className="role-record-table">
       <thead><tr><th>Option</th><th>Text</th><th>Answer</th><th>Misconception</th></tr></thead>
       <tbody>{fields.options.length ? fields.options.map((option) => {
         const tag = tagFor(option.id);
         return <tr key={option.id}>
-          <td>{option.id}</td><td>{option.text || 'NA'}</td>
-          <td>{revision.answerKeyWithheld ? 'Withheld' : fields.correctOptionId === option.id ? 'Correct' : fields.correctOptionId ? 'Wrong' : 'NA'}</td>
+          <td>{option.id}</td><td>{option.text || 'Not written yet'}</td>
+          <td>{revision.answerKeyWithheld ? 'Withheld' : fields.correctOptionId === option.id ? 'Correct' : fields.correctOptionId ? 'Wrong' : 'Not set'}</td>
           <td>{revision.answerKeyWithheld ? 'Withheld'
             : tag ? `${tag.code} v${tag.codeVersion} — ${tag.codeTitle} (${label(tag.tagState)}; code ${label(tag.codeState)})`
               : option.misconception ? `Chosen, recorded on submission — ${option.misconception.rationale}` : 'None'}</td>
@@ -320,11 +325,11 @@ function QuestionView({ revision, policy }: { readonly revision: BankQuestionRev
       }) : <tr><td colSpan={4}>No options yet</td></tr>}</tbody>
     </table></div>
     <dl>
-      <div><dt>Explanation</dt><dd>{revision.answerKeyWithheld ? 'Withheld' : fields.explanation ?? 'NA'}</dd></div>
-      <div><dt>Difficulty</dt><dd>{fields.difficulty ? label(fields.difficulty) : 'NA'}</dd></div>
-      <div><dt>Skill</dt><dd>{revision.topic ? `${revision.topic.name} (${revision.topic.stableKey})` : 'NA'}</dd></div>
-      <div><dt>Licence</dt><dd>{fields.licenceLabel ?? 'NA'}{fields.attribution ? ` — ${fields.attribution}` : ''}</dd></div>
-      <div><dt>Basis</dt><dd>{fields.basis ?? 'NA'}</dd></div>
+      {revision.answerKeyWithheld || fields.explanation ? <div><dt>Explanation</dt><dd>{revision.answerKeyWithheld ? 'Withheld' : fields.explanation}</dd></div> : null}
+      {fields.difficulty ? <div><dt>Difficulty</dt><dd>{label(fields.difficulty)}</dd></div> : null}
+      {revision.topic ? <div><dt>Skill</dt><dd>{`${revision.topic.name} (${revision.topic.stableKey})`}</dd></div> : null}
+      {fields.licenceLabel || fields.attribution ? <div><dt>Licence</dt><dd>{fields.licenceLabel ?? MISSING_TEXT}{fields.attribution ? ` — ${fields.attribution}` : ''}</dd></div> : null}
+      {fields.basis ? <div><dt>Basis</dt><dd>{fields.basis}</dd></div> : null}
       <div><dt>Drafted by</dt><dd>{revision.agentDraft
         ? `The coding agent (${revision.agentDraft.generatorVersion}, ${revision.agentDraft.promptVersion}, ${when(revision.agentDraft.generatedAt)}) — check it against its basis`
         : revision.aiDraft
@@ -338,12 +343,12 @@ function QuestionView({ revision, policy }: { readonly revision: BankQuestionRev
     <div className="role-record-table-wrap"><table className="role-record-table" aria-label="Hint ladder">
       <thead><tr><th>Hint</th><th>Text</th></tr></thead>
       <tbody>{policy.hintLevels.map((entry, index) => <tr key={entry.level}>
-        <td>Level {entry.level} — {label(entry.name)}<br /><small>{entry.meaning}</small></td><td>{fields.hints[index] || 'NA'}</td>
+        <td>Level {entry.level} — {label(entry.name)}<br /><small>{entry.meaning}</small></td><td>{fields.hints[index] || 'Not written yet'}</td>
       </tr>)}</tbody>
     </table></div>
     <p><small>Hint ladder record: {revision.ladder
-      ? `${revision.ladder.source === 'AGENT_DRAFTED' ? `drafted by the coding agent (${revision.ladder.generatorVersion ?? 'NA'}, ${revision.ladder.promptVersion ?? 'NA'})`
-        : revision.ladder.source === 'AI_GENERATED' ? `drafted by ONE's AI (${revision.ladder.promptVersion ?? 'NA'}) — AI draft` : 'written by a person'} · ${label(revision.ladder.state)}`
+      ? `${revision.ladder.source === 'AGENT_DRAFTED' ? `drafted by the coding agent${versionsNote(revision.ladder.generatorVersion, revision.ladder.promptVersion)}`
+        : revision.ladder.source === 'AI_GENERATED' ? `drafted by ONE's AI${versionsNote(revision.ladder.promptVersion)} — AI draft` : 'written by a person'} · ${label(revision.ladder.state)}`
       : 'written on submission'}</small></p>
     <LadderChecks checks={revision.ladderChecks} />
   </div>;

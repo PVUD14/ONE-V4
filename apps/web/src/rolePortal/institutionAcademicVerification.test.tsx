@@ -249,6 +249,6 @@ describe('dashboard verification backlog', () => {
     await waitFor(() => expect(screen.queryByText('Loading your institution…')).not.toBeInTheDocument());
     expect(screen.queryByRole('heading', { name: 'Academic verification' })).not.toBeInTheDocument();
     expect(screen.queryByText('Awaiting verification')).not.toBeInTheDocument();
-    expect(screen.queryByText(/NA/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/\bNA\b/)).not.toBeInTheDocument();
   });
 });

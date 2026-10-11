@@ -34,8 +34,7 @@ import { V2Chip, V2EmptyState, V2Stat } from '../dashboardsV2.js';
 import { growthCodeLabel } from './growthLeads.js';
 import { formatApiError } from './shared.js';
 import { formatDateTime } from '../dates.js';
-
-const NA = 'NA';
+import { MISSING_TEXT } from '../labels.js';
 
 const kindLabels: Readonly<Record<string, string>> = { VISIT: 'Visit', CALL: 'Call', MEETING: 'Meeting', NOTE: 'Note' };
 const kindIcons: Readonly<Record<string, string>> = { VISIT: '📍', CALL: '📞', MEETING: '🤝', NOTE: '📝' };
@@ -56,7 +55,7 @@ function fieldError(cause: unknown, fallback: string): string {
 }
 
 function when(value: string | null): string {
-  return value ? formatDateTime(value) : NA;
+  return value ? formatDateTime(value) : MISSING_TEXT;
 }
 
 function dueLabel(followUp: GrowthFollowUpDto): string {
@@ -109,22 +108,22 @@ export function GrowthFieldPage({ role }: { readonly role?: string | undefined }
                 <button type="button" className="pilot-btn" aria-pressed={!team} onClick={() => setView('MINE')}>Mine</button>
                 <button type="button" className="pilot-btn" aria-pressed={team} onClick={() => setView('TEAM')}>My team</button>
               </> : null}
-              <V2Chip tone="slate">{field ? `Today ${field.today}` : NA}</V2Chip>
+              {field ? <V2Chip tone="slate">{`Today ${field.today}`}</V2Chip> : null}
             </div>
           </div>
         </div>
 
         <div className="v2-row v2-cols-4" role="region" aria-label="Field summary">
-          <V2Stat icon="📍" tone="teal" value={counts ? counts.visitsThisMonth : NA} label="Visits this month" />
-          <V2Stat icon="🤝" tone="blue" value={counts ? counts.metThisMonth : NA} label="Met this month" />
-          <V2Stat icon="📅" tone="amber" value={counts ? counts.followUpsDueToday : NA} label="Follow-ups due today" />
-          <V2Stat icon="⏰" tone="purple" value={counts ? counts.followUpsOverdue : NA} label="Overdue follow-ups" />
+          <V2Stat icon="📍" tone="teal" value={counts ? counts.visitsThisMonth : null} label="Visits this month" />
+          <V2Stat icon="🤝" tone="blue" value={counts ? counts.metThisMonth : null} label="Met this month" />
+          <V2Stat icon="📅" tone="amber" value={counts ? counts.followUpsDueToday : null} label="Follow-ups due today" />
+          <V2Stat icon="⏰" tone="purple" value={counts ? counts.followUpsOverdue : null} label="Overdue follow-ups" />
         </div>
 
         {error ? <p className="form-error" role="alert">{error}</p> : null}
 
         <section className="v2-card" aria-label="Follow-ups">
-          <div className="v2-card-head"><h2>Follow-ups</h2><V2Chip tone="slate">{counts ? `${counts.followUpsOpen} open` : NA}</V2Chip></div>
+          <div className="v2-card-head"><h2>Follow-ups</h2>{counts ? <V2Chip tone="slate">{`${counts.followUpsOpen} open`}</V2Chip> : null}</div>
           {!field && !error ? <p className="v2-empty">Loading…</p> : null}
           {field && !followUps.length ? <V2EmptyState icon="📅" title="No open follow-ups" note={team ? 'Nobody on your team has an open follow-up.' : 'Add a follow-up from a lead when there is something to do next.'} /> : null}
           {field && token ? <>
@@ -135,11 +134,11 @@ export function GrowthFieldPage({ role }: { readonly role?: string | undefined }
         </section>
 
         <section className="v2-card" aria-label="Recent field work">
-          <div className="v2-card-head"><h2>Recent field work</h2><V2Chip tone="slate">{counts ? `${counts.activitiesThisMonth} this month` : NA}</V2Chip></div>
+          <div className="v2-card-head"><h2>Recent field work</h2>{counts ? <V2Chip tone="slate">{`${counts.activitiesThisMonth} this month`}</V2Chip> : null}</div>
           {field && token ? (field.activities.length
             ? <ActivityList items={field.activities} token={token} showLead onChanged={() => setReload((value) => value + 1)} />
             : <V2EmptyState icon="📍" title="No field work logged yet" note="Visits, calls, meetings and notes appear here once they are logged on a lead." />)
-            : <p className="v2-empty">{error ? NA : 'Loading…'}</p>}
+            : error ? null : <p className="v2-empty">Loading…</p>}
         </section>
       </div>
 
@@ -154,10 +153,12 @@ export function GrowthFieldPage({ role }: { readonly role?: string | undefined }
   );
 }
 
-function LocationNoticeCard({ vocabulary }: { readonly vocabulary: GrowthFieldVocabularyDto | null }): React.ReactElement {
+function LocationNoticeCard({ vocabulary }: { readonly vocabulary: GrowthFieldVocabularyDto | null }): React.ReactElement | null {
+  // With no notice loaded there is nothing honest to show, so the card is left out.
+  if (!vocabulary) return null;
   return <section className="v2-card" aria-label="Visit location">
     <div className="v2-card-head"><h2>Visit location</h2><V2Chip tone="amber">Draft wording, pending approval</V2Chip></div>
-    {vocabulary ? <>{vocabulary.locationNotice.text.map((line) => <p key={line} className="v2-empty">{line}</p>)}<small>Version {vocabulary.locationNotice.version}</small></> : <p className="v2-empty">{NA}</p>}
+    {vocabulary.locationNotice.text.map((line) => <p key={line} className="v2-empty">{line}</p>)}<small>Version {vocabulary.locationNotice.version}</small>
   </section>;
 }
 
@@ -268,10 +269,10 @@ export function LeadFieldPanel({ leadId, token, contacts }: {
     <h4>Follow-ups</h4>
     {followUps.length && field?.vocabulary ? <div className="v2-list">{followUps.map((item) => (
       <FollowUpRow key={item.id} item={item} token={token} vocabulary={field.vocabulary} showAssignee showLead={false} onChanged={() => changed('Follow-up updated.')} />
-    ))}</div> : <p className="v2-empty">{field ? 'No follow-ups on this lead.' : NA}</p>}
+    ))}</div> : field ? <p className="v2-empty">No follow-ups on this lead.</p> : null}
     <h4>Activity</h4>
     {activities.length ? <ActivityList items={activities} token={token} showLead={false} onChanged={() => changed('Location removed.')} />
-      : <p className="v2-empty">{field ? 'No visits, calls, meetings or notes logged yet.' : NA}</p>}
+      : field ? <p className="v2-empty">No visits, calls, meetings or notes logged yet.</p> : null}
   </div>;
 }
 

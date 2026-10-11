@@ -8,6 +8,7 @@
  */
 import { requestJson } from './http.js';
 import type { SuppressedCountDto } from './privacyOperations.js';
+import { MISSING_TEXT } from '../labels.js';
 
 export type CampusDriveState = 'REQUESTED' | 'CHANGES_REQUESTED' | 'APPROVED' | 'SCHEDULED' | 'REJECTED' | 'COMPLETED' | 'CANCELLED';
 export type CampusDriveAction = 'RESUBMIT' | 'APPROVE' | 'REJECT' | 'REQUEST_CHANGES' | 'SCHEDULE' | 'CANCEL' | 'COMPLETE';
@@ -99,9 +100,9 @@ export const campusDriveStateLabels: Readonly<Record<CampusDriveState, string>> 
 };
 export const venueModeLabels: Readonly<Record<VenueMode, string>> = { ON_CAMPUS: 'On campus', VIRTUAL: 'Virtual', OFF_CAMPUS: 'Off campus' };
 
-/** A reason code as words: SCHEDULE_CHANGE_NEEDED → "Schedule change needed". */
+/** A reason code as words: SCHEDULE_CHANGE_NEEDED → "Schedule change needed". No code reads "Not recorded", never "NA". */
 export function reasonLabel(code: string | null | undefined): string {
-  if (!code) return 'NA';
+  if (!code) return MISSING_TEXT;
   const words = code.toLowerCase().split('_').join(' ');
   return words.charAt(0).toUpperCase() + words.slice(1);
 }

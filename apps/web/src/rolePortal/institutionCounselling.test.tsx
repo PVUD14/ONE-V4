@@ -117,7 +117,8 @@ describe('Counselling notes section', () => {
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('Counselling notes for this student are not available to you. Support code: corr123.');
     expect(document.body.textContent).not.toMatch(/stack trace/);
-    expect(screen.getByText('NA — counselling notes unavailable.')).toBeInTheDocument();
+    expect(screen.getByText('Counselling notes are unavailable.')).toBeInTheDocument();
+    expect(screen.queryByText('NA')).not.toBeInTheDocument();
   });
 
   it('explains SCOPE_REQUIRED in plain words', () => {

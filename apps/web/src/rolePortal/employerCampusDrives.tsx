@@ -25,10 +25,11 @@ import {
 import { formatApiError } from './shared.js';
 import { formatDateTime } from '../dates.js';
 
-function formatWhen(value: string | null | undefined): string {
-  if (!value) return 'NA';
+/** A time as local words; with no time, the given honest phrase ("Not set", "Not yet"), never "NA". */
+function formatWhen(value: string | null | undefined, missing = 'Not recorded'): string {
+  if (!value) return missing;
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? 'NA' : formatDateTime(date);
+  return Number.isNaN(date.getTime()) ? missing : formatDateTime(date);
 }
 function localToIso(value: string): string | undefined {
   if (!value) return undefined;
@@ -163,9 +164,9 @@ export function EmployerCampusDrivesSection({ employerId, opportunityId, token, 
                 {drive.state === 'APPROVED' || drive.state === 'SCHEDULED' ? (lifecycleState === 'PUBLISHED'
                   ? <span className="hiring-meta"> Live for the college's students.</span>
                   : <span className="hiring-meta"> Publish the job for students to see it.</span>) : null}</td>
-              <td>{formatWhen(drive.proposedStartAt)}{drive.venueMode ? ` · ${venueModeLabels[drive.venueMode]}` : ''}</td>
-              <td>{formatWhen(drive.scheduledStartAt)}</td>
-              <td>{drive.decision ? `${drive.decision.reasonCode ? `${reasonLabel(drive.decision.reasonCode)}. ` : ''}${drive.decision.note ?? ''}` || 'NA' : 'NA'}
+              <td>{formatWhen(drive.proposedStartAt, 'Not set')}{drive.venueMode ? ` · ${venueModeLabels[drive.venueMode]}` : ''}</td>
+              <td>{formatWhen(drive.scheduledStartAt, 'Not yet')}</td>
+              <td>{drive.decision ? `${drive.decision.reasonCode ? `${reasonLabel(drive.decision.reasonCode)}. ` : ''}${drive.decision.note ?? ''}` || 'None' : 'None'}
                 {drive.closeReasonCode ? <span className="hiring-meta"> Cancelled: {reasonLabel(drive.closeReasonCode)}</span> : null}</td>
               <td>{drive.applicationCount ?? 0}</td>
               <td><div className="hiring-actions">

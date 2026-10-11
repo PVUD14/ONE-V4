@@ -11,6 +11,7 @@ import { requestJson } from './http.js';
 import type { SuppressedCountDto } from './privacyOperations.js';
 import { bearerHeader } from '../sandbox.js';
 import { smallCountText } from '../momentum/smallCountRule.js';
+import { MISSING_TEXT } from '../labels.js';
 
 export interface InstitutionUnitDto {
   readonly id: string; readonly institutionId: string; readonly kind: string; readonly name: string; readonly parentUnitId?: string | null;
@@ -380,7 +381,7 @@ export const institutionResultScaleLabels: Readonly<Record<InstitutionResultScal
 export interface ProgrammeGradingScaleDto {
   readonly programUnitId: string;
   readonly scale: InstitutionResultScale;
-  /** Null: the college has not given one, or the scale has none. Shown as NA. */
+  /** Null: the college has not given one, or the scale has none. Shown as "Not set". */
   readonly passThreshold: number | null;
   readonly updatedAt: string;
 }
@@ -395,7 +396,7 @@ export interface InstitutionSettingsDto {
     readonly institutionType: string | null;
   };
   readonly college: { readonly about: string | null; readonly placementContactEmail: string | null; readonly updatedAt: string | null };
-  /** Every programme; gradingScale null means NA — no scale is ever guessed. */
+  /** Every programme; gradingScale null means none is set — no scale is ever guessed. */
   readonly programmes: readonly { readonly programUnitId: string; readonly programName: string; readonly parentName: string | null; readonly gradingScale: ProgrammeGradingScaleDto | null }[];
   readonly canEdit: boolean;
   readonly options: { readonly scales: readonly InstitutionResultScale[]; readonly numericScaleMaximum: Readonly<Partial<Record<InstitutionResultScale, number>>> };
@@ -742,9 +743,12 @@ export function listStaffActionSummaries(token: string, institutionId: string, a
   ).then((response) => (Array.isArray(response?.actions) ? response.actions : []));
 }
 
-/** How a suppressed count is shown: never the number, always "<5" (the shared small-count rule). */
+/**
+ * How a suppressed count is shown: never the number, always "<5" (the shared small-count rule).
+ * A count the server did not send reads "Not recorded" (never "NA", never a made-up 0).
+ */
 export function suppressedCountLabel(count: { readonly suppressed: boolean; readonly value?: number | null; readonly count?: number | null } | null | undefined): string {
-  if (!count) return 'NA';
+  if (!count) return MISSING_TEXT;
   return smallCountText(count);
 }
 

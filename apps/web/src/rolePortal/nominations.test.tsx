@@ -76,7 +76,8 @@ describe('INST-14 student: nominations on Applications', () => {
     expect(screen.getByText(/Nominated by Placement officer, Synthetic Placement College/)).toBeInTheDocument();
     expect(screen.getByText(/You meet the role's eligibility rules · "Strong fit for the analytics team."/)).toBeInTheDocument();
     expect(screen.getByText(/Nothing about you is shared with the employer unless you opt in/)).toBeInTheDocument();
-    expect(screen.getByText(/Drive: NA · On campus · applications close NA/)).toBeInTheDocument();
+    expect(screen.getByText(/Drive: Date not set · On campus/)).toBeInTheDocument();
+    expect(screen.queryByText(/applications close/)).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'Review and decide' }));
     const panel = await screen.findByLabelText('Opt in to nomination');
@@ -163,7 +164,8 @@ describe('INST-14 college: nominations in a drive\'s details', () => {
     const table = await screen.findByRole('table', { name: 'Nominated students' });
     expect(within(table).getByText('Opted in')).toBeInTheDocument();
     expect(within(table).getByText('Not opted in')).toBeInTheDocument();
-    expect(within(table).getByText('NA')).toBeInTheDocument();
+    expect(within(table).getByText('Not recorded')).toBeInTheDocument();   // no college ID
+    expect(within(table).queryByText('NA')).not.toBeInTheDocument();
     expect(screen.getByText(/Nominated: <5 · Opted in: <5 · Not opted in: <5/)).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/Declined|You declined/);
 

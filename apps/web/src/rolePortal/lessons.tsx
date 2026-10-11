@@ -11,8 +11,8 @@
  * prerequisites, files an approval a second person grants (Settings → Approvals).
  *
  * The server decides everything: capabilities, reason codes, who wrote or approved a revision, and
- * whether a publish needs an approval. Levels and styles are words, never numbers. Missing values
- * read NA.
+ * whether a publish needs an approval. Levels and styles are words, never numbers. A missing value
+ * hides its row, or reads in plain words where a column must stay.
  */
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -45,10 +45,10 @@ import { AiDraftProvenance, AiDraftsCard, TranslateWithAiDialog } from './conten
 import { formatApiError } from './shared.js';
 import { SupportCode } from '../supportCode.js';
 import { formatDateTime } from '../dates.js';
-import { codeLabel } from '../labels.js';
+import { MISSING_TEXT, codeLabel } from '../labels.js';
 
 const label = (value: string): string => value.split('_').map((word) => word.charAt(0) + word.slice(1).toLowerCase()).join(' ');
-const when = (value: string | null | undefined): string => (value ? formatDateTime(value) : 'NA');
+const when = (value: string | null | undefined): string => (value ? formatDateTime(value) : MISSING_TEXT);
 const statusText = (status: string): string => (status === 'LIVE' ? 'Live' : status === 'PENDING' ? 'Not yet published' : status === 'RETIRED' ? 'Retired' : status === 'ARCHIVED' ? 'Archived' : 'Unknown');
 const statusTone = (status: string): 'success' | 'warning' | 'neutral' | 'info' => (status === 'LIVE' ? 'success' : status === 'PENDING' ? 'warning' : 'neutral');
 const stateTone = (state: LessonRevisionState): 'success' | 'warning' | 'neutral' | 'info' =>
@@ -152,10 +152,10 @@ export function OperationsLessonsPage(): React.ReactElement | null {
   return <section className="role-module role-module--dense" aria-label="Lessons and variants">
     {heading}
     <div className="v2-row v2-cols-4 career-stat-strip role-wide">
-      <V2Stat icon="📚" tone="teal" value={summary ? summary.live : 'NA'} label="Live lessons" />
-      <V2Stat icon="🌐" tone="purple" value={summary ? summary.liveVariants : 'NA'} label="Live variants" />
-      <V2Stat icon="🔍" tone="amber" value={summary ? summary.awaitingReview : 'NA'} label="Awaiting review" />
-      <V2Stat icon="🚀" tone="blue" value={summary ? summary.awaitingPublish : 'NA'} label="Approved, awaiting publish" />
+      <V2Stat icon="📚" tone="teal" value={summary ? summary.live : null} label="Live lessons" />
+      <V2Stat icon="🌐" tone="purple" value={summary ? summary.liveVariants : null} label="Live variants" />
+      <V2Stat icon="🔍" tone="amber" value={summary ? summary.awaitingReview : null} label="Awaiting review" />
+      <V2Stat icon="🚀" tone="blue" value={summary ? summary.awaitingPublish : null} label="Approved, awaiting publish" />
     </div>
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     <section className="role-card role-wide"><div className="role-section-title"><h2>Lessons</h2>
@@ -179,10 +179,10 @@ export function OperationsLessonsPage(): React.ReactElement | null {
           <td>{lesson.kind === 'VARIANT' ? 'Variant' : `Lesson${lesson.variantCount ? ` · ${lesson.variantCount} variant${lesson.variantCount === 1 ? '' : 's'}` : ''}`}</td>
           <td>{variantText(policy, lesson.variant)}</td>
           <td><StatusBadge label={statusText(lesson.status)} tone={statusTone(lesson.status)} /></td>
-          <td>{lesson.publishedRevision ? `Revision ${lesson.publishedRevision}` : 'NA'}</td>
+          <td>{lesson.publishedRevision ? `Revision ${lesson.publishedRevision}` : 'Not published'}</td>
           <td>{lesson.openRevision ? `Revision ${lesson.openRevision.revision} · ${label(lesson.openRevision.state)}` : 'None'}
             {needsNativeSpeakerReview(lesson.kind, lesson.variant, lesson.openRevision ? lesson.openRevision.state : null) ? <> <StatusBadge label="Needs native-speaker review" tone="warning" /></> : null}</td>
-          <td>{lesson.kind === 'VARIANT' ? 'As its lesson' : lesson.topic ? lesson.topic.stableKey : 'NA'}</td>
+          <td>{lesson.kind === 'VARIANT' ? 'As its lesson' : lesson.topic ? lesson.topic.stableKey : 'Not set'}</td>
           <td><button type="button" className="secondary" aria-label={`Open ${lesson.stableKey}${lesson.kind === 'VARIANT' ? ` (${lesson.variant.language}/${lesson.variant.level}/${lesson.variant.style})` : ''}`}
             onClick={() => setSelectedId(lesson.lessonId)}>Open</button></td>
         </tr>)}</tbody></table></div> : null}
@@ -248,12 +248,12 @@ function LessonPanel({ token, lessonId, policy, onOpen, onChanged, onClose }: {
       <div><dt>Kind</dt><dd>{isVariant ? 'Variant — another rendering of a lesson, completed as that lesson' : 'Lesson — students complete it and it records evidence'}</dd></div>
       <div><dt>Language, level, style</dt><dd>{variantText(policy, lesson.variant)}</dd></div>
       {isVariant ? <div><dt>Renders</dt><dd>{lesson.base
-        ? <>{lesson.base.title} ({lesson.base.stableKey}), revision {lesson.basedOnRevision ?? 'NA'}{stale ? ` — the lesson is now at revision ${lesson.baseRevision ?? 'NA'}` : ''}{' '}
+        ? <>{lesson.base.title} ({lesson.base.stableKey}){lesson.basedOnRevision !== null && lesson.basedOnRevision !== undefined ? `, revision ${lesson.basedOnRevision}` : ''}{stale && lesson.baseRevision !== null && lesson.baseRevision !== undefined ? ` — the lesson is now at revision ${lesson.baseRevision}` : ''}{' '}
           <button type="button" className="secondary" onClick={() => onOpen(lesson.base!.lessonId)}>Open the lesson</button></>
-        : 'NA'}</dd></div> : null}
-      {!isVariant ? <div><dt>Skill</dt><dd>{lesson.topic ? `${lesson.topic.name} (${lesson.topic.stableKey}) · ${statusText(lesson.topic.status)}` : 'NA'}</dd></div> : null}
-      {!isVariant ? <div><dt>Module</dt><dd>{lesson.moduleKey ?? 'NA'}</dd></div> : null}
-      <div><dt>Current revision</dt><dd>{lesson.publishedRevision ?? 'NA'}</dd></div>
+        : MISSING_TEXT}</dd></div> : null}
+      {!isVariant && lesson.topic ? <div><dt>Skill</dt><dd>{`${lesson.topic.name} (${lesson.topic.stableKey}) · ${statusText(lesson.topic.status)}`}</dd></div> : null}
+      {!isVariant && lesson.moduleKey ? <div><dt>Module</dt><dd>{lesson.moduleKey}</dd></div> : null}
+      {lesson.publishedRevision !== null && lesson.publishedRevision !== undefined ? <div><dt>Current revision</dt><dd>{lesson.publishedRevision}</dd></div> : null}
       <div><dt>{isVariant ? 'Published revisions' : 'Versions students have been given'}</dt><dd>{lesson.versions.length
         ? lesson.versions.map((entry) => `v${entry.version} ${entry.superseded ? '(replaced)' : '(current)'} · ${when(entry.publishedAt)}`).join('; ')
         : 'None yet'}</dd></div>
@@ -269,7 +269,7 @@ function LessonPanel({ token, lessonId, policy, onOpen, onChanged, onClose }: {
         <tbody>{lesson.variants.map((variant) => <tr key={variant.lessonId}>
           <td>{variantText(policy, variant.variant)}</td><td>{variant.title}</td>
           <td><StatusBadge label={statusText(variant.status)} tone={statusTone(variant.status)} /></td>
-          <td>{variant.basedOnRevision ?? 'NA'}</td>
+          <td>{variant.basedOnRevision ?? MISSING_TEXT}</td>
           <td><button type="button" className="secondary" onClick={() => onOpen(variant.lessonId)}>Open variant</button></td>
         </tr>)}</tbody></table></div> : <p>No variants yet.</p>}
       {lesson.status === 'LIVE' && policy.viewer.edit ? <>
@@ -331,7 +331,7 @@ function LessonPanel({ token, lessonId, policy, onOpen, onChanged, onClose }: {
       onCreated={(created) => { setDialog(null); onChanged(); onOpen(created.lessonId); }} /> : null}
     {dialog?.kind === 'transition' ? <ReasonDialog title={transitionTitle(dialog.toState, dialog.revision.revision)}
       approvalNote={dialog.toState === 'APPROVED'
-        ? `Not required to approve. Approving also records your rights review of the ${dialog.revision.fields.licenceLabel ?? 'NA'} licence the author declared. You will not be able to publish what you approve.`
+        ? `Not required to approve. Approving also records your rights review of the ${dialog.revision.fields.licenceLabel ? `${dialog.revision.fields.licenceLabel} ` : ''}licence the author declared. You will not be able to publish what you approve.`
         : 'Not required: recorded with your reason.'}
       reasons={policy.reasons.transition[dialog.toState] ?? []}
       rightsReasons={dialog.toState === 'APPROVED' ? policy.reasons.rights : null}
@@ -353,7 +353,7 @@ function LessonPanel({ token, lessonId, policy, onOpen, onChanged, onClose }: {
       title={`Publish revision ${dialog.revision.revision} of ${name}`}
       details={[['Lesson', name],
         ['Effect', lesson.status === 'LIVE'
-          ? `Replaces revision ${lesson.publishedRevision ?? 'NA'} for students and changes what completing it records (its skill or prerequisites).`
+          ? `Replaces ${lesson.publishedRevision ? `revision ${lesson.publishedRevision}` : 'the published revision'} for students and changes what completing it records (its skill or prerequisites).`
           : 'Adds the lesson to the module students complete; completing it records evidence.']]}
       onCancel={() => setDialog(null)} onFiled={(message) => { setDialog(null); setNotice(message); }} /> : null}
   </section>;
@@ -371,17 +371,17 @@ function LessonView({ revision, policy }: { readonly revision: LessonRevisionDto
   const fields = revision.fields;
   const isVariant = revision.identity.variantOf !== null;
   return <div>
-    <h4>{fields.title || 'NA'}</h4>
-    <p>{fields.summary || 'NA'}</p>
+    {fields.title ? <h4>{fields.title}</h4> : null}
+    {fields.summary ? <p>{fields.summary}</p> : null}
     <dl>
-      <div><dt>Practice</dt><dd>{fields.practice ?? 'NA'}</dd></div>
+      {fields.practice ? <div><dt>Practice</dt><dd>{fields.practice}</dd></div> : null}
       <div><dt>Language, level, style</dt><dd>{variantText(policy, revision.identity.variant)}</dd></div>
-      {!isVariant ? <div><dt>Module</dt><dd>{fields.moduleKey ?? 'NA'}</dd></div> : null}
-      {!isVariant ? <div><dt>Skill</dt><dd>{revision.topic ? `${revision.topic.name} (${revision.topic.stableKey})` : 'NA'}</dd></div> : null}
+      {!isVariant && fields.moduleKey ? <div><dt>Module</dt><dd>{fields.moduleKey}</dd></div> : null}
+      {!isVariant && revision.topic ? <div><dt>Skill</dt><dd>{`${revision.topic.name} (${revision.topic.stableKey})`}</dd></div> : null}
       {!isVariant ? <div><dt>Prerequisites</dt><dd>{fields.prerequisites.length ? fields.prerequisites.join(', ') : 'None'}</dd></div> : null}
-      {isVariant ? <div><dt>Renders revision</dt><dd>{revision.identity.basedOnRevision ?? 'NA'}</dd></div> : null}
-      <div><dt>Licence</dt><dd>{fields.licenceLabel ?? 'NA'}{fields.attribution ? ` — ${fields.attribution}` : ''}</dd></div>
-      <div><dt>Basis</dt><dd>{fields.basis ?? 'NA'}</dd></div>
+      {isVariant && revision.identity.basedOnRevision !== null && revision.identity.basedOnRevision !== undefined ? <div><dt>Renders revision</dt><dd>{revision.identity.basedOnRevision}</dd></div> : null}
+      {fields.licenceLabel || fields.attribution ? <div><dt>Licence</dt><dd>{fields.licenceLabel ?? MISSING_TEXT}{fields.attribution ? ` — ${fields.attribution}` : ''}</dd></div> : null}
+      {fields.basis ? <div><dt>Basis</dt><dd>{fields.basis}</dd></div> : null}
       <div><dt>Drafted by</dt><dd>{revision.agentDraft
         ? `The coding agent (${revision.agentDraft.generatorVersion}, ${revision.agentDraft.promptVersion}, ${when(revision.agentDraft.generatedAt)}) — check it against its basis`
         : revision.aiDraft

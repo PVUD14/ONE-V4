@@ -2,7 +2,7 @@
  * Web tests for the "Tutor by college" panel on AI Operations (ENG-25): every college with its tutor state,
  * groups under five shown as <5 with counts withheld, no student identity, switching on files an
  * AI_TUTOR_COLLEGE_ENABLE approval (never switches anything itself), switching off needs a reason, the switch-on
- * control is disabled while no passing evaluation exists, and a malformed reply shows NA rather than a crash.
+ * control is disabled while no passing evaluation exists, and a malformed reply says it could not be read rather than crashing.
  */
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';

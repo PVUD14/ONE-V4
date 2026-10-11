@@ -29,6 +29,18 @@
   :root:not([data-theme="light"]) { --btn-solid: var(--brand); --btn-solid-ink: var(--navy-950); }
 }
 
+/* Gold "celebration" tag (approved 2026-10-11): where a view already spends its one orange on a
+   streak, an Offer celebrates in gold instead. Built from the orange-300 token; text holds
+   6.6:1 (light) and 7.9:1 (dark) on its fill. */
+:root, [data-theme], .t-light, .t-dark {
+  --gold-soft: color-mix(in srgb, var(--orange-300) 30%, var(--surface));
+  --gold-ink: #6E4E00;
+}
+[data-theme="dark"], .t-dark { --gold-soft: color-mix(in srgb, var(--orange-300) 18%, var(--surface)); --gold-ink: var(--orange-300); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --gold-soft: color-mix(in srgb, var(--orange-300) 18%, var(--surface)); --gold-ink: var(--orange-300); }
+}
+
 /* =====================================================================================
    BUTTONS
    ===================================================================================== */
@@ -64,18 +76,27 @@ button.secondary {
 }
 button.secondary:not(:disabled):hover { border-color: var(--brand); filter: none; }
 
-/* Pilot buttons: primary is the hero gradient (.btn-p); ghost is secondary; soft is brand-soft. */
+/* Pilot buttons. An ordinary pilot button is the plain solid brand button; the hero gradient
+   (.btn-p) is kept for each page's one main action (approved 2026-10-11): a button marked
+   .primary, the action in a page head or a home hero, and the student home's next-step button.
+   Ghost is secondary; soft is brand-soft. */
 :is(.pilot, body) .pilot-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   min-height: 36px; padding: 0 16px;
   border: 0; border-radius: var(--r-xl);
-  background: var(--grad); color: #FFFFFF;
-  box-shadow: var(--glow-btn);
+  background: var(--btn-solid); color: var(--btn-solid-ink);
+  box-shadow: none;
   font: 600 13px/1.2 var(--font-sans);
   text-decoration: none; cursor: pointer;
   transition: transform var(--m-micro) var(--e-out), box-shadow var(--m-micro) var(--e-out), border-color var(--m-micro), filter var(--m-micro);
 }
-:is(.pilot, body) .pilot-btn:not(:disabled):hover { transform: translateY(-1px); box-shadow: var(--glow-btn-hover); filter: saturate(1.08) brightness(1.04); }
+:is(.pilot, body) .pilot-btn:not(:disabled):hover { transform: translateY(-1px); filter: brightness(1.06); }
+:is(.pilot, body) :is(.pilot-btn.primary, .pilot-btn.sh-shine, .pilot-page-head .pilot-btn:not(.ghost, .soft), .ih-ta .pilot-btn:not(.ghost, .soft)):not(:disabled, [aria-disabled="true"]) {
+  background: var(--grad); color: #FFFFFF; box-shadow: var(--glow-btn);
+}
+:is(.pilot, body) :is(.pilot-btn.primary, .pilot-btn.sh-shine, .pilot-page-head .pilot-btn:not(.ghost, .soft), .ih-ta .pilot-btn:not(.ghost, .soft)):not(:disabled):hover {
+  box-shadow: var(--glow-btn-hover); filter: saturate(1.08) brightness(1.04);
+}
 :is(.pilot, body) .pilot-btn:not(:disabled):active { transform: translateY(0) scale(.97); transition-duration: var(--m-press); }
 :is(.pilot, body) .pilot-btn.ghost {
   background: var(--surface); color: var(--text); border: 1px solid var(--line-2); box-shadow: none;
@@ -193,6 +214,7 @@ button.secondary:not(:disabled):hover { border-color: var(--brand); filter: none
 .tag.t-band { --tb: var(--brand-soft); color: var(--brand-ink); }
 .tag.t-cyan { --tb: var(--cyan-soft); color: var(--cyan-ink); }
 .tag.t-hot { --tb: var(--orange-soft); color: var(--orange-ink); }
+.tag.t-gold { --tb: var(--gold-soft); color: var(--gold-ink); }
 .tag.t-ok { --tb: var(--ok-soft); color: var(--ok-ink); }
 .tag.t-warn { --tb: var(--warn-soft); color: var(--warn); }
 .tag.t-danger { --tb: var(--danger-soft); color: var(--danger); }
@@ -477,3 +499,22 @@ button.secondary:not(:disabled):hover { border-color: var(--brand); filter: none
   .rb .rb-s.cur .rb-cur { animation: rbCurGlowP var(--loop-breathe) ease-in-out infinite; }
   .rb .rb-s.next .rb-next::before { animation: rbStripes var(--loop-breathe) ease-in-out infinite; }
 }
+
+/* The lesson the learning page was opened on ("Resume lesson", approved 2026-10-11): the same
+   lesson card, set first and marked with the brand edge so it reads as where you left off. */
+.career-api-opened {
+  position: relative;
+  margin: 0 0 14px;
+  padding: 18px 20px 16px;
+  border: 1px solid var(--brand);
+  border-radius: var(--r-2xl);
+  background: var(--surface);
+  box-shadow: var(--shadow, none);
+  scroll-margin-top: 96px;
+}
+.career-api-opened:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+.career-api-opened > span { color: var(--brand-ink); font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.career-api-opened h3 { margin: 6px 0; color: var(--text); font: 700 18px/1.3 var(--font-display); }
+.career-api-opened p { color: var(--text-2); }
+.career-api-opened small { display: block; margin: 8px 0; color: var(--text-3); }
+.career-api-opened button { margin-top: 8px; }

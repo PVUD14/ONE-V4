@@ -73,8 +73,10 @@ describe('screening tests, employer side', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Results' }));
     expect(await screen.findByText('Priya Nair')).toBeInTheDocument();
     expect(screen.getByText('100%')).toBeInTheDocument();
-    // A candidate who has not sat it yet reads NA, never a zero that looks like a failure.
-    expect(screen.getByText('NA')).toBeInTheDocument();
+    // A candidate who has not sat it yet reads "No score yet", never NA and never a zero that looks like a failure.
+    expect(screen.getByText('No score yet')).toBeInTheDocument();
+    expect(screen.queryByText('NA')).not.toBeInTheDocument();
+    expect(screen.queryByText('0%')).not.toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/readiness|demonstrated|progressing/i);
   });
 

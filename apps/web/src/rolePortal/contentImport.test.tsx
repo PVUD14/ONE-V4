@@ -3,7 +3,7 @@
  * caps, previews a picked file (kind, format, file name and content go to the server), shows every
  * row's problems in plain words and offers no commit while any row or the file has a problem,
  * commits only the previewed file with its digest and a reason code chosen in a confirm dialog,
- * previews again when a commit is refused as stale, and its loading / NA / empty / error /
+ * previews again when a commit is refused as stale, and its loading / missing / empty / error /
  * forbidden states are honest. Navigation labels are unchanged.
  */
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -73,11 +73,13 @@ async function pickAndPreview(content = csv, filename = 'skills.csv'): Promise<v
 }
 
 describe('bulk import', () => {
-  it('shows the fields and caps for the chosen kind, NA counts and an empty report', async () => {
+  it('shows the fields and caps for the chosen kind, no counts before a preview, and an empty report', async () => {
     render(<OperationsContentImportPage />);
     expect(screen.getByText('Loading the import policy…')).toBeInTheDocument();
     expect(await screen.findByText('stable_key, name, description')).toBeInTheDocument();
-    expect(screen.getAllByText('NA').length).toBeGreaterThanOrEqual(3);
+    expect(screen.queryByText('Rows in the file')).toBeNull();
+    expect(screen.queryByText('Rows with problems')).toBeNull();
+    expect(document.body.textContent).not.toMatch(/(^|[^A-Za-z])NA([^A-Za-z]|$)/);
     expect(screen.getByText('No file previewed yet')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Preview' })).toBeDisabled();
     fireEvent.change(screen.getByLabelText('Import kind'), { target: { value: 'QUESTION' } });
@@ -129,7 +131,7 @@ describe('bulk import', () => {
     expect(within(table).getByText('The prerequisites form a cycle')).toBeInTheDocument();
     expect(within(table).getByText('A required field is empty: description')).toBeInTheDocument();
     expect(within(table).getByText('SKILL_LEVEL_TOO_LONG:AWARE')).toBeInTheDocument();
-    expect(within(table).getByText('NA')).toBeInTheDocument();
+    expect(within(table).getByText('No key')).toBeInTheDocument();
     expect(screen.getByText(/2 rows have problems\. Nothing can be imported until every row is fixed; nothing was written\./)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /as drafts/ })).not.toBeInTheDocument();
   });

@@ -5,7 +5,7 @@
  * engine decides — planner decisions per day and the override rate, and the mastery shadow comparison;
  * under System Health, whether its jobs run — the last calibration run and its status, and the code
  * sandbox. Every figure is the server's; a count the server withheld (fewer than 5 people) shows <5, and
- * a figure with no source shows NA in its slot. No student, topic, institution or item is ever named.
+ * a figure with no source is left out (never "NA"). No student, topic, institution or item is ever named.
  * Design: docs/architecture/engine-health-panels-design.md
  */
 import { useEffect, useState } from 'react';
@@ -29,16 +29,22 @@ import { codeLabel } from '../labels.js';
 import { NaValue } from '../naState.js';
 import { SuppressedBlock, SMALL_COUNT_TEXT, shownCount, smallCountText } from '../momentum/smallCount.js';
 
-const NA = 'NA';
 const windowChoices: readonly EngineHealthWindowDays[] = [7, 14, 30];
 
-/** A server count: NA when absent, <5 when withheld, else the value. */
-export function engineCount(count: EngineSuppressedCountDto | null | undefined): string {
-  if (!count) return NA;
+/** A server count: undefined when absent (its slot is hidden or reads "Not recorded"), <5 when withheld, else the value. */
+export function engineCount(count: EngineSuppressedCountDto): string;
+export function engineCount(count: EngineSuppressedCountDto | null | undefined): string | undefined;
+export function engineCount(count: EngineSuppressedCountDto | null | undefined): string | undefined {
+  if (!count) return undefined;
   return smallCountText(count, (value) => value.toLocaleString());
 }
 
-const when = (value: string | null | undefined): string => (value ? formatDateTime(value) : NA);
+const when = (value: string | null | undefined): string | undefined => (value ? formatDateTime(value) : undefined);
+
+/** A <dl> row, omitted when its value has no source. */
+function Row({ term, children }: { readonly term: string; readonly children: React.ReactNode }): React.ReactElement | null {
+  return children === undefined || children === null ? null : <div><dt>{term}</dt><dd>{children}</dd></div>;
+}
 
 function isPlanner(value: unknown): value is PlannerHealthDto {
   return Boolean(value) && Array.isArray((value as PlannerHealthDto).days);
@@ -194,31 +200,31 @@ export function EngineJobsPanels({ token }: { readonly token: string }): React.R
       {forbiddenReference ? <p>Not permitted. <SupportCode reference={forbiddenReference} /></p> : null}
       {error ? <p className="form-error" role="alert">{error}</p> : null}
       {loading && !data ? <p>Loading the calibration job…</p> : null}
-      <p><StatusBadge label={status?.label ?? NA} tone={status?.tone ?? 'neutral'} /></p>
+      {status ? <p><StatusBadge label={status.label} tone={status.tone} /></p> : null}
       <p>{status?.note ?? 'Calibration status is not available.'}</p>
-      <dl>
-        <div><dt>Last run imported</dt><dd>{when(run?.recordedAt)}{run ? ` (${run.ageDays} day${run.ageDays === 1 ? '' : 's'} ago)` : ''}</dd></div>
-        <div><dt>Fitted</dt><dd>{when(run?.generatedAt)}</dd></div>
-        <div><dt>Attempts exported</dt><dd>{when(run?.exportedAt)}</dd></div>
-        <div><dt>Items calibrated</dt><dd>{run ? run.items.calibrated.toLocaleString() : NA}</dd></div>
-        <div><dt>Items still provisional</dt><dd>{run ? run.items.provisional.toLocaleString() : NA}</dd></div>
-        <div><dt>Learners read</dt><dd><NaValue value={run ? engineCount(run.learnersRead) : NA} /></dd></div>
-        <div><dt>Responses read</dt><dd><NaValue value={run ? smallCountText(run.responsesRead, (value) => value.toLocaleString()) : NA} /></dd></div>
-        <div><dt>Runs recorded</dt><dd>{calibration ? calibration.runsRecorded.toLocaleString() : NA}</dd></div>
-        <div><dt>Algorithm</dt><dd>{run ? `${run.algorithmId} · ${run.library} · at least ${run.minResponses} responses per item` : NA}</dd></div>
-      </dl>
+      {calibration ? <dl>
+        <Row term="Last run imported">{run && when(run.recordedAt) ? `${when(run.recordedAt)} (${run.ageDays} day${run.ageDays === 1 ? '' : 's'} ago)` : undefined}</Row>
+        <Row term="Fitted">{when(run?.generatedAt)}</Row>
+        <Row term="Attempts exported">{when(run?.exportedAt)}</Row>
+        <Row term="Items calibrated">{run ? run.items.calibrated.toLocaleString() : undefined}</Row>
+        <Row term="Items still provisional">{run ? run.items.provisional.toLocaleString() : undefined}</Row>
+        <Row term="Learners read">{run ? <NaValue value={engineCount(run.learnersRead)} /> : undefined}</Row>
+        <Row term="Responses read">{run ? <NaValue value={smallCountText(run.responsesRead, (value) => value.toLocaleString())} /> : undefined}</Row>
+        <Row term="Runs recorded">{calibration.runsRecorded.toLocaleString()}</Row>
+        <Row term="Algorithm">{run ? `${run.algorithmId} · ${run.library} · at least ${run.minResponses} responses per item` : undefined}</Row>
+      </dl> : null}
       {run && Object.keys(run.items.provisionalByReason).length
         ? <ul className="role-check-list">{Object.entries(run.items.provisionalByReason).map(([reason, count]) => <li key={reason}>{codeLabel(reason)}: {count.toLocaleString()}</li>)}</ul>
         : null}
       <p><small>Source: item_calibration_runs and item_calibrations. Recalibrated monthly and imported only when accepted; overdue after {calibration?.overdueAfterDays ?? 38} days.</small></p>
     </section>
     <section className="role-card"><h2>Code sandbox</h2>
-      <p><StatusBadge label={data?.sandbox?.state === 'NOT_BUILT' ? 'Not built' : NA} tone="neutral" /></p>
-      <p>{data?.sandbox?.state === 'NOT_BUILT' ? 'The isolated code sandbox has not been built yet, so there is nothing to measure. Both figures stay NA until it exists.' : 'Sandbox status is not available.'}</p>
-      <dl>
-        <div><dt>Available</dt><dd>{data?.sandbox?.available === true ? 'Yes' : data?.sandbox?.available === false ? 'No' : NA}</dd></div>
-        <div><dt>Rejected executions</dt><dd>{typeof data?.sandbox?.rejectedExecutions === 'number' ? data.sandbox.rejectedExecutions.toLocaleString() : NA}</dd></div>
-      </dl>
+      {data?.sandbox?.state === 'NOT_BUILT' ? <p><StatusBadge label="Not built" tone="neutral" /></p> : null}
+      <p>{data?.sandbox?.state === 'NOT_BUILT' ? 'The isolated code sandbox has not been built yet, so there is nothing to measure. Its figures appear once it exists.' : 'Sandbox status is not available.'}</p>
+      {typeof data?.sandbox?.available === 'boolean' || typeof data?.sandbox?.rejectedExecutions === 'number' ? <dl>
+        <Row term="Available">{data?.sandbox?.available === true ? 'Yes' : data?.sandbox?.available === false ? 'No' : undefined}</Row>
+        <Row term="Rejected executions">{typeof data?.sandbox?.rejectedExecutions === 'number' ? data.sandbox.rejectedExecutions.toLocaleString() : undefined}</Row>
+      </dl> : null}
       <p><small>Source: none yet.</small></p>
     </section>
   </div>;

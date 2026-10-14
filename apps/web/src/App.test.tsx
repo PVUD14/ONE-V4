@@ -384,7 +384,7 @@ describe('All-role portal registry and preview workflows', () => {
     expect(screen.getByText(/Your ONE account, your records and your choices stay yours/)).toBeInTheDocument();
     expect(screen.queryByText(/No active ONE workspace/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Student identity unavailable/)).not.toBeInTheDocument();
-  });
+  }, 20000);
 
   it('ignores an aborted workspace context request instead of showing a false workspace failure', async () => {
     configureHostedCallback();

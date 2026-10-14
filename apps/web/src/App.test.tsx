@@ -369,12 +369,12 @@ describe('All-role portal registry and preview workflows', () => {
       if (url.endsWith('/api/v1/me/consents/privacy-notice')) return { ok: true, json: async () => ({ requiredVersion: null, grantedVersion: null, required: false }) };
       if (url.endsWith('/api/v1/security/context')) {
         return { ok: true, json: async () => ({ userId: 'graduate-user', memberships: [], studentRelationships: [],
-          formerStudentRelationships: [{ institutionId: 'institution-1', state: 'GRADUATED', effectiveFrom: '2022-07-01T00:00:00.000Z', effectiveTo: '2026-05-30T18:30:00.000Z' }] }) };
+          formerStudentRelationships: [{ institutionId: 'institution-1', state: 'GRADUATED', effectiveFrom: '2022-07-01T00:00:00.000Z', effectiveTo: '2026-05-31T06:30:00.000Z' }] }) };
       }
       if (url.endsWith('/api/v1/students/me')) {
         return { ok: true, json: async () => ({ student: { userId: 'graduate-user', verifiedEmail: 'graduate@example.test', fullName: 'Asha Rao', institutionStudentId: 'CSE-001',
           institutionId: 'institution-1', institutionName: 'Local College', formerStudent: true, academicStatus: 'GRADUATED',
-          relationship: { id: 'rel-1', state: 'GRADUATED', effectiveFrom: '2022-07-01T00:00:00.000Z', effectiveTo: '2026-05-30T18:30:00.000Z' } } }) };
+          relationship: { id: 'rel-1', state: 'GRADUATED', effectiveFrom: '2022-07-01T00:00:00.000Z', effectiveTo: '2026-05-31T06:30:00.000Z' } } }) };
       }
       return { ok: false, status: 404, headers: { get: () => null }, json: async () => ({}) };
     });
